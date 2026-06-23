@@ -104,6 +104,29 @@ const METRIC_LABEL: Record<ViewMode, string> = {
   margen: "Margen %",
 };
 
+// Totales same-period del AÑO EN CURSO (mismos números que la card YTD del
+// dashboard: ventas_dashboard_prev_same_period, día-prorrateado). Se usan SOLO
+// para el Δ del Total de la fila del año en curso → comparación justa de período
+// igual (ene–<mes> vs ene–<mes> del año previo), no año-completo.
+export interface CurrentYtdSamePeriod {
+  year: number;
+  periodLabel: string;   // "ene–jun"
+  ventas: number; ventasPrev: number;
+  utilidad: number; utilidadPrev: number;
+  margen: number; margenPrev: number;
+}
+
+// Δ relativo same-period del Total del año en curso, según el modo activo.
+function samePeriodTotalDelta(s: CurrentYtdSamePeriod, mode: ViewMode): number | null {
+  const [c, p] = mode === "margen"
+    ? [s.margen, s.margenPrev]
+    : mode === "utilidad"
+      ? [s.utilidad, s.utilidadPrev]
+      : [s.ventas, s.ventasPrev];
+  if (c == null || p == null || p <= 0) return null;
+  return (c - p) / p;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Card centrada (modal) con el histórico mes × año de UNA empresa, en orientación
 // HORIZONTAL: filas = años, columnas = los 12 meses (misma orientación que la
@@ -113,7 +136,7 @@ const METRIC_LABEL: Record<ViewMode, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 export function EmpresaMesAnioPanel({
   open, onClose, nombre, empresa, years, currentYear, error,
-  viewMode, onViewMode,
+  viewMode, onViewMode, currentYtd,
 }: {
   open: boolean;
   onClose: () => void;
@@ -126,6 +149,9 @@ export function EmpresaMesAnioPanel({
   error: string | null;
   viewMode: ViewMode;
   onViewMode: (m: ViewMode) => void;
+  /** Totales same-period del año en curso para el Δ justo del Total. null cuando
+   *  el año visible no es el año en curso (años cerrados usan año-vs-año). */
+  currentYtd?: CurrentYtdSamePeriod | null;
 }) {
   // Monta-luego-anima (entrada) y anima-luego-desmonta (salida): scale+fade en
   // desktop, slide desde abajo en mobile. Sin pop brusco.
@@ -159,7 +185,7 @@ export function EmpresaMesAnioPanel({
   if (!render) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`Histórico mes × año de ${nombre}`}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-8" role="dialog" aria-modal="true" aria-label={`Histórico mes × año de ${nombre}`}>
       {/* Backdrop oscuro + blur sutil. */}
       <div
         onClick={onClose}
@@ -175,7 +201,7 @@ export function EmpresaMesAnioPanel({
         className={cn(
           "relative flex w-full flex-col border-stone-200 bg-white shadow-2xl",
           "h-[92vh] rounded-t-2xl border-t",
-          "sm:h-auto sm:max-h-[88vh] sm:max-w-[940px] sm:rounded-2xl sm:border",
+          "sm:h-auto sm:max-h-[90vh] sm:max-w-[1240px] sm:rounded-2xl sm:border",
           "transition-all duration-300 ease-out motion-reduce:transition-none",
           shown
             ? "translate-y-0 opacity-100 sm:scale-100"
@@ -183,7 +209,7 @@ export function EmpresaMesAnioPanel({
         )}
       >
         {/* Header: eyebrow + nombre (izq) · toggle métrica + X (der). */}
-        <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-7 sm:pt-6">
+        <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-9 sm:pt-7">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400">Histórico mes × año</p>
             <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-stone-950">{nombre}</h2>
@@ -235,13 +261,13 @@ export function EmpresaMesAnioPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-5 sm:px-7 sm:pb-7">
+        <div className="flex-1 overflow-y-auto px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-5 sm:px-9 sm:pb-9 sm:pt-7">
           {error ? (
             <p className="py-6 text-sm text-stone-500">No se pudo cargar el histórico: {error}</p>
           ) : !empresa || currentYear == null ? (
             <PanelSkeleton />
           ) : (
-            <MatrizHorizontal empresa={empresa} years={years} currentYear={currentYear} viewMode={viewMode} />
+            <MatrizHorizontal empresa={empresa} years={years} currentYear={currentYear} viewMode={viewMode} currentYtd={currentYtd ?? null} />
           )}
         </div>
       </div>
@@ -262,12 +288,13 @@ function PanelSkeleton() {
 // columnas reparten el ancho parejo y nunca se desalinean. Bajo cada número, el
 // Δ % vs el mismo mes (o el total) del año anterior.
 function MatrizHorizontal({
-  empresa, years, currentYear, viewMode,
+  empresa, years, currentYear, viewMode, currentYtd,
 }: {
   empresa: EmpresaMesAnio;
   years: number[];
   currentYear: number;
   viewMode: ViewMode;
+  currentYtd: CurrentYtdSamePeriod | null;
 }) {
   return (
     <div className="-mx-1 overflow-x-auto sm:mx-0 sm:overflow-x-visible">
@@ -277,15 +304,15 @@ function MatrizHorizontal({
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 bg-white pb-2.5 pl-1 pr-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
+            <th className="sticky left-0 bg-white pb-3 pl-1 pr-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
               Año
             </th>
             {MONTHS.map((m) => (
-              <th key={m} className="pb-2.5 pl-1 pr-1.5 text-right text-[11px] font-medium uppercase tracking-wide text-stone-400">
+              <th key={m} className="pb-3 pl-1 pr-1.5 text-right text-[11px] font-medium uppercase tracking-wide text-stone-400">
                 {m}
               </th>
             ))}
-            <th className="border-l border-stone-200 pb-2.5 pl-2 pr-1 text-right text-[11px] font-semibold uppercase tracking-wide text-stone-600">
+            <th className="border-l border-stone-200 pb-3 pl-2 pr-1 text-right text-[11px] font-semibold uppercase tracking-wide text-stone-600">
               Total
             </th>
           </tr>
@@ -293,12 +320,16 @@ function MatrizHorizontal({
         <tbody className="divide-y divide-stone-100">
           {years.map((y) => {
             const isCurrent = y === currentYear;
+            // Δ del Total: año en curso → same-period (justo); años cerrados → año vs año.
+            const totalOverride = isCurrent && currentYtd && currentYtd.year === y
+              ? { ratio: samePeriodTotalDelta(currentYtd, viewMode), label: currentYtd.periodLabel }
+              : null;
             return (
               <tr key={y} className={cn(isCurrent && "bg-stone-50")}>
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 py-2.5 pl-1 pr-2 text-left align-top text-sm tabular-nums",
+                    "sticky left-0 py-3.5 pl-1 pr-2 text-left align-top text-sm tabular-nums",
                     isCurrent ? "bg-stone-50 font-semibold text-stone-950" : "bg-white font-medium text-stone-600",
                   )}
                 >
@@ -319,6 +350,7 @@ function MatrizHorizontal({
                   mode={viewMode}
                   isCurrent={isCurrent}
                   isTotal
+                  deltaOverride={totalOverride}
                 />
               </tr>
             );
@@ -331,22 +363,26 @@ function MatrizHorizontal({
 
 // Una celda: número (arriba) + Δ % vs año anterior (abajo, pequeño y discreto).
 // Sin Δ cuando no hay base previa. Meses sin dato → "—" sin Δ.
+// deltaOverride: cuando se pasa, su ratio sustituye al Δ por defecto (lo usa el
+// Total del año en curso para comparar mismo-período, no año-completo) y rotula
+// el período parcial ("ene–jun").
 function MatrizCell({
-  cur, prev, mode, isCurrent, isTotal = false,
+  cur, prev, mode, isCurrent, isTotal = false, deltaOverride = null,
 }: {
   cur: Vals | null;
   prev: Vals | null;
   mode: ViewMode;
   isCurrent: boolean;
   isTotal?: boolean;
+  deltaOverride?: { ratio: number | null; label: string } | null;
 }) {
   const v = metricValue(cur, mode);
-  const d = relDelta(cur, prev, mode);
-  const fmt = d == null ? null : formatDeltaRatio(d, "pct");
+  const ratio = deltaOverride ? deltaOverride.ratio : relDelta(cur, prev, mode);
+  const fmt = ratio == null ? null : formatDeltaRatio(ratio, "pct");
   return (
     <td
       className={cn(
-        "py-2.5 pl-1 pr-1.5 text-right align-top font-mono text-xs tabular-nums",
+        "py-3.5 pl-1 pr-1.5 text-right align-top font-mono text-xs tabular-nums",
         isTotal && "border-l border-stone-200 pl-2",
         v == null ? "text-stone-300" : isCurrent ? "font-medium text-stone-950" : isTotal ? "font-medium text-stone-800" : "font-normal text-stone-700",
       )}
@@ -356,6 +392,9 @@ function MatrizCell({
         <div className={cn("mt-0.5 text-[10px] font-normal leading-none", deltaTone[fmt.tone] ?? "text-stone-400")}>
           {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
         </div>
+      )}
+      {deltaOverride && (
+        <div className="mt-0.5 text-[9px] font-normal uppercase tracking-wide text-stone-400">{deltaOverride.label}</div>
       )}
     </td>
   );

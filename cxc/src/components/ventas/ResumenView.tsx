@@ -18,7 +18,7 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
-import { EmpresaMesAnioPanel, useResumenMesAnio } from "./ResumenMesAnio";
+import { EmpresaMesAnioPanel, useResumenMesAnio, type CurrentYtdSamePeriod } from "./ResumenMesAnio";
 
 // Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
 // proyección. Inline para evitar importar server-only de empresa-mapping.
@@ -152,7 +152,25 @@ export function ResumenView({
   // Cambiar el toggle de métrica no recarga (se deriva en cliente).
   const { data: mesAnioData, error: mesAnioError } = useResumenMesAnio(panelEmpresaId !== null);
   const panelEmpresa = panelEmpresaId ? mesAnioData?.empresas.find((e) => e.id === panelEmpresaId) ?? null : null;
-  const panelNombre = data.empresas.find((e) => e.empresa.id === panelEmpresaId)?.empresa.nombre ?? panelEmpresa?.nombre ?? "";
+  const panelResumenEmpresa = panelEmpresaId ? data.empresas.find((e) => e.empresa.id === panelEmpresaId) ?? null : null;
+  const panelNombre = panelResumenEmpresa?.empresa.nombre ?? panelEmpresa?.nombre ?? "";
+  // Δ justo del Total del año en curso: same-period (día-prorrateado) reusando los
+  // mismos números que la card YTD del dashboard (ventas2025 ya viene recortado al
+  // mismo período). Solo cuando el año visible es el año en curso (no cerrado);
+  // los años cerrados conservan su Δ año-vs-año en la propia card.
+  const panelCurrentYtd: CurrentYtdSamePeriod | null =
+    !isClosedYear && panelResumenEmpresa && mesAnioData?.currentYear === selectedYear
+      ? {
+          year: selectedYear,
+          periodLabel: `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]}`.toLowerCase(),
+          ventas:       sumYtd(panelResumenEmpresa.ventas2026),
+          ventasPrev:   sumSlice(panelResumenEmpresa.ventas2025, data.mesActual),
+          utilidad:     sumYtd(panelResumenEmpresa.utilidad2026),
+          utilidadPrev: sumSlice(panelResumenEmpresa.utilidad2025, data.mesActual),
+          margen:       panelResumenEmpresa.margenPct,
+          margenPrev:   panelResumenEmpresa.margenPctPrev,
+        }
+      : null;
   const k = data.kpis;
   const prevYear = selectedYear - 1;
   const isUtil = viewMode === "utilidad";
@@ -512,6 +530,7 @@ export function ResumenView({
         error={mesAnioError}
         viewMode={viewMode}
         onViewMode={onToggleMode}
+        currentYtd={panelCurrentYtd}
       />
     </div>
   );
@@ -1322,4 +1341,10 @@ function buildRow(
 
 function sumYtd(arr: (number | null)[]): number {
   return arr.reduce<number>((s, v) => s + (v ?? 0), 0);
+}
+
+// Suma los primeros n meses (mismo período Ene..mesActual). El prev YTD same-period
+// del módulo se calcula así (ver queries.ts → sumSlice/upTo).
+function sumSlice(arr: (number | null)[], n: number): number {
+  return arr.slice(0, n).reduce<number>((s, v) => s + (v ?? 0), 0);
 }
