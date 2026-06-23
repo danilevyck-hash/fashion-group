@@ -17,6 +17,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
+import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 
 // Geist Mono via el package oficial de Vercel (`geist`). Next 14.2.3 todavía
@@ -65,7 +66,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <OfflineBanner />
             <ContextMenuProviderWrapper>
               <Sidebar />
-              <SidebarAwareMain>{children}</SidebarAwareMain>
+              <SidebarAwareMain>
+                <PageTransition>{children}</PageTransition>
+              </SidebarAwareMain>
             </ContextMenuProviderWrapper>
             <InstallPrompt />
             {/* Suspense: UpdatePrompt usa useSearchParams() (detecta navegación
