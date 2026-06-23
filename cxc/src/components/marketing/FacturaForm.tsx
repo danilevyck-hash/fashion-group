@@ -189,7 +189,7 @@ export function FacturaForm({
     Boolean(initial?.tiene_importacion),
   );
   const [estadoPago, setEstadoPago] = useState<EstadoPagoFactura>(
-    initial?.estado_pago === "pagado" ? "pagado" : "pendiente",
+    initial?.estado_pago === "pagado" ? "pagado" : "creado",
   );
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
@@ -802,15 +802,15 @@ export function FacturaForm({
               <button
                 type="button"
                 role="radio"
-                aria-checked={estadoPago === "pendiente"}
-                onClick={() => setEstadoPago("pendiente")}
+                aria-checked={estadoPago === "creado"}
+                onClick={() => setEstadoPago("creado")}
                 className={`flex-1 px-3 py-2 text-sm transition ${
-                  estadoPago === "pendiente"
-                    ? "bg-amber-500 text-white"
+                  estadoPago === "creado"
+                    ? "bg-gray-600 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
-                Pendiente
+                Creado
               </button>
               <button
                 type="button"
@@ -819,7 +819,7 @@ export function FacturaForm({
                 onClick={() => setEstadoPago("pagado")}
                 className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
                   estadoPago === "pagado"
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-green-600 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >

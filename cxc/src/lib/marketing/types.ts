@@ -25,7 +25,7 @@ export type EstadoProyecto = "abierto" | "cerrado";
 // Estado de pago a nivel FACTURA (registro de gastos). Reemplaza en la UI al
 // workflow de cobranza del proyecto (abierto/enviado/cobrado), que se conserva
 // en DB pero ya no se muestra ni se opera.
-export type EstadoPagoFactura = "pendiente" | "pagado";
+export type EstadoPagoFactura = "creado" | "pagado";
 
 // Tipo de marca:
 //   'externa' — hay contraparte (Tommy, Calvin, Reebok) con quien compartir 50/50.
