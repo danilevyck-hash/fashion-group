@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
-import { MONTHS, fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
-import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
+import { MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -27,8 +26,8 @@ export interface MesAnioData {
   empresas: EmpresaMesAnio[];
 }
 
-// Fetcher puro del resumen mes×año (toda la data en una respuesta; abrir el
-// panel de otra empresa NO refetchea — filtra en cliente).
+// Fetcher puro del resumen mes×año (toda la data en una respuesta; abrir la card
+// de otra empresa NO refetchea — filtra en cliente).
 async function fetchMesAnio(): Promise<MesAnioData> {
   const res = await fetch("/api/ventas/mes-anio", { cache: "no-store" });
   if (!res.ok) {
@@ -39,9 +38,9 @@ async function fetchMesAnio(): Promise<MesAnioData> {
 }
 
 // Carga (cacheada vía SWR) el resumen mes×año. enabled evita el fetch hasta que
-// el usuario abre el panel de una empresa (clave null → SWR no dispara). La
-// caché vive a nivel app (SWRProvider) → reabrir pinta al instante. Compartido
-// por la vista desktop y la mobile.
+// el usuario abre la card de una empresa (clave null → SWR no dispara). La caché
+// vive a nivel app (SWRProvider) → reabrir pinta al instante. Compartido por la
+// vista desktop y la mobile.
 export function useResumenMesAnio(enabled: boolean): { data: MesAnioData | null; error: string | null } {
   const { data, error } = useSWR<MesAnioData>(
     enabled ? "ventas-resumen-mes-anio" : null,
@@ -56,7 +55,6 @@ export function useResumenMesAnio(enabled: boolean): { data: MesAnioData | null;
 
 // Mismo guard que el resto del módulo: bajo $100 de ventas el margen no informa.
 const MARGEN_VENTAS_MIN = 100;
-const zeroVals = (): Vals => ({ ventas: 0, costo: 0, utilidad: 0 });
 
 function metricValue(v: Vals | null, mode: ViewMode): number | null {
   if (!v) return null;
@@ -64,45 +62,26 @@ function metricValue(v: Vals | null, mode: ViewMode): number | null {
   return mode === "utilidad" ? v.utilidad : v.ventas;
 }
 
-// Valor de celda en la matriz (compacto: $1.2M / $345K / 42.3%).
-function renderCompact(v: number | null, mode: ViewMode): string {
+// Celda: número limpio, sin $ ni Δ. Ventas/utilidad → entero con separador de
+// miles; margen → porcentaje 1 decimal. Sin data → "—".
+function renderNum(v: number | null, mode: ViewMode): string {
   if (v == null) return "—";
   if (mode === "margen") return (v * 100).toFixed(1) + "%";
-  return fmtMoneyCompact(v);
+  return Math.round(v).toLocaleString("en-US");
 }
-
-// Δ de la celda: pct para ventas/utilidad, pts para margen. prev null → sin Δ.
-function cellDelta(cur: Vals, prev: Vals | null, mode: ViewMode): DeltaFormat {
-  if (!prev) return formatDeltaRatio(null);
-  if (mode === "margen") {
-    const cm = metricValue(cur, "margen");
-    const pm = prev.ventas < MARGEN_VENTAS_MIN ? null : prev.utilidad / prev.ventas;
-    if (cm == null || pm == null) return formatDeltaRatio(null);
-    return formatDeltaRatio(cm - pm, "pts");
-  }
-  const cv = mode === "utilidad" ? cur.utilidad : cur.ventas;
-  const pv = mode === "utilidad" ? prev.utilidad : prev.ventas;
-  if (pv <= 0) return formatDeltaRatio(null);
-  return formatDeltaRatio((cv - pv) / pv, "pct");
-}
-
-// Δ discreto — color sutil, nunca gritón.
-const deltaTone: Record<string, string> = {
-  emerald: "text-emerald-600",
-  orange: "text-red-500",
-  stone: "text-stone-400",
-};
 
 const METRIC_LABEL: Record<ViewMode, string> = {
   ventas: "Ventas",
   utilidad: "Utilidad",
-  margen: "Margen",
+  margen: "Margen %",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Panel dedicado de una empresa: hero stat (YTD año en curso + Δ vs año previo
-// mismo período) → matriz mes × año ligera. Drawer lateral en desktop, sheet
-// full-screen en mobile. Reusa la data del endpoint /api/ventas/mes-anio.
+// Card centrada (modal) con el histórico mes × año de UNA empresa, en orientación
+// HORIZONTAL: filas = años, columnas = los 12 meses (misma orientación que la
+// tabla principal de Ventas). Tabla limpia, solo números (sin Δ, sin $). Reusa
+// la data del endpoint /api/ventas/mes-anio. Centrada en desktop, full-screen
+// sheet en mobile.
 // ─────────────────────────────────────────────────────────────────────────────
 export function EmpresaMesAnioPanel({
   open, onClose, nombre, empresa, years, currentYear, error,
@@ -120,19 +99,23 @@ export function EmpresaMesAnioPanel({
   viewMode: ViewMode;
   onViewMode: (m: ViewMode) => void;
 }) {
-  // Monta-luego-anima (entrada) y anima-luego-desmonta (salida) → slide suave
-  // en ambos sentidos, sin pop brusco.
+  // Monta-luego-anima (entrada) y anima-luego-desmonta (salida): scale+fade en
+  // desktop, slide desde abajo en mobile. Sin pop brusco.
   const [render, setRender] = useState(open);
   const [shown, setShown] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (open) {
       setRender(true);
-      const id = requestAnimationFrame(() => setShown(true));
+      const id = requestAnimationFrame(() => {
+        setShown(true);
+        closeRef.current?.focus();
+      });
       return () => cancelAnimationFrame(id);
     }
     setShown(false);
-    const t = setTimeout(() => setRender(false), 300);
+    const t = setTimeout(() => setRender(false), 280);
     return () => clearTimeout(t);
   }, [open]);
 
@@ -148,37 +131,65 @@ export function EmpresaMesAnioPanel({
   if (!render) return null;
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`Histórico mes × año de ${nombre}`}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`Histórico mes × año de ${nombre}`}>
+      {/* Backdrop oscuro + blur sutil. */}
       <div
         onClick={onClose}
         aria-hidden="true"
-        className={cn("absolute inset-0 bg-black/30 transition-opacity duration-300", shown ? "opacity-100" : "opacity-0")}
+        className={cn(
+          "absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none",
+          shown ? "opacity-100" : "opacity-0",
+        )}
       />
-      {/* Panel: sheet desde abajo (mobile) · drawer desde la derecha (≥sm). */}
+      {/* Card: full-screen sheet (mobile, sube desde abajo) · centrada mediana
+          (≥sm, entra con scale+fade). */}
       <div
         className={cn(
-          "absolute flex flex-col bg-white shadow-2xl transition-transform duration-300 ease-out",
-          "inset-0 sm:left-auto sm:right-0 sm:w-[460px] sm:max-w-[92vw]",
-          shown ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-y-0 sm:translate-x-full",
+          "relative flex w-full flex-col border-stone-200 bg-white shadow-2xl",
+          "h-[92vh] rounded-t-2xl border-t",
+          "sm:h-auto sm:max-h-[88vh] sm:max-w-[940px] sm:rounded-2xl sm:border",
+          "transition-all duration-300 ease-out motion-reduce:transition-none",
+          shown
+            ? "translate-y-0 opacity-100 sm:scale-100"
+            : "translate-y-full opacity-0 sm:translate-y-0 sm:scale-[0.96]",
         )}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))]">
+        {/* Header: eyebrow + nombre (izq) · toggle métrica + X (der). */}
+        <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-7 sm:pt-6">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400">Histórico mes × año</p>
-            <h2 className="mt-0.5 truncate text-xl font-semibold tracking-tight text-stone-950">{nombre}</h2>
+            <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-stone-950">{nombre}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="-mr-2 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden rounded-full bg-stone-100 p-0.5 text-xs sm:inline-flex">
+              {(["ventas", "utilidad", "margen"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => onViewMode(m)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 font-medium transition",
+                    viewMode === m ? "bg-white text-stone-950 shadow-sm" : "text-stone-500 hover:text-stone-700",
+                  )}
+                >
+                  {METRIC_LABEL[m]}
+                </button>
+              ))}
+            </div>
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="grid h-9 w-9 place-items-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-5">
-          {/* Toggle de métrica — comparte estado con la tabla principal. */}
+        {/* Toggle métrica en mobile (full-width bajo el header). */}
+        <div className="border-b border-stone-100 px-6 py-3 sm:hidden">
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
             {(["ventas", "utilidad", "margen"] as const).map((m) => (
               <button
@@ -186,21 +197,23 @@ export function EmpresaMesAnioPanel({
                 type="button"
                 onClick={() => onViewMode(m)}
                 className={cn(
-                  "rounded-full px-3.5 py-1.5 font-medium transition",
-                  viewMode === m ? "bg-white text-stone-950 shadow-sm" : "text-stone-500 hover:text-stone-700",
+                  "rounded-full px-3 py-1.5 font-medium transition",
+                  viewMode === m ? "bg-white text-stone-950 shadow-sm" : "text-stone-500",
                 )}
               >
-                {m === "margen" ? "Margen %" : METRIC_LABEL[m]}
+                {METRIC_LABEL[m]}
               </button>
             ))}
           </div>
+        </div>
 
+        <div className="flex-1 overflow-y-auto px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-5 sm:px-7 sm:pb-7">
           {error ? (
-            <p className="mt-6 text-sm text-stone-500">No se pudo cargar el histórico: {error}</p>
+            <p className="py-6 text-sm text-stone-500">No se pudo cargar el histórico: {error}</p>
           ) : !empresa || currentYear == null ? (
             <PanelSkeleton />
           ) : (
-            <PanelBody empresa={empresa} years={years} currentYear={currentYear} viewMode={viewMode} />
+            <MatrizHorizontal empresa={empresa} years={years} currentYear={currentYear} viewMode={viewMode} />
           )}
         </div>
       </div>
@@ -210,20 +223,16 @@ export function EmpresaMesAnioPanel({
 
 function PanelSkeleton() {
   return (
-    <div className="mt-6 animate-pulse space-y-6">
-      <div className="space-y-2">
-        <div className="h-3 w-24 rounded bg-stone-100" />
-        <div className="h-10 w-48 rounded bg-stone-100" />
-        <div className="h-3 w-32 rounded bg-stone-100" />
-      </div>
-      <div className="space-y-3">
-        {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-5 rounded bg-stone-100" />)}
-      </div>
+    <div className="animate-pulse space-y-3 py-2">
+      <div className="h-4 w-full rounded bg-stone-100" />
+      {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-7 rounded bg-stone-100" />)}
     </div>
   );
 }
 
-function PanelBody({
+// Tabla horizontal: años en filas, meses en columnas. table-fixed → las 12
+// columnas reparten el ancho parejo y nunca se desalinean. Solo números.
+function MatrizHorizontal({
   empresa, years, currentYear, viewMode,
 }: {
   empresa: EmpresaMesAnio;
@@ -231,116 +240,58 @@ function PanelBody({
   currentYear: number;
   viewMode: ViewMode;
 }) {
-  const prevYear = currentYear - 1;
-
-  // Hero: YTD del año en curso vs el año previo en el MISMO conjunto de meses
-  // (mismo período) — todo derivado de la propia data del endpoint.
-  const cur = zeroVals();
-  const prevSame = zeroVals();
-  let hasPrev = false;
-  for (let mes = 1; mes <= 12; mes++) {
-    const cy = empresa.byMonth[mes]?.[currentYear];
-    if (!cy) continue;
-    cur.ventas += cy.ventas; cur.costo += cy.costo; cur.utilidad += cy.utilidad;
-    const py = empresa.byMonth[mes]?.[prevYear];
-    if (py) {
-      hasPrev = true;
-      prevSame.ventas += py.ventas; prevSame.costo += py.costo; prevSame.utilidad += py.utilidad;
-    }
-  }
-  const heroVal = metricValue(cur, viewMode);
-  const heroStr = heroVal == null
-    ? "—"
-    : viewMode === "margen" ? (heroVal * 100).toFixed(1) + "%" : fmtMoney(heroVal);
-  const heroDelta = hasPrev ? cellDelta(cur, prevSame, viewMode) : formatDeltaRatio(null);
-  const heroDeltaShown = heroDelta.arrow !== null || heroDelta.displayValue !== "—";
-
   return (
-    <div className="mt-6 space-y-7">
-      {/* Stat hero — la pieza con peso. */}
-      <div>
-        <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400">
-          {METRIC_LABEL[viewMode]} · {currentYear}
-        </p>
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-mono text-[40px] font-medium leading-none tracking-tight tabular-nums text-stone-950">
-            {heroStr}
-          </span>
-          {heroDeltaShown && (
-            <span className={cn("font-mono text-sm font-medium tabular-nums", deltaTone[heroDelta.tone] ?? "text-stone-400")}>
-              {heroDelta.arrow ? `${heroDelta.arrow} ` : ""}{heroDelta.displayValue}
-            </span>
-          )}
-        </div>
-        <p className="mt-1.5 text-xs text-stone-500">
-          {hasPrev ? `vs ${prevYear} · mismo período` : `Sin comparativo ${prevYear}`}
-        </p>
-      </div>
-
-      {/* Matriz ligera mes × año — sin grid pesado, solo aire + separadores finos. */}
-      <table className="w-full">
+    <div className="-mx-1 overflow-x-auto sm:mx-0 sm:overflow-x-visible">
+      <table className="w-full min-w-[660px] table-fixed border-collapse sm:min-w-0">
+        <colgroup>
+          <col className="w-[58px]" />
+        </colgroup>
         <thead>
           <tr>
-            <th className="pb-2.5 text-left text-[10px] font-medium uppercase tracking-wider text-stone-400">Mes</th>
-            {years.map((y) => (
-              <th key={y} className="pb-2.5 pl-3 text-right text-[10px] font-medium uppercase tracking-wider text-stone-400">
-                <div className="text-stone-500">{y}</div>
-                {y === currentYear ? <div className="text-[9px] font-normal normal-case tracking-normal text-stone-300">al día</div> : null}
+            <th className="sticky left-0 bg-white pb-2.5 pl-1 pr-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
+              Año
+            </th>
+            {MONTHS.map((m) => (
+              <th key={m} className="pb-2.5 pl-1 pr-1.5 text-right text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                {m}
               </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-100">
-          {MONTHS.map((label, mi) => {
-            const mes = mi + 1;
-            const rowYears = empresa.byMonth[mes] ?? {};
+          {years.map((y) => {
+            const isCurrent = y === currentYear;
             return (
-              <tr key={mes}>
-                <td className="whitespace-nowrap py-2.5 pr-3 text-left align-top text-xs font-medium text-stone-500">{label}</td>
-                {years.map((y) => <PanelCell key={y} cur={rowYears[y] ?? null} mode={viewMode} />)}
+              <tr key={y} className={cn(isCurrent && "bg-stone-50")}>
+                <th
+                  scope="row"
+                  className={cn(
+                    "sticky left-0 py-2.5 pl-1 pr-2 text-left text-sm tabular-nums",
+                    isCurrent ? "bg-stone-50 font-semibold text-stone-950" : "bg-white font-medium text-stone-600",
+                  )}
+                >
+                  {y}
+                </th>
+                {MONTHS.map((_, mi) => {
+                  const cur = empresa.byMonth[mi + 1]?.[y] ?? null;
+                  const v = metricValue(cur, viewMode);
+                  return (
+                    <td
+                      key={mi}
+                      className={cn(
+                        "py-2.5 pl-1 pr-1.5 text-right font-mono text-xs tabular-nums",
+                        v == null ? "text-stone-300" : isCurrent ? "font-medium text-stone-950" : "font-normal text-stone-700",
+                      )}
+                    >
+                      {renderNum(v, viewMode)}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
         </tbody>
-        <tfoot>
-          <tr className="border-t border-stone-200">
-            <td className="pt-3 text-left text-[10px] font-semibold uppercase tracking-widest text-stone-500">Total</td>
-            {years.map((y) => {
-              const v = metricValue(empresa.totalByYear[y] ?? null, viewMode);
-              return (
-                <td key={y} className="pt-3 pl-3 text-right font-mono text-sm font-medium tabular-nums text-stone-900">
-                  {renderCompact(v, viewMode)}
-                </td>
-              );
-            })}
-          </tr>
-        </tfoot>
       </table>
-
-      <p className="text-[11px] leading-relaxed text-stone-400">
-        Cada mes se compara con el mismo mes del año anterior. Los meses sin datos quedan en “—”; el mes en curso va parcial y no calcula Δ.
-      </p>
     </div>
-  );
-}
-
-// Una celda mes-año: valor compacto + Δ pequeño y sutil debajo. Sin Δ en celdas
-// sin comparativo o vacías. Alineación a la derecha, tabular.
-function PanelCell({ cur, mode }: { cur: Cell | null; mode: ViewMode }) {
-  const v = metricValue(cur, mode);
-  if (v == null) {
-    return <td className="py-2.5 pl-3 text-right align-top font-mono text-sm tabular-nums text-stone-300">—</td>;
-  }
-  const d = cellDelta(cur as Vals, cur?.prev ?? null, mode);
-  const show = d.arrow !== null || d.displayValue !== "—";
-  return (
-    <td className="py-2.5 pl-3 text-right align-top">
-      <div className="font-mono text-sm tabular-nums text-stone-900">{renderCompact(v, mode)}</div>
-      {show && (
-        <div className={cn("mt-0.5 font-mono text-[10px] tabular-nums", deltaTone[d.tone] ?? "text-stone-400")}>
-          {d.arrow ? `${d.arrow} ` : ""}{d.displayValue}
-        </div>
-      )}
-    </td>
   );
 }
