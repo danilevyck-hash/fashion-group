@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { MONTHS } from "@/lib/ventas/format";
+import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -62,13 +63,40 @@ function metricValue(v: Vals | null, mode: ViewMode): number | null {
   return mode === "utilidad" ? v.utilidad : v.ventas;
 }
 
-// Celda: número limpio, sin $ ni Δ. Ventas/utilidad → entero con separador de
-// miles; margen → porcentaje 1 decimal. Sin data → "—".
-function renderNum(v: number | null, mode: ViewMode): string {
+// Monto abreviado, sin $: miles → "937k" (sin decimales), millones → "1.2M"
+// (1 decimal). Mantiene angostas las 13 columnas + Δ.
+function abbrevAmount(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sign}${Math.round(abs / 1_000)}k`;
+  return `${sign}${Math.round(abs)}`;
+}
+
+// Celda: número limpio, sin $ ni Δ. Ventas/utilidad → abreviado; margen →
+// porcentaje 1 decimal. Sin data → "—".
+function renderMetric(v: number | null, mode: ViewMode): string {
   if (v == null) return "—";
   if (mode === "margen") return (v * 100).toFixed(1) + "%";
-  return Math.round(v).toLocaleString("en-US");
+  return abbrevAmount(v);
 }
+
+// Δ relativo (ratio) del valor actual vs el del año anterior, en los 3 modos.
+// En Margen es el cambio relativo % entre los dos márgenes — NO puntos. null
+// cuando no hay base previa comparable (sin dato previo o previo ≤ 0).
+function relDelta(cur: Vals | null, prev: Vals | null, mode: ViewMode): number | null {
+  const c = metricValue(cur, mode);
+  const p = metricValue(prev, mode);
+  if (c == null || p == null || p <= 0) return null;
+  return (c - p) / p;
+}
+
+// tone → clase (mismo tratamiento que la tabla principal de Ventas).
+const deltaTone: Record<string, string> = {
+  emerald: "text-emerald-600",
+  orange: "text-red-600",
+  stone: "text-stone-400",
+};
 
 const METRIC_LABEL: Record<ViewMode, string> = {
   ventas: "Ventas",
@@ -230,8 +258,9 @@ function PanelSkeleton() {
   );
 }
 
-// Tabla horizontal: años en filas, meses en columnas. table-fixed → las 12
-// columnas reparten el ancho parejo y nunca se desalinean. Solo números.
+// Tabla horizontal: años en filas, meses en columnas + Total. table-fixed → las
+// columnas reparten el ancho parejo y nunca se desalinean. Bajo cada número, el
+// Δ % vs el mismo mes (o el total) del año anterior.
 function MatrizHorizontal({
   empresa, years, currentYear, viewMode,
 }: {
@@ -242,9 +271,9 @@ function MatrizHorizontal({
 }) {
   return (
     <div className="-mx-1 overflow-x-auto sm:mx-0 sm:overflow-x-visible">
-      <table className="w-full min-w-[660px] table-fixed border-collapse sm:min-w-0">
+      <table className="w-full min-w-[760px] table-fixed border-collapse sm:min-w-0">
         <colgroup>
-          <col className="w-[58px]" />
+          <col className="w-[52px]" />
         </colgroup>
         <thead>
           <tr>
@@ -256,6 +285,9 @@ function MatrizHorizontal({
                 {m}
               </th>
             ))}
+            <th className="border-l border-stone-200 pb-2.5 pl-2 pr-1 text-right text-[11px] font-semibold uppercase tracking-wide text-stone-600">
+              Total
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-100">
@@ -266,32 +298,65 @@ function MatrizHorizontal({
                 <th
                   scope="row"
                   className={cn(
-                    "sticky left-0 py-2.5 pl-1 pr-2 text-left text-sm tabular-nums",
+                    "sticky left-0 py-2.5 pl-1 pr-2 text-left align-top text-sm tabular-nums",
                     isCurrent ? "bg-stone-50 font-semibold text-stone-950" : "bg-white font-medium text-stone-600",
                   )}
                 >
                   {y}
                 </th>
-                {MONTHS.map((_, mi) => {
-                  const cur = empresa.byMonth[mi + 1]?.[y] ?? null;
-                  const v = metricValue(cur, viewMode);
-                  return (
-                    <td
-                      key={mi}
-                      className={cn(
-                        "py-2.5 pl-1 pr-1.5 text-right font-mono text-xs tabular-nums",
-                        v == null ? "text-stone-300" : isCurrent ? "font-medium text-stone-950" : "font-normal text-stone-700",
-                      )}
-                    >
-                      {renderNum(v, viewMode)}
-                    </td>
-                  );
-                })}
+                {MONTHS.map((_, mi) => (
+                  <MatrizCell
+                    key={mi}
+                    cur={empresa.byMonth[mi + 1]?.[y] ?? null}
+                    prev={empresa.byMonth[mi + 1]?.[y - 1] ?? null}
+                    mode={viewMode}
+                    isCurrent={isCurrent}
+                  />
+                ))}
+                <MatrizCell
+                  cur={empresa.totalByYear[y] ?? null}
+                  prev={empresa.totalByYear[y - 1] ?? null}
+                  mode={viewMode}
+                  isCurrent={isCurrent}
+                  isTotal
+                />
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Una celda: número (arriba) + Δ % vs año anterior (abajo, pequeño y discreto).
+// Sin Δ cuando no hay base previa. Meses sin dato → "—" sin Δ.
+function MatrizCell({
+  cur, prev, mode, isCurrent, isTotal = false,
+}: {
+  cur: Vals | null;
+  prev: Vals | null;
+  mode: ViewMode;
+  isCurrent: boolean;
+  isTotal?: boolean;
+}) {
+  const v = metricValue(cur, mode);
+  const d = relDelta(cur, prev, mode);
+  const fmt = d == null ? null : formatDeltaRatio(d, "pct");
+  return (
+    <td
+      className={cn(
+        "py-2.5 pl-1 pr-1.5 text-right align-top font-mono text-xs tabular-nums",
+        isTotal && "border-l border-stone-200 pl-2",
+        v == null ? "text-stone-300" : isCurrent ? "font-medium text-stone-950" : isTotal ? "font-medium text-stone-800" : "font-normal text-stone-700",
+      )}
+    >
+      <div>{renderMetric(v, mode)}</div>
+      {fmt && (
+        <div className={cn("mt-0.5 text-[10px] font-normal leading-none", deltaTone[fmt.tone] ?? "text-stone-400")}>
+          {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
+        </div>
+      )}
+    </td>
   );
 }
