@@ -105,7 +105,7 @@ export default function ReclamoForm({
         <span className="text-gray-600 font-medium">Nuevo Reclamo</span>
       </nav>
       <div className="flex items-center justify-between mb-8 sm:mb-10">
-        <h1 className="text-xl font-light tracking-tight">Nuevo Reclamo</h1>
+        <h1 className="text-[21px] font-medium tracking-tight">Nuevo Reclamo</h1>
         {!revealAll && (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
@@ -115,11 +115,11 @@ export default function ReclamoForm({
                   className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${s <= currentStep ? "bg-black" : "bg-gray-200"}`}
                 />
               ))}
-              <span className="text-[11px] text-gray-400 ml-1.5">Paso {currentStep} de 4</span>
+              <span className="text-xs text-gray-400 ml-1.5">Paso {currentStep} de 4</span>
             </div>
             <button
               onClick={() => setShowAll(true)}
-              className="text-[11px] text-gray-400 hover:text-black transition underline underline-offset-2"
+              className="text-xs text-gray-400 hover:text-black transition underline underline-offset-2"
             >
               Mostrar todos los campos
             </button>
@@ -129,19 +129,19 @@ export default function ReclamoForm({
 
       {/* ── Factura PDF + autocompletado por IA (opcional, no bloquea) ── */}
       <div className="mb-10">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Factura (PDF) — autocompletar</div>
+        <div className="text-sm font-semibold text-gray-900 mb-4">Factura (PDF) — autocompletar</div>
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
-          <p className="text-[11px] text-gray-400 mt-2">Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido. Revisa y corrige. Los ítems a reclamar se siguen agregando a mano.</p>
+          <p className="text-xs text-gray-400 mt-2">Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido. Revisa y corrige. Los ítems a reclamar se siguen agregando a mano.</p>
         </div>
       </div>
 
       {/* ── Step 1: Empresa (always visible) ── */}
       <div className="mb-10">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Empresa</div>
+        <div className="text-sm font-semibold text-gray-900 mb-4">Empresa</div>
         <div className="max-w-xs">
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
+            <label className="text-xs text-gray-500">Empresa *</label>
             <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleBlur("empresa")} className={`border-b ${fieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none bg-transparent`}>
               <option value="">Seleccionar...</option>
               {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -155,20 +155,20 @@ export default function ReclamoForm({
       {/* ── Step 2: Factura, Fecha, Pedido (after empresa selected) ── */}
       <AccordionContent open={step2Visible} duration={200}>
         <div className="mb-10">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Datos de Factura</div>
+          <div className="text-sm font-semibold text-gray-900 mb-4">Datos de Factura</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</label>
+              <label className="text-xs text-gray-500">N° Factura *</label>
               <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
               {fieldError("factura", fFactura) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
+              <label className="text-xs text-gray-500">Fecha *</label>
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
               {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido *</label>
+              <label className="text-xs text-gray-500">N° Pedido *</label>
               <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
               {fieldError("pedido", fPedido) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
@@ -179,11 +179,11 @@ export default function ReclamoForm({
       {/* ── Step 3: Items table (after factura filled) ── */}
       <AccordionContent open={step3Visible} duration={200}>
       <div className="mb-10">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Ítems del Reclamo</div>
+        <div className="text-sm font-semibold text-gray-900 mb-2">Ítems del Reclamo</div>
         {/* Quick-tap motivo pills */}
         {recentMotivos.length > 0 && (
           <div className="mb-4">
-            <p className="text-[11px] text-gray-400 mb-1.5">Motivos recientes:</p>
+            <p className="text-xs text-gray-400 mb-1.5">Motivos recientes:</p>
             <div className="flex flex-wrap gap-1.5">
               {recentMotivos.map((m) => (
                 <button
@@ -203,9 +203,9 @@ export default function ReclamoForm({
           </div>
         )}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
             <thead>
-              <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                 <th className="pb-2 font-medium text-left">Código *</th>
                 <th className="pb-2 font-medium text-left">Descripción *</th>
                 <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
@@ -242,7 +242,7 @@ export default function ReclamoForm({
                     </select>
                   </td>
                   <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
-                  <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                  <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                   <td className="py-2 pr-1">
                     {addingMotivo === idx ? (
                       <div className="flex items-center gap-1">
@@ -272,22 +272,22 @@ export default function ReclamoForm({
           {fItems.map((item, idx) => (
             <div key={idx} className="rounded-lg border border-gray-200 p-3 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Ítem {idx + 1}</span>
+                <span className="text-xs text-gray-500">Ítem {idx + 1}</span>
                 {fItems.length > 1 && (
                   <button type="button" onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-xs text-gray-400 hover:text-red-500 min-h-[44px] px-2">Quitar</button>
                 )}
               </div>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Código *</span>
+                <span className="text-xs text-gray-500">Código *</span>
                 <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
               </label>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Descripción *</span>
+                <span className="text-xs text-gray-500">Descripción *</span>
                 <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Talla *</span>
+                  <span className="text-xs text-gray-500">Talla *</span>
                   {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                     <div className="flex items-center gap-1">
                       <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
@@ -301,12 +301,12 @@ export default function ReclamoForm({
                   )}
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Cantidad *</span>
+                  <span className="text-xs text-gray-500">Cantidad *</span>
                   <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
                 </label>
               </div>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Género *</span>
+                <span className="text-xs text-gray-500">Género *</span>
                 <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black ${item.genero ? "text-black" : "text-gray-400"}`}>
                   <option value="">Género…</option>
                   {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -314,16 +314,16 @@ export default function ReclamoForm({
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Precio U. *</span>
-                  <input type="number" inputMode="decimal" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                  <span className="text-xs text-gray-500">Precio U. *</span>
+                  <input type="number" inputMode="decimal" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
                 </label>
                 <div className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Subtotal</span>
+                  <span className="text-xs text-gray-500">Subtotal</span>
                   <p className="py-2 text-sm tabular-nums text-gray-600">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</p>
                 </div>
               </div>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Motivo *</span>
+                <span className="text-xs text-gray-500">Motivo *</span>
                 {addingMotivo === idx ? (
                   <div className="flex items-center gap-1">
                     <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" autoFocus />
@@ -355,7 +355,7 @@ export default function ReclamoForm({
       {/* ── Step 4: Notas (after at least 1 item) ── */}
       <AccordionContent open={step4Visible} duration={200}>
         <div className="mb-10">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Notas</div>
+          <div className="text-sm font-semibold text-gray-900 mb-4">Notas</div>
           <div className="max-w-2xl">
             <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Notas adicionales sobre el reclamo..." className="w-full border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none resize-none" />
           </div>
@@ -374,7 +374,7 @@ export default function ReclamoForm({
             </div>
           </div>
           <div className="mb-6">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Evidencia fotográfica</div>
+            <div className="text-sm font-semibold text-gray-900 mb-1">Evidencia fotográfica</div>
             <p className="text-xs text-gray-400 mb-3">Adjunta fotos para agilizar la resolución</p>
             {formFotos.length > 0 && (
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mb-3" style={{ scrollSnapType: "x mandatory" }}>

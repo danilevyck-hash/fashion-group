@@ -193,32 +193,32 @@ export default function ReclamoDetail({
 
       <div className="flex items-start justify-between mb-4 gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-light tracking-tight flex items-center gap-2">
+          <h1 className="text-[21px] font-medium tracking-tight flex items-center gap-2">
             {current.nro_reclamo}
             <FotoBadge count={fotos.length} />
           </h1>
           {editMode ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mt-3 max-w-2xl">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</span>
+                <span className="text-xs text-gray-500">Empresa *</span>
                 <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
                   {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</span>
+                <span className="text-xs text-gray-500">N° Factura *</span>
                 <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido *</span>
+                <span className="text-xs text-gray-500">N° Pedido *</span>
                 <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</span>
+                <span className="text-xs text-gray-500">Fecha *</span>
                 <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</span>
+                <span className="text-xs text-gray-500">Notas</span>
                 <textarea
                   value={editNotas}
                   onChange={(e) => {
@@ -233,7 +233,7 @@ export default function ReclamoDetail({
                 />
               </label>
               <div className="sm:col-span-2 flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Factura (PDF) — autocompletar</span>
+                <span className="text-xs text-gray-500">Factura (PDF) — autocompletar</span>
                 <FacturaPdfUploader
                   pdfUrl={current.factura_pdf_url}
                   onUploaded={setEditFacturaPdfPath}
@@ -243,9 +243,29 @@ export default function ReclamoDetail({
             </div>
           ) : (
             <>
-              <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
-              <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
-              <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
+              <p className="text-sm text-gray-500 mt-1">{current.empresa} · {current.marca}</p>
+              <dl className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3 max-w-xl">
+                <div>
+                  <dt className="text-xs text-gray-500">Factura</dt>
+                  <dd className="text-sm text-gray-900 tabular-nums">{current.nro_factura || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Pedido</dt>
+                  <dd className="text-sm text-gray-900 tabular-nums">{current.nro_orden_compra || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Fecha</dt>
+                  <dd className="text-sm text-gray-900">{fmtDate(current.fecha_reclamo)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Proveedor</dt>
+                  <dd className="text-sm text-gray-900">{current.proveedor || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Antigüedad</dt>
+                  <dd className="text-sm text-gray-900">{days} días</dd>
+                </div>
+              </dl>
               {current.factura_pdf_url && (
                 <button
                   type="button"
@@ -319,7 +339,7 @@ export default function ReclamoDetail({
       {/* El stepper "Creado -> Pagado ?" se elimino: el pill de estado (arriba) es
           el UNICO indicador de estado. Aqui solo queda la metadata de ultimo cambio. */}
       {!editMode && (
-        <p className="text-[11px] text-gray-400 mb-2">
+        <p className="text-xs text-gray-400 mb-2">
           Último cambio: {(() => {
             const latestSeg = seg.length > 0 ? seg[0]?.created_at : null;
             const raw = current.updated_at || latestSeg || current.created_at;
@@ -332,35 +352,35 @@ export default function ReclamoDetail({
 
       {/* Totals — en edición se recalculan en vivo desde los ítems editados */}
       <div className="flex items-center justify-between mb-2 mt-6">
-        <div className="text-xs uppercase tracking-widest text-gray-400">Totales</div>
-        {editMode && <span className="text-[11px] text-gray-400">Actualizando en vivo</span>}
+        <div className="text-sm font-semibold text-gray-700">Totales</div>
+        {editMode && <span className="text-xs text-gray-400">Actualizando en vivo</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Imp. importación (10%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub * TASA_IMPORTACION)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS (7%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub * TASA_ITBMS)}</div></div>
-        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(totalsSub * FACTOR_TOTAL)}</div></div>
+        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Subtotal</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub)}</div></div>
+        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Imp. importación (10%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub * TASA_IMPORTACION)}</div></div>
+        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS (7%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub * TASA_ITBMS)}</div></div>
+        <div className="bg-gray-900 rounded-xl p-4 text-center"><div className="text-xs text-white/70">Total</div><div className="text-[19px] font-semibold tabular-nums mt-1.5 text-white">${fmt(totalsSub * FACTOR_TOTAL)}</div></div>
       </div>
 
       {/* Settlement — recuperación / notas de crédito */}
       {(current.estado === "Pagado" || settlements.length > 0) && (
         <div className="mb-8 border border-gray-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-xs uppercase tracking-widest text-gray-400">Recuperación</div>
-            <span className="text-[11px] font-medium text-emerald-700 tabular-nums">{pctRec.toFixed(0)}% recuperado</span>
+            <div className="text-sm font-semibold text-gray-700">Recuperación</div>
+            <span className="text-xs font-medium text-emerald-700 tabular-nums">{pctRec.toFixed(0)}% recuperado</span>
           </div>
 
           <div className="grid grid-cols-3 gap-3 mb-3">
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase">Reclamado</div>
+              <div className="text-xs text-gray-500">Reclamado</div>
               <div className="text-sm font-semibold tabular-nums mt-1">${fmt(reclamado)}</div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase">Recuperado</div>
+              <div className="text-xs text-gray-500">Recuperado</div>
               <div className="text-sm font-semibold tabular-nums mt-1 text-emerald-700">${fmt(recuperado)}</div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] text-gray-400 uppercase">{deltaRec >= 0 ? "Pendiente" : "A favor"}</div>
+              <div className="text-xs text-gray-500">{deltaRec >= 0 ? "Pendiente" : "A favor"}</div>
               <div className={`text-sm font-semibold tabular-nums mt-1 ${deltaRec > 0 ? "text-amber-600" : "text-gray-500"}`}>${fmt(Math.abs(deltaRec))}</div>
             </div>
           </div>
@@ -382,7 +402,7 @@ export default function ReclamoDetail({
                   </div>
                   <button
                     onClick={() => onRemoveSettlement(s.id)}
-                    className="text-[11px] text-gray-400 hover:text-red-600 transition shrink-0 ml-3"
+                    className="text-xs text-gray-400 hover:text-red-600 transition shrink-0 ml-3"
                   >
                     Quitar
                   </button>
@@ -398,18 +418,18 @@ export default function ReclamoDetail({
             <div className="rounded-md border border-gray-200 p-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[11px] text-gray-500">Monto recuperado *</span>
+                  <span className="text-xs text-gray-500">Monto recuperado *</span>
                   <input type="number" inputMode="decimal" min="0" step="0.01" value={ncMonto}
                     onChange={(e) => setNcMonto(e.target.value)} placeholder="0.00"
                     className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm tabular-nums outline-none focus:border-black transition" />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] text-gray-500">Fecha *</span>
+                  <span className="text-xs text-gray-500">Fecha *</span>
                   <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)}
                     className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
                 </label>
                 <label className="col-span-2 block">
-                  <span className="text-[11px] text-gray-500">N° nota de crédito (opcional)</span>
+                  <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
                   <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422"
                     className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
                 </label>
@@ -432,13 +452,13 @@ export default function ReclamoDetail({
       {/* Items table — UNA sola tabla: editable in-place cuando editMode, read-only si no */}
       {(editMode || items.length > 0) && (
         <div className="mb-8">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Ítems</div>
+          <div className="text-sm font-semibold text-gray-700 mb-3">Ítems</div>
           {editMode ? (
             <>
               <ScrollableTable minWidth={700} className="mb-4">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
                   <thead className="sticky top-0 bg-white z-10">
-                    <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                    <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                       <th className="pb-2 font-medium text-left">Código *</th>
                       <th className="pb-2 font-medium text-left">Descripción *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
@@ -463,7 +483,7 @@ export default function ReclamoDetail({
                           </select>
                         </td>
                         <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
-                        <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                        <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1">
                           {addingEditMotivo === idx ? (
                             <div className="flex items-center gap-1">
@@ -491,9 +511,9 @@ export default function ReclamoDetail({
             </>
           ) : (
             <ScrollableTable minWidth={700}>
-              <table className="w-full text-sm">
+              <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
                 <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                  <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                     <th className="text-left pb-2 font-medium">Código</th>
                     <th className="text-left pb-2 font-medium">Descripción</th>
                     <th className="text-left pb-2 font-medium">Talla</th>
@@ -530,7 +550,7 @@ export default function ReclamoDetail({
 
       {/* Evidencia fotográfica */}
       <div className="mb-8">
-        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Evidencia fotográfica</div>
+        <div className="text-sm font-semibold text-gray-700 mb-1">Evidencia fotográfica</div>
         <p className="text-xs text-gray-400 mb-3">Adjunta fotos para agilizar la resolución</p>
 
         {/* Thumbnail row — horizontal scroll on mobile */}
@@ -563,7 +583,7 @@ export default function ReclamoDetail({
           </>
         )}
         {fotos.length === 0 && (
-          <p className="text-[11px] text-gray-300 mt-2 italic">Sin fotos adjuntas</p>
+          <p className="text-xs text-gray-300 mt-2 italic">Sin fotos adjuntas</p>
         )}
       </div>
 
@@ -571,7 +591,7 @@ export default function ReclamoDetail({
 
       {/* Seguimiento */}
       <div className="mb-8">
-        <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
+        <div className="text-sm font-semibold text-gray-700 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
           <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none" />
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Agregar</button>
@@ -579,7 +599,7 @@ export default function ReclamoDetail({
         {seg.map((s) => (
           <div key={s.id} className="border-b border-gray-50 py-2">
             <p className="text-sm">{s.nota}</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{fmtDate(s.created_at.slice(0, 10))} {new Date(s.created_at).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" })} — {s.autor}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{fmtDate(s.created_at.slice(0, 10))} {new Date(s.created_at).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" })} — {s.autor}</p>
           </div>
         ))}
       </div>
