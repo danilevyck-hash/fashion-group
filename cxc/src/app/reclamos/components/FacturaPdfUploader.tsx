@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { useToast } from "@/components/ToastSystem";
-import PdfUploader, { type UploadResult } from "@/components/marketing/PdfUploader";
 import { PdfLightbox } from "@/components/ui";
+
+const MAX_MB = 10;
 
 // Campos que la IA puede extraer de la factura (cualquiera puede ser null).
 export interface FacturaIAData {
@@ -24,14 +25,18 @@ interface Props {
 }
 
 // Uploader de PDF de factura para reclamos: sube al bucket privado, llama a la
-// IA para pre-llenar la cabecera y deja "Ver factura" si ya hay PDF. Reusa el
-// PdfUploader genérico de Marketing (no lo modifica). Replica el UX de Marketing.
+// IA para pre-llenar la cabecera y deja "Ver factura" si ya hay PDF. Dropzone
+// propio en franja compacta (drag-and-drop + click) para que el detalle en
+// edición quepa en un pantallazo.
 export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: Props) {
   const { toast } = useToast();
   const [leyendoIA, setLeyendoIA] = useState(false);
   const [pdfLightbox, setPdfLightbox] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpload = async (file: File): Promise<UploadResult> => {
+  const handleUpload = async (file: File): Promise<void> => {
     // 1) Signed upload URL al bucket privado.
     const urlRes = await fetch("/api/reclamos/factura-pdf/upload-url", {
       method: "POST",
@@ -73,9 +78,35 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
     } finally {
       setLeyendoIA(false);
     }
-
-    return { url: "", nombreOriginal: file.name, sizeBytes: file.size };
   };
+
+  function validar(file: File): string | null {
+    const esPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!esPdf) return "Ese archivo no es un PDF.";
+    if (file.size > MAX_MB * 1024 * 1024) return `El PDF pesa más de ${MAX_MB}MB. Intenta uno más liviano.`;
+    return null;
+  }
+
+  async function procesar(file: File) {
+    const err = validar(file);
+    if (err) { toast(err, "error"); return; }
+    setSubiendo(true);
+    try {
+      await handleUpload(file);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo subir el PDF.", "error");
+    } finally {
+      setSubiendo(false);
+    }
+  }
+
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault(); e.stopPropagation(); setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) procesar(file);
+  }
+  function onDragOver(e: DragEvent<HTMLDivElement>) { e.preventDefault(); e.stopPropagation(); if (!dragging) setDragging(true); }
+  function onDragLeave(e: DragEvent<HTMLDivElement>) { e.preventDefault(); e.stopPropagation(); setDragging(false); }
 
   return (
     <div className="space-y-2">
@@ -97,12 +128,44 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           </button>
         </div>
       )}
-      <PdfUploader
-        onUpload={handleUpload}
-        label={pdfUrl ? "Reemplazar el PDF de la factura" : "Sube el PDF de la factura para autocompletar"}
-        accept="application/pdf"
-        maxSizeMb={10}
-      />
+      {/* Franja compacta: drag-and-drop + click. Reemplaza el dropzone alto del
+          PdfUploader de Marketing para que el detalle en edición quepa en un
+          pantallazo. Misma lógica de subida + IA (handleUpload). */}
+      <div
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        className={`flex items-center gap-2 rounded-md border border-dashed px-3 py-2 transition ${
+          dragging ? "border-fuchsia-400 bg-fuchsia-50" : "border-gray-300 bg-white hover:border-gray-400"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400 shrink-0">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        <span className="text-xs text-gray-500 flex-1 truncate">
+          {subiendo
+            ? "Subiendo…"
+            : dragging
+              ? "Suelta el PDF aquí"
+              : `Arrastra o elige el PDF de la factura (máx ${MAX_MB}MB)`}
+        </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) procesar(f); e.target.value = ""; }}
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={subiendo}
+          className="text-[11px] font-medium border border-gray-200 rounded px-2 py-1 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50"
+        >
+          {pdfUrl ? "Reemplazar" : "Elegir archivo"}
+        </button>
+      </div>
       {leyendoIA && (
         <div className="flex items-center gap-2 text-xs text-gray-500">
           <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
