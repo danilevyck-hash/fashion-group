@@ -77,7 +77,16 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // anterior, y los meses posteriores no se emiten. Si `year` no es el
     // año actual del calendario, devuelve full-mes-vs-full-mes (no
     // aplica recorte).
-    supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
+    // v2: rama año-en-curso acotada por ventana de fechas (sargable) — misma
+    // matemática día-grano, ~Nx más rápido (Causa 4 del audit). Migración:
+    // 20260623120000_ventas_dashboard_prev_same_period_v2.sql. Fallback a la
+    // función vigente si la migración aún no se aplicó → deploy sin orden forzado
+    // (sin _v2 funciona igual que hoy; con _v2 va rápido).
+    (async () => {
+      const v2 = await supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year });
+      if (!v2.error) return v2;
+      return supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year });
+    })(),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
     // Proyección de cierre por empresa + agregado del grupo. v5 agrega
     // cierre_anio_anterior + delta_vs_anio_anterior por empresa y grupo.
@@ -102,7 +111,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
-  if (prevRes.error) throw new Error(`ventas_dashboard_prev_same_period(${year}): ${prevRes.error.message}`);
+  if (prevRes.error) throw new Error(`ventas_dashboard_prev_same_period_v2(${year}): ${prevRes.error.message}`);
 
   const cur = (curRes.data as DashboardSummaryRow[] | null) ?? [];
 
