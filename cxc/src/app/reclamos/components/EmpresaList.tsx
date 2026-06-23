@@ -30,19 +30,35 @@ interface Props {
   onBack: () => void;
   onNewReclamo: () => void;
   onLoadDetail: (id: string) => void;
+  /** Abre el detalle directamente en modo edición. */
+  onEditReclamo: (id: string) => void;
   onDeleteReclamo: (id: string) => void;
+  /** Borrado en lote de los seleccionados (admin). */
+  onDeleteSelected: (ids: string[]) => void;
   /** Recarga los reclamos tras enviar el correo (el envío no cambia el estado). */
   onReload: () => void;
 }
 
 type BulkAction = "zip";
 
+// Íconos de acción por fila — discretos, hover. stroke currentColor para heredar color.
+const IconEye = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+const IconPencil = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+);
+const IconTrash = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+);
+
 export default function EmpresaList({
-  activeEmpresa, reclamos, contactos, search, setSearch,
+  role, activeEmpresa, reclamos, contactos, search, setSearch,
   filterEstado, setFilterEstado, selectionMode, setSelectionMode,
   selectedIds, setSelectedIds, sortCol, setSortCol, sortDir, setSortDir,
-  onBack, onNewReclamo, onLoadDetail, onReload,
+  onBack, onNewReclamo, onLoadDetail, onEditReclamo, onDeleteReclamo, onDeleteSelected, onReload,
 }: Props) {
+  const isAdmin = role === "admin";
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
@@ -71,7 +87,9 @@ export default function EmpresaList({
     return 0;
   });
 
-  const allSelectableIds = sortedRecs.filter((r) => r.estado === "Creado").map((r) => r.id);
+  // Selección para enviar/ZIP Y borrar → TODOS los reclamos son seleccionables
+  // (antes solo "Creado"; se quitó la restricción porque ahora también borra).
+  const allSelectableIds = sortedRecs.map((r) => r.id);
   const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
   function toggleSelect(id: string) {
@@ -168,6 +186,17 @@ export default function EmpresaList({
               >
                 {busy === "zip" ? "Generando ZIP..." : "Descargar ZIP"}
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => onDeleteSelected(selectedIds)}
+                  disabled={busy !== null}
+                  title="Eliminar los reclamos seleccionados"
+                  className="text-sm border border-red-200 text-red-600 px-4 py-2 rounded-md hover:bg-red-50 active:scale-[0.97] transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {IconTrash}
+                  Eliminar seleccionados
+                </button>
+              )}
               <button
                 onClick={cancelSelection}
                 disabled={busy !== null}
@@ -185,7 +214,7 @@ export default function EmpresaList({
                 onClick={() => { setSelectionMode(!selectionMode); setSelectedIds([]); }}
                 className={`text-sm border px-4 py-2 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
               >
-                {selectionMode ? "Salir" : "Seleccionar"}
+                {selectionMode ? "Cancelar" : "Seleccionar"}
               </button>
               <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
             </>
@@ -221,13 +250,13 @@ export default function EmpresaList({
             return (
               <div
                 key={r.id}
-                onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : onLoadDetail(r.id)}
+                onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}
                 className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     {selectionMode && (
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
+                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" />
                     )}
                     <div>
                       <p className="text-sm font-medium flex items-center gap-1.5">
@@ -246,6 +275,15 @@ export default function EmpresaList({
                   </div>
                   <span className="text-sm font-semibold tabular-nums">${fmt(total)}</span>
                 </div>
+                {!selectionMode && (
+                  <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconEye}</button>
+                    <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
+                    {isAdmin && (
+                      <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-2 text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -291,6 +329,7 @@ export default function EmpresaList({
               <th onClick={() => toggleSort("dias")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Antigüedad {sortCol === "dias" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("estado")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Estado {sortCol === "estado" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("total")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Total {sortCol === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
+              {!selectionMode && <th className="pb-3 text-right font-medium"><span className="sr-only">Acciones</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -300,11 +339,11 @@ export default function EmpresaList({
               const isOpen = r.estado === "Creado";
               return (
                 <tr key={r.id}
-                  onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : onLoadDetail(r.id)}
+                  onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}
                   className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
                   {selectionMode && (
                     <td className="py-3">
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
+                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" />
                     </td>
                   )}
                   <td className="py-3 font-medium text-xs">
@@ -318,6 +357,17 @@ export default function EmpresaList({
                   <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
                   <td className="py-3"><StatusBadge estado={r.estado} /></td>
                   <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
+                  {!selectionMode && (
+                    <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconEye}</button>
+                        <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconPencil}</button>
+                        {isAdmin && (
+                          <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-1.5 text-gray-400 hover:text-red-600 rounded transition">{IconTrash}</button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}
