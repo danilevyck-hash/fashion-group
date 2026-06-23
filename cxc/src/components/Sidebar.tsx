@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import { Home, ChevronRight } from "lucide-react";
 import {
@@ -73,14 +74,14 @@ function activeChildKeyFor(children: AppModule[], pathname: string): string | nu
  *  por el overflow del nav; anclado al top del ícono de grupo (left = ancho del
  *  rail colapsado, w-16 = 64px). */
 function CollapsedFlyout({
-  group, top, role, fgModules, pathname, onNavigate,
+  group, top, role, fgModules, pathname, onClose,
 }: {
   group: AppGroup;
   top: number;
   role: string;
   fgModules: string[] | null;
   pathname: string;
-  onNavigate: (href: string) => void;
+  onClose: () => void;
 }) {
   const children = getModulesInGroup(group.key, role, fgModules);
   const activeChildKey = activeChildKeyFor(children, pathname);
@@ -97,9 +98,10 @@ function CollapsedFlyout({
           const MIcon = m.icon;
           const active = m.key === activeChildKey;
           return (
-            <button
+            <Link
               key={m.key}
-              onClick={() => onNavigate(m.href)}
+              href={m.href}
+              onClick={onClose}
               title={m.label}
               className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors ${
                 active
@@ -109,7 +111,7 @@ function CollapsedFlyout({
             >
               <MIcon size={14} strokeWidth={1.5} className="flex-shrink-0" />
               <span className="truncate text-left">{m.label}</span>
-            </button>
+            </Link>
           );
         })}
       </div>
@@ -204,8 +206,8 @@ export default function Sidebar() {
           collapsed ? "px-1.5" : "px-5"
         }`}
       >
-        <button
-          onClick={() => router.push("/home")}
+        <Link
+          href="/home"
           className="flex items-center gap-2 hover:opacity-70 transition min-w-0"
           title={collapsed ? "Fashion Group" : undefined}
         >
@@ -215,7 +217,7 @@ export default function Sidebar() {
               Fashion Group
             </span>
           )}
-        </button>
+        </Link>
         <button
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
@@ -229,8 +231,8 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
-        <button
-          onClick={() => router.push("/home")}
+        <Link
+          href="/home"
           title={collapsed ? "Inicio" : undefined}
           className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} py-2.5 text-sm transition-all border-l-2 ${
             homeActive
@@ -240,7 +242,7 @@ export default function Sidebar() {
         >
           <Home size={16} strokeWidth={1.5} />
           {!collapsed && <span className="truncate">Inicio</span>}
-        </button>
+        </Link>
         <div className="h-px bg-gray-100 my-1 mx-5" />
         {visibleGroups.map((g) => {
           const Icon = g.icon;
@@ -275,7 +277,7 @@ export default function Sidebar() {
                     role={userRole}
                     fgModules={fgModules}
                     pathname={pathname}
-                    onNavigate={(href) => { setFlyout(null); router.push(href); }}
+                    onClose={() => setFlyout(null)}
                   />
                 )}
               </div>
@@ -324,9 +326,9 @@ export default function Sidebar() {
                     const MIcon = m.icon;
                     const mActive = m.key === activeChildKey;
                     return (
-                      <button
+                      <Link
                         key={m.key}
-                        onClick={() => router.push(m.href)}
+                        href={m.href}
                         title={m.label}
                         tabIndex={isOpen ? 0 : -1}
                         className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-1.5 text-[13px] transition-colors border-l-2 ${
@@ -337,7 +339,7 @@ export default function Sidebar() {
                       >
                         <MIcon size={14} strokeWidth={1.5} className="flex-shrink-0" />
                         <span className="truncate text-left">{m.label}</span>
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>

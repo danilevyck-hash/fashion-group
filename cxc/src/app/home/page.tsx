@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import { getVisibleGroups, getVisibleModules, getModulesInGroup } from "@/lib/modules";
@@ -157,9 +158,9 @@ export default function HomePage() {
                   {modules.map((m) => {
                     const ModIcon = m.icon;
                     return (
-                      <button
+                      <Link
                         key={m.key}
-                        onClick={() => router.push(m.href)}
+                        href={m.href}
                         className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors ${
                           darkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"
                         }`}
@@ -182,7 +183,7 @@ export default function HomePage() {
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${darkMode ? "text-gray-600" : "text-gray-300"}`}>
                           <path d="M9 18l6-6-6-6"/>
                         </svg>
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
