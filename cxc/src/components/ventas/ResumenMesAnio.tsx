@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { MONTHS, fmtMoneyCompact } from "@/lib/ventas/format";
@@ -11,7 +10,7 @@ type ViewMode = "ventas" | "utilidad" | "margen";
 
 interface Vals { ventas: number; costo: number; utilidad: number }
 interface Cell extends Vals { prev: Vals | null }
-interface EmpresaMesAnio {
+export interface EmpresaMesAnio {
   id: string;
   nombre: string;
   byMonth: Record<number, Record<number, Cell>>;  // [mes 1..12][anio]
@@ -115,45 +114,24 @@ function MesAnioCell({ cur, mode, dark = false, showDelta = true }: {
   );
 }
 
-export function ResumenMesAnio({ data, error, viewMode }: {
-  data: MesAnioData | null; error: string | null; viewMode: ViewMode;
+// Matriz mes × año de UNA empresa, pensada para desplegarse EN LÍNEA debajo de
+// la fila de la empresa en el heatmap de Resumen (acordeón). Reusa la data del
+// endpoint /api/ventas/mes-anio (cargada perezosamente vía useResumenMesAnio).
+// El acceso ya no es un modo del toggle: se entra tocando la fila de la empresa.
+export function MesAnioMatrix({
+  empresa, years, currentYear, partial, earliestPartial, viewMode,
+}: {
+  empresa: EmpresaMesAnio;
+  years: number[];
+  currentYear: number | null;
+  partial: { year: number; month: number } | null;
+  earliestPartial: { year: number; label: string } | null;
+  viewMode: ViewMode;
 }) {
-  // El selector vive acá (self-contained): cambiar de empresa no refetchea.
-  const [empresaId, setEmpresaId] = useState<string | null>(null);
-
-  if (error) {
-    return <Card className="p-6 text-sm text-stone-500">No se pudo cargar el resumen mes × año: {error}</Card>;
-  }
-  if (!data) {
-    return <Card className="p-6 text-sm text-stone-400">Cargando resumen mes × año…</Card>;
-  }
-  if (data.empresas.length === 0) {
-    return <Card className="p-6 text-sm text-stone-400">Sin data disponible.</Card>;
-  }
-
-  const { years, currentYear, partial, earliestPartial } = data;
-  const empresa = data.empresas.find((e) => e.id === empresaId) ?? data.empresas[0];
   const partialMesLabel = partial ? MONTHS[partial.month - 1] : null;
 
   return (
-    <div className="space-y-4">
-      {/* Selector de empresa — única empresa desglosada por mes × año. */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="mesanio-empresa" className="text-[11px] font-medium uppercase tracking-wider text-stone-500">
-          Empresa
-        </label>
-        <select
-          id="mesanio-empresa"
-          value={empresa.id}
-          onChange={(e) => setEmpresaId(e.target.value)}
-          className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-950 shadow-sm focus:border-stone-400 focus:outline-none"
-        >
-          {data.empresas.map((e) => (
-            <option key={e.id} value={e.id}>{e.nombre}</option>
-          ))}
-        </select>
-      </div>
-
+    <div className="space-y-3">
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 640 }}>
