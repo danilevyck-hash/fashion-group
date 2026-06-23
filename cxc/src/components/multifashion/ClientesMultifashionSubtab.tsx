@@ -17,6 +17,7 @@
 // Click en una row expande sparkline mensual (un cliente expandido a la vez).
 
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Package, Users, ChevronDown, Store } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
@@ -125,12 +126,7 @@ function computeRange(
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultifashionSubtabProps) {
-  const [wholesale, setWholesale] = useState<WholesaleResp | null>(null);
-  const [retail, setRetail] = useState<RetailResp | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
 
   // Filtro de período PROPIO del tab (persistido en URL ?mfCliRango). Es un
   // filtro del mismo nivel → history "replace" (no cicla en back/forward).
@@ -143,49 +139,45 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
     return `Últimos ${n} meses · hasta ${MES_NOMBRES[mes - 1].toLowerCase()} ${selectedYear}`;
   }, [rango, selectedYear, mes]);
 
+  // MISMOS params que antes: el querystring (fecha_inicio + fecha_fin) ES la
+  // clave SWR → cada rango cachea por separado y revalida en background. Un solo
+  // useSWR cuyo fetcher dispara ambos fetch en paralelo y devuelve {wholesale,
+  // retail}, preservando el loading/error combinados del Promise.all original.
+  const qs = `fecha_inicio=${range.fecha_inicio}&fecha_fin=${range.fecha_fin}`;
+  const { data, error, isLoading, mutate } = useSWR<{ wholesale: WholesaleResp; retail: RetailResp }>(
+    ["multifashion-clientes", range.fecha_inicio, range.fecha_fin],
+    async () => {
+      const [ws, rt] = await Promise.all([
+        fetch(`/api/multifashion/clientes-wholesale?${qs}`, { cache: "no-store" }).then(async r => {
+          if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            throw new Error(body?.error ?? `wholesale HTTP ${r.status}`);
+          }
+          return r.json() as Promise<WholesaleResp>;
+        }),
+        fetch(`/api/multifashion/retail-recurrentes?${qs}`, { cache: "no-store" }).then(async r => {
+          if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            throw new Error(body?.error ?? `retail HTTP ${r.status}`);
+          }
+          return r.json() as Promise<RetailResp>;
+        }),
+      ]);
+      return { wholesale: ws, retail: rt };
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+
+  const wholesale = data?.wholesale ?? null;
+  const retail = data?.retail ?? null;
+  const loading = isLoading && !data;
+  const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
+
+  // Al cambiar el rango, colapsa la fila expandida (igual que el efecto original
+  // hacía con setExpandedId(null) en cada cambio de params).
   useEffect(() => {
-    const ctrl = new AbortController();
-    setLoading(true);
-    setError(null);
     setExpandedId(null);
-
-    const qs = `fecha_inicio=${range.fecha_inicio}&fecha_fin=${range.fecha_fin}`;
-
-    Promise.all([
-      fetch(`/api/multifashion/clientes-wholesale?${qs}`, {
-        cache: "no-store",
-        signal: ctrl.signal,
-      }).then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error ?? `wholesale HTTP ${r.status}`);
-        }
-        return r.json() as Promise<WholesaleResp>;
-      }),
-      fetch(`/api/multifashion/retail-recurrentes?${qs}`, {
-        cache: "no-store",
-        signal: ctrl.signal,
-      }).then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error ?? `retail HTTP ${r.status}`);
-        }
-        return r.json() as Promise<RetailResp>;
-      }),
-    ])
-      .then(([ws, rt]) => {
-        setWholesale(ws);
-        setRetail(rt);
-      })
-      .catch(err => {
-        if (err?.name === "AbortError") return;
-        console.error("[clientes-multifashion] fetch failed", err);
-        setError(err instanceof Error ? err.message : "error inesperado");
-      })
-      .finally(() => setLoading(false));
-
-    return () => ctrl.abort();
-  }, [range.fecha_inicio, range.fecha_fin, reloadKey]);
+  }, [range.fecha_inicio, range.fecha_fin]);
 
   // Pico mensual compartido (escala visual unificada entre ambas secciones).
   const peakMes = useMemo(() => Math.max(
@@ -206,10 +198,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {error ? (
+      {errorMsg ? (
         <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
-          No se pudo cargar la lista: {error}
-          <button onClick={() => setReloadKey((k) => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
+          No se pudo cargar la lista: {errorMsg}
+          <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </Card>
       ) : loading && !wholesale && !retail ? (
         <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">

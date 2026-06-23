@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
@@ -18,30 +18,30 @@ export interface AnualData {
   totalGrupo: { byYear: Record<number, Cell>; total: Vals };
 }
 
-// Carga (una vez por activación) el resumen anual. enabled evita el fetch hasta
-// que el usuario elige "Anual". Compartido por la vista desktop y la mobile.
+// Fetcher puro del resumen anual (mismo endpoint/shape de siempre).
+async function fetchResumenAnual(): Promise<AnualData> {
+  const res = await fetch("/api/ventas/resumen-anual", { cache: "no-store" });
+  if (!res.ok) {
+    const e = await res.json().catch(() => null);
+    throw new Error(e?.error || `HTTP ${res.status}`);
+  }
+  return (await res.json()) as AnualData;
+}
+
+// Carga (cacheada vía SWR) el resumen anual. enabled evita el fetch hasta que el
+// usuario elige "Anual" (clave null → SWR no dispara). La caché vive a nivel app
+// (SWRProvider) → volver a "Anual" pinta al instante. Compartido por la vista
+// desktop y la mobile. Devuelve el mismo shape { data, error } de antes.
 export function useResumenAnual(enabled: boolean): { data: AnualData | null; error: string | null } {
-  const [data, setData] = useState<AnualData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!enabled || data || error) return;
-    let cancel = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/ventas/resumen-anual", { cache: "no-store" });
-        if (!res.ok) {
-          const e = await res.json().catch(() => null);
-          throw new Error(e?.error || `HTTP ${res.status}`);
-        }
-        const d = (await res.json()) as AnualData;
-        if (!cancel) setData(d);
-      } catch (err) {
-        if (!cancel) setError(err instanceof Error ? err.message : "Error al cargar");
-      }
-    })();
-    return () => { cancel = true; };
-  }, [enabled, data, error]);
-  return { data, error };
+  const { data, error } = useSWR<AnualData>(
+    enabled ? "ventas-resumen-anual" : null,
+    fetchResumenAnual,
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+  return {
+    data: data ?? null,
+    error: error ? (error instanceof Error ? error.message : "Error al cargar") : null,
+  };
 }
 
 // Mismo guard que el resto del módulo: bajo $100 de ventas el margen no informa.
