@@ -11,8 +11,8 @@
 //   limit      default 50, max 200
 //
 // Devuelve:
-//   { clientes: Cliente[], total: number, page: number, limit: number,
-//     provincias: string[] }
+//   { clientes: Cliente[], total: number, page: number, limit: number }
+//   (las provincias del dropdown las entrega el SSR una sola vez, no este route)
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -52,33 +52,20 @@ export async function GET(req: NextRequest) {
 
   query = query.order("nombre", { ascending: true }).range(from, to);
 
-  const [{ data: clientes, count, error }, provinciasRes] = await Promise.all([
-    query,
-    supabaseServer
-      .from("clientes_master")
-      .select("provincia")
-      .eq("deleted", false)
-      .not("provincia", "is", null),
-  ]);
+  // La lista de provincias del dropdown la entrega el SSR (page.tsx) una sola vez;
+  // el cliente NO lee `provincias` de esta respuesta. Antes se re-escaneaba
+  // clientes_master en CADA búsqueda/paginación (full-scan desperdiciado) → fuera.
+  const { data: clientes, count, error } = await query;
 
   if (error) {
     console.error("[api/clientes] list error:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const provincias = [
-    ...new Set(
-      (provinciasRes.data ?? [])
-        .map(r => (r.provincia ?? "").trim())
-        .filter(Boolean) as string[],
-    ),
-  ].sort((a, b) => a.localeCompare(b, "es"));
-
   return NextResponse.json({
     clientes: clientes ?? [],
     total: count ?? 0,
     page,
     limit,
-    provincias,
   });
 }
