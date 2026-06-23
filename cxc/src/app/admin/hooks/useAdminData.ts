@@ -160,7 +160,15 @@ async function fetchAdminData(): Promise<AdminData> {
     }
   }
 
-  return { clients: clientsArr, uploads: latestUploads, contactLog: latestLog, ts: Date.now() };
+  // Frescura = cuándo se MATERIALIZÓ la MV del aging (no la hora del request). El
+  // endpoint /api/cxc/aging devuelve refreshedAt (materializado_en de
+  // switch_estadocuenta_aging_mv); si cayó al fallback de la view en vivo (sin MV
+  // todavía), refreshedAt es null → Date.now().
+  const refreshTs = agingJson?.refreshedAt
+    ? new Date(agingJson.refreshedAt as string).getTime()
+    : Date.now();
+
+  return { clients: clientsArr, uploads: latestUploads, contactLog: latestLog, ts: refreshTs };
 }
 
 /**
