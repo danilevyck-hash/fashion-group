@@ -10,7 +10,6 @@
 // Sin tooltips (no hover en touch); drill-down al detalle queda para el
 // siguiente sprint.
 
-import { Fragment } from "react";
 import type {
   VentasResumen,
   EmpresaMonthlySales,
@@ -25,7 +24,6 @@ import { ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
-import { MesAnioMatrix, type MesAnioData } from "./ResumenMesAnio";
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -54,13 +52,9 @@ interface ResumenViewMobileProps {
   /** Datos del modo Anual (compartidos con el desktop; fetch perezoso en ResumenView). */
   anualData: AnualData | null;
   anualError: string | null;
-  /** Histórico mes × año (compartido con el desktop; fetch perezoso en ResumenView
-   *  al expandir la primera fila). Se despliega en línea bajo la fila tocada. */
-  mesAnioData: MesAnioData | null;
-  mesAnioError: string | null;
-  /** Fila de empresa expandida (id ventas corto) + toggle. Compartido con desktop. */
-  expandedEmpresaId: string | null;
-  onToggleEmpresa: (id: string) => void;
+  /** Abre el panel mes × año de una empresa (id ventas corto). El panel lo
+   *  renderiza ResumenView (único en el árbol). */
+  onOpenEmpresa: (id: string) => void;
   /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
    *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
   multiMayoreoLabel?: string | null;
@@ -76,10 +70,7 @@ export function ResumenViewMobile({
   setGranularity,
   anualData,
   anualError,
-  mesAnioData,
-  mesAnioError,
-  expandedEmpresaId,
-  onToggleEmpresa,
+  onOpenEmpresa,
   multiMayoreoLabel,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
@@ -109,10 +100,7 @@ export function ResumenViewMobile({
           granularity={granularity}
           isClosedYear={isClosedYear}
           multiMayoreoLabel={multiMayoreoLabel}
-          mesAnioData={mesAnioData}
-          mesAnioError={mesAnioError}
-          expandedEmpresaId={expandedEmpresaId}
-          onToggleEmpresa={onToggleEmpresa}
+          onOpenEmpresa={onOpenEmpresa}
         />
       )}
     </div>
@@ -270,20 +258,14 @@ function MobileHeatmap({
   granularity,
   isClosedYear,
   multiMayoreoLabel,
-  mesAnioData,
-  mesAnioError,
-  expandedEmpresaId,
-  onToggleEmpresa,
+  onOpenEmpresa,
 }: {
   data: VentasResumen;
   viewMode: ViewMode;
   granularity: Granularity;
   isClosedYear: boolean;
   multiMayoreoLabel?: string | null;
-  mesAnioData: MesAnioData | null;
-  mesAnioError: string | null;
-  expandedEmpresaId: string | null;
-  onToggleEmpresa: (id: string) => void;
+  onOpenEmpresa: (id: string) => void;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
 
@@ -338,8 +320,6 @@ function MobileHeatmap({
   const showProy = !isClosedYear && !!data.proyeccion;
   const showMensual = !isClosedYear && !!data.proyeccionMensual;
   const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
-  // Ancho total (en columnas) → colSpan de la fila acordeón mes × año.
-  const colSpanTotal = 1 + cols.length + 1 + (showProy ? 1 : 0) + (showMensual ? 1 : 0);
 
   return (
     <div className="relative overflow-x-auto rounded-xl border border-stone-200 bg-white">
@@ -393,31 +373,19 @@ function MobileHeatmap({
             const proy = showProy
               ? findProyeccionForEmpresa(data.proyeccion!, r.id)
               : null;
-            const isExpanded = expandedEmpresaId === r.id;
-            const empMesAnio = isExpanded ? mesAnioData?.empresas.find(e => e.id === r.id) ?? null : null;
             return (
-              <Fragment key={r.id}>
               <tr
-                onClick={() => onToggleEmpresa(r.id)}
-                aria-expanded={isExpanded}
-                className={cn(
-                  "cursor-pointer border-b border-stone-100 last:border-b-0 active:bg-stone-50",
-                  isExpanded && "bg-stone-50",
-                )}
+                key={r.id}
+                onClick={() => onOpenEmpresa(r.id)}
+                aria-haspopup="dialog"
+                className="cursor-pointer border-b border-stone-100 last:border-b-0 active:bg-stone-50"
               >
                 <th
                   scope="row"
-                  className={cn(
-                    "sticky left-0 z-10 min-w-[120px] max-w-[150px] border-r border-stone-200 px-3 py-3 text-left text-xs font-medium text-stone-900",
-                    isExpanded ? "bg-stone-50" : "bg-white",
-                  )}
+                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] border-r border-stone-200 bg-white px-3 py-3 text-left text-xs font-medium text-stone-900"
                 >
                   <div className="flex items-center gap-1.5">
-                    <ChevronRight
-                      className={cn("h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform", isExpanded && "rotate-90")}
-                      aria-hidden
-                    />
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate">{r.nombre}</span>
                       {r.id === "multi" && multiMayoreoLabel && (
                         /* Nota VISIBLE (paridad con desktop): la fila es american_classic
@@ -427,6 +395,8 @@ function MobileHeatmap({
                         </span>
                       )}
                     </span>
+                    {/* Affordance: abre el panel mes × año de la empresa. */}
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-stone-300" aria-hidden />
                   </div>
                 </th>
                 {r.cells.map((c, ci) => (
@@ -447,29 +417,6 @@ function MobileHeatmap({
                 {showProy && <MobileProyCell proyeccion={proy} />}
                 {showMensual && <MobileMensualCell pm={data.proyeccionMensual![r.id]} />}
               </tr>
-              {isExpanded && (
-                <tr className="border-b border-stone-100 bg-stone-50">
-                  <td colSpan={colSpanTotal} className="p-2">
-                    {mesAnioError ? (
-                      <p className="px-1 py-2 text-xs text-stone-500">No se pudo cargar el histórico mes × año: {mesAnioError}</p>
-                    ) : !mesAnioData ? (
-                      <p className="px-1 py-2 text-xs text-stone-400">Cargando histórico mes × año…</p>
-                    ) : empMesAnio ? (
-                      <MesAnioMatrix
-                        empresa={empMesAnio}
-                        years={mesAnioData.years}
-                        currentYear={mesAnioData.currentYear}
-                        partial={mesAnioData.partial}
-                        earliestPartial={mesAnioData.earliestPartial}
-                        viewMode={viewMode}
-                      />
-                    ) : (
-                      <p className="px-1 py-2 text-xs text-stone-400">Sin histórico para esta empresa.</p>
-                    )}
-                  </td>
-                </tr>
-              )}
-              </Fragment>
             );
           })}
           <tr className="bg-stone-900 text-white">
