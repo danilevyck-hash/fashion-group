@@ -67,9 +67,9 @@ function mapFactura(row: Record<string, unknown>): MkFactura {
     itbms: Number(row.itbms ?? 0),
     total: Number(row.total ?? 0),
     tiene_importacion: Boolean(row.tiene_importacion ?? false),
-    estado_pago: String(row.estado_pago ?? "pendiente") === "pagado"
+    estado_pago: String(row.estado_pago ?? "creado") === "pagado"
       ? "pagado"
-      : "pendiente",
+      : "creado",
     anulado_en: (row.anulado_en as string | null) ?? null,
     anulado_motivo: (row.anulado_motivo as string | null) ?? null,
     created_at: String(row.created_at ?? ""),

@@ -299,7 +299,7 @@ export async function createFactura(
     ? calcularCostoTotal(subtotal, true)
     : round2(subtotal + itbms);
 
-  const estadoPago = input.estadoPago === "pagado" ? "pagado" : "pendiente";
+  const estadoPago = input.estadoPago === "pagado" ? "pagado" : "creado";
 
   const payload = {
     proyecto_id: input.proyectoId,
@@ -353,7 +353,7 @@ export async function updateFactura(
     payload.concepto = c;
   }
   if (input.estadoPago !== undefined) {
-    payload.estado_pago = input.estadoPago === "pagado" ? "pagado" : "pendiente";
+    payload.estado_pago = input.estadoPago === "pagado" ? "pagado" : "creado";
   }
 
   // Si cambia subtotal, itbms o tieneImportacion, recalcular total.

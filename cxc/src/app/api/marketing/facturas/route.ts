@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       subtotal: Number(body.subtotal),
       itbms: body.itbms !== undefined ? Number(body.itbms) : 0,
       tieneImportacion: Boolean(body.tieneImportacion),
-      estadoPago: body.estadoPago === "pagado" ? "pagado" : "pendiente",
+      estadoPago: body.estadoPago === "pagado" ? "pagado" : "creado",
     });
 
     // Si el usuario decidió guardar a sabiendas un duplicado, dejamos rastro

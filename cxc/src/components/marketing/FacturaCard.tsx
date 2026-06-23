@@ -63,11 +63,11 @@ export function FacturaCard({
             <span
               className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
                 factura.estado_pago === "pagado"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-amber-50 text-amber-800 border-amber-200"
+                  ? "bg-green-50 text-green-700 border-green-200"
+                  : "bg-gray-100 text-gray-600 border-gray-300"
               }`}
             >
-              {factura.estado_pago === "pagado" ? "Pagado" : "Pendiente"}
+              {factura.estado_pago === "pagado" ? "Pagado" : "Creado"}
             </span>
           )}
           {factura.tiene_importacion && !anulada && (
