@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    const { buffer, fotosIncluidas, fotosOmitidas } = await buildReclamosZip(reclamos, empresa, contacto);
+    const { buffer, fotosIncluidas, fotosOmitidas, pdfsIncluidos, pdfsOmitidos } = await buildReclamosZip(reclamos, empresa, contacto);
 
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.zip`;
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
         "X-Reclamos-Count": String(reclamos.length),
         "X-Fotos-Incluidas": String(fotosIncluidas),
         "X-Fotos-Omitidas": String(fotosOmitidas),
+        "X-Facturas-Incluidas": String(pdfsIncluidos),
+        "X-Facturas-Omitidas": String(pdfsOmitidos),
       },
     });
   } catch (err) {

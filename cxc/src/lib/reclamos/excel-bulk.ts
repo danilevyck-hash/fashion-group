@@ -1,6 +1,9 @@
 import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
+import { facturaPath, fotosFolder } from "./zip-paths";
+
+const LINK_FG = "0563C1"; // azul de hyperlink
 
 const TASA_IMPORTACION = 0.10;
 const TASA_ITBMS = 0.077;
@@ -45,6 +48,7 @@ interface ReclamoFull {
   fecha_reclamo?: string;
   estado?: string;
   notas?: string;
+  factura_pdf_path?: string | null;
   reclamo_items?: ReclamoItem[];
   reclamo_fotos?: ReclamoFoto[];
 }
@@ -76,11 +80,12 @@ function fillRow(cMax: number, r: number, ws: XLSX.WorkSheet, bg: string) {
   }
 }
 
-function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = false): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
-  const CMAX = 8; // 9 columnas (0..8)
+  // En modo ZIP (relative) agrega 2 columnas de links a los archivos del ZIP.
+  const CMAX = relative ? 10 : 8;
   let r = 0;
 
   // Title
@@ -117,7 +122,8 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
   h[r] = 6; r++;
 
   // Headers
-  const headers = ["N° Reclamo", "Factura", "Fecha", "Estado", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos"];
+  const headers = ["N° Reclamo", "Factura", "Fecha", "Estado", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos",
+    ...(relative ? ["Factura PDF", "Fotos"] : [])];
   headers.forEach((hv, i) => {
     ws[addr(r, i)] = {
       v: hv,
@@ -195,6 +201,26 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     ws[addr(r, 6)] = num(itbms);
     ws[addr(r, 7)] = num(total, true);
     ws[addr(r, 8)] = int(nFotos);
+    // Links relativos a los archivos del ZIP (Factura PDF / carpeta de fotos).
+    if (relative) {
+      const linkCell = (label: string, target: string) => ({
+        v: label,
+        t: "s" as const,
+        s: {
+          font: { sz: 10, color: { rgb: LINK_FG }, underline: true, name: "Calibri" },
+          fill: { fgColor: { rgb: DATA_BG } },
+          alignment: { horizontal: "center" },
+          border: B,
+        },
+        l: { Target: target, Tooltip: label },
+      });
+      ws[addr(r, 9)] = rec.factura_pdf_path
+        ? linkCell("Ver factura", facturaPath(rec.nro_reclamo))
+        : txt("—", "center");
+      ws[addr(r, 10)] = (rec.reclamo_fotos || []).length > 0
+        ? linkCell("Ver fotos", fotosFolder(rec.nro_reclamo))
+        : txt("—", "center");
+    }
     h[r] = 18; r++;
   }
 
@@ -234,10 +260,11 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
   ws[addr(r, 6)] = tNum(grandItbms);
   ws[addr(r, 7)] = tNum(grandTotal);
   ws[addr(r, 8)] = tInt(grandFotos);
+  if (relative) { ws[addr(r, 9)] = tBand("", "center"); ws[addr(r, 10)] = tBand("", "center"); }
   merges.push({ s: { r, c: 0 }, e: { r, c: 3 } });
   h[r] = 24; r++;
 
-  ws["!ref"] = `A1:I${r}`;
+  ws["!ref"] = `A1:${XLSX.utils.encode_col(CMAX)}${r}`;
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 16 },
@@ -249,6 +276,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     { wch: 14 },
     { wch: 16 },
     { wch: 9 },
+    ...(relative ? [{ wch: 14 }, { wch: 12 }] : []),
   ];
   ws["!rows"] = h.map((v) => ({ hpt: v || 16 }));
   return ws;
@@ -271,17 +299,19 @@ export async function buildBulkReclamosExcel(
   reclamos: ReclamoFull[],
   empresa: string,
   contacto: Contacto | null,
+  opts: { relative?: boolean } = {},
 ): Promise<Buffer> {
+  const relative = !!opts.relative;
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
 
-  const resumen = buildResumenSheet(reclamos, empresa);
+  const resumen = buildResumenSheet(reclamos, empresa, relative);
   XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
 
   for (const rec of reclamos) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
     const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
-    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos);
+    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, { relative });
     XLSX.utils.book_append_sheet(wb, sheet, safeSheetName(rec.nro_reclamo || "Reclamo", used));
   }
 

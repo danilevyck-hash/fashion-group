@@ -48,11 +48,11 @@ export function empresaDesdeIA(
 
 export const DEFAULT_MOTIVOS = [
   "Mercancía defectuosa",
-  "Talla incorrecta",
-  "Cantidad incorrecta",
   "Producto no recibido",
-  "Daño en transporte",
   "Error de facturación",
+  "Sobrante de mercancía",
+  "Faltante de mercancía",
+  "Mercancía manchada",
 ];
 
 export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];

@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdmin } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
+import { validateReclamoFull } from "@/lib/reclamos/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -26,66 +27,65 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items, factura_pdf_path } = body;
 
-  if (!empresa || !nro_factura || !fecha_reclamo) {
-    return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
-  }
+  // Obligatoriedad (cabecera + ítems). Solo notas / factura PDF / fotos opcionales.
+  const vErr = validateReclamoFull({ empresa, nro_factura, fecha_reclamo, nro_orden_compra }, items);
+  if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
 
-  // Generate nro_reclamo with retry to avoid UNIQUE conflicts
+  // Número REC-{año}-{correlativo} que REINICIA por año: el correlativo es el MAX
+  // del sufijo entre los reclamos cuyo nro_reclamo empieza con REC-{año}- (no un
+  // COUNT global). Concurrencia: el INSERT se reintenta ante violación de
+  // unicidad (23505) recalculando el siguiente correlativo — nro_reclamo es
+  // UNIQUE, esa es la garantía real (no el COUNT+SELECT no atómico de antes).
   const year = new Date().getFullYear();
-  let nro_reclamo = "";
-  let attempts = 0;
-  while (!nro_reclamo && attempts < 5) {
-    attempts++;
-    const { count } = await supabaseServer
-      .from("reclamos")
-      .select("*", { count: "exact", head: true })
-      .then((r) => ({ count: r.count ?? 0 }));
-    const seq = (count || 0) + attempts;
-    const candidate = `REC-${year}-${String(seq).padStart(4, "0")}`;
-    const { data: existing } = await supabaseServer
-      .from("reclamos")
-      .select("id")
-      .eq("nro_reclamo", candidate)
-      .maybeSingle();
-    if (!existing) nro_reclamo = candidate;
-  }
-  if (!nro_reclamo) {
-    // Fallback: use MAX sequence + random to guarantee uniqueness
-    const { data: maxRow } = await supabaseServer
+  const prefix = `REC-${year}-`;
+
+  async function nextNroReclamo(): Promise<string> {
+    const { data } = await supabaseServer
       .from("reclamos")
       .select("nro_reclamo")
-      .like("nro_reclamo", `REC-${year}-%`)
-      .order("nro_reclamo", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const maxSeq = maxRow ? parseInt(maxRow.nro_reclamo.split("-").pop() || "0", 10) : 0;
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    nro_reclamo = `REC-${year}-${String(maxSeq + rand).padStart(4, "0")}`;
+      .like("nro_reclamo", `${prefix}%`);
+    let max = 0;
+    for (const row of data ?? []) {
+      const suf = parseInt(String(row.nro_reclamo).slice(prefix.length), 10);
+      if (Number.isFinite(suf) && suf > max) max = suf;
+    }
+    // padStart(4): 0001. Si supera 9999, String() crece a 5 dígitos sin truncar.
+    return `${prefix}${String(max + 1).padStart(4, "0")}`;
   }
 
-  const { data: reclamo, error: recErr } = await supabaseServer
-    .from("reclamos")
-    .insert({
-      nro_reclamo,
-      empresa,
-      proveedor: proveedor || "",
-      marca: marca || "",
-      nro_factura,
-      nro_orden_compra: nro_orden_compra || "",
-      fecha_reclamo,
-      estado: "Creado",
-      notas: notas || "",
-      factura_pdf_path: factura_pdf_path || null,
-    })
-    .select()
-    .single();
+  let reclamo: { id: string } | null = null;
+  let lastErr: { message?: string; code?: string; details?: string; hint?: string } | null = null;
+  let attemptedNro = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    attemptedNro = await nextNroReclamo();
+    const ins = await supabaseServer
+      .from("reclamos")
+      .insert({
+        nro_reclamo: attemptedNro,
+        empresa,
+        proveedor: proveedor || "",
+        marca: marca || "",
+        nro_factura,
+        nro_orden_compra,
+        fecha_reclamo,
+        estado: "Creado",
+        notas: notas || "",
+        factura_pdf_path: factura_pdf_path || null,
+      })
+      .select()
+      .single();
+    if (!ins.error) { reclamo = ins.data; break; }
+    lastErr = ins.error;
+    // 23505 = unique_violation: otro request tomó ese número → reintenta con MAX recalculado.
+    if (ins.error.code !== "23505") break;
+  }
 
-  if (recErr) return NextResponse.json({
-    error: recErr.message,
-    code: recErr.code,
-    details: recErr.details,
-    hint: recErr.hint,
-    attempted_nro: nro_reclamo,
+  if (!reclamo) return NextResponse.json({
+    error: lastErr?.message || "No se pudo crear el reclamo.",
+    code: lastErr?.code,
+    details: lastErr?.details,
+    hint: lastErr?.hint,
+    attempted_nro: attemptedNro,
   }, { status: 500 });
 
   let itemsWarning = "";

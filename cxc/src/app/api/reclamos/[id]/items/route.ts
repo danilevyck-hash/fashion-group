@@ -3,11 +3,17 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { validateReclamoItems } from "@/lib/reclamos/validate";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const { items } = await req.json();
+
+  // Obligatoriedad: >= 1 ítem y cada uno completo. Se valida ANTES de borrar los
+  // existentes para no dejar el reclamo sin ítems si el payload es inválido.
+  const vErr = validateReclamoItems(items);
+  if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
 
   // Backup current items before replacing
   const { data: backup } = await supabaseServer.from("reclamo_items").select("*").eq("reclamo_id", params.id);

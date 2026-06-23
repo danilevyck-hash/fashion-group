@@ -200,21 +200,21 @@ export default function ReclamoDetail({
           {editMode ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mt-3 max-w-2xl">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa</span>
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</span>
                 <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
                   {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura</span>
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</span>
                 <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</span>
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido *</span>
                 <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha</span>
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</span>
                 <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
@@ -439,13 +439,13 @@ export default function ReclamoDetail({
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                      <th className="pb-2 font-medium text-left">Código</th>
-                      <th className="pb-2 font-medium text-left">Descripción</th>
-                      <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
+                      <th className="pb-2 font-medium text-left">Código *</th>
+                      <th className="pb-2 font-medium text-left">Descripción *</th>
+                      <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
-                      <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
-                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
-                      <th className="pb-2 font-medium text-left">Motivo</th>
+                      <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant. *</th>
+                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U. *</th>
+                      <th className="pb-2 font-medium text-left">Motivo *</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
                       <th className="pb-2 w-6"></th>
                     </tr>
