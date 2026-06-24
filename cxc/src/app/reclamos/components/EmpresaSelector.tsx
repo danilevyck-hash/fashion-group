@@ -52,26 +52,18 @@ export default function EmpresaSelector({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el ZIP.");
+        throw new Error(err?.error || "Error al generar el Excel.");
       }
-      const omitidas = Number(res.headers.get("X-Fotos-Omitidas") || "0");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      const sizeMB = blob.size / (1024 * 1024);
-      if (sizeMB > 25) {
-        showToast(`ZIP de ${sizeMB.toFixed(0)}MB descargado. Pesado para adjuntar en Outlook — considera enviar por selección de reclamos.`);
-      } else if (omitidas > 0) {
-        showToast(`ZIP descargado. ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir.`);
-      } else {
-        showToast(`ZIP de ${empresa} descargado`);
-      }
+      showToast(`Excel de ${empresa} descargado`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el ZIP");
+      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
       setZipBusy(null);
     }
@@ -159,8 +151,8 @@ export default function EmpresaSelector({
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5 flex-wrap justify-end">
-                      <button onClick={(ev) => downloadEmpresaZip(empresa, ev)} disabled={zipBusy !== null} title="Descargar Excel resumen + fotos comprimidas de toda la empresa en un solo ZIP"
-                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{zipBusy === empresa ? "ZIP…" : "↓ ZIP"}</button>
+                      <button onClick={(ev) => downloadEmpresaZip(empresa, ev)} disabled={zipBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{zipBusy === empresa ? "Excel…" : "↓ Excel"}</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">

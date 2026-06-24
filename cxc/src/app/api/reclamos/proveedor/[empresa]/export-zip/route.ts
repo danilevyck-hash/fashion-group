@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
-import { fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/excel-bulk";
-import { buildReclamosZip } from "@/lib/reclamos/zip-bulk";
+import { buildBulkReclamosExcel, fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/excel-bulk";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // armar+comprimir el ZIP puede tardar
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest, { params }: { params: { empresa: string } }) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -28,21 +27,18 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    const { buffer, fotosIncluidas, fotosOmitidas, pdfsIncluidos, pdfsOmitidos } = await buildReclamosZip(reclamos, empresa, contacto);
+    // Excel pelado con links WEB (factura firmada + fotos públicas) → abre con un
+    // clic en Mac/Windows, sin extraer ni permisos. Ya no se arma ZIP con binarios.
+    const buf = await buildBulkReclamosExcel(reclamos, empresa, contacto);
 
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.zip`;
+    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
-    return new NextResponse(new Uint8Array(buffer), {
+    return new NextResponse(new Uint8Array(buf), {
       headers: {
-        "Content-Type": "application/zip",
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,
-        // El cliente lee estos headers para avisar si faltaron fotos o si pesa mucho.
         "X-Reclamos-Count": String(reclamos.length),
-        "X-Fotos-Incluidas": String(fotosIncluidas),
-        "X-Fotos-Omitidas": String(fotosOmitidas),
-        "X-Facturas-Incluidas": String(pdfsIncluidos),
-        "X-Facturas-Omitidas": String(pdfsOmitidos),
       },
     });
   } catch (err) {

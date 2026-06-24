@@ -1,5 +1,4 @@
 import XLSX from "xlsx-js-style";
-import { facturaPath, fotoPath } from "@/lib/reclamos/zip-paths";
 
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
@@ -16,21 +15,19 @@ const CMAX = 7; // 8 columnas (0..7): Código, Descripción, Talla, Género, Can
 function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i = 0; i <= c; i++) if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } }; }
 
 /**
- * Hoja Excel de un reclamo. `opts.relative` (modo ZIP): los links de factura y
- * fotos apuntan a las rutas RELATIVAS de los archivos dentro del ZIP
- * ({nro_reclamo}/factura.pdf, {nro_reclamo}/fotos/foto_N.jpg) → no expiran.
- * Sin `relative` (Excel suelto): los links de fotos usan la URL pública del
- * bucket reclamo-fotos (comportamiento previo) y no hay link de factura.
+ * Hoja Excel de un reclamo. Los links son URLs WEB que abren con un clic en el
+ * navegador (Mac/Windows), sin extraer nada ni permisos:
+ *   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
+ *   - Fotos:   URL pública del bucket reclamo-fotos.
+ * El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
  */
 export function buildReclamoSheet(
   rec: Record<string, unknown>,
   items: Record<string, unknown>[],
   fotos: ReclamoFoto[] = [],
-  opts: { relative?: boolean } = {},
 ): XLSX.WorkSheet {
-  const relative = !!opts.relative;
+  const facturaUrl = (rec.factura_pdf_url as string | null | undefined) || null;
   const nroReclamo = String(rec.nro_reclamo || "");
-  const tieneFactura = !!rec.factura_pdf_path;
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
@@ -124,7 +121,7 @@ export function buildReclamoSheet(
     h[r] = 18; r++;
   };
 
-  const tieneSeccion = (relative && tieneFactura) || fotos.length > 0;
+  const tieneSeccion = !!facturaUrl || fotos.length > 0;
   if (tieneSeccion) {
     // Spacer
     fill(CMAX, r, ws, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 10; r++;
@@ -132,18 +129,16 @@ export function buildReclamoSheet(
     ws[addr(r, 0)] = { v: "ARCHIVOS Y EVIDENCIA", t: "s", s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: MID } }, alignment: { horizontal: "center", vertical: "center" } } };
     fill(CMAX, r, ws, MID); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 22; r++;
 
-    // Factura PDF (solo en ZIP, link relativo)
-    if (relative && tieneFactura) {
-      linkRow("Factura", "Ver factura", facturaPath(nroReclamo));
+    // Factura PDF — link WEB (signed URL larga; bucket privado, no expuesto).
+    if (facturaUrl) {
+      linkRow("Factura", "Ver factura", facturaUrl);
     }
 
-    // Fotos
+    // Fotos — URL pública (bucket reclamo-fotos), abre con un clic.
     const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
     for (let i = 0; i < fotos.length; i++) {
       const foto = fotos[i];
-      const target = relative
-        ? fotoPath(nroReclamo, i + 1)
-        : (foto.url || `${supabaseUrl}/storage/v1/object/public/reclamo-fotos/${foto.storage_path}`);
+      const target = foto.url || `${supabaseUrl}/storage/v1/object/public/reclamo-fotos/${foto.storage_path}`;
       linkRow(`Foto ${i + 1}`, `Ver foto ${i + 1}`, target);
     }
   }

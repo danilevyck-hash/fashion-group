@@ -109,7 +109,7 @@ export default function EnviarProveedorModal({
 
         <div className="px-5 py-4 space-y-4">
           <p className="text-xs text-gray-400">
-            {empresa} — {count} reclamo{count === 1 ? "" : "s"} · se adjunta el ZIP (Excel resumen + fotos)
+            {empresa} — {count} reclamo{count === 1 ? "" : "s"} · se adjunta el Excel (con links a facturas y fotos que abren con un clic)
           </p>
 
           <div>

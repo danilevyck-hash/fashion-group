@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
+import { adjuntarFacturaUrls } from "@/lib/reclamos/factura-storage";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +26,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const items = (data.reclamo_items || []) as Record<string, unknown>[];
   const fotos = (data.reclamo_fotos || []) as { url?: string; storage_path: string }[];
-  const ws = buildReclamoSheet(data, items, fotos);
+  // Adjunta el link WEB firmado de la factura (bucket privado) para el Excel.
+  const [withUrl] = await adjuntarFacturaUrls([data]);
+  const ws = buildReclamoSheet(withUrl, items, fotos);
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Reclamo");
