@@ -30,7 +30,7 @@ export default function EmpresaSelector({
   expandedHistorial, setExpandedHistorial, totalPendiente, pendientes, alertas,
   onNewReclamo, onSelectEmpresa, onLoadDetail, freshness,
 }: Props) {
-  const [zipBusy, setZipBusy] = useState<string | null>(null);
+  const [excelBusy, setExcelBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
@@ -38,12 +38,12 @@ export default function EmpresaSelector({
     return contactos.find((c) => c.empresa === empresa) || null;
   }
 
-  async function downloadEmpresaZip(empresa: string, ev: React.MouseEvent) {
+  async function downloadEmpresaExcel(empresa: string, ev: React.MouseEvent) {
     ev.stopPropagation();
-    if (zipBusy) return;
+    if (excelBusy) return;
     const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
     if (!ids.length) return;
-    setZipBusy(empresa);
+    setExcelBusy(empresa);
     try {
       const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/export-zip`, {
         method: "POST",
@@ -65,7 +65,7 @@ export default function EmpresaSelector({
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
-      setZipBusy(null);
+      setExcelBusy(null);
     }
   }
 
@@ -151,8 +151,8 @@ export default function EmpresaSelector({
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5 flex-wrap justify-end">
-                      <button onClick={(ev) => downloadEmpresaZip(empresa, ev)} disabled={zipBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
-                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{zipBusy === empresa ? "Excel…" : "↓ Excel"}</button>
+                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} disabled={excelBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{excelBusy === empresa ? "Excel…" : "↓ Excel"}</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">

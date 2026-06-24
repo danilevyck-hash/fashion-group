@@ -77,7 +77,7 @@ export default function ReclamoDetail({
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [zipBusy, setZipBusy] = useState(false);
+  const [excelBusy, setExcelBusy] = useState(false);
   const [facturaLightbox, setFacturaLightbox] = useState<string | null>(null);
 
   // La IA rellena la cabecera en edición (campos editables); NO toca los ítems.
@@ -89,9 +89,9 @@ export default function ReclamoDetail({
     if (data.nro_orden_compra) setEditPedido(data.nro_orden_compra);
   }
 
-  async function downloadZip() {
-    if (zipBusy) return;
-    setZipBusy(true);
+  async function downloadExcel() {
+    if (excelBusy) return;
+    setExcelBusy(true);
     try {
       const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(current.empresa)}/export-zip`, {
         method: "POST",
@@ -113,7 +113,7 @@ export default function ReclamoDetail({
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
-      setZipBusy(false);
+      setExcelBusy(false);
     }
   }
 
@@ -303,9 +303,9 @@ export default function ReclamoDetail({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
             Editar
           </button>
-          <button onClick={downloadZip} disabled={zipBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
+          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-            {zipBusy ? "Generando Excel…" : "Descargar Excel"}
+            {excelBusy ? "Generando Excel…" : "Descargar Excel"}
           </button>
           {role === "admin" && (
             <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center gap-1">

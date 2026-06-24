@@ -39,7 +39,7 @@ interface Props {
   onReload: () => void;
 }
 
-type BulkAction = "zip";
+type BulkAction = "excel";
 
 // Íconos de acción por fila — discretos, hover. stroke currentColor para heredar color.
 const IconEye = (
@@ -87,7 +87,7 @@ export default function EmpresaList({
     return 0;
   });
 
-  // Selección para enviar/ZIP Y borrar → TODOS los reclamos son seleccionables
+  // Selección para enviar/Excel y borrar → TODOS los reclamos son seleccionables
   // (antes solo "Creado"; se quitó la restricción porque ahora también borra).
   const allSelectableIds = sortedRecs.map((r) => r.id);
   const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
@@ -103,9 +103,9 @@ export default function EmpresaList({
 
   const empresaPath = encodeURIComponent(activeEmpresa);
 
-  async function downloadBulkZip() {
+  async function downloadBulkExcel() {
     if (busy || selectedIds.length === 0) return;
-    setBusy("zip");
+    setBusy("excel");
     try {
       const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-zip`, {
         method: "POST",
@@ -171,12 +171,12 @@ export default function EmpresaList({
                 Enviar al proveedor
               </button>
               <button
-                onClick={downloadBulkZip}
+                onClick={downloadBulkExcel}
                 disabled={busy !== null}
                 title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
                 className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
               >
-                {busy === "zip" ? "Generando Excel..." : "Descargar Excel"}
+                {busy === "excel" ? "Generando Excel..." : "Descargar Excel"}
               </button>
               {isAdmin && (
                 <button
