@@ -18,7 +18,7 @@ interface EnviarProveedorModalProps {
 
 /**
  * Modal editable para "Enviar al proveedor": to / asunto / mensaje autocompletados
- * desde el contacto, todos editables. Al enviar, el server arma el ZIP y lo adjunta
+ * desde el contacto, todos editables. Al enviar, el server arma el Excel y lo adjunta
  * (o manda un link firmado si pesa demasiado). Reusable desde la lista de empresas,
  * la selección múltiple y el detalle de un reclamo.
  */
