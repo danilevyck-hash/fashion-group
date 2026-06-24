@@ -432,17 +432,29 @@ export default function ReclamoForm({
       {/* ── Acciones ── */}
       {savedReclamoId ? (
         <div className="mt-8 border-t border-gray-200 pt-6">
-          <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-lg">
-            <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0">
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
-            </div>
+          {/* Estado HONESTO: en verde "guardado" solo cuando reclamo + fotos
+              terminaron OK. Mientras sube: "Guardando…". Si una foto falló: mixto. */}
+          <div className={`flex items-center gap-3 mb-6 p-4 rounded-lg ${saving ? "bg-gray-50" : fotosError ? "bg-amber-50" : "bg-green-50"}`}>
+            {saving ? (
+              <span className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin flex-shrink-0" />
+            ) : fotosError ? (
+              <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 text-white text-[11px] font-bold leading-none">!</div>
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
+              </div>
+            )}
             <div>
-              <p className="text-sm font-medium">{savedNroReclamo} guardado</p>
-              <p className="text-xs text-gray-400">{fotosError ? "Reintenta las fotos que fallaron arriba, o continúa — son opcionales." : pendingFotos.length > 0 ? "Reclamo guardado con sus fotos." : "Reclamo guardado. Puedes agregar fotos desde el reclamo."}</p>
+              <p className="text-sm font-medium">
+                {saving ? "Guardando reclamo y fotos…" : fotosError ? `${savedNroReclamo} guardado · faltan fotos` : pendingFotos.length > 0 ? `${savedNroReclamo} guardado con sus fotos` : `${savedNroReclamo} guardado`}
+              </p>
+              <p className="text-xs text-gray-500">
+                {saving ? "No cierres esta pantalla." : fotosError ? "El reclamo quedó guardado, pero algunas fotos no subieron. Reintenta arriba." : pendingFotos.length > 0 ? "Reclamo y fotos subidos correctamente." : "Reclamo guardado. Puedes agregar fotos desde el reclamo."}
+              </p>
             </div>
           </div>
           <button onClick={onViewSaved} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">Ver reclamo →</button>
-          <button onClick={onResetAndCreateAnother} className="text-sm text-gray-400 hover:text-black transition ml-4">Crear otro reclamo</button>
+          <button onClick={onResetAndCreateAnother} disabled={saving} className="text-sm text-gray-400 hover:text-black transition ml-4 disabled:opacity-50">Crear otro reclamo</button>
         </div>
       ) : (
         <div className="mt-8">
