@@ -27,16 +27,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data)
 }
 
-export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req); if (denied) return denied
-  const body = await req.json()
-  if (!body.name) return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
-  const { data, error } = await reebokServer.from('products').insert(body).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at').single()
-  if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
-  const s = getSession(req)
-  await logActivity(s?.role || 'admin', 'product_create', 'reebok', { productId: data.id, name: body.name }, s?.userName)
-  return NextResponse.json(data)
-}
+// La creación manual de productos fue retirada: el catálogo lo llena el cron
+// `reebok-catalogo` desde Switch (no se crean productos a mano). Solo quedan
+// GET (lectura), PUT (actualizar image_url al subir foto) y DELETE (ocultar).
 
 export async function PUT(req: NextRequest) {
   const denied = requireAdmin(req); if (denied) return denied
