@@ -23,6 +23,12 @@ import crypto from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
+// El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
+// internos de supabase-js. Sin esto, la lectura de cron_heartbeats queda pegada
+// al primer snapshot (ej. antes de existir la fila reebok-catalogo) y devuelve
+// last_success_at:null indefinidamente, aunque la fila esté en la DB.
+// `dynamic = "force-dynamic"` NO basta (ver switch-reconciliacion/route.ts).
+export const fetchCache = "force-no-store";
 
 // Todos los crons corren 1×/día (plan Hobby). Stale = sin success en >26h
 // (mismo umbral que el watchdog interno de switch-reconciliacion).
