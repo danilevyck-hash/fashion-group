@@ -456,14 +456,14 @@ export default function ReclamoDetail({
           {editMode ? (
             <>
               <ScrollableTable minWidth={700} className="mb-4">
-                <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
+                <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                       <th className="pb-2 font-medium text-left">Código *</th>
                       <th className="pb-2 font-medium text-left">Descripción *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
-                      <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant. *</th>
+                      <th className="pb-2 font-medium text-right" style={{ minWidth: 60 }}>Cant. *</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U. *</th>
                       <th className="pb-2 font-medium text-left">Motivo *</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
@@ -482,7 +482,7 @@ export default function ReclamoDetail({
                             {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
                           </select>
                         </td>
-                        <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
+                        <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1"><input type="number" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1">
                           {addingEditMotivo === idx ? (

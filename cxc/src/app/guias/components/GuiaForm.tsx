@@ -349,7 +349,7 @@ export default function GuiaForm({
         )}
 
         <ScrollableTable minWidth={800}>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
               <th className="py-3 px-4 font-normal w-10 text-left">#</th>
@@ -357,7 +357,7 @@ export default function GuiaForm({
               <th className="py-3 px-4 font-normal text-left">Dirección <span className="text-red-500">*</span><AddNewInline placeholder="Ciudad" onAdd={onAddDireccion} /></th>
               <th className="py-3 px-4 font-normal text-left">Empresa <span className="text-red-500">*</span></th>
               <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span><div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div></th>
-              <th className="py-3 px-4 font-normal w-20 text-center">Bultos <span className="text-red-500">*</span></th>
+              <th className="py-3 px-4 font-normal w-20 text-right">Bultos <span className="text-red-500">*</span></th>
               <th className="py-3 w-8"></th>
             </tr>
           </thead>
@@ -403,7 +403,7 @@ export default function GuiaForm({
                 </td>
                 <td className="py-2 pr-2">
                   <input type="number" min={0} value={item.bultos || ""} placeholder="0" onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)} onBlur={() => handleBlur(`item-${idx}-bultos`)}
-                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition", `item-${idx}-bultos`, String(item.bultos || ""))} />
+                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-right focus:border-black transition", `item-${idx}-bultos`, String(item.bultos || ""))} />
                   {touched[`item-${idx}-bultos`] && !item.bultos && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 text-center">
