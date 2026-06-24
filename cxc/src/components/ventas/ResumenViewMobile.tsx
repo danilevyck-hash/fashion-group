@@ -150,12 +150,12 @@ function KpiTile({
   sub: { text: string; sign: number | null } | null;
 }) {
   const subTone = sub == null || sub.sign == null
-    ? "text-stone-500"
-    : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-stone-500";
+    ? "text-gray-500"
+    : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-gray-500";
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-2.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
-      <p className="mt-1 font-mono text-[17px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">
+    <div className="rounded-xl border border-gray-200 bg-white p-2.5">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 font-mono text-[17px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">
         {value}
       </p>
       {sub && (
@@ -216,7 +216,7 @@ function SegmentedRow<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg bg-stone-100 p-0.5" role="tablist">
+    <div className="flex rounded-lg bg-gray-100 p-0.5" role="tablist">
       {options.map(o => {
         const isActive = active === o.value;
         return (
@@ -229,8 +229,8 @@ function SegmentedRow<T extends string>({
             className={cn(
               "flex-1 rounded-md py-2.5 text-xs font-medium transition min-h-[44px]",
               isActive
-                ? "bg-white text-stone-950 shadow-sm"
-                : "text-stone-500 active:text-stone-700"
+                ? "bg-white text-gray-950 shadow-sm"
+                : "text-gray-500 active:text-gray-700"
             )}
           >
             {o.label}
@@ -322,13 +322,13 @@ function MobileHeatmap({
   const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
 
   return (
-    <div className="relative overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <div className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
       <table className="w-full border-collapse text-xs [&_td]:align-middle [&_th]:align-middle">
         <thead>
-          <tr className="border-b border-stone-200 bg-stone-50">
+          <tr className="border-b border-gray-200 bg-gray-50">
             <th
               scope="col"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-stone-500"
+              className="sticky left-0 z-10 min-w-[120px] border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
             >
               Empresa
             </th>
@@ -337,7 +337,7 @@ function MobileHeatmap({
                 key={c}
                 scope="col"
                 className={cn(
-                  "px-2 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500",
+                  "px-2 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500",
                   ci === currentColIdx && "bg-[rgba(15,118,110,0.06)] text-teal-800"
                 )}
               >
@@ -346,14 +346,14 @@ function MobileHeatmap({
             ))}
             <th
               scope="col"
-              className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
+              className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
             >
               Total
             </th>
             {showProy && (
               <th
                 scope="col"
-                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
+                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
               >
                 Proyección
               </th>
@@ -361,7 +361,7 @@ function MobileHeatmap({
             {showMensual && (
               <th
                 scope="col"
-                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
+                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
               >
                 Cierre {mesProyLabel} (proy.)
               </th>
@@ -378,11 +378,11 @@ function MobileHeatmap({
                 key={r.id}
                 onClick={() => onOpenEmpresa(r.id)}
                 aria-haspopup="dialog"
-                className="cursor-pointer border-b border-stone-100 last:border-b-0 active:bg-stone-50"
+                className="cursor-pointer border-b border-gray-100 last:border-b-0 active:bg-gray-50"
               >
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] border-r border-stone-200 bg-white px-3 py-3 text-left text-xs font-medium text-stone-900"
+                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] border-r border-gray-200 bg-white px-3 py-3 text-left text-xs font-medium text-gray-900"
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="min-w-0 flex-1">
@@ -390,13 +390,13 @@ function MobileHeatmap({
                       {r.id === "multi" && multiMayoreoLabel && (
                         /* Nota VISIBLE (paridad con desktop): la fila es american_classic
                            COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */
-                        <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-stone-500">
+                        <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-gray-500">
                           incluye mayoreo · {multiMayoreoLabel}
                         </span>
                       )}
                     </span>
                     {/* Affordance: abre el panel mes × año de la empresa. */}
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-stone-300" aria-hidden />
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300" aria-hidden />
                   </div>
                 </th>
                 {r.cells.map((c, ci) => (
@@ -419,10 +419,10 @@ function MobileHeatmap({
               </tr>
             );
           })}
-          <tr className="bg-stone-900 text-white">
+          <tr className="bg-gray-900 text-white">
             <th
               scope="row"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-700 bg-stone-900 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide"
+              className="sticky left-0 z-10 min-w-[120px] border-r border-gray-700 bg-gray-900 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide"
             >
               Total grupo
             </th>
@@ -468,7 +468,7 @@ function MobileCell({
 
   if (cur == null) {
     return (
-      <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-stone-300", bgCls)}>
+      <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-300", bgCls)}>
         —
       </td>
     );
@@ -481,7 +481,7 @@ function MobileCell({
   return (
     <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
       <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-xs text-stone-600">{renderCell(cur, mode)}</span>
+        <span className="w-full text-right text-xs text-gray-600">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
     </td>
@@ -514,7 +514,7 @@ function MobileTotalCell({
     display = formatCompactCurrency(cur);
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono tabular-nums text-stone-950">
+    <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono tabular-nums text-gray-950">
       <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="w-full text-right text-xs font-semibold">{display}</span>
         <DeltaPct delta={delta} mode={mode} />
@@ -528,14 +528,14 @@ function MobileTotalCell({
 function MobileMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
   if (!pm || pm.proyeccion == null) {
     return (
-      <td className="border-l border-stone-200 px-2.5 py-3 text-right text-xs text-stone-400">
+      <td className="border-l border-gray-200 px-2.5 py-3 text-right text-xs text-gray-400">
         datos insuf.
       </td>
     );
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-3 text-right">
-      <span className="block font-mono text-xs font-semibold tabular-nums text-stone-900">{formatCompactCurrency(pm.proyeccion)}</span>
+    <td className="border-l border-gray-200 px-2.5 py-3 text-right">
+      <span className="block font-mono text-xs font-semibold tabular-nums text-gray-900">{formatCompactCurrency(pm.proyeccion)}</span>
       {pm.volatil && <span className="mt-0.5 block text-xs text-amber-600">volátil</span>}
     </td>
   );
@@ -546,7 +546,7 @@ function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEm
   const vals = Object.values(pm);
   const total = vals.reduce((s, e) => s + (e.suficiente_data && e.proyeccion != null ? e.proyeccion : 0), 0);
   return (
-    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-white">
+    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-white">
       {formatCompactCurrency(total)}
     </td>
   );
@@ -555,13 +555,13 @@ function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEm
 function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
   if (!proyeccion) {
     return (
-      <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums text-stone-300">
+      <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums text-gray-300">
         —
       </td>
     );
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-700">
+    <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-700">
       {formatCompactCurrency(proyeccion.proyeccion_cierre)}
     </td>
   );
@@ -581,7 +581,7 @@ function MobileTotalGrupoCell({
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
   if (cur == null) {
-    return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-stone-500", bgCls)}>—</td>;
+    return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-500", bgCls)}>—</td>;
   }
 
   return (
@@ -626,7 +626,7 @@ function MobileTotalGrupoYtdCell({
     display = formatCompactCurrency(v);
   }
   return (
-    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
+    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
       <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="w-full text-right text-xs font-semibold">{display}</span>
         <DeltaPct delta={d} mode={mode} dark />
@@ -637,7 +637,7 @@ function MobileTotalGrupoYtdCell({
 
 function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
   return (
-    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-200">
+    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-200">
       {formatCompactCurrency(proyeccion.totales_grupo.proyeccion_cierre)}
     </td>
   );
@@ -667,7 +667,7 @@ function DeltaPct({
       ? dark ? "text-emerald-300" : "text-emerald-700"
       : fmt.tone === "orange"
         ? dark ? "text-rose-300" : "text-rose-600"
-        : dark ? "text-stone-400" : "text-stone-500";
+        : dark ? "text-gray-400" : "text-gray-500";
   // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio. Discreto
   // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
   // grilla vibre.

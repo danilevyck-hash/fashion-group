@@ -6,8 +6,8 @@ type Variant = "neutral" | "success" | "warning" | "danger" | "accent";
 
 const VARIANTS: Record<Variant, { idle: string; active: string }> = {
   neutral: {
-    idle:   "border-stone-200 bg-white text-stone-600 hover:bg-stone-50",
-    active: "border-stone-900 bg-stone-900 text-white",
+    idle:   "border-gray-200 bg-white text-gray-600 hover:bg-gray-50",
+    active: "border-gray-900 bg-gray-900 text-white",
   },
   success: {
     idle:   "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",

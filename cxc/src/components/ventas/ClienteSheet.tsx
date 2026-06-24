@@ -73,7 +73,7 @@ export function ClienteSheet({
           aria-label="Cerrar"
           className="flex w-full justify-center pt-3 pb-2"
         >
-          <div className="h-1 w-10 rounded-full bg-stone-300" />
+          <div className="h-1 w-10 rounded-full bg-gray-300" />
         </button>
         <div className="flex-1 overflow-y-auto px-5 pb-8">
           <ClienteHoverCard

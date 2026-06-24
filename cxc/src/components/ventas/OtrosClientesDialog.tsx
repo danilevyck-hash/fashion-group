@@ -13,7 +13,7 @@ type SortDir = "asc" | "desc";
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
-  stone:   "text-stone-500",
+  stone:   "text-gray-500",
 };
 
 interface OtrosClientesDialogProps {
@@ -67,20 +67,20 @@ export function OtrosClientesDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="otros-clientes-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4"
       onClick={onClose}
     >
       <div
-        className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-xl"
+        className="relative flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-stone-200 px-5 py-3.5">
+        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
           <div>
-            <h2 id="otros-clientes-title" className="font-display text-base font-semibold text-stone-950">
+            <h2 id="otros-clientes-title" className="font-display text-base font-semibold text-gray-950">
               Otros clientes
             </h2>
-            <p className="mt-0.5 text-xs text-stone-500">
+            <p className="mt-0.5 text-xs text-gray-500">
               {orphans.length} {orphans.length === 1 ? "cliente sin código maestro" : "clientes sin código maestro"}
             </p>
           </div>
@@ -88,7 +88,7 @@ export function OtrosClientesDialog({
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-md p-1 text-stone-500 transition hover:bg-stone-100 hover:text-stone-950"
+            className="rounded-md p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-950"
           >
             <X className="h-4 w-4" />
           </button>
@@ -98,7 +98,7 @@ export function OtrosClientesDialog({
         <div className="flex-1 overflow-auto">
           <table className="w-full border-collapse">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-stone-100">
+              <tr className="bg-gray-100">
                 <SortHeader col="nombre" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Nombre</SortHeader>
                 <SortHeader col="id"     align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Código</SortHeader>
                 {showEmpresaColumn && (
@@ -113,13 +113,13 @@ export function OtrosClientesDialog({
               {sorted.map(c => {
                 const fmt = formatDeltaRatio(c.delta);
                 return (
-                  <tr key={`${c.empresaKey}-${c.id}-${c.nombre}`} className="border-b border-stone-100">
-                    <td className="px-3 py-2.5 text-sm text-stone-950">{c.nombre}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs text-stone-500">{c.id || "—"}</td>
+                  <tr key={`${c.empresaKey}-${c.id}-${c.nombre}`} className="border-b border-gray-100">
+                    <td className="px-3 py-2.5 text-sm text-gray-950">{c.nombre}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-gray-500">{c.id || "—"}</td>
                     {showEmpresaColumn && (
-                      <td className="px-3 py-2.5 text-xs text-stone-700">{c.empresa}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-700">{c.empresa}</td>
                     )}
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-sm text-stone-950 tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-sm text-gray-950 tabular-nums">
                       {fmtMoney(c.ytd)}
                     </td>
                     <td className={cn(
@@ -129,7 +129,7 @@ export function OtrosClientesDialog({
                       {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
                       {fmt.displayValue}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs text-stone-500 tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono text-xs text-gray-500 tabular-nums">
                       {c.ultima || "—"}
                     </td>
                   </tr>
@@ -137,7 +137,7 @@ export function OtrosClientesDialog({
               })}
               {sorted.length === 0 && (
                 <tr>
-                  <td colSpan={showEmpresaColumn ? 6 : 5} className="px-3 py-12 text-center text-sm text-stone-500">
+                  <td colSpan={showEmpresaColumn ? 6 : 5} className="px-3 py-12 text-center text-sm text-gray-500">
                     No hay clientes huérfanos en el filtro actual.
                   </td>
                 </tr>
@@ -161,9 +161,9 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-xs font-medium uppercase tracking-wide transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-gray-200 bg-gray-100 px-3 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
-        active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
+        active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
       )}
     >
       <span className="inline-flex items-center gap-1">

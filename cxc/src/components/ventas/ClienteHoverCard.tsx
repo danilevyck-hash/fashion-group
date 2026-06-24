@@ -203,7 +203,7 @@ interface ClienteHoverCardProps {
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
-  stone:   "text-stone-500",
+  stone:   "text-gray-500",
 };
 
 export function ClienteHoverCard({
@@ -234,22 +234,22 @@ export function ClienteHoverCard({
       <div className="space-y-1.5">
         <Link
           href={`/clientes/${encodeURIComponent(codigo)}`}
-          className="block font-display text-[17px] font-medium leading-tight text-stone-950 hover:text-teal-700 transition"
+          className="block font-display text-[17px] font-medium leading-tight text-gray-950 hover:text-teal-700 transition"
         >
           {nombre}
         </Link>
-        <div className="text-xs text-stone-600">
+        <div className="text-xs text-gray-600">
           {empresa} · <span className="font-mono">{codigo}</span>
         </div>
         <CxcChip state={cxc} />
       </div>
 
       {/* Bloque Ventas: total 12m + delta vs 12m anteriores */}
-      <div className="border-t border-stone-100 pt-3">
+      <div className="border-t border-gray-100 pt-3">
         {histLoading ? (
           <div className="space-y-2">
-            <div className="h-7 w-32 animate-pulse rounded bg-stone-100" />
-            <div className="h-3 w-44 animate-pulse rounded bg-stone-100" />
+            <div className="h-7 w-32 animate-pulse rounded bg-gray-100" />
+            <div className="h-3 w-44 animate-pulse rounded bg-gray-100" />
           </div>
         ) : ready && delta ? (
           <>
@@ -257,8 +257,8 @@ export function ClienteHoverCard({
                 caption sin explicar). */}
             <div className="flex items-end justify-between gap-3">
               <div>
-                <div className="text-xs uppercase tracking-wide text-stone-500">Últimos 12 meses</div>
-                <div className="mt-0.5 font-mono text-2xl font-medium leading-none tabular-nums text-stone-950">
+                <div className="text-xs uppercase tracking-wide text-gray-500">Últimos 12 meses</div>
+                <div className="mt-0.5 font-mono text-2xl font-medium leading-none tabular-nums text-gray-950">
                   {fmtMoneyCompact(ready.total_12m)}
                 </div>
               </div>
@@ -270,7 +270,7 @@ export function ClienteHoverCard({
                 {delta.displayValue}
               </div>
             </div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-stone-500">
+            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-gray-500">
               <span className="uppercase tracking-wide">12 meses anteriores</span>
               <span className="font-mono tabular-nums">
                 {ready.total_12m_prior > 0 ? fmtMoneyCompact(ready.total_12m_prior) : "sin compras"}
@@ -285,7 +285,7 @@ export function ClienteHoverCard({
       </div>
 
       {/* Detalles: recurrencia (última compra vive en la columna de la fila) */}
-      <div className="space-y-2 border-t border-stone-100 pt-3 text-xs">
+      <div className="space-y-2 border-t border-gray-100 pt-3 text-xs">
         <DetailRow
           label="Recurrencia"
           value={ready
@@ -306,24 +306,24 @@ export function ClienteHoverCard({
  *  Estado vacío limpio cuando el cliente no tiene facturas registradas. */
 function UltimasFacturas({ state }: { state: FacturasState }) {
   return (
-    <div className="space-y-1.5 border-t border-stone-100 pt-3">
-      <div className="text-xs uppercase tracking-wide text-stone-500">Últimas facturas</div>
+    <div className="space-y-1.5 border-t border-gray-100 pt-3">
+      <div className="text-xs uppercase tracking-wide text-gray-500">Últimas facturas</div>
       {state.status === "loading" ? (
         <div className="space-y-1.5">
-          <div className="h-3.5 w-full animate-pulse rounded bg-stone-100" />
-          <div className="h-3.5 w-5/6 animate-pulse rounded bg-stone-100" />
-          <div className="h-3.5 w-4/6 animate-pulse rounded bg-stone-100" />
+          <div className="h-3.5 w-full animate-pulse rounded bg-gray-100" />
+          <div className="h-3.5 w-5/6 animate-pulse rounded bg-gray-100" />
+          <div className="h-3.5 w-4/6 animate-pulse rounded bg-gray-100" />
         </div>
       ) : state.status === "error" ? (
-        <p className="text-xs text-stone-400">No se pudieron cargar.</p>
+        <p className="text-xs text-gray-400">No se pudieron cargar.</p>
       ) : state.data.length === 0 ? (
-        <p className="text-xs text-stone-400">Sin facturas registradas.</p>
+        <p className="text-xs text-gray-400">Sin facturas registradas.</p>
       ) : (
         <ul className="space-y-1">
           {state.data.map((f, i) => (
             <li key={i} className="flex items-baseline justify-between gap-3 text-xs">
-              <span className="text-stone-600">{f.fecha ? fmtDate(f.fecha) : "—"}</span>
-              <span className="font-mono tabular-nums text-stone-800">{fmtMoney(f.monto)}</span>
+              <span className="text-gray-600">{f.fecha ? fmtDate(f.fecha) : "—"}</span>
+              <span className="font-mono tabular-nums text-gray-800">{fmtMoney(f.monto)}</span>
             </li>
           ))}
         </ul>
@@ -341,7 +341,7 @@ function UltimasFacturas({ state }: { state: FacturasState }) {
  *  Errores se silencian (no se renderiza el chip) para no romper el card. */
 function CxcChip({ state }: { state: CxcState }) {
   if (state.status === "loading") {
-    return <div className="h-5 w-56 animate-pulse rounded bg-stone-100" />;
+    return <div className="h-5 w-56 animate-pulse rounded bg-gray-100" />;
   }
   if (state.status === "error") {
     return null;
@@ -350,7 +350,7 @@ function CxcChip({ state }: { state: CxcState }) {
 
   if (saldo_total <= 0) {
     return (
-      <div className="inline-flex items-center rounded bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+      <div className="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
         Sin saldo pendiente
       </div>
     );
@@ -402,11 +402,11 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-xs uppercase tracking-wide text-stone-500">{label}</span>
+      <span className="text-xs uppercase tracking-wide text-gray-500">{label}</span>
       {loading ? (
-        <div className="h-3.5 w-32 animate-pulse rounded bg-stone-100" />
+        <div className="h-3.5 w-32 animate-pulse rounded bg-gray-100" />
       ) : (
-        <span className="text-stone-800">{value ?? "—"}</span>
+        <span className="text-gray-800">{value ?? "—"}</span>
       )}
     </div>
   );

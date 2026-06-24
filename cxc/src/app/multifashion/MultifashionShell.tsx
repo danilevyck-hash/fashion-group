@@ -70,10 +70,10 @@ export function MultifashionShell({
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-950 md:text-4xl">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
             Multifashion
           </h1>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-gray-500">
             Retail tienda física · año fiscal {selectedYear}
           </p>
         </div>
@@ -102,11 +102,11 @@ export function MultifashionShell({
       {multi ? (
         <MultifashionView data={multi} selectedYear={selectedYear} isClosedYear={isClosedYear} />
       ) : (
-        <div className="rounded-lg border border-stone-200 bg-white p-8 text-center">
-          <p className="text-sm text-stone-700">
+        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+          <p className="text-sm text-gray-700">
             No se pudieron cargar los datos de <strong>Multifashion</strong>.
           </p>
-          <p className="mt-1 text-xs text-stone-500">Intenta recargar en unos segundos.</p>
+          <p className="mt-1 text-xs text-gray-500">Intenta recargar en unos segundos.</p>
         </div>
       )}
     </main>

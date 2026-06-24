@@ -16,7 +16,7 @@ import dynamic from "next/dynamic";
 // Vistas LAZY: solo el modo activo (Todas / Por empresa) descarga su JS, en su
 // propio chunk → fuera del bundle inicial de /comisiones. Skeleton mientras carga.
 function ViewSkeleton() {
-  return <div className="mt-4 h-72 w-full animate-pulse rounded-lg bg-stone-100" aria-hidden />;
+  return <div className="mt-4 h-72 w-full animate-pulse rounded-lg bg-gray-100" aria-hidden />;
 }
 const ComisionesConsolidadoView = dynamic(
   () => import("./ComisionesConsolidadoView").then((m) => m.ComisionesConsolidadoView),

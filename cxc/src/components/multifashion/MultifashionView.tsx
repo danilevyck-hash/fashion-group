@@ -15,7 +15,7 @@ import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 
 const SUBTAB_TRIGGER_CLASS =
-  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none";
+  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 interface MultifashionViewProps {
   data: Multifashion;
@@ -118,14 +118,14 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
       {subtab === "resumen" && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-stone-500">Mes</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={goPrev}
             disabled={!canPrev}
             aria-label="Mes anterior"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-200 disabled:hover:text-stone-600"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -146,14 +146,14 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
             onClick={goNext}
             disabled={!canNext}
             aria-label="Mes siguiente"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-200 disabled:hover:text-stone-600"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
         </div>
         {showMesCerradoHint && (
-          <p className="mt-1 text-right text-xs text-stone-400">
+          <p className="mt-1 text-right text-xs text-gray-400">
             último mes cerrado · {MES_FULL_OVERVIEW[currentCalMonth - 1].toLowerCase()} en curso
           </p>
         )}
@@ -161,7 +161,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
       )}
 
       <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
-        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={SUBTAB_TRIGGER_CLASS}>
             <TrendingUp className="h-3 w-3" /> Resumen
           </TabsTrigger>

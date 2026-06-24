@@ -33,7 +33,7 @@ export function CumulativeChartCard({
 }) {
   return (
     <Card className="p-4">
-      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
         Ventas acumuladas · {year} vs {prevYear}
       </p>
       <div className="h-[200px] w-full">
@@ -76,7 +76,7 @@ export function CumulativeChartCard({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 flex items-center gap-4 text-xs text-stone-500">
+      <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#185FA5" }} />{year} (hasta hoy)
         </span>
@@ -108,22 +108,22 @@ function CumulativeTooltip({
   const p = mesMapPrev.get(mes);
   const cell = (v: number | undefined) => (v != null ? fmtMoney(v) : "—");
   return (
-    <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
-      <p className="mb-1.5 font-medium text-stone-700">{MONTH_ABBR[mes]}</p>
+    <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <p className="mb-1.5 font-medium text-gray-700">{MONTH_ABBR[mes]}</p>
       <div className="grid grid-cols-[auto_auto_auto] gap-x-3 gap-y-0.5">
         <span />
-        <span className="text-right text-xs uppercase tracking-wide text-stone-400">Mes</span>
-        <span className="text-right text-xs uppercase tracking-wide text-stone-400">Acum.</span>
-        <span className="inline-flex items-center gap-1.5 text-stone-500">
+        <span className="text-right text-xs uppercase tracking-wide text-gray-400">Mes</span>
+        <span className="text-right text-xs uppercase tracking-wide text-gray-400">Acum.</span>
+        <span className="inline-flex items-center gap-1.5 text-gray-500">
           <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#185FA5" }} />{year}
         </span>
-        <span className="text-right font-mono tabular-nums text-stone-950">{cell(a?.ventas)}</span>
-        <span className="text-right font-mono tabular-nums text-stone-950">{cell(a?.acumulado)}</span>
-        <span className="inline-flex items-center gap-1.5 text-stone-500">
+        <span className="text-right font-mono tabular-nums text-gray-950">{cell(a?.ventas)}</span>
+        <span className="text-right font-mono tabular-nums text-gray-950">{cell(a?.acumulado)}</span>
+        <span className="inline-flex items-center gap-1.5 text-gray-500">
           <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#BA7517" }} />{prevYear}
         </span>
-        <span className="text-right font-mono tabular-nums text-stone-700">{cell(p?.ventas)}</span>
-        <span className="text-right font-mono tabular-nums text-stone-700">{cell(p?.acumulado)}</span>
+        <span className="text-right font-mono tabular-nums text-gray-700">{cell(p?.ventas)}</span>
+        <span className="text-right font-mono tabular-nums text-gray-700">{cell(p?.acumulado)}</span>
       </div>
     </div>
   );

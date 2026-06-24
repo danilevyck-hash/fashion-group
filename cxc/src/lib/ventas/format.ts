@@ -65,9 +65,9 @@ export function heatmapClasses(
   d: number | null | undefined,
   mode: "pct" | "pts" = "pct",
 ): { bg: string; fg: string } {
-  if (d == null) return { bg: "bg-transparent", fg: "text-stone-400" };
+  if (d == null) return { bg: "bg-transparent", fg: "text-gray-400" };
   const threshold = mode === "pts" ? 0.005 : 0.05;
   if (d > threshold)  return { bg: "bg-teal-100",    fg: "text-teal-800" };
   if (d < -threshold) return { bg: "bg-orange-200",  fg: "text-orange-900" };
-  return                     { bg: "bg-transparent", fg: "text-stone-500" };
+  return                     { bg: "bg-transparent", fg: "text-gray-500" };
 }

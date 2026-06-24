@@ -509,21 +509,21 @@ export default function EntregaForm({
         onClick={() => !guardando && onClose()}
       />
       <div
-        className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-2xl w-full mx-0 sm:mx-4 border border-stone-200 max-h-[95vh] overflow-y-auto"
+        className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-2xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-stone-900">
+            <h3 className="text-base font-semibold text-gray-900">
               {initial ? "Editar entrega" : "Nueva entrega de muebles"}
             </h3>
-            <p className="text-xs text-stone-500 truncate">{proyectoNombre}</p>
+            <p className="text-xs text-gray-500 truncate">{proyectoNombre}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-sm text-stone-500 hover:text-black transition disabled:opacity-50"
+            className="text-sm text-gray-500 hover:text-black transition disabled:opacity-50"
           >
             Cerrar
           </button>
@@ -531,7 +531,7 @@ export default function EntregaForm({
 
         <div className="p-6 space-y-6">
           {productos.length === 0 ? (
-            <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
               No hay productos en el inventario. Agrega productos primero en{" "}
               <span className="underline">/marketing/mobiliario</span>.
             </div>
@@ -546,10 +546,10 @@ export default function EntregaForm({
               <section className="space-y-2">
                 <label
                   htmlFor="entrega-nombre"
-                  className="block text-sm font-medium text-stone-800"
+                  className="block text-sm font-medium text-gray-800"
                 >
                   Nombre de la entrega{" "}
-                  <span className="text-stone-400 font-normal">(opcional)</span>
+                  <span className="text-gray-400 font-normal">(opcional)</span>
                 </label>
                 <input
                   id="entrega-nombre"
@@ -559,13 +559,13 @@ export default function EntregaForm({
                   disabled={guardando}
                   maxLength={120}
                   placeholder="Ej: Reposición vitrina, kit local nuevo…"
-                  className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                 />
               </section>
 
               {/* Paso 1: Marca(s) con % */}
               <section className="space-y-2">
-                <label className="block text-sm font-medium text-stone-800">
+                <label className="block text-sm font-medium text-gray-800">
                   ¿A qué marca(s) pertenece esta entrega?
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -581,16 +581,16 @@ export default function EntregaForm({
                         disabled={guardando}
                         className={`text-left rounded-lg border-2 px-4 py-3 transition ${
                           seleccionada
-                            ? "border-stone-900 bg-stone-50"
-                            : "border-stone-200 bg-white hover:border-stone-400"
+                            ? "border-gray-900 bg-gray-50"
+                            : "border-gray-200 bg-white hover:border-gray-400"
                         } disabled:opacity-50`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-stone-900">
+                          <span className="text-sm font-medium text-gray-900">
                             {m.nombre}
                           </span>
                           {seleccionada && (
-                            <span className="text-stone-900 text-xs">✓</span>
+                            <span className="text-gray-900 text-xs">✓</span>
                           )}
                         </div>
                       </button>
@@ -600,8 +600,8 @@ export default function EntregaForm({
 
                 {/* % por marca cuando hay más de una */}
                 {multiMarca && (
-                  <div className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-2">
-                    <div className="text-xs uppercase tracking-wide text-stone-500">
+                  <div className="rounded-md border border-gray-200 bg-gray-50/50 p-3 space-y-2">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">
                       Porcentaje por marca (debe sumar 100%)
                     </div>
                     {marcasSel.map((m) => (
@@ -609,7 +609,7 @@ export default function EntregaForm({
                         key={m.marcaId}
                         className="flex items-center justify-between gap-3"
                       >
-                        <span className="text-sm text-stone-700">
+                        <span className="text-sm text-gray-700">
                           {marcaById.get(m.marcaId)?.nombre ?? "Marca"}
                         </span>
                         <div className="flex items-center gap-1">
@@ -621,16 +621,16 @@ export default function EntregaForm({
                               setMarcaPct(m.marcaId, e.target.value)
                             }
                             disabled={guardando}
-                            className="w-20 rounded-md border border-stone-300 px-2 py-1.5 text-sm text-right font-mono tabular-nums focus:border-stone-900 focus:outline-none disabled:bg-stone-50"
+                            className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-right font-mono tabular-nums focus:border-gray-900 focus:outline-none disabled:bg-gray-50"
                           />
-                          <span className="text-sm text-stone-500">%</span>
+                          <span className="text-sm text-gray-500">%</span>
                         </div>
                       </div>
                     ))}
                     <div
                       className={`text-xs text-right tabular-nums ${
                         Math.abs(sumPctSel - 100) < 0.01
-                          ? "text-stone-500"
+                          ? "text-gray-500"
                           : "text-red-600 font-medium"
                       }`}
                     >
@@ -644,11 +644,11 @@ export default function EntregaForm({
               <section className="space-y-2">
                 <label
                   htmlFor="entrega-paneles"
-                  className="block text-base font-semibold text-stone-900"
+                  className="block text-base font-semibold text-gray-900"
                 >
                   Cantidad de paneles
                 </label>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-gray-500">
                   Los paneles definen el kit. Cuando escribas la cantidad,
                   los accesorios se llenan según la curva sugerida (×3 tablas,
                   ×3 conjunto, ×1 colgador, ×3 barra). Podés ajustarlos a mano.
@@ -662,14 +662,14 @@ export default function EntregaForm({
                   value={panelesStr}
                   onChange={(e) => setPaneles(e.target.value)}
                   disabled={guardando}
-                  className="w-full rounded-md border border-stone-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                  className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                   placeholder="0"
                 />
                 {hayManualEditado && panelesOk && (
                   <button
                     type="button"
                     onClick={recalcularCurva}
-                    className="text-xs text-stone-600 hover:text-black underline"
+                    className="text-xs text-gray-600 hover:text-black underline"
                   >
                     Recalcular accesorios según curva
                   </button>
@@ -678,7 +678,7 @@ export default function EntregaForm({
 
               {/* Paso 3: Accesorios */}
               <section className="space-y-2">
-                <h4 className="text-sm font-medium text-stone-800">
+                <h4 className="text-sm font-medium text-gray-800">
                   Accesorios
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -692,7 +692,7 @@ export default function EntregaForm({
                         panelesOk && sugerido > 0 && valActual !== sugerido;
                       return (
                         <div key={cat}>
-                          <label className="block text-sm text-stone-700 mb-1">
+                          <label className="block text-sm text-gray-700 mb-1">
                             {labelAccesorio(cat)}
                             {prod ? null : (
                               <span className="text-amber-700 text-xs ml-1">
@@ -708,16 +708,16 @@ export default function EntregaForm({
                             value={value}
                             onChange={(e) => setAccesorio(cat, e.target.value)}
                             disabled={guardando || !prod}
-                            className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                             placeholder="0"
                           />
                           {muestraSugerido && (
-                            <div className="text-xs text-stone-400 mt-0.5">
+                            <div className="text-xs text-gray-400 mt-0.5">
                               Sugerido: {sugerido}
                             </div>
                           )}
                           {prod && (
-                            <div className="text-xs text-stone-400 mt-0.5">
+                            <div className="text-xs text-gray-400 mt-0.5">
                               Stock disponible: {prod.stock_total}
                             </div>
                           )}
@@ -729,10 +729,10 @@ export default function EntregaForm({
 
                 {/* Otros productos del catálogo (si hay) */}
                 {productosByCat.otros.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-stone-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-gray-100">
                     {productosByCat.otros.map((p) => (
                       <div key={p.id}>
-                        <label className="block text-sm text-stone-700 mb-1">
+                        <label className="block text-sm text-gray-700 mb-1">
                           {p.nombre}
                         </label>
                         <input
@@ -748,10 +748,10 @@ export default function EntregaForm({
                             }))
                           }
                           disabled={guardando}
-                          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                           placeholder="0"
                         />
-                        <div className="text-xs text-stone-400 mt-0.5">
+                        <div className="text-xs text-gray-400 mt-0.5">
                           Stock disponible: {p.stock_total}
                         </div>
                       </div>
@@ -775,18 +775,18 @@ export default function EntregaForm({
               )}
 
               {/* Resumen */}
-              <section className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-1">
-                <div className="text-xs uppercase tracking-wide text-stone-500">
+              <section className="rounded-md border border-gray-200 bg-gray-50/50 p-3 space-y-1">
+                <div className="text-xs uppercase tracking-wide text-gray-500">
                   Resumen
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-stone-700">Total entrega</span>
-                  <span className="font-mono tabular-nums font-semibold text-stone-900">
+                  <span className="text-gray-700">Total entrega</span>
+                  <span className="font-mono tabular-nums font-semibold text-gray-900">
                     {formatearMonto(totalEntrega)}
                   </span>
                 </div>
                 {marcasSel.length > 0 && totalEntrega > 0 && (
-                  <div className="text-xs text-stone-600 pt-1 border-t border-stone-200 space-y-0.5">
+                  <div className="text-xs text-gray-600 pt-1 border-t border-gray-200 space-y-0.5">
                     {desgloseMarcas.map((d) => (
                       <div key={d.marcaId} className="flex justify-between">
                         <span>{marcaById.get(d.marcaId)?.nombre ?? "Marca"}</span>
@@ -819,7 +819,7 @@ export default function EntregaForm({
                 type="button"
                 onClick={onClose}
                 disabled={guardando}
-                className="rounded-md border border-stone-300 bg-white text-stone-700 px-3 py-2 text-sm hover:bg-stone-50 disabled:opacity-50"
+                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -827,7 +827,7 @@ export default function EntregaForm({
                 type="button"
                 onClick={handleGuardar}
                 disabled={!puedeGuardar}
-                className="rounded-md bg-stone-900 text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
+                className="rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
                 title={
                   !marcasOk
                     ? "Selecciona marca(s) y que el % sume 100"

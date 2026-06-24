@@ -1,14 +1,14 @@
 "use client";
 
 const ROLE_COLORS: Record<string, string> = {
-  admin:        "bg-stone-900 text-white",
+  admin:        "bg-gray-900 text-white",
   secretaria:   "bg-amber-600 text-white",
   vendedor:     "bg-teal-700 text-white",
-  bodega:       "bg-stone-400 text-white",
+  bodega:       "bg-gray-400 text-white",
   contabilidad: "bg-sky-500 text-white",
 };
 
-const FALLBACK = "bg-stone-300 text-stone-700";
+const FALLBACK = "bg-gray-300 text-gray-700";
 
 const SIZE_CLASSES: Record<string, string> = {
   sm: "w-8 h-8 text-xs",
