@@ -452,7 +452,16 @@ export async function fetchMultifashion({
   // alimenta la línea acumulada diaria del Overview; proyeccion_cierre_v1 la
   // proyección ponderada por temporada del header. Todo en paralelo.
   const [mv6, serieAct, seriePrev, proy, mayPrev] = await Promise.all([
-    supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes }),
+    // v7 = v6 con el bloque de margen tienda-completa leído de ventas_rollup_mensual_mv
+    // (híbrido: cerrados=MV, mes en curso=vivo) → quita 2 agregaciones en vivo de
+    // switch_ventas_unificado_vw (~2.2s c/u). Mismo número exacto. Migración:
+    // 20260623130000_multifashion_margen_desde_mv.sql. Fallback a v6 si aún no se
+    // aplicó (deploy sin orden forzado).
+    (async () => {
+      const v7 = await supabaseServer.rpc("multifashion_mensual_v7", { p_year: year, p_mes: mes });
+      if (!v7.error) return v7;
+      return supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes });
+    })(),
     supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }),
     supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }),
     supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }),
@@ -465,7 +474,7 @@ export async function fetchMultifashion({
       .eq("anio", year - 1)
       .eq("is_wholesale", true),
   ]);
-  if (mv6.error) throw new Error(`multifashion_mensual_v6: ${mv6.error.message}`);
+  if (mv6.error) throw new Error(`multifashion_mensual_v7/v6: ${mv6.error.message}`);
   if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);
   if (seriePrev.error) throw new Error(`multifashion_overview_serie_v1(${year - 1}): ${seriePrev.error.message}`);
   if (proy.error) throw new Error(`multifashion_proyeccion_cierre_v1: ${proy.error.message}`);

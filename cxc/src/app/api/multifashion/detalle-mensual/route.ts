@@ -61,7 +61,14 @@ export async function GET(req: NextRequest) {
   const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
-    supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes }),
+    // _v2: margen mensual desde ventas_rollup_mensual_mv (híbrido cerrados/mes en
+    // curso) — mismo número exacto, sin agregar las vistas en vivo. Fallback a la v1
+    // si la migración aún no se aplicó (aditivo: si ambas fallan, la card cae a "—").
+    (async () => {
+      const v2 = await supabaseServer.rpc("multifashion_margen_tienda_mensual_v2", { p_year: year, p_mes: mes });
+      if (!v2.error) return v2;
+      return supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes });
+    })(),
     // Mayoreo del mes: misma vista, is_wholesale=true. subtotal ya trae el signo
     // de NC (la vista lo resuelve). Mayoreo de Multifashion es escaso (≤ unas
     // pocas filas/mes), no requiere paginación.
