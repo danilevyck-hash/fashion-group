@@ -275,13 +275,23 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
 
   // ── Fotos del formulario (adjuntar ANTES de guardar) ──────────────────────
-  // Selecciona una foto: valida y la deja en preview local (no sube todavía).
-  function addPendingFoto(file: File) {
-    const vErr = validateFotoFile(file);
-    if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }
+  // Selección MÚLTIPLE: valida cada una y las deja en preview local (no suben
+  // todavía). Respeta el tope de 5: toma las que caben y avisa si sobran.
+  function addPendingFoto(files: File[]) {
     setPendingFotos((prev) => {
-      if (prev.length >= 5) { setToast("Máximo 5 fotos."); setTimeout(() => setToast(null), 3000); return prev; }
-      return [...prev, { localId: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file), status: "pending" }];
+      const slots = 5 - prev.length;
+      if (slots <= 0) { setToast("Ya tienes el máximo de 5 fotos."); setTimeout(() => setToast(null), 4000); return prev; }
+      const additions: LocalFoto[] = [];
+      let rejected = 0;
+      for (const file of files) {
+        if (additions.length >= slots) break;
+        if (validateFotoFile(file)) { rejected++; continue; }
+        additions.push({ localId: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file), status: "pending" });
+      }
+      const overflow = files.length - rejected - additions.length;
+      if (overflow > 0) { setToast(`Se agregaron ${additions.length}; ${overflow} no caben (máximo 5 fotos).`); setTimeout(() => setToast(null), 5000); }
+      else if (rejected > 0) { setToast(`${rejected} archivo(s) no son imágenes válidas y se omitieron.`); setTimeout(() => setToast(null), 5000); }
+      return additions.length > 0 ? [...prev, ...additions] : prev;
     });
   }
   // Quita una foto del preview. Si ya estaba subida (reclamo creado), la borra del server.
@@ -451,17 +461,32 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     loadReclamos();
   }
 
-  async function uploadFoto(file: File) {
-    if (!current) return;
-    const vErr = validateFotoFile(file);
-    if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }
+  async function uploadFoto(files: File[]) {
+    if (!current || files.length === 0) return;
+    // Tope de 5: descuenta las que ya tiene el reclamo y avisa si sobran.
+    const slots = 5 - (current.reclamo_fotos?.length ?? 0);
+    if (slots <= 0) { setToast("Ya tienes el máximo de 5 fotos."); setTimeout(() => setToast(null), 4000); return; }
+    const valid = files.filter((f) => !validateFotoFile(f));
+    const invalid = files.length - valid.length;
+    const toUpload = valid.slice(0, slots);
+    const overflow = valid.length - toUpload.length;
+    if (toUpload.length === 0) {
+      setToast(invalid > 0 ? "Ningún archivo es una imagen válida." : "Ya tienes el máximo de 5 fotos."); setTimeout(() => setToast(null), 5000); return;
+    }
     setUploadingDetailFoto(true);
+    const errores: string[] = [];
     try {
-      await uploadReclamoFoto(current.id, file); // valida, con timeout — nunca cuelga
+      for (const file of toUpload) {
+        try {
+          await uploadReclamoFoto(current.id, file); // comprime + timeout — nunca cuelga
+        } catch (e) {
+          errores.push(e instanceof Error ? e.message : "No se pudo subir una foto.");
+        }
+      }
       await loadDetail(current.id);
-    } catch (e) {
-      // Error VISIBLE con el mensaje real (antes: genérico). Nunca falla en silencio.
-      setToast(e instanceof Error ? e.message : "No se pudo subir la foto."); setTimeout(() => setToast(null), 6000);
+      // Feedback honesto: nunca falla en silencio (mensaje real de #191).
+      if (errores.length > 0) { setToast(errores[0]); setTimeout(() => setToast(null), 6000); }
+      else if (overflow > 0 || invalid > 0) { setToast(`Se subieron ${toUpload.length}; ${overflow + invalid} se omitieron (máximo 5 / no válidas).`); setTimeout(() => setToast(null), 5000); }
     } finally {
       setUploadingDetailFoto(false);
     }

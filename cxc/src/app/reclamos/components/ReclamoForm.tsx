@@ -25,7 +25,7 @@ interface Props {
   savedReclamoId: string | null;
   savedNroReclamo: string;
   pendingFotos: LocalFoto[];
-  onAddFoto: (file: File) => void;
+  onAddFoto: (files: File[]) => void;
   onRemoveFoto: (lf: LocalFoto) => void;
   onRetryFotos: () => void;
   saving: boolean;
@@ -414,7 +414,7 @@ export default function ReclamoForm({
 
         {pendingFotos.length < 5 && !savedReclamoId && (
           <>
-            <input ref={formFotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onAddFoto(file); if (formFotoRef.current) formFotoRef.current.value = ""; }} />
+            <input ref={formFotoRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onAddFoto(files); if (formFotoRef.current) formFotoRef.current.value = ""; }} />
             <button
               type="button"
               onClick={() => formFotoRef.current?.click()}
