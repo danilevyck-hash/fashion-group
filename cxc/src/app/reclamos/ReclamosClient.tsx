@@ -9,7 +9,8 @@ import UndoToast from "@/components/UndoToast";
 import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
-import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
+import { Reclamo, RItem, Foto, LocalFoto, Contacto, RView } from "./components/types";
+import { validateFotoFile, uploadReclamoFoto } from "./components/fotoUpload";
 
 export interface ReclamosInitialData {
   reclamos: Reclamo[];
@@ -88,7 +89,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
   const [fFacturaPdfPath, setFFacturaPdfPath] = useState<string | null>(null);
   const [savedReclamoId, setSavedReclamoId] = useState<string | null>(null); const [savedNroReclamo, setSavedNroReclamo] = useState("");
-  const [formFotos, setFormFotos] = useState<Foto[]>([]); const [uploadingFormFoto, setUploadingFormFoto] = useState(false);
+  // Fotos seleccionadas ANTES de guardar (preview local) — se suben al crear el
+  // reclamo, con estado por foto. uploadingDetailFoto = spinner en modo edición.
+  const [pendingFotos, setPendingFotos] = useState<LocalFoto[]>([]);
+  const [uploadingDetailFoto, setUploadingDetailFoto] = useState(false);
   // Detail state
   const [nota, setNota] = useState(""); const [editMode, setEditMode] = useState(false);
   const [editEmpresa, setEditEmpresa] = useState(""); const [editFactura, setEditFactura] = useState("");
@@ -266,23 +270,84 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   function resetForm() {
     setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura("");
     setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setFFacturaPdfPath(null); setError(null);
-    setSavedReclamoId(null); setSavedNroReclamo(""); setFormFotos([]);
+    setSavedReclamoId(null); setSavedNroReclamo("");
+    setPendingFotos((prev) => { prev.forEach((f) => URL.revokeObjectURL(f.previewUrl)); return []; });
+  }
+
+  // ── Fotos del formulario (adjuntar ANTES de guardar) ──────────────────────
+  // Selecciona una foto: valida y la deja en preview local (no sube todavía).
+  function addPendingFoto(file: File) {
+    const vErr = validateFotoFile(file);
+    if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }
+    setPendingFotos((prev) => {
+      if (prev.length >= 5) { setToast("Máximo 5 fotos."); setTimeout(() => setToast(null), 3000); return prev; }
+      return [...prev, { localId: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file), status: "pending" }];
+    });
+  }
+  // Quita una foto del preview. Si ya estaba subida (reclamo creado), la borra del server.
+  function removePendingFoto(lf: LocalFoto) {
+    setPendingFotos((prev) => prev.filter((x) => x.localId !== lf.localId));
+    URL.revokeObjectURL(lf.previewUrl);
+    if (lf.uploaded && savedReclamoId) {
+      fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: lf.uploaded.id, storage_path: lf.uploaded.storage_path }) }).catch(() => {});
+    }
+  }
+  // Sube las fotos pendientes/erróneas a un reclamo ya creado. Estado por foto.
+  // Devuelve true si TODAS quedaron subidas.
+  async function uploadPendingFotos(reclamoId: string): Promise<boolean> {
+    const targets = pendingFotos.filter((f) => f.status === "pending" || f.status === "error");
+    let allOk = true;
+    for (const lf of targets) {
+      setPendingFotos((prev) => prev.map((x) => x.localId === lf.localId ? { ...x, status: "uploading", error: undefined } : x));
+      try {
+        const uploaded = await uploadReclamoFoto(reclamoId, lf.file);
+        setPendingFotos((prev) => prev.map((x) => x.localId === lf.localId ? { ...x, status: "done", uploaded, error: undefined } : x));
+      } catch (e) {
+        allOk = false;
+        const msg = e instanceof Error ? e.message : "No se pudo subir la foto.";
+        setPendingFotos((prev) => prev.map((x) => x.localId === lf.localId ? { ...x, status: "error", error: msg } : x));
+      }
+    }
+    return allOk;
+  }
+  // Reintenta solo las fotos que fallaron (el reclamo ya existe).
+  async function retryFotos() {
+    if (!savedReclamoId) return;
+    setSaving(true);
+    const allOk = await uploadPendingFotos(savedReclamoId);
+    setError(allOk ? null : "Algunas fotos siguen sin subir. Revísalas y reintenta.");
+    setSaving(false);
   }
 
   async function saveReclamo() {
-    // Obligatoriedad completa (cabecera + cada ítem). Solo notas/PDF/fotos opcionales.
-    const vErr = validateReclamoFull(
-      { empresa: fEmpresa, nro_factura: fFactura, fecha_reclamo: fFecha, nro_orden_compra: fPedido },
-      fItems,
-    );
-    if (vErr) { setError(vErr); return; }
-    const items = fItems;
-    setSaving(true); setError(null);
+    setError(null);
+    let reclamoId = savedReclamoId;
+    // Si el reclamo aún no existe, validar campos y crearlo. Si ya existe (caso
+    // reintento de fotos tras un fallo), saltar la creación y solo subir fotos.
+    if (!reclamoId) {
+      // Obligatoriedad completa (cabecera + cada ítem). Solo notas/PDF/fotos opcionales.
+      const vErr = validateReclamoFull(
+        { empresa: fEmpresa, nro_factura: fFactura, fecha_reclamo: fFecha, nro_orden_compra: fPedido },
+        fItems,
+      );
+      if (vErr) { setError(vErr); return; }
+    }
+    setSaving(true);
     try {
-      const empInfo = EMPRESAS_MAP[fEmpresa];
-      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items, factura_pdf_path: fFacturaPdfPath }) });
-      if (res.ok) { const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
-      else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
+      if (!reclamoId) {
+        const empInfo = EMPRESAS_MAP[fEmpresa];
+        const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items: fItems, factura_pdf_path: fFacturaPdfPath }) });
+        if (!res.ok) { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); setSaving(false); return; }
+        const saved = await res.json();
+        reclamoId = saved.id;
+        setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || "");
+        loadReclamos();
+      }
+      // Subir las fotos adjuntas (si hay) al reclamo recién creado — un solo flujo.
+      if (reclamoId) {
+        const allOk = await uploadPendingFotos(reclamoId);
+        if (!allOk) setError("El reclamo se guardó, pero algunas fotos no subieron. Reintenta abajo.");
+      }
     } catch { setError("Error de conexión."); }
     setSaving(false);
   }
@@ -388,12 +453,18 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   async function uploadFoto(file: File) {
     if (!current) return;
+    const vErr = validateFotoFile(file);
+    if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }
+    setUploadingDetailFoto(true);
     try {
-      const fd = new FormData(); fd.append("file", file);
-      const res = await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd });
-      if (!res.ok) { setToast("No se pudo subir la foto."); setTimeout(() => setToast(null), 3000); return; }
+      await uploadReclamoFoto(current.id, file); // valida, con timeout — nunca cuelga
       await loadDetail(current.id);
-    } catch { setToast("Error al subir foto."); setTimeout(() => setToast(null), 3000); }
+    } catch (e) {
+      // Error VISIBLE con el mensaje real (antes: genérico). Nunca falla en silencio.
+      setToast(e instanceof Error ? e.message : "No se pudo subir la foto."); setTimeout(() => setToast(null), 6000);
+    } finally {
+      setUploadingDetailFoto(false);
+    }
   }
   async function deleteFoto(fotoId: string, path: string) {
     if (!current) return;
@@ -529,8 +600,8 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         facturaPdfPath={fFacturaPdfPath} setFacturaPdfPath={setFFacturaPdfPath}
         savedReclamoId={savedReclamoId}
         savedNroReclamo={savedNroReclamo}
-        formFotos={formFotos} setFormFotos={setFormFotos}
-        uploadingFormFoto={uploadingFormFoto} setUploadingFormFoto={setUploadingFormFoto}
+        pendingFotos={pendingFotos}
+        onAddFoto={addPendingFoto} onRemoveFoto={removePendingFoto} onRetryFotos={retryFotos}
         saving={saving}
         error={error}
         customMotivos={customMotivos} setCustomMotivos={setCustomMotivos}
@@ -576,6 +647,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onDeleteReclamo={requestDeleteReclamo}
         onSaveEdit={saveEdit}
         onUploadFoto={uploadFoto}
+        uploadingFoto={uploadingDetailFoto}
         onDeleteFoto={deleteFoto}
         onAddSettlement={addSettlement}
         onRemoveSettlement={removeSettlement}

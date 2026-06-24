@@ -26,6 +26,18 @@ export interface Foto {
   url: string;
 }
 
+/** Foto seleccionada en el formulario ANTES de guardar el reclamo. Vive en estado
+ *  local (preview con object URL) hasta que, al Guardar, se sube al reclamo recién
+ *  creado. `status` da feedback real por foto (nunca un spinner colgado). */
+export interface LocalFoto {
+  localId: string;
+  file: File;
+  previewUrl: string;
+  status: "pending" | "uploading" | "done" | "error";
+  error?: string;
+  uploaded?: Foto; // registro del server una vez subida (id/path para borrar)
+}
+
 export interface Contacto {
   id: string;
   empresa: string;
