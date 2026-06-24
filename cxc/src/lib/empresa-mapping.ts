@@ -12,6 +12,37 @@ export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
 };
 
 /**
+ * Iniciales por empresa para la numeración de reclamos NUEVOS
+ * (<INICIALES>-<AÑO>-<correlativo>, ej. VI-2026-0001). Iniciales confirmadas por
+ * Daniel. Los reclamos guardan el NOMBRE de la empresa (no la key), así que el
+ * lookup es por nombre normalizado (trim + minúsculas). Incluye alias de
+ * Multifashion / American Classics → MF. Solo afecta números nuevos: los viejos
+ * REC-YYYY-XXXX no se tocan.
+ */
+const EMPRESA_NAME_TO_INITIALS: Record<string, string> = {
+  "vistana international": "VI",
+  "fashion wear": "FW",
+  "fashion shoes": "FS",
+  "active shoes": "AS",
+  "active wear": "AW",
+  "joystep": "JS",
+  "confecciones boston": "CB",
+  "multifashion": "MF",
+  "american classics": "MF",
+  "american classic": "MF",
+};
+
+/**
+ * Iniciales de la empresa de un reclamo (por NOMBRE). Fallback "RE" si la empresa
+ * no está mapeada — sigue siendo un prefijo válido y único, nunca colisiona con el
+ * formato viejo REC-.
+ */
+export function reclamoInitials(empresa: string): string {
+  const norm = (empresa || "").trim().toLowerCase();
+  return EMPRESA_NAME_TO_INITIALS[norm] ?? "RE";
+}
+
+/**
  * Short ids usados por el bundle de Ventas redesign (matrix heatmap, mock-data).
  * El módulo Ventas trabaja con estos ids cortos en el shape de la API; el resto
  * del codebase sigue usando las DB keys largas (vistana, fashion_wear, ...).

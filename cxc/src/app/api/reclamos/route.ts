@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdmin } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 import { validateReclamoFull } from "@/lib/reclamos/validate";
+import { reclamoInitials } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +32,16 @@ export async function POST(req: NextRequest) {
   const vErr = validateReclamoFull({ empresa, nro_factura, fecha_reclamo, nro_orden_compra }, items);
   if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
 
-  // Número REC-{año}-{correlativo} que REINICIA por año: el correlativo es el MAX
-  // del sufijo entre los reclamos cuyo nro_reclamo empieza con REC-{año}- (no un
-  // COUNT global). Concurrencia: el INSERT se reintenta ante violación de
-  // unicidad (23505) recalculando el siguiente correlativo — nro_reclamo es
-  // UNIQUE, esa es la garantía real (no el COUNT+SELECT no atómico de antes).
+  // Número <INICIALES>-{año}-{correlativo} con correlativo INDEPENDIENTE por
+  // empresa Y por año (ej. VI-2026-0001, FW-2026-0001). El correlativo es el MAX
+  // del sufijo SOLO entre los reclamos con el MISMO prefijo de esta empresa+año
+  // (no un COUNT global, no mezcla con otras empresas ni con los viejos REC-).
+  // Concurrencia: el INSERT se reintenta ante violación de unicidad (23505)
+  // recalculando el siguiente correlativo — nro_reclamo es UNIQUE (global), esa es
+  // la garantía real. Los reclamos existentes (REC-YYYY-XXXX) NO se tocan: su
+  // prefijo nunca coincide con el nuevo, conservan su número.
   const year = new Date().getFullYear();
-  const prefix = `REC-${year}-`;
+  const prefix = `${reclamoInitials(empresa)}-${year}-`;
 
   async function nextNroReclamo(): Promise<string> {
     const { data } = await supabaseServer
