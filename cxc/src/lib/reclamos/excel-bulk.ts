@@ -308,8 +308,12 @@ export async function buildBulkReclamosExcel(
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
 
-  const resumen = buildResumenSheet(recs, empresa);
-  XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
+  // La hoja "Resumen" solo aporta con 2+ reclamos (es un consolidado). Con un
+  // solo reclamo el Excel lleva únicamente la hoja de ese reclamo.
+  if (recs.length >= 2) {
+    const resumen = buildResumenSheet(recs, empresa);
+    XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
+  }
 
   for (const rec of recs) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
