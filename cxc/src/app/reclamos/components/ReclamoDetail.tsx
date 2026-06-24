@@ -50,7 +50,7 @@ interface Props {
   onChangeEstado: (e: string) => void;
   onDeleteReclamo: (id: string) => void;
   onSaveEdit: () => void;
-  onUploadFoto: (file: File) => void;
+  onUploadFoto: (files: File[]) => void;
   uploadingFoto?: boolean;
   onDeleteFoto: (fotoId: string, path: string) => void;
   onAddSettlement: (rows: { monto: number; nota_credito: string; fecha: string }[]) => void;
@@ -571,7 +571,7 @@ export default function ReclamoDetail({
         {/* Upload area */}
         {fotos.length < 5 && (
           <>
-            <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={uploadingFoto} onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
+            <input ref={fotoRef} type="file" accept="image/*" multiple className="hidden" disabled={uploadingFoto} onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) onUploadFoto(files); if (fotoRef.current) fotoRef.current.value = ""; }} />
             <button
               onClick={() => fotoRef.current?.click()}
               disabled={uploadingFoto}
