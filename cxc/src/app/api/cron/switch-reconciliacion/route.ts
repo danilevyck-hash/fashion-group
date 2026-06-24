@@ -55,8 +55,10 @@ import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
-// Watchdog: alerta si algún cron lleva más de 30h sin registrar success.
-const WATCHDOG_STALE_HOURS = 30;
+// Watchdog: alerta si algún cron lleva más de 26h sin registrar success. 26h da
+// margen sobre el ciclo diario (1×/día) sin tragarse un día entero: un cron
+// saltado se detecta en la pasada del día siguiente, no esperando 30h.
+const WATCHDOG_STALE_HOURS = 26;
 // Horas UTC de las pasadas de reconciliación (espejo de vercel.json). El watchdog
 // las usa para saber si un colateral stale TODAVÍA tiene una pasada de
 // recuperación hoy → si la tiene, no alerta (se va a auto-recuperar).

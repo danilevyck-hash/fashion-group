@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncArticulosDiario, type ArticulosSyncResult } from "@/lib/switch-api/sync-articulos";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
-import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -61,7 +61,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  await recordCronHeartbeat(CRON_NAME);
+  // Heartbeat de éxito SOLO si TODAS las empresas corrieron OK. Si alguna falló,
+  // NO registramos éxito (el watchdog/reconciliación lo verán stale y recuperarán)
+  // y disparamos alerta Telegram. Antes el heartbeat se registraba siempre → falso
+  // éxito: el watchdog lo veía fresco y nunca alertaba (bug de doble ceguera).
+  if (errors.length === 0) {
+    await recordCronHeartbeat(CRON_NAME);
+  } else {
+    const detalle = errors.map((e) => `${e.empresaKey}: ${e.error}`).join("; ");
+    await logCronError(CRON_NAME, `${errors.length} empresa(s) fallaron — ${detalle}`);
+  }
 
   return NextResponse.json(
     { ok: errors.length === 0, range: { desde, hasta }, results, errors },

@@ -47,7 +47,7 @@ import {
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
-import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
@@ -199,7 +199,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  await recordCronHeartbeat(CRON_NAME);
+  // Heartbeat de éxito SOLO si TODOS los syncs corrieron OK. Si alguno falló, NO
+  // registramos éxito (la reconciliación detecta los pares faltantes en
+  // switch_sync_log y recupera; el watchdog ve el heartbeat stale) y disparamos
+  // alerta Telegram inmediata. Antes el heartbeat se registraba siempre → un 207
+  // parcial quedaba invisible para el watchdog.
+  if (errors.length === 0) {
+    await recordCronHeartbeat(CRON_NAME);
+  } else {
+    const detalle = errors.map((e) => `${e.empresaKey}/${e.tipo}: ${e.error}`).join("; ");
+    await logCronError(CRON_NAME, `${errors.length} sync(s) fallaron — ${detalle}`);
+  }
   return NextResponse.json(
     {
       ok: errors.length === 0,

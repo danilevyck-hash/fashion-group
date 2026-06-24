@@ -61,7 +61,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         `Súbelas en el catálogo.`,
       );
     }
-    await recordCronHeartbeat(CRON_NAME);
+    // Heartbeat de éxito SOLO si no hubo error (las empresas fallidas ya
+    // alertaron arriba). Antes se registraba siempre → falso éxito ante un 207.
+    if (!result.hadError) await recordCronHeartbeat(CRON_NAME);
   }
 
   return NextResponse.json({ ok: !result.hadError, ...result }, { status: result.hadError ? 207 : 200 });
