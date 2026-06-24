@@ -1,4 +1,5 @@
 import XLSX from "xlsx-js-style";
+import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
 
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
@@ -18,7 +19,7 @@ function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i
  * Hoja Excel de un reclamo. Los links son URLs WEB que abren con un clic en el
  * navegador (Mac/Windows), sin extraer nada ni permisos:
  *   - Factura: rec.factura_pdf_url (signed URL larga; bucket privado, no expuesto).
- *   - Fotos:   URL pública del bucket reclamo-fotos.
+ *   - Fotos:   galería web del reclamo (página con todas las fotos, token HMAC).
  * El caller adjunta factura_pdf_url vía adjuntarFacturaUrls (factura-storage.ts).
  */
 export function buildReclamoSheet(
@@ -28,6 +29,7 @@ export function buildReclamoSheet(
 ): XLSX.WorkSheet {
   const facturaUrl = (rec.factura_pdf_url as string | null | undefined) || null;
   const nroReclamo = String(rec.nro_reclamo || "");
+  const reclamoId = String(rec.id || "");
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
@@ -134,12 +136,10 @@ export function buildReclamoSheet(
       linkRow("Factura", "Ver factura", facturaUrl);
     }
 
-    // Fotos — URL pública (bucket reclamo-fotos), abre con un clic.
-    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-    for (let i = 0; i < fotos.length; i++) {
-      const foto = fotos[i];
-      const target = foto.url || `${supabaseUrl}/storage/v1/object/public/reclamo-fotos/${foto.storage_path}`;
-      linkRow(`Foto ${i + 1}`, `Ver foto ${i + 1}`, target);
+    // Fotos — galería web del reclamo: UN link a una página con TODAS las fotos
+    // (token HMAC), abre con un clic sin extraer ni permisos. Sin id no se firma.
+    if (fotos.length > 0 && reclamoId) {
+      linkRow("Fotos", `Ver fotos (${fotos.length})`, reclamoGaleriaUrl(reclamoId));
     }
   }
 

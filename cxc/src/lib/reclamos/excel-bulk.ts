@@ -2,15 +2,9 @@ import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { adjuntarFacturaUrls } from "./factura-storage";
+import { reclamoGaleriaUrl } from "./gallery-token";
 
 const LINK_FG = "0563C1"; // azul de hyperlink
-
-// URL pública de una foto (bucket reclamo-fotos ya es PÚBLICO). Abre con un clic
-// en el navegador, sin extraer ni permisos. Mismo patrón que el Excel suelto.
-const SUPA_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-function fotoPublicUrl(f: ReclamoFoto): string {
-  return f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
-}
 
 const TASA_IMPORTACION = 0.10;
 const TASA_ITBMS = 0.077;
@@ -211,7 +205,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     ws[addr(r, 7)] = num(total, true);
     ws[addr(r, 8)] = int(nFotos);
     // Links WEB (abren con un clic, sin extraer): factura = signed URL larga
-    // (bucket privado); fotos = URL pública de la primera foto.
+    // (bucket privado); fotos = galería web del reclamo (todas las fotos, token).
     const linkCell = (label: string, target: string) => ({
       v: label,
       t: "s" as const,
@@ -223,12 +217,11 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       },
       l: { Target: target, Tooltip: label },
     });
-    const foto0 = (rec.reclamo_fotos || [])[0];
     ws[addr(r, 9)] = rec.factura_pdf_url
       ? linkCell("Ver factura", rec.factura_pdf_url)
       : txt("—", "center");
-    ws[addr(r, 10)] = foto0
-      ? linkCell("Ver fotos", fotoPublicUrl(foto0))
+    ws[addr(r, 10)] = nFotos > 0
+      ? linkCell("Ver fotos", reclamoGaleriaUrl(rec.id))
       : txt("—", "center");
     h[r] = 18; r++;
   }
