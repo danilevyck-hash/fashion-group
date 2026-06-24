@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   // de columnas futuras agregadas a `products`.
   let query = supabase
     .from('products')
-    .select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at')
+    .select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at')
     .order('created_at', { ascending: false })
 
   if (searchParams.get('active') === 'true') query = query.eq('active', true)
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   const denied = requireAdmin(req); if (denied) return denied
   const body = await req.json()
   if (!body.name) return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
-  const { data, error } = await reebokServer.from('products').insert(body).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at').single()
+  const { data, error } = await reebokServer.from('products').insert(body).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at').single()
   if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
   const s = getSession(req)
   await logActivity(s?.role || 'admin', 'product_create', 'reebok', { productId: data.id, name: body.name }, s?.userName)
@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest) {
   const denied = requireAdmin(req); if (denied) return denied
   const body = await req.json()
   const { id, ...fields } = body
-  const { data, error } = await reebokServer.from('products').update(fields).eq('id', id).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at').single()
+  const { data, error } = await reebokServer.from('products').update(fields).eq('id', id).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at').single()
   if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
   return NextResponse.json(data)
 }
