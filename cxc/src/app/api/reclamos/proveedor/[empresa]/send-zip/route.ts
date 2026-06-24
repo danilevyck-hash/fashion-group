@@ -33,6 +33,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface SendBody extends BulkSelector {
   to?: string;
+  cc?: string;
   subject?: string;
   message?: string;
 }
@@ -59,6 +60,15 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     const invalid = recipients.find((r) => !EMAIL_RE.test(r));
     if (invalid) {
       return NextResponse.json({ error: `Correo inválido: ${invalid}` }, { status: 400 });
+    }
+    // CC opcional (uno o varios, separados por coma).
+    const ccList = (body.cc || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const invalidCc = ccList.find((r) => !EMAIL_RE.test(r));
+    if (invalidCc) {
+      return NextResponse.json({ error: `Correo en copia inválido: ${invalidCc}` }, { status: 400 });
     }
     if (!subject) {
       return NextResponse.json({ error: "Falta el asunto." }, { status: 400 });
@@ -143,6 +153,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     const { error: sendError } = await getResend().emails.send({
       from: "Fashion Group <info@fashiongr.com>",
       to: recipients,
+      cc: ccList.length ? ccList : undefined,
       subject,
       html,
       attachments: attachments.length ? attachments : undefined,
@@ -156,7 +167,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     // Registro en seguimiento (igual que el correo consolidado existente)
     const ids = reclamos.map((r) => r.id);
     if (ids.length > 0) {
-      const nota = `Correo con Excel adjunto enviado a ${recipients.join(", ")} (${reclamos.length} reclamos)`;
+      const ccNota = ccList.length ? ` · CC: ${ccList.join(", ")}` : "";
+      const nota = `Correo con Excel adjunto enviado a ${recipients.join(", ")}${ccNota} (${reclamos.length} reclamos)`;
       await supabaseServer.from("reclamo_seguimiento").insert(
         ids.map((reclamo_id) => ({ reclamo_id, nota, autor: "Sistema" })),
       );

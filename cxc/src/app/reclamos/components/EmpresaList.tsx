@@ -42,8 +42,8 @@ interface Props {
 type BulkAction = "excel";
 
 // Íconos de acción por fila — discretos, hover. stroke currentColor para heredar color.
-const IconEye = (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" /><circle cx="12" cy="12" r="3" /></svg>
+const IconMail = (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
 );
 const IconPencil = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
@@ -69,6 +69,9 @@ export default function EmpresaList({
   const [busy, setBusy] = useState<BulkAction | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
+  // Envío de UN solo reclamo desde el botón de mail de la fila (independiente del
+  // envío en lote por selección). Guarda el reclamo objetivo; null = modal cerrado.
+  const [mailRec, setMailRec] = useState<Reclamo | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
@@ -304,7 +307,7 @@ export default function EmpresaList({
                 </div>
                 {!selectionMode && (
                   <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconEye}</button>
+                    <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconMail}</button>
                     <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
                     <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
                     {isAdmin && (
@@ -388,7 +391,7 @@ export default function EmpresaList({
                   {!selectionMode && (
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-0.5">
-                        <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconEye}</button>
+                        <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconMail}</button>
                         <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
                         <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconPencil}</button>
                         {isAdmin && (
@@ -410,14 +413,20 @@ export default function EmpresaList({
       </div>
 
       <EnviarProveedorModal
-        open={sendOpen}
+        open={sendOpen || mailRec !== null}
         empresa={activeEmpresa}
-        reclamoIds={selectedIds}
+        reclamoIds={mailRec ? [mailRec.id] : selectedIds}
         defaultTo={c?.correo || ""}
         contactoNombre={c?.nombre_contacto || c?.nombre}
-        count={selCount}
-        onClose={() => setSendOpen(false)}
-        onSent={(msg) => { showToast(msg); cancelSelection(); onReload(); }}
+        count={mailRec ? 1 : selCount}
+        defaultSubject={mailRec ? `Reclamo ${mailRec.nro_reclamo} — ${activeEmpresa}` : undefined}
+        onClose={() => { setSendOpen(false); setMailRec(null); }}
+        onSent={(msg) => {
+          showToast(msg);
+          if (mailRec) setMailRec(null);
+          else cancelSelection();
+          onReload();
+        }}
       />
     </div>
   );
