@@ -1,0 +1,68 @@
+/**
+ * Cron diario: catálogo Reebok (products) auto-actualizado desde Switch.
+ *
+ * Schedule: 45 6 * * * UTC — DESPUÉS de los switch-sync de Active Wear/Shoes
+ * (05:30 / 05:40) para no chocar con la sesión única de Switch, y en un minuto
+ * libre (06:00 backup, 06:30 ocupado).
+ *
+ * Refresca precio/existencia/disponibilidad de los productos visibles, oculta
+ * los que quedan en existencia 0, auto-agrega los nuevos con existencia >= 1, y
+ * alerta por Telegram los nuevos sin foto. Fail-safe: un fallo de Switch NO
+ * modifica el catálogo. Dry-run: ?dryRun=1 (no escribe, devuelve el plan).
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { sendTelegramAlert, shortError } from "@/lib/telegram";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+const CRON_NAME = "reebok-catalogo";
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado" }, { status: 500 });
+  }
+  if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const dryRun = req.nextUrl.searchParams.get("dryRun") === "1";
+
+  let result;
+  try {
+    result = await syncCatalogoReebok({ dryRun });
+  } catch (err) {
+    // Fallo catastrófico (inesperado). Alerta y salir — no se tocó nada útil.
+    if (!dryRun) {
+      await sendTelegramAlert(`🚨 Cron reebok-catalogo falló: ${shortError(err instanceof Error ? err.message : String(err))}`);
+    }
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+  }
+
+  if (!dryRun) {
+    // Alerta de fallo por empresa (Switch 401 / vacío): NO se tocó esa empresa.
+    const fallidas = result.empresas.filter((e) => e.error);
+    if (fallidas.length > 0) {
+      await sendTelegramAlert(
+        `🚨 Reebok catálogo: ${fallidas.map((e) => `${e.empresaKey} (${shortError(e.error)})`).join("; ")}. ` +
+        `Su catálogo NO se modificó (fail-safe).`,
+      );
+    }
+    // Alerta de productos nuevos sin foto.
+    const cods = result.nuevosSinFotoTotal;
+    if (cods.length > 0) {
+      const lista = cods.slice(0, 40).join(", ") + (cods.length > 40 ? `, +${cods.length - 40} más` : "");
+      await sendTelegramAlert(
+        `🟥 Reebok: ${cods.length} producto${cods.length === 1 ? "" : "s"} nuevo${cods.length === 1 ? "" : "s"} sin foto — ${lista}. ` +
+        `Súbelas en el catálogo.`,
+      );
+    }
+    await recordCronHeartbeat(CRON_NAME);
+  }
+
+  return NextResponse.json({ ok: !result.hadError, ...result }, { status: result.hadError ? 207 : 200 });
+}
