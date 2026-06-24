@@ -1,9 +1,16 @@
 import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
-import { facturaPath, fotosFolder } from "./zip-paths";
+import { adjuntarFacturaUrls } from "./factura-storage";
 
 const LINK_FG = "0563C1"; // azul de hyperlink
+
+// URL pública de una foto (bucket reclamo-fotos ya es PÚBLICO). Abre con un clic
+// en el navegador, sin extraer ni permisos. Mismo patrón que el Excel suelto.
+const SUPA_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+function fotoPublicUrl(f: ReclamoFoto): string {
+  return f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
+}
 
 const TASA_IMPORTACION = 0.10;
 const TASA_ITBMS = 0.077;
@@ -49,6 +56,7 @@ interface ReclamoFull {
   estado?: string;
   notas?: string;
   factura_pdf_path?: string | null;
+  factura_pdf_url?: string | null; // signed URL web (la adjunta adjuntarFacturaUrls)
   reclamo_items?: ReclamoItem[];
   reclamo_fotos?: ReclamoFoto[];
 }
@@ -80,12 +88,13 @@ function fillRow(cMax: number, r: number, ws: XLSX.WorkSheet, bg: string) {
   }
 }
 
-function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = false): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
-  // En modo ZIP (relative) agrega 2 columnas de links a los archivos del ZIP.
-  const CMAX = relative ? 10 : 8;
+  // 2 columnas de links WEB (Factura PDF firmada / Fotos públicas) — abren con un
+  // clic en el navegador, sin extraer ni permisos.
+  const CMAX = 10;
   let r = 0;
 
   // Title
@@ -123,7 +132,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = 
 
   // Headers
   const headers = ["N° Reclamo", "Factura", "Fecha", "Estado", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos",
-    ...(relative ? ["Factura PDF", "Fotos"] : [])];
+    "Factura PDF", "Fotos"];
   headers.forEach((hv, i) => {
     ws[addr(r, i)] = {
       v: hv,
@@ -201,26 +210,26 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = 
     ws[addr(r, 6)] = num(itbms);
     ws[addr(r, 7)] = num(total, true);
     ws[addr(r, 8)] = int(nFotos);
-    // Links relativos a los archivos del ZIP (Factura PDF / carpeta de fotos).
-    if (relative) {
-      const linkCell = (label: string, target: string) => ({
-        v: label,
-        t: "s" as const,
-        s: {
-          font: { sz: 10, color: { rgb: LINK_FG }, underline: true, name: "Calibri" },
-          fill: { fgColor: { rgb: DATA_BG } },
-          alignment: { horizontal: "center" },
-          border: B,
-        },
-        l: { Target: target, Tooltip: label },
-      });
-      ws[addr(r, 9)] = rec.factura_pdf_path
-        ? linkCell("Ver factura", facturaPath(rec.nro_reclamo))
-        : txt("—", "center");
-      ws[addr(r, 10)] = (rec.reclamo_fotos || []).length > 0
-        ? linkCell("Ver fotos", fotosFolder(rec.nro_reclamo))
-        : txt("—", "center");
-    }
+    // Links WEB (abren con un clic, sin extraer): factura = signed URL larga
+    // (bucket privado); fotos = URL pública de la primera foto.
+    const linkCell = (label: string, target: string) => ({
+      v: label,
+      t: "s" as const,
+      s: {
+        font: { sz: 10, color: { rgb: LINK_FG }, underline: true, name: "Calibri" },
+        fill: { fgColor: { rgb: DATA_BG } },
+        alignment: { horizontal: "center" },
+        border: B,
+      },
+      l: { Target: target, Tooltip: label },
+    });
+    const foto0 = (rec.reclamo_fotos || [])[0];
+    ws[addr(r, 9)] = rec.factura_pdf_url
+      ? linkCell("Ver factura", rec.factura_pdf_url)
+      : txt("—", "center");
+    ws[addr(r, 10)] = foto0
+      ? linkCell("Ver fotos", fotoPublicUrl(foto0))
+      : txt("—", "center");
     h[r] = 18; r++;
   }
 
@@ -260,7 +269,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = 
   ws[addr(r, 6)] = tNum(grandItbms);
   ws[addr(r, 7)] = tNum(grandTotal);
   ws[addr(r, 8)] = tInt(grandFotos);
-  if (relative) { ws[addr(r, 9)] = tBand("", "center"); ws[addr(r, 10)] = tBand("", "center"); }
+  ws[addr(r, 9)] = tBand("", "center"); ws[addr(r, 10)] = tBand("", "center");
   merges.push({ s: { r, c: 0 }, e: { r, c: 3 } });
   h[r] = 24; r++;
 
@@ -276,7 +285,8 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, relative = 
     { wch: 14 },
     { wch: 16 },
     { wch: 9 },
-    ...(relative ? [{ wch: 14 }, { wch: 12 }] : []),
+    { wch: 14 },
+    { wch: 12 },
   ];
   ws["!rows"] = h.map((v) => ({ hpt: v || 16 }));
   return ws;
@@ -298,20 +308,20 @@ function safeSheetName(name: string, used: Set<string>): string {
 export async function buildBulkReclamosExcel(
   reclamos: ReclamoFull[],
   empresa: string,
-  contacto: Contacto | null,
-  opts: { relative?: boolean } = {},
+  _contacto: Contacto | null,
 ): Promise<Buffer> {
-  const relative = !!opts.relative;
+  // Firma las facturas (1 año, lote) → cada reclamo lleva factura_pdf_url web.
+  const recs = await adjuntarFacturaUrls(reclamos);
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
 
-  const resumen = buildResumenSheet(reclamos, empresa, relative);
+  const resumen = buildResumenSheet(recs, empresa);
   XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
 
-  for (const rec of reclamos) {
+  for (const rec of recs) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
     const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
-    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos, { relative });
+    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos);
     XLSX.utils.book_append_sheet(wb, sheet, safeSheetName(rec.nro_reclamo || "Reclamo", used));
   }
 

@@ -5,6 +5,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 // storage.ts.
 export const FACTURA_BUCKET = "reclamo-facturas";
 const DEFAULT_TTL_SECONDS = 60 * 60; // 1h
+// TTL largo para los links del Excel EXPORTADO (mismo enfoque que Marketing
+// zip-export.ts): la factura sigue en bucket PRIVADO, pero el link firmado dura
+// ~1 año para que abra con un clic en el navegador (Mac/Windows), sin extraer
+// nada y sin exponer el bucket.
+export const FACTURA_LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año
 const SIGN_RETRY_DELAY_MS = 250;
 
 function sleep(ms: number): Promise<void> {
@@ -45,4 +50,40 @@ export async function firmarFacturaPathSafe(
     );
     return null;
   }
+}
+
+/** Firma en LOTE varios paths del bucket privado (createSignedUrls). Devuelve un
+ *  mapa path→signedUrl. Dedupe. TTL largo por defecto (1 año) para los links del
+ *  Excel exportado. Espejo de marketing/zip-export.ts firmarLote. */
+export async function firmarFacturasLote(
+  paths: ReadonlyArray<string>,
+  ttlSeconds: number = FACTURA_LINK_TTL_SECONDS,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = Array.from(new Set(paths.filter((p): p is string => !!p)));
+  if (unique.length === 0) return map;
+  const { data } = await supabaseServer.storage
+    .from(FACTURA_BUCKET)
+    .createSignedUrls(unique, ttlSeconds);
+  for (const row of data ?? []) {
+    if (row.signedUrl && row.path) map.set(row.path, row.signedUrl);
+  }
+  return map;
+}
+
+/** Adjunta `factura_pdf_url` (signed URL web, TTL largo) a cada reclamo que tenga
+ *  `factura_pdf_path`. Lo usan los exports de Excel para poner un link WEB de un
+ *  clic (no ruta relativa al ZIP) sin volver público el bucket. */
+export async function adjuntarFacturaUrls<T extends { factura_pdf_path?: string | null }>(
+  reclamos: T[],
+  ttlSeconds: number = FACTURA_LINK_TTL_SECONDS,
+): Promise<(T & { factura_pdf_url: string | null })[]> {
+  const paths = reclamos
+    .map((r) => r.factura_pdf_path)
+    .filter((p): p is string => !!p);
+  const urlMap = await firmarFacturasLote(paths, ttlSeconds);
+  return reclamos.map((r) => ({
+    ...r,
+    factura_pdf_url: r.factura_pdf_path ? urlMap.get(r.factura_pdf_path) ?? null : null,
+  }));
 }

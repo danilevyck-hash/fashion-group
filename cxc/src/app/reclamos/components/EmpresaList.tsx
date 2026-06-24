@@ -114,27 +114,19 @@ export default function EmpresaList({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el ZIP.");
+        throw new Error(err?.error || "Error al generar el Excel.");
       }
-      const omitidas = Number(res.headers.get("X-Fotos-Omitidas") || "0");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
       a.href = url;
-      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      const sizeMB = blob.size / (1024 * 1024);
-      if (sizeMB > 25) {
-        showToast(`ZIP de ${sizeMB.toFixed(0)}MB descargado. Es pesado para adjuntar en Outlook — considera seleccionar menos reclamos.`);
-      } else if (omitidas > 0) {
-        showToast(`ZIP descargado. ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir.`);
-      } else {
-        showToast(`ZIP descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
-      }
+      showToast(`Excel descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el ZIP");
+      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
       setBusy(null);
     }
@@ -181,10 +173,10 @@ export default function EmpresaList({
               <button
                 onClick={downloadBulkZip}
                 disabled={busy !== null}
-                title="Descargar Excel resumen + fotos comprimidas en un solo ZIP"
+                title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
                 className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
               >
-                {busy === "zip" ? "Generando ZIP..." : "Descargar ZIP"}
+                {busy === "zip" ? "Generando Excel..." : "Descargar Excel"}
               </button>
               {isAdmin && (
                 <button

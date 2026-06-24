@@ -2,31 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { Resend } from "resend";
-import { fetchReclamosForEmpresa, reclamoBulkConstants, type BulkSelector } from "@/lib/reclamos/excel-bulk";
-import { buildReclamosZip } from "@/lib/reclamos/zip-bulk";
+import { buildBulkReclamosExcel, fetchReclamosForEmpresa, reclamoBulkConstants, type BulkSelector } from "@/lib/reclamos/excel-bulk";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Bucket PRIVADO dedicado a los ZIPs (facturas + fotos del negocio).
-// NO usar el bucket público reclamo-fotos: ahí el objeto quedaría alcanzable
-// por URL aunque el link firmado venza. En privado, solo la signed URL sirve.
-const ZIP_BUCKET = "reclamo-zips-privado";
-const ATTACH_LIMIT = 10 * 1024 * 1024; // ≤10MB → adjunta; sobre eso → link firmado
-const SIGNED_URL_DAYS = 7;
-
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
-}
-
-/** Crea el bucket privado si no existe (idempotente, self-healing). */
-async function ensureZipBucket(): Promise<void> {
-  const { data } = await supabaseServer.storage.getBucket(ZIP_BUCKET);
-  if (data) return;
-  const { error } = await supabaseServer.storage.createBucket(ZIP_BUCKET, { public: false });
-  if (error && !/exist/i.test(error.message)) {
-    throw new Error(`No se pudo preparar el almacenamiento privado: ${error.message}`);
-  }
 }
 
 function fmt(n: number): string {
@@ -94,11 +76,11 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    // Arma el ZIP (Excel resumen + carpeta por reclamo con factura PDF + fotos)
-    const { buffer, fotosIncluidas, fotosOmitidas, pdfsIncluidos, pdfsOmitidos } = await buildReclamosZip(reclamos, empresa, contacto);
+    // Excel pelado con links WEB (factura firmada + fotos públicas). Abre con un
+    // clic en Mac/Windows, sin extraer ni permisos. Liviano → siempre se adjunta.
+    const buffer = await buildBulkReclamosExcel(reclamos, empresa, contacto);
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.zip`;
-    const sizeMB = buffer.length / (1024 * 1024);
+    const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
     // Tabla resumen (igual estilo que el correo consolidado existente)
     const { FACTOR_TOTAL } = reclamoBulkConstants();
@@ -121,33 +103,10 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       })
       .join("");
 
-    // Lógica híbrida: adjuntar o link firmado
-    const attachments: { filename: string; content: Buffer }[] = [];
-    let downloadBlock = "";
-    let mode: "attach" | "link" = "attach";
-
-    if (buffer.length <= ATTACH_LIMIT) {
-      attachments.push({ filename, content: buffer });
-      downloadBlock = `<p style="font-size:13px;color:#444">Adjunto encontrará <strong>${esc(filename)}</strong> (${sizeMB.toFixed(1)} MB) con el Excel resumen y las fotos de evidencia organizadas por número de factura.</p>`;
-    } else {
-      mode = "link";
-      await ensureZipBucket();
-      const path = `${safeName}/${new Date().toISOString().slice(0, 10)}_${Date.now()}_${filename}`;
-      const { error: upErr } = await supabaseServer.storage
-        .from(ZIP_BUCKET)
-        .upload(path, buffer, { contentType: "application/zip", upsert: true });
-      if (upErr) {
-        return NextResponse.json({ error: "No se pudo preparar el archivo para el envío." }, { status: 500 });
-      }
-      const { data: signed, error: signErr } = await supabaseServer.storage
-        .from(ZIP_BUCKET)
-        .createSignedUrl(path, SIGNED_URL_DAYS * 24 * 60 * 60);
-      if (signErr || !signed?.signedUrl) {
-        return NextResponse.json({ error: "No se pudo generar el enlace de descarga." }, { status: 500 });
-      }
-      downloadBlock = `<p style="font-size:13px;color:#444">El archivo (${sizeMB.toFixed(1)} MB) es demasiado grande para adjuntar, así que puede descargarlo desde este enlace (válido por ${SIGNED_URL_DAYS} días):</p>
-        <p style="margin:12px 0"><a href="${signed.signedUrl}" style="display:inline-block;background:#000;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-size:13px;font-weight:600">Descargar ZIP (${sizeMB.toFixed(1)} MB)</a></p>`;
-    }
+    // El Excel es liviano → siempre se adjunta. Los archivos (factura/fotos) abren
+    // desde los links WEB del propio Excel, así que no se adjuntan binarios.
+    const attachments = [{ filename, content: buffer }];
+    const downloadBlock = `<p style="font-size:13px;color:#444">Adjunto encontrará <strong>${esc(filename)}</strong>. Dentro del Excel, los enlaces <em>Ver factura</em> y <em>Ver fotos</em> abren los archivos en el navegador con un clic.</p>`;
 
     const messageHtml = esc(message).replace(/\n/g, "<br>");
 
@@ -197,28 +156,19 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     // Registro en seguimiento (igual que el correo consolidado existente)
     const ids = reclamos.map((r) => r.id);
     if (ids.length > 0) {
-      const nota =
-        mode === "link"
-          ? `Correo con ZIP (enlace de descarga) enviado a ${recipients.join(", ")} (${reclamos.length} reclamos)`
-          : `Correo con ZIP adjunto enviado a ${recipients.join(", ")} (${reclamos.length} reclamos)`;
+      const nota = `Correo con Excel adjunto enviado a ${recipients.join(", ")} (${reclamos.length} reclamos)`;
       await supabaseServer.from("reclamo_seguimiento").insert(
         ids.map((reclamo_id) => ({ reclamo_id, nota, autor: "Sistema" })),
       );
     }
 
-    // Pipeline de 2 estados: enviar el ZIP por correo NO cambia el estado. El
-    // reclamo se queda en "Creado"; solo el settlement (Pagado) lo avanza.
+    // Pipeline de 2 estados: enviar el correo NO cambia el estado. El reclamo se
+    // queda en "Creado"; solo el settlement (Pagado) lo avanza.
 
     return NextResponse.json({
       ok: true,
       sent: reclamos.length,
       to: recipients,
-      mode,
-      sizeMB: Number(sizeMB.toFixed(1)),
-      fotosIncluidas,
-      fotosOmitidas,
-      pdfsIncluidos,
-      pdfsOmitidos,
     });
   } catch (err) {
     console.error("send-zip error:", err);

@@ -100,19 +100,18 @@ export default function ReclamoDetail({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el ZIP.");
+        throw new Error(err?.error || "Error al generar el Excel.");
       }
-      const omitidas = Number(res.headers.get("X-Fotos-Omitidas") || "0");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Reclamo-${current.nro_reclamo}-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.download = `Reclamo-${current.nro_reclamo}-${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast(omitidas > 0 ? `ZIP descargado. ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir.` : "ZIP descargado");
+      showToast("Excel descargado");
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al generar el ZIP");
+      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
       setZipBusy(false);
     }
@@ -304,9 +303,9 @@ export default function ReclamoDetail({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
             Editar
           </button>
-          <button onClick={downloadZip} disabled={zipBusy} title="Descargar el ZIP de este reclamo (Excel + fotos comprimidas) para adjuntarlo a un correo" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
+          <button onClick={downloadZip} disabled={zipBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-            {zipBusy ? "Generando ZIP…" : "Descargar ZIP"}
+            {zipBusy ? "Generando Excel…" : "Descargar Excel"}
           </button>
           {role === "admin" && (
             <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center gap-1">
