@@ -203,7 +203,7 @@ export default function ReclamoForm({
           </div>
         )}
         <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+          <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3 [&_th]:px-5 [&_td]:px-5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
                 <th className="pb-2 font-medium text-left">Código *</th>
