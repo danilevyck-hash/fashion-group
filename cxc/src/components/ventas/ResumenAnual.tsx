@@ -77,12 +77,12 @@ function cellDelta(cur: Vals, prev: Vals | null, mode: ViewMode): DeltaFormat {
 const toneClass: Record<string, string> = {
   emerald: "text-emerald-700",
   orange: "text-orange-600",
-  stone: "text-stone-400",
+  stone: "text-gray-400",
 };
 const toneClassDark: Record<string, string> = {
   emerald: "text-emerald-300",
   orange: "text-orange-300",
-  stone: "text-stone-400",
+  stone: "text-gray-400",
 };
 
 // Una celda año: valor primario + Δ YoY debajo. En la columna TOTAL (varios
@@ -93,8 +93,8 @@ function AnualCell({ cur, prev, mode, dark = false, showDelta = true }: {
   const val = renderValue(metricValue(cur, mode), mode);
   const d = showDelta ? cellDelta(cur, prev, mode) : null;
   return (
-    <td className={cn("border-b px-2.5 py-3.5 text-right align-top", dark ? "border-stone-800" : "border-stone-200")}>
-      <div className={cn("font-mono text-sm tabular-nums", dark ? "text-white" : "text-stone-950")}>{val}</div>
+    <td className={cn("border-b px-2.5 py-3.5 text-right align-top", dark ? "border-gray-800" : "border-gray-200")}>
+      <div className={cn("font-mono text-sm tabular-nums", dark ? "text-white" : "text-gray-950")}>{val}</div>
       {d && (d.arrow !== null || d.displayValue !== "—") && (
         <div className={cn("font-mono text-xs tabular-nums", dark ? toneClassDark[d.tone] : toneClass[d.tone])}>
           {d.arrow ? `${d.arrow} ` : ""}{d.displayValue}
@@ -108,10 +108,10 @@ export function ResumenAnual({ data, error, viewMode }: {
   data: AnualData | null; error: string | null; viewMode: ViewMode;
 }) {
   if (error) {
-    return <Card className="p-6 text-sm text-stone-500">No se pudo cargar el resumen anual: {error}</Card>;
+    return <Card className="p-6 text-sm text-gray-500">No se pudo cargar el resumen anual: {error}</Card>;
   }
   if (!data) {
-    return <Card className="p-6 text-sm text-stone-400">Cargando resumen anual…</Card>;
+    return <Card className="p-6 text-sm text-gray-400">Cargando resumen anual…</Card>;
   }
 
   const { years, currentYear, parcial, empresas, totalGrupo } = data;
@@ -123,27 +123,27 @@ export function ResumenAnual({ data, error, viewMode }: {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 640 }}>
             <thead>
-              <tr className="bg-stone-100 text-left">
-                <th className="sticky left-0 top-0 z-30 min-w-[160px] bg-stone-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-stone-500">
+              <tr className="bg-gray-100 text-left">
+                <th className="sticky left-0 top-0 z-30 min-w-[160px] bg-gray-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Empresa
                 </th>
                 {years.map((y) => (
-                  <th key={y} className="sticky top-0 z-20 bg-stone-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">
-                    <div className="text-stone-700">{y}</div>
+                  <th key={y} className="sticky top-0 z-20 bg-gray-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <div className="text-gray-700">{y}</div>
                     {parcial && parcial.year === y ? (
-                      <div className="text-xs font-normal normal-case tracking-normal text-stone-400">parcial ({parcial.label})</div>
+                      <div className="text-xs font-normal normal-case tracking-normal text-gray-400">parcial ({parcial.label})</div>
                     ) : y === currentYear ? (
-                      <div className="text-xs font-normal normal-case tracking-normal text-stone-400">al día</div>
+                      <div className="text-xs font-normal normal-case tracking-normal text-gray-400">al día</div>
                     ) : null}
                   </th>
                 ))}
-                <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950">Total</th>
+                <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Total</th>
               </tr>
             </thead>
             <tbody>
               {empresas.map((e) => (
                 <tr key={e.id}>
-                  <td className="sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 bg-white px-3.5 py-3.5 text-sm text-stone-950">
+                  <td className="sticky left-0 z-10 whitespace-nowrap border-b border-gray-200 bg-white px-3.5 py-3.5 text-sm text-gray-950">
                     {e.nombre}
                   </td>
                   {years.map((y) => {
@@ -153,8 +153,8 @@ export function ResumenAnual({ data, error, viewMode }: {
                   <AnualCell cur={e.total} prev={null} mode={viewMode} showDelta={false} />
                 </tr>
               ))}
-              <tr className="bg-stone-950 text-white">
-                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
+              <tr className="bg-gray-950 text-white">
+                <td className="sticky left-0 z-10 bg-gray-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {years.map((y) => {
                   const c = totalGrupo.byYear[y] ?? emptyCell;
                   return <AnualCell key={y} cur={c} prev={c.prev} mode={viewMode} dark />;
@@ -165,13 +165,13 @@ export function ResumenAnual({ data, error, viewMode }: {
           </table>
         </div>
         {parcial && (
-          <p className="border-t border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-500">
+          <p className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
             {parcial.year} es parcial (datos desde {parcial.label}); no se calcula Δ interanual. El año en curso{currentYear ? ` (${currentYear})` : ""} va al día y su Δ compara contra el mismo período del año anterior.
           </p>
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="text-emerald-700">▲</span>
           {viewMode === "margen" ? "Δ interanual mayor a +0.5 pts" : "Δ interanual mayor a +5%"}

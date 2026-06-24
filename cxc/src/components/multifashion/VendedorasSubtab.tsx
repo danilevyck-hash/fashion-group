@@ -39,7 +39,7 @@ const MES_FULL = [
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
-  stone:   "text-stone-500",
+  stone:   "text-gray-500",
 };
 
 type SortKey = "tickets" | "ventas" | "delta_ventas" | "comision";
@@ -187,7 +187,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
         <ChipPill active={chip === "ytd"} onClick={() => setChip("ytd")}>
           {`YTD ${year}`}
         </ChipPill>
-        <span className="mx-1 h-4 w-px bg-stone-200" aria-hidden />
+        <span className="mx-1 h-4 w-px bg-gray-200" aria-hidden />
         <ChipPill active={chip === "ultimos_3"} onClick={() => setChip("ultimos_3")}>Últimos 3 meses</ChipPill>
         <ChipPill active={chip === "ultimos_6"} onClick={() => setChip("ultimos_6")}>Últimos 6 meses</ChipPill>
         <ChipPill active={chip === "ultimos_12"} onClick={() => setChip("ultimos_12")}>Últimos 12 meses</ChipPill>
@@ -195,15 +195,15 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
 
       {/* Subtitle */}
       <div className={cn(loading && "opacity-60 transition-opacity")}>
-        <h3 className="font-display text-base font-semibold text-stone-950">Vendedoras · {chipLabel[chip]}</h3>
+        <h3 className="font-display text-base font-semibold text-gray-950">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
-          <p className="mt-0.5 text-xs text-stone-500">
-            <span className="font-mono tabular-nums text-stone-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
-            <span className="font-mono tabular-nums text-stone-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
-            <span className="font-mono tabular-nums text-stone-700">{resp.tickets_total.toLocaleString()}</span> tickets
+          <p className="mt-0.5 text-xs text-gray-500">
+            <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
+            <span className="font-mono tabular-nums text-gray-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
+            <span className="font-mono tabular-nums text-gray-700">{resp.tickets_total.toLocaleString()}</span> tickets
           </p>
         )}
-        <p className="mt-1 text-xs text-stone-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
+        <p className="mt-1 text-xs text-gray-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
       </div>
 
       {/* Tabla única */}
@@ -216,12 +216,12 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" style={{ minWidth: 760 }}>
                 <thead>
-                  <tr className="bg-stone-100">
-                    <th className="w-10 border-b border-stone-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">#</th>
-                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-stone-500">Vendedora</th>
+                  <tr className="bg-gray-100">
+                    <th className="w-10 border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
+                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Vendedora</th>
                     <SortHeader col="tickets"      sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Tickets</SortHeader>
                     <SortHeader col="ventas"       sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Ventas</SortHeader>
-                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">Ticket prom.</th>
+                    <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Ticket prom.</th>
                     <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs año pasado</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
                   </tr>
@@ -279,20 +279,20 @@ function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; b
   const dv = formatDeltaRatio(v.delta_ventas_pct);
   return (
     <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{rank}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{v.nombre}</span>
           <BonoBadges v={v} badge={badge} />
         </div>
       </td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">{v.tickets.toLocaleString()}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(v.ventas)}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">${v.ticket_promedio.toFixed(2)}</td>
-      <td className={cn("border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">{v.tickets.toLocaleString()}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(v.ventas)}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm text-gray-700 tabular-nums">${v.ticket_promedio.toFixed(2)}</td>
+      <td className={cn("border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
         {dv.arrow && <span className="mr-1">{dv.arrow}</span>}{dv.displayValue}
       </td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">${v.comision.toFixed(2)}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">${v.comision.toFixed(2)}</td>
     </tr>
   );
 }
@@ -302,21 +302,21 @@ function VendedoraCard({ v, rank, badge }: { v: VendedoraDetalle; rank: number; 
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
-      rowHighlight(v, badge) ? "border-amber-200 bg-amber-50/40" : "border-stone-200"
+      rowHighlight(v, badge) ? "border-amber-200 bg-amber-50/40" : "border-gray-200"
     )}>
       <div className="flex flex-wrap items-baseline gap-1.5">
-        <span className="font-mono text-xs text-stone-500 tabular-nums">{rank}.</span>
-        <span className="truncate text-[15px] font-medium leading-tight text-stone-950">{v.nombre}</span>
+        <span className="font-mono text-xs text-gray-500 tabular-nums">{rank}.</span>
+        <span className="truncate text-[15px] font-medium leading-tight text-gray-950">{v.nombre}</span>
         <BonoBadges v={v} badge={badge} />
       </div>
       <div className="mt-2 flex items-baseline gap-3">
-        <span className="font-mono text-base font-medium tabular-nums text-stone-950">{fmtMoneyCompact(v.ventas)}</span>
+        <span className="font-mono text-base font-medium tabular-nums text-gray-950">{fmtMoneyCompact(v.ventas)}</span>
         <span className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[dv.tone])}>
           {dv.arrow && <span className="mr-0.5">{dv.arrow}</span>}{dv.displayValue}
-          <span className="ml-1 text-stone-400">vs año pasado</span>
+          <span className="ml-1 text-gray-400">vs año pasado</span>
         </span>
       </div>
-      <div className="mt-1 text-xs text-stone-500">
+      <div className="mt-1 text-xs text-gray-500">
         <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> tickets ·{" "}
         <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
@@ -337,7 +337,7 @@ function ChipPill({ active, onClick, children }: { active: boolean; onClick: () 
       aria-pressed={active}
       className={cn(
         "inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
-        active ? "border-teal-700 bg-teal-700 text-white" : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+        active ? "border-teal-700 bg-teal-700 text-white" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
       )}
     >
       {children}
@@ -348,8 +348,8 @@ function ChipPill({ active, onClick, children }: { active: boolean; onClick: () 
 function EmptyState() {
   return (
     <Card className="flex min-h-[200px] flex-col items-center justify-center gap-3 p-12 text-center">
-      <Users className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
-      <p className="text-sm text-stone-500">Sin vendedoras con actividad en este período</p>
+      <Users className="h-10 w-10 text-gray-400" strokeWidth={1.5} />
+      <p className="text-sm text-gray-500">Sin vendedoras con actividad en este período</p>
     </Card>
   );
 }
@@ -368,8 +368,8 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide transition",
-        active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
+        "cursor-pointer select-none whitespace-nowrap border-b border-gray-200 bg-gray-100 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide transition",
+        active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
       )}
     >
       <span className="inline-flex items-center gap-1">

@@ -166,7 +166,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </Select>
 
         <div className="relative min-w-[160px] flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
           <Input
             value={search}
             onChange={e => { setSearch(e.target.value); setVisible(PAGE); }}
@@ -182,31 +182,31 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
 
       {/* Totales — texto simple, sin cards */}
       {data && !loading && (
-        <p className="mb-3 text-sm text-stone-600">
-          Venta <span className="font-mono font-semibold tabular-nums text-stone-900">{fmtMoney(data.totales.venta)}</span>
-          <span className="mx-2 text-stone-300">·</span>
-          Margen <span className="font-mono font-semibold tabular-nums text-stone-900">{fmtMargen(data.totales.margen)}</span>
+        <p className="mb-3 text-sm text-gray-600">
+          Venta <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoney(data.totales.venta)}</span>
+          <span className="mx-2 text-gray-300">·</span>
+          Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
         </p>
       )}
 
       {error && (
-        <div className="rounded-lg border border-stone-200 bg-white p-8 text-center text-sm text-stone-700">
+        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-700">
           No se pudieron cargar los productos. <button onClick={load} className="underline">Reintentar</button>
         </div>
       )}
 
       {loading && (
-        <div className="rounded-lg border border-stone-200 bg-white p-3">
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
           <SkeletonTable rows={6} cols={5} />
         </div>
       )}
 
       {/* Tabla nivel 1 */}
       {data && !loading && !error && (
-        <div className="overflow-x-auto rounded-lg border border-stone-200">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-[0.04em] text-stone-400">
+              <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
                 <th className="px-3 py-2.5 font-normal">Descripción</th>
                 <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Códigos</th>
                 <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
@@ -217,7 +217,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-8 text-center text-stone-400">Sin productos para este filtro.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-400">Sin productos para este filtro.</td></tr>
               )}
               {visibleRows.map(p => {
                 const drillable = p.num_codigos > 1;
@@ -266,7 +266,7 @@ function SortableTh({
     <th className={`px-3 py-2.5 text-right font-normal ${className}`}>
       <button
         onClick={() => onClick(sortKey)}
-        className={`inline-flex items-center gap-0.5 hover:text-stone-700 ${isActive ? "text-stone-900" : ""}`}
+        className={`inline-flex items-center gap-0.5 hover:text-gray-700 ${isActive ? "text-gray-900" : ""}`}
       >
         {label}
         <span className="w-2 text-xs">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
@@ -303,49 +303,49 @@ function ProductoRow({
   return (
     <>
       <tr
-        className={`border-b border-stone-100 ${drillable ? "cursor-pointer hover:bg-stone-50" : ""}`}
+        className={`border-b border-gray-100 ${drillable ? "cursor-pointer hover:bg-gray-50" : ""}`}
         onClick={drillable ? onToggle : undefined}
       >
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-1.5">
             {drillable ? (
-              <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+              <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
             ) : (
               <span className="w-3.5 shrink-0" />
             )}
-            <span className="text-stone-800">{p.descripcion}</span>
+            <span className="text-gray-800">{p.descripcion}</span>
           </div>
         </td>
-        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-stone-500 sm:table-cell">{p.num_codigos}</td>
-        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-stone-600 sm:table-cell">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
-        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-stone-900">{fmtMoney(p.venta)}</td>
+        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{p.num_codigos}</td>
+        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
+        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-900">{fmtMoney(p.venta)}</td>
         <DeltaCell curr={p.venta} prev={prevVenta} />
-        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-stone-700">{fmtMargen(p.margen)}</td>
+        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-700">{fmtMargen(p.margen)}</td>
       </tr>
       {isOpen && (
-        <tr className="bg-stone-50/60">
+        <tr className="bg-gray-50/60">
           <td colSpan={6} className="px-3 py-0">
             <div className="py-2 pl-5">
-              {codigosLoading && <div className="py-2 text-xs text-stone-400">Cargando códigos…</div>}
+              {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando códigos…</div>}
               {!codigosLoading && codigos && codigos.length > 0 && (
                 <table className="w-full text-xs">
                   <tbody>
                     {codigos.map(c => (
-                      <tr key={c.codigo} className="border-b border-stone-100 last:border-0">
+                      <tr key={c.codigo} className="border-b border-gray-100 last:border-0">
                         <td className="py-1.5 pr-3">
-                          <span className="font-mono text-stone-500">{c.codigo}</span>
-                          {c.descripcion && <span className="ml-2 text-stone-400">{c.descripcion}</span>}
+                          <span className="font-mono text-gray-500">{c.codigo}</span>
+                          {c.descripcion && <span className="ml-2 text-gray-400">{c.descripcion}</span>}
                         </td>
-                        <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-stone-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-stone-800">{fmtMoney(c.venta)}</td>
-                        <td className="py-1.5 text-right font-mono tabular-nums text-stone-600">{fmtMargen(c.margen)}</td>
+                        <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
+                        <td className="py-1.5 text-right font-mono tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
               {!codigosLoading && codigos && codigos.length === 0 && (
-                <div className="py-2 text-xs text-stone-400">Sin códigos.</div>
+                <div className="py-2 text-xs text-gray-400">Sin códigos.</div>
               )}
             </div>
           </td>

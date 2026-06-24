@@ -149,10 +149,10 @@ function HoraTooltip({ active, payload }: {
   const row = (payload[0] as { payload?: { hora: number; ventas: number; n_tickets: number } }).payload;
   if (!row) return null;
   return (
-    <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
-      <p className="font-medium text-stone-950">{horaPicoLabel(row.hora)}</p>
-      <p className="mt-0.5 font-mono tabular-nums text-stone-700">{fmtMoney(row.ventas)}</p>
-      <p className="text-xs text-stone-500">
+    <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <p className="font-medium text-gray-950">{horaPicoLabel(row.hora)}</p>
+      <p className="mt-0.5 font-mono tabular-nums text-gray-700">{fmtMoney(row.ventas)}</p>
+      <p className="text-xs text-gray-500">
         {row.n_tickets} {row.n_tickets === 1 ? "ticket" : "tickets"}
       </p>
     </div>
@@ -188,25 +188,25 @@ function ChartTooltip({
 
   if (!isFuture) {
     if (ventas === 0) {
-      rows.push({ label: `${mesLabel} ${year}`, value: "Sin operación", tone: "text-stone-400" });
+      rows.push({ label: `${mesLabel} ${year}`, value: "Sin operación", tone: "text-gray-400" });
     } else {
       rows.push({ label: `${mesLabel} ${year}`, value: fmtMoney(ventas) });
     }
   }
   if (showPrevLine && prev > 0) {
-    rows.push({ label: `Mismo mes ${year - 1}`, value: fmtMoney(prev), tone: "text-stone-600" });
+    rows.push({ label: `Mismo mes ${year - 1}`, value: fmtMoney(prev), tone: "text-gray-600" });
   }
   if (rows.length === 0) {
-    rows.push({ label: "Pendiente", value: "—", tone: "text-stone-400" });
+    rows.push({ label: "Pendiente", value: "—", tone: "text-gray-400" });
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
-      <div className="mb-1 font-medium text-stone-700">Día {day}</div>
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <div className="mb-1 font-medium text-gray-700">Día {day}</div>
       {rows.map((r, i) => (
         <div key={i} className="flex items-center justify-between gap-4">
-          <span className="text-stone-500">{r.label}</span>
-          <span className={cn("font-mono tabular-nums text-stone-950", r.tone)}>{r.value}</span>
+          <span className="text-gray-500">{r.label}</span>
+          <span className={cn("font-mono tabular-nums text-gray-950", r.tone)}>{r.value}</span>
         </div>
       ))}
     </div>

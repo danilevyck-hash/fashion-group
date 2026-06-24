@@ -147,10 +147,10 @@ export default function SyncStatus({
     return (
       <span className={className}>
         <span
-          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-xs font-medium text-stone-600"
+          className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-600"
           title={warning ?? undefined}
         >
-          <Calendar className="h-3 w-3 text-stone-400" />
+          <Calendar className="h-3 w-3 text-gray-400" />
           {mainLabel}
         </span>
         {warning && (
@@ -164,7 +164,7 @@ export default function SyncStatus({
 
   return (
     <div className={className} aria-live="polite">
-      <p className="text-xs text-stone-500">{mainLabel}</p>
+      <p className="text-xs text-gray-500">{mainLabel}</p>
       {warning && (
         <p className="mt-0.5 text-xs text-amber-600" role="status">
           {warning}

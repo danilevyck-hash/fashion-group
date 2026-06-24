@@ -65,13 +65,13 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
           aria-label="Cerrar"
           className="flex w-full justify-center pt-3 pb-2"
         >
-          <div className="h-1 w-10 rounded-full bg-stone-300" />
+          <div className="h-1 w-10 rounded-full bg-gray-300" />
         </button>
 
         <div className="px-5 pb-6 pt-1">
-          <h2 className="font-display text-base font-medium text-stone-950">Ordenar por</h2>
+          <h2 className="font-display text-base font-medium text-gray-950">Ordenar por</h2>
 
-          <div className="mt-3 divide-y divide-stone-100">
+          <div className="mt-3 divide-y divide-gray-100">
             {OPTIONS.map(opt => {
               const active = sortBy === opt.key;
               return (
@@ -82,12 +82,12 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                     onChange(opt.key, sortDir);
                     onClose();
                   }}
-                  className="flex w-full items-center justify-between py-3.5 text-left text-sm text-stone-950"
+                  className="flex w-full items-center justify-between py-3.5 text-left text-sm text-gray-950"
                 >
                   <span>{opt.label}</span>
                   <span
                     aria-hidden
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border ${active ? "border-teal-700" : "border-stone-300"}`}
+                    className={`flex h-5 w-5 items-center justify-center rounded-full border ${active ? "border-teal-700" : "border-gray-300"}`}
                   >
                     {active && <span className="h-2.5 w-2.5 rounded-full bg-teal-700" />}
                   </span>
@@ -97,7 +97,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
           </div>
 
           <div className="mt-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Dirección
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -107,7 +107,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                 className={`rounded-md py-3 text-sm font-medium transition ${
                   sortDir === "desc"
                     ? "bg-teal-700 text-white"
-                    : "bg-stone-100 text-stone-700"
+                    : "bg-gray-100 text-gray-700"
                 }`}
               >
                 Descendente
@@ -118,7 +118,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
                 className={`rounded-md py-3 text-sm font-medium transition ${
                   sortDir === "asc"
                     ? "bg-teal-700 text-white"
-                    : "bg-stone-100 text-stone-700"
+                    : "bg-gray-100 text-gray-700"
                 }`}
               >
                 Ascendente

@@ -25,7 +25,7 @@ type SortDir = "asc" | "desc";
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
-  stone:   "text-stone-500",
+  stone:   "text-gray-500",
 };
 
 // Label legible del sort actual para el subtitle del header.
@@ -178,7 +178,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         : "Estricto del año en curso (solo clientes con compras YTD). Toca para ver los últimos 12 meses.");
   // Color del chip: teal cuando 12m rolling (señal "expandido"), stone para
   // YTD strict o año cerrado.
-  const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700";
+  const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-gray-100 text-gray-700";
 
   // Universo según el PERÍODO (no el sort). VENTAS LOCAL queda fuera (se muestra
   // marcado aparte, fuera del ranking). Esto define qué huérfanos van a "Otros".
@@ -289,10 +289,10 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
       )}
 
       {/* Sticky header: search + counter + pills + sort button (mobile only). */}
-      <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-stone-200 bg-stone-50 px-1 pb-2.5 pt-2.5">
+      <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-gray-200 bg-gray-50 px-1 pb-2.5 pt-2.5">
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="relative min-w-[180px] max-w-full flex-1 md:max-w-[360px]">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-500" />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-500" />
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -308,17 +308,17 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           <button
             type="button"
             onClick={() => setSortOpen(true)}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-xs font-medium text-stone-700 active:bg-stone-100 md:hidden"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 active:bg-gray-100 md:hidden"
             aria-label="Ordenar lista"
           >
-            <ArrowUpDown className="h-3.5 w-3.5 text-stone-500" />
+            <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
             <span>Ordenar</span>
           </button>
 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
-          <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-stone-500 md:flex">
+          <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 md:flex">
             <p>
-              <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {vistaSubtitleText} · ordenados por {SORT_LABELS[sortBy]}
+              <span className="font-mono text-gray-950">{filtered.length}</span> clientes activos · {vistaSubtitleText} · ordenados por {SORT_LABELS[sortBy]}
             </p>
             {isClosedYear ? (
               <span
@@ -344,8 +344,8 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             línea 2 con 6px de separación. Evita que el chip quede pegado
             al texto y dé sensación de amontonamiento. */}
         <div className="md:hidden">
-          <div className="text-xs text-stone-500">
-            <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
+          <div className="text-xs text-gray-500">
+            <span className="font-mono text-gray-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
           </div>
           {isClosedYear ? (
             <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-xs font-medium", vistaChipTone)}>
@@ -382,7 +382,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     "min-h-[40px] whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
                     active
                       ? "border-teal-700 bg-teal-700 text-white"
-                      : "border-stone-200 bg-white text-stone-700"
+                      : "border-gray-200 bg-white text-gray-700"
                   )}
                 >
                   {p.label}
@@ -398,7 +398,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 920 }}>
             <thead>
-              <tr className="bg-stone-100">
+              <tr className="bg-gray-100">
                 <SortHeader col="rank"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>#</SortHeader>
                 <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
@@ -436,20 +436,20 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
               })}
               {ventasLocalRow && !search.trim() && (
                 <tr className="bg-amber-50/40">
-                  <td className="border-b border-stone-200 px-3.5 py-3 text-right">
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right">
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
                   </td>
-                  <td className="border-b border-stone-200 px-3.5 py-3 text-sm font-medium text-stone-700" colSpan={2}>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-sm font-medium text-gray-700" colSpan={2}>
                     {ventasLocalRow.nombre}
-                    <span className="ml-2 text-xs font-normal text-stone-500">ventas de contado · fuera del ranking</span>
+                    <span className="ml-2 text-xs font-normal text-gray-500">ventas de contado · fuera del ranking</span>
                   </td>
-                  <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
-                  <td className="border-b border-stone-200 px-3.5 py-3 text-right text-stone-400">—</td>
-                  <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
+                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-gray-400">—</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
                 </tr>
               )}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-3.5 py-12 text-center text-sm text-stone-500">
+                <tr><td colSpan={6} className="px-3.5 py-12 text-center text-sm text-gray-500">
                   No se encontraron clientes con esos filtros.
                 </td></tr>
               )}
@@ -483,16 +483,16 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
             <div className="flex items-center gap-2">
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
-              <span className="text-sm font-medium text-stone-700">{ventasLocalRow.nombre}</span>
+              <span className="text-sm font-medium text-gray-700">{ventasLocalRow.nombre}</span>
             </div>
-            <div className="mt-1 flex items-center justify-between text-xs text-stone-500">
+            <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
               <span>ventas de contado · fuera del ranking</span>
-              <span className="font-mono tabular-nums text-stone-700">{fmtMoney(ventasLocalRow.ytd)}</span>
+              <span className="font-mono tabular-nums text-gray-700">{fmtMoney(ventasLocalRow.ytd)}</span>
             </div>
           </div>
         )}
         {filtered.length === 0 && (
-          <div className="rounded-lg border border-stone-200 bg-white px-4 py-12 text-center text-sm text-stone-500">
+          <div className="rounded-lg border border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-500">
             No se encontraron clientes con esos filtros.
           </div>
         )}
@@ -563,9 +563,9 @@ function ClienteRow({
   };
 
   return (
-    <tr className="cursor-pointer transition hover:bg-stone-50">
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{displayRank}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
+    <tr className="cursor-pointer transition hover:bg-gray-50">
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         {/* Desktop (md+): HoverCard con popover. Mobile (< md): el mismo
             botón dispara onMobileTap → abre ClienteSheet en el padre. */}
         <HoverCard openDelay={250} closeDelay={100}>
@@ -597,16 +597,16 @@ function ClienteRow({
             />
           </HoverCardContent>
         </HoverCard>
-        <div className="font-mono text-xs leading-tight text-stone-500">{c.id}</div>
+        <div className="font-mono text-xs leading-tight text-gray-500">{c.id}</div>
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-xs text-gray-700">
         {isMultiEmpresa ? (
           <TooltipProvider delayDuration={120}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="cursor-help underline decoration-dotted decoration-stone-300 underline-offset-4 hover:text-stone-950"
+                  className="cursor-help underline decoration-dotted decoration-gray-300 underline-offset-4 hover:text-gray-950"
                 >
                   {c.empresas_count} empresas
                 </button>
@@ -616,15 +616,15 @@ function ClienteRow({
                 align="start"
                 sideOffset={4}
                 collisionPadding={8}
-                className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+                className="min-w-[240px] border-0 bg-gray-950 p-3 text-white shadow-lg"
               >
-                <div className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
                   Desglose por empresa
                 </div>
                 <div className="mt-2 space-y-1">
                   {(c.empresas_breakdown ?? []).map(b => (
                     <div key={b.empresaKey} className="flex justify-between gap-4 text-xs">
-                      <span className="text-stone-300">{b.empresaNombre}</span>
+                      <span className="text-gray-300">{b.empresaNombre}</span>
                       <span className="font-mono text-white tabular-nums">{fmtMoney(b.monto)}</span>
                     </div>
                   ))}
@@ -636,12 +636,12 @@ function ClienteRow({
           c.empresa
         )}
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(c.ytd)}</td>
-      <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
+      <td className={cn("whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
         {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
         {fmt.displayValue}
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.ultima || "—"}</td>
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
     </tr>
   );
 }
@@ -655,27 +655,27 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
   const fmt = formatDeltaRatio(c.delta);
   return (
     <tr
-      className="cursor-pointer bg-stone-100 transition hover:bg-stone-200"
+      className="cursor-pointer bg-gray-100 transition hover:bg-gray-200"
       onClick={onClick}
       role="button"
       aria-label="Abrir detalle de otros clientes"
     >
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-400 tabular-nums">—</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
+      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-400 tabular-nums">—</td>
+      <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
         <div className="font-medium leading-tight">{c.nombre}</div>
-        <div className="font-mono text-xs leading-tight text-stone-500">click para ver detalle</div>
+        <div className="font-mono text-xs leading-tight text-gray-500">click para ver detalle</div>
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-xs text-gray-700">
         {c.empresa}
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">
         {fmtMoney(c.ytd)}
       </td>
-      <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+      <td className={cn("whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
         {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
         {fmt.displayValue}
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">
         {c.ultima || "—"}
       </td>
     </tr>
@@ -703,19 +703,19 @@ function ClienteCard({
       tabIndex={0}
       onClick={onTap}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
-      className="rounded-lg border border-stone-200 bg-white active:bg-stone-50"
+      className="rounded-lg border border-gray-200 bg-white active:bg-gray-50"
     >
       <div className="px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-2">
           <Link
             href={`/clientes/${encodeURIComponent(c.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-stone-950 hover:text-teal-700"
+            className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
           >
             {c.nombre}
           </Link>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500">
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
           <span className="font-mono">{c.id}</span>
           {showEmpresa && c.empresa && (
             <>
@@ -726,14 +726,14 @@ function ClienteCard({
         </div>
 
         <div className="mt-3 flex items-baseline gap-3">
-          <div className="font-mono text-base font-medium tabular-nums text-stone-950">
+          <div className="font-mono text-base font-medium tabular-nums text-gray-950">
             {fmtMoneyCompact(c.ytd)}
           </div>
           <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
             {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
             {fmt.displayValue}
           </div>
-          <div className="ml-auto truncate text-xs text-stone-500">
+          <div className="ml-auto truncate text-xs text-gray-500">
             {c.ultima || "—"}
           </div>
         </div>
@@ -751,19 +751,19 @@ function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
       tabIndex={0}
       onClick={onTap}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
-      className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3.5 active:bg-stone-100"
+      className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3.5 active:bg-gray-100"
     >
-      <div className="text-[15px] font-medium leading-tight text-stone-950">{c.nombre}</div>
-      <div className="mt-1 text-xs text-stone-500">Ver detalle de huérfanos sin master</div>
+      <div className="text-[15px] font-medium leading-tight text-gray-950">{c.nombre}</div>
+      <div className="mt-1 text-xs text-gray-500">Ver detalle de huérfanos sin master</div>
       <div className="mt-3 flex items-baseline gap-3">
-        <div className="font-mono text-base font-medium tabular-nums text-stone-950">
+        <div className="font-mono text-base font-medium tabular-nums text-gray-950">
           {fmtMoneyCompact(c.ytd)}
         </div>
         <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
           {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
           {fmt.displayValue}
         </div>
-        <div className="ml-auto text-xs text-stone-500">{c.ultima || "—"}</div>
+        <div className="ml-auto text-xs text-gray-500">{c.ultima || "—"}</div>
       </div>
     </div>
   );
@@ -780,9 +780,9 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
-        active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
+        active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
       )}
     >
       <span className="inline-flex items-center gap-1">

@@ -18,8 +18,8 @@ import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/
 function TabSkeleton() {
   return (
     <div className="mt-5 space-y-3" aria-hidden>
-      <div className="h-8 w-48 animate-pulse rounded bg-stone-100" />
-      <div className="h-64 w-full animate-pulse rounded-lg bg-stone-100" />
+      <div className="h-8 w-48 animate-pulse rounded bg-gray-100" />
+      <div className="h-64 w-full animate-pulse rounded-lg bg-gray-100" />
     </div>
   );
 }
@@ -166,10 +166,10 @@ export function VentasShell({
           en producción. */}
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-950 md:text-4xl">
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
             Ventas
           </h1>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-gray-500">
             8 empresas · año fiscal {selectedYear} · {mesesLabel}
           </p>
         </div>
@@ -199,28 +199,28 @@ export function VentasShell({
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger
             value="resumen"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <TrendingUp className="h-3.5 w-3.5" /> Resumen
           </TabsTrigger>
           <TabsTrigger
             value="clientes"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Contact className="h-3.5 w-3.5" /> Clientes
           </TabsTrigger>
           <TabsTrigger
             value="productos"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Package className="h-3.5 w-3.5" /> Productos
           </TabsTrigger>
           <TabsTrigger
             value="utilidad"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Percent className="h-3.5 w-3.5" /> Utilidad
           </TabsTrigger>
@@ -270,11 +270,11 @@ export function VentasShell({
 
 function ErrorState({ scope }: { scope: string }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-8 text-center">
-      <p className="text-sm text-stone-700">
+    <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+      <p className="text-sm text-gray-700">
         No se pudieron cargar los datos de <strong>{scope}</strong>.
       </p>
-      <p className="mt-1 text-xs text-stone-500">Intenta recargar en unos segundos.</p>
+      <p className="mt-1 text-xs text-gray-500">Intenta recargar en unos segundos.</p>
     </div>
   );
 }

@@ -105,7 +105,7 @@ export default function PanelCxcMobile({
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
   return (
-    <div className="md:hidden bg-stone-50">
+    <div className="md:hidden bg-gray-50">
       <div className="px-4 pt-4 pb-6 space-y-4">
         <MobileHeader
           canExport={canExport}
@@ -130,13 +130,13 @@ export default function PanelCxcMobile({
           disabled={!!empresaRestriction}
         />
 
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-gray-500">
           {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por total
         </p>
 
         {sortedMobile.length === 0 ? (
-          <div className="rounded-xl border border-stone-200 bg-white px-4 py-8 text-center">
-            <p className="text-sm text-stone-500">No hay clientes con estos filtros</p>
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center">
+            <p className="text-sm text-gray-500">No hay clientes con estos filtros</p>
             {(search || riskFilter !== "all" || companyFilter !== "all") && (
               <button
                 onClick={() => { setSearch(""); setRiskFilter("all"); if (!empresaRestriction) setCompanyFilter("all"); }}
@@ -166,7 +166,7 @@ export default function PanelCxcMobile({
           </ul>
         )}
 
-        <p className="pt-4 text-center text-xs leading-relaxed text-stone-400">
+        <p className="pt-4 text-center text-xs leading-relaxed text-gray-400">
           Política: 0-90d por vencer · 91-120d vencido reciente · +120d vencido crítico
         </p>
       </div>
@@ -205,7 +205,7 @@ function MobileHeader({
   return (
     <header className="flex items-start justify-between gap-3">
       <div>
-        <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-stone-900">
+        <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-gray-900">
           Panel CXC
         </h1>
         <SyncStatus
@@ -223,14 +223,14 @@ function MobileHeader({
             aria-label="Acciones"
             aria-haspopup="menu"
             aria-expanded={open}
-            className="grid h-11 w-11 place-items-center rounded-full text-stone-600 active:bg-stone-200"
+            className="grid h-11 w-11 place-items-center rounded-full text-gray-600 active:bg-gray-200"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
             </svg>
           </button>
           {open && (
-            <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg">
+            <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
               <MenuItem label="Exportar CSV" onClick={() => { setOpen(false); onExportar(); }} />
             </div>
           )}
@@ -246,7 +246,7 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
       type="button"
       role="menuitem"
       onClick={onClick}
-      className="block w-full px-4 py-3 text-left text-sm text-stone-700 active:bg-stone-100"
+      className="block w-full px-4 py-3 text-left text-sm text-gray-700 active:bg-gray-100"
     >
       {label}
     </button>
@@ -259,14 +259,14 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 
 function MobileHero({ total, clientCount }: { total: number; clientCount: number }) {
   return (
-    <section className="rounded-xl bg-stone-900 px-5 py-4 text-white shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+    <section className="rounded-xl bg-gray-900 px-5 py-4 text-white shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
         Total pendiente
       </p>
       <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
         {formatCompactCurrency(total)}
       </p>
-      <p className="mt-2 text-xs text-stone-400">
+      <p className="mt-2 text-xs text-gray-400">
         {clientCount} {clientCount === 1 ? "cliente" : "clientes"}
       </p>
     </section>
@@ -334,16 +334,16 @@ function MobileAgingChips({
             aria-pressed={isActive}
             className={[
               "rounded-xl border-2 px-2.5 py-2.5 text-left transition min-h-[44px]",
-              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-stone-200 bg-white",
+              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-gray-200 bg-white",
             ].join(" ")}
           >
             <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`}>
               {theme.label}
             </p>
-            <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-stone-900"}`}>
+            <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-gray-900"}`}>
               {formatCompactCurrency(value)}
             </p>
-            <p className="mt-0.5 text-xs text-stone-500 tabular-nums">
+            <p className="mt-0.5 text-xs text-gray-500 tabular-nums">
               {count} {count === 1 ? "cliente" : "clientes"}
             </p>
           </button>
@@ -361,7 +361,7 @@ function MobileSearch({ value, onChange }: { value: string; onChange: (v: string
   return (
     <div className="relative">
       <svg
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
         width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
       >
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -372,7 +372,7 @@ function MobileSearch({ value, onChange }: { value: string; onChange: (v: string
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder="Buscar cliente, tel, email…"
-        className="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-9 pr-3 text-base text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
+        className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
       />
     </div>
   );
@@ -395,7 +395,7 @@ function MobileEmpresaSelect({
         value={value}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full appearance-none rounded-lg border border-stone-200 bg-white py-2.5 pl-3 pr-8 text-sm text-stone-900 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400 disabled:opacity-60"
+        className="w-full appearance-none rounded-lg border border-gray-200 bg-white py-2.5 pl-3 pr-8 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
       >
         <option value="all">Todas mis empresas</option>
         {options.map(o => (
@@ -403,7 +403,7 @@ function MobileEmpresaSelect({
         ))}
       </select>
       <svg
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
         width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
       >
         <polyline points="6 9 12 15 18 9"/>
@@ -417,7 +417,7 @@ function MobileEmpresaSelect({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function worstBucketBorder(client: ConsolidatedClient): string {
-  if (client.total < 0) return "border-l-stone-400";
+  if (client.total < 0) return "border-l-gray-400";
   if (client.overdue > 0) return "border-l-[#A32D2D]";
   if (client.watch > 0) return "border-l-[#B45309]";
   return "border-l-[#0F6E56]";
@@ -442,13 +442,13 @@ function MobileClientCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm border-l-4 ${borderLeft}`}
+      className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm border-l-4 ${borderLeft}`}
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isExpanded}
-        className="block w-full text-left active:bg-stone-50"
+        className="block w-full text-left active:bg-gray-50"
       >
         <div className="flex items-start justify-between gap-3 px-3 py-3">
           <div className="min-w-0 flex-1">
@@ -461,20 +461,20 @@ function MobileClientCard({
                 aria-label={isFavorite ? "Quitar favorito" : "Marcar favorito"}
                 className="shrink-0 cursor-pointer text-base leading-none"
               >
-                {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-stone-300">☆</span>}
+                {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-gray-300">☆</span>}
               </span>
-              <span className="truncate text-sm font-medium text-stone-900">
+              <span className="truncate text-sm font-medium text-gray-900">
                 {client.nombre_normalized}
               </span>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="font-mono text-base font-semibold tabular-nums text-stone-900">
+            <span className="font-mono text-base font-semibold tabular-nums text-gray-900">
               {formatCompactCurrency(client.total)}
             </span>
             <svg
               width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className={`text-stone-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+              className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
             >
               <polyline points="6 9 12 15 18 9"/>
             </svg>
@@ -506,13 +506,13 @@ function BucketChip({
     <div
       className={[
         "flex-1 rounded-md border px-2 py-1 text-center",
-        isZero ? "border-stone-200 bg-stone-50" : `${theme.border} ${theme.bgActive}`,
+        isZero ? "border-gray-200 bg-gray-50" : `${theme.border} ${theme.bgActive}`,
       ].join(" ")}
     >
-      <p className={`font-mono text-xs font-medium tabular-nums ${isZero ? "text-stone-300" : theme.text}`}>
+      <p className={`font-mono text-xs font-medium tabular-nums ${isZero ? "text-gray-300" : theme.text}`}>
         {isZero ? "—" : formatCompactCurrency(value)}
       </p>
-      <p className={`text-xs uppercase tracking-wide ${isZero ? "text-stone-300" : theme.text}`}>
+      <p className={`text-xs uppercase tracking-wide ${isZero ? "text-gray-300" : theme.text}`}>
         {theme.label}
       </p>
     </div>
@@ -559,21 +559,21 @@ function MobileClientExpanded({
   );
 
   return (
-    <div className="border-t border-stone-100 bg-stone-50 px-3 py-3">
+    <div className="border-t border-gray-100 bg-gray-50 px-3 py-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
           Desglose por empresa ({rows.length})
         </p>
-        <span className={`shrink-0 font-mono text-xs font-semibold tabular-nums ${client.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
+        <span className={`shrink-0 font-mono text-xs font-semibold tabular-nums ${client.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
           ${fmt(client.total)}
         </span>
       </div>
-      <ul className="divide-y divide-stone-200/70 overflow-hidden rounded-md bg-white">
+      <ul className="divide-y divide-gray-200/70 overflow-hidden rounded-md bg-white">
         {rows.map(row => (
           <li key={row.key} className="px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
-              <span className="truncate text-xs text-stone-700">{row.nombre}</span>
-              <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${row.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
+              <span className="truncate text-xs text-gray-700">{row.nombre}</span>
+              <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${row.total < 0 ? "text-gray-500" : "text-gray-900"}`}>
                 ${fmt(row.total)}
               </span>
             </div>
@@ -582,7 +582,7 @@ function MobileClientExpanded({
               <EmpresaBucketMini variant="watch" value={row.watch} />
               <EmpresaBucketMini variant="overdue" value={row.overdue} />
             </div>
-            <p className={`mt-1.5 text-xs ${row.ultimoPagoFecha ? "text-stone-500" : "text-stone-400"}`}>
+            <p className={`mt-1.5 text-xs ${row.ultimoPagoFecha ? "text-gray-500" : "text-gray-400"}`}>
               {ultimoPagoLabel(row.ultimoPagoFecha, row.ultimoPagoMonto)}
             </p>
           </li>

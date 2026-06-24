@@ -204,7 +204,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
           <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </Card>
       ) : loading && !wholesale && !retail ? (
-        <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
+        <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-gray-500">
           Cargando clientes…
         </Card>
       ) : (
@@ -212,10 +212,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
           {/* Encabezado + filtro de período propio del tab. */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="font-display text-base font-semibold text-stone-950">Clientes · {periodoStr}</h3>
-              <p className="mt-0.5 text-xs text-stone-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
+              <h3 className="font-display text-base font-semibold text-gray-950">Clientes · {periodoStr}</h3>
+              <p className="mt-0.5 text-xs text-gray-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
             </div>
-            <div className="inline-flex items-center gap-0.5 rounded-md border border-stone-200 bg-stone-50 p-0.5">
+            <div className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5">
               {RANGO_OPCIONES.map(opt => (
                 <button
                   key={opt.value}
@@ -224,8 +224,8 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-medium transition",
                     rango === opt.value
-                      ? "bg-white text-stone-900 shadow-sm"
-                      : "text-stone-500 hover:text-stone-800",
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-800",
                   )}
                 >
                   {opt.label}
@@ -271,16 +271,16 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
           {/* Bucket anónimo (mostrador): CONTADO / CONSUMIDOR FINAL, sin nombre. */}
           {retail && (retail.ventas_anonimas > 0 || retail.tickets_anonimos > 0) && (
             <Card className="flex items-center gap-3 p-3.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-stone-200 bg-stone-50 text-stone-500">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500">
                 <Store className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-stone-900">Anónimos (mostrador)</p>
-                <p className="text-xs text-stone-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
+                <p className="text-sm font-medium text-gray-900">Anónimos (mostrador)</p>
+                <p className="text-xs text-gray-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-sm tabular-nums text-stone-950">{fmtMoney(retail.ventas_anonimas)}</p>
-                <p className="font-mono text-xs tabular-nums text-stone-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
+                <p className="font-mono text-sm tabular-nums text-gray-950">{fmtMoney(retail.ventas_anonimas)}</p>
+                <p className="font-mono text-xs tabular-nums text-gray-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
               </div>
             </Card>
           )}
@@ -319,18 +319,18 @@ function ClientesSection({
           {icon}
         </div>
         <div>
-          <h3 className="font-display text-sm font-semibold text-stone-950">{title}</h3>
-          <p className="text-xs text-stone-500">{subtitle}</p>
+          <h3 className="font-display text-sm font-semibold text-gray-950">{title}</h3>
+          <p className="text-xs text-gray-500">{subtitle}</p>
         </div>
       </div>
 
       {clientes.length === 0 ? (
-        <Card className="flex items-center justify-center py-8 text-xs text-stone-500">
+        <Card className="flex items-center justify-center py-8 text-xs text-gray-500">
           {emptyText}
         </Card>
       ) : (
         <Card className="overflow-hidden p-0">
-          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-stone-500">
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500">
             <span className="text-right" title="Posición en el ranking por monto">#</span>
             <span>Cliente</span>
             <span className="text-right">Total</span>
@@ -378,25 +378,25 @@ function ClienteRowItem({
     : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
 
   return (
-    <div className="border-t border-stone-200">
+    <div className="border-t border-gray-200">
       <button
         type="button"
         onClick={() => onToggle(id)}
         aria-expanded={isExpanded}
         className={cn(
           "grid w-full grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 px-3.5 py-2.5 text-left text-sm transition",
-          "hover:bg-stone-50/60",
-          isExpanded && "bg-stone-50/80",
+          "hover:bg-gray-50/60",
+          isExpanded && "bg-gray-50/80",
         )}
       >
-        <span className="text-right font-mono text-xs text-stone-500 tabular-nums">{rank}</span>
-        <span className="truncate font-medium text-stone-900">{cliente.nombre}</span>
-        <span className="text-right font-mono text-stone-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
-        <span className="text-right font-mono text-stone-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
-        <span className="text-right font-mono text-stone-700 tabular-nums">${ticketProm.toFixed(2)}</span>
-        <span className="text-right font-mono text-xs text-stone-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
+        <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</span>
+        <span className="truncate font-medium text-gray-900">{cliente.nombre}</span>
+        <span className="text-right font-mono text-gray-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
+        <span className="text-right font-mono text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
+        <span className="text-right font-mono text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
+        <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
         <ChevronDown className={cn(
-          "h-3.5 w-3.5 text-stone-400 transition-transform",
+          "h-3.5 w-3.5 text-gray-400 transition-transform",
           isExpanded && "rotate-180",
         )} />
       </button>
@@ -430,7 +430,7 @@ function ClienteSparkline({
   const cols = Math.max(cliente.meses.length, 1);
 
   return (
-    <div className="bg-stone-50/40 px-4 py-4">
+    <div className="bg-gray-50/40 px-4 py-4">
       <div
         className="grid gap-1"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
@@ -440,7 +440,7 @@ function ClienteSparkline({
           const hasData = m.ventas > 0;
           return (
             <div key={`${m.mes_anio}-${m.mes_idx}`} className="flex flex-col items-center gap-1">
-              <div className="relative flex h-12 w-full items-end justify-center rounded-sm bg-stone-100">
+              <div className="relative flex h-12 w-full items-end justify-center rounded-sm bg-gray-100">
                 {hasData && (
                   <div
                     className="w-full rounded-sm bg-teal-700/80 transition-all"
@@ -449,10 +449,10 @@ function ClienteSparkline({
                   />
                 )}
               </div>
-              <p className="text-xs font-medium uppercase text-stone-500 whitespace-nowrap">{labelFor(m)}</p>
+              <p className="text-xs font-medium uppercase text-gray-500 whitespace-nowrap">{labelFor(m)}</p>
               <p className={cn(
                 "font-mono text-xs tabular-nums",
-                hasData ? "text-stone-700" : "text-stone-300",
+                hasData ? "text-gray-700" : "text-gray-300",
               )}>
                 {hasData ? fmtMoneyCompact(m.ventas) : "—"}
               </p>
@@ -460,7 +460,7 @@ function ClienteSparkline({
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-stone-500">
+      <p className="mt-2 text-xs text-gray-500">
         Histórico mensual del rango. Escala compartida entre wholesale y retail.
       </p>
     </div>

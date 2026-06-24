@@ -95,7 +95,7 @@ function relDelta(cur: Vals | null, prev: Vals | null, mode: ViewMode): number |
 const deltaTone: Record<string, string> = {
   emerald: "text-emerald-600",
   orange: "text-red-600",
-  stone: "text-stone-400",
+  stone: "text-gray-400",
 };
 
 const METRIC_LABEL: Record<ViewMode, string> = {
@@ -199,7 +199,7 @@ export function EmpresaMesAnioPanel({
           (≥sm, entra con scale+fade). */}
       <div
         className={cn(
-          "relative flex w-full flex-col border-stone-200 bg-white shadow-2xl",
+          "relative flex w-full flex-col border-gray-200 bg-white shadow-2xl",
           "h-[92vh] rounded-t-2xl border-t",
           "sm:h-auto sm:max-h-[90vh] sm:max-w-[1240px] sm:rounded-2xl sm:border",
           "transition-all duration-300 ease-out motion-reduce:transition-none",
@@ -209,13 +209,13 @@ export function EmpresaMesAnioPanel({
         )}
       >
         {/* Header: eyebrow + nombre (izq) · toggle métrica + X (der). */}
-        <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-9 sm:pt-7">
+        <header className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-9 sm:pt-7">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Histórico mes × año</p>
-            <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-stone-950">{nombre}</h2>
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Histórico mes × año</p>
+            <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-gray-950">{nombre}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <div className="hidden rounded-full bg-stone-100 p-0.5 text-xs sm:inline-flex">
+            <div className="hidden rounded-full bg-gray-100 p-0.5 text-xs sm:inline-flex">
               {(["ventas", "utilidad", "margen"] as const).map((m) => (
                 <button
                   key={m}
@@ -223,7 +223,7 @@ export function EmpresaMesAnioPanel({
                   onClick={() => onViewMode(m)}
                   className={cn(
                     "rounded-full px-3 py-1.5 font-medium transition",
-                    viewMode === m ? "bg-white text-stone-950 shadow-sm" : "text-stone-500 hover:text-stone-700",
+                    viewMode === m ? "bg-white text-gray-950 shadow-sm" : "text-gray-500 hover:text-gray-700",
                   )}
                 >
                   {METRIC_LABEL[m]}
@@ -235,7 +235,7 @@ export function EmpresaMesAnioPanel({
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className="grid h-9 w-9 place-items-center rounded-full text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+              className="grid h-9 w-9 place-items-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
             </button>
@@ -243,8 +243,8 @@ export function EmpresaMesAnioPanel({
         </header>
 
         {/* Toggle métrica en mobile (full-width bajo el header). */}
-        <div className="border-b border-stone-100 px-6 py-3 sm:hidden">
-          <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
+        <div className="border-b border-gray-100 px-6 py-3 sm:hidden">
+          <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
             {(["ventas", "utilidad", "margen"] as const).map((m) => (
               <button
                 key={m}
@@ -252,7 +252,7 @@ export function EmpresaMesAnioPanel({
                 onClick={() => onViewMode(m)}
                 className={cn(
                   "rounded-full px-3 py-1.5 font-medium transition",
-                  viewMode === m ? "bg-white text-stone-950 shadow-sm" : "text-stone-500",
+                  viewMode === m ? "bg-white text-gray-950 shadow-sm" : "text-gray-500",
                 )}
               >
                 {METRIC_LABEL[m]}
@@ -263,7 +263,7 @@ export function EmpresaMesAnioPanel({
 
         <div className="flex-1 overflow-y-auto px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-5 sm:px-9 sm:pb-9 sm:pt-7">
           {error ? (
-            <p className="py-6 text-sm text-stone-500">No se pudo cargar el histórico: {error}</p>
+            <p className="py-6 text-sm text-gray-500">No se pudo cargar el histórico: {error}</p>
           ) : !empresa || currentYear == null ? (
             <PanelSkeleton />
           ) : (
@@ -278,8 +278,8 @@ export function EmpresaMesAnioPanel({
 function PanelSkeleton() {
   return (
     <div className="animate-pulse space-y-3 py-2">
-      <div className="h-4 w-full rounded bg-stone-100" />
-      {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-7 rounded bg-stone-100" />)}
+      <div className="h-4 w-full rounded bg-gray-100" />
+      {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-7 rounded bg-gray-100" />)}
     </div>
   );
 }
@@ -304,20 +304,20 @@ function MatrizHorizontal({
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 bg-white pb-3 pl-1 pr-2 text-left text-xs font-medium uppercase tracking-wide text-stone-400">
+            <th className="sticky left-0 bg-white pb-3 pl-1 pr-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
               Año
             </th>
             {MONTHS.map((m) => (
-              <th key={m} className="pb-3 pl-1 pr-1.5 text-right text-xs font-medium uppercase tracking-wide text-stone-400">
+              <th key={m} className="pb-3 pl-1 pr-1.5 text-right text-xs font-medium uppercase tracking-wide text-gray-400">
                 {m}
               </th>
             ))}
-            <th className="border-l border-stone-200 pb-3 pl-2 pr-1 text-right text-xs font-semibold uppercase tracking-wide text-stone-600">
+            <th className="border-l border-gray-200 pb-3 pl-2 pr-1 text-right text-xs font-semibold uppercase tracking-wide text-gray-600">
               Total
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-100">
+        <tbody className="divide-y divide-gray-100">
           {years.map((y) => {
             const isCurrent = y === currentYear;
             // Δ del Total: año en curso → same-period (justo); años cerrados → año vs año.
@@ -325,12 +325,12 @@ function MatrizHorizontal({
               ? { ratio: samePeriodTotalDelta(currentYtd, viewMode), label: currentYtd.periodLabel }
               : null;
             return (
-              <tr key={y} className={cn(isCurrent && "bg-stone-50")}>
+              <tr key={y} className={cn(isCurrent && "bg-gray-50")}>
                 <th
                   scope="row"
                   className={cn(
                     "sticky left-0 py-3.5 pl-1 pr-2 text-left align-top text-sm tabular-nums",
-                    isCurrent ? "bg-stone-50 font-semibold text-stone-950" : "bg-white font-medium text-stone-600",
+                    isCurrent ? "bg-gray-50 font-semibold text-gray-950" : "bg-white font-medium text-gray-600",
                   )}
                 >
                   {y}
@@ -383,18 +383,18 @@ function MatrizCell({
     <td
       className={cn(
         "py-3.5 pl-1 pr-1.5 text-right align-top font-mono text-xs tabular-nums",
-        isTotal && "border-l border-stone-200 pl-2",
-        v == null ? "text-stone-300" : isCurrent ? "font-medium text-stone-950" : isTotal ? "font-medium text-stone-800" : "font-normal text-stone-700",
+        isTotal && "border-l border-gray-200 pl-2",
+        v == null ? "text-gray-300" : isCurrent ? "font-medium text-gray-950" : isTotal ? "font-medium text-gray-800" : "font-normal text-gray-700",
       )}
     >
       <div>{renderMetric(v, mode)}</div>
       {fmt && (
-        <div className={cn("mt-0.5 text-xs font-normal leading-none", deltaTone[fmt.tone] ?? "text-stone-400")}>
+        <div className={cn("mt-0.5 text-xs font-normal leading-none", deltaTone[fmt.tone] ?? "text-gray-400")}>
           {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
         </div>
       )}
       {deltaOverride && (
-        <div className="mt-0.5 text-xs font-normal uppercase tracking-wide text-stone-400">{deltaOverride.label}</div>
+        <div className="mt-0.5 text-xs font-normal uppercase tracking-wide text-gray-400">{deltaOverride.label}</div>
       )}
     </td>
   );

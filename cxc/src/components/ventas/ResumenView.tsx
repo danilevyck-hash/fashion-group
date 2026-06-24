@@ -336,7 +336,7 @@ export function ResumenView({
           />
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
+          <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
             {(["ventas", "utilidad", "margen"] as const).map(m => (
               <button
                 key={m}
@@ -344,8 +344,8 @@ export function ResumenView({
                 className={cn(
                   "rounded-full px-3.5 py-1.5 font-medium capitalize transition",
                   viewMode === m
-                    ? "bg-white text-stone-950 shadow-sm"
-                    : "text-stone-500 hover:text-stone-700"
+                    ? "bg-white text-gray-950 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
                 {m === "ventas" ? "Ventas" : m === "utilidad" ? "Utilidad" : "Margen %"}
@@ -354,7 +354,7 @@ export function ResumenView({
           </div>
           {/* Bug #1 fix: selector año global vive ahora en VentasShell header,
               visible desde cualquier tab. No se duplica aquí. */}
-          <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
+          <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
             {(["mensual", "trimestral", "anual"] as const).map(g => (
               <button
                 key={g}
@@ -362,8 +362,8 @@ export function ResumenView({
                 className={cn(
                   "rounded-full px-3.5 py-1.5 font-medium transition",
                   granularity === g
-                    ? "bg-white text-stone-950 shadow-sm"
-                    : "text-stone-500 hover:text-stone-700"
+                    ? "bg-white text-gray-950 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
                 )}
               >
                 {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : "Anual"}
@@ -384,23 +384,23 @@ export function ResumenView({
             {/* Cabecera fija al scrollear (sticky top). La esquina Empresa
                 queda sticky en ambos ejes (left+top) sobre el resto. */}
             <thead>
-              <tr className="bg-stone-100 text-left">
-                <th className="sticky left-0 top-0 z-30 min-w-[180px] bg-stone-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-stone-500">
+              <tr className="bg-gray-100 text-left">
+                <th className="sticky left-0 top-0 z-30 min-w-[180px] bg-gray-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Empresa
                 </th>
                 {cols.map(c => (
-                  <th key={c} className="sticky top-0 z-20 bg-stone-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">
+                  <th key={c} className="sticky top-0 z-20 bg-gray-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                     {c}
                   </th>
                 ))}
-                <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950">Total</th>
+                <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Total</th>
                 {/* Columna "Proyección": sólo años en curso con data de
                     proyección disponible (no aplica a años cerrados). */}
                 {showProyeccionCol && (
-                  <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950">Proyección</th>
+                  <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Proyección</th>
                 )}
                 {showMensualCol && (
-                  <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950">
+                  <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">
                     Cierre {mesProyLabel} (proy.)
                   </th>
                 )}
@@ -417,13 +417,13 @@ export function ResumenView({
                   aria-haspopup="dialog"
                   className={cn(
                     "group cursor-pointer transition-colors",
-                    isMulti ? "bg-teal-50/60 hover:bg-teal-100/60" : "hover:bg-stone-50",
-                    isOpen && !isMulti && "bg-stone-50",
+                    isMulti ? "bg-teal-50/60 hover:bg-teal-100/60" : "hover:bg-gray-50",
+                    isOpen && !isMulti && "bg-gray-50",
                   )}
                 >
                   <td className={cn(
-                    "sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-sm text-stone-950",
-                    isMulti ? "bg-teal-50" : isOpen ? "bg-stone-50" : "bg-white"
+                    "sticky left-0 z-10 whitespace-nowrap border-b border-gray-200 px-3.5 py-3.5 text-sm text-gray-950",
+                    isMulti ? "bg-teal-50" : isOpen ? "bg-gray-50" : "bg-white"
                   )}>
                     <div className="flex items-center gap-1.5">
                       {isMulti && multi && multi.wholesale.ytdVentas > 0 ? (
@@ -436,7 +436,7 @@ export function ResumenView({
                         <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
                       )}
                       {/* Affordance: abre el panel mes × año de la empresa. */}
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-stone-300 transition-colors group-hover:text-stone-500" aria-hidden />
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-colors group-hover:text-gray-500" aria-hidden />
                     </div>
                   </td>
                   {r.cells.map((c, ci) => (
@@ -465,8 +465,8 @@ export function ResumenView({
                 </tr>
                 );
               })}
-              <tr className="bg-stone-950 text-white">
-                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
+              <tr className="bg-gray-950 text-white">
+                <td className="sticky left-0 z-10 bg-gray-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}
@@ -492,7 +492,7 @@ export function ResumenView({
           </table>
         </div>
         {partialFooter && (
-          <p className="border-t border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-500">
+          <p className="border-t border-gray-200 bg-gray-50 px-3.5 py-2 text-xs text-gray-500">
             {partialFooter}
           </p>
         )}
@@ -500,7 +500,7 @@ export function ResumenView({
 
       {/* Legend simple — solo arrow + dirección del delta. Sin swatch
           (la matriz ya no tiene fondos heatmap). */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="text-emerald-700">▲</span>
           {isMargen ? `vs ${prevYear} mayor a +0.5 pts` : `vs ${prevYear} mayor a +5%`}
@@ -510,7 +510,7 @@ export function ResumenView({
           {isMargen ? "menor a −0.5 pts" : "menor a −5%"}
         </span>
         {!isClosedYear && (
-          <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>sin data</span>
+          <span className="inline-flex items-center gap-1.5"><span className="text-gray-400">—</span>sin data</span>
         )}
       </div>
       </>
@@ -549,19 +549,19 @@ function MesVsMesCard({
   const up = (delta ?? 0) >= 0;
   const mes = MONTHS[idx] ?? "";
   return (
-    <Card className="border-stone-200 bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-        {mes} {year} <span className="text-stone-400">(en curso)</span> vs {mes} {year - 1}
+    <Card className="border-gray-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+        {mes} {year} <span className="text-gray-400">(en curso)</span> vs {mes} {year - 1}
       </p>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">{fmtMoney(curr)}</span>
+        <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{fmtMoney(curr)}</span>
         {delta !== null && (
           <span className={cn("font-mono text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-rose-600")}>
             {up ? "▲" : "▼"} {Math.abs(delta * 100).toFixed(0)}%
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-xs text-stone-500">
+      <p className="mt-1.5 text-xs text-gray-500">
         vs <span className="font-mono tabular-nums">{fmtMoney(prev)}</span> en {mes} {year - 1}
       </p>
     </Card>
@@ -571,10 +571,10 @@ function MesVsMesCard({
 /** KPI card — label uppercase + monto Geist Mono + sub con delta vs prev year. */
 function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <Card className="border-stone-200 bg-white p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
-      <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">{value}</p>
-      {sub && <p className="mt-1.5 text-xs text-stone-500">{sub}</p>}
+    <Card className="border-gray-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{value}</p>
+      {sub && <p className="mt-1.5 text-xs text-gray-500">{sub}</p>}
     </Card>
   );
 }
@@ -583,14 +583,14 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
  *  mayorista). Mayoristas marcan "volátil"; las de poca data "datos insuf." */
 function EmpresaMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
   return (
-    <td className="border-b border-stone-200 px-3.5 py-3.5 text-right align-middle">
+    <td className="border-b border-gray-200 px-3.5 py-3.5 text-right align-middle">
       {pm && pm.proyeccion != null ? (
         <>
-          <span className="block font-mono text-sm tabular-nums text-stone-950">{fmtMoneyCompact(pm.proyeccion)}</span>
+          <span className="block font-mono text-sm tabular-nums text-gray-950">{fmtMoneyCompact(pm.proyeccion)}</span>
           {pm.volatil && <span className="mt-0.5 block text-xs text-amber-600">estimación volátil</span>}
         </>
       ) : (
-        <span className="text-xs text-stone-400">datos insuf.</span>
+        <span className="text-xs text-gray-400">datos insuf.</span>
       )}
     </td>
   );
@@ -604,7 +604,7 @@ function TotalGroupMensualCell({ pm }: { pm: Record<string, ProyeccionMensualEmp
   return (
     <td className="px-3.5 py-3.5 text-right">
       <span className="block font-mono text-sm font-medium tabular-nums">{fmtMoneyCompact(total)}</span>
-      {nInsuf > 0 && <span className="text-xs text-stone-300">{nInsuf} sin proy.</span>}
+      {nInsuf > 0 && <span className="text-xs text-gray-300">{nInsuf} sin proy.</span>}
     </td>
   );
 }
@@ -625,14 +625,14 @@ function EmpresaProjectionCell({
 }) {
   if (!proyeccion) {
     return (
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums text-stone-400">
+      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400">
         —
       </td>
     );
   }
   const delta = proyeccion.delta_vs_anio_anterior;
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
+    <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -640,10 +640,10 @@ function EmpresaProjectionCell({
               type="button"
               className="block w-full cursor-help px-3.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              <span className="block text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
+              <span className="block text-sm font-medium text-gray-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
               <p className={cn(
                 "mt-0.5 text-xs",
-                delta == null ? "text-stone-400" : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500",
+                delta == null ? "text-gray-400" : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-gray-500",
               )}>
                 {delta == null
                   ? "sin comparativo"
@@ -653,7 +653,7 @@ function EmpresaProjectionCell({
           </TooltipTrigger>
           <TooltipContent
             side="left" align="start" sideOffset={8} collisionPadding={12}
-            className="min-w-[280px] max-w-[340px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+            className="min-w-[280px] max-w-[340px] border-0 bg-gray-950 p-3 text-white shadow-lg"
           >
             <ProjectionBreakdown proyeccion={proyeccion} mesCorte={mesCorte} prevYear={prevYear} />
           </TooltipContent>
@@ -687,10 +687,10 @@ function ProjectionBreakdown({
   return (
     <div className="space-y-2 text-xs">
       <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-stone-300">Algoritmo</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-300">Algoritmo</span>
         <span className={cn(
           "font-medium",
-          proyeccion.es_fallback_lineal ? "text-stone-400" : "text-white",
+          proyeccion.es_fallback_lineal ? "text-gray-400" : "text-white",
         )}>
           {algoLabel}
         </span>
@@ -734,7 +734,7 @@ function ProjectionBreakdown({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-stone-300">{label}</span>
+      <span className="text-gray-300">{label}</span>
       <span className="font-mono tabular-nums text-white">{value}</span>
     </div>
   );
@@ -755,7 +755,7 @@ function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
       <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
       <p className={cn(
         "mt-0.5 text-xs font-medium",
-        delta == null ? "text-stone-300" : delta < 0 ? "text-red-300" : delta > 0 ? "text-emerald-300" : "text-stone-300",
+        delta == null ? "text-gray-300" : delta < 0 ? "text-red-300" : delta > 0 ? "text-emerald-300" : "text-gray-300",
       )}>
         {delta == null
           ? "sin comparativo"
@@ -773,10 +773,10 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
   // del texto/arrow, no del bg. Tone derivado inline: rojo si delta < umbral,
   // verde si delta > umbral, stone si neutro.
   const fmt   = formatDeltaRatio(delta, dMode);
-  const tone  = delta == null ? "text-stone-500"
+  const tone  = delta == null ? "text-gray-500"
               : fmt.tone === "emerald" ? "text-emerald-700"
               : fmt.tone === "orange"  ? "text-red-700"
-              : "text-stone-500";
+              : "text-gray-500";
 
   if (cur == null) {
     // Mes futuro (o sin data aún): si hay dato del mismo mes año anterior,
@@ -785,15 +785,15 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
     const hasPrevForTooltip = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
     if (!hasPrevForTooltip) {
       return (
-        <td className="whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
-          <span className="text-stone-400">—</span>
+        <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
+          <span className="text-gray-400">—</span>
         </td>
       );
     }
     const prevPeriodLabel = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
     const prevVal = mode === "utilidad" ? cell.utilidadPrev : cell.ventasPrev;
     return (
-      <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
         <TooltipProvider delayDuration={120}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -801,19 +801,19 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
                 type="button"
                 className="block w-full cursor-help px-2.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
               >
-                <span className="text-stone-400">—</span>
+                <span className="text-gray-400">—</span>
               </button>
             </TooltipTrigger>
             <TooltipContent
               side="bottom" align="end" sideOffset={4} collisionPadding={12}
-              className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+              className="min-w-[220px] border-0 bg-gray-950 p-3 text-white shadow-lg"
             >
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-stone-300">{prevPeriodLabel}</span>
+                  <span className="text-gray-300">{prevPeriodLabel}</span>
                   <span className="font-mono tabular-nums text-white">{renderCellValue(prevVal, mode)}</span>
                 </div>
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-gray-400">
                   Aún no hay datos de {cell.periodLabel}
                 </p>
               </div>
@@ -829,7 +829,7 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
   const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
+    <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -839,19 +839,19 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
             >
               {isNa ? (
                 <span className="inline-flex items-baseline gap-1">
-                  <span className="text-stone-400">{renderCellValue(cur, mode)}</span>
-                  <span className="text-xs font-medium text-stone-400">n/a</span>
+                  <span className="text-gray-400">{renderCellValue(cur, mode)}</span>
+                  <span className="text-xs font-medium text-gray-400">n/a</span>
                 </span>
               ) : mode === "margen" ? (
                 <span className="inline-flex items-baseline gap-1.5">
                   {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
-                  <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
+                  <span className="text-gray-950">{renderCellValue(cur, mode)}</span>
                 </span>
               ) : (
                 // Modo Ventas/Utilidad: monto arriba, flecha + % same-period
                 // (fmt.displayValue ya viene del delta del RPC) abajo, menor.
                 <span className="flex flex-col items-end leading-tight">
-                  <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
+                  <span className="text-gray-950">{renderCellValue(cur, mode)}</span>
                   <span className={cn("mt-0.5 text-xs", tone)}>
                     {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
                   </span>
@@ -861,7 +861,7 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
           </TooltipTrigger>
           <TooltipContent
             side="bottom" align="end" sideOffset={4} collisionPadding={12}
-            className="min-w-[260px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+            className="min-w-[260px] border-0 bg-gray-950 p-3 text-white shadow-lg"
           >
             <CellEnrichedTooltip
               cell={cell}
@@ -898,10 +898,10 @@ function CellEnrichedTooltip({
     { mode: "margen",   label: "Margen" },
   ];
 
-  const muted = dark ? "text-stone-400" : "text-stone-500";
-  const labelMuted = dark ? "text-stone-300" : "text-stone-500";
-  const valueText = dark ? "text-white" : "text-stone-950";
-  const divider = dark ? "border-white/10" : "border-stone-200";
+  const muted = dark ? "text-gray-400" : "text-gray-500";
+  const labelMuted = dark ? "text-gray-300" : "text-gray-500";
+  const valueText = dark ? "text-white" : "text-gray-950";
+  const divider = dark ? "border-white/10" : "border-gray-200";
 
   return (
     <div className="space-y-1.5 text-xs">
@@ -912,7 +912,7 @@ function CellEnrichedTooltip({
       <div className={cn("grid grid-cols-[auto_1fr_1fr_auto] items-baseline gap-x-3 pb-1.5 border-b", divider)}>
         <span className={cn("text-xs font-medium uppercase tracking-wide", muted)}>Métrica</span>
         <span className={cn("text-right text-xs font-medium uppercase tracking-wide", muted)}>{prevPeriod}</span>
-        <span className={cn("text-right text-xs font-medium uppercase tracking-wide", dark ? "text-stone-200" : "text-stone-700")}>{curPeriod}</span>
+        <span className={cn("text-right text-xs font-medium uppercase tracking-wide", dark ? "text-gray-200" : "text-gray-700")}>{curPeriod}</span>
         <span className={cn("min-w-[64px] text-right text-xs font-medium uppercase tracking-wide", muted)}>Δ</span>
       </div>
       {rows.map(({ mode, label }) => {
@@ -926,10 +926,10 @@ function CellEnrichedTooltip({
           ? muted
           : fmt.tone === "emerald" ? (dark ? "text-teal-300" : "text-emerald-700")
           : fmt.tone === "orange"  ? (dark ? "text-orange-300" : "text-orange-700")
-          : (dark ? "text-stone-300" : "text-stone-500");
+          : (dark ? "text-gray-300" : "text-gray-500");
         return (
           <div key={mode} className="grid grid-cols-[auto_1fr_1fr_auto] items-baseline gap-x-3">
-            <span className={cn(isHighlight ? (dark ? "text-white font-medium" : "text-stone-950 font-medium") : labelMuted)}>
+            <span className={cn(isHighlight ? (dark ? "text-white font-medium" : "text-gray-950 font-medium") : labelMuted)}>
               {label}
             </span>
             <span className={cn("text-right font-mono tabular-nums", isHighlight ? valueText : muted)}>
@@ -1004,7 +1004,7 @@ function EmpresaTotalCell({
   const tone = deltaTextTone(delta, dMode);
 
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono tabular-nums">
+    <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -1012,7 +1012,7 @@ function EmpresaTotalCell({
               type="button"
               className="block w-full cursor-help px-3.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              <span className="block text-sm font-medium text-stone-950">{displayValue}</span>
+              <span className="block text-sm font-medium text-gray-950">{displayValue}</span>
               <span className={cn("mt-0.5 block text-xs", tone)}>
                 {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}{delta != null ? ` vs ${prevYear}` : ""}
               </span>
@@ -1020,7 +1020,7 @@ function EmpresaTotalCell({
           </TooltipTrigger>
           <TooltipContent
             side="bottom" align="end" sideOffset={4} collisionPadding={12}
-            className="min-w-[280px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+            className="min-w-[280px] border-0 bg-gray-950 p-3 text-white shadow-lg"
           >
             <CellEnrichedTooltip
               cell={enrichedCell}
@@ -1037,7 +1037,7 @@ function EmpresaTotalCell({
 }
 
 /**
- * Celda de la fila TOTAL GRUPO (fondo bg-stone-950). Muestra monto + arrow
+ * Celda de la fila TOTAL GRUPO (fondo bg-gray-950). Muestra monto + arrow
  * inline. Tooltip detalla prev/actual/delta. Esta función SOLO se usa para
  * las celdas mensuales o trimestrales del total grupo — la celda anual del
  * Total grupo vive en TotalGroupAnnualCell con layout monto+chip apilado.
@@ -1054,7 +1054,7 @@ function TotalGroupCell({
   if (cur == null) {
     return (
       <td className="whitespace-nowrap px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
-        <span className="text-stone-500">—</span>
+        <span className="text-gray-500">—</span>
       </td>
     );
   }
@@ -1064,9 +1064,9 @@ function TotalGroupCell({
   const dMode = deltaModeFor(mode);
   const fmt = formatDeltaRatio(delta, dMode);
   const arrowTone =
-    delta == null              ? "text-stone-300"  :
+    delta == null              ? "text-gray-300"  :
     fmt.tone === "emerald"     ? "text-emerald-400" :
-    fmt.tone === "orange"      ? "text-orange-400"  : "text-stone-300";
+    fmt.tone === "orange"      ? "text-orange-400"  : "text-gray-300";
   const prevPeriod = periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
@@ -1095,7 +1095,7 @@ function TotalGroupCell({
           </TooltipTrigger>
           <TooltipContent
             side="bottom" align="end" sideOffset={4} collisionPadding={12}
-            className="min-w-[260px] border-0 bg-white p-3 text-stone-950 shadow-lg"
+            className="min-w-[260px] border-0 bg-white p-3 text-gray-950 shadow-lg"
           >
             <CellEnrichedTooltip
               cell={agg}
@@ -1131,9 +1131,9 @@ function TotalGroupAnnualCell({
   const dMode = deltaModeFor(mode);
   const fmt = formatDeltaRatio(delta, dMode);
   const arrowTone =
-    delta == null            ? "text-stone-300"  :
+    delta == null            ? "text-gray-300"  :
     fmt.tone === "emerald"   ? "text-emerald-300" :
-    fmt.tone === "orange"    ? "text-orange-300"  : "text-stone-300";
+    fmt.tone === "orange"    ? "text-orange-300"  : "text-gray-300";
   const displayValue = cur == null
     ? "—"
     : mode === "margen" ? (cur * 100).toFixed(1) + "%" : fmtMoney(cur);
@@ -1155,7 +1155,7 @@ function TotalGroupAnnualCell({
           </TooltipTrigger>
           <TooltipContent
             side="bottom" align="end" sideOffset={4} collisionPadding={12}
-            className="min-w-[280px] border-0 bg-white p-3 text-stone-950 shadow-lg"
+            className="min-w-[280px] border-0 bg-white p-3 text-gray-950 shadow-lg"
           >
             <CellEnrichedTooltip
               cell={agg}
@@ -1194,23 +1194,23 @@ function MultifashionNameWithBreakdown({
               type="button"
               className="inline-flex cursor-help items-center gap-1.5 text-left outline-none focus-visible:underline"
             >
-              <span className="underline decoration-dotted decoration-stone-300 underline-offset-4">
+              <span className="underline decoration-dotted decoration-gray-300 underline-offset-4">
                 {nombre}
               </span>
-              <Info className="h-3 w-3 text-stone-400" />
+              <Info className="h-3 w-3 text-gray-400" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+          <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-gray-950 p-3 text-white shadow-lg">
             <div className="text-xs font-medium text-white">{nombre}</div>
             <div className="mt-1.5 flex justify-between gap-6 text-xs">
-              <span className="text-stone-300">Retail</span>
+              <span className="text-gray-300">Retail</span>
               <span className="font-mono text-white tabular-nums">{fmtMoney(retailYtd)}</span>
             </div>
             <div className="mt-1 flex justify-between gap-6 text-xs">
-              <span className="text-stone-300">Mayoreo</span>
+              <span className="text-gray-300">Mayoreo</span>
               <span className="font-mono text-white tabular-nums">{fmtMoney(wholesale.ytdVentas)}</span>
             </div>
-            <div className="mt-1.5 border-t border-white/10 pt-1.5 text-xs text-stone-400">
+            <div className="mt-1.5 border-t border-white/10 pt-1.5 text-xs text-gray-400">
               {clienteLabel}
             </div>
           </TooltipContent>
@@ -1218,7 +1218,7 @@ function MultifashionNameWithBreakdown({
       </TooltipProvider>
       {/* Nota VISIBLE (no solo tooltip): deja claro que esta fila es american_classic
           COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */}
-      <span className="block max-w-[170px] whitespace-normal text-xs font-normal leading-tight text-stone-500">
+      <span className="block max-w-[170px] whitespace-normal text-xs font-normal leading-tight text-gray-500">
         incluye mayoreo · {clienteLabel}
       </span>
     </div>
@@ -1243,11 +1243,11 @@ function parseIsoDateResumen(iso: string): Date {
 // Mapping tonal para delta texto (light bg, estilo Clientes tab).
 // El threshold se ajusta según mode: 0.05 (5%) para pct, 0.005 (0.5 pts) para pts.
 function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): string {
-  if (delta == null) return "text-stone-500";
+  if (delta == null) return "text-gray-500";
   const threshold = mode === "pts" ? 0.005 : 0.05;
   if (delta > threshold)  return "text-emerald-700";
   if (delta < -threshold) return "text-red-600";
-  return "text-stone-500";
+  return "text-gray-500";
 }
 
 // Rango formateado del prev YTD para el tooltip de Total: "1 ene – 9 may 2025"

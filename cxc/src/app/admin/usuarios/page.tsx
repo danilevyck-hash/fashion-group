@@ -173,7 +173,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Playfair Display para el título de página (carga lazy, no afecta otros módulos) */}
       <link rel="stylesheet" href={PLAYFAIR_HREF} />
 
@@ -183,12 +183,12 @@ export default function UsuariosPage() {
         <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h1
-              className="text-2xl sm:text-[28px] text-stone-900 leading-tight tracking-tight"
+              className="text-2xl sm:text-[28px] text-gray-900 leading-tight tracking-tight"
               style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700 }}
             >
               Usuarios
             </h1>
-            <p className="text-sm text-stone-600 mt-1">Crea usuarios y define qué módulos ve cada uno</p>
+            <p className="text-sm text-gray-600 mt-1">Crea usuarios y define qué módulos ve cada uno</p>
           </div>
           <button onClick={openNewUser} className="text-sm bg-teal-700 text-white px-4 py-2 rounded-md hover:bg-teal-800 transition flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -210,15 +210,15 @@ export default function UsuariosPage() {
                 return (
                   <article
                     key={u.id}
-                    className="group relative bg-white border border-stone-200 rounded-lg p-4 transition-shadow hover:shadow-sm hover:border-stone-300"
+                    className="group relative bg-white border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-sm hover:border-gray-300"
                   >
                     <div className="flex items-start gap-3">
                       <Avatar name={u.name} role={u.role} size="lg" />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-stone-900 leading-tight truncate">{u.name}</div>
-                        <div className="text-xs text-stone-500 mt-0.5 capitalize">{u.role}</div>
+                        <div className="text-sm font-medium text-gray-900 leading-tight truncate">{u.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 capitalize">{u.role}</div>
                         {u.associated_company && (
-                          <div className="text-xs text-stone-400 mt-1 truncate" title={u.associated_company}>
+                          <div className="text-xs text-gray-400 mt-1 truncate" title={u.associated_company}>
                             {u.associated_company}
                           </div>
                         )}
@@ -228,13 +228,13 @@ export default function UsuariosPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs text-stone-600">
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.active ? "bg-emerald-500" : "bg-stone-300"}`} />
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className={`w-1.5 h-1.5 rounded-full ${u.active ? "bg-emerald-500" : "bg-gray-300"}`} />
                           {u.active ? "Activo" : "Inactivo"}
                         </div>
-                        <div className="text-xs text-stone-400 mt-0.5" title={lastSeen ? new Date(lastSeen).toLocaleString("es-PA") : undefined}>
+                        <div className="text-xs text-gray-400 mt-0.5" title={lastSeen ? new Date(lastSeen).toLocaleString("es-PA") : undefined}>
                           {lastSeen ? `Última sesión ${relativeTime(lastSeen)}` : "Nunca ha entrado"}
                         </div>
                       </div>
@@ -242,14 +242,14 @@ export default function UsuariosPage() {
                         <button
                           onClick={() => openEditUser(u)}
                           title="Editar"
-                          className="text-stone-400 hover:text-stone-700 p-1.5 rounded transition-colors"
+                          className="text-gray-400 hover:text-gray-700 p-1.5 rounded transition-colors"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
                         </button>
                         <button
                           onClick={() => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
                           title={u.active ? "Desactivar" : "Reactivar"}
-                          className="text-stone-400 hover:text-red-600 p-1.5 rounded transition-colors"
+                          className="text-gray-400 hover:text-red-600 p-1.5 rounded transition-colors"
                         >
                           {u.active ? (
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
@@ -270,11 +270,11 @@ export default function UsuariosPage() {
         {/* User modal */}
         {showUserModal && (
           <div
-            className="fixed inset-0 bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
+            className="fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
             onClick={(e) => { if (e.target === e.currentTarget) setShowUserModal(false); }}
           >
             <div
-              className="bg-white rounded-xl shadow-xl border border-stone-200 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-md w-full max-h-[90vh] overflow-y-auto"
               role="dialog"
               aria-modal="true"
               aria-labelledby="usuario-modal-title"
@@ -282,7 +282,7 @@ export default function UsuariosPage() {
               <div className="px-6 pt-6 pb-2">
                 <h2
                   id="usuario-modal-title"
-                  className="text-stone-900 leading-tight"
+                  className="text-gray-900 leading-tight"
                   style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700, fontSize: "20px" }}
                 >
                   {editUserId ? "Editar usuario" : "Nuevo usuario"}
@@ -291,18 +291,18 @@ export default function UsuariosPage() {
 
               <div className="px-6 py-5 space-y-4">
                 <div>
-                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Nombre</label>
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">Nombre</label>
                   <input
                     value={uName}
                     onChange={e => setUName(e.target.value)}
                     placeholder="Nombre del usuario"
                     autoFocus
-                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">
                     {editUserId ? "Nueva contraseña" : "Contraseña"}
                   </label>
                   <div className="relative">
@@ -311,13 +311,13 @@ export default function UsuariosPage() {
                       value={uPassword}
                       onChange={e => setUPassword(e.target.value)}
                       placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 8 caracteres"}
-                      className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 pr-10 text-sm font-mono placeholder:text-stone-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
+                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-10 text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowModalPw(s => !s)}
                       title={showModalPw ? "Ocultar" : "Ver"}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1.5 rounded transition"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1.5 rounded transition"
                     >
                       {showModalPw ? (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
@@ -329,11 +329,11 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
                   <select
                     value={uRole}
                     onChange={e => setURole(e.target.value)}
-                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm focus:outline-none focus:border-teal-700 transition"
                   >
                     <option value="admin">Admin — acceso total</option>
                     <option value="secretaria">Secretaria — operaciones diarias</option>
@@ -349,22 +349,22 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
-                    Empresa <span className="font-normal text-stone-400 normal-case">(opcional)</span>
+                  <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">
+                    Empresa <span className="font-normal text-gray-400 normal-case">(opcional)</span>
                   </label>
                   <input
                     value={uCompany}
                     onChange={e => setUCompany(e.target.value)}
                     placeholder="vistana, fashion_wear, etc."
-                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
                   />
-                  <p className="text-xs text-stone-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
+                  <p className="text-xs text-gray-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
                 </div>
 
                 {/* Override de módulos per-usuario */}
                 <div className="pt-1">
                   <label className="flex items-center justify-between gap-3 cursor-pointer">
-                    <span className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
+                    <span className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
                     <input
                       type="checkbox"
                       checked={customPerms}
@@ -372,7 +372,7 @@ export default function UsuariosPage() {
                       className="accent-teal-700 w-4 h-4"
                     />
                   </label>
-                  <p className="text-xs text-stone-400 mt-1">
+                  <p className="text-xs text-gray-400 mt-1">
                     {customPerms
                       ? "Este usuario verá solo los módulos marcados (ignora los del rol)."
                       : "Apagado: usa los módulos por defecto de su rol."}
@@ -384,7 +384,7 @@ export default function UsuariosPage() {
                         return (
                           <label
                             key={mod.key}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-teal-50 border-teal-200" : "border-stone-200 hover:bg-stone-50"}`}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-teal-50 border-teal-200" : "border-gray-200 hover:bg-gray-50"}`}
                           >
                             <input
                               type="checkbox"
@@ -392,7 +392,7 @@ export default function UsuariosPage() {
                               onChange={() => toggleOverrideModule(mod.key)}
                               className="accent-teal-700 w-4 h-4"
                             />
-                            <span className="text-sm text-stone-800">{mod.label}</span>
+                            <span className="text-sm text-gray-800">{mod.label}</span>
                           </label>
                         );
                       })}
@@ -401,10 +401,10 @@ export default function UsuariosPage() {
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-stone-100 flex justify-end gap-2">
+              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
                 <button
                   onClick={() => setShowUserModal(false)}
-                  className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-md transition"
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition"
                 >
                   Cancelar
                 </button>
@@ -447,10 +447,10 @@ export default function UsuariosPage() {
                   aria-expanded={sessionsOpen}
                 >
                   <div className="flex items-center gap-3">
-                    <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">Sesiones activas</h2>
-                    <span className="text-xs text-stone-400">{active.length} {active.length === 1 ? "sesión" : "sesiones"}</span>
+                    <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500">Sesiones activas</h2>
+                    <span className="text-xs text-gray-400">{active.length} {active.length === 1 ? "sesión" : "sesiones"}</span>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-stone-400 transition-transform ${sessionsOpen ? "rotate-180" : ""}`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-gray-400 transition-transform ${sessionsOpen ? "rotate-180" : ""}`}>
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </button>
@@ -464,15 +464,15 @@ export default function UsuariosPage() {
                         <Chip variant="neutral" active={sessionRange === "30d"} onClick={() => setSessionRange("30d")}>30 días</Chip>
                         <Chip variant="neutral" active={sessionRange === "all"} onClick={() => setSessionRange("all")}>Todas</Chip>
                       </div>
-                      <button onClick={loadSessions} className="text-xs text-stone-400 hover:text-stone-700 transition">Actualizar</button>
+                      <button onClick={loadSessions} className="text-xs text-gray-400 hover:text-gray-700 transition">Actualizar</button>
                     </div>
 
                     {loadingSessions ? (
                       <SkeletonTable rows={3} cols={5} />
                     ) : filtered.length === 0 ? (
-                      <p className="text-sm text-stone-500 py-4 text-center">No hay sesiones en este rango.</p>
+                      <p className="text-sm text-gray-500 py-4 text-center">No hay sesiones en este rango.</p>
                     ) : (
-                      <div className="border border-stone-200 bg-white rounded-lg divide-y divide-stone-100">
+                      <div className="border border-gray-200 bg-white rounded-lg divide-y divide-gray-100">
                         {filtered.map(s => {
                           const userTotal = countByUser[s.user_name] || 0;
                           const showRevokeAll = userTotal >= 2;
@@ -481,14 +481,14 @@ export default function UsuariosPage() {
                               <Avatar name={s.user_name} role={s.user_role} size="sm" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-sm font-medium text-stone-900 truncate">{s.user_name}</span>
-                                  <span className="text-xs text-stone-400 capitalize">{s.user_role}</span>
+                                  <span className="text-sm font-medium text-gray-900 truncate">{s.user_name}</span>
+                                  <span className="text-xs text-gray-400 capitalize">{s.user_role}</span>
                                 </div>
-                                <div className="text-xs text-stone-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                                   <span title={new Date(s.last_seen).toLocaleString("es-PA")}>{relativeTime(s.last_seen)}</span>
                                   {s.ip_address && (
                                     <>
-                                      <span className="text-stone-300">·</span>
+                                      <span className="text-gray-300">·</span>
                                       <span className="font-mono text-xs">{s.ip_address}</span>
                                     </>
                                   )}
@@ -500,7 +500,7 @@ export default function UsuariosPage() {
                                     onClick={() => revokeAllSessions(s.user_name)}
                                     disabled={revokingSession === s.user_name}
                                     title={`Revocar todas las sesiones de ${s.user_name}`}
-                                    className="text-xs text-stone-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
+                                    className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
                                   >
                                     Revocar todas ({userTotal})
                                   </button>

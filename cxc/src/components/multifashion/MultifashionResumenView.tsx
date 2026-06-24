@@ -29,15 +29,15 @@ import type { CumPoint } from "./CumulativeChartCard";
 // recharts cargado aparte (ssr:false) → fuera del bundle inicial de /multifashion.
 const VentasDiariasChart = dynamic(
   () => import("./DetalleMensualCharts").then((m) => m.VentasDiariasChart),
-  { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded bg-stone-100" /> },
+  { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded bg-gray-100" /> },
 );
 const HorasChart = dynamic(
   () => import("./DetalleMensualCharts").then((m) => m.HorasChart),
-  { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded bg-stone-100" /> },
+  { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded bg-gray-100" /> },
 );
 const CumulativeChartCard = dynamic(
   () => import("./CumulativeChartCard").then((m) => m.CumulativeChartCard),
-  { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-lg bg-stone-100" /> },
+  { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-lg bg-gray-100" /> },
 );
 
 import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
@@ -165,11 +165,11 @@ function isDeltaNegligible(delta: number | null): boolean {
 }
 
 function deltaTone(delta: number | null): string {
-  if (delta == null) return "text-stone-500";
-  if (isDeltaNegligible(delta)) return "text-stone-500";
+  if (delta == null) return "text-gray-500";
+  if (isDeltaNegligible(delta)) return "text-gray-500";
   if (delta > 0.05)  return "text-emerald-700";
   if (delta < -0.05) return "text-red-700";
-  return "text-stone-500";
+  return "text-gray-500";
 }
 
 // Hora 0-23 → etiqueta corta para el eje X ("9a", "12p", "4p").
@@ -230,8 +230,8 @@ function fmtMargen(margen: number | null): string {
 }
 
 function deltaToneCierre(d: number | null): string {
-  if (d == null) return "text-stone-400";
-  return d > 0.001 ? "text-emerald-600" : d < -0.001 ? "text-red-600" : "text-stone-500";
+  if (d == null) return "text-gray-400";
+  return d > 0.001 ? "text-emerald-600" : d < -0.001 ? "text-red-600" : "text-gray-500";
 }
 function deltaStrCierre(d: number | null): string {
   if (d == null) return "—";
@@ -328,7 +328,7 @@ export function MultifashionResumenView({
           <TrendingUp className="h-5 w-5" />
         </div>
         <div>
-          <h2 className="font-display text-xl font-semibold leading-tight text-stone-950">{overview.tienda}</h2>
+          <h2 className="font-display text-xl font-semibold leading-tight text-gray-950">{overview.tienda}</h2>
           <div className="mt-1.5">
             <SyncStatus
               tabla="facturas"
@@ -348,7 +348,7 @@ export function MultifashionResumenView({
       )}
 
       {loading && !data && (
-        <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
+        <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-gray-500">
           Cargando {MESES_FULL[mes - 1]} {year}…
         </Card>
       )}
@@ -358,23 +358,23 @@ export function MultifashionResumenView({
         <>
           <Titular data={data} year={year} />
           {/* PANORAMA DEL AÑO — colapsable, debajo del titular y antes del gráfico. */}
-          <div className="overflow-hidden rounded-lg border border-stone-200">
+          <div className="overflow-hidden rounded-lg border border-gray-200">
             <button
               type="button"
               onClick={() => setPanoramaOpen((o) => !o)}
               aria-expanded={panoramaOpen}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-stone-50"
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
             >
-              <span className="font-display text-sm font-semibold text-stone-950">
+              <span className="font-display text-sm font-semibold text-gray-950">
                 Panorama del año {year}
               </span>
-              <span className="flex items-center gap-2 text-xs text-stone-500">
+              <span className="flex items-center gap-2 text-xs text-gray-500">
                 {panoramaOpen ? "Ocultar" : "Ver"}
                 <ChevronDown className={cn("h-4 w-4 transition-transform", panoramaOpen && "rotate-180")} />
               </span>
             </button>
             {panoramaOpen && (
-              <div className="border-t border-stone-200 p-4">
+              <div className="border-t border-gray-200 p-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <MiniKpi
                     label={`VENTAS ${ytdSuffix}`}
@@ -383,7 +383,7 @@ export function MultifashionResumenView({
                       <>
                         {retailYtdSub}
                         {overview.wholesale.ytdVentas > 0 && (
-                          <span className="block text-stone-500">
+                          <span className="block text-gray-500">
                             incluye {fmtMoney(overview.wholesale.ytdVentas)} en mayoreo
                             {overview.wholesale.topClienteName ? ` · ${overview.wholesale.topClienteName}` : ""}
                           </span>
@@ -399,10 +399,10 @@ export function MultifashionResumenView({
                         <>
                           <span className={deltaToneCierre(deltaCierreTienda)}>
                             {deltaStrCierre(deltaCierreTienda)}{" "}
-                            <span className="text-stone-500">vs cierre {prevYear}</span>
+                            <span className="text-gray-500">vs cierre {prevYear}</span>
                           </span>
                           {mayActualYear > 0 && (
-                            <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
+                            <span className="block text-gray-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
                           )}
                         </>
                       }
@@ -415,7 +415,7 @@ export function MultifashionResumenView({
                         <>
                           acumulado del año
                           {mayActualYear > 0 && (
-                            <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
+                            <span className="block text-gray-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
                           )}
                         </>
                       }
@@ -463,14 +463,14 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-[200px]">
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Ventas del mes · {headerTitle}
             </p>
-            <p className="mt-1 font-mono text-3xl font-semibold leading-tight tabular-nums text-stone-950">
+            <p className="mt-1 font-mono text-3xl font-semibold leading-tight tabular-nums text-gray-950">
               {fmtMoney(totales.ventas_total ?? totales.ventas)}
             </p>
             {(totales.mayoreo ?? 0) > 0 && (
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs text-gray-500">
                 incluye {fmtMoney(totales.mayoreo ?? 0)} en mayoreo
                 {data.mayoreo_cliente ? ` · ${data.mayoreo_cliente}` : ""}
               </p>
@@ -482,7 +482,7 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
           </div>
         </div>
         {/* Línea inferior: tickets retail · ticket promedio · proyección/margen */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-stone-100 pt-3 font-mono text-xs tabular-nums text-stone-600">
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-gray-100 pt-3 font-mono text-xs tabular-nums text-gray-600">
           <span>{totales.n_tickets.toLocaleString()} tickets retail</span>
           <span>ticket promedio ${totales.ticket_promedio.toFixed(2)}</span>
           {is_mes_actual && totales.proyeccion_cierre != null ? (
@@ -534,32 +534,32 @@ function ComparativoInteranualCard({
 
   const GRID = "grid grid-cols-[2.8rem_minmax(0,1fr)_minmax(0,1fr)_6rem] items-center gap-2 px-4";
   const deltaTone = (n: number | null) =>
-    n == null ? "text-stone-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
+    n == null ? "text-gray-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
   const fmtPct = (p: number | null) => (p == null ? "—" : `${p >= 0 ? "+" : ""}${(p * 100).toFixed(1)}%`);
   const fmtAbs = (n: number | null) => (n == null ? "" : `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`);
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-stone-100 px-4 py-3">
-        <h4 className="font-display text-sm font-semibold text-stone-950">Mes a mes vs {prevYear}</h4>
-        <p className="mt-0.5 text-xs text-stone-400">
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h4 className="font-display text-sm font-semibold text-gray-950">Mes a mes vs {prevYear}</h4>
+        <p className="mt-0.5 text-xs text-gray-400">
           Retail (sin mayoreo) · mismo corte. El mes en curso se compara al día {diaActual}.
         </p>
       </div>
-      <div className={cn(GRID, "border-b border-stone-200 bg-stone-50 py-2 text-xs font-medium uppercase tracking-[0.04em] text-stone-500")}>
+      <div className={cn(GRID, "border-b border-gray-200 bg-gray-50 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500")}>
         <span>Mes</span>
         <span className="text-right">{year}</span>
         <span className="text-right">{prevYear}</span>
         <span className="text-right">Δ</span>
       </div>
       {filas.map((f) => (
-        <div key={f.label} className={cn(GRID, "border-t border-stone-100 py-2 text-sm")}>
-          <span className="capitalize text-stone-700">
+        <div key={f.label} className={cn(GRID, "border-t border-gray-100 py-2 text-sm")}>
+          <span className="capitalize text-gray-700">
             {f.label}
-            {f.parcial ? <span className="ml-1 text-xs text-stone-400">d{diaActual}</span> : null}
+            {f.parcial ? <span className="ml-1 text-xs text-gray-400">d{diaActual}</span> : null}
           </span>
-          <span className="text-right font-mono tabular-nums text-stone-950">{fmtMoney(f.v)}</span>
-          <span className="text-right font-mono tabular-nums text-stone-500">
+          <span className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
+          <span className="text-right font-mono tabular-nums text-gray-500">
             {f.vPrev != null ? fmtMoney(f.vPrev) : "—"}
           </span>
           <span className="text-right font-mono tabular-nums leading-tight">
@@ -570,10 +570,10 @@ function ComparativoInteranualCard({
           </span>
         </div>
       ))}
-      <div className={cn(GRID, "border-t border-stone-300 bg-stone-50 py-2 text-sm font-semibold")}>
-        <span className="text-stone-700">YTD</span>
-        <span className="text-right font-mono tabular-nums text-stone-950">{fmtMoney(tot)}</span>
-        <span className="text-right font-mono tabular-nums text-stone-600">{fmtMoney(totPrev)}</span>
+      <div className={cn(GRID, "border-t border-gray-300 bg-gray-50 py-2 text-sm font-semibold")}>
+        <span className="text-gray-700">YTD</span>
+        <span className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(tot)}</span>
+        <span className="text-right font-mono tabular-nums text-gray-600">{fmtMoney(totPrev)}</span>
         <span className="text-right font-mono tabular-nums leading-tight">
           <span className={cn("font-medium", deltaTone(totPct))}>{fmtPct(totPct)}</span>
           <span className={cn("block text-xs", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
@@ -627,7 +627,7 @@ function ChartMesAnioMount({
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h4 className="font-display text-sm font-semibold text-stone-950">
+        <h4 className="font-display text-sm font-semibold text-gray-950">
           {chartView === "mes" ? "Ventas día por día" : "Ventas acumuladas"}
         </h4>
         <SegmentedToggle
@@ -648,25 +648,25 @@ function ChartMesAnioMount({
                 mesLabel={mes_label}
                 year={year}
               />
-              <p className="mt-2 px-1 text-xs text-stone-500">
+              <p className="mt-2 px-1 text-xs text-gray-500">
                 <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-teal-700" />
                 {mes_label} {year}
                 {showPrevLine ? (
                   <>
                     {" · "}
-                    <span className="mr-1 inline-block h-[2px] w-2 bg-stone-400" />
+                    <span className="mr-1 inline-block h-[2px] w-2 bg-gray-400" />
                     Mismo mes {anioAnterior}
                   </>
                 ) : (
-                  <span className="text-stone-400"> · sin datos de {anioAnterior} para comparar</span>
+                  <span className="text-gray-400"> · sin datos de {anioAnterior} para comparar</span>
                 )}
               </p>
             </>
           ) : (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-center">
-              <Info className="h-6 w-6 text-stone-400" strokeWidth={1.5} />
-              <p className="text-sm text-stone-500">No hay datos para este período</p>
-              <p className="text-xs text-stone-400">{mes_label} {year} no registra ventas retail.</p>
+              <Info className="h-6 w-6 text-gray-400" strokeWidth={1.5} />
+              <p className="text-sm text-gray-500">No hay datos para este período</p>
+              <p className="text-xs text-gray-400">{mes_label} {year} no registra ventas retail.</p>
             </div>
           )}
         </Card>
@@ -692,7 +692,7 @@ function SegmentedToggle<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <div className="flex rounded-md bg-stone-100 p-0.5" role="tablist">
+    <div className="flex rounded-md bg-gray-100 p-0.5" role="tablist">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -704,7 +704,7 @@ function SegmentedToggle<T extends string>({
             onClick={() => onChange(o.value)}
             className={cn(
               "rounded px-3 py-1 text-xs font-medium transition",
-              active ? "bg-white text-stone-950 shadow-sm" : "text-stone-500 hover:text-stone-700",
+              active ? "bg-white text-gray-950 shadow-sm" : "text-gray-500 hover:text-gray-700",
             )}
           >
             {o.label}
@@ -735,9 +735,9 @@ function ComparativoStat({
       : `$${Math.round(comp.ventas).toLocaleString()}`;
   return (
     <div className="text-right">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
       <p className={cn("mt-0.5 font-mono text-base font-semibold tabular-nums", tone)}>{pct}</p>
-      <p className="font-mono text-xs tabular-nums text-stone-500">{monto}</p>
+      <p className="font-mono text-xs tabular-nums text-gray-500">{monto}</p>
     </div>
   );
 }
@@ -751,17 +751,17 @@ function BestWorstDayCard({
 }) {
   return (
     <Card className="p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Mejor / peor día</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Mejor / peor día</p>
       <div className="mt-2 space-y-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700">
             <Award className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0">
-            <p className="font-mono text-base font-medium tabular-nums text-stone-950">
+            <p className="font-mono text-base font-medium tabular-nums text-gray-950">
               {mejor ? fmtMoney(mejor.ventas) : "—"}
             </p>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-gray-500">
               mejor{mejor ? ` · ${formatFechaShort(mejor.fecha)}` : ""}
             </p>
           </div>
@@ -771,10 +771,10 @@ function BestWorstDayCard({
             <AlertTriangle className="h-4 w-4" strokeWidth={1.75} />
           </div>
           <div className="min-w-0">
-            <p className="font-mono text-base font-medium tabular-nums text-stone-950">
+            <p className="font-mono text-base font-medium tabular-nums text-gray-950">
               {peor ? fmtMoney(peor.ventas) : "—"}
             </p>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-gray-500">
               peor{peor ? ` · ${formatFechaShort(peor.fecha)}` : ""}
             </p>
           </div>
@@ -812,7 +812,7 @@ function MiniBars({
       {showLabels && (
         <div className="mt-1 flex gap-px">
           {data.map((d, i) => (
-            <span key={i} className="flex-1 text-center text-[8.5px] uppercase text-stone-400">{d.label.slice(0, 1)}</span>
+            <span key={i} className="flex-1 text-center text-[8.5px] uppercase text-gray-400">{d.label.slice(0, 1)}</span>
           ))}
         </div>
       )}
@@ -840,9 +840,9 @@ function BestDowCard({ heatmap }: { heatmap: HeatmapDow[] }) {
           <CalendarDays className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Mejor día de semana</p>
-          <p className="mt-0.5 font-display text-base font-semibold text-stone-950">{hayData ? best!.dow_label : "—"}</p>
-          <p className="mt-0.5 font-mono text-xs tabular-nums text-stone-500">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Mejor día de semana</p>
+          <p className="mt-0.5 font-display text-base font-semibold text-gray-950">{hayData ? best!.dow_label : "—"}</p>
+          <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
             {hayData ? `${fmtMoneyCompact(best!.ventas_promedio)} promedio` : "sin data"}
           </p>
         </div>
@@ -873,11 +873,11 @@ function HoraPicoCard({
           <Clock className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Hora pico</p>
-          <p className="mt-0.5 font-display text-base font-semibold text-stone-950">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Hora pico</p>
+          <p className="mt-0.5 font-display text-base font-semibold text-gray-950">
             {hora != null ? horaPicoLabel(hora) : "—"}
           </p>
-          <p className="mt-0.5 font-mono text-xs tabular-nums text-stone-500">
+          <p className="mt-0.5 font-mono text-xs tabular-nums text-gray-500">
             {ventas != null ? `${fmtMoneyCompact(ventas)} en la hora` : "sin data"}
           </p>
         </div>
@@ -901,12 +901,12 @@ function MiniKpi({
 }) {
   return (
     <Card className="p-3.5">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
       <p className={cn(
-        "mt-1.5 font-mono text-[22px] font-medium leading-tight tabular-nums text-stone-950",
+        "mt-1.5 font-mono text-[22px] font-medium leading-tight tabular-nums text-gray-950",
         valueClassName,
       )}>{value}</p>
-      {sub && <p className="mt-1 text-xs text-stone-500">{sub}</p>}
+      {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
     </Card>
   );
 }

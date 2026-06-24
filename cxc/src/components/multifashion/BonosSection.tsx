@@ -34,7 +34,7 @@ const REGLA_BONO =
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
-  stone:   "text-stone-500",
+  stone:   "text-gray-500",
 };
 
 interface BonosSectionProps {
@@ -85,7 +85,7 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
   }
   if (!resp || resp.sin_data) {
     return resp?.sin_data
-      ? <Card className="p-4 text-center text-xs text-stone-500">Sin datos de ventas de Multifashion todavía.</Card>
+      ? <Card className="p-4 text-center text-xs text-gray-500">Sin datos de ventas de Multifashion todavía.</Card>
       : null;
   }
 
@@ -113,23 +113,23 @@ function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
 
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-teal-100 bg-teal-50/50 px-3.5 py-2.5 text-sm">
-      <span className="font-medium text-stone-700">Tienda completa {mesLabel} (incl. mayoreo):</span>
+      <span className="font-medium text-gray-700">Tienda completa {mesLabel} (incl. mayoreo):</span>
       {g.tiene_comparacion ? (
         <>
-          <span className="font-mono tabular-nums text-stone-900">{fmtMoney(g.ventas_mes)}</span>
-          <span className="text-stone-400">vs</span>
-          <span className="font-mono tabular-nums text-stone-600">{fmtMoney(g.ventas_mes_prev)} ({resp.mes_evaluado.year - 1})</span>
+          <span className="font-mono tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="text-gray-400">vs</span>
+          <span className="font-mono tabular-nums text-gray-600">{fmtMoney(g.ventas_mes_prev)} ({resp.mes_evaluado.year - 1})</span>
           <span className={cn("font-mono tabular-nums font-medium", TONE_LIGHT[delta.tone])}>
             {delta.arrow && <span className="mr-0.5">{delta.arrow}</span>}{delta.displayValue}
           </span>
         </>
       ) : (
         <>
-          <span className="font-mono tabular-nums text-stone-900">{fmtMoney(g.ventas_mes)}</span>
-          <span className="text-stone-500">· sin comparativo {resp.mes_evaluado.year - 1}</span>
+          <span className="font-mono tabular-nums text-gray-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="text-gray-500">· sin comparativo {resp.mes_evaluado.year - 1}</span>
         </>
       )}
-      <span title={tooltipRegla} className="ml-0.5 inline-flex cursor-help text-stone-400" aria-label="Regla del bono">
+      <span title={tooltipRegla} className="ml-0.5 inline-flex cursor-help text-gray-400" aria-label="Regla del bono">
         <Info className="h-3.5 w-3.5" />
       </span>
     </div>
@@ -140,7 +140,7 @@ function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
 function PendienteBanner({ resp }: { resp: BonosMultifashion }) {
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
   return (
-    <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50/60 px-3.5 py-2.5 text-sm text-stone-600">
+    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/60 px-3.5 py-2.5 text-sm text-gray-600">
       Bono de {mesLabel} pendiente — se calcula al cierre del mes.
     </div>
   );
