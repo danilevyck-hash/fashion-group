@@ -22,6 +22,7 @@ const STATIC_ASSET_RE =
 // Paths that start with these prefixes are public
 const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
+  "/api/health-crons", // meta-watchdog externo; protegido por HEALTHCHECK_TOKEN propio (no cookie)
   "/api/catalogo/reebok/products", // public catalog reads
   "/api/catalogo/reebok/inventory", // public catalog stock
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
@@ -60,17 +61,24 @@ async function isSessionValid(sessionToken: string): Promise<boolean> {
       }
     );
     if (!res.ok) {
-      // Fail CLOSED en error de red/5xx (antes fail-open: una caída de DB
-      // revivía sesiones revocadas). Loggeado para que el outage sea observable.
-      Sentry.captureMessage(`[auth] Supabase respondió ${res.status} validando sesión — fail-closed`, "error");
-      return false;
+      // Fail OPEN ante un blip transitorio de Supabase (5xx/red/error de infra):
+      // un fallo de la DB NO debe desloguear a un usuario con cookie HMAC válida.
+      // La cookie ya fue firmada y verificada → auténtica; solo no pudimos chequear
+      // la revocación. La tratamos como válida POR AHORA (el próximo request
+      // reintenta). Exposición acotada: una sesión revocada manualmente podría
+      // seguir viva durante el outage. Loggeado para observabilidad.
+      Sentry.captureMessage(`[auth] Supabase respondió ${res.status} validando sesión — fail-open transitorio`, "warning");
+      return true;
     }
     const rows = await res.json();
+    // Respuesta DEFINITIVA (2xx): 0 filas = token revocado o inexistente → sesión
+    // realmente inválida → desloguear. >0 = activa. Esto NO es un blip.
     return Array.isArray(rows) && rows.length > 0;
   } catch (err) {
-    // Fail CLOSED ante cualquier excepción.
+    // Fail OPEN ante excepción de red (fetch falló): blip transitorio, no
+    // desloguear por un error de conexión. Loggeado para observabilidad.
     Sentry.captureException(err);
-    return false;
+    return true;
   }
 }
 

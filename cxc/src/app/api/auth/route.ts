@@ -134,16 +134,13 @@ export async function POST(req: NextRequest) {
           };
 
           const sessionToken = randomUUID();
-          // Revoke any previous active session of this user before creating a new one.
-          // El middleware respeta `revoked = true` y redirige al login con ?expired=1.
-          // Esto invalida cookies anteriores (ej: si fueron robadas) cuando el usuario reloguea.
-          try {
-            await supabaseServer
-              .from("user_sessions")
-              .update({ revoked: true })
-              .eq("user_name", user.name)
-              .eq("revoked", false);
-          } catch { /* table may not exist yet */ }
+          // MULTI-DISPOSITIVO: NO se revocan las sesiones previas del usuario al
+          // loguear. Así puede estar activo en varios dispositivos a la vez
+          // (iPhone + escritorio + PWA), cada uno con su propia ventana deslizante
+          // de 7 días, sin que un login expulse a los otros. La revocación sigue
+          // disponible MANUALMENTE (Admin → Sesiones) para un dispositivo perdido,
+          // y el logout (DELETE) revoca solo la sesión de ESE dispositivo. La cookie
+          // es HMAC-firmada (no forjable) y caduca a los 7 días de inactividad.
 
           // Create revocable session record
           try {
