@@ -39,6 +39,25 @@ const EMPRESAS = [
   { empresaKey: "active_shoes", categories: ["footwear"], defaultCategory: "footwear" },
 ] as const;
 
+// FILTRO PROVEEDOR (Reebok real). active_wear/active_shoes NO son 100% Reebok:
+// active_wear mezcla apparel de otros proveedores (BELI 18, AMERICAN UNIQUE) y
+// basura contable de GENERAL ("RETENCION DE N/C", "CAJA DE LAPIZ"). El catálogo
+// Reebok = SOLO el distribuidor Reebok (Latin Fitness Group). Además se excluyen
+// los códigos "KL*" (reservados para Karl Lagerfeld, que Daniel venderá en
+// active_wear bajo el mismo proveedor pero NO es Reebok; hoy hay 0, es un seguro).
+// marcaId NO se usa: ids compartidos entre Reebok y basura → no es confiable.
+const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
+
+/** Un artículo entra al catálogo Reebok SOLO si su proveedor es Latin Fitness
+ *  Group Y su código NO empieza con "KL" (case-insensitive). */
+function isReebokArticulo(a: SwitchArticulo): boolean {
+  const proveedor = (a.proveedor ?? "").trim().toUpperCase();
+  if (proveedor !== REEBOK_PROVEEDOR) return false;
+  const codigo = (a.codigo ?? "").trim().toUpperCase();
+  if (codigo.startsWith("KL")) return false;
+  return true;
+}
+
 function num(s: string | null | undefined): number {
   const n = parseFloat(String(s ?? "").replace(/,/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -98,9 +117,15 @@ export async function syncCatalogoReebok(opts: { dryRun?: boolean } = {}): Promi
       const client = createSwitchClient(emp.empresaKey);
 
       // (1) /lista bulk → universo + disponible.
-      const arts = await fetchAllArticulos(emp.empresaKey);
-      out.switchCount = arts.length;
-      if (arts.length === 0) throw new Error("Switch /lista devolvió 0 artículos — no se toca el catálogo");
+      const artsAll = await fetchAllArticulos(emp.empresaKey);
+      out.switchCount = artsAll.length;
+      // Fail-safe sobre la respuesta CRUDA: 0 artículos = Switch falló → no tocar.
+      if (artsAll.length === 0) throw new Error("Switch /lista devolvió 0 artículos — no se toca el catálogo");
+
+      // FILTRO: solo Reebok real (Latin Fitness Group, sin códigos KL). Todo lo
+      // que no pase queda fuera del universo → no se agrega ni se refresca como
+      // Reebok. La basura (BELI 18, AMERICAN UNIQUE, GENERAL) nunca entra.
+      const arts = artsAll.filter(isReebokArticulo);
 
       // Productos del catálogo de estas categorías.
       const { data: existing, error: exErr } = await reebokServer

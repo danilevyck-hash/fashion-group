@@ -24,6 +24,16 @@ const SK = env.REEBOK_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
 const SH = { apikey: SK, Authorization: `Bearer ${SK}` };
 const num = (v) => { const n = parseFloat(String(v ?? "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; };
 
+// FILTRO PROVEEDOR — réplica exacta de sync-catalogo-reebok.ts: catálogo Reebok =
+// SOLO Latin Fitness Group (distribuidor Reebok) y código no-"KL". Excluye la
+// basura no-Reebok de active_wear (BELI 18, AMERICAN UNIQUE, GENERAL).
+const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
+const isReebok = (a) => {
+  if (String(a.proveedor ?? "").trim().toUpperCase() !== REEBOK_PROVEEDOR) return false;
+  if (String(a.codigo ?? "").trim().toUpperCase().startsWith("KL")) return false;
+  return true;
+};
+
 async function switchAuth(KEY) {
   const URL = (env[`SWITCH_${KEY}_API_URL`] || "").replace(/\/+$/, "");
   const a = await fetch(`${URL}/autenticacion`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ usuario: env[`SWITCH_${KEY}_API_USER`], password: env[`SWITCH_${KEY}_API_PASSWORD`] }) });
@@ -56,15 +66,27 @@ for (const { KEY, cats } of EMPRESAS) {
   console.log("\n" + "═".repeat(72) + `\n  ${KEY} (DRY-RUN — no escribe)\n` + "═".repeat(72));
   try {
     const sw = await switchAuth(KEY);
-    const arts = await listAll(sw);
-    if (arts.length === 0) { console.log("  Switch devolvió 0 — FAIL-SAFE: el cron NO tocaría este catálogo."); continue; }
+    const artsAll = await listAll(sw);
+    if (artsAll.length === 0) { console.log("  Switch devolvió 0 — FAIL-SAFE: el cron NO tocaría este catálogo."); continue; }
+    const arts = artsAll.filter(isReebok); // solo Reebok real (Latin Fitness, no-KL)
 
     const prods = await catalogProducts(cats);
     const bySku = new Map(); const activeSkus = new Set();
     for (const p of prods) { if (!p.sku) continue; bySku.set(String(p.sku), p); if (p.active) activeSkus.add(String(p.sku)); }
 
+    // Productos YA en el catálogo que NO pasarían el filtro (no-Latin-Fitness).
+    // NO se tocan; solo se reportan para que Daniel decida después.
+    const artByCodigo = new Map(artsAll.map((a) => [String(a.codigo), a]));
+    const noPasanFiltro = [];
+    for (const p of prods) {
+      if (!p.sku) continue;
+      const a = artByCodigo.get(String(p.sku));
+      if (!a) continue; // no está en /lista de Switch → no clasificable aquí
+      if (!isReebok(a)) noPasanFiltro.push(`${p.sku}[${(a.proveedor ?? "").trim() || "sin proveedor"}]${p.active ? "·activo" : "·oculto"}`);
+    }
+
     const stockSet = arts.filter((a) => activeSkus.has(String(a.codigo)) || num(a.disponible) >= 1);
-    process.stdout.write(`  /lista=${arts.length} · catálogo=${prods.length} (activos ${activeSkus.size}) · /stock a consultar=${stockSet.length} … `);
+    process.stdout.write(`  /lista=${artsAll.length} (Reebok ${arts.length}) · catálogo=${prods.length} (activos ${activeSkus.size}) · /stock a consultar=${stockSet.length} … `);
 
     let actualizados = 0, agregados = 0, ocultados = 0, reactivados = 0;
     const nuevos = [], aOcultar = [];
@@ -83,6 +105,7 @@ for (const { KEY, cats } of EMPRESAS) {
     console.log(`  REFRESCARÍA: ${actualizados} · AGREGARÍA: ${agregados} · OCULTARÍA: ${ocultados} · REACTIVARÍA: ${reactivados}`);
     if (nuevos.length) console.log(`  NUEVOS sin foto (${nuevos.length}): ${nuevos.slice(0, 30).join(", ")}${nuevos.length > 30 ? `, +${nuevos.length - 30} más` : ""}`);
     if (aOcultar.length) console.log(`  Se ocultarían: ${aOcultar.slice(0, 15).join(", ")}${aOcultar.length > 15 ? `, +${aOcultar.length - 15} más` : ""}`);
+    if (noPasanFiltro.length) console.log(`  ⚠️  EN CATÁLOGO pero NO pasan el filtro (${noPasanFiltro.length}) — NO se tocan, Daniel decide: ${noPasanFiltro.slice(0, 20).join(", ")}${noPasanFiltro.length > 20 ? `, +${noPasanFiltro.length - 20} más` : ""}`);
   } catch (err) {
     console.log(`  ERROR: ${err.message} — el cron NO tocaría este catálogo (fail-safe).`);
   }
