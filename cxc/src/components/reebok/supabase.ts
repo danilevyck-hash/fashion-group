@@ -20,6 +20,10 @@ export type Product = {
   active: boolean
   on_sale: boolean
   badge: string | null
+  // Stock desde Switch (cron reebok-catalogo). Pueden ser null en productos
+  // no-Reebok o aún sin sincronizar — la UI los muestra como "—"/Agotado, no error.
+  existencia?: number | null        // saldo físico en bodega (control interno)
+  disponibilidad?: number | null    // vendible (existencia − apartado) — dato principal
   created_at: string
 }
 

@@ -629,6 +629,7 @@ function Productos() {
                     qty={cartMap.get(p.id) || 0}
                     onQtyChange={handleQtyChange}
                     showBultos
+                    showStock
                   />
                 ))}
               </div>
@@ -644,6 +645,7 @@ function Productos() {
               qty={cartMap.get(p.id) || 0}
               onQtyChange={handleQtyChange}
               showBultos
+              showStock
             />
           ))}
         </div>

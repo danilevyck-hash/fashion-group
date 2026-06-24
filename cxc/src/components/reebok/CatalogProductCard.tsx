@@ -28,12 +28,13 @@ interface CatalogProductCardProps {
   onQtyChange: (productId: string, qty: number, product: Product) => void;
   disabled?: boolean;
   showBultos?: boolean; // vendor mode shows "bultos"
+  showStock?: boolean;  // catálogo interno: muestra disponibilidad + existencia (NO en público)
 }
 
 const isPreOrder = (p: Product) => p.badge === "proximamente";
 
 export default function CatalogProductCard({
-  product, qty, onQtyChange, disabled, showBultos,
+  product, qty, onQtyChange, disabled, showBultos, showStock,
 }: CatalogProductCardProps) {
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [justAdded, setJustAdded] = useState(false);
@@ -203,6 +204,26 @@ export default function CatalogProductCard({
               </div>
             )}
           </div>
+
+          {/* Stock interno (Switch): Disponible = principal, Existencia = secundario.
+              Solo catálogo interno (showStock); NUNCA en el catálogo público. */}
+          {showStock && (() => {
+            const disp = product.disponibilidad;
+            const exist = product.existencia;
+            const agotado = disp == null || disp <= 0;
+            return (
+              <div className="mt-2 pt-2 border-t border-[#1A2656]/10">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className={`text-sm font-semibold tabular-nums ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]"}`}>
+                    {agotado ? "Agotado" : `Disponible: ${disp}`}
+                  </span>
+                  <span className="text-xs text-[#1A2656]/45 tabular-nums">
+                    En bodega: {exist == null ? "—" : exist}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Add/Qty button */}
           {inOrder ? (
