@@ -51,6 +51,7 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
   onSaveEdit: () => void;
   onUploadFoto: (file: File) => void;
+  uploadingFoto?: boolean;
   onDeleteFoto: (fotoId: string, path: string) => void;
   onAddSettlement: (rows: { monto: number; nota_credito: string; fecha: string }[]) => void;
   onRemoveSettlement: (sid: string) => void;
@@ -69,7 +70,7 @@ export default function ReclamoDetail({
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
   newMotivoText, setNewMotivoText, onBack, onBackToEmpresa, onBackToReclamos,
   onAddNota, onChangeEstado,
-  onDeleteReclamo, onSaveEdit, onUploadFoto, onDeleteFoto,
+  onDeleteReclamo, onSaveEdit, onUploadFoto, uploadingFoto, onDeleteFoto,
   onAddSettlement, onRemoveSettlement,
   showToast,
 }: Props) {
@@ -570,13 +571,14 @@ export default function ReclamoDetail({
         {/* Upload area */}
         {fotos.length < 5 && (
           <>
-            <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
+            <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" disabled={uploadingFoto} onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
             <button
               onClick={() => fotoRef.current?.click()}
-              className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px]"
+              disabled={uploadingFoto}
+              className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              <span className="text-sm font-medium">Adjuntar fotos</span>
+              <span className="text-sm font-medium">{uploadingFoto ? "Subiendo…" : "Adjuntar fotos"}</span>
               <span className="text-xs text-gray-300 hidden sm:inline">({fotos.length}/5)</span>
             </button>
           </>

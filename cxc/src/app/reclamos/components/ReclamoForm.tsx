@@ -2,8 +2,8 @@
 
 import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
-import { RItem, Foto } from "./types";
-import { AccordionContent, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
+import { RItem, LocalFoto } from "./types";
+import { AccordionContent, FotoLightbox } from "@/components/ui";
 import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
@@ -24,10 +24,10 @@ interface Props {
   setFacturaPdfPath: (v: string | null) => void;
   savedReclamoId: string | null;
   savedNroReclamo: string;
-  formFotos: Foto[];
-  setFormFotos: React.Dispatch<React.SetStateAction<Foto[]>>;
-  uploadingFormFoto: boolean;
-  setUploadingFormFoto: (v: boolean) => void;
+  pendingFotos: LocalFoto[];
+  onAddFoto: (file: File) => void;
+  onRemoveFoto: (lf: LocalFoto) => void;
+  onRetryFotos: () => void;
   saving: boolean;
   error: string | null;
   customMotivos: string[];
@@ -47,15 +47,15 @@ export default function ReclamoForm({
   fEmpresa, setFEmpresa, fFecha, setFFecha, fFactura, setFFactura,
   fPedido, setFPedido, fNotas, setFNotas, fItems, setFItems,
   facturaPdfPath, setFacturaPdfPath,
-  savedReclamoId, savedNroReclamo, formFotos, setFormFotos,
-  uploadingFormFoto, setUploadingFormFoto, saving, error,
+  savedReclamoId, savedNroReclamo, pendingFotos, onAddFoto, onRemoveFoto, onRetryFotos,
+  saving, error,
   customMotivos, setCustomMotivos, addingMotivo, setAddingMotivo,
   newMotivoText, setNewMotivoText, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
   isEditing,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
-  const [deleteFotoTarget, setDeleteFotoTarget] = useState<Foto | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const fotosError = pendingFotos.some((f) => f.status === "error");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showAll, setShowAll] = useState(false);
   function handleBlur(field: string) { setTouched((prev) => ({ ...prev, [field]: true })); }
@@ -362,6 +362,74 @@ export default function ReclamoForm({
         </div>
       </AccordionContent>
 
+      {/* ── Evidencia fotográfica (opcional) — se adjuntan ANTES de guardar ── */}
+      <div className="mb-10">
+        <div className="text-sm font-semibold text-gray-900 mb-1">Evidencia fotográfica <span className="font-normal text-gray-400">(opcional)</span></div>
+        <p className="text-xs text-gray-400 mb-3">Adjunta las fotos ahora; se guardan junto con el reclamo en un solo paso.</p>
+
+        {pendingFotos.length > 0 && (
+          <div className="flex flex-wrap gap-4 mb-3">
+            {pendingFotos.map((f) => {
+              const src = f.uploaded?.url || f.previewUrl;
+              return (
+                <div key={f.localId} className="relative">
+                  <img src={src} alt="" onClick={() => setLightboxSrc(src)} className={`w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border cursor-pointer ${f.status === "error" ? "border-red-400" : "border-gray-200"}`} />
+                  {f.status === "uploading" && (
+                    <div className="absolute inset-0 rounded-lg bg-white/70 flex items-center justify-center">
+                      <span className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {f.status === "done" && (
+                    <div className="absolute -bottom-1.5 -left-1.5 w-6 h-6 bg-green-600 rounded-full flex items-center justify-center border-2 border-white">
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                    </div>
+                  )}
+                  {f.status === "error" && (
+                    <div className="absolute inset-0 rounded-lg bg-red-50/80 flex items-center justify-center pointer-events-none">
+                      <span className="text-red-600 text-[11px] font-semibold">Falló</span>
+                    </div>
+                  )}
+                  <button type="button" onClick={() => onRemoveFoto(f)} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {fotosError && (
+          <div className="mb-3 text-xs">
+            <p className="text-red-600 font-medium">Algunas fotos no se subieron:</p>
+            <ul className="mt-1 space-y-0.5">
+              {pendingFotos.filter((f) => f.status === "error").map((f) => (
+                <li key={f.localId} className="text-red-500">• {f.file.name}: {f.error}</li>
+              ))}
+            </ul>
+            {savedReclamoId && (
+              <button type="button" onClick={onRetryFotos} disabled={saving} className="mt-2 inline-flex items-center gap-1 font-medium border border-red-300 text-red-600 rounded-full px-3 py-1.5 hover:bg-red-50 disabled:opacity-50">
+                {saving ? "Reintentando…" : "Reintentar fotos"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {pendingFotos.length < 5 && !savedReclamoId && (
+          <>
+            <input ref={formFotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onAddFoto(file); if (formFotoRef.current) formFotoRef.current.value = ""; }} />
+            <button
+              type="button"
+              onClick={() => formFotoRef.current?.click()}
+              disabled={saving}
+              className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span className="text-sm font-medium">Adjuntar fotos</span>
+              <span className="text-xs text-gray-300 hidden sm:inline">({pendingFotos.length}/5)</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* ── Acciones ── */}
       {savedReclamoId ? (
         <div className="mt-8 border-t border-gray-200 pt-6">
           <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-lg">
@@ -370,48 +438,10 @@ export default function ReclamoForm({
             </div>
             <div>
               <p className="text-sm font-medium">{savedNroReclamo} guardado</p>
-              <p className="text-xs text-gray-400">Agrega fotos de evidencia si tienes (opcional)</p>
+              <p className="text-xs text-gray-400">{fotosError ? "Reintenta las fotos que fallaron arriba, o continúa — son opcionales." : pendingFotos.length > 0 ? "Reclamo guardado con sus fotos." : "Reclamo guardado. Puedes agregar fotos desde el reclamo."}</p>
             </div>
           </div>
-          <div className="mb-6">
-            <div className="text-sm font-semibold text-gray-900 mb-1">Evidencia fotográfica</div>
-            <p className="text-xs text-gray-400 mb-3">Adjunta fotos para agilizar la resolución</p>
-            {formFotos.length > 0 && (
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mb-3" style={{ scrollSnapType: "x mandatory" }}>
-                {formFotos.map((f) => (
-                  <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(f.url)}>
-                    <img src={f.url} alt="" className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border border-gray-200" />
-                    <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget(f); }} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {formFotos.length < 5 && (
-              <>
-                <input ref={formFotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !savedReclamoId) return;
-                  setUploadingFormFoto(true);
-                  const fd = new FormData(); fd.append("file", file);
-                  const res = await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "POST", body: fd });
-                  if (!res.ok) { console.error('Photo upload failed:', res.status); }
-                  else { const data = await res.json(); setFormFotos((p) => [...p, data]); }
-                  setUploadingFormFoto(false);
-                  if (formFotoRef.current) formFotoRef.current.value = "";
-                }} />
-                <button
-                  onClick={() => formFotoRef.current?.click()}
-                  disabled={uploadingFormFoto}
-                  className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px] disabled:opacity-50"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                  <span className="text-sm font-medium">{uploadingFormFoto ? "Subiendo..." : "Adjuntar fotos"}</span>
-                  <span className="text-xs text-gray-300 hidden sm:inline">({formFotos.length}/5)</span>
-                </button>
-              </>
-            )}
-          </div>
-          <button onClick={onViewSaved} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
+          <button onClick={onViewSaved} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">Ver reclamo →</button>
           <button onClick={onResetAndCreateAnother} className="text-sm text-gray-400 hover:text-black transition ml-4">Crear otro reclamo</button>
         </div>
       ) : (
@@ -419,26 +449,12 @@ export default function ReclamoForm({
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <div className="flex items-center gap-4 sm:gap-6">
             <button onClick={onSave} disabled={saving} className="flex-1 sm:flex-none bg-black text-white px-6 py-3 sm:py-2.5 rounded-md text-base sm:text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]">
-              {saving ? "Guardando..." : "Guardar Reclamo"}
+              {saving ? "Guardando…" : "Guardar Reclamo"}
             </button>
             <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         </div>
       )}
-
-      <ConfirmDeleteModal
-        open={!!deleteFotoTarget}
-        title="¿Eliminar esta foto?"
-        description="Se eliminará la foto de evidencia del reclamo. Esta acción no se puede deshacer."
-        onConfirm={async () => {
-          if (deleteFotoTarget && savedReclamoId) {
-            await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: deleteFotoTarget.id, storage_path: deleteFotoTarget.storage_path }) });
-            setFormFotos((p) => p.filter((x) => x.id !== deleteFotoTarget.id));
-          }
-          setDeleteFotoTarget(null);
-        }}
-        onCancel={() => setDeleteFotoTarget(null)}
-      />
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
