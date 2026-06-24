@@ -461,8 +461,52 @@ export interface SwitchClient {
    *  (facturas + pagos). Endpoint NO documentado (/apiproveedor/info) — devuelve 200
    *  incluso en error (página HTML); validar el SHAPE de la respuesta, no el status. */
   getProveedorInfo(proveedorId: number | string): Promise<SwitchProveedorInfoData>;
+  /** Maestro de artículos (catálogo de productos con precio + disponibilidad).
+   *  Paginación de 50 (/apiarticulos/lista). Un row por artículo (codigo único).
+   *  OJO: trae `disponible` pero NO `saldo` (existencia física) — eso vive en
+   *  getStock. */
+  getArticulos(params: { porPagina: number; paginaActual: number }): Promise<SwitchArticulosData>;
+  /** Stock por sucursal de UN artículo (/apiarticulos/stock?articuloId=X). Trae
+   *  `saldo` (existencia física) y `disponible` (disponibilidad). Una llamada por
+   *  artículo — usar con moderación (no hay bulk). */
+  getStock(articuloId: number | string): Promise<SwitchStockData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
+}
+
+/** Row de /apiarticulos/stock (data.stock[]). `saldo` = existencia física,
+ *  `disponible` = disponibilidad (existencia − comprometido). Strings numéricos. */
+export interface SwitchStockRow {
+  articuloCodigo: string;
+  sucursalId: number;
+  sucursal: string;
+  saldo: string | null;
+  disponible: string | null;
+  costo: string | null;
+}
+
+export interface SwitchStockData {
+  stock: SwitchStockRow[];
+}
+
+/** Item de /apiarticulos/lista (data.articulos[]). `precio`/`disponible`/`costo`
+ *  llegan como STRING ("83.9000", "-8.0000"); parsear con parseFloat. `talla`/
+ *  `color` son null para Reebok (sin variantes). `disponible` puede ser negativo. */
+export interface SwitchArticulo {
+  id: number;
+  codigo: string;
+  descripcion: string | null;
+  costo: string | null;
+  disponible: string | null;
+  precio: string | null;
+  talla: string | null;
+  color: string | null;
+  marcaId: number | null;
+  proveedor: string | null;
+}
+
+export interface SwitchArticulosData {
+  articulos: SwitchArticulo[];
 }
 
 /** Item de /apiproveedor/lista (data.proveedores[]). */
@@ -698,6 +742,29 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apireporte/ventasucursal?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getArticulos(params) {
+      const qs = new URLSearchParams({
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      return authedCall<SwitchArticulosData>(
+        empresaKey,
+        cfg,
+        `/apiarticulos/lista?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getStock(articuloId) {
+      const qs = new URLSearchParams({ articuloId: String(articuloId) });
+      return authedCall<SwitchStockData>(
+        empresaKey,
+        cfg,
+        `/apiarticulos/stock?${qs.toString()}`,
         "GET",
       );
     },
