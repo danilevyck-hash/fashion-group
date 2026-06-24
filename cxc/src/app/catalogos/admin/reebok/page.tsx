@@ -1,15 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, Suspense } from "react";
+import { useState, useCallback, useRef, useMemo, Suspense } from "react";
 import useSWR from "swr";
+import Image from "next/image";
 import { useUrlState } from "@/lib/hooks/useUrlState";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
-import Image from "next/image";
-import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
-import { csvBlob, stripBom } from "@/lib/csv-export";
-import { ConfirmModal } from "@/components/ui";
+import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
+import { validateProductPhoto, uploadProductPhoto } from "./photoUpload";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,208 +24,140 @@ interface ReebokProduct {
   active: boolean;
   on_sale: boolean;
   badge: string | null;
+  existencia: number | null;
+  disponibilidad: number | null;
   created_at: string;
 }
 
-interface InventoryItem {
-  id: string;
-  product_id: string;
-  size: string;
-  quantity: number;
-}
-
-// Fila de la vista unificada (presenciales + del link). El total ya viene
-// recalculado por el endpoint /pedidos-unificado.
-interface UnifiedPedido {
-  origen: "mio" | "link";
-  id_natural: string;
-  cliente: string;
-  total: number;
-  created_at: string;
-  vendor: string | null;
-  item_count: number;
-  // Tabla física de origen. El badge usa `origen`; el routing del detalle y el
-  // borrado usan `fuente` (una pública convertida vive en reebok_orders pero se
-  // muestra como "Del link").
-  fuente?: "orders" | "publicos";
-}
-
-interface ImportRow {
-  sku: string;
-  name: string;
-  price: number;
-  quantity: number;
-  gender: string;
-  badge: string;
-}
-
-type Tab = "productos" | "pedidos" | "importar";
+type Tab = "faltan-foto" | "completo" | "pedidos";
+type EmpresaFilter = "todas" | "wear" | "shoes";
+type FotoFilter = "todos" | "con" | "sin";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Empresa derivada de la categoría (misma convención que el cron e import).
+function empresaDe(cat: string): "wear" | "shoes" {
+  return cat === "footwear" ? "shoes" : "wear";
+}
+function empresaLabel(cat: string): string {
+  return empresaDe(cat) === "shoes" ? "Active Shoes" : "Active Wear";
 }
 
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
+function tieneFoto(p: ReebokProduct): boolean {
+  return !!(p.image_url && p.image_url.trim());
 }
 
-function escapeCsvField(val: string): string {
-  if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-    return `"${val.replace(/"/g, '""')}"`;
-  }
-  return val;
+function relativo(iso: string | null): string {
+  if (!iso) return "nunca";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "hace instantes";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "hace 1 día" : `hace ${d} días`;
 }
 
-function downloadCSV(
-  products: { sku: string; name: string; price: number; quantity: number; gender: string; badge: string; category: string }[],
-  filename: string,
-  includeCategory: boolean,
-) {
-  const header = includeCategory
-    ? "SKU,Nombre,Precio,Cantidad,Genero,Estado,Categoria"
-    : "SKU,Nombre,Precio,Cantidad,Genero,Estado";
-  const rows = products.map(p => {
-    const base = `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.quantity},${escapeCsvField(p.gender)},${p.badge || ""}`;
-    return includeCategory ? `${base},${escapeCsvField(p.category)}` : base;
-  });
-  const csv = [header, ...rows].join("\n");
-  const blob = csvBlob(csv);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function categoryToSpanish(cat: string): string {
-  if (cat === "footwear") return "Calzado";
-  if (cat === "apparel") return "Ropa";
-  if (cat === "accessories") return "Accesorios";
-  return "";
-}
-
-function parseCSV(text: string): Record<string, string>[] {
-  const lines = stripBom(text).split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map(h => h.trim().replace(/^"(.*)"$/, "$1"));
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (const ch of lines[i]) {
-      if (ch === '"') { inQuotes = !inQuotes; }
-      else if (ch === "," && !inQuotes) { vals.push(current.trim()); current = ""; }
-      else { current += ch; }
-    }
-    vals.push(current.trim());
-    const obj: Record<string, string> = {};
-    headers.forEach((h, idx) => { obj[h] = vals[idx] || ""; });
-    rows.push(obj);
-  }
-  return rows;
-}
-
-// ── SWR (Fase 2b) ───────────────────────────────────────────────────────────
-// Mismas opciones que el piloto CXC (#115): dedupe 60s + revalidateOnFocus por
-// hook (keepPreviousData se hereda del SWRProvider del layout).
 const REEBOK_SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;
 
-// Fetcher tolerante: en error devuelve [] (no lanza) para conservar el manejo
-// silencioso del fetch-on-mount original — listas vacías, sin UI de error.
-async function fetchList<T>(url: string): Promise<T[]> {
+async function fetchJson<T>(url: string, fallback: T): Promise<T> {
   try {
     const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ReebokAdminPage() {
-  // Suspense boundary requerido por useSearchParams (vía useUrlState) en
-  // Next 14 App Router — esta página es prerenderizada estática.
   return (
     <Suspense>
-      <ReebokAdminInner />
+      <ReebokCatalogoInner />
     </Suspense>
   );
 }
 
-function ReebokAdminInner() {
-  const { authChecked } = useAuth({
-    moduleKey: "catalogos",
-    allowedRoles: ["admin"],
-  });
+function ReebokCatalogoInner() {
+  const { authChecked } = useAuth({ moduleKey: "catalogos", allowedRoles: ["admin"] });
 
-  const [tab, setTab] = useUrlState<Tab>("tab", "productos");
+  const [tab, setTab] = useUrlState<Tab>("tab", "faltan-foto");
   const [toast, setToast] = useState<string | null>(null);
-
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // ── 3 listas vía useSWR (receta del piloto CXC #115): caché en memoria entre
-  // navegaciones (SWRProvider), dedupe 60s + revalidateOnFocus por-hook. Clave
-  // null hasta authChecked → no se pega a /api/catalogo/reebok/* pre-auth.
-  // Fetcher tolerante (silencioso → [] en error) para conservar el
-  // comportamiento actual: sin UI de error nueva. ──
+  // Solo productos ACTIVOS (el catálogo vivo; el cron oculta los de existencia 0).
   const { data: productsData, isLoading: productsLoading, mutate: mutateProducts } = useSWR<ReebokProduct[]>(
-    authChecked ? "reebok-products" : null,
-    () => fetchList<ReebokProduct>("/api/catalogo/reebok/products"),
+    authChecked ? "reebok-catalogo-products" : null,
+    () => fetchJson<ReebokProduct[]>("/api/catalogo/reebok/products?active=true", []),
     REEBOK_SWR_OPTS,
   );
-  const { data: inventoryData, isLoading: inventoryLoading, mutate: mutateInventory } = useSWR<InventoryItem[]>(
-    authChecked ? "reebok-inventory" : null,
-    () => fetchList<InventoryItem>("/api/catalogo/reebok/inventory"),
+  const { data: pedidosData, mutate: mutatePedidos } = useSWR<UnifiedPedido[]>(
+    authChecked ? "reebok-catalogo-pedidos" : null,
+    () => fetchJson<UnifiedPedido[]>("/api/catalogo/reebok/pedidos-unificado", []),
     REEBOK_SWR_OPTS,
   );
-  const { data: pedidosData, isLoading: pedidosLoading, mutate: mutatePedidos } = useSWR<UnifiedPedido[]>(
-    authChecked ? "reebok-pedidos" : null,
-    () => fetchList<UnifiedPedido>("/api/catalogo/reebok/pedidos-unificado"),
+  const { data: syncData } = useSWR<{ lastSync: string | null }>(
+    authChecked ? "reebok-sync-status" : null,
+    () => fetchJson<{ lastSync: string | null }>("/api/catalogo/reebok/sync-status", { lastSync: null }),
     REEBOK_SWR_OPTS,
   );
 
-  const products = productsData ?? [];
-  const inventory = inventoryData ?? [];
+  const products = useMemo(() => productsData ?? [], [productsData]);
   const pedidos = pedidosData ?? [];
-  // Solo spinner en el primer arranque (sin dato aún); al volver, la caché SWR
-  // ya tiene las listas → sin spinner.
-  const loading =
-    (productsLoading && !productsData) ||
-    (inventoryLoading && !inventoryData) ||
-    (pedidosLoading && !pedidosData);
+  const loading = productsLoading && !productsData;
 
-  const getStock = useCallback((productId: string) => {
-    return inventory
-      .filter((i) => i.product_id === productId)
-      .reduce((sum, i) => sum + i.quantity, 0);
-  }, [inventory]);
+  const metrics = useMemo(() => {
+    const total = products.length;
+    const sinFoto = products.filter((p) => !tieneFoto(p)).length;
+    const wear = products.filter((p) => empresaDe(p.category) === "wear").length;
+    const shoes = products.filter((p) => empresaDe(p.category) === "shoes").length;
+    return { total, sinFoto, wear, shoes };
+  }, [products]);
 
-  // Refetch tras mutación → revalidación SWR (mutate). Mismas firmas que antes,
-  // así los hijos (onProductsChanged / onRefresh / onImportComplete) no cambian.
-  const loadProducts = useCallback(async () => {
-    await Promise.all([mutateProducts(), mutateInventory()]);
-  }, [mutateProducts, mutateInventory]);
-  const loadPedidos = useCallback(async () => {
-    await mutatePedidos();
-  }, [mutatePedidos]);
+  const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
+  const reloadPedidos = useCallback(async () => { await mutatePedidos(); }, [mutatePedidos]);
+
+  async function excelSinFoto() {
+    const sin = products.filter((p) => !tieneFoto(p));
+    if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
+    try {
+      const XLSX = (await import("xlsx-js-style")).default;
+      const header = ["Código", "Descripción", "Empresa", "Disponible", "Existencia"];
+      const rows = sin.map((p) => [
+        p.sku || "",
+        p.name || "",
+        empresaLabel(p.category),
+        p.disponibilidad ?? "",
+        p.existencia ?? "",
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      ws["!cols"] = [{ wch: 16 }, { wch: 40 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
+      const headStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A2656" } } };
+      for (let c = 0; c < header.length; c++) {
+        const ref = XLSX.utils.encode_cell({ r: 0, c });
+        if (ws[ref]) ws[ref].s = headStyle;
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Sin foto");
+      XLSX.writeFile(wb, `Reebok-sin-foto-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast("Excel listo — revisa tu carpeta de descargas");
+    } catch {
+      showToast("No se pudo generar el Excel. Intenta de nuevo.");
+    }
+  }
 
   if (!authChecked) return null;
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "productos", label: "Productos" },
+  const tabs: { key: Tab; label: string; badge?: number }[] = [
+    { key: "faltan-foto", label: "Faltan foto", badge: metrics.sinFoto },
+    { key: "completo", label: "Catálogo completo" },
     { key: "pedidos", label: "Pedidos" },
-    { key: "importar", label: "Importar" },
   ];
 
   return (
@@ -241,30 +171,54 @@ function ReebokAdminInner() {
       )}
 
       <div className="max-w-5xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#1A2656] flex items-center justify-center">
-            <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
+        {/* Encabezado */}
+        <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1A2656] flex items-center justify-center">
+              <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Catálogo Reebok</h1>
+              <p className="text-xs text-gray-400">
+                Sincronizado con Switch {relativo(syncData?.lastSync ?? null)} · 1×/día
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">REEBOK</h1>
-            <p className="text-xs text-gray-400">Administrar catalogo</p>
-          </div>
+          <button
+            onClick={excelSinFoto}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Excel sin foto
+          </button>
         </div>
 
-        {/* Tabs */}
+        {/* Resumen */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <Metric label="Productos" value={metrics.total} />
+          <Metric label="Sin foto" value={metrics.sinFoto} highlight={metrics.sinFoto > 0} />
+          <Metric label="Active Wear" value={metrics.wear} />
+          <Metric label="Active Shoes" value={metrics.shoes} />
+        </div>
+
+        {/* Pestañas */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-6">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
-                tab === t.key
-                  ? "bg-white text-[#1A2656] shadow-sm"
-                  : "text-gray-400 hover:text-gray-600"
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition flex items-center justify-center gap-1.5 ${
+                tab === t.key ? "bg-white text-[#1A2656] shadow-sm" : "text-gray-400 hover:text-gray-600"
               }`}
             >
               {t.label}
+              {t.badge != null && t.badge > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[11px] font-bold rounded-full bg-[#E4002B] text-white">
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -275,19 +229,14 @@ function ReebokAdminInner() {
           </div>
         ) : (
           <>
-            {tab === "productos" && (
-              <ProductosTab products={products} getStock={getStock} onProductsChanged={loadProducts} />
+            {tab === "faltan-foto" && (
+              <FaltanFotoTab products={products} onPhotoSaved={reloadProducts} showToast={showToast} />
+            )}
+            {tab === "completo" && (
+              <CatalogoCompletoTab products={products} onPhotoSaved={reloadProducts} showToast={showToast} />
             )}
             {tab === "pedidos" && (
-              <PedidosTab pedidos={pedidos} onRefresh={loadPedidos} showToast={showToast} />
-            )}
-            {tab === "importar" && (
-              <ImportarTab
-                products={products}
-                inventory={inventory}
-                showToast={showToast}
-                onImportComplete={loadProducts}
-              />
+              <PedidosTab pedidos={pedidos} onRefresh={reloadPedidos} showToast={showToast} />
             )}
           </>
         )}
@@ -296,1235 +245,243 @@ function ReebokAdminInner() {
   );
 }
 
-// ── PRODUCTOS TAB (READ-ONLY) ────────────────────────────────────────────────
+// ── Resumen ─────────────────────────────────────────────────────────────────
 
-type ProductSubTab = "footwear" | "apparel" | "accessories";
-
-function ProductosTab({
-  products,
-  getStock,
-  onProductsChanged,
-}: {
-  products: ReebokProduct[];
-  getStock: (id: string) => number;
-  onProductsChanged: () => Promise<void>;
-}) {
-  // Sub-tab de productos (footwear/apparel/accessories) en la URL (?subtab=).
-  // Key distinta a "tab" para no chocar con el tab principal.
-  const [subTab, setSubTab] = useUrlState<ProductSubTab>("subtab", "footwear");
-  const [search, setSearch] = useState("");
-  const [ofertaFilter, setOfertaFilter] = useState<"" | "solo">("");
-  const [genderFilter, setGenderFilter] = useState<"" | "male" | "female" | "kids" | "unisex" | "otro">("");
-  const [estadoFilter, setEstadoFilter] = useState<"" | "nuevo" | "proximamente">("");
-
-  // Optimistic price overrides keyed by product id — survive parent refetches.
-  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [justSavedId, setJustSavedId] = useState<string | null>(null);
-  const [errorById, setErrorById] = useState<Record<string, string>>({});
-
-  const subTabs: { key: ProductSubTab; label: string }[] = [
-    { key: "footwear", label: "Calzado" },
-    { key: "apparel", label: "Ropa" },
-    { key: "accessories", label: "Accesorios" },
-  ];
-
-  // Inactive products are hidden everywhere — counts and lists reflect actives only.
-  const activeProducts = products.filter((p) => p.active !== false);
-
-  const counts = {
-    footwear: activeProducts.filter((p) => p.category === "footwear").length,
-    apparel: activeProducts.filter((p) => p.category === "apparel").length,
-    accessories: activeProducts.filter((p) => p.category === "accessories").length,
-  };
-
-  const inSubTab = activeProducts.filter((p) => p.category === subTab);
-
-  const STANDARD_GENDERS = new Set(["male", "female", "kids", "unisex"]);
-
-  const filtered = inSubTab.filter((p) => {
-    if (search) {
-      const q = search.toLowerCase();
-      if (
-        !p.name.toLowerCase().includes(q) &&
-        !(p.sku || "").toLowerCase().includes(q)
-      ) {
-        return false;
-      }
-    }
-    if (ofertaFilter === "solo" && p.badge !== "oferta") return false;
-    if (genderFilter) {
-      if (genderFilter === "otro") {
-        if (p.gender && STANDARD_GENDERS.has(p.gender)) return false;
-      } else if (p.gender !== genderFilter) {
-        return false;
-      }
-    }
-    if (estadoFilter && p.badge !== estadoFilter) return false;
-    return true;
-  });
-
-  const hasActiveFilters = Boolean(search || ofertaFilter || genderFilter || estadoFilter);
-
-  const sorted = [...filtered].sort((a, b) => {
-    const stockA = getStock(a.id);
-    const stockB = getStock(b.id);
-    if (stockA > 0 && stockB === 0) return -1;
-    if (stockA === 0 && stockB > 0) return 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  function displayPrice(p: ReebokProduct): number {
-    return priceOverrides[p.id] !== undefined ? priceOverrides[p.id] : (p.price || 0);
-  }
-
-  function startEdit(p: ReebokProduct) {
-    setEditingId(p.id);
-    setErrorById((eb) => {
-      if (!(p.id in eb)) return eb;
-      const next = { ...eb };
-      delete next[p.id];
-      return next;
-    });
-  }
-
-  function cancelEdit(p: ReebokProduct, inputEl: HTMLInputElement) {
-    // Restore the input value to the original so onBlur sees "no change" and exits.
-    inputEl.value = String(displayPrice(p));
-    inputEl.blur();
-  }
-
-  async function commitEdit(p: ReebokProduct, raw: string) {
-    setEditingId(null);
-
-    const current = displayPrice(p);
-    const trimmed = raw.trim().replace(",", ".");
-    if (trimmed === "") {
-      // Empty = treat as cancel, no error.
-      return;
-    }
-    const next = parseFloat(trimmed);
-    if (isNaN(next) || next < 0) {
-      setErrorById((eb) => ({ ...eb, [p.id]: "Precio invalido" }));
-      return;
-    }
-    if (next === current) {
-      return;
-    }
-
-    const hadOverride = p.id in priceOverrides;
-    const prevOverride = priceOverrides[p.id];
-
-    setSavingId(p.id);
-    setPriceOverrides((o) => ({ ...o, [p.id]: next })); // optimistic
-
-    try {
-      const res = await fetch("/api/catalogo/reebok/products", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: p.id, price: next }),
-      });
-      if (!res.ok) throw new Error("save failed");
-
-      setJustSavedId(p.id);
-      setTimeout(() => {
-        setJustSavedId((s) => (s === p.id ? null : s));
-      }, 1500);
-
-      // Refresh in background so the rest of the app sees the new price.
-      onProductsChanged().catch(() => { /* ignore */ });
-    } catch {
-      // Revert optimistic override to whatever it was before.
-      setPriceOverrides((o) => {
-        const copy = { ...o };
-        if (hadOverride) copy[p.id] = prevOverride;
-        else delete copy[p.id];
-        return copy;
-      });
-      setErrorById((eb) => ({ ...eb, [p.id]: "No se pudo guardar. Intenta de nuevo." }));
-    } finally {
-      setSavingId((s) => (s === p.id ? null : s));
-    }
-  }
-
+function Metric({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <div>
-      {/* Subtabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
-        {subTabs.map((st) => {
-          const active = subTab === st.key;
-          return (
-            <button
-              key={st.key}
-              onClick={() => setSubTab(st.key)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition ${
-                active
-                  ? "text-[#1A2656] border-[#1A2656]"
-                  : "text-gray-400 border-transparent hover:text-gray-600"
-              }`}
-            >
-              {st.label} ({counts[st.key]})
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Search */}
-      <div className="relative mb-3">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre o SKU..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1A2656]/30 transition"
-        />
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          value={ofertaFilter}
-          onChange={(e) => setOfertaFilter(e.target.value as "" | "solo")}
-          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
-        >
-          <option value="">Todas las ofertas</option>
-          <option value="solo">Solo en oferta</option>
-        </select>
-        <select
-          value={genderFilter}
-          onChange={(e) => setGenderFilter(e.target.value as "" | "male" | "female" | "kids" | "unisex" | "otro")}
-          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
-        >
-          <option value="">Todos los generos</option>
-          <option value="male">Hombre</option>
-          <option value="female">Mujer</option>
-          <option value="kids">Ninos</option>
-          <option value="unisex">Unisex</option>
-          <option value="otro">Otro</option>
-        </select>
-        <select
-          value={estadoFilter}
-          onChange={(e) => setEstadoFilter(e.target.value as "" | "nuevo" | "proximamente")}
-          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
-        >
-          <option value="">Todos los estados</option>
-          <option value="nuevo">Nuevo</option>
-          <option value="proximamente">Proximamente</option>
-        </select>
-      </div>
-
-      <p className="text-sm text-gray-500 mb-4">
-        {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
-        {hasActiveFilters && filtered.length !== inSubTab.length && ` (de ${inSubTab.length})`}
-      </p>
-
-      {sorted.length === 0 ? (
-        <div className="text-center py-12 text-sm text-gray-400">
-          {hasActiveFilters ? "Ningun producto coincide con los filtros" : "No hay productos en esta categoria"}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {sorted.map((product) => {
-            const stock = getStock(product.id);
-            const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
-            const isInactive = product.active === false;
-            const isEditing = editingId === product.id;
-            const isSaving = savingId === product.id;
-            const justSaved = justSavedId === product.id;
-            const error = errorById[product.id];
-            return (
-              <div
-                key={product.id}
-                className={`bg-white border rounded-lg p-3 ${isInactive ? "opacity-50 border-gray-100 bg-gray-50/50" : stock === 0 ? "opacity-60 border-gray-100" : "border-gray-200"}`}
-              >
-                <div className="flex items-center gap-3">
-                  {/* Image */}
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
-                    {product.image_url ? (
-                      <Image
-                        src={product.image_url}
-                        alt={product.name}
-                        width={48}
-                        height={48}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
-                      {isInactive && (
-                        <span className="text-xs font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
-                      )}
-                      {!isInactive && badgeLabel && (
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          product.badge === "oferta"
-                            ? "bg-orange-50 text-orange-600"
-                            : "bg-blue-50 text-blue-600"
-                        }`}>
-                          {badgeLabel}
-                        </span>
-                      )}
-                      {!isInactive && stock === 0 && (
-                        <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {product.sku || "—"} &middot; {product.category} &middot; {product.gender || "—"} &middot; Stock: {stock}
-                    </p>
-                  </div>
-
-                  {/* Price — inline editable */}
-                  <div className="flex-shrink-0 flex items-center gap-1.5">
-                    {isEditing ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-400">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          autoFocus
-                          defaultValue={displayPrice(product).toFixed(2)}
-                          onBlur={(e) => commitEdit(product, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              (e.target as HTMLInputElement).blur();
-                            } else if (e.key === "Escape") {
-                              e.preventDefault();
-                              cancelEdit(product, e.target as HTMLInputElement);
-                            }
-                          }}
-                          className="w-20 px-2 py-1 text-sm text-right tabular-nums border border-[#1A2656] rounded focus:outline-none focus:ring-1 focus:ring-[#1A2656]/30"
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEdit(product)}
-                        disabled={isSaving}
-                        title="Editar precio"
-                        className="text-sm font-semibold text-gray-900 tabular-nums hover:bg-gray-100 px-2 py-1 rounded transition disabled:opacity-50"
-                      >
-                        ${fmtMoney(displayPrice(product))}
-                      </button>
-                    )}
-                    {isSaving && (
-                      <svg className="w-3.5 h-3.5 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    )}
-                    {justSaved && !isSaving && (
-                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                {error && (
-                  <p className="text-xs text-red-600 mt-1.5 ml-15">{error}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div className={`rounded-lg border p-3 ${highlight ? "border-[#E4002B]/30 bg-[#E4002B]/5" : "border-gray-200 bg-white"}`}>
+      <div className={`text-2xl font-bold tabular-nums ${highlight ? "text-[#E4002B]" : "text-[#1A2656]"}`}>{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
     </div>
   );
 }
 
-// ── PEDIDOS TAB (vista unificada) ─────────────────────────────────────────────
+// ── Tab: Faltan foto (cola de trabajo) ────────────────────────────────────────
 
-type OrigenFilter = "todos" | "link" | "mio";
+function FaltanFotoTab({
+  products, onPhotoSaved, showToast,
+}: {
+  products: ReebokProduct[];
+  onPhotoSaved: () => Promise<void>;
+  showToast: (msg: string) => void;
+}) {
+  const sinFoto = products.filter((p) => !tieneFoto(p));
 
-function OrigenBadge({ origen }: { origen: "mio" | "link" }) {
-  if (origen === "link") {
+  if (sinFoto.length === 0) {
     return (
-      <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-        Del link
-      </span>
+      <div className="text-center py-20">
+        <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <p className="text-gray-900 font-medium">Todo al día</p>
+        <p className="text-gray-400 text-sm mt-1">Ningún producto activo sin foto.</p>
+      </div>
     );
   }
+
   return (
-    <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-      Mío
-    </span>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      {sinFoto.map((p) => (
+        <ProductPhotoCard key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+      ))}
+    </div>
   );
 }
 
-function PedidosTab({
-  pedidos,
-  onRefresh,
-  showToast,
+// ── Tab: Catálogo completo ────────────────────────────────────────────────────
+
+function CatalogoCompletoTab({
+  products, onPhotoSaved, showToast,
 }: {
-  pedidos: UnifiedPedido[];
-  onRefresh: () => Promise<void>;
+  products: ReebokProduct[];
+  onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
 }) {
-  const router = useRouter();
-  const [origenFilter, setOrigenFilter] = useState<OrigenFilter>("todos");
+  const [empresa, setEmpresa] = useState<EmpresaFilter>("todas");
+  const [foto, setFoto] = useState<FotoFilter>("todos");
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [converting, setConverting] = useState<string | null>(null);
 
-  // "Editar del link": convierte la pública en reebok_orders (idempotente) y
-  // redirige a la maquinaria de edición existente. El origen se conserva
-  // (origen_original='link') — el pedido sigue mostrándose como "Del link".
-  async function handleEditLink(p: UnifiedPedido) {
-    if (converting) return;
-    setConverting(p.id_natural);
-    try {
-      const res = await fetch(
-        `/api/catalogo/reebok/pedidos-publicos/${p.id_natural}/convertir`,
-        { method: "POST" },
-      );
-      if (!res.ok) throw new Error("convert failed");
-      const data = await res.json();
-      if (!data?.order_id) throw new Error("sin order_id");
-      router.push(`/catalogo/reebok/pedido/${data.order_id}`);
-    } catch {
-      showToast("No se pudo abrir el pedido para editar. Intenta de nuevo.");
-      setConverting(null);
-    }
-  }
-
-  async function handleExport() {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const res = await fetch("/api/catalogo/reebok/pedidos-export", { method: "POST" });
-      if (!res.ok) throw new Error("export failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Pedidos-Reebok-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast("Excel listo — revisa tu carpeta de descargas");
-    } catch {
-      showToast("No se pudo generar el Excel. Intenta de nuevo.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
-  const counts = {
-    todos: pedidos.length,
-    link: pedidos.filter((p) => p.origen === "link").length,
-    mio: pedidos.filter((p) => p.origen === "mio").length,
-  };
-
-  const filtered = pedidos.filter((p) => {
-    if (origenFilter !== "todos" && p.origen !== origenFilter) return false;
+  const filtered = products.filter((p) => {
+    if (empresa !== "todas" && empresaDe(p.category) !== empresa) return false;
+    if (foto === "con" && !tieneFoto(p)) return false;
+    if (foto === "sin" && tieneFoto(p)) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!p.cliente.toLowerCase().includes(q)) return false;
+      if (!(p.sku || "").toLowerCase().includes(q) && !p.name.toLowerCase().includes(q)) return false;
     }
     return true;
   });
 
-  // El detalle se enruta por la tabla física (fuente), no por el badge: una
-  // pública convertida vive en reebok_orders y se abre en el detalle interno.
-  // Fallback por `origen` si la vista aún no expone `fuente`.
-  function isOrdersRow(p: UnifiedPedido): boolean {
-    return p.fuente ? p.fuente === "orders" : p.origen === "mio";
-  }
-  function detailHref(p: UnifiedPedido): string {
-    return isOrdersRow(p)
-      ? `/catalogo/reebok/pedido/${p.id_natural}`
-      : `/pedido-reebok/${p.id_natural}`;
-  }
-
-  async function handleDelete() {
-    if (!deleting) return;
-    setDeleteLoading(true);
-    try {
-      // Borrar inline sólo aplica a pedidos del link (short_id en pedidos_publicos).
-      const res = await fetch(
-        `/api/catalogo/reebok/pedidos-publicos/${deleting.id_natural}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) throw new Error("delete failed");
-      showToast("Pedido borrado");
-      setDeleting(null);
-      await onRefresh();
-    } catch {
-      showToast("No se pudo borrar el pedido");
-    } finally {
-      setDeleteLoading(false);
-    }
-  }
-
-  const filterTabs: { key: OrigenFilter; label: string }[] = [
-    { key: "todos", label: `Todos (${counts.todos})` },
-    { key: "link", label: `Del link (${counts.link})` },
-    { key: "mio", label: `Míos (${counts.mio})` },
+  const empresaTabs: { key: EmpresaFilter; label: string }[] = [
+    { key: "todas", label: "Todas" },
+    { key: "wear", label: "Active Wear" },
+    { key: "shoes", label: "Active Shoes" },
+  ];
+  const fotoTabs: { key: FotoFilter; label: string }[] = [
+    { key: "todos", label: "Todos" },
+    { key: "con", label: "Con foto" },
+    { key: "sin", label: "Sin foto" },
   ];
 
   return (
     <div>
-      {/* Acciones */}
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={handleExport}
-          disabled={exporting || pedidos.length === 0}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-50"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          {exporting ? "Generando..." : "Exportar Excel"}
-        </button>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por código o nombre..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1A2656]/30 transition"
+          />
+        </div>
       </div>
 
-      {/* Filtros por origen */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
-        {filterTabs.map((ft) => {
-          const active = origenFilter === ft.key;
-          return (
-            <button
-              key={ft.key}
-              onClick={() => setOrigenFilter(ft.key)}
-              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition ${
-                active
-                  ? "text-[#1A2656] border-[#1A2656]"
-                  : "text-gray-400 border-transparent hover:text-gray-600"
-              }`}
-            >
-              {ft.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Buscador por cliente */}
-      <div className="relative mb-4">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente..."
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1A2656]/30 transition"
-        />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Segmented options={empresaTabs} value={empresa} onChange={setEmpresa} />
+        <Segmented options={fotoTabs} value={foto} onChange={setFoto} />
+        <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>
 
       {filtered.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-gray-400 text-sm">
-            {search || origenFilter !== "todos" ? "Ningún pedido coincide" : "No hay pedidos aún"}
-          </p>
+          <p className="text-gray-400 text-sm">Ningún producto coincide.</p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((pedido) => (
-                <tr
-                  key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
-                  onClick={() => router.push(detailHref(pedido))}
-                  className="hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <td className="px-4 py-3">
-                    <OrigenBadge origen={pedido.origen} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-900">
-                    {pedido.cliente === "Sin nombre" ? (
-                      <span className="text-gray-300 italic">Sin nombre</span>
-                    ) : (
-                      pedido.cliente
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                    ${fmtMoney(pedido.total)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {/* Editar/Borrar inline sólo para públicas NO convertidas
-                        (viven en pedidos_publicos con short_id). Una convertida
-                        ya es un reebok_orders: se edita abriéndola con clic. */}
-                    {(pedido.fuente ? pedido.fuente === "publicos" : pedido.origen === "link") && (
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditLink(pedido);
-                          }}
-                          disabled={converting === pedido.id_natural}
-                          className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
-                        >
-                          {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleting(pedido);
-                          }}
-                          className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {filtered.map((p) => (
+            <ProductPhotoCard key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+          ))}
         </div>
       )}
-
-      <ConfirmModal
-        open={!!deleting}
-        onClose={() => !deleteLoading && setDeleting(null)}
-        onConfirm={handleDelete}
-        title="¿Eliminar pedido?"
-        message={
-          deleting
-            ? `¿Eliminar el pedido de ${deleting.cliente === "Sin nombre" ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
-            : ""
-        }
-        confirmLabel="Eliminar pedido"
-        destructive
-        loading={deleteLoading}
-      />
     </div>
   );
 }
 
-// ── IMPORTAR TAB ──────────────────────────────────────────────────────────────
-
-function ImportarTab({
-  products,
-  inventory,
-  showToast,
-  onImportComplete,
+function Segmented<T extends string>({
+  options, value, onChange,
 }: {
-  products: ReebokProduct[];
-  inventory: InventoryItem[];
-  showToast: (msg: string) => void;
-  onImportComplete: () => Promise<void>;
+  options: { key: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
 }) {
   return (
-    <div className="space-y-6">
-      <ImportInstructions />
-      <ImportSection
-        title="Active Shoes"
-        subtitle="Calzado (footwear)"
-        company="active_shoes"
-        products={products}
-        inventory={inventory}
-        filterFn={(p) => p.category === "footwear"}
-        showToast={showToast}
-        onImportComplete={onImportComplete}
-        accentColor="#E4002B"
-      />
-      <ImportSection
-        title="Active Wear"
-        subtitle="Ropa y accesorios (apparel + accessories)"
-        company="active_wear"
-        products={products}
-        inventory={inventory}
-        filterFn={(p) => p.category === "apparel" || p.category === "accessories"}
-        showToast={showToast}
-        onImportComplete={onImportComplete}
-        accentColor="#1A2656"
-      />
-      <BatchPhotosSection showToast={showToast} />
+    <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+            value === o.key ? "bg-white text-[#1A2656] shadow-sm" : "text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-// ── Import Instructions ──────────────────────────────────────────────────────
+// ── Tarjeta de producto con subida de foto ────────────────────────────────────
 
-function ImportInstructions() {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-3">Como importar productos</h3>
-
-      <div className="space-y-3 text-xs text-gray-600">
-        <div>
-          <p className="font-medium text-gray-800 mb-1">Columnas del archivo</p>
-          <p className="font-mono text-xs text-gray-700">SKU, Nombre, Precio, Cantidad, Genero, Estado, Categoria</p>
-        </div>
-        <div>
-          <p className="font-medium text-gray-800 mb-1">Valores validos</p>
-          <ul className="space-y-0.5">
-            <li>
-              <span className="font-mono text-gray-700">Genero</span>: hombre/men/male, mujer/women/female/dama, ninos/kids/junior, unisex (acepta variantes en ingles o espanol, may/min)
-            </li>
-            <li>
-              <span className="font-mono text-gray-700">Estado</span>: nuevo, oferta, proximamente (o vacio)
-            </li>
-            <li>
-              <span className="font-mono text-gray-700">Categoria</span> (solo Active Wear): Ropa o Accesorios. Active Shoes no usa esta columna.
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="mt-4 bg-amber-50 border border-amber-300 rounded-lg p-3">
-        <div className="flex gap-2">
-          <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="text-xs text-amber-900 leading-relaxed">
-            <p className="font-semibold mb-1">Importante</p>
-            <p>
-              El archivo debe contener <strong>TODOS</strong> los productos de la empresa. Cualquier producto que no este en el archivo se desactiva y su stock pasa a 0. Para actualizar solo algunos, descarga primero la plantilla &mdash; ya trae todos los productos actuales con su precio y categoria &mdash; y edita sobre ella.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Import Section (reusable for shoes/wear) ─────────────────────────────────
-
-function ImportSection({
-  title,
-  subtitle,
-  company,
-  products,
-  inventory,
-  filterFn,
-  showToast,
-  onImportComplete,
-  accentColor,
+function ProductPhotoCard({
+  product, onPhotoSaved, showToast,
 }: {
-  title: string;
-  subtitle: string;
-  company: "active_shoes" | "active_wear";
-  products: ReebokProduct[];
-  inventory: InventoryItem[];
-  filterFn: (p: ReebokProduct) => boolean;
+  product: ReebokProduct;
+  onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
-  onImportComplete: () => Promise<void>;
-  accentColor: string;
 }) {
-  const [parsed, setParsed] = useState<CsvImportRow[] | null>(null);
-  const [preview, setPreview] = useState<{ updated: number; created: number; deactivated: number } | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ updated: number; created: number; deactivated: number; reactivated: number; unclassifiedNew: string[] } | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const companyProducts = products.filter(filterFn);
-
-  function getProductStock(productId: string) {
-    return inventory
-      .filter((i) => i.product_id === productId)
-      .reduce((sum, i) => sum + i.quantity, 0);
-  }
-
-  function handleDownloadTemplate() {
-    // Categoria only meaningful for active_wear (apparel vs accessories).
-    // Active Shoes is always footwear — omit the column entirely so the operator
-    // is not tempted to fill it.
-    const includeCategory = company === "active_wear";
-    const rows = companyProducts
-      .filter((p) => p.active !== false)
-      .map((p) => ({
-        sku: p.sku || "",
-        name: p.name,
-        price: p.price || 0,
-        quantity: getProductStock(p.id),
-        gender: p.gender || "",
-        badge: p.badge || "",
-        category: categoryToSpanish(p.category),
-      }));
-    downloadCSV(rows, `Reebok_${title.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`, includeCategory);
-    showToast("Plantilla descargada");
-  }
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const disp = product.disponibilidad;
+  const exist = product.existencia;
+  const agotado = disp == null || disp <= 0;
 
   async function handleFile(file: File) {
-    setImportResult(null);
-    setParsed(null);
-    setPreview(null);
-    setValidationErrors([]);
-    setValidationWarnings([]);
-
-    try {
-      const lower = file.name.toLowerCase();
-      const isExcel = lower.endsWith(".xlsx") || lower.endsWith(".xls");
-      let text: string;
-
-      if (isExcel) {
-        const XLSX = (await import("xlsx-js-style")).default;
-        const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        text = XLSX.utils.sheet_to_csv(ws);
-      } else {
-        const buf = await file.arrayBuffer();
-        let utf = new TextDecoder("utf-8").decode(buf);
-        if (utf.includes("�")) utf = new TextDecoder("latin1").decode(buf);
-        text = utf;
-      }
-
-      const existingSkus = new Set(companyProducts.map((p) => p.sku).filter(Boolean) as string[]);
-      const result = validateCsvImport(text, existingSkus);
-
-      setValidationErrors(result.errors);
-      setValidationWarnings(result.warnings);
-
-      if (result.rows.length > 0) {
-        setParsed(result.rows);
-      }
-
-      if (result.errors.length === 0 && result.summary) {
-        // Only currently-active SKUs missing from file will be soft-deleted.
-        const incomingSkus = new Set(result.rows.map((r) => r.sku));
-        const willDeactivate = companyProducts.filter(
-          (p) => p.active !== false && p.sku && !incomingSkus.has(p.sku),
-        ).length;
-        setPreview({ updated: result.summary.update, created: result.summary.create, deactivated: willDeactivate });
-      }
-    } catch {
-      showToast("Error al leer el archivo");
-    }
-  }
-
-  async function handleConfirmImport() {
-    if (!parsed) return;
-    setImporting(true);
-    try {
-      const res = await fetch("/api/catalogo/reebok/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ products: parsed, company }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setImportResult({
-          updated: result.updated,
-          created: result.created,
-          deactivated: result.deactivated ?? 0,
-          reactivated: result.reactivated ?? 0,
-          unclassifiedNew: Array.isArray(result.unclassifiedNew) ? result.unclassifiedNew : [],
-        });
-        setParsed(null);
-        setPreview(null);
-        showToast("Importacion completada");
-        await onImportComplete();
-      } else {
-        const err = await res.json();
-        showToast(err.error || "Error al importar");
-      }
-    } catch {
-      showToast("Error al importar");
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-0.5">{title}</h3>
-      <p className="text-xs text-gray-400 mb-4">{subtitle} &middot; {companyProducts.length} productos</p>
-
-      <div className="flex flex-wrap gap-3 mb-4">
-        <button
-          onClick={handleDownloadTemplate}
-          className="px-4 py-2 text-white text-sm font-medium rounded-lg active:scale-[0.97] transition flex items-center gap-2"
-          style={{ backgroundColor: accentColor }}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Descargar plantilla {title}
-        </button>
-      </div>
-
-      {/* Drop zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) handleFile(file);
-        }}
-        onClick={() => fileRef.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
-          dragOver ? "border-[#E4002B] bg-[#E4002B]/5" : "border-gray-200 hover:border-gray-300"
-        }`}
-      >
-        <svg className="w-7 h-7 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-        <p className="text-sm text-gray-500">Subir archivo {title}</p>
-        <p className="text-xs text-gray-400 mt-1">Arrastra un .csv, .xlsx o .xls — o haz click</p>
-      </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".csv,.xlsx,.xls"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-          e.target.value = "";
-        }}
-      />
-
-      {/* Validation errors (critical — block import) */}
-      {validationErrors.length > 0 && (
-        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-semibold text-red-800 mb-2">
-            {validationErrors.length} error{validationErrors.length !== 1 ? "es" : ""} encontrado{validationErrors.length !== 1 ? "s" : ""}
-          </p>
-          <ul className="space-y-1 max-h-48 overflow-y-auto">
-            {validationErrors.map((err, i) => (
-              <li key={i} className="text-xs text-red-700">{err}</li>
-            ))}
-          </ul>
-          <p className="text-xs text-red-600 mt-2">Corrige el archivo antes de importar.</p>
-          <button
-            onClick={() => { setParsed(null); setPreview(null); setValidationErrors([]); setValidationWarnings([]); }}
-            className="mt-2 px-3 py-1.5 text-xs text-red-700 border border-red-300 rounded-md hover:bg-red-100 transition"
-          >
-            Cerrar
-          </button>
-        </div>
-      )}
-
-      {/* Validation warnings (allow import) */}
-      {validationWarnings.length > 0 && validationErrors.length === 0 && (
-        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 mb-2">
-            {validationWarnings.length} advertencia{validationWarnings.length !== 1 ? "s" : ""}
-          </p>
-          <ul className="space-y-1 max-h-48 overflow-y-auto">
-            {validationWarnings.map((w, i) => (
-              <li key={i} className="text-xs text-amber-700">{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* All good message */}
-      {parsed && validationErrors.length === 0 && validationWarnings.length === 0 && preview && (
-        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-medium text-green-800">Todo bien — sin errores ni advertencias</p>
-        </div>
-      )}
-
-      {/* Preview */}
-      {preview && parsed && validationErrors.length === 0 && (
-        <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-            <p className="text-sm font-medium text-gray-700">Vista previa</p>
-            <div className="flex gap-4 mt-1 text-xs">
-              <span className="text-blue-600">{preview.updated} a actualizar</span>
-              <span className="text-green-600">{preview.created} nuevos</span>
-              <span className="text-gray-500">{preview.deactivated} se inactivaran</span>
-            </div>
-          </div>
-
-          <div className="max-h-64 overflow-y-auto">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b border-gray-100">
-                  <th className="text-left px-3 py-2 font-medium text-gray-500">SKU</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-500">Nombre</th>
-                  <th className="text-right px-3 py-2 font-medium text-gray-500">Precio</th>
-                  <th className="text-right px-3 py-2 font-medium text-gray-500">Cant.</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-500">Estado</th>
-                  <th className="text-left px-3 py-2 font-medium text-gray-500">Accion</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {parsed.slice(0, 50).map((row, i) => {
-                  const existingSkus = new Set(companyProducts.map((p) => p.sku));
-                  const exists = existingSkus.has(row.sku);
-                  return (
-                    <tr key={i} className="hover:bg-gray-50">
-                      <td className="px-3 py-1.5 font-mono text-gray-600">{row.sku}</td>
-                      <td className="px-3 py-1.5 text-gray-900">{row.name}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">${fmtMoney(row.price)}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">{row.quantity}</td>
-                      <td className="px-3 py-1.5">
-                        {row.badge ? (
-                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                            row.badge === "oferta" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600"
-                          }`}>
-                            {row.badge === "oferta" ? "Oferta" : "Nuevo"}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          exists ? "bg-blue-50 text-blue-600" : "bg-green-50 text-green-600"
-                        }`}>
-                          {exists ? "Actualizar" : "Nuevo"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {parsed.length > 50 && (
-              <p className="text-xs text-gray-400 px-3 py-2">... y {parsed.length - 50} mas</p>
-            )}
-          </div>
-
-          <div className="flex gap-2 px-4 py-3 bg-gray-50 border-t border-gray-200">
-            <button
-              onClick={handleConfirmImport}
-              disabled={importing}
-              className="px-4 py-2 bg-[#E4002B] text-white text-sm font-semibold rounded-lg hover:bg-[#E4002B]/90 active:scale-[0.97] transition disabled:opacity-50"
-            >
-              {importing ? "Importando..." : "Confirmar importacion"}
-            </button>
-            <button
-              onClick={() => { setParsed(null); setPreview(null); }}
-              className="px-4 py-2 text-gray-500 text-sm rounded-lg hover:bg-gray-100 transition"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {importResult && (
-        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-medium text-green-800">Importacion completada</p>
-          <p className="text-xs text-green-600 mt-1">
-            {importResult.updated} actualizados &middot; {importResult.created} nuevos &middot; {importResult.deactivated} inactivados
-            {importResult.reactivated > 0 ? ` · ${importResult.reactivated} reactivados` : ""}
-          </p>
-          {importResult.unclassifiedNew.length > 0 && (
-            <div className="mt-3 bg-amber-50 border border-amber-300 rounded px-3 py-2">
-              <p className="text-xs font-semibold text-amber-900">
-                {importResult.unclassifiedNew.length} producto{importResult.unclassifiedNew.length !== 1 ? "s" : ""} nuevo{importResult.unclassifiedNew.length !== 1 ? "s" : ""} entr{importResult.unclassifiedNew.length !== 1 ? "aron" : "ó"} como Ropa por defecto
-              </p>
-              <p className="text-xs text-amber-800 mt-1">
-                Clasificalos en el tab Productos o corrige la columna Categoria del archivo y vuelve a subir.
-              </p>
-              <p className="text-xs font-mono text-amber-900 mt-2 break-all">
-                {importResult.unclassifiedNew.join(", ")}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Batch Photos ──────────────────────────────────────────────────────────────
-
-function BatchPhotosSection({ showToast }: { showToast: (msg: string) => void }) {
-  const [matchResult, setMatchResult] = useState<{ matched: { file: File; sku: string; preview: string }[]; unmatched: { file: File; name: string }[] } | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  async function handleFiles(selectedFiles: FileList) {
-    const fileArray = Array.from(selectedFiles);
-
-    const res = await fetch("/api/catalogo/reebok/products");
-    if (!res.ok) { showToast("Error cargando productos"); return; }
-    const products: ReebokProduct[] = await res.json();
-
-    const matched: { file: File; sku: string; preview: string }[] = [];
-    const unmatched: { file: File; name: string }[] = [];
-
-    for (const file of fileArray) {
-      const nameWithoutExt = file.name.replace(/\.[^.]+$/, "").trim();
-      const matchedProduct = products.find((p) =>
-        p.sku === nameWithoutExt ||
-        p.sku?.replace(/-/g, ".") === nameWithoutExt ||
-        p.sku?.replace(/[.\-_]/g, "").toUpperCase() === nameWithoutExt.replace(/[.\-_]/g, "").toUpperCase()
-      );
-
-      if (matchedProduct) {
-        matched.push({ file, sku: matchedProduct.sku!, preview: URL.createObjectURL(file) });
-      } else {
-        unmatched.push({ file, name: file.name });
-      }
-    }
-
-    setMatchResult({ matched, unmatched });
-  }
-
-  async function handleUploadAll() {
-    if (!matchResult || matchResult.matched.length === 0) return;
+    setError(null);
+    const vErr = validateProductPhoto(file);
+    if (vErr) { setError(vErr); return; }
     setUploading(true);
-    setProgress(0);
-
-    const res = await fetch("/api/catalogo/reebok/products");
-    if (!res.ok) { showToast("Error cargando productos"); setUploading(false); return; }
-    const products: ReebokProduct[] = await res.json();
-    const skuToId = new Map<string, string>();
-    for (const p of products) {
-      if (p.sku) skuToId.set(p.sku, p.id);
+    try {
+      await uploadProductPhoto(product.id, product.sku || "", file);
+      showToast("Foto subida");
+      await onPhotoSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir la foto.");
+    } finally {
+      setUploading(false);
     }
-
-    let done = 0;
-    let errors = 0;
-
-    for (const { file, sku } of matchResult.matched) {
-      const productId = skuToId.get(sku);
-      if (!productId) { errors++; done++; setProgress(done); continue; }
-
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        // Send the resolved SKU so the upload route can use a deterministic
-        // Storage path and overwrite previous photos for this product in place.
-        formData.append("sku", sku);
-        const uploadRes = await fetch("/api/catalogo/reebok/upload", { method: "POST", body: formData });
-        if (uploadRes.ok) {
-          const { url } = await uploadRes.json();
-          await fetch("/api/catalogo/reebok/products", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: productId, image_url: url }),
-          });
-        } else {
-          errors++;
-        }
-      } catch {
-        errors++;
-      }
-      done++;
-      setProgress(done);
-    }
-
-    setUploading(false);
-    if (errors > 0) {
-      showToast(`${done - errors} fotos subidas, ${errors} errores`);
-    } else {
-      showToast(`${done} fotos subidas correctamente`);
-    }
-    setMatchResult(null);
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-1">Subir fotos en batch</h3>
-      <p className="text-xs text-gray-400 mb-4">Selecciona imagenes nombradas por SKU (ej: 100227359.jpg)</p>
-
-      <div
-        className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center hover:border-[#E4002B] transition cursor-pointer"
-        onClick={() => fileRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("border-[#E4002B]", "bg-[#E4002B]/5"); }}
-        onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove("border-[#E4002B]", "bg-[#E4002B]/5"); }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.currentTarget.classList.remove("border-[#E4002B]", "bg-[#E4002B]/5");
-          if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
-        }}
-      >
-        <svg className="w-7 h-7 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-        <p className="text-sm text-gray-500">Selecciona o arrastra imagenes</p>
-        <p className="text-xs text-gray-400 mt-1">Nombra cada archivo con el SKU del producto</p>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+      {/* Imagen / placeholder */}
+      <div className="relative aspect-square bg-[#F5F0E8]">
+        {tieneFoto(product) ? (
+          <Image src={product.image_url!} alt={product.name} fill sizes="(max-width:640px) 50vw, 25vw" className="object-contain" />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-[#1A2656]/30 gap-1">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+            </svg>
+            <span className="text-[11px] font-medium">Sin foto</span>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <span className="w-6 h-6 border-2 border-[#1A2656] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
 
-      {matchResult && (
-        <div className="mt-4">
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-4">
-            {matchResult.matched.map((match, i) => (
-              <div key={i} className="relative rounded-lg overflow-hidden border-2 border-green-300">
-                <Image src={match.preview} alt={match.sku} width={100} height={100} className="w-full aspect-square object-cover" unoptimized />
-                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-xs font-mono truncate bg-green-500/90 text-white">
-                  {match.sku}
-                </div>
-              </div>
-            ))}
-            {matchResult.unmatched.map((item, i) => (
-              <div key={`u-${i}`} className="relative rounded-lg overflow-hidden border-2 border-red-300">
-                <div className="w-full aspect-square bg-red-50 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-xs font-mono truncate bg-red-500/90 text-white">
-                  {item.name}
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Datos */}
+      <div className="p-3 flex flex-col gap-1.5 flex-1">
+        {product.sku && (
+          <span className="self-start text-[11px] bg-[#F5F0E8] text-[#1A2656]/60 px-1.5 py-0.5 rounded font-medium tabular-nums">
+            {product.sku}
+          </span>
+        )}
+        <h3 className="text-sm font-semibold text-[#1A2656] line-clamp-2 leading-snug">{product.name}</h3>
 
-          {uploading && (
-            <div className="mb-3">
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div
-                  className="bg-[#E4002B] h-2 rounded-full transition-all"
-                  style={{ width: `${(progress / matchResult.matched.length) * 100}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-400 mt-1">{progress} de {matchResult.matched.length}</p>
-            </div>
-          )}
+        {product.price != null && (
+          <div className="text-sm font-bold text-[#1A2656] tabular-nums">${product.price.toFixed(2)}</div>
+        )}
 
-          <div className="flex items-center gap-3">
-            <p className="text-xs text-gray-500">
-              {matchResult.matched.length} de {matchResult.matched.length + matchResult.unmatched.length} coinciden con un producto
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={handleUploadAll}
-                disabled={uploading || matchResult.matched.length === 0}
-                className="px-4 py-2 bg-[#E4002B] text-white text-sm font-semibold rounded-lg hover:bg-[#E4002B]/90 active:scale-[0.97] transition disabled:opacity-50"
-              >
-                {uploading ? "Subiendo..." : "Subir fotos"}
-              </button>
-              <button
-                onClick={() => setMatchResult(null)}
-                disabled={uploading}
-                className="px-4 py-2 text-gray-500 text-sm rounded-lg hover:bg-gray-100 transition"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
+        {/* Disponible (principal) + En bodega (secundario) */}
+        <div className="flex items-baseline justify-between gap-2 pt-1 mt-auto border-t border-[#1A2656]/10">
+          <span className={`text-sm font-semibold tabular-nums ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]"}`}>
+            {agotado ? "Agotado" : `Disponible: ${disp}`}
+          </span>
+          <span className="text-xs text-[#1A2656]/45 tabular-nums">En bodega: {exist == null ? "—" : exist}</span>
         </div>
-      )}
+
+        {/* Subir / cambiar foto */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); if (inputRef.current) inputRef.current.value = ""; }}
+        />
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className={`mt-1.5 w-full py-2 rounded-md text-xs font-semibold transition active:scale-[0.97] disabled:opacity-50 ${
+            tieneFoto(product)
+              ? "border border-gray-200 text-gray-600 hover:bg-gray-50"
+              : "bg-[#1A2656] text-white hover:bg-[#1A2656]/90"
+          }`}
+        >
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar foto" : "Subir foto"}
+        </button>
+        {error && <p className="text-[11px] text-[#E4002B] leading-tight">{error}</p>}
+      </div>
     </div>
   );
 }
