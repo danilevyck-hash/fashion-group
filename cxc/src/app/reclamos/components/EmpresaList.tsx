@@ -51,6 +51,12 @@ const IconPencil = (
 const IconTrash = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
 );
+const IconDownload = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+);
+const IconSpinner = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+);
 
 export default function EmpresaList({
   role, activeEmpresa, reclamos, contactos, search, setSearch,
@@ -61,6 +67,7 @@ export default function EmpresaList({
   const isAdmin = role === "admin";
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -129,6 +136,34 @@ export default function EmpresaList({
       showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
       setBusy(null);
+    }
+  }
+
+  // Descarga directa del Excel de UN reclamo (1 clic, sin abrir el detalle).
+  // Reusa el endpoint single [id]/excel → con 1 reclamo el Excel no lleva tab
+  // Resumen, solo la hoja del reclamo (con sus links de factura/fotos web).
+  async function downloadSingleExcel(r: Reclamo) {
+    if (downloadingId) return;
+    setDownloadingId(r.id);
+    try {
+      const res = await fetch(`/api/reclamos/${r.id}/excel`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el Excel.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
+      a.href = url;
+      a.download = `Reclamo-${safe}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`Excel de ${r.nro_reclamo} descargado`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el Excel");
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -270,6 +305,7 @@ export default function EmpresaList({
                 {!selectionMode && (
                   <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconEye}</button>
+                    <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
                     <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
                     {isAdmin && (
                       <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-2 text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
@@ -353,6 +389,7 @@ export default function EmpresaList({
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-0.5">
                         <button onClick={() => onLoadDetail(r.id)} title="Ver" aria-label="Ver" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconEye}</button>
+                        <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
                         <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconPencil}</button>
                         {isAdmin && (
                           <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-1.5 text-gray-400 hover:text-red-600 rounded transition">{IconTrash}</button>
