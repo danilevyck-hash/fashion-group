@@ -34,6 +34,10 @@ export interface EmpresaSyncCapability {
   facturas: boolean;
   /** Sincroniza estado de cuenta (CXC) a switch_estadocuenta. */
   cxc: boolean;
+  /** Sincroniza CxP (proveedores + estado de cuenta) a switch_proveedor_estadocuenta.
+   *  SEPARADO de cxc: Multifashion paga proveedores en Switch (cxp:true) pero es
+   *  retail sin CXC central (cxc:false); Boston no tiene ninguno de los dos. */
+  cxp: boolean;
 }
 
 export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability> = {
@@ -44,15 +48,18 @@ export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability
   // ⚠️ INVARIANTE (🟡-14): MF vive en switch_facturas Y multifashion_tickets a la
   // vez. NUNCA sumar ambas fuentes en un total → doble conteo. Ver el comentario
   // en src/lib/ventas/queries.ts (RETAIL_KEYS).
-  american_classic: { facturas: true, cxc: false },
-  vistana: { facturas: true, cxc: true },
-  fashion_wear: { facturas: true, cxc: true },
-  fashion_shoes: { facturas: true, cxc: true },
-  active_shoes: { facturas: true, cxc: true },
-  active_wear: { facturas: true, cxc: true },
-  joystep: { facturas: true, cxc: true },
-  // Boston: solo ventas. CXC por otro lado (Brand It).
-  confecciones_boston: { facturas: true, cxc: false },
+  // MF: retail sin CXC central (cxc:false) PERO sí paga proveedores en Switch
+  // (cxp:true, verificado: 13 proveedores / $77K en /apiproveedor) → su CxP entra a
+  // switch_proveedor_estadocuenta como las B2B.
+  american_classic: { facturas: true, cxc: false, cxp: true },
+  vistana: { facturas: true, cxc: true, cxp: true },
+  fashion_wear: { facturas: true, cxc: true, cxp: true },
+  fashion_shoes: { facturas: true, cxc: true, cxp: true },
+  active_shoes: { facturas: true, cxc: true, cxp: true },
+  active_wear: { facturas: true, cxc: true, cxp: true },
+  joystep: { facturas: true, cxc: true, cxp: true },
+  // Boston: solo ventas. CXC por otro lado (Brand It) y su CxP NO se quiere (cxp:false).
+  confecciones_boston: { facturas: true, cxc: false, cxp: false },
 };
 
 const ALL_KEYS = Object.keys(EMPRESA_SYNC_CAPABILITIES) as EmpresaKey[];
@@ -62,9 +69,15 @@ export function empresasConFacturas(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].facturas);
 }
 
-/** Empresas cuyo estado de cuenta va a switch_estadocuenta (excluye Boston). */
+/** Empresas cuyo estado de cuenta va a switch_estadocuenta (excluye Boston y MF). */
 export function empresasConCxc(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].cxc);
+}
+
+/** Empresas cuyo CxP (proveedores) va a switch_proveedor_estadocuenta: las 6 B2B
+ *  + Multifashion (american_classic). Excluye Boston. */
+export function empresasConCxp(): EmpresaKey[] {
+  return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].cxp);
 }
 
 export function isEmpresaKey(s: string): s is EmpresaKey {

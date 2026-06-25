@@ -8,7 +8,7 @@ import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/com
 import { getCompanyDisplay } from "@/lib/companies";
 import { fmt } from "@/lib/format";
 
-// Las 6 B2B con CxP (empresasConCxc).
+// Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion.
 const EMPRESAS = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
 
 interface ListItem {

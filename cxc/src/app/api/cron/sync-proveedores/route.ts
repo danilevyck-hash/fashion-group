@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Cron diario: Cuentas por Pagar (proveedores).
 //
-// Por cada empresa B2B (empresasConCxc), SECUENCIAL (token único de Switch),
+// Por cada empresa con CxP (empresasConCxp = 6 B2B + Multifashion), SECUENCIAL (token único de Switch),
 // itera /apiproveedor/lista + /apiproveedor/info y upserta una fila por
 // (empresa, proveedor) en switch_proveedor_estadocuenta. Cachea — el módulo lee de
 // esa tabla, no del API en vivo.
