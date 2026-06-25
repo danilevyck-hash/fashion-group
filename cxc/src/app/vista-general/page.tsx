@@ -12,8 +12,8 @@ interface VistaGeneral {
   ms: number;
   ventas: null | { mes: number; mesAnterior: number; deltaPct: number | null; mesNum: number; parcial: boolean; empresasCount: number; byEmpresa: { name: string; ventas: number }[] };
   margen: null | { pct: number | null; utilidad: number; empresasCount: number };
-  cxc: { total: number; vencido90: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo90: number }[] };
-  cxp: { total: number; vencido90: number; empresasCount: number };
+  cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
+  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number };
   cheques: { proximos7d: { id: string; cliente: string; empresa: string; monto: number; fecha: string }[]; total: number; count: number };
   reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
 }
@@ -92,8 +92,8 @@ function VistaGeneralInner() {
                 href="/admin"
                 label="Por cobrar (CXC)"
                 value={moneyK(data.cxc.total)}
-                sub={`${moneyK(data.cxc.vencido90)} vencido +90d`}
-                subTone={data.cxc.vencido90 > 0 ? "danger" : "muted"}
+                sub={`${moneyK(data.cxc.vencido)} vencido +120d`}
+                subTone={data.cxc.vencido > 0 ? "danger" : "muted"}
                 cobertura={cobertura(data.cxc.empresasCount)}
                 accent="blue"
               />
@@ -101,8 +101,8 @@ function VistaGeneralInner() {
                 href="/proveedores"
                 label="Por pagar (CXP)"
                 value={moneyK(data.cxp.total)}
-                sub={`${moneyK(data.cxp.vencido90)} vencido +90d`}
-                subTone={data.cxp.vencido90 > 0 ? "danger" : "muted"}
+                sub={`${moneyK(data.cxp.vencido)} vencido +120d`}
+                subTone={data.cxp.vencido > 0 ? "danger" : "muted"}
                 cobertura={cobertura(data.cxp.empresasCount)}
                 accent="rose"
               />
@@ -139,19 +139,41 @@ function VistaGeneralInner() {
               )}
             </Section>
 
+            {/* Cartera por antigüedad — CXC y CXP con los MISMOS tramos */}
+            <div className="mt-8">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Cartera por antigüedad</h2>
+              <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto">
+                <table className="w-full text-sm min-w-[520px]">
+                  <thead>
+                    <tr className="text-xs text-gray-400 border-b border-gray-100">
+                      <th className="text-left font-medium px-4 py-2.5"></th>
+                      <th className="text-right font-medium px-4 py-2.5">Corriente <span className="text-gray-300">(0-90)</span></th>
+                      <th className="text-right font-medium px-4 py-2.5">91-120 días</th>
+                      <th className="text-right font-medium px-4 py-2.5">Vencido <span className="text-gray-300">(+120d)</span></th>
+                      <th className="text-right font-medium px-4 py-2.5">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <TramoRow label="Por cobrar (CXC)" href="/admin" t={data.cxc} />
+                    <TramoRow label="Por pagar (CXP)" href="/proveedores" t={data.cxp} />
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Requiere tu atención */}
             <div className="mt-8">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Requiere tu atención</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* CXC +90d */}
-                <AlertCard title="Clientes con saldo +90 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
+                <AlertCard title="Clientes con saldo +120 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
                   {data.cxc.topClientes.length === 0 ? (
-                    <Empty>Nada vencido a +90 días.</Empty>
+                    <Empty>Nada vencido a +120 días.</Empty>
                   ) : (
                     data.cxc.topClientes.map((c) => (
                       <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-gray-50 transition">
                         <span className="text-sm text-gray-700 truncate">{c.nombre}<span className="text-gray-400 text-xs"> · {c.empresa}</span></span>
-                        <span className="text-sm font-semibold text-rose-600 tabular-nums shrink-0">{moneyK(c.saldo90)}</span>
+                        <span className="text-sm font-semibold text-rose-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
                       </Link>
                     ))
                   )}
@@ -228,6 +250,20 @@ function Kpi({ href, label, value, delta, deltaLabel, deltaMuted, tag, sub, subT
       {sub && <div className={`text-xs mt-0.5 ${subTone === "danger" ? "text-rose-600 font-medium" : "text-gray-400"}`}>{sub}</div>}
       {cobertura && <div className="text-[11px] text-gray-400 mt-1.5 inline-flex items-center gap-1"><span className="w-1 h-1 rounded-full bg-gray-300" />{cobertura}</div>}
     </Link>
+  );
+}
+
+function TramoRow({ label, href, t }: { label: string; href: string; t: { corriente: number; vigilancia: number; vencido: number; total: number } }) {
+  return (
+    <tr className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition">
+      <td className="px-4 py-2.5">
+        <Link href={href} className="text-sm font-medium text-gray-700 hover:text-gray-900 transition">{label}</Link>
+      </td>
+      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{moneyK(t.corriente)}</td>
+      <td className="px-4 py-2.5 text-right tabular-nums text-amber-600">{moneyK(t.vigilancia)}</td>
+      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-rose-600">{moneyK(t.vencido)}</td>
+      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-900">{moneyK(t.total)}</td>
+    </tr>
   );
 }
 

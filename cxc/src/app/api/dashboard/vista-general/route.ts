@@ -19,8 +19,16 @@ export const dynamic = "force-dynamic";
 // Cada KPI reporta SOLO las empresas que tienen ese módulo (empresasCount), sin
 // inventar data de las que no lo tienen.
 
-const VENCIDO_90_KEYS = ["d91_120", "d121_180", "d181_270", "d271_365", "mas_365"] as const;
-const CXP_VENCIDO_TITLES = new Set(["91-120", "121-180", "181-270", "271-365", "Mas de 365"]);
+// Tramos de aging IDÉNTICOS para CXC y CXP, con los MISMOS cortes de días que el
+// módulo /admin: Corriente (0-90) / Vigilancia (91-120) / Vencido (≥121 = "+120
+// días", estándar del headline de /admin). CXC lee columnas dXX; CXP lee los
+// títulos del aging JSON de switch_proveedor_estadocuenta.
+const CXC_CORRIENTE_KEYS = ["d0_30", "d31_60", "d61_90"] as const;
+const CXC_VIGILANCIA_KEYS = ["d91_120"] as const;
+const CXC_VENCIDO_KEYS = ["d121_180", "d181_270", "d271_365", "mas_365"] as const;
+const CXP_CORRIENTE_TITLES = new Set(["0-30", "31-60", "61-90"]);
+const CXP_VIGILANCIA_TITLES = new Set(["91-120"]);
+const CXP_VENCIDO_TITLES = new Set(["121-180", "181-270", "271-365", "Mas de 365"]);
 const RECLAMO_ANTIGUO_DIAS = 30;
 
 function num(x: unknown): number {
@@ -30,6 +38,7 @@ function num(x: unknown): number {
 
 interface AgingRow {
   company_key: string; nombre: string | null; codigo: string | null; total: number | null;
+  d0_30: number | null; d31_60: number | null; d61_90: number | null;
   d91_120: number | null; d121_180: number | null; d181_270: number | null; d271_365: number | null; mas_365: number | null;
 }
 interface CxpRow { empresa_key: string; nombre: string | null; saldo_total: number | null; aging: Array<{ saldo: number; title: string }> | null; }
@@ -49,9 +58,12 @@ export async function GET(req: NextRequest) {
   const [summaryRes, agingRes, cxpRes, chequesRes, reclamosRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
     supabaseServer.from("switch_estadocuenta_aging_mv")
-      .select("company_key,nombre,codigo,total,d91_120,d121_180,d181_270,d271_365,mas_365"),
+      .select("company_key,nombre,codigo,total,d0_30,d31_60,d61_90,d91_120,d121_180,d181_270,d271_365,mas_365"),
+    // CXP: TODAS las filas (incl. saldos a favor / negativos) para cuadrar con el
+    // grupo_saldo del módulo Proveedores. Antes filtraba saldo_total>0 y excluía 2
+    // proveedores con saldo a favor → total no cuadraba con el módulo.
     supabaseServer.from("switch_proveedor_estadocuenta")
-      .select("empresa_key,nombre,saldo_total,aging").gt("saldo_total", 0),
+      .select("empresa_key,nombre,saldo_total,aging"),
     supabaseServer.from("cheques")
       .select("id,cliente,empresa,monto,fecha_deposito")
       .eq("deleted", false).eq("estado", "pendiente").lte("fecha_deposito", in7d)
@@ -113,32 +125,43 @@ export async function GET(req: NextRequest) {
     console.error("[vista-general] ventas_dashboard_summary:", summaryRes.error.message);
   }
 
-  // ── CXC (empresas con aging) ──
+  // ── CXC (empresas con aging) ── tramos alineados a /admin (vencido = ≥121d).
   const agingRows = (agingRes.data as AgingRow[] | null) ?? [];
   const cxcEmpresas = new Set(agingRows.map((r) => r.company_key));
-  let cxcTotal = 0, cxcVencido90 = 0;
-  const clientes90: { nombre: string; codigo: string | null; empresa: string; saldo90: number }[] = [];
+  let cxcTotal = 0, cxcCorriente = 0, cxcVigilancia = 0, cxcVencido = 0;
+  const clientesVencidos: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] = [];
   for (const r of agingRows) {
     cxcTotal += num(r.total);
-    const v90 = VENCIDO_90_KEYS.reduce((s, k) => s + num(r[k]), 0);
-    cxcVencido90 += v90;
-    if (v90 > 0) clientes90.push({ nombre: r.nombre || "—", codigo: r.codigo, empresa: EMPRESA_KEY_TO_NAME[r.company_key] ?? r.company_key, saldo90: v90 });
+    cxcCorriente += CXC_CORRIENTE_KEYS.reduce((s, k) => s + num(r[k]), 0);
+    cxcVigilancia += CXC_VIGILANCIA_KEYS.reduce((s, k) => s + num(r[k]), 0);
+    const venc = CXC_VENCIDO_KEYS.reduce((s, k) => s + num(r[k]), 0);
+    cxcVencido += venc;
+    if (venc > 0) clientesVencidos.push({ nombre: r.nombre || "—", codigo: r.codigo, empresa: EMPRESA_KEY_TO_NAME[r.company_key] ?? r.company_key, saldo: venc });
   }
-  clientes90.sort((a, b) => b.saldo90 - a.saldo90);
+  clientesVencidos.sort((a, b) => b.saldo - a.saldo);
   const cxc = {
-    total: cxcTotal, vencido90: cxcVencido90, empresasCount: cxcEmpresas.size,
-    topClientes: clientes90.slice(0, 6),
+    total: cxcTotal, corriente: cxcCorriente, vigilancia: cxcVigilancia, vencido: cxcVencido,
+    empresasCount: cxcEmpresas.size,
+    topClientes: clientesVencidos.slice(0, 6),
   };
 
-  // ── CXP (empresas con proveedores) ──
+  // ── CXP (empresas con proveedores) ── mismos tramos que CXC; total incluye
+  // saldos a favor (negativos) → cuadra con grupo_saldo del módulo Proveedores.
   const cxpRows = (cxpRes.data as CxpRow[] | null) ?? [];
   const cxpEmpresas = new Set(cxpRows.map((r) => r.empresa_key));
-  let cxpTotal = 0, cxpVencido90 = 0;
+  let cxpTotal = 0, cxpCorriente = 0, cxpVigilancia = 0, cxpVencido = 0;
   for (const r of cxpRows) {
     cxpTotal += num(r.saldo_total);
-    for (const b of r.aging ?? []) if (CXP_VENCIDO_TITLES.has(b.title)) cxpVencido90 += num(b.saldo);
+    for (const b of r.aging ?? []) {
+      if (CXP_CORRIENTE_TITLES.has(b.title)) cxpCorriente += num(b.saldo);
+      else if (CXP_VIGILANCIA_TITLES.has(b.title)) cxpVigilancia += num(b.saldo);
+      else if (CXP_VENCIDO_TITLES.has(b.title)) cxpVencido += num(b.saldo);
+    }
   }
-  const cxp = { total: cxpTotal, vencido90: cxpVencido90, empresasCount: cxpEmpresas.size };
+  const cxp = {
+    total: cxpTotal, corriente: cxpCorriente, vigilancia: cxpVigilancia, vencido: cxpVencido,
+    empresasCount: cxpEmpresas.size,
+  };
 
   // ── Cheques por vencer (7d) ──
   const chequeRows = (chequesRes.data as ChequeRow[] | null) ?? [];
