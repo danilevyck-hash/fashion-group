@@ -7,6 +7,7 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
+import BulkPhotoUpload from "./BulkPhotoUpload";
 import { validateProductPhoto, uploadProductPhoto } from "./photoUpload";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -267,25 +268,29 @@ function FaltanFotoTab({
 }) {
   const sinFoto = products.filter((p) => !tieneFoto(p));
 
-  if (sinFoto.length === 0) {
-    return (
-      <div className="text-center py-20">
-        <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 flex items-center justify-center mb-4">
-          <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <p className="text-gray-900 font-medium">Todo al día</p>
-        <p className="text-gray-400 text-sm mt-1">Ningún producto activo sin foto.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-      {sinFoto.map((p) => (
-        <ProductPhotoCard key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
-      ))}
+    <div>
+      {/* Subida masiva: asigna por nombre=SKU contra TODOS los productos (permite
+          también reemplazar fotos existentes). La subida por tarjeta sigue abajo. */}
+      <BulkPhotoUpload products={products} onDone={onPhotoSaved} showToast={showToast} />
+
+      {sinFoto.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-14 h-14 mx-auto rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+            <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <p className="text-gray-900 font-medium">Todo al día</p>
+          <p className="text-gray-400 text-sm mt-1">Ningún producto activo sin foto.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {sinFoto.map((p) => (
+            <ProductPhotoCard key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
