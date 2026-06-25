@@ -6,10 +6,18 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
 import { getCompanyDisplay } from "@/lib/companies";
+import { empresasConCxp } from "@/lib/switch-api/empresas";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 
-// Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion.
-const EMPRESAS = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
+// Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
+const EMPRESAS = empresasConCxp();
+
+// Nombre legible por empresa_key. EMPRESA_KEY_TO_NAME cubre las 7 (incl.
+// american_classic → "Multifashion", que companies.ts/getCompanyDisplay no conoce).
+function empresaLabel(key: string): string {
+  return EMPRESA_KEY_TO_NAME[key] ?? getCompanyDisplay(key);
+}
 
 interface ListItem {
   key: string;
@@ -102,14 +110,14 @@ export default function ProveedoresListClient() {
           <div className="mb-5">
             <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Cuentas por pagar por las 6 empresas B2B: saldo, antigüedad y pagos.
+              Cuentas por pagar por empresa: saldo, antigüedad y pagos.
             </p>
           </div>
 
           {/* Total por pagar (grupo o empresa filtrada) */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4">
             <div className="text-xs uppercase tracking-[0.05em] text-gray-400">
-              {empresa ? `Por pagar · ${getCompanyDisplay(empresa)}` : "Por pagar · grupo"}
+              {empresa ? `Por pagar · ${empresaLabel(empresa)}` : "Por pagar · grupo"}
             </div>
             <div className={`text-2xl font-semibold tabular-nums mt-1 ${grupoSaldo < 0 ? "text-blue-600" : "text-purple-700"}`}>
               {grupoSaldo < 0 ? `Saldo a favor $${fmt(Math.abs(grupoSaldo))}` : `$${fmt(grupoSaldo)}`}
@@ -121,7 +129,7 @@ export default function ProveedoresListClient() {
             <Chip active={empresa === ""} onClick={() => setEmpresa("")}>Todas</Chip>
             {EMPRESAS.map((e) => (
               <Chip key={e} active={empresa === e} onClick={() => setEmpresa(e)}>
-                {getCompanyDisplay(e)}
+                {empresaLabel(e)}
               </Chip>
             ))}
           </div>
