@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 //     incluida). Solo este RPC (~0.7s warm); NO se llama la proyección de cierre
 //     (lenta) que el resumen completo arrastra y que el dashboard no necesita.
 //     Las 8 empresas.
-//   - CXC: switch_estadocuenta_aging_mv (6 empresas que tienen CXC). Vencido = ≥91d.
+//   - CXC: switch_estadocuenta_aging (vista base LIVE, la MISMA que /admin — no la
+//     MV diaria, para cuadrar al centavo con /admin). 6 empresas. Vencido = ≥91d.
 //   - CXP: switch_proveedor_estadocuenta (6 empresas que tienen CXP). Vencido = ≥91d.
 //   - Reclamos: sin pagar antiguos.
 // Cada KPI reporta SOLO las empresas que tienen ese módulo (empresasCount), sin
@@ -55,7 +56,11 @@ export async function GET(req: NextRequest) {
 
   const [summaryRes, agingRes, cxpRes, reclamosRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
-    supabaseServer.from("switch_estadocuenta_aging_mv")
+    // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
+    // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
+    // los re-syncs de la reconciliación → divergía con /admin intradía. Leer la
+    // misma vista base garantiza Δ=0.00 con /admin siempre.
+    supabaseServer.from("switch_estadocuenta_aging")
       .select("company_key,nombre,codigo,total,d0_30,d31_60,d61_90,d91_120,d121_180,d181_270,d271_365,mas_365"),
     // CXP: TODAS las filas (incl. saldos a favor / negativos) para cuadrar con el
     // grupo_saldo del módulo Proveedores. Antes filtraba saldo_total>0 y excluía 2
