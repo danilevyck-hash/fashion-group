@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Coins,
   Building2,
+  LayoutDashboard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +62,7 @@ export const GROUPS: AppGroup[] = [
 
 export const ALL_MODULES: AppModule[] = [
   // Ventas
+  { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas" },
   { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "ventas" },
   { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas" },
   { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin"],                                           group: "ventas" },
