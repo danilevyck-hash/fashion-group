@@ -1,9 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import DepuradorClient from "./DepuradorClient";
+import HistorialView from "./HistorialView";
+
+type Tab = "depurador" | "historial";
 
 export default function CargarProductosPage() {
   return (
@@ -15,12 +18,58 @@ export default function CargarProductosPage() {
 
 function CargarInner() {
   const { authChecked } = useAuth({ moduleKey: "cargar", allowedRoles: ["admin", "secretaria"] });
+  const [tab, setTab] = useState<Tab>("depurador");
+  const [refreshKey, setRefreshKey] = useState(0);
+
   if (!authChecked) return null;
+
+  // Registra la carga en el server al descargar (lo único que toca backend).
+  const handleDownloaded = async (payload: {
+    empresa: string;
+    marca: string;
+    cantidad_estilos: number;
+    total_unidades: number;
+    total_costo: number;
+  }) => {
+    try {
+      await fetch("/api/productos/cargar/historial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setRefreshKey((k) => k + 1);
+    } catch {
+      // El historial es secundario: si falla el registro, la descarga ya ocurrió.
+    }
+  };
 
   return (
     <div className="min-h-screen bg-stone-50">
       <AppHeader module="Cargar Productos" />
-      <DepuradorClient />
+
+      <div className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
+          <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
+          <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
+        </div>
+      </div>
+
+      {tab === "depurador"
+        ? <DepuradorClient onDownloaded={handleDownloaded} />
+        : <HistorialView refreshKey={refreshKey} />}
     </div>
+  );
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+        active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
