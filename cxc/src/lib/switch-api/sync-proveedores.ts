@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Sync de Cuentas por Pagar (proveedores) — Fase 1.
 //
-// Por empresa B2B (empresasConCxc): itera /apiproveedor/lista y luego
+// Por empresa con CxP (empresasConCxp = 6 B2B + Multifashion): itera /apiproveedor/lista y luego
 // /apiproveedor/info?proveedorId=X (NO documentado; trae saldoTotal + aging
 // bucketizado + ledger facturas/pagos). Calcula agregados y upserta una fila por
 // (empresa, proveedor) en switch_proveedor_estadocuenta.
@@ -19,7 +19,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, type SwitchProveedorElement } from "./client";
-import { empresasConCxc } from "./empresas";
+import { empresasConCxp } from "./empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const PROVEEDORES_PAGE = 50;
@@ -255,7 +255,8 @@ export async function syncEmpresaProveedores(
 /** Sync de todas las B2B (serial; tolerante: una falla → las demás siguen). */
 export async function syncAllProveedores(triggeredBy = "cron"): Promise<ProveedorSyncResult[]> {
   const results: ProveedorSyncResult[] = [];
-  for (const empresaKey of empresasConCxc()) {
+  // SECUENCIAL (token único de Switch). empresasConCxp() = 6 B2B + Multifashion.
+  for (const empresaKey of empresasConCxp()) {
     results.push(await syncEmpresaProveedores(empresaKey, triggeredBy));
   }
   return results;
