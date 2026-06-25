@@ -12,23 +12,23 @@ export const dynamic = "force-dynamic";
 //     incluida). Solo este RPC (~0.7s warm); NO se llama la proyección de cierre
 //     (lenta) que el resumen completo arrastra y que el dashboard no necesita.
 //     Las 8 empresas.
-//   - CXC: switch_estadocuenta_aging_mv (6 empresas que tienen CXC).
-//   - CXP: switch_proveedor_estadocuenta (6 empresas que tienen CXP).
-//   - Cheques: cheques pendientes por vencer (7d).
+//   - CXC: switch_estadocuenta_aging_mv (6 empresas que tienen CXC). Vencido = ≥91d.
+//   - CXP: switch_proveedor_estadocuenta (6 empresas que tienen CXP). Vencido = ≥91d.
 //   - Reclamos: sin pagar antiguos.
 // Cada KPI reporta SOLO las empresas que tienen ese módulo (empresasCount), sin
 // inventar data de las que no lo tienen.
 
-// Tramos de aging IDÉNTICOS para CXC y CXP, con los MISMOS cortes de días que el
-// módulo /admin: Corriente (0-90) / Vigilancia (91-120) / Vencido (≥121 = "+120
-// días", estándar del headline de /admin). CXC lee columnas dXX; CXP lee los
+// Tramos de aging IDÉNTICOS para CXC y CXP. Partición LIMPIA en 2 que suma al
+// total: Corriente (0-90) + Vencido (≥91 = "+90 días") = Total. La columna
+// "91-120" (Vigilancia) es un SUBCONJUNTO de Vencido que se muestra como DETALLE
+// (no se suma aparte → no hay doble conteo). CXC lee columnas dXX; CXP lee los
 // títulos del aging JSON de switch_proveedor_estadocuenta.
 const CXC_CORRIENTE_KEYS = ["d0_30", "d31_60", "d61_90"] as const;
-const CXC_VIGILANCIA_KEYS = ["d91_120"] as const;
-const CXC_VENCIDO_KEYS = ["d121_180", "d181_270", "d271_365", "mas_365"] as const;
+const CXC_VIGILANCIA_KEYS = ["d91_120"] as const; // 91-120, detalle (⊂ vencido)
+const CXC_VENCIDO_KEYS = ["d91_120", "d121_180", "d181_270", "d271_365", "mas_365"] as const; // ≥91
 const CXP_CORRIENTE_TITLES = new Set(["0-30", "31-60", "61-90"]);
-const CXP_VIGILANCIA_TITLES = new Set(["91-120"]);
-const CXP_VENCIDO_TITLES = new Set(["121-180", "181-270", "271-365", "Mas de 365"]);
+const CXP_VIGILANCIA_TITLES = new Set(["91-120"]); // detalle (⊂ vencido)
+const CXP_VENCIDO_TITLES = new Set(["91-120", "121-180", "181-270", "271-365", "Mas de 365"]); // ≥91
 const RECLAMO_ANTIGUO_DIAS = 30;
 
 function num(x: unknown): number {
@@ -42,7 +42,6 @@ interface AgingRow {
   d91_120: number | null; d121_180: number | null; d181_270: number | null; d271_365: number | null; mas_365: number | null;
 }
 interface CxpRow { empresa_key: string; nombre: string | null; saldo_total: number | null; aging: Array<{ saldo: number; title: string }> | null; }
-interface ChequeRow { id: string; cliente: string; empresa: string; monto: number; fecha_deposito: string; }
 interface ReclamoRow { id: string; nro_reclamo: string | null; empresa: string | null; estado: string | null; fecha_reclamo: string | null; }
 // Fila del RPC ventas_dashboard_summary: por empresa × mes (subtotal/utilidad/costo).
 interface SummaryRow { empresa: string; mes: number; total_subtotal: number | string | null; total_utilidad: number | string | null; total_costo: number | string | null; }
@@ -53,9 +52,8 @@ export async function GET(req: NextRequest) {
 
   const t0 = Date.now();
   const year = new Date().getFullYear();
-  const in7d = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10);
 
-  const [summaryRes, agingRes, cxpRes, chequesRes, reclamosRes] = await Promise.all([
+  const [summaryRes, agingRes, cxpRes, reclamosRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
     supabaseServer.from("switch_estadocuenta_aging_mv")
       .select("company_key,nombre,codigo,total,d0_30,d31_60,d61_90,d91_120,d121_180,d181_270,d271_365,mas_365"),
@@ -64,10 +62,6 @@ export async function GET(req: NextRequest) {
     // proveedores con saldo a favor → total no cuadraba con el módulo.
     supabaseServer.from("switch_proveedor_estadocuenta")
       .select("empresa_key,nombre,saldo_total,aging"),
-    supabaseServer.from("cheques")
-      .select("id,cliente,empresa,monto,fecha_deposito")
-      .eq("deleted", false).eq("estado", "pendiente").lte("fecha_deposito", in7d)
-      .order("fecha_deposito", { ascending: true }),
     supabaseServer.from("reclamos")
       .select("id,nro_reclamo,empresa,estado,fecha_reclamo")
       .eq("deleted", false).neq("estado", "Pagado")
@@ -125,7 +119,8 @@ export async function GET(req: NextRequest) {
     console.error("[vista-general] ventas_dashboard_summary:", summaryRes.error.message);
   }
 
-  // ── CXC (empresas con aging) ── tramos alineados a /admin (vencido = ≥121d).
+  // ── CXC (empresas con aging) ── vencido = ≥91d ("+90 días"). vigilancia
+  // (91-120) es un subconjunto del vencido (se suma aparte, no resta).
   const agingRows = (agingRes.data as AgingRow[] | null) ?? [];
   const cxcEmpresas = new Set(agingRows.map((r) => r.company_key));
   let cxcTotal = 0, cxcCorriente = 0, cxcVigilancia = 0, cxcVencido = 0;
@@ -145,33 +140,31 @@ export async function GET(req: NextRequest) {
     topClientes: clientesVencidos.slice(0, 6),
   };
 
-  // ── CXP (empresas con proveedores) ── mismos tramos que CXC; total incluye
-  // saldos a favor (negativos) → cuadra con grupo_saldo del módulo Proveedores.
+  // ── CXP (empresas con proveedores) ── mismos tramos que CXC (vencido = ≥91d);
+  // total incluye saldos a favor (negativos) → cuadra con grupo_saldo del módulo
+  // Proveedores. IFs INDEPENDIENTES (no else-if): vigilancia (91-120) ⊂ vencido,
+  // así que el bucket 91-120 cuenta en ambos (detalle + vencido), sin doble conteo
+  // en la partición corriente + vencido = total.
   const cxpRows = (cxpRes.data as CxpRow[] | null) ?? [];
   const cxpEmpresas = new Set(cxpRows.map((r) => r.empresa_key));
   let cxpTotal = 0, cxpCorriente = 0, cxpVigilancia = 0, cxpVencido = 0;
+  const proveedoresVencidos: { nombre: string; empresa: string; saldo: number }[] = [];
   for (const r of cxpRows) {
     cxpTotal += num(r.saldo_total);
+    let vencRow = 0;
     for (const b of r.aging ?? []) {
       if (CXP_CORRIENTE_TITLES.has(b.title)) cxpCorriente += num(b.saldo);
-      else if (CXP_VIGILANCIA_TITLES.has(b.title)) cxpVigilancia += num(b.saldo);
-      else if (CXP_VENCIDO_TITLES.has(b.title)) cxpVencido += num(b.saldo);
+      if (CXP_VIGILANCIA_TITLES.has(b.title)) cxpVigilancia += num(b.saldo);
+      if (CXP_VENCIDO_TITLES.has(b.title)) vencRow += num(b.saldo);
     }
+    cxpVencido += vencRow;
+    if (vencRow > 0) proveedoresVencidos.push({ nombre: r.nombre || "—", empresa: EMPRESA_KEY_TO_NAME[r.empresa_key] ?? r.empresa_key, saldo: vencRow });
   }
+  proveedoresVencidos.sort((a, b) => b.saldo - a.saldo);
   const cxp = {
     total: cxpTotal, corriente: cxpCorriente, vigilancia: cxpVigilancia, vencido: cxpVencido,
     empresasCount: cxpEmpresas.size,
-  };
-
-  // ── Cheques por vencer (7d) ──
-  const chequeRows = (chequesRes.data as ChequeRow[] | null) ?? [];
-  const cheques = {
-    proximos7d: chequeRows.slice(0, 8).map((c) => ({
-      id: c.id, cliente: c.cliente, empresa: EMPRESA_KEY_TO_NAME[c.empresa] ?? c.empresa,
-      monto: num(c.monto), fecha: c.fecha_deposito,
-    })),
-    total: chequeRows.reduce((s, c) => s + num(c.monto), 0),
-    count: chequeRows.length,
+    topProveedores: proveedoresVencidos.slice(0, 6),
   };
 
   // ── Reclamos sin pagar antiguos ──
@@ -189,6 +182,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     generadoEn: new Date().toISOString(),
     ms: Date.now() - t0,
-    ventas, margen, cxc, cxp, cheques, reclamos,
+    ventas, margen, cxc, cxp, reclamos,
   });
 }

@@ -13,8 +13,7 @@ interface VistaGeneral {
   ventas: null | { mes: number; mesAnterior: number; deltaPct: number | null; mesNum: number; parcial: boolean; empresasCount: number; byEmpresa: { name: string; ventas: number }[] };
   margen: null | { pct: number | null; utilidad: number; empresasCount: number };
   cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
-  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number };
-  cheques: { proximos7d: { id: string; cliente: string; empresa: string; monto: number; fecha: string }[]; total: number; count: number };
+  cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; saldo: number }[] };
   reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
 }
 
@@ -92,7 +91,7 @@ function VistaGeneralInner() {
                 href="/admin"
                 label="Por cobrar (CXC)"
                 value={moneyK(data.cxc.total)}
-                sub={`${moneyK(data.cxc.vencido)} vencido +120d`}
+                sub={`${moneyK(data.cxc.vencido)} vencido +90d`}
                 subTone={data.cxc.vencido > 0 ? "danger" : "muted"}
                 cobertura={cobertura(data.cxc.empresasCount)}
                 accent="blue"
@@ -101,7 +100,7 @@ function VistaGeneralInner() {
                 href="/proveedores"
                 label="Por pagar (CXP)"
                 value={moneyK(data.cxp.total)}
-                sub={`${moneyK(data.cxp.vencido)} vencido +120d`}
+                sub={`${moneyK(data.cxp.vencido)} vencido +90d`}
                 subTone={data.cxp.vencido > 0 ? "danger" : "muted"}
                 cobertura={cobertura(data.cxp.empresasCount)}
                 accent="rose"
@@ -148,8 +147,8 @@ function VistaGeneralInner() {
                     <tr className="text-xs text-gray-400 border-b border-gray-100">
                       <th className="text-left font-medium px-4 py-2.5"></th>
                       <th className="text-right font-medium px-4 py-2.5">Corriente <span className="text-gray-300">(0-90)</span></th>
-                      <th className="text-right font-medium px-4 py-2.5">91-120 días</th>
-                      <th className="text-right font-medium px-4 py-2.5">Vencido <span className="text-gray-300">(+120d)</span></th>
+                      <th className="text-right font-medium px-4 py-2.5">91-120 <span className="text-gray-300">(detalle)</span></th>
+                      <th className="text-right font-medium px-4 py-2.5">Vencido <span className="text-gray-300">(+90d)</span></th>
                       <th className="text-right font-medium px-4 py-2.5">Total</th>
                     </tr>
                   </thead>
@@ -159,6 +158,7 @@ function VistaGeneralInner() {
                   </tbody>
                 </table>
               </div>
+              <p className="text-[11px] text-gray-400 mt-2">Corriente + Vencido = Total. El tramo <span className="text-amber-600">91-120</span> es un detalle ya incluido en Vencido (+90d), no se suma aparte.</p>
             </div>
 
             {/* Requiere tu atención */}
@@ -166,9 +166,9 @@ function VistaGeneralInner() {
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Requiere tu atención</h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* CXC +90d */}
-                <AlertCard title="Clientes con saldo +120 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
+                <AlertCard title="Clientes con saldo +90 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
                   {data.cxc.topClientes.length === 0 ? (
-                    <Empty>Nada vencido a +120 días.</Empty>
+                    <Empty>Nada vencido a +90 días.</Empty>
                   ) : (
                     data.cxc.topClientes.map((c) => (
                       <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-gray-50 transition">
@@ -179,15 +179,15 @@ function VistaGeneralInner() {
                   )}
                 </AlertCard>
 
-                {/* Cheques por vencer */}
-                <AlertCard title="Cheques por vencer (7 días)" href="/cheques" linkLabel="Ir a Cheques" count={data.cheques.count}>
-                  {data.cheques.proximos7d.length === 0 ? (
-                    <Empty>Ningún cheque vence esta semana.</Empty>
+                {/* Proveedores con saldo vencido +90d */}
+                <AlertCard title="Proveedores con saldo vencido +90d" href="/proveedores" linkLabel="Ir a Proveedores" count={data.cxp.topProveedores.length}>
+                  {data.cxp.topProveedores.length === 0 ? (
+                    <Empty>Nada vencido a +90 días.</Empty>
                   ) : (
-                    data.cheques.proximos7d.map((c) => (
-                      <Link key={c.id} href="/cheques" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-gray-50 transition">
-                        <span className="text-sm text-gray-700 truncate">{c.cliente}<span className="text-gray-400 text-xs"> · {fmtDay(c.fecha)}</span></span>
-                        <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{moneyK(c.monto)}</span>
+                    data.cxp.topProveedores.map((p) => (
+                      <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded hover:bg-gray-50 transition">
+                        <span className="text-sm text-gray-700 truncate">{p.nombre}<span className="text-gray-400 text-xs"> · {p.empresa}</span></span>
+                        <span className="text-sm font-semibold text-rose-600 tabular-nums shrink-0">{moneyK(p.saldo)}</span>
                       </Link>
                     ))
                   )}
@@ -217,9 +217,6 @@ function VistaGeneralInner() {
   );
 }
 
-function fmtDay(iso: string): string {
-  return new Date(iso + "T00:00:00").toLocaleDateString("es-PA", { day: "numeric", month: "short" }).replace(".", "");
-}
 
 // ── Componentes UI ────────────────────────────────────────────────────────────
 
