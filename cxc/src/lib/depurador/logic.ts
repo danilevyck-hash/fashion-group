@@ -101,6 +101,20 @@ export function marcaKey(s: Cell): string {
   return String(s ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+/** Correcciones de marcas mal escritas del proveedor → marca correcta.
+ *  Llave = marcaKey(mal escrita). Ampliar aquí en el futuro. */
+export const MARCA_FIXES: Record<string, string> = {
+  [marcaKey("TH ACCESORIES")]: "TH ACCESSORIES", // typo del proveedor (una sola S)
+};
+
+/** Normaliza la marca corrigiendo typos conocidos (insensible a caja/espacios).
+ *  Se aplica al procesar: corrige la marca ANTES de buscar su fórmula y de
+ *  escribirla en el Excel, para que Switch nunca reciba la marca mal escrita. */
+export function fixMarca(marca: Cell): string {
+  const raw = String(marca ?? "");
+  return MARCA_FIXES[marcaKey(raw)] ?? raw;
+}
+
 function findCol(headers: Cell[], aliasList: string[], key?: string): number {
   const H = headers.map((h) => norm(h));
   // 1) match EXACTO (siempre gana)
@@ -300,8 +314,10 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
     const costo = first.costo;
     const cif = costo !== null ? Math.round(costo * factor * 100) / 100 : null;
-    // Marca y Proveedor en MAYÚSCULAS (así queda Switch internamente, evita duplicar marca)
-    const marcaUp = (first.marca || "").toUpperCase();
+    // Marca y Proveedor en MAYÚSCULAS (así queda Switch internamente, evita duplicar marca).
+    // fixMarca corrige typos conocidos del proveedor (ej. TH ACCESORIES → TH ACCESSORIES)
+    // antes del match de fórmula y de escribir en el Excel.
+    const marcaUp = fixMarca(first.marca).toUpperCase();
 
     // avisos de datos faltantes (no bloquea, solo informa)
     if (!ean) warnings.push(`${ref}: sin código de barra`);
