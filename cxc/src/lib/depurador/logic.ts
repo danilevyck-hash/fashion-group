@@ -10,7 +10,7 @@
 // y los metadatos de UI (talla editable, fallback, destino) en campos propios.
 // Los cálculos (redondeos, reglas, totales) son idénticos.
 
-import { MARCA_DESCRIPCIONES } from "./marca-descripciones";
+import { MARCA_DESCRIPCIONES, NORMALIZACION } from "./marca-descripciones";
 
 export type Cell = string | number | boolean | null | undefined;
 export type SheetRow = Cell[];
@@ -310,7 +310,10 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       const t = String(it.talla || "").trim();
       if (t && !tallaMap[t]) tallaMap[t] = it.ean;
     }
-    const desc = buildDesc(first.cat);
+    // Normaliza la descripción del proveedor a su forma limpia ANTES de mostrarla,
+    // matchear su excepción y escribirla en el Excel (Tarea 2). rubro/subrubro se
+    // derivan de la descripción ya limpia.
+    const desc = normalizeDescripcion(buildDesc(first.cat));
     const rubro = buildRubro(desc);
     const sub = buildSubrubro(desc);
     const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
@@ -501,6 +504,18 @@ export function esDescripcionCatalogada(marca: Cell, desc: Cell): boolean {
   if (!list) return false;
   const k = marcaKey(desc);
   return list.some((d) => marcaKey(d) === k);
+}
+
+// Normalización de descripciones sucias del proveedor → limpia (clave canónica).
+const NORM_BY_KEY: Map<string, string> = new Map(
+  Object.entries(NORMALIZACION).map(([dirty, clean]) => [marcaKey(dirty), clean])
+);
+
+/** Normaliza una descripción del proveedor a su forma limpia (insensible a
+ *  caja/espacios). Si no hay regla, devuelve la descripción tal cual. */
+export function normalizeDescripcion(desc: Cell): string {
+  const raw = String(desc ?? "").trim();
+  return NORM_BY_KEY.get(marcaKey(raw)) ?? raw;
 }
 
 /** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).
