@@ -390,6 +390,57 @@ export function matchEmpresaFromDestino(destinoRaw: string): string | null {
   return null;
 }
 
+/* ============ FÓRMULA DE PRECIO POR MARCA ============ */
+// precio = CEILING(Costo CIF ÷ divisor) + extra, redondeado hacia arriba.
+// El Costo CIF YA es FOB × 1.1 (lo calcula processRows) — el divisor NO vuelve
+// a multiplicar. Si divisor = 0 o no hay fórmula, el precio queda vacío (null).
+
+export type Redondeo = "int" | "half";
+
+export interface MarcaFormula {
+  marca: string;
+  empresa?: string | null;
+  divisor: number;
+  extra: number;
+  redondeo: Redondeo;
+}
+
+/** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).
+ *  Se redondea antes a 4 decimales para matar polvo de punto flotante. */
+export function ceilInt(x: number): number {
+  return Math.ceil(Math.round(x * 10000) / 10000);
+}
+
+/** Redondeo CEILING a .50 hacia arriba (13.44→13.50, 13.01→13.50). */
+export function ceilHalf(x: number): number {
+  return Math.ceil(x * 2 - 0.0001) / 2;
+}
+
+/** Calcula el precio de un estilo. Devuelve null (precio vacío) si no hay CIF,
+ *  no hay fórmula o el divisor es 0 → la secretaria lo pone a mano. */
+export function calcPrecio(
+  cif: number | null | undefined,
+  f: { divisor: number; extra: number; redondeo: Redondeo } | null | undefined
+): number | null {
+  if (cif === null || cif === undefined || !Number.isFinite(cif)) return null;
+  if (!f || !f.divisor || f.divisor === 0) return null;
+  const base = f.redondeo === "half" ? ceilHalf(cif / f.divisor) : ceilInt(cif / f.divisor);
+  return base + (f.extra || 0);
+}
+
+/** Texto humano de la fórmula, para mostrar en vivo. */
+export function formulaText(f: { divisor: number; extra: number; redondeo: Redondeo }): string {
+  const ex = f.extra > 0 ? ` + ${f.extra}` : "";
+  const r = f.redondeo === "half" ? "a .50" : "al entero";
+  return `TECHO(Costo CIF ÷ ${f.divisor || "—"})${ex} · redondeo ${r} hacia arriba`;
+}
+
+/** Hint compacto del cálculo de una fila (ej "17.60÷0.73+2"). */
+export function calcHint(cif: number | null | undefined, f: { divisor: number; extra: number } | null | undefined): string {
+  if (cif === null || cif === undefined || !f || !f.divisor) return "—";
+  return `${Number(cif).toFixed(2)}÷${f.divisor}${f.extra > 0 ? "+" + f.extra : ""}`;
+}
+
 /* ============ TOTALES PARA HISTORIAL (Tarea 4) ============ */
 export interface CargaTotales {
   cantidad_estilos: number;

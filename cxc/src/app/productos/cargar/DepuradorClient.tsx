@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import {
   MESES,
@@ -12,17 +12,30 @@ import {
   outputFilename,
   matchEmpresaFromDestino,
   computeTotales,
+  calcPrecio,
+  formulaText,
+  calcHint,
   norm,
   TEXT_COLS,
   type ProcessedRow,
   type NamedSheet,
+  type Redondeo,
+  type MarcaFormula,
 } from "@/lib/depurador/logic";
+
+const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
+const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
 // Columnas clave que se muestran en la vista previa (la talla va aparte, editable).
 const PREVIEW_COLS = [
   "Código *", "Código Barra *", "Descripción *", "rubro *", "subrubro",
   "Precio *", "Costo FOB *", "Costo CIF *", "Stock Ideal", "Marca *",
 ];
+
+// Orden de render: inserta una columna "Cálculo" (__calc) antes del Precio.
+const PREVIEW_COLS_RENDER: string[] = PREVIEW_COLS.flatMap((c) =>
+  c === "Precio *" ? ["__calc", c] : [c]
+);
 
 interface DepuradorClientProps {
   /** Callback al descargar — registra el historial liviano en el server (Tarea 4). */
@@ -55,6 +68,23 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [tasa, setTasa] = useState("7");
   const [factor, setFactor] = useState("1.1");
 
+  // ── Precio (Tarea 2) ───────────────────────────────────────────────────────
+  const [priceMode, setPriceMode] = useState<"global" | "marca">("global");
+  // Fórmula global: "draft" se edita en vivo; "applied" maneja el cálculo de las
+  // filas (se confirma con "Aplicar a todo"). Defaults del mockup: 0.73 / 2 / int.
+  const [draftDivisor, setDraftDivisor] = useState("0.73");
+  const [draftExtra, setDraftExtra] = useState(2);
+  const [draftRedondeo, setDraftRedondeo] = useState<Redondeo>("int");
+  const [applied, setApplied] = useState<{ divisor: number; extra: number; redondeo: Redondeo }>(
+    { divisor: 0.73, extra: 2, redondeo: "int" }
+  );
+  // Precios editados a mano (por índice de fila). No se sobrescriben al recalcular.
+  const [priceEdits, setPriceEdits] = useState<Record<number, string>>({});
+  // Fórmulas guardadas (tabla marca_formulas) + fórmulas editables por marca presente.
+  const [savedFormulas, setSavedFormulas] = useState<MarcaFormula[]>([]);
+  const [marcaForms, setMarcaForms] = useState<Record<string, MarcaFormula>>({});
+  const [savingMarca, setSavingMarca] = useState<string | null>(null);
+
   const runFile = useCallback(
     async (file: File, cfg: { mesIdx: number; anio: string; tasa: string; factor: string }) => {
       setFileName(file.name);
@@ -71,6 +101,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         const { rows, warnings: w } = processRows(best, cfg);
         setProcessed(rows);
         setWarnings(w);
+        setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
         setError("");
         // Empresa destino: aviso del archivo + preselección del dropdown (Tarea 3)
         const dest = rows.find((r) => r.destino)?.destino || "";
@@ -111,6 +142,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     setFileName("");
     setDestino("");
     setEmpresa("");
+    setPriceEdits({});
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -120,12 +152,131 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     );
   };
 
+  // ── Fórmulas guardadas + marcas presentes ──────────────────────────────────
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/productos/cargar/formulas")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+      .then((d) => { if (alive) setSavedFormulas(d.rows ?? []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // Marcas únicas presentes en el Excel (key normalizada + etiqueta original).
+  const marcasPresentes = useMemo(() => {
+    if (!processed) return [] as { key: string; label: string }[];
+    const seen = new Map<string, string>();
+    for (const r of processed) {
+      const label = String(r.cols["Marca *"] || "");
+      const key = norm(label);
+      if (key && !seen.has(key)) seen.set(key, label);
+    }
+    return [...seen.entries()].map(([key, label]) => ({ key, label }));
+  }, [processed]);
+
+  const savedByNorm = useMemo(() => {
+    const m = new Map<string, MarcaFormula>();
+    for (const f of savedFormulas) m.set(norm(f.marca), f);
+    return m;
+  }, [savedFormulas]);
+
+  // Siembra/refresca las fórmulas editables de las marcas presentes desde lo guardado.
+  useEffect(() => {
+    const next: Record<string, MarcaFormula> = {};
+    for (const { key, label } of marcasPresentes) {
+      const saved = savedByNorm.get(key);
+      next[key] = saved
+        ? { marca: saved.marca, empresa: saved.empresa, divisor: saved.divisor, extra: saved.extra, redondeo: saved.redondeo }
+        : { ...BLANK_FORMULA, marca: label };
+    }
+    setMarcaForms(next);
+  }, [marcasPresentes, savedByNorm]);
+
+  // ── Cálculo de precio por fila ──────────────────────────────────────────────
+  const formulaForRow = useCallback(
+    (row: ProcessedRow): { divisor: number; extra: number; redondeo: Redondeo } | null => {
+      if (priceMode === "global") return applied;
+      return marcaForms[norm(row.cols["Marca *"])] ?? null;
+    },
+    [priceMode, applied, marcaForms]
+  );
+
+  const cifOf = (row: ProcessedRow): number | null => {
+    const v = row.cols["Costo CIF *"];
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const autoPrice = (row: ProcessedRow): number | null => calcPrecio(cifOf(row), formulaForRow(row));
+
+  // Precio final de una fila: editado a mano si lo hay, si no el calculado.
+  const finalPrice = (i: number, row: ProcessedRow): number | null => {
+    const raw = priceEdits[i];
+    if (raw !== undefined) {
+      const t = raw.trim();
+      if (t === "") return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    }
+    return autoPrice(row);
+  };
+
+  const displayPrice = (i: number, row: ProcessedRow): string => {
+    const raw = priceEdits[i];
+    if (raw !== undefined) return raw;
+    const a = autoPrice(row);
+    return a === null ? "" : String(a);
+  };
+
+  const onPriceEdit = (i: number, value: string) =>
+    setPriceEdits((prev) => ({ ...prev, [i]: value }));
+
+  const applyGlobal = () =>
+    setApplied({ divisor: Number(draftDivisor) || 0, extra: draftExtra, redondeo: draftRedondeo });
+
+  const onMarcaFormChange = (key: string, patch: Partial<MarcaFormula>) =>
+    setMarcaForms((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+
+  const saveMarca = async (key: string) => {
+    const f = marcaForms[key];
+    if (!f || savingMarca) return;
+    setSavingMarca(key);
+    try {
+      const empresaLabel = EMPRESAS_DESTINO.find((e) => e.key === empresa)?.label || null;
+      const res = await fetch("/api/productos/cargar/formulas", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          marca: f.marca,
+          empresa: f.empresa ?? empresaLabel,
+          divisor: f.divisor,
+          extra: f.extra,
+          redondeo: f.redondeo,
+        }),
+      });
+      if (res.ok) {
+        const d = await fetch("/api/productos/cargar/formulas").then((r) => r.json()).catch(() => null);
+        if (d?.rows) setSavedFormulas(d.rows);
+      }
+    } finally {
+      setSavingMarca(null);
+    }
+  };
+
+  const draftFormulaTxt = formulaText({ divisor: Number(draftDivisor) || 0, extra: draftExtra, redondeo: draftRedondeo });
+
   const download = async () => {
     if (!processed || downloading) return;
     setDownloading(true);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
-      const aoa = buildAoa(processed);
+      // El precio final (calculado o editado) va a la columna "Precio *".
+      const finalRows = processed.map((r, i) => ({
+        ...r,
+        cols: { ...r.cols, "Precio *": finalPrice(i, r) },
+      }));
+      const aoa = buildAoa(finalRows);
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
       // Forzar formato texto en Código(0), Referencia(1), Código Barra(2)
@@ -335,10 +486,142 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
             </button>
           </div>
 
+          {/* Cálculo de precio (Tarea 2) */}
+          <div className="mb-5 rounded-xl border border-stone-200 bg-white p-5">
+            <div className="mb-3.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              ¿Cómo calcular los precios?
+            </div>
+            <div className="mb-4 flex overflow-hidden rounded-lg border border-stone-300">
+              <ModeBtn
+                active={priceMode === "global"}
+                onClick={() => setPriceMode("global")}
+                title="Una fórmula para todo el Excel"
+                desc="Defines un divisor + extra y aplica a todas las filas. Ideal cuando el Excel es de una sola marca."
+              />
+              <ModeBtn
+                active={priceMode === "marca"}
+                onClick={() => setPriceMode("marca")}
+                title="Fórmula guardada por marca"
+                desc="Cada marca usa su fórmula guardada en el sistema. Útil si el Excel mezcla marcas."
+                last
+              />
+            </div>
+
+            {priceMode === "global" ? (
+              <>
+                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[1.4fr_1fr_1.2fr_auto] sm:items-end">
+                  <div>
+                    <label className={priceLabelCls}>Divisor</label>
+                    <input
+                      type="number" step="0.01" value={draftDivisor}
+                      onChange={(e) => setDraftDivisor(e.target.value)} className={inputCls}
+                    />
+                    <div className="mt-1.5 flex gap-1.5">
+                      {DIVISOR_HINTS.map((h) => (
+                        <button
+                          key={h} type="button" onClick={() => setDraftDivisor(String(h))}
+                          className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
+                            Number(draftDivisor) === h
+                              ? "border-teal-600 bg-teal-600 text-white"
+                              : "border-stone-300 bg-white text-stone-500 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800"
+                          }`}
+                        >
+                          {h.toFixed(2)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className={priceLabelCls}>Extra $</label>
+                    <select value={draftExtra} onChange={(e) => setDraftExtra(parseInt(e.target.value))} className={selectCls}>
+                      {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={priceLabelCls}>Redondeo</label>
+                    <select value={draftRedondeo} onChange={(e) => setDraftRedondeo(e.target.value as Redondeo)} className={selectCls}>
+                      <option value="int">Entero hacia arriba</option>
+                      <option value="half">A .50 hacia arriba</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button" onClick={applyGlobal}
+                    className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
+                  >
+                    Aplicar a todo
+                  </button>
+                </div>
+                <div className="mt-3.5 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-[13px] text-sky-900">
+                  precio = <b className="font-mono">{draftFormulaTxt}</b>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr>
+                        {["Marca en este Excel", "Estado", "Divisor", "Extra $", "Redondeo", ""].map((h, i) => (
+                          <th key={i} className="border-b-[1.5px] border-stone-300 px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {marcasPresentes.map(({ key, label }) => {
+                        const f = marcaForms[key] ?? { ...BLANK_FORMULA, marca: label };
+                        const saved = savedByNorm.has(key);
+                        return (
+                          <tr key={key}>
+                            <td className="border-b border-stone-100 px-2.5 py-2 font-semibold text-stone-900">{label}</td>
+                            <td className="border-b border-stone-100 px-2.5 py-2">
+                              {saved
+                                ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Guardada</span>
+                                : <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Sin guardar</span>}
+                            </td>
+                            <td className="border-b border-stone-100 px-2.5 py-2">
+                              <input
+                                type="number" step="0.01" value={f.divisor || ""}
+                                onChange={(e) => onMarcaFormChange(key, { divisor: Number(e.target.value) || 0 })}
+                                className={miniInputCls}
+                              />
+                            </td>
+                            <td className="border-b border-stone-100 px-2.5 py-2">
+                              <select value={f.extra} onChange={(e) => onMarcaFormChange(key, { extra: parseInt(e.target.value) })} className={miniSelectCls}>
+                                {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                              </select>
+                            </td>
+                            <td className="border-b border-stone-100 px-2.5 py-2">
+                              <select value={f.redondeo} onChange={(e) => onMarcaFormChange(key, { redondeo: e.target.value as Redondeo })} className={miniSelectCls}>
+                                <option value="int">Entero</option>
+                                <option value="half">.50</option>
+                              </select>
+                            </td>
+                            <td className="border-b border-stone-100 px-2.5 py-2">
+                              <button
+                                type="button" onClick={() => saveMarca(key)} disabled={savingMarca === key}
+                                className="text-[12px] font-semibold text-teal-700 transition hover:text-teal-900 disabled:opacity-50"
+                              >
+                                {savingMarca === key ? "Guardando…" : saved ? "Guardar cambios" : "Guardar fórmula"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-[12px] text-stone-500">
+                  Las marcas con fórmula guardada aplican solas. Las que dicen &quot;Sin guardar&quot; usan lo que
+                  pongas aquí; puedes guardarla para la próxima.
+                </p>
+              </>
+            )}
+          </div>
+
           {/* Preview */}
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">
-              <span>Vista previa · un estilo por fila · la talla del EAN es editable</span>
+              <span>Vista previa · un estilo por fila · talla y precio editables</span>
               <span>{processed.length} filas</span>
             </div>
             <div className="max-h-[440px] overflow-auto">
@@ -346,7 +629,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                 <thead>
                   <tr>
                     <Th>Talla EAN</Th>
-                    {PREVIEW_COLS.map((c) => <Th key={c}>{c.replace(" *", "")}</Th>)}
+                    {PREVIEW_COLS_RENDER.map((c) => <Th key={c}>{c === "__calc" ? "Cálculo" : c.replace(" *", "")}</Th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -375,7 +658,30 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                             </span>
                           )}
                         </td>
-                        {PREVIEW_COLS.map((c) => {
+                        {PREVIEW_COLS_RENDER.map((c) => {
+                          if (c === "__calc") {
+                            return (
+                              <td key="__calc" className="border-b border-stone-100 px-3 py-2 font-mono text-[11px] text-stone-400">
+                                {calcHint(cifOf(d), formulaForRow(d))}
+                              </td>
+                            );
+                          }
+                          if (c === "Precio *") {
+                            const priceEdited = priceEdits[ri] !== undefined;
+                            return (
+                              <td key={c} className="border-b border-stone-100 px-3 py-2">
+                                <input
+                                  value={displayPrice(ri, d)}
+                                  onChange={(e) => onPriceEdit(ri, e.target.value)}
+                                  className={`w-16 rounded-md border px-1.5 py-0.5 text-right font-mono text-xs ${
+                                    priceEdited
+                                      ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
+                                      : "border-stone-300 bg-white text-stone-900"
+                                  } focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20`}
+                                />
+                              </td>
+                            );
+                          }
                           const v = d.cols[c];
                           const empty = v === null || v === undefined || v === "";
                           const mono = c === "Código Barra *";
@@ -411,6 +717,27 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 const inputCls =
   "w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const selectCls = inputCls;
+const priceLabelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500";
+const miniInputCls =
+  "w-20 rounded-md border border-stone-300 bg-stone-50 px-2 py-1 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const miniSelectCls =
+  "rounded-md border border-stone-300 bg-stone-50 px-2 py-1 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+
+function ModeBtn({ active, onClick, title, desc, last }: { active: boolean; onClick: () => void; title: string; desc: string; last?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 px-4 py-3.5 text-left transition ${last ? "" : "border-r border-stone-200"} ${active ? "bg-teal-50" : "bg-white hover:bg-stone-50"}`}
+    >
+      <div className="flex items-center gap-2">
+        <span className={`h-4 w-4 flex-shrink-0 rounded-full border-2 ${active ? "border-teal-600 bg-teal-600 ring-2 ring-inset ring-white" : "border-stone-300"}`} />
+        <span className={`text-sm font-semibold ${active ? "text-teal-800" : "text-stone-900"}`}>{title}</span>
+      </div>
+      <div className="mt-1 text-xs text-stone-500">{desc}</div>
+    </button>
+  );
+}
 
 function Field({ label, note, children }: { label: string; note?: string; children: React.ReactNode }) {
   return (
