@@ -10,6 +10,8 @@
 // y los metadatos de UI (talla editable, fallback, destino) en campos propios.
 // Los cálculos (redondeos, reglas, totales) son idénticos.
 
+import { MARCA_DESCRIPCIONES } from "./marca-descripciones";
+
 export type Cell = string | number | boolean | null | undefined;
 export type SheetRow = Cell[];
 
@@ -476,9 +478,29 @@ export interface MarcaRubroFormula {
   redondeo: Redondeo;
 }
 
-/** Clave canónica de una excepción por marca+rubro (insensible a caja/espacios). */
+/** Clave canónica de una excepción por marca+rubro/descripción (insensible a caja/espacios). */
 export function marcaRubroKey(marca: Cell, rubro: Cell): string {
   return `${marcaKey(marca)}|||${marcaKey(rubro)}`;
+}
+
+/* ============ CATÁLOGO FIJO DE DESCRIPCIONES POR MARCA ============ */
+// Mapa marca (clave canónica) → sus descripciones limpias del catálogo fijo.
+const DESC_BY_MARCA: Map<string, string[]> = new Map(
+  Object.entries(MARCA_DESCRIPCIONES).map(([m, arr]) => [marcaKey(m), arr])
+);
+
+/** Descripciones del catálogo para una marca (ya vienen en orden alfabético).
+ *  [] si la marca no está en el catálogo. */
+export function descripcionesDeMarca(marca: Cell): string[] {
+  return DESC_BY_MARCA.get(marcaKey(marca)) ?? [];
+}
+
+/** true si la descripción (canónica) está catalogada para esa marca. */
+export function esDescripcionCatalogada(marca: Cell, desc: Cell): boolean {
+  const list = DESC_BY_MARCA.get(marcaKey(marca));
+  if (!list) return false;
+  const k = marcaKey(desc);
+  return list.some((d) => marcaKey(d) === k);
 }
 
 /** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).

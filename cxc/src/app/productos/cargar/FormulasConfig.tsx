@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EMPRESAS_DESTINO, MARCA_CATALOGO, norm, marcaKey, type Redondeo, type MarcaFormula } from "@/lib/depurador/logic";
-import RubroExcepciones from "./RubroExcepciones";
+import DescripcionFormulas from "./DescripcionFormulas";
 
 interface EditRow {
   id: string;
@@ -149,7 +149,7 @@ export default function FormulasConfig() {
       </div>
 
       {subtab === "descripcion" ? (
-        <RubroExcepciones />
+        <DescripcionFormulas />
       ) : (
       <>
       {error && (
