@@ -16,6 +16,7 @@ import {
   formulaText,
   calcHint,
   norm,
+  marcaKey,
   TEXT_COLS,
   type ProcessedRow,
   type NamedSheet,
@@ -180,7 +181,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     const seen = new Map<string, string>();
     for (const r of processed) {
       const label = String(r.cols["Marca *"] || "");
-      const key = norm(label);
+      const key = marcaKey(label);
       if (key && !seen.has(key)) seen.set(key, label);
     }
     return [...seen.entries()].map(([key, label]) => ({ key, label }));
@@ -188,7 +189,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
   const savedByNorm = useMemo(() => {
     const m = new Map<string, MarcaFormula>();
-    for (const f of savedFormulas) m.set(norm(f.marca), f);
+    for (const f of savedFormulas) m.set(marcaKey(f.marca), f);
     return m;
   }, [savedFormulas]);
 
@@ -208,7 +209,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const formulaForRow = useCallback(
     (row: ProcessedRow): { divisor: number; extra: number; redondeo: Redondeo } | null => {
       if (priceMode === "global") return applied;
-      return marcaForms[norm(row.cols["Marca *"])] ?? null;
+      return marcaForms[marcaKey(row.cols["Marca *"])] ?? null;
     },
     [priceMode, applied, marcaForms]
   );

@@ -92,6 +92,15 @@ const COL_BLOCK: Record<string, string[]> = {
 /* ============ UTILES ============ */
 export const norm = (s: Cell): string => (s === null || s === undefined) ? "" : String(s).trim().toUpperCase();
 
+/** Clave canónica para emparejar marcas entre el Excel y la tabla de fórmulas.
+ *  Insensible a mayúsculas Y a espacios: NFKC (NBSP → espacio normal), colapsa
+ *  espacios múltiples, recorta y pasa a minúsculas. Así "CK MENSWEAR",
+ *  "ck  menswear" y "CK Menswear" caen en la misma clave. NO toca `norm`
+ *  (que usan la detección de columnas y las reglas de talla). */
+export function marcaKey(s: Cell): string {
+  return String(s ?? "").normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function findCol(headers: Cell[], aliasList: string[], key?: string): number {
   const H = headers.map((h) => norm(h));
   // 1) match EXACTO (siempre gana)
