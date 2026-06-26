@@ -327,11 +327,24 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     const q = norm(descFilter);
     return processed
       .map((d, ri) => ({ d, ri }))
-      .filter(({ d }) => !q || norm(d.cols["Descripción *"]).includes(q))
+      // Filtro por descripción exacta (dropdown). "" = todas.
+      .filter(({ d }) => !q || norm(d.cols["Descripción *"]) === q)
       // Orden alfabético por Descripción por default (A5). Solo la vista; el
       // índice ri original se mantiene para selección/edición/descarga.
       .sort((a, b) => String(a.d.cols["Descripción *"] || "").localeCompare(String(b.d.cols["Descripción *"] || ""), "es"));
   }, [processed, descFilter]);
+
+  // Descripciones distintas presentes en el Excel cargado, orden alfabético (para
+  // el dropdown de filtro). Se regenera al cargar otro archivo (depende de processed).
+  const descripciones = useMemo(() => {
+    if (!processed) return [] as string[];
+    const set = new Set<string>();
+    for (const r of processed) {
+      const d = String(r.cols["Descripción *"] || "");
+      if (d) set.add(d);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  }, [processed]);
 
   const visibleIdx = useMemo(() => visibleRows.map((r) => r.ri), [visibleRows]);
   const allVisibleSelected = visibleIdx.length > 0 && visibleIdx.every((i) => selected.has(i));
@@ -701,12 +714,14 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                 Vista previa · talla y precio editables
               </span>
               <div className="flex items-center gap-2">
-                <input
+                <select
                   value={descFilter}
                   onChange={(e) => onFilterChange(e.target.value)}
-                  placeholder="Filtrar por descripción…"
-                  className="w-52 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
-                />
+                  className="max-w-[280px] rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                >
+                  <option value="">Todas las descripciones</option>
+                  {descripciones.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
                 <span className="whitespace-nowrap text-[12px] text-stone-500">
                   {descFilter ? `${visibleRows.length} de ${processed.length}` : `${processed.length} filas`}
                 </span>
