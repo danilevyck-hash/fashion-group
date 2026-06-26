@@ -18,6 +18,7 @@ import {
   norm,
   marcaKey,
   marcaRubroKey,
+  esDescripcionCatalogada,
   TEXT_COLS,
   type ProcessedRow,
   type NamedSheet,
@@ -234,8 +235,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const formulaForRow = useCallback(
     (row: ProcessedRow): { divisor: number; extra: number; redondeo: Redondeo } | null => {
       if (priceMode === "global") return applied;
-      // PRIORIDAD: excepción por marca+rubro gana; si no, la fórmula de la marca.
-      const exc = rubroByKey.get(marcaRubroKey(row.cols["Marca *"], row.cols["rubro *"]));
+      // PRIORIDAD: excepción por marca+DESCRIPCIÓN gana; si no, la fórmula de la marca.
+      const exc = rubroByKey.get(marcaRubroKey(row.cols["Marca *"], row.cols["Descripción *"]));
       if (exc && exc.divisor) return { divisor: exc.divisor, extra: exc.extra, redondeo: exc.redondeo };
       return marcaForms[marcaKey(row.cols["Marca *"])] ?? null;
     },
@@ -430,6 +431,24 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const totalUnits = processed?.reduce((s, d) => s + (Number(d.cols["Stock Ideal"]) || 0), 0) ?? 0;
   const marcas = processed ? [...new Set(processed.map((d) => d.cols["Marca *"]).filter(Boolean))] : [];
   const revisar = processed?.filter((d) => d.fallback).length ?? 0;
+
+  // Descripciones del Excel que no están en el catálogo de su marca (Tarea 3).
+  // No rompen: usan la fórmula de la marca. Solo se avisa de forma discreta.
+  const descsNuevas = useMemo(() => {
+    if (!processed) return [] as { marca: string; desc: string }[];
+    const seen = new Set<string>();
+    const out: { marca: string; desc: string }[] = [];
+    for (const r of processed) {
+      const marca = String(r.cols["Marca *"] || "");
+      const desc = String(r.cols["Descripción *"] || "");
+      if (!desc) continue;
+      const k = `${marcaKey(marca)}|||${marcaKey(desc)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (!esDescripcionCatalogada(marca, desc)) out.push({ marca, desc });
+    }
+    return out;
+  }, [processed]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -705,6 +724,12 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                     </tbody>
                   </table>
                 </div>
+                {descsNuevas.length > 0 && (
+                  <p className="mt-2.5 text-[12px] text-stone-500">
+                    <span className="font-semibold text-amber-700">{descsNuevas.length} descripción(es)</span> de este Excel
+                    no están en el catálogo; usan la fórmula de su marca.
+                  </p>
+                )}
               </>
             )}
           </div>
