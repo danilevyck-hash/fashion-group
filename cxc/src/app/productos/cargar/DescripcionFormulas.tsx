@@ -20,8 +20,8 @@ function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo 
 const selCls = "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const numCls = "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
-export default function DescripcionFormulas() {
-  const [marca, setMarca] = useState(MARCA_CATALOGO[0].marca);
+export default function DescripcionFormulas({ refreshKey = 0 }: { refreshKey?: number }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<MarcaRubroFormula[]>([]);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function DescripcionFormulas() {
       .then((d: { rows: MarcaRubroFormula[] }) => setSaved(d.rows ?? []))
       .catch(() => setError("No se pudieron cargar las fórmulas por descripción."));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [refreshKey]);
 
   const savedByKey = useMemo(() => {
     const m = new Map<string, MarcaRubroFormula>();
@@ -42,9 +42,10 @@ export default function DescripcionFormulas() {
     return m;
   }, [saved]);
 
-  const descripciones = useMemo(() => descripcionesDeMarca(marca), [marca]);
+  const toggle = (marca: string) =>
+    setOpen((prev) => { const n = new Set(prev); if (n.has(marca)) n.delete(marca); else n.add(marca); return n; });
 
-  const rowFor = (desc: string) => {
+  const rowFor = (marca: string, desc: string) => {
     const key = marcaRubroKey(marca, desc);
     const e = edits[key];
     const s = savedByKey.get(key);
@@ -59,13 +60,13 @@ export default function DescripcionFormulas() {
     };
   };
 
-  const patch = (desc: string, p: Partial<Pick<Edit, "divisor" | "extra" | "redondeo">>) => {
-    const r = rowFor(desc);
+  const patch = (marca: string, desc: string, p: Partial<Pick<Edit, "divisor" | "extra" | "redondeo">>) => {
+    const r = rowFor(marca, desc);
     setEdits((prev) => ({ ...prev, [r.key]: { divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, ...p, dirty: true } }));
   };
 
-  const save = async (desc: string) => {
-    const r = rowFor(desc);
+  const save = async (marca: string, desc: string) => {
+    const r = rowFor(marca, desc);
     if (busyKey) return;
     setError(""); setBusyKey(r.key);
     try {
@@ -96,70 +97,85 @@ export default function DescripcionFormulas() {
     <div>
       <p className="mb-3 max-w-2xl text-[13px] text-stone-600">
         Una descripción puede tener su propia fórmula. Si existe, se usa esa en vez de la fórmula de la marca.
-        Déjala en blanco para usar la fórmula de la marca.
+        Déjala en blanco para usar la fórmula de la marca. Abre solo las marcas que vas a editar.
       </p>
-
-      <div className="mb-4 flex items-center gap-2">
-        <label className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Marca</label>
-        <select value={marca} onChange={(e) => setMarca(e.target.value)} className="h-9 min-w-[220px] rounded-md border border-stone-300 bg-stone-50 px-2.5 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20">
-          {MARCA_CATALOGO.map((c) => <option key={c.marca} value={c.marca}>{c.marca}</option>)}
-        </select>
-        <span className="text-[12px] text-stone-500">{descripciones.length} descripciones</span>
-      </div>
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">{error}</div>}
 
-      {descripciones.length === 0 ? (
-        <p className="py-6 text-center text-[13px] text-stone-400">Esta marca no tiene descripciones en el catálogo.</p>
-      ) : (
-        <table className="w-full border-collapse text-[13.5px]">
-          <thead>
-            <tr>
-              {["Descripción", "Divisor", "Extra $", "Redondeo", "Fórmula resultante", ""].map((h, i) => (
-                <th key={i} className="border-b-[1.5px] border-stone-300 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {descripciones.map((desc) => {
-              const r = rowFor(desc);
-              return (
-                <tr key={desc} className="hover:bg-teal-50">
-                  <td className="border-b border-stone-100 px-3 py-2">
-                    <span className="font-medium text-stone-900">{desc}</span>
-                    {r.saved && !r.dirty && <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Excepción</span>}
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-2">
-                    <input type="number" step="0.01" value={r.divisor || ""} placeholder="—"
-                      onChange={(e) => patch(desc, { divisor: Number(e.target.value) || 0 })} className={numCls} />
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-2">
-                    <select value={r.extra} onChange={(e) => patch(desc, { extra: parseInt(e.target.value) })} className={selCls}>
-                      {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-2">
-                    <select value={r.redondeo} onChange={(e) => patch(desc, { redondeo: e.target.value as Redondeo })} className={selCls}>
-                      <option value="int">Entero</option>
-                      <option value="half">.50</option>
-                    </select>
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-2 font-mono text-[12px] text-stone-500">
-                    {r.divisor ? compactFormula(r) : <span className="text-stone-400">usa la de la marca</span>}
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-2 whitespace-nowrap">
-                    <button type="button" onClick={() => save(desc)} disabled={busyKey === r.key}
-                      className={`rounded-md px-2 py-1 text-[12px] font-semibold transition disabled:opacity-50 ${r.dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
-                      {busyKey === r.key ? "…" : r.dirty ? "Guardar" : "Guardado"}
-                    </button>
-                    {flashKey === r.key && <span className="ml-2 text-[11px] font-semibold text-emerald-600">✓</span>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+      {MARCA_CATALOGO.map((c) => {
+        const descs = descripcionesDeMarca(c.marca);
+        const isOpen = open.has(c.marca);
+        const conFormula = descs.filter((d) => (savedByKey.get(marcaRubroKey(c.marca, d))?.divisor || 0) > 0).length;
+        return (
+          <div key={c.marca} className="mb-2 overflow-hidden rounded-lg border border-stone-200 bg-white">
+            <button
+              type="button"
+              onClick={() => toggle(c.marca)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition hover:bg-stone-50"
+            >
+              <span className="font-semibold text-stone-900">
+                <span className="mr-1.5 text-stone-400">{isOpen ? "▾" : "▸"}</span>{c.marca}
+              </span>
+              <span className="text-[12px] text-stone-500">
+                {descs.length} descripciones
+                {conFormula > 0 && <> · <b className="text-emerald-700">{conFormula} con fórmula propia</b></>}
+              </span>
+            </button>
+
+            {isOpen && (
+              <div className="overflow-x-auto border-t border-stone-200 px-3 py-2">
+                <table className="w-full border-collapse text-[13.5px]">
+                  <thead>
+                    <tr>
+                      {["Descripción", "Divisor", "Extra $", "Redondeo", "Fórmula resultante", ""].map((h, i) => (
+                        <th key={i} className="border-b-[1.5px] border-stone-300 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {descs.map((desc) => {
+                      const r = rowFor(c.marca, desc);
+                      return (
+                        <tr key={desc} className="hover:bg-teal-50">
+                          <td className="border-b border-stone-100 px-3 py-2">
+                            <span className="font-medium text-stone-900">{desc}</span>
+                            {r.saved && !r.dirty && <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">Excepción</span>}
+                          </td>
+                          <td className="border-b border-stone-100 px-3 py-2">
+                            <input type="number" step="0.01" value={r.divisor || ""} placeholder="—"
+                              onChange={(e) => patch(c.marca, desc, { divisor: Number(e.target.value) || 0 })} className={numCls} />
+                          </td>
+                          <td className="border-b border-stone-100 px-3 py-2">
+                            <select value={r.extra} onChange={(e) => patch(c.marca, desc, { extra: parseInt(e.target.value) })} className={selCls}>
+                              {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                            </select>
+                          </td>
+                          <td className="border-b border-stone-100 px-3 py-2">
+                            <select value={r.redondeo} onChange={(e) => patch(c.marca, desc, { redondeo: e.target.value as Redondeo })} className={selCls}>
+                              <option value="int">Entero</option>
+                              <option value="half">.50</option>
+                            </select>
+                          </td>
+                          <td className="border-b border-stone-100 px-3 py-2 font-mono text-[12px] text-stone-500">
+                            {r.divisor ? compactFormula(r) : <span className="text-stone-400">usa la de la marca</span>}
+                          </td>
+                          <td className="border-b border-stone-100 px-3 py-2 whitespace-nowrap">
+                            <button type="button" onClick={() => save(c.marca, desc)} disabled={busyKey === r.key}
+                              className={`rounded-md px-2 py-1 text-[12px] font-semibold transition disabled:opacity-50 ${r.dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
+                              {busyKey === r.key ? "…" : r.dirty ? "Guardar" : "Guardado"}
+                            </button>
+                            {flashKey === r.key && <span className="ml-2 text-[11px] font-semibold text-emerald-600">✓</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
