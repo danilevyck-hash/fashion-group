@@ -39,3 +39,21 @@ create policy service_role_all
   to service_role
   using (true)
   with check (true);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Pre-carga de fórmulas de Calvin Klein (empresa Vistana International).
+-- Idempotente: ON CONFLICT DO NOTHING no pisa lo que el usuario ya editó.
+-- Tommy (Fashion Wear / Fashion Shoes) queda vacío a propósito — se llena a mano
+-- en la pestaña de configuración del módulo.
+-- ─────────────────────────────────────────────────────────────────────────────
+insert into marca_formulas (marca, empresa, divisor, extra, redondeo) values
+  ('CK Accessories', 'Vistana International', 0.75, 0, 'int'),
+  ('CK Underwear',   'Vistana International', 0.73, 0, 'int'),
+  ('CK Jeans',       'Vistana International', 0.73, 0, 'int'),
+  ('CK Menswear',    'Vistana International', 0.73, 0, 'int'),
+  ('CK Footwear',    'Vistana International', 0.75, 0, 'int'),
+  ('CK Legwear',     'Vistana International', 0.63, 0, 'half'),
+  ('CK Kids',        'Vistana International', 0.75, 0, 'int'),
+  ('CK Swimwear',    'Vistana International', 0.75, 0, 'int'),
+  ('CK Womenswear',  'Vistana International', 0.73, 0, 'int')
+on conflict do nothing;

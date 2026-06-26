@@ -69,7 +69,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [factor, setFactor] = useState("1.1");
 
   // ── Precio (Tarea 2) ───────────────────────────────────────────────────────
-  const [priceMode, setPriceMode] = useState<"global" | "marca">("global");
+  // Default: cada marca toma su fórmula guardada. "global" sigue disponible.
+  const [priceMode, setPriceMode] = useState<"global" | "marca">("marca");
   // Fórmula global: "draft" se edita en vivo; "applied" maneja el cálculo de las
   // filas (se confirma con "Aplicar a todo"). Defaults del mockup: 0.73 / 2 / int.
   const [draftDivisor, setDraftDivisor] = useState("0.73");
