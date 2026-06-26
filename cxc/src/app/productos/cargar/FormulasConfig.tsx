@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EMPRESAS_DESTINO, MARCA_CATALOGO, norm, marcaKey, type Redondeo, type MarcaFormula } from "@/lib/depurador/logic";
+import RubroExcepciones from "./RubroExcepciones";
 
 interface EditRow {
   id: string;
@@ -238,6 +239,9 @@ export default function FormulasConfig() {
           </div>
         );
       })}
+
+      {/* Excepciones por marca + rubro (prioridad sobre la fórmula de la marca) */}
+      <RubroExcepciones />
     </div>
   );
 }
