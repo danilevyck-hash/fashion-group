@@ -156,18 +156,19 @@ function buildDesc(cat: Cell): string {
   return c.trim();
 }
 
-// rubro = cola de la descripción (después del 1er guion) con "/" -> "-"
-// Ej: "Men-T-Shirts S/S" -> "T-Shirts S-S"  |  "Unisex-Home" -> "Home"
+// rubro = lo que va ANTES del primer guion (el género), case tal cual.
+// Ej: "Men-T-Shirts S/S" -> "Men"  |  "Women-Bras" -> "Women"
 function buildRubro(desc: string): string {
   const i = desc.indexOf("-");
-  const cola = (i === -1 ? desc : desc.slice(i + 1));
-  return cola.replace(/\//g, "-").trim();
+  return (i === -1 ? desc : desc.slice(0, i)).trim();
 }
 
-// subrubro = primera palabra de la descripción / género (MEN, WOMEN, UNISEX...)
+// subrubro = lo que va DESPUÉS del primer guion; los "-" restantes -> "/".
+// Ej: "Men-Pant Non-Denim" -> "Pant Non/Denim"  |  "Women-Bras" -> "Bras"
 function buildSubrubro(desc: string): string {
   const i = desc.indexOf("-");
-  return (i === -1 ? desc : desc.slice(0, i)).trim().toUpperCase();
+  const tail = i === -1 ? "" : desc.slice(i + 1);
+  return tail.replace(/-/g, "/").trim();
 }
 
 interface RawItem {
