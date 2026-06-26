@@ -27,9 +27,10 @@ import {
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
-// Columnas clave que se muestran en la vista previa (la talla va aparte, editable).
+// Columnas que se muestran en la vista previa (la talla va aparte, editable).
+// rubro/subrubro se ocultan de la VISTA pero siguen yendo en el Excel (OUT_COLS).
 const PREVIEW_COLS = [
-  "Código *", "Código Barra *", "Descripción *", "rubro *", "subrubro",
+  "Código *", "Código Barra *", "Descripción *",
   "Precio *", "Costo FOB *", "Costo CIF *", "Stock Ideal", "Marca *",
 ];
 
@@ -59,7 +60,6 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [processed, setProcessed] = useState<ProcessedRow[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [destino, setDestino] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [downloading, setDownloading] = useState(false);
 
@@ -113,9 +113,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         setDescFilter("");
         setMassPrice("");
         setError("");
-        // Empresa destino: aviso del archivo + preselección del dropdown (Tarea 3)
+        // Empresa destino: preselección del dropdown desde el archivo (Tarea 3)
         const dest = rows.find((r) => r.destino)?.destino || "";
-        setDestino(dest);
         const match = matchEmpresaFromDestino(dest);
         if (match) setEmpresa(match);
       } catch (err) {
@@ -150,7 +149,6 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     setWarnings([]);
     setError("");
     setFileName("");
-    setDestino("");
     setEmpresa("");
     setPriceEdits({});
     setSelected(new Set());
@@ -376,13 +374,10 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Masthead compacto */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 border-b border-stone-300 pb-2.5">
+      <div className="mb-4 border-b border-stone-300 pb-2.5">
         <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
           Depurador de Productos
         </h1>
-        <span className="text-[12px] text-stone-500">
-          Excel del proveedor → plantilla de Switch · todo ocurre en tu navegador
-        </span>
       </div>
 
       {/* Drop zone */}
@@ -403,7 +398,6 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         <div className="text-base font-semibold text-stone-900">
           {fileName || "Suelta el archivo aquí o haz clic para buscar"}
         </div>
-        <div className="mt-1.5 text-[13px] text-stone-500">Acepta .xlsx y .xls del proveedor</div>
         <input
           ref={inputRef}
           type="file"
@@ -516,14 +510,6 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
               </button>
             </div>
           </div>
-
-          {destino && (
-            <p className="mb-3 rounded-md border border-stone-300 border-l-[3px] border-l-teal-600 bg-white px-3 py-1.5 text-[13px] text-stone-700">
-              <span className="text-stone-500">Destino del archivo:</span>{" "}
-              <b className="font-semibold uppercase tracking-wide text-teal-800">{destino}</b>{" "}
-              — verifica que estás subiendo a esta empresa en Switch.
-            </p>
-          )}
 
           {/* Stats slim */}
           <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600">
@@ -657,10 +643,6 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-2 text-[12px] text-stone-500">
-                  Las marcas con fórmula guardada aplican solas. Las que dicen &quot;Sin guardar&quot; usan lo que
-                  pongas aquí; puedes guardarla para la próxima.
-                </p>
               </>
             )}
           </div>
