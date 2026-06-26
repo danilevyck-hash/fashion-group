@@ -322,19 +322,14 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      {/* Masthead */}
-      <div className="mb-7 border-b-2 border-stone-900 pb-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700">
-          Fashion Group · Carga a Switch
-        </div>
-        <h1 className="mt-1 font-serif text-3xl font-semibold tracking-tight text-stone-900">
+      {/* Masthead compacto */}
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-3 border-b border-stone-300 pb-2.5">
+        <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
           Depurador de Productos
         </h1>
-        <p className="mt-1.5 max-w-xl text-sm text-stone-500">
-          Arrastra el Excel del proveedor (Tommy / Calvin Klein). La herramienta colapsa las
-          tallas a un estilo por fila y arma la plantilla lista para subir a Switch. Todo el
-          proceso ocurre en tu navegador — el archivo no sale de tu computadora.
-        </p>
+        <span className="text-[12px] text-stone-500">
+          Excel del proveedor → plantilla de Switch · todo ocurre en tu navegador
+        </span>
       </div>
 
       {/* Drop zone */}
@@ -347,11 +342,11 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
           setDragging(false);
           if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
         }}
-        className={`mb-6 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-11 text-center transition ${
+        className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
           dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
         }`}
       >
-        <UploadCloud className="mb-3 h-10 w-10 text-teal-800" strokeWidth={1.6} />
+        <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
         <div className="text-base font-semibold text-stone-900">
           {fileName || "Suelta el archivo aquí o haz clic para buscar"}
         </div>
@@ -365,8 +360,13 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         />
       </label>
 
-      {/* Config */}
-      <div className="mb-6 grid grid-cols-2 gap-3.5 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-4">
+      {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 7) */}
+      <details className="mb-4 rounded-xl border border-stone-200 bg-white">
+        <summary className="cursor-pointer list-none px-4 py-2.5 text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
+          <span className="text-stone-400">▸</span> Temporada y costos
+          <span className="ml-1.5 text-stone-500">· {MESES[mesIdx]}-{anio} · tasa {tasa} · factor {factor}</span>
+        </summary>
+        <div className="grid grid-cols-2 gap-3.5 border-t border-stone-200 p-4 sm:grid-cols-4">
         <Field label="Mes de entrada (temporada)" note="Se graba como fecha de ingreso del producto.">
           <select
             value={mesIdx}
@@ -397,7 +397,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
             className={inputCls}
           />
         </Field>
-      </div>
+        </div>
+      </details>
 
       {/* Error */}
       {error && (
@@ -409,14 +410,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
       {processed && processed.length > 0 && (
         <>
-          {/* Banners */}
-          <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            <span aria-hidden>✓</span>
-            <div>
-              <b className="font-semibold">Listo.</b> {processed.length} estilos procesados.
-              Revisa la vista previa y descarga la plantilla.
-            </div>
-          </div>
+          {/* Avisos */}
           {warnings.length > 0 && (
             <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <span aria-hidden>!</span>
@@ -440,10 +434,10 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
             </div>
           )}
 
-          {/* Empresa destino (Tarea 3) */}
-          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+          {/* Barra compacta: empresa destino + acciones (Tarea 3) */}
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-xl border border-stone-200 bg-white p-3">
+            <div className="min-w-[220px] flex-1">
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">
                 Empresa destino en Switch
               </label>
               <select value={empresa} onChange={(e) => setEmpresa(e.target.value)} className={selectCls}>
@@ -452,39 +446,38 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                   <option key={e.key} value={e.key}>{e.label} ({e.marca})</option>
                 ))}
               </select>
-              {destino && (
-                <p className="mt-1.5 rounded-md border border-stone-300 border-l-[3px] border-l-teal-600 bg-white px-3 py-2 text-[13px] text-stone-700">
-                  <span className="text-stone-500">Destino del archivo:</span>{" "}
-                  <b className="font-semibold uppercase tracking-wide text-teal-800">{destino}</b>{" "}
-                  — verifica que estás subiendo a esta empresa en Switch.
-                </p>
-              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={download}
+                disabled={downloading}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+              >
+                {downloading ? "Generando…" : "Descargar plantilla"}
+              </button>
+              <button
+                onClick={reset}
+                className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
+              >
+                Otro archivo
+              </button>
             </div>
           </div>
 
-          {/* Resumen */}
-          <div className="mb-4 flex overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <Stat n={String(processed.length)} l="Estilos" />
-            <Stat n={totalUnits.toLocaleString()} l="Unidades totales" />
-            <Stat n={String(marcas.length)} l="Marca(s)" />
-            <Stat n={String(processed[0].cols["Temporada"])} l="Temporada" last />
-          </div>
+          {destino && (
+            <p className="mb-3 rounded-md border border-stone-300 border-l-[3px] border-l-teal-600 bg-white px-3 py-1.5 text-[13px] text-stone-700">
+              <span className="text-stone-500">Destino del archivo:</span>{" "}
+              <b className="font-semibold uppercase tracking-wide text-teal-800">{destino}</b>{" "}
+              — verifica que estás subiendo a esta empresa en Switch.
+            </p>
+          )}
 
-          {/* Acciones */}
-          <div className="mb-6 flex flex-wrap gap-3">
-            <button
-              onClick={download}
-              disabled={downloading}
-              className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
-            >
-              {downloading ? "Generando…" : "Descargar plantilla para Switch"}
-            </button>
-            <button
-              onClick={reset}
-              className="rounded-lg border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
-            >
-              Cargar otro archivo
-            </button>
+          {/* Stats slim */}
+          <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600">
+            <span><b className="font-semibold text-stone-900">{processed.length}</b> estilos</span>
+            <span><b className="font-semibold text-stone-900">{totalUnits.toLocaleString()}</b> unidades</span>
+            <span><b className="font-semibold text-stone-900">{marcas.length}</b> marca(s)</span>
+            <span>Temporada <b className="font-semibold text-stone-900">{String(processed[0].cols["Temporada"])}</b></span>
           </div>
 
           {/* Cálculo de precio (Tarea 2) */}
@@ -746,15 +739,6 @@ function Field({ label, note, children }: { label: string; note?: string; childr
       <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">{label}</label>
       {children}
       {note && <div className="mt-1 text-[11px] text-stone-500">{note}</div>}
-    </div>
-  );
-}
-
-function Stat({ n, l, last }: { n: string; l: string; last?: boolean }) {
-  return (
-    <div className={`flex-1 px-4 py-4 ${last ? "" : "border-r border-stone-200"}`}>
-      <div className="font-serif text-2xl font-semibold leading-none text-teal-800">{n}</div>
-      <div className="mt-1.5 text-[11px] uppercase tracking-wide text-stone-500">{l}</div>
     </div>
   );
 }
