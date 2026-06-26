@@ -17,11 +17,13 @@ import {
   marginPct,
   norm,
   marcaKey,
+  marcaRubroKey,
   TEXT_COLS,
   type ProcessedRow,
   type NamedSheet,
   type Redondeo,
   type MarcaFormula,
+  type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
@@ -98,6 +100,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [savedFormulas, setSavedFormulas] = useState<MarcaFormula[]>([]);
   const [marcaForms, setMarcaForms] = useState<Record<string, MarcaFormula>>({});
   const [savingMarca, setSavingMarca] = useState<string | null>(null);
+  // Excepciones por marca+rubro (tienen prioridad sobre la fórmula de la marca).
+  const [rubroFormulas, setRubroFormulas] = useState<MarcaRubroFormula[]>([]);
 
   // ── Selección masiva + filtro por descripción (Tareas 3 y 4) ────────────────
   const [descFilter, setDescFilter] = useState("");
@@ -182,8 +186,19 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
       .then((d) => { if (alive) setSavedFormulas(d.rows ?? []); })
       .catch(() => {});
+    fetch("/api/productos/cargar/rubro-formulas")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+      .then((d) => { if (alive) setRubroFormulas(d.rows ?? []); })
+      .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // Excepciones por marca+rubro indexadas por clave canónica.
+  const rubroByKey = useMemo(() => {
+    const m = new Map<string, MarcaRubroFormula>();
+    for (const f of rubroFormulas) m.set(marcaRubroKey(f.marca, f.rubro), f);
+    return m;
+  }, [rubroFormulas]);
 
   // Marcas únicas presentes en el Excel (key normalizada + etiqueta original).
   const marcasPresentes = useMemo(() => {
@@ -219,9 +234,12 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const formulaForRow = useCallback(
     (row: ProcessedRow): { divisor: number; extra: number; redondeo: Redondeo } | null => {
       if (priceMode === "global") return applied;
+      // PRIORIDAD: excepción por marca+rubro gana; si no, la fórmula de la marca.
+      const exc = rubroByKey.get(marcaRubroKey(row.cols["Marca *"], row.cols["rubro *"]));
+      if (exc && exc.divisor) return { divisor: exc.divisor, extra: exc.extra, redondeo: exc.redondeo };
       return marcaForms[marcaKey(row.cols["Marca *"])] ?? null;
     },
-    [priceMode, applied, marcaForms]
+    [priceMode, applied, marcaForms, rubroByKey]
   );
 
   const cifOf = (row: ProcessedRow): number | null => {
