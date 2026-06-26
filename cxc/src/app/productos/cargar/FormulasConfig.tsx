@@ -52,6 +52,7 @@ export default function FormulasConfig() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [subtab, setSubtab] = useState<"marca" | "descripcion">("marca");
   const newCounter = useRef(0);
 
   useEffect(() => {
@@ -141,6 +142,16 @@ export default function FormulasConfig() {
         hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
       </div>
 
+      {/* Subtabs (FIX 3) */}
+      <div className="mb-4 inline-flex rounded-lg border border-stone-200 bg-white p-1">
+        <SubTabBtn active={subtab === "marca"} onClick={() => setSubtab("marca")}>Por marca</SubTabBtn>
+        <SubTabBtn active={subtab === "descripcion"} onClick={() => setSubtab("descripcion")}>Por descripción</SubTabBtn>
+      </div>
+
+      {subtab === "descripcion" ? (
+        <RubroExcepciones />
+      ) : (
+      <>
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
       )}
@@ -239,15 +250,26 @@ export default function FormulasConfig() {
           </div>
         );
       })}
-
-      {/* Excepciones por marca + rubro (prioridad sobre la fórmula de la marca) */}
-      <RubroExcepciones />
+      </>
+      )}
     </div>
   );
 }
 
 // ── Celdas reutilizables ────────────────────────────────────────────────────
 const selCls = "rounded-md border border-stone-300 bg-stone-50 px-2 py-1 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+
+function SubTabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 function FormulaCells({ row, patchRow }: { row: EditRow; patchRow: (id: string, p: Partial<EditRow>) => void }) {
   return (

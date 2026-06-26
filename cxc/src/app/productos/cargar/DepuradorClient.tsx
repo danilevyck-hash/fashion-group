@@ -765,7 +765,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                       />
                     </th>
                     <Th>Talla</Th>
-                    {PREVIEW_COLS_RENDER.map((c) => <Th key={c} narrow={NARROW_COLS.has(c)}>{COL_HEAD[c] ?? c}</Th>)}
+                    {PREVIEW_COLS_RENDER.map((c) => <Th key={c} narrow={NARROW_COLS.has(c)} tight={c === "__calc"}>{COL_HEAD[c] ?? c}</Th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -812,7 +812,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                         {PREVIEW_COLS_RENDER.map((c) => {
                           if (c === "__calc") {
                             return (
-                              <td key="__calc" className="whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
+                              <td key="__calc" className="w-px whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
                                 {calcCell(ri, d)}
                               </td>
                             );
@@ -909,9 +909,9 @@ function Field({ label, note, children }: { label: string; note?: string; childr
   );
 }
 
-function Th({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
+function Th({ children, narrow, tight }: { children: React.ReactNode; narrow?: boolean; tight?: boolean }) {
   return (
-    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
+    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"} ${tight ? "w-px" : ""}`}>
       {children}
     </th>
   );

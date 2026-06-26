@@ -103,21 +103,17 @@ export default function RubroExcepciones() {
     setSaved((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch, dirty: true } : x)));
 
   return (
-    <div className="mt-8">
-      <div className="mb-1 flex items-center justify-between gap-3 border-b-2 border-amber-300 pb-2">
-        <div>
-          <h3 className="text-[15px] font-bold text-stone-900">Excepciones por rubro</h3>
-          <p className="text-[12px] text-stone-500">
-            Sobrescriben la fórmula de la marca para un rubro específico (ej. CK Underwear · BOXER BRIEF).
-            <b className="text-amber-700"> Tienen prioridad</b> sobre la fórmula de la marca.
-          </p>
-        </div>
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="max-w-xl text-[13px] text-stone-600">
+          Una descripción puede tener su propia fórmula. Si existe, se usa esa en vez de la fórmula de la marca.
+        </p>
         <button
           type="button"
           onClick={addDraft}
           className="whitespace-nowrap rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
         >
-          + Agregar excepción
+          + Agregar
         </button>
       </div>
 
@@ -127,7 +123,7 @@ export default function RubroExcepciones() {
         <table className="mt-3 w-full border-collapse text-[13.5px]">
           <thead>
             <tr>
-              {["Marca", "Rubro", "Divisor", "Extra $", "Redondeo", "Fórmula resultante", ""].map((h, i) => (
+              {["Marca", "Descripción", "Divisor", "Extra $", "Redondeo", "Fórmula resultante", ""].map((h, i) => (
                 <th key={i} className="border-b-[1.5px] border-stone-300 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">{h}</th>
               ))}
             </tr>
@@ -205,7 +201,7 @@ export default function RubroExcepciones() {
         </table>
       ) : (
         <p className="py-6 text-center text-[13px] text-stone-400">
-          No hay excepciones. Usa &quot;Agregar excepción&quot; para crear una (ej. CK Underwear · BOXER BRIEF · 0.62).
+          Ninguna descripción tiene fórmula propia todavía. Usa &quot;Agregar&quot; para crear una.
         </p>
       )}
     </div>
