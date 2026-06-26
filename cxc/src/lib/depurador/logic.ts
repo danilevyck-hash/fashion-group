@@ -502,6 +502,15 @@ export function calcHint(cif: number | null | undefined, f: { divisor: number; e
   return `${Number(cif).toFixed(2)}÷${f.divisor}${f.extra > 0 ? "+" + f.extra : ""}`;
 }
 
+/** Margen REAL post-redondeo, en % entero: (precioFinal − CIF) / precioFinal.
+ *  Se trunca a entero (no redondea hacia arriba) para no inflar el margen.
+ *  Ej: CIF 13.20, precio 19 → 30%. null si falta CIF o el precio es ≤ 0. */
+export function marginPct(cif: number | null | undefined, finalPrice: number | null | undefined): number | null {
+  if (cif === null || cif === undefined || finalPrice === null || finalPrice === undefined) return null;
+  if (!Number.isFinite(cif) || !Number.isFinite(finalPrice) || finalPrice <= 0) return null;
+  return Math.floor(((finalPrice - cif) / finalPrice) * 100);
+}
+
 /* ============ TOTALES PARA HISTORIAL (Tarea 4) ============ */
 export interface CargaTotales {
   cantidad_estilos: number;

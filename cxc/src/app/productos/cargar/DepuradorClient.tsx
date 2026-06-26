@@ -14,7 +14,7 @@ import {
   computeTotales,
   calcPrecio,
   formulaText,
-  calcHint,
+  marginPct,
   norm,
   marcaKey,
   TEXT_COLS,
@@ -27,17 +27,29 @@ import {
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
-// Columnas que se muestran en la vista previa (la talla va aparte, editable).
-// rubro/subrubro se ocultan de la VISTA pero siguen yendo en el Excel (OUT_COLS).
-const PREVIEW_COLS = [
-  "Código *", "Código Barra *", "Descripción *",
-  "Precio *", "Costo FOB *", "Costo CIF *", "Stock Ideal", "Marca *",
+// Orden de columnas de la vista previa (la talla y el checkbox van aparte).
+// rubro/subrubro NO se muestran pero siguen yendo en el Excel (OUT_COLS).
+// Precio queda entre C. CIF y Stock (A4).
+const PREVIEW_COLS_RENDER = [
+  "Código *", "Código Barra *", "Descripción *", "__calc",
+  "Costo FOB *", "Costo CIF *", "Precio *", "Stock Ideal", "Marca *",
 ];
 
-// Orden de render: inserta una columna "Cálculo" (__calc) antes del Precio.
-const PREVIEW_COLS_RENDER: string[] = PREVIEW_COLS.flatMap((c) =>
-  c === "Precio *" ? ["__calc", c] : [c]
-);
+// Encabezados abreviados para que la tabla quepa sin scroll lateral (A3).
+const COL_HEAD: Record<string, string> = {
+  "__calc": "Cálculo",
+  "Código *": "Código",
+  "Código Barra *": "Código Barra",
+  "Descripción *": "Descripción",
+  "Costo FOB *": "C. FOB",
+  "Costo CIF *": "C. CIF",
+  "Precio *": "Precio",
+  "Stock Ideal": "Stock",
+  "Marca *": "Marca",
+};
+
+// Columnas numéricas estrechas (ancho mínimo al contenido).
+const NARROW_COLS = new Set(["__calc", "Costo FOB *", "Costo CIF *", "Precio *", "Stock Ideal"]);
 
 interface DepuradorClientProps {
   /** Callback al descargar — registra el historial liviano en el server (Tarea 4). */
@@ -240,6 +252,20 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     return a === null ? "" : String(a);
   };
 
+  // Texto de la columna "Cálculo": divisor (+extra) y margen REAL post-redondeo (A6).
+  // Si el precio fue editado a mano, solo el margen (la fórmula ya no aplica).
+  const calcCell = (i: number, row: ProcessedRow): string => {
+    const cif = cifOf(row);
+    const fp = finalPrice(i, row);
+    const m = marginPct(cif, fp);
+    const mTxt = m === null ? "" : `${m}%`;
+    if (priceEdits[i] !== undefined) return mTxt ? `· ${mTxt}` : "—"; // editado a mano
+    const f = formulaForRow(row);
+    if (!f || !f.divisor) return "—";
+    const ex = f.extra > 0 ? `+${f.extra}` : "";
+    return mTxt ? `÷${f.divisor}${ex} · ${mTxt}` : `÷${f.divisor}${ex}`;
+  };
+
   const onPriceEdit = (i: number, value: string) =>
     setPriceEdits((prev) => ({ ...prev, [i]: value }));
 
@@ -283,7 +309,10 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     const q = norm(descFilter);
     return processed
       .map((d, ri) => ({ d, ri }))
-      .filter(({ d }) => !q || norm(d.cols["Descripción *"]).includes(q));
+      .filter(({ d }) => !q || norm(d.cols["Descripción *"]).includes(q))
+      // Orden alfabético por Descripción por default (A5). Solo la vista; el
+      // índice ri original se mantiene para selección/edición/descarga.
+      .sort((a, b) => String(a.d.cols["Descripción *"] || "").localeCompare(String(b.d.cols["Descripción *"] || ""), "es"));
   }, [processed, descFilter]);
 
   const visibleIdx = useMemo(() => visibleRows.map((r) => r.ri), [visibleRows]);
@@ -409,9 +438,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
       {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 7) */}
       <details className="mb-4 rounded-xl border border-stone-200 bg-white">
-        <summary className="cursor-pointer list-none px-4 py-2.5 text-[13px] font-medium text-stone-600 [&::-webkit-details-marker]:hidden">
-          <span className="text-stone-400">▸</span> Temporada y costos
-          <span className="ml-1.5 text-stone-500">· {MESES[mesIdx]}-{anio} · tasa {tasa} · factor {factor}</span>
+        <summary className="cursor-pointer list-none px-4 py-2 text-[12px] font-medium text-stone-500 [&::-webkit-details-marker]:hidden">
+          <span className="text-stone-400">▸</span> Editar temporada y costos
         </summary>
         <div className="grid grid-cols-2 gap-3.5 border-t border-stone-200 p-4 sm:grid-cols-4">
         <Field label="Mes de entrada (temporada)" note="Se graba como fecha de ingreso del producto.">
@@ -481,61 +509,62 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
             </div>
           )}
 
-          {/* Barra compacta: empresa destino + acciones (Tarea 3) */}
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3 rounded-xl border border-stone-200 bg-white p-3">
-            <div className="min-w-[220px] flex-1">
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-stone-500">
-                Empresa destino en Switch
-              </label>
-              <select value={empresa} onChange={(e) => setEmpresa(e.target.value)} className={selectCls}>
-                <option value="">Selecciona una empresa…</option>
-                {EMPRESAS_DESTINO.map((e) => (
-                  <option key={e.key} value={e.key}>{e.label} ({e.marca})</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={download}
-                disabled={downloading}
-                className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
-              >
-                {downloading ? "Generando…" : "Descargar plantilla"}
-              </button>
-              <button
-                onClick={reset}
-                className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
-              >
-                Otro archivo
-              </button>
-            </div>
+          {/* Barra compacta: empresa destino + acciones (Tarea 3 / A2) */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 py-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Destino</span>
+            <select value={empresa} onChange={(e) => setEmpresa(e.target.value)} className="min-w-[200px] flex-1 rounded-md border border-stone-300 bg-stone-50 px-2.5 py-1.5 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20">
+              <option value="">Selecciona una empresa…</option>
+              {EMPRESAS_DESTINO.map((e) => (
+                <option key={e.key} value={e.key}>{e.label} ({e.marca})</option>
+              ))}
+            </select>
+            <button
+              onClick={download}
+              disabled={downloading}
+              className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
+            >
+              {downloading ? "Generando…" : "Descargar plantilla"}
+            </button>
+            <button
+              onClick={reset}
+              className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97]"
+            >
+              Otro archivo
+            </button>
           </div>
 
-          {/* Stats slim */}
-          <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600">
+          {/* Stats slim — línea única fusionada (A1) */}
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-[13px] text-stone-600">
             <span><b className="font-semibold text-stone-900">{processed.length}</b> estilos</span>
+            <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{totalUnits.toLocaleString()}</b> unidades</span>
+            <span className="text-stone-300">·</span>
             <span><b className="font-semibold text-stone-900">{marcas.length}</b> marca(s)</span>
-            <span>Temporada <b className="font-semibold text-stone-900">{String(processed[0].cols["Temporada"])}</b></span>
+            <span className="text-stone-300">·</span>
+            <span className="font-semibold text-stone-900">{String(processed[0].cols["Temporada"])}</span>
+            <span className="text-stone-300">·</span>
+            <span>tasa {tasa}</span>
+            <span className="text-stone-300">·</span>
+            <span>factor {factor}</span>
           </div>
 
-          {/* Cálculo de precio (Tarea 2) */}
-          <div className="mb-5 rounded-xl border border-stone-200 bg-white p-5">
-            <div className="mb-3.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
+          {/* Cálculo de precio (Tarea 2 / A2) */}
+          <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+            <div className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
               ¿Cómo calcular los precios?
             </div>
-            <div className="mb-4 flex overflow-hidden rounded-lg border border-stone-300">
+            <div className="mb-3 flex overflow-hidden rounded-lg border border-stone-300">
               <ModeBtn
                 active={priceMode === "global"}
                 onClick={() => setPriceMode("global")}
-                title="Una fórmula para todo el Excel"
-                desc="Defines un divisor + extra y aplica a todas las filas. Ideal cuando el Excel es de una sola marca."
+                title="Una fórmula para todo"
+                desc="Un divisor + extra para todas las filas."
               />
               <ModeBtn
                 active={priceMode === "marca"}
                 onClick={() => setPriceMode("marca")}
                 title="Fórmula guardada por marca"
-                desc="Cada marca usa su fórmula guardada en el sistema. Útil si el Excel mezcla marcas."
+                desc="Cada marca usa su fórmula guardada."
                 last
               />
             </div>
@@ -687,10 +716,10 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
               </div>
             )}
             <div className="max-h-[440px] overflow-auto">
-              <table className="w-full border-collapse whitespace-nowrap text-[12.5px] tabular-nums">
+              <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
                 <thead>
                   <tr>
-                    <th className="sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-3 py-2.5">
+                    <th className="sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5">
                       <input
                         type="checkbox"
                         ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
@@ -700,8 +729,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                         aria-label="Seleccionar todo lo visible"
                       />
                     </th>
-                    <Th>Talla EAN</Th>
-                    {PREVIEW_COLS_RENDER.map((c) => <Th key={c}>{c === "__calc" ? "Cálculo" : c.replace(" *", "")}</Th>)}
+                    <Th>Talla</Th>
+                    {PREVIEW_COLS_RENDER.map((c) => <Th key={c} narrow={NARROW_COLS.has(c)}>{COL_HEAD[c] ?? c}</Th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -716,7 +745,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                     const edited = d.talla !== d.tallaAuto || d.fallback;
                     return (
                       <tr key={ri} className="hover:bg-teal-50">
-                        <td className="border-b border-stone-100 px-3 py-2">
+                        <td className="border-b border-stone-100 px-2 py-2">
                           <input
                             type="checkbox"
                             checked={selected.has(ri)}
@@ -725,13 +754,13 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                             aria-label={`Seleccionar fila ${ri + 1}`}
                           />
                         </td>
-                        <td className="border-b border-stone-100 px-3 py-2">
+                        <td className="border-b border-stone-100 px-2 py-2">
                           {tallas.length > 1 ? (
                             <select
                               value={d.talla}
                               onChange={(e) => onTallaChange(ri, e.target.value)}
                               title={d.fallback ? "La regla no encontró la talla esperada. Revisa." : undefined}
-                              className={`rounded-md border px-1.5 py-0.5 text-xs ${
+                              className={`rounded-md border px-1 py-0.5 text-xs ${
                                 edited
                                   ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
                                   : "border-stone-300 bg-white text-stone-900"
@@ -748,19 +777,19 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                         {PREVIEW_COLS_RENDER.map((c) => {
                           if (c === "__calc") {
                             return (
-                              <td key="__calc" className="border-b border-stone-100 px-3 py-2 font-mono text-[11px] text-stone-400">
-                                {calcHint(cifOf(d), formulaForRow(d))}
+                              <td key="__calc" className="whitespace-nowrap border-b border-stone-100 px-2 py-2 text-right font-mono text-[11px] text-stone-400">
+                                {calcCell(ri, d)}
                               </td>
                             );
                           }
                           if (c === "Precio *") {
                             const priceEdited = priceEdits[ri] !== undefined;
                             return (
-                              <td key={c} className="border-b border-stone-100 px-3 py-2">
+                              <td key={c} className="border-b border-stone-100 px-2 py-2 text-right">
                                 <input
                                   value={displayPrice(ri, d)}
                                   onChange={(e) => onPriceEdit(ri, e.target.value)}
-                                  className={`w-16 rounded-md border px-1.5 py-0.5 text-right font-mono text-xs ${
+                                  className={`w-14 rounded-md border px-1 py-0.5 text-right font-mono text-xs ${
                                     priceEdited
                                       ? "border-amber-600 bg-amber-50 font-semibold text-amber-800"
                                       : "border-stone-300 bg-white text-stone-900"
@@ -771,12 +800,18 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                           }
                           const v = d.cols[c];
                           const empty = v === null || v === undefined || v === "";
-                          const mono = c === "Código Barra *";
+                          const narrow = NARROW_COLS.has(c);
+                          const isBarcode = c === "Código Barra *";
+                          const isCodigo = c === "Código *";
+                          const cls = isBarcode
+                            ? "font-mono text-[11px] break-all"
+                            : isCodigo
+                              ? "font-mono text-[11px]"
+                              : narrow
+                                ? "whitespace-nowrap text-right"
+                                : "";
                           return (
-                            <td
-                              key={c}
-                              className={`border-b border-stone-100 px-3 py-2 ${mono ? "font-mono text-xs" : ""}`}
-                            >
+                            <td key={c} className={`border-b border-stone-100 px-2 py-2 ${cls}`}>
                               {empty ? <span className="text-stone-300">—</span> : v}
                             </td>
                           );
@@ -815,13 +850,13 @@ function ModeBtn({ active, onClick, title, desc, last }: { active: boolean; onCl
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 px-4 py-3.5 text-left transition ${last ? "" : "border-r border-stone-200"} ${active ? "bg-teal-50" : "bg-white hover:bg-stone-50"}`}
+      className={`flex-1 px-3 py-2 text-left transition ${last ? "" : "border-r border-stone-200"} ${active ? "bg-teal-50" : "bg-white hover:bg-stone-50"}`}
     >
       <div className="flex items-center gap-2">
-        <span className={`h-4 w-4 flex-shrink-0 rounded-full border-2 ${active ? "border-teal-600 bg-teal-600 ring-2 ring-inset ring-white" : "border-stone-300"}`} />
-        <span className={`text-sm font-semibold ${active ? "text-teal-800" : "text-stone-900"}`}>{title}</span>
+        <span className={`h-3.5 w-3.5 flex-shrink-0 rounded-full border-2 ${active ? "border-teal-600 bg-teal-600 ring-2 ring-inset ring-white" : "border-stone-300"}`} />
+        <span className={`text-[13px] font-semibold ${active ? "text-teal-800" : "text-stone-900"}`}>{title}</span>
       </div>
-      <div className="mt-1 text-xs text-stone-500">{desc}</div>
+      <div className="mt-0.5 pl-[22px] text-[11px] text-stone-500">{desc}</div>
     </button>
   );
 }
@@ -836,9 +871,9 @@ function Field({ label, note, children }: { label: string; note?: string; childr
   );
 }
 
-function Th({ children }: { children: React.ReactNode }) {
+function Th({ children, narrow }: { children: React.ReactNode; narrow?: boolean }) {
   return (
-    <th className="sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-600">
+    <th className={`sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-2 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-stone-600 ${narrow ? "whitespace-nowrap text-right" : "text-left"}`}>
       {children}
     </th>
   );
