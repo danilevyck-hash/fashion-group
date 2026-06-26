@@ -466,6 +466,21 @@ export interface MarcaFormula {
   redondeo: Redondeo;
 }
 
+/** Excepción de fórmula por marca + rubro. Tiene prioridad sobre la de la marca. */
+export interface MarcaRubroFormula {
+  id?: string;
+  marca: string;
+  rubro: string;
+  divisor: number;
+  extra: number;
+  redondeo: Redondeo;
+}
+
+/** Clave canónica de una excepción por marca+rubro (insensible a caja/espacios). */
+export function marcaRubroKey(marca: Cell, rubro: Cell): string {
+  return `${marcaKey(marca)}|||${marcaKey(rubro)}`;
+}
+
 /** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).
  *  Se redondea antes a 4 decimales para matar polvo de punto flotante. */
 export function ceilInt(x: number): number {
