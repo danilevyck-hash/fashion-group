@@ -86,6 +86,11 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [marcaForms, setMarcaForms] = useState<Record<string, MarcaFormula>>({});
   const [savingMarca, setSavingMarca] = useState<string | null>(null);
 
+  // ── Selección masiva + filtro por descripción (Tareas 3 y 4) ────────────────
+  const [descFilter, setDescFilter] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [massPrice, setMassPrice] = useState("");
+
   const runFile = useCallback(
     async (file: File, cfg: { mesIdx: number; anio: string; tasa: string; factor: string }) => {
       setFileName(file.name);
@@ -103,6 +108,9 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         setProcessed(rows);
         setWarnings(w);
         setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
+        setSelected(new Set());
+        setDescFilter("");
+        setMassPrice("");
         setError("");
         // Empresa destino: aviso del archivo + preselección del dropdown (Tarea 3)
         const dest = rows.find((r) => r.destino)?.destino || "";
@@ -144,6 +152,9 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     setDestino("");
     setEmpresa("");
     setPriceEdits({});
+    setSelected(new Set());
+    setDescFilter("");
+    setMassPrice("");
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -266,6 +277,47 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   };
 
   const draftFormulaTxt = formulaText({ divisor: Number(draftDivisor) || 0, extra: draftExtra, redondeo: draftRedondeo });
+
+  // ── Filtro por descripción (visual) + selección masiva de precio ────────────
+  const visibleRows = useMemo(() => {
+    if (!processed) return [] as { d: ProcessedRow; ri: number }[];
+    const q = norm(descFilter);
+    return processed
+      .map((d, ri) => ({ d, ri }))
+      .filter(({ d }) => !q || norm(d.cols["Descripción *"]).includes(q));
+  }, [processed, descFilter]);
+
+  const visibleIdx = useMemo(() => visibleRows.map((r) => r.ri), [visibleRows]);
+  const allVisibleSelected = visibleIdx.length > 0 && visibleIdx.every((i) => selected.has(i));
+  const someVisibleSelected = visibleIdx.some((i) => selected.has(i));
+
+  const onFilterChange = (v: string) => { setDescFilter(v); setSelected(new Set()); };
+
+  const toggleRow = (i: number) =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(i)) n.delete(i); else n.add(i);
+      return n;
+    });
+
+  const toggleAllVisible = () =>
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (visibleIdx.every((i) => prev.has(i))) visibleIdx.forEach((i) => n.delete(i));
+      else visibleIdx.forEach((i) => n.add(i));
+      return n;
+    });
+
+  // Aplica un precio a las filas seleccionadas (marca cada una como editada a mano).
+  const applyMassPrice = () => {
+    if (selected.size === 0) return;
+    setPriceEdits((prev) => {
+      const n = { ...prev };
+      selected.forEach((i) => { n[i] = massPrice; });
+      return n;
+    });
+    setSelected(new Set());
+  };
 
   const download = async () => {
     if (!processed || downloading) return;
@@ -614,24 +666,82 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
           {/* Preview */}
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-stone-500">
-              <span>Vista previa · un estilo por fila · talla y precio editables</span>
-              <span>{processed.length} filas</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 px-4 py-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Vista previa · talla y precio editables
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  value={descFilter}
+                  onChange={(e) => onFilterChange(e.target.value)}
+                  placeholder="Filtrar por descripción…"
+                  className="w-52 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                />
+                <span className="whitespace-nowrap text-[12px] text-stone-500">
+                  {descFilter ? `${visibleRows.length} de ${processed.length}` : `${processed.length} filas`}
+                </span>
+              </div>
             </div>
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-teal-50 px-4 py-2.5">
+                <span className="text-[13px] font-medium text-teal-900">{selected.size} seleccionada(s)</span>
+                <input
+                  value={massPrice}
+                  onChange={(e) => setMassPrice(e.target.value)}
+                  placeholder="Precio"
+                  className="w-24 rounded-md border border-stone-300 bg-white px-2 py-1 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+                />
+                <button
+                  type="button"
+                  onClick={applyMassPrice}
+                  className="rounded-md bg-teal-600 px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
+                >
+                  Poner precio a seleccionadas
+                </button>
+                <button type="button" onClick={() => setSelected(new Set())} className="text-[12px] font-medium text-stone-500 transition hover:text-stone-800">
+                  Limpiar
+                </button>
+              </div>
+            )}
             <div className="max-h-[440px] overflow-auto">
               <table className="w-full border-collapse whitespace-nowrap text-[12.5px] tabular-nums">
                 <thead>
                   <tr>
+                    <th className="sticky top-0 border-b-[1.5px] border-stone-300 bg-stone-100 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
+                        checked={allVisibleSelected}
+                        onChange={toggleAllVisible}
+                        className="h-3.5 w-3.5 accent-teal-600"
+                        aria-label="Seleccionar todo lo visible"
+                      />
+                    </th>
                     <Th>Talla EAN</Th>
                     {PREVIEW_COLS_RENDER.map((c) => <Th key={c}>{c === "__calc" ? "Cálculo" : c.replace(" *", "")}</Th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {processed.map((d, ri) => {
+                  {visibleRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={PREVIEW_COLS_RENDER.length + 2} className="px-4 py-8 text-center text-stone-400">
+                        Ninguna fila coincide con &quot;{descFilter}&quot;.
+                      </td>
+                    </tr>
+                  ) : visibleRows.map(({ d, ri }) => {
                     const tallas = Object.keys(d.tallaMap || {});
                     const edited = d.talla !== d.tallaAuto || d.fallback;
                     return (
                       <tr key={ri} className="hover:bg-teal-50">
+                        <td className="border-b border-stone-100 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(ri)}
+                            onChange={() => toggleRow(ri)}
+                            className="h-3.5 w-3.5 accent-teal-600"
+                            aria-label={`Seleccionar fila ${ri + 1}`}
+                          />
+                        </td>
                         <td className="border-b border-stone-100 px-3 py-2">
                           {tallas.length > 1 ? (
                             <select
