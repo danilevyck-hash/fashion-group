@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EMPRESAS_DESTINO, MARCA_CATALOGO, norm, marcaKey, type Redondeo, type MarcaFormula } from "@/lib/depurador/logic";
 import DescripcionFormulas from "./DescripcionFormulas";
+import BulkExcel from "./BulkExcel";
 
 interface EditRow {
   id: string;
@@ -53,6 +54,7 @@ export default function FormulasConfig() {
   const [flashId, setFlashId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [subtab, setSubtab] = useState<"marca" | "descripcion">("marca");
+  const [reloadKey, setReloadKey] = useState(0);
   const newCounter = useRef(0);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function FormulasConfig() {
       })
       .catch(() => { if (alive) setError("No se pudieron cargar las fórmulas guardadas (el catálogo igual está editable)."); });
     return () => { alive = false; };
-  }, []);
+  }, [reloadKey]);
 
   const patchRow = (id: string, patch: Partial<EditRow>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch, dirty: true } : r)));
@@ -142,6 +144,9 @@ export default function FormulasConfig() {
         hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
       </div>
 
+      {/* Edición en masa por Excel (visible desde ambos subtabs) */}
+      <BulkExcel onDone={() => setReloadKey((k) => k + 1)} />
+
       {/* Subtabs (FIX 3) */}
       <div className="mb-4 inline-flex rounded-lg border border-stone-200 bg-white p-1">
         <SubTabBtn active={subtab === "marca"} onClick={() => setSubtab("marca")}>Por marca</SubTabBtn>
@@ -149,7 +154,7 @@ export default function FormulasConfig() {
       </div>
 
       {subtab === "descripcion" ? (
-        <DescripcionFormulas />
+        <DescripcionFormulas refreshKey={reloadKey} />
       ) : (
       <>
       {error && (
