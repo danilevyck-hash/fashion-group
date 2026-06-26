@@ -399,6 +399,42 @@ export function matchEmpresaFromDestino(destinoRaw: string): string | null {
   return null;
 }
 
+/* ============ CATÁLOGO FIJO DE MARCAS CK/TH ============ */
+export interface MarcaCatalogo {
+  marca: string;
+  empresa: string; // etiqueta de EMPRESAS_DESTINO, para agrupar en la config
+}
+
+// Catálogo fijo que la pantalla de Configuración SIEMPRE muestra como filas
+// editables, tenga o no fórmula guardada. CK → Vistana; TH apparel → Fashion Wear;
+// TH calzado → Fashion Shoes. Ampliar aquí si el proveedor agrega marcas.
+export const MARCA_CATALOGO: MarcaCatalogo[] = [
+  { marca: "CK Accessories", empresa: "Vistana International" },
+  { marca: "CK Display & Promo", empresa: "Vistana International" },
+  { marca: "CK Footwear", empresa: "Vistana International" },
+  { marca: "CK Jeans", empresa: "Vistana International" },
+  { marca: "CK Kids", empresa: "Vistana International" },
+  { marca: "CK Legwear", empresa: "Vistana International" },
+  { marca: "CK Menswear", empresa: "Vistana International" },
+  { marca: "CK Other", empresa: "Vistana International" },
+  { marca: "CK Swimwear", empresa: "Vistana International" },
+  { marca: "CK Underwear", empresa: "Vistana International" },
+  { marca: "CK Womenswear", empresa: "Vistana International" },
+  { marca: "TH Accessories", empresa: "Fashion Wear" },
+  { marca: "TH Display & Promo", empresa: "Fashion Wear" },
+  { marca: "TH Footwear", empresa: "Fashion Shoes" },
+  { marca: "TH Home", empresa: "Fashion Wear" },
+  { marca: "TH Kids", empresa: "Fashion Wear" },
+  { marca: "TH Legwear", empresa: "Fashion Wear" },
+  { marca: "TH License", empresa: "Fashion Wear" },
+  { marca: "TH Menswear", empresa: "Fashion Wear" },
+  { marca: "TH Other", empresa: "Fashion Wear" },
+  { marca: "TH Swimwear", empresa: "Fashion Wear" },
+  { marca: "TH Tommy Jeans", empresa: "Fashion Wear" },
+  { marca: "TH Underwear", empresa: "Fashion Wear" },
+  { marca: "TH Womenswear", empresa: "Fashion Wear" },
+];
+
 /* ============ FÓRMULA DE PRECIO POR MARCA ============ */
 // precio = CEILING(Costo CIF ÷ divisor) + extra, redondeado hacia arriba.
 // El Costo CIF YA es FOB × 1.1 (lo calcula processRows) — el divisor NO vuelve
