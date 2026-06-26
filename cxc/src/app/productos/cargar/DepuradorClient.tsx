@@ -602,50 +602,52 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
             {priceMode === "global" ? (
               <>
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[1.4fr_1fr_1.2fr_auto] sm:items-end">
-                  <div>
+                {/* Controles en una sola fila, alineados por la base, misma altura */}
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="w-36">
                     <label className={priceLabelCls}>Divisor</label>
                     <input
                       type="number" step="0.01" value={draftDivisor}
-                      onChange={(e) => setDraftDivisor(e.target.value)} className={inputCls}
+                      onChange={(e) => setDraftDivisor(e.target.value)} className={priceFieldCls}
                     />
-                    <div className="mt-1.5 flex gap-1.5">
-                      {DIVISOR_HINTS.map((h) => (
-                        <button
-                          key={h} type="button" onClick={() => setDraftDivisor(String(h))}
-                          className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
-                            Number(draftDivisor) === h
-                              ? "border-teal-600 bg-teal-600 text-white"
-                              : "border-stone-300 bg-white text-stone-500 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800"
-                          }`}
-                        >
-                          {h.toFixed(2)}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-                  <div>
+                  <div className="w-28">
                     <label className={priceLabelCls}>Extra $</label>
-                    <select value={draftExtra} onChange={(e) => setDraftExtra(parseInt(e.target.value))} className={selectCls}>
+                    <select value={draftExtra} onChange={(e) => setDraftExtra(parseInt(e.target.value))} className={priceFieldCls}>
                       {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
-                  <div>
+                  <div className="w-48">
                     <label className={priceLabelCls}>Redondeo</label>
-                    <select value={draftRedondeo} onChange={(e) => setDraftRedondeo(e.target.value as Redondeo)} className={selectCls}>
+                    <select value={draftRedondeo} onChange={(e) => setDraftRedondeo(e.target.value as Redondeo)} className={priceFieldCls}>
                       <option value="int">Entero hacia arriba</option>
                       <option value="half">A .50 hacia arriba</option>
                     </select>
                   </div>
                   <button
                     type="button" onClick={applyGlobal}
-                    className="rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
+                    className="h-9 rounded-md bg-teal-600 px-5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]"
                   >
                     Aplicar a todo
                   </button>
                 </div>
-                <div className="mt-3.5 rounded-lg border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-[13px] text-sky-900">
-                  precio = <b className="font-mono">{draftFormulaTxt}</b>
+                {/* Atajos de divisor, alineados a la izquierda bajo el campo Divisor */}
+                <div className="mt-2 flex gap-1.5">
+                  {DIVISOR_HINTS.map((h) => (
+                    <button
+                      key={h} type="button" onClick={() => setDraftDivisor(String(h))}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
+                        Number(draftDivisor) === h
+                          ? "border-teal-600 bg-teal-600 text-white"
+                          : "border-stone-300 bg-white text-stone-500 hover:border-teal-600 hover:bg-teal-50 hover:text-teal-800"
+                      }`}
+                    >
+                      {h.toFixed(2)}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2.5 rounded-md border border-stone-200 bg-stone-50 px-3 py-1.5 text-[12px] text-stone-600">
+                  precio = <b className="font-mono text-stone-800">{draftFormulaTxt}</b>
                 </div>
               </>
             ) : (
@@ -873,10 +875,13 @@ const inputCls =
   "w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const selectCls = inputCls;
 const priceLabelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-stone-500";
+// Campo alineado del modo global (input/select misma altura).
+const priceFieldCls =
+  "h-9 w-full rounded-md border border-stone-300 bg-stone-50 px-3 text-sm text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const miniInputCls =
-  "w-20 rounded-md border border-stone-300 bg-stone-50 px-2 py-1 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const miniSelectCls =
-  "rounded-md border border-stone-300 bg-stone-50 px-2 py-1 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+  "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] text-stone-900 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
 function ModeBtn({ active, onClick, title, desc, last }: { active: boolean; onClick: () => void; title: string; desc: string; last?: boolean }) {
   return (
