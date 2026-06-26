@@ -11,6 +11,7 @@ import {
   buildAoa,
   outputFilename,
   matchEmpresaFromDestino,
+  proveedorParaEmpresa,
   computeTotales,
   calcPrecio,
   formulaText,
@@ -385,10 +386,13 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     try {
       const XLSX = (await import("xlsx-js-style")).default;
       // El precio final (calculado o editado) va a la columna "Precio *".
-      const finalRows = processed.map((r, i) => ({
-        ...r,
-        cols: { ...r.cols, "Precio *": finalPrice(i, r) },
-      }));
+      // Proveedor fijo según la empresa destino (CAMBIO 2); otras empresas dejan el del archivo.
+      const provFijo = proveedorParaEmpresa(empresa);
+      const finalRows = processed.map((r, i) => {
+        const cols: Record<string, string | number | null> = { ...r.cols, "Precio *": finalPrice(i, r) };
+        if (provFijo) cols["Proveedor *"] = provFijo;
+        return { ...r, cols };
+      });
       const aoa = buildAoa(finalRows);
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 

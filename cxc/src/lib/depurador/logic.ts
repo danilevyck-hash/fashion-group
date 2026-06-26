@@ -299,7 +299,8 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   const tasa = config.tasa.trim();
   const mesIdx = config.mesIdx;
   const anio = String(config.anio);
-  const temporada = `${MESES[mesIdx]}-${anio}`;
+  // Temporada en formato AAAA-MM (ej. 2026-06) (CAMBIO 3).
+  const temporada = `${anio}-${String(mesIdx + 1).padStart(2, "0")}`;
 
   const out: ProcessedRow[] = [];
   for (const [ref, items] of groups) {
@@ -409,6 +410,17 @@ export const EMPRESAS_DESTINO: EmpresaDestino[] = [
   { key: "fashion_wear", label: "Fashion Wear", marca: "Tommy" },
   { key: "fashion_shoes", label: "Fashion Shoes", marca: "Tommy" },
 ];
+
+/** Proveedor fijo según la empresa destino (CAMBIO 2). Para las 3 empresas
+ *  conocidas devuelve el nombre exacto; para otras, null = dejar el del archivo. */
+export function proveedorParaEmpresa(empresaKey: string): string | null {
+  switch (empresaKey) {
+    case "vistana": return "American Designer Fashion";
+    case "fashion_wear":
+    case "fashion_shoes": return "American Fashion Wear, SA";
+    default: return null;
+  }
+}
 
 /** Preselecciona la empresa leyendo NOMBRE_DESTINATARIO_MERCANCIAS del archivo.
  *  Si no calza o no hay dato, devuelve null (la secretaria elige a mano). */
