@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED = ["admin", "secretaria"];
+
+// carga_history tiene RLS `to service_role`: sin la key, el rol anon falla en
+// silencio. Fallamos ruidosamente.
+const MISCONFIG = NextResponse.json(
+  { error: "Falta SUPABASE_SERVICE_ROLE_KEY en este entorno: el historial no se puede leer ni registrar." },
+  { status: 503 }
+);
 
 interface CargaPayload {
   empresa: string;
@@ -18,6 +25,7 @@ interface CargaPayload {
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED);
   if (authError) return authError;
+  if (!HAS_SERVICE_ROLE) return MISCONFIG;
 
   const { data, error } = await supabaseServer
     .from("carga_history")
@@ -35,6 +43,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED);
   if (authError) return authError;
+  if (!HAS_SERVICE_ROLE) return MISCONFIG;
 
   const session = getSession(req);
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });

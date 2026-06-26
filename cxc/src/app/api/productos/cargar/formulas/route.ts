@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
+import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
@@ -7,12 +7,20 @@ export const dynamic = "force-dynamic";
 // Cualquiera con acceso al módulo (admin + secretaria) puede leer y guardar.
 const ALLOWED = ["admin", "secretaria"];
 
+// marca_formulas tiene RLS `to service_role`: sin la service role key, el rol anon
+// la lee VACÍA sin error (fallo silencioso). Fallamos ruidosamente para que se vea.
+const MISCONFIG = NextResponse.json(
+  { error: "Falta SUPABASE_SERVICE_ROLE_KEY en este entorno: las fórmulas no se pueden leer ni guardar (RLS las bloquea para el rol anon)." },
+  { status: 503 }
+);
+
 const COLS = "id, marca, empresa, divisor, extra, redondeo, updated_at, updated_by";
 
 /** Lista todas las fórmulas guardadas, ordenadas por empresa y marca. */
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED);
   if (authError) return authError;
+  if (!HAS_SERVICE_ROLE) return MISCONFIG;
 
   const { data, error } = await supabaseServer
     .from("marca_formulas")
@@ -30,6 +38,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED);
   if (authError) return authError;
+  if (!HAS_SERVICE_ROLE) return MISCONFIG;
 
   const session = getSession(req);
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
