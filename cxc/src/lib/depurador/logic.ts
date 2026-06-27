@@ -321,10 +321,10 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
     const costo = first.costo;
     const cif = costo !== null ? Math.round(costo * factor * 100) / 100 : null;
-    // Marca y Proveedor en MAYÚSCULAS (así queda Switch internamente, evita duplicar marca).
-    // fixMarca corrige typos conocidos del proveedor (ej. TH ACCESORIES → TH ACCESSORIES)
-    // antes del match de fórmula y de escribir en el Excel.
-    const marcaUp = fixMarca(first.marca).toUpperCase();
+    // Marca en su forma canónica del catálogo (ej. "CK Menswear", no "CK MENSWEAR").
+    // fixMarca corrige typos conocidos (TH ACCESORIES → TH ACCESSORIES); canonicalMarca
+    // fija la capitalización del catálogo (consistente → evita duplicar marca en Switch).
+    const marcaUp = canonicalMarca(fixMarca(first.marca));
 
     // avisos de datos faltantes (no bloquea, solo informa)
     if (!ean) warnings.push(`${ref}: sin código de barra`);
@@ -532,6 +532,18 @@ const DESC_BY_MARCA: Map<string, string[]> = new Map(
  *  [] si la marca no está en el catálogo. */
 export function descripcionesDeMarca(marca: Cell): string[] {
   return DESC_BY_MARCA.get(marcaKey(marca)) ?? [];
+}
+
+// Marca canónica del catálogo por clave (para escribir "CK Menswear", no "CK MENSWEAR").
+const MARCA_CANON_BY_KEY: Map<string, string> = new Map(
+  MARCA_CATALOGO.map((c) => [marcaKey(c.marca), c.marca])
+);
+
+/** Devuelve la marca con la capitalización canónica del catálogo (ej. "CK Menswear").
+ *  Si no está en el catálogo, la deja tal cual (sin forzar mayúsculas). */
+export function canonicalMarca(marca: Cell): string {
+  const raw = String(marca ?? "").trim();
+  return MARCA_CANON_BY_KEY.get(marcaKey(raw)) ?? raw;
 }
 
 /** true si la descripción (canónica) está catalogada para esa marca. */
