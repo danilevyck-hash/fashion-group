@@ -378,13 +378,36 @@ export function setRowTalla(row: ProcessedRow, nuevaTalla: string): ProcessedRow
   };
 }
 
+// Columnas de texto que van en Title Case en el Excel (CAMBIO 5). Código,
+// Referencia, Marca (TH/CK) y Temporada (AAAA-MM) se dejan tal cual.
+const TITLECASE_COLS = new Set(["Descripción *", "rubro *", "subrubro", "Proveedor *"]);
+
+const SIGLA_BARRA = /^[A-Za-z]{1,3}(\/[A-Za-z]{1,3})+$/; // S/S, L/S
+const capSeg = (seg: string): string =>
+  seg.split("/").map((p) => (p ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p)).join("/");
+
+/** Title Case (Primera Mayúscula, resto minúscula) preservando siglas de manga
+ *  (S/S, L/S), códigos con dígitos (3PK, 2PK, 1PC) y acrónimos cortos (SA). */
+export function titleCase(s: Cell): string {
+  const str = String(s ?? "");
+  if (!str) return str;
+  return str.split(/(\s+)/).map((tok) => {
+    if (tok === "" || /^\s+$/.test(tok)) return tok;     // espacios
+    if (/\d/.test(tok)) return tok;                      // 3PK, 2PK, 1PC
+    if (SIGLA_BARRA.test(tok)) return tok.toUpperCase(); // S/S, L/S
+    if (/^[A-Z]{1,2}$/.test(tok)) return tok;            // SA (acrónimo corto)
+    return tok.split("-").map(capSeg).join("-");         // mantiene los "-"
+  }).join("");
+}
+
 /** AOA (array of arrays) con el header exacto de OUT_COLS para generar el Excel. */
 export function buildAoa(rows: ProcessedRow[]): (string | number)[][] {
   const aoa: (string | number)[][] = [OUT_COLS.slice()];
   for (const d of rows) {
     aoa.push(OUT_COLS.map((c) => {
       const v = d.cols[c];
-      return v === null || v === undefined ? "" : v;
+      if (v === null || v === undefined) return "";
+      return TITLECASE_COLS.has(c) ? titleCase(v) : v;
     }));
   }
   return aoa;
