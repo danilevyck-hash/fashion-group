@@ -18,9 +18,9 @@ const out = (desc: string, marca: string, col: string) => {
 
 describe("Depurador — rubro/subrubro (CAMBIO 1)", () => {
   it.each([
-    ["Men-T-Shirts S/S", "Men", "T/Shirts S/S"],
+    ["Men-T-Shirts S/S", "Men", "T-Shirts S/S"],
     ["Women-Bras", "Women", "Bras"],
-    ["Men-Pant Non-Denim", "Men", "Pant Non/Denim"],
+    ["Men-Pant Non-Denim", "Men", "Pant Non-Denim"],
     ["Men-Shirts / Woven Tops L/S", "Men", "Shirts / Woven Tops L/S"],
     ["Boys-Flip Flops", "Boys", "Flip Flops"],
     ["Kids Unisex-Polos S/S", "Kids Unisex", "Polos S/S"],

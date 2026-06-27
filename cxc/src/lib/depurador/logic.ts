@@ -163,12 +163,12 @@ function buildRubro(desc: string): string {
   return (i === -1 ? desc : desc.slice(0, i)).trim();
 }
 
-// subrubro = lo que va DESPUÉS del primer guion; los "-" restantes -> "/".
-// Ej: "Men-Pant Non-Denim" -> "Pant Non/Denim"  |  "Women-Bras" -> "Bras"
+// subrubro = todo lo que va DESPUÉS del primer guion, TAL CUAL (conserva sus
+// guiones internos). Solo el primer guion separa rubro de subrubro.
+// Ej: "Men-Pant Non-Denim" -> "Pant Non-Denim"  |  "Men-T-Shirts S/S" -> "T-Shirts S/S"
 function buildSubrubro(desc: string): string {
   const i = desc.indexOf("-");
-  const tail = i === -1 ? "" : desc.slice(i + 1);
-  return tail.replace(/-/g, "/").trim();
+  return (i === -1 ? "" : desc.slice(i + 1)).trim();
 }
 
 interface RawItem {
