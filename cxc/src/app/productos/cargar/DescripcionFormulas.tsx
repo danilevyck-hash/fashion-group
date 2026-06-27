@@ -17,6 +17,12 @@ function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo 
   return `TECHO(CIF ÷ ${d.divisor || "—"})${ex}${r}`;
 }
 
+// Grupos por empresa (igual que el subtab "Por marca"): CK→Vistana, TH→Fashion Wear/Shoes.
+const GRUPOS = [
+  { label: "Vistana International", brand: "Calvin Klein", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Vistana International") },
+  { label: "Fashion Wear / Fashion Shoes", brand: "Tommy Hilfiger", marcas: MARCA_CATALOGO.filter((c) => c.empresa !== "Vistana International") },
+];
+
 const selCls = "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 const numCls = "h-8 w-20 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
@@ -102,7 +108,13 @@ export default function DescripcionFormulas({ refreshKey = 0 }: { refreshKey?: n
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800">{error}</div>}
 
-      {MARCA_CATALOGO.map((c) => {
+      {GRUPOS.map((g) => (
+        <div key={g.label} className="mb-6">
+          <div className="mb-2 border-b border-stone-200 py-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">
+            {g.label}
+            <span className="ml-2 text-[12px] font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
+          </div>
+          {g.marcas.map((c) => {
         const descs = descripcionesDeMarca(c.marca);
         const isOpen = open.has(c.marca);
         const conFormula = descs.filter((d) => (savedByKey.get(marcaRubroKey(c.marca, d))?.divisor || 0) > 0).length;
@@ -176,6 +188,8 @@ export default function DescripcionFormulas({ refreshKey = 0 }: { refreshKey?: n
           </div>
         );
       })}
+        </div>
+      ))}
     </div>
   );
 }
