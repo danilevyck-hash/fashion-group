@@ -270,8 +270,8 @@ function MarcaCard({
   return (
     <div className="mb-1.5 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
       {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca) */}
-      <div onClick={onToggle} className="cursor-pointer select-none">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5">
+      <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
             <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
@@ -287,7 +287,6 @@ function MarcaCard({
             <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
           </div>
         </div>
-        <div className="px-3.5 pb-1 text-[11px] font-mono text-stone-400">{compactFormula(row)}</div>
       </div>
 
       {/* Cuerpo — al expandir */}
