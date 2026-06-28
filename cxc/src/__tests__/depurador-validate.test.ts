@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
+  esDescripcionCatalogada, matchEmpresaFromDestino,
   type SheetRow,
 } from "../lib/depurador/logic";
 
@@ -97,6 +98,23 @@ describe("Depurador — reclasificación de marcas (Tarea 6)", () => {
     ["CK Menswear", "Men-Polos S/S", "CK Menswear"],
   ])("%s → %s", (marca, desc, expected) => {
     expect(marcaDe(marca, desc)).toBe(expected);
+  });
+});
+
+describe("Depurador — Active Wear / Karl Lagerfeld (Tarea 4)", () => {
+  const rows = processRows([H, ["R1", "1", "Women-T-Shirts S/S", "M", 10, 10, 20, "KL Womenswear", "x"]] as SheetRow[], cfg).rows;
+  it("Active Wear usa plantilla de Vistana (23 cols FOB+CIF), proveedor configurable", () => {
+    expect((buildAoa(rows, outColsForEmpresa("active_wear"))[0] as string[]).length).toBe(23);
+    expect(buildAoa(rows, outColsForEmpresa("active_wear"))[0]).toContain("Costo FOB *");
+    expect(proveedorParaEmpresa("active_wear")).toBeNull(); // Daniel lo llena
+  });
+  it("matchEmpresaFromDestino reconoce KL/Active Wear/Multifashion", () => {
+    expect(matchEmpresaFromDestino("KARL LAGERFELD")).toBe("active_wear");
+    expect(matchEmpresaFromDestino("MULTIFASHION S.A.")).toBe("active_wear");
+  });
+  it("Marcas KL conocidas para la alarma (catalogadas vs huérfanas)", () => {
+    expect(esDescripcionCatalogada("KL Footwear", "Women-Sneakers")).toBe(true);
+    expect(esDescripcionCatalogada("KL Footwear", "Women-Boots")).toBe(false); // dispararía alarma/bloqueo
   });
 });
 

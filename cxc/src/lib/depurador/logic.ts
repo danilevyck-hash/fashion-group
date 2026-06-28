@@ -527,11 +527,12 @@ export interface EmpresaDestino {
   marca: string;
 }
 
-// Las 3 empresas destino fijas a las que se sube en Switch.
+// Empresas destino a las que se sube en Switch.
 export const EMPRESAS_DESTINO: EmpresaDestino[] = [
   { key: "vistana", label: "Vistana International", marca: "Calvin" },
   { key: "fashion_wear", label: "Fashion Wear", marca: "Tommy" },
   { key: "fashion_shoes", label: "Fashion Shoes", marca: "Tommy" },
+  { key: "active_wear", label: "Active Wear", marca: "Karl Lagerfeld" },
 ];
 
 /** Proveedor fijo según la empresa destino (CAMBIO 2). Para las 3 empresas
@@ -553,6 +554,7 @@ export function matchEmpresaFromDestino(destinoRaw: string): string | null {
   if (d.includes("VISTANA")) return "vistana";
   if (d.includes("FASHION SHOES")) return "fashion_shoes";
   if (d.includes("FASHION WEAR")) return "fashion_wear";
+  if (d.includes("ACTIVE WEAR") || d.includes("KARL") || d.includes("LAGERFELD") || d.includes("MULTIFASHION")) return "active_wear";
   return null;
 }
 

@@ -20,7 +20,8 @@ function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo 
 // Grupos por empresa (igual que el subtab "Por marca"): CK→Vistana, TH→Fashion Wear/Shoes.
 const GRUPOS = [
   { label: "Vistana International", brand: "Calvin Klein", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Vistana International") },
-  { label: "Fashion Wear / Fashion Shoes", brand: "Tommy Hilfiger", marcas: MARCA_CATALOGO.filter((c) => c.empresa !== "Vistana International") },
+  { label: "Fashion Wear / Fashion Shoes", brand: "Tommy Hilfiger", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Fashion Wear") },
+  { label: "Active Wear", brand: "Karl Lagerfeld", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Active Wear") },
 ];
 
 const selCls = "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";

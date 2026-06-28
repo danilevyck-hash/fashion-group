@@ -14,7 +14,8 @@ import {
 // Grupos por empresa (igual que en config).
 const GRUPOS = [
   { label: "Vistana International", brand: "Calvin Klein", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Vistana International") },
-  { label: "Fashion Wear / Fashion Shoes", brand: "Tommy Hilfiger", marcas: MARCA_CATALOGO.filter((c) => c.empresa !== "Vistana International") },
+  { label: "Fashion Wear / Fashion Shoes", brand: "Tommy Hilfiger", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Fashion Wear") },
+  { label: "Active Wear", brand: "Karl Lagerfeld", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Active Wear") },
 ];
 
 export default function ReglasView() {
