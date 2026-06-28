@@ -572,7 +572,8 @@ function empresaDeMarcaCatalogo(marca: string): string {
   const m = marca.toUpperCase();
   if (m.startsWith("KL")) return "Active Wear";
   if (m.startsWith("CK")) return "Vistana International";
-  return "Fashion Wear"; // TH
+  if (m === "TH FOOTWEAR") return "Fashion Shoes"; // calzado Tommy → plantilla Costo único
+  return "Fashion Wear"; // resto TH (apparel)
 }
 
 // Derivado del catálogo (MARCA_DESCRIPCIONES) para mantenerlo siempre sincronizado:
