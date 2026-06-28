@@ -75,6 +75,20 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
   });
 });
 
+describe("Depurador — servicios (Tarea 4)", () => {
+  it("AJUSTE DE PRECIO → servicio tipo 02", () => {
+    const c = processRows([H, ["S1", "1", "AJUSTE DE PRECIO", "M", 10, 5, 9, "Whatever", "x"]] as SheetRow[], cfg).rows[0].cols;
+    expect(c["Descripción *"]).toBe("Ajuste de Precio");
+    expect(c["Código Tipo de Artículo *"]).toBe("02");
+    expect(c["Marca *"]).toBe("Otros");
+    expect(c["rubro *"]).toBe("Otros");
+    expect(c["subrubro"]).toBe("");
+    expect(c["Stock Ideal"]).toBe(0);
+    expect(c["Costo FOB *"]).toBe(0);
+    expect(c["Costo CIF *"]).toBe(0);
+  });
+});
+
 describe("Depurador — proveedor (CAMBIO 2) y temporada (CAMBIO 3)", () => {
   it("Proveedor fijo por empresa", () => {
     expect(proveedorParaEmpresa("vistana")).toBe("American Designer Fashion");

@@ -178,6 +178,21 @@ function esGenero(rubro: string): boolean {
   return GENEROS.includes(first);
 }
 
+// Servicios: se detectan por la descripción. Tipo de artículo 02, sin stock,
+// costo "0" explícito, marca/rubro "Otros" (Tarea 4).
+const SERVICIOS: { match: string; descripcion: string }[] = [
+  { match: "AJUSTE DE PRECIO", descripcion: "Ajuste de Precio" },
+  { match: "MERCANCIA DEFECTUOSA", descripcion: "Mercancía Defectuosa" },
+  { match: "RETENCION", descripcion: "Retención de N/C" },
+  { match: "LIMPIEZA DE SALDO", descripcion: "Limpieza de Saldo" },
+];
+/** Si la descripción es un servicio, devuelve su nombre capitalizado; si no, null. */
+export function detectServicio(desc: Cell): string | null {
+  const d = norm(desc);
+  for (const s of SERVICIOS) if (d.includes(s.match)) return s.descripcion;
+  return null;
+}
+
 const MESES_TEMP: Record<string, string> = {
   FA: "11", FALL: "11", SP: "03", SPRING: "03", SF: "03", SU: "06",
   PF: "08", PS: "01", PSP: "01",
@@ -353,22 +368,35 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     // Normaliza la descripción del proveedor a su forma limpia ANTES de mostrarla,
     // matchear su excepción y escribirla en el Excel (Tarea 2). rubro/subrubro se
     // derivan de la descripción ya limpia.
-    const desc = normalizeDescripcion(buildDesc(first.cat));
-    let rubro = buildRubro(desc);
-    let sub = buildSubrubro(desc);
+    const descRaw = normalizeDescripcion(buildDesc(first.cat));
+    const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
+    let descOut = descRaw;
+    let rubro = buildRubro(descRaw);
+    let sub = buildSubrubro(descRaw);
     // Rubro no-género → basura → "Otros" y subrubro vacío (Tarea 3.2).
     if (!esGenero(rubro)) { rubro = "Otros"; sub = ""; }
-    const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
-    let fob = first.costo;
-    const cif = fob !== null ? Math.round(fob * factor * 100) / 100 : null;
+    // Marca en su forma canónica del catálogo (ej. "CK Menswear", no "CK MENSWEAR").
+    let marcaOut = canonicalMarca(fixMarca(first.marca));
+    let tipoArt = "01";
+    let stockOut: number = qtyTotal;
+    let fob: number | null = first.costo;
+    let cif = fob !== null ? Math.round(fob * factor * 100) / 100 : null;
     // FOB=0 pero CIF con valor → copiar CIF a FOB (Tarea 3.7).
     if ((fob === null || fob === 0) && cif !== null && cif > 0) fob = cif;
+
+    // Servicio (Tarea 4): tipo 02, sin stock, costo 0 explícito, marca/rubro Otros.
+    const servicio = detectServicio(descRaw);
+    if (servicio) {
+      descOut = servicio;
+      marcaOut = "Otros";
+      rubro = "Otros"; sub = "";
+      tipoArt = "02";
+      stockOut = 0;
+      fob = 0; cif = 0;
+    }
+
     // Código de barra obligatorio: si no hay, usar el código del producto (Tarea 3.8).
     const barcode = ean || ref;
-    // Marca en su forma canónica del catálogo (ej. "CK Menswear", no "CK MENSWEAR").
-    // fixMarca corrige typos conocidos (TH ACCESORIES → TH ACCESSORIES); canonicalMarca
-    // fija la capitalización del catálogo (consistente → evita duplicar marca en Switch).
-    const marcaUp = canonicalMarca(fixMarca(first.marca));
 
     // avisos de datos faltantes (no bloquea, solo informa)
     if (!ean) warnings.push(`${ref}: sin código de barra (se usó el código del producto)`);
@@ -380,22 +408,22 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
         "Código *": ref,
         "Referencia *": ref,
         "Código Barra *": barcode,
-        "Descripción *": desc,
+        "Descripción *": descOut,
         "Precio *": first.precio,
         "Tasa de Impuesto *": tasa,
         "Costo FOB *": fob,
         "Costo CIF *": cif,
         "rubro *": rubro,
         "subrubro": sub,
-        "Marca *": marcaUp,
+        "Marca *": marcaOut,
         "Proveedor *": first.prov,
         "Mínimo Stock": "",
-        "Código Tipo de Artículo *": "01",
+        "Código Tipo de Artículo *": tipoArt,
         "Unidad de medida *": "PIEZA",
         "Origen": "",
         "Lote": "",
         "Serie": "",
-        "Stock Ideal": qtyTotal,
+        "Stock Ideal": stockOut,
         "Temporada": temporada,
         "Composición": "",
         "Codigo CPBS": "",
