@@ -75,6 +75,25 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
   });
 });
 
+describe("Depurador — reclasificación de marcas (Tarea 6)", () => {
+  const marcaDe = (marca: string, desc: string) =>
+    processRows([H, ["R1", "1", desc, "M", 10, 10, 20, marca, "x"]] as SheetRow[], cfg).rows[0].cols["Marca *"];
+  it.each([
+    ["TODDLER BOYS", "Boys-Polos S/S", "TH Kids"],
+    ["UNISEX", "Unisex-Luggage", "TH Other"],
+    ["ALBERTO", "Men-Polos S/S", "TH Menswear"],
+    ["GENERAL", "Women-Panties", "TH Underwear"],
+    ["APPAREL", "Men-T-Shirts S/S", "CK Jeans"],
+    ["WOMEN", "Women-Bras", "CK Jeans"],
+    ["TH ACCESORIES", "Men-Bags", "TH Accessories"],
+    ["OTHERS", "Agua", "Otros"],
+    ["FREEZER MARCA", "Freezer Grande", "Otros"],
+    ["CK Menswear", "Men-Polos S/S", "CK Menswear"],
+  ])("%s → %s", (marca, desc, expected) => {
+    expect(marcaDe(marca, desc)).toBe(expected);
+  });
+});
+
 describe("Depurador — plantilla por empresa (Tarea 5)", () => {
   const rows = processRows([H, ["R1", "1", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
   it("Fashion Shoes: 24 cols, 'Costo *' único = CIF, con Composición/CPBS", () => {

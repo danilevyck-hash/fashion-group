@@ -375,8 +375,8 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     let sub = buildSubrubro(descRaw);
     // Rubro no-género → basura → "Otros" y subrubro vacío (Tarea 3.2).
     if (!esGenero(rubro)) { rubro = "Otros"; sub = ""; }
-    // Marca en su forma canónica del catálogo (ej. "CK Menswear", no "CK MENSWEAR").
-    let marcaOut = canonicalMarca(fixMarca(first.marca));
+    // Marca reclasificada (catálogo canónico, regla de marca rara, o "Otros") (Tarea 6).
+    let marcaOut = reclassMarca(first.marca, descRaw);
     let tipoArt = "01";
     let stockOut: number = qtyTotal;
     let fob: number | null = first.costo;
@@ -644,6 +644,23 @@ const MARCA_CANON_BY_KEY: Map<string, string> = new Map(
 export function canonicalMarca(marca: Cell): string {
   const raw = String(marca ?? "").trim();
   return MARCA_CANON_BY_KEY.get(marcaKey(raw)) ?? raw;
+}
+
+/** Reclasifica marcas raras del proveedor a una marca CK/TH válida o "Otros" (Tarea 6).
+ *  Si ya es una marca limpia del catálogo, devuelve su forma canónica. */
+export function reclassMarca(rawMarca: Cell, desc: Cell): string {
+  const fixed = fixMarca(rawMarca); // corrige typo TH ACCESORIES → TH ACCESSORIES
+  if (MARCA_CANON_BY_KEY.has(marcaKey(fixed))) return canonicalMarca(fixed);
+  const m = marcaKey(fixed);
+  const d = norm(desc);
+  if (m.startsWith("toddler")) return "TH Kids";          // TODDLER BOYS/GIRLS
+  if (m === "unisex") return "TH Other";                  // luggage
+  if (m === "alberto" && d.includes("POLO")) return "TH Menswear";
+  if (m === "general" && d.includes("PANTIES")) return "TH Underwear";
+  if (m === "apparel" && d.includes("T-SHIRT")) return "CK Jeans";
+  if (m === "women") return "CK Jeans";                   // marca suelta
+  // OTHERS y todo lo demás no-mercancía (AGUA, muebles, freezer, tazas…) → Otros.
+  return "Otros";
 }
 
 /** true si la descripción (canónica) está catalogada para esa marca. */
