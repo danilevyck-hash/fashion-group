@@ -21,6 +21,7 @@ import {
   marcaKey,
   marcaRubroKey,
   esDescripcionCatalogada,
+  descripcionesDeMarca,
   TEXT_COLS,
   type ProcessedRow,
   type NamedSheet,
@@ -79,6 +80,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const [error, setError] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [orphanSeen, setOrphanSeen] = useState(false); // alarma de descripción nueva (Tarea 8)
 
   // Config (mismos defaults del HTML: mes/año actual, tasa 7, factor 1.1)
   const [mesIdx, setMesIdx] = useState(now.getMonth());
@@ -127,6 +129,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         const { rows, warnings: w } = processRows(best, cfg);
         setProcessed(rows);
         setWarnings(w);
+        setOrphanSeen(false); // re-evaluar alarma de descripción nueva con el archivo nuevo
         setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
         setSelected(new Set());
         setDescFilter("");
@@ -438,8 +441,9 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
   const marcas = processed ? [...new Set(processed.map((d) => d.cols["Marca *"]).filter(Boolean))] : [];
   const revisar = processed?.filter((d) => d.fallback).length ?? 0;
 
-  // Descripciones del Excel que no están en el catálogo de su marca (Tarea 3).
-  // No rompen: usan la fórmula de la marca. Solo se avisa de forma discreta.
+  // Descripciones huérfanas: bajo una marca CK/TH conocida pero NO en su catálogo,
+  // tras aplicar normalización (Tarea 8). Las de marca "Otros"/desconocida NO cuentan
+  // (son basura intencional). No rompen: se procesan con su marca, solo se alarma.
   const descsNuevas = useMemo(() => {
     if (!processed) return [] as { marca: string; desc: string }[];
     const seen = new Set<string>();
@@ -448,6 +452,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
       const marca = String(r.cols["Marca *"] || "");
       const desc = String(r.cols["Descripción *"] || "");
       if (!desc) continue;
+      if (descripcionesDeMarca(marca).length === 0) continue; // marca no catalogada (Otros) → ignorar
       const k = `${marcaKey(marca)}|||${marcaKey(desc)}`;
       if (seen.has(k)) continue;
       seen.add(k);
@@ -458,6 +463,34 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
+      {/* Alarma de descripción NUEVA no catalogada (Tarea 8) — no bloquea, solo avisa fuerte */}
+      {processed && descsNuevas.length > 0 && !orphanSeen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl border-4 border-amber-500 bg-white p-6 shadow-2xl">
+            <div className="mb-2 text-center text-5xl">⚠️</div>
+            <h2 className="text-center text-xl font-bold text-amber-700">{descsNuevas.length} descripción(es) NUEVA(S) detectada(s)</h2>
+            <p className="mt-2 text-center text-sm text-stone-600">
+              No están en el catálogo de su marca. Se procesan igual (con su marca), pero
+              <b> toma una captura de pantalla y envíasela a Daniel para aprobación.</b>
+            </p>
+            <div className="mt-4 max-h-52 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3">
+              {descsNuevas.map((o, i) => (
+                <div key={i} className="text-[13px] text-stone-800">
+                  <span className="font-semibold text-amber-800">{o.marca}</span> → {o.desc}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setOrphanSeen(true)}
+              className="mt-5 w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 active:scale-[0.98]"
+            >
+              Entendido, ya tomé la captura — continuar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Masthead compacto */}
       <div className="mb-4 border-b border-stone-300 pb-2.5">
         <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
