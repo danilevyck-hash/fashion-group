@@ -171,6 +171,44 @@ function buildSubrubro(desc: string): string {
   return (i === -1 ? "" : desc.slice(i + 1)).trim();
 }
 
+// Géneros conocidos. Si el rubro no empieza con uno → es basura → "Otros" (Tarea 3.2).
+const GENEROS = ["men", "women", "boys", "girls", "kids", "unisex", "newborn", "toddler"];
+function esGenero(rubro: string): boolean {
+  const first = rubro.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  return GENEROS.includes(first);
+}
+
+const MESES_TEMP: Record<string, string> = {
+  FA: "11", FALL: "11", SP: "03", SPRING: "03", SF: "03", SU: "06",
+  PF: "08", PS: "01", PSP: "01",
+};
+
+/** Convierte una temporada "gringa" o sucia a AAAA-MM (Tarea 3.5). Si trae año
+ *  (2 o 4 dígitos) lo usa; si no, deja el año por defecto. Serial Excel
+ *  (40000-50000) → fecha. 7+ dígitos o irrecuperable → "". */
+export function convertTemporada(raw: Cell, anioDefault: string): string {
+  const s = String(raw ?? "").trim().toUpperCase();
+  if (!s) return "";
+  // Serial de Excel (días desde 1899-12-30)
+  const n = Number(s.replace(/[^0-9.]/g, ""));
+  if (/^[0-9.]+$/.test(s) && n >= 40000 && n <= 50000) {
+    const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  }
+  if (/^\d{7,}$/.test(s)) return ""; // irrecuperable
+  // Código gringo (FA, SP, SU, PF, PS, FALL, SPRING...) + año opcional (2 o 4 díg)
+  const m = s.match(/([A-Z]+)\s*'?\s*(\d{2,4})?/);
+  if (m && MESES_TEMP[m[1]]) {
+    let yr = m[2] || anioDefault;
+    if (yr.length === 2) yr = "20" + yr;
+    return `${yr}-${MESES_TEMP[m[1]]}`;
+  }
+  // Ya viene AAAA-MM o similar
+  const ym = s.match(/(\d{4})[-/](\d{1,2})/);
+  if (ym) return `${ym[1]}-${ym[2].padStart(2, "0")}`;
+  return "";
+}
+
 interface RawItem {
   ean: string;
   talla: Cell;
@@ -316,30 +354,36 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
     // matchear su excepción y escribirla en el Excel (Tarea 2). rubro/subrubro se
     // derivan de la descripción ya limpia.
     const desc = normalizeDescripcion(buildDesc(first.cat));
-    const rubro = buildRubro(desc);
-    const sub = buildSubrubro(desc);
+    let rubro = buildRubro(desc);
+    let sub = buildSubrubro(desc);
+    // Rubro no-género → basura → "Otros" y subrubro vacío (Tarea 3.2).
+    if (!esGenero(rubro)) { rubro = "Otros"; sub = ""; }
     const qtyTotal = items.reduce((s, it) => s + (it.cant || 0), 0);
-    const costo = first.costo;
-    const cif = costo !== null ? Math.round(costo * factor * 100) / 100 : null;
+    let fob = first.costo;
+    const cif = fob !== null ? Math.round(fob * factor * 100) / 100 : null;
+    // FOB=0 pero CIF con valor → copiar CIF a FOB (Tarea 3.7).
+    if ((fob === null || fob === 0) && cif !== null && cif > 0) fob = cif;
+    // Código de barra obligatorio: si no hay, usar el código del producto (Tarea 3.8).
+    const barcode = ean || ref;
     // Marca en su forma canónica del catálogo (ej. "CK Menswear", no "CK MENSWEAR").
     // fixMarca corrige typos conocidos (TH ACCESORIES → TH ACCESSORIES); canonicalMarca
     // fija la capitalización del catálogo (consistente → evita duplicar marca en Switch).
     const marcaUp = canonicalMarca(fixMarca(first.marca));
 
     // avisos de datos faltantes (no bloquea, solo informa)
-    if (!ean) warnings.push(`${ref}: sin código de barra`);
-    if (costo === null) warnings.push(`${ref}: sin costo`);
+    if (!ean) warnings.push(`${ref}: sin código de barra (se usó el código del producto)`);
+    if (fob === null) warnings.push(`${ref}: sin costo`);
     if (first.precio === null) warnings.push(`${ref}: sin precio`);
 
     out.push({
       cols: {
         "Código *": ref,
         "Referencia *": ref,
-        "Código Barra *": ean,
+        "Código Barra *": barcode,
         "Descripción *": desc,
         "Precio *": first.precio,
         "Tasa de Impuesto *": tasa,
-        "Costo FOB *": costo,
+        "Costo FOB *": fob,
         "Costo CIF *": cif,
         "rubro *": rubro,
         "subrubro": sub,
@@ -400,13 +444,20 @@ export function titleCase(s: Cell): string {
   }).join("");
 }
 
-/** AOA (array of arrays) con el header exacto de OUT_COLS para generar el Excel. */
-export function buildAoa(rows: ProcessedRow[]): (string | number)[][] {
-  const aoa: (string | number)[][] = [OUT_COLS.slice()];
+// Columnas de salida por defecto (Vistana / Fashion Wear): 23 cols, FOB+CIF, SIN
+// Composición ni Codigo CPBS (Tarea 3.3). El header de Fashion Shoes se arma en Tarea 5.
+export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición" && c !== "Codigo CPBS");
+
+/** AOA (array of arrays) para generar el Excel, con el set de columnas dado
+ *  (default = OUT_COLS_DEFAULT). Aplica Title Case y, en subrubro, "/"→"-". */
+export function buildAoa(rows: ProcessedRow[], cols: string[] = OUT_COLS_DEFAULT): (string | number)[][] {
+  const aoa: (string | number)[][] = [cols.slice()];
   for (const d of rows) {
-    aoa.push(OUT_COLS.map((c) => {
+    aoa.push(cols.map((c) => {
       const v = d.cols[c];
       if (v === null || v === undefined) return "";
+      // subrubro: Title Case y luego "/"→"-" (ej. "T-Shirts S/S" → "T-Shirts S-S") (Tarea 3.1).
+      if (c === "subrubro") return titleCase(v).replace(/\//g, "-");
       return TITLECASE_COLS.has(c) ? titleCase(v) : v;
     }));
   }

@@ -21,7 +21,7 @@ describe("Depurador — rubro/subrubro (CAMBIO 1)", () => {
     ["Men-T-Shirts S/S", "Men", "T-Shirts S/S"],
     ["Women-Bras", "Women", "Bras"],
     ["Men-Pant Non-Denim", "Men", "Pant Non-Denim"],
-    ["Men-Shirts / Woven Tops L/S", "Men", "Shirts / Woven Tops L/S"],
+    ["Men-Shirts / Woven Tops L/S", "Men", "Shirts Woven L/S"],
     ["Boys-Flip Flops", "Boys", "Flip Flops"],
     ["Kids Unisex-Polos S/S", "Kids Unisex", "Polos S/S"],
   ])("%s → rubro/subrubro", (desc, rubro, sub) => {
@@ -39,14 +39,39 @@ describe("Depurador — Title Case en el Excel (CAMBIO 5)", () => {
     expect(out("Men-Polos S/S", "CK Menswear", "Marca *")).toBe("CK Menswear");
     expect(out("Men-Sneakers", "TH Footwear", "Marca *")).toBe("TH Footwear");
   });
-  it("Rubro y Subrubro (L/S en mayúscula)", () => {
+  it("Rubro y Subrubro (output: subrubro con / → -)", () => {
     expect(out("Men-Bras", "CK Menswear", "rubro *")).toBe("Men");
-    expect(out("Men-Shirts / Woven Tops L/S", "CK Menswear", "subrubro")).toBe("Shirts / Woven Tops L/S");
+    // En el Excel el subrubro va sin "/" (Tarea 3.1): "T-Shirts S/S" → "T-Shirts S-S".
+    expect(out("Men-T-Shirts S/S", "CK Menswear", "subrubro")).toBe("T-Shirts S-S");
   });
   it("titleCase preserva siglas", () => {
     expect(titleCase("Men-T-Shirts S/S")).toBe("Men-T-Shirts S/S");
     expect(titleCase("Shirts / Woven Tops L/S")).toBe("Shirts / Woven Tops L/S");
     expect(titleCase("American Fashion Wear, SA")).toBe("American Fashion Wear, SA");
+  });
+});
+
+describe("Depurador — formato de salida (Tarea 3)", () => {
+  it("Principios de normalización", () => {
+    expect(cols("Newborn (Layette)-Bodies")["Descripción *"]).toBe("Newborn-Bodies");
+    expect(cols("Men-Heavyweight Knits")["Descripción *"]).toBe("Men-Heavyweight");
+    expect(cols("Men-Polo S/S DESTALLADO")["Descripción *"]).toBe("Men-Polos S/S");
+  });
+  it("Rubro no-género → Otros, subrubro vacío", () => {
+    const c = cols("Freezer-Grande");
+    expect(c["rubro *"]).toBe("Otros");
+    expect(c["subrubro"]).toBe("");
+  });
+  it("Código de barra vacío → usa el código del producto", () => {
+    const r = processRows([H, ["REF123", "", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows[0];
+    expect(r.cols["Código Barra *"]).toBe("REF123");
+  });
+  it("Header default sin Composición ni Codigo CPBS (23 cols)", () => {
+    const header = buildAoa(processRows([H, ["R1", "1", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows)[0];
+    expect(header).not.toContain("Composición");
+    expect(header).not.toContain("Codigo CPBS");
+    expect(header).toContain("Codigo CPBS Abrev");
+    expect(header.length).toBe(23);
   });
 });
 
