@@ -42,8 +42,8 @@ function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): Mar
 }
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
-const selCls = "h-8 rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
-const numCls = "h-8 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const selCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const numCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
 export default function FormulasConfig() {
   const [rows, setRows] = useState<MarcaRow[]>(() => MARCA_CATALOGO.map((c) => mkRow(c.marca, c.empresa)));
@@ -268,37 +268,39 @@ function MarcaCard({
   const marcaLabel = savingMarca ? "Guardando…" : row.dirty ? "Guardar" : row.saved ? "Guardado" : "Guardar";
 
   return (
-    <div className="mb-2 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
-      {/* Header — siempre visible */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <button type="button" onClick={onToggle} className="flex min-w-0 items-center gap-2 text-left">
-          <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
-          <span className="truncate text-[15px] font-bold text-stone-900">{row.marca}</span>
-          {descs.length > 0 && (
-            conFormula > 0
-              ? <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{conFormula} propia · {heredan} heredan</span>
-              : <span className="text-[11px] text-stone-500">{descs.length} desc · todas heredan</span>
-          )}
-        </button>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
-          <MarcaInputs row={row} onPatch={onPatchMarca} />
-          <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
+    <div className="mb-1.5 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
+      {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca) */}
+      <div onClick={onToggle} className="cursor-pointer select-none">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
+            <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
+            {descs.length > 0 && (
+              conFormula > 0
+                ? <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{conFormula} propia · {heredan} heredan</span>
+                : <span className="text-[11px] text-stone-500">{descs.length} desc · todas heredan</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
+            <MarcaInputs row={row} onPatch={onPatchMarca} />
+            <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
+          </div>
         </div>
+        <div className="px-3.5 pb-1 text-[11px] font-mono text-stone-400">{compactFormula(row)}</div>
       </div>
-      <div className="px-4 pb-1.5 text-[11px] font-mono text-stone-400">{compactFormula(row)}</div>
 
       {/* Cuerpo — al expandir */}
       {isOpen && descs.length > 0 && (
-        <div className="border-t border-stone-200 px-3 py-2">
-          <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+        <div className="border-t border-stone-200 px-3 py-1.5">
+          <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
             <span>Descripción</span><span className="text-right">Divisor</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
           </div>
           {descs.map((desc) => {
             const r = descRowFor(row.marca, desc);
             const hl = searchQ && norm(desc).includes(searchQ);
             return (
-              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 rounded-md px-1 py-1 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
+              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 rounded-md px-1 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
                 <span className={`truncate text-[13px] ${r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
                   {desc}{r.propia && <span className="ml-1.5 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
                 </span>
@@ -307,8 +309,7 @@ function MarcaCard({
                 <select value={r.extra} onChange={(e) => onPatchDesc(row.marca, desc, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`}>
                   {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
-                <select value={r.divisor ? r.redondeo : ""} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: (e.target.value || "int") as Redondeo })} className={`${selCls} w-full`}>
-                  {!r.divisor && <option value="">hereda</option>}
+                <select value={r.redondeo} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`}>
                   <option value="int">Entero</option>
                   <option value="half">.50</option>
                 </select>
