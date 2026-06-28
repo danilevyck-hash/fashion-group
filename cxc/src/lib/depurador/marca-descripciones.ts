@@ -315,4 +315,6 @@ export const NORMALIZACION: Record<string, string> = {
   "Women-Shirts  L/S": "Women-Shirts L/S",
   "Women-Small Leather Goods": "Women-Small Leather",
   "women-T-Shirts S/S": "Women-T-Shirts S/S",
+  "Men-T-Shirts": "Men-T-Shirts S/S",
+  "Girls-Panties 2PZ": "Girls-Panties",
 };

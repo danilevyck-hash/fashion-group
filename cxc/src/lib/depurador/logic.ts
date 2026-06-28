@@ -559,11 +559,34 @@ const NORM_BY_KEY: Map<string, string> = new Map(
   Object.entries(NORMALIZACION).map(([dirty, clean]) => [marcaKey(dirty), clean])
 );
 
+const SHIRTS_WOVEN = /Shirts\s*[-/]?\s*Woven\s*Tops/gi;
+
+/** Principios programáticos de limpieza de descripción (Tarea 1), en orden.
+ *  Se aplican ANTES de buscar en el catálogo. */
+function applyPrinciples(s: string): string {
+  let d = s;
+  d = d.replace(/\s*\(Layette\)/gi, "");              // 1 quitar (Layette)
+  d = d.replace(/\s*\bDESTALLADOS?\b/gi, "");          // 2 quitar DESTALLADO(S) (edición manual)
+  d = d.replace(/\s*\bOFERTA\b/gi, "");                // 3 quitar OFERTA
+  d = d.replace(SHIRTS_WOVEN, "Shirts Woven");         // 4 Shirts [-/]? Woven Tops → Shirts Woven
+  d = d.replace(/\s*\bKnits\b/gi, "");                 // 5 quitar Knits (plural; NO toca "Knit")
+  d = d.replace(/\s*\bGoods\b/gi, "");                 // 6 quitar Goods
+  d = d.replace(/\bPolo-/gi, "Polos ");                // 7a Polo-S/S → Polos S/S
+  d = d.replace(/\bPolo\b(?!s)/gi, "Polos");          // 7b Polo S/S → Polos S/S (singular→plural)
+  d = d.replace(/\bS-S\b/gi, "S/S").replace(/\bL-S\b/gi, "L/S"); // 8 S-S→S/S, L-S→L/S
+  d = d.replace(/\s{2,}/g, " ").trim();                // 9 colapsar dobles espacios
+  return d;
+}
+
 /** Normaliza una descripción del proveedor a su forma limpia (insensible a
- *  caja/espacios). Si no hay regla, devuelve la descripción tal cual. */
+ *  caja/espacios). Aplica el mapa directo NORMALIZACION + los principios
+ *  programáticos, y re-chequea el mapa tras los principios. */
 export function normalizeDescripcion(desc: Cell): string {
-  const raw = String(desc ?? "").trim();
-  return NORM_BY_KEY.get(marcaKey(raw)) ?? raw;
+  const original = String(desc ?? "").trim();
+  let d = NORM_BY_KEY.get(marcaKey(original)) ?? original; // 1) mapa directo (typo exacto)
+  d = applyPrinciples(d);                                  // 2) principios
+  d = NORM_BY_KEY.get(marcaKey(d)) ?? d;                   // 3) re-chequear mapa
+  return d;
 }
 
 /** Redondeo CEILING al entero hacia arriba (13.00→13, 13.01→14).
