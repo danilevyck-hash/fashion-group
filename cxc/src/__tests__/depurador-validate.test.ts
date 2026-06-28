@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa,
+  processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
   type SheetRow,
 } from "../lib/depurador/logic";
 
@@ -72,6 +72,25 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
     expect(header).not.toContain("Codigo CPBS");
     expect(header).toContain("Codigo CPBS Abrev");
     expect(header.length).toBe(23);
+  });
+});
+
+describe("Depurador — plantilla por empresa (Tarea 5)", () => {
+  const rows = processRows([H, ["R1", "1", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
+  it("Fashion Shoes: 24 cols, 'Costo *' único = CIF, con Composición/CPBS", () => {
+    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+    const header = aoa[0] as string[];
+    expect(header.length).toBe(24);
+    expect(header).toContain("Costo *");
+    expect(header).not.toContain("Costo FOB *");
+    expect(header).toContain("Composición");
+    expect(header).toContain("Codigo CPBS");
+    // Costo * = CIF (10 × 1.1 = 11)
+    expect(aoa[1][header.indexOf("Costo *")]).toBe(11);
+  });
+  it("Vistana/Fashion Wear: 23 cols con FOB+CIF", () => {
+    expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(23);
+    expect(buildAoa(rows, outColsForEmpresa("fashion_wear"))[0]).toContain("Costo FOB *");
   });
 });
 

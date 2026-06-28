@@ -473,15 +473,36 @@ export function titleCase(s: Cell): string {
 }
 
 // Columnas de salida por defecto (Vistana / Fashion Wear): 23 cols, FOB+CIF, SIN
-// Composición ni Codigo CPBS (Tarea 3.3). El header de Fashion Shoes se arma en Tarea 5.
+// Composición ni Codigo CPBS (Tarea 3.3).
 export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición" && c !== "Codigo CPBS");
 
+// Plantilla de Fashion Shoes (Tarea 5): 24 cols, UNA sola columna "Costo *" (=CIF),
+// e incluye Composición y Codigo CPBS (van VACÍAS pero la columna existe).
+export const OUT_COLS_SHOES = [
+  "Código *", "Referencia *", "Código Barra *", "Descripción *", "Precio *",
+  "Tasa de Impuesto *", "Costo *", "rubro *", "subrubro", "Marca *", "Proveedor *",
+  "Mínimo Stock", "Código Tipo de Artículo *", "Unidad de medida *", "Origen", "Lote",
+  "Serie", "Stock Ideal", "Temporada", "Composición", "Codigo CPBS", "Codigo CPBS Abrev",
+  "Bonificación", "Cantidad por caja",
+];
+
+/** Columnas de salida según la empresa destino (Tarea 5). Fashion Shoes usa la
+ *  plantilla de 1 columna de costo; el resto usa FOB+CIF. */
+export function outColsForEmpresa(empresaKey: string): string[] {
+  return empresaKey === "fashion_shoes" ? OUT_COLS_SHOES : OUT_COLS_DEFAULT;
+}
+
 /** AOA (array of arrays) para generar el Excel, con el set de columnas dado
- *  (default = OUT_COLS_DEFAULT). Aplica Title Case y, en subrubro, "/"→"-". */
+ *  (default = OUT_COLS_DEFAULT). Aplica Title Case y, en subrubro, "/"→"-".
+ *  La columna "Costo *" (plantilla Fashion Shoes) toma el Costo CIF. */
 export function buildAoa(rows: ProcessedRow[], cols: string[] = OUT_COLS_DEFAULT): (string | number)[][] {
   const aoa: (string | number)[][] = [cols.slice()];
   for (const d of rows) {
     aoa.push(cols.map((c) => {
+      if (c === "Costo *") {
+        const v = d.cols["Costo CIF *"] ?? d.cols["Costo FOB *"];
+        return v === null || v === undefined ? "" : v;
+      }
       const v = d.cols[c];
       if (v === null || v === undefined) return "";
       // subrubro: Title Case y luego "/"→"-" (ej. "T-Shirts S/S" → "T-Shirts S-S") (Tarea 3.1).

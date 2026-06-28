@@ -9,6 +9,7 @@ import {
   processRows,
   setRowTalla,
   buildAoa,
+  outColsForEmpresa,
   outputFilename,
   matchEmpresaFromDestino,
   proveedorParaEmpresa,
@@ -393,7 +394,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         if (provFijo) cols["Proveedor *"] = provFijo;
         return { ...r, cols };
       });
-      const aoa = buildAoa(finalRows);
+      // Plantilla según la empresa destino (Fashion Shoes = 1 columna de costo) (Tarea 5).
+      const aoa = buildAoa(finalRows, outColsForEmpresa(empresa));
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
       // Forzar formato texto en Código(0), Referencia(1), Código Barra(2)
