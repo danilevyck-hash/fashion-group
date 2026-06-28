@@ -1,6 +1,6 @@
 // Catálogo fijo de descripciones por marca (CK/TH/KL) y reglas de normalización.
 // Espejo del Excel maestro de compras de Daniel (fuente oficial). Editar aquí.
-// 25 marcas · 206 descripciones · 19 reglas de normalización.
+// 25 marcas · 206 descripciones · 20 reglas de normalización.
 
 /** Cada marca CK/TH/KL → sus descripciones limpias (orden alfabético). */
 export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
@@ -277,6 +277,7 @@ export const NORMALIZACION: Record<string, string> = {
   "Men-Polos L/S OFERTA": "Men-Polos L/S",
   "Men-Small Leather Goods": "Men-Small Leather",
   "WOMEN-WATCHES": "Women-Watches",
+  "Women-Blazers / Sports Jackets": "Women-Blazers",
   "Women-Heavyweight Knits": "Women-Heavyweight",
   "Women-Panties C": "Women-Panties",
   "Women-Shirts  L/S": "Women-Shirts L/S",
