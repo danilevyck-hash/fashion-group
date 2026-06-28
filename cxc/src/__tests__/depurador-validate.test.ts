@@ -57,6 +57,11 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
     expect(cols("Newborn (Layette)-Bodies")["Descripción *"]).toBe("Newborn-Bodies");
     expect(cols("Men-Heavyweight Knits")["Descripción *"]).toBe("Men-Heavyweight");
     expect(cols("Men-Polo S/S DESTALLADO")["Descripción *"]).toBe("Men-Polos S/S");
+    // Polo S/S Core se conserva (el proveedor lo manda así a propósito) — no se pluraliza.
+    expect(cols("Men-Polo S/S Core")["Descripción *"]).toBe("Men-Polo S/S Core");
+    expect(cols("Women-Polo S/S Core")["Descripción *"]).toBe("Women-Polo S/S Core");
+    // "Men-T-Shirts" (sin S/S) es válido en CK Underwear — no se le agrega S/S.
+    expect(cols("Men-T-Shirts")["Descripción *"]).toBe("Men-T-Shirts");
   });
   it("Rubro no-género → Otros, subrubro vacío", () => {
     const c = cols("Freezer-Grande");

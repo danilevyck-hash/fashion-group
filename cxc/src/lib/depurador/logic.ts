@@ -675,9 +675,8 @@ function applyPrinciples(s: string): string {
   d = d.replace(SHIRTS_WOVEN, "Shirts Woven");         // 4 Shirts [-/]? Woven Tops → Shirts Woven
   d = d.replace(/\s*\bKnits\b/gi, "");                 // 5 quitar Knits (plural; NO toca "Knit")
   d = d.replace(/\s*\bGoods\b/gi, "");                 // 6 quitar Goods
-  d = d.replace(/\bPolo-/gi, "Polos ");                // 7a Polo-S/S → Polos S/S
-  d = d.replace(/\bPolo\b(?!s)/gi, "Polos");          // 7b Polo S/S → Polos S/S (singular→plural)
-  d = d.replace(/\bS-S\b/gi, "S/S").replace(/\bL-S\b/gi, "L/S"); // 8 S-S→S/S, L-S→L/S
+  // (sin Polo→Polos: el proveedor manda "Polos S/S" y "Polo S/S Core" a propósito)
+  d = d.replace(/\bS-S\b/gi, "S/S").replace(/\bL-S\b/gi, "L/S"); // 7 S-S→S/S, L-S→L/S
   d = d.replace(/\s{2,}/g, " ").trim();                // 9 colapsar dobles espacios
   return d;
 }
@@ -690,7 +689,6 @@ export const PRINCIPIOS_LIMPIEZA: { titulo: string; ejemplo: string }[] = [
   { titulo: "Shirts / Woven Tops → Shirts Woven", ejemplo: "Men-Shirts / Woven Tops S/S → Men-Shirts Woven S/S" },
   { titulo: "Quitar Knits (plural; NO toca Knit)", ejemplo: "Men-Heavyweight Knits → Men-Heavyweight" },
   { titulo: "Quitar Goods", ejemplo: "Men-Small Leather Goods → Men-Small Leather" },
-  { titulo: "Polo → Polos (singular a plural)", ejemplo: "Men-Polo S/S → Men-Polos S/S" },
   { titulo: "S-S → S/S, L-S → L/S", ejemplo: "Boys-Polos S-S → Boys-Polos S/S" },
   { titulo: "Colapsar dobles espacios a uno", ejemplo: "Men-Shirts  L/S → Men-Shirts L/S" },
 ];
