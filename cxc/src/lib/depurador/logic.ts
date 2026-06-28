@@ -565,32 +565,19 @@ export interface MarcaCatalogo {
 // Catálogo fijo que la pantalla de Configuración SIEMPRE muestra como filas
 // editables, tenga o no fórmula guardada. CK → Vistana; TH apparel → Fashion Wear;
 // TH calzado → Fashion Shoes. Ampliar aquí si el proveedor agrega marcas.
-export const MARCA_CATALOGO: MarcaCatalogo[] = [
-  { marca: "CK Accessories", empresa: "Vistana International" },
-  { marca: "CK Display & Promo", empresa: "Vistana International" },
-  { marca: "CK Footwear", empresa: "Vistana International" },
-  { marca: "CK Jeans", empresa: "Vistana International" },
-  { marca: "CK Kids", empresa: "Vistana International" },
-  { marca: "CK Legwear", empresa: "Vistana International" },
-  { marca: "CK Menswear", empresa: "Vistana International" },
-  { marca: "CK Other", empresa: "Vistana International" },
-  { marca: "CK Swimwear", empresa: "Vistana International" },
-  { marca: "CK Underwear", empresa: "Vistana International" },
-  { marca: "CK Womenswear", empresa: "Vistana International" },
-  { marca: "TH Accessories", empresa: "Fashion Wear" },
-  { marca: "TH Display & Promo", empresa: "Fashion Wear" },
-  { marca: "TH Footwear", empresa: "Fashion Shoes" },
-  { marca: "TH Home", empresa: "Fashion Wear" },
-  { marca: "TH Kids", empresa: "Fashion Wear" },
-  { marca: "TH Legwear", empresa: "Fashion Wear" },
-  { marca: "TH License", empresa: "Fashion Wear" },
-  { marca: "TH Menswear", empresa: "Fashion Wear" },
-  { marca: "TH Other", empresa: "Fashion Wear" },
-  { marca: "TH Swimwear", empresa: "Fashion Wear" },
-  { marca: "TH Tommy Jeans", empresa: "Fashion Wear" },
-  { marca: "TH Underwear", empresa: "Fashion Wear" },
-  { marca: "TH Womenswear", empresa: "Fashion Wear" },
-];
+// Empresa (etiqueta para agrupar en la config) según el prefijo de la marca.
+function empresaDeMarcaCatalogo(marca: string): string {
+  const m = marca.toUpperCase();
+  if (m.startsWith("KL")) return "Active Wear";
+  if (m.startsWith("CK")) return "Vistana International";
+  return "Fashion Wear"; // TH
+}
+
+// Derivado del catálogo (MARCA_DESCRIPCIONES) para mantenerlo siempre sincronizado:
+// todas las marcas (CK/TH/KL) quedan reconocidas por canonicalMarca/reclassMarca.
+export const MARCA_CATALOGO: MarcaCatalogo[] = Object.keys(MARCA_DESCRIPCIONES).map(
+  (marca) => ({ marca, empresa: empresaDeMarcaCatalogo(marca) })
+);
 
 /* ============ FÓRMULA DE PRECIO POR MARCA ============ */
 // precio = CEILING(Costo CIF ÷ divisor) + extra, redondeado hacia arriba.

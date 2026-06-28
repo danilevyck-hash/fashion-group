@@ -35,9 +35,10 @@ describe("Depurador — Title Case en el Excel (CAMBIO 5)", () => {
   it("Descripción conserva S/S en mayúscula", () => {
     expect(out("Men-T-Shirts S/S", "CK Menswear", "Descripción *")).toBe("Men-T-Shirts S/S");
   });
-  it("Marca NO se rompe (TH/CK intactos, capitalización del catálogo)", () => {
+  it("Marca NO se rompe (TH/CK/KL intactos, capitalización del catálogo)", () => {
     expect(out("Men-Polos S/S", "CK Menswear", "Marca *")).toBe("CK Menswear");
-    expect(out("Men-Sneakers", "TH Footwear", "Marca *")).toBe("TH Footwear");
+    expect(out("Men-Polos S/S", "TH Tommy Jeans", "Marca *")).toBe("TH Tommy Jeans");
+    expect(out("Women-T-Shirts S/S", "KL Womenswear", "Marca *")).toBe("KL Womenswear");
   });
   it("Rubro y Subrubro (output: subrubro con / → -)", () => {
     expect(out("Men-Bras", "CK Menswear", "rubro *")).toBe("Men");
