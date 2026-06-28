@@ -386,6 +386,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
   const download = async () => {
     if (!processed || downloading) return;
+    if (descsNuevas.length > 0) return; // bloqueado: descripciones nuevas sin aprobar (Tarea 2)
     setDownloading(true);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -463,29 +464,30 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      {/* Alarma de descripción NUEVA no catalogada (Tarea 8) — no bloquea, solo avisa fuerte */}
+      {/* Alarma de descripción NUEVA no catalogada (Tarea 8) — BLOQUEA la descarga */}
       {processed && descsNuevas.length > 0 && !orphanSeen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border-4 border-amber-500 bg-white p-6 shadow-2xl">
+          <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6 shadow-2xl">
             <div className="mb-2 text-center text-5xl">⚠️</div>
-            <h2 className="text-center text-xl font-bold text-amber-700">{descsNuevas.length} descripción(es) NUEVA(S) detectada(s)</h2>
+            <h2 className="text-center text-xl font-bold text-red-700">{descsNuevas.length} descripción(es) NUEVA(S) detectada(s)</h2>
             <p className="mt-2 text-center text-sm text-stone-600">
-              No están en el catálogo de su marca. Se procesan igual (con su marca), pero
-              <b> toma una captura de pantalla y envíasela a Daniel para aprobación.</b>
+              Estas descripciones <b>NO están en el catálogo</b> de su marca. <b>No se puede descargar</b> la
+              plantilla hasta que Daniel las apruebe y se agreguen al catálogo. Toma una captura de pantalla
+              y envíasela a Daniel.
             </p>
-            <div className="mt-4 max-h-52 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="mt-4 max-h-52 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
               {descsNuevas.map((o, i) => (
                 <div key={i} className="text-[13px] text-stone-800">
-                  <span className="font-semibold text-amber-800">{o.marca}</span> → {o.desc}
+                  <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
                 </div>
               ))}
             </div>
             <button
               type="button"
               onClick={() => setOrphanSeen(true)}
-              className="mt-5 w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-amber-600 active:scale-[0.98]"
+              className="mt-5 w-full rounded-lg bg-stone-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-stone-800 active:scale-[0.98]"
             >
-              Entendido, ya tomé la captura — continuar
+              Cerrar
             </button>
           </div>
         </div>
@@ -609,7 +611,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
             </select>
             <button
               onClick={download}
-              disabled={downloading}
+              disabled={downloading || descsNuevas.length > 0}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               {downloading ? "Generando…" : "Descargar plantilla"}
@@ -621,6 +623,13 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
               Otro archivo
             </button>
           </div>
+
+          {/* Bloqueo de descarga por descripciones nuevas sin aprobar (Tarea 2) */}
+          {descsNuevas.length > 0 && (
+            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+              🔒 Bloqueado: hay {descsNuevas.length} descripción(es) nueva(s) sin aprobar. Envía la captura a Daniel.
+            </p>
+          )}
 
           {/* Stats slim — línea única fusionada (A1) */}
           <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-white px-4 py-2 text-[13px] text-stone-600">
@@ -764,9 +773,9 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
                   </table>
                 </div>
                 {descsNuevas.length > 0 && (
-                  <p className="mt-2.5 text-[12px] text-stone-500">
-                    <span className="font-semibold text-amber-700">{descsNuevas.length} descripción(es)</span> de este Excel
-                    no están en el catálogo; usan la fórmula de su marca.
+                  <p className="mt-2.5 text-[12px] font-semibold text-red-600">
+                    🔒 {descsNuevas.length} descripción(es) nueva(s) no están en el catálogo: la descarga está
+                    bloqueada hasta que Daniel las apruebe.
                   </p>
                 )}
               </>
