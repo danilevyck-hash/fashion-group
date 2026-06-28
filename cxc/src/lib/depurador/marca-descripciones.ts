@@ -1,6 +1,6 @@
 // Catálogo fijo de descripciones por marca (CK/TH) y reglas de normalización.
 // Generado desde marca-descripciones-REF.json. Fuente única — editar aquí.
-// 24 marcas · 238 descripciones · 21 reglas de normalización.
+// 24 marcas · 239 descripciones · 23 reglas de normalización.
 
 /** Cada marca CK/TH → sus descripciones limpias (orden alfabético). */
 export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
@@ -32,8 +32,8 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Men-Heavyweight",
     "Men-Polos L/S",
     "Men-Polos S/S",
-    "Men-Shirts / Woven Tops L/S",
-    "Men-Shirts / Woven Tops S/S",
+    "Men-Shirts Woven L/S",
+    "Men-Shirts Woven S/S",
     "Men-T-Shirts L/S",
     "Men-T-Shirts S/S",
     "Women-Denim Pants",
@@ -43,8 +43,8 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Women-Outerwear",
     "Women-Pant Knit",
     "Women-Pant Non-Denim",
-    "Women-Shirts / Woven Tops L/S",
-    "Women-Shirts / Woven Tops S/S",
+    "Women-Shirts Woven L/S",
+    "Women-Shirts Woven S/S",
     "Women-Sweaters",
     "Women-T-Shirts L/S",
     "Women-T-Shirts S/S",
@@ -73,8 +73,8 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Men-Polos L/S",
     "Men-Polos S/S",
     "Men-Shirts",
-    "Men-Shirts / Woven Tops L/S",
-    "Men-Shirts / Woven Tops S/S",
+    "Men-Shirts Woven L/S",
+    "Men-Shirts Woven S/S",
     "Men-Short Knit",
     "Men-Shorts Woven",
     "Men-T-Shirts L/S",
@@ -107,7 +107,7 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
   ],
   "CK WOMENSWEAR": [
     "Women-Panties",
-    "Women-Shirts / Woven Tops S/S",
+    "Women-Shirts Woven S/S",
     "Women-Sweaters",
     "Women-T-Shirts S/S",
   ],
@@ -152,7 +152,7 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Unisex-Home",
   ],
   "TH KIDS": [
-    "Boys Shirts S/S",
+    "Boys-Shirts S/S",
     "Boys-Denim Pants",
     "Boys-Giftpacks",
     "Boys-Heavyweight",
@@ -183,9 +183,10 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Girls-Sweaters",
     "Girls-T-Shirts S/S",
     "Kids-Hats",
-    "Newborn (Layette)-Bodies",
-    "Newborn (Layette)-Dresses",
-    "Newborn (Layette)-T-Shirts L/S",
+    "Newborn-Bodies",
+    "Newborn-Dresses",
+    "Newborn-T-Shirts L/S",
+    "Toddler Boys-Polos S/S",
     "Toddler Boys-Polos S/S Core",
     "Toddler Boys-T-Shirts S/S",
     "Toddler Boys-T-Shirts S/S Core",
