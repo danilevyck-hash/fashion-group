@@ -6,8 +6,9 @@ import AppHeader from "@/components/AppHeader";
 import DepuradorClient from "./DepuradorClient";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
+import ReglasView from "./ReglasView";
 
-type Tab = "depurador" | "formulas" | "historial";
+type Tab = "depurador" | "formulas" | "reglas" | "historial";
 
 export default function CargarProductosPage() {
   return (
@@ -52,6 +53,7 @@ function CargarInner() {
         <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
           <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
           <TabBtn active={tab === "formulas"} onClick={() => setTab("formulas")}>Fórmulas por marca</TabBtn>
+          <TabBtn active={tab === "reglas"} onClick={() => setTab("reglas")}>Reglas</TabBtn>
           <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
         </div>
       </div>
@@ -62,6 +64,7 @@ function CargarInner() {
         <DepuradorClient onDownloaded={handleDownloaded} />
       </div>
       {tab === "formulas" && <FormulasConfig />}
+      {tab === "reglas" && <ReglasView />}
       {tab === "historial" && <HistorialView refreshKey={refreshKey} />}
     </div>
   );

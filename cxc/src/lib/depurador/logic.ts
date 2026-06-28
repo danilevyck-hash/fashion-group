@@ -695,6 +695,19 @@ function applyPrinciples(s: string): string {
   return d;
 }
 
+/** Lista de los principios de limpieza (Tarea 1), para la pestaña "Reglas". */
+export const PRINCIPIOS_LIMPIEZA: { titulo: string; ejemplo: string }[] = [
+  { titulo: "Quitar (Layette)", ejemplo: "Newborn (Layette)-Bodies → Newborn-Bodies" },
+  { titulo: "Quitar DESTALLADO / DESTALLADOS (edición manual)", ejemplo: "Men-Polos S/S DESTALLADO → Men-Polos S/S" },
+  { titulo: "Quitar OFERTA", ejemplo: "Men-Polos L/S OFERTA → Men-Polos L/S" },
+  { titulo: "Shirts / Woven Tops → Shirts Woven", ejemplo: "Men-Shirts / Woven Tops S/S → Men-Shirts Woven S/S" },
+  { titulo: "Quitar Knits (plural; NO toca Knit)", ejemplo: "Men-Heavyweight Knits → Men-Heavyweight" },
+  { titulo: "Quitar Goods", ejemplo: "Men-Small Leather Goods → Men-Small Leather" },
+  { titulo: "Polo → Polos (singular a plural)", ejemplo: "Men-Polo S/S → Men-Polos S/S" },
+  { titulo: "S-S → S/S, L-S → L/S", ejemplo: "Boys-Polos S-S → Boys-Polos S/S" },
+  { titulo: "Colapsar dobles espacios a uno", ejemplo: "Men-Shirts  L/S → Men-Shirts L/S" },
+];
+
 /** Normaliza una descripción del proveedor a su forma limpia (insensible a
  *  caja/espacios). Aplica el mapa directo NORMALIZACION + los principios
  *  programáticos, y re-chequea el mapa tras los principios. */
