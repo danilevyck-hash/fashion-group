@@ -43,7 +43,8 @@ function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): Mar
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
 const selCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
-const numCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+// [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
+const numCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
 export default function FormulasConfig() {
   const [rows, setRows] = useState<MarcaRow[]>(() => MARCA_CATALOGO.map((c) => mkRow(c.marca, c.empresa)));
@@ -269,37 +270,46 @@ function MarcaCard({
 
   return (
     <div className="mb-1.5 overflow-hidden rounded-xl border border-stone-200 bg-stone-50">
-      {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca) */}
+      {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca).
+          Misma grilla que las filas de descripción → todo alineado en columnas. */}
       <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
-            <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
-            {descs.length > 0 && (
-              conFormula > 0
-                ? <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{conFormula} propia · {heredan} heredan</span>
-                : <span className="text-[11px] text-stone-500">{descs.length} desc · todas heredan</span>
-            )}
+        <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 py-2">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
+              <span className="truncate text-[14px] font-bold text-stone-900">{row.marca}</span>
+              {descs.length > 0 && (
+                conFormula > 0
+                  ? <span className="shrink-0 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">{conFormula} propia · {heredan} heredan</span>
+                  : <span className="shrink-0 text-[11px] text-stone-500">{descs.length} desc · todas heredan</span>
+              )}
+            </span>
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
           </div>
-          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-400">Marca:</span>
-            <MarcaInputs row={row} onPatch={onPatchMarca} />
-            <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
-          </div>
+          <input type="number" step="0.01" inputMode="decimal" value={row.divisor || ""} placeholder="—" onClick={(e) => e.stopPropagation()}
+            onChange={(e) => onPatchMarca(row.id, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-full`} aria-label={`Divisor ${row.marca}`} />
+          <select value={row.extra} onClick={(e) => e.stopPropagation()} onChange={(e) => onPatchMarca(row.id, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`} aria-label="Extra">
+            {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <select value={row.redondeo} onClick={(e) => e.stopPropagation()} onChange={(e) => onPatchMarca(row.id, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`} aria-label="Redondeo">
+            <option value="int">Entero</option>
+            <option value="half">.50</option>
+          </select>
+          <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
         </div>
       </div>
 
-      {/* Cuerpo — al expandir */}
+      {/* Cuerpo — al expandir (misma grilla y px que el header → columnas alineadas) */}
       {isOpen && descs.length > 0 && (
-        <div className="border-t border-stone-200 px-3 py-1.5">
-          <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+        <div className="border-t border-stone-200 py-1.5">
+          <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
             <span>Descripción</span><span className="text-right">Divisor</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
           </div>
           {descs.map((desc) => {
             const r = descRowFor(row.marca, desc);
             const hl = searchQ && norm(desc).includes(searchQ);
             return (
-              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 rounded-md px-1 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
+              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
                 <span className={`truncate text-[13px] ${r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
                   {desc}{r.propia && <span className="ml-1.5 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
                 </span>
@@ -341,7 +351,7 @@ function MarcaInputs({ row, onPatch }: { row: MarcaRow; onPatch: (id: string, p:
 function SaveBtn({ label, dirty, onClick, disabled, flashed, compact }: { label: string; dirty: boolean; onClick: () => void; disabled: boolean; flashed: boolean; compact?: boolean }) {
   return (
     <span className="whitespace-nowrap">
-      <button type="button" onClick={onClick} disabled={disabled}
+      <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} disabled={disabled}
         className={`rounded-md ${compact ? "px-1.5" : "px-2.5"} py-1 text-[12px] font-semibold transition disabled:opacity-50 ${dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
         {label}
       </button>
