@@ -1,6 +1,6 @@
 // Catálogo fijo de descripciones por marca (CK/TH) y reglas de normalización.
 // Generado desde marca-descripciones-REF.json. Fuente única — editar aquí.
-// 24 marcas · 239 descripciones · 23 reglas de normalización.
+// 24 marcas · 241 descripciones · 23 reglas de normalización.
 
 /** Cada marca CK/TH → sus descripciones limpias (orden alfabético). */
 export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
@@ -285,6 +285,8 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Women-Polos S/S Core",
     "Women-Shirts L/S",
     "Women-Shirts S/S",
+    "Women-Shirts Woven L/S",
+    "Women-Shirts Woven S/S",
     "Women-Shorts Woven",
     "Women-Sweaters",
     "Women-T-Shirts S/S",
