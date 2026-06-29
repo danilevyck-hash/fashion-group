@@ -10,7 +10,7 @@ import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { Reclamo, RItem, Foto, LocalFoto, Contacto, RView } from "./components/types";
-import { validateFotoFile, uploadReclamoFoto } from "./components/fotoUpload";
+import { validateFotoFile, uploadReclamoFoto, compressImage } from "./components/fotoUpload";
 
 export interface ReclamosInitialData {
   reclamos: Reclamo[];
@@ -24,6 +24,7 @@ import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
 import ReclamoDetail from "./components/ReclamoDetail";
 import SettlementModal, { SettlementInput } from "./components/SettlementModal";
+import ComprobanteModal from "./components/ComprobanteModal";
 import { validateReclamoFull } from "@/lib/reclamos/validate";
 
 // Clave de caché SWR del listado de Reclamos (Fase 3, mismo patrón que el piloto
@@ -80,6 +81,8 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [globalSearch, setGlobalSearch] = useState("");
   const [settleOpen, setSettleOpen] = useState(false);
   const [settling, setSettling] = useState(false);
+  const [enProcesoOpen, setEnProcesoOpen] = useState(false);
+  const [enProcesoSaving, setEnProcesoSaving] = useState(false);
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
@@ -373,10 +376,12 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
+    // Creado → En proceso: exige comprobante (foto + nota) → modal dedicado.
+    if (e === "En proceso" && current.estado === "Creado") { setEnProcesoOpen(true); return; }
     // Marcar Pagado no es un flip simple: captura el monto recuperado + NC(s) en
-    // un modal y el server hace insert + flip atómico. (Revertir Pagado→Creado
-    // sigue el PATCH normal — el settlement se conserva.)
-    if (e === "Pagado" && current.estado === "Creado") { setSettleOpen(true); return; }
+    // un modal y el server hace insert + flip atómico. (Los rollbacks de un paso
+    // siguen el PATCH normal — comprobante/settlement se conservan.)
+    if (e === "Pagado" && current.estado === "En proceso") { setSettleOpen(true); return; }
     // Optimistic: update estado badge immediately
     const prevEstado = current.estado;
     setCurrent({ ...current, estado: e });
@@ -386,6 +391,26 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
       loadReclamos();
     } catch { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+  }
+
+  // Creado → En proceso: comprime la foto del comprobante y la sube junto al
+  // cambio de estado (foto obligatoria — el server también la exige).
+  async function submitEnProceso(file: File, nota: string) {
+    if (!current) return;
+    setEnProcesoSaving(true);
+    try {
+      const toSend = await compressImage(file);
+      const fd = new FormData();
+      fd.append("file", toSend);
+      if (nota) fd.append("nota", nota);
+      const res = await fetch(`/api/reclamos/${current.id}/en-proceso`, { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setToast(data?.error || "No se pudo pasar a En proceso."); setTimeout(() => setToast(null), 5000); return; }
+      setEnProcesoOpen(false);
+      await loadDetail(current.id); loadReclamos();
+      setToast("Comprobante subido — reclamo En proceso"); setTimeout(() => setToast(null), 3000);
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
+    finally { setEnProcesoSaving(false); }
   }
 
   // Settlement: marca Pagado capturando monto recuperado + nota(s) de crédito.
@@ -533,7 +558,8 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   // "Pendiente" = reclamo abierto (aún no Pagado) = estado "Creado". Pipeline de
   // 2 estados: Creado (abierto) → Pagado (resuelto vía settlement).
-  const pendientes = reclamos.filter((r) => r.estado === "Creado");
+  // Pendientes = todo lo que no está Pagado (Creado + En proceso = reclamo abierto).
+  const pendientes = reclamos.filter((r) => r.estado !== "Pagado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — UN solo modal, usado por lista (single + bulk) y detalle ──
@@ -684,6 +710,12 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         submitting={settling}
         onClose={() => setSettleOpen(false)}
         onSubmit={submitSettlement}
+      />
+      <ComprobanteModal
+        open={enProcesoOpen}
+        submitting={enProcesoSaving}
+        onClose={() => setEnProcesoOpen(false)}
+        onSubmit={submitEnProceso}
       />
       {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
       {deleteModal}

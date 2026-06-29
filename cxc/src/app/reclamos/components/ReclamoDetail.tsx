@@ -128,6 +128,23 @@ export default function ReclamoDetail({
   const totalsSub = editMode ? calcSub(editItems) : sub;
   const days = daysSince(current.fecha_reclamo);
 
+  // Comprobante del paso "En proceso" (foto + nota opcional). Se muestra en los
+  // estados En proceso y Pagado. Click en la foto → lightbox.
+  const comprobanteCard = current.comprobante_url ? (
+    <div className="mb-3 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+      <button type="button" onClick={() => setLightboxSrc(current.comprobante_url!)} className="shrink-0" title="Ver comprobante">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={current.comprobante_url} alt="Comprobante" className="h-16 w-16 rounded-md border border-amber-200 object-cover" />
+      </button>
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-amber-800">Comprobante</div>
+        {current.comprobante_nota
+          ? <p className="mt-0.5 text-xs text-gray-600 whitespace-pre-wrap break-words">{current.comprobante_nota}</p>
+          : <p className="mt-0.5 text-xs text-gray-400 italic">Sin nota</p>}
+      </div>
+    </div>
+  ) : null;
+
   // ── Settlement (recuperación / notas de crédito) ──
   const settlements = (current.reclamo_settlements ?? []).filter((s) => !s.deleted);
   const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
@@ -151,12 +168,15 @@ export default function ReclamoDetail({
 
   // ── Smart suggestion: escalation ──
   const reclamoSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (days <= 45 || current.estado !== "Creado") return [];
+    if (days <= 45 || current.estado === "Pagado") return [];
+    const esCreado = current.estado === "Creado";
     return [{
       id: `reclamo-escalate-${current.id}`,
-      message: `Este reclamo lleva ${days} días abierto. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
-      actionLabel: "Marcar como Pagado",
-      onAction: () => onChangeEstado("Pagado"),
+      message: esCreado
+        ? `Este reclamo lleva ${days} días abierto. Súbele el comprobante para pasarlo a En proceso.`
+        : `Este reclamo lleva ${days} días abierto. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
+      actionLabel: esCreado ? "Pasar a En proceso" : "Marcar como Pagado",
+      onAction: () => onChangeEstado(esCreado ? "En proceso" : "Pagado"),
     }];
   }, [current.id, current.estado, days, onChangeEstado]);
 
@@ -317,22 +337,38 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {/* Acción de estado — pipeline de 2 estados: Creado → Pagado (vía settlement) */}
+      {/* Acción de estado — pipeline de 3 estados: Creado → En proceso → Pagado */}
       {!editMode && current.estado === "Creado" && (
         <div className="mb-6">
-          <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-            Marcar como Pagado
+          <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
+            Pasar a En proceso
           </button>
+          <p className="text-xs text-gray-400 mt-1.5">Requiere subir una foto del comprobante.</p>
+        </div>
+      )}
+      {!editMode && current.estado === "En proceso" && (
+        <div className="mb-6">
+          {comprobanteCard}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Marcar como Pagado
+            </button>
+            <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Creado">← Volver a Creado</button>
+          </div>
         </div>
       )}
       {!editMode && current.estado === "Pagado" && (
-        <div className="flex items-center gap-3 mb-6 flex-wrap">
-          <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-md text-sm font-medium">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Ciclo completado — Pagado
-          </span>
-          <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Creado">← Volver a Creado</button>
+        <div className="mb-6">
+          {comprobanteCard}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-md text-sm font-medium">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Ciclo completado — Pagado
+            </span>
+            <button onClick={() => onChangeEstado("En proceso")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a En proceso">← Volver a En proceso</button>
+          </div>
         </div>
       )}
 

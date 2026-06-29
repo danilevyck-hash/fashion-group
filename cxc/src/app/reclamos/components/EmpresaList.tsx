@@ -276,7 +276,7 @@ export default function EmpresaList({
           {sortedRecs.map((r) => {
             const days = daysSince(r.fecha_reclamo);
             const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-            const isOpen = r.estado === "Creado";
+            const isOpen = r.estado !== "Pagado";
             return (
               <div
                 key={r.id}
@@ -322,7 +322,7 @@ export default function EmpresaList({
       )}
 
       {sortedRecs.length === 0 ? (() => {
-        const openCount = allEmpresaRecs.filter(r => r.estado === "Creado").length;
+        const openCount = allEmpresaRecs.filter(r => r.estado !== "Pagado").length;
         if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
           return (
             <div className="flex flex-col items-center py-16 text-center">
@@ -367,7 +367,7 @@ export default function EmpresaList({
             {sortedRecs.map((r) => {
               const days = daysSince(r.fecha_reclamo);
               const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-              const isOpen = r.estado === "Creado";
+              const isOpen = r.estado !== "Pagado";
               return (
                 <tr key={r.id}
                   onClick={() => selectionMode ? toggleSelect(r.id) : onLoadDetail(r.id)}

@@ -65,6 +65,10 @@ export interface Reclamo {
   reclamo_settlements?: Settlement[];
   /** Monto reclamado congelado al marcar Pagado (para % recuperado estable). */
   monto_reclamado_snapshot?: number | null;
+  /** Comprobante del paso "En proceso": foto (obligatoria) + nota opcional. */
+  comprobante_url?: string | null;
+  comprobante_path?: string | null;
+  comprobante_nota?: string | null;
   /** Path interno del PDF de factura en el bucket privado (1:1 con el reclamo). */
   factura_pdf_path?: string | null;
   /** Signed URL temporal (TTL 1h) del PDF de factura; solo lo arma el GET del detalle. */

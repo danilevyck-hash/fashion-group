@@ -510,6 +510,8 @@ const STATUS_COLORS: Record<string, string> = {
   pendiente: "yellow", borrador: "yellow", "pendiente_aprobacion": "yellow",
   // Gray: reclamo creado (abierto) · Green: active/open
   "Creado": "gray", activo: "green", abierto: "green",
+  // Orange: reclamo en proceso (comprobante subido, esperando crédito)
+  "En proceso": "orange",
   // Green: completed/resolved/deposited — cerrado is gray (inactive)
   depositado: "green", aprobado: "green", "Pagado": "green", cerrado: "gray", "Entregado": "green", despachada: "green",
   // Red: rejected/expired/bounced

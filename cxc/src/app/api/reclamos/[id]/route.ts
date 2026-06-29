@@ -9,11 +9,14 @@ import { validateReclamoHeader } from "@/lib/reclamos/validate";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Máquina de estados del pipeline (Creado → Pagado, con corrección hacia atrás).
-// Validación de transición — fuente de verdad server.
+// Máquina de estados del pipeline (Creado → En proceso → Pagado), con corrección
+// de un paso hacia atrás. Validación de transición — fuente de verdad server.
+// Nota: Creado → En proceso se hace por el endpoint /en-proceso (exige comprobante);
+// este PATCH solo permite los rollbacks y En proceso → Pagado.
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  "Creado": ["Pagado"],
-  "Pagado": ["Creado"],
+  "Creado": ["En proceso"],
+  "En proceso": ["Creado", "Pagado"],
+  "Pagado": ["En proceso"],
 };
 
 export const dynamic = "force-dynamic";

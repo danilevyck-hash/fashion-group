@@ -60,7 +60,7 @@ export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 /** Género del ítem reclamado — dropdown FIJO (sin opción libre). Obligatorio. */
 export const GENEROS = ["Men", "Women", "Kids", "Accessories"] as const;
 
-export const ESTADOS = ["Creado", "Pagado"];
+export const ESTADOS = ["Creado", "En proceso", "Pagado"];
 
 /** Display-friendly names for estados (use in buttons/labels) */
 export const ESTADO_DISPLAY: Record<string, string> = {};
@@ -72,6 +72,7 @@ export function estadoLabel(estado: string): string {
 
 export const EC: Record<string, string> = {
   "Creado": "bg-gray-100 text-gray-600",
+  "En proceso": "bg-amber-50 text-amber-700",
   "Pagado": "bg-green-50 text-green-700",
 };
 
