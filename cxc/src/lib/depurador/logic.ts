@@ -79,8 +79,8 @@ const ALIAS: Record<string, string[]> = {
   destino: ["NOMBRE_DESTINATARIO_MERCANCIAS", "DESTINATARIO", "NOMBRE_DESTINATARIO"],
   // Número de factura/documento del proveedor → va a "Codigo CPBS". Si no se detecta
   // por nombre, se cae a la POSICIÓN columna C (índice 2) en processRows.
-  factura: ["NUMERO_FACTURA", "NUMERO FACTURA", "NRO_FACTURA", "NO_FACTURA", "NUM_FACTURA",
-    "N_FACTURA", "FACTURA", "NUMERO_DOCUMENTO", "NUMERO DOCUMENTO", "NRO_DOCUMENTO",
+  factura: ["FACT", "FACT.", "NUMERO_FACTURA", "NUMERO FACTURA", "NRO_FACTURA", "NO_FACTURA",
+    "NUM_FACTURA", "N_FACTURA", "FACTURA", "NUMERO_DOCUMENTO", "NUMERO DOCUMENTO", "NRO_DOCUMENTO",
     "NO_DOCUMENTO", "DOCUMENTO", "INVOICE", "INVOICE NUMBER", "INVOICE_NO", "DOCUMENT"],
 };
 
