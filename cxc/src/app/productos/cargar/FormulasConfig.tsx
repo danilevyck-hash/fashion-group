@@ -273,7 +273,7 @@ function MarcaCard({
       {/* Header — toda el área expande/colapsa (salvo los inputs de fórmula de marca).
           Misma grilla que las filas de descripción → todo alineado en columnas. */}
       <div onClick={onToggle} title={compactFormula(row)} className="cursor-pointer select-none">
-        <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 py-2">
+        <div className="grid grid-cols-[1fr_64px_50px_90px_96px] items-center gap-2 px-3.5 py-2">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-2">
               <span className="text-stone-400">{isOpen ? "▾" : "▸"}</span>
@@ -302,14 +302,14 @@ function MarcaCard({
       {/* Cuerpo — al expandir (misma grilla y px que el header → columnas alineadas) */}
       {isOpen && descs.length > 0 && (
         <div className="border-t border-stone-200 py-1.5">
-          <div className="grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+          <div className="grid grid-cols-[1fr_64px_50px_90px_96px] items-center gap-2 px-3.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
             <span>Descripción</span><span className="text-right">Divisor</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
           </div>
           {descs.map((desc) => {
             const r = descRowFor(row.marca, desc);
             const hl = searchQ && norm(desc).includes(searchQ);
             return (
-              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_auto] items-center gap-2 px-3.5 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
+              <div key={desc} className={`grid grid-cols-[1fr_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
                 <span className={`truncate text-[13px] ${r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
                   {desc}{r.propia && <span className="ml-1.5 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
                 </span>
