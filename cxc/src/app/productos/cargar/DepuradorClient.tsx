@@ -15,6 +15,7 @@ import {
   proveedorParaEmpresa,
   computeTotales,
   calcPrecio,
+  precioDescripcion,
   formulaText,
   marginPct,
   norm,
@@ -255,7 +256,15 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     return Number.isFinite(n) ? n : null;
   };
 
-  const autoPrice = (row: ProcessedRow): number | null => calcPrecio(cifOf(row), formulaForRow(row));
+  // Excepción por marca+descripción de la fila (solo en modo "por marca").
+  const excForRow = (row: ProcessedRow): MarcaRubroFormula | null =>
+    priceMode === "global" ? null : (rubroByKey.get(marcaRubroKey(row.cols["Marca *"], row.cols["Descripción *"])) ?? null);
+
+  // Precio automático: jerarquía precio fijo > fórmula propia > fórmula de la marca.
+  const autoPrice = (row: ProcessedRow): number | null => {
+    if (priceMode === "global") return calcPrecio(cifOf(row), applied);
+    return precioDescripcion(cifOf(row), excForRow(row), marcaForms[marcaKey(row.cols["Marca *"])] ?? null);
+  };
 
   // Precio final de una fila: editado a mano si lo hay, si no el calculado.
   const finalPrice = (i: number, row: ProcessedRow): number | null => {
@@ -284,6 +293,8 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     const m = marginPct(cif, fp);
     const mTxt = m === null ? "" : `${m}%`;
     if (priceEdits[i] !== undefined) return mTxt ? `· ${mTxt}` : "—"; // editado a mano
+    const exc = excForRow(row);
+    if (exc?.precio_fijo) return mTxt ? `fijo · ${mTxt}` : "fijo"; // precio fijo gana
     const f = formulaForRow(row);
     if (!f || !f.divisor) return "—";
     const ex = f.extra > 0 ? `+${f.extra}` : "";

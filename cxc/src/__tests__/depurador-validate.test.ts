@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
-  esDescripcionCatalogada, matchEmpresaFromDestino,
-  type SheetRow,
+  esDescripcionCatalogada, matchEmpresaFromDestino, precioDescripcion,
+  type SheetRow, type MarcaRubroFormula,
 } from "../lib/depurador/logic";
 
 const H = ["REFERENCIA", "EAN", "P_CATEGORY", "TALLA", "CANTIDAD", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
@@ -134,6 +134,26 @@ describe("Depurador — plantilla por empresa (Tarea 5)", () => {
   it("Vistana/Fashion Wear: 23 cols con FOB+CIF", () => {
     expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(23);
     expect(buildAoa(rows, outColsForEmpresa("fashion_wear"))[0]).toContain("Costo FOB *");
+  });
+});
+
+describe("Depurador — precio fijo por descripción (jerarquía)", () => {
+  const marcaF = { divisor: 0.73, extra: 2, redondeo: "int" as const }; // fórmula de la marca
+  const formulaPropia: MarcaRubroFormula = { marca: "X", rubro: "Y", divisor: 0.5, extra: 0, redondeo: "int" };
+  const fija: MarcaRubroFormula = { marca: "X", rubro: "Y", divisor: 0, extra: 0, redondeo: "int", precio_fijo: 19.99 };
+  it("precio fijo GANA (ignora costo/fórmula)", () => {
+    expect(precioDescripcion(100, fija, marcaF)).toBe(19.99);
+    expect(precioDescripcion(null, fija, marcaF)).toBe(19.99); // ni siquiera necesita CIF
+  });
+  it("sin precio fijo → fórmula propia de la descripción", () => {
+    expect(precioDescripcion(10, formulaPropia, marcaF)).toBe(20); // TECHO(10/0.5)=20
+  });
+  it("sin excepción → fórmula de la marca", () => {
+    expect(precioDescripcion(17.6, null, marcaF)).toBe(27); // TECHO(17.6/0.73)=25 +2 = 27
+  });
+  it("precio_fijo 0/negativo no aplica → cae a fórmula", () => {
+    const cero: MarcaRubroFormula = { marca: "X", rubro: "Y", divisor: 0.5, extra: 0, redondeo: "int", precio_fijo: 0 };
+    expect(precioDescripcion(10, cero, marcaF)).toBe(20); // usa la fórmula propia (divisor 0.5)
   });
 });
 

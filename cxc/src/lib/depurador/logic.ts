@@ -597,7 +597,9 @@ export interface MarcaFormula {
   redondeo: Redondeo;
 }
 
-/** Excepción de fórmula por marca + rubro. Tiene prioridad sobre la de la marca. */
+/** Excepción de fórmula por marca + rubro/descripción. Tiene prioridad sobre la de la marca.
+ *  `precio_fijo` (opcional): si está lleno, es el precio en dólares asignado directo a la
+ *  descripción y GANA a cualquier fórmula (ignora costo/divisor/extra/redondeo). */
 export interface MarcaRubroFormula {
   id?: string;
   marca: string;
@@ -605,6 +607,7 @@ export interface MarcaRubroFormula {
   divisor: number;
   extra: number;
   redondeo: Redondeo;
+  precio_fijo?: number | null;
 }
 
 /** Clave canónica de una excepción por marca+rubro/descripción (insensible a caja/espacios). */
@@ -728,6 +731,23 @@ export function calcPrecio(
   if (!f || !f.divisor || f.divisor === 0) return null;
   const base = f.redondeo === "half" ? ceilHalf(cif / f.divisor) : ceilInt(cif / f.divisor);
   return base + (f.extra || 0);
+}
+
+/** Precio de una descripción según la jerarquía (de mayor a menor prioridad):
+ *  1) precio fijo de la descripción → ese número tal cual (sin cálculo).
+ *  2) fórmula propia de la descripción (divisor/extra/redondeo).
+ *  3) fórmula de la marca.
+ *  Devuelve null si nada aplica (la secretaria lo pone a mano). */
+export function precioDescripcion(
+  cif: number | null | undefined,
+  exc: MarcaRubroFormula | null | undefined,
+  marcaFormula: { divisor: number; extra: number; redondeo: Redondeo } | null | undefined
+): number | null {
+  if (exc && exc.precio_fijo != null && Number.isFinite(exc.precio_fijo) && exc.precio_fijo > 0) {
+    return exc.precio_fijo; // 1) precio fijo gana
+  }
+  if (exc && exc.divisor) return calcPrecio(cif, exc); // 2) fórmula propia de la descripción
+  return calcPrecio(cif, marcaFormula ?? null);        // 3) fórmula de la marca
 }
 
 /** Texto humano de la fórmula, para mostrar en vivo. */

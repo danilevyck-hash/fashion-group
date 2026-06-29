@@ -19,8 +19,16 @@ interface MarcaRow {
   isNew: boolean;   // fila agregada a mano, aún sin guardar
   dirty: boolean;
 }
-interface DescEdit { divisor: number; extra: number; redondeo: Redondeo; dirty: boolean }
-interface DescRowState { key: string; divisor: number; extra: number; redondeo: Redondeo; savedRow?: MarcaRubroFormula; propia: boolean; dirty: boolean }
+type DescModo = "formula" | "fijo";
+interface DescEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: DescModo; dirty: boolean }
+interface DescRowState {
+  key: string; divisor: number; extra: number; redondeo: Redondeo;
+  precioFijo: number | null; modo: DescModo;
+  savedRow?: MarcaRubroFormula;
+  propia: boolean;  // tiene precio propio (fórmula propia o precio fijo)
+  fija: boolean;    // tiene precio fijo activo
+  dirty: boolean;
+}
 
 // Empresas (4 destinos) + "Otras" para lo que quede fuera.
 const EMPRESA_GROUPS = [
@@ -125,34 +133,47 @@ export default function FormulasConfig() {
     const key = marcaRubroKey(marca, desc);
     const e = descEdits[key];
     const s = descByKey.get(key);
+    const savedFijo = s?.precio_fijo ?? null;
+    const savedModo: DescModo = savedFijo != null && savedFijo > 0 ? "fijo" : "formula";
+    const divisor = e ? e.divisor : (s?.divisor ?? 0);
+    const precioFijo = e ? e.precioFijo : savedFijo;
+    const modo = e ? e.modo : savedModo;
     return {
       key,
-      divisor: e ? e.divisor : (s?.divisor ?? 0),
+      divisor,
       extra: e ? e.extra : (s?.extra ?? 0),
       redondeo: e ? e.redondeo : (s?.redondeo ?? "int"),
+      precioFijo,
+      modo,
       savedRow: s,
-      propia: !!s && !!s.divisor,
+      fija: modo === "fijo" && precioFijo != null && precioFijo > 0,
+      propia: modo === "fijo" ? precioFijo != null && precioFijo > 0 : divisor > 0,
       dirty: !!e?.dirty,
     };
   };
-  const patchDesc = (marca: string, desc: string, p: Partial<Pick<DescEdit, "divisor" | "extra" | "redondeo">>) => {
+  const patchDesc = (marca: string, desc: string, p: Partial<Pick<DescEdit, "divisor" | "extra" | "redondeo" | "precioFijo" | "modo">>) => {
     const r = descRowFor(marca, desc);
-    setDescEdits((prev) => ({ ...prev, [r.key]: { divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, ...p, dirty: true } }));
+    setDescEdits((prev) => ({ ...prev, [r.key]: { divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, precioFijo: r.precioFijo, modo: r.modo, ...p, dirty: true } }));
   };
   const saveDesc = async (marca: string, desc: string) => {
     const r = descRowFor(marca, desc);
     if (busyDesc) return;
     setError(""); setBusyDesc(r.key);
     try {
-      if (!r.divisor) { // vacío = hereda → borra la excepción si existía
+      const tieneFijo = r.modo === "fijo" && r.precioFijo != null && r.precioFijo > 0;
+      const tieneFormula = r.modo === "formula" && !!r.divisor;
+      if (!tieneFijo && !tieneFormula) { // vacío = hereda → borra la excepción si existía
         if (r.savedRow?.id) {
           const res = await fetch(`/api/productos/cargar/rubro-formulas?id=${encodeURIComponent(r.savedRow.id)}`, { method: "DELETE" });
           if (!res.ok) throw new Error("No se pudo guardar."); await reloadDesc();
         }
       } else {
+        const payload = tieneFijo
+          ? { marca, rubro: desc, divisor: 0, extra: 0, redondeo: "int", precio_fijo: r.precioFijo }
+          : { marca, rubro: desc, divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, precio_fijo: null };
         const res = await fetch("/api/productos/cargar/rubro-formulas", {
           method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ marca, rubro: desc, divisor: r.divisor, extra: r.extra, redondeo: r.redondeo }),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) { const d = await res.json().catch(() => null); throw new Error(d?.error || "No se pudo guardar."); }
         await reloadDesc();
@@ -186,7 +207,8 @@ export default function FormulasConfig() {
 
       <p className="mb-4 text-[13px] text-stone-500">
         Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
-        vacía = hereda la de la marca.
+        vacía = hereda la de la marca. Una descripción también puede tener <b className="text-amber-700">precio fijo</b>
+        {" "}(un monto en dólares directo) que gana a cualquier fórmula.
       </p>
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
@@ -310,18 +332,39 @@ function MarcaCard({
             const hl = searchQ && norm(desc).includes(searchQ);
             return (
               <div key={desc} className={`grid grid-cols-[minmax(0,1fr)_64px_50px_90px_96px] items-center gap-2 px-3.5 py-0.5 ${hl ? "bg-teal-50" : "hover:bg-white"}`}>
-                <span className={`truncate text-[13px] ${r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
-                  {desc}{r.propia && <span className="ml-1.5 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
-                </span>
-                <input type="number" step="0.01" value={r.divisor || ""} placeholder="—"
-                  onChange={(e) => onPatchDesc(row.marca, desc, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-full`} />
-                <select value={r.extra} onChange={(e) => onPatchDesc(row.marca, desc, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`}>
-                  {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <select value={r.redondeo} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`}>
-                  <option value="int">Entero</option>
-                  <option value="half">.50</option>
-                </select>
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <span className={`flex min-w-0 items-center gap-1.5 truncate text-[13px] ${r.fija ? "font-semibold text-amber-700" : r.propia ? "font-medium text-teal-700" : "text-stone-500"}`}>
+                    <span className="truncate">{desc}</span>
+                    {r.fija
+                      ? <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800">precio fijo</span>
+                      : r.propia && <span className="shrink-0 rounded bg-teal-50 px-1 py-0.5 text-[9px] font-semibold text-teal-700">propia</span>}
+                  </span>
+                  <select value={r.modo} onChange={(e) => onPatchDesc(row.marca, desc, { modo: e.target.value as DescModo })}
+                    className={`${selCls} shrink-0 w-[92px] ${r.modo === "fijo" ? "border-amber-300 text-amber-800" : ""}`} aria-label="Modo de precio">
+                    <option value="formula">Fórmula</option>
+                    <option value="fijo">Precio fijo</option>
+                  </select>
+                </div>
+                {r.modo === "fijo" ? (
+                  <div className="col-span-3 flex items-center gap-1">
+                    <span className="text-[13px] font-semibold text-amber-700">$</span>
+                    <input type="number" step="0.01" inputMode="decimal" value={r.precioFijo ?? ""} placeholder="precio fijo"
+                      onChange={(e) => onPatchDesc(row.marca, desc, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
+                      className={`${numCls} w-full border-amber-300 text-left`} aria-label={`Precio fijo ${desc}`} />
+                  </div>
+                ) : (
+                  <>
+                    <input type="number" step="0.01" value={r.divisor || ""} placeholder="—"
+                      onChange={(e) => onPatchDesc(row.marca, desc, { divisor: Number(e.target.value) || 0 })} className={`${numCls} w-full`} />
+                    <select value={r.extra} onChange={(e) => onPatchDesc(row.marca, desc, { extra: parseInt(e.target.value) })} className={`${selCls} w-full`}>
+                      {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <select value={r.redondeo} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`}>
+                      <option value="int">Entero</option>
+                      <option value="half">.50</option>
+                    </select>
+                  </>
+                )}
                 <SaveBtn label={busyDesc === r.key ? "…" : r.dirty ? "Guardar" : "✓"} dirty={r.dirty} onClick={() => onSaveDesc(row.marca, desc)} disabled={busyDesc === r.key} flashed={flashDesc === r.key} compact />
               </div>
             );

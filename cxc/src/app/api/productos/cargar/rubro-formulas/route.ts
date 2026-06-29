@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 // Cualquiera con acceso al módulo (admin + secretaria) puede leer y guardar.
 const ALLOWED = ["admin", "secretaria"];
 
-const COLS = "id, marca, rubro, divisor, extra, redondeo, updated_at, updated_by";
+const COLS = "id, marca, rubro, divisor, extra, redondeo, precio_fijo, updated_at, updated_by";
 
 const MISCONFIG = NextResponse.json(
   { error: "Falta SUPABASE_SERVICE_ROLE_KEY en este entorno: las excepciones por rubro no se pueden leer ni guardar." },
@@ -66,7 +66,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Redondeo inválido." }, { status: 400 });
   }
 
-  const fields = {
+  const fields: Record<string, unknown> = {
     marca,
     rubro,
     divisor,
@@ -75,6 +75,21 @@ export async function PUT(req: NextRequest) {
     updated_at: new Date().toISOString(),
     updated_by: session.userName || session.role || null,
   };
+
+  // precio_fijo (opcional): si está lleno, GANA a la fórmula. Solo se toca si el
+  // cuerpo lo trae (así BulkExcel, que no lo manda, no lo borra). > 0 = válido; null = limpiar.
+  if ("precio_fijo" in body) {
+    const pf = body.precio_fijo;
+    if (pf == null || pf === "") {
+      fields.precio_fijo = null;
+    } else {
+      const n = Number(pf);
+      if (!Number.isFinite(n) || n < 0) {
+        return NextResponse.json({ error: "Precio fijo inválido." }, { status: 400 });
+      }
+      fields.precio_fijo = n > 0 ? n : null;
+    }
+  }
 
   // Upsert manual case-insensitive por marca+rubro.
   const { data: existing, error: findErr } = await supabaseServer
