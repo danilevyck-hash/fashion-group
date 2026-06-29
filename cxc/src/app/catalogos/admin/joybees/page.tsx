@@ -33,7 +33,7 @@ interface ImportRow {
   badge: string;
 }
 
-type Tab = "productos" | "importar";
+type Tab = "faltan-foto" | "completo" | "importar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,10 +103,11 @@ function JoybeesAdminInner() {
     allowedRoles: ["admin"],
   });
 
-  const [tab, setTab] = useUrlState<Tab>("tab", "productos");
+  const [tab, setTab] = useUrlState<Tab>("tab", "faltan-foto");
   const [products, setProducts] = useState<JoybeesProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -127,12 +128,18 @@ function JoybeesAdminInner() {
     if (!authChecked) return;
     setLoading(true);
     loadProducts().finally(() => setLoading(false));
+    fetch("/api/catalogo/joybees/sync-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setLastSync(d.lastSync ?? null); })
+      .catch(() => {});
   }, [authChecked, loadProducts]);
 
   if (!authChecked) return null;
 
+  const sinFotoCount = products.filter((p) => !p.image_url?.trim()).length;
   const tabs: { key: Tab; label: string }[] = [
-    { key: "productos", label: "Productos" },
+    { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
+    { key: "completo", label: "Catálogo completo" },
     { key: "importar", label: "Importar" },
   ];
 
@@ -154,7 +161,10 @@ function JoybeesAdminInner() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">JOYBEES</h1>
-            <p className="text-xs text-gray-400">Administrar catalogo</p>
+            <p className="text-xs text-gray-400">
+              Se llena solo desde Switch por existencia · tú solo subes fotos
+              {lastSync && ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+            </p>
           </div>
         </div>
 
@@ -181,7 +191,10 @@ function JoybeesAdminInner() {
           </div>
         ) : (
           <>
-            {tab === "productos" && (
+            {tab === "faltan-foto" && (
+              <FaltanFotoTab products={products} showToast={showToast} onComplete={loadProducts} />
+            )}
+            {tab === "completo" && (
               <ProductosTab products={products} />
             )}
             {tab === "importar" && (
@@ -321,7 +334,49 @@ function ImportarTab({
         showToast={showToast}
         onImportComplete={onImportComplete}
       />
-      <BatchPhotosSection products={products} showToast={showToast} onComplete={onImportComplete} />
+    </div>
+  );
+}
+
+// ── FALTAN FOTO TAB ───────────────────────────────────────────────────────────
+// Subida masiva (nombre de archivo = SKU) + grid de los productos sin foto.
+
+function FaltanFotoTab({
+  products,
+  showToast,
+  onComplete,
+}: {
+  products: JoybeesProduct[];
+  showToast: (msg: string) => void;
+  onComplete: () => Promise<void>;
+}) {
+  const sinFoto = products.filter((p) => !p.image_url?.trim());
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-gray-500">
+        {sinFoto.length === 0
+          ? "Todos los productos tienen foto 🎉"
+          : `${sinFoto.length} producto${sinFoto.length === 1 ? "" : "s"} sin foto. Sube los archivos con el nombre = SKU; se emparejan solos.`}
+      </p>
+
+      <BatchPhotosSection products={products} showToast={showToast} onComplete={onComplete} />
+
+      {sinFoto.length > 0 && (
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Pendientes de foto</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {sinFoto.map((p) => (
+              <div key={p.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                <div className="aspect-square rounded bg-gray-100 flex items-center justify-center text-gray-300 text-xs mb-2">
+                  sin foto
+                </div>
+                <p className="text-[11px] font-mono text-gray-500 truncate" title={p.sku}>{p.sku}</p>
+                <p className="text-sm text-gray-900 truncate" title={p.name}>{p.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
