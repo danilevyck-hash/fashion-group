@@ -88,11 +88,14 @@ const TOKEN_TTL_MS = 55 * 60 * 1000;
 // (colisión de sesión) o si el propio /autenticacion expira, la corrida fallaba
 // sin reintento → la empresa quedaba stale un día entero (caso active_shoes /
 // active_wear). Este es el mismo patrón "robusto" de los backfills de FASE C:
-// re-auth + reintentos con backoff. Solo se activa ante errores TRANSITORIOS;
-// errores de config (env faltante) o 4xx de datos NO se reintentan.
+// re-auth + reintentos con backoff. Solo se activa ante errores TRANSITORIOS:
+// fallo de RED (fetch failed / ECONNRESET / ETIMEDOUT / ENOTFOUND → httpCode null),
+// timeout, o 5xx upstream. Los errores HTTP de negocio de Switch (config/env
+// faltante, 4xx de datos) NO se reintentan — se manejan como hoy.
+// Backoff: 2s tras el 1er fallo, 4s tras el 2do (RETRY_BASE_DELAY_MS × intento).
 const MAX_AUTH_ATTEMPTS = 3;
 const MAX_CALL_ATTEMPTS = 3;
-const RETRY_BASE_DELAY_MS = 1_000;
+const RETRY_BASE_DELAY_MS = 2_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -196,10 +199,16 @@ async function rawCall(
     return { httpCode: res.status, text, parsed };
   } catch (err: unknown) {
     const isAbort = err instanceof Error && err.name === "AbortError";
+    // El "fetch failed" de undici trae la causa real (ECONNRESET/ETIMEDOUT/ENOTFOUND)
+    // en err.cause.code — la incluimos para diagnóstico (no cambia la clasificación:
+    // todo fallo de red queda httpCode null = transitorio → reintenta authenticate/authedCall).
+    const cause = (err as { cause?: { code?: unknown } } | null)?.cause;
+    const causeCode = cause && typeof cause === "object" && typeof (cause as { code?: unknown }).code === "string"
+      ? ` (${(cause as { code: string }).code})` : "";
     throw new SwitchApiError({
       message: isAbort
         ? `Timeout >${opts.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms en ${opts.endpoint}`
-        : `Error de red en ${opts.endpoint}: ${err instanceof Error ? err.message : String(err)}`,
+        : `Error de red en ${opts.endpoint}: ${err instanceof Error ? err.message : String(err)}${causeCode}`,
       code: null,
       httpCode: null,
       empresaKey: opts.empresaKey,
@@ -298,7 +307,9 @@ async function authenticateOnce(
   return token;
 }
 
-// Re-auth con reintentos ante timeout/red/5xx del propio /autenticacion.
+// Re-auth con reintentos ante fallo de RED / timeout / 5xx del propio
+// /autenticacion (3 intentos, backoff 2s/4s). Un error HTTP de negocio de Switch
+// (4xx de datos) NO se reintenta — sale al primer intento, como hoy.
 async function authenticate(
   empresaKey: string,
   cfg: EmpresaConfig,
