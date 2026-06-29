@@ -1,6 +1,6 @@
 // Catálogo fijo de descripciones por marca (CK/TH/KL) y reglas de normalización.
 // Espejo del Excel maestro de compras de Daniel (fuente oficial). Editar aquí.
-// 26 marcas · 224 descripciones · 20 reglas de normalización.
+// 26 marcas · 226 descripciones · 20 reglas de normalización.
 
 /** Cada marca CK/TH/KL → sus descripciones limpias (orden alfabético). */
 export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
@@ -169,6 +169,7 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Boys-Outerwear",
     "Boys-Pant Non-Denim",
     "Boys-Polos S/S",
+    "Boys-Polos S/S Core",
     "Boys-Shirts Woven L/S",
     "Boys-Shorts Woven",
     "Boys-Sweaters",
@@ -192,6 +193,7 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
     "Newborn-T-Shirts S/S",
     "Toddler Boys-Polos S/S Core",
     "Toddler Boys-T-Shirts S/S",
+    "Toddler Boys-T-Shirts S/S Core",
   ],
   "TH Legwear": [
     "Kids-Socks Sport",
