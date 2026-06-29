@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
-import { ALL_MODULES } from "@/lib/modules";
+import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -368,7 +368,14 @@ export default function UsuariosPage() {
                     <input
                       type="checkbox"
                       checked={customPerms}
-                      onChange={e => setCustomPerms(e.target.checked)}
+                      onChange={e => {
+                        const on = e.target.checked;
+                        setCustomPerms(on);
+                        // Al activar, precargar los módulos que el usuario YA tiene por su rol.
+                        // El override REEMPLAZA al rol (no suma), así que sin precargar se
+                        // perderían los demás módulos al guardar.
+                        if (on && uModules.length === 0) setUModules(getDefaultModulesForRole(uRole));
+                      }}
                       className="accent-teal-700 w-4 h-4"
                     />
                   </label>
