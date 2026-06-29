@@ -34,9 +34,16 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 const PER_PAGE = 50;
 const MAX_PAGES = 80;
 
+// Reebok ahora vive 100% en active_shoes: Daniel movió en Switch todos los
+// productos Reebok de active_wear → active_shoes. active_wear pasa a Karl Lagerfeld
+// (códigos KL, ya excluidos por el filtro). UNA sola entrada que lee TODO el
+// catálogo Reebok desde active_shoes y matchea por SKU sobre las 3 categorías
+// (apparel/accessories/footwear) → preserva la categoría y la foto de cada producto
+// existente (el UPDATE no toca category ni image_url). Importante que sea UNA sola
+// entrada (no dos por categoría) para no insertar duplicados "pelados": con un único
+// bySku que cubre todas las categorías, cada artículo se matchea o inserta una vez.
 const EMPRESAS = [
-  { empresaKey: "active_wear", categories: ["apparel", "accessories"], defaultCategory: "apparel" },
-  { empresaKey: "active_shoes", categories: ["footwear"], defaultCategory: "footwear" },
+  { empresaKey: "active_shoes", categories: ["apparel", "accessories", "footwear"], defaultCategory: "footwear" },
 ] as const;
 
 // FILTRO PROVEEDOR (Reebok real). active_wear/active_shoes NO son 100% Reebok:
