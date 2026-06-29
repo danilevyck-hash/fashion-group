@@ -73,12 +73,12 @@ describe("Depurador — formato de salida (Tarea 3)", () => {
     const r = processRows([H, ["REF123", "", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows[0];
     expect(r.cols["Código Barra *"]).toBe("REF123");
   });
-  it("Header default sin Composición ni Codigo CPBS (23 cols)", () => {
+  it("Header default sin Composición pero CON Codigo CPBS (24 cols)", () => {
     const header = buildAoa(processRows([H, ["R1", "1", "Men-Bras", "M", 10, 10, 20, "CK Menswear", "x"]] as SheetRow[], cfg).rows)[0];
     expect(header).not.toContain("Composición");
-    expect(header).not.toContain("Codigo CPBS");
+    expect(header).toContain("Codigo CPBS");
     expect(header).toContain("Codigo CPBS Abrev");
-    expect(header.length).toBe(23);
+    expect(header.length).toBe(24);
   });
 });
 
@@ -103,8 +103,8 @@ describe("Depurador — reclasificación de marcas (Tarea 6)", () => {
 
 describe("Depurador — Active Wear / Karl Lagerfeld (Tarea 4)", () => {
   const rows = processRows([H, ["R1", "1", "Women-T-Shirts S/S", "M", 10, 10, 20, "KL Womenswear", "x"]] as SheetRow[], cfg).rows;
-  it("Active Wear usa plantilla de Vistana (23 cols FOB+CIF), proveedor configurable", () => {
-    expect((buildAoa(rows, outColsForEmpresa("active_wear"))[0] as string[]).length).toBe(23);
+  it("Active Wear usa plantilla de Vistana (24 cols FOB+CIF), proveedor configurable", () => {
+    expect((buildAoa(rows, outColsForEmpresa("active_wear"))[0] as string[]).length).toBe(24);
     expect(buildAoa(rows, outColsForEmpresa("active_wear"))[0]).toContain("Costo FOB *");
     expect(proveedorParaEmpresa("active_wear")).toBeNull(); // Daniel lo llena
   });
@@ -131,9 +131,10 @@ describe("Depurador — plantilla por empresa (Tarea 5)", () => {
     // Costo * = CIF (10 × 1.1 = 11)
     expect(aoa[1][header.indexOf("Costo *")]).toBe(11);
   });
-  it("Vistana/Fashion Wear: 23 cols con FOB+CIF", () => {
-    expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(23);
+  it("Vistana/Fashion Wear: 24 cols con FOB+CIF (incluye Codigo CPBS)", () => {
+    expect((buildAoa(rows, outColsForEmpresa("vistana"))[0] as string[]).length).toBe(24);
     expect(buildAoa(rows, outColsForEmpresa("fashion_wear"))[0]).toContain("Costo FOB *");
+    expect(buildAoa(rows, outColsForEmpresa("vistana"))[0]).toContain("Codigo CPBS");
   });
 });
 

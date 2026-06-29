@@ -489,9 +489,9 @@ export function titleCase(s: Cell): string {
   }).join("");
 }
 
-// Columnas de salida por defecto (Vistana / Fashion Wear): 23 cols, FOB+CIF, SIN
-// Composición ni Codigo CPBS (Tarea 3.3).
-export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición" && c !== "Codigo CPBS");
+// Columnas de salida por defecto (Vistana / Fashion Wear / Active Wear): 24 cols,
+// FOB+CIF, SIN Composición pero CON Codigo CPBS (= número de factura del proveedor).
+export const OUT_COLS_DEFAULT = OUT_COLS.filter((c) => c !== "Composición");
 
 // Plantilla de Fashion Shoes (Tarea 5): 24 cols, UNA sola columna "Costo *" (=CIF),
 // e incluye Composición y Codigo CPBS (van VACÍAS pero la columna existe).
