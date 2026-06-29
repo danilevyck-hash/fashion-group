@@ -77,6 +77,11 @@ const ALIAS: Record<string, string[]> = {
   prov: ["PROVEEDOR", "SUPPLIER", "VENDOR"],
   genero: ["GENERO", "GENDER", "GÉNERO"],
   destino: ["NOMBRE_DESTINATARIO_MERCANCIAS", "DESTINATARIO", "NOMBRE_DESTINATARIO"],
+  // Número de factura/documento del proveedor → va a "Codigo CPBS". Si no se detecta
+  // por nombre, se cae a la POSICIÓN columna C (índice 2) en processRows.
+  factura: ["NUMERO_FACTURA", "NUMERO FACTURA", "NRO_FACTURA", "NO_FACTURA", "NUM_FACTURA",
+    "N_FACTURA", "FACTURA", "NUMERO_DOCUMENTO", "NUMERO DOCUMENTO", "NRO_DOCUMENTO",
+    "NO_DOCUMENTO", "DOCUMENTO", "INVOICE", "INVOICE NUMBER", "INVOICE_NO", "DOCUMENT"],
 };
 
 // Palabras que indican prenda inferior (pantalón/short) → talla numérica de ropa
@@ -235,6 +240,7 @@ interface RawItem {
   cat: string;
   genero: string;
   destino: string;
+  factura: string;
 }
 
 interface PickEANResult {
@@ -323,6 +329,16 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       ". Revisa que sea el Excel correcto del proveedor.");
   }
 
+  // Columna del número de factura/documento del proveedor (→ "Codigo CPBS").
+  // 1) por nombre de encabezado (alias). 2) si no, por POSICIÓN columna C (índice 2),
+  //    siempre que esa columna no sea ya otra columna reconocida (evita agarrar la
+  //    descripción/categoría si el archivo de prueba la tiene en C).
+  let facturaCol = col.factura;
+  if (facturaCol === -1) {
+    const known = new Set([col.ref, col.ean, col.cat, col.talla, col.cant, col.costo, col.precio, col.marca, col.prov, col.genero, col.destino]);
+    if (!known.has(2)) facturaCol = 2;
+  }
+
   // Agrupar por REFERENCIA conservando orden de aparición
   const groups = new Map<string, RawItem[]>();
   for (let r = 1; r < rows.length; r++) {
@@ -341,6 +357,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       cat: col.cat !== -1 ? String(row[col.cat] ?? "").trim() : "",
       genero: col.genero !== -1 ? String(row[col.genero] ?? "").trim() : "",
       destino: col.destino !== -1 ? String(row[col.destino] ?? "").trim() : "",
+      factura: facturaCol !== -1 ? String(row[facturaCol] ?? "").trim() : "",
     };
     if (!groups.has(ref)) groups.set(ref, []);
     groups.get(ref)!.push(item);
@@ -426,7 +443,7 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
         "Stock Ideal": stockOut,
         "Temporada": temporada,
         "Composición": "",
-        "Codigo CPBS": "",
+        "Codigo CPBS": first.factura, // número de factura/documento del proveedor (columna C)
         "Codigo CPBS Abrev": "",
         "Bonificación": "",
         "Cantidad por caja": "",

@@ -157,6 +157,21 @@ describe("Depurador — precio fijo por descripción (jerarquía)", () => {
   });
 });
 
+describe("Depurador — Codigo CPBS = número de factura (columna C)", () => {
+  it("Fashion Shoes: CPBS lleva la factura detectada por header FACTURA (columna C)", () => {
+    const Hf = ["REFERENCIA", "EAN", "FACTURA", "P_CATEGORY", "TALLA", "CANTIDAD", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
+    const rows = processRows([Hf, ["R1", "1", "FAC-12345", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows;
+    const aoa = buildAoa(rows, outColsForEmpresa("fashion_shoes"));
+    const header = aoa[0] as string[];
+    expect(aoa[1][header.indexOf("Codigo CPBS")]).toBe("FAC-12345");
+  });
+  it("detecta la factura por POSICIÓN columna C aunque el header no sea reconocido", () => {
+    const Hpos = ["REFERENCIA", "EAN", "DOCU_X", "P_CATEGORY", "TALLA", "CANTIDAD", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
+    const r = processRows([Hpos, ["R1", "1", "DOC-777", "Men-Sneakers", "M", 10, 10, 20, "TH Footwear", "x"]] as SheetRow[], cfg).rows[0];
+    expect(r.cols["Codigo CPBS"]).toBe("DOC-777");
+  });
+});
+
 describe("Depurador — servicios (Tarea 4)", () => {
   it("AJUSTE DE PRECIO → servicio tipo 02", () => {
     const c = processRows([H, ["S1", "1", "AJUSTE DE PRECIO", "M", 10, 5, 9, "Whatever", "x"]] as SheetRow[], cfg).rows[0].cols;
