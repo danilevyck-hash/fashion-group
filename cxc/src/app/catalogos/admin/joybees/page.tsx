@@ -744,10 +744,12 @@ function BatchPhotosSection({
         const res = await fetch("/api/catalogo/joybees/upload", { method: "POST", body: formData });
         if (res.ok) {
           const { url } = await res.json();
+          // Solo {sku, image_url}: el endpoint tiene allow-list y rechaza el resto.
+          // Mandar el producto entero pisaría active/existencia/stock/price del cron.
           await fetch("/api/catalogo/joybees/products", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...product, image_url: url }),
+            body: JSON.stringify({ sku: product.sku, image_url: url }),
           });
           uploaded++;
         }
