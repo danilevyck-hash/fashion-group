@@ -62,6 +62,38 @@ async function compress(file: File): Promise<File> {
 }
 
 /**
+ * Actualiza la etiqueta (badge) de un producto vía PUT. `badge` null = sin
+ * etiqueta. Lanza Error con mensaje legible si falla (server/red/timeout) → el
+ * caller siempre puede mostrar el error y revertir el optimista.
+ */
+const BADGE_TIMEOUT_MS = 15_000;
+
+export async function updateProductBadge(productId: string, badge: string | null): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BADGE_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/catalogo/reebok/products", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: productId, badge }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || "No se pudo guardar la etiqueta.");
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Tardó demasiado. Revisa tu conexión e intenta de nuevo.");
+    }
+    if (err instanceof Error) throw err;
+    throw new Error("No se pudo guardar la etiqueta.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Sube la foto de un producto y actualiza products.image_url. Lanza Error con
  * mensaje legible si falla (server/red/timeout) → el caller siempre puede mostrar
  * el error y nunca queda un spinner infinito. Devuelve la URL nueva.

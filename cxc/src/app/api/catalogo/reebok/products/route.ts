@@ -29,13 +29,56 @@ export async function GET(req: NextRequest) {
 
 // La creación manual de productos fue retirada: el catálogo lo llena el cron
 // `reebok-catalogo` desde Switch (no se crean productos a mano). Solo quedan
-// GET (lectura), PUT (actualizar image_url al subir foto) y DELETE (ocultar).
+// GET (lectura), PUT (editar image_url/badge) y DELETE (ocultar).
+
+// Allow-list de columnas editables a mano. TODO lo demás (active, existencia,
+// disponibilidad, keep_visible, price, name…) lo maneja el cron `reebok-catalogo`
+// y se RECHAZA aquí — el PUT nunca debe pisar el estado de inventario.
+const EDITABLE_FIELDS = ['image_url', 'badge'] as const
+// badge = etiqueta visual manual. null = sin etiqueta; o uno de estos valores.
+const VALID_BADGES = new Set(['nuevo', 'oferta', 'proximamente'])
 
 export async function PUT(req: NextRequest) {
   const denied = requireAdmin(req); if (denied) return denied
-  const body = await req.json()
-  const { id, ...fields } = body
-  const { data, error } = await reebokServer.from('products').update(fields).eq('id', id).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at').single()
+  const body = await req.json().catch(() => null)
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Cuerpo inválido' }, { status: 400 })
+  }
+  const { id } = body as Record<string, unknown>
+  if (!id || typeof id !== 'string') {
+    return NextResponse.json({ error: 'id requerido' }, { status: 400 })
+  }
+
+  // Rechaza cualquier columna fuera de la allow-list (no la ignora silenciosamente).
+  const rejected = Object.keys(body).filter((k) => k !== 'id' && !(EDITABLE_FIELDS as readonly string[]).includes(k))
+  if (rejected.length > 0) {
+    return NextResponse.json({ error: `Campos no editables: ${rejected.join(', ')}` }, { status: 400 })
+  }
+
+  const updates: Record<string, unknown> = {}
+  for (const key of EDITABLE_FIELDS) {
+    if (key in body) updates[key] = (body as Record<string, unknown>)[key]
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })
+  }
+
+  // Validar badge: null (sin etiqueta) o un valor conocido. Evita meter texto libre.
+  if ('badge' in updates) {
+    const b = updates.badge
+    if (b !== null && !(typeof b === 'string' && VALID_BADGES.has(b))) {
+      return NextResponse.json({ error: 'Etiqueta inválida' }, { status: 400 })
+    }
+  }
+  // Validar image_url: string o null.
+  if ('image_url' in updates) {
+    const u = updates.image_url
+    if (u !== null && typeof u !== 'string') {
+      return NextResponse.json({ error: 'image_url inválido' }, { status: 400 })
+    }
+  }
+
+  const { data, error } = await reebokServer.from('products').update(updates).eq('id', id).select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at').single()
   if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
   return NextResponse.json(data)
 }

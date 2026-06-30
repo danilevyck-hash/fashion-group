@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
 import BulkPhotoUpload from "./BulkPhotoUpload";
-import { validateProductPhoto, uploadProductPhoto } from "./photoUpload";
+import { validateProductPhoto, uploadProductPhoto, updateProductBadge } from "./photoUpload";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,6 +47,20 @@ function empresaLabel(cat: string): string {
 function tieneFoto(p: ReebokProduct): boolean {
   return !!(p.image_url && p.image_url.trim());
 }
+
+// Etiquetas (badge) manuales. Mismo set que valida el endpoint y que pinta el
+// catálogo público. "" = sin etiqueta (se guarda como null).
+const BADGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Sin etiqueta" },
+  { value: "nuevo", label: "Nuevo" },
+  { value: "oferta", label: "Oferta" },
+  { value: "proximamente", label: "Próximamente" },
+];
+const BADGE_CHIP: Record<string, { label: string; cls: string }> = {
+  nuevo: { label: "Nuevo", cls: "bg-[#1A2656] text-white" },
+  oferta: { label: "Oferta", cls: "bg-[#E4002B] text-white" },
+  proximamente: { label: "Próximamente", cls: "bg-amber-500 text-white" },
+};
 
 function relativo(iso: string | null): string {
   if (!iso) return "nunca";
@@ -407,6 +421,33 @@ function ProductPhotoCard({
   const exist = product.existencia;
   const agotado = disp == null || disp <= 0;
 
+  // Edición de etiqueta (badge). El optimista vive en `pendingBadge` solo mientras
+  // guarda; la fuente de verdad es product.badge (revalida SWR tras el PUT) — así
+  // se evita el bug de useState seedeado de props que queda stale.
+  const [pendingBadge, setPendingBadge] = useState<string | null>(null);
+  const [savingBadge, setSavingBadge] = useState(false);
+  const [badgeSaved, setBadgeSaved] = useState(false);
+  const currentBadge = savingBadge ? pendingBadge : product.badge;
+  const chip = currentBadge ? BADGE_CHIP[currentBadge] : null;
+
+  async function handleBadgeChange(raw: string) {
+    const next = raw === "" ? null : raw;
+    if (next === (product.badge ?? null)) return;
+    setPendingBadge(next);
+    setSavingBadge(true);
+    setBadgeSaved(false);
+    try {
+      await updateProductBadge(product.id, next);
+      await onPhotoSaved(); // revalida → product.badge se actualiza
+      setBadgeSaved(true);
+      setTimeout(() => setBadgeSaved(false), 2000);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar la etiqueta.");
+    } finally {
+      setSavingBadge(false);
+    }
+  }
+
   async function handleFile(file: File) {
     setError(null);
     const vErr = validateProductPhoto(file);
@@ -427,6 +468,11 @@ function ProductPhotoCard({
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
       {/* Imagen / placeholder */}
       <div className="relative aspect-square bg-[#F5F0E8]">
+        {chip && (
+          <span className={`absolute top-2 left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded ${chip.cls}`}>
+            {chip.label}
+          </span>
+        )}
         {tieneFoto(product) ? (
           <Image src={product.image_url!} alt={product.name} fill sizes="(max-width:640px) 50vw, 25vw" className="object-contain" />
         ) : (
@@ -486,6 +532,35 @@ function ProductPhotoCard({
           {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar foto" : "Subir foto"}
         </button>
         {error && <p className="text-[11px] text-[#E4002B] leading-tight">{error}</p>}
+
+        {/* Etiqueta manual (badge). No toca inventario — solo la etiqueta visual. */}
+        <div className="mt-1.5 pt-2 border-t border-[#1A2656]/10">
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor={`badge-${product.id}`} className="text-[11px] font-medium text-gray-500">Etiqueta</label>
+            {savingBadge ? (
+              <span className="text-[10px] text-gray-400 inline-flex items-center gap-1">
+                <span className="w-2.5 h-2.5 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                Guardando…
+              </span>
+            ) : badgeSaved ? (
+              <span className="text-[10px] text-emerald-600 font-medium inline-flex items-center gap-0.5">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                Guardado
+              </span>
+            ) : null}
+          </div>
+          <select
+            id={`badge-${product.id}`}
+            value={currentBadge ?? ""}
+            disabled={savingBadge}
+            onChange={(e) => handleBadgeChange(e.target.value)}
+            className="w-full py-1.5 px-2 rounded-md border border-gray-200 text-xs text-[#1A2656] bg-white outline-none focus:border-[#1A2656]/40 disabled:opacity-50 transition"
+          >
+            {BADGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
