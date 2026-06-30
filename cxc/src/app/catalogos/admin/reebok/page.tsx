@@ -33,6 +33,7 @@ interface ReebokProduct {
 type Tab = "faltan-foto" | "completo" | "pedidos";
 type EmpresaFilter = "todas" | "wear" | "shoes";
 type FotoFilter = "todos" | "con" | "sin";
+type BadgeFilter = "todas" | "ninguno" | "nuevo" | "oferta" | "proximamente";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -320,18 +321,26 @@ function CatalogoCompletoTab({
 }) {
   const [empresa, setEmpresa] = useState<EmpresaFilter>("todas");
   const [foto, setFoto] = useState<FotoFilter>("todos");
+  const [badge, setBadge] = useState<BadgeFilter>("todas");
   const [search, setSearch] = useState("");
 
-  const filtered = products.filter((p) => {
-    if (empresa !== "todas" && empresaDe(p.category) !== empresa) return false;
-    if (foto === "con" && !tieneFoto(p)) return false;
-    if (foto === "sin" && tieneFoto(p)) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!(p.sku || "").toLowerCase().includes(q) && !p.name.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filtered = products
+    .filter((p) => {
+      if (empresa !== "todas" && empresaDe(p.category) !== empresa) return false;
+      if (foto === "con" && !tieneFoto(p)) return false;
+      if (foto === "sin" && tieneFoto(p)) return false;
+      if (badge !== "todas") {
+        const b = p.badge ?? null;
+        if (badge === "ninguno" ? b !== null : b !== badge) return false;
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        if (!(p.sku || "").toLowerCase().includes(q) && !p.name.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    })
+    // Orden alfabético por nombre ascendente (locale es).
+    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
 
   const empresaTabs: { key: EmpresaFilter; label: string }[] = [
     { key: "todas", label: "Todas" },
@@ -342,6 +351,13 @@ function CatalogoCompletoTab({
     { key: "todos", label: "Todos" },
     { key: "con", label: "Con foto" },
     { key: "sin", label: "Sin foto" },
+  ];
+  const badgeTabs: { key: BadgeFilter; label: string }[] = [
+    { key: "todas", label: "Todas" },
+    { key: "ninguno", label: "Sin etiqueta" },
+    { key: "nuevo", label: "Nuevo" },
+    { key: "oferta", label: "Oferta" },
+    { key: "proximamente", label: "Próximamente" },
   ];
 
   return (
@@ -363,6 +379,7 @@ function CatalogoCompletoTab({
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Segmented options={empresaTabs} value={empresa} onChange={setEmpresa} />
         <Segmented options={fotoTabs} value={foto} onChange={setFoto} />
+        <Segmented options={badgeTabs} value={badge} onChange={setBadge} />
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>
 
@@ -371,9 +388,9 @@ function CatalogoCompletoTab({
           <p className="text-gray-400 text-sm">Ningún producto coincide.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="space-y-2">
           {filtered.map((p) => (
-            <ProductPhotoCard key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+            <ProductListRow key={p.id} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
           ))}
         </div>
       )}
@@ -405,21 +422,16 @@ function Segmented<T extends string>({
   );
 }
 
-// ── Tarjeta de producto con subida de foto ────────────────────────────────────
+// ── Acciones de producto (foto + etiqueta), compartidas por tarjeta y fila ─────
 
-function ProductPhotoCard({
-  product, onPhotoSaved, showToast,
-}: {
-  product: ReebokProduct;
-  onPhotoSaved: () => Promise<void>;
-  showToast: (msg: string) => void;
-}) {
+function useProductActions(
+  product: ReebokProduct,
+  onPhotoSaved: () => Promise<void>,
+  showToast: (msg: string) => void,
+) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const disp = product.disponibilidad;
-  const exist = product.existencia;
-  const agotado = disp == null || disp <= 0;
 
   // Edición de etiqueta (badge). El optimista vive en `pendingBadge` solo mientras
   // guarda; la fuente de verdad es product.badge (revalida SWR tras el PUT) — así
@@ -463,6 +475,24 @@ function ProductPhotoCard({
       setUploading(false);
     }
   }
+
+  return { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange };
+}
+
+// ── Tarjeta de producto con subida de foto ────────────────────────────────────
+
+function ProductPhotoCard({
+  product, onPhotoSaved, showToast,
+}: {
+  product: ReebokProduct;
+  onPhotoSaved: () => Promise<void>;
+  showToast: (msg: string) => void;
+}) {
+  const { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange } =
+    useProductActions(product, onPhotoSaved, showToast);
+  const disp = product.disponibilidad;
+  const exist = product.existencia;
+  const agotado = disp == null || disp <= 0;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
@@ -560,6 +590,104 @@ function ProductPhotoCard({
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Fila de producto (vista lista densa) ──────────────────────────────────────
+
+function ProductListRow({
+  product, onPhotoSaved, showToast,
+}: {
+  product: ReebokProduct;
+  onPhotoSaved: () => Promise<void>;
+  showToast: (msg: string) => void;
+}) {
+  const { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange } =
+    useProductActions(product, onPhotoSaved, showToast);
+  const disp = product.disponibilidad;
+  const exist = product.existencia;
+  const agotado = disp == null || disp <= 0;
+
+  return (
+    <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-2.5">
+      {/* Miniatura */}
+      <div className="relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-[#F5F0E8]">
+        {chip && (
+          <span className={`absolute top-1 left-1 z-10 text-[9px] font-bold px-1 py-0.5 rounded ${chip.cls}`}>{chip.label}</span>
+        )}
+        {tieneFoto(product) ? (
+          <Image src={product.image_url!} alt={product.name} fill sizes="88px" className="object-contain" />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-[#1A2656]/30">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+            </svg>
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <span className="w-5 h-5 border-2 border-[#1A2656] border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {/* Datos en línea */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          {product.sku && (
+            <span className="shrink-0 text-[11px] bg-[#F5F0E8] text-[#1A2656]/60 px-1.5 py-0.5 rounded font-medium tabular-nums">{product.sku}</span>
+          )}
+          <h3 className="text-sm font-semibold text-[#1A2656] truncate">{product.name}</h3>
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs">
+          {product.price != null && (
+            <span className="font-bold text-[#1A2656] tabular-nums">${product.price.toFixed(2)}</span>
+          )}
+          <span className={`tabular-nums ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]/80"}`}>
+            {agotado ? "Agotado" : `Disp: ${disp}`}
+          </span>
+          <span className="text-[#1A2656]/45 tabular-nums">Bodega: {exist == null ? "—" : exist}</span>
+        </div>
+        {error && <p className="text-[11px] text-[#E4002B] leading-tight mt-1">{error}</p>}
+      </div>
+
+      {/* Controles a la derecha */}
+      <div className="shrink-0 flex items-center gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); if (inputRef.current) inputRef.current.value = ""; }}
+        />
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50 transition whitespace-nowrap"
+        >
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar" : "Subir foto"}
+        </button>
+        <div className="flex flex-col items-end gap-0.5">
+          <select
+            value={currentBadge ?? ""}
+            disabled={savingBadge}
+            onChange={(e) => handleBadgeChange(e.target.value)}
+            aria-label={`Etiqueta de ${product.name}`}
+            className="py-2 px-2 rounded-md border border-gray-200 text-xs text-[#1A2656] bg-white outline-none focus:border-[#1A2656]/40 disabled:opacity-50 transition"
+          >
+            {BADGE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {savingBadge ? (
+            <span className="text-[10px] text-gray-400">Guardando…</span>
+          ) : badgeSaved ? (
+            <span className="text-[10px] text-emerald-600 font-medium">✓ Guardado</span>
+          ) : null}
         </div>
       </div>
     </div>
