@@ -1,9 +1,10 @@
 // Sync del catálogo Joybees (tabla `joybees_products`) desde Switch. Wrapper
 // delgado sobre el motor parametrizado `syncCatalogo`.
 //
-// joystep vende EXCLUSIVAMENTE Joybees → TODO su inventario califica: SIN filtro de
-// proveedor ni prefijo. El filtro existencia>=1 ya descarta servicios/ajustes
-// contables (no tienen saldo físico).
+// joystep es casi 100% Joybees, pero su maestro incluye basura contable de otros
+// proveedores: "TERMO"/"AJUSTE DE PRECIO"/muebles con proveedor GENERAL o
+// CONFECCIONES BOSTON y saldo físico >= 1 (que el filtro existencia NO descarta).
+// FILTRO PROVEEDOR: solo el proveedor real de Joybees (JCBBRANDS) entra al catálogo.
 //
 // Diferencias con Reebok:
 //   - Sin tabla `inventory`: el stock vive en la columna `joybees_products.stock`.
@@ -17,17 +18,28 @@
 
 import { syncCatalogo, type CatalogoSyncResult } from "./sync-catalogo";
 import { joybeesServer } from "@/lib/joybees-supabase-server";
+import type { SwitchArticulo } from "./client";
 
 const EMPRESAS = [
   { empresaKey: "joystep", categories: [] as const, defaultCategory: "nuevo" },
 ] as const;
+
+const JOYBEES_PROVEEDOR = "JCBBRANDS";
+
+/** Un artículo entra al catálogo Joybees SOLO si su proveedor es JCBBRANDS.
+ *  Excluye la basura contable de joystep (TERMO/AJUSTE DE PRECIO/muebles con
+ *  proveedor GENERAL o CONFECCIONES BOSTON). Trim + uppercase para tolerar los
+ *  espacios sobrantes que Switch mete en el campo proveedor. */
+function isJoybeesArticulo(a: SwitchArticulo): boolean {
+  return (a.proveedor ?? "").trim().toUpperCase() === JOYBEES_PROVEEDOR;
+}
 
 export function syncCatalogoJoybees(opts: { dryRun?: boolean } = {}): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: joybeesServer,
     productsTable: "joybees_products",
     empresas: EMPRESAS,
-    articuloFilter: () => true, // joystep = 100% Joybees, sin filtro
+    articuloFilter: isJoybeesArticulo, // solo proveedor JCBBRANDS (excluye basura contable)
     // sin inventoryTable: el stock vive en el producto
     stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
     insertExtras: { gender: "adults_m" }, // gender NOT NULL; editable en el admin
