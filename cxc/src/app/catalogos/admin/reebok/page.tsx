@@ -31,18 +31,21 @@ interface ReebokProduct {
 }
 
 type Tab = "faltan-foto" | "completo" | "pedidos";
-type EmpresaFilter = "todas" | "wear" | "shoes";
+type CategoriaFilter = "todas" | "footwear" | "apparel" | "accessories";
 type FotoFilter = "todos" | "con" | "sin";
 type BadgeFilter = "todas" | "ninguno" | "nuevo" | "oferta" | "proximamente";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Empresa derivada de la categoría (misma convención que el cron e import).
-function empresaDe(cat: string): "wear" | "shoes" {
-  return cat === "footwear" ? "shoes" : "wear";
-}
-function empresaLabel(cat: string): string {
-  return empresaDe(cat) === "shoes" ? "Active Shoes" : "Active Wear";
+// Label por categoría real. Reebok vive 100% en active_shoes (Active Wear quedó
+// obsoleto); el grupo del catálogo ES la categoría: Footwear / Apparel / Accessories.
+const CATEGORIA_LABEL: Record<string, string> = {
+  footwear: "Footwear",
+  apparel: "Apparel",
+  accessories: "Accessories",
+};
+function categoriaLabel(cat: string): string {
+  return CATEGORIA_LABEL[cat] ?? cat;
 }
 
 function tieneFoto(p: ReebokProduct): boolean {
@@ -131,9 +134,10 @@ function ReebokCatalogoInner() {
   const metrics = useMemo(() => {
     const total = products.length;
     const sinFoto = products.filter((p) => !tieneFoto(p)).length;
-    const wear = products.filter((p) => empresaDe(p.category) === "wear").length;
-    const shoes = products.filter((p) => empresaDe(p.category) === "shoes").length;
-    return { total, sinFoto, wear, shoes };
+    const footwear = products.filter((p) => p.category === "footwear").length;
+    const apparel = products.filter((p) => p.category === "apparel").length;
+    const accessories = products.filter((p) => p.category === "accessories").length;
+    return { total, sinFoto, footwear, apparel, accessories };
   }, [products]);
 
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
@@ -144,11 +148,11 @@ function ReebokCatalogoInner() {
     if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
     try {
       const XLSX = (await import("xlsx-js-style")).default;
-      const header = ["Código", "Descripción", "Empresa", "Disponible", "Existencia"];
+      const header = ["Código", "Descripción", "Categoría", "Disponible", "Existencia"];
       const rows = sin.map((p) => [
         p.sku || "",
         p.name || "",
-        empresaLabel(p.category),
+        categoriaLabel(p.category),
         p.disponibilidad ?? "",
         p.existencia ?? "",
       ]);
@@ -212,11 +216,12 @@ function ReebokCatalogoInner() {
         </div>
 
         {/* Resumen */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
           <Metric label="Productos" value={metrics.total} />
           <Metric label="Sin foto" value={metrics.sinFoto} highlight={metrics.sinFoto > 0} />
-          <Metric label="Active Wear" value={metrics.wear} />
-          <Metric label="Active Shoes" value={metrics.shoes} />
+          <Metric label="Footwear" value={metrics.footwear} />
+          <Metric label="Apparel" value={metrics.apparel} />
+          <Metric label="Accessories" value={metrics.accessories} />
         </div>
 
         {/* Pestañas */}
@@ -319,14 +324,14 @@ function CatalogoCompletoTab({
   onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
 }) {
-  const [empresa, setEmpresa] = useState<EmpresaFilter>("todas");
+  const [categoria, setCategoria] = useState<CategoriaFilter>("todas");
   const [foto, setFoto] = useState<FotoFilter>("todos");
   const [badge, setBadge] = useState<BadgeFilter>("todas");
   const [search, setSearch] = useState("");
 
   const filtered = products
     .filter((p) => {
-      if (empresa !== "todas" && empresaDe(p.category) !== empresa) return false;
+      if (categoria !== "todas" && p.category !== categoria) return false;
       if (foto === "con" && !tieneFoto(p)) return false;
       if (foto === "sin" && tieneFoto(p)) return false;
       if (badge !== "todas") {
@@ -342,10 +347,11 @@ function CatalogoCompletoTab({
     // Orden alfabético por nombre ascendente (locale es).
     .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
 
-  const empresaTabs: { key: EmpresaFilter; label: string }[] = [
+  const categoriaTabs: { key: CategoriaFilter; label: string }[] = [
     { key: "todas", label: "Todas" },
-    { key: "wear", label: "Active Wear" },
-    { key: "shoes", label: "Active Shoes" },
+    { key: "footwear", label: "Footwear" },
+    { key: "apparel", label: "Apparel" },
+    { key: "accessories", label: "Accessories" },
   ];
   const fotoTabs: { key: FotoFilter; label: string }[] = [
     { key: "todos", label: "Todos" },
@@ -377,7 +383,7 @@ function CatalogoCompletoTab({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Segmented options={empresaTabs} value={empresa} onChange={setEmpresa} />
+        <Segmented options={categoriaTabs} value={categoria} onChange={setCategoria} />
         <Segmented options={fotoTabs} value={foto} onChange={setFoto} />
         <Segmented options={badgeTabs} value={badge} onChange={setBadge} />
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
