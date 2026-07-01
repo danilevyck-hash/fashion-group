@@ -38,7 +38,7 @@ const EMPRESA_GROUPS = [
 const CATALOG_KEYS = new Set(MARCA_CATALOGO.map((c) => marcaKey(c.marca)));
 
 function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo }): string {
-  const r = d.redondeo === "half" ? ".50" : "entero";
+  const r = d.redondeo === "half" ? ".50" : d.redondeo === "par" ? "par" : "entero";
   return `TECHO(CIF ÷ ${d.divisor || "—"})${d.extra > 0 ? ` + ${d.extra}` : ""} → ${r}`;
 }
 function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): MarcaRow {
@@ -316,6 +316,7 @@ function MarcaCard({
           <select value={row.redondeo} onClick={(e) => e.stopPropagation()} onChange={(e) => onPatchMarca(row.id, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`} aria-label="Redondeo">
             <option value="int">Entero</option>
             <option value="half">.50</option>
+            <option value="par">Par</option>
           </select>
           <SaveBtn label={marcaLabel} dirty={row.dirty || !row.saved} onClick={() => onSaveMarca(row.id)} disabled={savingMarca} flashed={flashMarca} />
         </div>
@@ -362,6 +363,7 @@ function MarcaCard({
                     <select value={r.redondeo} onChange={(e) => onPatchDesc(row.marca, desc, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-full`}>
                       <option value="int">Entero</option>
                       <option value="half">.50</option>
+                      <option value="par">Par</option>
                     </select>
                   </>
                 )}
@@ -386,6 +388,7 @@ function MarcaInputs({ row, onPatch }: { row: MarcaRow; onPatch: (id: string, p:
       <select value={row.redondeo} onChange={(e) => onPatch(row.id, { redondeo: e.target.value as Redondeo })} className={`${selCls} w-[90px]`} aria-label="Redondeo">
         <option value="int">Entero</option>
         <option value="half">.50</option>
+        <option value="par">Par</option>
       </select>
     </>
   );

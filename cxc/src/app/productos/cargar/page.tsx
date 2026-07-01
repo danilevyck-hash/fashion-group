@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
-import DepuradorClient from "./DepuradorClient";
+import DepuradorDispatcher from "./DepuradorDispatcher";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
@@ -59,9 +59,10 @@ function CargarInner() {
       </div>
 
       {/* Depurador SIEMPRE montado (solo oculto) para que el Excel cargado y sus
-          ediciones sobrevivan al cambiar de pestaña (FIX 1). */}
+          ediciones sobrevivan al cambiar de pestaña (FIX 1). El dispatcher detecta
+          CK/TH vs Reebok y aplica el flujo correcto en el mismo tab. */}
       <div className={tab === "depurador" ? "" : "hidden"}>
-        <DepuradorClient onDownloaded={handleDownloaded} />
+        <DepuradorDispatcher onDownloaded={handleDownloaded} />
       </div>
       {tab === "formulas" && <FormulasConfig />}
       {tab === "reglas" && <ReglasView />}

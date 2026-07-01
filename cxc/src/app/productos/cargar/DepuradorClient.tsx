@@ -67,10 +67,16 @@ interface DepuradorClientProps {
     total_unidades: number;
     total_costo: number;
   }) => void;
+  /** Archivo inyectado por el dispatcher (mismo tab). Si viene, se oculta la dropzone
+   *  propia y se procesa automáticamente. La lógica CK/TH no cambia. */
+  injectedFile?: File | null;
+  /** Volver a la dropzone del dispatcher. */
+  onReset?: () => void;
 }
 
-export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) {
+export default function DepuradorClient({ onDownloaded, injectedFile, onReset }: DepuradorClientProps) {
   const now = new Date();
+  const embedded = injectedFile !== undefined;
   const fileRef = useRef<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -157,6 +163,12 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     [runFile, mesIdx, anio, tasa, factor]
   );
 
+  // Modo dispatcher: procesar el archivo inyectado automáticamente (mismo tab).
+  useEffect(() => {
+    if (injectedFile) handleFile(injectedFile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedFile]);
+
   // Reprocesar al cambiar un parámetro si ya hay archivo cargado
   const reprocess = useCallback(
     (patch: Partial<{ mesIdx: number; anio: string; tasa: string; factor: string }>) => {
@@ -178,6 +190,7 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
     setDescFilter("");
     setMassPrice("");
     if (inputRef.current) inputRef.current.value = "";
+    onReset?.(); // en modo dispatcher, volver a la dropzone compartida
   };
 
   const onTallaChange = (rowIdx: number, nuevaTalla: string) => {
@@ -511,32 +524,34 @@ export default function DepuradorClient({ onDownloaded }: DepuradorClientProps) 
         </h1>
       </div>
 
-      {/* Drop zone */}
-      <label
-        onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-        }}
-        className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-          dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
-        }`}
-      >
-        <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
-        <div className="text-base font-semibold text-stone-900">
-          {fileName || "Suelta el archivo aquí o haz clic para buscar"}
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".xlsx,.xls"
-          className="hidden"
-          onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
-        />
-      </label>
+      {/* Drop zone propia (oculta en modo dispatcher: el padre tiene la dropzone) */}
+      {!embedded && (
+        <label
+          onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+          }}
+          className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
+            dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+          }`}
+        >
+          <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
+          <div className="text-base font-semibold text-stone-900">
+            {fileName || "Suelta el archivo aquí o haz clic para buscar"}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
+          />
+        </label>
+      )}
 
       {/* Config (colapsable — casi nunca cambia: factor 1.1, tasa 7) */}
       <details className="mb-4 rounded-xl border border-stone-200 bg-white">
