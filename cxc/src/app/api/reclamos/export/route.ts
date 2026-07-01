@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { csvWithBom, CSV_MIME } from "@/lib/csv-export";
+import { reclamoTaxes, ocultaPedido } from "@/lib/reclamos/tax";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +24,16 @@ export async function GET(req: NextRequest) {
 
   for (const r of data || []) {
     const items = r.reclamo_items || [];
+    // Active Shoes no usa N° de pedido → columna en blanco.
+    const pedido = ocultaPedido(r.empresa) ? "" : r.nro_orden_compra;
     if (items.length === 0) {
-      rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, r.nro_orden_compra, r.fecha_reclamo, r.estado, "", "", "", "", "", "", "", "", "", "", r.notas].join(";"));
+      rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, "", "", "", "", "", "", "", "", "", "", r.notas].join(";"));
     } else {
       for (const item of items) {
         const sub = item.subtotal || 0;
-        const imp = sub * 0.10;   // Tasa de importación 10%
-        const itbms = sub * 0.077; // ITBMS 7.7%
-        const tot = sub + imp + itbms;
-        rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, r.nro_orden_compra, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), imp.toFixed(2), itbms.toFixed(2), tot.toFixed(2), item.motivo, r.notas].join(";"));
+        // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
+        const tx = reclamoTaxes(r.empresa, sub);
+        rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), tx.importacion.toFixed(2), tx.itbms.toFixed(2), tx.total.toFixed(2), item.motivo, r.notas].join(";"));
       }
     }
   }

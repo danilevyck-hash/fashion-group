@@ -1,5 +1,6 @@
 import XLSX from "xlsx-js-style";
 import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
+import { reclamoTaxes, ocultaPedido, impLabel } from "@/lib/reclamos/tax";
 
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
@@ -29,6 +30,7 @@ export function buildReclamoSheet(
 ): XLSX.WorkSheet {
   const facturaUrl = (rec.factura_pdf_url as string | null | undefined) || null;
   const nroReclamo = String(rec.nro_reclamo || "");
+  const empresa = String(rec.empresa || "");
   const reclamoId = String(rec.id || "");
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
@@ -50,14 +52,15 @@ export function buildReclamoSheet(
   const mLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } });
   const mVal = (v: string, bold = false) => ({ v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
 
-  // Metadata rows: N° Reclamo / Empresa / Proveedor / N° Factura / N° Pedido
-  const meta = [
+  // Metadata rows: N° Reclamo / Empresa / Proveedor / N° Factura / N° Pedido.
+  // Active Shoes no usa N° de pedido → se omite esa fila.
+  const meta: [string, string, boolean][] = [
     ["N° Reclamo", nroReclamo, true],
     ["Empresa", String(rec.empresa || ""), false],
     ["Proveedor", String(rec.proveedor || ""), false],
     ["N° Factura", String(rec.nro_factura || ""), true],
-    ["N° Pedido", String(rec.nro_orden_compra || "—"), false],
-  ] as const;
+    ...(ocultaPedido(empresa) ? [] : [["N° Pedido", String(rec.nro_orden_compra || "—"), false] as [string, string, boolean]]),
+  ];
 
   for (const [lbl, val, bold] of meta) {
     ws[addr(r, 0)] = mLbl(lbl);
@@ -97,20 +100,21 @@ export function buildReclamoSheet(
   ws[addr(r, 0)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: "FFFFFF" } } } };
   h[r] = 6; r++;
 
-  // Totals (labels en col 6, valores en col 7)
-  const imp = subtotal * 0.10; const itbms = subtotal * 0.077; const total = subtotal + imp + itbms;
+  // Totals (labels en col 6, valores en col 7). Impuestos por empresa
+  // (Active Shoes: importación 15%, sin ITBMS).
+  const tx = reclamoTaxes(empresa, subtotal);
   const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" } } });
   const tVal = (v: number) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
 
   ws[addr(r, 6)] = tLbl("Subtotal:"); ws[addr(r, 7)] = tVal(subtotal); h[r] = 16; r++;
-  ws[addr(r, 6)] = tLbl("Importación (10%):"); ws[addr(r, 7)] = tVal(imp); h[r] = 16; r++;
-  ws[addr(r, 6)] = tLbl("ITBMS (7%):"); ws[addr(r, 7)] = tVal(itbms); h[r] = 16; r++;
+  ws[addr(r, 6)] = tLbl(`Importación (${impLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.importacion); h[r] = 16; r++;
+  if (tx.hasItbms) { ws[addr(r, 6)] = tLbl("ITBMS (7%):"); ws[addr(r, 7)] = tVal(tx.itbms); h[r] = 16; r++; }
 
   // Final total (banda 0..6 + valor en col 7)
   const totalRow = r;
   const tBand = (v: string, ha: string) => ({ v, t: "s", s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: ha, vertical: "center" } } });
   for (let c = 0; c <= 6; c++) ws[addr(r, c)] = tBand(c === 0 ? "TOTAL A ACREDITAR" : "", "center");
-  ws[addr(r, 7)] = { v: total, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "right", vertical: "center" } } };
+  ws[addr(r, 7)] = { v: tx.total, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "right", vertical: "center" } } };
   merges.push({ s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 6 } });
   h[r] = 28; r++;
 

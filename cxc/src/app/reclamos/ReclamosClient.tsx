@@ -18,7 +18,7 @@ export interface ReclamosInitialData {
   customMotivos: string[];
   detail: Reclamo | null;
 }
-import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, FACTOR_TOTAL } from "./components/constants";
+import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, reclamoTaxes } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
@@ -560,7 +560,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // 2 estados: Creado (abierto) → Pagado (resuelto vía settlement).
   // Pendientes = todo lo que no está Pagado (Creado + En proceso = reclamo abierto).
   const pendientes = reclamos.filter((r) => r.estado !== "Pagado");
-  const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
+  const totalPendiente = pendientes.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — UN solo modal, usado por lista (single + bulk) y detalle ──
   const pendingCount = pendingDelete?.length ?? 0;
@@ -706,7 +706,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       />
       <SettlementModal
         open={settleOpen}
-        reclamado={current.monto_reclamado_snapshot ?? calcSub(current.reclamo_items ?? []) * FACTOR_TOTAL}
+        reclamado={current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, calcSub(current.reclamo_items ?? [])).total}
         submitting={settling}
         onClose={() => setSettleOpen(false)}
         onSubmit={submitSettlement}

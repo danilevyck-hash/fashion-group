@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
@@ -124,8 +124,12 @@ export default function ReclamoDetail({
   const sub = calcSub(items);
   // Totales: en modo edición se recalculan EN VIVO desde editItems mientras el
   // usuario cambia cantidades/precios; en modo ver, desde los ítems guardados.
-  // La lógica fiscal (importación 10% / ITBMS / FACTOR_TOTAL) no cambia, solo la fuente.
+  // La lógica fiscal sale de reclamoTaxes(empresa): Active Shoes = importación 15%
+  // sin ITBMS; el resto = importación 10% + ITBMS 7.7% (sin cambios).
   const totalsSub = editMode ? calcSub(editItems) : sub;
+  // Empresa que rige los impuestos (en edición puede estar cambiándose).
+  const totalsEmpresa = editMode ? editEmpresa : current.empresa;
+  const totalsTax = reclamoTaxes(totalsEmpresa, totalsSub);
   const days = daysSince(current.fecha_reclamo);
 
   // Comprobante del paso "En proceso" (foto + nota opcional). Se muestra en los
@@ -148,8 +152,8 @@ export default function ReclamoDetail({
   // ── Settlement (recuperación / notas de crédito) ──
   const settlements = (current.reclamo_settlements ?? []).filter((s) => !s.deleted);
   const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
-  // Reclamado: snapshot congelado al marcar Pagado; si aún no, el vivo.
-  const reclamado = current.monto_reclamado_snapshot ?? sub * FACTOR_TOTAL;
+  // Reclamado: snapshot congelado al marcar Pagado; si aún no, el vivo (impuestos por empresa).
+  const reclamado = current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, sub).total;
   const deltaRec = reclamado - recuperado;
   const pctRec = reclamado > 0 ? (recuperado / reclamado) * 100 : 0;
   const [ncOpen, setNcOpen] = useState(false);
@@ -229,10 +233,12 @@ export default function ReclamoDetail({
                 <span className="text-xs text-gray-500">N° Factura *</span>
                 <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-gray-500">N° Pedido *</span>
-                <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
-              </label>
+              {!esActiveShoes(editEmpresa) && (
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-500">N° Pedido *</span>
+                  <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+                </label>
+              )}
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Fecha *</span>
                 <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
@@ -269,10 +275,12 @@ export default function ReclamoDetail({
                   <dt className="text-xs text-gray-500">Factura</dt>
                   <dd className="text-sm text-gray-900 tabular-nums">{current.nro_factura || "—"}</dd>
                 </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Pedido</dt>
-                  <dd className="text-sm text-gray-900 tabular-nums">{current.nro_orden_compra || "—"}</dd>
-                </div>
+                {!esActiveShoes(current.empresa) && (
+                  <div>
+                    <dt className="text-xs text-gray-500">Pedido</dt>
+                    <dd className="text-sm text-gray-900 tabular-nums">{current.nro_orden_compra || "—"}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs text-gray-500">Fecha</dt>
                   <dd className="text-sm text-gray-900">{fmtDate(current.fecha_reclamo)}</dd>
@@ -391,11 +399,11 @@ export default function ReclamoDetail({
         <div className="text-sm font-semibold text-gray-700">Totales</div>
         {editMode && <span className="text-xs text-gray-400">Actualizando en vivo</span>}
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+      <div className={`grid grid-cols-2 ${totalsTax.hasItbms ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 sm:gap-4 mb-8`}>
         <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Subtotal</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub)}</div></div>
-        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Imp. importación (10%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub * TASA_IMPORTACION)}</div></div>
-        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS (7%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsSub * TASA_ITBMS)}</div></div>
-        <div className="bg-gray-900 rounded-xl p-4 text-center"><div className="text-xs text-white/70">Total</div><div className="text-[19px] font-semibold tabular-nums mt-1.5 text-white">${fmt(totalsSub * FACTOR_TOTAL)}</div></div>
+        <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">Imp. importación ({impLabel(totalsEmpresa)})</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.importacion)}</div></div>
+        {totalsTax.hasItbms && <div className="border border-gray-200 rounded-xl p-4 text-center"><div className="text-xs text-gray-500">ITBMS (7%)</div><div className="text-[17px] font-semibold tabular-nums mt-1.5">${fmt(totalsTax.itbms)}</div></div>}
+        <div className="bg-gray-900 rounded-xl p-4 text-center"><div className="text-xs text-white/70">Total</div><div className="text-[19px] font-semibold tabular-nums mt-1.5 text-white">${fmt(totalsTax.total)}</div></div>
       </div>
 
       {/* Settlement — recuperación / notas de crédito */}

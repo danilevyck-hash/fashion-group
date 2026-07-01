@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { EMPRESAS, EC, daysSince, calcSub, FACTOR_TOTAL } from "./constants";
+import { EMPRESAS, EC, daysSince, calcSub, reclamoTaxes } from "./constants";
 import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
 
 interface Props {
@@ -126,7 +126,7 @@ export default function EmpresaSelector({
                         <td className="py-3 text-gray-500">{r.nro_factura}</td>
                         <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                         <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
-                        <td className="py-3 text-right tabular-nums">${fmt(calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL)}</td>
+                        <td className="py-3 text-right tabular-nums">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -141,7 +141,7 @@ export default function EmpresaSelector({
             {EMPRESAS.map((empresa) => {
               const ers = reclamos.filter((r) => r.empresa === empresa);
               const open = ers.filter((r) => r.estado !== "Pagado");
-              const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
+              const tot = open.reduce((s, r) => s + reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total, 0);
               const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
               const c = getC(empresa);
               return (
@@ -184,7 +184,7 @@ export default function EmpresaSelector({
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className={`px-1.5 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span>
-                                <span className="tabular-nums text-gray-500">${fmt(calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL)}</span>
+                                <span className="tabular-nums text-gray-500">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</span>
                               </div>
                             </div>
                           ))}

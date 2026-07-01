@@ -3,11 +3,14 @@
 //
 // OBLIGATORIOS:
 //   Cabecera: empresa, nro_factura, fecha_reclamo, nro_orden_compra (N° pedido).
+//     Excepción: Active Shoes NO usa N° pedido (no se pide ni se valida).
 //   Ítem: referencia (código), descripcion, talla, genero, cantidad (>0),
 //         precio_unitario (>=0), motivo. Y debe haber >= 1 ítem.
 // OPCIONALES (excluidos a propósito): notas, factura PDF, fotos.
 //
 // Devuelve un mensaje en español listo para mostrar, o null si todo está OK.
+
+import { ocultaPedido } from "./tax";
 
 export interface ReclamoHeaderInput {
   empresa?: unknown;
@@ -37,7 +40,8 @@ export function validateReclamoHeader(h: ReclamoHeaderInput): string | null {
   if (!s(h.empresa)) return "Selecciona la empresa.";
   if (!s(h.nro_factura)) return "Falta el N° de factura.";
   if (!s(h.fecha_reclamo)) return "Falta la fecha.";
-  if (!s(h.nro_orden_compra)) return "Falta el N° de pedido.";
+  // Active Shoes no usa N° de pedido → no es obligatorio para esa empresa.
+  if (!ocultaPedido(s(h.empresa)) && !s(h.nro_orden_compra)) return "Falta el N° de pedido.";
   return null;
 }
 

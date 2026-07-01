@@ -3,12 +3,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 import { adjuntarFacturaUrls } from "./factura-storage";
 import { reclamoGaleriaUrl } from "./gallery-token";
+import { reclamoTaxes, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 
 const LINK_FG = "0563C1"; // azul de hyperlink
-
-const TASA_IMPORTACION = 0.10;
-const TASA_ITBMS = 0.077;
-const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
 
 const PRI = "1B3A5C";
 const MID = "2E5E8E";
@@ -153,9 +150,11 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
       0,
     );
-    const imp = sub * TASA_IMPORTACION;
-    const itbms = sub * TASA_ITBMS;
-    const total = sub * FACTOR_TOTAL;
+    // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
+    const tx = reclamoTaxes(rec.empresa, sub);
+    const imp = tx.importacion;
+    const itbms = tx.itbms;
+    const total = tx.total;
     const nFotos = (rec.reclamo_fotos || []).length;
     grandSub += sub;
     grandImp += imp;

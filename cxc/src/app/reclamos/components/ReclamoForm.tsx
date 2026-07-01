@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
 import { AccordionContent, FotoLightbox } from "@/components/ui";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
@@ -62,6 +62,7 @@ export default function ReclamoForm({
   function fieldError(field: string, value: string) { return touched[field] && !value.trim(); }
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
+  const fTax = reclamoTaxes(fEmpresa, fSubtotal);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
 
   // Recently used motivos for quick-tap pills (custom motivos = most recently added)
@@ -167,11 +168,13 @@ export default function ReclamoForm({
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
               {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500">N° Pedido *</label>
-              <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
-              {fieldError("pedido", fPedido) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
+            {!esActiveShoes(fEmpresa) && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">N° Pedido *</label>
+                <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
+                {fieldError("pedido", fPedido) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+              </div>
+            )}
           </div>
         </div>
       </AccordionContent>
@@ -345,9 +348,9 @@ export default function ReclamoForm({
         <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-3">+ Agregar fila</button>
         <div className="mt-6 text-right text-sm space-y-1">
           <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
-          <div className="text-gray-400">Importación (10%): ${fmt(fSubtotal * TASA_IMPORTACION)}</div>
-          <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fSubtotal * TASA_ITBMS)}</div>
-          <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * FACTOR_TOTAL)}</div>
+          <div className="text-gray-400">Importación ({impLabel(fEmpresa)}): ${fmt(fTax.importacion)}</div>
+          {fTax.hasItbms && <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fTax.itbms)}</div>}
+          <div className="text-lg font-semibold">Total: ${fmt(fTax.total)}</div>
         </div>
       </div>
       </AccordionContent>
