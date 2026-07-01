@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { mailtoHref } from "@/lib/contact-links";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { ESTADOS, daysSince, calcSub, reclamoTaxes, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
@@ -90,7 +90,7 @@ export default function EmpresaList({
     let av: number | string = 0, bv: number | string = 0;
     if (sortCol === "fecha") { av = a.fecha_reclamo || ""; bv = b.fecha_reclamo || ""; }
     if (sortCol === "dias") { av = daysSince(a.fecha_reclamo); bv = daysSince(b.fecha_reclamo); }
-    if (sortCol === "total") { av = calcSub(a.reclamo_items ?? []) * FACTOR_TOTAL; bv = calcSub(b.reclamo_items ?? []) * FACTOR_TOTAL; }
+    if (sortCol === "total") { av = reclamoTaxes(a.empresa, calcSub(a.reclamo_items ?? [])).total; bv = reclamoTaxes(b.empresa, calcSub(b.reclamo_items ?? [])).total; }
     if (sortCol === "estado") { av = ESTADOS.indexOf(a.estado); bv = ESTADOS.indexOf(b.estado); }
     if (av < bv) return sortDir === "asc" ? -1 : 1;
     if (av > bv) return sortDir === "asc" ? 1 : -1;
@@ -275,7 +275,7 @@ export default function EmpresaList({
         <div className="sm:hidden space-y-2 mb-4">
           {sortedRecs.map((r) => {
             const days = daysSince(r.fecha_reclamo);
-            const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
+            const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
             const isOpen = r.estado !== "Pagado";
             return (
               <div
@@ -366,7 +366,7 @@ export default function EmpresaList({
           <tbody>
             {sortedRecs.map((r) => {
               const days = daysSince(r.fecha_reclamo);
-              const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
+              const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
               const isOpen = r.estado !== "Pagado";
               return (
                 <tr key={r.id}

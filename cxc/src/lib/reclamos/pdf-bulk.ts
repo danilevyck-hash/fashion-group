@@ -2,10 +2,7 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { supabaseServer } from "@/lib/supabase-server";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-
-const TASA_IMPORTACION = 0.10;
-const TASA_ITBMS = 0.077;
-const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
+import { reclamoTaxes, ocultaPedido, impLabel, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "@/lib/reclamos/tax";
 
 const PAGE_W = 216;
 const PAGE_H = 279;
@@ -119,30 +116,29 @@ function drawMetaBlock(doc: jsPDF, rec: ReclamoFull, startY: number): number {
   doc.text(rec.proveedor || "—", col2X, startY + 5);
   doc.text(rec.marca || "—", col3X, startY + 5);
 
+  const sinPedido = ocultaPedido(rec.empresa); // Active Shoes no usa N° de pedido
   doc.setFont("helvetica", "bold");
   doc.text("Fecha", col1X, startY + 12);
-  doc.text("Orden de Compra", col2X, startY + 12);
+  if (!sinPedido) doc.text("Orden de Compra", col2X, startY + 12);
   doc.text("Estado", col3X, startY + 12);
   doc.setFont("helvetica", "normal");
   doc.text(fmtDate(rec.fecha_reclamo), col1X, startY + 17);
-  doc.text(rec.nro_orden_compra || "—", col2X, startY + 17);
+  if (!sinPedido) doc.text(rec.nro_orden_compra || "—", col2X, startY + 17);
   doc.text(rec.estado || "—", col3X, startY + 17);
 
   return startY + 24;
 }
 
-function drawTotalsBlock(doc: jsPDF, subtotal: number, startY: number): number {
-  const total = subtotal * FACTOR_TOTAL;
-  const importacion = subtotal * TASA_IMPORTACION;
-  const itbms = subtotal * TASA_ITBMS;
-
-  const boxW = (PAGE_W - 2 * MARGIN - 9) / 4;
+function drawTotalsBlock(doc: jsPDF, empresa: string | undefined, subtotal: number, startY: number): number {
+  // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
+  const tx = reclamoTaxes(empresa, subtotal);
   const labels = [
     { label: "Subtotal", value: subtotal, dark: false },
-    { label: "Importación 10%", value: importacion, dark: false },
-    { label: "ITBMS 7%", value: itbms, dark: false },
-    { label: "TOTAL", value: total, dark: true },
+    { label: `Importación ${impLabel(empresa)}`, value: tx.importacion, dark: false },
+    ...(tx.hasItbms ? [{ label: "ITBMS 7%", value: tx.itbms, dark: false }] : []),
+    { label: "TOTAL", value: tx.total, dark: true },
   ];
+  const boxW = (PAGE_W - 2 * MARGIN - 3 * (labels.length - 1)) / labels.length;
   labels.forEach((l, i) => {
     const x = MARGIN + (boxW + 3) * i;
     if (l.dark) {
@@ -192,7 +188,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
       (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
       0,
     );
-    return acc + sub * FACTOR_TOTAL;
+    return acc + reclamoTaxes(r.empresa, sub).total;
   }, 0);
 
   drawCoverHeader(doc, empresa, reclamos.length, grandTotal);
@@ -201,7 +197,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
   const summaryRows = reclamos.map((r) => {
     const items = r.reclamo_items || [];
     const sub = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0);
-    const total = sub * FACTOR_TOTAL;
+    const total = reclamoTaxes(r.empresa, sub).total;
     return [
       r.nro_reclamo || "",
       fmtDate(r.fecha_reclamo),
@@ -244,7 +240,7 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
       0,
     );
 
-    cursorY = drawTotalsBlock(doc, subtotal, cursorY);
+    cursorY = drawTotalsBlock(doc, rec.empresa, subtotal, cursorY);
 
     if (items.length > 0) {
       cursorY = ensureSpace(doc, cursorY, 30);

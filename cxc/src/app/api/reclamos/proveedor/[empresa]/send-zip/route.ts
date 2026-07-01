@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { Resend } from "resend";
-import { buildBulkReclamosExcel, fetchReclamosForEmpresa, reclamoBulkConstants, type BulkSelector } from "@/lib/reclamos/excel-bulk";
+import { buildBulkReclamosExcel, fetchReclamosForEmpresa, type BulkSelector } from "@/lib/reclamos/excel-bulk";
+import { reclamoTaxes } from "@/lib/reclamos/tax";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -93,7 +94,6 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
     // Tabla resumen (igual estilo que el correo consolidado existente)
-    const { FACTOR_TOTAL } = reclamoBulkConstants();
     let grandTotal = 0;
     const summaryRows = reclamos
       .map((r) => {
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
           (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
           0,
         );
-        const total = sub * FACTOR_TOTAL;
+        const total = reclamoTaxes(empresa, sub).total;
         grandTotal += total;
         return `<tr>
           <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(r.nro_reclamo)}</td>

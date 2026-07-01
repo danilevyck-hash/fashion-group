@@ -16,7 +16,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
-import { FACTOR_TOTAL } from "@/app/reclamos/components/constants";
+import { reclamoTaxes } from "@/lib/reclamos/tax";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (markPaid) {
     const { data: rec } = await supabaseServer
       .from("reclamos")
-      .select("estado, reclamo_items(cantidad, precio_unitario, deleted)")
+      .select("estado, empresa, reclamo_items(cantidad, precio_unitario, deleted)")
       .eq("id", id)
       .single();
 
@@ -89,14 +89,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
 
-    // Snapshot del reclamado = Σ(items vivos) × FACTOR_TOTAL.
+    // Snapshot del reclamado = Σ(items vivos) + impuestos por empresa
+    // (Active Shoes: importación 15%, sin ITBMS).
     const items = (rec.reclamo_items ?? []).filter((i: { deleted?: boolean }) => !i.deleted);
     const sub = items.reduce(
       (acc: number, i: { cantidad?: number; precio_unitario?: number }) =>
         acc + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
       0,
     );
-    const snapshot = Math.round(sub * FACTOR_TOTAL * 100) / 100;
+    const snapshot = Math.round(reclamoTaxes(rec.empresa, sub).total * 100) / 100;
 
     const { error: updErr } = await supabaseServer
       .from("reclamos")
