@@ -10,7 +10,6 @@ import {
   buildCatalogoAoa,
   buildSwitchRows,
   buildSwitchAoa,
-  REEBOK_TEMPORADA_DEFAULT,
   TEXT_COLS,
   type ReebokItem,
   type CatalogoRow,
@@ -18,6 +17,8 @@ import {
   type PrecioAB,
 } from "@/lib/depurador/reebok";
 import type { SheetRow } from "@/lib/depurador/logic";
+
+type Salida = "catalogo" | "switch";
 
 export default function ReebokClient() {
   const fileRef = useRef<File | null>(null);
@@ -34,9 +35,16 @@ export default function ReebokClient() {
   // Config de salida
   const [months, setMonths] = useState<MonthOption[]>([]);
   const [monthColIdx, setMonthColIdx] = useState<number>(-1);
-  const [temporada, setTemporada] = useState(REEBOK_TEMPORADA_DEFAULT);
+  const [salida, setSalida] = useState<Salida>("catalogo");
   const [precioAB, setPrecioAB] = useState<PrecioAB>("A");
   const [tasa] = useState("7");
+
+  // Temporada automática: fecha actual, día 1 del mes en curso, formato AAAA-MM
+  // (idéntico a CK/TH → logic.ts). Sin campo manual.
+  const temporada = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
 
   const runFile = useCallback(async (file: File, monthIdx?: number) => {
     setFileName(file.name);
@@ -108,6 +116,11 @@ export default function ReebokClient() {
 
   const catalogo: CatalogoRow[] = useMemo(() => (items ? buildCatalogo(items) : []), [items]);
   const totalPiezas = useMemo(() => catalogo.reduce((s, r) => s + r.piezas, 0), [catalogo]);
+  // Filas Switch (para preview y descarga de la Salida B).
+  const switchRows = useMemo(
+    () => (items ? buildSwitchRows(items, { precioAB, temporada, tasa }) : []),
+    [items, precioAB, temporada, tasa],
+  );
 
   // Fuerza a texto las columnas dadas (evita notación científica en códigos numéricos).
   const forceTextCols = (
@@ -153,8 +166,7 @@ export default function ReebokClient() {
     setDownloading("switch");
     try {
       const XLSX = (await import("xlsx-js-style")).default;
-      const rows = buildSwitchRows(items, { precioAB, temporada, tasa });
-      const aoa = buildSwitchAoa(rows);
+      const aoa = buildSwitchAoa(switchRows);
       const ws = XLSX.utils.aoa_to_sheet(aoa);
       // Código(0), Referencia(1), Código Barra(2) forzados a texto (igual que el Depurador).
       forceTextCols(XLSX, ws as never, TEXT_COLS);
@@ -168,6 +180,10 @@ export default function ReebokClient() {
   };
 
   const fmt = (v: number | null): string => (v === null ? "—" : String(v));
+  const num = (v: string | number | null | undefined): string =>
+    v === null || v === undefined || v === "" ? "—" : String(v);
+
+  const handleDownload = () => (salida === "catalogo" ? downloadCatalogo() : downloadSwitch());
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
@@ -234,6 +250,12 @@ export default function ReebokClient() {
 
           {/* Config de salida */}
           <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-3">
+            <Field label="¿Qué quieres generar?" note="Pedido = catálogo · Switch = plantilla por SKU.">
+              <div className="flex overflow-hidden rounded-lg border border-stone-300">
+                <PriceBtn active={salida === "catalogo"} onClick={() => setSalida("catalogo")} label="Pedido para cliente" />
+                <PriceBtn active={salida === "switch"} onClick={() => setSalida("switch")} label="Plantilla Switch" last />
+              </div>
+            </Field>
             <Field label="Columna de piezas (mes)" note="Autodetectada; corrige si hace falta.">
               <select
                 value={monthColIdx}
@@ -246,19 +268,14 @@ export default function ReebokClient() {
                 ))}
               </select>
             </Field>
-            <Field label="Temporada (Switch)" note="Se escribe tal cual en la plantilla.">
-              <input
-                type="text" value={temporada}
-                onChange={(e) => setTemporada(e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="Precio de venta (Switch)" note="A = ÷0.75 · B = ÷0.80.">
-              <div className="flex overflow-hidden rounded-lg border border-stone-300">
-                <PriceBtn active={precioAB === "A"} onClick={() => setPrecioAB("A")} label="Precio A" />
-                <PriceBtn active={precioAB === "B"} onClick={() => setPrecioAB("B")} label="Precio B" last />
-              </div>
-            </Field>
+            {salida === "switch" && (
+              <Field label="Precio de venta (Switch)" note="A = ÷0.75 · B = ÷0.80.">
+                <div className="flex overflow-hidden rounded-lg border border-stone-300">
+                  <PriceBtn active={precioAB === "A"} onClick={() => setPrecioAB("A")} label="Precio A" />
+                  <PriceBtn active={precioAB === "B"} onClick={() => setPrecioAB("B")} label="Precio B" last />
+                </div>
+              </Field>
+            )}
           </div>
 
           {monthColIdx === -1 && (
@@ -267,7 +284,7 @@ export default function ReebokClient() {
             </div>
           )}
 
-          {/* Stats + acciones */}
+          {/* Stats + acción */}
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-[13px] text-stone-600">
             <span><b className="font-semibold text-stone-900">{catalogo.length}</b> estilos</span>
             <span className="text-stone-300">·</span>
@@ -276,18 +293,11 @@ export default function ReebokClient() {
             <span><b className="font-semibold text-stone-900">{totalPiezas.toLocaleString()}</b> piezas{monthLabel ? ` (${monthLabel})` : ""}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               <button
-                onClick={downloadCatalogo}
-                disabled={!!downloading}
-                className="rounded-md border border-red-600 bg-white px-4 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {downloading === "catalogo" ? "Generando…" : "Descargar catálogo clientes"}
-              </button>
-              <button
-                onClick={downloadSwitch}
+                onClick={handleDownload}
                 disabled={!!downloading}
                 className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
               >
-                {downloading === "switch" ? "Generando…" : "Descargar plantilla Switch"}
+                {downloading ? "Generando…" : salida === "catalogo" ? "Descargar pedido" : "Descargar plantilla Switch"}
               </button>
               <button
                 onClick={reset}
@@ -298,41 +308,80 @@ export default function ReebokClient() {
             </div>
           </div>
 
-          {/* Preview del catálogo de clientes */}
-          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="border-b border-stone-200 px-4 py-2.5">
-              <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                Vista previa · catálogo clientes ({catalogo.length} estilos)
-              </span>
-            </div>
-            <div className="max-h-[440px] overflow-auto">
-              <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
-                <thead>
-                  <tr>
-                    {["PO", "New Article", "Name", "Depto", "Género", "WP", "Costo", "Precio A", "Precio B", `Piezas`].map((h, i) => (
-                      <Th key={i} narrow={i >= 5}>{h}</Th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalogo.map((r, i) => (
-                    <tr key={i} className="hover:bg-red-50">
-                      <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.po || "—"}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.newArticle}</td>
-                      <td className="border-b border-stone-100 px-2 py-2">{r.name}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.department}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.gender}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.wholesale)}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.costo)}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioA)}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioB)}</td>
-                      <td className="border-b border-stone-100 px-2 py-2 text-right">{r.piezas}</td>
+          {/* Preview según la salida elegida */}
+          {salida === "catalogo" ? (
+            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+              <div className="border-b border-stone-200 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Vista previa · pedido para cliente ({catalogo.length} estilos)
+                </span>
+              </div>
+              <div className="max-h-[440px] overflow-auto">
+                <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
+                  <thead>
+                    <tr>
+                      {["PO", "New Article", "Name", "Depto", "Género", "WP", "Costo", "Precio A", "Precio B", "Piezas"].map((h, i) => (
+                        <Th key={i} narrow={i >= 5}>{h}</Th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {catalogo.map((r, i) => (
+                      <tr key={i} className="hover:bg-red-50">
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.po || "—"}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{r.newArticle}</td>
+                        <td className="border-b border-stone-100 px-2 py-2">{r.name}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.department}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{r.gender}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.wholesale)}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{fmt(r.costo)}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioA)}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{fmt(r.precioB)}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{r.piezas}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-2.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Vista previa · plantilla Switch ({switchRows.length} SKUs)
+                </span>
+                <span className="text-[11px] text-stone-500">Temporada {temporada} · Precio {precioAB}</span>
+              </div>
+              <div className="max-h-[440px] overflow-auto">
+                <table className="w-full table-auto border-collapse text-[12px] tabular-nums">
+                  <thead>
+                    <tr>
+                      {["Código", "Código Barra", "Descripción", "Marca", "Rubro", "Subrubro", "FOB", "CIF", "Precio", "Unidad", "Stock"].map((h, i) => (
+                        <Th key={i} narrow={i >= 6 && i <= 8}>{h}</Th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {switchRows.map((r, i) => (
+                      <tr key={i} className="hover:bg-red-50">
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px]">{num(r["Código *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 font-mono text-[11px] break-all">{num(r["Código Barra *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2">{num(r["Descripción *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r["Marca *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r["rubro *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r["subrubro"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r["Costo FOB *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r["Costo CIF *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right font-semibold text-stone-900">{num(r["Precio *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-[11px]">{num(r["Unidad de medida *"])}</td>
+                        <td className="border-b border-stone-100 px-2 py-2 text-right">{num(r["Stock Ideal"])}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 

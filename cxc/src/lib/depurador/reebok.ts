@@ -14,9 +14,7 @@ import type { Cell, SheetRow } from "./logic";
 export { OUT_COLS_DEFAULT, TEXT_COLS };
 
 /* ============ CONSTANTES ============ */
-export const REEBOK_MARCA = "REEBOK";
 export const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
-export const REEBOK_TEMPORADA_DEFAULT = "SS26";
 
 // Meses en español para autodetectar la columna de piezas del mes (JULIO, AGOSTO…).
 export const MESES_ES = [
@@ -249,9 +247,9 @@ export function buildSwitchRows(
       "Tasa de Impuesto *": cfg.tasa,
       "Costo FOB *": fob,
       "Costo CIF *": cif,
-      "rubro *": it.department,
-      "subrubro": it.gender,
-      "Marca *": REEBOK_MARCA,
+      "rubro *": it.category,       // CATEGORY (SHOES / T-SHIRTS / SOCKS / BAGS…)
+      "subrubro": it.gender,        // GENDER (Male / Female / Kids / Unisex)
+      "Marca *": it.department,     // Department (FOOTWEAR / APPAREL / HARDWARE)
       "Proveedor *": REEBOK_PROVEEDOR,
       "Mínimo Stock": "",
       "Código Tipo de Artículo *": "01",

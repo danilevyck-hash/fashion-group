@@ -87,9 +87,9 @@ describe("Reebok — Salida B (plantilla Switch)", () => {
     expect(r["Costo FOB *"]).toBeCloseTo(34.32, 2);     // 42.9×0.8
     expect(r["Costo CIF *"]).toBeCloseTo(37.75, 2);     // ×1.1
     expect(r["Precio *"]).toBe(52);                     // Precio A
-    expect(r["rubro *"]).toBe("FOOTWEAR");              // Department tal cual
-    expect(r["subrubro"]).toBe("Female");              // GENDER
-    expect(r["Marca *"]).toBe("REEBOK");
+    expect(r["Marca *"]).toBe("FOOTWEAR");             // Department
+    expect(r["rubro *"]).toBe("SHOES");                // CATEGORY
+    expect(r["subrubro"]).toBe("Female");             // GENDER
     expect(r["Proveedor *"]).toBe("LATIN FITNESS GROUP");
     expect(r["Código Tipo de Artículo *"]).toBe("01");
     expect(r["Unidad de medida *"]).toBe("PAR");        // footwear
@@ -112,9 +112,9 @@ describe("Reebok — Salida B (plantilla Switch)", () => {
   it("buildSwitchAoa NO aplica Title Case (FOOTWEAR / LATIN FITNESS GROUP intactos)", () => {
     const { items } = parseReebok(rows(), MONTH);
     const aoa = buildSwitchAoa(buildSwitchRows(items, { precioAB: "A", temporada: "SS26", tasa: "7" }));
-    const rubroIdx = OUT_COLS_DEFAULT.indexOf("rubro *");
+    const marcaIdx = OUT_COLS_DEFAULT.indexOf("Marca *");
     const provIdx = OUT_COLS_DEFAULT.indexOf("Proveedor *");
-    expect(aoa[1][rubroIdx]).toBe("FOOTWEAR");
+    expect(aoa[1][marcaIdx]).toBe("FOOTWEAR");           // Department en Marca, sin Title Case
     expect(aoa[1][provIdx]).toBe("LATIN FITNESS GROUP");
   });
 });
