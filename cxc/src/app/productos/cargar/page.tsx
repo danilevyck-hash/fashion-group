@@ -4,11 +4,12 @@ import { Suspense, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import DepuradorClient from "./DepuradorClient";
+import ReebokClient from "./ReebokClient";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
 
-type Tab = "depurador" | "formulas" | "reglas" | "historial";
+type Tab = "depurador" | "reebok" | "formulas" | "reglas" | "historial";
 
 export default function CargarProductosPage() {
   return (
@@ -52,6 +53,7 @@ function CargarInner() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
           <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
+          <TabBtn active={tab === "reebok"} onClick={() => setTab("reebok")}>Reebok</TabBtn>
           <TabBtn active={tab === "formulas"} onClick={() => setTab("formulas")}>Fórmulas por marca</TabBtn>
           <TabBtn active={tab === "reglas"} onClick={() => setTab("reglas")}>Reglas</TabBtn>
           <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
@@ -62,6 +64,11 @@ function CargarInner() {
           ediciones sobrevivan al cambiar de pestaña (FIX 1). */}
       <div className={tab === "depurador" ? "" : "hidden"}>
         <DepuradorClient onDownloaded={handleDownloaded} />
+      </div>
+      {/* Reebok SIEMPRE montado (solo oculto) para que el Excel cargado sobreviva al
+          cambiar de pestaña, igual que el Depurador. */}
+      <div className={tab === "reebok" ? "" : "hidden"}>
+        <ReebokClient />
       </div>
       {tab === "formulas" && <FormulasConfig />}
       {tab === "reglas" && <ReglasView />}
