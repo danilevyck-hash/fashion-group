@@ -13,6 +13,7 @@ import {
   TEXT_COLS,
   REEBOK_MARCA_A,
   REEBOK_MARCA_B,
+  REEBOK_MARCA_EXC,
   REEBOK_EMPRESA,
   REEBOK_FORMULA_A_DEFAULT,
   REEBOK_FORMULA_B_DEFAULT,
@@ -23,8 +24,11 @@ import {
   type PrecioAB,
   type PriceFormula,
 } from "@/lib/depurador/reebok";
-import { marcaKey, type Redondeo, type MarcaFormula } from "@/lib/depurador/logic";
+import { marcaKey, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
+
+type NameMode = "formula" | "fijo";
+interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
 
 type Salida = "catalogo" | "switch";
 
@@ -62,6 +66,14 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   const [savingF, setSavingF] = useState<PrecioAB | null>(null);
   const [flashF, setFlashF] = useState<PrecioAB | null>(null);
 
+  // Excepciones por Name (modelo): fórmula propia o precio fijo. Ganan a la marca.
+  const [nameExc, setNameExc] = useState<MarcaRubroFormula[]>([]);
+  const [nameEdits, setNameEdits] = useState<Record<string, NameEdit>>({});
+  const [savingName, setSavingName] = useState<string | null>(null);
+  const [flashName, setFlashName] = useState<string | null>(null);
+  const [excOpen, setExcOpen] = useState(false);
+  const [excFilter, setExcFilter] = useState("");
+
   // Temporada automática: fecha actual, día 1 del mes en curso, formato AAAA-MM
   // (idéntico a CK/TH → logic.ts). Sin campo manual.
   const temporada = useMemo(() => {
@@ -85,6 +97,17 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  // Cargar excepciones por Name (marca "Reebok") de la tabla de excepciones (reusa CK/TH).
+  const reloadExc = useCallback(() => {
+    fetch("/api/productos/cargar/rubro-formulas")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
+      .then((d: { rows: MarcaRubroFormula[] }) => {
+        setNameExc((d.rows ?? []).filter((f) => marcaKey(f.marca) === marcaKey(REEBOK_MARCA_EXC)));
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { reloadExc(); }, [reloadExc]);
 
   const runFile = useCallback(async (file: File, monthIdx?: number) => {
     setFileName(file.name);
@@ -160,17 +183,89 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
     [months, monthColIdx],
   );
 
+  // Excepciones por Name indexadas por clave canónica (= excByName de los builders).
+  const excByName = useMemo(() => {
+    const m = new Map<string, MarcaRubroFormula>();
+    for (const f of nameExc) m.set(marcaKey(f.rubro), f);
+    return m;
+  }, [nameExc]);
+
+  // Names (modelos) presentes en el Excel cargado, orden alfabético.
+  const namesPresent = useMemo(() => {
+    if (!items) return [] as string[];
+    const set = new Set<string>();
+    for (const it of items) { const n = it.name.trim(); if (n) set.add(n); }
+    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  }, [items]);
+
   const catalogo: CatalogoRow[] = useMemo(
-    () => (items ? buildCatalogo(items, { formulaA, formulaB }) : []),
-    [items, formulaA, formulaB],
+    () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName }) : []),
+    [items, formulaA, formulaB, excByName],
   );
   const totalPiezas = useMemo(() => catalogo.reduce((s, r) => s + r.piezas, 0), [catalogo]);
   // Filas Switch (una por artículo) para preview y descarga.
   const switchRows: SwitchRow[] = useMemo(
-    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa }) : []),
-    [items, precioAB, formulaA, formulaB, temporada, tasa],
+    () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName }) : []),
+    [items, precioAB, formulaA, formulaB, temporada, tasa, excByName],
   );
   const revisar = useMemo(() => switchRows.filter((r) => r.fallback).length, [switchRows]);
+
+  // ── Excepciones por Name: fila derivada, edición y guardado ──────────────────
+  const nameRowFor = (name: string) => {
+    const key = marcaKey(name);
+    const e = nameEdits[name];
+    const s = excByName.get(key);
+    const savedFijo = s?.precio_fijo ?? null;
+    const savedModo: NameMode = savedFijo != null && savedFijo > 0 ? "fijo" : "formula";
+    const divisor = e ? e.divisor : (s?.divisor ?? 0);
+    const precioFijo = e ? e.precioFijo : savedFijo;
+    const modo = e ? e.modo : savedModo;
+    return {
+      key, name, divisor, extra: e ? e.extra : (s?.extra ?? 0),
+      redondeo: e ? e.redondeo : (s?.redondeo ?? "par") as Redondeo,
+      precioFijo, modo, savedRow: s,
+      fija: modo === "fijo" && precioFijo != null && precioFijo > 0,
+      propia: modo === "fijo" ? precioFijo != null && precioFijo > 0 : divisor > 0,
+      dirty: !!e?.dirty,
+    };
+  };
+  const patchName = (name: string, p: Partial<NameEdit>) => {
+    const r = nameRowFor(name);
+    setNameEdits((prev) => ({ ...prev, [name]: { divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, precioFijo: r.precioFijo, modo: r.modo, ...p, dirty: true } }));
+  };
+  const saveName = async (name: string) => {
+    if (savingName) return;
+    const r = nameRowFor(name);
+    setSavingName(name);
+    try {
+      const tieneFijo = r.modo === "fijo" && r.precioFijo != null && r.precioFijo > 0;
+      const tieneFormula = r.modo === "formula" && !!r.divisor;
+      if (!tieneFijo && !tieneFormula) {
+        // Vacío = hereda la fórmula de marca → borra la excepción si existía.
+        if (r.savedRow?.id) {
+          const res = await fetch(`/api/productos/cargar/rubro-formulas?id=${encodeURIComponent(r.savedRow.id)}`, { method: "DELETE" });
+          if (res.ok) reloadExc();
+        }
+      } else {
+        const payload = tieneFijo
+          ? { marca: REEBOK_MARCA_EXC, rubro: name, divisor: 0, extra: 0, redondeo: "int", precio_fijo: r.precioFijo }
+          : { marca: REEBOK_MARCA_EXC, rubro: name, divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, precio_fijo: null };
+        const res = await fetch("/api/productos/cargar/rubro-formulas", {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        if (res.ok) reloadExc();
+      }
+      setNameEdits((prev) => { const n = { ...prev }; delete n[name]; return n; });
+      setFlashName(name); setTimeout(() => setFlashName((f) => (f === name ? null : f)), 1500);
+    } finally {
+      setSavingName(null);
+    }
+  };
+  const namesFiltered = useMemo(() => {
+    const q = excFilter.trim().toLowerCase();
+    return q ? namesPresent.filter((n) => n.toLowerCase().includes(q)) : namesPresent;
+  }, [namesPresent, excFilter]);
+  const conExc = useMemo(() => namesPresent.filter((n) => nameRowFor(n).propia).length, [namesPresent, excByName, nameEdits]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Guardar una fórmula Reebok en el sistema de fórmulas por marca.
   const saveFormula = async (which: PrecioAB) => {
@@ -365,6 +460,82 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
             </div>
             <FormulaRow label="Precio A" f={formulaA} onChange={setFormulaA} onSave={() => saveFormula("A")} saving={savingF === "A"} flashed={flashF === "A"} />
             <FormulaRow label="Precio B" f={formulaB} onChange={setFormulaB} onSave={() => saveFormula("B")} saving={savingF === "B"} flashed={flashF === "B"} />
+          </div>
+
+          {/* Excepciones por modelo (Name): fórmula propia o precio fijo (gana a la marca) */}
+          <div className="mb-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+            <button
+              type="button" onClick={() => setExcOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left"
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-stone-400">{excOpen ? "▾" : "▸"}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-500">Precios por modelo (Name)</span>
+              </span>
+              <span className="text-[11px] text-stone-500">
+                {conExc > 0 ? <span className="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700">{conExc} con precio propio</span> : `${namesPresent.length} modelos · todos heredan`}
+              </span>
+            </button>
+            {excOpen && (
+              <div className="border-t border-stone-200 p-3">
+                <p className="mb-2 text-[12px] text-stone-500">
+                  Vacío = hereda la fórmula de marca. <b className="text-red-700">Precio fijo</b> gana a todo.
+                  El precio del modelo aplica a Precio A, Precio B y a la plantilla Switch.
+                </p>
+                <input
+                  value={excFilter} onChange={(e) => setExcFilter(e.target.value)} placeholder="Buscar modelo…"
+                  className="mb-2 w-full max-w-xs rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20"
+                />
+                <div className="max-h-72 overflow-auto">
+                  <div className="grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                    <span>Modelo</span><span>Modo</span><span className="text-right">÷ / Fijo</span><span className="text-right">Extra</span><span>Redondeo</span><span></span>
+                  </div>
+                  {namesFiltered.map((name) => {
+                    const r = nameRowFor(name);
+                    return (
+                      <div key={name} className={`grid grid-cols-[minmax(0,1fr)_92px_70px_54px_86px_72px] items-center gap-2 px-1 py-0.5 ${r.propia ? "bg-red-50/40" : "hover:bg-stone-50"}`}>
+                        <span className={`truncate text-[13px] ${r.fija ? "font-semibold text-red-700" : r.propia ? "font-medium text-red-600" : "text-stone-700"}`} title={name}>
+                          {name}
+                          {r.fija && <span className="ml-1 rounded bg-red-100 px-1 py-0.5 text-[9px] font-semibold text-red-800">fijo</span>}
+                        </span>
+                        <select value={r.modo} onChange={(e) => patchName(name, { modo: e.target.value as NameMode })} className={miniSelectCls}>
+                          <option value="formula">Fórmula</option>
+                          <option value="fijo">Precio fijo</option>
+                        </select>
+                        {r.modo === "fijo" ? (
+                          <input type="number" step="0.01" value={r.precioFijo ?? ""} placeholder="$" aria-label={`Precio fijo ${name}`}
+                            onChange={(e) => patchName(name, { precioFijo: e.target.value === "" ? null : Number(e.target.value) })}
+                            className={`${miniInputCls} w-full border-red-300 text-left`} />
+                        ) : (
+                          <input type="number" step="0.01" value={r.divisor || ""} placeholder="—" aria-label={`Divisor ${name}`}
+                            onChange={(e) => patchName(name, { divisor: Number(e.target.value) || 0 })} className={`${miniInputCls} w-full`} />
+                        )}
+                        {r.modo === "fijo" ? <span /> : (
+                          <select value={r.extra} onChange={(e) => patchName(name, { extra: parseInt(e.target.value) })} className={`${miniSelectCls} w-full`} aria-label={`Extra ${name}`}>
+                            {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                          </select>
+                        )}
+                        {r.modo === "fijo" ? <span /> : (
+                          <select value={r.redondeo} onChange={(e) => patchName(name, { redondeo: e.target.value as Redondeo })} className={`${miniSelectCls} w-full`} aria-label={`Redondeo ${name}`}>
+                            <option value="int">Entero</option>
+                            <option value="half">.50</option>
+                            <option value="par">Par</option>
+                          </select>
+                        )}
+                        <span className="whitespace-nowrap">
+                          <button type="button" onClick={() => saveName(name)} disabled={savingName === name}
+                            className="rounded-md px-1.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50">
+                            {savingName === name ? "…" : r.dirty ? "Guardar" : "✓"}
+                          </button>
+                          {flashName === name && <span className="ml-1 text-[11px] font-semibold text-emerald-600">✓</span>}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {namesFiltered.length === 0 && <div className="px-1 py-3 text-center text-[12px] text-stone-400">Sin modelos que coincidan.</div>}
+                </div>
+              </div>
+            )}
           </div>
 
           {monthColIdx === -1 && (

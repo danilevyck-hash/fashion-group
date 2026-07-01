@@ -5,6 +5,7 @@ import {
   OUT_COLS_DEFAULT, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT,
   type SheetRow,
 } from "../lib/depurador/reebok";
+import { marcaKey, type MarcaRubroFormula } from "../lib/depurador/logic";
 
 // Headers reales del Book4 (fila 2; la fila 1 es basura).
 const JUNK = [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 2292, 0, 2292, 2292, null, null, null];
@@ -173,5 +174,38 @@ describe("Reebok — Salida B (Switch, fila por ARTÍCULO)", () => {
     const provIdx = OUT_COLS_DEFAULT.indexOf("Proveedor *");
     expect(aoa[1][marcaIdx]).toBe("FOOTWEAR");
     expect(aoa[1][provIdx]).toBe("LATIN FITNESS GROUP");
+  });
+});
+
+describe("Reebok — excepciones por Name (jerarquía precio fijo > fórmula Name > marca)", () => {
+  // Excepción keyed por marcaKey(Name), como la arma ReebokClient (rubro = Name).
+  const excMap = (name: string, f: Partial<MarcaRubroFormula>): Map<string, MarcaRubroFormula> =>
+    new Map([[marcaKey(name), { marca: "Reebok", rubro: name, divisor: 0, extra: 0, redondeo: "par", ...f } as MarcaRubroFormula]]);
+
+  it("precio fijo por Name gana en catálogo (A y B) y en Switch", () => {
+    const { items } = parseReebok(rowsFemale(), MONTH);
+    const exc = excMap("CLUB C 85", { precio_fijo: 99 });
+    const cat = buildCatalogo(items, { formulaA: REEBOK_FORMULA_A_DEFAULT, formulaB: REEBOK_FORMULA_B_DEFAULT, excByName: exc });
+    expect(cat[0].precioA).toBe(99);
+    expect(cat[0].precioB).toBe(99); // un override único para A y B
+    const sw = buildSwitchRows(items, { formula: REEBOK_FORMULA_A_DEFAULT, temporada: "2026-07", tasa: "7", excByName: exc });
+    expect(sw[0].cols["Precio *"]).toBe(99);
+  });
+
+  it("fórmula propia del Name gana a la de marca (A y B iguales)", () => {
+    const { items } = parseReebok(rowsFemale(), MONTH);
+    // costo catálogo = 37.75 → ÷0.5 = 75.5 → ceilPar = 76
+    const exc = excMap("CLUB C 85", { divisor: 0.5, extra: 0, redondeo: "par" });
+    const cat = buildCatalogo(items, { formulaA: REEBOK_FORMULA_A_DEFAULT, formulaB: REEBOK_FORMULA_B_DEFAULT, excByName: exc });
+    expect(cat[0].precioA).toBe(76);
+    expect(cat[0].precioB).toBe(76);
+  });
+
+  it("Name sin excepción usa la fórmula de marca (A≠B normal)", () => {
+    const { items } = parseReebok(rowsFemale(), MONTH);
+    const exc = excMap("OTRO MODELO", { precio_fijo: 99 }); // no matchea CLUB C 85
+    const cat = buildCatalogo(items, { formulaA: REEBOK_FORMULA_A_DEFAULT, formulaB: REEBOK_FORMULA_B_DEFAULT, excByName: exc });
+    expect(cat[0].precioA).toBe(52); // fórmula A
+    expect(cat[0].precioB).toBe(48); // fórmula B
   });
 });

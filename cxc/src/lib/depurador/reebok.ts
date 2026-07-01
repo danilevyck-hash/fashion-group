@@ -8,8 +8,8 @@
 //   A) Catálogo para clientes (una fila por PO NAME + New Article).
 //   B) Plantilla Switch (una fila por ARTÍCULO, 24 cols FOB, formato tipo Vistana).
 
-import { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar, calcPrecio } from "./logic";
-import type { Cell, SheetRow, Redondeo } from "./logic";
+import { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar, precioDescripcion, marcaKey } from "./logic";
+import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
 
 export { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar };
 
@@ -22,6 +22,16 @@ export const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
 export const REEBOK_MARCA_A = "Reebok Precio A";
 export const REEBOK_MARCA_B = "Reebok Precio B";
 export const REEBOK_EMPRESA = "Active Shoes";
+
+// Marca usada para las EXCEPCIONES por Name (modelo), en la tabla marca_rubro_formulas.
+// Jerarquía por Name (igual que CK/TH): precio fijo > fórmula del Name > fórmula de
+// marca (A o B). Un override por Name aplica a AMBAS salidas y a Precio A y B.
+export const REEBOK_MARCA_EXC = "Reebok";
+
+/** Excepción (fórmula/precio-fijo) del Name, o null. `excByName` va keyed por marcaKey(Name). */
+export function excForName(excByName: Map<string, MarcaRubroFormula> | undefined, name: string): MarcaRubroFormula | null {
+  return excByName?.get(marcaKey(name)) ?? null;
+}
 
 export interface PriceFormula { divisor: number; extra: number; redondeo: Redondeo }
 export const REEBOK_FORMULA_A_DEFAULT: PriceFormula = { divisor: 0.75, extra: 0, redondeo: "par" };
@@ -234,7 +244,12 @@ export interface CatalogoRow {
   piezas: number;
 }
 
-export interface CatalogoConfig { formulaA: PriceFormula; formulaB: PriceFormula }
+export interface CatalogoConfig {
+  formulaA: PriceFormula;
+  formulaB: PriceFormula;
+  /** Excepciones por Name (marcaKey(Name) → excepción). Ganan a la fórmula de marca. */
+  excByName?: Map<string, MarcaRubroFormula>;
+}
 
 export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): CatalogoRow[] {
   const groups = new Map<string, ReebokItem[]>();
@@ -248,8 +263,10 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
     const first = group[0];
     const w = first.wholesale;
     const costo = w === null ? null : round2(w * 0.8 * 1.1);
-    const precioA = calcPrecio(costo, cfg.formulaA);
-    const precioB = calcPrecio(costo, cfg.formulaB);
+    // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
+    const exc = excForName(cfg.excByName, first.name);
+    const precioA = precioDescripcion(costo, exc, cfg.formulaA);
+    const precioB = precioDescripcion(costo, exc, cfg.formulaB);
     const piezas = group.reduce((s, it) => s + (it.piezas || 0), 0);
     out.push({
       po: first.po, newArticle: first.newArticle, name: first.name, department: first.department,
@@ -285,7 +302,13 @@ export function buildCatalogoAoa(rows: CatalogoRow[], monthLabel: string): (stri
 
 export type PrecioAB = "A" | "B";
 
-export interface SwitchBuildConfig { formula: PriceFormula; temporada: string; tasa: string }
+export interface SwitchBuildConfig {
+  formula: PriceFormula;
+  temporada: string;
+  tasa: string;
+  /** Excepciones por Name (marcaKey(Name) → excepción). Ganan a la fórmula de marca. */
+  excByName?: Map<string, MarcaRubroFormula>;
+}
 
 /** Fila Switch = las 24 columnas + metadatos de UI (talla-muestra, fallback). */
 export interface SwitchRow {
@@ -311,7 +334,8 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
     const w = first.wholesale;
     const fob = w === null ? null : round2(fobReebok(first.department, w, first.wholesaleOff));
     const cif = fob === null ? null : round2(fob * 1.1);
-    const precio = calcPrecio(cif, cfg.formula);
+    // Jerarquía por Name: precio fijo > fórmula del Name > fórmula de marca (A/B).
+    const precio = precioDescripcion(cif, excForName(cfg.excByName, first.name), cfg.formula);
     out.push({
       cols: {
         "Código *": first.newArticle,

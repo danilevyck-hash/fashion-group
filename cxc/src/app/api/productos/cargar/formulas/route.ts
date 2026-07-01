@@ -64,7 +64,7 @@ export async function PUT(req: NextRequest) {
   if (!Number.isFinite(extra) || extra < 0 || extra > 5) {
     return NextResponse.json({ error: "Extra debe ser un entero entre 0 y 5." }, { status: 400 });
   }
-  if (redondeo !== "int" && redondeo !== "half") {
+  if (redondeo !== "int" && redondeo !== "half" && redondeo !== "par") {
     return NextResponse.json({ error: "Redondeo inválido." }, { status: 400 });
   }
 
