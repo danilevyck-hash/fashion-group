@@ -6,15 +6,26 @@
 // processRows() del Depurador. Reusa el orden de columnas Switch (OUT_COLS_DEFAULT),
 // TEXT_COLS y el patrón xlsx-js-style del cliente. Dos salidas:
 //   A) Catálogo para clientes (una fila por PO NAME + New Article).
-//   B) Plantilla Switch (una fila por SKU, 24 cols FOB, formato tipo Vistana).
+//   B) Plantilla Switch (una fila por ARTÍCULO, 24 cols FOB, formato tipo Vistana).
 
-import { OUT_COLS_DEFAULT, TEXT_COLS } from "./logic";
-import type { Cell, SheetRow } from "./logic";
+import { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar, calcPrecio } from "./logic";
+import type { Cell, SheetRow, Redondeo } from "./logic";
 
-export { OUT_COLS_DEFAULT, TEXT_COLS };
+export { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar };
 
 /* ============ CONSTANTES ============ */
 export const REEBOK_PROVEEDOR = "LATIN FITNESS GROUP";
+
+// Reebok entra al sistema de fórmulas por marca (FormulasConfig) como DOS marcas
+// editables: "Reebok Precio A" y "Reebok Precio B". Defaults equivalentes al cálculo
+// histórico (÷0.75 / ÷0.80, redondeo al par hacia arriba), pero editables.
+export const REEBOK_MARCA_A = "Reebok Precio A";
+export const REEBOK_MARCA_B = "Reebok Precio B";
+export const REEBOK_EMPRESA = "Active Shoes";
+
+export interface PriceFormula { divisor: number; extra: number; redondeo: Redondeo }
+export const REEBOK_FORMULA_A_DEFAULT: PriceFormula = { divisor: 0.75, extra: 0, redondeo: "par" };
+export const REEBOK_FORMULA_B_DEFAULT: PriceFormula = { divisor: 0.8, extra: 0, redondeo: "par" };
 
 // Meses en español para autodetectar la columna de piezas del mes (JULIO, AGOSTO…).
 export const MESES_ES = [
@@ -31,13 +42,6 @@ function num(v: Cell): number | null {
   if (typeof v === "number") return v;
   const n = parseFloat(String(v).replace(/,/g, "").trim());
   return isNaN(n) ? null : n;
-}
-
-/** Siguiente entero PAR hacia arriba: ceil(x); si es impar, +1.
- *  (37.752/0.75=50.34 → 51 → 52 · 37.752/0.80=47.19 → 48 → 48) */
-export function ceilPar(x: number): number {
-  const c = Math.ceil(Math.round(x * 10000) / 10000);
-  return c % 2 === 0 ? c : c + 1;
 }
 
 const esFootwear = (dept: Cell): boolean => normH(dept).includes("FOOTWEAR");
@@ -165,9 +169,63 @@ export function parseReebok(rows: SheetRow[], monthColIdx: number): ParseResult 
   return { items, headerRow, cols, warnings };
 }
 
+/* ============ ORDEN Y TALLA-MUESTRA ============ */
+// Ambas salidas se ordenan por PO NAME → Name → Género.
+const cmpPoNameGender = (a: { po: string; name: string; gender: string }, b: { po: string; name: string; gender: string }): number =>
+  a.po.localeCompare(b.po, "es") || a.name.localeCompare(b.name, "es") || a.gender.localeCompare(b.gender, "es");
+
+/** true si el artículo es Kids/Unisex para la talla-muestra:
+ *  AGE GROUP presente y ≠ Adult, o GENDER = Unisex. */
+const esKidsUnisex = (it: ReebokItem): boolean => {
+  const ag = normH(it.ageGroup);
+  return (ag !== "" && ag !== "ADULT") || normH(it.gender) === "UNISEX";
+};
+
+interface SampleResult { sku: string; talla: string; fallback: boolean }
+
+/** Elige el código de barra representativo (talla-muestra) de un artículo:
+ *  - Footwear Male → 9 · Female → 7 · Kids/Unisex → mediana de las tallas.
+ *    Si la talla exacta (9/7) no existe: la numérica más cercana + fallback (ámbar).
+ *  - Apparel/Hardware → M; si no hay M → la talla única. */
+function pickSample(group: ReebokItem[]): SampleResult {
+  const first = group[0];
+  // Mapa talla → sku (primera aparición). Tallas numéricas ordenadas para mediana/cercanía.
+  const bySize = new Map<string, string>();
+  for (const it of group) { const t = it.talla.trim(); if (t && !bySize.has(t)) bySize.set(t, it.sku); }
+  const nums = [...bySize.keys()]
+    .map((t) => ({ t, n: num(t) }))
+    .filter((x): x is { t: string; n: number } => x.n !== null)
+    .sort((a, b) => a.n - b.n);
+  const skuOf = (t: string): string => bySize.get(t) ?? first.sku;
+  const fallbackAll = (): SampleResult => {
+    const t = [...bySize.keys()][0] ?? first.talla;
+    return { sku: skuOf(t), talla: t, fallback: bySize.size > 1 };
+  };
+
+  if (esFootwear(first.department)) {
+    if (esKidsUnisex(first) || (normH(first.gender) !== "MALE" && normH(first.gender) !== "FEMALE")) {
+      if (nums.length === 0) return fallbackAll();
+      const mid = nums[Math.floor((nums.length - 1) / 2)]; // mediana (talla real, sin fallback)
+      return { sku: skuOf(mid.t), talla: mid.t, fallback: false };
+    }
+    const target = normH(first.gender) === "MALE" ? 9 : 7;
+    if (nums.length === 0) return fallbackAll();
+    const exact = nums.find((x) => x.n === target);
+    if (exact) return { sku: skuOf(exact.t), talla: exact.t, fallback: false };
+    // Más cercana + fallback ámbar (empate → la menor).
+    const nearest = nums.reduce((best, x) =>
+      Math.abs(x.n - target) < Math.abs(best.n - target) ? x : best, nums[0]);
+    return { sku: skuOf(nearest.t), talla: nearest.t, fallback: true };
+  }
+  // Apparel / Hardware → M; si no hay M → talla única.
+  const m = [...bySize.keys()].find((t) => normH(t) === "M");
+  if (m) return { sku: skuOf(m), talla: m, fallback: false };
+  return fallbackAll();
+}
+
 /* ============ SALIDA A · CATÁLOGO CLIENTES ============ */
 // Una fila por PO NAME + New Article. Costo = WholesalePrice × 0.80 × 1.1 (flat).
-// Precio A = ceil_par(Costo / 0.75) · Precio B = ceil_par(Costo / 0.80).
+// Precio A/B = fórmulas editables (default ÷0.75 / ÷0.80, redondeo par). Orden PO/Name/Género.
 
 export interface CatalogoRow {
   po: string; newArticle: string; name: string; department: string; category: string;
@@ -176,7 +234,9 @@ export interface CatalogoRow {
   piezas: number;
 }
 
-export function buildCatalogo(items: ReebokItem[]): CatalogoRow[] {
+export interface CatalogoConfig { formulaA: PriceFormula; formulaB: PriceFormula }
+
+export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): CatalogoRow[] {
   const groups = new Map<string, ReebokItem[]>();
   for (const it of items) {
     const key = `${it.po}|||${it.newArticle}`;
@@ -188,8 +248,8 @@ export function buildCatalogo(items: ReebokItem[]): CatalogoRow[] {
     const first = group[0];
     const w = first.wholesale;
     const costo = w === null ? null : round2(w * 0.8 * 1.1);
-    const precioA = costo === null ? null : ceilPar(costo / 0.75);
-    const precioB = costo === null ? null : ceilPar(costo / 0.8);
+    const precioA = calcPrecio(costo, cfg.formulaA);
+    const precioB = calcPrecio(costo, cfg.formulaB);
     const piezas = group.reduce((s, it) => s + (it.piezas || 0), 0);
     out.push({
       po: first.po, newArticle: first.newArticle, name: first.name, department: first.department,
@@ -197,8 +257,7 @@ export function buildCatalogo(items: ReebokItem[]): CatalogoRow[] {
       wholesale: w, costo, precioA, precioB, piezas,
     });
   }
-  // Orden estable: PO, luego New Article.
-  out.sort((a, b) => a.po.localeCompare(b.po, "es") || a.newArticle.localeCompare(b.newArticle, "es"));
+  out.sort(cmpPoNameGender);
   return out;
 }
 
@@ -220,60 +279,82 @@ export function buildCatalogoAoa(rows: CatalogoRow[], monthLabel: string): (stri
 }
 
 /* ============ SALIDA B · PLANTILLA SWITCH ============ */
-// Una fila por SKU. 24 cols (OUT_COLS_DEFAULT, sin Composición) = mismo formato que
-// Vistana/Fashion Wear. SIN Title Case (Department y proveedor tal cual, en mayúscula).
+// UNA fila por ARTÍCULO (New Article), igual que CK/TH. Cantidad = suma de todas las
+// tallas del mes. Código de barra = el de la talla-muestra (pickSample). 24 cols
+// (OUT_COLS_DEFAULT) = formato Vistana. SIN Title Case (Department/proveedor tal cual).
 
 export type PrecioAB = "A" | "B";
 
-export interface SwitchBuildConfig { precioAB: PrecioAB; temporada: string; tasa: string }
+export interface SwitchBuildConfig { formula: PriceFormula; temporada: string; tasa: string }
 
-/** Filas Switch keyed por OUT_COLS_DEFAULT (una por SKU). */
-export function buildSwitchRows(
-  items: ReebokItem[],
-  cfg: SwitchBuildConfig,
-): Record<string, string | number | null>[] {
-  const divisor = cfg.precioAB === "A" ? 0.75 : 0.8;
-  return items.map((it) => {
-    const w = it.wholesale;
-    const fob = w === null ? null : round2(fobReebok(it.department, w, it.wholesaleOff));
+/** Fila Switch = las 24 columnas + metadatos de UI (talla-muestra, fallback). */
+export interface SwitchRow {
+  cols: Record<string, string | number | null>;
+  talla: string;
+  fallback: boolean;   // true si no se halló la talla exacta (9/7) → revisar (ámbar)
+  po: string; name: string; gender: string;
+}
+
+/** Filas Switch, una por artículo, ordenadas por PO/Name/Género. */
+export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): SwitchRow[] {
+  const groups = new Map<string, ReebokItem[]>();
+  for (const it of items) {
+    if (!it.newArticle) continue;
+    if (!groups.has(it.newArticle)) groups.set(it.newArticle, []);
+    groups.get(it.newArticle)!.push(it);
+  }
+  const out: SwitchRow[] = [];
+  for (const [, group] of groups) {
+    const first = group[0];
+    const sample = pickSample(group);
+    const qty = group.reduce((s, it) => s + (it.piezas || 0), 0);
+    const w = first.wholesale;
+    const fob = w === null ? null : round2(fobReebok(first.department, w, first.wholesaleOff));
     const cif = fob === null ? null : round2(fob * 1.1);
-    const precio = cif === null ? null : ceilPar(cif / divisor);
-    return {
-      "Código *": it.newArticle,
-      "Referencia *": it.newArticle,
-      "Código Barra *": it.sku || it.newArticle,
-      "Descripción *": it.name,
-      "Precio *": precio,
-      "Tasa de Impuesto *": cfg.tasa,
-      "Costo FOB *": fob,
-      "Costo CIF *": cif,
-      "rubro *": it.category,       // CATEGORY (SHOES / T-SHIRTS / SOCKS / BAGS…)
-      "subrubro": it.gender,        // GENDER (Male / Female / Kids / Unisex)
-      "Marca *": it.department,     // Department (FOOTWEAR / APPAREL / HARDWARE)
-      "Proveedor *": REEBOK_PROVEEDOR,
-      "Mínimo Stock": "",
-      "Código Tipo de Artículo *": "01",
-      "Unidad de medida *": unidadPara(it.department),
-      "Origen": "",
-      "Lote": "",
-      "Serie": "",
-      "Stock Ideal": it.piezas,
-      "Temporada": cfg.temporada,
-      "Codigo CPBS": "",
-      "Codigo CPBS Abrev": "",
-      "Bonificación": "",
-      "Cantidad por caja": "",
-    };
-  });
+    const precio = calcPrecio(cif, cfg.formula);
+    out.push({
+      cols: {
+        "Código *": first.newArticle,
+        "Referencia *": first.newArticle,
+        "Código Barra *": sample.sku || first.newArticle,
+        "Descripción *": first.name,
+        "Precio *": precio,
+        "Tasa de Impuesto *": cfg.tasa,
+        "Costo FOB *": fob,
+        "Costo CIF *": cif,
+        "rubro *": first.category,       // CATEGORY (SHOES / T-SHIRTS / SOCKS / BAGS…)
+        "subrubro": first.gender,        // GENDER (Male / Female / Kids / Unisex)
+        "Marca *": first.department,     // Department (FOOTWEAR / APPAREL / HARDWARE)
+        "Proveedor *": REEBOK_PROVEEDOR,
+        "Mínimo Stock": "",
+        "Código Tipo de Artículo *": "01",
+        "Unidad de medida *": unidadPara(first.department),
+        "Origen": "",
+        "Lote": "",
+        "Serie": "",
+        "Stock Ideal": qty,
+        "Temporada": cfg.temporada,
+        "Codigo CPBS": "",
+        "Codigo CPBS Abrev": "",
+        "Bonificación": "",
+        "Cantidad por caja": "",
+      },
+      talla: sample.talla,
+      fallback: sample.fallback,
+      po: first.po, name: first.name, gender: first.gender,
+    });
+  }
+  out.sort(cmpPoNameGender);
+  return out;
 }
 
 /** AOA de la plantilla Switch. Constructor propio SIN Title Case (a diferencia de
  *  buildAoa del Depurador): Department y proveedor van tal cual (mayúscula). */
-export function buildSwitchAoa(rows: Record<string, string | number | null>[]): (string | number)[][] {
+export function buildSwitchAoa(rows: SwitchRow[]): (string | number)[][] {
   const aoa: (string | number)[][] = [OUT_COLS_DEFAULT.slice()];
   for (const r of rows) {
     aoa.push(OUT_COLS_DEFAULT.map((c) => {
-      const v = r[c];
+      const v = r.cols[c];
       return v === null || v === undefined ? "" : v;
     }));
   }

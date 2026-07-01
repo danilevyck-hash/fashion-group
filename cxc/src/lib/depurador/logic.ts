@@ -604,7 +604,9 @@ export const MARCA_CATALOGO: MarcaCatalogo[] = Object.keys(MARCA_DESCRIPCIONES).
 // El Costo CIF YA es FOB × 1.1 (lo calcula processRows) — el divisor NO vuelve
 // a multiplicar. Si divisor = 0 o no hay fórmula, el precio queda vacío (null).
 
-export type Redondeo = "int" | "half";
+// "int" = entero hacia arriba · "half" = a .50 hacia arriba · "par" = siguiente
+// entero PAR hacia arriba (usado por Reebok). CK/TH solo usan int/half.
+export type Redondeo = "int" | "half" | "par";
 
 export interface MarcaFormula {
   marca: string;
@@ -738,6 +740,13 @@ export function ceilHalf(x: number): number {
   return Math.ceil(x * 2 - 0.0001) / 2;
 }
 
+/** Redondeo al siguiente entero PAR hacia arriba: ceil(x); si es impar, +1
+ *  (50.34→51→52, 47.19→48→48). Usado por Reebok. */
+export function ceilPar(x: number): number {
+  const c = Math.ceil(Math.round(x * 10000) / 10000);
+  return c % 2 === 0 ? c : c + 1;
+}
+
 /** Calcula el precio de un estilo. Devuelve null (precio vacío) si no hay CIF,
  *  no hay fórmula o el divisor es 0 → la secretaria lo pone a mano. */
 export function calcPrecio(
@@ -746,7 +755,8 @@ export function calcPrecio(
 ): number | null {
   if (cif === null || cif === undefined || !Number.isFinite(cif)) return null;
   if (!f || !f.divisor || f.divisor === 0) return null;
-  const base = f.redondeo === "half" ? ceilHalf(cif / f.divisor) : ceilInt(cif / f.divisor);
+  const q = cif / f.divisor;
+  const base = f.redondeo === "half" ? ceilHalf(q) : f.redondeo === "par" ? ceilPar(q) : ceilInt(q);
   return base + (f.extra || 0);
 }
 
@@ -770,7 +780,7 @@ export function precioDescripcion(
 /** Texto humano de la fórmula, para mostrar en vivo. */
 export function formulaText(f: { divisor: number; extra: number; redondeo: Redondeo }): string {
   const ex = f.extra > 0 ? ` + ${f.extra}` : "";
-  const r = f.redondeo === "half" ? "a .50" : "al entero";
+  const r = f.redondeo === "half" ? "a .50" : f.redondeo === "par" ? "al par" : "al entero";
   return `TECHO(Costo CIF ÷ ${f.divisor || "—"})${ex} · redondeo ${r} hacia arriba`;
 }
 

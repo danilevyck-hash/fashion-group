@@ -16,9 +16,10 @@ interface Summary { marcaOk: number; descOk: number; delOk: number; errors: stri
 
 const CATALOG_MARCA_KEYS = new Set(MARCA_CATALOGO.map((c) => marcaKey(c.marca)));
 const catalogMarca = (m: string) => MARCA_CATALOGO.find((c) => marcaKey(c.marca) === marcaKey(m));
-const redondeoLabel = (r: Redondeo) => (r === "half" ? ".50" : "Entero");
+const redondeoLabel = (r: Redondeo) => (r === "half" ? ".50" : r === "par" ? "Par" : "Entero");
 const parseRedondeo = (v: unknown): Redondeo => {
   const s = marcaKey(v as string);
+  if (s.includes("par")) return "par";
   return s.includes("half") || s.includes(".5") || s.includes("50") ? "half" : "int";
 };
 const isBlank = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
