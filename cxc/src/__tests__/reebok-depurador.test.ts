@@ -72,10 +72,21 @@ describe("Reebok — Salida A (pedido cliente)", () => {
     const cat = buildCatalogo(items, CFG);
     expect(cat.map((c) => c.po)).toEqual(["ALEX", "VIC"]); // ALEX antes que VIC
   });
-  it("AOA rotula piezas con el mes", () => {
+  it("AOA: header sin WholesalePrice/Costo/COLOR NAME, piezas rotulada con el mes", () => {
     const { items } = parseReebok(rowsFemale(), MONTH);
     const aoa = buildCatalogoAoa(buildCatalogo(items, CFG), "JULIO");
-    expect(aoa[0][aoa[0].length - 1]).toBe("Piezas JULIO");
+    expect(aoa[0]).toEqual([
+      "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
+      "Precio A", "Precio B", "Piezas JULIO",
+    ]);
+    expect(aoa[0]).not.toContain("WholesalePrice");
+    expect(aoa[0]).not.toContain("Costo");
+    expect(aoa[0]).not.toContain("COLOR NAME");
+    // La fila de datos alinea con el header (New Article en col 1, Precio A/B, piezas).
+    expect(aoa[1][1]).toBe("100000015");
+    expect(aoa[1][7]).toBe(52);  // Precio A
+    expect(aoa[1][8]).toBe(48);  // Precio B
+    expect(aoa[1][9]).toBe(7);   // piezas
   });
 });
 

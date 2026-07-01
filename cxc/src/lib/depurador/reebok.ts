@@ -278,18 +278,20 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
   return out;
 }
 
-/** AOA del catálogo de clientes. `monthLabel` rotula la columna de piezas (ej. "JULIO"). */
+/** AOA del catálogo de clientes. `monthLabel` rotula la columna de piezas (ej. "JULIO").
+ *  NO incluye WholesalePrice, Costo ni COLOR NAME (son internos; el cliente solo ve
+ *  Precio A/B y piezas). */
 export function buildCatalogoAoa(rows: CatalogoRow[], monthLabel: string): (string | number)[][] {
   const head = [
-    "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "COLOR NAME", "GENDER",
-    "WholesalePrice", "Costo", "Precio A", "Precio B", `Piezas ${monthLabel}`.trim(),
+    "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
+    "Precio A", "Precio B", `Piezas ${monthLabel}`.trim(),
   ];
   const aoa: (string | number)[][] = [head];
   const cell = (v: number | null): string | number => (v === null ? "" : v);
   for (const r of rows) {
     aoa.push([
-      r.po, r.newArticle, r.name, r.department, r.category, r.ageGroup, r.colorName, r.gender,
-      cell(r.wholesale), cell(r.costo), cell(r.precioA), cell(r.precioB), r.piezas,
+      r.po, r.newArticle, r.name, r.department, r.category, r.ageGroup, r.gender,
+      cell(r.precioA), cell(r.precioB), r.piezas,
     ]);
   }
   return aoa;
