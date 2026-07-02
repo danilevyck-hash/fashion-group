@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import type { MkMarca } from "@/lib/marketing/types";
 import ProyectosHomeView from "./components/ProyectosHomeView";
+import MarcaSelector from "./components/MarcaSelector";
 import ProyectoOverlay from "./components/ProyectoOverlay";
 import AnuladosLista from "./components/AnuladosLista";
 import ReportesTabs from "./components/ReportesTabs";
@@ -44,6 +45,8 @@ function MarketingPage() {
   });
 
   const proyectoParam = searchParams.get("proyecto");
+  // Bucket de card: "legacy" (archivo Tommy/Calvin) o un marca_id (uuid). null = selector.
+  const marcaParam = searchParams.get("marca");
   const vistaRaw = searchParams.get("vista");
   // Compatibilidad: la vista legacy "papelera" se trata internamente como
   // "anulados". Más abajo redirigimos la URL para que quede limpia.
@@ -96,20 +99,23 @@ function MarketingPage() {
   }, []);
 
   const navegar = useCallback(
-    (next: { proyecto?: string | null; vista?: VistaExtra }) => {
+    (next: { proyecto?: string | null; vista?: VistaExtra; marca?: string | null }) => {
       const params = new URLSearchParams();
       const nextProyecto =
         next.proyecto === undefined ? proyectoParam : next.proyecto ?? null;
       const nextVista = next.vista === undefined ? vistaParam : next.vista;
+      const nextMarca = next.marca === undefined ? marcaParam : next.marca ?? null;
       if (nextVista) {
+        // Anulados/Reportes son globales: no arrastran marca ni proyecto.
         params.set("vista", nextVista);
-      } else if (nextProyecto) {
-        params.set("proyecto", nextProyecto);
+      } else {
+        if (nextMarca) params.set("marca", nextMarca);
+        if (nextProyecto) params.set("proyecto", nextProyecto);
       }
       const qs = params.toString();
       router.replace(qs ? `/marketing?${qs}` : "/marketing");
     },
-    [proyectoParam, vistaParam, router],
+    [proyectoParam, vistaParam, marcaParam, router],
   );
 
   const refrescar = () => setRefreshKey((k) => k + 1);
@@ -132,13 +138,24 @@ function MarketingPage() {
   const mostrandoVistaExtra =
     vistaParam === "anulados" || vistaParam === "reportes";
 
+  // Etiqueta del bucket activo (card seleccionada).
+  const bucketLabel =
+    marcaParam === "legacy"
+      ? "Gastos Tommy y Calvin"
+      : marcaParam
+        ? marcas.find((m) => m.id === marcaParam)?.nombre ?? "Marca"
+        : null;
+
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "anulados") {
     breadcrumbs.push({ label: "Anulados" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
   } else if (proyectoParam && nombreProyectoActual) {
+    if (bucketLabel) breadcrumbs.push({ label: bucketLabel, onClick: () => navegar({ proyecto: null }) });
     breadcrumbs.push({ label: nombreProyectoActual });
+  } else if (bucketLabel) {
+    breadcrumbs.push({ label: bucketLabel });
   }
 
   return (
@@ -165,10 +182,26 @@ function MarketingPage() {
               <ReportesTabs />
             )}
           </div>
-        ) : (
+        ) : marcaParam ? (
           <ProyectosHomeView
             marcas={marcas}
+            grupo={marcaParam === "legacy" ? "legacy" : "marca"}
+            marcaIdFijo={marcaParam === "legacy" ? undefined : marcaParam}
+            bucketLabel={bucketLabel ?? ""}
+            bucketEsLegacy={marcaParam === "legacy"}
+            onBack={() => navegar({ marca: null, proyecto: null })}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
+            onNuevoProyecto={() => setShowNuevoProyecto(true)}
+            onOpenAnulados={() => navegar({ vista: "anulados" })}
+            onOpenReportes={() => navegar({ vista: "reportes" })}
+            onOpenInventario={() => router.push("/marketing/mobiliario")}
+            refreshKey={refreshKey}
+          />
+        ) : (
+          <MarcaSelector
+            marcas={marcas}
+            onSelectMarca={(id) => navegar({ marca: id })}
+            onSelectLegacy={() => navegar({ marca: "legacy" })}
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}

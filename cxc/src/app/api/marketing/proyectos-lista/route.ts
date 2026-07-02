@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const filtroEstado = (url.searchParams.get("filtro_estado") ?? "activos").toLowerCase();
   const marcaIdFiltro = url.searchParams.get("marca_id");
+  // Bucket de cards por marca (rediseño): grupo=legacy → solo proyectos con ≥1
+  // factura legacy (bucket "Tommy y Calvin"); grupo=marca + marca_id → solo
+  // proyectos con ≥1 factura NO-legacy de esa marca. Sin grupo = sin filtro (compat).
+  const grupo = (url.searchParams.get("grupo") ?? "").toLowerCase();
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
   // Escape ILIKE wildcards una sola vez (reutilizado en facturas y proyectos).
@@ -156,7 +160,7 @@ export async function GET(req: NextRequest) {
     const [facturasRes, adjFotosRes, fmRes, entregasRes] = await Promise.all([
       supabaseServer
         .from("mk_facturas")
-        .select("id, proyecto_id, total, anulado_en")
+        .select("id, proyecto_id, total, anulado_en, grupo_legacy")
         .in("proyecto_id", proyectoIds)
         .is("anulado_en", null),
       supabaseServer
@@ -183,7 +187,15 @@ export async function GET(req: NextRequest) {
       id: string;
       proyecto_id: string;
       total: number;
+      grupo_legacy?: boolean;
     }>;
+    // Legacy por factura y por proyecto (para el filtro de cards por marca).
+    const legacyByFactura = new Map<string, boolean>();
+    const hasLegacyByProy = new Set<string>();
+    for (const f of facturas) {
+      legacyByFactura.set(String(f.id), !!f.grupo_legacy);
+      if (f.grupo_legacy) hasLegacyByProy.add(String(f.proyecto_id));
+    }
     const fm = (fmRes.data ?? []) as Array<{
       factura_id: string;
       marca_id: string;
@@ -221,6 +233,9 @@ export async function GET(req: NextRequest) {
     // normalizado entre las marcas de esa factura): 1 marca = total completo;
     // 2 marcas 50/50 = mitad real a cada una. Alimenta el tooltip de desglose.
     const marcasByProy = new Map<string, Set<string>>();
+    // Marcas SOLO de facturas no-legacy (para el filtro de cards por marca; el
+    // display de badges/desglose sigue usando marcasByProy con todas).
+    const nonLegacyMarcasByProy = new Map<string, Set<string>>();
     const cobrableFactByProyMarca = new Map<string, Map<string, number>>();
     const fmByFactura = new Map<string, Array<{ mid: string; pct: number }>>();
     for (const r of fm) {
@@ -229,6 +244,13 @@ export async function GET(req: NextRequest) {
       const arr = fmByFactura.get(fid) ?? [];
       arr.push({ mid: String(r.marca_id), pct: Number(r.porcentaje ?? 0) });
       fmByFactura.set(fid, arr);
+    }
+    for (const [fid, rows] of fmByFactura) {
+      if (legacyByFactura.get(fid)) continue; // solo no-legacy alimenta el bucket de marca
+      const pid = facturaIndex.get(fid)!.proyectoId;
+      const set = nonLegacyMarcasByProy.get(pid) ?? new Set<string>();
+      for (const r of rows) set.add(r.mid);
+      nonLegacyMarcasByProy.set(pid, set);
     }
     for (const [fid, rows] of fmByFactura) {
       const finfo = facturaIndex.get(fid)!;
@@ -297,10 +319,18 @@ export async function GET(req: NextRequest) {
       return { total: Number(total.toFixed(2)), desglose };
     }
 
-    // Filtro por marca_id (si se pidió, se excluyen proyectos sin esa marca
-    // en mk_factura_marcas). Proyectos sin facturas quedan fuera del filtro
-    // — un proyecto vacío no puede "ser de Tommy" si aún no hay facturas.
-    const passMarca = (pid: string): boolean => {
+    // Filtro por bucket de card:
+    //   grupo=legacy  → proyectos con ≥1 factura legacy (card "Tommy y Calvin").
+    //   grupo=marca   → proyectos con ≥1 factura NO-legacy de marca_id.
+    //   sin grupo     → filtro marca_id sobre TODAS las facturas (compat previa).
+    // Proyectos sin facturas de ese bucket quedan fuera (un proyecto vacío no
+    // pertenece a ninguna marca todavía).
+    const passBucket = (pid: string): boolean => {
+      if (grupo === "legacy") return hasLegacyByProy.has(pid);
+      if (grupo === "marca") {
+        if (!marcaIdFiltro) return true;
+        return nonLegacyMarcasByProy.get(pid)?.has(marcaIdFiltro) ?? false;
+      }
       if (!marcaIdFiltro) return true;
       const set = marcasByProy.get(pid);
       return !!set && set.has(marcaIdFiltro);
@@ -327,7 +357,7 @@ export async function GET(req: NextRequest) {
     };
 
     const resultado = proyectos
-      .filter((p) => passMarca(String(p.id)))
+      .filter((p) => passBucket(String(p.id)))
       .filter((p) => passTipo(String(p.id)))
       .map((p) => {
         const pid = String(p.id);

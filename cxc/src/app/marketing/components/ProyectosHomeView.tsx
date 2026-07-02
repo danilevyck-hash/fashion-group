@@ -59,6 +59,13 @@ interface Props {
   onOpenReportes: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
+  // Modo bucket (rediseño por marca): al entrar desde una card. El filtro de
+  // marca queda FIJO por el bucket y se oculta el dropdown.
+  grupo?: "legacy" | "marca";
+  marcaIdFijo?: string;
+  bucketLabel?: string;
+  bucketEsLegacy?: boolean;
+  onBack?: () => void;
 }
 
 
@@ -82,8 +89,14 @@ export default function ProyectosHomeView({
   onOpenReportes,
   onOpenInventario,
   refreshKey,
+  grupo,
+  marcaIdFijo,
+  bucketLabel,
+  bucketEsLegacy,
+  onBack,
 }: Props) {
   const { toast } = useToast();
+  const enBucket = !!onBack; // renderizado desde una card (Nivel 2)
   // Archivo plano: ya no hay filtros por estado en la UI. Forzamos "todos"
   // para que la query backend devuelva la lista completa sin condicionar.
   const [filtroEstado] = useState<FiltroEstado>("todos");
@@ -111,7 +124,8 @@ export default function ProyectosHomeView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           busqueda: busquedaDebounced || undefined,
-          marca_id: marcaIdFiltro || null,
+          marca_id: marcaIdFijo || marcaIdFiltro || null,
+          grupo: grupo || undefined,
         }),
       });
       if (!res.ok) {
@@ -137,7 +151,7 @@ export default function ProyectosHomeView({
     } finally {
       setExportando(false);
     }
-  }, [exportando, busquedaDebounced, marcaIdFiltro, toast]);
+  }, [exportando, busquedaDebounced, marcaIdFiltro, marcaIdFijo, grupo, toast]);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -150,7 +164,15 @@ export default function ProyectosHomeView({
     try {
       const qs = new URLSearchParams();
       qs.set("filtro_estado", filtroEstado);
-      if (marcaIdFiltro) qs.set("marca_id", marcaIdFiltro);
+      // Bucket fijo (rediseño): legacy o marca. Sin bucket, cae al dropdown legacy-compat.
+      if (grupo === "legacy") {
+        qs.set("grupo", "legacy");
+      } else if (marcaIdFijo) {
+        qs.set("grupo", "marca");
+        qs.set("marca_id", marcaIdFijo);
+      } else if (marcaIdFiltro) {
+        qs.set("marca_id", marcaIdFiltro);
+      }
       if (busquedaDebounced) qs.set("busqueda", busquedaDebounced);
       const res = await fetch(`/api/marketing/proyectos-lista?${qs.toString()}`, {
         cache: "no-store",
@@ -163,7 +185,7 @@ export default function ProyectosHomeView({
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado, marcaIdFiltro, busquedaDebounced]);
+  }, [filtroEstado, marcaIdFiltro, marcaIdFijo, grupo, busquedaDebounced]);
 
   useEffect(() => {
     cargar();
@@ -226,12 +248,26 @@ export default function ProyectosHomeView({
 
   return (
     <div className="space-y-4">
+      {/* Back a las cards de marca (modo bucket) */}
+      {enBucket && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1"
+        >
+          ← Marcas
+        </button>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
+          <h1 className="text-xl font-semibold text-gray-900">
+            {enBucket ? bucketLabel || "Marketing" : "Marketing"}
+          </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Registro de gastos de mercadeo por cliente
+            {bucketEsLegacy
+              ? "Archivo congelado (Tommy + Calvin) · solo lectura"
+              : "Registro de gastos de mercadeo por cliente"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
@@ -267,18 +303,20 @@ export default function ProyectosHomeView({
           >
             {exportando ? "Generando ZIP…" : "Exportar"}
           </button>
-          <button
-            type="button"
-            onClick={onNuevoProyecto}
-            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
-          >
-            + Nuevo proyecto
-          </button>
+          {!bucketEsLegacy && (
+            <button
+              type="button"
+              onClick={onNuevoProyecto}
+              className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
+            >
+              + Nuevo proyecto
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Filtros: búsqueda + marca */}
-      <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-2">
+      {/* Filtros: búsqueda (+ dropdown de marca solo fuera del modo bucket) */}
+      <div className={`grid grid-cols-1 gap-2 ${enBucket ? "" : "sm:grid-cols-[1fr_200px]"}`}>
         <input
           type="search"
           value={busqueda}
@@ -286,18 +324,20 @@ export default function ProyectosHomeView({
           placeholder="Buscar por proyecto, tienda o N° de factura…"
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
         />
-        <select
-          value={marcaIdFiltro}
-          onChange={(e) => setMarcaIdFiltro(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none"
-        >
-          <option value="">Todas las marcas</option>
-          {marcas.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nombre}
-            </option>
-          ))}
-        </select>
+        {!enBucket && (
+          <select
+            value={marcaIdFiltro}
+            onChange={(e) => setMarcaIdFiltro(e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none"
+          >
+            <option value="">Todas las marcas</option>
+            {marcas.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.nombre}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Lista */}
@@ -310,11 +350,17 @@ export default function ProyectosHomeView({
       ) : proyectos.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">
           <div className="text-sm text-gray-600 mb-1">
-            {busquedaDebounced || marcaIdFiltro
+            {busquedaDebounced
               ? "No hay proyectos que coincidan con el filtro."
-              : "No hay proyectos todavía."}
+              : bucketEsLegacy
+                ? "No hay gastos en el archivo Tommy y Calvin."
+                : enBucket
+                  ? "Aún no hay gastos de esta marca. Crea un proyecto y registra su primera factura."
+                  : marcaIdFiltro
+                    ? "No hay proyectos que coincidan con el filtro."
+                    : "No hay proyectos todavía."}
           </div>
-          {!busquedaDebounced && !marcaIdFiltro && (
+          {!busquedaDebounced && !marcaIdFiltro && !bucketEsLegacy && (
             <button
               type="button"
               onClick={onNuevoProyecto}

@@ -104,6 +104,11 @@ export interface MkFactura {
   // Registro de gastos: Pendiente (default) / Pagado. Independiente del estado
   // de cobranza del proyecto (legacy, oculto en UI).
   estado_pago: EstadoPagoFactura;
+  // Rediseño por marca: las facturas existentes (Tommy/Calvin) quedan legacy=true
+  // (card "Gastos Tommy y Calvin", congelada); las nuevas nacen false y se agrupan
+  // por marca. Default false en DB. Opcional en el tipo porque varios payloads
+  // arman el objeto sin este campo (se trata como false si falta).
+  grupo_legacy?: boolean;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;

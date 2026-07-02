@@ -18,11 +18,13 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as {
       busqueda?: string;
       marca_id?: string | null;
+      grupo?: "legacy" | "marca";
     };
 
     const result = await buildMarketingZip({
       busqueda: body.busqueda,
       marcaId: body.marca_id ?? null,
+      grupo: body.grupo === "legacy" || body.grupo === "marca" ? body.grupo : undefined,
     });
 
     const fecha = new Date().toISOString().slice(0, 10);
