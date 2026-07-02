@@ -29,10 +29,47 @@ export const dynamic = "force-dynamic";
 // last_success_at:null indefinidamente, aunque la fila esté en la DB.
 // `dynamic = "force-dynamic"` NO basta (ver switch-reconciliacion/route.ts).
 export const fetchCache = "force-no-store";
+// Cinturón de seguridad: acota la función por debajo del timeout (~30s) del
+// monitor externo (cron-job.org) para responder SIEMPRE un HTTP claro (200/503)
+// en vez de colgarse y producir un "Timeout" ambiguo.
+export const maxDuration = 20;
 
 // Todos los crons corren 1×/día (plan Hobby). Stale = sin success en >26h
 // (mismo umbral que el watchdog interno de switch-reconciliacion).
 const STALE_HOURS = 26;
+
+// Timeout interno de la lectura de cron_heartbeats. La query es diminuta (~14
+// filas) pero no tiene timeout propio: si Supabase se atasca por contención
+// (coincide con switch-reconciliacion a las 14:00 UTC), el handler esperaría
+// indefinidamente y cruzaría los ~30s del monitor externo. Con esto falla rápido
+// y reintenta una vez (absorbe el blip transitorio).
+const READ_TIMEOUT_MS = 8000;
+
+type Beat = { cron_name: string; last_success_at: string | null };
+
+/** Lee cron_heartbeats con un deadline de READ_TIMEOUT_MS (AbortController +
+ *  Promise.race). Lanza si vence o si Supabase devuelve error. */
+async function leerHeartbeatsUnaVez(): Promise<Beat[]> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error("read-timeout"));
+    }, READ_TIMEOUT_MS);
+  });
+  try {
+    const query = supabaseServer
+      .from("cron_heartbeats")
+      .select("cron_name, last_success_at")
+      .abortSignal(controller.signal);
+    const { data, error } = await Promise.race([query, timeoutPromise]);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Beat[];
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 // Crons que registran heartbeat (deben existir en cron_heartbeats). Un cron de
 // esta lista SIN fila = nunca registró success → se reporta como stale (null).
@@ -77,18 +114,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabaseServer
-    .from("cron_heartbeats")
-    .select("cron_name, last_success_at");
-  if (error) {
+  // Lectura con timeout interno + 1 reintento. El reintento absorbe el blip
+  // transitorio (lo más común); si tras el reintento sigue fallando, respondemos
+  // 503 RÁPIDO (dentro de la ventana del monitor) manteniendo el fail-closed.
+  let data: Beat[];
+  try {
+    try {
+      data = await leerHeartbeatsUnaVez();
+    } catch {
+      data = await leerHeartbeatsUnaVez();
+    }
+  } catch (err) {
+    const detalle = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { ok: false, error: `No pude leer cron_heartbeats: ${error.message}` },
+      { ok: false, error: "timeout leyendo cron_heartbeats", detalle },
       { status: 503 },
     );
   }
 
-  const beats = new Map(
-    (data ?? []).map((h) => [h.cron_name as string, h.last_success_at as string]),
+  const beats = new Map<string, string | null>(
+    data.map((h) => [h.cron_name, h.last_success_at]),
   );
   const now = Date.now();
   const cutoffMs = now - STALE_HOURS * 3600 * 1000;
