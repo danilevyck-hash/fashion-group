@@ -39,6 +39,9 @@ const GALERIA_BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fashiongr.
 export interface ExportFiltro {
   busqueda?: string;
   marcaId?: string | null;
+  // Bucket de card (rediseño): "legacy" = archivo Tommy/Calvin; "marca" = gastos
+  // nuevos (no-legacy). undefined = sin filtro de grupo (export global).
+  grupo?: "legacy" | "marca";
 }
 
 // Gasto de muebles (submódulo Mobiliario) — entra al Excel como fila más para
@@ -166,6 +169,7 @@ async function firmarLote(paths: ReadonlyArray<string>): Promise<Map<string, str
 export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportResult> {
   const busqueda = (filtro.busqueda || "").trim();
   const marcaId = filtro.marcaId || null;
+  const grupo = filtro.grupo; // "legacy" | "marca" | undefined
 
   // 1. Carga base (volumen chico: ~70 facturas / 18 proyectos / 122 adjuntos).
   const [facturasRes, proyectosRes, adjuntosRes, fmRes, entregasRes, marcasRes] = await Promise.all([
@@ -226,16 +230,34 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
 
   // 3. Filtro por marca → proyectos con ≥1 factura de esa marca (igual que la
-  //    pantalla, que filtra proyectos y muestra todas sus facturas).
+  //    pantalla, que filtra proyectos y muestra todas sus facturas). En modo
+  //    grupo="marca" solo cuentan las facturas NO-legacy de esa marca.
   let proyectoIdsMarca: Set<string> | null = null;
   if (marcaId) {
+    const nonLegacyIds =
+      grupo === "marca"
+        ? new Set(facturas.filter((f) => !f.grupo_legacy).map((f) => f.id))
+        : null;
     const factIdsMarca = new Set(
       (fmRes.data ?? [])
         .filter((r) => r.marca_id === marcaId)
-        .map((r) => String(r.factura_id)),
+        .map((r) => String(r.factura_id))
+        .filter((fid) => !nonLegacyIds || nonLegacyIds.has(fid)),
     );
     proyectoIdsMarca = new Set(
       facturas.filter((f) => factIdsMarca.has(f.id)).map((f) => f.proyecto_id),
+    );
+  }
+
+  // 3b. Filtro por bucket legacy → proyectos con ≥1 factura legacy.
+  let proyectoIdsGrupo: Set<string> | null = null;
+  if (grupo === "legacy") {
+    proyectoIdsGrupo = new Set(
+      facturas.filter((f) => f.grupo_legacy).map((f) => f.proyecto_id),
+    );
+  } else if (grupo === "marca") {
+    proyectoIdsGrupo = new Set(
+      facturas.filter((f) => !f.grupo_legacy).map((f) => f.proyecto_id),
     );
   }
 
@@ -268,6 +290,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
 
   const proyectoPasa = (pid: string): boolean => {
+    if (proyectoIdsGrupo && !proyectoIdsGrupo.has(pid)) return false;
     if (proyectoIdsMarca && !proyectoIdsMarca.has(pid)) return false;
     if (proyectoIdsBusqueda && !proyectoIdsBusqueda.has(pid)) return false;
     return true;
