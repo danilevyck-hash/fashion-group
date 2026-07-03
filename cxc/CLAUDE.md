@@ -20,8 +20,9 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Bodega | `bodega` | guias (despacho), packing-lists, catálogos, búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo). Nota: directorio aparece solo en la búsqueda global, NO como módulo navegable |
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
 | Vendedor | `vendedor` | catálogos (reebok), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
+| Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
 
-> Roles reales del sistema = los 5 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+> Roles reales del sistema = los 6 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. Agrupados:

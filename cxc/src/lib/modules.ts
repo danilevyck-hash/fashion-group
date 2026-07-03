@@ -66,7 +66,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas" },
   { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "ventas" },
   { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas" },
-  { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin"],                                           group: "ventas" },
+  { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                            group: "ventas" },
   { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor"],                 group: "ventas" },
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "ventas" },
 
@@ -102,6 +102,10 @@ export const SYSTEM_ROLES: { key: string; label: string }[] = [
   { key: "secretaria", label: "Secretaria" },
   { key: "bodega", label: "Bodega" },
   { key: "vendedor", label: "Vendedor" },
+  // Gerente de American Classic: SOLO Multifashion. Sus módulos salen de
+  // role_permissions (fila gerente_acs) como los demás roles; el roles[] del
+  // módulo arriba es el fallback si la tabla no responde.
+  { key: "gerente_acs", label: "Gerente ACS" },
 ];
 
 /** Lista de keys de todos los roles del sistema. */
