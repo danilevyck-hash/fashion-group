@@ -4,7 +4,9 @@
  *
  * Auth: Authorization: Bearer ${CRON_SECRET}.
  * Params (opcionales): empresas=a,b,c · year=YYYY · mes=1..12 · backfill=1
- * sin params → mes en curso, todas (RECIBOS_EMPRESA_KEYS).
+ * sin params → modo cron diario: mes en curso, todas (RECIBOS_EMPRESA_KEYS);
+ * los días 1-5 del mes incluye también el mes anterior (cierra el gap del
+ * último día del mes, ver mesesCronDiario).
  */
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -12,7 +14,7 @@ import {
   RECIBOS_EMPRESA_KEYS,
   type SyncRecibosResult,
 } from "@/lib/switch-api/sync-recibos";
-import { mesActual, mesesDeAnio, type Mes } from "@/lib/switch-api/sync-utilidad";
+import { mesActual, mesesCronDiario, mesesDeAnio, type Mes } from "@/lib/switch-api/sync-utilidad";
 import { isEmpresaKey } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     if (!Number.isInteger(mes) || mes < 1 || mes > 12) return NextResponse.json({ ok: false, error: "mes inválido (1..12)" }, { status: 400 });
     meses = [{ year, month: mes }];
   } else {
-    meses = [cur];
+    meses = mesesCronDiario(); // cron diario: mes en curso (+ mes anterior los días 1-5)
   }
 
   const triggeredBy = hasParams ? "manual" : "cron";

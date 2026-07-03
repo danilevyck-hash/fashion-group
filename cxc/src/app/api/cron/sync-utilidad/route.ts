@@ -13,7 +13,9 @@
  *   year=YYYY        (default: año UTC actual)
  *   mes=1..12        un solo mes
  *   backfill=1       todos los meses del año hasta el mes actual (o 12 si año pasado)
- *   sin params       → mes en curso, todas las B2B (modo cron diario)
+ *   sin params       → modo cron diario: mes en curso, todas las B2B; los días
+ *                      1-5 del mes incluye también el mes anterior (cierra el
+ *                      gap del último día del mes, ver mesesCronDiario)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,6 +23,7 @@ import {
   syncEmpresaUtilidad,
   B2B_COMISION_KEYS,
   mesActual,
+  mesesCronDiario,
   mesesDeAnio,
   type Mes,
   type SyncUtilidadResult,
@@ -78,7 +81,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
     meses = [{ year, month: mes }];
   } else {
-    meses = [cur]; // cron diario: mes en curso
+    meses = mesesCronDiario(); // cron diario: mes en curso (+ mes anterior los días 1-5)
   }
 
   const triggeredBy = hasParams ? "manual" : "cron";

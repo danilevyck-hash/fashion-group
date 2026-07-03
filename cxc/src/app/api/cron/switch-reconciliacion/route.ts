@@ -40,7 +40,7 @@ import {
   syncEmpresaEstadoCuenta,
   syncCostoDiario,
 } from "@/lib/switch-api/sync-empresa";
-import { syncAllUtilidad, mesActual } from "@/lib/switch-api/sync-utilidad";
+import { syncAllUtilidad, mesesCronDiario } from "@/lib/switch-api/sync-utilidad";
 import { syncAllRecibos } from "@/lib/switch-api/sync-recibos";
 import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
@@ -200,7 +200,9 @@ const COLATERAL_CRONS: ColateralCron[] = [
     cronName: "sync-utilidad",
     label: "utilidad",
     recover: async () => {
-      const rs = await syncAllUtilidad([mesActual()]);
+      // Misma ventana que el cron diario (mes en curso + anterior los días 1-5):
+      // si el recovery corre el 1-5, no debe re-abrir el gap del último día del mes.
+      const rs = await syncAllUtilidad(mesesCronDiario());
       const bad = rs.filter((r) => !r.ok);
       return {
         ok: bad.length === 0,
@@ -212,7 +214,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     cronName: "sync-recibos",
     label: "recibos",
     recover: async () => {
-      const rs = await syncAllRecibos([mesActual()]);
+      const rs = await syncAllRecibos(mesesCronDiario());
       const bad = rs.filter((r) => !r.ok);
       return {
         ok: bad.length === 0,
