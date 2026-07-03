@@ -268,6 +268,20 @@ export function mesActual(): Mes {
   return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
 }
 
+/** Meses del cron diario: mes en curso + mes ANTERIOR durante los días 1-5 (UTC).
+ *  Cierra el gap del último día del mes: el cron corre ~08:00 UTC (~3am Panamá),
+ *  así que los docs/recibos registrados en Switch durante el día hábil del 30/31
+ *  quedaban fuera para siempre (el día 1 el cron ya solo pedía el mes nuevo).
+ *  Re-sincronizar el mes anterior es idempotente: utilidad upserta por
+ *  (empresa_key, secuencial) y recibos hace delete+insert por (empresa, mes) —
+ *  cada doc cuenta en el mes de su propia fecha. */
+export function mesesCronDiario(now: Date = new Date()): Mes[] {
+  const cur = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  if (now.getUTCDate() > 5) return [cur];
+  const prev = cur.month === 1 ? { year: cur.year - 1, month: 12 } : { year: cur.year, month: cur.month - 1 };
+  return [prev, cur];
+}
+
 /** Helper: todos los meses de un año hasta el mes dado (para backfill). */
 export function mesesDeAnio(year: number, hastaMes: number): Mes[] {
   return Array.from({ length: hastaMes }, (_, i) => ({ year, month: i + 1 }));
