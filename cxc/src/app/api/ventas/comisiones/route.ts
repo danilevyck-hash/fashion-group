@@ -1,7 +1,10 @@
 /**
- * Comisiones B2B por empresa + período. Lee el RPC comision_b2b (cache
+ * Comisiones B2B por empresa + período. Lee el RPC comision_b2b_v5 (cache
  * switch_factura_utilidad + comision_tasas). Regla: facturas con utilidad>20%
- * menos NC, excluye intercompañía/internos; comisión = base × tasa por cartera.
+ * menos NC, excluye intercompañía/internos. Desde v5 (jul-2026, retroactivo)
+ * las VENTAS se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC
+ * usa su propio vendedor); los COBROS siguen por cartera (los recibos no
+ * exponen a qué facturas se aplican).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("comision_b2b_v4", {
+  const { data, error } = await supabaseServer.rpc("comision_b2b_v5", {
     p_empresa_key: empresa,
     p_year: year,
     p_mes: mes,
