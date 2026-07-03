@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Package, Users, ChevronDown, Store } from "lucide-react";
+import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent, MessageCircle } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { cn } from "@/lib/utils";
@@ -77,6 +77,44 @@ const RANGO_OPCIONES: { value: RangoCli; label: string }[] = [
   { value: "6m", label: "6 meses" },
   { value: "12m", label: "12 meses" },
 ];
+
+// ─── Fidelización ACS (endpoint /api/multifashion/fidelizacion) ─────────────
+
+export interface FidelCliente {
+  cliente_switch_id: number;
+  nombre: string;
+  nombre_norm: string;
+  telefono_wa: string | null;
+  registrado: boolean;
+  visitas: number;
+  visitas_90d: number;
+  ultima_compra: string | null;
+  estado5: "disponible" | "usado" | null;
+  frecuente: boolean;
+  dormido: boolean;
+  nuevo_mes: boolean;
+  cinco_pendiente: boolean;
+}
+
+interface FidelResp {
+  hoy: string;
+  detalle_activo: boolean;
+  cards: { frecuentes: number; nuevos_mes: number; dormidos: number; cinco_pendiente: number };
+  clientes: FidelCliente[];
+}
+
+type SegFiltro = "todos" | "frecuentes" | "dormidos" | "cinco";
+
+const SEG_OPCIONES: { value: SegFiltro; label: string }[] = [
+  { value: "todos", label: "Todos" },
+  { value: "frecuentes", label: "Frecuentes" },
+  { value: "dormidos", label: "Dormidos" },
+  { value: "cinco", label: "5% disponible" },
+];
+
+// Misma normalización de identidad que el RPC del ranking y el endpoint.
+const normNombre = (s: string): string =>
+  s.normalize("NFKC").replace(/\s+/g, " ").trim().toUpperCase();
 
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
@@ -173,6 +211,36 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
   const loading = isLoading && !data;
   const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
 
+  // ── Fidelización ACS: segmentos + estado 5% + WhatsApp ────────────────────
+  // Independiente del rango del tab (snapshot "hoy"). Si el endpoint falla,
+  // la pestaña degrada a lo de siempre (sin tarjetas/chips/columnas nuevas).
+  const [seg, setSeg] = useUrlState<SegFiltro>("mfCliSeg", "todos");
+  const { data: fidel } = useSWR<FidelResp>(
+    "multifashion-fidelizacion",
+    async () => {
+      const r = await fetch("/api/multifashion/fidelizacion", { cache: "no-store" });
+      if (!r.ok) throw new Error(`fidelizacion HTTP ${r.status}`);
+      return r.json();
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+  const fidelMap = useMemo(
+    () => new Map((fidel?.clientes ?? []).map((c) => [c.nombre_norm, c])),
+    [fidel],
+  );
+  // Chips: filtran la tabla de identificados por segmento (match por nombre).
+  const retailFiltrado = useMemo(() => {
+    const base = retail?.clientes ?? [];
+    if (!fidel || seg === "todos") return base;
+    return base.filter((c) => {
+      const i = fidelMap.get(normNombre(c.nombre));
+      if (!i) return false;
+      if (seg === "frecuentes") return i.frecuente;
+      if (seg === "dormidos") return i.dormido;
+      return i.estado5 === "disponible";
+    });
+  }, [retail, fidel, fidelMap, seg]);
+
   // Al cambiar el rango, colapsa la fila expandida (igual que el efecto original
   // hacía con setExpandedId(null) en cada cambio de params).
   useEffect(() => {
@@ -234,6 +302,64 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             </div>
           </div>
 
+          {/* Fidelización ACS: 4 segmentos (snapshot hoy, independiente del rango) */}
+          {fidel && (
+            <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SegCard
+                  icon={<Repeat className="h-4 w-4" />}
+                  tone="teal"
+                  valor={fidel.cards.frecuentes}
+                  label="Frecuentes"
+                  sub="2+ visitas en 90 días"
+                />
+                <SegCard
+                  icon={<UserPlus className="h-4 w-4" />}
+                  tone="teal"
+                  valor={fidel.cards.nuevos_mes}
+                  label="Nuevos del mes"
+                  sub="registrados este mes"
+                />
+                <SegCard
+                  icon={<Moon className="h-4 w-4" />}
+                  tone="amber"
+                  valor={fidel.cards.dormidos}
+                  label="Dormidos"
+                  sub="60+ días sin comprar"
+                />
+                <SegCard
+                  icon={<Percent className="h-4 w-4" />}
+                  tone="teal"
+                  valor={fidel.cards.cinco_pendiente}
+                  label="5% pendiente"
+                  sub="sin segunda visita"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {SEG_OPCIONES.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSeg(opt.value)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-medium transition",
+                      seg === opt.value
+                        ? "border-teal-700 bg-teal-700 text-white"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                {!fidel.detalle_activo && (
+                  <span className="ml-1 text-xs text-gray-400">
+                    El estado &quot;usado&quot; del 5% se activa cuando corra la migración de detalle.
+                  </span>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Sección 1: Wholesale */}
           <ClientesSection
             prefix="ws"
@@ -256,16 +382,19 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             prefix="rt"
             title="Clientes identificados"
             subtitle={retail
-              ? `${retail.pct_identificado ?? 0}% de las ventas retail · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre`
+              ? `${retail.pct_identificado ?? 0}% de las ventas retail · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre${seg !== "todos" ? ` · filtro: ${SEG_OPCIONES.find(o => o.value === seg)?.label}` : ""}`
               : "—"}
             icon={<Users className="h-4 w-4" />}
             iconTone="teal"
-            clientes={retail?.clientes ?? []}
+            clientes={retailFiltrado}
+            fidelMap={fidel ? fidelMap : undefined}
             peakMes={peakMes}
             spansYears={spansYears}
             expandedId={expandedId}
             onToggleRow={toggleRow}
-            emptyText={`No hay clientes retail con nombre en ${periodoStr}.`}
+            emptyText={seg !== "todos"
+              ? `Ningún cliente del período cae en "${SEG_OPCIONES.find(o => o.value === seg)?.label}".`
+              : `No hay clientes retail con nombre en ${periodoStr}.`}
           />
 
           {/* Bucket anónimo (mostrador): CONTADO / CONSUMIDOR FINAL, sin nombre. */}
@@ -292,9 +421,35 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
 
 // ─── Sub-components ────────────────────────────────────────────────────────
 
+function SegCard({ icon, tone, valor, label, sub }: {
+  icon: React.ReactNode;
+  tone: "teal" | "amber";
+  valor: number;
+  label: string;
+  sub: string;
+}) {
+  const toneCls = tone === "amber"
+    ? "border-amber-100 bg-amber-50 text-amber-700"
+    : "border-teal-100 bg-teal-50 text-teal-700";
+  return (
+    <Card className={cn("p-3.5", tone === "amber" && valor > 0 && "border-amber-200 bg-amber-50/40")}>
+      <div className="flex items-center gap-2.5">
+        <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md border", toneCls)}>
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="font-mono text-lg font-semibold leading-tight text-gray-950 tabular-nums">{valor}</p>
+          <p className="truncate text-xs font-medium text-gray-900">{label}</p>
+          <p className="truncate text-xs text-gray-400">{sub}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function ClientesSection({
   prefix, title, subtitle, icon, iconTone,
-  clientes, peakMes, spansYears, expandedId, onToggleRow, emptyText,
+  clientes, fidelMap, peakMes, spansYears, expandedId, onToggleRow, emptyText,
 }: {
   prefix: "ws" | "rt";
   title: string;
@@ -302,6 +457,8 @@ function ClientesSection({
   icon: React.ReactNode;
   iconTone: "amber" | "teal";
   clientes: ClienteRow[];
+  /** Fidelización ACS por nombre normalizado — solo la sección retail la recibe. */
+  fidelMap?: Map<string, FidelCliente>;
   peakMes: number;
   spansYears: boolean;
   expandedId: string | null;
@@ -330,13 +487,20 @@ function ClientesSection({
         </Card>
       ) : (
         <Card className="overflow-hidden p-0">
-          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500">
+          <div className={cn(
+            "items-center gap-3 border-b border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500",
+            fidelMap
+              ? "grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_5.5rem_2.5rem_1.25rem]"
+              : "grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
+          )}>
             <span className="text-right" title="Posición en el ranking por monto">#</span>
             <span>Cliente</span>
             <span className="text-right">Total</span>
             <span className="text-right">Tickets</span>
             <span className="text-right">T. prom</span>
             <span className="text-right">Última</span>
+            {fidelMap && <span className="text-center" title="Fidelización: disponible = registrado sin usar el 5%">5%</span>}
+            {fidelMap && <span className="text-center" title="WhatsApp">WA</span>}
             <span />
           </div>
 
@@ -349,6 +513,7 @@ function ClientesSection({
                 id={id}
                 rank={idx + 1}
                 cliente={c}
+                fidel={fidelMap ? fidelMap.get(normNombre(c.nombre)) ?? null : undefined}
                 peakMes={peakMes}
                 spansYears={spansYears}
                 isExpanded={isExpanded}
@@ -363,11 +528,13 @@ function ClientesSection({
 }
 
 function ClienteRowItem({
-  id, rank, cliente, peakMes, spansYears, isExpanded, onToggle,
+  id, rank, cliente, fidel, peakMes, spansYears, isExpanded, onToggle,
 }: {
   id: string;
   rank: number;
   cliente: ClienteRow;
+  /** undefined = sección sin fidelización (wholesale); null = sin match ACS. */
+  fidel?: FidelCliente | null;
   peakMes: number;
   spansYears: boolean;
   isExpanded: boolean;
@@ -376,15 +543,22 @@ function ClienteRowItem({
   const ticketProm = cliente.ticket_prom != null
     ? cliente.ticket_prom
     : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
+  const conFidel = fidel !== undefined;
 
   return (
     <div className="border-t border-gray-200">
-      <button
-        type="button"
+      {/* div role=button (no <button>): la celda WhatsApp anida un <a>. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => onToggle(id)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(id); } }}
         aria-expanded={isExpanded}
         className={cn(
-          "grid w-full grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 px-3.5 py-2.5 text-left text-sm transition",
+          "grid w-full cursor-pointer items-center gap-3 px-3.5 py-2.5 text-left text-sm transition",
+          conFidel
+            ? "grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_5.5rem_2.5rem_1.25rem]"
+            : "grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem]",
           "hover:bg-gray-50/60",
           isExpanded && "bg-gray-50/80",
         )}
@@ -395,11 +569,40 @@ function ClienteRowItem({
         <span className="text-right font-mono text-gray-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
         <span className="text-right font-mono text-gray-700 tabular-nums">${ticketProm.toFixed(2)}</span>
         <span className="text-right font-mono text-xs text-gray-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
+        {conFidel && (
+          <span className="flex justify-center">
+            {fidel?.estado5 === "disponible" ? (
+              <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">Disponible</span>
+            ) : fidel?.estado5 === "usado" ? (
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-500">Usado ✓</span>
+            ) : (
+              <span className="text-xs text-gray-300">—</span>
+            )}
+          </span>
+        )}
+        {conFidel && (
+          <span className="flex justify-center">
+            {fidel?.telefono_wa ? (
+              <a
+                href={fidel.telefono_wa}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`WhatsApp a ${cliente.nombre}`}
+                className="flex h-6 w-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.95]"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+              </a>
+            ) : (
+              <span className="text-[10px] leading-tight text-gray-300" title="Sin teléfono en el maestro de Switch">sin tel.</span>
+            )}
+          </span>
+        )}
         <ChevronDown className={cn(
           "h-3.5 w-3.5 text-gray-400 transition-transform",
           isExpanded && "rotate-180",
         )} />
-      </button>
+      </div>
 
       <div
         className={cn(
