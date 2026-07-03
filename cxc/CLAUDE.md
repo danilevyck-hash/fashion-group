@@ -242,8 +242,12 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - "Compartir" button (copy link + PDF) for vendors
 - Removed old auth system and CartProvider (dead code)
 
-### Reclamos (April 10-11)
-- Pipeline lineal de 3 estados: Borrador → Enviado → Pagado (con progress indicator). Definido en `src/app/reclamos/components/constants.ts` (ESTADOS) y `VALID_TRANSITIONS`. Los estados Confirmado/Aplicado/Aplicada fueron descartados; siguen en el CHECK constraint de DB como legacy (limpieza pendiente en Sprint B).
+### Reclamos — pipeline de estados (julio 2026)
+- Estados reales (código y DB, CHECK de migración `20260629100000`): **Creado → En proceso → Pagado**. Los nombres viejos Borrador/Enviado ya no existen (#161 los fusionó en Creado; `c1dcd854` agregó "En proceso"). `ESTADOS` en `src/app/reclamos/components/constants.ts`; transiciones server-side en `VALID_TRANSITIONS` de `api/reclamos/[id]/route.ts`.
+- **Creado → En proceso** (`POST /[id]/en-proceso`): comprobante (foto o PDF) **opcional**.
+- **→ Pagado**: SOLO vía `POST /[id]/settlements` con `markPaid` (nunca por PATCH). Acepta desde **Creado (salto directo, pago inmediato) o En proceso** y **exige comprobante ya adjunto** (foto o PDF) — sin adjunto responde 400 y revierte los settlements (compensación).
+- Adjuntar comprobante sin cambiar estado: `POST /[id]/comprobante`. Subida compartida en `src/lib/reclamos/comprobante-storage.ts` (bucket reclamo-fotos `/comprobante`; PDF sin compresión, máx 4MB).
+- Rollbacks de un paso vía PATCH: En proceso→Creado, Pagado→En proceso.
 
 ### CXC (April 10-11)
 - Simplified ContactPanel (6 clear sections)
