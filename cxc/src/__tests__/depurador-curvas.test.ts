@@ -112,29 +112,28 @@ describe("Curvas — distribución por bulto", () => {
 });
 
 describe("Curvas — Excel de salida", () => {
-  it("una sección por referencia+curva: título + encabezados + filas por talla", () => {
+  it("una sección por referencia+curva: encabezados + filas por talla, SIN fila de título", () => {
     const { curvas } = parseCurvas([H, ...W1A] as SheetRow[]);
     const { aoa, meta } = buildCurvasAoa(curvas);
-    expect(meta.titleRows).toEqual([0]);
-    expect(meta.headerRows).toEqual([1]);
-    expect(String(aoa[0][0])).toContain("FS100 · Curva W1A · 21 bultos · 12 pzs/bulto");
-    expect(aoa[1]).toEqual(["Referencia", "Talla", "Código de barra", "Cantidad"]);
-    expect(aoa[2]).toEqual(["FS100", "5", "111", 1]);
-    expect(aoa[7]).toEqual(["FS100", "10", "116", 1]);
-    expect(aoa).toHaveLength(8);
+    expect(meta.headerRows).toEqual([0]);
+    expect(aoa[0]).toEqual(["Referencia", "Talla", "Código de barra", "Cantidad"]);
+    expect(aoa[1]).toEqual(["FS100", "5", "111", 1]);
+    expect(aoa[6]).toEqual(["FS100", "10", "116", 1]);
+    expect(aoa).toHaveLength(7);
   });
 
-  it("dos secciones → fila en blanco entre ellas", () => {
+  it("dos secciones → fila en blanco entre ellas y cada una arranca con encabezados", () => {
     const { curvas } = parseCurvas([H, ...W1A, ["FS100", "211", "5", 6, "W1B", 6, ""]] as SheetRow[]);
     const { aoa, meta } = buildCurvasAoa(curvas);
-    expect(meta.titleRows).toHaveLength(2);
-    expect(aoa[meta.titleRows[1] - 1]).toEqual([]); // separador
+    expect(meta.headerRows).toHaveLength(2);
+    expect(aoa[meta.headerRows[1] - 1]).toEqual([]); // separador
+    expect(aoa[meta.headerRows[1]]).toEqual(["Referencia", "Talla", "Código de barra", "Cantidad"]);
   });
 
   it("nombre de archivo", () => {
     const { curvas } = parseCurvas([H, ...W1A] as SheetRow[]);
-    expect(curvasFilename(curvas)).toBe("CURVAS_FS100.xlsx");
-    expect(curvasFilename([...curvas, ...curvas])).toBe("CURVAS_FS100_y_1_mas.xlsx");
+    expect(curvasFilename(curvas)).toBe("TALLAS_FS100.xlsx");
+    expect(curvasFilename([...curvas, ...curvas])).toBe("TALLAS_FS100_y_1_mas.xlsx");
   });
 });
 

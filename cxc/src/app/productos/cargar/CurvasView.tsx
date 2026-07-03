@@ -85,15 +85,12 @@ export default function CurvasView() {
       const ws = XLSX.utils.aoa_to_sheet(aoa);
 
       const range = XLSX.utils.decode_range(ws["!ref"] as string);
-      const titleSet = new Set(meta.titleRows);
       const headerSet = new Set(meta.headerRows);
       for (let R = 0; R <= range.e.r; R++) {
         for (let C = 0; C <= range.e.c; C++) {
           const addr = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[addr]) continue;
-          if (titleSet.has(R)) {
-            ws[addr].s = { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: "E7E5E4" } } };
-          } else if (headerSet.has(R)) {
+          if (headerSet.has(R)) {
             ws[addr].s = { font: { bold: true }, border: { bottom: { style: "thin", color: { rgb: "999999" } } } };
           } else if (C === 2) {
             // Código de barra como TEXTO (evita notación científica del EAN).
@@ -116,7 +113,7 @@ export default function CurvasView() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Curvas por bulto</h2>
+        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Tallas por bulto</h2>
         <p className="mt-1.5 text-sm text-stone-500">
           Sube el Excel crudo de Fashion Shoes (con CODIGO_PREPACK), marca las curvas que quieres y
           descarga el detalle de tallas por bulto para enviarlo al cliente.

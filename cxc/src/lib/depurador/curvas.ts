@@ -218,26 +218,20 @@ export function parseCurvas(rows: SheetRow[]): CurvasResult {
 
 export const CURVAS_OUT_COLS = ["Referencia", "Talla", "Código de barra", "Cantidad"];
 
-/** Fila de metadatos por sección, para que la UI pueda estilizar (título vs datos). */
+/** Fila de metadatos por sección, para que la UI pueda estilizar los encabezados. */
 export interface CurvasAoaMeta {
-  /** Índices (base 0) de las filas de título de sección. */
-  titleRows: number[];
-  /** Índices de las filas de encabezado de columnas. */
+  /** Índices (base 0) de las filas de encabezado de columnas. */
   headerRows: number[];
 }
 
-/** AOA del Excel de salida: una sección por referencia+curva seleccionada.
- *  Título (referencia · curva · bultos · pzs/bulto · estilo) + encabezados +
- *  una fila por talla con la cantidad POR BULTO. */
+/** AOA del Excel de salida: una sección por referencia+curva seleccionada —
+ *  encabezados + una fila por talla con la cantidad POR BULTO (sin fila de
+ *  título; la referencia ya va en cada fila de datos). */
 export function buildCurvasAoa(seleccion: Curva[]): { aoa: (string | number)[][]; meta: CurvasAoaMeta } {
   const aoa: (string | number)[][] = [];
-  const meta: CurvasAoaMeta = { titleRows: [], headerRows: [] };
+  const meta: CurvasAoaMeta = { headerRows: [] };
   seleccion.forEach((c, i) => {
     if (i > 0) aoa.push([]); // fila en blanco entre secciones
-    meta.titleRows.push(aoa.length);
-    aoa.push([
-      `${c.referencia} · Curva ${c.codigo} · ${c.bultos} bultos · ${c.ordXPp} pzs/bulto${c.estilo ? ` · ${c.estilo}` : ""}`,
-    ]);
     meta.headerRows.push(aoa.length);
     aoa.push(CURVAS_OUT_COLS.slice());
     for (const t of c.tallas) {
@@ -247,10 +241,10 @@ export function buildCurvasAoa(seleccion: Curva[]): { aoa: (string | number)[][]
   return { aoa, meta };
 }
 
-/** Nombre del archivo de salida: CURVAS_<REF1>[_y_N_mas].xlsx */
+/** Nombre del archivo de salida: TALLAS_<REF1>[_y_N_mas].xlsx */
 export function curvasFilename(seleccion: Curva[]): string {
-  if (!seleccion.length) return "CURVAS.xlsx";
+  if (!seleccion.length) return "TALLAS.xlsx";
   const ref = seleccion[0].referencia.replace(/[^A-Za-z0-9]/g, "_").slice(0, 16).toUpperCase();
   const extra = seleccion.length > 1 ? `_y_${seleccion.length - 1}_mas` : "";
-  return `CURVAS_${ref}${extra}.xlsx`;
+  return `TALLAS_${ref}${extra}.xlsx`;
 }

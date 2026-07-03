@@ -53,7 +53,7 @@ function CargarInner() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
           <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
-          <TabBtn active={tab === "curvas"} onClick={() => setTab("curvas")}>Curvas</TabBtn>
+          <TabBtn active={tab === "curvas"} onClick={() => setTab("curvas")}>Tallas</TabBtn>
           <TabBtn active={tab === "formulas"} onClick={() => setTab("formulas")}>Fórmulas por marca</TabBtn>
           <TabBtn active={tab === "reglas"} onClick={() => setTab("reglas")}>Reglas</TabBtn>
           <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
