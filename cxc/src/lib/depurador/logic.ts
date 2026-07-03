@@ -260,8 +260,13 @@ function pickEAN(items: RawItem[], catRaw: string, genRaw: string): PickEANResul
   const isWomen = cat.includes("WOMEN") || gen === "WOMEN";
   const isBottom = BOTTOMS.some((w) => cat.includes(w));
   const isFoot = FOOTWEAR.some((w) => cat.includes(w));
+  // Kids: a veces viene con tallas USA (M) y a veces Europa (8, 10, 12) →
+  // intentar "8" primero y caer a "M". Solo KIDS literal (Boys/Girls/Toddler
+  // siguen en la regla general). Caso ADITIVO: no toca los existentes.
+  const isKids = cat.includes("KIDS") || gen === "KIDS";
 
   const order: string[] = [];
+  if (isKids) order.push("8");                  // kids: talla Europa 8
   if (isFoot && isMen) order.push("41");        // zapato hombre
   else if (isFoot && isWomen) order.push("37"); // zapato dama
   else if (isBottom && isMen) order.push("32"); // pantalón/short hombre

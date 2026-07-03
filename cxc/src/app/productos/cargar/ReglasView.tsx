@@ -11,6 +11,25 @@ import {
   norm,
 } from "@/lib/depurador/logic";
 
+// Regla de talla del EAN representativo (espejo de pickEAN en lib/depurador/logic.ts).
+// Solo lectura: si se cambia la regla en el código hay que actualizar esta tabla.
+const REGLA_TALLA: { caso: string; detecta: string; talla: string }[] = [
+  { caso: "Calzado hombre", detecta: "descripción con palabra de calzado (sneaker, sandal, shoe…) + Men", talla: "41" },
+  { caso: "Calzado dama", detecta: "descripción con palabra de calzado + Women", talla: "37" },
+  { caso: "Pantalón / short hombre", detecta: "descripción con short, pant, denim, jean, chino… + Men", talla: "32" },
+  { caso: "Pantalón / short dama", detecta: "descripción con short, pant, denim, jean, chino… + Women", talla: "27" },
+  { caso: "Kids", detecta: "género o descripción con Kids (Boys/Girls/Toddler van por la regla general)", talla: "8 · si no existe, M" },
+  { caso: "Resto (tops, ropa interior, accesorios…)", detecta: "todo lo demás", talla: "M" },
+];
+
+// Regla Reebok (espejo de pickSample en lib/depurador/reebok.ts).
+const REGLA_TALLA_REEBOK: { caso: string; talla: string }[] = [
+  { caso: "Footwear · Male", talla: "9 · si no existe, la numérica más cercana (queda en ámbar)" },
+  { caso: "Footwear · Female", talla: "7 · si no existe, la numérica más cercana (queda en ámbar)" },
+  { caso: "Footwear · Kids / Unisex (AGE GROUP ≠ Adult o GENDER Unisex)", talla: "mediana de las tallas disponibles" },
+  { caso: "Apparel / Hardware", talla: "M · si no hay M, la talla única (ámbar si hay varias)" },
+];
+
 // Grupos por empresa (igual que en config).
 const GRUPOS = [
   { label: "Vistana International", brand: "Calvin Klein", marcas: MARCA_CATALOGO.filter((c) => c.empresa === "Vistana International") },
@@ -50,6 +69,47 @@ export default function ReglasView() {
             </li>
           ))}
         </ol>
+      </section>
+
+      {/* Sección — Regla de talla del EAN representativo (solo lectura) */}
+      <section className="mb-8">
+        <h3 className="mb-2 text-[13px] font-bold uppercase tracking-wide text-teal-800">Regla de talla (EAN representativo)</h3>
+        <p className="mb-3 text-[13px] text-stone-500">
+          Cada estilo colapsa a una fila y el código de barra que se sube a Switch es el de esta talla.
+          Si la talla esperada no existe, se usa la más chica y la fila queda marcada en ámbar para revisar.
+        </p>
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Caso</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Cómo se detecta</th>
+                <th className="border-b border-stone-200 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-stone-500">Talla elegida</th>
+              </tr>
+            </thead>
+            <tbody>
+              {REGLA_TALLA.map((r) => (
+                <tr key={r.caso} className="hover:bg-teal-50">
+                  <td className="border-b border-stone-100 px-3 py-1.5 font-medium text-stone-900">{r.caso}</td>
+                  <td className="border-b border-stone-100 px-3 py-1.5 text-stone-500">{r.detecta}</td>
+                  <td className="border-b border-stone-100 px-3 py-1.5 font-mono text-[12px] text-stone-900">{r.talla}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-stone-200 bg-white px-3.5 py-3">
+          <div className="mb-2 text-[12px] font-bold uppercase tracking-wide text-teal-800">Reebok · Active Shoes (talla-muestra)</div>
+          <ul className="space-y-1.5">
+            {REGLA_TALLA_REEBOK.map((r) => (
+              <li key={r.caso} className="text-[13px]">
+                <span className="font-medium text-stone-900">{r.caso}</span>
+                <span className="ml-2 text-stone-500">→ {r.talla}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       {/* Sección A — Reglas directas de normalización */}

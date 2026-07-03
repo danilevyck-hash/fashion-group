@@ -197,3 +197,46 @@ describe("Depurador — proveedor (CAMBIO 2) y temporada (CAMBIO 3)", () => {
     expect(cols("Men-Bras")["Temporada"]).toBe("2026-06");
   });
 });
+
+describe("Depurador — regla de talla del EAN (caso Kids, aditivo)", () => {
+  // Plantilla con varias tallas por estilo. GENERO en la última columna.
+  const HG = [...H, "GENERO"];
+  const style = (desc: string, tallas: string[], genero = "") =>
+    processRows(
+      [HG, ...tallas.map((t) => ["R1", `EAN-${t}`, desc, t, 5, 10, 20, "TH Kids", "x", genero])] as SheetRow[],
+      cfg
+    ).rows[0];
+
+  it("Kids con tallas Europa (8, 10, 12) → elige la 8", () => {
+    const r = style("Kids Unisex-Polos S/S", ["8", "10", "12"]);
+    expect(r.talla).toBe("8");
+    expect(r.cols["Código Barra *"]).toBe("EAN-8");
+    expect(r.fallback).toBe(false);
+  });
+  it("Kids por columna GENERO (tallas 10, 8, 12) → elige la 8", () => {
+    const r = style("Toddler-Polos S/S", ["10", "8", "12"], "KIDS");
+    expect(r.talla).toBe("8");
+    expect(r.cols["Código Barra *"]).toBe("EAN-8");
+  });
+  it("Kids con tallas USA sin 8 → cae a M", () => {
+    const r = style("Kids Unisex-Polos S/S", ["S", "M", "L"]);
+    expect(r.talla).toBe("M");
+    expect(r.cols["Código Barra *"]).toBe("EAN-M");
+    expect(r.fallback).toBe(false);
+  });
+  it("Kids sin 8 ni M → fallback a la más chica con alerta", () => {
+    const r = style("Kids Unisex-Polos S/S", ["10", "12", "14"]);
+    expect(r.talla).toBe("10");
+    expect(r.fallback).toBe(true);
+  });
+  // Regresión: los casos existentes NO cambian.
+  it("Calzado hombre sigue en 41, dama en 37", () => {
+    expect(style("Men-Sneakers", ["40", "41", "42"]).talla).toBe("41");
+    expect(style("Women-Sandals", ["36", "37", "38"]).talla).toBe("37");
+  });
+  it("Bottoms hombre 32, dama 27, tops M", () => {
+    expect(style("Men-Pant Non-Denim", ["30", "32", "34"]).talla).toBe("32");
+    expect(style("Women-Denim Short", ["25", "27", "29"]).talla).toBe("27");
+    expect(style("Men-T-Shirts S/S", ["S", "M", "L"]).talla).toBe("M");
+  });
+});
