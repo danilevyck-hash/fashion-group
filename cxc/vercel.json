@@ -13,6 +13,7 @@
     { "path": "/api/cron/sync-utilidad", "schedule": "0 7 * * *" },
     { "path": "/api/cron/sync-recibos", "schedule": "50 7 * * *" },
     { "path": "/api/cron/switch-articulos", "schedule": "40 8 * * *" },
+    { "path": "/api/cron/acs-fidelizacion", "schedule": "15 8 * * *" },
     { "path": "/api/cron/reebok-catalogo", "schedule": "45 6 * * *" },
     { "path": "/api/cron/joybees-catalogo", "schedule": "0 11 * * *" },
     { "path": "/api/cron/sync-clientes-master", "schedule": "0 7 * * *" },
