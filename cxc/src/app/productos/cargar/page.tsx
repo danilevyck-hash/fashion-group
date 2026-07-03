@@ -7,8 +7,9 @@ import DepuradorDispatcher from "./DepuradorDispatcher";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
+import CurvasView from "./CurvasView";
 
-type Tab = "depurador" | "formulas" | "reglas" | "historial";
+type Tab = "depurador" | "curvas" | "formulas" | "reglas" | "historial";
 
 export default function CargarProductosPage() {
   return (
@@ -52,6 +53,7 @@ function CargarInner() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
           <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
+          <TabBtn active={tab === "curvas"} onClick={() => setTab("curvas")}>Curvas</TabBtn>
           <TabBtn active={tab === "formulas"} onClick={() => setTab("formulas")}>Fórmulas por marca</TabBtn>
           <TabBtn active={tab === "reglas"} onClick={() => setTab("reglas")}>Reglas</TabBtn>
           <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
@@ -63,6 +65,11 @@ function CargarInner() {
           CK/TH vs Reebok y aplica el flujo correcto en el mismo tab. */}
       <div className={tab === "depurador" ? "" : "hidden"}>
         <DepuradorDispatcher onDownloaded={handleDownloaded} />
+      </div>
+      {/* Curvas también queda montada (oculta) para no perder el archivo cargado
+          al cambiar de pestaña — mismo criterio que el Depurador. */}
+      <div className={tab === "curvas" ? "" : "hidden"}>
+        <CurvasView />
       </div>
       {tab === "formulas" && <FormulasConfig />}
       {tab === "reglas" && <ReglasView />}
