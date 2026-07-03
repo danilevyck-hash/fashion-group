@@ -4,10 +4,11 @@
 // El período (mes/año) lo controla el shell; aquí solo el selector de empresa,
 // que RECUERDA la última empresa usada (localStorage fg_last_comision_empresa).
 //
-// Regla (server, RPC comision_b2b_v4): base = facturas con utilidad>20% − todas
+// Regla (server, RPC comision_b2b_v5): base = facturas con utilidad>20% − todas
 // las NC, excluyendo intercompañía/clientes internos; comisión = base × tasa
-// del vendedor dueño del cliente. Muestra a todos los vendedores activos aunque
-// base=$0; los sin actividad se colapsan a una línea al pie.
+// del VENDEDOR DE LA FACTURA (v5 jul-2026, retroactivo; la NC usa su propio
+// vendedor; cobros siguen por cartera). Muestra a todos los vendedores activos
+// aunque base=$0; los sin actividad se colapsan a una línea al pie.
 
 import { useCallback, useEffect, useState } from "react";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
