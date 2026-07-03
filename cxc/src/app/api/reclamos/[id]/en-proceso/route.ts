@@ -3,15 +3,17 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
+import { subirComprobante } from "@/lib/reclamos/comprobante-storage";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Pasa un reclamo de "Creado" → "En proceso".
- * EXIGE una foto de comprobante (multipart `file`); la nota es opcional (`nota`).
- * Guarda la foto en el bucket reclamo-fotos (subcarpeta /comprobante) y escribe
- * comprobante_url/path/nota + estado en el reclamo, más una nota de seguimiento.
+ * El comprobante (multipart `file`, foto o PDF) es OPCIONAL en este paso; la nota
+ * también (`nota`). Si viene archivo, se guarda en el bucket reclamo-fotos
+ * (subcarpeta /comprobante) y se escribe comprobante_url/path/nota.
+ * El comprobante OBLIGATORIO se exige al marcar Pagado (endpoint settlements).
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, RECLAMOS_ROLES);
@@ -32,46 +34,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const file = formData.get("file") as File | null;
   const nota = String(formData.get("nota") ?? "").trim();
-  if (!file) {
-    return NextResponse.json({ error: "Debes subir una foto de comprobante para pasar a En proceso." }, { status: 400 });
-  }
 
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const storagePath = `${id}/comprobante/${crypto.randomUUID()}.${ext}`;
-    const contentType = file.type ||
-      (ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg");
-
-    const { error: uploadError } = await supabaseServer.storage
-      .from("reclamo-fotos")
-      .upload(storagePath, buffer, { contentType, upsert: true });
-    if (uploadError) {
-      console.error("Comprobante upload error:", JSON.stringify(uploadError));
-      return NextResponse.json({ error: "No se pudo subir el comprobante." }, { status: 500 });
+    const updates: Record<string, unknown> = { estado: "En proceso", updated_at: new Date().toISOString() };
+    let subido: { url: string; path: string } | null = null;
+    if (file) {
+      subido = await subirComprobante(id, file);
+      if (!subido) return NextResponse.json({ error: "No se pudo subir el comprobante." }, { status: 500 });
+      updates.comprobante_url = subido.url;
+      updates.comprobante_path = subido.path;
+      updates.comprobante_nota = nota || null;
     }
 
-    const { data: urlData } = supabaseServer.storage.from("reclamo-fotos").getPublicUrl(storagePath);
-
-    const { error: updErr } = await supabaseServer.from("reclamos").update({
-      estado: "En proceso",
-      comprobante_url: urlData.publicUrl,
-      comprobante_path: storagePath,
-      comprobante_nota: nota || null,
-      updated_at: new Date().toISOString(),
-    }).eq("id", id);
+    const { error: updErr } = await supabaseServer.from("reclamos").update(updates).eq("id", id);
     if (updErr) { console.error(updErr); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
     // Nota de seguimiento (queda en el historial del reclamo).
     const session = getSession(req);
     await supabaseServer.from("reclamo_seguimiento").insert({
       reclamo_id: id,
-      nota: `Pasó a "En proceso" — comprobante subido${nota ? `: ${nota}` : ""}`,
+      nota: subido
+        ? `Pasó a "En proceso" — comprobante adjuntado${nota ? `: ${nota}` : ""}`
+        : `Pasó a "En proceso"${nota ? ` — ${nota}` : ""}`,
       autor: session?.userName || session?.role || "",
     });
-    await logActivity(session?.role || "unknown", "reclamo_en_proceso", "reclamos", { reclamoId: id }, session?.userName);
+    await logActivity(session?.role || "unknown", "reclamo_en_proceso", "reclamos", { reclamoId: id, conComprobante: !!subido }, session?.userName);
 
-    return NextResponse.json({ ok: true, comprobante_url: urlData.publicUrl, comprobante_path: storagePath, comprobante_nota: nota || null });
+    return NextResponse.json({
+      ok: true,
+      comprobante_url: subido?.url ?? null,
+      comprobante_path: subido?.path ?? null,
+      comprobante_nota: subido ? (nota || null) : null,
+    });
   } catch (err) {
     console.error("en-proceso exception:", err);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

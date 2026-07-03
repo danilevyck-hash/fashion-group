@@ -35,6 +35,27 @@ export function validateFotoFile(file: File): string | null {
   return null;
 }
 
+// El comprobante (a diferencia de las fotos de evidencia) también acepta PDF.
+// Los PDF no pasan por compresión, así que el tope es el límite real de body
+// de la función en Vercel (~4.5MB) con margen.
+const PDF_MAX_MB = 4;
+
+/** Valida el archivo de COMPROBANTE: foto (mismas reglas que las fotos) o PDF. */
+export function validateComprobanteFile(file: File): string | null {
+  const esPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+  if (esPdf) {
+    if (file.size > PDF_MAX_MB * 1024 * 1024) {
+      return `El PDF es demasiado grande (máximo ${PDF_MAX_MB}MB).`;
+    }
+    return null;
+  }
+  const err = validateFotoFile(file);
+  if (err && file.type && !ALLOWED.includes(file.type)) {
+    return "El comprobante debe ser una foto (JPG, PNG, WEBP) o un PDF.";
+  }
+  return err;
+}
+
 async function decodeImage(file: File): Promise<{ src: CanvasImageSource; w: number; h: number; close: () => void }> {
   if (typeof createImageBitmap === "function") {
     // imageOrientation:"from-image" respeta el EXIF (foto de celular rotada).

@@ -132,16 +132,23 @@ export default function ReclamoDetail({
   const totalsTax = reclamoTaxes(totalsEmpresa, totalsSub);
   const days = daysSince(current.fecha_reclamo);
 
-  // Comprobante del paso "En proceso" (foto + nota opcional). Se muestra en los
-  // estados En proceso y Pagado. Click en la foto → lightbox.
+  // Comprobante del reclamo (foto o PDF + nota opcional). Se muestra en todos los
+  // estados cuando existe. Foto → lightbox; PDF → se abre en otra pestaña.
+  const comprobanteEsPdf = /\.pdf(\?|$)/i.test(current.comprobante_path || current.comprobante_url || "");
   const comprobanteCard = current.comprobante_url ? (
     <div className="mb-3 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-      <button type="button" onClick={() => setLightboxSrc(current.comprobante_url!)} className="shrink-0" title="Ver comprobante">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={current.comprobante_url} alt="Comprobante" className="h-16 w-16 rounded-md border border-amber-200 object-cover" />
-      </button>
+      {comprobanteEsPdf ? (
+        <a href={current.comprobante_url} target="_blank" rel="noopener noreferrer" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-white text-red-600" title="Ver comprobante (PDF)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+        </a>
+      ) : (
+        <button type="button" onClick={() => setLightboxSrc(current.comprobante_url!)} className="shrink-0" title="Ver comprobante">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={current.comprobante_url} alt="Comprobante" className="h-16 w-16 rounded-md border border-amber-200 object-cover" />
+        </button>
+      )}
       <div className="min-w-0">
-        <div className="text-xs font-semibold text-amber-800">Comprobante</div>
+        <div className="text-xs font-semibold text-amber-800">Comprobante{comprobanteEsPdf ? " (PDF)" : ""}</div>
         {current.comprobante_nota
           ? <p className="mt-0.5 text-xs text-gray-600 whitespace-pre-wrap break-words">{current.comprobante_nota}</p>
           : <p className="mt-0.5 text-xs text-gray-400 italic">Sin nota</p>}
@@ -177,7 +184,7 @@ export default function ReclamoDetail({
     return [{
       id: `reclamo-escalate-${current.id}`,
       message: esCreado
-        ? `Este reclamo lleva ${days} días abierto. Súbele el comprobante para pasarlo a En proceso.`
+        ? `Este reclamo lleva ${days} días abierto. Pásalo a En proceso, o márcalo como Pagado si ya se resolvió.`
         : `Este reclamo lleva ${days} días abierto. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
       actionLabel: esCreado ? "Pasar a En proceso" : "Marcar como Pagado",
       onAction: () => onChangeEstado(esCreado ? "En proceso" : "Pagado"),
@@ -345,14 +352,22 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {/* Acción de estado — pipeline de 3 estados: Creado → En proceso → Pagado */}
+      {/* Acción de estado — pipeline de 3 estados: Creado → En proceso → Pagado,
+          con salto directo Creado → Pagado (reclamos que se pagan de inmediato). */}
       {!editMode && current.estado === "Creado" && (
         <div className="mb-6">
-          <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
-            Pasar a En proceso
-          </button>
-          <p className="text-xs text-gray-400 mt-1.5">Requiere subir una foto del comprobante.</p>
+          {comprobanteCard}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
+              Pasar a En proceso
+            </button>
+            <button onClick={() => onChangeEstado("Pagado")} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all flex items-center gap-2" title="Salto directo: reclamo pagado de inmediato">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Marcar como Pagado
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">El comprobante es opcional para En proceso; para marcar Pagado es obligatorio (foto o PDF).</p>
         </div>
       )}
       {!editMode && current.estado === "En proceso" && (

@@ -11,11 +11,13 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 // Máquina de estados del pipeline (Creado → En proceso → Pagado), con corrección
 // de un paso hacia atrás. Validación de transición — fuente de verdad server.
-// Nota: Creado → En proceso se hace por el endpoint /en-proceso (exige comprobante);
-// este PATCH solo permite los rollbacks y En proceso → Pagado.
+// Notas: Creado → En proceso va por el endpoint /en-proceso (comprobante opcional).
+// A Pagado NUNCA se llega por este PATCH: solo vía settlements con markPaid, que
+// exige comprobante (foto o PDF) y acepta desde Creado (pago inmediato) o En proceso.
+// Este PATCH solo permite los rollbacks de un paso.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Creado": ["En proceso"],
-  "En proceso": ["Creado", "Pagado"],
+  "En proceso": ["Creado"],
   "Pagado": ["En proceso"],
 };
 

@@ -3,9 +3,10 @@
 //
 // POST  body { settlements: [{ monto, nota_credito?, fecha }], markPaid?: boolean }
 //   - Inserta las filas de settlement.
-//   - Si markPaid: marca el reclamo como Pagado (solo desde "Creado") y congela
-//     el snapshot del reclamado. Atómico-best-effort: si el flip falla, borra los
-//     settlements recién insertados (compensación) → reintento seguro.
+//   - Si markPaid: marca el reclamo como Pagado (desde "Creado" o "En proceso";
+//     EXIGE comprobante ya adjunto — foto o PDF) y congela el snapshot del
+//     reclamado. Atómico-best-effort: si el flip falla, borra los settlements
+//     recién insertados (compensación) → reintento seguro.
 // DELETE ?sid=<id>  → soft-delete de un settlement.
 //
 // Auth: admin/secretaria (igual que editar reclamos).
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (markPaid) {
     const { data: rec } = await supabaseServer
       .from("reclamos")
-      .select("estado, empresa, reclamo_items(cantidad, precio_unitario, deleted)")
+      .select("estado, empresa, comprobante_url, reclamo_items(cantidad, precio_unitario, deleted)")
       .eq("id", id)
       .single();
 
@@ -81,10 +82,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (ids.length) await supabaseServer.from("reclamo_settlements").delete().in("id", ids);
     };
 
-    if (!rec || rec.estado !== "Creado") {
+    if (!rec || (rec.estado !== "Creado" && rec.estado !== "En proceso")) {
       await compensar();
       return NextResponse.json(
-        { error: `Solo se puede marcar Pagado desde "Creado" (estado actual: ${rec?.estado ?? "?"}).` },
+        { error: `Solo se puede marcar Pagado desde "Creado" o "En proceso" (estado actual: ${rec?.estado ?? "?"}).` },
+        { status: 400 },
+      );
+    }
+
+    // Comprobante obligatorio para Pagado (foto o PDF ya adjunto al reclamo).
+    if (!rec.comprobante_url) {
+      await compensar();
+      return NextResponse.json(
+        { error: "Adjunta el comprobante (foto o PDF) antes de marcar como Pagado." },
         { status: 400 },
       );
     }

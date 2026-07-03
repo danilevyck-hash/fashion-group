@@ -83,6 +83,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [settling, setSettling] = useState(false);
   const [enProcesoOpen, setEnProcesoOpen] = useState(false);
   const [enProcesoSaving, setEnProcesoSaving] = useState(false);
+  // Modal de comprobante OBLIGATORIO antes de marcar Pagado (cuando falta adjunto).
+  const [comprobantePagoOpen, setComprobantePagoOpen] = useState(false);
+  const [comprobantePagoSaving, setComprobantePagoSaving] = useState(false);
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
@@ -376,12 +379,16 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
-    // Creado → En proceso: exige comprobante (foto + nota) → modal dedicado.
+    // Creado → En proceso: modal de comprobante (foto o PDF, OPCIONAL en este paso).
     if (e === "En proceso" && current.estado === "Creado") { setEnProcesoOpen(true); return; }
-    // Marcar Pagado no es un flip simple: captura el monto recuperado + NC(s) en
-    // un modal y el server hace insert + flip atómico. (Los rollbacks de un paso
-    // siguen el PATCH normal — comprobante/settlement se conservan.)
-    if (e === "Pagado" && current.estado === "En proceso") { setSettleOpen(true); return; }
+    // Marcar Pagado (desde Creado = pago inmediato, o desde En proceso): exige
+    // comprobante adjunto — si falta, primero el modal de adjuntar (obligatorio) y
+    // recién después el settlement. El server (settlements) re-valida ambas cosas.
+    // (Los rollbacks de un paso siguen el PATCH normal — comprobante/settlement se conservan.)
+    if (e === "Pagado" && (current.estado === "Creado" || current.estado === "En proceso")) {
+      if (!current.comprobante_url) { setComprobantePagoOpen(true); return; }
+      setSettleOpen(true); return;
+    }
     // Optimistic: update estado badge immediately
     const prevEstado = current.estado;
     setCurrent({ ...current, estado: e });
@@ -393,24 +400,42 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     } catch { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
 
-  // Creado → En proceso: comprime la foto del comprobante y la sube junto al
-  // cambio de estado (foto obligatoria — el server también la exige).
-  async function submitEnProceso(file: File, nota: string) {
+  // Creado → En proceso: el comprobante (foto o PDF) es OPCIONAL. Si viene foto se
+  // comprime en cliente; el PDF va tal cual (compressImage lo devuelve intacto).
+  async function submitEnProceso(file: File | null, nota: string) {
     if (!current) return;
     setEnProcesoSaving(true);
     try {
-      const toSend = await compressImage(file);
       const fd = new FormData();
-      fd.append("file", toSend);
+      if (file) fd.append("file", await compressImage(file));
       if (nota) fd.append("nota", nota);
       const res = await fetch(`/api/reclamos/${current.id}/en-proceso`, { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setToast(data?.error || "No se pudo pasar a En proceso."); setTimeout(() => setToast(null), 5000); return; }
       setEnProcesoOpen(false);
       await loadDetail(current.id); loadReclamos();
-      setToast("Comprobante subido — reclamo En proceso"); setTimeout(() => setToast(null), 3000);
+      setToast(file ? "Comprobante subido — reclamo En proceso" : "Reclamo En proceso"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
     finally { setEnProcesoSaving(false); }
+  }
+
+  // Comprobante obligatorio para Pagado: lo adjunta SIN cambiar estado y, si todo
+  // sale bien, abre el modal de settlement (que es quien hace el flip a Pagado).
+  async function submitComprobantePago(file: File | null, nota: string) {
+    if (!current || !file) return; // el modal exige archivo (requireFile)
+    setComprobantePagoSaving(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", await compressImage(file));
+      if (nota) fd.append("nota", nota);
+      const res = await fetch(`/api/reclamos/${current.id}/comprobante`, { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setToast(data?.error || "No se pudo subir el comprobante."); setTimeout(() => setToast(null), 5000); return; }
+      setComprobantePagoOpen(false);
+      await loadDetail(current.id);
+      setSettleOpen(true); // ahora sí: capturar recuperación y marcar Pagado
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
+    finally { setComprobantePagoSaving(false); }
   }
 
   // Settlement: marca Pagado capturando monto recuperado + nota(s) de crédito.
@@ -714,8 +739,22 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       <ComprobanteModal
         open={enProcesoOpen}
         submitting={enProcesoSaving}
+        requireFile={false}
+        title={'Pasar a "En proceso"'}
+        description="Adjunta el comprobante (foto o PDF) si ya lo tienes — en este paso es opcional."
+        submitLabel="Pasar a En proceso"
         onClose={() => setEnProcesoOpen(false)}
         onSubmit={submitEnProceso}
+      />
+      <ComprobanteModal
+        open={comprobantePagoOpen}
+        submitting={comprobantePagoSaving}
+        requireFile={true}
+        title="Falta el comprobante"
+        description="Para marcar como Pagado es obligatorio adjuntar el comprobante (foto o PDF)."
+        submitLabel="Adjuntar y continuar"
+        onClose={() => setComprobantePagoOpen(false)}
+        onSubmit={submitComprobantePago}
       />
       {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
       {deleteModal}
