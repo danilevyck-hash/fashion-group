@@ -79,6 +79,15 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
   const sinIntento = envio === null;
   const puedeReintentar = sinIntento || envio?.estado === "error";
 
+  function buildWaHref(): string {
+    const num = order?.order_number || "";
+    const total = order ? `$${fmt(Number(order.total) || 0)}` : "";
+    const texto = cfg.publicHref
+      ? `Hola! Aquí está tu pedido ${num} de ${cfg.label} (${total}): ${typeof window !== "undefined" ? window.location.origin : ""}${cfg.publicHref(orderId)}`
+      : `Hola! Tu pedido ${num} de ${cfg.label} por ${total} quedó confirmado. Te enviamos el detalle en PDF.`;
+    return `https://wa.me/?text=${encodeURIComponent(texto)}`;
+  }
+
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-10">
       {order === null && envio === undefined ? (
@@ -134,6 +143,17 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
             <Link href={cfg.pedidoHref(orderId)} className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition flex items-center justify-center">
               Ver pedido (PDF · email)
             </Link>
+            {/* WhatsApp: con link público del pedido (Joybees) o resumen sin
+                link (Reebok interno no tiene ruta pública — el PDF sale de
+                "Ver pedido"). El usuario elige el contacto en WhatsApp. */}
+            <a
+              href={buildWaHref()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-emerald-300 bg-emerald-50 px-4 min-h-[48px] text-sm font-medium text-emerald-800 hover:border-emerald-400 transition flex items-center justify-center gap-1.5"
+            >
+              Compartir por WhatsApp
+            </a>
             {cfg.publicHref && (
               <button
                 onClick={() => {
