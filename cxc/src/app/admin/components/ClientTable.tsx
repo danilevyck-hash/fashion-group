@@ -7,6 +7,7 @@ import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
 import { AccordionContent, useContextMenu, BottomSheet } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
+import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 
@@ -33,6 +34,8 @@ interface Props {
   onOpenEmail: (client: ConsolidatedClient) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
   onQuickMarkContacted: (clientName: string, method: string) => void;
+  onWhatsApp: (client: ConsolidatedClient) => void;
+  onCopyMessage: (client: ConsolidatedClient) => void;
   favorites?: Set<string>;
   onToggleFavorite?: (name: string) => void;
   /** Search and risk filters are now managed by the parent page, hide them here */
@@ -54,6 +57,9 @@ export default function ClientTable({
   userRole,
   onOpenEmail,
   onSaveEdit,
+  onQuickMarkContacted,
+  onWhatsApp,
+  onCopyMessage,
   favorites,
   onToggleFavorite,
   hideSearchAndRiskFilters,
@@ -81,6 +87,18 @@ export default function ClientTable({
       },
     ];
   }, [onOpenEmail]);
+
+  // Menú "···" visible en cada fila: mismas acciones que el context menu
+  // (que solo existe con click-derecho) + contacto de cobranza — alcanzable
+  // en touch (iPad no tiene click-derecho).
+  const buildRowMenuItems = useCallback((client: ConsolidatedClient): OverflowMenuItem[] => [
+    { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
+    { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
+    { label: "WhatsApp", onClick: () => onWhatsApp(client) },
+    { label: "Enviar email", onClick: () => onOpenEmail(client), disabled: !client.correo },
+    { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
+    { label: "Ver en directorio", onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); } },
+  ], [onQuickMarkContacted, onWhatsApp, onOpenEmail, onCopyMessage]);
 
   // (pagination removed — all clients rendered)
 
@@ -131,6 +149,7 @@ export default function ClientTable({
           isFavorite={favorites?.has(client.nombre_normalized)}
           onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
           onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
+          actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
         />
         <AccordionContent open={isExpanded}>
           <ContactPanel

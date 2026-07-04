@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
 import { csvBlob } from "@/lib/csv-export";
+import { waHref } from "@/lib/contact-links";
 import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
@@ -354,6 +355,21 @@ function AdminDashboardInner() {
     window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
   }
 
+  // WhatsApp al celular (o teléfono) del cliente con el estado de cuenta
+  // prellenado. Los usuarios cobran por WhatsApp — mailto: solo no alcanza.
+  function openWhatsApp(client: ConsolidatedClient) {
+    const href = waHref(client.celular || client.telefono, buildEmailBody(client));
+    if (!href) { showToast("Este cliente no tiene teléfono registrado. Edite el contacto primero."); return; }
+    window.open(href, "_blank");
+  }
+
+  // Copia el mensaje de cobro al portapapeles (para pegar donde sea).
+  function copyMessage(client: ConsolidatedClient) {
+    navigator.clipboard.writeText(`${buildEmailSubject(client)}\n\n${buildEmailBody(client)}`)
+      .then(() => showToast("Mensaje copiado — pégalo en WhatsApp o correo"))
+      .catch(() => showToast("No se pudo copiar. Intenta de nuevo."));
+  }
+
   function handleQuickMarkContacted(clientName: string, method: string) {
     const prevEntry = contactLog[clientName];
     const now = new Date().toISOString();
@@ -618,6 +634,8 @@ function AdminDashboardInner() {
         onOpenEmail={openEmail}
         onSaveEdit={handleSaveEdit}
         onQuickMarkContacted={handleQuickMarkContacted}
+        onWhatsApp={openWhatsApp}
+        onCopyMessage={copyMessage}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         hideSearchAndRiskFilters

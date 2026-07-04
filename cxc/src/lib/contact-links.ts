@@ -19,6 +19,18 @@ export function telHref(raw: string | null | undefined): string | null {
 }
 
 /**
+ * Link de WhatsApp (wa.me) con la misma normalización de teléfono que telHref
+ * (+507 para números locales). `text` opcional = mensaje prellenado.
+ * Devuelve null si el teléfono no es utilizable.
+ */
+export function waHref(raw: string | null | undefined, text?: string): string | null {
+  const tel = telHref(raw);
+  if (!tel) return null;
+  const digits = tel.slice("tel:+".length);
+  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+}
+
+/**
  * Devuelve un href `mailto:` si el valor parece un email; null si no.
  */
 export function mailtoHref(raw: string | null | undefined): string | null {

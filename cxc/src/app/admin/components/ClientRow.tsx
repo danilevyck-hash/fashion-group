@@ -19,9 +19,11 @@ interface Props {
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onRowContextMenu?: (e: React.MouseEvent) => void;
+  /** Menú "···" con acciones de contacto — visible en la fila (touch-friendly). */
+  actionsMenu?: React.ReactNode;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, isFavorite, onToggleFavorite, onRowContextMenu }: Props) {
+export default function ClientRow({ client, isExpanded, onToggle, userRole, isFavorite, onToggleFavorite, onRowContextMenu, actionsMenu }: Props) {
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
 
   return (
@@ -101,8 +103,9 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
             <div className="col-span-2 text-right tabular-nums text-red-600">
               {client.overdue === 0 ? <span className="text-gray-300">—</span> : fmt(client.overdue)}
             </div>
-            <div className="col-span-2 text-right tabular-nums font-semibold relative">
-              {fmt(client.total)}
+            <div className="col-span-2 text-right tabular-nums font-semibold relative flex items-center justify-end gap-0.5">
+              <span>{fmt(client.total)}</span>
+              {actionsMenu && <span onClick={(e) => e.stopPropagation()}>{actionsMenu}</span>}
             </div>
           </>
         </div>
