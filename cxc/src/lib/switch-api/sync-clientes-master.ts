@@ -67,21 +67,40 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
   const now = new Date().toISOString();
   const empty = { source_rows: 0, distinct_codigos: 0, upserted: 0, skipped_sin_nombre: 0, synced_at: now };
 
-  // 1. Traer todos los clientes del espejo de Switch.
-  const { data, error } = await supabaseServer
-    .from("switch_clientes")
-    .select("codigo, nombre, razonsocial, identificacion, raw_data, synced_at")
-    .order("synced_at", { ascending: false });
+  // 1. Traer todos los clientes del espejo de Switch, paginado.
+  //    - Excluye american_classic: son clientes retail ACS (la fidelización lee
+  //      switch_clientes directo), NO directorio B2B — decisión Daniel 4-jul-2026.
+  //      Además evita el O(N×M) del trigger trg_refresh_wholesale sobre ventas_raw.
+  //    - PostgREST trunca silenciosamente a 1,000 filas por request → paginamos
+  //      con .range() hasta que llegue una página incompleta. Tiebreaker por id
+  //      para que la paginación sea estable (synced_at empata dentro de un sync).
+  const PAGE = 1000;
+  const rows: SwitchClienteRow[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabaseServer
+      .from("switch_clientes")
+      .select("codigo, nombre, razonsocial, identificacion, raw_data, synced_at")
+      .neq("empresa_key", "american_classic")
+      .order("synced_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
 
-  if (error) {
-    return { ok: false, ...empty, error: error.message };
+    if (error) {
+      return { ok: false, ...empty, error: error.message };
+    }
+
+    const batch = (data ?? []) as SwitchClienteRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+    from += PAGE;
   }
 
   // 2. Dedup por codigo: switch_clientes tiene una fila por (empresa, cliente);
   //    la identidad fiscal es la misma. Orden desc por synced_at → la primera
   //    fila de cada codigo es la más reciente.
   const byCodigo = new Map<string, SwitchClienteRow>();
-  for (const row of (data ?? []) as SwitchClienteRow[]) {
+  for (const row of rows) {
     const codigo = cleanText(row.codigo);
     if (!codigo) continue;
     if (!byCodigo.has(codigo)) byCodigo.set(codigo, row);
@@ -112,7 +131,7 @@ export async function syncClientesMaster(): Promise<ClientesMasterResult> {
     });
   }
 
-  const sourceRows = data?.length ?? 0;
+  const sourceRows = rows.length;
 
   if (payload.length === 0) {
     return {
