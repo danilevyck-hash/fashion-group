@@ -42,8 +42,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     if (!dryRun) {
       await sendTelegramAlert(`🚨 Cron reebok-catalogo falló: ${shortError(msg)}`);
       // Persistir el error (cron_email_errors) — sin esto el fallo solo vivía
-      // en Telegram y la reconciliación/auditoría no tenía rastro.
-      await logCronError("reebok_catalogo_failed", msg);
+      // en Telegram y la reconciliación/auditoría no tenía rastro. Sin Telegram:
+      // la alerta específica de arriba ya avisó (evita el doble aviso).
+      await logCronError("reebok_catalogo_failed", msg, null, { telegram: false });
     }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
@@ -56,9 +57,12 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
         `🚨 Reebok catálogo: ${fallidas.map((e) => `${e.empresaKey} (${shortError(e.error)})`).join("; ")}. ` +
         `Su catálogo NO se modificó (fail-safe).`,
       );
+      // Solo persistencia — la alerta específica de arriba ya avisó por Telegram.
       await logCronError(
         "reebok_catalogo_failed",
         fallidas.map((e) => `${e.empresaKey}: ${e.error}`).join("; "),
+        null,
+        { telegram: false },
       );
     }
     // Alerta de productos nuevos sin foto.

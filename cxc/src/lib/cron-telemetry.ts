@@ -4,10 +4,12 @@
  * - recordCronHeartbeat(name): registra que el cron terminó OK hoy. El watchdog
  *   (dentro de switch-reconciliacion, 10:00 UTC) revisa estos heartbeats y alerta
  *   si alguno lleva >30h sin success.
- * - logCronError(tipo, message, context?): persiste el error en cron_email_errors
- *   (igual que antes) Y dispara una alerta Telegram con el error truncado a 200
- *   chars (shortError). Tolerante a fallos: nunca lanza, así un fallo de logging
- *   no tumba al cron que lo llama.
+ * - logCronError(tipo, message, context?, opts?): persiste el error en
+ *   cron_email_errors (igual que antes) Y dispara una alerta Telegram con el
+ *   error truncado a 200 chars (shortError). Si el caller ya mandó su propia
+ *   alerta Telegram con más detalle, pasar { telegram: false } para persistir
+ *   sin duplicar el aviso. Tolerante a fallos: nunca lanza, así un fallo de
+ *   logging no tumba al cron que lo llama.
  *
  * Requiere la tabla cron_heartbeats (ver migración
  * supabase/migrations/*_cron_heartbeats.sql) — aplicar manualmente.
@@ -38,12 +40,15 @@ export async function recordCronHeartbeat(cronName: string): Promise<void> {
 /**
  * Registra un error de cron en cron_email_errors y dispara alerta Telegram.
  * No lanza. `context` es opcional (se guarda en cheque_context por compat con
- * el esquema existente de la tabla).
+ * el esquema existente de la tabla). `opts.telegram` (default true) permite
+ * persistir sin mandar Telegram cuando el caller ya envió una alerta propia
+ * más específica (evita el doble aviso).
  */
 export async function logCronError(
   tipo: string,
   message: string,
   context?: string | null,
+  opts?: { telegram?: boolean },
 ): Promise<void> {
   // 1. Persistir en cron_email_errors (best-effort).
   try {
@@ -61,6 +66,9 @@ export async function logCronError(
     );
   }
 
-  // 2. Alerta Telegram con el error truncado (best-effort; sendTelegramAlert no lanza).
-  await sendTelegramAlert(`🚨 Cron error — ${tipo}\n${shortError(message)}`);
+  // 2. Alerta Telegram con el error truncado (best-effort; sendTelegramAlert no
+  // lanza). Se omite si el caller ya mandó su propia alerta específica.
+  if (opts?.telegram !== false) {
+    await sendTelegramAlert(`🚨 Cron error — ${tipo}\n${shortError(message)}`);
+  }
 }
