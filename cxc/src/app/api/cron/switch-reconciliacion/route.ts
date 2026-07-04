@@ -47,6 +47,8 @@ import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
+import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
+import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
@@ -331,6 +333,52 @@ const COLATERAL_CRONS: ColateralCron[] = [
       return { ok: r.ok, detail: r.detail };
     },
   },
+  // ⚠️ Los catálogos van AL FINAL a propósito: cada run hace 1 llamada /stock
+  // por artículo en Switch (puede tomar varios minutos) y no debe comerse el
+  // RECOVERY_BUDGET_MS de los colaterales anteriores. Lo que no entre en una
+  // pasada lo toma la siguiente.
+  {
+    // Catálogo Joybees (joystep). Su cron corre 11:00 UTC → recoverAfterHourUtc=12
+    // para no adelantarse al run normal (la pasada de las 10:00 lo saltaría igual,
+    // pero el guard lo hace explícito). Idempotente y fail-safe: un fallo de
+    // Switch NO modifica el catálogo (incidente 4-jul-2026: ráfaga de deploys en
+    // su ventana 11:00-12:00 le comió la invocación y nadie lo reintentaba).
+    cronName: "joybees-catalogo",
+    label: "joybees-catalogo",
+    recoverAfterHourUtc: 12,
+    recover: async () => {
+      const r = await syncCatalogoJoybees();
+      const bad = r.empresas.filter((e) => e.error);
+      return {
+        ok: !r.hadError,
+        detail: !r.hadError
+          ? `${r.empresas.length} empresa(s), catálogo actualizado`
+          : `falló: ${bad.map((e) => `${e.empresaKey}: ${e.error}`).join("; ")}`,
+      };
+    },
+  },
+  {
+    // Catálogo Reebok (active_shoes). DOS slots diarios (06:45 y 17:00 UTC) pero
+    // el heartbeat es de granularidad diaria → la reconciliación solo detecta
+    // "cero success HOY". recoverAfterHourUtc=8 (slot temprano 06:45 + 1h, patrón
+    // cheques-alert): solo recuperar cuando el primer slot ya debió correr. Si el
+    // slot de las 17:00 se pierde con el de 06:45 exitoso, no hay señal (heartbeat
+    // fresco) — aceptable: ese slot es solo refresh intradía. Idempotente y
+    // fail-safe igual que Joybees.
+    cronName: "reebok-catalogo",
+    label: "reebok-catalogo",
+    recoverAfterHourUtc: 8,
+    recover: async () => {
+      const r = await syncCatalogoReebok();
+      const bad = r.empresas.filter((e) => e.error);
+      return {
+        ok: !r.hadError,
+        detail: !r.hadError
+          ? `${r.empresas.length} empresa(s), catálogo actualizado`
+          : `falló: ${bad.map((e) => `${e.empresaKey}: ${e.error}`).join("; ")}`,
+      };
+    },
+  },
 ];
 
 /** Heartbeats de los colaterales que NO tienen success de hoy (= se perdieron). */
@@ -376,7 +424,13 @@ function autoRecoveryStillComingToday(cronName: string, nowHourUtc: number): boo
   const after = col.recoverAfterHourUtc ?? 0;
   const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
   if (eligible.length === 0) return false; // nunca elegible hoy → alertar
-  return Math.max(...eligible) >= nowHourUtc; // queda una pasada hoy → silenciar
+  // Estricto (>): solo silenciar si queda una pasada POSTERIOR a esta. Con >=
+  // la última pasada del día (18:00) se contaba a sí misma como "recuperación
+  // por venir" y el stale de colaterales sin recoverAfterHourUtc quedaba
+  // silenciado PARA SIEMPRE (caso real 4-jul-2026: sync-clientes-master stale
+  // sin alerta de watchdog). Si el fallo persiste tras la recuperación de esta
+  // pasada, además lo reporta el alert de failedColaterales/skipped.
+  return Math.max(...eligible) > nowHourUtc; // queda una pasada MÁS TARDE hoy → silenciar
 }
 
 async function checkStaleCrons(): Promise<string[]> {

@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
-import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { sendTelegramAlert, shortError } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +36,14 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   try {
     result = await syncCatalogoJoybees({ dryRun });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     if (!dryRun) {
-      await sendTelegramAlert(`🚨 Cron joybees-catalogo falló: ${shortError(err instanceof Error ? err.message : String(err))}`);
+      await sendTelegramAlert(`🚨 Cron joybees-catalogo falló: ${shortError(msg)}`);
+      // Persistir el error (cron_email_errors) — sin esto el fallo solo vivía
+      // en Telegram y la reconciliación/auditoría no tenía rastro.
+      await logCronError("joybees_catalogo_failed", msg);
     }
-    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 
   if (!dryRun) {
@@ -48,6 +52,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       await sendTelegramAlert(
         `🚨 Joybees catálogo: ${fallidas.map((e) => `${e.empresaKey} (${shortError(e.error)})`).join("; ")}. ` +
         `Su catálogo NO se modificó (fail-safe).`,
+      );
+      await logCronError(
+        "joybees_catalogo_failed",
+        fallidas.map((e) => `${e.empresaKey}: ${e.error}`).join("; "),
       );
     }
     const cods = result.nuevosSinFotoTotal;

@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
-import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { sendTelegramAlert, shortError } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +38,14 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     result = await syncCatalogoReebok({ dryRun });
   } catch (err) {
     // Fallo catastrófico (inesperado). Alerta y salir — no se tocó nada útil.
+    const msg = err instanceof Error ? err.message : String(err);
     if (!dryRun) {
-      await sendTelegramAlert(`🚨 Cron reebok-catalogo falló: ${shortError(err instanceof Error ? err.message : String(err))}`);
+      await sendTelegramAlert(`🚨 Cron reebok-catalogo falló: ${shortError(msg)}`);
+      // Persistir el error (cron_email_errors) — sin esto el fallo solo vivía
+      // en Telegram y la reconciliación/auditoría no tenía rastro.
+      await logCronError("reebok_catalogo_failed", msg);
     }
-    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 
   if (!dryRun) {
@@ -51,6 +55,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       await sendTelegramAlert(
         `🚨 Reebok catálogo: ${fallidas.map((e) => `${e.empresaKey} (${shortError(e.error)})`).join("; ")}. ` +
         `Su catálogo NO se modificó (fail-safe).`,
+      );
+      await logCronError(
+        "reebok_catalogo_failed",
+        fallidas.map((e) => `${e.empresaKey}: ${e.error}`).join("; "),
       );
     }
     // Alerta de productos nuevos sin foto.
