@@ -45,6 +45,24 @@ export function useGuiasState() {
     try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_entregador`, v); else localStorage.removeItem(`guia_firma_${expandedId}_entregador`); } } catch { /* */ }
   }
 
+  // Campos del despacho persistidos por guía (mismo patrón que las firmas):
+  // si la PWA se recarga a mitad del despacho, lo tipeado no se pierde.
+  function persistDespachoField(field: string, v: string) {
+    try {
+      if (!expandedId) return;
+      const key = `guia_despacho_${expandedId}`;
+      const cur = JSON.parse(localStorage.getItem(key) || "{}");
+      cur[field] = v;
+      localStorage.setItem(key, JSON.stringify(cur));
+    } catch { /* */ }
+  }
+  function setBPlacaPersist(v: string) { setBPlaca(v); persistDespachoField("placa", v); }
+  function setBReceptorPersist(v: string) { setBReceptor(v); persistDespachoField("receptor", v); }
+  function setBCedulaPersist(v: string) { setBCedula(v); persistDespachoField("cedula", v); }
+  function setBChoferPersist(v: string) { setBChofer(v); persistDespachoField("chofer", v); }
+  function setBNumeroGuiaTranspPersist(v: string) { setBNumeroGuiaTransp(v); persistDespachoField("numeroGuiaTransp", v); }
+  function setTipoDespachoPersist(v: "externo" | "directo") { setTipoDespacho(v); persistDespachoField("tipoDespacho", v); }
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -90,6 +108,15 @@ export function useGuiasState() {
           const saved2 = localStorage.getItem(`guia_firma_${id}_entregador`);
           if (saved1) _setPendingFirma1(saved1);
           if (saved2) _setPendingFirma2(saved2);
+          // Draft de campos tipeados (si la PWA se recargó a mitad): pisa
+          // solo lo que el server no trae.
+          const draft = JSON.parse(localStorage.getItem(`guia_despacho_${id}`) || "{}");
+          if (draft.placa && !g.placa) setBPlaca(draft.placa);
+          if (draft.receptor && !g.receptor_nombre) setBReceptor(draft.receptor);
+          if (draft.cedula && !g.cedula) setBCedula(draft.cedula);
+          if (draft.chofer && !g.nombre_chofer) setBChofer(draft.chofer);
+          if (draft.numeroGuiaTransp && !g.numero_guia_transp) setBNumeroGuiaTransp(draft.numeroGuiaTransp);
+          if (draft.tipoDespacho && !g.tipo_despacho) setTipoDespacho(draft.tipoDespacho);
         } catch { /* */ }
       }
     } catch { showToast("Error al cargar detalles"); }
@@ -149,35 +176,52 @@ export function useGuiasState() {
       payload.nombre_chofer = bChofer;
     }
 
-    const res = await fetch(`/api/guias/${expandedGuia.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    // try/catch + finally: sin esto, un fetch rechazado (WiFi caído en bodega)
+    // dejaba el botón en "Guardando..." para siempre y sin aviso.
+    try {
+      const res = await fetch(`/api/guias/${expandedGuia.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (res.ok) {
-      showToast(`Guía GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
-      try { localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`); localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`); } catch { /* */ }
+      if (res.ok) {
+        showToast(`Guía GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
+        try {
+          localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`);
+          localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`);
+          localStorage.removeItem(`guia_despacho_${expandedGuia.id}`);
+        } catch { /* */ }
 
-      const fullRes = await fetch(`/api/guias/${expandedGuia.id}`);
-      if (fullRes.ok) {
-        const updated = await fullRes.json();
-        setExpandedGuia(updated);
+        const fullRes = await fetch(`/api/guias/${expandedGuia.id}`).catch(() => null);
+        if (fullRes?.ok) {
+          const updated = await fullRes.json();
+          setExpandedGuia(updated);
+        }
+        loadGuias();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Error al guardar");
       }
-      loadGuias();
-    } else {
-      const errData = await res.json().catch(() => ({}));
-      showToast(errData.error || "Error al guardar");
+    } catch {
+      showToast("Sin conexión. Tus datos y firmas quedaron guardados — intenta de nuevo.");
+    } finally {
+      setBSaving(false);
     }
-    setBSaving(false);
   }
 
   async function rejectGuia(id: string, motivo: string) {
-    const res = await fetch(`/api/guias/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado: "Rechazada", motivo_rechazo: motivo }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/guias/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "Rechazada", motivo_rechazo: motivo }),
+      });
+    } catch {
+      showToast("Sin conexión. Intenta de nuevo en unos segundos.");
+      return;
+    }
     if (res.ok) {
       showToast("Guía rechazada");
       if (expandedId === id) {
@@ -195,12 +239,12 @@ export function useGuiasState() {
     search, setSearch,
     showPending, setShowPending,
     expandedId, expandedGuia, expandedLoading, toggleExpand,
-    tipoDespacho, setTipoDespacho,
-    bPlaca, setBPlaca,
-    bReceptor, setBReceptor,
-    bCedula, setBCedula,
-    bChofer, setBChofer,
-    bNumeroGuiaTransp, setBNumeroGuiaTransp,
+    tipoDespacho, setTipoDespacho: setTipoDespachoPersist,
+    bPlaca, setBPlaca: setBPlacaPersist,
+    bReceptor, setBReceptor: setBReceptorPersist,
+    bCedula, setBCedula: setBCedulaPersist,
+    bChofer, setBChofer: setBChoferPersist,
+    bNumeroGuiaTransp, setBNumeroGuiaTransp: setBNumeroGuiaTranspPersist,
     bSaving,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,
