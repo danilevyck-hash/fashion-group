@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { getVisibleModules } from "@/lib/modules";
 
 interface CxcResult { id: string; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
@@ -35,6 +36,11 @@ interface FlatItem {
   href: string;
   icon: string;
 }
+
+// Roles admitidos por /api/search (requireRole). Para los demás (ej.
+// gerente_acs) la búsqueda global se OCULTA por completo — mostrar una caja
+// que siempre responde 403/vacío es peor que no mostrarla.
+export const SEARCH_ROLES = ["admin", "secretaria", "vendedor", "bodega", "contabilidad"];
 
 function parseQuickAction(query: string): QuickAction | null {
   const q = query.trim();
@@ -214,9 +220,12 @@ const SEARCH_MODULES = [
   { label: "Caja", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
 ];
 
-function getModuleSuggestions(q: string) {
+function getModuleSuggestions(q: string, visibleHrefs: Set<string>) {
   const ql = q.toLowerCase();
-  return SEARCH_MODULES.filter(m => m.keywords.some(k => k.includes(ql) || ql.includes(k))).slice(0, 3);
+  return SEARCH_MODULES
+    .filter(m => visibleHrefs.has(m.href))
+    .filter(m => m.keywords.some(k => k.includes(ql) || ql.includes(k)))
+    .slice(0, 3);
 }
 
 export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { darkMode?: boolean; compact?: boolean; fullScreen?: boolean; onClose?: () => void }) {
@@ -231,9 +240,29 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Rol + módulos custom del usuario: los atajos ("Ir a...", spotlight) solo
+  // ofrecen módulos que el rol puede abrir. Los resultados del API ya vienen
+  // filtrados por rol server-side.
+  const [role, setRole] = useState<string | null>(null);
+  const [fgModules, setFgModules] = useState<string[] | null>(null);
+  useEffect(() => {
+    setRole(sessionStorage.getItem("cxc_role") || "");
+    try { setFgModules(JSON.parse(sessionStorage.getItem("fg_modules") || "null")); } catch { setFgModules(null); }
+  }, []);
+  const visibleHrefs = useMemo(
+    () => new Set(role ? getVisibleModules(role, fgModules).map(m => m.href) : []),
+    [role, fgModules],
+  );
+  const canQuickAction = useCallback((href: string) => {
+    const base = "/" + (href.split("?")[0].split("/")[1] || "");
+    return visibleHrefs.has(base);
+  }, [visibleHrefs]);
+
   const items = results ? flatten(results) : [];
-  const quickAction = query.length >= 2 ? parseQuickAction(query) : null;
+  const rawQuickAction = query.length >= 2 ? parseQuickAction(query) : null;
+  const quickAction = rawQuickAction && canQuickAction(rawQuickAction.href) ? rawQuickAction : null;
   const hasResults = items.length > 0 || quickAction !== null;
+  const searchDisabled = role !== null && role !== "" && !SEARCH_ROLES.includes(role);
   const searched = results !== null && query.length >= 2;
 
   const doSearch = useCallback(async (q: string) => {
@@ -253,13 +282,14 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
 
   useEffect(() => {
     // Open dropdown immediately if quick action matches (before API call)
-    if (query.length >= 2 && parseQuickAction(query)) {
+    const qa = query.length >= 2 ? parseQuickAction(query) : null;
+    if (qa && canQuickAction(qa.href)) {
       setOpen(true);
     }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => doSearch(query), 300);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [query, doSearch]);
+  }, [query, doSearch, canQuickAction]);
 
   // Cmd+K / Ctrl+K global shortcut
   useEffect(() => {
@@ -285,6 +315,10 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [compact, query]);
+
+  // Rol sin búsqueda global (ej. gerente_acs): no renderizar la caja.
+  // Va después de TODOS los hooks (regla de hooks).
+  if (searchDisabled) return null;
 
   function navigate(item: FlatItem) {
     setOpen(false);
@@ -356,7 +390,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
             <div className="text-center py-8">
               <p className="text-sm text-gray-400">No encontramos nada para &ldquo;{query}&rdquo;</p>
               {(() => {
-                const suggestions = getModuleSuggestions(query);
+                const suggestions = getModuleSuggestions(query, visibleHrefs);
                 if (suggestions.length === 0) return null;
                 return (
                   <div className="mt-4">
@@ -508,7 +542,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
             <div className="px-4 py-6 text-center">
               <p className="text-sm text-gray-400">No encontramos nada para &quot;{query}&quot;</p>
               {(() => {
-                const suggestions = getModuleSuggestions(query);
+                const suggestions = getModuleSuggestions(query, visibleHrefs);
                 if (suggestions.length === 0) return null;
                 return (
                   <div className="mt-3">
