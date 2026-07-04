@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useUrlState } from "@/lib/hooks/useUrlState";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
 import { getCompanyDisplay } from "@/lib/companies";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
@@ -34,14 +36,36 @@ interface ListItem {
   aging_overdue: number;
 }
 
+// useSearchParams exige un boundary de Suspense (misma envoltura que CXC).
 export default function ProveedoresListClient() {
+  return (
+    <Suspense>
+      <ProveedoresList />
+    </Suspense>
+  );
+}
+
+function ProveedoresList() {
   const { authChecked } = useAuth({ moduleKey: "proveedores", allowedRoles: ["admin", "contabilidad"] });
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [items, setItems] = useState<ListItem[]>([]);
   const [grupoSaldo, setGrupoSaldo] = useState(0);
-  const [empresa, setEmpresa] = useState<string>(""); // "" = Todas
-  const [q, setQ] = useState("");
+  // Filtro de empresa, receta CXC (D3): la URL (?empresa=) MANDA si está
+  // presente (compartible / sobrevive refresh); si no, cae a la memoria de
+  // useLastUsed. Al cambiarlo se escribe en AMBOS. "" = Todas.
+  const [urlEmpresa, setUrlEmpresa] = useUrlState("empresa", "");
+  const [lastEmpresa, setLastEmpresa] = useLastUsed("proveedores_empresa", "");
+  const empresaParamPresent = searchParams.get("empresa") !== null;
+  const empresaRaw = empresaParamPresent ? urlEmpresa : lastEmpresa;
+  const empresa = (EMPRESAS as string[]).includes(empresaRaw) ? empresaRaw : "";
+  const setEmpresa = useCallback((next: string) => {
+    setUrlEmpresa(next);
+    setLastEmpresa(next);
+  }, [setUrlEmpresa, setLastEmpresa]);
+  // Búsqueda sembrada desde la URL (?q=), igual que ?search= en CXC.
+  const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [showSinSaldo, setShowSinSaldo] = useState(false);
 
