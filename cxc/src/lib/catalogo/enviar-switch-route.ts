@@ -10,7 +10,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
 
-const SEND_ROLES = ["admin", "secretaria"];
+// El vendedor también puede consultar/reintentar el envío: crear+enviar desde
+// el checkout ya es suyo — el Reintentar es la misma operación tras un fallo.
+const SEND_ROLES = ["admin", "secretaria", "vendedor"];
 
 interface OrderRow {
   id: string;
