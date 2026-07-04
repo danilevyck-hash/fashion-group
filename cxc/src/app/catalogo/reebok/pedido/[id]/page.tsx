@@ -560,7 +560,7 @@ export default function OrderDetailPage() {
                     {canEdit ? (
                       <input type="number" min={1} step={1} value={item.quantity}
                         onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
-                        className="w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                        className="w-14 min-h-[44px] text-center border-b border-gray-200 text-base md:text-sm outline-none focus:border-black tabular-nums" />
                     ) : (
                       <span className="tabular-nums">{item.quantity}</span>
                     )}

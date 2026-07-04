@@ -838,7 +838,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar cheque o cliente..."
+            placeholder="Buscar cheque o cliente…"
             className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-full sm:max-w-xs"
           />
         </div>
@@ -1074,7 +1074,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <span className="text-sm text-emerald-700">{selectedIds.size} pendiente{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
-            <button onClick={() => setConfirmBatch({ ids: selectedIds, clearFn: setSelectedIds })} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md hover:bg-emerald-700 transition disabled:opacity-50">
+            <button onClick={() => setConfirmBatch({ ids: selectedIds, clearFn: setSelectedIds })} disabled={batchProcessing} className="text-xs bg-black text-white px-4 py-1.5 rounded-md hover:bg-gray-800 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Marcar depositados"}
             </button>
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
@@ -1140,7 +1140,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 {isRebotado && (
                   <div className="mt-2 pt-2 border-t border-red-100 bg-red-50/40 -mx-4 px-4 pb-1 rounded-b-lg">
                     <div className="text-xs text-red-400 mb-1">Este cheque rebotó{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
-                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition">
+                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs bg-black text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-gray-800 transition">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                       Re-depositar cheque
                     </button>

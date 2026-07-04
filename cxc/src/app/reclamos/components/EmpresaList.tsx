@@ -267,7 +267,7 @@ export default function EmpresaList({
       </div>
 
       <div className="mb-6">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
       </div>
 
       {/* Mobile card list — visible on small screens only */}

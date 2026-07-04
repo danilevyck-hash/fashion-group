@@ -37,7 +37,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 min-w-0 flex-1">
               {onToggleFavorite && (
-                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none">
+                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none p-2.5 -m-2.5">
                   {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300">☆</span>}
                 </button>
               )}
@@ -89,7 +89,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
           <>
             <div className="col-span-4 font-medium truncate flex items-center gap-1.5">
               {onToggleFavorite && (
-                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none hover:scale-110 transition-transform">
+                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none p-2.5 -m-2.5 hover:scale-110 transition-transform">
                   {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300 group-hover:text-gray-400">☆</span>}
                 </button>
               )}

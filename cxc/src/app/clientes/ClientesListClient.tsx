@@ -131,7 +131,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="search"
-            placeholder="Buscar por nombre o código (D-XXX)..."
+            placeholder="Buscar por nombre o código (D-XXX)…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition"

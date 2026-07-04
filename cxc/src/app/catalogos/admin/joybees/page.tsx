@@ -246,7 +246,7 @@ function ProductosTab({ products }: { products: JoybeesProduct[] }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre o SKU..."
+          placeholder="Buscar por nombre o SKU…"
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#FFE443] transition"
         />
       </div>

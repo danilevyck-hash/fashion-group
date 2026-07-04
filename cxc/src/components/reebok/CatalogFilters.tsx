@@ -57,7 +57,7 @@ export default function CatalogFilters({
         {searchInput && (
           <button
             onClick={() => onSearchChange("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition text-xs"
+            className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 transition" aria-label="Limpiar búsqueda"
           >
             &times;
           </button>
@@ -73,7 +73,7 @@ export default function CatalogFilters({
             <button
               key={opt.value}
               onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
                 gender === opt.value
                   ? "bg-[#1A2656] text-white shadow-sm"
                   : "bg-white text-[#1A2656]/60 border border-[#1A2656]/10 hover:border-[#1A2656]/25"
@@ -93,7 +93,7 @@ export default function CatalogFilters({
             <button
               key={opt.value}
               onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
                 category === opt.value
                   ? "bg-[#1A2656] text-white shadow-sm"
                   : "bg-white text-[#1A2656]/60 border border-[#1A2656]/10 hover:border-[#1A2656]/25"
@@ -110,7 +110,7 @@ export default function CatalogFilters({
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => onSaleFilterChange(saleFilter === "oferta" ? "" : "oferta")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
               saleFilter === "oferta"
                 ? "bg-[#E4002B] text-white shadow-sm"
                 : "bg-white text-[#E4002B]/70 border border-[#E4002B]/20 hover:border-[#E4002B]/40"
@@ -120,7 +120,7 @@ export default function CatalogFilters({
           </button>
           <button
             onClick={() => onSaleFilterChange(saleFilter === "nuevo" ? "" : "nuevo")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
               saleFilter === "nuevo"
                 ? "bg-[#1A2656] text-white shadow-sm"
                 : "bg-white text-[#1A2656]/60 border border-[#1A2656]/10 hover:border-[#1A2656]/25"
@@ -130,7 +130,7 @@ export default function CatalogFilters({
           </button>
           <button
             onClick={() => onSaleFilterChange(saleFilter === "proximamente" ? "" : "proximamente")}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
               saleFilter === "proximamente"
                 ? "bg-amber-500 text-white shadow-sm"
                 : "bg-white text-amber-700 border border-amber-300 hover:border-amber-400"
@@ -148,7 +148,7 @@ export default function CatalogFilters({
           {hasActiveFilters && (
             <button
               onClick={onClearAll}
-              className="text-xs text-[#1A2656]/40 hover:text-[#E4002B] transition min-h-[32px] px-2"
+              className="text-xs text-[#1A2656]/40 hover:text-[#E4002B] transition min-h-[44px] px-2"
             >
               Limpiar filtros
             </button>
@@ -159,7 +159,7 @@ export default function CatalogFilters({
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value)}
-            className="text-xs border border-[#1A2656]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1A2656]/30 transition bg-white text-[#1A2656]/60 min-h-[32px]"
+            className="text-xs border border-[#1A2656]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1A2656]/30 transition bg-white text-[#1A2656]/60 min-h-[44px]"
           >
             <option value="relevancia">Ordenar: Relevancia</option>
             <option value="precio-asc">Precio: menor a mayor</option>

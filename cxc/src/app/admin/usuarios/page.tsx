@@ -190,7 +190,7 @@ export default function UsuariosPage() {
             </h1>
             <p className="text-sm text-gray-600 mt-1">Crea usuarios y define qué módulos ve cada uno</p>
           </div>
-          <button onClick={openNewUser} className="text-sm bg-teal-700 text-white px-4 py-2 rounded-md hover:bg-teal-800 transition flex items-center gap-1.5">
+          <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Nuevo Usuario
           </button>
@@ -418,7 +418,7 @@ export default function UsuariosPage() {
                 <button
                   onClick={saveUser}
                   disabled={savingUser}
-                  className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-md hover:bg-teal-800 transition disabled:opacity-50"
+                  className="px-5 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition disabled:opacity-50"
                 >
                   {savingUser ? "Guardando..." : "Guardar"}
                 </button>

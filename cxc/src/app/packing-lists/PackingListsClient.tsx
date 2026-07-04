@@ -834,7 +834,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                   onClick={saveAllPLs}
                   disabled={uploading || saveablePreviewItems.length === 0}
                   title={saveablePreviewItems.length === 0 ? "Ningún PL está listo para guardar — resuelve los errores" : blockedPreviewItems > 0 ? `${blockedPreviewItems} PL${blockedPreviewItems !== 1 ? "s" : ""} con errores no se guardarán` : undefined}
-                  className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                  className="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
                   {uploading
                     ? "Guardando..."
@@ -1013,7 +1013,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                   <button
                     onClick={() => generateCombinedPDF(selectedItems)}
                     disabled={selectedItems.length === 0}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                     Descargar PDF{selectedItems.length !== 1 ? ` (${selectedItems.length})` : ""}
@@ -1138,7 +1138,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                   <button
                     onClick={downloadSelected}
                     disabled={downloading}
-                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                    className="px-4 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
                   >
                     {downloading ? "Generando..." : `Descargar ${visibleSelectedCount} seleccionado${visibleSelectedCount !== 1 ? "s" : ""}`}
                   </button>

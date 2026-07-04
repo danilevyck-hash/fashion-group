@@ -391,7 +391,7 @@ function MobileSearch({ value, onChange }: { value: string; onChange: (v: string
         inputMode="search"
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="Buscar cliente, tel, email…"
+        placeholder="Buscar cliente, teléfono, email…"
         className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
       />
     </div>
@@ -483,7 +483,7 @@ function MobileClientCard({
                 onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); } }}
                 aria-label={isFavorite ? "Quitar favorito" : "Marcar favorito"}
-                className="shrink-0 cursor-pointer text-base leading-none"
+                className="shrink-0 cursor-pointer text-base leading-none p-2.5 -m-2.5"
               >
                 {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-gray-300">☆</span>}
               </span>

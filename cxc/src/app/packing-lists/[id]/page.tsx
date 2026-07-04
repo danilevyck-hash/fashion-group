@@ -546,7 +546,7 @@ export default function PackingListDetailPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar referencia"
+            placeholder="Buscar referencia…"
             className="w-full pl-11 pr-4 py-3 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>

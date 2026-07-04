@@ -91,7 +91,7 @@ export default function EmpresaSelector({
 
         {/* Global search */}
         <div className="mb-4">
-          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo o empresa..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
+          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo o empresa…" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
         </div>
 
         {globalSearch.trim() ? (() => {

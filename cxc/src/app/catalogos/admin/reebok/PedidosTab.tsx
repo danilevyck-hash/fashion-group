@@ -202,7 +202,7 @@ export default function PedidosTab({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente..."
+          placeholder="Buscar por cliente…"
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1A2656]/30 transition"
         />
       </div>

@@ -178,7 +178,7 @@ export default function ClientTable({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar cliente..."
+                placeholder="Buscar cliente…"
                 className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
                 onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
               />
@@ -262,7 +262,7 @@ export default function ClientTable({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nombre, telefono, email..."
+                placeholder="Buscar cliente, teléfono, email…"
                 className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
                 onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
               />

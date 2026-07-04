@@ -15,6 +15,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import { PullToRefresh } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
 import type { Multifashion } from "@/components/ventas/types";
@@ -51,7 +52,7 @@ export function MultifashionShell({
   // admin-only). fallbackData = el SSR SOLO para el año inicial; los demás años
   // se piden bajo demanda. Cambiar el selector solo cambia la key (sin fetch
   // manual): SWR sirve caché si ya se vio ese año y revalida en background.
-  const { data: multi, error, isLoading } = useSWR<Multifashion>(
+  const { data: multi, error, isLoading, mutate } = useSWR<Multifashion>(
     authChecked ? ["multifashion-overview", selectedYear] : null,
     () => fetchOverview(selectedYear),
     {
@@ -74,6 +75,7 @@ export function MultifashionShell({
     {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
         desktop-only. Para gerente_acs (módulo único, PWA) es su ÚNICA salida. */}
     <AppHeader module="Multifashion" />
+    <PullToRefresh onRefresh={async () => { await mutate(); }}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -117,6 +119,7 @@ export function MultifashionShell({
         </div>
       )}
     </main>
+    </PullToRefresh>
     </>
   );
 }

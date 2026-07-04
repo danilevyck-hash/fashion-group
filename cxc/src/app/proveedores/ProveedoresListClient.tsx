@@ -180,7 +180,7 @@ function ProveedoresList() {
           {/* Search */}
           <input
             type="search"
-            placeholder="Buscar proveedor..."
+            placeholder="Buscar proveedor…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-4"

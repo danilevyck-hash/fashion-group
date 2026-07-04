@@ -215,7 +215,7 @@ export default function GuiasList({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por transportista, cliente, factura o N° de guía..."
+                placeholder="Buscar por transportista, cliente, factura o N° de guía…"
                 className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
               <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>

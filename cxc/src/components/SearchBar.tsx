@@ -466,7 +466,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (searched) setOpen(true); }}
           onKeyDown={onKeyDown}
-          placeholder="Buscar... (⌘K)"
+          placeholder="Buscar… (⌘K)"
           className={`w-full pl-10 pr-10 py-2 text-sm rounded-lg outline-none ${inputBg} bg-transparent`}
           autoFocus={compact}
         />

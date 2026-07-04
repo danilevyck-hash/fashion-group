@@ -186,7 +186,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente o vendedor..."
+          placeholder="Buscar por cliente o vendedor…"
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#FFE443] transition"
         />
       </div>
