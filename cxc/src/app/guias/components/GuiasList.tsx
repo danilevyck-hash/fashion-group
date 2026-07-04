@@ -230,6 +230,9 @@ export default function GuiasList({
                     if (!search) return true;
                     const q = search.toLowerCase();
                     return (
+                      // Número interno: matchea "45", "045" y "GT-045".
+                      String(g.numero).includes(q) ||
+                      `gt-${String(g.numero).padStart(3, "0")}`.includes(q) ||
                       (g.transportista || "").toLowerCase().includes(q) ||
                       (g.numero_guia_transp || "").toLowerCase().includes(q) ||
                       (g.guia_items || []).some(

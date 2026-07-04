@@ -5,9 +5,12 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 
 export default function CatalogosMarcasPage() {
+  // Alineado con modules.ts (roles del módulo catalogos) y role_permissions:
+  // secretaria y bodega tienen el módulo — sin ellos aquí dependían del
+  // fallback fg_modules y un load frío los rebotaba a /home.
   const { authChecked, role } = useAuth({
     moduleKey: "catalogos",
-    allowedRoles: ["admin", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
   });
 
   if (!authChecked) return null;
