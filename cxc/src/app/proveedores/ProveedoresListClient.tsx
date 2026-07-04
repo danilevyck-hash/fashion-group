@@ -11,6 +11,7 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import AgingLegend from "@/app/admin/components/AgingLegend";
+import { exportProveedoresExcel } from "./excel-proveedores";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
@@ -168,8 +169,19 @@ export default function ProveedoresListClient() {
           ) : (
             <>
               <AgingLegend />
-              <div className="text-xs text-gray-500 mb-2 tabular-nums">
-                {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="text-xs text-gray-500 tabular-nums">
+                  {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
+                </div>
+                <button
+                  onClick={() => {
+                    const scope = empresa ? empresaLabel(empresa) : "Todo el grupo";
+                    exportProveedoresExcel(items, `${scope}${q ? ` — búsqueda: ${q}` : ""} — ${items.length} proveedores`, empresa ? empresaLabel(empresa) : undefined);
+                  }}
+                  className="shrink-0 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97]"
+                >
+                  Exportar Excel
+                </button>
               </div>
 
               {/* Desktop */}
