@@ -513,6 +513,10 @@ export interface SwitchClient {
     desde: string;
     hasta: string;
   }): Promise<SwitchDiarioVentasData>;
+  /** POST /apipermiso?proceso=NNNN — ¿el usuario del token puede realizar el
+   *  proceso? (0001=cambiar precio, 0002=descuento, doc pág 11). Verificado en
+   *  vivo 5-jul: responde {permiso:true|false}. */
+  verificarPermiso(proceso: string): Promise<boolean>;
   /** POST /cierresesion best-effort: cierra la sesión única de Switch para no
    *  dejar un token vivo que mate el login del próximo cron (code 0006).
    *  NUNCA lanza. Solo actúa si hay token cacheado — loguearse solo para
@@ -1054,6 +1058,16 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         `/apireporte/diarioventas?${qs.toString()}`,
         "GET",
       );
+    },
+
+    async verificarPermiso(proceso) {
+      const data = await authedCall<{ permiso: boolean | string }>(
+        empresaKey,
+        cfg,
+        `/apipermiso?proceso=${encodeURIComponent(proceso)}`,
+        "POST",
+      );
+      return data.permiso === true || data.permiso === "true" || data.permiso === "TRUE";
     },
 
     async logout() {

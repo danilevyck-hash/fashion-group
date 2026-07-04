@@ -164,6 +164,26 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
 
   if (errores.length) return { kind: "prevalidacion", errores, warnings };
 
+  // ¿Hay precios editados (≠ lista)? La doc exige verificar el permiso 0001
+  // antes de un cambio de precio (pág 11). Si el usuario API no lo tiene →
+  // error claro ANTES de intentar; si la verificación misma falla, seguimos
+  // (terminar decide) con warning.
+  const hayPrecioEditado = lineas.some((l) => Math.abs(l.precioSwitch - l.precioCatalogo) >= 0.01);
+  if (hayPrecioEditado) {
+    try {
+      const permiso = await client.verificarPermiso("0001");
+      if (!permiso) {
+        return {
+          kind: "prevalidacion",
+          errores: ["El usuario de Switch no tiene permiso para cambiar precios (proceso 0001) — pedirlo al administrador de Switch o usar el precio de lista"],
+          warnings,
+        };
+      }
+    } catch {
+      warnings.push("No se pudo verificar el permiso de cambio de precio (0001) — se intenta el envío igual");
+    }
+  }
+
   // Precio editable (5-jul, verificado en vivo 16-000000492: Switch respeta el
   // precio enviado, $30 sobre lista $35): va el precio del PEDIDO.
   const articulos: SwitchPedidoLineaInput[] = lineas.map((l) => ({
@@ -220,7 +240,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
         .update({ estado: "error", error_detalle: e.message, updated_at: new Date().toISOString() })
         .eq("id", envio.id);
       await sendTelegramAlert(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
-      return { kind: "rechazado", error: `Switch rechazó el pedido: ${e.message}`, warnings };
+      const detalle = hayPrecioEditado
+        ? `Switch rechazó el cambio de precio: ${e.message}`
+        : `Switch rechazó el pedido: ${e.message}`;
+      return { kind: "rechazado", error: detalle, warnings };
     }
     // Timeout / fallo de red: NO sabemos si el pedido se creó. Queda 'enviado'
     // sin número → bloquea reintentos; resolver a mano contra el panel Switch.
