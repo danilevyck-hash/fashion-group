@@ -9,6 +9,8 @@ import { getCompanyDisplay } from "@/lib/companies";
 import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
+import { AGING, type AgingKey } from "@/lib/cxc-aging";
+import AgingLegend from "@/app/admin/components/AgingLegend";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
@@ -26,6 +28,9 @@ interface ListItem {
   comprado_ytd: number;
   empresas_count: number;
   ultimo_pago_dias: number | null;
+  aging_current: number;
+  aging_watch: number;
+  aging_overdue: number;
 }
 
 export default function ProveedoresListClient() {
@@ -69,7 +74,7 @@ export default function ProveedoresListClient() {
   // tienen saldo (incluido "a favor" negativo) siempre se muestran.
   const conSaldo = items.filter((it) => Math.abs(it.saldo_total) >= 0.005);
   const sinSaldo = items.filter((it) => Math.abs(it.saldo_total) < 0.005);
-  const colsCount = empresa ? 3 : 4;
+  const colsCount = empresa ? 7 : 8;
 
   const renderRow = (it: ListItem) => (
     <tr
@@ -79,7 +84,13 @@ export default function ProveedoresListClient() {
     >
       <td className="py-2 px-3 font-medium">{it.nombre}</td>
       <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(it.comprado_ytd)}</td>
+      <AgingCell value={it.aging_current} aging="current" />
+      <AgingCell value={it.aging_watch} aging="watch" />
+      <AgingCell value={it.aging_overdue} aging="overdue" />
       <SaldoCell value={it.saldo_total} />
+      <td className="py-2 px-3 text-right tabular-nums text-gray-500">
+        {it.ultimo_pago_dias != null ? `hace ${it.ultimo_pago_dias}d` : <span className="text-gray-300">—</span>}
+      </td>
       {!empresa && <td className="py-2 px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
     </tr>
   );
@@ -98,7 +109,14 @@ export default function ProveedoresListClient() {
       </div>
       <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
         Comprado YTD ${fmt(it.comprado_ytd)}{!empresa && it.empresas_count > 1 ? ` · ${it.empresas_count} empresas` : ""}
+        {it.ultimo_pago_dias != null ? ` · pago hace ${it.ultimo_pago_dias}d` : ""}
       </div>
+      {(it.aging_watch !== 0 || it.aging_overdue !== 0) && (
+        <div className="mt-0.5 flex gap-3 text-xs tabular-nums">
+          {it.aging_watch !== 0 && <span className={AGING.watch.text}>{AGING.watch.colLabel} ${fmt(it.aging_watch)}</span>}
+          {it.aging_overdue !== 0 && <span className={AGING.overdue.text}>{AGING.overdue.colLabel} ${fmt(it.aging_overdue)}</span>}
+        </div>
+      )}
     </li>
   );
 
@@ -149,6 +167,7 @@ export default function ProveedoresListClient() {
             <EmptyState title="Sin proveedores" subtitle={q ? "Probá con otra búsqueda." : "No hay datos sincronizados aún."} />
           ) : (
             <>
+              <AgingLegend />
               <div className="text-xs text-gray-500 mb-2 tabular-nums">
                 {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
               </div>
@@ -161,7 +180,11 @@ export default function ProveedoresListClient() {
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                         <th className="py-2 px-3">Proveedor</th>
                         <th className="py-2 px-3 text-right">Comprado YTD</th>
+                        <th className="py-2 px-3 text-right">{AGING.current.colLabel}</th>
+                        <th className="py-2 px-3 text-right">{AGING.watch.colLabel}</th>
+                        <th className="py-2 px-3 text-right">{AGING.overdue.colLabel}</th>
                         <th className="py-2 px-3 text-right">Por pagar</th>
+                        <th className="py-2 px-3 text-right">Último pago</th>
                         {!empresa && <th className="py-2 px-3 text-right">Empresas</th>}
                       </tr>
                     </thead>
@@ -218,6 +241,17 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     >
       {children}
     </button>
+  );
+}
+
+// Tramo de aging con el color del vocabulario CXC; cero en gris claro,
+// negativo (crédito) en azul.
+function AgingCell({ value, aging }: { value: number; aging: AgingKey }) {
+  const tone = value === 0 ? "text-gray-300" : value < 0 ? "text-blue-600" : AGING[aging].text;
+  return (
+    <td className={`py-2 px-3 text-right tabular-nums ${tone}`}>
+      {value === 0 ? "—" : value < 0 ? `-$${fmt(Math.abs(value))}` : `$${fmt(value)}`}
+    </td>
   );
 }
 

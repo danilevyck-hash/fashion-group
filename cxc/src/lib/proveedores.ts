@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { condenseAging } from "@/lib/proveedores-aging";
 
 export interface ProveedorRow {
   empresa_key: string;
@@ -62,6 +63,10 @@ export interface ProveedorListItem {
   comprado_ytd: number;
   empresas_count: number;
   ultimo_pago_dias: number | null; // el más reciente entre empresas
+  // Aging condensado al vocabulario CXC (suma de los buckets reales de Switch).
+  aging_current: number;  // 0-90d (por vencer)
+  aging_watch: number;    // 91-120d (vencido reciente)
+  aging_overdue: number;  // 121d+ (vencido crítico)
 }
 
 /** Lista agrupada por proveedor. empresa=filtra a esa empresa; q=busca por nombre. */
@@ -81,6 +86,7 @@ export function buildList(
   let items: ProveedorListItem[] = [...byKey.entries()].map(([key, rs]) => {
     const nombre = rs.map((r) => r.nombre).sort((a, b) => b.length - a.length)[0];
     const dias = rs.map((r) => r.ultimo_pago_dias).filter((d): d is number => d != null);
+    const aging = condenseAging(rs.flatMap((r) => r.aging ?? []));
     return {
       key,
       nombre,
@@ -88,6 +94,9 @@ export function buildList(
       comprado_ytd: round2(rs.reduce((s, r) => s + Number(r.comprado_ytd), 0)),
       empresas_count: new Set(rs.map((r) => r.empresa_key)).size,
       ultimo_pago_dias: dias.length ? Math.min(...dias) : null,
+      aging_current: aging.current,
+      aging_watch: aging.watch,
+      aging_overdue: aging.overdue,
     };
   });
 

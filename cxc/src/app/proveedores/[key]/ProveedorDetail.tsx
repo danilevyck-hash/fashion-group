@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { getCompanyDisplay } from "@/lib/companies";
+import { AGING } from "@/lib/cxc-aging";
+import { agingKeyForBucket } from "@/lib/proveedores-aging";
 
 interface EmpresaTotals {
   empresa: string;
@@ -108,10 +110,10 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               {/* Aging bucketizado (viene de Switch). Buckets vacíos en gris. */}
               <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-2">Antigüedad del saldo</div>
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                {data.total_grupo.aging.map((b, i) => {
+                {data.total_grupo.aging.map((b) => {
                   const v = b.saldo;
-                  const tone =
-                    v === 0 ? "text-gray-300" : i >= 4 ? "text-red-700" : i >= 2 ? "text-amber-700" : "text-gray-800";
+                  // Mismo vocabulario de color que CXC (0-90 por vencer / 91-120 / 121+).
+                  const tone = v === 0 ? "text-gray-300" : AGING[agingKeyForBucket(b.title)].text;
                   return (
                     <div key={b.title} className="text-center">
                       <div className="text-xs text-gray-400">{b.title}</div>
