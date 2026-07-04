@@ -77,6 +77,9 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
   const [clienteQuery, setClienteQuery] = useState("");
   const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
   const [sending, setSending] = useState(false);
+  // Línea con el precio en edición (tap sobre el precio → input numérico).
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [erroresDetalle, setErroresDetalle] = useState<string[]>([]);
 
@@ -130,6 +133,15 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
   const setQty = (productId: string, qty: number) => {
     if (qty <= 0) persistCart(cart.filter((i) => i.product_id !== productId));
     else persistCart(cart.map((i) => (i.product_id === productId ? { ...i, quantity: qty } : i)));
+  };
+
+  // Precio editable por línea (decisión Daniel 5-jul). Default = precio del
+  // sync de Switch; el payload a /apipedido/terminar manda el editado y el
+  // pedido local lo guarda igual. Commit al salir del input o Enter.
+  const commitPrice = (productId: string) => {
+    const v = Math.round((parseFloat(priceDraft) || 0) * 100) / 100;
+    setEditingPrice(null);
+    if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, unit_price: v } : i)));
   };
 
   // ── Confirmar y enviar ──
@@ -215,7 +227,32 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{l.name}</p>
-                        <p className="text-xs text-gray-400 tabular-nums">{l.sku} · ${fmt(l.unit_price)}/pza · bulto de {l.bulto}</p>
+                        <p className="text-xs text-gray-400 tabular-nums">
+                          {l.sku} ·{" "}
+                          {editingPrice === l.product_id ? (
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0.01"
+                              step="0.01"
+                              autoFocus
+                              value={priceDraft}
+                              onChange={(e) => setPriceDraft(e.target.value)}
+                              onBlur={() => commitPrice(l.product_id)}
+                              onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
+                              className="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs tabular-nums outline-none focus:border-black"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}
+                              className="underline decoration-dotted underline-offset-2 hover:text-gray-700 transition min-h-[44px] align-middle"
+                              title="Tocar para editar el precio"
+                            >
+                              ${fmt(l.unit_price)}/pza
+                            </button>
+                          )}
+                          {" "}· bulto de {l.bulto}
+                        </p>
                       </div>
                       <span className="shrink-0 text-sm font-semibold tabular-nums">${fmt(l.subtotal)}</span>
                     </div>

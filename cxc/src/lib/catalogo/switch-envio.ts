@@ -129,8 +129,9 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     }
     const precioCatalogo = Number(item.unit_price) || 0;
     if (Math.abs(precioSwitch - precioCatalogo) >= 0.01) {
+      // Precio editable (5-jul): se envía el del PEDIDO, no el de lista.
       warnings.push(
-        `SKU ${sku}: precio del pedido $${precioCatalogo.toFixed(2)} ≠ precio Switch $${precioSwitch.toFixed(2)} — se enviará el de Switch`,
+        `SKU ${sku}: precio del pedido $${precioCatalogo.toFixed(2)} ≠ lista Switch $${precioSwitch.toFixed(2)} — se enviará el del pedido`,
       );
     }
 
@@ -163,13 +164,15 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
 
   if (errores.length) return { kind: "prevalidacion", errores, warnings };
 
+  // Precio editable (5-jul, verificado en vivo 16-000000492: Switch respeta el
+  // precio enviado, $30 sobre lista $35): va el precio del PEDIDO.
   const articulos: SwitchPedidoLineaInput[] = lineas.map((l) => ({
     codigoBarraId: String(l.codigoBarraId),
     cantidad: l.piezas.toFixed(4),
-    precio: l.precioSwitch.toFixed(2),
+    precio: l.precioCatalogo.toFixed(2),
     descuento: DESCUENTO_LINEA,
   }));
-  const totalEstimado = lineas.reduce((s, l) => s + l.piezas * l.precioSwitch, 0);
+  const totalEstimado = lineas.reduce((s, l) => s + l.piezas * l.precioCatalogo, 0);
 
   if (p.dry) {
     return {
