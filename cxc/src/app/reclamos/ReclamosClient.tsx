@@ -84,9 +84,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [settling, setSettling] = useState(false);
   const [enProcesoOpen, setEnProcesoOpen] = useState(false);
   const [enProcesoSaving, setEnProcesoSaving] = useState(false);
-  // Modal de comprobante OBLIGATORIO antes de marcar Pagado (cuando falta adjunto).
-  const [comprobantePagoOpen, setComprobantePagoOpen] = useState(false);
-  const [comprobantePagoSaving, setComprobantePagoSaving] = useState(false);
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
@@ -396,12 +393,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     if (!current || current.estado === e) return;
     // Creado → En proceso: modal de comprobante (foto o PDF, OPCIONAL en este paso).
     if (e === "En proceso" && current.estado === "Creado") { setEnProcesoOpen(true); return; }
-    // Marcar Pagado (desde Creado = pago inmediato, o desde En proceso): exige
-    // comprobante adjunto — si falta, primero el modal de adjuntar (obligatorio) y
-    // recién después el settlement. El server (settlements) re-valida ambas cosas.
+    // Marcar Pagado (desde Creado = pago inmediato, o desde En proceso): UN solo
+    // modal — si falta comprobante, el propio SettlementModal integra la sección
+    // de adjuntar (obligatoria). El server (settlements) re-valida ambas cosas.
     // (Los rollbacks de un paso siguen el PATCH normal — comprobante/settlement se conservan.)
     if (e === "Pagado" && (current.estado === "Creado" || current.estado === "En proceso")) {
-      if (!current.comprobante_url) { setComprobantePagoOpen(true); return; }
       setSettleOpen(true); return;
     }
     // Optimistic: update estado badge immediately
@@ -434,30 +430,21 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     finally { setEnProcesoSaving(false); }
   }
 
-  // Comprobante obligatorio para Pagado: lo adjunta SIN cambiar estado y, si todo
-  // sale bien, abre el modal de settlement (que es quien hace el flip a Pagado).
-  async function submitComprobantePago(file: File | null, nota: string) {
-    if (!current || !file) return; // el modal exige archivo (requireFile)
-    setComprobantePagoSaving(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", await compressImage(file));
-      if (nota) fd.append("nota", nota);
-      const res = await fetch(`/api/reclamos/${current.id}/comprobante`, { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setToast(data?.error || "No se pudo subir el comprobante."); setTimeout(() => setToast(null), 5000); return; }
-      setComprobantePagoOpen(false);
-      await loadDetail(current.id);
-      setSettleOpen(true); // ahora sí: capturar recuperación y marcar Pagado
-    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
-    finally { setComprobantePagoSaving(false); }
-  }
-
   // Settlement: marca Pagado capturando monto recuperado + nota(s) de crédito.
-  async function submitSettlement(rows: SettlementInput[]) {
+  // Si el modal trae comprobante (reclamo sin adjunto), se sube PRIMERO — si esa
+  // subida falla no se toca el estado; si el settlement falla después, el
+  // comprobante queda adjunto y el reintento ya no lo re-pide.
+  async function submitSettlement(rows: SettlementInput[], comprobante: File | null) {
     if (!current) return;
     setSettling(true);
     try {
+      if (comprobante) {
+        const fd = new FormData();
+        fd.append("file", await compressImage(comprobante));
+        const up = await fetch(`/api/reclamos/${current.id}/comprobante`, { method: "POST", body: fd });
+        const upData = await up.json().catch(() => ({}));
+        if (!up.ok) { setToast(upData?.error || "No se pudo subir el comprobante."); setTimeout(() => setToast(null), 5000); return; }
+      }
       const res = await fetch(`/api/reclamos/${current.id}/settlements`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settlements: rows, markPaid: true }),
@@ -757,6 +744,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         open={settleOpen}
         reclamado={current.monto_reclamado_snapshot ?? reclamoTaxes(current.empresa, calcSub(current.reclamo_items ?? [])).total}
         submitting={settling}
+        requireComprobante={!current.comprobante_url}
         onClose={() => setSettleOpen(false)}
         onSubmit={submitSettlement}
       />
@@ -769,16 +757,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         submitLabel="Pasar a En proceso"
         onClose={() => setEnProcesoOpen(false)}
         onSubmit={submitEnProceso}
-      />
-      <ComprobanteModal
-        open={comprobantePagoOpen}
-        submitting={comprobantePagoSaving}
-        requireFile={true}
-        title="Falta el comprobante"
-        description="Para marcar como Pagado es obligatorio adjuntar el comprobante (foto o PDF)."
-        submitLabel="Adjuntar y continuar"
-        onClose={() => setComprobantePagoOpen(false)}
-        onSubmit={submitComprobantePago}
       />
       {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
       {deleteModal}

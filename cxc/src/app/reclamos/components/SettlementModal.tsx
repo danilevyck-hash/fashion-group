@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { validateComprobanteFile } from "./fotoUpload";
 
 export interface SettlementInput {
   monto: number;
@@ -23,8 +24,13 @@ interface Props {
   submitting: boolean;
   title?: string;
   confirmLabel?: string;
+  /** true cuando el reclamo aún NO tiene comprobante adjunto: el modal integra
+   *  la sección de adjuntar (obligatoria) — un solo modal, un solo submit
+   *  (antes eran 2 modales encadenados). */
+  requireComprobante?: boolean;
   onClose: () => void;
-  onSubmit: (rows: SettlementInput[]) => void;
+  /** comprobante viene solo cuando requireComprobante=true. */
+  onSubmit: (rows: SettlementInput[], comprobante: File | null) => void;
 }
 
 /** Hoy en Panamá (YYYY-MM-DD). */
@@ -41,18 +47,22 @@ export default function SettlementModal({
   submitting,
   title = "Registrar recuperación",
   confirmLabel = "Marcar como Pagado",
+  requireComprobante = false,
   onClose,
   onSubmit,
 }: Props) {
   useBodyScrollLock(open);
   const [rows, setRows] = useState<Row[]>([{ monto: "", nota_credito: "", fecha: hoyPanama() }]);
   const [error, setError] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Reset al abrir.
   useEffect(() => {
     if (open) {
       setRows([{ monto: "", nota_credito: "", fecha: hoyPanama() }]);
       setError(null);
+      setFile(null);
     }
   }, [open]);
 
@@ -65,7 +75,19 @@ export default function SettlementModal({
   const addRow = () => setRows((rs) => [...rs, { monto: "", nota_credito: "", fecha: hoyPanama() }]);
   const removeRow = (i: number) => setRows((rs) => (rs.length > 1 ? rs.filter((_, idx) => idx !== i) : rs));
 
+  const pickFile = (f: File | null) => {
+    if (!f) return;
+    const err = validateComprobanteFile(f);
+    if (err) { setError(err); return; }
+    setError(null);
+    setFile(f);
+  };
+
   const confirm = () => {
+    if (requireComprobante && !file) {
+      setError("Adjunta el comprobante (foto o PDF) — es obligatorio para marcar Pagado.");
+      return;
+    }
     for (const r of rows) {
       const m = Number(r.monto);
       if (!Number.isFinite(m) || m <= 0) {
@@ -78,7 +100,7 @@ export default function SettlementModal({
       }
     }
     setError(null);
-    onSubmit(rows.map((r) => ({ monto: Number(r.monto), nota_credito: r.nota_credito.trim(), fecha: r.fecha })));
+    onSubmit(rows.map((r) => ({ monto: Number(r.monto), nota_credito: r.nota_credito.trim(), fecha: r.fecha })), file);
   };
 
   return createPortal(
@@ -95,6 +117,28 @@ export default function SettlementModal({
           <p className="mt-0.5 text-xs text-gray-500">
             Reclamado: ${money(reclamado)} · anota cuánto recuperó el proveedor (puede ser parcial).
           </p>
+        )}
+
+        {requireComprobante && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <div className="text-[11px] uppercase tracking-[0.05em] text-amber-700 font-medium">
+              Comprobante de pago *
+            </div>
+            <p className="mt-0.5 text-xs text-amber-800">Foto o PDF — obligatorio para marcar Pagado.</p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="mt-2 w-full rounded-md border border-amber-300 bg-white px-3 min-h-[44px] text-sm text-gray-700 hover:border-amber-400 transition"
+            >
+              {file ? `📎 ${file.name}` : "Adjuntar foto o PDF"}
+            </button>
+          </div>
         )}
 
         <div className="mt-4 space-y-4">
