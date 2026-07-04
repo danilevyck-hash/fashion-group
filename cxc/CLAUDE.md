@@ -82,28 +82,35 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-18 crons configurados (todos 1×/día por restricción del plan Hobby, ver nota):
+31 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
 | /api/cron/cleanup-packing-lists | 03:00 |
 | /api/cron/multifashion-sync | 05:00 |
-| /api/cron/switch-sync (vistana, active_wear) | 05:30 |
-| /api/cron/switch-sync (fashion_shoes, fashion_wear) | 05:35 |
-| /api/cron/switch-sync (active_shoes, joystep) | 05:40 |
-| /api/cron/switch-sync (american_classic, confecciones_boston) | 06:30 |
+| /api/cron/switch-sync tipo=all (vistana, active_wear) | 05:30 |
+| /api/cron/switch-sync tipo=all (fashion_shoes, fashion_wear) | 05:35 |
+| /api/cron/switch-sync tipo=all (active_shoes, joystep) | 05:40 |
 | /api/cron/backup | 06:00 |
 | /api/cron/refresh-clientes-views | 06:30 |
+| /api/cron/switch-sync tipo=all (american_classic, confecciones_boston) | 06:30 |
+| /api/cron/reebok-catalogo | 06:45 |
+| /api/cron/sync-utilidad | 07:00 |
 | /api/cron/sync-clientes-master | 07:00 |
-| /api/cron/sync-utilidad | 08:00 |
-| /api/cron/sync-recibos | 08:30 |
-| /api/cron/switch-articulos | 09:00 |
+| /api/cron/sync-recibos | 07:50, 20:10, 22:20 (3 entradas) |
+| /api/cron/acs-fidelizacion | 08:15 |
+| /api/cron/switch-articulos | 08:40 |
 | /api/cron/sync-proveedores | 09:30 |
+| /api/cron/joybees-catalogo | 11:00 |
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
+| /api/cron/switch-sync tipo=facturas (american_classic) | 15:00, 23:15 (2 entradas — ventas ACS intradía) |
+| /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 19:00/19:05/19:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía) |
 
-> **Plan Vercel Hobby:** los crons solo corren 1×/día (las 3 entradas de `switch-reconciliacion` son expresiones distintas, no sub-diario) y las funciones tienen tope `maxDuration` 300s.
+> **Plan Vercel Hobby:** cada entrada de cron corre 1×/día y las funciones tienen tope `maxDuration` 300s. Para frecuencia sub-diaria se agregan entradas separadas del mismo path (patrón `switch-reconciliacion`).
+>
+> **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van ≥50 min separados (un 2do login mata el token del 1ro → code 0006). Crons de empresas disjuntas pueden ir a 5 min (patrón 05:30/05:35/05:40). Ojo: `sync-recibos` toca las 5 B2B + american_classic → las entradas intradía de ACS (15:00/23:15) y de estadocuenta esquivan sus corridas de 20:10/22:20 y la reconciliación de 14:00/18:00.
 
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
