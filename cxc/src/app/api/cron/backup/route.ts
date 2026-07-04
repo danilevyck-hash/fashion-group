@@ -19,6 +19,10 @@
 // (comprobantes, fotos, adjuntos) a backups/_storage/<bucket>/<path>, guiada
 // por un manifest — solo copia lo nuevo/cambiado desde el último backup.
 //
+// Off-site: réplica de los mismos NDJSON.gz a Cloudflare R2 (S3-compatible),
+// incremental por manifest de hashes (src/lib/backup/r2.ts). Si faltan las
+// env vars R2_* se omite sin afectar el backup a Supabase.
+//
 // Restore: scripts/restore.mjs (ver header del script para uso y prueba).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,6 +31,7 @@ import { gzipSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
+import { replicateBackupToR2, type R2BackupFile } from "@/lib/backup/r2";
 
 const CRON_NAME = "backup";
 const BUCKET = "backups";
@@ -139,6 +144,11 @@ const MANIFEST_PATH = `${STORAGE_PREFIX}/manifest.json`;
 // (el manifest solo registra lo efectivamente copiado). Deja headroom para
 // meta.json + limpieza dentro de los 300s de Hobby.
 const REPLICA_DEADLINE_MS = 240_000;
+// Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): corre tras la
+// réplica de Storage; el set completo pesa ~7 MB gz (~10-25s en subir), así
+// que 280s desde el arranque deja 20s de headroom para meta.json + limpieza.
+// Lo que no alcance queda pendiente y el manifest lo recupera mañana.
+const R2_DEADLINE_MS = 280_000;
 
 // Columna(s) de orden para paginación estable (PostgREST Range sin order NO es
 // determinista). Default: "id". Excepciones = tablas cuya PK no es "id".
@@ -271,6 +281,9 @@ export async function GET(req: NextRequest) {
   const results: Array<{ file: string; table: string; rows: number; bytes: number }> = [];
   const errores: Array<{ file: string; error: string }> = [];
   let totalBytes = 0;
+  // Mismos bytes que van a Supabase, para la réplica off-site a R2 (paths
+  // estables data/<archivo>.ndjson.gz — sin fecha; R2 guarda "el último").
+  const r2Files: R2BackupFile[] = [];
 
   // Un dataset a la vez: fetch paginado → NDJSON → gzip → upload → liberar.
   // Si uno falla, se registra y se sigue con el resto (backup parcial > nada).
@@ -289,6 +302,7 @@ export async function GET(req: NextRequest) {
       if (upErr) throw new Error(`upload ${file}: ${upErr.message}`);
       results.push({ file, table: ds.table, rows: rows.length, bytes: gz.length });
       totalBytes += gz.length;
+      r2Files.push({ key: `data/${file}.ndjson.gz`, body: gz });
     } catch (e) {
       errores.push({ file, error: e instanceof Error ? e.message : String(e) });
     }
@@ -301,6 +315,18 @@ export async function GET(req: NextRequest) {
     errores.push({ file: `storage:${err.slice(0, 120)}`, error: err });
   }
 
+  // Réplica off-site a Cloudflare R2 (best-effort): si faltan las env vars
+  // R2_* se omite en silencio; si falla a mitad, el backup a Supabase ya está
+  // a salvo → alerta Telegram SIN marcar el backup como fallido (nada de R2
+  // entra a `errores`, que dispararía el 500). El manifest en R2 hace
+  // catch-up de lo pendiente/fallido en la corrida siguiente.
+  const r2 = await replicateBackupToR2(r2Files, startMs + R2_DEADLINE_MS);
+  if (r2.enabled && r2.errores.length > 0) {
+    const detalleR2 = r2.errores.join("; ");
+    console.error("[backup] réplica R2 con errores:", detalleR2);
+    await logCronError("backup_r2", detalleR2);
+  }
+
   // meta.json — índice del backup del día (lo lee scripts/restore.mjs).
   const meta = {
     format: "v2-ndjson-gz",
@@ -308,6 +334,7 @@ export async function GET(req: NextRequest) {
     timestamp: now.toISOString(),
     datasets: results,
     storage: { copiados: storage.copiados, bytes: storage.bytes, pendientes: storage.pendientes },
+    r2,
     errores,
   };
   const { error: metaErr } = await supabaseServer.storage
@@ -360,6 +387,7 @@ export async function GET(req: NextRequest) {
     totalRows: results.reduce((s, r) => s + r.rows, 0),
     totalBytes,
     storage,
+    r2,
     counts: Object.fromEntries(results.map((r) => [r.file, r.rows])),
   });
 }
