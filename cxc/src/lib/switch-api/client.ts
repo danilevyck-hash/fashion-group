@@ -501,8 +501,49 @@ export interface SwitchClient {
   apipedidoTerminar(
     params: SwitchPedidoTerminarParams,
   ): Promise<SwitchPedidoTerminarData>;
+  /** Cierre diario de caja (/apireporte/diarioventas, doc pág 17): totales de
+   *  ventas/NC/impuestos/descuentos + desglose por forma de pago. VERIFICADO EN
+   *  VIVO (4-jul-2026, MULTI): `hasta` es EXCLUSIVO — para el día D pasar
+   *  desde=D, hasta=D+1 (con desde=hasta responde todo en cero). El corte de
+   *  día es hora LOCAL (Panamá); granTotal cuadró al centavo con
+   *  switch_facturas 3 días seguidos. OJO: totalDescuentos trae valores no
+   *  confiables (≈ granTotal) — mostrar con reserva. */
+  getDiarioVentas(params: {
+    sucursalId: number;
+    desde: string;
+    hasta: string;
+  }): Promise<SwitchDiarioVentasData>;
+  /** POST /cierresesion best-effort: cierra la sesión única de Switch para no
+   *  dejar un token vivo que mate el login del próximo cron (code 0006).
+   *  NUNCA lanza. Solo actúa si hay token cacheado — loguearse solo para
+   *  desloguearse crearía justo la colisión que se quiere evitar. */
+  logout(): Promise<void>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
+}
+
+/** Respuesta (data.diarioDeVentas) de /apireporte/diarioventas. Montos como
+ *  strings numéricos salvo granTotal (number). totalNotasCredito llega
+ *  NEGATIVA (NC nativas negativas, mismo quirk que /apinotacredito). */
+export interface SwitchDiarioVentas {
+  fecha: string;                       // "2026-07-03 / 2026-07-03"
+  ultimaVenta: string;
+  fechaUltimaVenta: string;            // DD-MM-YYYY
+  horaUltimaVenta: string;
+  totalVentasEmitidas: string;         // count de facturas
+  totalVentas: string;
+  totalImpuestoVenta: string;
+  totalNotaCreditoEmitidas: string;
+  totalNotasCredito: string;
+  totalImpuestoNotaCredito: string;
+  totalDescuentos: string;
+  granTotal: number;
+  totalProductos: string | number;
+  formasDePago: Array<{ nombre: string; total: string }>;
+}
+
+export interface SwitchDiarioVentasData {
+  diarioDeVentas: SwitchDiarioVentas;
 }
 
 /** Row de /apiarticulos/stock (data.stock[]). `saldo` = existencia física,
@@ -983,6 +1024,37 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         "POST",
         body,
       );
+    },
+
+    async getDiarioVentas(params) {
+      const qs = new URLSearchParams({
+        sucursalId: String(params.sucursalId),
+        desde: params.desde,
+        hasta: params.hasta,
+      });
+      return authedCall<SwitchDiarioVentasData>(
+        empresaKey,
+        cfg,
+        `/apireporte/diarioventas?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async logout() {
+      const cached = tokenCache.get(empresaKey);
+      if (!cached) return;
+      tokenCache.delete(empresaKey);
+      try {
+        await rawCall(cfg, {
+          empresaKey,
+          endpoint: "/cierresesion",
+          method: "POST",
+          token: cached.token,
+          timeoutMs: 10_000,
+        });
+      } catch {
+        // Best-effort: el token expira solo en ~60min de todas formas.
+      }
     },
 
     clearTokenCache() {

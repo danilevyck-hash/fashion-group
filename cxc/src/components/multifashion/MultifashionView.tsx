@@ -7,12 +7,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  TrendingUp, Users, UserCircle, ChevronLeft, ChevronRight,
+  TrendingUp, Users, UserCircle, Wallet, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import type { Multifashion } from "@/components/ventas/types";
 import { VendedorasSubtab } from "./VendedorasSubtab";
 import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
+import { CajaSubtab } from "./CajaSubtab";
 
 const SUBTAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
@@ -171,6 +172,9 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           <TabsTrigger value="clientes" className={SUBTAB_TRIGGER_CLASS}>
             <UserCircle className="h-3 w-3" /> Clientes
           </TabsTrigger>
+          <TabsTrigger value="caja" className={SUBTAB_TRIGGER_CLASS}>
+            <Wallet className="h-3 w-3" /> Caja
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-5">
@@ -186,6 +190,11 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} />
+        </TabsContent>
+        <TabsContent value="caja" className="mt-5">
+          {/* Cuadre diario: independiente del año/mes global — usa su propio
+              selector de día (default hoy). */}
+          <CajaSubtab />
         </TabsContent>
       </Tabs>
     </div>
