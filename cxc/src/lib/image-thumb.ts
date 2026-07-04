@@ -14,6 +14,12 @@ export function supabaseThumb(url: string | null | undefined, width = 600, quali
   const [base, qs] = url.split("?");
   const params = new URLSearchParams(qs || "");
   params.set("width", String(width));
+  params.set("height", String(width));
+  // GOTCHA verificado en vivo (5-jul-2026): sin `resize=contain`, el default
+  // del render es cover Y con solo width devuelve width×altoOriginal — una
+  // FRANJA vertical recortada (1000×1000 → 160×1000). contain + caja cuadrada
+  // preserva la foto completa (160×160), como object-contain en el catálogo.
+  params.set("resize", "contain");
   params.set("quality", String(quality));
   return `${base.replace(OBJECT_PREFIX, RENDER_PREFIX)}?${params.toString()}`;
 }
