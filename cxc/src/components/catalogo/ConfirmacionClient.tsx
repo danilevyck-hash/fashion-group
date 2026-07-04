@@ -73,7 +73,11 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
 
   const ambiguo = envio?.estado === "enviado" && (envio.error_detalle || "").startsWith("AMBIGUO");
   const switchOk = envio && (envio.estado === "verificado" || (envio.estado === "enviado" && !ambiguo));
-  const puedeReintentar = envio === null || envio?.estado === "error";
+  // Distinguir "nunca se intentó" (envio null — ej. pedido legacy) de "falló"
+  // (estado error): decir "no se completó" sin intento previo confunde
+  // (diagnóstico del piloto 4-jul).
+  const sinIntento = envio === null;
+  const puedeReintentar = sinIntento || envio?.estado === "error";
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-10">
@@ -82,8 +86,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
       ) : (
         <div className="space-y-4">
           {/* Estado principal */}
-          <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : "border-red-200 bg-red-50"}`}>
-            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? "⚠️" : "!"}</div>
+          <div className={`rounded-lg border-2 p-6 text-center ${switchOk ? "border-emerald-300 bg-emerald-50" : ambiguo ? "border-amber-300 bg-amber-50" : sinIntento ? "border-gray-300 bg-gray-50" : "border-red-200 bg-red-50"}`}>
+            <div className="text-3xl">{switchOk ? "✓" : ambiguo ? "⚠️" : sinIntento ? "→" : "!"}</div>
             <h1 className="mt-2 text-lg font-semibold">
               {order ? `Pedido ${order.order_number} guardado` : "Pedido guardado"}
             </h1>
@@ -97,9 +101,13 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
                 Switch no respondió al enviar — el pedido pudo o no haberse creado allá.
                 Revisa el panel de Switch antes de reintentar.
               </p>
+            ) : sinIntento ? (
+              <p className="mt-1 text-sm text-gray-600">
+                Este pedido aún no se ha enviado a Switch. Puedes enviarlo con el botón de abajo.
+              </p>
             ) : (
               <div className="mt-1 text-sm text-red-800">
-                <p>El envío a Switch no se completó — el pedido está guardado en el sistema y no se pierde.</p>
+                <p>El envío a Switch falló — el pedido está guardado en el sistema y no se pierde.</p>
                 {envio?.error_detalle && <p className="mt-1 text-xs">{envio.error_detalle}</p>}
               </div>
             )}
@@ -120,7 +128,7 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
                 disabled={retrying}
                 className="rounded-md bg-black px-4 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40 sm:col-span-2"
               >
-                {retrying ? "Reintentando…" : "Reintentar envío a Switch"}
+                {retrying ? "Enviando…" : sinIntento ? "Enviar a Switch" : "Reintentar envío a Switch"}
               </button>
             )}
             <Link href={cfg.pedidoHref(orderId)} className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition flex items-center justify-center">

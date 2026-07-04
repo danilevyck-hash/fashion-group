@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTelegramAlert } from "@/lib/telegram";
+import { sendTelegramAlert, shortError } from "@/lib/telegram";
 import {
   createSwitchClient,
   SwitchApiError,
@@ -216,6 +216,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
         .from(p.enviosTable)
         .update({ estado: "error", error_detalle: e.message, updated_at: new Date().toISOString() })
         .eq("id", envio.id);
+      await sendTelegramAlert(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
       return { kind: "rechazado", error: `Switch rechazó el pedido: ${e.message}`, warnings };
     }
     // Timeout / fallo de red: NO sabemos si el pedido se creó. Queda 'enviado'
@@ -225,6 +226,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       .from(p.enviosTable)
       .update({ estado: "enviado", error_detalle: `AMBIGUO (sin respuesta de Switch): ${msg}`, updated_at: new Date().toISOString() })
       .eq("id", envio.id);
+    await sendTelegramAlert(`🚨 Envío a Switch AMBIGUO — ${p.marcaLabel} ${p.orderNumber}: Switch no respondió (${shortError(msg)}). REVISAR EL PANEL antes de reintentar.`);
     return { kind: "ambiguo", error: "Switch no respondió — el pedido pudo o no haberse creado. Revisa el panel de Switch antes de reintentar." };
   }
 
