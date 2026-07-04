@@ -481,6 +481,26 @@ export interface SwitchClient {
    *  `saldo` (existencia física) y `disponible` (disponibilidad). Una llamada por
    *  artículo — usar con moderación (no hay bulk). */
   getStock(articuloId: number | string): Promise<SwitchStockData>;
+  /** Talla y color de UN artículo por sucursal (/apiarticulos/tallacolor, doc
+   *  pág 38). Devuelve el codigoBarraId de cada combinación talla/color con
+   *  saldo/disponible por sucursal. `sucursalId` opcional (de /apisucursal/lista)
+   *  filtra la info a una sucursal específica. */
+  apiarticulosTallaColor(params: {
+    articuloId: number | string;
+    sucursalId?: number | string;
+  }): Promise<SwitchTallaColorData>;
+  /** Detalle de un pedido (/apipedido/info?pedidoId=X, doc págs 50-51):
+   *  data.pedido (cabecera con cliente/vendedor/impuestos/urlswitchpay) +
+   *  data.detalle[] (líneas con codigoBarraId, cantidad, precio, descuentos). */
+  apipedidoInfo(pedidoId: number | string): Promise<SwitchPedidoInfoData>;
+  /** Crea un pedido (POST /apipedido/terminar, doc págs 51-53). PRIMER endpoint
+   *  POST de negocio del cliente (hasta ahora el único POST era /autenticacion).
+   *  Los valores de articulos[] van como STRING con decimales (ej. cantidad
+   *  "1.0000", descuento "0.00"). Descuentos: primero por línea, luego el global
+   *  ($100 −5% = $95 −20% = $76, doc pág 51). */
+  apipedidoTerminar(
+    params: SwitchPedidoTerminarParams,
+  ): Promise<SwitchPedidoTerminarData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
 }
@@ -507,6 +527,8 @@ export interface SwitchArticulo {
   id: number;
   codigo: string;
   descripcion: string | null;
+  /** ID interno del código de barra en Switch (numérico; distinto del EAN `codigoBarra`). */
+  codigoBarraId: number | null;
   costo: string | null;
   disponible: string | null;
   precio: string | null;
@@ -620,6 +642,104 @@ export interface SwitchArticuloVenta {
 export interface SwitchVentaSucursalData {
   ventasucursal: SwitchArticuloVenta[];
   paginacion?: SwitchPaginacion;
+}
+
+// ─── Pedidos (/apipedido/*) y talla-color ────────────────────────────────────
+
+/** Row de /apiarticulos/tallacolor (data.tallacolor[], doc pág 38). Un row por
+ *  combinación talla/color × sucursal. `saldo` = existencia física del artículo
+ *  para esa talla/color, `disponible` = disponibilidad. Strings numéricos. */
+export interface SwitchTallaColorRow {
+  codigoBarraId: number;
+  codigoBarra: string | null;
+  color: string | null;
+  talla: string | null;
+  saldo: string | number | null;
+  disponible: string | number | null;
+  sucursalId: number;
+  sucursal: string;
+  [key: string]: unknown;
+}
+
+export interface SwitchTallaColorData {
+  tallacolor: SwitchTallaColorRow[];
+}
+
+/** Línea de `articulos` para POST /apipedido/terminar. TODOS los valores van
+ *  como STRING con decimales — el mismo formato con que el API devuelve montos
+ *  (4 decimales): cantidad "1.0000", precio "20.50", descuento "0.00". Ejemplo
+ *  de la doc (pág 52): {"codigoBarraId":"123","cantidad":"120.0000",
+ *  "precio":"20.50","descuento":"10.00"}. */
+export interface SwitchPedidoLineaInput {
+  /** Id del código de barra (de apiarticulosTallaColor / apiarticulos). */
+  codigoBarraId: string;
+  cantidad: string;
+  precio: string;
+  /** Porcentaje de descuento por línea ("0.00" si no aplica). */
+  descuento: string;
+  /** Opcional: vendedor por línea; si no se envía, Switch usa el vendedor
+   *  principal del pedido. */
+  vendedorId?: string;
+}
+
+export interface SwitchPedidoTerminarParams {
+  vendedorId: number;
+  clienteId: number;
+  articulos: SwitchPedidoLineaInput[];
+  /** Porcentaje de descuento global del pedido (opcional). Se aplica DESPUÉS
+   *  del descuento por línea. String con decimales, ej. "5.00". */
+  descuentoGlobal?: string;
+}
+
+/** Respuesta (data) de POST /apipedido/terminar. */
+export interface SwitchPedidoTerminarData {
+  mensaje: string;
+  numeroInterno: string | number;
+  pedidoId: number | string;
+  clienteEmail: string | null;
+  urlswitchpay: string | null;
+  [key: string]: unknown;
+}
+
+/** Cabecera de /apipedido/info (data.pedido). Impuestos (doc pág 51): si
+ *  clienteImpuestoCodigo ≠ "R", cada línea usa el MENOR entre clienteImpuesto y
+ *  articuloImpuesto; si es "R" usa siempre articuloImpuesto. */
+export interface SwitchPedidoInfo {
+  clienteId: number;
+  pedidoId: number;
+  cliente: string;
+  clienteEmail: string | null;
+  vendedorId: number;
+  vendedor: string;
+  clienteImpuesto: string | number | null;
+  clienteImpuestoCodigo: string | null;
+  urlswitchpay: string | null;
+  [key: string]: unknown;
+}
+
+/** Línea de /apipedido/info (data.detalle[]). Montos como strings numéricos;
+ *  descuento/descuentoGlobal son PORCENTAJES, no montos. */
+export interface SwitchPedidoDetalleLinea {
+  codigoBarraId: number;
+  codigobarra: string | null;
+  articuloId: number;
+  codigoArticulo: string | null;
+  imagen: string | null;
+  cantidad: string | number;
+  precio: string | number;
+  descuento: string | number;
+  descuentoGlobal: string | number | null;
+  vendedorId: number | null;
+  articuloImpuesto: string | number | null;
+  articuloImpuestoCodigo: string | null;
+  descripcion: string | null;
+  tipoArticulo: string | null;
+  [key: string]: unknown;
+}
+
+export interface SwitchPedidoInfoData {
+  pedido: SwitchPedidoInfo;
+  detalle: SwitchPedidoDetalleLinea[];
 }
 
 export function createSwitchClient(empresaKey: string): SwitchClient {
@@ -816,6 +936,51 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         cfg,
         `/apiproveedor/info?${qs.toString()}`,
         "GET",
+      );
+    },
+
+    async apiarticulosTallaColor(params) {
+      const qs = new URLSearchParams({ articuloId: String(params.articuloId) });
+      if (params.sucursalId !== undefined) {
+        qs.set("sucursalId", String(params.sucursalId));
+      }
+      return authedCall<SwitchTallaColorData>(
+        empresaKey,
+        cfg,
+        `/apiarticulos/tallacolor?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async apipedidoInfo(pedidoId) {
+      const qs = new URLSearchParams({ pedidoId: String(pedidoId) });
+      return authedCall<SwitchPedidoInfoData>(
+        empresaKey,
+        cfg,
+        `/apipedido/info?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async apipedidoTerminar(params) {
+      // Body como JSON (igual que /autenticacion). La doc NO especifica
+      // content-type para este POST: si Switch rechaza el body JSON, el
+      // fallback a probar en el piloto es form-urlencoded con `articulos`
+      // como string JSON (la doc pág 52 muestra articulos como "JSON").
+      const body: Record<string, unknown> = {
+        vendedorId: params.vendedorId,
+        clienteId: params.clienteId,
+        articulos: params.articulos,
+      };
+      if (params.descuentoGlobal !== undefined) {
+        body.descuentoGlobal = params.descuentoGlobal;
+      }
+      return authedCall<SwitchPedidoTerminarData>(
+        empresaKey,
+        cfg,
+        "/apipedido/terminar",
+        "POST",
+        body,
       );
     },
 
