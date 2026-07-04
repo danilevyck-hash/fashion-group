@@ -10,6 +10,7 @@ import {
   type AppGroup, type AppModule,
 } from "@/lib/modules";
 import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
+import { recordModuleClick } from "@/lib/module-frequents";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -101,7 +102,10 @@ function CollapsedFlyout({
             <Link
               key={m.key}
               href={m.href}
-              onClick={onClose}
+              onClick={() => {
+                recordModuleClick(m.key, typeof window !== "undefined" ? sessionStorage.getItem("fg_user_name") : null);
+                onClose();
+              }}
               title={m.label}
               className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors ${
                 active
@@ -329,6 +333,7 @@ export default function Sidebar() {
                       <Link
                         key={m.key}
                         href={m.href}
+                        onClick={() => recordModuleClick(m.key, userName)}
                         title={m.label}
                         tabIndex={isOpen ? 0 : -1}
                         className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-1.5 text-[13px] transition-colors border-l-2 ${

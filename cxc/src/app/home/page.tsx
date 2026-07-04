@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
-import { getVisibleGroups, getVisibleModules, getModulesInGroup } from "@/lib/modules";
+import { getVisibleGroups, getVisibleModules, getModulesInGroup, type AppModule } from "@/lib/modules";
+import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -23,6 +24,7 @@ export default function HomePage() {
   const [darkMode, setDarkMode] = useState(false);
   const [dhAlert, setDhAlert] = useState<{ critical: number; warning: number } | null>(null);
   const [dhDismissed, setDhDismissed] = useState(false);
+  const [frequents, setFrequents] = useState<AppModule[]>([]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -72,6 +74,14 @@ export default function HomePage() {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [authChecked, role]);
+
+  // "Tus frecuentes": top módulos por clics del usuario (localStorage). Se lee
+  // tras montar (client-only) para no romper SSR/hidratación; se recalcula si
+  // cambian rol/permisos/usuario.
+  useEffect(() => {
+    if (!authChecked || !role) return;
+    setFrequents(getFrequentModules(role, fgModules, userName));
+  }, [authChecked, role, fgModules, userName]);
 
   const visibleGroups = role ? getVisibleGroups(role, fgModules) : [];
   const displayName = userName || "";
@@ -131,6 +141,42 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Tus frecuentes: los módulos más usados por el usuario (aprendido de
+            sus clics reales). Solo aparece si ya hay historial; cada tarjeta
+            registra el clic para seguir aprendiendo. */}
+        {frequents.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center gap-2.5 mb-2 px-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={darkMode ? "text-gray-400" : "text-gray-500"}>
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+              <h2 className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Tus frecuentes
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {frequents.map((m) => {
+                const ModIcon = m.icon;
+                return (
+                  <Link
+                    key={m.key}
+                    href={m.href}
+                    onClick={() => recordModuleClick(m.key, userName)}
+                    className={`flex items-center gap-2.5 rounded-lg border px-3 py-3 transition-colors ${
+                      darkMode ? "border-gray-800 bg-gray-900 hover:bg-gray-800" : "border-gray-200 bg-white hover:bg-gray-50"
+                    }`}
+                  >
+                    <ModIcon size={18} strokeWidth={1.5} className={`shrink-0 ${darkMode ? "text-gray-300" : "text-gray-600"}`} />
+                    <span className={`text-sm font-medium leading-tight truncate ${darkMode ? "text-gray-100" : "text-gray-900"}`}>
+                      {m.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Cards de grupo: cada grupo lista sus módulos como links directos.
             Solo aparecen los módulos visibles según permisos (misma fuente que
             el sidebar: getVisibleGroups / getModulesInGroup). Mobile: apiladas. */}
@@ -161,6 +207,7 @@ export default function HomePage() {
                       <Link
                         key={m.key}
                         href={m.href}
+                        onClick={() => recordModuleClick(m.key, userName)}
                         className={`w-full text-left flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors ${
                           darkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"
                         }`}
