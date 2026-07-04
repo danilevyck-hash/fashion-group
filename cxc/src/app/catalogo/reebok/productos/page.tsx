@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder, genderFilterLabel } from "@/lib/reebok-gender";
-import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
 import CatalogFilters, { SaleFilter } from "@/components/reebok/CatalogFilters";
@@ -33,88 +32,23 @@ function Productos() {
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showNameModal, setShowNameModal] = useState(false);
 
   // ── State: cart + draft context ──
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [draftClient, setDraftClient] = useState("");
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const [draftNumber, setDraftNumber] = useState("");
-  const [draftOriginalIds, setDraftOriginalIds] = useState<Set<string>>(new Set());
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * Number(i.unit_price || 0), 0);
 
-  const [restoredDraftBanner, setRestoredDraftBanner] = useState<string | null>(null);
-
-  // ── On mount: determine mode from sessionStorage, fallback to localStorage ──
+  // ── On mount: hidratar el carrito (session → localStorage). El cliente y el
+  // pedido nacen en el CHECKOUT (rediseño 5-jul) — ya no hay borrador en DB
+  // desde el catálogo.
   useEffect(() => {
-    const existingDraftId = sessionStorage.getItem("reebok_draft_id");
-    const newClient = sessionStorage.getItem("reebok_draft_client");
-
-    if (existingDraftId) {
-      fetch(`/api/catalogo/reebok/orders/${existingDraftId}`).then(r => r.ok ? r.json() : null).then(order => {
-        if (order && order.status === "borrador") {
-          setDraftId(order.id);
-          setDraftNumber(order.order_number);
-          setDraftClient(order.client_name || "");
-          const items: CartItem[] = (order.reebok_order_items || []).map((i: CartItem) => ({
-            product_id: i.product_id, sku: i.sku || "", name: i.name || "",
-            image_url: i.image_url || "", quantity: i.quantity, unit_price: i.unit_price,
-          }));
-          setCart(items);
-          setDraftOriginalIds(new Set(items.map(i => i.product_id)));
-        } else {
-          sessionStorage.removeItem("reebok_draft_id");
-        }
-      }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
-    } else if (newClient) {
-      setDraftClient(newClient);
-      try {
-        const saved = sessionStorage.getItem("reebok_cart");
-        if (saved) setCart(JSON.parse(saved));
-      } catch { /* corrupt data — ignore */ }
-    } else {
-      try {
-        const lsClient = localStorage.getItem("reebok_draft_client");
-        const lsCart = localStorage.getItem("reebok_cart");
-        if (lsClient && lsCart) {
-          const parsed = JSON.parse(lsCart);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setRestoredDraftBanner(lsClient);
-            return;
-          }
-        }
-      } catch { /* */ }
-      // Vendedor puede armar el carrito sin cliente; conservar items en sesion.
-      try {
-        const saved = sessionStorage.getItem("reebok_cart");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) setCart(parsed);
-        }
-      } catch { /* */ }
-    }
-  }, []);
-
-  function restoreDraft() {
     try {
-      const lsClient = localStorage.getItem("reebok_draft_client") || "";
-      const lsCart = localStorage.getItem("reebok_cart");
-      sessionStorage.setItem("reebok_draft_client", lsClient);
-      setDraftClient(lsClient);
-      if (lsCart) { setCart(JSON.parse(lsCart)); sessionStorage.setItem("reebok_cart", lsCart); }
-    } catch { /* */ }
-    setRestoredDraftBanner(null);
-  }
-
-  function discardDraft() {
-    localStorage.removeItem("reebok_draft_client");
-    localStorage.removeItem("reebok_cart");
-    sessionStorage.removeItem("reebok_cart");
-    setRestoredDraftBanner(null);
-  }
+      const raw = sessionStorage.getItem("reebok_cart") || localStorage.getItem("reebok_cart");
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed) && parsed.length > 0) setCart(parsed);
+    } catch { /* data corrupta — carrito vacío */ }
+  }, []);
 
   const cartInitialized = useRef(false);
   useEffect(() => {
@@ -122,9 +56,8 @@ function Productos() {
     sessionStorage.setItem("reebok_cart", JSON.stringify(cart));
     try {
       localStorage.setItem("reebok_cart", JSON.stringify(cart));
-      if (draftClient) localStorage.setItem("reebok_draft_client", draftClient);
     } catch { /* */ }
-  }, [cart, draftClient]);
+  }, [cart]);
 
   // Stock: el del sync nocturno (<24h) — decisión de Daniel 5-jul: CERO
   // llamadas en vivo a Switch desde el catálogo.
@@ -137,78 +70,10 @@ function Productos() {
     });
   }, []);
 
-  // ── Floating bar action: create or update ──
-  async function handleFloatingBarClick() {
+  // ── Barra: al checkout (el pedido se crea y envía a Switch allá) ──
+  function handleFloatingBarClick() {
     if (cart.length === 0) return;
-    if (!draftId && !draftClient) { setShowNameModal(true); return; }
-    setSaving(true);
-
-    if (draftId) {
-      setToast("Actualizando pedido...");
-      try {
-        for (const item of cart) {
-          const res = await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item),
-          });
-          // Si un item no se guardo, abortamos: NO navegamos como exito.
-          if (!res.ok) throw new Error("PATCH item fallido");
-        }
-        for (const pid of draftOriginalIds) {
-          if (!cart.find(i => i.product_id === pid)) {
-            const res = await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
-              method: "PATCH", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ product_id: pid, quantity: 0 }),
-            });
-            if (!res.ok) throw new Error("PATCH remove fallido");
-          }
-        }
-        router.push(`/catalogo/reebok/pedido/${draftId}`);
-      } catch {
-        // Algun item fallo (o sin conexion): no navegamos. El carrito queda
-        // intacto para reintentar (el PATCH por product_id es idempotente).
-        setToast("No se pudo actualizar el pedido. Revisa tu conexion e intenta de nuevo.");
-        setSaving(false);
-      }
-    } else {
-      setToast("Creando pedido...");
-      // Token idempotente: se genera una vez y se PERSISTE en sessionStorage.
-      // Si este POST falla y el vendedor toca de nuevo, el retry reusa el MISMO
-      // token → el server (reebok_create_order) devuelve el pedido ya creado en
-      // vez de duplicarlo. Solo se borra al confirmar un exito.
-      let token = sessionStorage.getItem("reebok_create_token");
-      if (!token) {
-        token = (typeof crypto !== "undefined" && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        sessionStorage.setItem("reebok_create_token", token);
-      }
-      try {
-        const res = await fetch("/api/catalogo/reebok/orders", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            client_name: draftClient,
-            vendor_name: sessionStorage.getItem("fg_user_name") || null,
-            client_email: sessionStorage.getItem("reebok_draft_client_email") || null,
-            items: cart,
-            idempotency_key: token,
-          }),
-        });
-        if (res.ok) {
-          const order = await res.json();
-          sessionStorage.removeItem("reebok_draft_client");
-          sessionStorage.removeItem("reebok_draft_client_email");
-          sessionStorage.removeItem("reebok_cart");
-          sessionStorage.removeItem("reebok_create_token"); // exito → el proximo pedido usa un token nuevo
-          sessionStorage.setItem("reebok_draft_id", order.id);
-          router.push(`/catalogo/reebok/pedido/${order.id}`);
-        } else {
-          const err = await res.json().catch(() => ({}));
-          setToast(err.error || "Error al crear pedido");
-          setSaving(false);
-        }
-      } catch { setToast("Sin conexion. Verifica tu internet e intenta de nuevo."); setSaving(false); }
-    }
+    router.push("/catalogo/reebok/checkout");
   }
 
   // ── Scroll, search, filters ──
@@ -297,7 +162,6 @@ function Productos() {
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const hasContext = draftClient || draftId;
 
   // ── Download catalog as PDF ──
   const [downloading, setDownloading] = useState(false);
@@ -660,54 +524,6 @@ function Productos() {
     <div className="max-w-7xl mx-auto px-4 py-6">
       <CatalogHeader variant="vendor" />
 
-      {/* ── Banner: recovered draft from localStorage ── */}
-      {restoredDraftBanner && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-          <span className="text-sm text-amber-700">Tienes un pedido sin terminar para <strong>{restoredDraftBanner}</strong>.</span>
-          <div className="flex gap-2">
-            <button onClick={restoreDraft} className="text-xs bg-[#1A2656] text-white px-4 py-1.5 rounded-lg hover:bg-[#0f1a3d] transition font-medium">Continuar</button>
-            <button onClick={discardDraft} className="text-xs text-gray-500 hover:text-[#1A2656] transition px-2">Descartar</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Banner: order context ── */}
-      {hasContext ? (
-        <div className="flex items-center justify-between bg-white border border-[#1A2656]/10 rounded-xl px-4 py-3 mb-4 shadow-sm">
-          <div className="flex items-center gap-2 text-sm">
-            {!draftId && (
-              <div className="flex items-center gap-1.5 mr-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-medium">&#10003;</span>
-                <span className="w-5 h-5 rounded-full bg-[#1A2656] text-white text-xs flex items-center justify-center font-bold">2</span>
-                <span className="text-xs text-[#1A2656]/30 font-medium">Paso 2 de 2</span>
-              </div>
-            )}
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            {draftId ? (
-              <>
-                <span className="text-[#1A2656]/50">Editando</span>
-                <span className="font-semibold text-[#1A2656]">{draftNumber}</span>
-                <span className="text-[#1A2656]/30">— {draftClient}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-[#1A2656]/50">Elige productos para</span>
-                <span className="font-semibold text-[#1A2656]">{draftClient}</span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {!draftId && <button onClick={() => setShowNameModal(true)} className="text-xs text-[#1A2656]/40 hover:text-[#1A2656] transition font-medium">Cambiar</button>}
-            {draftId && <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-[#1A2656] font-semibold hover:underline transition">Ver pedido &rarr;</Link>}
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-          <span className="text-sm text-amber-800">Sin cliente seleccionado &middot; podras asignarlo al confirmar el pedido</span>
-          <button onClick={() => setShowNameModal(true)} className="text-sm bg-[#1A2656] text-white px-4 py-1.5 rounded-lg hover:bg-[#0f1a3d] transition font-medium">Seleccionar cliente</button>
-        </div>
-      )}
-
       {/* ── Filters ── */}
       <CatalogFilters
         searchInput={searchInput}
@@ -762,17 +578,6 @@ function Productos() {
           className="fixed bottom-24 right-4 z-30 w-10 h-10 bg-white border border-[#1A2656]/10 rounded-full shadow-md flex items-center justify-center text-[#1A2656]/40 hover:text-[#1A2656] transition min-w-[44px] min-h-[44px]">&uarr;</button>
       )}
 
-      {/* ── Name modal (when no context) ── */}
-      {showNameModal && (
-        <NewOrderModal
-          onClose={() => setShowNameModal(false)}
-          onSelected={(name) => {
-            setDraftClient(name);
-            setToast(`Cliente seleccionado: ${name}`);
-          }}
-        />
-      )}
-
       {/* ── Sticky cart bar ── */}
       {cartCount > 0 && (
         <StickyCartBar
@@ -783,16 +588,9 @@ function Productos() {
           onClearCart={handleClearCart}
           variant="vendor"
           onCreateOrder={handleFloatingBarClick}
-          saving={saving}
-          actionLabel={saving ? "Guardando..." : draftId ? `Actualizar ${draftNumber}` : "Crear pedido"}
-          actionColor={draftId ? "bg-[#1A2656] hover:bg-[#0f1a3d]" : "bg-[#E4002B] hover:bg-[#c90025]"}
-          miniCartLink={
-            draftId ? (
-              <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-[#1A2656] font-semibold hover:underline">
-                Ver pedido &rarr;
-              </Link>
-            ) : undefined
-          }
+          saving={false}
+          actionLabel="Ver pedido"
+          actionColor="bg-[#E4002B] hover:bg-[#c90025]"
           formatTotal={fmt}
         />
       )}
