@@ -126,30 +126,16 @@ function Productos() {
     } catch { /* */ }
   }, [cart, draftClient]);
 
-  // Stock EN VIVO desde Switch al agregar un producto (1 consulta por sku por
-  // sesión de pantalla; el endpoint tiene su propio micro-caché de 60s).
-  // Actualiza Disponible/En bodega de la card con el número real.
-  const stockPedido = useRef<Set<string>>(new Set());
-  const refreshStockVivo = useCallback((productId: string, sku: string | null | undefined) => {
-    if (!sku || stockPedido.current.has(sku)) return;
-    stockPedido.current.add(sku);
-    fetch(`/api/catalogo/stock-vivo?marca=reebok&sku=${encodeURIComponent(sku)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((d: { existencia: number; disponible: number }) => {
-        setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, existencia: d.existencia, disponibilidad: d.disponible } : p));
-      })
-      .catch(() => { stockPedido.current.delete(sku); }); // permitir reintento
-  }, []);
-
+  // Stock: el del sync nocturno (<24h) — decisión de Daniel 5-jul: CERO
+  // llamadas en vivo a Switch desde el catálogo.
   const handleQtyChange = useCallback((productId: string, qty: number, product: Product) => {
-    if (qty > 0) refreshStockVivo(productId, product.sku);
     setCart(prev => {
       if (qty <= 0) return prev.filter(i => i.product_id !== productId);
       const idx = prev.findIndex(i => i.product_id === productId);
       if (idx >= 0) return prev.map((item, i) => i === idx ? { ...item, quantity: qty } : item);
       return [...prev, { product_id: productId, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: qty, unit_price: product.price || 0, category: product.category, is_preorder: product.badge === "proximamente" }];
     });
-  }, [refreshStockVivo]);
+  }, []);
 
   // ── Floating bar action: create or update ──
   async function handleFloatingBarClick() {

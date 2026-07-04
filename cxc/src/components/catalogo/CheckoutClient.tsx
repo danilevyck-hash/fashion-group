@@ -2,12 +2,13 @@
 
 // Checkout ÚNICO de los catálogos (Reebok y Joybees) — mockup aprobado:
 // carrito → esta pantalla → confirmación. Items editables, cliente del
-// directorio Switch (default Contado), vendedor AUTOMÁTICO por login,
-// re-validación de stock en vivo y UN botón "Confirmar y enviar a Switch".
+// directorio Switch (default Contado), vendedor AUTOMÁTICO por login, total y
+// UN botón "Confirmar y enviar a Switch". SIN validación de stock aquí
+// (decisión de Daniel 5-jul: el stock del sync <24h basta; flujo rápido).
 // El carrito vive en localStorage y NUNCA se limpia antes de que el pedido
 // quede guardado en DB.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseThumb } from "@/lib/image-thumb";
@@ -61,7 +62,6 @@ const BRANDS: Record<string, BrandCfg> = {
 };
 
 interface Cliente { id: number; codigo: string | null; nombre: string }
-interface StockInfo { existencia: number; disponible: number }
 
 const CONTADO: Cliente = { id: 1, codigo: null, nombre: "Contado" };
 
@@ -76,9 +76,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
   const [clienteQuery, setClienteQuery] = useState("");
   const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
-  const [stocks, setStocks] = useState<Record<string, StockInfo>>({});
-  const [stockLoading, setStockLoading] = useState(false);
-  const [stockTs, setStockTs] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [erroresDetalle, setErroresDetalle] = useState<string[]>([]);
@@ -118,33 +115,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
       .then((d) => setClientes(d.clientes ?? []))
       .catch(() => setClientes([]));
   }, [clientePickerOpen, clientes, marca]);
-
-  // ── Stock en vivo de todo el carrito ──
-  const refreshStock = useCallback(async (items: CheckoutCartItem[]) => {
-    const skus = items.map((i) => i.sku).filter(Boolean);
-    if (!skus.length) return;
-    setStockLoading(true);
-    try {
-      const r = await fetch("/api/catalogo/stock-carrito", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marca, skus }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        setStocks(d.stocks ?? {});
-        setStockTs(d.actualizado ?? null);
-      }
-    } catch { /* aviso implícito: sin datos de stock */ }
-    setStockLoading(false);
-  }, [marca]);
-
-  const stockPedido = useRef(false);
-  useEffect(() => {
-    if (!loaded || !cart.length || stockPedido.current) return;
-    stockPedido.current = true;
-    refreshStock(cart);
-  }, [loaded, cart, refreshStock]);
 
   // ── Derivados ──
   const lineas = useMemo(() => cart.map((i) => {
@@ -233,8 +203,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
           {/* Items */}
           <section className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
             {lineas.map((l) => {
-              const st = stocks[l.sku];
-              const faltante = st && l.piezas > st.disponible;
               return (
                 <div key={l.product_id} className="flex gap-3 p-3">
                   <div className="h-16 w-16 shrink-0 rounded-md bg-gray-50 overflow-hidden">
@@ -260,11 +228,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
                       </div>
                       <div className="text-right text-xs tabular-nums">
                         <span className="text-gray-400">{l.piezas} pzas</span>
-                        {st && (
-                          <span className={`ml-2 ${faltante ? "text-red-600 font-medium" : "text-emerald-700"}`}>
-                            {faltante ? `solo ${st.disponible} disp.` : `${st.disponible} disp.`}
-                          </span>
-                        )}
                         {l.is_preorder && <span className="ml-2 text-amber-700 font-medium">preventa</span>}
                       </div>
                     </div>
@@ -273,14 +236,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
               );
             })}
           </section>
-
-          {/* Stock refresh */}
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>{stockLoading ? "Consultando stock en Switch…" : stockTs ? `Stock verificado en vivo` : "Stock del último sync"}</span>
-            <button onClick={() => refreshStock(cart)} disabled={stockLoading} className="rounded-md border border-gray-200 px-2.5 py-1.5 font-medium text-gray-600 hover:border-gray-300 transition disabled:opacity-40 min-h-[44px]">
-              Re-validar stock
-            </button>
-          </div>
 
           {/* Cliente */}
           <section className="rounded-lg border border-gray-200 bg-white p-4">
