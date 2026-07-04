@@ -173,7 +173,11 @@ export async function syncCatalogo(
           const shouldShow = existencia >= 1 || keepVisible;
           const nameFinal = p.name && p.name.trim() ? p.name : (art.descripcion ?? p.name);
           if (!dryRun) {
-            await db.from(productsTable).update({
+            // supabase-js NO lanza ante error de DB: devuelve { error }. Si no lo
+            // chequeamos, un fallo de escritura (p.ej. columna inexistente) queda
+            // invisible → contadores mentirosos + heartbeat verde. Throw → aborta
+            // la empresa, setea out.error, dispara alerta Telegram (sin falso éxito).
+            const { error: upErr } = await db.from(productsTable).update({
               price: precio,
               name: nameFinal,
               active: shouldShow,
@@ -181,11 +185,13 @@ export async function syncCatalogo(
               ...(config.articuloFields ? config.articuloFields(art) : {}),
               // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
             }).eq("id", p.id);
+            if (upErr) throw new Error(`update ${productsTable} sku=${codigo}: ${upErr.message}`);
             if (inventoryTable) {
-              await db.from(inventoryTable).upsert(
+              const { error: invErr } = await db.from(inventoryTable).upsert(
                 { product_id: p.id, size: "UNICA", quantity: existencia },
                 { onConflict: "product_id,size" },
               );
+              if (invErr) throw new Error(`upsert ${inventoryTable} product=${p.id}: ${invErr.message}`);
             }
           }
           if (p.active === false && shouldShow) out.reactivados++;
@@ -207,11 +213,16 @@ export async function syncCatalogo(
               ...(config.articuloFields ? config.articuloFields(art) : {}),
               ...(config.insertExtras ?? {}),
             }).select("id").single();
-            if (!insErr && np?.id && inventoryTable) {
-              await db.from(inventoryTable).upsert(
+            // Antes: `if (!insErr && ...)` tragaba el error del INSERT en silencio
+            // (contaba el producto como agregado + alerta "nuevo sin foto" aunque no
+            // se guardara). Ahora el fallo aborta la empresa y se reporta.
+            if (insErr) throw new Error(`insert ${productsTable} sku=${art.codigo}: ${insErr.message}`);
+            if (np?.id && inventoryTable) {
+              const { error: invErr } = await db.from(inventoryTable).upsert(
                 { product_id: np.id, size: "UNICA", quantity: existencia },
                 { onConflict: "product_id,size" },
               );
+              if (invErr) throw new Error(`upsert ${inventoryTable} product=${np.id}: ${invErr.message}`);
             }
           }
         }
