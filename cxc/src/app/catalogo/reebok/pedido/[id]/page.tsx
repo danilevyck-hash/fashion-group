@@ -7,6 +7,7 @@ import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
+import { supabaseThumb } from "@/lib/image-thumb";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
@@ -548,7 +549,7 @@ export default function OrderDetailPage() {
                 <tr key={idx} className="border-b border-gray-50">
                   <td className="py-2">
                     <div className="w-10 h-10 bg-gray-50 rounded overflow-hidden">
-                      {item.image_url ? <img src={item.image_url} alt="" className="w-full h-full object-contain" /> : null}
+                      {item.image_url ? <img src={supabaseThumb(item.image_url, 160) ?? item.image_url} alt="" className="w-full h-full object-contain" onError={(e) => { const el = e.currentTarget; if (el.src !== item.image_url) el.src = item.image_url; }} /> : null}
                     </div>
                   </td>
                   <td className="py-2">

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import BultosBadge from "@/components/shared/BultosBadge";
+import { supabaseThumb } from "@/lib/image-thumb";
 
 const COLOR_DOT_MAP: Record<string, string> = {
   black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
@@ -37,6 +38,8 @@ export default function CatalogProductCard({
   product, qty, onQtyChange, disabled, showBultos, showStock,
 }: CatalogProductCardProps) {
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
+  // Thumbnail (render transform); si falla, cae a la URL original una vez.
+  const [useThumb, setUseThumb] = useState(true);
   const [justAdded, setJustAdded] = useState(false);
   const [showLightbox, setShowLightbox] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
@@ -132,15 +135,20 @@ export default function CatalogProductCard({
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  key={imageStatus}
-                  src={product.image_url}
+                  key={`${imageStatus}-${useThumb}`}
+                  src={useThumb ? (supabaseThumb(product.image_url, 600) ?? product.image_url) : product.image_url}
                   alt={product.name}
                   width={300}
                   height={300}
                   loading="lazy"
                   className="w-full h-full object-contain p-3"
                   onLoad={() => setImageStatus("loaded")}
-                  onError={() => setImageStatus("error")}
+                  onError={() => {
+                    // 1er fallo: reintenta con la URL original (por si el
+                    // transform no soporta ese archivo); 2do fallo: error real.
+                    if (useThumb) { setUseThumb(false); setImageStatus("loading"); }
+                    else setImageStatus("error");
+                  }}
                 />
               )}
             </>
