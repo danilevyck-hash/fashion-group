@@ -8,6 +8,7 @@ import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { Reclamo, RItem, Foto, LocalFoto, Contacto, RView } from "./components/types";
 import { validateFotoFile, uploadReclamoFoto, compressImage } from "./components/fotoUpload";
@@ -150,19 +151,32 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [addingMotivo, setAddingMotivo] = useState<number | null>(null);
   const [addingEditMotivo, setAddingEditMotivo] = useState<number | null>(null); const [newMotivoText, setNewMotivoText] = useState("");
 
-  // Nuevo Reclamo ya NO usa borrador autosave (el flujo toma ~1 min y el borrador
-  // causaba confusión: reaparecía como "borrador de hace X días" tras guardar).
-  // Limpieza one-time: borra cualquier borrador zombi que haya quedado en
-  // localStorage, para que las secretarias que ya tenían uno no vean el banner
-  // una última vez.
-  useEffect(() => {
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith("fg_draft_reclamo_")) localStorage.removeItem(k);
-      }
-    } catch { /* localStorage no disponible — ignorar */ }
-  }, []);
+  // Borrador del reclamo NUEVO (reintroducido 4-jul a pedido de Daniel — es el
+  // form más largo del sistema). La versión anterior se quitó porque el
+  // borrador "reaparecía tras guardar"; eso se corrige aquí con dos guardas:
+  // (1) post-guardado (savedReclamoId) el autosave se considera vacío y no
+  // re-crea el borrador, y (2) el save exitoso lo limpia explícitamente.
+  const reclamoDraftData = useMemo(
+    () => ({ fEmpresa, fFecha, fFactura, fPedido, fNotas, fItems }),
+    [fEmpresa, fFecha, fFactura, fPedido, fNotas, fItems],
+  );
+  const isReclamoDraftEmpty = useCallback((d: typeof reclamoDraftData) => {
+    if (savedReclamoId) return true; // guarda (1): no re-crear tras guardar
+    return !d.fEmpresa && !d.fFactura && !d.fPedido && !d.fNotas &&
+      d.fItems.every(i => !i.referencia && !i.descripcion && !i.motivo && !(Number(i.precio_unitario) > 0));
+  }, [savedReclamoId]);
+  const { draft: reclamoDraft, hasDraft: hasReclamoDraft, clearDraft: clearReclamoDraft, draftTimeAgo: reclamoDraftTimeAgo } =
+    useDraftAutoSave("reclamo", reclamoDraftData, isReclamoDraftEmpty);
+  function restoreReclamoDraft() {
+    if (!reclamoDraft) return;
+    setFEmpresa(reclamoDraft.fEmpresa || "");
+    setFFecha(reclamoDraft.fFecha || new Date().toISOString().slice(0, 10));
+    setFFactura(reclamoDraft.fFactura || "");
+    setFPedido(reclamoDraft.fPedido || "");
+    setFNotas(reclamoDraft.fNotas || "");
+    setFItems(reclamoDraft.fItems?.length ? reclamoDraft.fItems : [emptyItem()]);
+    clearReclamoDraft();
+  }
 
   function buildUrl(v: RView, id: string | null | undefined, empresa: string | null): string {
     const params = new URLSearchParams();
@@ -357,6 +371,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         const saved = await res.json();
         reclamoId = saved.id;
         setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || "");
+        clearReclamoDraft(); // guarda (2) del bug original: sin esto reaparecía tras guardar
         loadReclamos();
       }
       // Subir las fotos adjuntas (si hay) al reclamo recién creado — un solo flujo.
@@ -667,6 +682,15 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   if (view === "form") {
     return (
       <ReclamoForm
+        draftBanner={!savedReclamoId && hasReclamoDraft ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center justify-between gap-4">
+            <p className="text-sm text-amber-800">Tienes un borrador guardado de {reclamoDraftTimeAgo}. ¿Restaurar?</p>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button onClick={restoreReclamoDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
+              <button onClick={clearReclamoDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
+            </div>
+          </div>
+        ) : null}
         fEmpresa={fEmpresa} setFEmpresa={setFEmpresa}
         fFecha={fFecha} setFFecha={setFFecha}
         fFactura={fFactura} setFFactura={setFFactura}

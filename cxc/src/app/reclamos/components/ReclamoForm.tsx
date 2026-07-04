@@ -8,6 +8,8 @@ import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, lo
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
+  /** Banner de restaurar borrador (lo arma el padre). */
+  draftBanner?: React.ReactNode;
   fEmpresa: string;
   setFEmpresa: (v: string) => void;
   fFecha: string;
@@ -52,6 +54,7 @@ export default function ReclamoForm({
   customMotivos, setCustomMotivos, addingMotivo, setAddingMotivo,
   newMotivoText, setNewMotivoText, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
   isEditing,
+  draftBanner,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -105,6 +108,7 @@ export default function ReclamoForm({
         <span className="text-gray-300">/</span>
         <span className="text-gray-600 font-medium">Nuevo Reclamo</span>
       </nav>
+      {draftBanner}
       <div className="flex items-center justify-between mb-8 sm:mb-10">
         <h1 className="text-[21px] font-medium tracking-tight">Nuevo Reclamo</h1>
         {!revealAll && (
