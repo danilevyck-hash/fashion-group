@@ -5,6 +5,7 @@ import Drawer from "@/components/Drawer";
 import { fmt } from "@/lib/format";
 import GastoForm, { normalizeStr } from "./GastoForm";
 import { CajaResponsable } from "./types";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 
 interface PeriodoLike {
   id: string;
@@ -41,6 +42,10 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   const [gItbmsPct, setGItbmsPct] = useState("0");
   const [gCategoria, setGCategoria] = useState("Transporte");
   const [gResponsableId, setGResponsableId] = useState("");
+  // Última categoría/responsable usados (fg_last_*): la secretaria que carga
+  // 10 comprobantes del mismo responsable no lo re-elige 10 veces.
+  const [lastCategoria, setLastCategoria] = useLastUsed("caja_categoria", "Transporte");
+  const [lastResponsable, setLastResponsable] = useLastUsed("caja_responsable", "");
   const [addingGasto, setAddingGasto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showManageCat, setShowManageCat] = useState(false);
@@ -52,6 +57,19 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   const subtotalNum = parseFloat(gSubtotal) || 0;
   const itbmsNum = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
   const totalNum = Math.round((subtotalNum + itbmsNum) * 100) / 100;
+
+  // Sembrar con lo último usado al abrir (la categoría directo; el responsable
+  // solo si sigue existiendo en el catálogo ya cargado).
+  useEffect(() => {
+    if (!open) return;
+    setGCategoria(lastCategoria || "Transporte");
+  }, [open, lastCategoria]);
+  useEffect(() => {
+    if (!open || !lastResponsable) return;
+    if (responsablesCatalog.some((r) => String(r.id) === lastResponsable)) {
+      setGResponsableId((prev) => prev || lastResponsable);
+    }
+  }, [open, lastResponsable, responsablesCatalog]);
 
   // Carga catálogos al abrir.
   useEffect(() => {
@@ -74,8 +92,9 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
     setGNroFactura("");
     setGSubtotal("");
     setGItbmsPct("0");
-    setGCategoria("Transporte");
-    setGResponsableId("");
+    // Categoría y responsable NO se resetean: "Guardar y nuevo" retiene lo
+    // recién usado (el caso real es cargar varios comprobantes seguidos del
+    // mismo responsable).
   }
 
   async function save(opts: { andNew: boolean; skipNegativeCheck?: boolean }) {
@@ -112,6 +131,8 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
         setError((payload && typeof payload.error === "string" ? payload.error : null) || "Error al agregar gasto. Intenta de nuevo.");
         return;
       }
+      setLastCategoria(resolvedCategoria);
+      setLastResponsable(gResponsableId);
       if (opts.andNew) {
         resetForm();
         onSaved({ keepOpen: true });
