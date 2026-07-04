@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
+import { reebokServer } from '@/lib/reebok-supabase-server'
 import { logActivity } from '@/lib/log-activity'
 import { getSession } from '@/lib/require-auth'
 import { requireRole } from '@/lib/requireRole'
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Upsert inventory with size 'UNICA' (bulk = no size tracking)
-      const { error } = await supabase
+      const { error } = await reebokServer
         .from('inventory')
         .upsert(
           { product_id: productId, size: 'UNICA', quantity: item.quantity },
