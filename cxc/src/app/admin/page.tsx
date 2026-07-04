@@ -496,6 +496,10 @@ function AdminDashboardInner() {
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         contactLog={contactLog}
+        onQuickMarkContacted={handleQuickMarkContacted}
+        onOpenEmail={openEmail}
+        onWhatsApp={openWhatsApp}
+        onCopyMessage={copyMessage}
         canExport={canExport}
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}

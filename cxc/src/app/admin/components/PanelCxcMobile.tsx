@@ -6,15 +6,17 @@
 // padre (AdminDashboardInner) y se pasan acá para que persistan al rotar
 // entre breakpoints.
 //
-// NO incluye contacto (telefono/whatsapp/email/marcar-contactado) — decisión de
-// producto. El desglose por empresa muestra total exacto + último pago, y
-// "Ver facturas pendientes" enlaza a la ficha /clientes/[codigo].
+// Contacto: cada card tiene menú "···" con las MISMAS acciones que la tabla
+// desktop (Ya contacté / WhatsApp / email / copiar mensaje) — pedido de Daniel
+// 4-jul-2026 (antes se excluía a propósito). El desglose por empresa muestra
+// total exacto + último pago, y "Ver facturas pendientes" enlaza a la ficha.
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
+import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import {
   SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -46,6 +48,10 @@ interface PanelCxcMobileProps {
   favorites: Set<string>;
   onToggleFavorite: (name: string) => void;
   contactLog?: Record<string, { date: string; method: string }>;
+  onQuickMarkContacted: (clientName: string, method: string) => void;
+  onOpenEmail: (client: ConsolidatedClient) => void;
+  onWhatsApp: (client: ConsolidatedClient) => void;
+  onCopyMessage: (client: ConsolidatedClient) => void;
   canExport: boolean;
   onExportarCsv: () => void;
   empresaRestriction: string | null;
@@ -63,6 +69,10 @@ export default function PanelCxcMobile({
   setCompanyFilter,
   favorites,
   onToggleFavorite,
+  onQuickMarkContacted,
+  onOpenEmail,
+  onWhatsApp,
+  onCopyMessage,
   canExport,
   onExportarCsv,
   empresaRestriction,
@@ -103,6 +113,15 @@ export default function PanelCxcMobile({
   }, [filtered, favorites]);
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
+
+  // Mismo menú "···" que la tabla desktop (ClientTable.buildRowMenuItems).
+  const buildRowMenuItems = (client: ConsolidatedClient): OverflowMenuItem[] => [
+    { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
+    { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
+    { label: "WhatsApp", onClick: () => onWhatsApp(client) },
+    { label: "Enviar email", onClick: () => onOpenEmail(client), disabled: !client.correo },
+    { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
+  ];
 
   return (
     <div className="md:hidden bg-gray-50">
@@ -159,6 +178,7 @@ export default function PanelCxcMobile({
                     onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
+                    actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
                   />
                 </li>
               );
@@ -430,6 +450,7 @@ function MobileClientCard({
   onToggleFavorite,
   isExpanded,
   onToggle,
+  actionsMenu,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
@@ -437,6 +458,7 @@ function MobileClientCard({
   onToggleFavorite: () => void;
   isExpanded: boolean;
   onToggle: () => void;
+  actionsMenu?: React.ReactNode;
 }) {
   const borderLeft = worstBucketBorder(client);
 
@@ -444,11 +466,13 @@ function MobileClientCard({
     <article
       className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm border-l-4 ${borderLeft}`}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
         aria-expanded={isExpanded}
-        className="block w-full text-left active:bg-gray-50"
+        className="block w-full cursor-pointer text-left active:bg-gray-50"
       >
         <div className="flex items-start justify-between gap-3 px-3 py-3">
           <div className="min-w-0 flex-1">
@@ -472,6 +496,7 @@ function MobileClientCard({
             <span className="font-mono text-base font-semibold tabular-nums text-gray-900">
               {formatCompactCurrency(client.total)}
             </span>
+            {actionsMenu && <span onClick={e => e.stopPropagation()}>{actionsMenu}</span>}
             <svg
               width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
               className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -486,7 +511,7 @@ function MobileClientCard({
           <BucketChip variant="watch" value={client.watch} />
           <BucketChip variant="overdue" value={client.overdue} />
         </div>
-      </button>
+      </div>
 
       {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} />}
     </article>
