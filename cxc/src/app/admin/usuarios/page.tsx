@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
+import VendedorSwitchSection from "./VendedorSwitchSection";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
 
 // Cargar Playfair Display sin contaminar otros módulos —
@@ -406,6 +407,9 @@ export default function UsuariosPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Mapeo vendedor Switch — solo en edición (necesita user id). */}
+                {editUserId && <VendedorSwitchSection userId={editUserId} showToast={showToast} />}
               </div>
 
               <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
