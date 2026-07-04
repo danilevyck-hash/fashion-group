@@ -1,9 +1,9 @@
 "use client";
 
 // Pantalla de CONFIRMACIÓN post-checkout (Reebok y Joybees): estado real del
-// pedido y su envío a Switch leído del server (no confía en estado de
-// navegación). Si Switch falló: el pedido está guardado, aviso claro y botón
-// Reintentar. Nunca hay carrito que perder aquí — se limpió al guardar en DB.
+// pedido y su envío a Switch leído del server. MÁXIMO 3 acciones (decisión de
+// Daniel 5-jul): Enviar/Reintentar solo si aplica, Ver PDF directo en pestaña
+// nueva (el share nativo del visor cubre WhatsApp/mail), y Volver al catálogo.
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -13,15 +13,11 @@ const BRANDS = {
   reebok: {
     label: "REEBOK",
     catalogHref: "/catalogo/reebok/productos",
-    pedidoHref: (id: string) => `/catalogo/reebok/pedido/${id}`,
-    publicHref: null as ((id: string) => string) | null,
     api: "/api/catalogo/reebok",
   },
   joybees: {
     label: "JOYBEES",
     catalogHref: "/catalogo/joybees",
-    pedidoHref: (id: string) => `/catalogo/joybees/pedido/${id}`,
-    publicHref: (id: string) => `/pedido-joybees/${id}`,
     api: "/api/catalogo/joybees",
   },
 };
@@ -40,7 +36,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
   const [retrying, setRetrying] = useState(false);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     const [oRes, eRes] = await Promise.all([
@@ -79,14 +74,6 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
   const sinIntento = envio === null;
   const puedeReintentar = sinIntento || envio?.estado === "error";
 
-  function buildWaHref(): string {
-    const num = order?.order_number || "";
-    const total = order ? `$${fmt(Number(order.total) || 0)}` : "";
-    const texto = cfg.publicHref
-      ? `Hola! Aquí está tu pedido ${num} de ${cfg.label} (${total}): ${typeof window !== "undefined" ? window.location.origin : ""}${cfg.publicHref(orderId)}`
-      : `Hola! Tu pedido ${num} de ${cfg.label} por ${total} quedó confirmado. Te enviamos el detalle en PDF.`;
-    return `https://wa.me/?text=${encodeURIComponent(texto)}`;
-  }
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-10">
@@ -129,7 +116,8 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
 
           {retryMsg && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-3 py-2">{retryMsg}</p>}
 
-          {/* Acciones */}
+          {/* Acciones — máximo 3: enviar/reintentar (si aplica), Ver PDF
+              directo (share nativo del visor), volver. */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {puedeReintentar && (
               <button
@@ -140,33 +128,15 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok"
                 {retrying ? "Enviando…" : sinIntento ? "Enviar a Switch" : "Reintentar envío a Switch"}
               </button>
             )}
-            <Link href={cfg.pedidoHref(orderId)} className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition flex items-center justify-center">
-              Ver pedido (PDF · email)
-            </Link>
-            {/* WhatsApp: con link público del pedido (Joybees) o resumen sin
-                link (Reebok interno no tiene ruta pública — el PDF sale de
-                "Ver pedido"). El usuario elige el contacto en WhatsApp. */}
             <a
-              href={buildWaHref()}
+              href={`${cfg.api}/orders/${orderId}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-4 min-h-[48px] text-sm font-medium text-emerald-800 hover:border-emerald-400 transition flex items-center justify-center gap-1.5"
+              className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition flex items-center justify-center"
             >
-              Compartir por WhatsApp
+              Ver PDF
             </a>
-            {cfg.publicHref && (
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}${cfg.publicHref!(orderId)}`)
-                    .then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); })
-                    .catch(() => { /* */ });
-                }}
-                className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm font-medium text-gray-700 hover:border-gray-300 transition"
-              >
-                {copied ? "Link copiado ✓" : "Copiar link para el cliente"}
-              </button>
-            )}
-            <Link href={cfg.catalogHref} className={`rounded-md border border-gray-200 px-4 min-h-[48px] text-sm text-gray-500 hover:border-gray-300 transition flex items-center justify-center ${cfg.publicHref ? "" : ""}`}>
+            <Link href={cfg.catalogHref} className="rounded-md border border-gray-200 px-4 min-h-[48px] text-sm text-gray-500 hover:border-gray-300 transition flex items-center justify-center">
               Volver al catálogo
             </Link>
           </div>
