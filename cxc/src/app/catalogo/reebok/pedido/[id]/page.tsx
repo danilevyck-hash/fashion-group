@@ -13,6 +13,7 @@ interface OrderItem { id?: string; product_id: string; sku: string; name: string
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
 interface DirClient { nombre: string; empresa: string; }
 interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
+interface ClienteSwitchRow { cliente_switch_id: number; codigo: string | null; nombre: string | null; }
 interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
 interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number; }
 
@@ -59,6 +60,18 @@ export default function OrderDetailPage() {
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [switchLoading, setSwitchLoading] = useState(false);
   const [switchSending, setSwitchSending] = useState(false);
+  // ── Cliente Switch del pedido (Fase 2: cliente real en vez de Contado) ──
+  const [clienteSwitch, setClienteSwitch] = useState<{ id: number; nombre: string | null; codigo: string | null } | null>(null);
+  const [showClienteModal, setShowClienteModal] = useState(false);
+  const [clienteQuery, setClienteQuery] = useState("");
+  const [clienteResults, setClienteResults] = useState<ClienteSwitchRow[]>([]);
+  const [clienteBuscando, setClienteBuscando] = useState(false);
+  const [clienteGuardando, setClienteGuardando] = useState(false);
+  const [modoNuevoCliente, setModoNuevoCliente] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoTelefono, setNuevoTelefono] = useState("");
+  const [nuevoCodigo, setNuevoCodigo] = useState("");
+  const [nuevoError, setNuevoError] = useState<string | null>(null);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -93,6 +106,14 @@ export default function OrderDetailPage() {
             const er = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
           } catch { /* no bloquea la carga del pedido */ }
+          // Cliente Switch asignado al pedido (null = Contado, el default del piloto)
+          try {
+            const cr = await fetch(`/api/catalogo/reebok/clientes-switch?orderId=${id}`);
+            if (cr.ok) {
+              const cd = await cr.json();
+              setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+            }
+          } catch { /* no bloquea la carga del pedido */ }
         }
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
@@ -117,6 +138,21 @@ export default function OrderDetailPage() {
     function h(e: MouseEvent) { if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowSugg(false); }
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  // Búsqueda de clientes Switch (selector del modal, 300ms debounce). Corre
+  // solo con el modal abierto en modo búsqueda; query vacío lista los primeros.
+  useEffect(() => {
+    if (!showClienteModal || modoNuevoCliente) return;
+    const t = setTimeout(async () => {
+      setClienteBuscando(true);
+      try {
+        const r = await fetch(`/api/catalogo/reebok/clientes-switch?q=${encodeURIComponent(clienteQuery)}`);
+        if (r.ok) { const d = await r.json(); setClienteResults(d.clientes || []); }
+      } catch { /* sin red: se queda la lista anterior */ }
+      setClienteBuscando(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [clienteQuery, showClienteModal, modoNuevoCliente]);
 
   // Mantener refs sincronizados con el ultimo estado.
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -295,6 +331,78 @@ export default function OrderDetailPage() {
       showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
     }
     setSwitchSending(false);
+  }
+
+  // ── CLIENTE SWITCH (Fase 2) ──
+  // Sugerencia de código para el alta: iniciales del nombre + número, editable.
+  // NO se inventa secuencia D-XXX automática — el código lo confirma el humano.
+  function sugerirCodigo(nombre: string): string {
+    const iniciales = nombre.trim().split(/\s+/).map(w => w[0] || "").join("")
+      .normalize("NFD").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 3) || "CLI";
+    return `${iniciales}-${Math.floor(100 + Math.random() * 900)}`;
+  }
+
+  function abrirClienteModal() {
+    setModoNuevoCliente(false);
+    setClienteQuery("");
+    setClienteResults([]);
+    setNuevoError(null);
+    setShowClienteModal(true);
+  }
+
+  function abrirNuevoCliente() {
+    setNuevoNombre(clientName.trim());
+    setNuevoTelefono("");
+    setNuevoCodigo(sugerirCodigo(clientName));
+    setNuevoError(null);
+    setModoNuevoCliente(true);
+  }
+
+  // Asigna (o quita, con null) el cliente Switch del pedido.
+  async function asignarClienteSwitch(c: ClienteSwitchRow | null) {
+    setClienteGuardando(true);
+    try {
+      const res = await fetch(`/api/catalogo/reebok/clientes-switch`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id, clienteSwitchId: c ? c.cliente_switch_id : null }),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setClienteSwitch(c ? { id: c.cliente_switch_id, nombre: c.nombre, codigo: c.codigo } : null);
+        setShowClienteModal(false);
+        showToast(c ? `Cliente Switch: ${c.nombre || c.codigo}` : "Cliente Switch: Contado (mostrador)");
+      } else {
+        showToast(d.error || "No se pudo guardar el cliente. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("No se pudo guardar el cliente. Revisa tu conexion.");
+    }
+    setClienteGuardando(false);
+  }
+
+  // Alta de cliente REAL en Switch (POST /apicliente/crear) + asignación al pedido.
+  async function crearClienteSwitch() {
+    setNuevoError(null);
+    setClienteGuardando(true);
+    try {
+      const res = await fetch(`/api/catalogo/reebok/clientes-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nuevoNombre, telefono: nuevoTelefono, codigo: nuevoCodigo, orderId: id }),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        if (d.clienteSwitchId) {
+          setClienteSwitch({ id: d.clienteSwitchId, nombre: nuevoNombre.trim(), codigo: d.codigo || nuevoCodigo });
+        }
+        setShowClienteModal(false);
+        showToast(d.verificado ? `Cliente creado en Switch: ${nuevoNombre.trim()}` : "Cliente creado en Switch (sin verificar — revisa el panel)");
+      } else {
+        setNuevoError(d.error || "No se pudo crear el cliente en Switch. Intenta de nuevo.");
+      }
+    } catch {
+      setNuevoError("Error de conexion — revisa en el panel de Switch si el cliente se creo antes de reintentar.");
+    }
+    setClienteGuardando(false);
   }
 
   async function deleteOrder() {
@@ -670,6 +778,19 @@ export default function OrderDetailPage() {
                   {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
                     <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
                   )}
+                  {/* Cliente Switch del pedido — solo editable ANTES del envío.
+                      Default: Contado (mostrador), el piloto de siempre. */}
+                  <div className="flex items-center gap-2 text-sm mb-3">
+                    <span className="text-gray-500">Cliente Switch:</span>
+                    <span className="text-gray-800">
+                      {clienteSwitch ? (clienteSwitch.nombre || clienteSwitch.codigo || `id ${clienteSwitch.id}`) : "Contado (mostrador)"}
+                      {clienteSwitch?.codigo && clienteSwitch.nombre ? <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span> : null}
+                    </span>
+                    <button onClick={abrirClienteModal}
+                      className="text-xs text-gray-500 underline hover:text-black transition">
+                      Cambiar
+                    </button>
+                  </div>
                   <button onClick={previewSwitch} disabled={switchLoading}
                     className="border border-gray-300 text-black text-sm px-4 py-2 rounded-md hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40">
                     {switchLoading ? "Consultando Switch..." : switchEnvio?.estado === "error" ? "Reintentar envio a Switch" : "Enviar a Switch"}
@@ -779,6 +900,82 @@ export default function OrderDetailPage() {
                 </div>
               </>
             ) : null}
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Modal de cliente Switch: buscador sobre la tabla local + alta de
+          cliente nuevo en el ERP (formulario mínimo, código confirmado a mano). */}
+      {showClienteModal && (
+        <ModalOverlay onBackdropClick={() => { if (!clienteGuardando) setShowClienteModal(false); }}>
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {!modoNuevoCliente ? (
+              <>
+                <h3 className="text-base font-medium mb-1">Cliente Switch del pedido</h3>
+                <p className="text-xs text-gray-500 mb-3">El pedido se creara en Switch a nombre de este cliente. Si no eliges uno, va a Contado (mostrador).</p>
+                <input value={clienteQuery} onChange={e => setClienteQuery(e.target.value)}
+                  placeholder="Buscar por nombre o codigo..."
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-2" />
+                <div className="border border-gray-100 rounded-md divide-y divide-gray-50 mb-3 max-h-60 overflow-y-auto">
+                  <button onClick={() => asignarClienteSwitch(null)} disabled={clienteGuardando}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
+                    Contado (mostrador) <span className="text-xs text-gray-400">— default</span>
+                  </button>
+                  {clienteBuscando ? (
+                    <div className="px-3 py-2 text-xs text-gray-400">Buscando...</div>
+                  ) : clienteResults.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-400">
+                      {clienteQuery ? "Sin resultados — puedes crearlo como cliente nuevo" : "Escribe para buscar clientes de Active Shoes"}
+                    </div>
+                  ) : (
+                    clienteResults.map((c) => (
+                      <button key={c.cliente_switch_id} onClick={() => asignarClienteSwitch(c)} disabled={clienteGuardando}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
+                        {c.nombre || `Cliente ${c.cliente_switch_id}`}
+                        {c.codigo && <span className="text-xs text-gray-400 font-mono ml-2">{c.codigo}</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={abrirNuevoCliente} disabled={clienteGuardando}
+                    className="flex-1 border border-gray-300 text-black px-4 py-2.5 rounded-md text-sm hover:border-gray-500 transition disabled:opacity-40 min-h-[44px]">
+                    Cliente nuevo
+                  </button>
+                  <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
+                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
+                    Cerrar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base font-medium mb-1">Cliente nuevo en Switch</h3>
+                <p className="text-xs text-gray-500 mb-4">Se crea REAL en el ERP (Active Shoes) y queda asignado a este pedido.</p>
+                <label className="block text-xs text-gray-500 mb-1">Nombre</label>
+                <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-3" />
+                <label className="block text-xs text-gray-500 mb-1">Telefono (opcional)</label>
+                <input value={nuevoTelefono} onChange={e => setNuevoTelefono(e.target.value)}
+                  placeholder="6612-3456" inputMode="tel"
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-3" />
+                <label className="block text-xs text-gray-500 mb-1">Codigo en Switch</label>
+                <input value={nuevoCodigo} onChange={e => setNuevoCodigo(e.target.value)}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm font-mono outline-none focus:border-black transition mb-1" />
+                <p className="text-xs text-gray-400 mb-3">Solo letras, numeros y guiones. Revisalo antes de crear — asi va a quedar en Switch.</p>
+                {nuevoError && <p className="text-xs text-red-600 mb-3">{nuevoError}</p>}
+                <div className="flex gap-3">
+                  <button onClick={crearClienteSwitch} disabled={clienteGuardando}
+                    className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                    {clienteGuardando ? "Creando en Switch..." : "Crear cliente"}
+                  </button>
+                  <button onClick={() => { if (!clienteGuardando) setModoNuevoCliente(false); }} disabled={clienteGuardando}
+                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+                    Volver
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </ModalOverlay>
       )}
