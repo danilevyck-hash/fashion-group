@@ -10,6 +10,7 @@
 // ============================================================================
 
 import XLSX from "xlsx-js-style";
+import { CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 import type {
   EntregaConItems,
   MkInventarioProducto,
@@ -18,44 +19,28 @@ import type {
 } from "./types";
 import { resumirPorTienda, type FilaResumenTienda } from "./inventario-resumen";
 
-// ---- Estilos compartidos ----
+// ---- Estilos compartidos (estilo de la casa I11: navy + Calibri) ----
+const BORDER_CASA = {
+  top: { style: "thin", color: { rgb: CASA_PALETTE.brd } },
+  bottom: { style: "thin", color: { rgb: CASA_PALETTE.brd } },
+  left: { style: "thin", color: { rgb: CASA_PALETTE.brd } },
+  right: { style: "thin", color: { rgb: CASA_PALETTE.brd } },
+};
+
 const HEADER_STYLE = {
-  font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
-  fill: { patternType: "solid", fgColor: { rgb: "1F1F1F" } },
+  font: { bold: true, color: { rgb: "FFFFFF" }, sz: 10, name: "Calibri" },
+  fill: { patternType: "solid", fgColor: { rgb: CASA_PALETTE.pri } },
   alignment: { horizontal: "center", vertical: "center", wrapText: true },
-  border: {
-    top: { style: "thin", color: { rgb: "BFBFBF" } },
-    bottom: { style: "thin", color: { rgb: "BFBFBF" } },
-    left: { style: "thin", color: { rgb: "BFBFBF" } },
-    right: { style: "thin", color: { rgb: "BFBFBF" } },
-  },
+  border: BORDER_CASA,
 };
 
-const TOTAL_AMARILLO_STYLE = {
-  font: { bold: true, sz: 11, color: { rgb: "000000" } },
-  fill: { patternType: "solid", fgColor: { rgb: "FFE699" } },
+// Fila de totales: banda PRI blanca bold (igual que `tot` del helper).
+const TOTAL_STYLE = {
+  font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" },
+  fill: { patternType: "solid", fgColor: { rgb: CASA_PALETTE.pri } },
   alignment: { vertical: "center" },
-  border: {
-    top: { style: "thin", color: { rgb: "BFBFBF" } },
-    bottom: { style: "thin", color: { rgb: "BFBFBF" } },
-    left: { style: "thin", color: { rgb: "BFBFBF" } },
-    right: { style: "thin", color: { rgb: "BFBFBF" } },
-  },
+  border: BORDER_CASA,
 };
-
-const TOTAL_GRIS_STYLE = {
-  font: { bold: true, sz: 10 },
-  fill: { patternType: "solid", fgColor: { rgb: "EFEFEF" } },
-  alignment: { vertical: "center" },
-  border: {
-    top: { style: "thin", color: { rgb: "BFBFBF" } },
-    bottom: { style: "thin", color: { rgb: "BFBFBF" } },
-    left: { style: "thin", color: { rgb: "BFBFBF" } },
-    right: { style: "thin", color: { rgb: "BFBFBF" } },
-  },
-};
-
-const MONEY_FMT = '"$"#,##0.00';
 
 function sanitizeSheetName(s: string): string {
   const cleaned = (s || "Hoja").replace(/[\\/:*?[\]]/g, " ").trim();
@@ -110,7 +95,7 @@ function setDashOrNumber(
     (ws as Record<string, unknown>)[addr] = {
       t: "s",
       v: "—",
-      s: { alignment: { horizontal: "center" }, font: { color: { rgb: "9E9E9E" } } },
+      s: { alignment: { horizontal: "center" }, font: { color: { rgb: "9E9E9E" }, name: "Calibri", sz: 10 } },
     };
   } else {
     const cellSpec: { t: "n"; v: number; z?: string } = { t: "n", v: value };
@@ -171,8 +156,8 @@ function hojaResumen(
   }
   applyMoneyFmt(ws, 1, filas.length, [...marcaCols, totalCol]);
 
-  // Fila TOTAL en amarillo.
-  applyStyleToRow(ws, aoa.length - 1, nCols, TOTAL_AMARILLO_STYLE);
+  // Fila TOTAL en banda PRI (estilo de la casa).
+  applyStyleToRow(ws, aoa.length - 1, nCols, TOTAL_STYLE);
   applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [...marcaCols, totalCol]);
 
   ws["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<
@@ -224,7 +209,7 @@ function hojaTiendaDetalle(
   }
   applyMoneyFmt(ws, 1, filas.length, [2, 3]);
 
-  applyStyleToRow(ws, aoa.length - 1, header.length, TOTAL_GRIS_STYLE);
+  applyStyleToRow(ws, aoa.length - 1, header.length, TOTAL_STYLE);
   applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [3]);
 
   ws["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<

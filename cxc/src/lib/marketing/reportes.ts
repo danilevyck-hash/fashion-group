@@ -4,6 +4,14 @@
 // Todos los totales excluyen registros con anulado_en != null.
 // ============================================================================
 import XLSX from "xlsx-js-style";
+import {
+  buildReportSheet,
+  workbookFromSheets,
+  MONEY_FMT,
+  XLSX_MIME,
+  type ReportCell,
+  type ReportColumn,
+} from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   formatearFecha,
@@ -401,122 +409,73 @@ function esReporteProyectoItem(x: unknown): x is ReporteProyectoItem {
   );
 }
 
+// Tabular puro → buildReportSheet (estilo de la casa I11: banda navy PRI +
+// Calibri + moneda numérica). Mismas columnas y datos que antes.
 export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
-  const wb = XLSX.utils.book_new();
-  const headerStyle = {
-    font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
-    fill: { fgColor: { rgb: "111827" } },
-    alignment: { horizontal: "center", vertical: "center" },
-  };
-  const moneyFmt = '"$"#,##0.00';
-
-  let ws: XLSX.WorkSheet;
   let hoja: string;
+  let title: string;
+  let columns: ReportColumn[];
+  let rows: ReportCell[][];
 
   if (tipo === "marca") {
     if (!esArrayDe(data, esReporteMarcaItem)) {
       throw new Error("data inválida para reporte por marca");
     }
     hoja = "Por marca";
-    const aoa: unknown[][] = [["Marca", "Código", "Gasto"]];
-    for (const item of data) {
-      aoa.push([item.marca.nombre, item.marca.codigo, item.gasto]);
-    }
-    ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 14 }];
-    for (let c = 0; c < 3; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c });
-      if (ws[addr]) ws[addr].s = headerStyle;
-    }
-    for (let r = 1; r <= data.length; r++) {
-      const addr = XLSX.utils.encode_cell({ r, c: 2 });
-      if (ws[addr]) {
-        ws[addr].t = "n";
-        ws[addr].z = moneyFmt;
-      }
-    }
+    title = "FASHION GROUP — Marketing por Marca";
+    columns = [
+      { header: "Marca", wch: 20 },
+      { header: "Código", wch: 10 },
+      { header: "Gasto", wch: 14, align: "right", fmt: MONEY_FMT },
+    ];
+    rows = data.map((item) => [item.marca.nombre, item.marca.codigo, item.gasto]);
   } else if (tipo === "tienda") {
     if (!esArrayDe(data, esReporteTiendaItem)) {
       throw new Error("data inválida para reporte por tienda");
     }
     hoja = "Por tienda";
+    title = "FASHION GROUP — Marketing por Tienda";
     const marcasUnicas = Array.from(
       new Set(data.flatMap((d) => Object.keys(d.porMarca)))
     ).sort((a, b) => a.localeCompare(b, "es"));
-    const aoa: unknown[][] = [["Tienda", ...marcasUnicas, "Gasto"]];
-    for (const item of data) {
-      aoa.push([
-        item.tienda,
-        ...marcasUnicas.map((m) => item.porMarca[m] ?? 0),
-        item.total,
-      ]);
-    }
-    ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 24 }, ...marcasUnicas.map(() => ({ wch: 14 })), { wch: 14 }];
-    for (let c = 0; c < aoa[0].length; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c });
-      if (ws[addr]) ws[addr].s = headerStyle;
-    }
-    for (let r = 1; r <= data.length; r++) {
-      for (let c = 1; c < aoa[0].length; c++) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (ws[addr]) {
-          ws[addr].t = "n";
-          ws[addr].z = moneyFmt;
-        }
-      }
-    }
+    columns = [
+      { header: "Tienda", wch: 24 },
+      ...marcasUnicas.map(
+        (m): ReportColumn => ({ header: m, wch: 14, align: "right", fmt: MONEY_FMT })
+      ),
+      { header: "Gasto", wch: 14, align: "right", fmt: MONEY_FMT },
+    ];
+    rows = data.map((item) => [
+      item.tienda,
+      ...marcasUnicas.map((m) => item.porMarca[m] ?? 0),
+      item.total,
+    ]);
   } else {
     if (!esArrayDe(data, esReporteProyectoItem)) {
       throw new Error("data inválida para reporte por proyecto");
     }
     hoja = "Por proyecto";
-    const aoa: unknown[][] = [
-      [
-        "Proyecto",
-        "Tienda",
-        "Fecha inicio",
-        "Estado",
-        "Marcas",
-        "Gasto real",
-      ],
+    title = "FASHION GROUP — Marketing por Proyecto";
+    columns = [
+      { header: "Proyecto", wch: 28 },
+      { header: "Tienda", wch: 20 },
+      { header: "Fecha inicio", wch: 14 },
+      { header: "Estado", wch: 14 },
+      { header: "Marcas", wch: 30 },
+      { header: "Gasto real", wch: 14, align: "right", fmt: MONEY_FMT },
     ];
-    for (const item of data) {
-      const marcasTxt = item.marcas.map((m) => m.nombre).join(", ");
-      aoa.push([
-        item.proyecto.nombre ?? item.proyecto.tienda,
-        item.proyecto.tienda,
-        formatearFecha(item.proyecto.fecha_inicio),
-        etiquetaEstadoProyecto(item.proyecto.estado),
-        marcasTxt,
-        item.gastoTotal,
-      ]);
-    }
-    ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [
-      { wch: 28 },
-      { wch: 20 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 30 },
-      { wch: 14 },
-    ];
-    for (let c = 0; c < 6; c++) {
-      const addr = XLSX.utils.encode_cell({ r: 0, c });
-      if (ws[addr]) ws[addr].s = headerStyle;
-    }
-    for (let r = 1; r <= data.length; r++) {
-      const addr = XLSX.utils.encode_cell({ r, c: 5 });
-      if (ws[addr]) {
-        ws[addr].t = "n";
-        ws[addr].z = moneyFmt;
-      }
-    }
+    rows = data.map((item) => [
+      item.proyecto.nombre ?? item.proyecto.tienda,
+      item.proyecto.tienda,
+      formatearFecha(item.proyecto.fecha_inicio),
+      etiquetaEstadoProyecto(item.proyecto.estado),
+      item.marcas.map((m) => m.nombre).join(", "),
+      item.gastoTotal,
+    ]);
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, hoja);
+  const ws = buildReportSheet({ title, columns, rows });
+  const wb = workbookFromSheets([{ name: hoja, ws }]);
   const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-  return new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  return new Blob([buf], { type: XLSX_MIME });
 }

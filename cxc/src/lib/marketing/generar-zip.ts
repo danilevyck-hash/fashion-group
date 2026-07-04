@@ -14,6 +14,7 @@
 import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -88,7 +89,7 @@ async function resolverAdjunto(
   return { blob, filename: fallbackName };
 }
 
-interface FacturaConMarcas extends MkFactura {
+export interface FacturaConMarcas extends MkFactura {
   marcas: MarcaConPorcentaje[];
 }
 
@@ -139,16 +140,19 @@ function mesEjecucion(isoString: string | null): string {
 //     una. Σ por marca == total. SIN co-op — espeja reportes.ts "Por Marca").
 // Última columna: Comentarios (vacía).
 //
-// Estilo: Arial 10/11, header fondo #1F1F1F texto blanco, bordes #BFBFBF,
-// formato moneda $#,##0.00 en montos, alineación texto izq / monto der,
-// freeze pane en fila 2.
+// Estilo de la casa (I11): Calibri 10, header banda navy PRI texto blanco,
+// fila TOTALES banda PRI, bordes CASA, formato moneda $#,##0.00 en montos,
+// alineación texto izq / monto der, freeze pane en fila 2.
+//
+// buildRespaldoWorkbook es PURO (datos → WorkBook) y exportado para tests;
+// generarRespaldoExcel lo envuelve para producir el Blob del ZIP.
 // ----------------------------------------------------------------------------
-function generarRespaldoExcel(
+export function buildRespaldoWorkbook(
   proyecto: MkProyecto,
   facturas: FacturaConMarcas[],
   marcasDelProyecto: MkMarca[],
   entregas: ReadonlyArray<EntregaConItems> = [],
-): Blob {
+): XLSX.WorkBook {
   const mes = mesEjecucion(proyecto.fecha_enviado ?? proyecto.created_at ?? null);
   const detalle = proyecto.nombre ?? proyecto.tienda ?? "";
 
@@ -254,15 +258,15 @@ function generarRespaldoExcel(
   setFormulaSum(numMontoCol);
   for (const c of gastoCols) setFormulaSum(c);
 
-  // ── Estilos ──
-  const borderThin = { style: "thin", color: { rgb: "BFBFBF" } };
+  // ── Estilos (estilo de la casa I11: navy + Calibri) ──
+  const borderThin = { style: "thin", color: { rgb: CASA_PALETTE.brd } };
   const borders = {
     top: borderThin,
     bottom: borderThin,
     left: borderThin,
     right: borderThin,
   };
-  const moneyFmt = "$#,##0.00";
+  const moneyFmt = MONEY_FMT;
 
   // Texto: alineación izquierda. Montos: derecha.
   const isMontoCol = (c: number): boolean =>
@@ -281,16 +285,16 @@ function generarRespaldoExcel(
       const esMonto = isMontoCol(c);
 
       const baseFont = {
-        name: "Arial",
-        sz: esHeader ? 11 : 10,
+        name: "Calibri",
+        sz: 10,
         bold: esHeader || esTotales,
-        color: esHeader ? { rgb: "FFFFFF" } : { rgb: "000000" },
+        color: esHeader || esTotales ? { rgb: "FFFFFF" } : { rgb: "333333" },
       };
 
-      const fill = esHeader
-        ? { patternType: "solid", fgColor: { rgb: "1F1F1F" } }
-        : esTotales
-          ? { patternType: "solid", fgColor: { rgb: "EFEFEF" } }
+      // Header y fila TOTALES en banda PRI (estilo de la casa).
+      const fill =
+        esHeader || esTotales
+          ? { patternType: "solid", fgColor: { rgb: CASA_PALETTE.pri } }
           : undefined;
 
       cell.s = {
@@ -329,7 +333,16 @@ function generarRespaldoExcel(
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Facturas");
+  return wb;
+}
 
+function generarRespaldoExcel(
+  proyecto: MkProyecto,
+  facturas: FacturaConMarcas[],
+  marcasDelProyecto: MkMarca[],
+  entregas: ReadonlyArray<EntregaConItems> = [],
+): Blob {
+  const wb = buildRespaldoWorkbook(proyecto, facturas, marcasDelProyecto, entregas);
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   return new Blob([arrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

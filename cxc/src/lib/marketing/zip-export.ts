@@ -23,6 +23,7 @@
 import JSZip from "jszip";
 import sharp from "sharp";
 import XLSX from "xlsx-js-style";
+import { CASA_PALETTE, makeCellStyles, MONEY_FMT } from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
@@ -446,9 +447,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
 
   // 8. Excel resumen_gastos.xlsx — hoja "Resumen" (1 fila por cliente) + 1
-  //    pestaña por cliente (sección Gastos + sección Fotos). Minimalista. NO
-  //    unifica tablas: facturas y muebles son filas distintas que solo conviven.
-  const wb = XLSX.utils.book_new();
+  //    pestaña por cliente (sección Gastos + sección Fotos). Estilo de la casa
+  //    (I11: navy + Calibri, links azules conservados). NO unifica tablas:
+  //    facturas y muebles son filas distintas que solo conviven.
 
   // Marca de una factura: nombres completos (1 tras la corrección; " / " si
   // hubiera varias). Marca de un mueble: desde total_por_marca con su %.
@@ -470,11 +471,6 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
 
   // Agrupar gastos (facturas + muebles) y fotos por CLIENTE (misma clave que la
   // carpeta del ZIP → pestañas alineadas con las carpetas).
-  interface GastoXlsx {
-    fecha: string; concepto: string; proveedor: string; marca: string;
-    numero: string; total: number; signed?: string;
-  }
-  interface FotoXlsx { archivo: string; signed?: string }
   interface ClienteBucket { gastos: GastoXlsx[]; fotos: FotoXlsx[]; marcaIds: Set<string> }
   const buckets = new Map<string, ClienteBucket>();
   const bucket = (nombre: string): ClienteBucket => {
@@ -537,8 +533,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     }
   }
 
-  const totalDe = (b: ClienteBucket): number =>
-    b.gastos.reduce((s, g) => s + g.total, 0);
+  const totalDe = (b: ClienteBucket): number => sumGastos(b.gastos);
   // Orden: por total desc; "Sin cliente" al final.
   const clientes = Array.from(buckets.keys()).sort((a, b) => {
     if (a === "Sin cliente") return 1;
@@ -553,14 +548,88 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     if (!codigoDeCliente.has(n)) codigoDeCliente.set(n, p.tienda_codigo ?? null);
   }
 
-  // ── Estilos minimalistas (gris suave en headers, links azules, sin grid pesado) ──
-  const money = "$#,##0.00";
-  const fontBase = { name: "Arial", sz: 10, color: { rgb: "111111" } };
-  const headFill = { patternType: "solid", fgColor: { rgb: "F2F2F2" } };
-  const sectionFill = { patternType: "solid", fgColor: { rgb: "E6E6E6" } };
-  const ruleBottom = { bottom: { style: "thin", color: { rgb: "D9D9D9" } } };
-  const ruleTop = { top: { style: "thin", color: { rgb: "BFBFBF" } } };
-  const linkFontX = { name: "Arial", sz: 10, color: { rgb: "1155CC" }, underline: true };
+  // Construcción del workbook (pura, testeable): 1 entrada por cliente en el
+  // MISMO orden calculado arriba.
+  const wb = buildResumenGastosWorkbook(
+    clientes.map((nombre) => {
+      const b = buckets.get(nombre)!;
+      return {
+        nombre,
+        codigo: codigoDeCliente.get(nombre) ?? null,
+        marcas: siglasCliente(b.marcaIds),
+        gastos: b.gastos,
+        fotos: b.fotos,
+      };
+    }),
+  );
+
+  const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  zip.file("resumen_gastos.xlsx", xlsxBuf);
+
+  const buffer = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+
+  return {
+    buffer,
+    gastos: facturasSel.length + entregasSel.length,
+    proyectos: proyectosSel.length,
+    fotosIncluidas,
+    fotosOmitidas,
+    pdfsIncluidos,
+    pdfsOmitidos,
+  };
+}
+
+// ── Excel resumen_gastos.xlsx (construcción PURA de workbook, testeable) ─────
+// Estilo de la casa (I11): headers y totales en banda navy PRI, secciones
+// GASTOS/FOTOS en banda MID, Calibri 10. Se CONSERVAN los links azules 1155CC
+// (PDF de factura, galería, PDF combinado) y la estructura de hojas: "Resumen"
+// + 1 pestaña por cliente.
+
+export interface GastoXlsx {
+  fecha: string;
+  concepto: string;
+  proveedor: string;
+  marca: string;
+  numero: string;
+  total: number;
+  signed?: string;
+}
+
+export interface FotoXlsx {
+  archivo: string;
+  signed?: string;
+}
+
+export interface ClienteResumenXlsx {
+  /** Nombre display del cliente (misma clave que su carpeta del ZIP). */
+  nombre: string;
+  /** Código D-XXX; null = "Sin cliente" (sin galería ni PDF combinado). */
+  codigo: string | null;
+  /** Siglas de marcas ("TH, CK") para la columna Marcas del Resumen. */
+  marcas: string;
+  gastos: GastoXlsx[];
+  fotos: FotoXlsx[];
+}
+
+const sumGastos = (gastos: ReadonlyArray<GastoXlsx>): number =>
+  gastos.reduce((s, g) => s + g.total, 0);
+
+export function buildResumenGastosWorkbook(
+  clientes: ReadonlyArray<ClienteResumenXlsx>,
+): XLSX.WorkBook {
+  const wb = XLSX.utils.book_new();
+
+  // ── Estilos de la casa (links azules conservados) ──
+  const { B } = makeCellStyles(CASA_PALETTE);
+  const fontBase = { name: "Calibri", sz: 10, color: { rgb: "333333" } };
+  const headFont = { name: "Calibri", sz: 10, bold: true, color: { rgb: "FFFFFF" } };
+  const headFill = { patternType: "solid", fgColor: { rgb: CASA_PALETTE.pri } };
+  const sectionFill = { patternType: "solid", fgColor: { rgb: CASA_PALETTE.mid } };
+  const linkFontX = { name: "Calibri", sz: 10, color: { rgb: "1155CC" }, underline: true };
   const setCell = (ws: XLSX.WorkSheet, r: number, c: number, patch: Record<string, unknown>): void => {
     const addr = XLSX.utils.encode_cell({ r, c });
     const cur = (ws as Record<string, unknown>)[addr] as Record<string, unknown> | undefined;
@@ -581,10 +650,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   // Columna "Marcas" = siglas de las marcas que toca cada cliente (facturas +
   // muebles), igual que los chips de la pantalla.
   const headRes = ["Cliente", "Marcas", "# Gastos", "# Fotos", "Total"];
-  const filasRes = clientes.map((nombre) => {
-    const b = buckets.get(nombre)!;
-    return [nombre, siglasCliente(b.marcaIds), b.gastos.length, b.fotos.length, totalDe(b)] as (string | number)[];
-  });
+  const filasRes = clientes.map(
+    (c) => [c.nombre, c.marcas, c.gastos.length, c.fotos.length, sumGastos(c.gastos)] as (string | number)[],
+  );
   const granGastos = filasRes.reduce((s, r) => s + Number(r[2]), 0);
   const granFotos = filasRes.reduce((s, r) => s + Number(r[3]), 0);
   const granTotal = filasRes.reduce((s, r) => s + Number(r[4]), 0);
@@ -596,22 +664,30 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const esTextoCol = (c: number): boolean => c === 0 || c === 1; // Cliente, Marcas
   for (let c = 0; c < headRes.length; c++) {
     styleCell(wsR, 0, c, {
-      font: { ...fontBase, bold: true },
+      font: headFont,
       fill: headFill,
-      alignment: { horizontal: esTextoCol(c) ? "left" : "right" },
-      border: ruleBottom,
+      alignment: { horizontal: esTextoCol(c) ? "left" : "right", vertical: "center" },
+      border: B,
     });
   }
   for (let r = 1; r < aoaRes.length; r++) {
     const esTotal = r === totalRowR;
     for (let c = 0; c < headRes.length; c++) {
-      styleCell(wsR, r, c, {
-        font: { ...fontBase, bold: esTotal },
-        alignment: { horizontal: esTextoCol(c) ? "left" : "right" },
-        ...(esTotal ? { border: ruleTop } : {}),
-      });
+      styleCell(
+        wsR,
+        r,
+        c,
+        esTotal
+          ? {
+              font: headFont,
+              fill: headFill,
+              alignment: { horizontal: esTextoCol(c) ? "left" : "right", vertical: "center" },
+              border: B,
+            }
+          : { font: fontBase, alignment: { horizontal: esTextoCol(c) ? "left" : "right" }, border: B },
+      );
     }
-    fmtCell(wsR, r, 4, money);
+    fmtCell(wsR, r, 4, MONEY_FMT);
   }
   XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
 
@@ -629,16 +705,15 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     return cand;
   };
   const headG = ["Fecha", "Concepto", "Proveedor", "Marca", "N° Factura", "Total", "Factura"];
-  for (const nombre of clientes) {
-    const b = buckets.get(nombre)!;
-    const codigo = codigoDeCliente.get(nombre) ?? null;
+  for (const cli of clientes) {
+    const codigo = cli.codigo;
     // Galería = 1 link por cliente (requiere código). "Sin cliente" / sin código
     // → links individuales por foto (no hay galería sin código de cliente).
-    const usarGaleria = !!codigo && b.fotos.length > 0;
+    const usarGaleria = !!codigo && cli.fotos.length > 0;
 
     // Fila "Ver todas las facturas (N)" arriba de la tabla (solo si el cliente
     // tiene código y ≥1 factura con PDF). Abre el PDF combinado del cliente.
-    const nFacturasPdf = b.gastos.filter((g) => g.signed).length;
+    const nFacturasPdf = cli.gastos.filter((g) => g.signed).length;
     const verFacturas = !!codigo && nFacturasPdf > 0;
     const aoa: (string | number)[][] = [["GASTOS"]];
     let verFacturasRow = -1;
@@ -649,11 +724,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     const headerRow = aoa.length;
     aoa.push(headG);
     const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
-    for (const g of b.gastos) {
+    for (const g of cli.gastos) {
       aoa.push([g.fecha, g.concepto, g.proveedor, g.marca, g.numero, g.total, g.signed ? "Ver factura" : "—"]);
     }
-    const gastoEnd = gastoStart + b.gastos.length - 1;
-    aoa.push(["", "", "", "", "Subtotal", totalDe(b), ""]);
+    const gastoEnd = gastoStart + cli.gastos.length - 1;
+    aoa.push(["", "", "", "", "Subtotal", sumGastos(cli.gastos), ""]);
     const subtotalRow = aoa.length - 1;
     aoa.push([""]);
     const fotosTitle = aoa.length;
@@ -663,51 +738,68 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     let fotoStart = -1;
     if (usarGaleria) {
       galeriaRow = aoa.length;
-      aoa.push([`Ver todas las fotos (${b.fotos.length})`]);
+      aoa.push([`Ver todas las fotos (${cli.fotos.length})`]);
     } else {
       aoa.push(["Archivo", "Foto"]);
       fotoHeader = aoa.length - 1;
       fotoStart = aoa.length;
-      for (const f of b.fotos) {
+      for (const f of cli.fotos) {
         aoa.push([f.archivo, f.signed ? "Ver foto" : "—"]);
       }
-      if (b.fotos.length === 0) aoa.push(["(sin fotos)", ""]);
+      if (cli.fotos.length === 0) aoa.push(["(sin fotos)", ""]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
 
     // Links de gasto (col 6) + SUM del subtotal (col 5).
-    b.gastos.forEach((g, i) => {
+    cli.gastos.forEach((g, i) => {
       if (g.signed) {
         setCell(ws, gastoStart + i, 6, { t: "s", v: "Ver factura", l: { Target: g.signed, Tooltip: "Abrir PDF de la factura" } });
       }
     });
-    if (b.gastos.length > 0) {
+    if (cli.gastos.length > 0) {
       const L = XLSX.utils.encode_col(5);
       setCell(ws, subtotalRow, 5, { t: "n", f: `SUM(${L}${gastoStart + 1}:${L}${gastoEnd + 1})` });
     }
 
-    // Estilos comunes.
-    styleCell(ws, 0, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
-    styleCell(ws, fotosTitle, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
+    // Estilos comunes: títulos de sección en banda MID, headers banda PRI.
+    styleCell(ws, 0, 0, { font: { ...headFont, sz: 11 }, fill: sectionFill });
+    styleCell(ws, fotosTitle, 0, { font: { ...headFont, sz: 11 }, fill: sectionFill });
     for (let c = 0; c < headG.length; c++) {
-      styleCell(ws, headerRow, c, { font: { ...fontBase, bold: true }, fill: headFill, alignment: { horizontal: c === 5 ? "right" : "left" }, border: ruleBottom });
+      styleCell(ws, headerRow, c, {
+        font: headFont,
+        fill: headFill,
+        alignment: { horizontal: c === 5 ? "right" : "left", vertical: "center" },
+        border: B,
+      });
     }
-    for (let i = 0; i < b.gastos.length; i++) {
+    for (let i = 0; i < cli.gastos.length; i++) {
       const r = gastoStart + i;
       for (let c = 0; c < headG.length; c++) {
-        const esLink = c === 6 && !!b.gastos[i].signed;
+        const esLink = c === 6 && !!cli.gastos[i].signed;
         styleCell(ws, r, c, {
           font: esLink ? linkFontX : fontBase,
           alignment: { horizontal: c === 5 ? "right" : "left", wrapText: c === 1 },
+          border: B,
         });
       }
-      fmtCell(ws, r, 5, money);
+      fmtCell(ws, r, 5, MONEY_FMT);
     }
-    styleCell(ws, subtotalRow, 4, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" } });
-    styleCell(ws, subtotalRow, 5, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" }, border: ruleTop });
-    fmtCell(ws, subtotalRow, 5, money);
+    // Fila Subtotal en banda PRI (totales estilo de la casa).
+    styleCell(ws, subtotalRow, 4, {
+      font: headFont,
+      fill: headFill,
+      alignment: { horizontal: "right", vertical: "center" },
+      border: B,
+    });
+    styleCell(ws, subtotalRow, 5, {
+      font: headFont,
+      fill: headFill,
+      alignment: { horizontal: "right", vertical: "center" },
+      border: B,
+    });
+    fmtCell(ws, subtotalRow, 5, MONEY_FMT);
 
     // Link "Ver todas las facturas (N)" → PDF combinado del cliente.
     if (verFacturas) {
@@ -719,44 +811,32 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     // Sección de fotos: galería (1 link) o links individuales.
     if (usarGaleria) {
       const url = `${GALERIA_BASE}/marketing/galeria/${encodeURIComponent(codigo!)}?t=${signGalleryToken(codigo!)}`;
-      setCell(ws, galeriaRow, 0, { t: "s", v: `Ver todas las fotos (${b.fotos.length})`, l: { Target: url, Tooltip: "Abrir galería del cliente" } });
+      setCell(ws, galeriaRow, 0, { t: "s", v: `Ver todas las fotos (${cli.fotos.length})`, l: { Target: url, Tooltip: "Abrir galería del cliente" } });
       styleCell(ws, galeriaRow, 0, { font: linkFontX });
     } else {
-      b.fotos.forEach((f, i) => {
+      cli.fotos.forEach((f, i) => {
         if (f.signed) {
           setCell(ws, fotoStart + i, 1, { t: "s", v: "Ver foto", l: { Target: f.signed, Tooltip: "Abrir foto" } });
         }
       });
       for (let c = 0; c < 2; c++) {
-        styleCell(ws, fotoHeader, c, { font: { ...fontBase, bold: true }, fill: headFill, border: ruleBottom });
+        styleCell(ws, fotoHeader, c, {
+          font: headFont,
+          fill: headFill,
+          alignment: { horizontal: "left", vertical: "center" },
+          border: B,
+        });
       }
-      for (let i = 0; i < b.fotos.length; i++) {
+      for (let i = 0; i < cli.fotos.length; i++) {
         const r = fotoStart + i;
-        styleCell(ws, r, 0, { font: fontBase, alignment: { horizontal: "left", wrapText: true } });
-        styleCell(ws, r, 1, { font: b.fotos[i].signed ? linkFontX : fontBase });
+        styleCell(ws, r, 0, { font: fontBase, alignment: { horizontal: "left", wrapText: true }, border: B });
+        styleCell(ws, r, 1, { font: cli.fotos[i].signed ? linkFontX : fontBase, border: B });
       }
     }
 
     ws["!freeze"] = { xSplit: 0, ySplit: headerRow + 1 } as unknown as Record<string, unknown>;
-    XLSX.utils.book_append_sheet(wb, ws, tabName(nombre));
+    XLSX.utils.book_append_sheet(wb, ws, tabName(cli.nombre));
   }
 
-  const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  zip.file("resumen_gastos.xlsx", xlsxBuf);
-
-  const buffer = await zip.generateAsync({
-    type: "nodebuffer",
-    compression: "DEFLATE",
-    compressionOptions: { level: 6 },
-  });
-
-  return {
-    buffer,
-    gastos: facturasSel.length + entregasSel.length,
-    proyectos: proyectosSel.length,
-    fotosIncluidas,
-    fotosOmitidas,
-    pdfsIncluidos,
-    pdfsOmitidos,
-  };
+  return wb;
 }
