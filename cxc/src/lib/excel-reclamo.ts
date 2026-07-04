@@ -1,20 +1,23 @@
 import XLSX from "xlsx-js-style";
 import { reclamoGaleriaUrl } from "@/lib/reclamos/gallery-token";
 import { reclamoTaxes, ocultaPedido, impLabel } from "@/lib/reclamos/tax";
-
-function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
+import { addr, makeCellStyles, CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
 
 interface ReclamoFoto {
   url?: string;
   storage_path: string;
 }
 
-// Blue corporate palette
-const PRI = "1B3A5C"; const MID = "2E5E8E"; const SEP = "D4E6F1"; const LBL_BG = "EBF5FB"; const VAL_BG = "FDFEFE"; const DATA_BG = "F8F9F9"; const BRD = "D5DBDB";
-const B = { top: { style: "thin", color: { rgb: BRD } }, bottom: { style: "thin", color: { rgb: BRD } }, left: { style: "thin", color: { rgb: BRD } }, right: { style: "thin", color: { rgb: BRD } } };
-const CMAX = 7; // 8 columnas (0..7): Código, Descripción, Talla, Género, Cant., Precio, Subtotal, Motivo
+// Paleta y celdas del estilo de la casa (helper estándar de exports — I11):
+// PRI/MID/SEP/bordes vienen de CASA_PALETTE vía makeCellStyles.
+const { B, fillRow, hdr, td, tdN, band, palette } = makeCellStyles(CASA_PALETTE);
 
-function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i = 0; i <= c; i++) if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } }; }
+// Fondos propios de la FICHA de reclamo (label azul claro / valor casi blanco).
+// El helper no los provee — quedan como constantes del módulo.
+const LBL_BG = "EBF5FB";
+const VAL_BG = "FDFEFE";
+const LINK_FG = "0563C1"; // azul de hyperlink
+const CMAX = 7; // 8 columnas (0..7): Código, Descripción, Talla, Género, Cant., Precio, Subtotal, Motivo
 
 /**
  * Hoja Excel de un reclamo. Los links son URLs WEB que abren con un clic en el
@@ -37,20 +40,14 @@ export function buildReclamoSheet(
   const merges: XLSX.Range[] = [];
   let r = 0;
 
-  // Row 0: Title
-  ws[addr(r, 0)] = { v: "FASHION GROUP", t: "s", s: { font: { bold: true, sz: 18, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "center", vertical: "center" } } };
-  fill(CMAX, r, ws, PRI); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 32; r++;
+  // Título / subtítulo / separador — bandas estándar de la casa.
+  band(ws, r, CMAX, merges, "FASHION GROUP", palette.pri, 18); h[r] = 32; r++;
+  band(ws, r, CMAX, merges, "Reclamo a Proveedor", palette.mid, 12); h[r] = 22; r++;
+  fillRow(ws, r, CMAX, palette.sep); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 6; r++;
 
-  // Row 1: Subtitle
-  ws[addr(r, 0)] = { v: "Reclamo a Proveedor", t: "s", s: { font: { bold: true, sz: 12, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: MID } }, alignment: { horizontal: "center", vertical: "center" } } };
-  fill(CMAX, r, ws, MID); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 22; r++;
-
-  // Row 2: Separator
-  fill(CMAX, r, ws, SEP); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 6; r++;
-
-  // Metadata helpers
-  const mLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } });
-  const mVal = (v: string, bold = false) => ({ v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
+  // Metadata helpers (layout de ficha: label LBL_BG / valor VAL_BG)
+  const mLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } });
+  const mVal = (v: string, bold = false) => ({ v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
 
   // Metadata rows: N° Reclamo / Empresa / Proveedor / N° Factura / N° Pedido.
   // Active Shoes no usa N° de pedido → se omite esa fila.
@@ -71,28 +68,29 @@ export function buildReclamoSheet(
   }
 
   // Separator
-  fill(CMAX, r, ws, SEP); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 8; r++;
+  fillRow(ws, r, CMAX, palette.sep); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 8; r++;
 
   // Table header (Género entre Talla y Cant.)
   const headers = ["Código", "Descripción", "Talla", "Género", "Cant.", "Precio Unit.", "Subtotal", "Motivo"];
-  headers.forEach((hv, i) => { ws[addr(r, i)] = { v: hv, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "center", vertical: "center" }, border: B } }; });
+  headers.forEach((hv, i) => { ws[addr(r, i)] = hdr(hv, "center"); });
   h[r] = 22; r++;
 
-  // Items
+  // Items (celdas td/tdN del helper; alt=true → fondo dataBg uniforme)
   let subtotal = 0;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const cant = Number(item.cantidad) || 0; const precio = Number(item.precio_unitario) || 0; const sub = cant * precio;
     subtotal += sub;
-    const s = (fg: string, sz: number, ha: string, bold = false, italic = false) => ({ font: { sz, bold, italic, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: DATA_BG } }, alignment: { horizontal: ha }, border: B });
-    ws[addr(r, 0)] = { v: String(item.referencia || ""), t: "s", s: s("333333", 9, "left") };
-    ws[addr(r, 1)] = { v: String(item.descripcion || ""), t: "s", s: s("111111", 10, "left") };
-    ws[addr(r, 2)] = { v: String(item.talla || ""), t: "s", s: s("555555", 9, "center") };
-    ws[addr(r, 3)] = { v: String(item.genero || ""), t: "s", s: s("555555", 9, "center") };
-    ws[addr(r, 4)] = { v: cant, t: "n", s: s("111111", 10, "right") };
-    ws[addr(r, 5)] = { v: precio, t: "n", z: '"$"#,##0.00', s: s("111111", 10, "right") };
-    ws[addr(r, 6)] = { v: sub, t: "n", z: '"$"#,##0.00', s: s("111111", 10, "right", true) };
-    ws[addr(r, 7)] = { v: String(item.motivo || ""), t: "s", s: s("666666", 9, "left", false, true) };
+    ws[addr(r, 0)] = td(String(item.referencia || ""), true, { sz: 9 });
+    ws[addr(r, 1)] = td(String(item.descripcion || ""), true, { fg: "111111" });
+    ws[addr(r, 2)] = td(String(item.talla || ""), true, { fg: "555555", sz: 9, ha: "center" });
+    ws[addr(r, 3)] = td(String(item.genero || ""), true, { fg: "555555", sz: 9, ha: "center" });
+    ws[addr(r, 4)] = tdN(cant, true, { fg: "111111" });
+    ws[addr(r, 5)] = tdN(precio, true, { fmt: MONEY_FMT, fg: "111111" });
+    ws[addr(r, 6)] = tdN(sub, true, { fmt: MONEY_FMT, bold: true, fg: "111111" });
+    const motivo = td(String(item.motivo || ""), true, { fg: "666666", sz: 9 });
+    Object.assign(motivo.s.font, { italic: true });
+    ws[addr(r, 7)] = motivo;
     h[r] = 18; r++;
   }
 
@@ -103,25 +101,25 @@ export function buildReclamoSheet(
   // Totals (labels en col 6, valores en col 7). Impuestos por empresa
   // (Active Shoes: importación 15%, sin ITBMS).
   const tx = reclamoTaxes(empresa, subtotal);
-  const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" } } });
-  const tVal = (v: number) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
+  const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" } } });
+  const tVal = (v: number) => ({ v, t: "n", z: MONEY_FMT, s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: palette.brd } } } } });
 
   ws[addr(r, 6)] = tLbl("Subtotal:"); ws[addr(r, 7)] = tVal(subtotal); h[r] = 16; r++;
   ws[addr(r, 6)] = tLbl(`Importación (${impLabel(empresa)}):`); ws[addr(r, 7)] = tVal(tx.importacion); h[r] = 16; r++;
   if (tx.hasItbms) { ws[addr(r, 6)] = tLbl("ITBMS (7%):"); ws[addr(r, 7)] = tVal(tx.itbms); h[r] = 16; r++; }
 
-  // Final total (banda 0..6 + valor en col 7)
+  // Final total — banda PRI 13pt (layout de ficha, conservado): banda 0..6 + valor en col 7
   const totalRow = r;
-  const tBand = (v: string, ha: string) => ({ v, t: "s", s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: ha, vertical: "center" } } });
+  const tBand = (v: string, ha: string) => ({ v, t: "s", s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: palette.pri } }, alignment: { horizontal: ha, vertical: "center" } } });
   for (let c = 0; c <= 6; c++) ws[addr(r, c)] = tBand(c === 0 ? "TOTAL A ACREDITAR" : "", "center");
-  ws[addr(r, 7)] = { v: tx.total, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "right", vertical: "center" } } };
+  ws[addr(r, 7)] = { v: tx.total, t: "n", z: MONEY_FMT, s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: palette.pri } }, alignment: { horizontal: "right", vertical: "center" } } };
   merges.push({ s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 6 } });
   h[r] = 28; r++;
 
-  // Archivos (factura + evidencia) — links relativos al ZIP cuando relative=true
+  // Archivos (factura + evidencia) — links WEB de un clic (celdas .l)
   const linkRow = (label: string, linkText: string, target: string) => {
-    ws[addr(r, 0)] = { v: label, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } };
-    ws[addr(r, 1)] = { v: linkText, t: "s", s: { font: { sz: 9, color: { rgb: "0563C1" }, underline: true, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: B }, l: { Target: target, Tooltip: linkText } };
+    ws[addr(r, 0)] = { v: label, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: palette.pri }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } };
+    ws[addr(r, 1)] = { v: linkText, t: "s", s: { font: { sz: 9, color: { rgb: LINK_FG }, underline: true, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: B }, l: { Target: target, Tooltip: linkText } };
     for (let c = 2; c <= CMAX; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } }, border: B } };
     merges.push({ s: { r, c: 1 }, e: { r, c: CMAX } });
     h[r] = 18; r++;
@@ -130,10 +128,9 @@ export function buildReclamoSheet(
   const tieneSeccion = !!facturaUrl || fotos.length > 0;
   if (tieneSeccion) {
     // Spacer
-    fill(CMAX, r, ws, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 10; r++;
+    fillRow(ws, r, CMAX, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 10; r++;
     // Section header
-    ws[addr(r, 0)] = { v: "ARCHIVOS Y EVIDENCIA", t: "s", s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: MID } }, alignment: { horizontal: "center", vertical: "center" } } };
-    fill(CMAX, r, ws, MID); merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } }); h[r] = 22; r++;
+    band(ws, r, CMAX, merges, "ARCHIVOS Y EVIDENCIA", palette.mid, 11); h[r] = 22; r++;
 
     // Factura PDF — link WEB (signed URL larga; bucket privado, no expuesto).
     if (facturaUrl) {
