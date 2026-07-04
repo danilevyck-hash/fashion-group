@@ -4,13 +4,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
-import { ConfirmDeleteModal, Toast } from "@/components/ui";
+import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
 interface DirClient { nombre: string; empresa: string; }
+interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
+interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
+interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number; }
 
 // Fallback cuando el item no resuelve category via products (producto borrado).
 // "apparel" devuelve bulto=6: NUNCA inflar a 12 a ciegas.
@@ -48,6 +51,13 @@ export default function OrderDetailPage() {
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
+  // ── Envío a Switch (ERP) ──
+  const [switchEnvio, setSwitchEnvio] = useState<SwitchEnvio | null>(null);
+  const [switchPreview, setSwitchPreview] = useState<SwitchPreview | null>(null);
+  const [switchErrores, setSwitchErrores] = useState<string[] | null>(null);
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [switchLoading, setSwitchLoading] = useState(false);
+  const [switchSending, setSwitchSending] = useState(false);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -78,6 +88,13 @@ export default function OrderDetailPage() {
         if (d.client_email) setClientEmail(d.client_email);
         // Track active draft so catalog can add to it
         if (d.status === "borrador") sessionStorage.setItem("reebok_draft_id", id);
+        // Estado del envío a Switch (solo admin/secretaria; otros reciben 403 y se ignora)
+        if (["admin", "secretaria"].includes(r)) {
+          try {
+            const er = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`);
+            if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
+          } catch { /* no bloquea la carga del pedido */ }
+        }
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
@@ -223,6 +240,65 @@ export default function OrderDetailPage() {
     setSaving(false);
     showToast("Pedido en modo edicion");
     load();
+  }
+
+  // ── ENVIAR A SWITCH (ERP) ──
+  // Paso 1: dry-run — resuelve sku→codigoBarraId y precio VIVOS contra Switch
+  // y muestra el resumen + advertencias en un modal. Cero escrituras.
+  async function previewSwitch() {
+    setSwitchLoading(true); setSwitchErrores(null); setSwitchPreview(null);
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dry: true }),
+      });
+      const d = await res.json();
+      if (res.ok && d.preview) {
+        setSwitchPreview(d.preview); setShowSwitchModal(true);
+      } else if (res.status === 422 && d.errores) {
+        setSwitchErrores(d.errores); setShowSwitchModal(true);
+      } else {
+        showToast(d.error || "No se pudo consultar Switch. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("No se pudo consultar Switch. Revisa tu conexion.");
+    }
+    setSwitchLoading(false);
+  }
+
+  // Paso 2: el POST real. Un solo envío por pedido (candado en el server).
+  async function confirmSwitch() {
+    setSwitchSending(true);
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
+        setShowSwitchModal(false);
+        showToast(`Pedido creado en Switch: ${d.numeroInterno}`);
+      } else if (d.ambiguo) {
+        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error });
+        setShowSwitchModal(false);
+        showToast("Switch no respondio — revisa el panel antes de reintentar.");
+      } else {
+        setShowSwitchModal(false);
+        setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+        showToast(d.error || "Switch rechazo el pedido.");
+      }
+    } catch {
+      // Se perdio la respuesta: el server pudo haber completado el envio.
+      // Refrescar el estado real desde la DB en vez de asumir.
+      setShowSwitchModal(false);
+      try {
+        const er = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`);
+        if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
+      } catch { /* sin red */ }
+      showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
+    }
+    setSwitchSending(false);
   }
 
   async function deleteOrder() {
@@ -573,6 +649,40 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
+          {/* ERP Switch — solo admin/secretaria. Escritura real en el ERP:
+              un envio no-fallido por pedido; el server tiene el candado. */}
+          {canDelete && (
+            <div className="pt-3 border-t border-gray-100">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">ERP Switch</p>
+              {switchEnvio && switchEnvio.estado === "verificado" ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Pedido creado en Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
+                </div>
+              ) : switchEnvio && switchEnvio.estado === "enviado" ? (
+                <div className="text-sm text-amber-700">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    {switchEnvio.numero_interno
+                      ? <>Enviado a Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
+                      : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
+                  </div>
+                  {switchEnvio.error_detalle && <p className="text-xs text-amber-600 mt-1">{switchEnvio.error_detalle}</p>}
+                </div>
+              ) : (
+                <div>
+                  {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
+                    <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
+                  )}
+                  <button onClick={previewSwitch} disabled={switchLoading}
+                    className="border border-gray-300 text-black text-sm px-4 py-2 rounded-md hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40">
+                    {switchLoading ? "Consultando Switch..." : switchEnvio?.estado === "error" ? "Reintentar envio a Switch" : "Enviar a Switch"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {canEdit && (
             <button onClick={editOrder} disabled={saving}
               className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
@@ -603,6 +713,79 @@ export default function OrderDetailPage() {
         onCancel={() => setShowDeleteModal(false)}
         loading={deletingOrder}
       />
+
+      {/* Modal de envio a Switch: resumen del dry-run + advertencias, o los
+          errores de pre-validacion si el pedido no cruza con el ERP. */}
+      {showSwitchModal && (
+        <ModalOverlay onBackdropClick={() => { if (!switchSending) setShowSwitchModal(false); }}>
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {switchErrores ? (
+              <>
+                <h3 className="text-base font-medium mb-2">No se puede enviar a Switch</h3>
+                <ul className="text-sm text-red-600 space-y-1.5 mb-5 list-disc pl-4">
+                  {switchErrores.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+                <button onClick={() => setShowSwitchModal(false)}
+                  className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]">
+                  Entendido
+                </button>
+              </>
+            ) : switchPreview ? (
+              <>
+                <h3 className="text-base font-medium mb-1">Crear pedido en Switch</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Cliente: <span className="text-gray-700">{switchPreview.cliente}</span> · Vendedor: <span className="text-gray-700">{switchPreview.vendedor}</span> · Sin descuento
+                </p>
+                <table className="w-full text-xs mb-3">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-400">
+                      <th className="py-1.5 text-left font-normal">SKU</th>
+                      <th className="py-1.5 text-center font-normal">Piezas</th>
+                      <th className="py-1.5 text-right font-normal">Precio Switch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {switchPreview.lineas.map((l, i) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td className="py-1.5">
+                          <span className="font-mono">{l.sku}</span>
+                          <span className="block text-gray-400 truncate max-w-[220px]">{l.descripcionSwitch}</span>
+                        </td>
+                        <td className="py-1.5 text-center tabular-nums">{l.piezas} <span className="text-gray-400">({l.bultos} bultos)</span></td>
+                        <td className="py-1.5 text-right tabular-nums">${fmt(l.precioSwitch)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-between text-sm mb-3">
+                  <span className="text-gray-500">{switchPreview.totalPiezas} piezas</span>
+                  <span className="font-medium tabular-nums">${fmt(switchPreview.totalEstimado)}</span>
+                </div>
+                {switchPreview.warnings.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                    {switchPreview.warnings.map((w, i) => (
+                      <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {w}</p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mb-4">
+                  Esto crea un pedido REAL en el ERP (active_shoes). Si algo sale mal, se borra manualmente desde el panel de Switch.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={confirmSwitch} disabled={switchSending}
+                    className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                    {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
+                  </button>
+                  <button onClick={() => setShowSwitchModal(false)} disabled={switchSending}
+                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </ModalOverlay>
+      )}
 
       <Toast message={toast} />
     </div>

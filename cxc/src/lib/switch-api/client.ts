@@ -476,7 +476,7 @@ export interface SwitchClient {
    *  Paginación de 50 (/apiarticulos/lista). Un row por artículo (codigo único).
    *  OJO: trae `disponible` pero NO `saldo` (existencia física) — eso vive en
    *  getStock. */
-  getArticulos(params: { porPagina: number; paginaActual: number }): Promise<SwitchArticulosData>;
+  getArticulos(params: { porPagina: number; paginaActual: number; filtro?: string }): Promise<SwitchArticulosData>;
   /** Stock por sucursal de UN artículo (/apiarticulos/stock?articuloId=X). Trae
    *  `saldo` (existencia física) y `disponible` (disponibilidad). Una llamada por
    *  artículo — usar con moderación (no hay bulk). */
@@ -882,6 +882,7 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         porPagina: String(params.porPagina),
         paginaActual: String(params.paginaActual),
       });
+      if (params.filtro) qs.set("filtro", params.filtro);
       return authedCall<SwitchArticulosData>(
         empresaKey,
         cfg,
