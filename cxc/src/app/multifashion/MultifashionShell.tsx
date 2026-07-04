@@ -6,12 +6,15 @@
 // MultifashionView (selector único de mes + flechas ‹ ›, PR #25) — este shell
 // solo provee año + data overview y delega el resto.
 //
-// Gate admin-only vía useAuth (mismo patrón que /admin). Permisos de los demás
-// roles se definen después.
+// Gate vía useAuth (mismo patrón que /admin): admin + gerente_acs (Jennifer).
+// gerente_acs va explícito en allowedRoles — sin eso dependía del fallback
+// fg_modules de sessionStorage y un load frío podía rebotarla a /home, que la
+// re-redirige aquí (loop).
 
 import { useState } from "react";
 import useSWR from "swr";
 import { useAuth } from "@/lib/hooks/useAuth";
+import AppHeader from "@/components/AppHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
 import type { Multifashion } from "@/components/ventas/types";
@@ -37,9 +40,9 @@ export function MultifashionShell({
   multi: initialMulti,
 }: MultifashionShellProps) {
   const currentYear = new Date().getFullYear();
-  // Gate admin-only. Mientras no esté chequeado no renderizamos contenido para
-  // no parpadear data a un rol sin acceso (useAuth redirige si no pasa).
-  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin"] });
+  // Mientras no esté chequeado no renderizamos contenido para no parpadear
+  // data a un rol sin acceso (useAuth redirige si no pasa).
+  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
 
   // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -67,6 +70,10 @@ export function MultifashionShell({
   const isClosedYear = selectedYear < currentYear;
 
   return (
+    <>
+    {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
+        desktop-only. Para gerente_acs (módulo único, PWA) es su ÚNICA salida. */}
+    <AppHeader module="Multifashion" />
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -110,5 +117,6 @@ export function MultifashionShell({
         </div>
       )}
     </main>
+    </>
   );
 }

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { PullToRefresh } from "@/components/ui";
+import AppHeader from "@/components/AppHeader";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
 // Tabs cargados LAZY: cada vista va en su propio chunk y solo se descarga al
@@ -157,6 +158,10 @@ export function VentasShell({
         : "sin cierres aún");
 
   return (
+    <>
+    {/* Único chrome en móvil (drawer/búsqueda/logout/notifs) — el Sidebar es
+        desktop-only, sin esto la página queda sin salida en la PWA. */}
+    <AppHeader module="Ventas" />
     <PullToRefresh onRefresh={onRefresh}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Page head — `relative z-20` para garantizar stacking context propio
@@ -265,6 +270,7 @@ export function VentasShell({
       </Tabs>
     </main>
     </PullToRefresh>
+    </>
   );
 }
 
