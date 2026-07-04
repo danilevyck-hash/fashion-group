@@ -82,7 +82,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-31 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota):
+33 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -94,7 +94,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/backup | 06:00 |
 | /api/cron/refresh-clientes-views | 06:30 |
 | /api/cron/switch-sync tipo=all (american_classic, confecciones_boston) | 06:30 |
-| /api/cron/reebok-catalogo | 06:45 |
+| /api/cron/reebok-catalogo | 06:45, 17:00 (2 entradas — solo toca active_shoes en Switch) |
 | /api/cron/sync-utilidad | 07:00 |
 | /api/cron/sync-clientes-master | 07:00 |
 | /api/cron/sync-recibos | 07:50, 20:10, 22:20 (3 entradas) |
@@ -105,8 +105,8 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
-| /api/cron/switch-sync tipo=facturas (american_classic) | 15:00, 23:15 (2 entradas — ventas ACS intradía) |
-| /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 19:00/19:05/19:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía) |
+| /api/cron/switch-sync tipo=facturas (american_classic) | 15:00, 23:15, 01:30 (3 entradas — ventas ACS intradía) |
+| /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO para dar 60 min a reebok-catalogo 17:00) |
 
 > **Plan Vercel Hobby:** cada entrada de cron corre 1×/día y las funciones tienen tope `maxDuration` 300s. Para frecuencia sub-diaria se agregan entradas separadas del mismo path (patrón `switch-reconciliacion`).
 >

@@ -22,14 +22,16 @@
     { "path": "/api/cron/switch-reconciliacion", "schedule": "0 14 * * *" },
     { "path": "/api/cron/switch-reconciliacion", "schedule": "0 18 * * *" },
     { "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic", "schedule": "0 15 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear", "schedule": "0 19 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear", "schedule": "5 19 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep", "schedule": "10 19 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep", "schedule": "0 16 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear", "schedule": "5 16 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear", "schedule": "10 16 * * *" },
+    { "path": "/api/cron/reebok-catalogo", "schedule": "0 17 * * *" },
     { "path": "/api/cron/sync-recibos", "schedule": "10 20 * * *" },
     { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear", "schedule": "10 21 * * *" },
     { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear", "schedule": "15 21 * * *" },
     { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep", "schedule": "20 21 * * *" },
     { "path": "/api/cron/sync-recibos", "schedule": "20 22 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic", "schedule": "15 23 * * *" }
+    { "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic", "schedule": "15 23 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic", "schedule": "30 1 * * *" }
   ]
 }
