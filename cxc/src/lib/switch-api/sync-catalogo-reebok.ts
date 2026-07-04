@@ -7,7 +7,9 @@
 // categorías y matchea por SKU → cada artículo se matchea o inserta una vez.
 //
 // FILTRO PROVEEDOR: solo el distribuidor Reebok (Latin Fitness Group), excluyendo
-// códigos "KL*" (Karl Lagerfeld, mismo proveedor pero NO Reebok).
+// códigos "KL*" (Karl Lagerfeld, mismo proveedor pero NO Reebok). Si un producto
+// ya publicado SALE del filtro (p.ej. pasa a proveedor KL), el motor lo oculta en
+// el siguiente run (regla 5 de sync-catalogo) — no queda huérfano publicado.
 
 import { syncCatalogo, type CatalogoSyncResult } from "./sync-catalogo";
 import { reebokServer } from "@/lib/reebok-supabase-server";

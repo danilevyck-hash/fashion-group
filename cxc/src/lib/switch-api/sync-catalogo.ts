@@ -9,6 +9,10 @@
 //   2. Auto-agregar: codigo nuevo (no en la tabla) con existencia >= 1.
 //   3. Refrescar precio + existencia + disponibilidad cada corrida.
 //   4. keep_visible / badge "proximamente" fuerzan visible aunque existencia=0.
+//   5. Huérfanos del filtro: un producto PUBLICADO cuyo SKU ya no está en el
+//      conjunto FILTRADO de Switch (cambió de proveedor, pasó a KL, o desapareció
+//      de /lista) se oculta (active=false); si vuelve a entrar al filtro con
+//      existencia, la regla 1 lo reactiva.
 //   La regla mostrar/ocultar/agregar usa EXISTENCIA, no disponibilidad.
 //
 // RETO: `saldo` (existencia) NO viene en el bulk /lista — solo en /stock (1 call
@@ -227,6 +231,35 @@ export async function syncCatalogo(
           }
         }
         // existencia<=0 y no está en catálogo → no entra (correcto).
+      }
+
+      // (5) HUÉRFANOS DEL FILTRO: el loop (4) solo toca lo que está en
+      // stockByCodigo (artículos que PASAN articuloFilter). Un producto PUBLICADO
+      // cuyo SKU ya no está en el conjunto FILTRADO (el artículo cambió de
+      // proveedor, pasó a "KL*", o desapareció de /lista) quedaba activo para
+      // siempre. Se oculta (active=false, NO se borra) — mismo mecanismo que la
+      // regla existencia=0. keep_visible / badge "proximamente" se respetan.
+      //
+      // FAIL-SAFE adicional (no debilita el existente): si el conjunto FILTRADO
+      // quedó vacío (p.ej. Switch cambió el formato del campo proveedor y el
+      // filtro dejó de matchear), NO se oculta nada en masa — mismo espíritu que
+      // el guard de /lista vacía. Solo se ocultan huérfanos cuando el filtro
+      // sigue devolviendo artículos reales.
+      if (arts.length > 0) {
+        const filteredSkus = new Set(arts.map((a) => String(a.codigo)));
+        for (const p of bySku.values()) {
+          if (!p.active) continue; // ya oculto — nada que hacer
+          if (filteredSkus.has(String(p.sku))) continue; // sigue en el filtro (lo maneja el loop 4)
+          if (p.keep_visible === true || p.badge === "proximamente") continue;
+          if (!dryRun) {
+            const { error: hideErr } = await db
+              .from(productsTable)
+              .update({ active: false })
+              .eq("id", p.id);
+            if (hideErr) throw new Error(`ocultar huérfano ${productsTable} sku=${p.sku}: ${hideErr.message}`);
+          }
+          out.ocultados++;
+        }
       }
     } catch (err) {
       out.error = err instanceof Error ? err.message : String(err);
