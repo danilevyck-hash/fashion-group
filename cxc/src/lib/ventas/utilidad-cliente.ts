@@ -41,78 +41,45 @@ export function fmtMoneySigned(n: number): string {
   return sign + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Export Excel — todas las filas (no solo las visibles). Patrón xlsx-js-style,
-// igual que el tab Productos. Montos como números reales con formato contable.
-export async function exportUtilidadToExcel(resp: UtilidadClienteResponse): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+// Export Excel — todas las filas (no solo las visibles). Estilo de la casa
+// (src/lib/excel-export.ts, hallazgo I11): título navy, subtítulo MID con los
+// totales, headers navy, zebra, fila TOTAL en banda PRI. Montos MONEY_FMT y
+// margen PCT_FMT como números reales.
 
-  const rows: (string | number)[][] = [
-    [`FASHION GROUP — Utilidad por cliente · ${resp.year} · 5 empresas B2B`],
-    [
-      `Ventas ${fmtMoneyPlain(resp.totales.ventas)} · Costo ${fmtMoneyPlain(resp.totales.costo)} · ` +
-      `Utilidad ${fmtMoneyPlain(resp.totales.utilidad)} · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`,
-    ],
-    [],
-    ["Cliente", "Empresa", "# Docs", "Ventas", "Costo", "Utilidad", "Margen%"],
-  ];
+/** Construcción pura del sheet (sin DOM) — testeable. */
+export async function buildUtilidadSheet(resp: UtilidadClienteResponse): Promise<import("xlsx-js-style").WorkSheet> {
+  const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
 
-  for (const r of resp.rows) {
-    rows.push([r.cliente, r.empresa, r.nDocs, r.ventas, r.costo, r.utilidad, r.margen ?? 0]);
-  }
+  const subtitle =
+    `Ventas ${fmtMoneyPlain(resp.totales.ventas)} · Costo ${fmtMoneyPlain(resp.totales.costo)} · ` +
+    `Utilidad ${fmtMoneyPlain(resp.totales.utilidad)} · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`;
 
   const totalDocs = resp.rows.reduce((s, r) => s + r.nDocs, 0);
-  rows.push(["TOTAL", "", totalDocs, resp.totales.ventas, resp.totales.costo, resp.totales.utilidad, resp.totales.margen ?? 0]);
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 34 }, { wch: 20 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 }];
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
-  ];
-
-  const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
-  if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
-  const noteCell = ws[XLSX.utils.encode_cell({ r: 1, c: 0 })];
-  if (noteCell) noteCell.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-  for (let c = 0; c < 7; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 3, c })];
-    if (cell) cell.s = { font: { bold: true } };
-  }
-
-  const currFmt = { numFmt: "$#,##0.00;[Red]-$#,##0.00" };
-  const pctFmt = { numFmt: "0.0%" };
-  const numFmt = { numFmt: "#,##0" };
-  const lastRow = rows.length - 1;
-  for (let r = 4; r <= lastRow; r++) {
-    const isTotal = r === lastRow;
-    const base = isTotal ? { font: { bold: true } } : {};
-    const setFmt = (c: number, fmt: object) => {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })];
-      if (cell) cell.s = { ...base, ...fmt };
-    };
-    if (isTotal) {
-      const nCell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
-      if (nCell) nCell.s = { font: { bold: true } };
-    }
-    setFmt(2, numFmt);  // # docs
-    setFmt(3, currFmt); // ventas
-    setFmt(4, currFmt); // costo
-    setFmt(5, currFmt); // utilidad
-    setFmt(6, pctFmt);  // margen
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Utilidad por cliente");
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  const blob = new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  return buildReportSheet({
+    title: `FASHION GROUP — Utilidad por cliente · ${resp.year} · 5 empresas B2B`,
+    subtitle,
+    columns: [
+      { header: "Cliente", wch: 34 },
+      { header: "Empresa", wch: 20 },
+      { header: "# Docs", wch: 8, align: "right", fmt: "#,##0" },
+      { header: "Ventas", wch: 16, align: "right", fmt: MONEY_FMT },
+      { header: "Costo", wch: 16, align: "right", fmt: MONEY_FMT },
+      { header: "Utilidad", wch: 16, align: "right", fmt: MONEY_FMT },
+      { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
+    ],
+    rows: resp.rows.map(r => [r.cliente, r.empresa, r.nDocs, r.ventas, r.costo, r.utilidad, r.margen ?? 0]),
+    totals: ["TOTAL", null, totalDocs, resp.totales.ventas, resp.totales.costo, resp.totales.utilidad, resp.totales.margen ?? 0],
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `utilidad-por-cliente-${resp.year}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+}
+
+export async function exportUtilidadToExcel(resp: UtilidadClienteResponse): Promise<void> {
+  const ws = await buildUtilidadSheet(resp);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(
+    workbookFromSheets([{ name: "Utilidad por cliente", ws }]),
+    `utilidad-por-cliente-${resp.year}.xlsx`,
+  );
 }
 
 function fmtMoneyPlain(n: number): string {

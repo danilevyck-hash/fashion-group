@@ -1,12 +1,11 @@
 // Excel export para el tab Resumen de /ventas.
-// Portado del antiguo VentasClient.tsx; adaptado al shape VentasResumen del rediseño.
-//
-// Output: una hoja con título + nota de "Data actualizada al X" (cuando aplica),
-// headers (Empresa | meses con data | Total | Margen% | YTD prev recortado |
-// Δ vs prev %), una fila por empresa, y fila TOTAL al final con bold +
-// formato moneda/%.
-// Solo incluye meses con data en el año actual (drops futuros nulls).
+// Migrado al estilo de la casa (src/lib/excel-export.ts, hallazgo I11):
+// banda de título navy + subtítulo MID (nota "Data actualizada al ..."),
+// headers navy, zebra, fila TOTAL en banda PRI. Moneda MONEY_FMT y % PCT_FMT
+// como números reales. Mismas columnas y datos que la versión anterior:
+// Empresa | meses con data | Total | Margen% | YTD prev recortado | Δ vs prev %.
 
+import type { WorkSheet } from "xlsx-js-style";
 import type { VentasResumen } from "@/components/ventas/types";
 import { MONTHS } from "./format";
 
@@ -34,8 +33,9 @@ function prevYtdColumnLabel(data: VentasResumen, prevYear: number): string {
   return `YTD ${prevYear} (1 ene – ${d.getDate()} ${MES_FULL[d.getMonth()].toLowerCase().slice(0, 3)})`;
 }
 
-export async function exportResumenToExcel(data: VentasResumen): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+/** Construcción pura del sheet (sin DOM) — testeable. */
+export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet> {
+  const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
   const prevYear = data.year - 1;
 
   // Solo meses con data en al menos una empresa
@@ -54,21 +54,8 @@ export async function exportResumenToExcel(data: VentasResumen): Promise<void> {
     ? `Data actualizada al ${formatFechaPA(data.fecha_corte)}`
     : "";
 
-  // ── Rows ─────────────────────────────────────────────────────────────────
-  // [0] título
-  // [1] nota de fecha (vacío si no aplica)
-  // [2] vacío
-  // [3] headers
-  // [4..] data
-  // [last] TOTAL
-  const rows: (string | number)[][] = [
-    [`FASHION GROUP — Ventas ${data.year}`],
-    [dataNote],
-    [],
-    ["Empresa", ...periodLabels, "Total", "Margen%", prevYtdLabel, deltaLabel],
-  ];
-
-  // Filas de empresa — incluye la nueva columna prev YTD + Δ
+  // Filas de empresa — meses + Total + Margen% + prev YTD + Δ
+  const rows: (string | number)[][] = [];
   for (const e of data.empresas) {
     const monthValues = monthsWithData.map(i => Number(e.ventas2026[i] ?? 0));
     const total = monthValues.reduce((s, v) => s + v, 0);
@@ -81,7 +68,7 @@ export async function exportResumenToExcel(data: VentasResumen): Promise<void> {
     rows.push([e.empresa.nombre, ...monthValues, total, e.margenPct, prevYtd, delta]);
   }
 
-  // Fila TOTAL
+  // Fila TOTAL (banda PRI)
   const totalsByMonth = monthsWithData.map(i =>
     data.empresas.reduce((s, e) => s + Number(e.ventas2026[i] ?? 0), 0)
   );
@@ -94,75 +81,25 @@ export async function exportResumenToExcel(data: VentasResumen): Promise<void> {
   const grandPrevYtd = data.empresas.reduce<number>((s, e) =>
     s + e.ventas2025.reduce<number>((ss, v) => ss + (v ?? 0), 0), 0);
   const grandDelta = grandPrevYtd > 0 ? (grandTotal - grandPrevYtd) / grandPrevYtd : 0;
-  rows.push(["TOTAL", ...totalsByMonth, grandTotal, grandMargen, grandPrevYtd, grandDelta]);
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const numPeriods = periodLabels.length;
-  // Empresa + N meses + Total + Margen% + PrevYTD + Δ
-  const totalCols = 1 + numPeriods + 4;
-  ws["!cols"] = [
-    { wch: 24 },
-    ...periodLabels.map(() => ({ wch: 14 })),
-    { wch: 16 }, // Total
-    { wch: 10 }, // Margen%
-    { wch: 22 }, // YTD prev (largo por el rango entre paréntesis)
-    { wch: 12 }, // Δ vs prev
-  ];
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }, // título merge
-    { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } }, // nota merge
-  ];
-
-  const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
-  if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
-  const noteCell = ws[XLSX.utils.encode_cell({ r: 1, c: 0 })];
-  if (noteCell) noteCell.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-
-  // Header row (r=3) bold
-  for (let c = 0; c < totalCols; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 3, c })];
-    if (cell) cell.s = { font: { bold: true } };
-  }
-
-  const dataStartRow = 4;
-  const lastDataRow = rows.length - 1;
-  const currFmt = { numFmt: "$#,##0.00" };
-  const pctFmt = { numFmt: "0.0%" };
-
-  for (let r = dataStartRow; r <= lastDataRow; r++) {
-    const isTotal = r === lastDataRow;
-    const base = isTotal ? { font: { bold: true } } : {};
-    // Cols 1..numPeriods+1 = meses + Total → moneda
-    for (let c = 1; c <= numPeriods + 1; c++) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })];
-      if (cell) cell.s = { ...base, ...currFmt };
-    }
-    // Margen% (col numPeriods+2)
-    const mCell = ws[XLSX.utils.encode_cell({ r, c: numPeriods + 2 })];
-    if (mCell) mCell.s = { ...base, ...pctFmt };
-    // YTD prev (col numPeriods+3) → moneda
-    const pyCell = ws[XLSX.utils.encode_cell({ r, c: numPeriods + 3 })];
-    if (pyCell) pyCell.s = { ...base, ...currFmt };
-    // Δ vs prev (col numPeriods+4) → pct
-    const dCell = ws[XLSX.utils.encode_cell({ r, c: numPeriods + 4 })];
-    if (dCell) dCell.s = { ...base, ...pctFmt };
-    if (isTotal) {
-      const nCell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
-      if (nCell) nCell.s = { font: { bold: true } };
-    }
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Ventas");
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  const blob = new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  return buildReportSheet({
+    title: `FASHION GROUP — Ventas ${data.year}`,
+    subtitle: dataNote || undefined,
+    columns: [
+      { header: "Empresa", wch: 24 },
+      ...periodLabels.map(l => ({ header: l, wch: 14, align: "right" as const, fmt: MONEY_FMT })),
+      { header: "Total", wch: 16, align: "right", fmt: MONEY_FMT },
+      { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
+      { header: prevYtdLabel, wch: 22, align: "right", fmt: MONEY_FMT },
+      { header: deltaLabel, wch: 12, align: "right", fmt: PCT_FMT },
+    ],
+    rows,
+    totals: ["TOTAL", ...totalsByMonth, grandTotal, grandMargen, grandPrevYtd, grandDelta],
   });
+}
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `ventas-${data.year}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+export async function exportResumenToExcel(data: VentasResumen): Promise<void> {
+  const ws = await buildResumenSheet(data);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(workbookFromSheets([{ name: "Ventas", ws }]), `ventas-${data.year}.xlsx`);
 }

@@ -1,7 +1,11 @@
-// Export Excel del reporte detallado de comisión por vendedor (tab Comisiones).
-// Replica el Excel manual de Daniel: sección VENTAS, sección COBROS, cierre.
-// Usa xlsx-js-style (estándar del proyecto).
+// Export Excel del reporte de comisiones (tab Comisiones) — tres salidas:
+// detalle por vendedor (VENTAS/COBROS/CIERRE), resumen por empresa y
+// consolidado todas-las-empresas. Migrados al estilo de la casa
+// (src/lib/excel-export.ts, hallazgo I11): banda de título navy, subtítulo
+// MID (período + regla del banner), headers navy, zebra, totales en banda
+// PRI. Moneda MONEY_FMT y % PCT_FMT como números reales.
 
+import type { WorkSheet, Range } from "xlsx-js-style";
 import { fmtDate } from "@/lib/format";
 
 export interface VentaDoc {
@@ -38,105 +42,126 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const MONEY = "$#,##0.00";
-const PCT = "0.00%";
+// ── Detalle por vendedor: UNA hoja con secciones apiladas ────────────────────
+// Misma estructura vertical que el original: título, sección VENTAS (tabla +
+// total), sección COBROS (tabla + total), sección CIERRE (bases × tasas +
+// comisión total). Solo cambia la paleta/estilo unificado. Como el layout es
+// propio (multi-sección) usa makeCellStyles, no buildReportSheet (solo tablas
+// simples).
 
-export async function exportComisionDetalle(d: ComisionDetalle, empresaNombre: string): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+/** Construcción pura del sheet del detalle (sin DOM) — testeable. */
+export async function buildComisionDetalleSheet(
+  d: ComisionDetalle,
+  empresaNombre: string,
+): Promise<WorkSheet> {
+  const { makeCellStyles, CASA_PALETTE, MONEY_FMT, PCT_FMT, addr } = await import("@/lib/excel-export");
+  const { band, hdr, td, tdN, tot, fillRow } = makeCellStyles(CASA_PALETTE);
   const periodo = `${MESES[d.mes - 1]} ${d.year}`;
-  const rows: (string | number | null)[][] = [];
 
-  rows.push([`Comisión — ${d.vendedor}`]);
-  rows.push([`${empresaNombre} · ${periodo}`]);
-  rows.push([]);
+  const ws: WorkSheet = {};
+  const merges: Range[] = [];
+  const heights: number[] = [];
+  const lastCol = 4;
+  let r = 0;
+
+  // Título + subtítulo (empresa · período) + separador — patrón de la casa.
+  band(ws, r, lastCol, merges, `Comisión — ${d.vendedor}`, CASA_PALETTE.pri, 14);
+  heights[r] = 30; r++;
+  band(ws, r, lastCol, merges, `${empresaNombre} · ${periodo}`, CASA_PALETTE.mid, 10);
+  heights[r] = 20; r++;
+  fillRow(ws, r, lastCol, CASA_PALETTE.sep);
+  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
+  heights[r] = 4; r++;
+
+  const section = (label: string) => {
+    band(ws, r, lastCol, merges, label, CASA_PALETTE.mid, 11);
+    heights[r] = 20; r++;
+  };
+  const spacer = () => { heights[r] = 8; r++; };
 
   // ── VENTAS ──
-  rows.push(["VENTAS"]);
-  rows.push(["Fecha", "Cliente", "Factura", "Subtotal", "% Utilidad"]);
-  const ventasStart = rows.length;
-  for (const v of d.ventas) {
-    rows.push([
-      fmtDate(v.fecha),
-      v.cliente,
-      v.secuencial,
-      v.subtotal,
-      v.pct_utilidad == null ? "" : v.pct_utilidad / 100,
-    ]);
-  }
-  rows.push(["", "", "Total ventas", d.ventas_base, ""]);
-  const ventasTotalRow = rows.length - 1;
-
-  rows.push([]);
+  section("VENTAS");
+  ["Fecha", "Cliente", "Factura", "Subtotal", "% Utilidad"].forEach((h, i) => {
+    ws[addr(r, i)] = hdr(h, i >= 3 ? "right" : "left");
+  });
+  heights[r] = 22; r++;
+  d.ventas.forEach((v, idx) => {
+    const alt = idx % 2 === 0;
+    ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
+    ws[addr(r, 1)] = td(v.cliente, alt);
+    ws[addr(r, 2)] = td(v.secuencial, alt);
+    ws[addr(r, 3)] = tdN(v.subtotal, alt, { fmt: MONEY_FMT });
+    ws[addr(r, 4)] = v.pct_utilidad == null
+      ? td("", alt)
+      : tdN(v.pct_utilidad / 100, alt, { fmt: PCT_FMT });
+    heights[r] = 18; r++;
+  });
+  ws[addr(r, 0)] = tot("", { ha: "left" });
+  ws[addr(r, 1)] = tot("", { ha: "left" });
+  ws[addr(r, 2)] = tot("Total ventas", { ha: "right" });
+  ws[addr(r, 3)] = tot(d.ventas_base, { fmt: MONEY_FMT });
+  ws[addr(r, 4)] = tot("", { ha: "left" });
+  heights[r] = 22; r++;
+  spacer();
 
   // ── COBROS ──
-  rows.push(["COBROS"]);
-  rows.push(["Fecha", "Cliente", "Monto"]);
-  const cobrosStart = rows.length;
-  for (const c of d.cobros) {
-    rows.push([fmtDate(c.fecha), c.cliente, c.monto]);
-  }
-  rows.push(["", "Total cobros", d.cobros_base]);
-  const cobrosTotalRow = rows.length - 1;
-
-  rows.push([]);
+  section("COBROS");
+  ["Fecha", "Cliente", "Monto"].forEach((h, i) => {
+    ws[addr(r, i)] = hdr(h, i === 2 ? "right" : "left");
+  });
+  heights[r] = 22; r++;
+  d.cobros.forEach((c, idx) => {
+    const alt = idx % 2 === 0;
+    ws[addr(r, 0)] = td(fmtDate(c.fecha), alt);
+    ws[addr(r, 1)] = td(c.cliente, alt);
+    ws[addr(r, 2)] = tdN(c.monto, alt, { fmt: MONEY_FMT });
+    heights[r] = 18; r++;
+  });
+  ws[addr(r, 0)] = tot("", { ha: "left" });
+  ws[addr(r, 1)] = tot("Total cobros", { ha: "right" });
+  ws[addr(r, 2)] = tot(d.cobros_base, { fmt: MONEY_FMT });
+  heights[r] = 22; r++;
+  spacer();
 
   // ── CIERRE ──
-  rows.push(["CIERRE"]);
-  rows.push(["Ventas", d.ventas_base, `× ${(d.tasa_venta * 100).toFixed(2)}%`, d.comision_venta]);
-  rows.push(["Cobros", d.cobros_base, `× ${(d.tasa_cobro * 100).toFixed(2)}%`, d.comision_cobro]);
-  rows.push(["Comisión total", "", "", d.comision_total]);
-  const cierreStart = rows.length - 4;
+  section("CIERRE");
+  const cierre: [string, number, string, number][] = [
+    ["Ventas", d.ventas_base, `× ${(d.tasa_venta * 100).toFixed(2)}%`, d.comision_venta],
+    ["Cobros", d.cobros_base, `× ${(d.tasa_cobro * 100).toFixed(2)}%`, d.comision_cobro],
+  ];
+  cierre.forEach(([label, base, tasa, comision], idx) => {
+    const alt = idx % 2 === 0;
+    ws[addr(r, 0)] = td(label, alt);
+    ws[addr(r, 1)] = tdN(base, alt, { fmt: MONEY_FMT });
+    ws[addr(r, 2)] = td(tasa, alt, { ha: "right" });
+    ws[addr(r, 3)] = tdN(comision, alt, { fmt: MONEY_FMT });
+    heights[r] = 18; r++;
+  });
+  ws[addr(r, 0)] = tot("Comisión total", { ha: "left" });
+  ws[addr(r, 1)] = tot("", { ha: "left" });
+  ws[addr(r, 2)] = tot("", { ha: "left" });
+  ws[addr(r, 3)] = tot(d.comision_total, { fmt: MONEY_FMT });
+  heights[r] = 22; r++;
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!ref"] = `A1:${addr(r - 1, lastCol)}`;
+  ws["!merges"] = merges;
   ws["!cols"] = [{ wch: 14 }, { wch: 32 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
+  ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
+  return ws;
+}
 
-  const cell = (r: number, c: number) => ws[XLSX.utils.encode_cell({ r, c })];
-  const bold = { font: { bold: true } };
-  const money = { numFmt: MONEY };
-  const pct = { numFmt: PCT };
-
-  // título + subtítulo
-  if (cell(0, 0)) cell(0, 0).s = { font: { bold: true, sz: 14 } };
-  if (cell(1, 0)) cell(1, 0).s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-
-  // headers de sección + tablas
-  for (const r of [3, 6]) if (cell(r, 0)) cell(r, 0).s = { font: { bold: true, sz: 12 } }; // VENTAS / (COBROS movido) — set abajo dinámico
-  // estilos de ventas
-  if (cell(4, 0)) for (let c = 0; c < 5; c++) if (cell(4, c)) cell(4, c)!.s = bold;
-  for (let r = ventasStart; r < ventasTotalRow; r++) {
-    if (cell(r, 3)) cell(r, 3)!.s = money;
-    if (cell(r, 4)) cell(r, 4)!.s = pct;
-  }
-  if (cell(ventasTotalRow, 2)) cell(ventasTotalRow, 2)!.s = bold;
-  if (cell(ventasTotalRow, 3)) cell(ventasTotalRow, 3)!.s = { ...bold, ...money };
-
-  // COBROS header (la fila "COBROS" y su header)
-  const cobrosLabelRow = cobrosStart - 2;
-  const cobrosHdrRow = cobrosStart - 1;
-  if (cell(cobrosLabelRow, 0)) cell(cobrosLabelRow, 0)!.s = { font: { bold: true, sz: 12 } };
-  for (let c = 0; c < 3; c++) if (cell(cobrosHdrRow, c)) cell(cobrosHdrRow, c)!.s = bold;
-  for (let r = cobrosStart; r < cobrosTotalRow; r++) {
-    if (cell(r, 2)) cell(r, 2)!.s = money;
-  }
-  if (cell(cobrosTotalRow, 1)) cell(cobrosTotalRow, 1)!.s = bold;
-  if (cell(cobrosTotalRow, 2)) cell(cobrosTotalRow, 2)!.s = { ...bold, ...money };
-
-  // CIERRE
-  if (cell(cierreStart, 0)) cell(cierreStart, 0)!.s = { font: { bold: true, sz: 12 } };
-  for (let r = cierreStart + 1; r <= cierreStart + 3; r++) {
-    if (cell(r, 1)) cell(r, 1)!.s = money;
-    if (cell(r, 3)) cell(r, 3)!.s = { ...bold, ...money };
-  }
-  if (cell(cierreStart + 3, 0)) cell(cierreStart + 3, 0)!.s = { font: { bold: true, sz: 12 } };
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Comisión");
+export async function exportComisionDetalle(d: ComisionDetalle, empresaNombre: string): Promise<void> {
+  const ws = await buildComisionDetalleSheet(d, empresaNombre);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   const safe = d.vendedor.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
-  XLSX.writeFile(wb, `Comision-${safe}-${empresaNombre.replace(/\s+/g, "")}-${d.year}-${String(d.mes).padStart(2, "0")}.xlsx`);
+  downloadWorkbook(
+    workbookFromSheets([{ name: "Comisión", ws }]),
+    `Comision-${safe}-${empresaNombre.replace(/\s+/g, "")}-${d.year}-${String(d.mes).padStart(2, "0")}.xlsx`,
+  );
 }
 
 // ── Export del RESUMEN del tab (vista actual: empresa + mes + año) ────────────
-// Una fila por vendedor + fila Total. Misma regla del banner en el encabezado.
+// Una fila por vendedor + fila Total. Misma regla del banner en el subtítulo.
 export interface ComisionResumenRow {
   vendedor: string;
   base: number;           // ventas base
@@ -159,21 +184,10 @@ const REGLA_NOTA =
   "excluyendo retenciones de ITBMS. Ambas excluyen intercompañía y clientes internos, " +
   "y se asignan al vendedor dueño del cliente. Fuente: reportes de Switch.";
 
-export async function exportComisionesResumen(r: ComisionResumen): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+/** Construcción pura del sheet (sin DOM) — testeable. */
+export async function buildComisionesResumenSheet(r: ComisionResumen): Promise<WorkSheet> {
+  const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
   const periodo = `${MESES[r.mes - 1]} ${r.year}`;
-  const rows: (string | number | null)[][] = [];
-
-  rows.push([`Comisiones — ${r.empresaNombre}`]);
-  rows.push([periodo]);
-  rows.push([REGLA_NOTA]);
-  rows.push([]);
-  rows.push(["Vendedor", "Ventas", "Com. Venta", "Cobros", "Com. Cobro", "Com. Total"]);
-  const dataStart = rows.length;
-
-  for (const v of r.vendedores) {
-    rows.push([v.vendedor, v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total]);
-  }
 
   // Total = suma de las filas (no recálculo), consistente con el tab.
   const tot = r.vendedores.reduce(
@@ -186,36 +200,32 @@ export async function exportComisionesResumen(r: ComisionResumen): Promise<void>
     }),
     { base: 0, comision: 0, base_cobro: 0, comision_cobro: 0, comision_total: 0 },
   );
-  rows.push(["Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total]);
-  const totalRow = rows.length - 1;
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 13 }, { wch: 13 }];
-  ws["!merges"] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }];
+  return buildReportSheet({
+    title: `Comisiones — ${r.empresaNombre}`,
+    subtitle: `${periodo} · ${REGLA_NOTA}`,
+    columns: [
+      { header: "Vendedor", wch: 26 },
+      { header: "Ventas", wch: 14, align: "right", fmt: MONEY_FMT },
+      { header: "Com. Venta", wch: 13, align: "right", fmt: MONEY_FMT },
+      { header: "Cobros", wch: 14, align: "right", fmt: MONEY_FMT },
+      { header: "Com. Cobro", wch: 13, align: "right", fmt: MONEY_FMT },
+      { header: "Com. Total", wch: 13, align: "right", fmt: MONEY_FMT },
+    ],
+    rows: r.vendedores.map(v => [
+      v.vendedor, v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total,
+    ]),
+    totals: ["Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total],
+  });
+}
 
-  const cell = (rr: number, cc: number) => ws[XLSX.utils.encode_cell({ r: rr, c: cc })];
-  const money = { numFmt: MONEY };
-
-  if (cell(0, 0)) cell(0, 0)!.s = { font: { bold: true, sz: 14 } };
-  if (cell(1, 0)) cell(1, 0)!.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-  if (cell(2, 0)) cell(2, 0)!.s = { font: { italic: true, sz: 9, color: { rgb: "888888" } }, alignment: { wrapText: true, vertical: "top" } };
-
-  // headers
-  for (let c = 0; c < 6; c++) if (cell(4, c)) cell(4, c)!.s = { font: { bold: true }, alignment: { horizontal: c === 0 ? "left" : "right" } };
-
-  // datos: moneda en columnas 1..5
-  for (let rr = dataStart; rr <= totalRow; rr++) {
-    for (let c = 1; c < 6; c++) if (cell(rr, c)) cell(rr, c)!.s = { ...money };
-  }
-  // fila Total en negrita
-  for (let c = 0; c < 6; c++) {
-    if (!cell(totalRow, c)) continue;
-    cell(totalRow, c)!.s = c === 0 ? { font: { bold: true } } : { font: { bold: true }, ...money };
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Comisiones");
-  XLSX.writeFile(wb, `comisiones-${r.empresaKey}-${String(r.mes).padStart(2, "0")}-${r.year}.xlsx`);
+export async function exportComisionesResumen(r: ComisionResumen): Promise<void> {
+  const ws = await buildComisionesResumenSheet(r);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(
+    workbookFromSheets([{ name: "Comisiones", ws }]),
+    `comisiones-${r.empresaKey}-${String(r.mes).padStart(2, "0")}-${r.year}.xlsx`,
+  );
 }
 
 // ── Export CONSOLIDADO (vista "Todas las empresas") ──────────────────────────
@@ -235,70 +245,46 @@ export interface ComisionConsolidado {
   sinAsignar?: ComisionConsolidadoRow | null;   // fila DEFAULT consolidada
 }
 
-export async function exportComisionesConsolidado(c: ComisionConsolidado): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+/** Construcción pura del sheet (sin DOM) — testeable. */
+export async function buildComisionesConsolidadoSheet(c: ComisionConsolidado): Promise<WorkSheet> {
+  const { buildReportSheet, MONEY_FMT } = await import("@/lib/excel-export");
   const periodo = `${MESES[c.mes - 1]} ${c.year}`;
-  const rows: (string | number | null)[][] = [];
-
-  rows.push(["Comisiones — Todas las empresas"]);
-  rows.push([periodo]);
-  rows.push([REGLA_NOTA]);
-  rows.push([]);
-
-  const header = ["Vendedor", ...c.empresas.map((e) => e.nombre), "Total"];
-  rows.push(header);
-  const dataStart = rows.length;
 
   const rowFor = (r: ComisionConsolidadoRow) => [
     r.vendedor,
     ...c.empresas.map((e) => r.porEmpresa[e.key] ?? 0),
-    r.total,
+    { v: r.total, bold: true }, // columna TOTAL destacada
   ];
 
-  for (const v of c.vendedores) rows.push(rowFor(v));
+  const rows = c.vendedores.map(rowFor);
   if (c.sinAsignar) rows.push(rowFor({ ...c.sinAsignar, vendedor: "Sin asignar" }));
 
   // Total general = suma de TODAS las filas mostradas (vendedores + sin asignar).
   const allRows = [...c.vendedores, ...(c.sinAsignar ? [c.sinAsignar] : [])];
-  const totalRowVals: (string | number)[] = ["Total"];
+  const totals: (string | number)[] = ["Total"];
   for (const e of c.empresas) {
-    totalRowVals.push(allRows.reduce((a, r) => a + (r.porEmpresa[e.key] ?? 0), 0));
+    totals.push(allRows.reduce((a, r) => a + (r.porEmpresa[e.key] ?? 0), 0));
   }
-  totalRowVals.push(allRows.reduce((a, r) => a + (r.total ?? 0), 0));
-  rows.push(totalRowVals);
-  const totalRow = rows.length - 1;
+  totals.push(allRows.reduce((a, r) => a + (r.total ?? 0), 0));
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  const nCols = header.length;
-  ws["!cols"] = [{ wch: 26 }, ...c.empresas.map(() => ({ wch: 15 })), { wch: 15 }];
-  ws["!merges"] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: nCols - 1 } }];
+  return buildReportSheet({
+    title: "Comisiones — Todas las empresas",
+    subtitle: `${periodo} · ${REGLA_NOTA}`,
+    columns: [
+      { header: "Vendedor", wch: 26 },
+      ...c.empresas.map(e => ({ header: e.nombre, wch: 15, align: "right" as const, fmt: MONEY_FMT })),
+      { header: "Total", wch: 15, align: "right", fmt: MONEY_FMT },
+    ],
+    rows,
+    totals,
+  });
+}
 
-  const cell = (rr: number, cc: number) => ws[XLSX.utils.encode_cell({ r: rr, c: cc })];
-  const money = { numFmt: MONEY };
-
-  if (cell(0, 0)) cell(0, 0)!.s = { font: { bold: true, sz: 14 } };
-  if (cell(1, 0)) cell(1, 0)!.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-  if (cell(2, 0)) cell(2, 0)!.s = { font: { italic: true, sz: 9, color: { rgb: "888888" } }, alignment: { wrapText: true, vertical: "top" } };
-
-  // headers
-  for (let c2 = 0; c2 < nCols; c2++) {
-    if (cell(4, c2)) cell(4, c2)!.s = { font: { bold: true }, alignment: { horizontal: c2 === 0 ? "left" : "right" } };
-  }
-  // datos: moneda en columnas 1..nCols-1
-  for (let rr = dataStart; rr <= totalRow; rr++) {
-    for (let c2 = 1; c2 < nCols; c2++) if (cell(rr, c2)) cell(rr, c2)!.s = { ...money };
-  }
-  // columna TOTAL destacada (negrita) por fila de datos
-  for (let rr = dataStart; rr < totalRow; rr++) {
-    if (cell(rr, nCols - 1)) cell(rr, nCols - 1)!.s = { font: { bold: true }, ...money };
-  }
-  // fila Total en negrita
-  for (let c2 = 0; c2 < nCols; c2++) {
-    if (!cell(totalRow, c2)) continue;
-    cell(totalRow, c2)!.s = c2 === 0 ? { font: { bold: true } } : { font: { bold: true }, ...money };
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Consolidado");
-  XLSX.writeFile(wb, `comisiones-consolidado-${String(c.mes).padStart(2, "0")}-${c.year}.xlsx`);
+export async function exportComisionesConsolidado(c: ComisionConsolidado): Promise<void> {
+  const ws = await buildComisionesConsolidadoSheet(c);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(
+    workbookFromSheets([{ name: "Consolidado", ws }]),
+    `comisiones-consolidado-${String(c.mes).padStart(2, "0")}-${c.year}.xlsx`,
+  );
 }

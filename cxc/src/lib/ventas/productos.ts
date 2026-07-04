@@ -77,74 +77,40 @@ export function fmtMargen(d: number | null | undefined): string {
 }
 
 // Export Excel del nivel 1 (todas las descripciones, no solo el Top 20).
-export async function exportProductosToExcel(resp: ProductosResponse): Promise<void> {
-  const XLSX = (await import("xlsx-js-style")).default;
+// Estilo de la casa (src/lib/excel-export.ts, hallazgo I11): título navy,
+// subtítulo MID con venta total y margen, headers navy, zebra, fila TOTAL en
+// banda PRI. Venta MONEY_FMT y margen PCT_FMT como números reales.
+
+/** Construcción pura del sheet (sin DOM) — testeable. */
+export async function buildProductosSheet(resp: ProductosResponse): Promise<import("xlsx-js-style").WorkSheet> {
+  const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
   const nombre = empresaNombre(resp.empresa);
   const periodo = periodoLabel(resp.year, resp.mes);
 
-  const rows: (string | number)[][] = [
-    [`FASHION GROUP — Productos · ${nombre} · ${periodo}`],
-    [`Venta total ${fmtMoneyPlain(resp.totales.venta)} · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`],
-    [],
-    ["Descripción", "# Códigos", "Cantidad", "Venta", "Margen%"],
-  ];
-
-  for (const p of resp.productos) {
-    rows.push([p.descripcion, p.num_codigos, p.cantidad, p.venta, p.margen ?? 0]);
-  }
-
   const totalCant = resp.productos.reduce((s, p) => s + p.cantidad, 0);
-  rows.push(["TOTAL", "", totalCant, resp.totales.venta, resp.totales.margen ?? 0]);
 
-  const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws["!cols"] = [{ wch: 34 }, { wch: 11 }, { wch: 12 }, { wch: 16 }, { wch: 10 }];
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
-  ];
-
-  const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
-  if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
-  const noteCell = ws[XLSX.utils.encode_cell({ r: 1, c: 0 })];
-  if (noteCell) noteCell.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
-  for (let c = 0; c < 5; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 3, c })];
-    if (cell) cell.s = { font: { bold: true } };
-  }
-
-  const currFmt = { numFmt: "$#,##0.00" };
-  const pctFmt = { numFmt: "0.0%" };
-  const numFmt = { numFmt: "#,##0" };
-  const lastRow = rows.length - 1;
-  for (let r = 4; r <= lastRow; r++) {
-    const isTotal = r === lastRow;
-    const base = isTotal ? { font: { bold: true } } : {};
-    const setFmt = (c: number, fmt: object) => {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })];
-      if (cell) cell.s = { ...base, ...fmt };
-    };
-    if (isTotal) {
-      const nCell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
-      if (nCell) nCell.s = { font: { bold: true } };
-    }
-    setFmt(1, numFmt); // # códigos
-    setFmt(2, numFmt); // cantidad
-    setFmt(3, currFmt); // venta
-    setFmt(4, pctFmt); // margen
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Productos");
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  const blob = new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  return buildReportSheet({
+    title: `FASHION GROUP — Productos · ${nombre} · ${periodo}`,
+    subtitle: `Venta total ${fmtMoneyPlain(resp.totales.venta)} · Margen ${resp.totales.margen != null ? (resp.totales.margen * 100).toFixed(1) + "%" : "—"}`,
+    columns: [
+      { header: "Descripción", wch: 34 },
+      { header: "# Códigos", wch: 11, align: "right", fmt: "#,##0" },
+      { header: "Cantidad", wch: 12, align: "right", fmt: "#,##0" },
+      { header: "Venta", wch: 16, align: "right", fmt: MONEY_FMT },
+      { header: "Margen%", wch: 10, align: "right", fmt: PCT_FMT },
+    ],
+    rows: resp.productos.map(p => [p.descripcion, p.num_codigos, p.cantidad, p.venta, p.margen ?? 0]),
+    totals: ["TOTAL", null, totalCant, resp.totales.venta, resp.totales.margen ?? 0],
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `productos-${resp.empresa}-${resp.mes ? String(resp.mes).padStart(2, "0") : "ytd"}-${resp.year}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+}
+
+export async function exportProductosToExcel(resp: ProductosResponse): Promise<void> {
+  const ws = await buildProductosSheet(resp);
+  const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
+  downloadWorkbook(
+    workbookFromSheets([{ name: "Productos", ws }]),
+    `productos-${resp.empresa}-${resp.mes ? String(resp.mes).padStart(2, "0") : "ytd"}-${resp.year}.xlsx`,
+  );
 }
 
 function fmtMoneyPlain(n: number): string {
