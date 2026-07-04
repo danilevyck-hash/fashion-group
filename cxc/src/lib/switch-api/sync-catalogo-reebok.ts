@@ -37,6 +37,8 @@ export function syncCatalogoReebok(opts: { dryRun?: boolean } = {}): Promise<Cat
     articuloFilter: isReebokArticulo,
     inventoryTable: "inventory",
     stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad }),
+    // Persistir el codigoBarraId de Switch (backfill llega solo con cada corrida del cron).
+    articuloFields: (a) => ({ codigo_barra_id: a.codigoBarraId ?? null }),
     insertExtras: { on_sale: false },
   }, opts);
 }

@@ -58,6 +58,10 @@ export interface CatalogoSyncConfig {
   /** Campos fijos extra en el INSERT de nuevos (Reebok: {on_sale:false};
    *  Joybees: {gender:"adults_m"} porque gender es NOT NULL). */
   insertExtras?: Record<string, unknown>;
+  /** Columnas extra derivadas del artículo Switch, escritas en UPDATE e INSERT
+   *  (Reebok: {codigo_barra_id}). Opcional — omitir si la tabla no tiene las
+   *  columnas (Joybees). */
+  articuloFields?: (a: SwitchArticulo) => Record<string, unknown>;
 }
 
 interface ExistingProduct {
@@ -174,6 +178,7 @@ export async function syncCatalogo(
               name: nameFinal,
               active: shouldShow,
               ...config.stockFields(existencia, disponibilidad),
+              ...(config.articuloFields ? config.articuloFields(art) : {}),
               // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
             }).eq("id", p.id);
             if (inventoryTable) {
@@ -199,6 +204,7 @@ export async function syncCatalogo(
               active: true,
               image_url: null,
               ...config.stockFields(existencia, disponibilidad),
+              ...(config.articuloFields ? config.articuloFields(art) : {}),
               ...(config.insertExtras ?? {}),
             }).select("id").single();
             if (!insErr && np?.id && inventoryTable) {
