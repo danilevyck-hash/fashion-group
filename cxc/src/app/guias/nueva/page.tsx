@@ -24,6 +24,17 @@ export default function GuiaNuevaPage() {
         module="Guías de Transporte"
         breadcrumbs={[{ label: "Nueva guía" }]}
       />
+      {s.hasGuiaDraft && (
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-amber-800">Tienes un borrador guardado de {s.guiaDraftTimeAgo}. ¿Restaurar?</p>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button onClick={s.restoreGuiaDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
+              <button onClick={s.clearGuiaDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
+            </div>
+          </div>
+        </div>
+      )}
       <GuiaForm
         editingId={null}
         formNumero={s.formNumero}
