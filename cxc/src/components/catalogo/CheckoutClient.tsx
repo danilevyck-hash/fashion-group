@@ -45,7 +45,7 @@ const BRANDS: Record<string, BrandCfg> = {
     confirmBase: "/catalogo/reebok/confirmacion",
     cartLocal: "reebok_cart",
     cartSession: "reebok_cart",
-    clearKeys: ["reebok_draft_id", "reebok_draft_client", "reebok_draft_client_email", "reebok_create_token"],
+    clearKeys: [], // draft keys viejos eliminados (flujo crear-pedido-primero muerto)
     bulto: (c) => (c === "footwear" ? 12 : 6),
     accent: "#1A2656",
   },

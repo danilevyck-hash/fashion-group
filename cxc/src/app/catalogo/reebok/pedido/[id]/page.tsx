@@ -87,8 +87,6 @@ export default function OrderDetailPage() {
         }
         setOrder(d); setItems(sortReebokOrderItems(d.reebok_order_items || [])); setClientName(d.client_name || "");
         if (d.client_email) setClientEmail(d.client_email);
-        // Track active draft so catalog can add to it
-        if (d.status === "borrador") sessionStorage.setItem("reebok_draft_id", id);
         // Estado del envío a Switch (solo admin/secretaria; otros reciben 403 y se ignora)
         if (["admin", "secretaria"].includes(r)) {
           try {
@@ -205,10 +203,7 @@ export default function OrderDetailPage() {
       return;
     }
 
-    // 2. Clear active draft so catalog starts fresh
-    sessionStorage.removeItem("reebok_draft_id");
-
-    // 3. Try to send email (non-blocking — order is already confirmed)
+    // 2. Try to send email (non-blocking — order is already confirmed)
     try {
       const emailRes = await fetch("/api/catalogo/reebok/send-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
