@@ -518,7 +518,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   }
 
   async function exportCheques() {
-    const XLSX = (await import("xlsx-js-style")).default;
     const hoy = todayStr();
     const semana = getVencenSemanaRange(hoy).end;
     let data: Cheque[];
@@ -551,95 +550,8 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         break;
     }
     if (data.length === 0) { showToast("No hay cheques para exportar"); return; }
-    const label = exportFilterLabel();
-    const sheetName = label.charAt(0).toUpperCase() + label.slice(1);
-
-    // Style helpers — matches Caja/Préstamos exports
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const B: any = { top: { style: "thin", color: { rgb: "D5DBDB" } }, bottom: { style: "thin", color: { rgb: "D5DBDB" } }, left: { style: "thin", color: { rgb: "D5DBDB" } }, right: { style: "thin", color: { rgb: "D5DBDB" } } };
-    const ec = XLSX.utils.encode_cell;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ws: any = {};
-    const heights: number[] = [];
-    let r = 0;
-
-    // Title row — merged, bold, 14pt, navy bg
-    for (let ci = 0; ci < 6; ci++) {
-      ws[ec({ r, c: ci })] = {
-        v: ci === 0 ? `FASHION GROUP — Cheques ${sheetName}` : "",
-        t: "s",
-        s: { font: { bold: true, sz: 14, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: "left", vertical: "center" } },
-      };
-    }
-    heights[r] = 30;
-    r++;
-
-    // Spacer
-    heights[r] = 6;
-    r++;
-
-    // Header row — navy bg, white bold
-    const hdrs = ["Cliente", "Nº Cheque", "Monto", "Fecha Depósito", "Vendedor"];
-    hdrs.forEach((h, ci) => {
-      ws[ec({ r, c: ci })] = {
-        v: h, t: "s",
-        s: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: ci === 2 ? "right" : "left", vertical: "center" }, border: B },
-      };
-    });
-    heights[r] = 22;
-    r++;
-
-    // Data rows — alternating white / light gray
-    let totalMonto = 0;
-    for (let i = 0; i < data.length; i++) {
-      const ch = data[i];
-      const alt = i % 2 === 1;
-      const bg = alt ? "F8F9F9" : "FFFFFF";
-      const cellS = (fg = "333333", sz = 10) => ({ font: { sz, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "left" as const }, border: B });
-
-      ws[ec({ r, c: 0 })] = { v: ch.cliente, t: "s", s: cellS("111111") };
-      ws[ec({ r, c: 1 })] = { v: ch.numero_cheque, t: "s", s: cellS("333333", 9) };
-      ws[ec({ r, c: 2 })] = { v: ch.monto, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, color: { rgb: "333333" }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
-      ws[ec({ r, c: 3 })] = { v: fmtDate(ch.fecha_deposito), t: "s", s: cellS("555555", 9) };
-      ws[ec({ r, c: 4 })] = { v: ch.vendedor || "", t: "s", s: cellS("555555", 9) };
-      totalMonto += Number(ch.monto) || 0;
-      heights[r] = 18;
-      r++;
-    }
-
-    // Spacer
-    heights[r] = 6;
-    r++;
-
-    // Totals row
-    for (let ci = 0; ci < 5; ci++) {
-      const topB = { ...B, top: { style: "medium", color: { rgb: "1B3A5C" } } };
-      if (ci === 1) {
-        ws[ec({ r, c: ci })] = { v: "TOTAL", t: "s", s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
-      } else if (ci === 2) {
-        ws[ec({ r, c: ci })] = { v: totalMonto, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
-      } else {
-        ws[ec({ r, c: ci })] = { v: "", t: "s", s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, border: topB } };
-      }
-    }
-    heights[r] = 22;
-    r++;
-
-    ws["!ref"] = `A1:E${r}`;
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
-    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
-    ws["!rows"] = heights.map((h: number) => ({ hpt: h || 16 }));
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `cheques-${label.replace(/ /g, "-")}-${todayStr()}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const { exportChequesExcel } = await import("./excel-cheques");
+    exportChequesExcel(data, exportFilterLabel());
     showToast("Excel listo — revisa tu carpeta de descargas");
   }
 
