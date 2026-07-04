@@ -5,6 +5,7 @@ import { getBultoSize } from "@/lib/reebok-bulto";
 import { sendTelegramAlert } from "@/lib/telegram";
 import {
   createSwitchClient,
+  logoutAllSwitchSessions,
   SwitchApiError,
   type SwitchPedidoLineaInput,
 } from "@/lib/switch-api/client";
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ envio: data ?? null });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+async function handlePost(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, SEND_ROLES);
   if (auth instanceof NextResponse) return auth;
 
@@ -321,4 +322,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   );
 
   return NextResponse.json({ ok: true, numeroInterno, pedidoSwitchId, verificado, warnings });
+}
+
+// Higiene de sesión única: al terminar el envío —éxito o fallo— se cierra la
+// sesión de Switch abierta por este proceso (POST /cierresesion, best-effort)
+// para no matar el login del próximo cron de la misma empresa (code 0006).
+export async function POST(req: NextRequest, ctx: { params: { id: string } }) {
+  try {
+    return await handlePost(req, ctx);
+  } finally {
+    await logoutAllSwitchSessions();
+  }
 }

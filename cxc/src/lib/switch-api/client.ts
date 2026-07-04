@@ -783,6 +783,22 @@ export interface SwitchPedidoInfoData {
   detalle: SwitchPedidoDetalleLinea[];
 }
 
+/** Cierra (best-effort, POST /cierresesion) TODAS las sesiones de Switch que
+ *  este proceso abrió — itera el token cache, así que cierra exactamente lo que
+ *  se autenticó en esta invocación y nada más (no-op si no hubo logins).
+ *  Para el `finally` de cada cron: sin esto el token queda vivo ~60min y mata
+ *  el login del próximo cron que toque la MISMA empresa (sesión única, code
+ *  0006). NUNCA lanza — la higiene de sesión jamás debe romper un cron. */
+export async function logoutAllSwitchSessions(): Promise<void> {
+  for (const key of [...tokenCache.keys()]) {
+    try {
+      await createSwitchClient(key).logout();
+    } catch {
+      // readConfig puede lanzar por env faltante — best-effort, seguir.
+    }
+  }
+}
+
 export function createSwitchClient(empresaKey: string): SwitchClient {
   const cfg = readConfig(empresaKey);
 

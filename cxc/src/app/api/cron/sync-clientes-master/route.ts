@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 
@@ -25,7 +26,7 @@ export const maxDuration = 60;
 
 const CRON_NAME = "sync-clientes-master";
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+async function handleCron(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado" }, { status: 500 });
@@ -47,4 +48,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   );
   await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json(result);
+}
+
+// Higiene de sesión única (4-jul-2026): al terminar el cron —éxito o fallo—
+// se cierran las sesiones de Switch abiertas por este proceso (POST
+// /cierresesion, best-effort). Sin esto el token queda vivo ~60min y mata el
+// login del siguiente cron que toque la misma empresa (colisión code 0006).
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  try {
+    return await handleCron(req);
+  } finally {
+    await logoutAllSwitchSessions();
+  }
 }
