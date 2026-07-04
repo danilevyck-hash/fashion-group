@@ -36,3 +36,24 @@ export function csvWithBom(content: string): string {
 export function stripBom(text: string): string {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
+
+/**
+ * Escapa un valor para CSV (RFC 4180): si contiene el delimitador, comillas o
+ * saltos de línea, lo envuelve en comillas y DOBLA las comillas internas.
+ * NUNCA mutar el dato (nada de reemplazar ";" por ","): el valor llega intacto
+ * a Excel. El delimitador de cada export se mantiene como está hoy (CXC/Joybees
+ * usan coma, Reclamos/Directorio punto y coma — decisión de Daniel 4-jul-2026:
+ * no cambiar cómo abren los archivos existentes).
+ */
+export function escapeCsvField(value: unknown, delimiter: "," | ";" = ","): string {
+  const s = value === null || value === undefined ? "" : String(value);
+  if (s.includes(delimiter) || s.includes('"') || s.includes("\n") || s.includes("\r")) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+/** Construye las líneas CSV escapando cada campo con el delimitador dado. */
+export function buildCsv(rows: unknown[][], delimiter: "," | ";" = ","): string {
+  return rows.map((row) => row.map((f) => escapeCsvField(f, delimiter)).join(delimiter)).join("\n");
+}
