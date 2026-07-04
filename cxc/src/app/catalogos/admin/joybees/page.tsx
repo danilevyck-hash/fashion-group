@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob, stripBom } from "@/lib/csv-export";
+import PedidosTab from "./PedidosTab";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ interface ImportRow {
   badge: string;
 }
 
-type Tab = "faltan-foto" | "completo" | "importar";
+type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -140,6 +141,7 @@ function JoybeesAdminInner() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
     { key: "completo", label: "Catálogo completo" },
+    { key: "pedidos", label: "Pedidos" },
     { key: "importar", label: "Importar" },
   ];
 
@@ -196,6 +198,9 @@ function JoybeesAdminInner() {
             )}
             {tab === "completo" && (
               <ProductosTab products={products} />
+            )}
+            {tab === "pedidos" && (
+              <PedidosTab showToast={showToast} />
             )}
             {tab === "importar" && (
               <ImportarTab

@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { JoybeesProduct } from "@/components/joybees/JoybeesProductCard";
-import { Toast } from "@/components/ui";
+import { Toast, ModalOverlay } from "@/components/ui";
 import JoybeesHeader from "@/components/joybees/JoybeesHeader";
 import JoybeesFilters from "@/components/joybees/JoybeesFilters";
 import JoybeesGroupedCard from "@/components/joybees/JoybeesGroupedCard";
@@ -28,6 +28,7 @@ export default function JoybeesCatalogPage() {
 
 function JoybeesCatalog() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [products, setProducts] = useState<JoybeesProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
@@ -208,6 +209,60 @@ function JoybeesCatalog() {
   // WhatsApp
   const [sendingOrder, setSendingOrder] = useState(false);
 
+  // Crear pedido en el sistema (además de WhatsApp — no reemplaza)
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [clientNameInput, setClientNameInput] = useState("");
+
+  function openCreateOrder() {
+    if (cart.length === 0 || creatingOrder) return;
+    setShowNameModal(true);
+  }
+
+  async function submitCreateOrder() {
+    const name = clientNameInput.trim();
+    if (!name) { setToast("Escribe el nombre del cliente"); return; }
+    setCreatingOrder(true);
+    // Token idempotente persistido: si el POST falla y el vendedor reintenta,
+    // reusa el MISMO token → el server devuelve el pedido ya creado en vez de
+    // duplicarlo. Se borra solo al confirmar exito.
+    let token = sessionStorage.getItem("joybees_create_token");
+    if (!token) {
+      token = (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("joybees_create_token", token);
+    }
+    try {
+      const res = await fetch("/api/catalogo/joybees/orders", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name: name,
+          vendor_name: (typeof window !== "undefined" && sessionStorage.getItem("fg_user_name")) || null,
+          items: cart.map(i => ({
+            product_id: i.product_id, sku: i.sku, name: i.name,
+            image_url: i.image_url, quantity: i.quantity, unit_price: i.unit_price,
+          })),
+          idempotency_key: token,
+        }),
+      });
+      if (res.ok) {
+        const order = await res.json();
+        sessionStorage.removeItem("joybees_create_token"); // exito → proximo pedido usa token nuevo
+        setCart([]);
+        try { localStorage.removeItem("joybees_cart"); } catch { /* */ }
+        router.push(`/catalogo/joybees/pedido/${order.id}`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setToast(err.error || "No se pudo crear el pedido. Intenta de nuevo.");
+        setCreatingOrder(false);
+      }
+    } catch {
+      setToast("Sin conexion. Verifica tu internet e intenta de nuevo.");
+      setCreatingOrder(false);
+    }
+  }
+
   async function handleSendWhatsApp() {
     if (cart.length === 0 || sendingOrder) return;
     setSendingOrder(true);
@@ -308,6 +363,19 @@ function JoybeesCatalog() {
         {/* Header + Share */}
         <div className="flex items-start justify-between">
           <JoybeesHeader variant="vendor" />
+          <div className="flex items-center gap-2">
+          {cartCount > 0 && (
+            <button
+              onClick={openCreateOrder}
+              disabled={creatingOrder}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#404041] bg-[#FFE443] hover:bg-[#f5d90a] transition px-3 py-2 rounded-lg disabled:opacity-50 min-h-[36px]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+              {creatingOrder ? "Creando..." : "Crear pedido en el sistema"}
+            </button>
+          )}
           <div className="relative" ref={shareRef}>
             <button
               onClick={() => setShowShareMenu(!showShareMenu)}
@@ -330,6 +398,7 @@ function JoybeesCatalog() {
               </div>
             )}
           </div>
+          </div>
         </div>
 
         <JoybeesFilters
@@ -346,6 +415,42 @@ function JoybeesCatalog() {
         />
 
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}
+
+        {/* Modal: nombre del cliente para crear el pedido en el sistema */}
+        {showNameModal && (
+          <ModalOverlay onBackdropClick={() => { if (!creatingOrder) setShowNameModal(false); }}>
+            <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-base font-semibold mb-1">Crear pedido</h3>
+              <p className="text-sm text-gray-500 mb-4">¿Para qué cliente es este pedido?</p>
+              <input
+                type="text"
+                value={clientNameInput}
+                onChange={(e) => setClientNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") submitCreateOrder(); }}
+                placeholder="Nombre del cliente"
+                autoFocus
+                disabled={creatingOrder}
+                className="w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm focus:border-black focus:outline-none mb-4 disabled:opacity-50"
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={submitCreateOrder}
+                  disabled={creatingOrder || !clientNameInput.trim()}
+                  className="flex-1 px-4 py-2.5 rounded-md text-sm font-semibold bg-[#FFE443] text-[#404041] hover:bg-[#f5d90a] active:scale-[0.97] transition disabled:opacity-40 min-h-[44px]"
+                >
+                  {creatingOrder ? "Creando..." : "Crear pedido"}
+                </button>
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  disabled={creatingOrder}
+                  className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </ModalOverlay>
+        )}
 
         <Toast message={toast} />
 

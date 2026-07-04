@@ -32,6 +32,8 @@ const PUBLIC_PREFIXES = [
   "/reclamos/galeria/",             // galería pública de fotos por reclamo (token HMAC)
   "/pedido-reebok/",                // public order view page (no auth)
   "/api/catalogo/reebok/pedido-publico", // public order API (no auth)
+  "/pedido-joybees/",               // Joybees public order view page (no auth)
+  "/api/catalogo/joybees/pedido-publico", // Joybees public order API (no auth)
   "/api/catalogo/joybees/public",       // Joybees public catalog (no auth)
   "/_next/",
   "/icon-",

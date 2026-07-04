@@ -79,6 +79,7 @@ const EXPECTED_CRONS = [
   "cheques-alert",
   "cleanup-packing-lists",
   "integrity-check",
+  "joybees-catalogo",
   "multifashion-sync",
   "reebok-catalogo",
   "refresh-clientes-views",
