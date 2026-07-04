@@ -104,8 +104,15 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   if (rpcErr || !created) {
     return NextResponse.json({ error: `No se pudo guardar el pedido: ${rpcErr?.message || "?"}` }, { status: 500 });
   }
-  const orderId = String((created as { id: string }).id);
-  const orderNumber = String((created as { order_number: string }).order_number);
+  // El RPC devuelve { order_id, order_number, already_created } — NO `id`.
+  // (Bug del piloto 4-jul: leer .id daba "undefined" → redirect a
+  // /confirmacion/undefined, update a 0 filas y envío nunca registrado.)
+  const orderId = String((created as { order_id: string }).order_id ?? "");
+  const orderNumber = String((created as { order_number: string }).order_number ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) {
+    console.error(`[checkout] RPC ${cfg.createOrderRpc} devolvió order_id inválido:`, JSON.stringify(created));
+    return NextResponse.json({ error: "No se pudo guardar el pedido (id inválido). Intenta de nuevo." }, { status: 500 });
+  }
 
   // Confirmado + cliente/vendedor de Switch guardados (para el Reintentar).
   // Tolerante a DDL 20260705120000 pendiente: sin las columnas, el envío de
@@ -115,7 +122,9 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     .update({ status: "confirmado", cliente_switch_id: clienteId, vendedor_switch_id: mapping.vendedor_id })
     .eq("id", orderId);
   if (updErr) {
-    await cfg.db.from(cfg.ordersTable).update({ status: "confirmado" }).eq("id", orderId);
+    console.error(`[checkout] update cliente/vendedor falló (${updErr.message}) — reintento solo status`);
+    const { error: updErr2 } = await cfg.db.from(cfg.ordersTable).update({ status: "confirmado" }).eq("id", orderId);
+    if (updErr2) console.error(`[checkout] update status también falló: ${updErr2.message}`);
   }
 
   // ── 2) Envío a Switch (motor compartido) ──
