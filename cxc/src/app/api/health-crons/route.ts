@@ -74,6 +74,7 @@ async function leerHeartbeatsUnaVez(): Promise<Beat[]> {
 // Crons que registran heartbeat (deben existir en cron_heartbeats). Un cron de
 // esta lista SIN fila = nunca registró success → se reporta como stale (null).
 const EXPECTED_CRONS = [
+  "acs-fidelizacion",
   "backup",
   "cheques-alert",
   "cleanup-packing-lists",
