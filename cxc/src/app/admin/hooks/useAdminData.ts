@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
-import { supabase } from "@/lib/supabase";
 import { VENDOR_MAP } from "@/lib/vendors";
 import type { VendorMap } from "@/lib/vendors";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
@@ -28,18 +27,17 @@ interface AdminData {
  * atrapa (si la red falla, rechaza → SWR marca error y caemos al snapshot).
  */
 async function fetchAdminData(): Promise<AdminData> {
-  const [vendorRows, upRows, agingJson, overridesRes, pagosRes, logRes] =
+  // overrides/últimopago/contact-log: antes eran lecturas anon directas a Supabase;
+  // ahora rutas server con service_role (RLS de esas tablas cerrada). No-críticas
+  // (resuelven a [] si fallan); solo /api/cxc/aging puede rechazar → error/snapshot.
+  const [vendorRows, upRows, agingJson, overrides, pagos, log] =
     await Promise.all([
       fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
-      supabase.from("cxc_client_overrides").select("*"),
-      supabase.from("switch_ultimo_pago_cliente_v2").select("*"),
-      supabase
-        .from("cxc_contact_log")
-        .select("*")
-        .order("contacted_at", { ascending: false })
-        .limit(2000),
+      fetch("/api/cxc/overrides", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch("/api/cxc/contact-log", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
 
   // Vendor map (global VENDOR_MAP) — opcional.
@@ -64,15 +62,15 @@ async function fetchAdminData(): Promise<AdminData> {
   const rows = (agingJson?.rows ?? null) as CxcRow[] | null;
 
   const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
-  if (overridesRes.data) {
-    for (const o of overridesRes.data) overrideMap[o.nombre_normalized] = o;
+  if (Array.isArray(overrides)) {
+    for (const o of overrides) overrideMap[o.nombre_normalized] = o;
   }
 
   // Último pago por empresa+cliente (vista switch_ultimo_pago_cliente_v2,
   // lee de switch_recibos). Join por (empresa_key, cliente_codigo).
   const pagoMap = new Map<string, { fecha: string; monto: number }>();
-  if (pagosRes.data) {
-    for (const p of pagosRes.data) {
+  if (Array.isArray(pagos)) {
+    for (const p of pagos) {
       if (!p.cliente_codigo) continue;
       pagoMap.set(`${p.empresa_key}|${p.cliente_codigo}`, {
         fecha: p.ultimo_pago_fecha,
@@ -152,8 +150,8 @@ async function fetchAdminData(): Promise<AdminData> {
 
   // Último contacto por cliente (cxc_contact_log, ya leído arriba en paralelo).
   const latestLog: Record<string, ContactEntry> = {};
-  if (logRes.data) {
-    for (const l of logRes.data) {
+  if (Array.isArray(log)) {
+    for (const l of log) {
       if (!latestLog[l.nombre_normalized]) {
         latestLog[l.nombre_normalized] = { date: l.contacted_at, method: l.method };
       }

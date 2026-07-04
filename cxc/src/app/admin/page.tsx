@@ -3,7 +3,6 @@
 import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
 import { csvBlob } from "@/lib/csv-export";
@@ -384,13 +383,14 @@ function AdminDashboardInner() {
       id: `contact-${clientName}-${now}`,
       message: `Contacto registrado vía ${methodLabel[method] ?? method}`,
       execute: async () => {
-        const { error } = await supabase.from("cxc_contact_log").insert({
-          nombre_normalized: clientName,
-          method,
+        const res = await fetch("/api/cxc/contact-log", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre_normalized: clientName, method }),
         });
-        if (error) {
+        if (!res.ok) {
           showToast("No se pudo registrar el contacto. Intenta de nuevo.");
-          throw error;
+          throw new Error("contact-log POST failed");
         }
         // Invalidar la caché SWR tras la escritura → el último contacto del
         // server reemplaza al optimista al toque (mutate).
@@ -408,11 +408,12 @@ function AdminDashboardInner() {
   }
 
   async function handleSaveEdit(nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) {
-    const { error } = await supabase.from("cxc_client_overrides").upsert(
-      { nombre_normalized: nombre, ...data, updated_at: new Date().toISOString() },
-      { onConflict: "nombre_normalized" }
-    );
-    if (error) {
+    const res = await fetch("/api/cxc/overrides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre_normalized: nombre, ...data }),
+    });
+    if (!res.ok) {
       showToast("Error al guardar contacto");
       return;
     }
