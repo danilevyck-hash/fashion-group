@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
-import { csvBlob } from "@/lib/csv-export";
+import { csvBlob, buildCsv } from "@/lib/csv-export";
 import { waHref } from "@/lib/contact-links";
 import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
@@ -71,13 +71,26 @@ function buildEmailBody(client: ConsolidatedClient) {
 
 function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: string, companyLabel?: string) {
   const date = new Date().toISOString().slice(0, 10);
-  const meta = `"Reporte CXC Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros"\n`;
-  const header = "Cliente,0-30d,31-60d,61-90d,91-120d,121d+,Total,Estado,Correo,Telefono,Celular,Contacto\n";
+  const meta = `Reporte CXC Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros`;
+  const header = ["Cliente", "0-30d", "31-60d", "61-90d", "91-120d", "121d+", "Total", "Estado", "Correo", "Telefono", "Celular", "Contacto"];
   const rows = data.map((c) => {
     const estado = c.overdue > 0 ? "Vencido crítico" : c.watch > 0 ? "Vencido reciente" : "Por vencer";
-    return `"${c.nombre_normalized}",${(c.d0_30 ?? c.current).toFixed(2)},${(c.d31_60 ?? 0).toFixed(2)},${(c.d61_90 ?? 0).toFixed(2)},${(c.d91_120 ?? c.watch).toFixed(2)},${(c.d121_plus ?? c.overdue).toFixed(2)},${c.total.toFixed(2)},"${estado}","${c.correo}","${c.telefono}","${c.celular}","${c.contacto}"`;
-  }).join("\n");
-  const blob = csvBlob(meta + header + rows);
+    return [
+      c.nombre_normalized,
+      (c.d0_30 ?? c.current).toFixed(2),
+      (c.d31_60 ?? 0).toFixed(2),
+      (c.d61_90 ?? 0).toFixed(2),
+      (c.d91_120 ?? c.watch).toFixed(2),
+      (c.d121_plus ?? c.overdue).toFixed(2),
+      c.total.toFixed(2),
+      estado,
+      c.correo,
+      c.telefono,
+      c.celular,
+      c.contacto,
+    ];
+  });
+  const blob = csvBlob(buildCsv([[meta], header, ...rows], ","));
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

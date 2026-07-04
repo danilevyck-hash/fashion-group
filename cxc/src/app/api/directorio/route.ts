@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
-import { csvWithBom, CSV_MIME } from "@/lib/csv-export";
+import { csvWithBom, buildCsv, CSV_MIME } from "@/lib/csv-export";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 
@@ -27,13 +27,10 @@ export async function GET(req: NextRequest) {
     if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
     if (format === "csv") {
-      const header = "nombre;empresa;telefono;celular;correo;contacto;notas";
-      const rows = (data || []).map((r) =>
-        [r.nombre, r.empresa, r.telefono, r.celular, r.correo, r.contacto, r.notas]
-          .map((v) => (v || "").replace(/;/g, ","))
-          .join(";")
-      );
-      const csv = [header, ...rows].join("\n");
+      const header = ["nombre", "empresa", "telefono", "celular", "correo", "contacto", "notas"];
+      const rows = (data || []).map((r) => [r.nombre, r.empresa, r.telefono, r.celular, r.correo, r.contacto, r.notas]);
+      // escapeCsvField (vía buildCsv) conserva el valor intacto — nada de mutar ";" a ",".
+      const csv = buildCsv([header, ...rows], ";");
       return new NextResponse(csvWithBom(csv), {
         headers: {
           "Content-Type": CSV_MIME,

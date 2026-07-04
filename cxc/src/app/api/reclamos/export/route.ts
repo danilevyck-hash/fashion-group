@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
-import { csvWithBom, CSV_MIME } from "@/lib/csv-export";
+import { csvWithBom, buildCsv, CSV_MIME } from "@/lib/csv-export";
 import { reclamoTaxes, ocultaPedido } from "@/lib/reclamos/tax";
 
 export const dynamic = "force-dynamic";
@@ -19,26 +19,26 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
-  const header = "N° Reclamo;Empresa;Proveedor;Marca;N° Factura;N° Orden Compra;Fecha Reclamo;Estado;Referencia;Descripción;Talla;Cantidad;Precio Unit.;Subtotal Item;Importación (10%);ITBMS (7%);Total Item;Motivo;Notas";
-  const rows: string[] = [];
+  const header = ["N° Reclamo", "Empresa", "Proveedor", "Marca", "N° Factura", "N° Orden Compra", "Fecha Reclamo", "Estado", "Referencia", "Descripción", "Talla", "Cantidad", "Precio Unit.", "Subtotal Item", "Importación (10%)", "ITBMS (7%)", "Total Item", "Motivo", "Notas"];
+  const rows: unknown[][] = [];
 
   for (const r of data || []) {
     const items = r.reclamo_items || [];
     // Active Shoes no usa N° de pedido → columna en blanco.
     const pedido = ocultaPedido(r.empresa) ? "" : r.nro_orden_compra;
     if (items.length === 0) {
-      rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, "", "", "", "", "", "", "", "", "", "", r.notas].join(";"));
+      rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, "", "", "", "", "", "", "", "", "", "", r.notas]);
     } else {
       for (const item of items) {
         const sub = item.subtotal || 0;
         // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
         const tx = reclamoTaxes(r.empresa, sub);
-        rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), tx.importacion.toFixed(2), tx.itbms.toFixed(2), tx.total.toFixed(2), item.motivo, r.notas].join(";"));
+        rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), tx.importacion.toFixed(2), tx.itbms.toFixed(2), tx.total.toFixed(2), item.motivo, r.notas]);
       }
     }
   }
 
-  const csv = [header, ...rows].join("\n");
+  const csv = buildCsv([header, ...rows], ";");
   return new NextResponse(csvWithBom(csv), {
     headers: {
       "Content-Type": CSV_MIME,
