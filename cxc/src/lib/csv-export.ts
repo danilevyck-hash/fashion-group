@@ -41,9 +41,9 @@ export function stripBom(text: string): string {
  * Escapa un valor para CSV (RFC 4180): si contiene el delimitador, comillas o
  * saltos de línea, lo envuelve en comillas y DOBLA las comillas internas.
  * NUNCA mutar el dato (nada de reemplazar ";" por ","): el valor llega intacto
- * a Excel. El delimitador de cada export se mantiene como está hoy (CXC/Joybees
- * usan coma, Reclamos/Directorio punto y coma — decisión de Daniel 4-jul-2026:
- * no cambiar cómo abren los archivos existentes).
+ * a Excel. Estándar del sistema: delimitador COMA en todos los exports
+ * (decisión de Daniel 4-jul-2026); el parámetro ";" existe solo para parseo
+ * de archivos externos estilo Switch.
  */
 export function escapeCsvField(value: unknown, delimiter: "," | ";" = ","): string {
   const s = value === null || value === undefined ? "" : String(value);

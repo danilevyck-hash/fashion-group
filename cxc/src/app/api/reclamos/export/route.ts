@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const csv = buildCsv([header, ...rows], ";");
+  const csv = buildCsv([header, ...rows], ",");
   return new NextResponse(csvWithBom(csv), {
     headers: {
       "Content-Type": CSV_MIME,

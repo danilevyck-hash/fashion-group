@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
     if (format === "csv") {
       const header = ["nombre", "empresa", "telefono", "celular", "correo", "contacto", "notas"];
       const rows = (data || []).map((r) => [r.nombre, r.empresa, r.telefono, r.celular, r.correo, r.contacto, r.notas]);
-      // escapeCsvField (vía buildCsv) conserva el valor intacto — nada de mutar ";" a ",".
-      const csv = buildCsv([header, ...rows], ";");
+      // escapeCsvField (vía buildCsv) conserva el valor intacto — nada de mutar el dato.
+      const csv = buildCsv([header, ...rows], ",");
       return new NextResponse(csvWithBom(csv), {
         headers: {
           "Content-Type": CSV_MIME,
