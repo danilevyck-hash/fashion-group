@@ -227,32 +227,41 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{l.name}</p>
-                        <p className="text-xs text-gray-400 tabular-nums">
-                          {l.sku} ·{" "}
+                        <p className="text-xs text-gray-400 tabular-nums">{l.sku} · bulto de {l.bulto}</p>
+                        {/* Precio: campo tocable OBVIO (borde + fondo + lápiz),
+                            no un link sutil — cualquiera debe intuir que se
+                            puede cambiar sin explicárselo. */}
+                        <div className="mt-1">
                           {editingPrice === l.product_id ? (
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min="0.01"
-                              step="0.01"
-                              autoFocus
-                              value={priceDraft}
-                              onChange={(e) => setPriceDraft(e.target.value)}
-                              onBlur={() => commitPrice(l.product_id)}
-                              onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
-                              className="w-20 rounded border border-gray-300 px-1.5 py-0.5 text-xs tabular-nums outline-none focus:border-black"
-                            />
+                            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                              $
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0.01"
+                                step="0.01"
+                                autoFocus
+                                value={priceDraft}
+                                onChange={(e) => setPriceDraft(e.target.value)}
+                                onBlur={() => commitPrice(l.product_id)}
+                                onKeyDown={(e) => { if (e.key === "Enter") commitPrice(l.product_id); if (e.key === "Escape") setEditingPrice(null); }}
+                                className="w-24 rounded-md border-2 border-black bg-white px-2 min-h-[40px] text-sm font-medium tabular-nums outline-none"
+                              />
+                              /pza
+                            </span>
                           ) : (
                             <button
                               onClick={() => { setEditingPrice(l.product_id); setPriceDraft(String(l.unit_price)); }}
-                              className="underline decoration-dotted underline-offset-2 hover:text-gray-700 transition min-h-[44px] align-middle"
-                              title="Tocar para editar el precio"
+                              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-gray-50 px-2.5 min-h-[40px] text-sm font-medium tabular-nums text-gray-800 hover:border-gray-400 hover:bg-gray-100 active:scale-[0.97] transition"
+                              title="Tocar para cambiar el precio"
                             >
-                              ${fmt(l.unit_price)}/pza
+                              ${fmt(l.unit_price)}<span className="text-xs font-normal text-gray-400">/pza</span>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                              </svg>
                             </button>
                           )}
-                          {" "}· bulto de {l.bulto}
-                        </p>
+                        </div>
                       </div>
                       <span className="shrink-0 text-sm font-semibold tabular-nums">${fmt(l.subtotal)}</span>
                     </div>
