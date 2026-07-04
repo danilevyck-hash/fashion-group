@@ -147,25 +147,21 @@ function ReebokCatalogoInner() {
     const sin = products.filter((p) => !tieneFoto(p));
     if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
     try {
-      const XLSX = (await import("xlsx-js-style")).default;
-      const header = ["Código", "Descripción", "Categoría", "Disponible", "Existencia"];
-      const rows = sin.map((p) => [
-        p.sku || "",
-        p.name || "",
-        categoriaLabel(p.category),
-        p.disponibilidad ?? "",
-        p.existencia ?? "",
+      // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
+      const [{ buildReebokSinFotoWorkbook }, { downloadWorkbook, exportFilename }] = await Promise.all([
+        import("@/lib/catalogos/sinfoto-excel"),
+        import("@/lib/excel-export"),
       ]);
-      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-      ws["!cols"] = [{ wch: 16 }, { wch: 40 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];
-      const headStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A2656" } } };
-      for (let c = 0; c < header.length; c++) {
-        const ref = XLSX.utils.encode_cell({ r: 0, c });
-        if (ws[ref]) ws[ref].s = headStyle;
-      }
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sin foto");
-      XLSX.writeFile(wb, `Reebok-sin-foto-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      const wb = buildReebokSinFotoWorkbook(
+        sin.map((p) => ({
+          sku: p.sku || "",
+          nombre: p.name || "",
+          categoria: categoriaLabel(p.category),
+          disponible: p.disponibilidad ?? "",
+          existencia: p.existencia ?? "",
+        })),
+      );
+      downloadWorkbook(wb, exportFilename("reebok-sin-foto"));
       showToast("Excel listo — revisa tu carpeta de descargas");
     } catch {
       showToast("No se pudo generar el Excel. Intenta de nuevo.");
