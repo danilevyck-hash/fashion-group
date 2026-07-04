@@ -75,6 +75,7 @@ async function leerHeartbeatsUnaVez(): Promise<Beat[]> {
 // esta lista SIN fila = nunca registró success → se reporta como stale (null).
 const EXPECTED_CRONS = [
   "acs-fidelizacion",
+  "acs-resumen-diario",
   "backup",
   "cheques-alert",
   "cleanup-packing-lists",
