@@ -57,7 +57,22 @@ function JoybeesCatalog() {
     try { localStorage.setItem("joybees_cart", JSON.stringify(cart)); } catch { /* */ }
   }, [cart]);
 
+  // Stock EN VIVO desde Switch al agregar (mismo patrón que Reebok). Joybees
+  // gatea el botón Agregar con product.stock — el vivo lo corrige en pantalla.
+  const stockPedido = useRef<Set<string>>(new Set());
+  const refreshStockVivo = useCallback((productId: string, sku: string | null | undefined) => {
+    if (!sku || stockPedido.current.has(sku)) return;
+    stockPedido.current.add(sku);
+    fetch(`/api/catalogo/stock-vivo?marca=joybees&sku=${encodeURIComponent(sku)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((d: { disponible: number }) => {
+        setProducts((prev) => prev.map((p) => p.id === productId ? { ...p, stock: d.disponible } : p));
+      })
+      .catch(() => { stockPedido.current.delete(sku); });
+  }, []);
+
   const handleQtyChange = useCallback((productId: string, qty: number, product: JoybeesProduct) => {
+    if (qty > 0) refreshStockVivo(productId, product.sku);
     setCart(prev => {
       if (qty <= 0) return prev.filter(i => i.product_id !== productId);
       const idx = prev.findIndex(i => i.product_id === productId);
@@ -71,7 +86,7 @@ function JoybeesCatalog() {
         unit_price: product.price || 0,
       }];
     });
-  }, []);
+  }, [refreshStockVivo]);
 
   // Scroll
   useEffect(() => {
