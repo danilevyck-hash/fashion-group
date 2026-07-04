@@ -29,10 +29,18 @@ import {
   Coins,
   Building2,
   LayoutDashboard,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   type LucideIcon,
 } from "lucide-react";
 
-export type ModuleGroup = "finanzas" | "ventas" | "operacion" | "productos" | "sistema";
+export type ModuleGroup =
+  | "plata-entra"
+  | "plata-sale"
+  | "ventas-clientes"
+  | "operacion"
+  | "productos"
+  | "sistema";
 
 export interface AppModule {
   key: string;
@@ -54,28 +62,31 @@ export interface AppGroup {
 // Las páginas de grupo viven en una ruta dinámica /g/[grupo] para evitar
 // colisión con rutas de módulo (ej: grupo "ventas" vs módulo /ventas).
 export const GROUPS: AppGroup[] = [
-  { key: "ventas",    label: "Ventas",    href: "/g/ventas",    icon: BarChart3 },
-  { key: "finanzas",  label: "Finanzas",  href: "/g/finanzas",  icon: Wallet },
-  { key: "operacion", label: "Operación", href: "/g/operacion", icon: Briefcase },
-  { key: "productos", label: "Productos", href: "/g/productos", icon: ShoppingBag },
-  { key: "sistema",   label: "Sistema",   href: "/g/sistema",   icon: Settings },
+  { key: "plata-entra",     label: "Plata que entra",   href: "/g/plata-entra",     icon: ArrowDownToLine },
+  { key: "plata-sale",      label: "Plata que sale",    href: "/g/plata-sale",      icon: ArrowUpFromLine },
+  { key: "ventas-clientes", label: "Ventas y Clientes", href: "/g/ventas-clientes", icon: BarChart3 },
+  { key: "operacion",       label: "Operación",         href: "/g/operacion",       icon: Briefcase },
+  { key: "productos",       label: "Productos",         href: "/g/productos",       icon: ShoppingBag },
+  { key: "sistema",         label: "Sistema",           href: "/g/sistema",         icon: Settings },
 ];
 
 export const ALL_MODULES: AppModule[] = [
-  // Ventas
-  { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas" },
-  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "ventas" },
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas" },
-  { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                            group: "ventas" },
-  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor"],                 group: "ventas" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "ventas" },
+  // Plata que entra
+  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "plata-entra" },
+  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "plata-entra" },
+  { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "plata-entra" },
 
-  // Finanzas
-  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "finanzas" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "finanzas" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
-  { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "finanzas" },
-  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo, aging y pagos",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
+  // Plata que sale
+  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo, aging y pagos",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
+  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "plata-sale" },
+  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
+  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "plata-sale" },
+
+  // Ventas y Clientes
+  { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas-clientes" },
+  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas-clientes" },
+  { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                            group: "ventas-clientes" },
+  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor"],                 group: "ventas-clientes" },
 
   // Operación
   { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "vendedor"],       group: "operacion" },
@@ -143,11 +154,12 @@ export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: 
   return getVisibleModules(role, fgModules).filter(m => m.group === group);
 }
 
-export const GROUP_ORDER: ModuleGroup[] = ["ventas", "finanzas", "operacion", "productos", "sistema"];
+export const GROUP_ORDER: ModuleGroup[] = ["plata-entra", "plata-sale", "ventas-clientes", "operacion", "productos", "sistema"];
 export const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
-  finanzas:  { title: "Finanzas",  description: "Cobros, pagos y gastos del grupo" },
-  ventas:    { title: "Ventas",    description: "Ventas, cuentas por cobrar y clientes" },
-  operacion: { title: "Operación", description: "Despachos, bultos y reclamos" },
-  productos: { title: "Productos", description: "Catálogos y pedidos" },
-  sistema:   { title: "Sistema",   description: "Configuración y administración" },
+  "plata-entra":     { title: "Plata que entra",   description: "Cobros, cheques y comisiones" },
+  "plata-sale":      { title: "Plata que sale",    description: "Pagos a proveedores, gastos y préstamos" },
+  "ventas-clientes": { title: "Ventas y Clientes", description: "Ventas, resumen ejecutivo y clientes" },
+  operacion:         { title: "Operación",         description: "Despachos, bultos y reclamos" },
+  productos:         { title: "Productos",         description: "Catálogos y carga de productos" },
+  sistema:           { title: "Sistema",           description: "Configuración y administración" },
 };
