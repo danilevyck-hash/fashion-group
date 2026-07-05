@@ -12,30 +12,89 @@
 //   - "Hoy vs día comparable": misma fecha −364 días = MISMO DÍA DE LA SEMANA
 //     del año pasado (un viernes se compara con viernes — estándar retail).
 //   - "Mes vs año pasado": acumulado 1..D vs 1..D del año anterior (mismo día
-//     de corte, la convención YoY del módulo).
+//     de corte en AMBOS lados, la convención YoY del módulo).
+//
+// GUARDIA ANTI-RUIDO (incidente 5-jul-2026): los crons de Vercel Hobby tienen
+// jitter — el sync de 01:30 puede correr tarde o no correr. Si el resumen lee
+// antes de que el sync de cierre haya escrito el día, "Hoy" da $0 · -100% falso
+// y el mes compara 1..D-1 contra 1..D (asimétrico). Antes de calcular se
+// verifica en switch_sync_log que hubo un sync de facturas ACS exitoso DESPUÉS
+// del cierre de tienda (fecha+1 01:30 UTC = 20:30 Panamá). Si no lo hubo, el
+// mensaje omite la línea de "Hoy" y reporta el mes al último día completo
+// (1..D-1 vs 1..D-1, simétrico). Un $0 real con sync fresco (tienda cerrada,
+// domingo/feriado) se manda normal.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
+
+export { hoyPanama };
 
 const VIEW = "_multifashion_sf_vw";
 const PAGE = 1000;
 
 export interface AcsResumenDiario {
-  fecha: string;          // día del resumen (hoy Panamá)
-  hoy: number;
+  fecha: string;          // día del resumen (hoy Panamá) — el que se anuncia
+  corte: string;          // último día COMPLETO incluido (= fecha si sync fresco)
+  syncFresco: boolean;    // ¿el sync de cierre (01:30 UTC) ya corrió para `fecha`?
+  hoy: number;            // solo significativo si syncFresco
   hoyPrev: number;        // día comparable (−364d, mismo día de semana)
   fechaComparable: string;
-  mes: number;            // acumulado 1..fecha
-  mesPrev: number;        // acumulado 1..fecha del año anterior
-}
-
-export function hoyPanama(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(new Date());
+  mes: number;            // acumulado 1..corte
+  mesPrev: number;        // acumulado 1..corte del año anterior (mismo D)
 }
 
 export function addDays(fecha: string, days: number): string {
   const d = new Date(`${fecha}T12:00:00Z`);
   return new Date(d.getTime() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+// ── Ventanas del comparativo (puras, testeables) ─────────────────────────────
+
+export interface VentanasResumen {
+  fechaComparable: string; // corte − 364 días (mismo día de la semana, año pasado)
+  inicioMes: string;       // día 1 del mes de corte
+  inicioMesPrev: string;   // día 1 del mismo mes, año anterior
+  cortePrev: string;       // misma fecha de corte, año anterior (29-feb → 28-feb)
+}
+
+/** Ventanas same-period ESTRICTAS: 1..D vs 1..D con el MISMO D en ambos lados. */
+export function ventanasResumen(corte: string): VentanasResumen {
+  const prevYear = String(Number(corte.slice(0, 4)) - 1);
+  const mmdd = corte.slice(5) === "02-29" ? "02-28" : corte.slice(5);
+  return {
+    fechaComparable: addDays(corte, -364),
+    inicioMes: `${corte.slice(0, 7)}-01`,
+    inicioMesPrev: `${prevYear}-${corte.slice(5, 7)}-01`,
+    cortePrev: `${prevYear}-${mmdd}`,
+  };
+}
+
+/** Momento UTC en que el sync de cierre captura el día `fecha` completo:
+ *  fecha+1 a las 01:30 UTC = 20:30 Panamá del propio `fecha`. */
+export function cierreUtcDe(fecha: string): string {
+  return `${addDays(fecha, 1)}T01:30:00.000Z`;
+}
+
+/** ¿Hubo un sync de facturas ACS exitoso que arrancó DESPUÉS del cierre de
+ *  tienda de `fecha` y cuyo rango cubre `fecha`? Fail-open: si la consulta
+ *  falla se asume fresco (comportamiento previo del cron). */
+export async function ventasAcsSyncFresco(fecha: string): Promise<boolean> {
+  const { data, error } = await supabaseServer
+    .from("switch_sync_log")
+    .select("id")
+    .eq("empresa_key", "american_classic")
+    .eq("sync_type", "facturas")
+    .eq("status", "success")
+    .gte("started_at", cierreUtcDe(fecha))
+    .lte("range_from", fecha)
+    .gte("range_to", fecha)
+    .limit(1);
+  if (error) {
+    console.error(`[acs-resumen] no pude verificar frescura del sync (${error.message}); asumo fresco`);
+    return true;
+  }
+  return (data?.length ?? 0) > 0;
 }
 
 /** SUM(subtotal) retail en [desde, hasta] (fechas Panamá, inclusive) —
@@ -58,26 +117,30 @@ async function sumRetail(desde: string, hasta: string): Promise<number> {
   return Math.round(sum * 100) / 100;
 }
 
-export async function calcularResumenDiario(fecha: string): Promise<AcsResumenDiario> {
-  const fechaComparable = addDays(fecha, -364);
-  const inicioMes = `${fecha.slice(0, 7)}-01`;
-  const inicioMesPrev = `${addDays(fecha, -365).slice(0, 4)}-${fecha.slice(5, 7)}-01`;
-  const cortePrev = `${addDays(fecha, -365).slice(0, 4)}-${fecha.slice(5)}`; // misma fecha, año −1
+export async function calcularResumenDiario(
+  fecha: string,
+  syncFresco = true,
+): Promise<AcsResumenDiario> {
+  // Sin sync fresco el día `fecha` está incompleto en la DB: se recorta el
+  // corte al último día completo para que el mes compare 1..D-1 vs 1..D-1.
+  const corte = syncFresco ? fecha : addDays(fecha, -1);
+  const v = ventanasResumen(corte);
 
   const [hoy, hoyPrev, mes, mesPrev] = await Promise.all([
-    sumRetail(fecha, fecha),
-    sumRetail(fechaComparable, fechaComparable),
-    sumRetail(inicioMes, fecha),
-    sumRetail(inicioMesPrev, cortePrev),
+    syncFresco ? sumRetail(corte, corte) : Promise.resolve(0),
+    syncFresco ? sumRetail(v.fechaComparable, v.fechaComparable) : Promise.resolve(0),
+    sumRetail(v.inicioMes, corte),
+    sumRetail(v.inicioMesPrev, v.cortePrev),
   ]);
 
-  return { fecha, hoy, hoyPrev, fechaComparable, mes, mesPrev };
+  return { fecha, corte, syncFresco, hoy, hoyPrev, fechaComparable: v.fechaComparable, mes, mesPrev };
 }
 
 // ── Formato del mensaje (formato exacto pedido por Daniel) ───────────────────
-//   🏪 ACS vie 4-jul
-//   Hoy: $2,186 · +5%
-//   Mes: $9,140 · +8.2%
+//   Sync fresco:                      Sync viejo / no corrió:
+//   🏪 ACS vie 4-jul                  🏪 ACS vie 4-jul
+//   Hoy: $2,186 · +5%                 ⏳ Ventas del día aún sincronizando
+//   Mes: $9,140 · +8.2%               Mes (al 3-jul): $5,298 · +39.1%
 
 function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -97,7 +160,21 @@ export function fmtDiaLabel(fecha: string): string {
   return `${wd} ${d.getUTCDate()}-${mes}`;
 }
 
+/** "3-jul" — sin día de semana, para el label "Mes (al …)". */
+export function fmtDiaCorto(fecha: string): string {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
+  return `${d.getUTCDate()}-${mes}`;
+}
+
 export function buildMensaje(r: AcsResumenDiario): string {
+  if (!r.syncFresco) {
+    return [
+      `🏪 ACS ${fmtDiaLabel(r.fecha)}`,
+      `⏳ Ventas del día aún sincronizando`,
+      `Mes (al ${fmtDiaCorto(r.corte)}): ${fmtMonto(r.mes)} · ${fmtPct(r.mes, r.mesPrev, 1)}`,
+    ].join("\n");
+  }
   return [
     `🏪 ACS ${fmtDiaLabel(r.fecha)}`,
     `Hoy: ${fmtMonto(r.hoy)} · ${fmtPct(r.hoy, r.hoyPrev, 0)}`,
