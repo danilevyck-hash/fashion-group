@@ -156,6 +156,10 @@ export async function replicateBackupToR2(
           body: new Uint8Array(f.body),
           headers: {
             "Content-Type": contentTypeFor(f.key),
+            // Sin esto, undici en Vercel pasa los bodies grandes a
+            // transfer-encoding chunked y R2 responde 411 MissingContentLength
+            // (visto en vivo 5-jul: fallaban exactamente los 6 archivos grandes).
+            "Content-Length": String(f.body.length),
             // Payload firmado (aws4fetch usaría UNSIGNED-PAYLOAD para bodies
             // binarios); el sha256 ya está calculado para el manifest.
             "x-amz-content-sha256": sig.split("|")[1],
@@ -176,7 +180,10 @@ export async function replicateBackupToR2(
       const res = await cfg.client.fetch(`${cfg.baseUrl}/${R2_MANIFEST_KEY}`, {
         method: "PUT",
         body: JSON.stringify(manifest),
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": String(Buffer.byteLength(JSON.stringify(manifest))),
+        },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${await readBodySafe(res)}`);
     } catch (e) {
