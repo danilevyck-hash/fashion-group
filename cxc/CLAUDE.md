@@ -82,7 +82,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-33 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
+35 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -106,6 +106,8 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
 | /api/cron/switch-sync tipo=facturas (american_classic) | 15:00, 23:15, 01:30 (3 entradas — ventas ACS intradía) |
+| /api/cron/acs-resumen-diario | 01:45 (resumen diario ventas ACS a Telegram) |
+| /api/cron/grupo-resumen-mensual | 13:00 el día 3 de cada mes (`0 13 3 * *` — resumen mensual del grupo a Telegram; único cron NO diario, umbral propio en health-crons) |
 | /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO para dar 60 min a reebok-catalogo 17:00) |
 
 > **Plan Vercel Hobby:** cada entrada de cron corre 1×/día y las funciones tienen tope `maxDuration` 300s. Para frecuencia sub-diaria se agregan entradas separadas del mismo path (patrón `switch-reconciliacion`).

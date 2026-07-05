@@ -79,6 +79,7 @@ const EXPECTED_CRONS = [
   "backup",
   "cheques-alert",
   "cleanup-packing-lists",
+  "grupo-resumen-mensual",
   "integrity-check",
   "joybees-catalogo",
   "multifashion-sync",
@@ -92,6 +93,13 @@ const EXPECTED_CRONS = [
   "sync-recibos",
   "sync-utilidad",
 ] as const;
+
+// Crons MENSUALES: el umbral diario de 26h los marcaría stale ~29 días al mes.
+// Umbral propio = un ciclo mensual completo + margen (corre el día 3; 33 días
+// cubre el gap más largo entre corridas aun con jitter).
+const STALE_HOURS_POR_CRON: Record<string, number> = {
+  "grupo-resumen-mensual": 33 * 24,
+};
 
 /** Compara tokens en tiempo constante (evita fuga por timing). */
 function tokenOk(provided: string, expected: string): boolean {
@@ -139,12 +147,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     data.map((h) => [h.cron_name, h.last_success_at]),
   );
   const now = Date.now();
-  const cutoffMs = now - STALE_HOURS * 3600 * 1000;
 
   const stale: Array<{ cron: string; last_success_at: string | null; hours_ago: number | null }> = [];
   const fresh: Array<{ cron: string; last_success_at: string; hours_ago: number }> = [];
 
   for (const cron of EXPECTED_CRONS) {
+    const cutoffMs = now - (STALE_HOURS_POR_CRON[cron] ?? STALE_HOURS) * 3600 * 1000;
     const last = beats.get(cron) ?? null;
     const t = last ? new Date(last).getTime() : NaN;
     const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;

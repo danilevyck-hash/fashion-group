@@ -142,11 +142,11 @@ export async function calcularResumenDiario(
 //   Hoy: $2,186 · +5%                 ⏳ Ventas del día aún sincronizando
 //   Mes: $9,140 · +8.2%               Mes (al 3-jul): $5,298 · +39.1%
 
-function fmtMonto(n: number): string {
+export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
-function fmtPct(cur: number, prev: number, decimales: number): string {
+export function fmtPct(cur: number, prev: number, decimales: number): string {
   if (prev <= 0) return "s/d año pasado";
   const pct = ((cur - prev) / prev) * 100;
   const val = pct.toFixed(decimales);

@@ -135,6 +135,10 @@
     {
       "path": "/api/cron/acs-resumen-diario",
       "schedule": "45 1 * * *"
+    },
+    {
+      "path": "/api/cron/grupo-resumen-mensual",
+      "schedule": "0 13 3 * *"
     }
   ]
 }
