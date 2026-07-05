@@ -455,21 +455,7 @@ export interface SwitchClient {
   listClientes(params: {
     porPagina: number;
     paginaActual: number;
-    /** Filtro de búsqueda (doc pág 21, opcional) — matchea nombre/código. */
-    filtro?: string;
   }): Promise<SwitchClientesData>;
-  /** Impuestos aceptados para clientes (GET /apicliente/impuestos, doc pág 25).
-   *  El impuestoId de apiclienteCrear sale de aquí (buscar por nombre, ej.
-   *  "Regular" — no hardcodear el id, puede variar por empresa). */
-  apiclienteImpuestos(): Promise<SwitchClienteImpuestosData>;
-  /** Tipos de cliente (GET /apicliente/tiposcliente, doc pág 26). El campo
-   *  tipoCliente de apiclienteCrear usa el CODIGO (no un id). */
-  apiclienteTiposCliente(): Promise<SwitchTiposClienteData>;
-  /** Crea un cliente (POST /apicliente/crear, doc págs 27-28). Requeridos:
-   *  codigo ([a-zA-Z0-9-]), nombre, impuestoId (de apiclienteImpuestos),
-   *  vendedorId (de /apivendedor/lista). Respuesta: data.clienteId.
-   *  ESCRITURA REAL en el ERP — usar con el mismo cuidado que apipedidoTerminar. */
-  apiclienteCrear(params: SwitchClienteCrearParams): Promise<SwitchClienteCrearData>;
   /** Estado de cuenta (CXC) de un cliente: facturas/NC abiertas con saldo y aging. */
   getEstadoCuenta(clienteId: number | string): Promise<SwitchEstadoCuentaData>;
   /** Reporte "Total de ventas" del mes EN CURSO (tipo=03): totales diarios con
@@ -703,66 +689,6 @@ export interface SwitchVentaSucursalData {
   paginacion?: SwitchPaginacion;
 }
 
-// ─── Clientes (/apicliente/*) — catálogos de alta y creación ─────────────────
-
-/** Item de /apicliente/impuestos (data.impuestos[], doc pág 25). `valor` llega
- *  como string numérico. El impuesto "Regular" suele tener codigo "R" (mismo
- *  código que clienteImpuestoCodigo en /apipedido/info, doc pág 51). */
-export interface SwitchClienteImpuesto {
-  id: number;
-  nombre: string | null;
-  codigo: string | null;
-  valor: string | number | null;
-  [key: string]: unknown;
-}
-
-export interface SwitchClienteImpuestosData {
-  impuestos: SwitchClienteImpuesto[];
-}
-
-/** Item de /apicliente/tiposcliente (data.tipos[], doc pág 26). OJO: la clave
- *  es el CODIGO (string), no un id numérico. */
-export interface SwitchTipoCliente {
-  codigo: string;
-  nombre: string | null;
-  [key: string]: unknown;
-}
-
-export interface SwitchTiposClienteData {
-  tipos: SwitchTipoCliente[];
-}
-
-/** Params de POST /apicliente/crear (doc págs 27-28). */
-export interface SwitchClienteCrearParams {
-  /** Requerido. Solo [a-zA-Z0-9-]. */
-  codigo: string;
-  /** Requerido. */
-  nombre: string;
-  /** Requerido. Id del impuesto retornado por GET /apicliente/impuestos. */
-  impuestoId: number;
-  /** Requerido. Id del vendedor retornado por GET /apivendedor/lista. */
-  vendedorId: number;
-  razonSocial?: string;
-  email?: string;
-  /** Código del tipo de cliente retornado por GET /apicliente/tiposcliente. */
-  tipoCliente?: string;
-  /** Código retornado por GET /apicliente/tiposidentificacion. */
-  tipoIdentificacion?: string;
-  identificacion?: string;
-  codigoTelefono?: string;
-  telefono?: string;
-  /** Número válido; por defecto Switch usa 0. */
-  limiteCredito?: number;
-  sexoCliente?: "Masculino" | "Femenino";
-}
-
-/** Respuesta (data) de POST /apicliente/crear. */
-export interface SwitchClienteCrearData {
-  mensaje: string;
-  clienteId: number | string;
-  [key: string]: unknown;
-}
-
 // ─── Pedidos (/apipedido/*) y talla-color ────────────────────────────────────
 
 /** Row de /apiarticulos/tallacolor (data.tallacolor[], doc pág 38). Un row por
@@ -970,57 +896,11 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         porPagina: String(params.porPagina),
         paginaActual: String(params.paginaActual),
       });
-      if (params.filtro) qs.set("filtro", params.filtro);
       return authedCall<SwitchClientesData>(
         empresaKey,
         cfg,
         `/apicliente/lista?${qs.toString()}`,
         "GET",
-      );
-    },
-
-    async apiclienteImpuestos() {
-      return authedCall<SwitchClienteImpuestosData>(
-        empresaKey,
-        cfg,
-        "/apicliente/impuestos",
-        "GET",
-      );
-    },
-
-    async apiclienteTiposCliente() {
-      return authedCall<SwitchTiposClienteData>(
-        empresaKey,
-        cfg,
-        "/apicliente/tiposcliente",
-        "GET",
-      );
-    },
-
-    async apiclienteCrear(params) {
-      // Body como JSON (mismo patrón que /apipedido/terminar). Solo se mandan
-      // los opcionales que vienen definidos — Switch aplica sus defaults.
-      const body: Record<string, unknown> = {
-        codigo: params.codigo,
-        nombre: params.nombre,
-        impuestoId: params.impuestoId,
-        vendedorId: params.vendedorId,
-      };
-      if (params.razonSocial !== undefined) body.razonSocial = params.razonSocial;
-      if (params.email !== undefined) body.email = params.email;
-      if (params.tipoCliente !== undefined) body.tipoCliente = params.tipoCliente;
-      if (params.tipoIdentificacion !== undefined) body.tipoIdentificacion = params.tipoIdentificacion;
-      if (params.identificacion !== undefined) body.identificacion = params.identificacion;
-      if (params.codigoTelefono !== undefined) body.codigoTelefono = params.codigoTelefono;
-      if (params.telefono !== undefined) body.telefono = params.telefono;
-      if (params.limiteCredito !== undefined) body.limiteCredito = params.limiteCredito;
-      if (params.sexoCliente !== undefined) body.sexoCliente = params.sexoCliente;
-      return authedCall<SwitchClienteCrearData>(
-        empresaKey,
-        cfg,
-        "/apicliente/crear",
-        "POST",
-        body,
       );
     },
 

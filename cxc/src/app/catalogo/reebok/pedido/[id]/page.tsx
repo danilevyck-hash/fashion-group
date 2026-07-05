@@ -67,11 +67,6 @@ export default function OrderDetailPage() {
   const [clienteResults, setClienteResults] = useState<ClienteSwitchRow[]>([]);
   const [clienteBuscando, setClienteBuscando] = useState(false);
   const [clienteGuardando, setClienteGuardando] = useState(false);
-  const [modoNuevoCliente, setModoNuevoCliente] = useState(false);
-  const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoTelefono, setNuevoTelefono] = useState("");
-  const [nuevoCodigo, setNuevoCodigo] = useState("");
-  const [nuevoError, setNuevoError] = useState<string | null>(null);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -140,9 +135,9 @@ export default function OrderDetailPage() {
   }, []);
 
   // Búsqueda de clientes Switch (selector del modal, 300ms debounce). Corre
-  // solo con el modal abierto en modo búsqueda; query vacío lista los primeros.
+  // solo con el modal abierto; query vacío lista los primeros.
   useEffect(() => {
-    if (!showClienteModal || modoNuevoCliente) return;
+    if (!showClienteModal) return;
     const t = setTimeout(async () => {
       setClienteBuscando(true);
       try {
@@ -152,7 +147,7 @@ export default function OrderDetailPage() {
       setClienteBuscando(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [clienteQuery, showClienteModal, modoNuevoCliente]);
+  }, [clienteQuery, showClienteModal]);
 
   // Mantener refs sincronizados con el ultimo estado.
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -334,28 +329,12 @@ export default function OrderDetailPage() {
   }
 
   // ── CLIENTE SWITCH (Fase 2) ──
-  // Sugerencia de código para el alta: iniciales del nombre + número, editable.
-  // NO se inventa secuencia D-XXX automática — el código lo confirma el humano.
-  function sugerirCodigo(nombre: string): string {
-    const iniciales = nombre.trim().split(/\s+/).map(w => w[0] || "").join("")
-      .normalize("NFD").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 3) || "CLI";
-    return `${iniciales}-${Math.floor(100 + Math.random() * 900)}`;
-  }
-
+  // Los clientes nuevos se crean desde el panel de Switch — aquí solo se
+  // busca y asigna un cliente existente (el sync llena switch_clientes).
   function abrirClienteModal() {
-    setModoNuevoCliente(false);
     setClienteQuery("");
     setClienteResults([]);
-    setNuevoError(null);
     setShowClienteModal(true);
-  }
-
-  function abrirNuevoCliente() {
-    setNuevoNombre(clientName.trim());
-    setNuevoTelefono("");
-    setNuevoCodigo(sugerirCodigo(clientName));
-    setNuevoError(null);
-    setModoNuevoCliente(true);
   }
 
   // Asigna (o quita, con null) el cliente Switch del pedido.
@@ -376,31 +355,6 @@ export default function OrderDetailPage() {
       }
     } catch {
       showToast("No se pudo guardar el cliente. Revisa tu conexion.");
-    }
-    setClienteGuardando(false);
-  }
-
-  // Alta de cliente REAL en Switch (POST /apicliente/crear) + asignación al pedido.
-  async function crearClienteSwitch() {
-    setNuevoError(null);
-    setClienteGuardando(true);
-    try {
-      const res = await fetch(`/api/catalogo/reebok/clientes-switch`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: nuevoNombre, telefono: nuevoTelefono, codigo: nuevoCodigo, orderId: id }),
-      });
-      const d = await res.json();
-      if (res.ok && d.ok) {
-        if (d.clienteSwitchId) {
-          setClienteSwitch({ id: d.clienteSwitchId, nombre: nuevoNombre.trim(), codigo: d.codigo || nuevoCodigo });
-        }
-        setShowClienteModal(false);
-        showToast(d.verificado ? `Cliente creado en Switch: ${nuevoNombre.trim()}` : "Cliente creado en Switch (sin verificar — revisa el panel)");
-      } else {
-        setNuevoError(d.error || "No se pudo crear el cliente en Switch. Intenta de nuevo.");
-      }
-    } catch {
-      setNuevoError("Error de conexion — revisa en el panel de Switch si el cliente se creo antes de reintentar.");
     }
     setClienteGuardando(false);
   }
@@ -904,78 +858,41 @@ export default function OrderDetailPage() {
         </ModalOverlay>
       )}
 
-      {/* Modal de cliente Switch: buscador sobre la tabla local + alta de
-          cliente nuevo en el ERP (formulario mínimo, código confirmado a mano). */}
+      {/* Modal de cliente Switch: buscador sobre la tabla local switch_clientes.
+          Los clientes nuevos se crean desde el panel de Switch (aquí no hay alta). */}
       {showClienteModal && (
         <ModalOverlay onBackdropClick={() => { if (!clienteGuardando) setShowClienteModal(false); }}>
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {!modoNuevoCliente ? (
-              <>
-                <h3 className="text-base font-medium mb-1">Cliente Switch del pedido</h3>
-                <p className="text-xs text-gray-500 mb-3">El pedido se creara en Switch a nombre de este cliente. Si no eliges uno, va a Contado (mostrador).</p>
-                <input value={clienteQuery} onChange={e => setClienteQuery(e.target.value)}
-                  placeholder="Buscar por nombre o codigo..."
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-2" />
-                <div className="border border-gray-100 rounded-md divide-y divide-gray-50 mb-3 max-h-60 overflow-y-auto">
-                  <button onClick={() => asignarClienteSwitch(null)} disabled={clienteGuardando}
+            <h3 className="text-base font-medium mb-1">Cliente Switch del pedido</h3>
+            <p className="text-xs text-gray-500 mb-3">El pedido se creara en Switch a nombre de este cliente. Si no eliges uno, va a Contado (mostrador).</p>
+            <input value={clienteQuery} onChange={e => setClienteQuery(e.target.value)}
+              placeholder="Buscar por nombre o codigo..."
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-2" />
+            <div className="border border-gray-100 rounded-md divide-y divide-gray-50 mb-3 max-h-60 overflow-y-auto">
+              <button onClick={() => asignarClienteSwitch(null)} disabled={clienteGuardando}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
+                Contado (mostrador) <span className="text-xs text-gray-400">— default</span>
+              </button>
+              {clienteBuscando ? (
+                <div className="px-3 py-2 text-xs text-gray-400">Buscando...</div>
+              ) : clienteResults.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-gray-400">
+                  {clienteQuery ? "Sin resultados — los clientes nuevos se crean desde el panel de Switch" : "Escribe para buscar clientes de Active Shoes"}
+                </div>
+              ) : (
+                clienteResults.map((c) => (
+                  <button key={c.cliente_switch_id} onClick={() => asignarClienteSwitch(c)} disabled={clienteGuardando}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
-                    Contado (mostrador) <span className="text-xs text-gray-400">— default</span>
+                    {c.nombre || `Cliente ${c.cliente_switch_id}`}
+                    {c.codigo && <span className="text-xs text-gray-400 font-mono ml-2">{c.codigo}</span>}
                   </button>
-                  {clienteBuscando ? (
-                    <div className="px-3 py-2 text-xs text-gray-400">Buscando...</div>
-                  ) : clienteResults.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-gray-400">
-                      {clienteQuery ? "Sin resultados — puedes crearlo como cliente nuevo" : "Escribe para buscar clientes de Active Shoes"}
-                    </div>
-                  ) : (
-                    clienteResults.map((c) => (
-                      <button key={c.cliente_switch_id} onClick={() => asignarClienteSwitch(c)} disabled={clienteGuardando}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
-                        {c.nombre || `Cliente ${c.cliente_switch_id}`}
-                        {c.codigo && <span className="text-xs text-gray-400 font-mono ml-2">{c.codigo}</span>}
-                      </button>
-                    ))
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <button onClick={abrirNuevoCliente} disabled={clienteGuardando}
-                    className="flex-1 border border-gray-300 text-black px-4 py-2.5 rounded-md text-sm hover:border-gray-500 transition disabled:opacity-40 min-h-[44px]">
-                    Cliente nuevo
-                  </button>
-                  <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
-                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
-                    Cerrar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3 className="text-base font-medium mb-1">Cliente nuevo en Switch</h3>
-                <p className="text-xs text-gray-500 mb-4">Se crea REAL en el ERP (Active Shoes) y queda asignado a este pedido.</p>
-                <label className="block text-xs text-gray-500 mb-1">Nombre</label>
-                <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-3" />
-                <label className="block text-xs text-gray-500 mb-1">Telefono (opcional)</label>
-                <input value={nuevoTelefono} onChange={e => setNuevoTelefono(e.target.value)}
-                  placeholder="6612-3456" inputMode="tel"
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-3" />
-                <label className="block text-xs text-gray-500 mb-1">Codigo en Switch</label>
-                <input value={nuevoCodigo} onChange={e => setNuevoCodigo(e.target.value)}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm font-mono outline-none focus:border-black transition mb-1" />
-                <p className="text-xs text-gray-400 mb-3">Solo letras, numeros y guiones. Revisalo antes de crear — asi va a quedar en Switch.</p>
-                {nuevoError && <p className="text-xs text-red-600 mb-3">{nuevoError}</p>}
-                <div className="flex gap-3">
-                  <button onClick={crearClienteSwitch} disabled={clienteGuardando}
-                    className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
-                    {clienteGuardando ? "Creando en Switch..." : "Crear cliente"}
-                  </button>
-                  <button onClick={() => { if (!clienteGuardando) setModoNuevoCliente(false); }} disabled={clienteGuardando}
-                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
-                    Volver
-                  </button>
-                </div>
-              </>
-            )}
+                ))
+              )}
+            </div>
+            <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
+              className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
+              Cerrar
+            </button>
           </div>
         </ModalOverlay>
       )}
