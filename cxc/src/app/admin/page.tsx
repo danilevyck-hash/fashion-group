@@ -19,6 +19,7 @@ import AgingLegend from "./components/AgingLegend";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
+import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import useAdminData from "./hooks/useAdminData";
 import SyncStatus from "@/components/shared/SyncStatus";
 import {
@@ -142,6 +143,8 @@ function AdminDashboardInner() {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [toast, setToast] = useState<string | null>(null);
+  const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
+  const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
@@ -514,6 +517,7 @@ function AdminDashboardInner() {
         onOpenEmail={openEmail}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
+        onOpenEstado={openEstadoCuenta}
         canExport={canExport}
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}
@@ -654,11 +658,18 @@ function AdminDashboardInner() {
         onQuickMarkContacted={handleQuickMarkContacted}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
+        onOpenEstado={openEstadoCuenta}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         hideSearchAndRiskFilters
       />
       </div>
+
+      <EstadoCuentaDrawer
+        client={estadoClient}
+        companyFilter={companyFilter}
+        onClose={() => setEstadoClient(null)}
+      />
 
       <Toast message={toast} />
       {pendingUndo && (

@@ -52,6 +52,7 @@ interface PanelCxcMobileProps {
   onOpenEmail: (client: ConsolidatedClient) => void;
   onWhatsApp: (client: ConsolidatedClient) => void;
   onCopyMessage: (client: ConsolidatedClient) => void;
+  onOpenEstado: (client: ConsolidatedClient) => void;
   canExport: boolean;
   onExportarCsv: () => void;
   empresaRestriction: string | null;
@@ -73,6 +74,7 @@ export default function PanelCxcMobile({
   onOpenEmail,
   onWhatsApp,
   onCopyMessage,
+  onOpenEstado,
   canExport,
   onExportarCsv,
   empresaRestriction,
@@ -116,6 +118,7 @@ export default function PanelCxcMobile({
 
   // Mismo menú "···" que la tabla desktop (ClientTable.buildRowMenuItems).
   const buildRowMenuItems = (client: ConsolidatedClient): OverflowMenuItem[] => [
+    { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
     { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
     { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
@@ -178,6 +181,7 @@ export default function PanelCxcMobile({
                     onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
+                    onOpenEstado={() => onOpenEstado(client)}
                     actionsMenu={<OverflowMenu items={buildRowMenuItems(client)} ariaLabel={`Acciones de ${client.nombre_normalized}`} />}
                   />
                 </li>
@@ -450,6 +454,7 @@ function MobileClientCard({
   onToggleFavorite,
   isExpanded,
   onToggle,
+  onOpenEstado,
   actionsMenu,
 }: {
   client: ConsolidatedClient;
@@ -458,6 +463,7 @@ function MobileClientCard({
   onToggleFavorite: () => void;
   isExpanded: boolean;
   onToggle: () => void;
+  onOpenEstado: () => void;
   actionsMenu?: React.ReactNode;
 }) {
   const borderLeft = worstBucketBorder(client);
@@ -513,7 +519,7 @@ function MobileClientCard({
         </div>
       </div>
 
-      {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} />}
+      {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} onOpenEstado={onOpenEstado} />}
     </article>
   );
 }
@@ -547,9 +553,11 @@ function BucketChip({
 function MobileClientExpanded({
   client,
   cxcCompanies,
+  onOpenEstado,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
+  onOpenEstado: () => void;
 }) {
   // `companies[key].nombre` es el nombre del cliente registrado en esa
   // empresa (variante por empresa), NO el nombre de la empresa. El nombre
@@ -613,17 +621,29 @@ function MobileClientExpanded({
           </li>
         ))}
       </ul>
-      {codigo && (
-        <Link
-          href={`/clientes/${encodeURIComponent(codigo)}`}
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onOpenEstado}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white active:scale-[0.97]"
         >
-          Ver facturas pendientes
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
           </svg>
-        </Link>
-      )}
+          Estado de cuenta
+        </button>
+        {codigo && (
+          <Link
+            href={`/clientes/${encodeURIComponent(codigo)}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
+          >
+            Ver facturas pendientes
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+            </svg>
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

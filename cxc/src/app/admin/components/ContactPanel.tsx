@@ -14,12 +14,14 @@ interface Props {
   onSaveEdit?: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
   companyFilter: string;
   roleCompanies: Company[];
+  onOpenEstado?: (client: ConsolidatedClient) => void;
 }
 
 export default function ContactPanel({
   client,
   companyFilter,
   roleCompanies,
+  onOpenEstado,
 }: Props) {
   const [desgloseOpen, setDesgloseOpen] = useState(true);
 
@@ -98,16 +100,30 @@ export default function ContactPanel({
         </div>
       )}
 
-      {/* ── Ver ficha completa (contacto + historial) ──────── */}
-      {codigo && (
-        <Link
-          href={`/clientes/${encodeURIComponent(codigo)}`}
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium transition"
-        >
-          Ver ficha completa ›
-        </Link>
-      )}
+      {/* ── Acciones: estado de cuenta + ficha completa ──────── */}
+      <div className="flex items-center gap-3">
+        {onOpenEstado && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onOpenEstado(client); }}
+            className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white transition active:scale-[0.97]"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>
+            </svg>
+            Estado de cuenta
+          </button>
+        )}
+        {codigo && (
+          <Link
+            href={`/clientes/${encodeURIComponent(codigo)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium transition"
+          >
+            Ver ficha completa ›
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

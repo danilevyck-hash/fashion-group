@@ -36,6 +36,7 @@ interface Props {
   onQuickMarkContacted: (clientName: string, method: string) => void;
   onWhatsApp: (client: ConsolidatedClient) => void;
   onCopyMessage: (client: ConsolidatedClient) => void;
+  onOpenEstado: (client: ConsolidatedClient) => void;
   favorites?: Set<string>;
   onToggleFavorite?: (name: string) => void;
   /** Search and risk filters are now managed by the parent page, hide them here */
@@ -60,6 +61,7 @@ export default function ClientTable({
   onQuickMarkContacted,
   onWhatsApp,
   onCopyMessage,
+  onOpenEstado,
   favorites,
   onToggleFavorite,
   hideSearchAndRiskFilters,
@@ -92,13 +94,14 @@ export default function ClientTable({
   // (que solo existe con click-derecho) + contacto de cobranza — alcanzable
   // en touch (iPad no tiene click-derecho).
   const buildRowMenuItems = useCallback((client: ConsolidatedClient): OverflowMenuItem[] => [
+    { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
     { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
     { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
     { label: "Enviar email", onClick: () => onOpenEmail(client), disabled: !client.correo },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
     { label: "Ver en directorio", onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); } },
-  ], [onQuickMarkContacted, onWhatsApp, onOpenEmail, onCopyMessage]);
+  ], [onOpenEstado, onQuickMarkContacted, onWhatsApp, onOpenEmail, onCopyMessage]);
 
   // (pagination removed — all clients rendered)
 
@@ -157,6 +160,7 @@ export default function ClientTable({
             onSaveEdit={onSaveEdit}
             companyFilter={companyFilter}
             roleCompanies={roleCompanies}
+            onOpenEstado={onOpenEstado}
           />
         </AccordionContent>
       </div>
