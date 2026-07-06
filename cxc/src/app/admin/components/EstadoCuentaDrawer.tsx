@@ -56,6 +56,7 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
   const [data, setData] = useState<EstadoCuenta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const open = !!client;
   const codigo = client ? codigoDe(client) : null;
@@ -78,6 +79,53 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
 
   const totalDocs = data ? data.empresas.reduce((n, e) => n + e.documentos.length, 0) : 0;
 
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Compartir por WhatsApp/mail nativo (share sheet del sistema con el PDF
+  // adjunto). En desktop/navegadores sin Web Share cae a descarga directa.
+  async function handleShare() {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
+      const { doc, filename } = buildEstadoCuentaPDF(data, nombre);
+      const blob = doc.output("blob");
+      const file = new File([blob], filename, { type: "application/pdf" });
+      const nav = navigator as Navigator & { canShare?: (d?: ShareData) => boolean };
+      if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], title: "Estado de cuenta", text: `Estado de cuenta — ${nombre}` });
+      } else {
+        downloadBlob(blob, filename);
+      }
+    } catch (e) {
+      // AbortError = el usuario cerró el share sheet → no es error.
+      if ((e as Error)?.name !== "AbortError") console.error("[estado-cuenta] compartir:", e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const { buildEstadoCuentaPDF } = await import("@/lib/pdf-estado-cuenta");
+      const { doc, filename } = buildEstadoCuentaPDF(data, nombre);
+      downloadBlob(doc.output("blob"), filename);
+    } catch (e) {
+      console.error("[estado-cuenta] descargar:", e);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Drawer
       open={open}
@@ -85,11 +133,37 @@ export default function EstadoCuentaDrawer({ client, companyFilter, onClose }: P
       title="Estado de cuenta"
       footer={
         data && totalDocs > 0 ? (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-500">{totalDocs} documento{totalDocs === 1 ? "" : "s"} con saldo</span>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wide text-gray-400">Total</p>
-              <p className="text-lg font-semibold tabular-nums leading-tight">{money(data.total)}</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">{totalDocs} documento{totalDocs === 1 ? "" : "s"} con saldo</span>
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">Total</p>
+                <p className="text-lg font-semibold tabular-nums leading-tight">{money(data.total)}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={busy}
+                className="flex-1 inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-black px-3 text-sm font-medium text-white transition active:scale-[0.97] disabled:opacity-60"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
+                Compartir
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={busy}
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 text-sm font-medium text-gray-800 transition active:scale-[0.97] disabled:opacity-60"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                PDF
+              </button>
             </div>
           </div>
         ) : undefined
