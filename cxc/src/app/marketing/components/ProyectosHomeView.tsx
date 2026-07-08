@@ -114,6 +114,11 @@ export default function ProyectosHomeView({
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
   const [exportando, setExportando] = useState(false);
+  // Total de impulsadoras de ESTA marca (solo en modo bucket por marca). Se
+  // muestra como línea aparte para que el detalle visible cuadre con la card,
+  // ya que los pagos de impulsadora son gastos sueltos (no aparecen como
+  // proyectos en la lista).
+  const [impulsadoraTotal, setImpulsadoraTotal] = useState(0);
 
   // Exporta los gastos visibles (respeta búsqueda + marca; sin filtro baja todo)
   // a un ZIP: carpeta por cliente → proyecto → fotos + gasto, con Excel resumen.
@@ -192,6 +197,32 @@ export default function ProyectosHomeView({
   useEffect(() => {
     cargar();
   }, [cargar, refreshKey]);
+
+  // Total de impulsadoras de la marca del bucket (para la línea de cuadre).
+  useEffect(() => {
+    if (grupo !== "marca" || !marcaIdFijo) {
+      setImpulsadoraTotal(0);
+      return;
+    }
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/marketing/marca-resumen", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          impulsadoraPorMarca?: Record<string, { count: number; total: number }>;
+        };
+        if (!cancelado) {
+          setImpulsadoraTotal(data.impulsadoraPorMarca?.[marcaIdFijo]?.total ?? 0);
+        }
+      } catch {
+        // Silencioso: la línea de impulsadoras es informativa, no bloquea la lista.
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [grupo, marcaIdFijo, refreshKey]);
 
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
@@ -578,6 +609,24 @@ export default function ProyectosHomeView({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Línea de cuadre: los pagos de impulsadora de esta marca son gastos
+          sueltos (no proyectos) → se muestran aparte para que el detalle
+          visible sume igual que el total de la card. */}
+      {enBucket && grupo === "marca" && marcaIdFijo && impulsadoraTotal > 0 && (
+        <button
+          type="button"
+          onClick={onOpenImpulsadoras}
+          className="w-full flex items-center justify-between rounded-[10px] border border-[#e5e5e5] bg-white px-[18px] py-3 hover:border-gray-400 transition text-left"
+        >
+          <span className="text-sm text-gray-700">
+            Impulsadoras <span className="text-gray-400">· esta marca</span>
+          </span>
+          <span className="text-sm font-medium tabular-nums text-gray-900">
+            {formatearMonto(impulsadoraTotal)} ›
+          </span>
+        </button>
       )}
 
       {anularPendiente && (
