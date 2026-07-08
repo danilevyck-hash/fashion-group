@@ -17,10 +17,19 @@ interface ReclamoItem {
   motivo?: string;
   nro_factura?: string;
   nro_orden_compra?: string;
+  deleted?: boolean;
 }
 
 interface ReclamoFoto {
   storage_path: string;
+}
+
+interface ReclamoSettlement {
+  id?: string;
+  monto?: number;
+  nota_credito?: string | null;
+  fecha?: string;
+  deleted?: boolean;
 }
 
 interface ReclamoFull {
@@ -34,8 +43,22 @@ interface ReclamoFull {
   fecha_reclamo?: string;
   estado?: string;
   notas?: string;
+  monto_reclamado_snapshot?: number | null;
   reclamo_items?: ReclamoItem[];
   reclamo_fotos?: ReclamoFoto[];
+  reclamo_settlements?: ReclamoSettlement[];
+}
+
+// Items vigentes (no borrados) — evita sobrecontar líneas soft-deleted.
+function itemsVivos(rec: ReclamoFull): ReclamoItem[] {
+  return (rec.reclamo_items || []).filter((i) => !i.deleted);
+}
+
+function subtotalDe(rec: ReclamoFull): number {
+  return itemsVivos(rec).reduce(
+    (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
+    0,
+  );
 }
 
 function fmt(n: number): string {
@@ -163,6 +186,68 @@ function drawTotalsBlock(doc: jsPDF, empresa: string | undefined, subtotal: numb
   return startY + 18;
 }
 
+// Bloque de recuperación: Reclamado vs Recuperado (Σ NCs) + lista de notas de
+// crédito. Solo se dibuja si hay settlements vigentes o el reclamo está Pagado.
+function drawSettlementBlock(doc: jsPDF, rec: ReclamoFull, subtotal: number, startY: number): number {
+  const settlements = (rec.reclamo_settlements || []).filter((s) => !s.deleted);
+  if (settlements.length === 0 && rec.estado !== "Pagado") return startY;
+
+  const reclamado = rec.monto_reclamado_snapshot ?? reclamoTaxes(rec.empresa, subtotal).total;
+  const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
+
+  let y = startY;
+  // Encabezado de sección
+  doc.setFillColor(46, 94, 142);
+  doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, 8, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text("Recuperación / Notas de crédito", PAGE_W / 2, y + 5.5, { align: "center" });
+  y += 12;
+
+  // Cajas Reclamado / Recuperado
+  const boxes = [
+    { label: "Reclamado", value: reclamado, dark: false },
+    { label: "Recuperado", value: recuperado, dark: true },
+  ];
+  const boxW = (PAGE_W - 2 * MARGIN - 3) / 2;
+  boxes.forEach((b, i) => {
+    const x = MARGIN + (boxW + 3) * i;
+    if (b.dark) {
+      doc.setFillColor(27, 58, 92);
+      doc.rect(x, y, boxW, 14, "F");
+      doc.setTextColor(170, 170, 170);
+    } else {
+      doc.setDrawColor(220, 220, 220);
+      doc.setFillColor(248, 249, 249);
+      doc.rect(x, y, boxW, 14, "FD");
+      doc.setTextColor(120, 120, 120);
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.text(b.label.toUpperCase(), x + boxW / 2, y + 5, { align: "center" });
+    doc.setTextColor(b.dark ? 255 : 30, b.dark ? 255 : 30, b.dark ? 255 : 30);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(`$${fmt(b.value)}`, x + boxW / 2, y + 11, { align: "center" });
+  });
+  y += 18;
+
+  // Lista de notas de crédito
+  if (settlements.length > 0) {
+    doc.setTextColor(80, 80, 80);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    for (const s of settlements) {
+      const nc = s.nota_credito ? ` · NC ${s.nota_credito}` : "";
+      doc.text(`${fmtDate(s.fecha)} — $${fmt(Number(s.monto) || 0)}${nc}`, MARGIN + 2, y);
+      y += 5;
+    }
+    y += 2;
+  }
+  return y;
+}
+
 function drawNotas(doc: jsPDF, notas: string, startY: number): number {
   doc.setTextColor(80, 80, 80);
   doc.setFont("helvetica", "italic");
@@ -183,62 +268,62 @@ function ensureSpace(doc: jsPDF, cursorY: number, needed: number): number {
 export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: string): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
-  const grandTotal = reclamos.reduce((acc, r) => {
-    const sub = (r.reclamo_items || []).reduce(
-      (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
+  // 1 solo reclamo → PDF individual limpio (sin portada ni tabla resumen).
+  const single = reclamos.length === 1;
+
+  if (!single) {
+    const grandTotal = reclamos.reduce(
+      (acc, r) => acc + reclamoTaxes(r.empresa, subtotalDe(r)).total,
       0,
     );
-    return acc + reclamoTaxes(r.empresa, sub).total;
-  }, 0);
 
-  drawCoverHeader(doc, empresa, reclamos.length, grandTotal);
+    drawCoverHeader(doc, empresa, reclamos.length, grandTotal);
 
-  // Summary table
-  const summaryRows = reclamos.map((r) => {
-    const items = r.reclamo_items || [];
-    const sub = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0);
-    const total = reclamoTaxes(r.empresa, sub).total;
-    return [
-      r.nro_reclamo || "",
-      fmtDate(r.fecha_reclamo),
-      r.nro_factura || "",
-      r.estado || "",
-      `${items.length}`,
-      `$${fmt(total)}`,
-    ];
-  });
+    // Summary table
+    const summaryRows = reclamos.map((r) => {
+      const items = itemsVivos(r);
+      const total = reclamoTaxes(r.empresa, subtotalDe(r)).total;
+      return [
+        r.nro_reclamo || "",
+        fmtDate(r.fecha_reclamo),
+        r.nro_factura || "",
+        r.estado || "",
+        `${items.length}`,
+        `$${fmt(total)}`,
+      ];
+    });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (doc as any).autoTable({
-    startY: 50,
-    head: [["N° Reclamo", "Fecha", "Factura", "Estado", "Ítems", "Total"]],
-    body: summaryRows,
-    styles: { fontSize: 9, cellPadding: 2.5 },
-    headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [248, 249, 249] },
-    columnStyles: {
-      0: { cellWidth: 28 },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 38 },
-      3: { cellWidth: 24 },
-      4: { halign: "center", cellWidth: 16 },
-      5: { halign: "right", cellWidth: "auto" },
-    },
-  });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (doc as any).autoTable({
+      startY: 50,
+      head: [["N° Reclamo", "Fecha", "Factura", "Estado", "Ítems", "Total"]],
+      body: summaryRows,
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [27, 58, 92], textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 249, 249] },
+      columnStyles: {
+        0: { cellWidth: 28 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 38 },
+        3: { cellWidth: 24 },
+        4: { halign: "center", cellWidth: 16 },
+        5: { halign: "right", cellWidth: "auto" },
+      },
+    });
+  }
 
-  // Per-reclamo full detail pages
-  for (const rec of reclamos) {
-    doc.addPage();
+  // Per-reclamo full detail pages (for clásico: hay await de fotos adentro).
+  for (let idx = 0; idx < reclamos.length; idx++) {
+    const rec = reclamos[idx];
+    // Para multi: cada detalle en página nueva. Para single: detalle en página 1.
+    if (!single || idx > 0) doc.addPage();
     let cursorY = MARGIN;
 
     cursorY = drawReclamoSectionHeader(doc, rec, cursorY);
     cursorY = drawMetaBlock(doc, rec, cursorY);
 
-    const items = rec.reclamo_items || [];
-    const subtotal = items.reduce(
-      (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
-      0,
-    );
+    const items = itemsVivos(rec);
+    const subtotal = subtotalDe(rec);
 
     cursorY = drawTotalsBlock(doc, rec.empresa, subtotal, cursorY);
 
@@ -273,6 +358,13 @@ export async function buildBulkReclamosPdf(reclamos: ReclamoFull[], empresa: str
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       cursorY = ((doc as any).lastAutoTable?.finalY ?? cursorY) + 6;
+    }
+
+    // Recuperación (settlements/NCs) — solo si hay pagos o está Pagado.
+    const settlementsVivos = (rec.reclamo_settlements || []).filter((s) => !s.deleted);
+    if (settlementsVivos.length > 0 || rec.estado === "Pagado") {
+      cursorY = ensureSpace(doc, cursorY, 40);
+      cursorY = drawSettlementBlock(doc, rec, subtotal, cursorY);
     }
 
     if (rec.notas && rec.notas.trim()) {
@@ -329,8 +421,9 @@ export async function fetchReclamosForEmpresa(empresa: string, sel: BulkSelector
   if (sel.reclamo_ids && sel.reclamo_ids.length > 0) {
     const { data, error } = await supabaseServer
       .from("reclamos")
-      .select("*, reclamo_items(*), reclamo_fotos(*)")
+      .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_settlements(*)")
       .eq("empresa", empresa)
+      .eq("deleted", false)
       .in("id", sel.reclamo_ids)
       .order("created_at", { ascending: false });
     if (error) throw new Error("Error al cargar reclamos");
@@ -342,8 +435,9 @@ export async function fetchReclamosForEmpresa(empresa: string, sel: BulkSelector
     const search = (sel.all_with_filter.search || "").trim();
     let query = supabaseServer
       .from("reclamos")
-      .select("*, reclamo_items(*), reclamo_fotos(*)")
+      .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_settlements(*)")
       .eq("empresa", empresa)
+      .eq("deleted", false)
       .order("created_at", { ascending: false });
     if (tab !== "all") query = query.eq("estado", tab);
     if (search) {

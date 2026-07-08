@@ -31,6 +31,7 @@ export default function EmpresaSelector({
   onNewReclamo, onSelectEmpresa, onLoadDetail, freshness,
 }: Props) {
   const [excelBusy, setExcelBusy] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
 
@@ -66,6 +67,37 @@ export default function EmpresaSelector({
       showToast(err instanceof Error ? err.message : "Error al generar el Excel");
     } finally {
       setExcelBusy(null);
+    }
+  }
+
+  async function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    if (pdfBusy) return;
+    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
+    if (!ids.length) return;
+    setPdfBusy(empresa);
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/export-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reclamo_ids: ids }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el PDF.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`PDF de ${empresa} descargado`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
+    } finally {
+      setPdfBusy(null);
     }
   }
 
@@ -153,6 +185,8 @@ export default function EmpresaSelector({
                     <div className="flex gap-1.5 flex-wrap justify-end">
                       <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} disabled={excelBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
                         className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{excelBusy === empresa ? "Excel…" : "↓ Excel"}</button>
+                      <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} disabled={pdfBusy !== null} title="Descargar PDF consolidado del proveedor (resumen + detalle por reclamo con fotos)"
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{pdfBusy === empresa ? "PDF…" : "↓ PDF"}</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">
