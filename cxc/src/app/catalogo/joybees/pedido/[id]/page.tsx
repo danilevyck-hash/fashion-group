@@ -4,11 +4,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
-import { ConfirmDeleteModal, Toast } from "@/components/ui";
+import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import { getBultoSize } from "@/lib/joybees-bulto";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; joybees_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
+interface DirClient { nombre: string; empresa: string; }
+interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
+interface ClienteSwitchRow { cliente_switch_id: number; codigo: string | null; nombre: string | null; }
+interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
+interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number; }
 
 // Joybees es todo footwear → bulto siempre 12.
 const BULTO = getBultoSize();
@@ -47,6 +52,23 @@ export default function OrderDetailPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<DirClient[]>([]);
+  const [showSugg, setShowSugg] = useState(false);
+  // ── Envío a Switch (ERP) ──
+  const [switchEnvio, setSwitchEnvio] = useState<SwitchEnvio | null>(null);
+  const [switchPreview, setSwitchPreview] = useState<SwitchPreview | null>(null);
+  const [switchErrores, setSwitchErrores] = useState<string[] | null>(null);
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [switchLoading, setSwitchLoading] = useState(false);
+  const [switchSending, setSwitchSending] = useState(false);
+  // ── Cliente Switch del pedido (cliente real en vez de Contado) ──
+  const [clienteSwitch, setClienteSwitch] = useState<{ id: number; nombre: string | null; codigo: string | null } | null>(null);
+  const [showClienteModal, setShowClienteModal] = useState(false);
+  const [clienteQuery, setClienteQuery] = useState("");
+  const [clienteResults, setClienteResults] = useState<ClienteSwitchRow[]>([]);
+  const [clienteBuscando, setClienteBuscando] = useState(false);
+  const [clienteGuardando, setClienteGuardando] = useState(false);
+  const nameRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlight = useRef(false);
   const pendingSave = useRef(false);
@@ -63,16 +85,64 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/catalogo/joybees/orders/${id}`);
       if (res.ok) {
         const d = await res.json();
+        const r = sessionStorage.getItem("cxc_role") || "";
         setOrder(d); setItems(sortItems(d.joybees_order_items || [])); setClientName(d.client_name || "");
         if (d.client_email) setClientEmail(d.client_email);
         // Track active draft so catalog can add to it
         if (d.status === "borrador") sessionStorage.setItem("joybees_draft_id", id);
+        // Estado del envío a Switch (solo admin/secretaria; otros reciben 403 y se ignora)
+        if (["admin", "secretaria"].includes(r)) {
+          try {
+            const er = await fetch(`/api/catalogo/joybees/orders/${id}/enviar-switch`);
+            if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
+          } catch { /* no bloquea la carga del pedido */ }
+          // Cliente Switch asignado al pedido (null = Contado, el default)
+          try {
+            const cr = await fetch(`/api/catalogo/joybees/clientes-switch?orderId=${id}`);
+            if (cr.ok) {
+              const cd = await cr.json();
+              setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+            }
+          } catch { /* no bloquea la carga del pedido */ }
+        }
       } else router.push("/catalogo/joybees/pedidos");
     } catch { router.push("/catalogo/joybees/pedidos"); }
     setLoading(false);
   }, [id, router]);
 
   useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); load(); }, [load]);
+
+  // Client autocomplete (directorio de clientes, 300ms debounce).
+  useEffect(() => {
+    if (clientName.length < 2) { setSuggestions([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/catalogo/joybees/clientes-search?q=${encodeURIComponent(clientName)}`);
+        if (r.ok) { const d = await r.json(); setSuggestions(d || []); setShowSugg((d || []).length > 0); }
+      } catch { /* */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [clientName]);
+
+  useEffect(() => {
+    function h(e: MouseEvent) { if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowSugg(false); }
+    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  // Búsqueda de clientes Switch (selector del modal, 300ms debounce). Corre
+  // solo con el modal abierto; query vacío lista los primeros.
+  useEffect(() => {
+    if (!showClienteModal) return;
+    const t = setTimeout(async () => {
+      setClienteBuscando(true);
+      try {
+        const r = await fetch(`/api/catalogo/joybees/clientes-switch?q=${encodeURIComponent(clienteQuery)}`);
+        if (r.ok) { const d = await r.json(); setClienteResults(d.clientes || []); }
+      } catch { /* sin red: se queda la lista anterior */ }
+      setClienteBuscando(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [clienteQuery, showClienteModal]);
 
   // Mantener refs sincronizados con el ultimo estado.
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -209,6 +279,96 @@ export default function OrderDetailPage() {
     setItems(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // ── ENVIAR A SWITCH (ERP) ──
+  // Paso 1: dry-run — resuelve sku→codigoBarraId y precio VIVOS contra Switch
+  // y muestra el resumen + advertencias en un modal. Cero escrituras.
+  async function previewSwitch() {
+    setSwitchLoading(true); setSwitchErrores(null); setSwitchPreview(null);
+    try {
+      const res = await fetch(`/api/catalogo/joybees/orders/${id}/enviar-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dry: true }),
+      });
+      const d = await res.json();
+      if (res.ok && d.preview) {
+        setSwitchPreview(d.preview); setShowSwitchModal(true);
+      } else if (res.status === 422 && d.errores) {
+        setSwitchErrores(d.errores); setShowSwitchModal(true);
+      } else {
+        showToast(d.error || "No se pudo consultar Switch. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("No se pudo consultar Switch. Revisa tu conexion.");
+    }
+    setSwitchLoading(false);
+  }
+
+  // Paso 2: el POST real. Un solo envío por pedido (candado en el server).
+  async function confirmSwitch() {
+    setSwitchSending(true);
+    try {
+      const res = await fetch(`/api/catalogo/joybees/orders/${id}/enviar-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
+        setShowSwitchModal(false);
+        showToast(`Pedido creado en Switch: ${d.numeroInterno}`);
+      } else if (d.ambiguo) {
+        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error });
+        setShowSwitchModal(false);
+        showToast("Switch no respondio — revisa el panel antes de reintentar.");
+      } else {
+        setShowSwitchModal(false);
+        setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+        showToast(d.error || "Switch rechazo el pedido.");
+      }
+    } catch {
+      // Se perdio la respuesta: el server pudo haber completado el envio.
+      // Refrescar el estado real desde la DB en vez de asumir.
+      setShowSwitchModal(false);
+      try {
+        const er = await fetch(`/api/catalogo/joybees/orders/${id}/enviar-switch`);
+        if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
+      } catch { /* sin red */ }
+      showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
+    }
+    setSwitchSending(false);
+  }
+
+  // ── CLIENTE SWITCH ──
+  // Los clientes nuevos se crean desde el panel de Switch — aquí solo se busca
+  // y asigna un cliente existente (el sync llena switch_clientes).
+  function abrirClienteModal() {
+    setClienteQuery("");
+    setClienteResults([]);
+    setShowClienteModal(true);
+  }
+
+  // Asigna (o quita, con null) el cliente Switch del pedido.
+  async function asignarClienteSwitch(c: ClienteSwitchRow | null) {
+    setClienteGuardando(true);
+    try {
+      const res = await fetch(`/api/catalogo/joybees/clientes-switch`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id, clienteSwitchId: c ? c.cliente_switch_id : null }),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setClienteSwitch(c ? { id: c.cliente_switch_id, nombre: c.nombre, codigo: c.codigo } : null);
+        setShowClienteModal(false);
+        showToast(c ? `Cliente Switch: ${c.nombre || c.codigo}` : "Cliente Switch: Contado (mostrador)");
+      } else {
+        showToast(d.error || "No se pudo guardar el cliente. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("No se pudo guardar el cliente. Revisa tu conexion.");
+    }
+    setClienteGuardando(false);
+  }
+
   // ── SHARE: PDF + link publico + email to client ──
   const [clientEmail, setClientEmail] = useState("");
   const [sendingToClient, setSendingToClient] = useState(false);
@@ -297,11 +457,24 @@ export default function OrderDetailPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
-          <div className="relative flex-1">
+          <div className="relative flex-1" ref={nameRef}>
             {canEdit ? (
-              <input value={clientName} onChange={e => setClientName(e.target.value)}
-                placeholder="Nombre del cliente"
-                className="text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent hover:border-gray-200 focus:border-black" />
+              <>
+                <input value={clientName} onChange={e => setClientName(e.target.value)}
+                  onFocus={() => suggestions.length > 0 && setShowSugg(true)}
+                  placeholder="Nombre del cliente"
+                  className="text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent hover:border-gray-200 focus:border-black" />
+                {showSugg && suggestions.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto">
+                    {suggestions.map((s, i) => (
+                      <button key={i} onClick={() => { setClientName(s.nombre); setShowSugg(false); }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">
+                        {s.nombre}{s.empresa ? <span className="text-xs text-gray-400 ml-2">{s.empresa}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <span className="text-xl font-semibold">{clientName}</span>
             )}
@@ -485,6 +658,53 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
+          {/* ERP Switch — solo admin/secretaria. Escritura real en el ERP:
+              un envio no-fallido por pedido; el server tiene el candado. */}
+          {canDelete && (
+            <div className="pt-3 border-t border-gray-100">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">ERP Switch</p>
+              {switchEnvio && switchEnvio.estado === "verificado" ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  Pedido creado en Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
+                </div>
+              ) : switchEnvio && switchEnvio.estado === "enviado" ? (
+                <div className="text-sm text-amber-700">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    {switchEnvio.numero_interno
+                      ? <>Enviado a Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
+                      : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
+                  </div>
+                  {switchEnvio.error_detalle && <p className="text-xs text-amber-600 mt-1">{switchEnvio.error_detalle}</p>}
+                </div>
+              ) : (
+                <div>
+                  {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
+                    <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
+                  )}
+                  {/* Cliente Switch del pedido — solo editable ANTES del envío.
+                      Default: Contado (mostrador). */}
+                  <div className="flex items-center gap-2 text-sm mb-3">
+                    <span className="text-gray-500">Cliente Switch:</span>
+                    <span className="text-gray-800">
+                      {clienteSwitch ? (clienteSwitch.nombre || clienteSwitch.codigo || `id ${clienteSwitch.id}`) : "Contado (mostrador)"}
+                      {clienteSwitch?.codigo && clienteSwitch.nombre ? <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span> : null}
+                    </span>
+                    <button onClick={abrirClienteModal}
+                      className="text-xs text-gray-500 underline hover:text-black transition">
+                      Cambiar
+                    </button>
+                  </div>
+                  <button onClick={previewSwitch} disabled={switchLoading}
+                    className="border border-gray-300 text-black text-sm px-4 py-2 rounded-md hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40">
+                    {switchLoading ? "Consultando Switch..." : switchEnvio?.estado === "error" ? "Reintentar envio a Switch" : "Enviar a Switch"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {canEdit && (
             <button onClick={editOrder} disabled={saving}
               className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
@@ -515,6 +735,118 @@ export default function OrderDetailPage() {
         onCancel={() => setShowDeleteModal(false)}
         loading={deletingOrder}
       />
+
+      {/* Modal de envio a Switch: resumen del dry-run + advertencias, o los
+          errores de pre-validacion si el pedido no cruza con el ERP. */}
+      {showSwitchModal && (
+        <ModalOverlay onBackdropClick={() => { if (!switchSending) setShowSwitchModal(false); }}>
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {switchErrores ? (
+              <>
+                <h3 className="text-base font-medium mb-2">No se puede enviar a Switch</h3>
+                <ul className="text-sm text-red-600 space-y-1.5 mb-5 list-disc pl-4">
+                  {switchErrores.map((e, i) => <li key={i}>{e}</li>)}
+                </ul>
+                <button onClick={() => setShowSwitchModal(false)}
+                  className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]">
+                  Entendido
+                </button>
+              </>
+            ) : switchPreview ? (
+              <>
+                <h3 className="text-base font-medium mb-1">Crear pedido en Switch</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Cliente: <span className="text-gray-700">{switchPreview.cliente}</span> · Vendedor: <span className="text-gray-700">{switchPreview.vendedor}</span> · Sin descuento
+                </p>
+                <table className="w-full text-xs mb-3">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-400">
+                      <th className="py-1.5 text-left font-normal">SKU</th>
+                      <th className="py-1.5 text-center font-normal">Piezas</th>
+                      <th className="py-1.5 text-right font-normal">Precio Switch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {switchPreview.lineas.map((l, i) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td className="py-1.5">
+                          <span className="font-mono">{l.sku}</span>
+                          <span className="block text-gray-400 truncate max-w-[220px]">{l.descripcionSwitch}</span>
+                        </td>
+                        <td className="py-1.5 text-center tabular-nums">{l.piezas} <span className="text-gray-400">({l.bultos} bultos)</span></td>
+                        <td className="py-1.5 text-right tabular-nums">${fmt(l.precioSwitch)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-between text-sm mb-3">
+                  <span className="text-gray-500">{switchPreview.totalPiezas} piezas</span>
+                  <span className="font-medium tabular-nums">${fmt(switchPreview.totalEstimado)}</span>
+                </div>
+                {switchPreview.warnings.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                    {switchPreview.warnings.map((w, i) => (
+                      <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {w}</p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mb-4">
+                  Esto crea un pedido REAL en el ERP (joystep). Si algo sale mal, se borra manualmente desde el panel de Switch.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={confirmSwitch} disabled={switchSending}
+                    className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                    {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
+                  </button>
+                  <button onClick={() => setShowSwitchModal(false)} disabled={switchSending}
+                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Modal de cliente Switch: buscador sobre la tabla local switch_clientes.
+          Los clientes nuevos se crean desde el panel de Switch (aquí no hay alta). */}
+      {showClienteModal && (
+        <ModalOverlay onBackdropClick={() => { if (!clienteGuardando) setShowClienteModal(false); }}>
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-medium mb-1">Cliente Switch del pedido</h3>
+            <p className="text-xs text-gray-500 mb-3">El pedido se creara en Switch a nombre de este cliente. Si no eliges uno, va a Contado (mostrador).</p>
+            <input value={clienteQuery} onChange={e => setClienteQuery(e.target.value)}
+              placeholder="Buscar por nombre o codigo..."
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-2" />
+            <div className="border border-gray-100 rounded-md divide-y divide-gray-50 mb-3 max-h-60 overflow-y-auto">
+              <button onClick={() => asignarClienteSwitch(null)} disabled={clienteGuardando}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
+                Contado (mostrador) <span className="text-xs text-gray-400">— default</span>
+              </button>
+              {clienteBuscando ? (
+                <div className="px-3 py-2 text-xs text-gray-400">Buscando...</div>
+              ) : clienteResults.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-gray-400">
+                  {clienteQuery ? "Sin resultados — los clientes nuevos se crean desde el panel de Switch" : "Escribe para buscar clientes de Joystep"}
+                </div>
+              ) : (
+                clienteResults.map((c) => (
+                  <button key={c.cliente_switch_id} onClick={() => asignarClienteSwitch(c)} disabled={clienteGuardando}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
+                    {c.nombre || `Cliente ${c.cliente_switch_id}`}
+                    {c.codigo && <span className="text-xs text-gray-400 font-mono ml-2">{c.codigo}</span>}
+                  </button>
+                ))
+              )}
+            </div>
+            <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
+              className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
+              Cerrar
+            </button>
+          </div>
+        </ModalOverlay>
+      )}
 
       <Toast message={toast} />
     </div>
