@@ -39,7 +39,7 @@ interface Props {
   onReload: () => void;
 }
 
-type BulkAction = "excel";
+type BulkAction = "excel" | "pdf";
 
 // Íconos de acción por fila — discretos, hover. stroke currentColor para heredar color.
 const IconMail = (
@@ -57,6 +57,9 @@ const IconDownload = (
 const IconSpinner = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="animate-spin"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" /><path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
 );
+const IconPdf = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+);
 
 export default function EmpresaList({
   role, activeEmpresa, reclamos, contactos, search, setSearch,
@@ -68,6 +71,7 @@ export default function EmpresaList({
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [pdfDownloadingId, setPdfDownloadingId] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
   // Envío de UN solo reclamo desde el botón de mail de la fila (independiente del
   // envío en lote por selección). Guarda el reclamo objetivo; null = modal cerrado.
@@ -170,6 +174,66 @@ export default function EmpresaList({
     }
   }
 
+  // PDF consolidado de los reclamos seleccionados (mismo payload que el Excel bulk).
+  async function downloadBulkPdf() {
+    if (busy || selectedIds.length === 0) return;
+    setBusy("pdf");
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reclamo_ids: selectedIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el PDF.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
+      a.href = url;
+      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`PDF descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // PDF directo de UN reclamo desde la fila (via endpoint por-proveedor con 1 id).
+  async function downloadSinglePdf(r: Reclamo) {
+    if (pdfDownloadingId) return;
+    setPdfDownloadingId(r.id);
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reclamo_ids: [r.id] }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el PDF.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = (r.nro_reclamo || "reclamo").replace(/[^A-Za-z0-9_-]+/g, "_");
+      a.href = url;
+      a.download = `Reclamo-${safe}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`PDF de ${r.nro_reclamo} descargado`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el PDF");
+    } finally {
+      setPdfDownloadingId(null);
+    }
+  }
+
   function cancelSelection() {
     setSelectionMode(false);
     setSelectedIds([]);
@@ -215,6 +279,14 @@ export default function EmpresaList({
                 className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
               >
                 {busy === "excel" ? "Generando Excel..." : "Descargar Excel"}
+              </button>
+              <button
+                onClick={downloadBulkPdf}
+                disabled={busy !== null}
+                title="Descargar PDF consolidado de los reclamos seleccionados (resumen + detalle con fotos)"
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
+              >
+                {busy === "pdf" ? "Generando PDF..." : "Descargar PDF"}
               </button>
               {isAdmin && (
                 <button
@@ -309,6 +381,7 @@ export default function EmpresaList({
                   <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconMail}</button>
                     <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
+                    <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
                     <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
                     {isAdmin && (
                       <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-2 text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
@@ -393,6 +466,7 @@ export default function EmpresaList({
                       <div className="flex items-center justify-end gap-0.5">
                         <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconMail}</button>
                         <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
+                        <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
                         <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconPencil}</button>
                         {isAdmin && (
                           <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-1.5 text-gray-400 hover:text-red-600 rounded transition">{IconTrash}</button>
