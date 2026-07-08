@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/cron/acs-resumen-diario — Resumen de ventas ACS del día a Telegram.
-// Corre 01:45 UTC (20:45 Panamá), después del sync intradía de facturas ACS de
-// 01:30 → el número de "hoy" ya incluye el día completo de la tienda.
+// Corre 01:00 UTC (20:00 Panamá = 8pm), después del sync de cierre de facturas
+// ACS de 00:15 UTC (la tienda cierra 7pm sin más movimiento) → el número de
+// "hoy" ya incluye el día completo de la tienda.
 //
-// Los crons Hobby tienen jitter (el sync de 01:30 puede correr tarde o no
+// Los crons Hobby tienen jitter (el sync de 00:15 puede correr tarde o no
 // correr): antes de calcular se verifica en switch_sync_log que el sync de
 // cierre ya corrió; si no, el mensaje omite "Hoy" y reporta el mes al último
 // día completo (ver guardia anti-ruido en src/lib/acs-resumen-diario.ts).

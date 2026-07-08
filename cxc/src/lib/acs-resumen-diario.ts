@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Resumen diario ACS para Telegram (cron acs-resumen-diario, 01:45 UTC =
-// 20:45 Panamá, tras el sync ACS de 01:30).
+// Resumen diario ACS para Telegram (cron acs-resumen-diario, 01:00 UTC =
+// 20:00 Panamá = 8pm, tras el sync ACS de cierre de 00:15 UTC = 19:15 Panamá).
 //
 // SEMÁNTICA = la del módulo Multifashion (validada al centavo contra
 // multifashion_overview_serie_v1 el 4-jul-2026):
@@ -15,11 +15,13 @@
 //     de corte en AMBOS lados, la convención YoY del módulo).
 //
 // GUARDIA ANTI-RUIDO (incidente 5-jul-2026): los crons de Vercel Hobby tienen
-// jitter — el sync de 01:30 puede correr tarde o no correr. Si el resumen lee
-// antes de que el sync de cierre haya escrito el día, "Hoy" da $0 · -100% falso
-// y el mes compara 1..D-1 contra 1..D (asimétrico). Antes de calcular se
-// verifica en switch_sync_log que hubo un sync de facturas ACS exitoso DESPUÉS
-// del cierre de tienda (fecha+1 01:30 UTC = 20:30 Panamá). Si no lo hubo, el
+// jitter — el sync de cierre (00:15) puede correr tarde o no correr. Si el
+// resumen lee antes de que el sync de cierre haya escrito el día, "Hoy" da
+// $0 · -100% falso y el mes compara 1..D-1 contra 1..D (asimétrico). Antes de
+// calcular se verifica en switch_sync_log que hubo un sync de facturas ACS
+// exitoso DESPUÉS del cierre de tienda (fecha+1 00:00 UTC = 19:00 Panamá =
+// cierre 7pm; el sync de 00:15 UTC lo satisface con ~45 min de margen antes del
+// resumen de 01:00). Si no lo hubo, el
 // mensaje omite la línea de "Hoy" y reporta el mes al último día completo
 // (1..D-1 vs 1..D-1, simétrico). Un $0 real con sync fresco (tienda cerrada,
 // domingo/feriado) se manda normal.
@@ -36,7 +38,7 @@ const PAGE = 1000;
 export interface AcsResumenDiario {
   fecha: string;          // día del resumen (hoy Panamá) — el que se anuncia
   corte: string;          // último día COMPLETO incluido (= fecha si sync fresco)
-  syncFresco: boolean;    // ¿el sync de cierre (01:30 UTC) ya corrió para `fecha`?
+  syncFresco: boolean;    // ¿el sync de cierre (00:15 UTC) ya corrió para `fecha`?
   hoy: number;            // solo significativo si syncFresco
   hoyPrev: number;        // día comparable (−364d, mismo día de semana)
   fechaComparable: string;
@@ -70,10 +72,13 @@ export function ventanasResumen(corte: string): VentanasResumen {
   };
 }
 
-/** Momento UTC en que el sync de cierre captura el día `fecha` completo:
- *  fecha+1 a las 01:30 UTC = 20:30 Panamá del propio `fecha`. */
+/** Momento UTC del cierre de tienda del día `fecha`: fecha+1 a las 00:00 UTC =
+ *  19:00 Panamá (7pm) del propio `fecha`. La tienda cierra 7pm sin más
+ *  movimiento; el sync de cierre (00:15 UTC) arranca después de este instante y
+ *  captura el día completo. La guardia exige un sync `success` con
+ *  started_at >= este momento. */
 export function cierreUtcDe(fecha: string): string {
-  return `${addDays(fecha, 1)}T01:30:00.000Z`;
+  return `${addDays(fecha, 1)}T00:00:00.000Z`;
 }
 
 /** ¿Hubo un sync de facturas ACS exitoso que arrancó DESPUÉS del cierre de

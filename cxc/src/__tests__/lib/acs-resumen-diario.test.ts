@@ -67,9 +67,9 @@ describe("ventanasResumen — same-period estricto 1..D vs 1..D", () => {
 });
 
 describe("cierreUtcDe", () => {
-  it("el cierre del día Panamá es fecha+1 a las 01:30 UTC (20:30 Panamá)", () => {
-    expect(cierreUtcDe("2026-07-04")).toBe("2026-07-05T01:30:00.000Z");
-    expect(cierreUtcDe("2026-12-31")).toBe("2027-01-01T01:30:00.000Z");
+  it("el cierre del día Panamá es fecha+1 a las 00:00 UTC (19:00 Panamá = 7pm)", () => {
+    expect(cierreUtcDe("2026-07-04")).toBe("2026-07-05T00:00:00.000Z");
+    expect(cierreUtcDe("2026-12-31")).toBe("2027-01-01T00:00:00.000Z");
   });
 });
 

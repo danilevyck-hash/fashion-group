@@ -130,11 +130,11 @@
     },
     {
       "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic",
-      "schedule": "30 1 * * *"
+      "schedule": "15 0 * * *"
     },
     {
       "path": "/api/cron/acs-resumen-diario",
-      "schedule": "45 1 * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/grupo-resumen-mensual",
