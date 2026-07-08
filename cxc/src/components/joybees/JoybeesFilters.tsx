@@ -65,7 +65,8 @@ export default function JoybeesFilters({
         {searchInput && (
           <button
             onClick={() => onSearchChange("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition text-xs"
+            className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#404041]/40 hover:text-[#404041] transition"
+            aria-label="Limpiar búsqueda"
           >
             &times;
           </button>
@@ -81,7 +82,7 @@ export default function JoybeesFilters({
             <button
               key={opt.value}
               onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
                 gender === opt.value
                   ? "bg-[#404041] text-white shadow-sm"
                   : "bg-white text-[#404041]/60 border border-[#404041]/10 hover:border-[#404041]/25"
@@ -101,7 +102,7 @@ export default function JoybeesFilters({
           {hasActiveFilters && (
             <button
               onClick={onClearAll}
-              className="text-xs text-[#404041]/40 hover:text-[#404041] transition min-h-[32px] px-2"
+              className="text-xs text-[#404041]/40 hover:text-[#404041] transition min-h-[44px] px-2"
             >
               Limpiar filtros
             </button>
@@ -112,7 +113,7 @@ export default function JoybeesFilters({
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value)}
-            className="text-xs border border-[#404041]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#404041]/30 transition bg-white text-[#404041]/60 min-h-[32px]"
+            className="text-xs border border-[#404041]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#404041]/30 transition bg-white text-[#404041]/60 min-h-[44px]"
           >
             <option value="relevancia">Ordenar: Relevancia</option>
             <option value="precio-asc">Precio: menor a mayor</option>

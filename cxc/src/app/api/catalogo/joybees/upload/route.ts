@@ -4,6 +4,12 @@ import { requireRole } from "@/lib/requireRole";
 
 export const dynamic = "force-dynamic";
 
+// Lowercase + keep alphanumerics, period, hyphen, underscore — everything else → '_'.
+// Storage paths must be deterministic per SKU so a re-upload overwrites the same object.
+function normalizeSku(sku: string): string {
+  return sku.toLowerCase().replace(/[^a-z0-9._-]/g, "_");
+}
+
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
@@ -24,7 +30,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "La imagen es muy pequena o esta danada (minimo 5KB)." }, { status: 400 });
   }
 
-  const filename = `joybees/${Date.now()}-${file.name}`;
+  // Con SKU (subida por fila) → path determinístico: cada re-subida sobrescribe
+  // el mismo objeto (sin huérfanos en Storage). Sin SKU (subida masiva legacy) →
+  // path con timestamp para no pisar subidas ajenas. Espejo de reebok/upload.
+  const rawSku = (formData.get("sku") as string | null)?.trim() || "";
+  const skuKey = rawSku ? normalizeSku(rawSku) : "";
+  const filename = skuKey
+    ? `joybees/${skuKey}`
+    : `joybees/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabaseServer.storage
     .from("product-images")
@@ -36,5 +49,9 @@ export async function POST(req: NextRequest) {
     .from("product-images")
     .getPublicUrl(filename);
 
-  return NextResponse.json({ url: publicUrl });
+  // Con path determinístico la URL es estable; sin `?v=` el browser seguiría
+  // sirviendo los bytes viejos cacheados tras una re-subida.
+  const url = skuKey ? `${publicUrl}?v=${Date.now()}` : publicUrl;
+
+  return NextResponse.json({ url });
 }

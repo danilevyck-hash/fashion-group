@@ -5,6 +5,7 @@ import { JoybeesProduct } from "./JoybeesProductCard";
 import { GroupedProduct } from "./groupByModel";
 import { getBultoSize } from "@/lib/joybees-bulto";
 import BultosBadge from "@/components/shared/BultosBadge";
+import { supabaseThumb } from "@/lib/image-thumb";
 
 const BULTO_SIZE = getBultoSize();
 
@@ -38,6 +39,8 @@ export default function JoybeesGroupedCard({
 }: JoybeesGroupedCardProps) {
   const groupStock = group.variants.reduce((s, v) => s + (v.product.stock || 0), 0);
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
+  // Thumbnail (render transform); si falla, cae a la URL original una vez.
+  const [useThumb, setUseThumb] = useState(true);
   const [showLightbox, setShowLightbox] = useState(false);
 
   // Track "just added" per variant
@@ -126,12 +129,20 @@ export default function JoybeesGroupedCard({
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
-                  key={imageStatus}
-                  src={group.image_url}
+                  key={`${imageStatus}-${useThumb}`}
+                  src={useThumb ? (supabaseThumb(group.image_url, 600) ?? group.image_url) : group.image_url}
                   alt={group.name}
+                  width={300}
+                  height={300}
+                  loading="lazy"
                   className="w-full h-full object-contain"
                   onLoad={() => setImageStatus("loaded")}
-                  onError={() => setImageStatus("error")}
+                  onError={() => {
+                    // 1er fallo: reintenta con la URL original (por si el
+                    // transform no soporta ese archivo); 2do fallo: error real.
+                    if (useThumb) { setUseThumb(false); setImageStatus("loading"); }
+                    else setImageStatus("error");
+                  }}
                 />
               )}
             </>

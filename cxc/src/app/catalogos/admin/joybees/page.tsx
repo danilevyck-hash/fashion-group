@@ -8,6 +8,7 @@ import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob, stripBom } from "@/lib/csv-export";
 import PedidosTab from "./PedidosTab";
+import { validateJoybeesPhoto, uploadJoybeesPhoto } from "./photoUpload";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,34 @@ type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
 
 function fmtMoney(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function tieneFoto(p: JoybeesProduct): boolean {
+  return !!(p.image_url && p.image_url.trim());
+}
+
+// Joybees es 100% calzado. El "tipo" se deriva del NOMBRE (no hay columna tipo):
+// contiene "Clog" → Clogs, "Sandal" → Sandalias, "Flip" → Flips. Los demás
+// (Flat, Trekking, Popinz…) no caen en ninguna card de tipo.
+type TipoJoybees = "Clogs" | "Sandalias" | "Flips";
+function tipoJoybees(name: string): TipoJoybees | null {
+  const n = (name || "").toLowerCase();
+  if (n.includes("clog")) return "Clogs";
+  if (n.includes("sandal")) return "Sandalias";
+  if (n.includes("flip")) return "Flips";
+  return null;
+}
+
+// Género de Switch → etiqueta simple en español (para el Excel).
+const GENERO_LABEL: Record<string, string> = {
+  women: "Mujer",
+  adults_m: "Hombre",
+  adults: "Adulto",
+  unisex: "Unisex",
+  kids: "Niños",
+};
+function generoLabel(g: string): string {
+  return GENERO_LABEL[g] ?? (g || "");
 }
 
 function escapeCsvField(val: string): string {
@@ -135,9 +164,44 @@ function JoybeesAdminInner() {
       .catch(() => {});
   }, [authChecked, loadProducts]);
 
+  async function excelSinFoto() {
+    const sin = products.filter((p) => !tieneFoto(p));
+    if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
+    try {
+      // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, REEBOK_PALETTE } =
+        await import("@/lib/excel-export");
+      const ws = buildReportSheet({
+        title: "JOYBEES — Productos sin foto",
+        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
+        columns: [
+          { header: "Código", wch: 18 },
+          { header: "Descripción", wch: 40 },
+          { header: "Tipo", wch: 12 },
+          { header: "Género", wch: 12 },
+          { header: "Stock", wch: 10, align: "right", fmt: "0" },
+        ],
+        rows: sin.map((p) => [p.sku || "", p.name || "", tipoJoybees(p.name) ?? "", generoLabel(p.gender), p.stock ?? ""]),
+        palette: REEBOK_PALETTE,
+      });
+      const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
+      downloadWorkbook(wb, exportFilename("joybees-sin-foto"));
+      showToast("Excel listo — revisa tu carpeta de descargas");
+    } catch {
+      showToast("No se pudo generar el Excel. Intenta de nuevo.");
+    }
+  }
+
   if (!authChecked) return null;
 
   const sinFotoCount = products.filter((p) => !p.image_url?.trim()).length;
+  const metrics = {
+    total: products.length,
+    sinFoto: sinFotoCount,
+    clogs: products.filter((p) => tipoJoybees(p.name) === "Clogs").length,
+    sandalias: products.filter((p) => tipoJoybees(p.name) === "Sandalias").length,
+    flips: products.filter((p) => tipoJoybees(p.name) === "Flips").length,
+  };
   const tabs: { key: Tab; label: string }[] = [
     { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
     { key: "completo", label: "Catálogo completo" },
@@ -157,17 +221,37 @@ function JoybeesAdminInner() {
 
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-[#FFE443] flex items-center justify-center">
-            <span className="text-[#404041] font-extrabold text-sm">JB</span>
+        <div className="flex items-start justify-between gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FFE443] flex items-center justify-center">
+              <span className="text-[#404041] font-extrabold text-sm">JB</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">JOYBEES</h1>
+              <p className="text-xs text-gray-400">
+                Se llena solo desde Switch por existencia · tú solo subes fotos
+                {lastSync && ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">JOYBEES</h1>
-            <p className="text-xs text-gray-400">
-              Se llena solo desde Switch por existencia · tú solo subes fotos
-              {lastSync && ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
-            </p>
-          </div>
+          <button
+            onClick={excelSinFoto}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Excel sin foto
+          </button>
+        </div>
+
+        {/* Resumen */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          <Metric label="Productos" value={metrics.total} />
+          <Metric label="Sin foto" value={metrics.sinFoto} highlight={metrics.sinFoto > 0} />
+          <Metric label="Clogs" value={metrics.clogs} />
+          <Metric label="Sandalias" value={metrics.sandalias} />
+          <Metric label="Flips" value={metrics.flips} />
         </div>
 
         {/* Tabs */}
@@ -197,7 +281,7 @@ function JoybeesAdminInner() {
               <FaltanFotoTab products={products} showToast={showToast} onComplete={loadProducts} />
             )}
             {tab === "completo" && (
-              <ProductosTab products={products} />
+              <ProductosTab products={products} showToast={showToast} onComplete={loadProducts} />
             )}
             {tab === "pedidos" && (
               <PedidosTab showToast={showToast} />
@@ -216,9 +300,30 @@ function JoybeesAdminInner() {
   );
 }
 
-// ── PRODUCTOS TAB (READ-ONLY) ────────────────────────────────────────────────
+// ── Resumen ───────────────────────────────────────────────────────────────────
 
-function ProductosTab({ products }: { products: JoybeesProduct[] }) {
+function Metric({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${highlight ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"}`}>
+      <div className={`text-2xl font-bold tabular-nums ${highlight ? "text-amber-600" : "text-[#404041]"}`}>{value}</div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+// ── PRODUCTOS TAB ─────────────────────────────────────────────────────────────
+// Subida de foto por fila (espejo de Reebok). Las etiquetas (badge) se muestran
+// tal cual — NO se editan aquí (decisión del dueño).
+
+function ProductosTab({
+  products,
+  showToast,
+  onComplete,
+}: {
+  products: JoybeesProduct[];
+  showToast: (msg: string) => void;
+  onComplete: () => Promise<void>;
+}) {
   const [search, setSearch] = useState("");
 
   const filtered = products.filter((p) => {
@@ -257,65 +362,121 @@ function ProductosTab({ products }: { products: JoybeesProduct[] }) {
       </p>
 
       <div className="space-y-2">
-        {sorted.map((product) => {
-          const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
+        {sorted.map((product) => (
+          <ProductRow key={product.id} product={product} showToast={showToast} onComplete={onComplete} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          return (
-            <div
-              key={product.id}
-              className={`bg-white border rounded-lg p-3 ${product.stock === 0 ? "opacity-40 border-gray-100" : "border-gray-200"}`}
-            >
-              <div className="flex items-center gap-3">
-                {/* Image */}
-                <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
-                  {product.image_url ? (
-                    <Image
-                      src={product.image_url}
-                      alt={product.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+// ── Fila de producto con subida de foto por fila ──────────────────────────────
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
-                    {badgeLabel && (
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                        product.badge === "oferta"
-                          ? "bg-orange-50 text-orange-600"
-                          : "bg-blue-50 text-blue-600"
-                      }`}>
-                        {badgeLabel}
-                      </span>
-                    )}
-                    {product.stock === 0 && (
-                      <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {product.sku} &middot; {product.category} &middot; {product.gender} &middot; Stock: {product.stock}
-                  </p>
-                </div>
+function ProductRow({
+  product,
+  showToast,
+  onComplete,
+}: {
+  product: JoybeesProduct;
+  showToast: (msg: string) => void;
+  onComplete: () => Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-                {/* Price */}
-                <p className="text-sm font-semibold text-gray-900 tabular-nums flex-shrink-0">
-                  ${fmtMoney(product.price)}
-                </p>
-              </div>
+  const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
+
+  async function handleFile(file: File) {
+    setError(null);
+    const vErr = validateJoybeesPhoto(file);
+    if (vErr) { setError(vErr); return; }
+    setUploading(true);
+    try {
+      await uploadJoybeesPhoto(product.sku, file);
+      showToast("Foto subida");
+      await onComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo subir la foto.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      className={`bg-white border rounded-lg p-3 ${product.stock === 0 ? "border-gray-100" : "border-gray-200"}`}
+    >
+      <div className="flex items-center gap-3">
+        {/* Image */}
+        <div className={`relative w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden ${product.stock === 0 ? "opacity-40" : ""}`}>
+          {tieneFoto(product) ? (
+            <Image
+              src={product.image_url!}
+              alt={product.name}
+              width={48}
+              height={48}
+              className="w-full h-full object-cover"
+              unoptimized
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-gray-300">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
             </div>
-          );
-        })}
+          )}
+          {uploading && (
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+              <span className="w-4 h-4 border-2 border-[#404041] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className={`flex-1 min-w-0 ${product.stock === 0 ? "opacity-60" : ""}`}>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+            {badgeLabel && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                product.badge === "oferta"
+                  ? "bg-orange-50 text-orange-600"
+                  : "bg-blue-50 text-blue-600"
+              }`}>
+                {badgeLabel}
+              </span>
+            )}
+            {product.stock === 0 && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {product.sku} &middot; {product.category} &middot; {product.gender} &middot; Stock: {product.stock}
+          </p>
+          {error && <p className="text-[11px] text-red-500 leading-tight mt-1">{error}</p>}
+        </div>
+
+        {/* Price */}
+        <p className="text-sm font-semibold text-gray-900 tabular-nums flex-shrink-0">
+          ${fmtMoney(product.price)}
+        </p>
+
+        {/* Subir / cambiar foto */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); if (inputRef.current) inputRef.current.value = ""; }}
+        />
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex-shrink-0 px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50 transition whitespace-nowrap"
+        >
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar" : "Subir foto"}
+        </button>
       </div>
     </div>
   );
