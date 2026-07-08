@@ -23,6 +23,8 @@ interface JoybeesStickyCartBarProps {
   onClearCart: () => void;
   variant: "public" | "vendor";
   onSendWhatsApp?: () => void;
+  clientName?: string;
+  onClientNameChange?: (v: string) => void;
   saving?: boolean;
   actionLabel?: string;
   formatTotal: (n: number) => string;
@@ -31,7 +33,7 @@ interface JoybeesStickyCartBarProps {
 export default function JoybeesStickyCartBar({
   cart, cartCount, cartTotal,
   onQtyChange, onClearCart,
-  variant, onSendWhatsApp,
+  variant, onSendWhatsApp, clientName, onClientNameChange,
   saving, actionLabel, formatTotal,
 }: JoybeesStickyCartBarProps) {
   const [miniCartOpen, setMiniCartOpen] = useState(false);
@@ -122,6 +124,23 @@ export default function JoybeesStickyCartBar({
         </div>
       </div>
 
+      {/* Client name input (public variant) */}
+      {variant === "public" && onClientNameChange && (
+        <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[#404041]/50 mb-1">
+            Tu nombre
+          </label>
+          <input
+            type="text"
+            value={clientName || ""}
+            onChange={(e) => onClientNameChange(e.target.value)}
+            placeholder="Escribe tu nombre"
+            autoComplete="name"
+            className="w-full rounded-lg border border-gray-200 bg-[#FFFEF5] px-3 py-2 text-sm text-[#404041] placeholder:text-[#404041]/30 focus:border-[#404041] focus:bg-white focus:outline-none transition"
+          />
+        </div>
+      )}
+
       {/* Bottom bar */}
       <div className="p-3 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
         <button
@@ -153,7 +172,7 @@ export default function JoybeesStickyCartBar({
 
         <button
           onClick={handleAction}
-          disabled={saving}
+          disabled={saving || (variant === "public" && onClientNameChange !== undefined && !(clientName || "").trim())}
           className="flex-1 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition min-h-[56px] disabled:opacity-50 text-white bg-[#25D366] hover:bg-[#1fb855] active:scale-[0.98]"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

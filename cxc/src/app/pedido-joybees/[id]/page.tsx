@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getBultoSize } from "@/lib/joybees-bulto";
+import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
 
 interface OrderItem {
   product_id: string;
@@ -15,11 +16,12 @@ interface OrderItem {
 }
 
 interface Order {
-  id: string;
-  client_name: string | null;
+  id: number;
+  short_id: string;
   items: OrderItem[];
   total: number;
   created_at: string;
+  cliente_nombre: string | null;
 }
 
 function fmtMoney(n: number) {
@@ -29,12 +31,6 @@ function fmtMoney(n: number) {
 function fmtDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
-}
-
-// Joybees es todo footwear → bulto siempre 12. unit_price está por pieza.
-function calculateTotal(items: OrderItem[]) {
-  if (!Array.isArray(items)) return 0;
-  return items.reduce((sum, i) => sum + i.quantity * getBultoSize() * i.unit_price, 0);
 }
 
 export default function PedidoJoybeesPage() {
@@ -114,8 +110,8 @@ export default function PedidoJoybeesPage() {
           </div>
           <div className="text-right">
             <p className="text-white/80 text-sm font-medium">Pedido</p>
-            {order.client_name && (
-              <p className="text-white text-xs mt-0.5">{order.client_name}</p>
+            {order.cliente_nombre && (
+              <p className="text-white text-xs mt-0.5">{order.cliente_nombre}</p>
             )}
             <p className="text-white/40 text-xs">{fmtDate(order.created_at)}</p>
           </div>
@@ -167,7 +163,7 @@ export default function PedidoJoybeesPage() {
         <div className="bg-[#1A2656] rounded-b-xl px-6 py-4 flex items-center justify-between">
           <span className="text-white/70 text-sm font-medium">Total</span>
           <span className="text-[#FFE443] font-bold text-xl tabular-nums">
-            ${fmtMoney(calculateTotal(order.items))}
+            ${fmtMoney(calculateJoybeesOrderTotal(order.items))}
           </span>
         </div>
 

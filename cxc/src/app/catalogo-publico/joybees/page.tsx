@@ -176,38 +176,60 @@ function PublicJoybeesCatalog() {
   }
 
   const [sendingOrder, setSendingOrder] = useState(false);
-  // Si window.open lo bloquea el navegador (común en iOS), guardamos el pedido
-  // para que el cliente pueda reintentar o copiarlo — sin vaciar el carrito.
+  const [clientName, setClientName] = useState("");
+  // Si el navegador bloquea window.open (común en iOS), el pedido YA quedó
+  // guardado en el server; guardamos el mensaje para reintentar/copiar.
   const [failedOrder, setFailedOrder] = useState<{ msg: string; url: string } | null>(null);
 
-  function buildOrderMessage() {
-    const total = cart.reduce((s, i) => s + i.quantity * BULTO_SIZE * i.unit_price, 0);
-    const itemLines = cart.map(i => {
-      return `${i.name} (${i.sku}) x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * BULTO_SIZE} pzas) — $${(i.quantity * BULTO_SIZE * i.unit_price).toFixed(2)}`;
-    }).join("\n");
-    const msg = `Hola, quiero hacer un pedido de Joybees:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}`;
-    return { msg, url: `https://wa.me/50766745522?text=${encodeURIComponent(msg)}` };
-  }
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("joybees_public_client_name");
+      if (saved) setClientName(saved);
+    } catch { /* ignore */ }
+  }, []);
 
-  function clearCartAfterSend() {
-    setCart([]);
-    try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
-  }
+  useEffect(() => {
+    try { localStorage.setItem("joybees_public_client_name", clientName); } catch { /* */ }
+  }, [clientName]);
 
+  // WhatsApp send con link compartible: PRIMERO persiste el pedido en el server
+  // (precios validados server-side), y solo si el POST fue OK abre WhatsApp.
   async function handleSendWhatsApp() {
     if (cart.length === 0 || sendingOrder) return;
+    const trimmedName = clientName.trim();
+    if (!trimmedName) {
+      setToast("Escribe tu nombre antes de enviar el pedido");
+      return;
+    }
     setSendingOrder(true);
     try {
-      const { msg, url } = buildOrderMessage();
+      const res = await fetch("/api/catalogo/joybees/pedido-publico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const { short_id } = await res.json();
+
+      const total = cart.reduce((s, i) => s + i.quantity * BULTO_SIZE * i.unit_price, 0);
+      const itemLines = cart.map(i => {
+        return `${i.name} (${i.sku}) x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * BULTO_SIZE} pzas) — $${(i.quantity * BULTO_SIZE * i.unit_price).toFixed(2)}`;
+      }).join("\n");
+      const link = `https://www.fashiongr.com/pedido-joybees/${short_id}`;
+      const msg = `Hola, soy ${trimmedName}. Quiero hacer un pedido de Joybees:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
+      const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
       const win = window.open(url, "_blank");
+
+      // El pedido ya quedó guardado en el server (short_id), así que vaciar el
+      // carrito es seguro aunque WhatsApp no haya abierto.
+      setCart([]);
+      try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
+
       if (!win) {
-        // Popup bloqueado: NO vaciamos el carrito. El pedido aún no salió.
         setFailedOrder({ msg, url });
-        setToast("WhatsApp no se abrió. Tócalo de nuevo o copia tu pedido.");
+        setToast("Recibimos tu pedido. Ábrelo en WhatsApp para confirmar o cópialo.");
         return;
       }
-      // WhatsApp abrió: el pedido está en el chat, falta que el cliente toque Enviar.
-      clearCartAfterSend();
       setFailedOrder(null);
       setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
     } catch {
@@ -221,7 +243,6 @@ function PublicJoybeesCatalog() {
     if (!failedOrder) return;
     const win = window.open(failedOrder.url, "_blank");
     if (win) {
-      clearCartAfterSend();
       setFailedOrder(null);
       setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
     } else {
@@ -349,6 +370,8 @@ function PublicJoybeesCatalog() {
           onClearCart={handleClearCart}
           variant="public"
           onSendWhatsApp={handleSendWhatsApp}
+          clientName={clientName}
+          onClientNameChange={setClientName}
           saving={sendingOrder}
           actionLabel={sendingOrder ? "Enviando..." : undefined}
           formatTotal={fmt}
@@ -359,7 +382,7 @@ function PublicJoybeesCatalog() {
             className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#404041]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
             style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
           >
-            <p className="text-sm font-semibold text-[#404041]">Tu pedido todavía NO se ha enviado</p>
+            <p className="text-sm font-semibold text-[#404041]">Recibimos tu pedido — falta confirmarlo</p>
             <p className="text-xs text-[#404041]/60 mt-0.5 mb-3">
               WhatsApp no se abrió. Ábrelo de nuevo o copia tu pedido y pégalo en el chat al +507 6674-5522.
             </p>

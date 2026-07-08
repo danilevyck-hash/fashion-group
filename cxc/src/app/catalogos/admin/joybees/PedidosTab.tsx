@@ -4,20 +4,24 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDeleteModal } from "@/components/ui";
 
-// Pedido tal como lo devuelve GET /api/catalogo/joybees/orders.
-export interface JoybeesPedido {
-  id: string;
-  order_number: string;
-  client_name: string;
-  vendor_name: string | null;
+// Fila de la vista unificada (presenciales + del link) que devuelve
+// GET /api/catalogo/joybees/pedidos-unificado. El total ya viene recalculado
+// por el endpoint (bulto 12) — no recalcular aquí. Espejo de Reebok.
+export interface JoybeesUnifiedPedido {
+  origen: "mio" | "link";
+  id_natural: string;
+  cliente: string;
   total: number;
-  status: PedidoStatus;
   created_at: string;
+  vendor: string | null;
   item_count: number;
+  // Tabla física de origen. El badge usa `origen`; el routing del detalle y el
+  // borrado usan `fuente` (una pública convertida vive en joybees_orders pero se
+  // muestra como "Del link").
+  fuente?: "orders" | "publicos";
 }
 
-type PedidoStatus = "borrador" | "enviado" | "confirmado";
-type StatusFilter = "todos" | PedidoStatus;
+type OrigenFilter = "todos" | "link" | "mio";
 
 function fmtMoney(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -28,19 +32,35 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 }
 
+function OrigenBadge({ origen }: { origen: "mio" | "link" }) {
+  if (origen === "link") {
+    return (
+      <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-[#FFE443] text-[#404041]">
+        Del link
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+      Mío
+    </span>
+  );
+}
+
 export default function PedidosTab({ showToast }: { showToast: (msg: string) => void }) {
   const router = useRouter();
-  const [pedidos, setPedidos] = useState<JoybeesPedido[]>([]);
+  const [pedidos, setPedidos] = useState<JoybeesUnifiedPedido[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [origenFilter, setOrigenFilter] = useState<OrigenFilter>("todos");
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState<JoybeesPedido | null>(null);
+  const [deleting, setDeleting] = useState<JoybeesUnifiedPedido | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [converting, setConverting] = useState<string | null>(null);
 
   const loadPedidos = useCallback(async () => {
     try {
-      const res = await fetch("/api/catalogo/joybees/orders");
+      const res = await fetch("/api/catalogo/joybees/pedidos-unificado");
       if (res.ok) {
         const data = await res.json();
         setPedidos(Array.isArray(data) ? data : []);
@@ -52,6 +72,49 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
     setLoading(true);
     loadPedidos().finally(() => setLoading(false));
   }, [loadPedidos]);
+
+  // El detalle se enruta por la tabla física (fuente), no por el badge: una
+  // pública convertida vive en joybees_orders y se abre en el detalle interno.
+  // Fallback por `origen` si la vista aún no expone `fuente`.
+  function isOrdersRow(p: JoybeesUnifiedPedido): boolean {
+    return p.fuente ? p.fuente === "orders" : p.origen === "mio";
+  }
+  function detailHref(p: JoybeesUnifiedPedido): string {
+    return isOrdersRow(p)
+      ? `/catalogo/joybees/pedido/${p.id_natural}`
+      : `/pedido-joybees/${p.id_natural}`;
+  }
+
+  // "Editar del link": convierte la pública en joybees_orders (idempotente) y
+  // redirige a la maquinaria de edición existente. El origen se conserva
+  // (el pedido sigue mostrándose como "Del link").
+  async function handleEditLink(p: JoybeesUnifiedPedido) {
+    if (converting) return;
+    setConverting(p.id_natural);
+    try {
+      const res = await fetch(
+        `/api/catalogo/joybees/pedidos-publicos/${p.id_natural}/convertir`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error("convert failed");
+      const data = await res.json();
+      if (!data?.order_id) throw new Error("sin order_id");
+      router.push(`/catalogo/joybees/pedido/${data.order_id}`);
+    } catch {
+      showToast("No se pudo abrir el pedido para editar. Intenta de nuevo.");
+      setConverting(null);
+    }
+  }
+
+  // Abrir el editor de un pedido. Del link (público sin convertir) → convierte y
+  // redirige (handleEditLink); interno/orders → abre su detalle directo.
+  function handleEdit(p: JoybeesUnifiedPedido) {
+    if (isOrdersRow(p)) {
+      router.push(`/catalogo/joybees/pedido/${p.id_natural}`);
+    } else {
+      handleEditLink(p);
+    }
+  }
 
   async function handleExport() {
     if (exporting) return;
@@ -78,7 +141,12 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
     if (!deleting) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/catalogo/joybees/orders/${deleting.id}`, { method: "DELETE" });
+      // Borrado SOFT por tabla física (fuente): orders → joybees_orders,
+      // publicos → joybees_pedidos_publicos. Ninguno toca Switch.
+      const url = isOrdersRow(deleting)
+        ? `/api/catalogo/joybees/orders/${deleting.id_natural}`
+        : `/api/catalogo/joybees/pedidos-publicos/${deleting.id_natural}`;
+      const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error("delete failed");
       showToast("Pedido borrado");
       setDeleting(null);
@@ -92,26 +160,24 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
 
   const counts = {
     todos: pedidos.length,
-    borrador: pedidos.filter((p) => p.status === "borrador").length,
-    enviado: pedidos.filter((p) => p.status === "enviado").length,
-    confirmado: pedidos.filter((p) => p.status === "confirmado").length,
+    link: pedidos.filter((p) => p.origen === "link").length,
+    mio: pedidos.filter((p) => p.origen === "mio").length,
   };
 
   const filtered = pedidos.filter((p) => {
-    if (statusFilter !== "todos" && p.status !== statusFilter) return false;
+    if (origenFilter !== "todos" && p.origen !== origenFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      const cliente = (p.client_name || "").toLowerCase();
+      const cliente = (p.cliente || "").toLowerCase();
       if (!cliente.includes(q)) return false;
     }
     return true;
   });
 
-  const filterTabs: { key: StatusFilter; label: string }[] = [
+  const filterTabs: { key: OrigenFilter; label: string }[] = [
     { key: "todos", label: `Todos (${counts.todos})` },
-    { key: "borrador", label: `Borrador (${counts.borrador})` },
-    { key: "enviado", label: `Enviado (${counts.enviado})` },
-    { key: "confirmado", label: `Confirmado (${counts.confirmado})` },
+    { key: "link", label: `Del link (${counts.link})` },
+    { key: "mio", label: `Míos (${counts.mio})` },
   ];
 
   if (loading) {
@@ -138,17 +204,17 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         </button>
       </div>
 
-      {/* Filtros por estado */}
+      {/* Filtros por origen */}
       <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto">
         {filterTabs.map((ft) => {
-          const active = statusFilter === ft.key;
+          const active = origenFilter === ft.key;
           return (
             <button
               key={ft.key}
-              onClick={() => setStatusFilter(ft.key)}
+              onClick={() => setOrigenFilter(ft.key)}
               className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 whitespace-nowrap transition ${
                 active
-                  ? "text-[#1A2656] border-[#1A2656]"
+                  ? "text-[#404041] border-[#404041]"
                   : "text-gray-400 border-transparent hover:text-gray-600"
               }`}
             >
@@ -174,7 +240,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-gray-400 text-sm">
-            {search || statusFilter !== "todos" ? "Ningún pedido coincide" : "No hay pedidos aún"}
+            {search || origenFilter !== "todos" ? "Ningún pedido coincide" : "No hay pedidos aún"}
           </p>
         </div>
       ) : (
@@ -182,6 +248,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
@@ -191,15 +258,18 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
             <tbody className="divide-y divide-gray-100">
               {filtered.map((pedido) => (
                 <tr
-                  key={pedido.id}
-                  onClick={() => router.push(`/catalogo/joybees/pedido/${pedido.id}`)}
+                  key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
+                  onClick={() => router.push(detailHref(pedido))}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
+                  <td className="px-4 py-3">
+                    <OrigenBadge origen={pedido.origen} />
+                  </td>
                   <td className="px-4 py-3 text-gray-900">
-                    {pedido.client_name?.trim() ? (
-                      pedido.client_name
-                    ) : (
+                    {pedido.cliente === "Sin nombre" || !pedido.cliente?.trim() ? (
                       <span className="text-gray-300 italic">Sin nombre</span>
+                    ) : (
+                      pedido.cliente
                     )}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
@@ -207,15 +277,19 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
+                    {/* Editar/Eliminar en TODAS las filas (Mío y Del link).
+                        Editar: orders → abre su detalle; público sin convertir →
+                        convierte y abre. Eliminar: soft-delete por fuente. */}
                     <div className="inline-flex items-center gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          router.push(`/catalogo/joybees/pedido/${pedido.id}`);
+                          handleEdit(pedido);
                         }}
-                        className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition"
+                        disabled={converting === pedido.id_natural}
+                        className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
                       >
-                        Editar
+                        {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
                       </button>
                       <button
                         onClick={(e) => {
@@ -242,7 +316,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         title="¿Eliminar pedido?"
         description={
           deleting
-            ? `¿Eliminar el pedido ${deleting.order_number} de ${deleting.client_name?.trim() ? deleting.client_name : "cliente sin nombre"} por $${fmtMoney(deleting.total)}? Desaparecerá de la lista. No se envía nada a Switch.`
+            ? `¿Eliminar el pedido de ${deleting.cliente === "Sin nombre" || !deleting.cliente?.trim() ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Desaparecerá de la lista. No se envía nada a Switch.`
             : ""
         }
         loading={deleteLoading}
