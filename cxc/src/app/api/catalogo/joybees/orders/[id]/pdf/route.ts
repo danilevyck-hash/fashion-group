@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data: order, error } = await cfg.db
     .from(cfg.ordersTable)
-    .select(`order_number, client_name, created_at, ${cfg.itemsRelation}(product_id, sku, name, quantity, unit_price, image_url, is_preorder)`)
+    .select(`order_number, client_name, created_at, ${cfg.itemsRelation}(product_id, sku, name, quantity, unit_price, image_url)`)
     .eq("id", params.id)
     .single();
   if (error || !order) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
