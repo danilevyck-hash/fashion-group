@@ -28,9 +28,11 @@ export async function DELETE(
     return NextResponse.json({ error: "short_id requerido" }, { status: 400 });
   }
 
+  // Soft-delete (borrado VISUAL): no toca Switch, queda recuperable en DB. La
+  // vista reebok_pedidos_unificado_vw excluye deleted=true → sale de la lista.
   const { error } = await supabaseServer
     .from("reebok_pedidos_publicos")
-    .delete()
+    .update({ deleted: true, deleted_at: new Date().toISOString() })
     .eq("short_id", short_id);
 
   if (error) {

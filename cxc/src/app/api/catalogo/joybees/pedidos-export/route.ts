@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await joybeesServer
       .from("joybees_orders")
       .select("client_name, vendor_name, created_at, joybees_order_items(quantity, unit_price)")
+      .eq("deleted", false) // soft-delete: los borrados no salen en el Excel
       .order("created_at", { ascending: false });
 
     if (error) {

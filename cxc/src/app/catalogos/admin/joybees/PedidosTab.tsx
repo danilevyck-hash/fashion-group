@@ -241,15 +241,26 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleting(pedido);
-                      }}
-                      className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
-                    >
-                      Eliminar
-                    </button>
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/catalogo/joybees/pedido/${pedido.id}`);
+                        }}
+                        className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleting(pedido);
+                        }}
+                        className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -265,7 +276,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         title="¿Eliminar pedido?"
         description={
           deleting
-            ? `¿Eliminar el pedido ${deleting.order_number} de ${deleting.client_name?.trim() ? deleting.client_name : "cliente sin nombre"} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
+            ? `¿Eliminar el pedido ${deleting.order_number} de ${deleting.client_name?.trim() ? deleting.client_name : "cliente sin nombre"} por $${fmtMoney(deleting.total)}? Desaparecerá de la lista. No se envía nada a Switch.`
             : ""
         }
         loading={deleteLoading}

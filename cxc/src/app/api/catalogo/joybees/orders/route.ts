@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     .select(
       "id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status, joybees_order_items(id, product_id, quantity, unit_price)",
     )
+    .eq("deleted", false) // soft-delete: los borrados no salen en la lista
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 

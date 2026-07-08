@@ -99,7 +99,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "Solo admin y secretaria pueden eliminar" }, { status: 403 });
   }
 
-  const { error } = await joybeesServer.from("joybees_orders").delete().eq("id", params.id);
+  // Soft-delete (borrado VISUAL): no toca Switch, queda recuperable en DB. El
+  // GET de la lista filtra deleted=false → sale de la lista del admin.
+  const { error } = await joybeesServer
+    .from("joybees_orders")
+    .update({ deleted: true, deleted_at: new Date().toISOString() })
+    .eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

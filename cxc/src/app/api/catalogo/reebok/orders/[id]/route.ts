@@ -123,7 +123,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "Solo admin y secretaria pueden eliminar" }, { status: 403 });
   }
 
-  const { error } = await reebokServer.from("reebok_orders").delete().eq("id", params.id);
+  // Soft-delete (borrado VISUAL): no toca Switch, queda recuperable en DB. La
+  // vista reebok_pedidos_unificado_vw excluye deleted=true → sale de la lista.
+  const { error } = await reebokServer
+    .from("reebok_orders")
+    .update({ deleted: true, deleted_at: new Date().toISOString() })
+    .eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

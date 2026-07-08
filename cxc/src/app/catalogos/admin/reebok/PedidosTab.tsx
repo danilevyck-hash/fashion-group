@@ -132,15 +132,26 @@ export default function PedidosTab({
       : `/pedido-reebok/${p.id_natural}`;
   }
 
+  // Abrir el editor de un pedido. Del link (público sin convertir) → convierte y
+  // redirige (handleEditLink); interno/orders → abre su detalle directo.
+  function handleEdit(p: UnifiedPedido) {
+    if (isOrdersRow(p)) {
+      router.push(`/catalogo/reebok/pedido/${p.id_natural}`);
+    } else {
+      handleEditLink(p);
+    }
+  }
+
   async function handleDelete() {
     if (!deleting) return;
     setDeleteLoading(true);
     try {
-      // Borrar inline sólo aplica a pedidos del link (short_id en pedidos_publicos).
-      const res = await fetch(
-        `/api/catalogo/reebok/pedidos-publicos/${deleting.id_natural}`,
-        { method: "DELETE" },
-      );
+      // Borrado SOFT por tabla física (fuente): orders → reebok_orders,
+      // publicos → reebok_pedidos_publicos. Ninguno toca Switch.
+      const url = isOrdersRow(deleting)
+        ? `/api/catalogo/reebok/orders/${deleting.id_natural}`
+        : `/api/catalogo/reebok/pedidos-publicos/${deleting.id_natural}`;
+      const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error("delete failed");
       showToast("Pedido borrado");
       setDeleting(null);
@@ -247,32 +258,30 @@ export default function PedidosTab({
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    {/* Editar/Borrar inline sólo para públicas NO convertidas
-                        (viven en pedidos_publicos con short_id). Una convertida
-                        ya es un reebok_orders: se edita abriéndola con clic. */}
-                    {(pedido.fuente ? pedido.fuente === "publicos" : pedido.origen === "link") && (
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditLink(pedido);
-                          }}
-                          disabled={converting === pedido.id_natural}
-                          className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
-                        >
-                          {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleting(pedido);
-                          }}
-                          className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    )}
+                    {/* Editar/Eliminar en TODAS las filas (Mío y Del link).
+                        Editar: orders → abre su detalle; público sin convertir →
+                        convierte y abre. Eliminar: soft-delete por fuente. */}
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(pedido);
+                        }}
+                        disabled={converting === pedido.id_natural}
+                        className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+                      >
+                        {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleting(pedido);
+                        }}
+                        className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -288,7 +297,7 @@ export default function PedidosTab({
         title="¿Eliminar pedido?"
         message={
           deleting
-            ? `¿Eliminar el pedido de ${deleting.cliente === "Sin nombre" ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
+            ? `¿Eliminar el pedido de ${deleting.cliente === "Sin nombre" ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Desaparecerá de la lista. No se envía nada a Switch.`
             : ""
         }
         confirmLabel="Eliminar pedido"
