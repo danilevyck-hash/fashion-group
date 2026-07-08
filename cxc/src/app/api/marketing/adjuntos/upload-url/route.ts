@@ -10,6 +10,9 @@ const uuidRegex =
 interface UploadUrlRequest {
   proyectoId?: string;
   facturaId?: string;
+  // Comprobante de pago de impulsadora: se sube ANTES de crear la(s) factura(s),
+  // por eso se ancla a la impulsadora (path impulsadora/{id}/…).
+  impulsadoraId?: string;
   filename: string;
   contentType?: string;
 }
@@ -34,9 +37,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!body.proyectoId && !body.facturaId) {
+    if (!body.proyectoId && !body.facturaId && !body.impulsadoraId) {
       return NextResponse.json(
-        { error: "Se requiere proyectoId o facturaId" },
+        { error: "Se requiere proyectoId, facturaId o impulsadoraId" },
         { status: 400 },
       );
     }
@@ -52,15 +55,26 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+    if (body.impulsadoraId && !uuidRegex.test(body.impulsadoraId)) {
+      return NextResponse.json(
+        { error: "impulsadoraId inválido" },
+        { status: 400 },
+      );
+    }
 
     const safeName = sanitizarNombre(body.filename);
     const timestamp = Date.now();
 
-    // Path: marketing/{proyectoId}/{facturaId?}/{timestamp}_{filename}
-    // Nota: el bucket ya se llama "marketing", así que el path interno NO lleva el prefijo "marketing/".
+    // Path interno del bucket "marketing" (sin prefijo "marketing/"):
+    //   proyecto/factura → {proyectoId}/{facturaId?}/{ts}_{name}
+    //   impulsadora      → impulsadora/{impulsadoraId}/{ts}_{name}
     const parts: string[] = [];
-    if (body.proyectoId) parts.push(body.proyectoId);
-    if (body.facturaId) parts.push(body.facturaId);
+    if (body.impulsadoraId) {
+      parts.push("impulsadora", body.impulsadoraId);
+    } else {
+      if (body.proyectoId) parts.push(body.proyectoId);
+      if (body.facturaId) parts.push(body.facturaId);
+    }
     parts.push(`${timestamp}_${safeName}`);
     const path = parts.join("/");
 

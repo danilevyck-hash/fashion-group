@@ -10,6 +10,7 @@ export async function pedirUploadUrl(args: {
   file: File;
   proyectoId?: string;
   facturaId?: string;
+  impulsadoraId?: string;
 }): Promise<UploadUrlResponse> {
   const res = await fetch("/api/marketing/adjuntos/upload-url", {
     method: "POST",
@@ -17,6 +18,7 @@ export async function pedirUploadUrl(args: {
     body: JSON.stringify({
       proyectoId: args.proyectoId,
       facturaId: args.facturaId,
+      impulsadoraId: args.impulsadoraId,
       filename: args.file.name,
       contentType: args.file.type,
     }),

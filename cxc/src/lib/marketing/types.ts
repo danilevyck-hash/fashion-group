@@ -109,10 +109,34 @@ export interface MkFactura {
   // por marca. Default false en DB. Opcional en el tipo porque varios payloads
   // arman el objeto sin este campo (se trata como false si falta).
   grupo_legacy?: boolean;
+  // Impulsadoras: gasto suelto (sin proyecto). impulsadora_id apunta al
+  // catálogo mk_impulsadoras; impulsadora_mes = mes cubierto (DATE día 1).
+  // Ambos NULL para facturas normales de proyecto.
+  impulsadora_id?: string | null;
+  impulsadora_mes?: string | null;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ----------------------------------------------------------------------------
+// Impulsadoras — catálogo con pago fijo mensual imputado a marca(s)
+// ----------------------------------------------------------------------------
+export interface MkImpulsadora {
+  id: string;
+  nombre: string;
+  monto_mensual: number;
+  activa: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MkImpulsadoraMarca {
+  id: string;
+  impulsadora_id: string;
+  marca_id: string;
+  porcentaje: number;
 }
 
 export interface MkAdjunto {
@@ -234,6 +258,56 @@ export interface CreateAdjuntoInput {
   url: string;
   nombreOriginal?: string;
   sizeBytes?: number;
+}
+
+// ----------------------------------------------------------------------------
+// Impulsadoras — inputs + tipos compuestos (para el catálogo y el pago mensual)
+// ----------------------------------------------------------------------------
+
+// Split de una impulsadora: marca + % (la suma debe dar 100).
+export interface ImpulsadoraMarcaInput {
+  marcaId: string;
+  porcentaje: number;
+}
+
+export interface CreateImpulsadoraInput {
+  nombre: string;
+  montoMensual: number;
+  marcas: ImpulsadoraMarcaInput[];
+}
+
+// Comprobante ya subido a Storage (path + metadatos). El pago NO se guarda sin
+// esto (validación server-side).
+export interface ComprobanteInput {
+  path: string;
+  tipo: "pdf_factura" | "foto_factura";
+  nombreOriginal?: string;
+  sizeBytes?: number;
+}
+
+export interface RegistrarPagoImpulsadoraInput {
+  mes: string; // "YYYY-MM-01" (día 1 del mes cubierto)
+  monto: number; // total del pago (editable; default = monto_mensual)
+  comprobante: ComprobanteInput;
+}
+
+// Marca del split con nombre/código resueltos, para la UI.
+export interface ImpulsadoraMarcaResuelta {
+  marca: MkMarca;
+  porcentaje: number;
+}
+
+// Estado de pago de un mes concreto para una impulsadora.
+export interface PagoMesEstado {
+  mes: string; // "YYYY-MM-01"
+  pagado: boolean;
+}
+
+// Fila del catálogo de impulsadoras que consume la UI (lista + chips).
+export interface ImpulsadoraConEstado extends MkImpulsadora {
+  marcas: ImpulsadoraMarcaResuelta[];
+  mesAnterior: PagoMesEstado;
+  mesActual: PagoMesEstado;
 }
 
 // ----------------------------------------------------------------------------

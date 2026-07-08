@@ -57,6 +57,7 @@ interface Props {
   onNuevoProyecto: () => void;
   onOpenAnulados: () => void;
   onOpenReportes: () => void;
+  onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
   // Modo bucket (rediseño por marca): al entrar desde una card. El filtro de
@@ -87,6 +88,7 @@ export default function ProyectosHomeView({
   onNuevoProyecto,
   onOpenAnulados,
   onOpenReportes,
+  onOpenImpulsadoras,
   onOpenInventario,
   refreshKey,
   grupo,
@@ -285,6 +287,14 @@ export default function ProyectosHomeView({
             className="text-gray-600 hover:text-black transition"
           >
             Reportes
+          </button>
+          <span className="text-gray-300">·</span>
+          <button
+            type="button"
+            onClick={onOpenImpulsadoras}
+            className="text-gray-600 hover:text-black transition"
+          >
+            Impulsadoras
           </button>
           <span className="text-gray-300">·</span>
           <button

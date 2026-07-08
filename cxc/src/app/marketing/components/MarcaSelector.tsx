@@ -22,6 +22,7 @@ interface Props {
   onNuevoProyecto: () => void;
   onOpenAnulados: () => void;
   onOpenReportes: () => void;
+  onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
 }
@@ -54,6 +55,7 @@ export default function MarcaSelector({
   onNuevoProyecto,
   onOpenAnulados,
   onOpenReportes,
+  onOpenImpulsadoras,
   onOpenInventario,
   refreshKey,
 }: Props) {
@@ -135,6 +137,10 @@ export default function MarcaSelector({
           <span className="text-gray-300">·</span>
           <button type="button" onClick={onOpenReportes} className="text-gray-600 hover:text-black transition">
             Reportes
+          </button>
+          <span className="text-gray-300">·</span>
+          <button type="button" onClick={onOpenImpulsadoras} className="text-gray-600 hover:text-black transition">
+            Impulsadoras
           </button>
           <span className="text-gray-300">·</span>
           <button type="button" onClick={onOpenAnulados} className="text-xs text-gray-400 hover:text-gray-700 transition">

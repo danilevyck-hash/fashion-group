@@ -179,7 +179,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     supabaseServer
       .from("mk_adjuntos")
       .select("*")
-      .in("tipo", ["pdf_factura", "foto_proyecto"]),
+      // foto_factura entra por los comprobantes de impulsadora (comprobante foto).
+      .in("tipo", ["pdf_factura", "foto_proyecto", "foto_factura"]),
     // Marca por factura (SIEMPRE — alimenta la columna Marca y el filtro por marca).
     supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id"),
     // Gastos de muebles asignados a un proyecto (proyecto_id no nulo = no
@@ -346,7 +347,35 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
         (fotosPorProyecto.get(p.id)?.length ?? 0) > 0 ||
         (entregasPorProyecto.get(p.id)?.length ?? 0) > 0),
   );
-  if (proyectosSel.length === 0) {
+  // Impulsadoras: facturas SUELTAS (impulsadora_id, sin proyecto). No entran al
+  // filtro por proyecto de arriba; se seleccionan aparte respetando marca +
+  // grupo + búsqueda. En grupo="legacy" no aplican (son gastos nuevos).
+  const impBusqTerm = busqueda ? busqueda.toLowerCase() : "";
+  const impMontoNum = busqueda ? Number(busqueda.replace(/,/g, "")) : NaN;
+  const impHasMonto = busqueda.replace(/,/g, "").trim() !== "" && Number.isFinite(impMontoNum);
+  const impulsadoraFacturasSel =
+    grupo === "legacy"
+      ? []
+      : facturas
+          .filter((f) => !!f.impulsadora_id && !f.anulado_en)
+          .filter((f) => !marcaId || (marcasByFactura.get(f.id) ?? []).includes(marcaId))
+          .filter((f) => {
+            if (!busqueda) return true;
+            return (
+              (f.numero_factura || "").toLowerCase().includes(impBusqTerm) ||
+              (f.concepto || "").toLowerCase().includes(impBusqTerm) ||
+              (f.proveedor || "").toLowerCase().includes(impBusqTerm) ||
+              (impHasMonto && Number(f.total) === impMontoNum)
+            );
+          })
+          .sort((a, b) => {
+            const ma = String(a.impulsadora_mes ?? a.fecha_factura ?? "");
+            const mb = String(b.impulsadora_mes ?? b.fecha_factura ?? "");
+            return ma < mb ? -1 : ma > mb ? 1 : 0;
+          });
+
+  // SIN_RESULTADOS solo si NO hay ni proyectos ni gastos de impulsadora.
+  if (proyectosSel.length === 0 && impulsadoraFacturasSel.length === 0) {
     throw new Error("SIN_RESULTADOS");
   }
   const proyectoIdsSel = new Set(proyectosSel.map((p) => p.id));
@@ -357,7 +386,16 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     .filter((e) => proyectoIdsSel.has(e.proyecto_id))
     .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
-  // 5. Firmar en lote todos los paths (PDFs de gastos + fotos de proyectos).
+  // Comprobante (pdf_factura o foto_factura) por factura de impulsadora.
+  const comprobantePorFactura = new Map<string, MkAdjunto>();
+  for (const a of adjuntos) {
+    if ((a.tipo === "pdf_factura" || a.tipo === "foto_factura") && a.factura_id) {
+      if (!comprobantePorFactura.has(a.factura_id)) comprobantePorFactura.set(a.factura_id, a);
+    }
+  }
+
+  // 5. Firmar en lote todos los paths (PDFs de gastos + fotos de proyectos +
+  //    comprobantes de impulsadora).
   const pathsAFirmar: string[] = [];
   for (const f of facturasSel) {
     for (const pdf of pdfsPorFactura.get(f.id) ?? []) pathsAFirmar.push(pdf.url);
@@ -365,7 +403,31 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   for (const p of proyectosSel) {
     for (const foto of fotosPorProyecto.get(p.id) ?? []) pathsAFirmar.push(foto.url);
   }
+  for (const f of impulsadoraFacturasSel) {
+    const c = comprobantePorFactura.get(f.id);
+    if (c) pathsAFirmar.push(c.url);
+  }
   const urlFirmada = await firmarLote(pathsAFirmar);
+
+  // Bucket de impulsadoras (GastoXlsx cronológico + siglas de marca) para el
+  // Excel: pestaña propia + fila de desglose en la hoja Resumen.
+  const impulsadoraMarcaIds = new Set<string>();
+  const impulsadoraGastos: GastoXlsx[] = impulsadoraFacturasSel.map((f) => {
+    for (const mid of marcasByFactura.get(f.id) ?? []) impulsadoraMarcaIds.add(mid);
+    const c = comprobantePorFactura.get(f.id);
+    const nombres = (marcasByFactura.get(f.id) ?? [])
+      .map((mid) => marcaNombreById.get(mid))
+      .filter((n): n is string => !!n);
+    return {
+      fecha: String(f.impulsadora_mes ?? f.fecha_factura ?? "").slice(0, 10),
+      concepto: f.concepto || "",
+      proveedor: f.proveedor || "",
+      marca: nombres.length ? nombres.join(" / ") : "—",
+      numero: f.numero_factura || "",
+      total: Number(f.total ?? 0),
+      signed: c ? urlFirmada.get(c.url) : undefined,
+    };
+  });
 
   // 6. Nombre de carpeta de cliente. El contenido cuelga DIRECTO aquí — sin
   //    nivel de carpeta por proyecto.
@@ -549,19 +611,29 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
 
   // Construcción del workbook (pura, testeable): 1 entrada por cliente en el
-  // MISMO orden calculado arriba.
-  const wb = buildResumenGastosWorkbook(
-    clientes.map((nombre) => {
-      const b = buckets.get(nombre)!;
-      return {
-        nombre,
-        codigo: codigoDeCliente.get(nombre) ?? null,
-        marcas: siglasCliente(b.marcaIds),
-        gastos: b.gastos,
-        fotos: b.fotos,
-      };
-    }),
-  );
+  // MISMO orden calculado arriba. Las impulsadoras van al final como bucket
+  // propio (sin cliente) → pestaña "Impulsadoras" + desglose en Resumen.
+  const clienteObjs: ClienteResumenXlsx[] = clientes.map((nombre) => {
+    const b = buckets.get(nombre)!;
+    return {
+      nombre,
+      codigo: codigoDeCliente.get(nombre) ?? null,
+      marcas: siglasCliente(b.marcaIds),
+      gastos: b.gastos,
+      fotos: b.fotos,
+    };
+  });
+  if (impulsadoraGastos.length > 0) {
+    clienteObjs.push({
+      nombre: "Impulsadoras",
+      codigo: null,
+      marcas: siglasCliente(impulsadoraMarcaIds),
+      gastos: impulsadoraGastos,
+      fotos: [],
+      esImpulsadoras: true,
+    });
+  }
+  const wb = buildResumenGastosWorkbook(clienteObjs);
 
   const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   zip.file("resumen_gastos.xlsx", xlsxBuf);
@@ -574,7 +646,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
 
   return {
     buffer,
-    gastos: facturasSel.length + entregasSel.length,
+    gastos: facturasSel.length + entregasSel.length + impulsadoraFacturasSel.length,
     proyectos: proyectosSel.length,
     fotosIncluidas,
     fotosOmitidas,
@@ -613,6 +685,9 @@ export interface ClienteResumenXlsx {
   marcas: string;
   gastos: GastoXlsx[];
   fotos: FotoXlsx[];
+  /** Bucket de impulsadoras (gastos sueltos sin cliente). Alimenta el desglose
+   *  "Subtotal impulsadoras / Otros gastos" en la hoja Resumen. */
+  esImpulsadoras?: boolean;
 }
 
 const sumGastos = (gastos: ReadonlyArray<GastoXlsx>): number =>
@@ -656,11 +731,36 @@ export function buildResumenGastosWorkbook(
   const granGastos = filasRes.reduce((s, r) => s + Number(r[2]), 0);
   const granFotos = filasRes.reduce((s, r) => s + Number(r[3]), 0);
   const granTotal = filasRes.reduce((s, r) => s + Number(r[4]), 0);
-  const aoaRes = [headRes, ...filasRes, ["TOTAL", "", granGastos, granFotos, granTotal]];
+
+  // Desglose impulsadoras: si hay ≥1 bucket de impulsadoras, antes del TOTAL se
+  // insertan dos filas — "Subtotal impulsadoras" y "Otros gastos" (el resto).
+  const impulsadorasTotal = clientes
+    .filter((c) => c.esImpulsadoras)
+    .reduce((s, c) => s + sumGastos(c.gastos), 0);
+  const hayImpulsadoras = clientes.some((c) => c.esImpulsadoras);
+  const otrosGastos = Number((granTotal - impulsadorasTotal).toFixed(2));
+
+  const filasDesglose: (string | number)[][] = hayImpulsadoras
+    ? [
+        ["Subtotal impulsadoras", "", "", "", Number(impulsadorasTotal.toFixed(2))],
+        ["Otros gastos", "", "", "", otrosGastos],
+      ]
+    : [];
+
+  const aoaRes = [
+    headRes,
+    ...filasRes,
+    ...filasDesglose,
+    ["TOTAL", "", granGastos, granFotos, granTotal],
+  ];
   const wsR = XLSX.utils.aoa_to_sheet(aoaRes);
   wsR["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
   wsR["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
   const totalRowR = aoaRes.length - 1;
+  // Filas de desglose (banda MID = resumen suave, distinto del TOTAL en PRI).
+  const desgloseStart = 1 + filasRes.length;
+  const desgloseEnd = desgloseStart + filasDesglose.length - 1;
+  const esDesglose = (r: number): boolean => hayImpulsadoras && r >= desgloseStart && r <= desgloseEnd;
   const esTextoCol = (c: number): boolean => c === 0 || c === 1; // Cliente, Marcas
   for (let c = 0; c < headRes.length; c++) {
     styleCell(wsR, 0, c, {
@@ -684,7 +784,14 @@ export function buildResumenGastosWorkbook(
               alignment: { horizontal: esTextoCol(c) ? "left" : "right", vertical: "center" },
               border: B,
             }
-          : { font: fontBase, alignment: { horizontal: esTextoCol(c) ? "left" : "right" }, border: B },
+          : esDesglose(r)
+            ? {
+                font: { ...headFont, color: { rgb: "FFFFFF" } },
+                fill: sectionFill,
+                alignment: { horizontal: esTextoCol(c) ? "left" : "right", vertical: "center" },
+                border: B,
+              }
+            : { font: fontBase, alignment: { horizontal: esTextoCol(c) ? "left" : "right" }, border: B },
       );
     }
     fmtCell(wsR, r, 4, MONEY_FMT);
