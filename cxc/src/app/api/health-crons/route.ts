@@ -21,6 +21,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabaseServer } from "@/lib/supabase-server";
+import {
+  CRON_STALE_HOURS_DEFAULT,
+  cronStaleThresholdHours,
+} from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 // El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
@@ -34,9 +38,10 @@ export const fetchCache = "force-no-store";
 // en vez de colgarse y producir un "Timeout" ambiguo.
 export const maxDuration = 20;
 
-// Todos los crons corren 1×/día (plan Hobby). Stale = sin success en >26h
-// (mismo umbral que el watchdog interno de switch-reconciliacion).
-const STALE_HOURS = 26;
+// Todos los crons corren 1×/día (plan Hobby). Stale = sin success en >26h por
+// defecto. El umbral (default + overrides mensuales) vive en cron-telemetry.ts,
+// compartido con el watchdog interno de switch-reconciliacion.
+const STALE_HOURS = CRON_STALE_HOURS_DEFAULT;
 
 // Timeout interno de la lectura de cron_heartbeats. La query es diminuta (~14
 // filas) pero no tiene timeout propio: si Supabase se atasca por contención
@@ -94,13 +99,6 @@ const EXPECTED_CRONS = [
   "sync-utilidad",
 ] as const;
 
-// Crons MENSUALES: el umbral diario de 26h los marcaría stale ~29 días al mes.
-// Umbral propio = un ciclo mensual completo + margen (corre el día 3; 33 días
-// cubre el gap más largo entre corridas aun con jitter).
-const STALE_HOURS_POR_CRON: Record<string, number> = {
-  "grupo-resumen-mensual": 33 * 24,
-};
-
 /** Compara tokens en tiempo constante (evita fuga por timing). */
 function tokenOk(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
@@ -152,7 +150,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const fresh: Array<{ cron: string; last_success_at: string; hours_ago: number }> = [];
 
   for (const cron of EXPECTED_CRONS) {
-    const cutoffMs = now - (STALE_HOURS_POR_CRON[cron] ?? STALE_HOURS) * 3600 * 1000;
+    const cutoffMs = now - cronStaleThresholdHours(cron) * 3600 * 1000;
     const last = beats.get(cron) ?? null;
     const t = last ? new Date(last).getTime() : NaN;
     const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;

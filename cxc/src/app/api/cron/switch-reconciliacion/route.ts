@@ -54,14 +54,15 @@ import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
-import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat, cronIsStale } from "@/lib/cron-telemetry";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
-// Watchdog: alerta si algún cron lleva más de 26h sin registrar success. 26h da
-// margen sobre el ciclo diario (1×/día) sin tragarse un día entero: un cron
-// saltado se detecta en la pasada del día siguiente, no esperando 30h.
-const WATCHDOG_STALE_HOURS = 26;
+// Watchdog: alerta si algún cron excede su umbral stale. El umbral (26h por
+// defecto, propio para crons no diarios como grupo-resumen-mensual) vive en
+// cron-telemetry.ts y lo comparte con health-crons — así los dos vigías nunca
+// vuelven a divergir (antes este tenía 26h plano y alertaba falsamente que el
+// resumen mensual estaba caído entre corridas).
 // Horas UTC de las pasadas de reconciliación (espejo de vercel.json). El watchdog
 // las usa para saber si un colateral stale TODAVÍA tiene una pasada de
 // recuperación hoy → si la tiene, no alerta (se va a auto-recuperar).
@@ -441,19 +442,18 @@ async function checkStaleCrons(): Promise<string[]> {
     console.error(`[watchdog] no pude leer cron_heartbeats: ${error.message}`);
     return [];
   }
-  const cutoffMs = Date.now() - WATCHDOG_STALE_HOURS * 3600 * 1000;
+  const now = Date.now();
   const nowHourUtc = new Date().getUTCHours();
   const stale = (data || [])
-    .filter((h) => {
-      const t = new Date(h.last_success_at).getTime();
-      return Number.isFinite(t) && t < cutoffMs;
-    })
+    // Umbral por-cron compartido (cronIsStale): un cron mensual como
+    // grupo-resumen-mensual usa 33 días, no las 26h del default.
+    .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
     // Silenciar los que aún se van a auto-recuperar hoy (anti alerta-fantasma).
     .filter((h) => !autoRecoveryStillComingToday(h.cron_name, nowHourUtc))
     .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
   if (stale.length > 0) {
     await sendTelegramAlert(
-      `⏰ Watchdog crons — ${stale.length} sin success >${WATCHDOG_STALE_HOURS}h:\n` +
+      `⏰ Watchdog crons — ${stale.length} sin success reciente:\n` +
         stale.map((s) => `• ${s}`).join("\n"),
     );
   }
