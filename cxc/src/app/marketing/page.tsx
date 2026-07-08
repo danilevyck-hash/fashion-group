@@ -22,11 +22,12 @@ import MarcaSelector from "./components/MarcaSelector";
 import ProyectoOverlay from "./components/ProyectoOverlay";
 import AnuladosLista from "./components/AnuladosLista";
 import ReportesTabs from "./components/ReportesTabs";
+import ImpulsadorasView from "./components/ImpulsadorasView";
 import NuevoProyectoModal from "./components/NuevoProyectoModal";
 
 // `historial` se removió de la UI; el archivo del componente queda en disco
 // (HistorialView.tsx) por si se reactiva, pero ya no se rutea.
-type VistaExtra = "anulados" | "reportes" | null;
+type VistaExtra = "anulados" | "reportes" | "impulsadoras" | null;
 
 export default function MarketingPageWrapper() {
   return (
@@ -53,7 +54,7 @@ function MarketingPage() {
   const vistaParam: VistaExtra =
     vistaRaw === "papelera"
       ? "anulados"
-      : vistaRaw === "anulados" || vistaRaw === "reportes"
+      : vistaRaw === "anulados" || vistaRaw === "reportes" || vistaRaw === "impulsadoras"
         ? (vistaRaw as VistaExtra)
         : null;
 
@@ -136,7 +137,7 @@ function MarketingPage() {
   if (!authChecked) return null;
 
   const mostrandoVistaExtra =
-    vistaParam === "anulados" || vistaParam === "reportes";
+    vistaParam === "anulados" || vistaParam === "reportes" || vistaParam === "impulsadoras";
 
   // Etiqueta del bucket activo (card seleccionada).
   const bucketLabel =
@@ -151,6 +152,8 @@ function MarketingPage() {
     breadcrumbs.push({ label: "Anulados" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
+  } else if (vistaParam === "impulsadoras") {
+    breadcrumbs.push({ label: "Impulsadoras" });
   } else if (proyectoParam && nombreProyectoActual) {
     if (bucketLabel) breadcrumbs.push({ label: bucketLabel, onClick: () => navegar({ proyecto: null }) });
     breadcrumbs.push({ label: nombreProyectoActual });
@@ -178,6 +181,8 @@ function MarketingPage() {
             </button>
             {vistaParam === "anulados" ? (
               <AnuladosLista esAdmin={role === "admin"} />
+            ) : vistaParam === "impulsadoras" ? (
+              <ImpulsadorasView marcas={marcas} />
             ) : (
               <ReportesTabs />
             )}
@@ -194,6 +199,7 @@ function MarketingPage() {
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
+            onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}
           />
@@ -205,6 +211,7 @@ function MarketingPage() {
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
+            onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}
           />

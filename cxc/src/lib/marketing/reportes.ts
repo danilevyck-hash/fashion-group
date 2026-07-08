@@ -233,6 +233,40 @@ async function cargarGastoCompletoPorMarca(
   return out;
 }
 
+// Gasto de impulsadoras por marca. Facturas sueltas (impulsadora_id set, sin
+// proyecto): cada una es una marca al 100%, así que su total va completo a esa
+// marca. Se filtra por año contra impulsadora_mes cuando se pide.
+async function cargarGastoImpulsadoraPorMarca(
+  anio?: number,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  let q = supabaseServer
+    .from("mk_facturas")
+    .select("id, total, impulsadora_mes")
+    .not("impulsadora_id", "is", null)
+    .is("anulado_en", null);
+  const rango = anioRange(anio);
+  if (rango) q = q.gte("impulsadora_mes", rango.ini).lte("impulsadora_mes", rango.fin);
+  const { data: facts, error: fErr } = await q;
+  if (fErr) throw new Error(`cargarGastoImpulsadoraPorMarca[fact]: ${fErr.message}`);
+  const facturas = (facts ?? []) as Array<{ id: string; total: number | null }>;
+  if (facturas.length === 0) return out;
+
+  const totalById = new Map(facturas.map((f) => [String(f.id), Number(f.total ?? 0)]));
+  const { data: fm, error: fmErr } = await supabaseServer
+    .from("mk_factura_marcas")
+    .select("factura_id, marca_id")
+    .in("factura_id", Array.from(totalById.keys()));
+  if (fmErr) throw new Error(`cargarGastoImpulsadoraPorMarca[fm]: ${fmErr.message}`);
+
+  for (const r of (fm ?? []) as Array<{ factura_id: string; marca_id: string }>) {
+    const monto = totalById.get(String(r.factura_id)) ?? 0;
+    const mid = String(r.marca_id);
+    out.set(mid, round2((out.get(mid) ?? 0) + monto));
+  }
+  return out;
+}
+
 export async function reportePorMarca(
   anio?: number
 ): Promise<ReporteMarcaItem[]> {
@@ -243,14 +277,20 @@ export async function reportePorMarca(
   if (marcas.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const gastoPorProyMarca = await cargarGastoCompletoPorMarca(proyectoIds);
+  const [gastoPorProyMarca, gastoImpulsadora] = await Promise.all([
+    cargarGastoCompletoPorMarca(proyectoIds),
+    cargarGastoImpulsadoraPorMarca(anio),
+  ]);
 
-  // Gasto completo por marca = suma sobre todos los proyectos.
+  // Gasto completo por marca = suma sobre todos los proyectos + impulsadoras.
   const gastoByMarca = new Map<string, number>();
   for (const [, inner] of gastoPorProyMarca) {
     for (const [marcaId, monto] of inner) {
       gastoByMarca.set(marcaId, (gastoByMarca.get(marcaId) ?? 0) + monto);
     }
+  }
+  for (const [marcaId, monto] of gastoImpulsadora) {
+    gastoByMarca.set(marcaId, (gastoByMarca.get(marcaId) ?? 0) + monto);
   }
 
   return marcas.map((m) => ({
