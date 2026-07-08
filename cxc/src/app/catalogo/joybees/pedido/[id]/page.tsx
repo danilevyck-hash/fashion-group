@@ -387,15 +387,6 @@ export default function OrderDetailPage() {
     }
   }
 
-  function copyPublicLink() {
-    const url = `${window.location.origin}/pedido-joybees/${id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      showToast("Link copiado — compártelo con el cliente");
-    }).catch(() => {
-      showToast("No se pudo copiar el link");
-    });
-  }
-
   async function sendToClient() {
     if (!clientEmail.trim() || !clientEmail.includes("@")) {
       showToast("Ingresa un email valido"); return;
@@ -469,7 +460,7 @@ export default function OrderDetailPage() {
                     {suggestions.map((s, i) => (
                       <button key={i} onClick={() => { setClientName(s.nombre); setShowSugg(false); }}
                         className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">
-                        {s.nombre}{s.empresa ? <span className="text-xs text-gray-400 ml-2">{s.empresa}</span> : null}
+                        {s.nombre}
                       </button>
                     ))}
                   </div>
@@ -631,10 +622,6 @@ export default function OrderDetailPage() {
               <button onClick={downloadPDF} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Descargar PDF
-              </button>
-              <button onClick={copyPublicLink} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                Copiar link publico
               </button>
               {!showEmailInput ? (
                 <button onClick={() => setShowEmailInput(true)} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">

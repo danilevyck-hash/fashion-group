@@ -28,25 +28,6 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 }
 
-const STATUS_LABEL: Record<PedidoStatus, string> = {
-  borrador: "Borrador",
-  enviado: "Enviado",
-  confirmado: "Confirmado",
-};
-
-function StatusBadge({ status }: { status: PedidoStatus }) {
-  const styles: Record<PedidoStatus, string> = {
-    borrador: "bg-gray-100 text-gray-600",
-    enviado: "bg-blue-50 text-blue-700",
-    confirmado: "bg-green-50 text-green-700",
-  };
-  return (
-    <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${styles[status]}`}>
-      {STATUS_LABEL[status] ?? status}
-    </span>
-  );
-}
-
 export default function PedidosTab({ showToast }: { showToast: (msg: string) => void }) {
   const router = useRouter();
   const [pedidos, setPedidos] = useState<JoybeesPedido[]>([]);
@@ -121,8 +102,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
     if (search) {
       const q = search.toLowerCase();
       const cliente = (p.client_name || "").toLowerCase();
-      const vendedor = (p.vendor_name || "").toLowerCase();
-      if (!cliente.includes(q) && !vendedor.includes(q)) return false;
+      if (!cliente.includes(q)) return false;
     }
     return true;
   });
@@ -178,7 +158,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         })}
       </div>
 
-      {/* Buscador por cliente o vendedor */}
+      {/* Buscador por cliente */}
       <div className="relative mb-4">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -186,7 +166,7 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente o vendedor…"
+          placeholder="Buscar por cliente…"
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#FFE443] transition"
         />
       </div>
@@ -202,12 +182,8 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Pedido</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Vendedor</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-500">Items</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500">Estado</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500"></th>
               </tr>
@@ -219,9 +195,6 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
                   onClick={() => router.push(`/catalogo/joybees/pedido/${pedido.id}`)}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600 whitespace-nowrap">
-                    {pedido.order_number}
-                  </td>
                   <td className="px-4 py-3 text-gray-900">
                     {pedido.client_name?.trim() ? (
                       pedido.client_name
@@ -229,15 +202,8 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
                       <span className="text-gray-300 italic">Sin nombre</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {pedido.vendor_name?.trim() || <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-500 tabular-nums">{pedido.item_count}</td>
                   <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
                     ${fmtMoney(pedido.total)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={pedido.status} />
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
