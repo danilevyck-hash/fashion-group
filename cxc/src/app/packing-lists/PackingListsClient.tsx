@@ -245,43 +245,66 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
     if (records.length === 0) return;
     setDownloading(true);
     try {
-      const items: PLPreviewItem[] = await Promise.all(
-        records.map(async (pl): Promise<PLPreviewItem> => {
-          const res = await fetch(`/api/packing-lists/${pl.id}`);
-          const data = await res.json();
-          const indexRows: PLIndexRow[] = (data.items || []).map(
-            (item: { estilo: string; producto: string; total_pcs: number; bultos: Record<string, number>; bulto_muestra: string; is_os?: boolean }) => ({
-              estilo: item.estilo,
-              producto: item.producto,
-              totalPcs: item.total_pcs,
-              distribution: item.bultos || {},
-              bultoMuestra: item.bulto_muestra || "",
-              isOS: item.is_os || false,
-            })
-          );
-          return {
-            parsed: {
-              numeroPL: pl.numero_pl,
-              empresa: pl.empresa,
-              fechaEntrega: pl.fecha_entrega,
-              totalBultos: pl.total_bultos,
-              totalPiezas: pl.total_piezas,
-              bultos: [],
-            },
-            index: indexRows,
-            errors: [],
-            existsInDB: true,
-            adjustments: {},
-            fallbackErrors: {},
-            fallbackInFlight: null,
-          };
+      // Cada PL que falle al cargar se salta y se reporta — no se mete al PDF
+      // combinado con índice vacío (antes producía páginas incompletas mudas).
+      const fallidos: string[] = [];
+      const resultados = await Promise.all(
+        records.map(async (pl): Promise<PLPreviewItem | null> => {
+          try {
+            const res = await fetch(`/api/packing-lists/${pl.id}`);
+            if (!res.ok) {
+              fallidos.push(pl.numero_pl || pl.id);
+              return null;
+            }
+            const data = await res.json();
+            const indexRows: PLIndexRow[] = (data.items || []).map(
+              (item: { estilo: string; producto: string; total_pcs: number; bultos: Record<string, number>; bulto_muestra: string; is_os?: boolean }) => ({
+                estilo: item.estilo,
+                producto: item.producto,
+                totalPcs: item.total_pcs,
+                distribution: item.bultos || {},
+                bultoMuestra: item.bulto_muestra || "",
+                isOS: item.is_os || false,
+              })
+            );
+            return {
+              parsed: {
+                numeroPL: pl.numero_pl,
+                empresa: pl.empresa,
+                fechaEntrega: pl.fecha_entrega,
+                totalBultos: pl.total_bultos,
+                totalPiezas: pl.total_piezas,
+                bultos: [],
+              },
+              index: indexRows,
+              errors: [],
+              existsInDB: true,
+              adjustments: {},
+              fallbackErrors: {},
+              fallbackInFlight: null,
+            };
+          } catch {
+            fallidos.push(pl.numero_pl || pl.id);
+            return null;
+          }
         })
       );
+      const items = resultados.filter((x): x is PLPreviewItem => x !== null);
+      if (items.length === 0) {
+        setToast("No se pudo descargar ningún PL. Intenta de nuevo.");
+        return;
+      }
       await generateCombinedPDF(items);
+      if (fallidos.length > 0) {
+        setToast(
+          `PDF listo con ${items.length} PL. ${fallidos.length} no se pudieron incluir: ${fallidos.join(", ")}`,
+        );
+      }
     } catch {
       setToast("Error al descargar PDFs");
+    } finally {
+      setDownloading(false);
     }
-    setDownloading(false);
   }
   async function downloadSelected() {
     await downloadPLsByRecords(filteredPlList.filter(p => selectedIds.has(p.id)));

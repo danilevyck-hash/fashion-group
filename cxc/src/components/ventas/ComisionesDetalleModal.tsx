@@ -63,7 +63,10 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       backdropClassName="bg-black/40"
       className="overflow-y-auto p-4 print:static print:block print:bg-white print:p-0"
     >
-      <div className="my-6 w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-lg print:my-0 print:max-w-full print:border-0 print:shadow-none">
+      {/* id="print-document": globals.css oculta todo en @media print salvo este
+          nodo; sin él, window.print() imprime una hoja en blanco. Los botones de
+          acción del header ya van en un contenedor print:hidden. */}
+      <div id="print-document" className="my-6 w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-lg print:my-0 print:max-w-full print:border-0 print:shadow-none">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4">
           <div>
