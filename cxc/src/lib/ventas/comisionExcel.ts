@@ -21,6 +21,12 @@ export interface CobroDoc {
   cliente: string;
   monto: number;
 }
+export interface ComisionDescuento {
+  id: string;
+  concepto: string;
+  monto: number;
+  activo: boolean;
+}
 export interface ComisionDetalle {
   empresa_key: string;
   year: number;
@@ -37,6 +43,15 @@ export interface ComisionDetalle {
   comision_total: number;
 }
 
+// FA / NC para la columna "Tipo" (dato: "Factura" | "Nota de Crédito").
+export function tipoDocCorto(tipo: string): string {
+  return tipo === "Nota de Crédito" ? "NC" : "FA";
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -49,12 +64,15 @@ const MESES = [
 // propio (multi-sección) usa makeCellStyles, no buildReportSheet (solo tablas
 // simples).
 
-/** Construcción pura del sheet del detalle (sin DOM) — testeable. */
+/** Construcción pura del sheet del detalle (sin DOM) — testeable.
+ *  `descuentos` = descuentos ACTIVOS del mes (se restan del total a pagar).
+ *  NO incluye utilidad (reporte físico que ven los vendedores). */
 export async function buildComisionDetalleSheet(
   d: ComisionDetalle,
   empresaNombre: string,
+  descuentos: ComisionDescuento[] = [],
 ): Promise<WorkSheet> {
-  const { makeCellStyles, CASA_PALETTE, MONEY_FMT, PCT_FMT, addr } = await import("@/lib/excel-export");
+  const { makeCellStyles, CASA_PALETTE, MONEY_FMT, addr } = await import("@/lib/excel-export");
   const { band, hdr, td, tdN, tot, fillRow } = makeCellStyles(CASA_PALETTE);
   const periodo = `${MESES[d.mes - 1]} ${d.year}`;
 
@@ -79,10 +97,10 @@ export async function buildComisionDetalleSheet(
   };
   const spacer = () => { heights[r] = 8; r++; };
 
-  // ── VENTAS ──
+  // ── VENTAS ── (columna Tipo FA/NC; SIN % utilidad en el reporte físico)
   section("VENTAS");
-  ["Fecha", "Cliente", "Factura", "Subtotal", "% Utilidad"].forEach((h, i) => {
-    ws[addr(r, i)] = hdr(h, i >= 3 ? "right" : "left");
+  ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
+    ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
   });
   heights[r] = 22; r++;
   d.ventas.forEach((v, idx) => {
@@ -90,17 +108,15 @@ export async function buildComisionDetalleSheet(
     ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
     ws[addr(r, 1)] = td(v.cliente, alt);
     ws[addr(r, 2)] = td(v.secuencial, alt);
-    ws[addr(r, 3)] = tdN(v.subtotal, alt, { fmt: MONEY_FMT });
-    ws[addr(r, 4)] = v.pct_utilidad == null
-      ? td("", alt)
-      : tdN(v.pct_utilidad / 100, alt, { fmt: PCT_FMT });
+    ws[addr(r, 3)] = td(tipoDocCorto(v.tipo), alt, { ha: "center" });
+    ws[addr(r, 4)] = tdN(v.subtotal, alt, { fmt: MONEY_FMT });
     heights[r] = 18; r++;
   });
   ws[addr(r, 0)] = tot("", { ha: "left" });
   ws[addr(r, 1)] = tot("", { ha: "left" });
-  ws[addr(r, 2)] = tot("Total ventas", { ha: "right" });
-  ws[addr(r, 3)] = tot(d.ventas_base, { fmt: MONEY_FMT });
-  ws[addr(r, 4)] = tot("", { ha: "left" });
+  ws[addr(r, 2)] = tot("", { ha: "left" });
+  ws[addr(r, 3)] = tot("Total ventas", { ha: "right" });
+  ws[addr(r, 4)] = tot(d.ventas_base, { fmt: MONEY_FMT });
   heights[r] = 22; r++;
   spacer();
 
@@ -137,11 +153,37 @@ export async function buildComisionDetalleSheet(
     ws[addr(r, 3)] = tdN(comision, alt, { fmt: MONEY_FMT });
     heights[r] = 18; r++;
   });
-  ws[addr(r, 0)] = tot("Comisión total", { ha: "left" });
-  ws[addr(r, 1)] = tot("", { ha: "left" });
-  ws[addr(r, 2)] = tot("", { ha: "left" });
-  ws[addr(r, 3)] = tot(d.comision_total, { fmt: MONEY_FMT });
-  heights[r] = 22; r++;
+
+  const descActivos = descuentos.filter((x) => x.activo);
+  if (descActivos.length === 0) {
+    // Sin descuentos: el total final es la comisión total (comportamiento previo).
+    ws[addr(r, 0)] = tot("Comisión total", { ha: "left" });
+    ws[addr(r, 1)] = tot("", { ha: "left" });
+    ws[addr(r, 2)] = tot("", { ha: "left" });
+    ws[addr(r, 3)] = tot(d.comision_total, { fmt: MONEY_FMT });
+    heights[r] = 22; r++;
+  } else {
+    // Subtotal comisión → descuentos (negativos) → Total a pagar.
+    ws[addr(r, 0)] = td("Subtotal comisión", true, { bold: true });
+    ws[addr(r, 1)] = td("", true);
+    ws[addr(r, 2)] = td("", true);
+    ws[addr(r, 3)] = tdN(d.comision_total, true, { fmt: MONEY_FMT, bold: true });
+    heights[r] = 18; r++;
+    descActivos.forEach((dx, idx) => {
+      const alt = idx % 2 === 0;
+      ws[addr(r, 0)] = td(dx.concepto, alt);
+      ws[addr(r, 1)] = td("", alt);
+      ws[addr(r, 2)] = td("", alt);
+      ws[addr(r, 3)] = tdN(-dx.monto, alt, { fmt: MONEY_FMT, fg: "C0392B" });
+      heights[r] = 18; r++;
+    });
+    const totalAPagar = round2(d.comision_total - descActivos.reduce((s, x) => s + x.monto, 0));
+    ws[addr(r, 0)] = tot("Total a pagar", { ha: "left" });
+    ws[addr(r, 1)] = tot("", { ha: "left" });
+    ws[addr(r, 2)] = tot("", { ha: "left" });
+    ws[addr(r, 3)] = tot(totalAPagar, { fmt: MONEY_FMT });
+    heights[r] = 22; r++;
+  }
 
   ws["!ref"] = `A1:${addr(r - 1, lastCol)}`;
   ws["!merges"] = merges;
@@ -150,8 +192,12 @@ export async function buildComisionDetalleSheet(
   return ws;
 }
 
-export async function exportComisionDetalle(d: ComisionDetalle, empresaNombre: string): Promise<void> {
-  const ws = await buildComisionDetalleSheet(d, empresaNombre);
+export async function exportComisionDetalle(
+  d: ComisionDetalle,
+  empresaNombre: string,
+  descuentos: ComisionDescuento[] = [],
+): Promise<void> {
+  const ws = await buildComisionDetalleSheet(d, empresaNombre, descuentos);
   const { workbookFromSheets, downloadWorkbook } = await import("@/lib/excel-export");
   const safe = d.vendedor.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
   downloadWorkbook(

@@ -112,17 +112,19 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s["A1"].v).toBe("Comisión — Ana Pérez");
     expect(s["A2"].v).toBe("Fashion Wear · Junio 2026");
 
-    // VENTAS
+    // VENTAS — columnas: Fecha · Cliente · Factura · Tipo · Subtotal (SIN % utilidad).
     expect(s["A4"].v).toBe("VENTAS");
     expect(s["A5"].v).toBe("Fecha");
-    expect(s["D5"].v).toBe("Subtotal");
-    expect(s["D6"].t).toBe("n");
-    expect(s["D6"].v).toBe(500);
-    expect(s["D6"].z).toBe(MONEY_FMT);
-    expect(s["E6"].v).toBeCloseTo(0.25); // % utilidad como fracción
-    expect(s["C7"].v).toBe("Total ventas");
-    expect(s["D7"].t).toBe("n");
-    expect(s["D7"].v).toBe(500);
+    expect(s["D5"].v).toBe("Tipo");
+    expect(s["E5"].v).toBe("Subtotal");
+    expect(s["D6"].v).toBe("FA"); // tipo corto
+    expect(s["E6"].t).toBe("n");
+    expect(s["E6"].v).toBe(500);
+    expect(s["E6"].z).toBe(MONEY_FMT);
+    expect(s["F6"]).toBeUndefined(); // no hay columna de % utilidad
+    expect(s["D7"].v).toBe("Total ventas");
+    expect(s["E7"].t).toBe("n");
+    expect(s["E7"].v).toBe(500);
 
     // COBROS
     expect(s["A9"].v).toBe("COBROS");
@@ -143,6 +145,35 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s["A17"].v).toBe("Comisión total");
     expect(s["D17"].t).toBe("n");
     expect(s["D17"].v).toBe(6.5);
+  });
+
+  it("comisión detalle con descuentos fijos (subtotal − descuentos = total a pagar)", async () => {
+    const d: ComisionDetalle = {
+      empresa_key: "fashion_shoes", year: 2026, mes: 6, vendedor: "REINALDO ESPINOSA",
+      tasa_venta: 0.01, tasa_cobro: 0.01,
+      ventas: [{ fecha: "2026-06-02", cliente: "City Mall", secuencial: "11-2410", tipo: "Factura", subtotal: 5706, pct_utilidad: 26.44 }],
+      cobros: [{ fecha: "2026-06-10", cliente: "City Mall", monto: 1000 }],
+      ventas_base: 85963, cobros_base: 234878.74,
+      comision_venta: 859.63, comision_cobro: 2348.79, comision_total: 3208.42,
+    };
+    const descuentos = [
+      { id: "11111111-1111-1111-1111-111111111111", concepto: "Descuento", monto: 1400, activo: true },
+      { id: "22222222-2222-2222-2222-222222222222", concepto: "Descuento de adelanto", monto: 173.08, activo: true },
+    ];
+    const ws = await buildComisionDetalleSheet(d, "Fashion Shoes", descuentos);
+    const wb = roundtrip([{ name: "Comisión", ws }]);
+    const s = wb.Sheets["Comisión"];
+
+    // CIERRE: Ventas(15) Cobros(16) Subtotal comisión(17) Desc(18) Desc(19) Total a pagar(20)
+    expect(s["A17"].v).toBe("Subtotal comisión");
+    expect(s["D17"].v).toBe(3208.42);
+    expect(s["A18"].v).toBe("Descuento");
+    expect(s["D18"].v).toBe(-1400);
+    expect(s["A19"].v).toBe("Descuento de adelanto");
+    expect(s["D19"].v).toBe(-173.08);
+    expect(s["A20"].v).toBe("Total a pagar");
+    expect(s["D20"].t).toBe("n");
+    expect(s["D20"].v).toBeCloseTo(1635.34, 2); // 3208.42 − 1400 − 173.08
   });
 
   it("comisiones resumen por empresa", async () => {
