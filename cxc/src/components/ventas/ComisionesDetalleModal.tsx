@@ -4,15 +4,24 @@
 // Replica el Excel manual: sección VENTAS, sección COBROS, cierre.
 // Exporta a Excel (xlsx-js-style) y es imprimible.
 //
-// Print: cae en EXACTAMENTE 2 páginas fijas (letter landscape, definido en
-// globals.css). Página 1 = VENTAS, página 2 = COBROS + CIERRE. Para mantener la
-// fuente legible (piso 8px) el layout de impresión es tipo periódico: las filas
-// de cada sección se reparten en N bloques (1..3) lado a lado, cada bloque es su
-// propia <table> con su propio <thead>. N columnas multiplican la capacidad
-// vertical por bloque. Estilos print scopeados aquí (no en globals.css, que es
-// compartido con Guías/Caja). La vista de pantalla NO cambia (tabla única).
+// Print: cae en EXACTAMENTE 2 páginas fijas (letter landscape). Página 1 =
+// VENTAS, página 2 = COBROS + CIERRE. Para mantener la fuente legible (piso 8px)
+// el layout de impresión es tipo periódico: las filas de cada sección se
+// reparten en N bloques (1..3) lado a lado, cada bloque es su propia <table> con
+// su propio <thead>. N columnas multiplican la capacidad vertical por bloque.
+// Estilos print scopeados aquí (no en globals.css, que es compartido con
+// Guías/Caja). La vista de pantalla NO cambia (tabla única).
+//
+// GOTCHA (por qué el portal): ModalOverlay llama useBodyScrollLock, que deja el
+// <body> en `position:fixed; top:-Ypx; overflow:hidden` mientras el modal está
+// abierto. Un body fijo y recortado NO pagina: Chrome lo trata como una caja del
+// tamaño del viewport, imprime UNA hoja y descarta el resto — `break-before:page`
+// se ignora en silencio. Por eso el modal se portalea a <body> y en @media print
+// se deshace el lock y se ocultan los demás hijos del body. Sin el portal no hay
+// forma de aislar el documento sin tocar globals.css.
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Download, Printer } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
@@ -170,6 +179,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // El portal necesita `document`; en SSR no existe. Montamos en el cliente.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     let alive = true;
@@ -251,7 +263,10 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
     </div>
   );
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
+    <div data-cds-print="">
     <ModalOverlay
       align="start"
       backdropClassName="bg-black/40"
@@ -260,6 +275,24 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
       {/* Estilos print scopeados a este reporte (globals.css es compartido). */}
       <style>{`
         @media print {
+          /* Orientación del reporte. globals.css ya la declara igual; se repite
+             acá para que el print no dependa de una hoja compartida. */
+          @page { size: letter landscape; margin: 1.5cm; }
+
+          /* Deshacer el lock de scroll del body (position:fixed + overflow:hidden)
+             SOLO al imprimir: con el body fijo Chrome no pagina y sale 1 hoja.
+             Los estilos inline del hook son sin !important, así que estas reglas
+             ganan. Al cerrar el diálogo de print el lock vuelve solo. */
+          body {
+            position: static !important;
+            top: auto !important; left: auto !important; right: auto !important;
+            width: auto !important; height: auto !important;
+            overflow: visible !important;
+          }
+          /* Solo el reporte entra al flujo de impresión. */
+          body > *:not([data-cds-print]) { display: none !important; }
+          #print-document { position: static !important; max-width: none !important; }
+
           /* Cobros arranca en su propia página → reporte fijo de 2 páginas. */
           #print-document .cds-cobros { break-before: page; page-break-before: always; }
           /* Nunca partir una fila ni la caja de cierre entre páginas. */
@@ -524,5 +557,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
         </div>
       </div>
     </ModalOverlay>
+    </div>,
+    document.body,
   );
 }
