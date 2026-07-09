@@ -4,57 +4,151 @@
 // Replica el Excel manual: sección VENTAS, sección COBROS, cierre.
 // Exporta a Excel (xlsx-js-style) y es imprimible.
 //
-// Print: diseñado para caer en EXACTAMENTE 2 páginas fijas (letter landscape,
-// definido en globals.css). Página 1 = VENTAS, página 2 = COBROS + CIERRE.
-// La escala de fuente por sección se auto-reduce según cantidad de filas para
-// que cada sección quepa en su página. Estilos print scopeados aquí (no en
-// globals.css, que es compartido con Guías/Caja).
+// Print: cae en EXACTAMENTE 2 páginas fijas (letter landscape, definido en
+// globals.css). Página 1 = VENTAS, página 2 = COBROS + CIERRE. Para mantener la
+// fuente legible (piso 8px) el layout de impresión es tipo periódico: las filas
+// de cada sección se reparten en N bloques (1..3) lado a lado, cada bloque es su
+// propia <table> con su propio <thead>. N columnas multiplican la capacidad
+// vertical por bloque. Estilos print scopeados aquí (no en globals.css, que es
+// compartido con Guías/Caja). La vista de pantalla NO cambia (tabla única).
 
 import { useEffect, useState } from "react";
 import { X, Download, Printer } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
-import { exportComisionDetalle, tipoDocCorto, type ComisionDetalle, type ComisionDescuento } from "@/lib/ventas/comisionExcel";
+import { exportComisionDetalle, tipoDocCorto, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Fecha compacta para los bloques de impresión: día + mes, SIN año (el mes/año
+// ya va en el header compacto y todas las filas son del mismo mes). Reusa el
+// parseo de fmtDate ("5 jul 2026" → "5 jul") para ahorrar ancho en 3 columnas.
+function fmtDateShort(d: string): string {
+  const parts = fmtDate(d).split(" ");
+  return parts.length >= 3 ? parts.slice(0, 2).join(" ") : fmtDate(d);
+}
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// Escala print por rangos de filas — cada sección se reduce de forma
-// INDEPENDIENTE para caber en SU página. Tiers cds-s0..cds-s6 (fuente + padding,
-// definidos en el <style> scopeado). Calibrado empíricamente para letter
-// landscape con margen 1.5cm (alto útil ~7.3in) imprimiendo a PDF y contando
-// páginas; los umbrales quedan ~2-3 filas por debajo del máximo medido (margen
-// para nombres de cliente largos que ocupen 2 líneas).
-//
-// La página de VENTAS solo carga su tabla → más capacidad por tier.
-function ventasTierClass(rows: number): string {
-  if (rows <= 21) return "cds-s0"; // medido: 23
-  if (rows <= 26) return "cds-s1"; // 28
-  if (rows <= 33) return "cds-s2"; // 36
-  if (rows <= 41) return "cds-s3"; // 44
-  if (rows <= 52) return "cds-s4"; // 55
-  if (rows <= 64) return "cds-s5"; // 67
-  if (rows <= 76) return "cds-s6"; // 79
-  if (rows <= 94) return "cds-s7"; // 97
-  return "cds-s8"; // hasta ~112 (extremo; texto muy pequeño pero cabe)
+// ── Layout de impresión: (tier, N bloques) por sección ───────────────────────
+// Capacidad VERTICAL por bloque (una columna) medida empíricamente en letter
+// landscape con margen 1.5cm imprimiendo a PDF (ver PR #217). Con N bloques lado
+// a lado la capacidad total = capacidad_por_bloque(tier) × N.
+//   VENTAS: solo su tabla → más capacidad.
+//   COBROS: además carga la caja CIERRE + totales → menos capacidad.
+const VENTAS_CAP: Record<string, number> = {
+  "cds-s0": 21, "cds-s1": 26, "cds-s2": 33, "cds-s3": 41,
+  "cds-s4": 52, "cds-s5": 64, "cds-s6": 76, "cds-s7": 94, "cds-s8": 112,
+};
+const COBROS_CAP: Record<string, number> = {
+  "cds-s0": 11, "cds-s1": 15, "cds-s2": 19, "cds-s3": 24,
+  "cds-s4": 30, "cds-s5": 37, "cds-s6": 44, "cds-s7": 54, "cds-s8": 65,
+};
+// Piso de fuente = s2 (8px). Se prioriza FUENTE GRANDE sobre menos columnas:
+// se itera el tier por fuera (s0→s1→s2) y N por dentro (1→2→3); primera combo
+// donde filas ≤ cap(tier)×N. Si ni s2×3 alcanza, se sigue bajando tier con N=3.
+const MAIN_TIERS = ["cds-s0", "cds-s1", "cds-s2"];
+const OVERFLOW_TIERS = ["cds-s3", "cds-s4", "cds-s5", "cds-s6", "cds-s7", "cds-s8"];
+
+function pickLayout(rows: number, cap: Record<string, number>): { tier: string; n: number } {
+  for (const t of MAIN_TIERS) {
+    for (let n = 1; n <= 3; n++) {
+      if (rows <= cap[t] * n) return { tier: t, n };
+    }
+  }
+  for (const t of OVERFLOW_TIERS) {
+    if (rows <= cap[t] * 3) return { tier: t, n: 3 };
+  }
+  return { tier: "cds-s8", n: 3 };
 }
-// La página de COBROS además lleva la caja CIERRE + el total Ventas+Cobros →
-// ~10 filas menos de capacidad por tier (calibrado con cierre de 3 descuentos).
-function cobrosTierClass(rows: number): string {
-  if (rows <= 11) return "cds-s0"; // medido: 13
-  if (rows <= 15) return "cds-s1"; // 16
-  if (rows <= 19) return "cds-s2"; // 20
-  if (rows <= 24) return "cds-s3"; // 25
-  if (rows <= 30) return "cds-s4"; // 31
-  if (rows <= 37) return "cds-s5"; // 39
-  if (rows <= 44) return "cds-s6"; // 46
-  if (rows <= 54) return "cds-s7"; // 56
-  return "cds-s8"; // hasta ~65
+
+// Reparte filas en N bloques en orden column-major (bloque 1 = filas 1..k,
+// bloque 2 = k+1..2k, …), como en el mockup aprobado.
+function splitColumnMajor<T>(arr: T[], n: number): T[][] {
+  const k = Math.max(1, Math.ceil(arr.length / n));
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += k) out.push(arr.slice(i, i + k));
+  return out.length ? out : [[]];
+}
+
+// Anchos de columna por bloque (table-layout:fixed). Cliente se lleva el sobrante
+// y trunca con ellipsis; las demás columnas van nowrap y NO se recortan. Calibrado
+// para el peor caso HORIZONTAL: 3 bloques a 11px (la fuente más grande que llega
+// a 3 columnas). Con fecha corta "5 jul" (sin año) entran Fecha/Factura/Tipo/
+// Subtotal completas y Cliente trunca. Padding horizontal fijo 3px.
+const VENTAS_COLS = ["15%", "23%", "24%", "12%", "26%"];
+const COBROS_COLS = ["18%", "48%", "34%"];
+
+function VentasPrintBlocks({ rows, n }: { rows: VentaDoc[]; n: number }) {
+  if (rows.length === 0) return <p className="cds-empty">Sin ventas comisionables.</p>;
+  const blocks = splitColumnMajor(rows, n);
+  return (
+    <div className="cds-blocks" style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+      {blocks.map((block, bi) => (
+        <div key={bi} className="cds-block" style={{ flex: "1 1 0", minWidth: 0 }}>
+          <table className="cds-block-table">
+            <colgroup>{VENTAS_COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Factura</th>
+                <th className="cds-col-center">Tipo</th>
+                <th className="cds-col-num">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {block.map((v, i) => (
+                <tr key={i} className={v.subtotal < 0 ? "cds-row-neg" : ""}>
+                  <td>{fmtDateShort(v.fecha)}</td>
+                  <td>{v.cliente}</td>
+                  <td className="cds-col-muted">{v.secuencial}</td>
+                  <td className="cds-col-center cds-col-muted">{tipoDocCorto(v.tipo)}</td>
+                  <td className="cds-col-num">{fmtMoney(v.subtotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CobrosPrintBlocks({ rows, n }: { rows: CobroDoc[]; n: number }) {
+  if (rows.length === 0) return <p className="cds-empty">Sin cobros comisionables.</p>;
+  const blocks = splitColumnMajor(rows, n);
+  return (
+    <div className="cds-blocks" style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+      {blocks.map((block, bi) => (
+        <div key={bi} className="cds-block" style={{ flex: "1 1 0", minWidth: 0 }}>
+          <table className="cds-block-table">
+            <colgroup>{COBROS_COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th className="cds-col-num">Monto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {block.map((c, i) => (
+                <tr key={i}>
+                  <td>{fmtDateShort(c.fecha)}</td>
+                  <td>{c.cliente}</td>
+                  <td className="cds-col-num">{fmtMoney(c.monto)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface Props {
@@ -132,12 +226,12 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const pctTasaV = data ? (data.tasa_venta * 100).toFixed(2) : "";
   const pctTasaC = data ? (data.tasa_cobro * 100).toFixed(2) : "";
 
-  // Escala independiente por sección. Para cobros, si hay más de 3 descuentos la
-  // caja de cierre crece: se suman esas filas extra al conteo para bajar el tier.
-  const ventasTier = data ? ventasTierClass(data.ventas.length) : "cds-s0";
-  const cobrosTier = data
-    ? cobrosTierClass(data.cobros.length + Math.max(0, descuentos.length - 3))
-    : "cds-s0";
+  // Layout de impresión por sección (fuente + N columnas). Para cobros, si hay
+  // más de 3 descuentos la caja de cierre crece: se suman esas filas extra al
+  // conteo para bajar la utilización (elige tier más chico o más columnas).
+  const ventasLayout = data ? pickLayout(data.ventas.length, VENTAS_CAP) : { tier: "cds-s0", n: 1 };
+  const cobrosRowsEff = data ? data.cobros.length + Math.max(0, descuentos.length - 3) : 0;
+  const cobrosLayout = data ? pickLayout(cobrosRowsEff, COBROS_CAP) : { tier: "cds-s0", n: 1 };
 
   // Header compacto (una línea), repetido arriba de cada página en print.
   const headerLinea = `Comisión — ${vendedor.toUpperCase()} · ${empresaNombre} · ${MESES[mes - 1]} ${year}`;
@@ -162,34 +256,66 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           /* Nunca partir una fila ni la caja de cierre entre páginas. */
           #print-document tr,
           #print-document .cds-cierre { page-break-inside: avoid; break-inside: avoid; }
-          /* Auto-reducción de fuente + padding por rango de filas (por sección). */
+
+          /* ── Bloques tipo periódico ── */
+          #print-document .cds-block-table {
+            width: 100%; table-layout: fixed; border-collapse: collapse;
+          }
+          #print-document .cds-block-table th {
+            text-align: left; font-weight: 500; text-transform: uppercase;
+            letter-spacing: 0.02em; color: #6b7280;
+            border-bottom: 1px solid #d1d5db;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          }
+          #print-document .cds-block-table td {
+            color: #1f2937; border-bottom: 1px solid #f3f4f6;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          }
+          #print-document .cds-block-table .cds-col-muted { color: #6b7280; }
+          #print-document .cds-block-table .cds-col-num { text-align: right; font-variant-numeric: tabular-nums; }
+          #print-document .cds-block-table .cds-col-center { text-align: center; }
+          #print-document .cds-block-table tr.cds-row-neg td { color: #e11d48; }
+          #print-document .cds-empty { color: #9ca3af; font-size: 11px; padding: 8px 0; }
+
+          /* Total a ancho completo debajo de los bloques. */
+          #print-document .cds-total-line {
+            border-top: 1.5px solid #d1d5db; margin-top: 4px; padding-top: 4px;
+            font-size: 11px; font-weight: 600; color: #111827;
+          }
+
+          /* Auto-reducción de fuente + padding VERTICAL por tier (controla el
+             alto de fila = capacidad). El padding horizontal es fijo (abajo)
+             para no recortar fechas/facturas/montos en bloques angostos. */
           #print-document .cds-s0 table { font-size: 11px; }
           #print-document .cds-s0 table th,
-          #print-document .cds-s0 table td { padding: 4px 8px !important; }
+          #print-document .cds-s0 table td { padding-top: 4px !important; padding-bottom: 4px !important; }
           #print-document .cds-s1 table { font-size: 9.5px; }
           #print-document .cds-s1 table th,
-          #print-document .cds-s1 table td { padding: 3px 6px !important; }
+          #print-document .cds-s1 table td { padding-top: 3px !important; padding-bottom: 3px !important; }
           #print-document .cds-s2 table { font-size: 8px; }
           #print-document .cds-s2 table th,
-          #print-document .cds-s2 table td { padding: 2px 5px !important; }
+          #print-document .cds-s2 table td { padding-top: 2px !important; padding-bottom: 2px !important; }
           #print-document .cds-s3 table { font-size: 7px; }
           #print-document .cds-s3 table th,
-          #print-document .cds-s3 table td { padding: 1.2px 4px !important; }
+          #print-document .cds-s3 table td { padding-top: 1.2px !important; padding-bottom: 1.2px !important; }
           #print-document .cds-s4 table { font-size: 6px; }
           #print-document .cds-s4 table th,
-          #print-document .cds-s4 table td { padding: 0.7px 3px !important; }
+          #print-document .cds-s4 table td { padding-top: 0.7px !important; padding-bottom: 0.7px !important; }
           #print-document .cds-s5 table { font-size: 5px; }
           #print-document .cds-s5 table th,
-          #print-document .cds-s5 table td { padding: 0.4px 3px !important; }
+          #print-document .cds-s5 table td { padding-top: 0.4px !important; padding-bottom: 0.4px !important; }
           #print-document .cds-s6 table { font-size: 4.2px; }
           #print-document .cds-s6 table th,
-          #print-document .cds-s6 table td { padding: 0.3px 2px !important; }
+          #print-document .cds-s6 table td { padding-top: 0.3px !important; padding-bottom: 0.3px !important; }
           #print-document .cds-s7 table { font-size: 3.4px; }
           #print-document .cds-s7 table th,
-          #print-document .cds-s7 table td { padding: 0.2px 2px !important; }
+          #print-document .cds-s7 table td { padding-top: 0.2px !important; padding-bottom: 0.2px !important; }
           #print-document .cds-s8 table { font-size: 2.9px; }
           #print-document .cds-s8 table th,
-          #print-document .cds-s8 table td { padding: 0.15px 1px !important; }
+          #print-document .cds-s8 table td { padding-top: 0.15px !important; padding-bottom: 0.15px !important; }
+          /* Padding horizontal fijo y chico (no afecta el alto = capacidad). */
+          #print-document .cds-block-table th,
+          #print-document .cds-block-table td { padding-left: 3px !important; padding-right: 3px !important; }
         }
       `}</style>
       {/* id="print-document": globals.css oculta todo en @media print salvo este
@@ -230,10 +356,12 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           ) : data ? (
             <div className="space-y-6 print:space-y-0">
               {/* ══════════ PÁGINA 1 — VENTAS ══════════ */}
-              <section className={`cds-ventas ${ventasTier}`}>
+              <section className="cds-ventas">
                 {compactHeader}
                 <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Ventas</h3>
-                <div className="overflow-x-auto rounded-lg border border-gray-200 print:overflow-visible print:rounded-none print:border-0">
+
+                {/* PANTALLA: tabla única (sin cambios). */}
+                <div className="print:hidden overflow-x-auto rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -242,8 +370,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                         <th className="px-3 py-2 font-medium">Factura</th>
                         <th className="px-3 py-2 text-center font-medium">Tipo</th>
                         <th className="px-3 py-2 text-right font-medium">Subtotal</th>
-                        {/* % Utilidad: solo pantalla. print:hidden → fuera del reporte físico. */}
-                        <th className="px-3 py-2 text-right font-medium print:hidden">% Util.</th>
+                        <th className="px-3 py-2 text-right font-medium">% Util.</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -256,7 +383,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                           <td className="px-3 py-1.5 tabular-nums text-gray-500">{v.secuencial}</td>
                           <td className="px-3 py-1.5 text-center tabular-nums text-gray-500">{tipoDocCorto(v.tipo)}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(v.subtotal)}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums text-gray-500 print:hidden">{v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -264,47 +391,65 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                       <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
                         <td className="px-3 py-2" colSpan={4}>TOTAL VENTAS</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.ventas_base)}</td>
-                        <td className="print:hidden"></td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table>
+                </div>
+
+                {/* IMPRESIÓN: bloques tipo periódico + total a ancho completo. */}
+                <div className={`hidden print:block ${ventasLayout.tier}`}>
+                  <VentasPrintBlocks rows={data.ventas} n={ventasLayout.n} />
+                  <div className="cds-total-line flex items-center justify-between">
+                    <span>TOTAL VENTAS</span>
+                    <span className="tabular-nums">{fmtMoney(data.ventas_base)}</span>
+                  </div>
                 </div>
               </section>
 
               {/* ══════════ PÁGINA 2 — COBROS + CIERRE ══════════ */}
               <section className="cds-cobros">
                 {compactHeader}
-                <div className={cobrosTier}>
-                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Cobros</h3>
-                  <div className="overflow-x-auto rounded-lg border border-gray-200 print:overflow-visible print:rounded-none print:border-0">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                          <th className="px-3 py-2 font-medium">Fecha</th>
-                          <th className="px-3 py-2 font-medium">Cliente</th>
-                          <th className="px-3 py-2 text-right font-medium">Monto</th>
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Cobros</h3>
+
+                {/* PANTALLA: tabla única (sin cambios). */}
+                <div className="print:hidden overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2 font-medium">Fecha</th>
+                        <th className="px-3 py-2 font-medium">Cliente</th>
+                        <th className="px-3 py-2 text-right font-medium">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.cobros.length === 0 ? (
+                        <tr><td colSpan={3} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
+                      ) : data.cobros.map((c, i) => (
+                        <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-800">
+                          <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(c.fecha)}</td>
+                          <td className="px-3 py-1.5">{c.cliente}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(c.monto)}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {data.cobros.length === 0 ? (
-                          <tr><td colSpan={3} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
-                        ) : data.cobros.map((c, i) => (
-                          <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-800">
-                            <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(c.fecha)}</td>
-                            <td className="px-3 py-1.5">{c.cliente}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(c.monto)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
-                          <td className="px-3 py-2" colSpan={2}>TOTAL COBROS</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.cobros_base)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
+                        <td className="px-3 py-2" colSpan={2}>TOTAL COBROS</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.cobros_base)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <p className="mt-1 text-xs text-gray-400 print:hidden">El API de Switch no expone el número de recibo.</p>
+
+                {/* IMPRESIÓN: bloques tipo periódico + total a ancho completo. */}
+                <div className={`hidden print:block ${cobrosLayout.tier}`}>
+                  <CobrosPrintBlocks rows={data.cobros} n={cobrosLayout.n} />
+                  <div className="cds-total-line flex items-center justify-between">
+                    <span>TOTAL COBROS</span>
+                    <span className="tabular-nums">{fmtMoney(data.cobros_base)}</span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400 print:hidden">El API de Switch no expone el número de recibo.</p>
                 </div>
 
                 {/* Suma de las BASES sobre las que se comisiona (no de las comisiones). */}
