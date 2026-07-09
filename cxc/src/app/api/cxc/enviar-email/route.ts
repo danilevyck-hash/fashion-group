@@ -91,7 +91,7 @@ function resolveEmpresas(auth: SessionPayload, user: CurrentUser | null, empresa
 }
 
 // Destinatario sugerido: override de contacto (por nombre) > email del directorio
-// Switch (por código) > correo de clientes_master (por código, último fallback).
+// Switch (por código) > email de clientes_master (por código, último fallback).
 async function resolveDestinatario(nombreNormalizado: string, codigo: string): Promise<string> {
   if (nombreNormalizado) {
     const { data } = await supabaseServer
@@ -111,14 +111,15 @@ async function resolveDestinatario(nombreNormalizado: string, codigo: string): P
     const e = (row.email as string | null)?.trim();
     if (e) return e;
   }
-  // Último fallback: clientes_master.correo (la columna se llama `correo`, no `email`).
+  // Último fallback: clientes_master.email (columna renombrada desde `correo`).
   const { data: cm } = await supabaseServer
     .from("clientes_master")
-    .select("correo")
+    .select("email")
     .eq("codigo", codigo)
-    .not("correo", "is", null)
+    .eq("deleted", false)
+    .not("email", "is", null)
     .limit(1);
-  const correo = (cm?.[0]?.correo as string | null)?.trim();
+  const correo = (cm?.[0]?.email as string | null)?.trim();
   return correo || "";
 }
 
