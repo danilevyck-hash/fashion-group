@@ -58,8 +58,10 @@ const ROWS_PER_COL = 42;
 // TOTAL COBROS + TOTAL VENTAS + COBROS + la caja CIERRE. Así el cierre nunca
 // queda huérfano solo en una hoja: se rompe ANTES y baja acompañado de filas.
 const CIERRE_RESERVE_ROWS = 16;
-// La última hoja de VENTAS solo reserva su línea de TOTAL VENTAS.
-const TOTAL_LINE_ROWS = 3;
+// La última hoja de VENTAS solo reserva su línea de TOTAL VENTAS (~24px ≈ 1.2
+// filas; el aire de ROWS_PER_COL absorbe el resto). Con 3 la columna izquierda
+// moría a ~75px del pie — media pulgada vacía que era justo la queja.
+const TOTAL_LINE_ROWS = 1;
 
 /**
  * Reparte `total` filas en hojas: las primeras llevan `capFull`, la última a lo
@@ -92,12 +94,16 @@ function chunkBySizes<T>(arr: T[], sizes: number[]): T[][] {
   return out;
 }
 
-// Reparte filas en N bloques en orden column-major (bloque 1 = filas 1..k,
-// bloque 2 = k+1..2k, …), como en el mockup aprobado.
-function splitColumnMajor<T>(arr: T[], n: number): T[][] {
-  const k = Math.max(1, Math.ceil(arr.length / n));
+// Reparte filas en hasta N columnas LLENANDO cada una hasta el fondo de la hoja
+// (colCap filas) antes de pasar a la siguiente: izquierda completa primero,
+// luego la derecha. Un reparto parejo (ceil(n/2) y ceil(n/2)) dejaba las dos
+// columnas muertas a media hoja con media página vacía abajo (feedback de
+// Daniel con Reinaldo/Fashion Shoes/mayo: 42 filas → 21+21).
+function splitFillFirst<T>(arr: T[], n: number, colCap: number): T[][] {
   const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += k) out.push(arr.slice(i, i + k));
+  for (let i = 0; i < n && i * colCap < arr.length; i++) {
+    out.push(arr.slice(i * colCap, (i + 1) * colCap));
+  }
   return out.length ? out : [[]];
 }
 
@@ -108,16 +114,19 @@ function splitColumnMajor<T>(arr: T[], n: number): T[][] {
 // REALES de producción: secuencial de 13 chars "155-000000244", cliente de 32
 // chars, subtotal "$63,737.00" y NC negativa "$-63,737.00" (signo incluido).
 // El peor caso horizontal es 2 bloques en portrait (~346px por bloque).
-const VENTAS_COLS = ["13%", "32%", "24%", "8%", "23%"];
+// Tipo lleva 10%: con 8% el rótulo "TIPO" del thead truncaba a "TI…".
+const VENTAS_COLS = ["13%", "30%", "24%", "10%", "23%"];
 const COBROS_COLS = ["18%", "48%", "34%"];
 
-function VentasPrintBlocks({ rows, n }: { rows: VentaDoc[]; n: number }) {
+function VentasPrintBlocks({ rows, n, colCap }: { rows: VentaDoc[]; n: number; colCap: number }) {
   if (rows.length === 0) return <p className="cds-empty">Sin ventas comisionables.</p>;
-  const blocks = splitColumnMajor(rows, n);
+  // Solo se renderizan bloques con filas: si todo cabe en la izquierda, la
+  // tabla va a ancho completo y no hay divisor colgando junto a nada.
+  const blocks = splitFillFirst(rows, n, colCap);
   return (
-    <div className="cds-blocks" style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+    <div className="cds-blocks">
       {blocks.map((block, bi) => (
-        <div key={bi} className="cds-block" style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div key={bi} className="cds-block">
           <table className="cds-block-table">
             <colgroup>{VENTAS_COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
@@ -147,13 +156,13 @@ function VentasPrintBlocks({ rows, n }: { rows: VentaDoc[]; n: number }) {
   );
 }
 
-function CobrosPrintBlocks({ rows, n }: { rows: CobroDoc[]; n: number }) {
+function CobrosPrintBlocks({ rows, n, colCap }: { rows: CobroDoc[]; n: number; colCap: number }) {
   if (rows.length === 0) return <p className="cds-empty">Sin cobros comisionables.</p>;
-  const blocks = splitColumnMajor(rows, n);
+  const blocks = splitFillFirst(rows, n, colCap);
   return (
-    <div className="cds-blocks" style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+    <div className="cds-blocks">
       {blocks.map((block, bi) => (
-        <div key={bi} className="cds-block" style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div key={bi} className="cds-block">
           <table className="cds-block-table">
             <colgroup>{COBROS_COLS.map((w, i) => <col key={i} style={{ width: w }} />)}</colgroup>
             <thead>
@@ -268,11 +277,16 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const ventasRows = data?.ventas ?? [];
   const cobrosRows = data?.cobros ?? [];
 
-  const ventasSizes = paginate(ventasRows.length, 2 * ROWS_PER_COL, 2 * ROWS_PER_COL - TOTAL_LINE_ROWS);
+  // Las columnas se llenan hasta el fondo de la hoja, así que los totales / el
+  // cierre de la última hoja van DEBAJO de las columnas y le restan alto a CADA
+  // columna (cap − reserva), no al total de la hoja.
+  const ventasCapLast = ROWS_PER_COL - TOTAL_LINE_ROWS;
+  const ventasSizes = paginate(ventasRows.length, 2 * ROWS_PER_COL, 2 * ventasCapLast);
   const ventasPages = chunkBySizes(ventasRows, ventasSizes);
 
-  const cobrosCols = cobrosRows.length <= ROWS_PER_COL - reserva ? 1 : 2;
-  const cobrosSizes = paginate(cobrosRows.length, cobrosCols * ROWS_PER_COL, cobrosCols * ROWS_PER_COL - reserva);
+  const cobrosCapLast = ROWS_PER_COL - reserva;
+  const cobrosCols = cobrosRows.length <= cobrosCapLast ? 1 : 2;
+  const cobrosSizes = paginate(cobrosRows.length, cobrosCols * ROWS_PER_COL, cobrosCols * cobrosCapLast);
   const cobrosPages = chunkBySizes(cobrosRows, cobrosSizes);
 
   const totalPaginas = ventasPages.length + cobrosPages.length;
@@ -350,6 +364,15 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           #print-document .cds-cierre { page-break-inside: avoid; break-inside: avoid; }
 
           /* ── Bloques tipo periódico ── */
+          /* align-items por defecto (stretch): el bloque corto se estira al alto
+             del lleno y el divisor corre a lo alto de las columnas. */
+          #print-document .cds-blocks { display: flex; }
+          #print-document .cds-block { flex: 1 1 0; min-width: 0; }
+          /* Divisor sutil entre columnas, con margen simétrico (10px por lado). */
+          #print-document .cds-block + .cds-block {
+            border-left: 1px solid #e5e7eb;
+            margin-left: 10px; padding-left: 10px;
+          }
           #print-document .cds-block-table {
             width: 100%; table-layout: fixed; border-collapse: collapse;
           }
@@ -566,7 +589,11 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                 {ventasPages.map((pageRows, i) => (
                   <PageChrome key={`v${i}`} n={i + 1}>
                     <p className="cds-seccion-titulo">Ventas{i > 0 ? " (continúa)" : ""}</p>
-                    <VentasPrintBlocks rows={pageRows} n={2} />
+                    <VentasPrintBlocks
+                      rows={pageRows}
+                      n={2}
+                      colCap={i === ventasPages.length - 1 ? ventasCapLast : ROWS_PER_COL}
+                    />
                     {i === ventasPages.length - 1 && (
                       <div className="cds-total-line flex items-center justify-between">
                         <span>TOTAL VENTAS</span>
@@ -581,7 +608,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                   return (
                     <PageChrome key={`c${i}`} n={ventasPages.length + i + 1}>
                       <p className="cds-seccion-titulo">Cobros{i > 0 ? " (continúa)" : ""}</p>
-                      <CobrosPrintBlocks rows={pageRows} n={cobrosCols} />
+                      <CobrosPrintBlocks rows={pageRows} n={cobrosCols} colCap={esUltima ? cobrosCapLast : ROWS_PER_COL} />
                       {esUltima && (
                         <>
                           <div className="cds-total-line flex items-center justify-between">
