@@ -98,7 +98,7 @@ export default function ClientTable({
     { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
     { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
-    { label: "Enviar email", onClick: () => onOpenEmail(client), disabled: !client.correo },
+    { label: "Enviar email", onClick: () => onOpenEmail(client) },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
     { label: "Ver en directorio", onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); } },
   ], [onOpenEstado, onQuickMarkContacted, onWhatsApp, onOpenEmail, onCopyMessage]);

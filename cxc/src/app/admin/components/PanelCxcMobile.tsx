@@ -122,7 +122,7 @@ export default function PanelCxcMobile({
     { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
     { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
-    { label: "Enviar email", onClick: () => onOpenEmail(client), disabled: !client.correo },
+    { label: "Enviar email", onClick: () => onOpenEmail(client) },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
   ];
 
