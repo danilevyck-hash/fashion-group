@@ -18,7 +18,7 @@ interface PreviewData {
   asunto: string;
   cuerpo: string;
   firma: string;
-  tablaHtml: string;
+  resumenHtml: string;
   empresasNombres: string[];
   sharedCount: number;
   mes: string;
@@ -115,7 +115,7 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
   if (!open) return null;
 
   const previewHtml = preview
-    ? composeEmailHtml({ cuerpo, tablaHtml: preview.tablaHtml, firma: preview.firma })
+    ? composeEmailHtml({ cuerpo, resumenHtml: preview.resumenHtml, firma: preview.firma })
     : "";
 
   return (
