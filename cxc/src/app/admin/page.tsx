@@ -20,6 +20,7 @@ import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
+import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
 import SyncStatus from "@/components/shared/SyncStatus";
 import {
@@ -145,6 +146,7 @@ function AdminDashboardInner() {
   const [toast, setToast] = useState<string | null>(null);
   const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
   const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
+  const [emailClient, setEmailClient] = useState<ConsolidatedClient | null>(null);
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
@@ -363,11 +365,11 @@ function AdminDashboardInner() {
 
   // ── Actions ──────────────────────────────────────────
 
+  // Envío real desde el sistema (Resend) con estado de cuenta multi-empresa
+  // adjunto. Reemplaza al viejo mailto:. El modal resuelve el destinatario y
+  // permite editarlo, así que ya no exigimos client.correo acá.
   function openEmail(client: ConsolidatedClient) {
-    if (!client.correo) { showToast("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
-    const subject = encodeURIComponent(buildEmailSubject(client));
-    const body = encodeURIComponent(buildEmailBody(client));
-    window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
+    setEmailClient(client);
   }
 
   // WhatsApp al celular (o teléfono) del cliente con el estado de cuenta
@@ -669,6 +671,13 @@ function AdminDashboardInner() {
         client={estadoClient}
         companyFilter={companyFilter}
         onClose={() => setEstadoClient(null)}
+      />
+
+      <EnviarEmailModal
+        client={emailClient}
+        companyFilter={companyFilter}
+        onClose={() => setEmailClient(null)}
+        onSent={showToast}
       />
 
       <Toast message={toast} />
