@@ -76,11 +76,15 @@ function splitColumnMajor<T>(arr: T[], n: number): T[][] {
 }
 
 // Anchos de columna por bloque (table-layout:fixed). Cliente se lleva el sobrante
-// y trunca con ellipsis; las demás columnas van nowrap y NO se recortan. Calibrado
-// para el peor caso HORIZONTAL: 3 bloques a 11px (la fuente más grande que llega
-// a 3 columnas). Con fecha corta "5 jul" (sin año) entran Fecha/Factura/Tipo/
-// Subtotal completas y Cliente trunca. Padding horizontal fijo 3px.
-const VENTAS_COLS = ["15%", "23%", "24%", "12%", "26%"];
+// y trunca con ellipsis; Fecha/Factura/Tipo/Subtotal van nowrap y NUNCA se
+// recortan (son los datos que el contador concilia). Calibrado por MEDICIÓN
+// (scrollWidth vs clientWidth con Playwright a la anchura real de impresión) con
+// las cadenas REALES de producción: secuencial de 13 chars "155-000000244",
+// cliente de 32 chars, subtotal "$63,737.00" y NC negativa "$-63,737.00" (signo
+// incluido). El peor caso horizontal es 3 bloques a 9.5px (ver el bump de tier
+// de ventas más abajo): con estos anchos Factura queda con ~4px de margen.
+// Padding horizontal fijo 2px (no afecta el alto = capacidad).
+const VENTAS_COLS = ["14%", "25%", "28%", "10%", "23%"];
 const COBROS_COLS = ["18%", "48%", "34%"];
 
 function VentasPrintBlocks({ rows, n }: { rows: VentaDoc[]; n: number }) {
@@ -229,7 +233,12 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   // Layout de impresión por sección (fuente + N columnas). Para cobros, si hay
   // más de 3 descuentos la caja de cierre crece: se suman esas filas extra al
   // conteo para bajar la utilización (elige tier más chico o más columnas).
-  const ventasLayout = data ? pickLayout(data.ventas.length, VENTAS_CAP) : { tier: "cds-s0", n: 1 };
+  let ventasLayout = data ? pickLayout(data.ventas.length, VENTAS_CAP) : { tier: "cds-s0", n: 1 };
+  // VENTAS tiene 5 columnas: a 11px en 3 bloques el bloque es demasiado angosto
+  // para la factura real (13 chars, p.ej. "155-000000244") + un Cliente útil. Se
+  // baja un tier (11px → 9.5px, sigue ≥8px y en 2 páginas: s1×3 cabe hasta 78
+  // filas). Medido contra datos reales: sin recorte de Factura/Subtotal/Tipo.
+  if (ventasLayout.tier === "cds-s0" && ventasLayout.n === 3) ventasLayout = { tier: "cds-s1", n: 3 };
   const cobrosRowsEff = data ? data.cobros.length + Math.max(0, descuentos.length - 3) : 0;
   const cobrosLayout = data ? pickLayout(cobrosRowsEff, COBROS_CAP) : { tier: "cds-s0", n: 1 };
 
@@ -315,7 +324,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           #print-document .cds-s8 table td { padding-top: 0.15px !important; padding-bottom: 0.15px !important; }
           /* Padding horizontal fijo y chico (no afecta el alto = capacidad). */
           #print-document .cds-block-table th,
-          #print-document .cds-block-table td { padding-left: 3px !important; padding-right: 3px !important; }
+          #print-document .cds-block-table td { padding-left: 2px !important; padding-right: 2px !important; }
         }
       `}</style>
       {/* id="print-document": globals.css oculta todo en @media print salvo este
