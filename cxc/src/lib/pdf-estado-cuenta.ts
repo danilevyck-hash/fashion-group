@@ -17,7 +17,7 @@ function hoy(): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
-function addHeader(doc: jsPDF, nombre: string, codigo: string): number {
+function addHeader(doc: jsPDF, nombre: string, codigo: string, empresaNombre: string | null): number {
   const w = doc.internal.pageSize.getWidth();
 
   try {
@@ -35,17 +35,33 @@ function addHeader(doc: jsPDF, nombre: string, codigo: string): number {
   doc.setTextColor(107, 114, 128);
   doc.text(`Estado de cuenta — ${hoy()}`, w - 19, 18, { align: "right" });
 
+  // Empresa acreedora: el cliente debe saber A QUIÉN le debe este estado de
+  // cuenta. Solo cuando el PDF es de una sola empresa (el caso del correo); si
+  // trae varias, cada grupo ya lleva su propio encabezado más abajo.
+  let y = 25;
+  if (empresaNombre) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(17, 24, 39);
+    doc.text(empresaNombre, textX, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    doc.text("Empresa acreedora", w - 19, y, { align: "right" });
+    y += 6;
+  }
+
   // Cliente + código
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(17, 24, 39);
-  doc.text(nombre, textX, 25);
+  doc.text(nombre, textX, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
-  doc.text(codigo, w - 19, 25, { align: "right" });
+  doc.text(codigo, w - 19, y, { align: "right" });
 
-  const y = 29;
+  y += 4;
   doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.5);
   doc.line(19, y, w - 19, y);
@@ -69,9 +85,11 @@ function addFooter(doc: jsPDF): void {
 export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc: jsPDF; filename: string } {
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   const w = doc.internal.pageSize.getWidth();
-  let y = addHeader(doc, nombre, data.codigo);
 
   const multi = data.empresas.length > 1;
+  // Un solo grupo → la empresa va en el header (correo: un PDF por empresa).
+  const empresaHeader = multi ? null : (data.empresas[0]?.empresa_nombre ?? null);
+  let y = addHeader(doc, nombre, data.codigo, empresaHeader);
 
   for (const emp of data.empresas) {
     // Encabezado de empresa (solo si hay más de una)

@@ -3,15 +3,18 @@
 // servidor → se importan igual en el modal (cliente) y en la ruta (servidor)).
 //
 // La MISMA `composeEmailHtml` arma el preview del modal y el HTML que sale por
-// Resend, y la MISMA `buildTablaHtml` arma la tabla — así lo que el usuario ve
+// Resend, y la MISMA `buildResumenHtml` arma la tabla — así lo que el usuario ve
 // en el preview es EXACTAMENTE lo que se envía.
 //
+// El cuerpo lleva SOLO un resumen (una fila por empresa: saldo total y saldo con
+// más de 90 días). El detalle documento por documento vive en los PDFs adjuntos.
+//
 // IMPORTANTE: `dias` es la EDAD del documento desde su emisión, NO días de mora.
-// Los buckets se rotulan sólo por su rango de días. PROHIBIDO usar la palabra
+// La columna se rotula sólo por su rango de días. PROHIBIDO usar la palabra
 // "vencido"/"vencida" en el correo.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { EstadoCuentaEmpresa } from "@/lib/cxc/estado-cuenta-data";
+import type { EstadoCuentaDoc, EstadoCuentaEmpresa } from "@/lib/cxc/estado-cuenta-data";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -47,96 +50,65 @@ export function sanitizeFilenamePart(s: string): string {
   return s.replace(/[/\\]/g, "-").replace(/\s+/g, " ").trim();
 }
 
-/**
- * Fecha de vencimiento = fecha_creacion + plazo_credito días. Si no hay plazo
- * (0/null → todas las NC y Recibos) devuelve "—". Formato dd/mm/aaaa.
- */
-export function fmtVence(fecha: string | null, plazoCredito: number | null): string {
-  if (!fecha || !plazoCredito || plazoCredito <= 0) return "—";
-  // fecha viene como date/ISO; anclar a mediodía evita corrimientos por zona.
-  const base = new Date(fecha.includes("T") ? fecha : `${fecha}T12:00:00`);
-  if (isNaN(base.getTime())) return "—";
-  base.setDate(base.getDate() + Math.round(plazoCredito));
-  const dd = String(base.getDate()).padStart(2, "0");
-  const mm = String(base.getMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${base.getFullYear()}`;
-}
-
-// Buckets por EDAD en días (no mora). 0-30, 31-60, 61-90, 91-120, 121+.
-export const BUCKET_LABELS = ["0-30", "31-60", "61-90", "91-120", "121+"] as const;
-
-/** Índice de bucket (0..4) para una edad en días. null/negativo cae en 0-30. */
-export function bucketIndex(dias: number | null): number {
-  const d = dias == null ? 0 : dias;
-  if (d <= 30) return 0;
-  if (d <= 60) return 1;
-  if (d <= 90) return 2;
-  if (d <= 120) return 3;
-  return 4;
-}
-
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Saldo firmado de los documentos con más de 90 días de EDAD (dias >= 91). No
+ * es mora: es antigüedad desde la emisión. `dias` null se trata como 0.
+ */
+export function saldoMas90(docs: EstadoCuentaDoc[]): number {
+  return round(docs.reduce((s, d) => ((d.dias ?? 0) > 90 ? s + d.saldo : s), 0));
+}
 
 const TH = "padding:6px 8px;font-size:11px;font-weight:600;color:#374151;border-bottom:1px solid #e5e7eb;background:#f9fafb";
 const TD = "padding:6px 8px;font-size:12px;color:#111827;border-bottom:1px solid #f3f4f6";
 
 /**
- * Tabla HTML por empresa: título "{Empresa} — {Cliente}" + columnas
- * Doc. | Vence | Saldo | [Antigüedad (días): 0-30 | 31-60 | 61-90 | 91-120 | 121+].
- * Cada documento coloca su saldo firmado en SU bucket según la edad; la fila
- * Total suma saldo y cada bucket.
+ * Tabla RESUMEN del cuerpo: una fila por empresa con Saldo total y el saldo con
+ * más de 90 días de antigüedad, + fila Total. El detalle documento por documento
+ * NO va en el correo: vive en los PDFs adjuntos (uno por empresa).
+ *
+ * Los montos salen de `EstadoCuentaEmpresa.subtotal` y de los mismos documentos
+ * que arman el PDF (helper compartido) → cuadran al centavo con la pantalla.
  */
-export function buildTablaHtml(empresas: EstadoCuentaEmpresa[], cliente: string): string {
-  const clienteSafe = escapeHtml(cliente);
-  return empresas
-    .map((emp) => {
-      const totals = [0, 0, 0, 0, 0];
-      const rows = emp.documentos
-        .map((doc) => {
-          const bi = bucketIndex(doc.dias);
-          totals[bi] = round(totals[bi] + doc.saldo);
-          const cells = BUCKET_LABELS.map((_, i) =>
-            `<td style="${TD};text-align:right;font-variant-numeric:tabular-nums">${i === bi ? money(doc.saldo) : ""}</td>`,
-          ).join("");
-          return `<tr>
-            <td style="${TD}">${escapeHtml(doc.numero)}</td>
-            <td style="${TD};white-space:nowrap">${fmtVence(doc.fecha, doc.plazoCredito)}</td>
-            <td style="${TD};text-align:right;font-variant-numeric:tabular-nums">${money(doc.saldo)}</td>
-            ${cells}
-          </tr>`;
-        })
-        .join("");
-      const totalCells = totals
-        .map((t) => `<td style="${TD};text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${money(t)}</td>`)
-        .join("");
-      return `
-      <div style="margin:0 0 20px">
-        <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#111827">${escapeHtml(emp.empresa_nombre)} — ${clienteSafe}</p>
-        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">
-          <thead>
-            <tr>
-              <th rowspan="2" style="${TH};text-align:left">Doc.</th>
-              <th rowspan="2" style="${TH};text-align:left">Vence</th>
-              <th rowspan="2" style="${TH};text-align:right">Saldo</th>
-              <th colspan="5" style="${TH};text-align:center">Antigüedad (días)</th>
-            </tr>
-            <tr>
-              ${BUCKET_LABELS.map((l) => `<th style="${TH};text-align:right">${l}</th>`).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-            <tr>
-              <td style="${TD};font-weight:700">Total</td>
-              <td style="${TD}"></td>
-              <td style="${TD};text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${money(emp.subtotal)}</td>
-              ${totalCells}
-            </tr>
-          </tbody>
-        </table>
-      </div>`;
-    })
+export function buildResumenHtml(empresas: EstadoCuentaEmpresa[], cliente: string): string {
+  const rows = empresas
+    .map(
+      (emp) => `<tr>
+        <td style="${TD}">${escapeHtml(emp.empresa_nombre)}</td>
+        <td style="${TD};text-align:right;font-variant-numeric:tabular-nums">${money(emp.subtotal)}</td>
+        <td style="${TD};text-align:right;font-variant-numeric:tabular-nums">${money(saldoMas90(emp.documentos))}</td>
+      </tr>`,
+    )
     .join("");
+
+  const total = round(empresas.reduce((s, e) => s + e.subtotal, 0));
+  const totalMas90 = round(empresas.reduce((s, e) => s + saldoMas90(e.documentos), 0));
+
+  return `
+  <div style="margin:0 0 18px">
+    <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#111827">${escapeHtml(cliente)}</p>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb">
+      <thead>
+        <tr>
+          <th style="${TH};text-align:left">Empresa</th>
+          <th style="${TH};text-align:right">Saldo total</th>
+          <th style="${TH};text-align:right">Más de 90 días</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        <tr>
+          <td style="${TD};font-weight:700">Total</td>
+          <td style="${TD};text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${money(total)}</td>
+          <td style="${TD};text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${money(totalMas90)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin:8px 0 0;font-size:12px;color:#6b7280">
+      El detalle de cada documento está en los estados de cuenta adjuntos.
+    </p>
+  </div>`;
 }
 
 /** Firma del correo: nombre del usuario + línea fija (sin cargo). */
@@ -164,12 +136,12 @@ export function defaultAsunto(empresasNombres: string[], mes: string): string {
 }
 
 /**
- * HTML completo del correo = encabezado + cuerpo editable + tablas + cierre +
- * firma. `cuerpo` es texto plano (se escapa + nl2br). `tablaHtml` ya es HTML
- * (viene de buildTablaHtml, no editable). `firma` es texto plano.
+ * HTML completo del correo = encabezado + cuerpo editable + resumen + cierre +
+ * firma. `cuerpo` es texto plano (se escapa + nl2br). `resumenHtml` ya es HTML
+ * (viene de buildResumenHtml, no editable). `firma` es texto plano.
  */
-export function composeEmailHtml(opts: { cuerpo: string; tablaHtml: string; firma: string }): string {
-  const { cuerpo, tablaHtml, firma } = opts;
+export function composeEmailHtml(opts: { cuerpo: string; resumenHtml: string; firma: string }): string {
+  const { cuerpo, resumenHtml, firma } = opts;
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;color:#111827">
     <div style="background:#111827;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0">
@@ -178,7 +150,7 @@ export function composeEmailHtml(opts: { cuerpo: string; tablaHtml: string; firm
     </div>
     <div style="padding:20px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px">
       <p style="font-size:13px;line-height:1.6;margin:0 0 18px">${nl2br(cuerpo)}</p>
-      ${tablaHtml}
+      ${resumenHtml}
       <p style="font-size:13px;line-height:1.6;margin:18px 0 0">Quedamos atentos a sus comentarios.</p>
       <p style="font-size:13px;line-height:1.6;margin:12px 0 0">Saludos,<br>${nl2br(firma)}</p>
       <p style="color:#9ca3af;font-size:11px;margin:20px 0 0;border-top:1px solid #e5e7eb;padding-top:12px">

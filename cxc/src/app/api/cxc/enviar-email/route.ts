@@ -18,7 +18,7 @@ import { requireRole, type SessionPayload } from "@/lib/requireRole";
 import { SWITCH_ESTADOCUENTA_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fetchEstadoCuentaData, type EstadoCuentaResult } from "@/lib/cxc/estado-cuenta-data";
 import {
-  buildTablaHtml,
+  buildResumenHtml,
   composeEmailHtml,
   buildFirma,
   defaultAsunto,
@@ -143,14 +143,14 @@ async function sharedCount(email: string): Promise<number> {
 interface Paquete {
   result: EstadoCuentaResult;
   empresasNombres: string[];
-  tablaHtml: string;
+  resumenHtml: string;
   mes: string;
 }
 function armarPaquete(result: EstadoCuentaResult, nombre: string): Paquete {
   const mes = mesLabel();
   const empresasNombres = result.empresas.map((e) => e.empresa_nombre);
-  const tablaHtml = buildTablaHtml(result.empresas, nombre);
-  return { result, empresasNombres, tablaHtml, mes };
+  const resumenHtml = buildResumenHtml(result.empresas, nombre);
+  return { result, empresasNombres, resumenHtml, mes };
 }
 
 export async function GET(req: NextRequest) {
@@ -176,7 +176,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Error al leer estado de cuenta" }, { status: 500 });
   }
 
-  const { empresasNombres, tablaHtml, mes } = armarPaquete(result, nombre);
+  const { empresasNombres, resumenHtml, mes } = armarPaquete(result, nombre);
   const destinatario = await resolveDestinatario(nombreNormalizado, codigo);
   const compartidoPor = await sharedCount(destinatario);
   const firma = buildFirma(user?.nombreCompleto ?? "Fashion Group");
@@ -187,7 +187,7 @@ export async function GET(req: NextRequest) {
     asunto: defaultAsunto(empresasNombres, mes),
     cuerpo: defaultCuerpo(mes),
     firma,
-    tablaHtml,
+    resumenHtml,
     empresasNombres,
     sharedCount: compartidoPor,
     mes,
@@ -241,9 +241,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Este cliente no tiene documentos con saldo." }, { status: 400 });
   }
 
-  const { tablaHtml, mes } = armarPaquete(result, nombre);
+  const { resumenHtml, mes } = armarPaquete(result, nombre);
   const firma = buildFirma(user?.nombreCompleto ?? "Fashion Group");
-  const html = composeEmailHtml({ cuerpo, tablaHtml, firma });
+  const html = composeEmailHtml({ cuerpo, resumenHtml, firma });
 
   // Un PDF por empresa (incluye empresas con saldo a favor).
   const attachments: { filename: string; content: string }[] = [];
