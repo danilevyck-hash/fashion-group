@@ -20,6 +20,7 @@
 import { createSwitchClient, SwitchApiError } from "./client";
 import type { SwitchFactura } from "./types";
 import { supabaseServer } from "../supabase-server";
+import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
 
 export interface SyncResult {
   logId: string;
@@ -350,6 +351,19 @@ export async function syncMultifashionTickets(
   }
   const logId = (logRow as { id: string }).id;
 
+  // Corrida TAMBIÉN en switch_sync_log (empresa_key='american_classic', la key
+  // canónica del grupo para esta empresa; sync_type='multifashion') — es la
+  // fuente del streak de la política anti-ruido 401 (alert-policy.ts). El log
+  // legacy multifashion_sync_log sigue siendo el detallado (skip_details).
+  // Degradable: si el CHECK no admite 'multifashion' aún, switchLogId=null.
+  const switchLogId = await createSwitchSyncLog({
+    empresaKey: "american_classic",
+    syncType: "multifashion",
+    triggeredBy: opts.triggeredBy,
+    rangeFrom: opts.desde,
+    rangeTo: opts.hasta,
+  });
+
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
@@ -436,6 +450,7 @@ export async function syncMultifashionTickets(
       records_skipped: skipped,
       skip_details: skipDetails,
     });
+    await finishSwitchSyncLog(switchLogId, "success", { inserted, updated, skipped });
 
     return { logId, inserted, updated, skipped, durationMs };
   } catch (err: unknown) {
@@ -458,6 +473,12 @@ export async function syncMultifashionTickets(
       records_skipped: skipped,
       error_message: message.slice(0, 2000),
       skip_details: skipDetails,
+    });
+    await finishSwitchSyncLog(switchLogId, "error", {
+      inserted,
+      updated,
+      skipped,
+      errorMessage: message,
     });
 
     throw err;

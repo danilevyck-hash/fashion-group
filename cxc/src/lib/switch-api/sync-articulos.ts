@@ -10,6 +10,7 @@
 
 import { createSwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
+import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 
 export interface ArticulosSyncResult {
   empresaKey: string;
@@ -36,6 +37,35 @@ function* dateRange(desde: string, hasta: string): Generator<string> {
 }
 
 export async function syncArticulosDiario(
+  empresaKey: string,
+  desde: string,
+  hasta: string,
+  triggeredBy: SwitchSyncTriggeredBy = "cron",
+): Promise<ArticulosSyncResult> {
+  // Corrida registrada en switch_sync_log (sync_type='articulos') para la
+  // política anti-ruido 401 (alert-policy.ts). Degradable: sin log, el sync
+  // corre igual y el 401 alerta inmediato (fail-open).
+  const logId = await createSwitchSyncLog({
+    empresaKey,
+    syncType: "articulos",
+    triggeredBy,
+    rangeFrom: desde,
+    rangeTo: hasta,
+  });
+
+  try {
+    const result = await syncArticulosDiarioInner(empresaKey, desde, hasta);
+    await finishSwitchSyncLog(logId, "success", { updated: result.filas });
+    return result;
+  } catch (err) {
+    await finishSwitchSyncLog(logId, "error", {
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+async function syncArticulosDiarioInner(
   empresaKey: string,
   desde: string,
   hasta: string,

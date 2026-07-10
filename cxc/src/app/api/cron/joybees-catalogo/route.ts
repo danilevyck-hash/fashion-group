@@ -15,6 +15,7 @@ import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,18 +49,16 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   }
 
   if (!dryRun) {
+    // Fallo por empresa: NO se tocó esa empresa (fail-safe). Política anti-ruido
+    // 401 (alert-policy.ts): NO-401 alerta inmediato; un 401/token solo alerta
+    // si acumula 2+ corridas consecutivas (streak en switch_sync_log,
+    // sync_type='catalogo_joybees').
     const fallidas = result.empresas.filter((e) => e.error);
     if (fallidas.length > 0) {
-      await sendTelegramAlert(
-        `🚨 Joybees catálogo: ${fallidas.map((e) => `${e.empresaKey} (${shortError(e.error)})`).join("; ")}. ` +
-        `Su catálogo NO se modificó (fail-safe).`,
-      );
-      // Solo persistencia — la alerta específica de arriba ya avisó por Telegram.
-      await logCronError(
-        "joybees_catalogo_failed",
-        fallidas.map((e) => `${e.empresaKey}: ${e.error}`).join("; "),
-        null,
-        { telegram: false },
+      await alertSwitchCronErrors(
+        CRON_NAME,
+        fallidas.map((e) => ({ empresaKey: e.empresaKey, syncType: "catalogo_joybees", error: e.error! })),
+        { nota: "El catálogo NO se modificó (fail-safe)." },
       );
     }
     const cods = result.nuevosSinFotoTotal;

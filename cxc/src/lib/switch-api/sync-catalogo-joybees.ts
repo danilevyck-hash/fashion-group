@@ -37,6 +37,7 @@ function isJoybeesArticulo(a: SwitchArticulo): boolean {
 export function syncCatalogoJoybees(opts: { dryRun?: boolean } = {}): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: joybeesServer,
+    syncLogType: "catalogo_joybees",
     productsTable: "joybees_products",
     empresas: EMPRESAS,
     articuloFilter: isJoybeesArticulo, // solo proveedor JCBBRANDS (excluye basura contable)

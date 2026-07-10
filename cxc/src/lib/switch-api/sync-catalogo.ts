@@ -31,6 +31,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSwitchClient, type SwitchArticulo } from "./client";
+import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
 
 const PER_PAGE = 50;
 const MAX_PAGES = 80;
@@ -47,6 +48,10 @@ export interface CatalogoEmpresaScope {
 export interface CatalogoSyncConfig {
   /** Cliente Supabase del proyecto donde vive la tabla del catálogo. */
   db: SupabaseClient;
+  /** sync_type con el que cada corrida por empresa se registra en switch_sync_log
+   *  ('catalogo_reebok' / 'catalogo_joybees') — fuente del streak de la política
+   *  anti-ruido 401 (alert-policy.ts). Los dry-run NO se registran. */
+  syncLogType: string;
   /** Tabla de productos: "products" (Reebok), "joybees_products" (Joybees). */
   productsTable: string;
   empresas: readonly CatalogoEmpresaScope[];
@@ -127,6 +132,11 @@ export async function syncCatalogo(
       empresaKey: emp.empresaKey, switchCount: 0, stockChecks: 0,
       actualizados: 0, agregados: 0, ocultados: 0, reactivados: 0, nuevosSinFoto: [],
     };
+    // Corrida por empresa en switch_sync_log (streak 401 de alert-policy.ts).
+    // Los dry-run no se registran: no son corridas reales y ensuciarían el streak.
+    const logId = dryRun
+      ? null
+      : await createSwitchSyncLog({ empresaKey: emp.empresaKey, syncType: config.syncLogType });
     try {
       const client = createSwitchClient(emp.empresaKey);
 
@@ -263,6 +273,15 @@ export async function syncCatalogo(
       }
     } catch (err) {
       out.error = err instanceof Error ? err.message : String(err);
+    }
+    if (out.error) {
+      await finishSwitchSyncLog(logId, "error", { errorMessage: out.error });
+    } else {
+      await finishSwitchSyncLog(logId, "success", {
+        inserted: out.agregados,
+        updated: out.actualizados + out.reactivados,
+        skipped: out.ocultados,
+      });
     }
     empresasOut.push(out);
   }
