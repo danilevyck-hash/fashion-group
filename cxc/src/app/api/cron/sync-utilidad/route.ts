@@ -31,7 +31,8 @@ import {
 } from "@/lib/switch-api/sync-utilidad";
 import { isEmpresaKey } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -94,13 +95,16 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const errors = results.filter((r) => !r.ok);
   // Heartbeat de éxito SOLO si TODAS las empresas corrieron OK. Si alguna falló,
   // NO registramos éxito (el watchdog/reconciliación lo verán stale y recuperarán)
-  // y disparamos alerta Telegram. Antes el heartbeat se registraba siempre → falso
-  // éxito: el watchdog lo veía fresco y nunca alertaba (bug de doble ceguera).
+  // y alertamos vía alertSwitchCronErrors: errores NO-401 alertan de inmediato;
+  // un 401/token (transitorio de sesión única) solo alerta si la empresa acumula
+  // 2+ corridas consecutivas con 401 en switch_sync_log.
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
   } else {
-    const detalle = errors.map((e) => `${e.empresaKey}: ${e.error ?? "error"}`).join("; ");
-    await logCronError(CRON_NAME, `${errors.length}/${results.length} empresas fallaron — ${detalle}`);
+    await alertSwitchCronErrors(
+      CRON_NAME,
+      errors.map((e) => ({ empresaKey: e.empresaKey, syncType: "utilidad", error: e.error ?? "error" })),
+    );
   }
   return NextResponse.json(
     { ok: errors.length === 0, meses, results },

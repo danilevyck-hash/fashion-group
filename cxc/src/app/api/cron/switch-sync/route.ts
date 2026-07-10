@@ -48,7 +48,8 @@ import {
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
@@ -202,14 +203,17 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   // Heartbeat de éxito SOLO si TODOS los syncs corrieron OK. Si alguno falló, NO
   // registramos éxito (la reconciliación detecta los pares faltantes en
-  // switch_sync_log y recupera; el watchdog ve el heartbeat stale) y disparamos
-  // alerta Telegram inmediata. Antes el heartbeat se registraba siempre → un 207
-  // parcial quedaba invisible para el watchdog.
+  // switch_sync_log y recupera; el watchdog ve el heartbeat stale) y alertamos
+  // vía alertSwitchCronErrors: los errores NO-401 alertan de inmediato como
+  // siempre; un 401/token (transitorio de sesión única) solo alerta si la misma
+  // empresa+tipo acumula 2+ corridas consecutivas con 401 en switch_sync_log.
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
   } else {
-    const detalle = errors.map((e) => `${e.empresaKey}/${e.tipo}: ${e.error}`).join("; ");
-    await logCronError(CRON_NAME, `${errors.length} sync(s) fallaron — ${detalle}`);
+    await alertSwitchCronErrors(
+      CRON_NAME,
+      errors.map((e) => ({ empresaKey: e.empresaKey, syncType: e.tipo, error: e.error })),
+    );
   }
   return NextResponse.json(
     {
