@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncArticulosDiario, type ArticulosSyncResult } from "@/lib/switch-api/sync-articulos";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -52,11 +53,16 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     ? empresasParam.split(",").map(s => s.trim()).filter(e => universe.includes(e as (typeof universe)[number]))
     : universe;
 
+  // triggered_by del log: override manual de rango/empresas = corrida manual.
+  const triggeredBy = sp.get("desde") !== null || sp.get("hasta") !== null || empresasParam !== null
+    ? ("manual" as const)
+    : ("cron" as const);
+
   const results: ArticulosSyncResult[] = [];
   const errors: Array<{ empresaKey: string; error: string }> = [];
   for (const empresaKey of empresas) {
     try {
-      results.push(await syncArticulosDiario(empresaKey, desde, hasta));
+      results.push(await syncArticulosDiario(empresaKey, desde, hasta, triggeredBy));
     } catch (err: unknown) {
       errors.push({ empresaKey, error: err instanceof Error ? err.message : String(err) });
     }
@@ -64,13 +70,16 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   // Heartbeat de éxito SOLO si TODAS las empresas corrieron OK. Si alguna falló,
   // NO registramos éxito (el watchdog/reconciliación lo verán stale y recuperarán)
-  // y disparamos alerta Telegram. Antes el heartbeat se registraba siempre → falso
-  // éxito: el watchdog lo veía fresco y nunca alertaba (bug de doble ceguera).
+  // y alertamos vía alertSwitchCronErrors: errores NO-401 alertan de inmediato;
+  // un 401/token (transitorio de sesión única) solo alerta si la empresa acumula
+  // 2+ corridas consecutivas con 401 en switch_sync_log.
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
   } else {
-    const detalle = errors.map((e) => `${e.empresaKey}: ${e.error}`).join("; ");
-    await logCronError(CRON_NAME, `${errors.length} empresa(s) fallaron — ${detalle}`);
+    await alertSwitchCronErrors(
+      CRON_NAME,
+      errors.map((e) => ({ empresaKey: e.empresaKey, syncType: "articulos", error: e.error })),
+    );
   }
 
   return NextResponse.json(

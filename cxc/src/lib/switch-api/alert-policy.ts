@@ -16,10 +16,10 @@
  *     alertando de inmediato como hasta ahora.
  *
  * Los routes que usan esto: switch-sync (facturas/estadocuenta/costo),
- * sync-recibos y sync-utilidad — los que alertan por empresa Y registran cada
- * corrida en switch_sync_log. Los crons sin historia por empresa en ese log
- * (switch-articulos, multifashion-sync, catálogos) siguen alertando inmediato:
- * sin corridas previas consultables no hay forma de distinguir el 1er 401.
+ * sync-recibos, sync-utilidad y —desde jul-2026, vía sync-log.ts— también
+ * switch-articulos (articulos), multifashion-sync (multifashion) y los
+ * catálogos (catalogo_reebok / catalogo_joybees). Todos registran cada corrida
+ * por empresa_key+sync_type en switch_sync_log; ese log es la fuente del streak.
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -78,8 +78,13 @@ export function computeStreak401(rows: SyncLogStreakRow[]): { streak: number; si
  * switch_sync_log como 'error' (los syncs finalizan el log antes de rethrow),
  * así que la corrida actual es la primera fila del resultado.
  *
- * Fail-open a alertar: si la consulta falla, escalate=true con streak=0 —
- * mejor un aviso de más que un 401 persistente en silencio.
+ * Fail-open a alertar en DOS casos, ambos con streak=0 (sin medir):
+ *   - la consulta al log falla.
+ *   - la consulta OK pero la corrida actual NO aparece registrada (p.ej. el
+ *     CHECK de sync_type aún no admite el tipo nuevo y el INSERT degradó, ver
+ *     sync-log.ts) → sin historia confiable. Sin esto, un cron cuyo logging no
+ *     funcione tendría sus 401 silenciados PARA SIEMPRE.
+ * Mejor un aviso de más que un 401 persistente en silencio.
  */
 export async function evaluateSwitch401Escalation(
   empresaKey: string,
@@ -99,7 +104,9 @@ export async function evaluateSwitch401Escalation(
       return { escalate: true, streak: 0, sinceIso: null };
     }
     const { streak, sinceIso } = computeStreak401(data as SyncLogStreakRow[]);
-    return { escalate: streak >= 2, streak, sinceIso };
+    // streak=0 = la corrida actual (que acaba de fallar con 401) no aparece en
+    // el log → historia no confiable → fail-open a alertar.
+    return { escalate: streak >= 2 || streak === 0, streak, sinceIso };
   } catch (err) {
     console.error(`[alert-policy] evaluateSwitch401Escalation threw: ${err instanceof Error ? err.message : String(err)}`);
     return { escalate: true, streak: 0, sinceIso: null };
@@ -121,7 +128,8 @@ function fmtPanama(iso: string): string {
 
 export interface CronSwitchError {
   empresaKey: string;
-  /** sync_type de switch_sync_log (facturas|estadocuenta|costo|recibos|utilidad). */
+  /** sync_type de switch_sync_log (facturas|estadocuenta|costo|recibos|utilidad|
+   *  articulos|multifashion|catalogo_reebok|catalogo_joybees). */
   syncType: string;
   error: string;
 }
@@ -132,17 +140,21 @@ export interface CronSwitchError {
  *   - 401    → silencio en la 1ra corrida; alerta escalada si la misma
  *              empresa+sync acumula 2+ corridas consecutivas con 401.
  * Todo se persiste en cron_email_errors (vía logCronError). Nunca lanza.
+ * `opts.nota`: contexto extra que se anexa a los mensajes de Telegram (ej. los
+ * catálogos agregan "Su catálogo NO se modificó (fail-safe)").
  */
 export async function alertSwitchCronErrors(
   cronName: string,
   errores: CronSwitchError[],
+  opts?: { nota?: string },
 ): Promise<void> {
+  const nota = opts?.nota ? `\n${opts.nota}` : "";
   const inmediatos = errores.filter((e) => !isSwitch401(e.error));
   const token401 = errores.filter((e) => isSwitch401(e.error));
 
   if (inmediatos.length > 0) {
     const detalle = inmediatos.map((e) => `${e.empresaKey}/${e.syncType}: ${e.error}`).join("; ");
-    await logCronError(cronName, `${inmediatos.length} sync(s) fallaron — ${detalle}`);
+    await logCronError(cronName, `${inmediatos.length} sync(s) fallaron — ${detalle}${nota}`);
   }
 
   for (const e of token401) {
@@ -150,10 +162,10 @@ export async function alertSwitchCronErrors(
     if (esc.escalate) {
       const desde = esc.streak >= 2 && esc.sinceIso
         ? `${esc.streak} corridas consecutivas con 401, falla desde ${fmtPanama(esc.sinceIso)} (Panamá)`
-        : "no pude medir el historial en switch_sync_log — alerto por seguridad";
+        : "no pude medir el historial en switch_sync_log (corrida sin registrar o consulta fallida) — alerto por seguridad";
       await sendTelegramAlert(
         `🚨 Switch 401 REPETIDO — ${cronName} · ${e.empresaKey}/${e.syncType}\n` +
-          `${desde}.\nÚltimo error: ${shortError(e.error)}`,
+          `${desde}.\nÚltimo error: ${shortError(e.error)}${nota}`,
       );
       await logCronError(
         cronName,

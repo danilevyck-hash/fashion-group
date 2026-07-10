@@ -15,7 +15,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -163,7 +164,13 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    await logCronError("multifashion_sync_failed", message);
+    // Política anti-ruido 401 (alert-policy.ts): NO-401 alerta inmediato; un
+    // 401/token solo alerta si acumula 2+ corridas consecutivas (streak en
+    // switch_sync_log, sync_type='multifashion'). El tipo en cron_email_errors
+    // pasa de "multifashion_sync_failed" a CRON_NAME (consistente con el resto).
+    await alertSwitchCronErrors(CRON_NAME, [
+      { empresaKey: "american_classic", syncType: "multifashion", error: message },
+    ]);
     return NextResponse.json(
       { ok: false, error: message, range: { desde, hasta } },
       { status: 500 },
