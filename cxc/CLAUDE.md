@@ -82,7 +82,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-35 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
+36 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -101,7 +101,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/acs-fidelizacion | 08:15 |
 | /api/cron/switch-articulos | 08:40 |
 | /api/cron/sync-proveedores | 09:30 |
-| /api/cron/joybees-catalogo | 11:00 |
+| /api/cron/joybees-catalogo | 11:00, 17:05 (2 entradas — solo toca joystep en Switch) |
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |

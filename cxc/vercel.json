@@ -105,6 +105,10 @@
       "schedule": "0 17 * * *"
     },
     {
+      "path": "/api/cron/joybees-catalogo",
+      "schedule": "5 17 * * *"
+    },
+    {
       "path": "/api/cron/sync-recibos",
       "schedule": "10 20 * * *"
     },

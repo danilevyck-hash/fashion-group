@@ -202,11 +202,13 @@ function JoybeesAdminInner() {
     sandalias: products.filter((p) => tipoJoybees(p.name) === "Sandalias").length,
     flips: products.filter((p) => tipoJoybees(p.name) === "Flips").length,
   };
+  // "importar" (carga por plantilla) ya no se muestra: el catálogo se sincroniza
+  // por API desde Switch (cron joybees-catalogo). El flujo queda como respaldo,
+  // accesible solo por URL directa ?tab=importar.
   const tabs: { key: Tab; label: string }[] = [
     { key: "faltan-foto", label: sinFotoCount > 0 ? `Faltan foto (${sinFotoCount})` : "Faltan foto" },
     { key: "completo", label: "Catálogo completo" },
     { key: "pedidos", label: "Pedidos" },
-    { key: "importar", label: "Importar" },
   ];
 
   return (
