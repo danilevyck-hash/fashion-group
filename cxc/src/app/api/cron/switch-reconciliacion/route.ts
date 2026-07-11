@@ -52,6 +52,7 @@ import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
+import { calcularResumenDiario, buildMensaje } from "@/lib/acs-resumen-diario";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, cronIsStale } from "@/lib/cron-telemetry";
@@ -332,6 +333,24 @@ const COLATERAL_CRONS: ColateralCron[] = [
     recover: async () => {
       const r = await runCleanupPackingLists();
       return { ok: r.ok, detail: r.detail };
+    },
+  },
+  {
+    // Resumen diario ACS a Telegram (incidente 11-jul-2026: la invocación de la
+    // 01:00 UTC se perdió tras una promoción de deploy, cero rastro). Recupera
+    // reportando AYER Panamá, NO hoyPanama(): las pasadas de reconciliación
+    // (10:00/14:00/18:00 UTC = madrugada/mañana Panamá) caen en el día Panamá
+    // SIGUIENTE al que quedó sin reportar — ayer es ese día, ya completo en DB
+    // (syncFresco=true por ser pasado). Prefijo "(recuperado)" para distinguirlo
+    // del run normal de la 01:00. Solo lee la DB, no toca Switch. Su cron corre
+    // 01:00 UTC, muy antes de la primera pasada (10:00) → sin guard de hora.
+    cronName: "acs-resumen-diario",
+    label: "acs-resumen",
+    recover: async () => {
+      const ayer = panamaDate(-1);
+      const resumen = await calcularResumenDiario(ayer, true);
+      const sent = await sendTelegramAlert(`(recuperado) ${buildMensaje(resumen)}`);
+      return { ok: sent, detail: sent ? `resumen ${ayer} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },
   // ⚠️ Los catálogos van AL FINAL a propósito: cada run hace 1 llamada /stock
