@@ -141,11 +141,19 @@ export async function calcularResumenDiario(
   return { fecha, corte, syncFresco, hoy, hoyPrev, fechaComparable: v.fechaComparable, mes, mesPrev };
 }
 
-// ── Formato del mensaje (formato exacto pedido por Daniel) ───────────────────
-//   Sync fresco:                      Sync viejo / no corrió:
-//   🏪 ACS vie 4-jul                  🏪 ACS vie 4-jul
-//   Hoy: $2,186 · +5%                 ⏳ Ventas del día aún sincronizando
-//   Mes: $9,140 · +8.2%               Mes (al 3-jul): $5,298 · +39.1%
+// ── Formato del mensaje (formato exacto validado por Daniel, 11-jul-2026) ────
+//   Sync fresco:
+//   🏪 ACS · viernes 10 jul
+//   Día:  $1,112  vs  $1,854 (vie 11-jul-25) · -40%
+//   Mes:  $15,576  vs  $9,820 (1-10 jul-25) · +58.6%
+//
+//   Sync viejo / no corrió (guardia anti-ruido, corte recortado a D-1):
+//   🏪 ACS · viernes 10 jul
+//   ⏳ Ventas del día aún sincronizando
+//   Mes (al 9-jul):  $14,464  vs  $8,700 (1-9 jul-25) · +66.3%
+//
+//   Sin datos del año pasado (prev ≤ 0): la línea omite el "vs …":
+//   Día:  $1,112 · s/d año pasado
 
 export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -172,17 +180,48 @@ export function fmtDiaCorto(fecha: string): string {
   return `${d.getUTCDate()}-${mes}`;
 }
 
+/** "viernes 10 jul" — día de semana completo, para el título. */
+export function fmtDiaTitulo(fecha: string): string {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  const wd = new Intl.DateTimeFormat("es-PA", { weekday: "long", timeZone: "UTC" }).format(d);
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
+  return `${wd} ${d.getUTCDate()} ${mes}`;
+}
+
+/** "vie 11-jul-25" — el día comparable del año pasado (−364d), con su día de
+ *  semana para que se vea que es el MISMO día de semana. */
+export function fmtComparableDia(fecha: string): string {
+  return `${fmtDiaLabel(fecha)}-${fecha.slice(2, 4)}`;
+}
+
+/** "1-10 jul-25" — rango same-period del año pasado (1..D del mes de `corte`).
+ *  Mismo recorte 29-feb → 28-feb que ventanasResumen.cortePrev. */
+export function fmtRangoMesPrev(corte: string): string {
+  const d = new Date(`${corte}T12:00:00Z`);
+  const dia = corte.slice(5) === "02-29" ? 28 : d.getUTCDate();
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
+  const yyPrev = String(Number(corte.slice(0, 4)) - 1).slice(2);
+  return `1-${dia} ${mes}-${yyPrev}`;
+}
+
 export function buildMensaje(r: AcsResumenDiario): string {
+  const titulo = `🏪 ACS · ${fmtDiaTitulo(r.fecha)}`;
+  // "Label:  $cur  vs  $prev (comparable) · ±%" — sin año pasado (prev ≤ 0) se
+  // omite el "vs …" y fmtPct pone "s/d año pasado".
+  const lineaMes = (label: string) =>
+    r.mesPrev > 0
+      ? `${label}:  ${fmtMonto(r.mes)}  vs  ${fmtMonto(r.mesPrev)} (${fmtRangoMesPrev(r.corte)}) · ${fmtPct(r.mes, r.mesPrev, 1)}`
+      : `${label}:  ${fmtMonto(r.mes)} · ${fmtPct(r.mes, r.mesPrev, 1)}`;
   if (!r.syncFresco) {
     return [
-      `🏪 ACS ${fmtDiaLabel(r.fecha)}`,
+      titulo,
       `⏳ Ventas del día aún sincronizando`,
-      `Mes (al ${fmtDiaCorto(r.corte)}): ${fmtMonto(r.mes)} · ${fmtPct(r.mes, r.mesPrev, 1)}`,
+      lineaMes(`Mes (al ${fmtDiaCorto(r.corte)})`),
     ].join("\n");
   }
-  return [
-    `🏪 ACS ${fmtDiaLabel(r.fecha)}`,
-    `Hoy: ${fmtMonto(r.hoy)} · ${fmtPct(r.hoy, r.hoyPrev, 0)}`,
-    `Mes: ${fmtMonto(r.mes)} · ${fmtPct(r.mes, r.mesPrev, 1)}`,
-  ].join("\n");
+  const lineaDia =
+    r.hoyPrev > 0
+      ? `Día:  ${fmtMonto(r.hoy)}  vs  ${fmtMonto(r.hoyPrev)} (${fmtComparableDia(r.fechaComparable)}) · ${fmtPct(r.hoy, r.hoyPrev, 0)}`
+      : `Día:  ${fmtMonto(r.hoy)} · ${fmtPct(r.hoy, r.hoyPrev, 0)}`;
+  return [titulo, lineaDia, lineaMes("Mes")].join("\n");
 }
