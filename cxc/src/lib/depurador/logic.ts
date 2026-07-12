@@ -163,7 +163,7 @@ function buildDesc(cat: Cell): string {
 
 // rubro = lo que va ANTES del primer guion (el género), case tal cual.
 // Ej: "Men-T-Shirts S/S" -> "Men"  |  "Women-Bras" -> "Women"
-function buildRubro(desc: string): string {
+export function buildRubro(desc: string): string {
   const i = desc.indexOf("-");
   return (i === -1 ? desc : desc.slice(0, i)).trim();
 }
@@ -171,14 +171,14 @@ function buildRubro(desc: string): string {
 // subrubro = todo lo que va DESPUÉS del primer guion, TAL CUAL (conserva sus
 // guiones internos). Solo el primer guion separa rubro de subrubro.
 // Ej: "Men-Pant Non-Denim" -> "Pant Non-Denim"  |  "Men-T-Shirts S/S" -> "T-Shirts S/S"
-function buildSubrubro(desc: string): string {
+export function buildSubrubro(desc: string): string {
   const i = desc.indexOf("-");
   return (i === -1 ? "" : desc.slice(i + 1)).trim();
 }
 
 // Géneros conocidos. Si el rubro no empieza con uno → es basura → "Otros" (Tarea 3.2).
 const GENEROS = ["men", "women", "boys", "girls", "kids", "unisex", "newborn", "toddler"];
-function esGenero(rubro: string): boolean {
+export function esGenero(rubro: string): boolean {
   const first = rubro.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
   return GENEROS.includes(first);
 }

@@ -5,6 +5,7 @@ import {
   EMPRESAS_DESTINO, MARCA_CATALOGO, descripcionesDeMarca, norm, marcaKey, marcaRubroKey,
   type Redondeo, type MarcaFormula, type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
+import { TIENDA_MARCA_CATALOGO } from "@/lib/depurador/tienda";
 import BulkExcel from "./BulkExcel";
 
 // ── Modelos ──────────────────────────────────────────────────────────────────
@@ -35,7 +36,36 @@ const EMPRESA_GROUPS = [
   ...EMPRESAS_DESTINO.map((e) => ({ label: e.label, marca: e.marca })),
   { label: "", marca: "" },
 ];
-const CATALOG_KEYS = new Set(MARCA_CATALOGO.map((c) => marcaKey(c.marca)));
+
+// Set de fórmulas: "depurador" (importación de proveedores, tablas marca_formulas)
+// o "tienda" (Facturas Tienda → Multifashion/ACS, tablas tienda_*). MISMA UI,
+// endpoints y catálogo distintos. Default depurador = comportamiento original.
+export type FormulasScope = "depurador" | "tienda";
+
+const SCOPE_CONFIG: Record<FormulasScope, {
+  formulasApi: string;
+  rubroApi: string;
+  catalogo: { marca: string; empresa: string }[];
+  grupos: { label: string; marca: string }[];
+}> = {
+  depurador: {
+    formulasApi: "/api/productos/cargar/formulas",
+    rubroApi: "/api/productos/cargar/rubro-formulas",
+    catalogo: MARCA_CATALOGO,
+    grupos: EMPRESA_GROUPS,
+  },
+  tienda: {
+    formulasApi: "/api/productos/cargar/tienda-formulas",
+    rubroApi: "/api/productos/cargar/tienda-rubro-formulas",
+    catalogo: TIENDA_MARCA_CATALOGO,
+    grupos: [
+      ...EMPRESAS_DESTINO.map((e) => ({ label: e.label, marca: e.marca })),
+      { label: "Active Shoes", marca: "Reebok" },
+      { label: "Joystep", marca: "Joybees" },
+      { label: "", marca: "" },
+    ],
+  },
+};
 
 function compactFormula(d: { divisor: number; extra: number; redondeo: Redondeo }): string {
   const r = d.redondeo === "half" ? ".50" : d.redondeo === "par" ? "par" : "entero";
@@ -54,8 +84,12 @@ const selCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[
 // [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
 const numCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
-export default function FormulasConfig() {
-  const [rows, setRows] = useState<MarcaRow[]>(() => MARCA_CATALOGO.map((c) => mkRow(c.marca, c.empresa)));
+export default function FormulasConfig({ scope = "depurador" }: { scope?: FormulasScope }) {
+  // Si el scope cambia, el padre debe remontar con key={scope} (el estado inicial
+  // del catálogo se siembra una sola vez).
+  const cfg = SCOPE_CONFIG[scope];
+  const catalogKeys = useMemo(() => new Set(cfg.catalogo.map((c) => marcaKey(c.marca))), [cfg]);
+  const [rows, setRows] = useState<MarcaRow[]>(() => cfg.catalogo.map((c) => mkRow(c.marca, c.empresa)));
   const [descSaved, setDescSaved] = useState<MarcaRubroFormula[]>([]);
   const [descEdits, setDescEdits] = useState<Record<string, DescEdit>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -71,26 +105,26 @@ export default function FormulasConfig() {
   // Carga fórmulas de marca + de descripción.
   useEffect(() => {
     let alive = true;
-    fetch("/api/productos/cargar/formulas")
+    fetch(cfg.formulasApi)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
       .then((d: { rows: MarcaFormula[] }) => {
         if (!alive) return;
         const saved = d.rows ?? [];
         const byKey = new Map(saved.map((f) => [marcaKey(f.marca), f] as const));
-        const catalogRows = MARCA_CATALOGO.map((c) => mkRow(c.marca, c.empresa, byKey.get(marcaKey(c.marca))));
-        const extraRows = saved.filter((f) => !CATALOG_KEYS.has(marcaKey(f.marca))).map((f) => mkRow(f.marca, f.empresa ?? null, f));
+        const catalogRows = cfg.catalogo.map((c) => mkRow(c.marca, c.empresa, byKey.get(marcaKey(c.marca))));
+        const extraRows = saved.filter((f) => !catalogKeys.has(marcaKey(f.marca))).map((f) => mkRow(f.marca, f.empresa ?? null, f));
         setRows([...catalogRows, ...extraRows]);
       })
       .catch(() => { if (alive) setError("No se pudieron cargar las fórmulas guardadas (el catálogo igual está editable)."); });
-    fetch("/api/productos/cargar/rubro-formulas")
+    fetch(cfg.rubroApi)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("fetch"))))
       .then((d: { rows: MarcaRubroFormula[] }) => { if (alive) setDescSaved(d.rows ?? []); })
       .catch(() => {});
     return () => { alive = false; };
-  }, [reloadKey]);
+  }, [reloadKey, cfg, catalogKeys]);
 
   const reloadDesc = () =>
-    fetch("/api/productos/cargar/rubro-formulas").then((r) => r.json()).then((d) => setDescSaved(d.rows ?? [])).catch(() => {});
+    fetch(cfg.rubroApi).then((r) => r.json()).then((d) => setDescSaved(d.rows ?? [])).catch(() => {});
 
   const descByKey = useMemo(() => {
     const m = new Map<string, MarcaRubroFormula>();
@@ -114,7 +148,7 @@ export default function FormulasConfig() {
     if (!row.marca.trim()) { setError("Escribe el nombre de la marca antes de guardar."); return; }
     setError(""); setSavingId(id);
     try {
-      const res = await fetch("/api/productos/cargar/formulas", {
+      const res = await fetch(cfg.formulasApi, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ marca: row.marca.trim(), empresa: row.empresa || null, divisor: row.divisor, extra: row.extra, redondeo: row.redondeo }),
       });
@@ -164,14 +198,14 @@ export default function FormulasConfig() {
       const tieneFormula = r.modo === "formula" && !!r.divisor;
       if (!tieneFijo && !tieneFormula) { // vacío = hereda → borra la excepción si existía
         if (r.savedRow?.id) {
-          const res = await fetch(`/api/productos/cargar/rubro-formulas?id=${encodeURIComponent(r.savedRow.id)}`, { method: "DELETE" });
+          const res = await fetch(`${cfg.rubroApi}?id=${encodeURIComponent(r.savedRow.id)}`, { method: "DELETE" });
           if (!res.ok) throw new Error("No se pudo guardar."); await reloadDesc();
         }
       } else {
         const payload = tieneFijo
           ? { marca, rubro: desc, divisor: 0, extra: 0, redondeo: "int", precio_fijo: r.precioFijo }
           : { marca, rubro: desc, divisor: r.divisor, extra: r.extra, redondeo: r.redondeo, precio_fijo: null };
-        const res = await fetch("/api/productos/cargar/rubro-formulas", {
+        const res = await fetch(cfg.rubroApi, {
           method: "PUT", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
@@ -198,12 +232,20 @@ export default function FormulasConfig() {
         <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Configuración de fórmulas</h2>
       </div>
 
-      <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
-        <b className="text-teal-800">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
-        hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
-      </div>
+      {scope === "tienda" ? (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+          <b className="text-teal-800">Fórmulas de TIENDA (Facturas Tienda):</b> precio = TECHO(Costo ÷ divisor) + extra,
+          redondeado hacia arriba. El costo es el PRECIO de la factura (lo que la empresa le cobra a la tienda).
+          Este set es SEPARADO de las fórmulas del Depurador.
+        </div>
+      ) : (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+          <b className="text-teal-800">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
+          hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
+        </div>
+      )}
 
-      <BulkExcel onDone={() => setReloadKey((k) => k + 1)} />
+      {scope === "depurador" && <BulkExcel onDone={() => setReloadKey((k) => k + 1)} />}
 
       <p className="mb-4 text-[13px] text-stone-500">
         Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
@@ -233,7 +275,7 @@ export default function FormulasConfig() {
               <input value={row.marca} onChange={(e) => patchMarca(row.id, { marca: e.target.value })} placeholder="Nombre de la marca"
                 className="w-40 rounded-md border border-stone-300 bg-white px-2 py-1 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20" />
               <select value={row.empresa ?? ""} onChange={(e) => patchMarca(row.id, { empresa: e.target.value || null })} className={selCls}>
-                {EMPRESAS_DESTINO.map((e) => <option key={e.key} value={e.label}>{e.label}</option>)}
+                {cfg.grupos.filter((g) => g.label).map((g) => <option key={g.label} value={g.label}>{g.label}</option>)}
                 <option value="">Otras</option>
               </select>
               <MarcaInputs row={row} onPatch={patchMarca} />
@@ -244,9 +286,9 @@ export default function FormulasConfig() {
       )}
 
       {/* Grupos por compañía → tarjetas de marca */}
-      {EMPRESA_GROUPS.map((g) => {
+      {cfg.grupos.map((g) => {
         const groupRows = rows.filter(
-          (r) => !r.isNew && rowMatch(r) && (g.label ? r.empresa === g.label : !EMPRESAS_DESTINO.some((e) => e.label === r.empresa))
+          (r) => !r.isNew && rowMatch(r) && (g.label ? r.empresa === g.label : !cfg.grupos.some((x) => x.label && x.label === r.empresa))
         );
         if (groupRows.length === 0) return null;
         return (
