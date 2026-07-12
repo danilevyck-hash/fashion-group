@@ -31,6 +31,7 @@ export const MARCA_DESCRIPCIONES: Record<string, string[]> = {
   ],
   "CK Jeans": [
     "Men-Denim Pants",
+    "Men-Dress Shirts",
     "Men-Heavyweight",
     "Men-Other Knit Tops",
     "Men-Outerwear",
