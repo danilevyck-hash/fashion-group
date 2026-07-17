@@ -6,6 +6,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { mailtoHref } from "@/lib/contact-links";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, reclamoTaxes, estadoLabel } from "./constants";
+import { matchReclamo, matchHint } from "./search";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
 import EnviarProveedorModal from "./EnviarProveedorModal";
@@ -81,10 +82,8 @@ export default function EmpresaList({
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
   const empresaRecs = allEmpresaRecs.filter((r) => {
     if (filterEstado !== "all" && r.estado !== filterEstado) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!(r.nro_reclamo || "").toLowerCase().includes(q) && !(r.nro_factura || "").toLowerCase().includes(q)) return false;
-    }
+    // N° reclamo, factura (header + ítems) y código de ítem — ver search.ts.
+    if (search && matchReclamo(r, search) === null) return false;
     return true;
   });
 
@@ -339,7 +338,7 @@ export default function EmpresaList({
       </div>
 
       <div className="mb-6">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar…" className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o ítem…" className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
       </div>
 
       {/* Mobile card list — visible on small screens only */}
@@ -366,6 +365,9 @@ export default function EmpresaList({
                         <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{r.nro_factura}</p>
+                      {search && matchHint(r, matchReclamo(r, search)) && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</p>
+                      )}
                     </div>
                   </div>
                   <StatusBadge estado={r.estado} />
@@ -455,6 +457,9 @@ export default function EmpresaList({
                       {r.nro_reclamo}
                       <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
                     </span>
+                    {search && matchHint(r, matchReclamo(r, search)) && (
+                      <span className="block font-normal text-[10px] text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</span>
+                    )}
                   </td>
                   <td className="py-3 text-gray-500">{r.nro_factura}</td>
                   <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>

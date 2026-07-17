@@ -5,6 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { EMPRESAS, EC, daysSince, calcSub, reclamoTaxes } from "./constants";
+import { matchReclamo, matchHint } from "./search";
 import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
 
 interface Props {
@@ -123,17 +124,20 @@ export default function EmpresaSelector({
 
         {/* Global search */}
         <div className="mb-4">
-          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo o empresa…" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
+          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, código de ítem o empresa…" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
         </div>
 
         {globalSearch.trim() ? (() => {
           const q = globalSearch.toLowerCase();
-          const results = reclamos.filter((r) =>
-            (r.nro_factura || "").toLowerCase().includes(q) ||
-            (r.nro_reclamo || "").toLowerCase().includes(q) ||
-            (r.empresa || "").toLowerCase().includes(q) ||
-            (r.notas || "").toLowerCase().includes(q)
-          );
+          // matchReclamo cubre N° reclamo, factura (header + ítems) y código de
+          // ítem; empresa y notas se mantienen como campos extra de esta lista.
+          const results = reclamos
+            .map((r) => ({ r, via: matchReclamo(r, globalSearch) }))
+            .filter(({ r, via }) =>
+              via !== null ||
+              (r.empresa || "").toLowerCase().includes(q) ||
+              (r.notas || "").toLowerCase().includes(q)
+            );
           return (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -151,9 +155,12 @@ export default function EmpresaSelector({
                     <th className="text-right pb-3 font-medium">Total</th>
                   </tr></thead>
                   <tbody>
-                    {results.map((r) => (
+                    {results.map(({ r, via }) => (
                       <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
-                        <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td>
+                        <td className="py-3 font-medium text-xs">
+                          {r.nro_reclamo}
+                          {matchHint(r, via) && <span className="block font-normal text-[10px] text-gray-400 mt-0.5">{matchHint(r, via)}</span>}
+                        </td>
                         <td className="py-3 text-gray-500">{r.empresa}</td>
                         <td className="py-3 text-gray-500">{r.nro_factura}</td>
                         <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
