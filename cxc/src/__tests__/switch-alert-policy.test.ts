@@ -16,7 +16,7 @@ vi.mock("@/lib/telegram", () => ({
   shortError: (s: string) => s,
 }));
 
-import { isSwitch401, computeStreak401 } from "@/lib/switch-api/alert-policy";
+import { isSwitch401, isSwitchTransitorio, isSwitchSilenciable, computeStreakSilenciable } from "@/lib/switch-api/alert-policy";
 
 describe("isSwitch401", () => {
   it("detecta token muerto a media paginación (caso real recibos)", () => {
@@ -40,7 +40,7 @@ describe("isSwitch401", () => {
     expect(isSwitch401("Auth fallo: HTTP 401 — LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
   });
 
-  it("errores no-token siguen siendo inmediatos", () => {
+  it("errores no-token no son 401 (pero red/5xx ahora son silenciables aparte)", () => {
     expect(isSwitch401("Error de red en /autenticacion: fetch failed")).toBe(false);
     expect(isSwitch401("Timeout >30000ms en /apifactura")).toBe(false);
     expect(isSwitch401("/apifactura → HTTP 500: Internal Server Error")).toBe(false);
@@ -51,7 +51,30 @@ describe("isSwitch401", () => {
   });
 });
 
-describe("computeStreak401", () => {
+describe("isSwitchTransitorio (anti-ruido red, 17-jul-2026)", () => {
+  it("detecta errores de red reales del incidente 17-jul", () => {
+    expect(isSwitchTransitorio("Error de red en /autenticacion: fetch failed (ECONNREFUSED)")).toBe(true);
+    expect(isSwitchTransitorio("Error de red en /autenticacion: fetch failed (UND_ERR_CONNECT_TIMEOUT)")).toBe(true);
+    expect(isSwitchTransitorio("Timeout >30000ms en /apifactura")).toBe(true);
+    expect(isSwitchTransitorio("/apifactura → HTTP 502: Bad Gateway")).toBe(true);
+  });
+
+  it("LICENCIA y errores de negocio siguen siendo inmediatos", () => {
+    expect(isSwitchTransitorio("Error de red en /x: LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
+    expect(isSwitchTransitorio("Auth fallo: HTTP 400 — LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
+    expect(isSwitchTransitorio("Auth respondió 200 pero sin token: <!DOCTYPE html>")).toBe(false);
+    expect(isSwitchTransitorio("Run previo atascado en 'running' (probable timeout); cerrado por el siguiente run.")).toBe(false);
+    expect(isSwitchTransitorio(null)).toBe(false);
+  });
+
+  it("isSwitchSilenciable = 401 o transitorio", () => {
+    expect(isSwitchSilenciable("/apifactura → HTTP 401: TOKEN INVALIDO")).toBe(true);
+    expect(isSwitchSilenciable("Error de red en /autenticacion: fetch failed (ECONNREFUSED)")).toBe(true);
+    expect(isSwitchSilenciable("Auth fallo: HTTP 400 — LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
+  });
+});
+
+describe("computeStreakSilenciable", () => {
   const err401 = (started_at: string) => ({
     status: "error",
     started_at,
@@ -64,12 +87,12 @@ describe("computeStreak401", () => {
   });
 
   it("1 solo 401 (corrida actual) → streak 1, no escala", () => {
-    const r = computeStreak401([err401("2026-07-10T05:30:00Z"), success("2026-07-09T05:30:00Z")]);
+    const r = computeStreakSilenciable([err401("2026-07-10T05:30:00Z"), success("2026-07-09T05:30:00Z")]);
     expect(r.streak).toBe(1);
   });
 
   it("2 corridas consecutivas 401 → streak 2 con sinceIso de la primera", () => {
-    const r = computeStreak401([
+    const r = computeStreakSilenciable([
       err401("2026-07-10T05:30:00Z"),
       err401("2026-07-09T05:30:00Z"),
       success("2026-07-08T05:30:00Z"),
@@ -79,7 +102,7 @@ describe("computeStreak401", () => {
   });
 
   it("un success intermedio corta el streak", () => {
-    const r = computeStreak401([
+    const r = computeStreakSilenciable([
       err401("2026-07-10T05:30:00Z"),
       success("2026-07-09T05:30:00Z"),
       err401("2026-07-08T05:30:00Z"),
@@ -87,16 +110,26 @@ describe("computeStreak401", () => {
     expect(r.streak).toBe(1);
   });
 
-  it("un error NO-401 intermedio también corta el streak", () => {
-    const r = computeStreak401([
+  it("un error de RED intermedio NO corta el streak (mismo Switch caído)", () => {
+    const r = computeStreakSilenciable([
       err401("2026-07-10T05:30:00Z"),
-      { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "Error de red en /autenticacion: fetch failed" },
+      { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "Error de red en /autenticacion: fetch failed (ECONNREFUSED)" },
+      err401("2026-07-08T05:30:00Z"),
+    ]);
+    expect(r.streak).toBe(3);
+    expect(r.sinceIso).toBe("2026-07-08T05:30:00Z");
+  });
+
+  it("un error NO silenciable (LICENCIA) sí corta el streak", () => {
+    const r = computeStreakSilenciable([
+      err401("2026-07-10T05:30:00Z"),
+      { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "Auth fallo: HTTP 400 — LICENCIA NO SE ENCUENTRA ACTIVA" },
       err401("2026-07-08T05:30:00Z"),
     ]);
     expect(r.streak).toBe(1);
   });
 
   it("sin historial → streak 0", () => {
-    expect(computeStreak401([]).streak).toBe(0);
+    expect(computeStreakSilenciable([]).streak).toBe(0);
   });
 });

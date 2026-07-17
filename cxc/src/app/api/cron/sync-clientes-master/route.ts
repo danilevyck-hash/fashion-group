@@ -39,7 +39,9 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   if (!result.ok) {
     console.error("[cron/sync-clientes-master] falló:", result.error);
-    await logCronError("sync_clientes_master_failed", result.error ?? "error desconocido");
+    // SIN Telegram inmediato (anti-ruido 17-jul-2026): colateral de la
+    // reconciliación → ella re-ejecuta y alerta si sigue caído; rastro en cron_email_errors.
+    await logCronError("sync_clientes_master_failed", result.error ?? "error desconocido", null, { telegram: false });
     return NextResponse.json(result, { status: 500 });
   }
 

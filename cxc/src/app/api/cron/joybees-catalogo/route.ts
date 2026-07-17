@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { sendTelegramAlert } from "@/lib/telegram";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
@@ -39,12 +39,11 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   try {
     result = await syncCatalogoJoybees({ dryRun });
   } catch (err) {
+    // Fallo catastrófico — no se tocó nada útil (fail-safe). SIN Telegram
+    // inmediato (anti-ruido 17-jul-2026): colateral de la reconciliación → ella
+    // re-ejecuta y alerta si sigue caído. El rastro queda en cron_email_errors.
     const msg = err instanceof Error ? err.message : String(err);
     if (!dryRun) {
-      await sendTelegramAlert(`🚨 Cron joybees-catalogo falló: ${shortError(msg)}`);
-      // Persistir el error (cron_email_errors) — sin esto el fallo solo vivía
-      // en Telegram y la reconciliación/auditoría no tenía rastro. Sin Telegram:
-      // la alerta específica de arriba ya avisó (evita el doble aviso).
       await logCronError("joybees_catalogo_failed", msg, null, { telegram: false });
     }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
@@ -52,8 +51,8 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   if (!dryRun) {
     // Fallo por empresa: NO se tocó esa empresa (fail-safe). Política anti-ruido
-    // 401 (alert-policy.ts): NO-401 alerta inmediato; un 401/token solo alerta
-    // si acumula 2+ corridas consecutivas (streak en switch_sync_log,
+    // (alert-policy.ts): 401/red/timeout/5xx solo alertan con 2+ corridas
+    // consecutivas (streak en switch_sync_log,
     // sync_type='catalogo_joybees').
     const fallidas = result.empresas.filter((e) => e.error);
     if (fallidas.length > 0) {
