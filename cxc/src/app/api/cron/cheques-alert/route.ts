@@ -34,7 +34,9 @@ export async function GET(req: NextRequest) {
   const r = await runChequesAlert();
   if (!r.ok) {
     console.error("[cheques-alert] query failed:", r.detail);
-    await logCronError("cheques_query_failed", r.detail);
+    // SIN Telegram inmediato (anti-ruido 17-jul-2026): colateral de la
+    // reconciliación → ella re-ejecuta y alerta si sigue caído; rastro en cron_email_errors.
+    await logCronError("cheques_query_failed", r.detail, null, { telegram: false });
     return NextResponse.json({ error: r.detail }, { status: 500 });
   }
 

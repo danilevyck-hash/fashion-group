@@ -37,7 +37,9 @@ export async function GET(req: NextRequest) {
     } catch (logErr) {
       console.error("[cleanup-packing-lists] cron_email_errors insert threw:", logErr);
     }
-    await logCronError("cleanup_packing_lists_failed", r.detail);
+    // SIN Telegram inmediato (anti-ruido 17-jul-2026): colateral de la
+    // reconciliación → ella re-ejecuta y alerta si sigue caído; rastro en cron_email_errors.
+    await logCronError("cleanup_packing_lists_failed", r.detail, null, { telegram: false });
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 

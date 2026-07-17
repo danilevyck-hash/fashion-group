@@ -54,7 +54,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, fecha, syncFresco, mensaje, resumen });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await logCronError(`${CRON_NAME}_failed`, msg);
+    // SIN Telegram inmediato (anti-ruido 17-jul-2026): colateral de la
+    // reconciliación → ella re-ejecuta y alerta si sigue caído; rastro en cron_email_errors.
+    await logCronError(`${CRON_NAME}_failed`, msg, null, { telegram: false });
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

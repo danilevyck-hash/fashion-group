@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
   const r = await runIntegrityCheck();
   if (!r.ok) {
     console.error("[integrity] check run failed:", r.detail);
-    await logCronError("integrity_check_failed", r.detail);
+    // SIN Telegram inmediato (anti-ruido 17-jul-2026): colateral de la
+    // reconciliación → ella re-ejecuta y alerta si sigue caído; rastro en cron_email_errors.
+    await logCronError("integrity_check_failed", r.detail, null, { telegram: false });
     return NextResponse.json({ error: r.detail }, { status: 500 });
   }
 

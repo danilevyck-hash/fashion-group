@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { sendTelegramAlert } from "@/lib/telegram";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
@@ -38,13 +38,12 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   try {
     result = await syncCatalogoReebok({ dryRun });
   } catch (err) {
-    // Fallo catastrófico (inesperado). Alerta y salir — no se tocó nada útil.
+    // Fallo catastrófico (inesperado) — no se tocó nada útil (fail-safe). SIN
+    // Telegram inmediato (anti-ruido 17-jul-2026): este cron está en
+    // COLATERAL_CRONS → la reconciliación lo re-ejecuta y alerta ella misma si
+    // sigue caído. El rastro queda en cron_email_errors.
     const msg = err instanceof Error ? err.message : String(err);
     if (!dryRun) {
-      await sendTelegramAlert(`🚨 Cron reebok-catalogo falló: ${shortError(msg)}`);
-      // Persistir el error (cron_email_errors) — sin esto el fallo solo vivía
-      // en Telegram y la reconciliación/auditoría no tenía rastro. Sin Telegram:
-      // la alerta específica de arriba ya avisó (evita el doble aviso).
       await logCronError("reebok_catalogo_failed", msg, null, { telegram: false });
     }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
@@ -52,9 +51,8 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   if (!dryRun) {
     // Fallo por empresa (Switch 401 / vacío): NO se tocó esa empresa (fail-safe).
-    // Política anti-ruido 401 (alert-policy.ts): NO-401 alerta inmediato; un
-    // 401/token solo alerta si acumula 2+ corridas consecutivas (streak en
-    // switch_sync_log, sync_type='catalogo_reebok').
+    // Política anti-ruido (alert-policy.ts): 401/red/timeout/5xx solo alertan
+    // con 2+ corridas consecutivas (streak en switch_sync_log, sync_type='catalogo_reebok').
     const fallidas = result.empresas.filter((e) => e.error);
     if (fallidas.length > 0) {
       await alertSwitchCronErrors(
