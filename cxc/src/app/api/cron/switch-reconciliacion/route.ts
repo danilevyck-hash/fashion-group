@@ -56,6 +56,7 @@ import { calcularResumenDiario, buildMensaje } from "@/lib/acs-resumen-diario";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, cronIsStale } from "@/lib/cron-telemetry";
+import { colateralDayStartIso } from "@/lib/fecha-panama";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
@@ -190,6 +191,13 @@ interface ColateralCron {
   // y recuperarlo antes duplicaría la alerta). Sin valor = recuperable siempre
   // (caso de los Switch syncs, que corren temprano: 05:30–09:30 UTC).
   recoverAfterHourUtc?: number;
+  // Cron programado entre 00:00 y 05:00 UTC (ANTES de la medianoche Panamá). Su
+  // "success de hoy" se mide contra el inicio del día UTC, no del día Panamá —
+  // si no, su heartbeat (p.ej. 01:01 UTC) siempre cae antes del umbral de 05:00
+  // UTC y la primera pasada del día lo re-corre aunque sí corrió (incidente
+  // 17-jul-2026: "(recuperado)" duplicado del resumen ACS). Ver
+  // colateralDayStartIso en fecha-panama.ts.
+  earlyUtcRun?: boolean;
 }
 
 const COLATERAL_CRONS: ColateralCron[] = [
@@ -330,6 +338,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // alerta y corre temprano (03:00 UTC) → sin guard de hora.
     cronName: "cleanup-packing-lists",
     label: "cleanup-packing-lists",
+    earlyUtcRun: true, // corre 03:00 UTC, antes de la medianoche Panamá
     recover: async () => {
       const r = await runCleanupPackingLists();
       return { ok: r.ok, detail: r.detail };
@@ -346,6 +355,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // 01:00 UTC, muy antes de la primera pasada (10:00) → sin guard de hora.
     cronName: "acs-resumen-diario",
     label: "acs-resumen",
+    earlyUtcRun: true, // corre 01:00 UTC, antes de la medianoche Panamá
     recover: async () => {
       const ayer = panamaDate(-1);
       const resumen = await calcularResumenDiario(ayer, true);
@@ -412,9 +422,16 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
     console.error(`[reconciliacion] no pude leer cron_heartbeats: ${error.message}`);
     return []; // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
   }
+  // Umbral por-cron: los earlyUtcRun (00:00-05:00 UTC) se miden contra el inicio
+  // del día UTC; el resto contra el inicio del día Panamá (dayStartIso).
+  const earlyStartIso = colateralDayStartIso(true);
   const successHoy = new Set(
     (data ?? [])
-      .filter((h) => h.last_success_at && h.last_success_at >= dayStartIso)
+      .filter((h) => {
+        if (!h.last_success_at) return false;
+        const col = COLATERAL_CRONS.find((c) => c.cronName === h.cron_name);
+        return h.last_success_at >= (col?.earlyUtcRun ? earlyStartIso : dayStartIso);
+      })
       .map((h) => h.cron_name),
   );
   // No recuperar un colateral antes de su hora programada (recoverAfterHourUtc):
