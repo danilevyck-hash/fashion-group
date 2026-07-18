@@ -19,6 +19,7 @@ import {
   TrendingUp,
   ShoppingBag,
   Megaphone,
+  Receipt,
   BookOpen,
   PackagePlus,
   Users,
@@ -81,6 +82,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "plata-sale" },
   { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "plata-sale" },
+  { key: "gastos-empresa", label: "Gastos de Empresa",  subtitle: "Gastos mensuales por empresa y saldos bancarios",    href: "/gastos-empresa", icon: Receipt,          roles: ["admin", "contabilidad"],                           group: "plata-sale" },
 
   // Ventas y Clientes
   { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas-clientes" },
