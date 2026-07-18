@@ -10,6 +10,8 @@
 
 import { createSwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
+import { sendTelegramAlert } from "@/lib/telegram";
+import { esCostoSospechoso } from "./costo-guard";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 
 export interface ArticulosSyncResult {
@@ -18,9 +20,40 @@ export interface ArticulosSyncResult {
   hasta: string;
   dias: number;
   filas: number;
+  costosSospechosos: number;
 }
 
 const SUCURSAL_ID = 1; // PRINCIPAL (única en todas las empresas)
+
+interface CostoSospechoso {
+  fecha: string;
+  codigo: string | null;
+  descripcion: string | null;
+  tipo: string;
+  cantidad: number;
+  costo: number;
+}
+
+function fmtMonto(n: number): string {
+  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
+async function alertarCostosSospechosos(empresaKey: string, filas: CostoSospechoso[]): Promise<void> {
+  const detalle = filas
+    .slice(0, 5)
+    .map((f) => {
+      const unit = f.cantidad > 0 ? ` (≈ ${fmtMonto(f.costo / f.cantidad)}/und)` : "";
+      const desc = (f.descripcion ?? "").slice(0, 40);
+      return `• ${f.fecha} · ${f.codigo ?? "?"} ${desc} [${f.tipo}]: costo ${fmtMonto(f.costo)} × ${f.cantidad} und${unit}`;
+    })
+    .join("\n");
+  const extra = filas.length > 5 ? `\n…y ${filas.length - 5} más.` : "";
+  await sendTelegramAlert(
+    `⚠️ Costo sospechoso en artículos — ${empresaKey}\n${detalle}${extra}\n` +
+      `Se guardaron con costo $0 para no dañar el margen. ` +
+      `Corrige el costo del artículo en Switch y relanza switch-articulos de ese día.`,
+  );
+}
 
 function num(x: unknown): number {
   const n = parseFloat(String(x).replace(/,/g, ""));
@@ -74,6 +107,7 @@ async function syncArticulosDiarioInner(
   const now = new Date().toISOString();
   let dias = 0;
   let filas = 0;
+  const sospechosos: CostoSospechoso[] = [];
 
   for (const fecha of dateRange(desde, hasta)) {
     dias++;
@@ -84,6 +118,19 @@ async function syncArticulosDiarioInner(
       const data = await client.getVentaSucursal({ fecha, sucursalId: SUCURSAL_ID, porPagina: 50, paginaActual: pagina });
       const arr = data?.ventasucursal ?? [];
       for (const a of arr) {
+        const cantidadTotal = num(a.cantidadtotal);
+        const costoTotal = num(a.costototal);
+        const sospechoso = esCostoSospechoso(costoTotal, cantidadTotal);
+        if (sospechoso) {
+          sospechosos.push({
+            fecha,
+            codigo: a.codigo ?? null,
+            descripcion: a.descripcion ?? null,
+            tipo: a.tipo,
+            cantidad: cantidadTotal,
+            costo: costoTotal,
+          });
+        }
         byKey.set(`${a.articuloId}|${a.tipo}`, {
           empresa_key: empresaKey,
           fecha,
@@ -93,9 +140,9 @@ async function syncArticulosDiarioInner(
           unidad_medida_id: a.unidadmedidaId ?? null,
           tipo: a.tipo,
           total_comprobantes: Number(a.totalcomprobantes) || 0,
-          cantidad_total: num(a.cantidadtotal),
+          cantidad_total: cantidadTotal,
           venta_total: num(a.ventatotal),
-          costo_total: num(a.costototal),
+          costo_total: sospechoso ? 0 : costoTotal,
           synced_at: now,
           updated_at: now,
         });
@@ -113,5 +160,10 @@ async function syncArticulosDiarioInner(
     filas += byKey.size;
   }
 
-  return { empresaKey, desde, hasta, dias, filas };
+  if (sospechosos.length > 0) {
+    console.error(`[sync-articulos] ${empresaKey}: ${sospechosos.length} fila(s) con costo sospechoso`, sospechosos);
+    await alertarCostosSospechosos(empresaKey, sospechosos);
+  }
+
+  return { empresaKey, desde, hasta, dias, filas, costosSospechosos: sospechosos.length };
 }
