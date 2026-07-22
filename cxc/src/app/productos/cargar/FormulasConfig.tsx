@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   EMPRESAS_DESTINO, MARCA_CATALOGO, descripcionesDeMarca, norm, marcaKey, marcaRubroKey,
-  type Redondeo, type MarcaFormula, type MarcaRubroFormula,
+  type CatalogoDescripciones, type Redondeo, type MarcaFormula, type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
 import { TIENDA_MARCA_CATALOGO } from "@/lib/depurador/tienda";
+import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 import BulkExcel from "./BulkExcel";
+
+// Catálogo vacío estable mientras carga el real (evita reindexar por render).
+const CATALOGO_VACIO: CatalogoDescripciones = {};
 
 // ── Modelos ──────────────────────────────────────────────────────────────────
 interface MarcaRow {
@@ -88,6 +92,9 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
   // Si el scope cambia, el padre debe remontar con key={scope} (el estado inicial
   // del catálogo se siembra una sola vez).
   const cfg = SCOPE_CONFIG[scope];
+  // Catálogo de descripciones por marca (tabla depurador_descripciones).
+  const { catalogo: catalogoDescs, cargando: descsCargando, fallo: descsFallo, reintentar: reintentarDescs } = useCatalogoDescripciones();
+  const descsCatalogo = catalogoDescs ?? CATALOGO_VACIO;
   const catalogKeys = useMemo(() => new Set(cfg.catalogo.map((c) => marcaKey(c.marca))), [cfg]);
   const [rows, setRows] = useState<MarcaRow[]>(() => cfg.catalogo.map((c) => mkRow(c.marca, c.empresa)));
   const [descSaved, setDescSaved] = useState<MarcaRubroFormula[]>([]);
@@ -220,7 +227,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
 
   // ── Búsqueda (marca o descripción; si matchea desc, abre la tarjeta) ──
   const q = norm(search);
-  const descMatch = (marca: string) => !!q && descripcionesDeMarca(marca).some((d) => norm(d).includes(q));
+  const descMatch = (marca: string) => !!q && descripcionesDeMarca(descsCatalogo, marca).some((d) => norm(d).includes(q));
   const rowMatch = (row: MarcaRow) => !q || norm(row.marca).includes(q) || descMatch(row.marca);
   const toggle = (id: string) => setOpen((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -245,7 +252,25 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
         </div>
       )}
 
-      {scope === "depurador" && <BulkExcel onDone={() => setReloadKey((k) => k + 1)} />}
+      {scope === "depurador" && <BulkExcel catalogo={catalogoDescs} onDone={() => setReloadKey((k) => k + 1)} />}
+
+      {descsCargando && (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+          Cargando catálogo de descripciones…
+        </div>
+      )}
+      {descsFallo && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
+          <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+          <button
+            type="button"
+            onClick={reintentarDescs}
+            className="rounded-md border border-red-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       <p className="mb-4 text-[13px] text-stone-500">
         Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
@@ -299,7 +324,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
             </div>
             {groupRows.map((row) => (
               <MarcaCard
-                key={row.id} row={row}
+                key={row.id} row={row} catalogo={descsCatalogo}
                 isOpen={open.has(row.id) || descMatch(row.marca)}
                 onToggle={() => toggle(row.id)}
                 onPatchMarca={patchMarca} onSaveMarca={saveMarca}
@@ -317,17 +342,17 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
 
 // ── Tarjeta de marca ─────────────────────────────────────────────────────────
 function MarcaCard({
-  row, isOpen, onToggle, onPatchMarca, onSaveMarca, savingMarca, flashMarca,
+  row, catalogo, isOpen, onToggle, onPatchMarca, onSaveMarca, savingMarca, flashMarca,
   descRowFor, onPatchDesc, onSaveDesc, busyDesc, flashDesc, searchQ,
 }: {
-  row: MarcaRow; isOpen: boolean; onToggle: () => void;
+  row: MarcaRow; catalogo: CatalogoDescripciones; isOpen: boolean; onToggle: () => void;
   onPatchMarca: (id: string, p: Partial<MarcaRow>) => void; onSaveMarca: (id: string) => void;
   savingMarca: boolean; flashMarca: boolean;
   descRowFor: (m: string, d: string) => DescRowState;
   onPatchDesc: (m: string, d: string, p: Partial<DescEdit>) => void; onSaveDesc: (m: string, d: string) => void;
   busyDesc: string | null; flashDesc: string | null; searchQ: string;
 }) {
-  const descs = descripcionesDeMarca(row.marca);
+  const descs = descripcionesDeMarca(catalogo, row.marca);
   const conFormula = descs.filter((d) => descRowFor(row.marca, d).propia).length;
   const heredan = descs.length - conFormula;
   const marcaLabel = savingMarca ? "Guardando…" : row.dirty ? "Guardar" : row.saved ? "Guardado" : "Guardar";

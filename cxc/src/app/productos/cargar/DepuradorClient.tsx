@@ -30,6 +30,8 @@ import {
   type MarcaFormula,
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
+import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
+import AlarmaDescripcionesNuevas from "./AlarmaDescripcionesNuevas";
 
 const DIVISOR_HINTS = [0.70, 0.73, 0.75, 0.63];
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
@@ -95,6 +97,16 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [tasa, setTasa] = useState("7");
   const [factor, setFactor] = useState("1.1");
 
+  // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
+  // Sin catálogo NO se procesa ni se descarga nada (sin fallback al archivo TS).
+  const {
+    catalogo,
+    cargando: catalogoCargando,
+    fallo: catalogoFallo,
+    reintentar: reintentarCatalogo,
+    agregarDescripcion,
+  } = useCatalogoDescripciones();
+
   // ── Precio (Tarea 2) ───────────────────────────────────────────────────────
   // Default: cada marca toma su fórmula guardada. "global" sigue disponible.
   const [priceMode, setPriceMode] = useState<"global" | "marca">("marca");
@@ -157,17 +169,20 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
   const handleFile = useCallback(
     (file: File) => {
+      if (!catalogo) return; // sin catálogo no se procesa (cargando o falló)
       fileRef.current = file;
       runFile(file, { mesIdx, anio, tasa, factor });
     },
-    [runFile, mesIdx, anio, tasa, factor]
+    [runFile, mesIdx, anio, tasa, factor, catalogo]
   );
 
   // Modo dispatcher: procesar el archivo inyectado automáticamente (mismo tab).
+  // Espera a que el catálogo esté cargado; fileRef evita reprocesar cuando el
+  // catálogo cambia (p.ej. al aprobar una descripción).
   useEffect(() => {
-    if (injectedFile) handleFile(injectedFile);
+    if (injectedFile && catalogo && fileRef.current !== injectedFile) handleFile(injectedFile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [injectedFile]);
+  }, [injectedFile, catalogo]);
 
   // Reprocesar al cambiar un parámetro si ya hay archivo cargado
   const reprocess = useCallback(
@@ -409,7 +424,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   };
 
   const download = async () => {
-    if (!processed || downloading) return;
+    if (!processed || downloading || !catalogo) return;
     if (descsNuevas.length > 0) return; // bloqueado: descripciones nuevas sin aprobar (Tarea 2)
     setDownloading(true);
     try {
@@ -469,52 +484,35 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   // Descripciones huérfanas: bajo una marca CK/TH conocida pero NO en su catálogo,
   // tras aplicar normalización (Tarea 8). Las de marca "Otros"/desconocida NO cuentan
   // (son basura intencional). No rompen: se procesan con su marca, solo se alarma.
+  // Depende del catálogo en memoria → al aprobar una descripción se re-evalúa en vivo.
   const descsNuevas = useMemo(() => {
-    if (!processed) return [] as { marca: string; desc: string }[];
+    if (!processed || !catalogo) return [] as { marca: string; desc: string }[];
     const seen = new Set<string>();
     const out: { marca: string; desc: string }[] = [];
     for (const r of processed) {
       const marca = String(r.cols["Marca *"] || "");
       const desc = String(r.cols["Descripción *"] || "");
       if (!desc) continue;
-      if (descripcionesDeMarca(marca).length === 0) continue; // marca no catalogada (Otros) → ignorar
+      if (descripcionesDeMarca(catalogo, marca).length === 0) continue; // marca no catalogada (Otros) → ignorar
       const k = `${marcaKey(marca)}|||${marcaKey(desc)}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      if (!esDescripcionCatalogada(marca, desc)) out.push({ marca, desc });
+      if (!esDescripcionCatalogada(catalogo, marca, desc)) out.push({ marca, desc });
     }
     return out;
-  }, [processed]);
+  }, [processed, catalogo]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      {/* Alarma de descripción NUEVA no catalogada (Tarea 8) — BLOQUEA la descarga */}
+      {/* Alarma de descripción NUEVA no catalogada (Tarea 8) — BLOQUEA la descarga.
+          Admin/secretaria pueden aprobarlas ahí mismo; al aprobar, el catálogo en
+          memoria se actualiza y la alarma se re-evalúa en vivo. */}
       {processed && descsNuevas.length > 0 && !orphanSeen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6 shadow-2xl">
-            <div className="mb-2 text-center text-5xl">⚠️</div>
-            <h2 className="text-center text-xl font-bold text-red-700">{descsNuevas.length} descripción(es) NUEVA(S) detectada(s)</h2>
-            <p className="mt-2 text-center text-sm text-stone-600">
-              Estas descripciones <b>NO están en el catálogo</b> de su marca. <b>No se puede descargar</b> la
-              plantilla hasta que Daniel las apruebe y se agreguen al catálogo. Toma una captura de pantalla
-              y envíasela a Daniel.
-            </p>
-            <div className="mt-4 max-h-52 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
-              {descsNuevas.map((o, i) => (
-                <div key={i} className="text-[13px] text-stone-800">
-                  <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setOrphanSeen(true)}
-              className="mt-5 w-full rounded-lg bg-stone-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-stone-800 active:scale-[0.98]"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+        <AlarmaDescripcionesNuevas
+          items={descsNuevas}
+          onAprobada={(marca, desc) => { agregarDescripcion(marca, desc); }}
+          onClose={() => setOrphanSeen(true)}
+        />
       )}
 
       {/* Masthead compacto */}
@@ -523,6 +521,25 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
           Depurador de Productos
         </h1>
       </div>
+
+      {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
+      {catalogoCargando && (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+          Cargando catálogo de descripciones…
+        </div>
+      )}
+      {catalogoFallo && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+          <button
+            type="button"
+            onClick={reintentarCatalogo}
+            className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Drop zone propia (oculta en modo dispatcher: el padre tiene la dropzone) */}
       {!embedded && (
@@ -535,19 +552,24 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             setDragging(false);
             if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
           }}
-          className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-            dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+          className={`mb-4 flex flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
+            !catalogo
+              ? "cursor-not-allowed border-stone-200 bg-stone-100 opacity-60"
+              : dragging ? "cursor-pointer border-teal-600 bg-teal-50" : "cursor-pointer border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
           }`}
         >
           <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
           <div className="text-base font-semibold text-stone-900">
-            {fileName || "Suelta el archivo aquí o haz clic para buscar"}
+            {!catalogo
+              ? "Espera a que cargue el catálogo de descripciones…"
+              : fileName || "Suelta el archivo aquí o haz clic para buscar"}
           </div>
           <input
             ref={inputRef}
             type="file"
             accept=".xlsx,.xls"
             className="hidden"
+            disabled={!catalogo}
             onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
           />
         </label>
@@ -637,7 +659,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             </select>
             <button
               onClick={download}
-              disabled={downloading || descsNuevas.length > 0}
+              disabled={downloading || descsNuevas.length > 0 || !catalogo}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               {downloading ? "Generando…" : "Descargar plantilla"}
@@ -652,8 +674,15 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
 
           {/* Bloqueo de descarga por descripciones nuevas sin aprobar (Tarea 2) */}
           {descsNuevas.length > 0 && (
-            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-              🔒 Bloqueado: hay {descsNuevas.length} descripción(es) nueva(s) sin aprobar. Envía la captura a Daniel.
+            <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+              <span>🔒 Bloqueado: hay {descsNuevas.length} descripción(es) nueva(s) sin aprobar.</span>
+              <button
+                type="button"
+                onClick={() => setOrphanSeen(false)}
+                className="rounded-md border border-red-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+              >
+                Ver y aprobar
+              </button>
             </p>
           )}
 
@@ -801,7 +830,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                 {descsNuevas.length > 0 && (
                   <p className="mt-2.5 text-[12px] font-semibold text-red-600">
                     🔒 {descsNuevas.length} descripción(es) nueva(s) no están en el catálogo: la descarga está
-                    bloqueada hasta que Daniel las apruebe.
+                    bloqueada hasta aprobarlas al catálogo.
                   </p>
                 )}
               </>

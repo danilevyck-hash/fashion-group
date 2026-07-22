@@ -1,9 +1,20 @@
 import { describe, it, expect } from "vitest";
 import {
   processRows, buildAoa, OUT_COLS, titleCase, proveedorParaEmpresa, outColsForEmpresa,
-  esDescripcionCatalogada, matchEmpresaFromDestino, precioDescripcion,
-  type SheetRow, type MarcaRubroFormula,
+  esDescripcionCatalogada, descripcionesDeMarca, matchEmpresaFromDestino, precioDescripcion,
+  MARCA_CATALOGO,
+  type SheetRow, type MarcaRubroFormula, type CatalogoDescripciones,
 } from "../lib/depurador/logic";
+import { marcasQueContienen } from "../lib/depurador/tienda";
+
+// El catálogo de descripciones ya NO es una constante: vive en la tabla
+// depurador_descripciones y las funciones lo reciben como parámetro. Para los
+// tests se inyecta este fixture (espejo de un pedazo del seed real).
+const CATALOGO_TEST: CatalogoDescripciones = {
+  "KL Footwear": ["Women-Flip Flops", "Women-Sneakers"],
+  "KL Womenswear": ["Women-T-Shirts S/S"],
+  "TH Menswear": ["Men-Polos S/S", "Men-T-Shirts S/S"],
+};
 
 const H = ["REFERENCIA", "EAN", "P_CATEGORY", "TALLA", "CANTIDAD", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
 const cfg = { factor: 1.1, tasa: "7", mesIdx: 5, anio: "2026" }; // Junio 2026
@@ -113,8 +124,32 @@ describe("Depurador — Active Wear / Karl Lagerfeld (Tarea 4)", () => {
     expect(matchEmpresaFromDestino("MULTIFASHION S.A.")).toBe("active_wear");
   });
   it("Marcas KL conocidas para la alarma (catalogadas vs huérfanas)", () => {
-    expect(esDescripcionCatalogada("KL Footwear", "Women-Sneakers")).toBe(true);
-    expect(esDescripcionCatalogada("KL Footwear", "Women-Boots")).toBe(false); // dispararía alarma/bloqueo
+    expect(esDescripcionCatalogada(CATALOGO_TEST, "KL Footwear", "Women-Sneakers")).toBe(true);
+    expect(esDescripcionCatalogada(CATALOGO_TEST, "KL Footwear", "Women-Boots")).toBe(false); // dispararía alarma/bloqueo
+  });
+});
+
+describe("Depurador — catálogo de descripciones inyectado (tabla, no constante)", () => {
+  it("descripcionesDeMarca es insensible a caja/espacios de la marca", () => {
+    expect(descripcionesDeMarca(CATALOGO_TEST, "kl  footwear")).toEqual(["Women-Flip Flops", "Women-Sneakers"]);
+    expect(descripcionesDeMarca(CATALOGO_TEST, "KL FOOTWEAR")).toEqual(["Women-Flip Flops", "Women-Sneakers"]);
+    expect(descripcionesDeMarca(CATALOGO_TEST, "Marca Inexistente")).toEqual([]);
+  });
+  it("esDescripcionCatalogada compara descripciones insensible a caja", () => {
+    expect(esDescripcionCatalogada(CATALOGO_TEST, "TH Menswear", "MEN-POLOS S/S")).toBe(true);
+    expect(esDescripcionCatalogada(CATALOGO_TEST, "TH Menswear", "Men-Boots")).toBe(false);
+  });
+  it("MARCA_CATALOGO sigue en código con las 26 marcas CK/TH/KL", () => {
+    expect(MARCA_CATALOGO.length).toBe(26);
+    const marcas = MARCA_CATALOGO.map((c) => c.marca);
+    expect(marcas).toContain("CK Menswear");
+    expect(marcas).toContain("TH Footwear");
+    expect(marcas).toContain("KL Accessories");
+  });
+  it("marcasQueContienen (Facturas Tienda) deriva la marca desde el catálogo inyectado", () => {
+    expect(marcasQueContienen(CATALOGO_TEST, "active_wear", "Women-Sneakers")).toEqual(["KL Footwear"]);
+    expect(marcasQueContienen(CATALOGO_TEST, "active_wear", "Women-Boots")).toEqual([]); // nueva → bloquea
+    expect(marcasQueContienen(CATALOGO_TEST, "fashion_wear", "Men-Polos S/S")).toEqual(["TH Menswear"]);
   });
 });
 

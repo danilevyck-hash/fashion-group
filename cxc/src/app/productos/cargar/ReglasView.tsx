@@ -10,6 +10,7 @@ import {
   descripcionesDeMarca,
   norm,
 } from "@/lib/depurador/logic";
+import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
 
 // Regla de talla del EAN representativo (espejo de pickEAN en lib/depurador/logic.ts).
 // Solo lectura: si se cambia la regla en el código hay que actualizar esta tabla.
@@ -40,6 +41,8 @@ const GRUPOS = [
 
 export default function ReglasView() {
   const [q, setQ] = useState("");
+  // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
+  const { catalogo, cargando, fallo, reintentar } = useCatalogoDescripciones();
   const normEntries = useMemo(() => Object.entries(NORMALIZACION).sort((a, b) => a[0].localeCompare(b[0], "es")), []);
   const filteredNorm = useMemo(() => {
     const s = norm(q);
@@ -141,17 +144,34 @@ export default function ReglasView() {
         </div>
       </section>
 
-      {/* Sección C — Catálogo de marcas y descripciones */}
+      {/* Sección C — Catálogo de marcas y descripciones (desde la tabla) */}
       <section>
         <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-teal-800">Catálogo de marcas y descripciones</h3>
-        {GRUPOS.map((g) => (
+        {cargando && (
+          <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
+            Cargando catálogo de descripciones…
+          </div>
+        )}
+        {fallo && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-800">
+            <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+            <button
+              type="button"
+              onClick={reintentar}
+              className="rounded-md border border-red-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+        {catalogo && GRUPOS.map((g) => (
           <div key={g.label} className="mb-5">
             <div className="mb-2 border-b border-stone-200 py-1.5 text-[12px] font-bold uppercase tracking-wide text-teal-800">
               {g.label}<span className="ml-2 font-normal normal-case tracking-normal text-stone-500">· {g.brand}</span>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {g.marcas.map((c) => {
-                const ds = descripcionesDeMarca(c.marca);
+                const ds = descripcionesDeMarca(catalogo, c.marca);
                 return (
                   <div key={c.marca} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
                     <div className="text-[13px] font-semibold text-stone-900">{c.marca} <span className="text-[11px] font-normal text-stone-400">({ds.length})</span></div>

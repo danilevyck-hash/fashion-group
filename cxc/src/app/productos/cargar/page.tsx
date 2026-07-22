@@ -9,6 +9,7 @@ import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
 import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
+import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
 
 type Tab = "depurador" | "facturas" | "curvas" | "formulas" | "reglas" | "historial";
 type FormulasScope = "depurador" | "tienda";
@@ -22,7 +23,7 @@ export default function CargarProductosPage() {
 }
 
 function CargarInner() {
-  const { authChecked } = useAuth({ moduleKey: "cargar", allowedRoles: ["admin", "secretaria"] });
+  const { authChecked, role } = useAuth({ moduleKey: "cargar", allowedRoles: ["admin", "secretaria"] });
   const [tab, setTab] = useState<Tab>("depurador");
   const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -91,6 +92,8 @@ function CargarInner() {
         </div>
       )}
       {tab === "formulas" && <FormulasConfig key={formulasScope} scope={formulasScope} />}
+      {/* Catálogo de descripciones (tabla depurador_descripciones) — SOLO admin. */}
+      {tab === "formulas" && role === "admin" && <CatalogoDescripcionesAdmin />}
       {tab === "reglas" && <ReglasView />}
       {tab === "historial" && <HistorialView refreshKey={refreshKey} />}
     </div>
