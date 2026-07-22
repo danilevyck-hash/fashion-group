@@ -108,14 +108,17 @@ export default function OrderDetailPage() {
             const er = await fetch(`/api/catalogo/reebok/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
           } catch { /* no bloquea la carga del pedido */ }
-          // Cliente Switch asignado al pedido (null = Contado, el default del piloto)
-          try {
-            const cr = await fetch(`/api/catalogo/reebok/clientes-switch?orderId=${id}`);
-            if (cr.ok) {
-              const cd = await cr.json();
-              setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
-            }
-          } catch { /* no bloquea la carga del pedido */ }
+          // Cliente Switch asignado al pedido (null = Contado, el default del
+          // piloto) — solo admin/secretaria (el endpoint no permite vendedor)
+          if (["admin", "secretaria"].includes(r)) {
+            try {
+              const cr = await fetch(`/api/catalogo/reebok/clientes-switch?orderId=${id}`);
+              if (cr.ok) {
+                const cd = await cr.json();
+                setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+              }
+            } catch { /* no bloquea la carga del pedido */ }
+          }
         }
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
