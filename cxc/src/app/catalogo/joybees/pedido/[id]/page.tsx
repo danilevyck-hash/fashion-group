@@ -69,6 +69,11 @@ export default function OrderDetailPage() {
   const [clienteResults, setClienteResults] = useState<ClienteSwitchRow[]>([]);
   const [clienteBuscando, setClienteBuscando] = useState(false);
   const [clienteGuardando, setClienteGuardando] = useState(false);
+  // ── Candado post-envío a Switch + reemplazo (Duplicar y corregir) ──
+  const [reemplazadoPor, setReemplazadoPor] = useState<{ id: string; order_number: string } | null>(null);
+  const [pedidoOriginal, setPedidoOriginal] = useState<{ id: string; order_number: string; switch_numero: string | null } | null>(null);
+  const [duplicando, setDuplicando] = useState(false);
+  const switchLockRef = useRef(false);
   const nameRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlight = useRef(false);
@@ -88,11 +93,13 @@ export default function OrderDetailPage() {
         const d = await res.json();
         const r = sessionStorage.getItem("cxc_role") || "";
         setOrder(d); setItems(sortItems(d.joybees_order_items || [])); setClientName(d.client_name || "");
+        setReemplazadoPor(d.reemplazado_por || null); setPedidoOriginal(d.original || null);
         if (d.client_email) setClientEmail(d.client_email);
         // Track active draft so catalog can add to it
         if (d.status === "borrador") sessionStorage.setItem("joybees_draft_id", id);
-        // Estado del envío a Switch (solo admin/secretaria; otros reciben 403 y se ignora)
-        if (["admin", "secretaria"].includes(r)) {
+        // Estado del envío a Switch (admin/secretaria/vendedor — el vendedor
+        // también necesita ver el candado post-envío; otros roles se ignoran)
+        if (["admin", "secretaria", "vendedor"].includes(r)) {
           try {
             const er = await fetch(`/api/catalogo/joybees/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
@@ -149,13 +156,18 @@ export default function OrderDetailPage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { clientNameRef.current = clientName; }, [clientName]);
 
+  // Candado post-envío: con envío activo a Switch ('enviado' o 'verificado')
+  // el contenido del pedido queda de solo lectura ('pendiente' no bloquea).
+  const switchLock = !!switchEnvio && ["enviado", "verificado"].includes(switchEnvio.estado);
+  useEffect(() => { switchLockRef.current = switchLock; }, [switchLock]);
+
   // ── AUTO-SAVE (2s debounce) ──
   const changeCount = useRef(0);
   useEffect(() => {
     changeCount.current++;
     // Editar funciona en cualquier estado (incluso confirmado). El PUT no
     // manda status, asi que el pedido NO cambia de estado al guardar.
-    if (changeCount.current <= 1 || !order) return;
+    if (changeCount.current <= 1 || !order || switchLockRef.current) return;
     setAutoSaveStatus("dirty");
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => { performSave(); }, 2000);
@@ -167,6 +179,8 @@ export default function OrderDetailPage() {
   // saveInFlight; si llega otra peticion mientras guarda, encola un trailing
   // save con los datos mas recientes (refs). No manda status ni envia correo.
   async function performSave() {
+    // Pedido bloqueado por Switch: no hay nada editable que guardar.
+    if (switchLockRef.current) { setAutoSaveStatus(null); return; }
     if (saveInFlight.current) { pendingSave.current = true; return; }
     if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
     saveInFlight.current = true;
@@ -176,7 +190,13 @@ export default function OrderDetailPage() {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_name: clientNameRef.current, items: itemsRef.current }),
       });
-      if (!res.ok) {
+      if (res.status === 409) {
+        // Candado del server: el pedido ya esta en Switch. Refrescar el estado
+        // para que la UI pase a solo lectura con el banner.
+        setAutoSaveStatus(null);
+        showToast("Este pedido ya está en Switch — no se puede editar aquí.");
+        load();
+      } else if (!res.ok) {
         setAutoSaveStatus("error");
         showToast("No se pudo guardar. Revisa tu conexion e intenta de nuevo.");
       } else {
@@ -260,6 +280,25 @@ export default function OrderDetailPage() {
     setSaving(false);
     showToast("Pedido en modo edicion");
     load();
+  }
+
+  // ── DUPLICAR Y CORREGIR (pedido bloqueado por envío a Switch) ──
+  // Clona el pedido como borrador NUEVO editable (reemplaza_a = este) y navega.
+  async function duplicarPedido() {
+    setDuplicando(true);
+    try {
+      const res = await fetch(`/api/catalogo/joybees/orders/${id}/duplicar`, { method: "POST" });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        showToast(d.yaExistia ? `Ya existe ${d.order_number} — te llevo a ese pedido` : `Pedido duplicado: ${d.order_number}`);
+        router.push(`/catalogo/joybees/pedido/${d.id}`);
+      } else {
+        showToast(d.error || "No se pudo duplicar el pedido. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("Error de conexion. Intenta de nuevo.");
+    }
+    setDuplicando(false);
   }
 
   async function deleteOrder() {
@@ -411,7 +450,9 @@ export default function OrderDetailPage() {
     setSendingToClient(false);
   }
 
-  const canEdit = ["admin", "secretaria", "vendedor"].includes(role);
+  const isEditorRole = ["admin", "secretaria", "vendedor"].includes(role);
+  // El candado post-envío a Switch deja TODO el contenido de solo lectura.
+  const canEdit = isEditorRole && !switchLock;
   const canDelete = ["admin", "secretaria"].includes(role);
   const isConfirmed = order?.status === "confirmado";
 
@@ -483,6 +524,31 @@ export default function OrderDetailPage() {
       </div>
 
       <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</p>
+
+      {/* Candado post-envío a Switch: solo lectura + salida clara (duplicar) */}
+      {switchLock && switchEnvio && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-4">
+          <p className="text-sm text-amber-900 font-medium">
+            Este pedido ya está en Switch como #{switchEnvio.numero_interno || switchEnvio.pedido_switch_id || "?"} — no se puede editar aquí.
+          </p>
+          {reemplazadoPor ? (
+            <p className="text-sm text-amber-800 mt-2">
+              Reemplazado por{" "}
+              <Link href={`/catalogo/joybees/pedido/${reemplazadoPor.id}`} className="font-medium underline hover:text-black transition">
+                {reemplazadoPor.order_number}
+              </Link>
+            </p>
+          ) : isEditorRole ? (
+            <div className="mt-3">
+              <button onClick={duplicarPedido} disabled={duplicando}
+                className="bg-black text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                {duplicando ? "Duplicando..." : "Duplicar y corregir"}
+              </button>
+              <p className="text-xs text-amber-700 mt-2">o edítalo directamente en el panel de Switch</p>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Save bar — prominent status + manual save */}
       {canEdit && (
@@ -776,6 +842,15 @@ export default function OrderDetailPage() {
                     {switchPreview.warnings.map((w, i) => (
                       <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {w}</p>
                     ))}
+                  </div>
+                )}
+                {/* Recordatorio anti-duplicado: este pedido reemplaza a uno que
+                    YA está en Switch — hay que borrar el viejo en el panel. */}
+                {pedidoOriginal?.switch_numero && (
+                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-4">
+                    <p className="text-xs text-red-700 font-medium">
+                      Este pedido reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en el panel de Switch para no duplicar.
+                    </p>
                   </div>
                 )}
                 <p className="text-xs text-gray-400 mb-4">
