@@ -769,25 +769,32 @@ export default function OrderDetailPage() {
             </button>
           )}
         </div>
-      ) : (
+      ) : switchLock ? null : (
+        // Bajo candado de Switch NO se muestra "Confirmar pedido": la única
+        // acción protagonista es "Duplicar y corregir" (en el banner).
         <button onClick={confirmOrder} disabled={confirming || !items.length}
           className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
           {confirming ? "Confirmando..." : "Confirmar pedido"}
         </button>
       )}
 
-      {/* Delete — only draft, small text at bottom */}
-      {canDelete && !isConfirmed && (
+      {/* Delete — discreto. Bajo candado de Switch el soft-delete es solo
+          OCULTAR local (no toca Switch), y el label lo dice claro. */}
+      {canDelete && (!isConfirmed || switchLock) && (
         <button onClick={() => setShowDeleteModal(true)}
           className="text-xs text-gray-400 hover:text-red-500 transition mt-6 py-1 block mx-auto">
-          Eliminar pedido
+          {switchLock ? "Ocultar de la lista (el pedido sigue en Switch)" : "Eliminar pedido"}
         </button>
       )}
 
       <ConfirmDeleteModal
         open={showDeleteModal}
-        title={`Eliminar pedido ${order?.order_number || ""}?`}
-        description={`Se eliminara el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}).`}
+        title={switchLock ? `Ocultar pedido ${order?.order_number || ""} de la lista?` : `Eliminar pedido ${order?.order_number || ""}?`}
+        description={switchLock
+          ? `El pedido sigue en Switch como #${switchEnvio?.numero_interno || switchEnvio?.pedido_switch_id || "?"} — aquí solo se oculta de la lista. Para anularlo de verdad, hazlo en el panel de Switch.`
+          : `Se eliminara el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}).`}
+        confirmLabel={switchLock ? "Ocultar" : undefined}
+        loadingLabel={switchLock ? "Ocultando..." : undefined}
         onConfirm={deleteOrder}
         onCancel={() => setShowDeleteModal(false)}
         loading={deletingOrder}

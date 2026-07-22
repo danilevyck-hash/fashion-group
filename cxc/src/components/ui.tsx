@@ -245,6 +245,8 @@ export function ConfirmDeleteModal({
   onConfirm,
   onCancel,
   loading = false,
+  confirmLabel = "Eliminar",
+  loadingLabel = "Eliminando...",
 }: {
   open: boolean;
   title: string;
@@ -252,6 +254,10 @@ export function ConfirmDeleteModal({
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  /** Label del botón rojo (default "Eliminar") — p.ej. "Ocultar" cuando el
+   *  borrado es solo visual (pedido que sigue existiendo en Switch). */
+  confirmLabel?: string;
+  loadingLabel?: string;
 }) {
   const [enabled, setEnabled] = useState(false);
 
@@ -283,7 +289,7 @@ export function ConfirmDeleteModal({
             disabled={!enabled || loading}
             className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-40 min-h-[44px]"
           >
-            {loading ? "Eliminando..." : !enabled ? "Eliminar..." : "Eliminar"}
+            {loading ? loadingLabel : !enabled ? `${confirmLabel}...` : confirmLabel}
           </button>
           <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]">
             Cancelar
