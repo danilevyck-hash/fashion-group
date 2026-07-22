@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { joybeesServer } from "@/lib/joybees-supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
+import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
 
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
 const DELETE_ROLES = ["admin", "secretaria"];
@@ -29,9 +30,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     items.map((i) => ({ quantity: i.quantity, unit_price: i.unit_price })),
   );
 
+  // Trazabilidad de reemplazo (Duplicar y corregir). Tolerante a la DDL
+  // 20260722120000 pendiente (todo null hasta que corra).
+  const reemplazo = await fetchReemplazoInfo(joybeesServer, "joybees_orders", "joybees_switch_envios", params.id);
+
   return NextResponse.json({
     ...data,
     total: recalcTotal,
+    ...reemplazo,
   });
 }
 
@@ -42,6 +48,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   const { client_name, vendor_name, client_email, comment, items, status } = await req.json();
+
+  // ── Candado post-envío a Switch (defensa en profundidad) ──
+  // Solo bloquea CONTENIDO (cliente, items, precios, comentario). Un PUT de
+  // solo status —el flujo "Editar y re-enviar pedido" del email— sigue pasando.
+  const tieneContenido = [client_name, vendor_name, client_email, comment, items].some((v) => v !== undefined);
+  if (tieneContenido) {
+    const envio = await getEnvioActivo(joybeesServer, "joybees_switch_envios", params.id);
+    if (envio) return switchLockResponse(envio);
+  }
+
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (client_name !== undefined) update.client_name = client_name;
   if (vendor_name !== undefined) update.vendor_name = vendor_name;

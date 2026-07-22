@@ -3,6 +3,7 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
+import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
 
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
 const DELETE_ROLES = ["admin", "secretaria"];
@@ -44,10 +45,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     })),
   );
 
+  // Trazabilidad de reemplazo (Duplicar y corregir). Tolerante a la DDL
+  // 20260722120000 pendiente (todo null hasta que corra).
+  const reemplazo = await fetchReemplazoInfo(reebokServer, "reebok_orders", "reebok_switch_envios", params.id);
+
   return NextResponse.json({
     ...data,
     reebok_order_items: enrichedItems,
     total: recalcTotal,
+    ...reemplazo,
   });
 }
 
@@ -58,6 +64,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 
   const { client_name, vendor_name, client_email, comment, items, status } = await req.json();
+
+  // ── Candado post-envío a Switch (defensa en profundidad) ──
+  // Solo bloquea CONTENIDO (cliente, items, precios, comentario). Un PUT de
+  // solo status —el flujo "Editar y re-enviar pedido" del email— sigue pasando.
+  const tieneContenido = [client_name, vendor_name, client_email, comment, items].some((v) => v !== undefined);
+  if (tieneContenido) {
+    const envio = await getEnvioActivo(reebokServer, "reebok_switch_envios", params.id);
+    if (envio) return switchLockResponse(envio);
+  }
+
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (client_name !== undefined) update.client_name = client_name;
   if (vendor_name !== undefined) update.vendor_name = vendor_name;
