@@ -10,9 +10,14 @@
 // y los metadatos de UI (talla editable, fallback, destino) en campos propios.
 // Los cálculos (redondeos, reglas, totales) son idénticos.
 
-import { MARCA_DESCRIPCIONES, NORMALIZACION } from "./marca-descripciones";
+import { NORMALIZACION } from "./marca-descripciones";
 
 export type Cell = string | number | boolean | null | undefined;
+
+/** Catálogo de descripciones por marca. La fuente de verdad es la tabla
+ *  `depurador_descripciones` (GET /api/productos/cargar/descripciones);
+ *  las funciones que lo usan lo reciben como parámetro (puras/sincrónicas). */
+export type CatalogoDescripciones = Record<string, string[]>;
 export type SheetRow = Cell[];
 
 export interface NamedSheet {
@@ -598,9 +603,39 @@ function empresaDeMarcaCatalogo(marca: string): string {
   return "Fashion Wear"; // resto TH (apparel)
 }
 
-// Derivado del catálogo (MARCA_DESCRIPCIONES) para mantenerlo siempre sincronizado:
-// todas las marcas (CK/TH/KL) quedan reconocidas por canonicalMarca/reclassMarca.
-export const MARCA_CATALOGO: MarcaCatalogo[] = Object.keys(MARCA_DESCRIPCIONES).map(
+// Lista FIJA de las marcas del catálogo (CK/TH/KL). Es lógica de negocio y se
+// queda en código (las descripciones de cada marca viven en la tabla
+// depurador_descripciones). Ampliar aquí si el proveedor agrega marcas.
+const MARCAS_CATALOGO: string[] = [
+  "CK Accessories",
+  "CK Display & Promo",
+  "CK Footwear",
+  "CK Jeans",
+  "CK Kids",
+  "CK Legwear",
+  "CK Menswear",
+  "CK Other",
+  "CK Performance",
+  "CK Swimwear",
+  "CK Underwear",
+  "CK Womenswear",
+  "KL Accessories",
+  "KL Footwear",
+  "KL Menswear",
+  "KL Womenswear",
+  "TH Accessories",
+  "TH Footwear",
+  "TH Kids",
+  "TH Legwear",
+  "TH Menswear",
+  "TH Other",
+  "TH Swimwear",
+  "TH Tommy Jeans",
+  "TH Underwear",
+  "TH Womenswear",
+];
+
+export const MARCA_CATALOGO: MarcaCatalogo[] = MARCAS_CATALOGO.map(
   (marca) => ({ marca, empresa: empresaDeMarcaCatalogo(marca) })
 );
 
@@ -639,16 +674,25 @@ export function marcaRubroKey(marca: Cell, rubro: Cell): string {
   return `${marcaKey(marca)}|||${marcaKey(rubro)}`;
 }
 
-/* ============ CATÁLOGO FIJO DE DESCRIPCIONES POR MARCA ============ */
-// Mapa marca (clave canónica) → sus descripciones limpias del catálogo fijo.
-const DESC_BY_MARCA: Map<string, string[]> = new Map(
-  Object.entries(MARCA_DESCRIPCIONES).map(([m, arr]) => [marcaKey(m), arr])
-);
+/* ============ CATÁLOGO DE DESCRIPCIONES POR MARCA (inyectado) ============ */
+// El catálogo viene de la tabla depurador_descripciones y se inyecta como
+// parámetro. Para no reindexar en cada llamada, el mapa marca (clave canónica)
+// → descripciones se cachea por objeto de catálogo (WeakMap).
+const DESC_INDEX_CACHE = new WeakMap<CatalogoDescripciones, Map<string, string[]>>();
+
+function descIndex(catalogo: CatalogoDescripciones): Map<string, string[]> {
+  let idx = DESC_INDEX_CACHE.get(catalogo);
+  if (!idx) {
+    idx = new Map(Object.entries(catalogo).map(([m, arr]) => [marcaKey(m), arr]));
+    DESC_INDEX_CACHE.set(catalogo, idx);
+  }
+  return idx;
+}
 
 /** Descripciones del catálogo para una marca (ya vienen en orden alfabético).
  *  [] si la marca no está en el catálogo. */
-export function descripcionesDeMarca(marca: Cell): string[] {
-  return DESC_BY_MARCA.get(marcaKey(marca)) ?? [];
+export function descripcionesDeMarca(catalogo: CatalogoDescripciones, marca: Cell): string[] {
+  return descIndex(catalogo).get(marcaKey(marca)) ?? [];
 }
 
 // Marca canónica del catálogo por clave (para escribir "CK Menswear", no "CK MENSWEAR").
@@ -681,8 +725,8 @@ export function reclassMarca(rawMarca: Cell, desc: Cell): string {
 }
 
 /** true si la descripción (canónica) está catalogada para esa marca. */
-export function esDescripcionCatalogada(marca: Cell, desc: Cell): boolean {
-  const list = DESC_BY_MARCA.get(marcaKey(marca));
+export function esDescripcionCatalogada(catalogo: CatalogoDescripciones, marca: Cell, desc: Cell): boolean {
+  const list = descIndex(catalogo).get(marcaKey(marca));
   if (!list) return false;
   const k = marcaKey(desc);
   return list.some((d) => marcaKey(d) === k);

@@ -7,6 +7,7 @@ import {
   esDescripcionCatalogada,
   marcaKey,
   marcaRubroKey,
+  type CatalogoDescripciones,
   type Redondeo,
   type MarcaFormula,
   type MarcaRubroFormula,
@@ -34,7 +35,7 @@ async function runPool<T>(items: T[], n: number, fn: (it: T) => Promise<void>) {
   );
 }
 
-export default function BulkExcel({ onDone }: { onDone?: () => void }) {
+export default function BulkExcel({ catalogo, onDone }: { catalogo: CatalogoDescripciones | null; onDone?: () => void }) {
   const [busy, setBusy] = useState<"" | "download" | "upload">("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +48,7 @@ export default function BulkExcel({ onDone }: { onDone?: () => void }) {
   };
 
   const download = async () => {
-    if (busy) return;
+    if (busy || !catalogo) return;
     setBusy("download"); setSummary(null);
     try {
       const [mf, rf] = await Promise.all([
@@ -64,7 +65,7 @@ export default function BulkExcel({ onDone }: { onDone?: () => void }) {
       }
       const descAoa: (string | number)[][] = [["Marca", "Descripción", "Divisor", "Extra", "Redondeo"]];
       for (const c of MARCA_CATALOGO) {
-        for (const d of descripcionesDeMarca(c.marca)) {
+        for (const d of descripcionesDeMarca(catalogo, c.marca)) {
           const f = rubroByKey.get(marcaRubroKey(c.marca, d));
           descAoa.push([c.marca, d, f?.divisor ?? "", f?.extra ?? "", f ? redondeoLabel(f.redondeo) : ""]);
         }
@@ -87,7 +88,7 @@ export default function BulkExcel({ onDone }: { onDone?: () => void }) {
   };
 
   const upload = async (file: File) => {
-    if (busy) return;
+    if (busy || !catalogo) return;
     setBusy("upload"); setSummary(null);
     const errors: string[] = [];
     try {
@@ -133,9 +134,9 @@ export default function BulkExcel({ onDone }: { onDone?: () => void }) {
           const marca = String(row[0] ?? "").trim();
           const desc = String(row[1] ?? "").trim();
           if (!marca && !desc) continue;
-          if (!esDescripcionCatalogada(marca, desc)) { errors.push(`Por descripción: "${marca} · ${desc}" no está en el catálogo`); continue; }
+          if (!esDescripcionCatalogada(catalogo, marca, desc)) { errors.push(`Por descripción: "${marca} · ${desc}" no está en el catálogo`); continue; }
           const cat = catalogMarca(marca)!;
-          const canonDesc = descripcionesDeMarca(cat.marca).find((d) => marcaKey(d) === marcaKey(desc)) ?? desc;
+          const canonDesc = descripcionesDeMarca(catalogo, cat.marca).find((d) => marcaKey(d) === marcaKey(desc)) ?? desc;
           const key = marcaRubroKey(cat.marca, canonDesc);
           if (isBlank(row[2])) {
             const ex = rubroByKey.get(key);
@@ -186,13 +187,13 @@ export default function BulkExcel({ onDone }: { onDone?: () => void }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">Edición en masa</span>
         <button
-          type="button" onClick={download} disabled={!!busy}
+          type="button" onClick={download} disabled={!!busy || !catalogo}
           className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "download" ? "Generando…" : "Descargar Excel"}
         </button>
         <button
-          type="button" onClick={() => inputRef.current?.click()} disabled={!!busy}
+          type="button" onClick={() => inputRef.current?.click()} disabled={!!busy || !catalogo}
           className="rounded-md bg-teal-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "upload" ? "Subiendo…" : "Subir Excel"}

@@ -29,11 +29,13 @@ import {
   titleCase,
   norm,
   MARCA_CATALOGO,
+  descripcionesDeMarca,
+  esDescripcionCatalogada,
+  type CatalogoDescripciones,
   type Cell,
   type SheetRow,
   type MarcaCatalogo,
 } from "./logic";
-import { MARCA_DESCRIPCIONES } from "./marca-descripciones";
 
 export { OUT_COLS_SHOES };
 
@@ -89,7 +91,7 @@ export function matchEmpresaTienda(proveedor: Cell, descripcion: Cell): EmpresaT
 }
 
 /* ============ CATÁLOGO DE MARCAS DE TIENDA (para FormulasConfig) ============ */
-// Mismo catálogo CK/TH/KL del Depurador + las marcas propias de la tienda
+// Mismas marcas CK/TH/KL del Depurador + las marcas propias de la tienda
 // (Reebok convertido y Joybees). Las fórmulas de tienda viven en tablas aparte
 // (tienda_marca_formulas / tienda_rubro_formulas) porque el markup es distinto.
 export const TIENDA_MARCA_CATALOGO: MarcaCatalogo[] = [
@@ -102,8 +104,10 @@ export const TIENDA_MARCA_CATALOGO: MarcaCatalogo[] = [
 
 /* ============ DERIVACIÓN DE MARCA (formatos B/C sin columna MARCA) ============ */
 // Prefijo de marcas candidatas según la empresa del grupo detectada.
-function marcasCandidatasDeEmpresa(empresaKey: string): string[] {
-  const marcas = Object.keys(MARCA_DESCRIPCIONES);
+// (Exportada: la alarma de aprobación la usa para el dropdown de marca cuando
+// una descripción bloqueada no trae marca exacta.)
+export function marcasCandidatasDeEmpresa(empresaKey: string): string[] {
+  const marcas = MARCA_CATALOGO.map((c) => c.marca);
   switch (empresaKey) {
     case "vistana": return marcas.filter((m) => m.toUpperCase().startsWith("CK"));
     case "fashion_shoes": return marcas.filter((m) => m.toUpperCase() === "TH FOOTWEAR");
@@ -115,10 +119,9 @@ function marcasCandidatasDeEmpresa(empresaKey: string): string[] {
 
 /** Marcas del catálogo (de la empresa detectada) cuyo catálogo contiene la
  *  descripción normalizada. 1 = inequívoca · >1 = ambigua (dropdown) · 0 = nueva. */
-export function marcasQueContienen(empresaKey: string, descNorm: string): string[] {
-  const k = marcaKey(descNorm);
+export function marcasQueContienen(catalogo: CatalogoDescripciones, empresaKey: string, descNorm: string): string[] {
   return marcasCandidatasDeEmpresa(empresaKey).filter((m) =>
-    (MARCA_DESCRIPCIONES[m] ?? []).some((d) => marcaKey(d) === k)
+    esDescripcionCatalogada(catalogo, m, descNorm)
   );
 }
 
@@ -318,14 +321,18 @@ export interface FacturaProcessResult {
   /** true si el archivo NO trae FECHA (formato A) → la temporada sale del
    *  mes/año que ingresa la secretaria. */
   sinFecha: boolean;
-  /** Descripciones que BLOQUEAN la descarga: no están en el catálogo
-   *  MARCA_DESCRIPCIONES bajo una marca conocida (Daniel debe aprobarlas). */
-  bloqueos: { marca: string; desc: string }[];
+  /** Descripciones que BLOQUEAN la descarga: no están en el catálogo de
+   *  descripciones bajo una marca conocida (hay que aprobarlas al catálogo).
+   *  `empresaKey` viene cuando la marca no es exacta (formatos B/C con
+   *  candidatas 0): la aprobación debe elegir una marca de esa empresa. */
+  bloqueos: { marca: string; desc: string; empresaKey?: string }[];
 }
 
 export interface FacturaConfig {
   /** Temporada AAAA-MM a usar cuando la factura no trae FECHA (formato A). */
   temporadaFallback: string;
+  /** Catálogo de descripciones por marca (tabla depurador_descripciones). */
+  catalogo: CatalogoDescripciones;
 }
 
 function numDe(v: Cell): number | null {
@@ -394,7 +401,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
   }
 
   const warnings: string[] = [];
-  const bloqueosSet = new Map<string, { marca: string; desc: string }>();
+  const bloqueosSet = new Map<string, { marca: string; desc: string; empresaKey?: string }>();
   const nInterno = formato === "A" ? nInternoDe(rows) : "";
 
   // Agrupar por CODIGO (misma pieza en varias líneas/facturas → suma cantidades).
@@ -494,7 +501,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
         marca = reclassMarca(row[col.marca], descOut);
       } else if (empresa) {
         // Formatos B/C: derivar del catálogo (empresa → marcas candidatas).
-        const candidatas = marcasQueContienen(empresa.key, descOut);
+        const candidatas = marcasQueContienen(cfg.catalogo, empresa.key, descOut);
         if (candidatas.length === 1) {
           marca = candidatas[0];
         } else if (candidatas.length > 1) {
@@ -506,7 +513,7 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
           // empresa → BLOQUEA la descarga hasta que Daniel la apruebe.
           marca = "Otros";
           const marcaLabel = `${empresa.label} (sin marca exacta)`;
-          bloqueosSet.set(`${marcaLabel}|||${marcaKey(descOut)}`, { marca: marcaLabel, desc: descOut });
+          bloqueosSet.set(`${marcaLabel}|||${marcaKey(descOut)}`, { marca: marcaLabel, desc: descOut, empresaKey: empresa.key });
         }
       } else {
         marca = "Otros";
@@ -517,8 +524,10 @@ export function processFactura(rows: SheetRow[], cfg: FacturaConfig): FacturaPro
     // catalogada que NO está en su catálogo. "Otros" y RBK/JOYBEES no bloquean.
     if (!servicio && !esReebok && !esJoybees && marca !== "Otros" && marcaCandidatas.length === 0) {
       const canon = canonicalMarca(marca);
-      const catalogo = MARCA_DESCRIPCIONES[canon];
-      if (catalogo && !catalogo.some((d) => marcaKey(d) === marcaKey(descOut))) {
+      if (
+        descripcionesDeMarca(cfg.catalogo, canon).length > 0 &&
+        !esDescripcionCatalogada(cfg.catalogo, canon, descOut)
+      ) {
         bloqueosSet.set(`${canon}|||${marcaKey(descOut)}`, { marca: canon, desc: descOut });
       }
     }

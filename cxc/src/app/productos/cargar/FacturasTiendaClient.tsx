@@ -15,11 +15,14 @@ import {
   marcaRubroKey,
   precioDescripcion,
   marginPct,
+  type CatalogoDescripciones,
   type SheetRow,
   type Redondeo,
   type MarcaFormula,
   type MarcaRubroFormula,
 } from "@/lib/depurador/logic";
+import { useCatalogoDescripciones } from "@/lib/hooks/useCatalogoDescripciones";
+import AlarmaDescripcionesNuevas from "./AlarmaDescripcionesNuevas";
 import {
   EMPRESAS_TIENDA,
   MAX_FILAS_SWITCH,
@@ -63,6 +66,16 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
   const [mesIdx, setMesIdx] = useState(now.getMonth());
   const [anio, setAnio] = useState(String(now.getFullYear()));
 
+  // Catálogo de descripciones (tabla depurador_descripciones — fuente de verdad).
+  // Sin catálogo NO se procesa ni se descarga nada (sin fallback al archivo TS).
+  const {
+    catalogo,
+    cargando: catalogoCargando,
+    fallo: catalogoFallo,
+    reintentar: reintentarCatalogo,
+    agregarDescripcion,
+  } = useCatalogoDescripciones();
+
   // Fórmulas de TIENDA (set separado del Depurador).
   const [savedFormulas, setSavedFormulas] = useState<MarcaFormula[]>([]);
   const [marcaForms, setMarcaForms] = useState<Record<string, MarcaFormula>>({});
@@ -86,9 +99,9 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   const temporadaFallback = `${anio}-${String(mesIdx + 1).padStart(2, "0")}`;
 
-  const runRows = useCallback((raw: SheetRow[], temporada: string) => {
+  const runRows = useCallback((raw: SheetRow[], temporada: string, cat: CatalogoDescripciones) => {
     try {
-      const res = processFactura(raw, { temporadaFallback: temporada });
+      const res = processFactura(raw, { temporadaFallback: temporada, catalogo: cat });
       setResult(res);
       setRows(res.rows);
       setPriceEdits({});
@@ -103,6 +116,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   const handleFile = useCallback(
     async (file: File) => {
+      if (!catalogo) return; // sin catálogo no se procesa (cargando o falló)
       setFileName(file.name);
       setError("");
       try {
@@ -126,7 +140,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         }
         if (!raw) throw new Error("No pude leer el archivo.");
         rawRef.current = raw;
-        runRows(raw, temporadaFallback);
+        runRows(raw, temporadaFallback, catalogo);
       } catch (err) {
         rawRef.current = null;
         setResult(null);
@@ -134,14 +148,22 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         setError(err instanceof Error ? err.message : "Error inesperado al leer el archivo.");
       }
     },
-    [runRows, temporadaFallback]
+    [runRows, temporadaFallback, catalogo]
   );
 
   // Reprocesar al cambiar mes/año (solo afecta facturas sin FECHA).
   const reprocess = (patch: Partial<{ mesIdx: number; anio: string }>) => {
     const m = patch.mesIdx ?? mesIdx;
     const a = patch.anio ?? anio;
-    if (rawRef.current) runRows(rawRef.current, `${a}-${String(m + 1).padStart(2, "0")}`);
+    if (rawRef.current && catalogo) runRows(rawRef.current, `${a}-${String(m + 1).padStart(2, "0")}`, catalogo);
+  };
+
+  // Aprobación exitosa desde la alarma: actualiza el catálogo en memoria y
+  // REPROCESA la factura con el catálogo nuevo (la marca derivada puede cambiar
+  // de "Otros" a la marca aprobada) → la alarma se re-evalúa en vivo.
+  const onDescripcionAprobada = (marca: string, desc: string) => {
+    const next = agregarDescripcion(marca, desc);
+    if (rawRef.current) runRows(rawRef.current, temporadaFallback, next);
   };
 
   const reset = () => {
@@ -270,8 +292,8 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   // ── Descarga: máx 500 filas por archivo; ZIP si sale más de uno ─────────────
   const download = async () => {
-    if (!result || rows.length === 0 || downloading) return;
-    if (result.bloqueos.length > 0) return; // bloqueado hasta que Daniel apruebe
+    if (!result || rows.length === 0 || downloading || !catalogo) return;
+    if (result.bloqueos.length > 0) return; // bloqueado hasta aprobar las descripciones nuevas
     setDownloading(true);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -354,33 +376,15 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      {/* Alarma de descripción NUEVA no catalogada — BLOQUEA la descarga */}
+      {/* Alarma de descripción NUEVA no catalogada — BLOQUEA la descarga.
+          Admin/secretaria pueden aprobarlas ahí mismo; al aprobar se reprocesa la
+          factura con el catálogo nuevo y la alarma se re-evalúa en vivo. */}
       {result && bloqueos.length > 0 && !orphanSeen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6 shadow-2xl">
-            <div className="mb-2 text-center text-5xl">⚠️</div>
-            <h2 className="text-center text-xl font-bold text-red-700">{bloqueos.length} descripción(es) NUEVA(S) detectada(s)</h2>
-            <p className="mt-2 text-center text-sm text-stone-600">
-              Estas descripciones <b>NO están en el catálogo</b> de su marca. <b>No se puede descargar</b> la
-              plantilla hasta que Daniel las apruebe y se agreguen al catálogo. Toma una captura de pantalla
-              y envíasela a Daniel.
-            </p>
-            <div className="mt-4 max-h-52 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
-              {bloqueos.map((o, i) => (
-                <div key={i} className="text-[13px] text-stone-800">
-                  <span className="font-semibold text-red-800">{o.marca}</span> → {o.desc}
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setOrphanSeen(true)}
-              className="mt-5 w-full rounded-lg bg-stone-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-stone-800 active:scale-[0.98]"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+        <AlarmaDescripcionesNuevas
+          items={bloqueos}
+          onAprobada={onDescripcionAprobada}
+          onClose={() => setOrphanSeen(true)}
+        />
       )}
 
       {/* Masthead */}
@@ -393,6 +397,25 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         </p>
       </div>
 
+      {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
+      {catalogoCargando && (
+        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600">
+          Cargando catálogo de descripciones…
+        </div>
+      )}
+      {catalogoFallo && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>No se pudo cargar el catálogo de descripciones. Intenta de nuevo.</span>
+          <button
+            type="button"
+            onClick={reintentarCatalogo}
+            className="rounded-md border border-red-300 bg-white px-3 py-1 text-[13px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+
       {/* Drop zone */}
       <label
         onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
@@ -403,19 +426,24 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
           setDragging(false);
           if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
         }}
-        className={`mb-4 flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
-          dragging ? "border-teal-600 bg-teal-50" : "border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
+        className={`mb-4 flex flex-col items-center rounded-xl border-2 border-dashed px-6 py-6 text-center transition ${
+          !catalogo
+            ? "cursor-not-allowed border-stone-200 bg-stone-100 opacity-60"
+            : dragging ? "cursor-pointer border-teal-600 bg-teal-50" : "cursor-pointer border-stone-300 bg-white hover:border-teal-600 hover:bg-teal-50"
         }`}
       >
         <UploadCloud className="mb-2 h-7 w-7 text-teal-800" strokeWidth={1.6} />
         <div className="text-base font-semibold text-stone-900">
-          {fileName || "Suelta la factura aquí (.xls, .csv o .xlsx) o haz clic para buscar"}
+          {!catalogo
+            ? "Espera a que cargue el catálogo de descripciones…"
+            : fileName || "Suelta la factura aquí (.xls, .csv o .xlsx) o haz clic para buscar"}
         </div>
         <input
           ref={inputRef}
           type="file"
           accept=".xlsx,.xls,.csv"
           className="hidden"
+          disabled={!catalogo}
           onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
         />
       </label>
@@ -493,7 +521,7 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
             </span>
             <button
               onClick={download}
-              disabled={downloading || bloqueos.length > 0}
+              disabled={downloading || bloqueos.length > 0 || !catalogo}
               className="rounded-md bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               {downloading ? "Generando…" : archivos > 1 ? "Descargar ZIP" : "Descargar plantilla"}
@@ -507,8 +535,15 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
           </div>
 
           {bloqueos.length > 0 && (
-            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-              🔒 Bloqueado: hay {bloqueos.length} descripción(es) nueva(s) sin aprobar. Envía la captura a Daniel.
+            <p className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+              <span>🔒 Bloqueado: hay {bloqueos.length} descripción(es) nueva(s) sin aprobar.</span>
+              <button
+                type="button"
+                onClick={() => setOrphanSeen(false)}
+                className="rounded-md border border-red-300 bg-white px-2 py-0.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+              >
+                Ver y aprobar
+              </button>
             </p>
           )}
 
