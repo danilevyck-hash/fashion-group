@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { getEnvioActivo, switchLockResponse } from "@/lib/catalogo/switch-lock";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
   const { product_id, sku, name, image_url, quantity, unit_price, is_preorder } = await req.json();
   if (!product_id) return NextResponse.json({ error: "product_id requerido" }, { status: 400 });
+
+  // Candado post-envío a Switch: un pedido ya enviado no acepta cambios de items.
+  const envio = await getEnvioActivo(reebokServer, "reebok_switch_envios", params.id);
+  if (envio) return switchLockResponse(envio);
 
   if (quantity <= 0) {
     const { error } = await reebokServer.from("reebok_order_items").delete()
