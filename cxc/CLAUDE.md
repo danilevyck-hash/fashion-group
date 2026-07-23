@@ -82,7 +82,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-36 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
+38 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -91,15 +91,15 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/switch-sync tipo=all (vistana, active_wear) | 05:30 |
 | /api/cron/switch-sync tipo=all (fashion_shoes, fashion_wear) | 05:35 |
 | /api/cron/switch-sync tipo=all (active_shoes, joystep) | 05:40 |
-| /api/cron/backup | 06:00 |
-| /api/cron/refresh-clientes-views | 06:30 |
+| /api/cron/backup | 06:00, 18:30 (2 entradas — la 2ª es "segunda oportunidad": no-op si la 1ª ya registró success hoy) |
 | /api/cron/switch-sync tipo=all (american_classic, confecciones_boston) | 06:30 |
-| /api/cron/reebok-catalogo | 06:45, 17:00 (2 entradas — solo toca active_shoes en Switch) |
 | /api/cron/sync-utilidad | 07:00 |
 | /api/cron/sync-clientes-master | 07:00 |
+| /api/cron/refresh-clientes-views | 07:35 (fuera del minuto 06:30 de switch-sync AC/Boston y de la ráfaga 07:00-07:31 — solo DB, sin Switch) |
 | /api/cron/sync-recibos | 07:50, 20:10, 22:20 (3 entradas) |
-| /api/cron/acs-fidelizacion | 08:15 |
 | /api/cron/switch-articulos | 08:40 |
+| /api/cron/acs-fidelizacion | 11:30, 16:30 (2 entradas — la 2ª es "segunda oportunidad": no-op si la 1ª ya registró success hoy; 11:30 esquiva sync-recibos 07:50 y switch-articulos 08:40 en american_classic) |
+| /api/cron/reebok-catalogo | 12:10, 17:00 (2 entradas — solo toca active_shoes en Switch; 12:10 esquiva sync-utilidad 07:00 en active_shoes) |
 | /api/cron/sync-proveedores | 09:30 |
 | /api/cron/joybees-catalogo | 11:00, 17:05 (2 entradas — solo toca joystep en Switch) |
 | /api/cron/integrity-check | 12:00 |
