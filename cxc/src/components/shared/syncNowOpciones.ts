@@ -1,6 +1,7 @@
 // Opciones compartidas del botón "Actualizar ahora" (SyncNowButton) para las
-// vistas que muestran TODAS las empresas y por eso abren menú (el endpoint
-// /api/admin/sync-now dispara UNA empresa por vez — sesión única de Switch).
+// vistas que muestran TODAS las empresas (el endpoint /api/admin/sync-now
+// dispara UNA empresa por vez — sesión única de Switch). Ventas las consume
+// con `secuencial` (un clic = todas en secuencia); Comisiones abre menú.
 //
 // Las listas son espejo de las del server (empresasConFacturas /
 // RECIBOS_EMPRESA_KEYS): se duplican acá como arrays planos para que el bundle

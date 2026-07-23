@@ -7,15 +7,22 @@
  * clientes-master y catálogos no llevan empresa (catálogos fijan la suya:
  * active_shoes / joystep).
  *
- * Candado de 3 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
- *   a) running (fila 'running' fresca en switch_sync_log; el lock REAL es el
- *      índice único parcial switch_sync_log_running_lock — DDL 20260723150000,
- *      manual; mientras no corra, queda el pre-check),
- *   b) cron-proximo (próximo cron de esa empresa en <= 40 min),
- *   c) cooldown (último success hace < 10 min).
+ * Candado de 2 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
+ *   a) running (fila 'running' fresca de esa EMPRESA en switch_sync_log — del
+ *      mismo tipo o de CUALQUIER otro sync_type, ej. un cron corriendo YA; el
+ *      lock REAL es el índice único parcial switch_sync_log_running_lock —
+ *      DDL 20260723150000, manual; mientras no corra, queda el pre-check),
+ *   b) cooldown (último success hace < 10 min).
+ *
+ * La ventana "cron-proximo" se ELIMINÓ (jul-2026): el clic siempre actualiza.
+ * Trade-off aceptado: un manual pegado a la ventana de un cron de la MISMA
+ * empresa puede matarle el token al otro (sesión única, code 0006) — el que
+ * pierda falla limpio y switch-reconciliacion lo recupera (ambos fail-safe).
  *
  * Respuestas: 200 {ok, duracionMs, resumen} · 409 {motivo, detalle} ·
  * 400 body inválido · 401/403 sin permiso · 500 error del sync.
+ * El 409 motivo "running" NO se muestra al usuario: SyncNowButton se engancha
+ * al sync en curso (re-intenta cada ~5s) y refresca la vista al terminar.
  *
  * Ejecuta la lib correspondiente IN-PROCESS con triggeredBy:'manual' y cierra
  * las sesiones Switch abiertas al final (higiene de sesión única, igual que
@@ -40,7 +47,6 @@ import {
   moduloConfig,
   lockKeyDe,
   precheckSyncNow,
-  proximoCronDe,
   nombreEmpresa,
   rolesSyncNow,
   type SyncNowModulo,
@@ -63,28 +69,36 @@ function respuestaLockOcupado(): NextResponse {
   return NextResponse.json(
     {
       motivo: "running",
-      detalle: "Ya hay una actualización en curso (empezó hace un momento). Espera a que termine.",
+      detalle: "Ya hay una actualización en curso (empezó hace un momento).",
     },
     { status: 409 },
   );
 }
 
-async function fetchRunningStartedAt(empresaKey: string, syncType: string): Promise<string | null> {
+/** Corridas 'running' de la EMPRESA (cualquier sync_type), separadas en la del
+ *  módulo pedido vs. cualquier otra (cron corriendo YA — sesión única Switch).
+ *  La frescura (<30 min) la evalúa precheckSyncNow; acá solo se consulta. */
+async function fetchRunningDeEmpresa(
+  empresaKey: string,
+  syncType: string,
+): Promise<{ mismo: string | null; otro: string | null }> {
   const { data, error } = await supabaseServer
     .from("switch_sync_log")
-    .select("started_at")
+    .select("started_at, sync_type")
     .eq("empresa_key", empresaKey)
-    .eq("sync_type", syncType)
     .eq("status", "running")
     .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
   if (error) {
     // Fail-open del pre-check: el lock real (índice único) sigue protegiendo.
-    console.error(`[sync-now] no pude leer running de ${empresaKey}/${syncType}: ${error.message}`);
-    return null;
+    console.error(`[sync-now] no pude leer running de ${empresaKey}: ${error.message}`);
+    return { mismo: null, otro: null };
   }
-  return (data as { started_at: string } | null)?.started_at ?? null;
+  const rows = (data ?? []) as { started_at: string; sync_type: string }[];
+  return {
+    mismo: rows.find((r) => r.sync_type === syncType)?.started_at ?? null,
+    otro: rows.find((r) => r.sync_type !== syncType)?.started_at ?? null,
+  };
 }
 
 async function fetchLastSuccessFinishedAt(
@@ -223,22 +237,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const ahora = new Date();
 
-  // ── Candado de 3 capas ─────────────────────────────────────────────────────
+  // ── Candado de 2 capas (running + cooldown) ────────────────────────────────
   const lock = lockKeyDe(modulo, empresa);
   if (lock) {
     // Limpia huérfanos (>30 min) para que ni el pre-check ni el índice único
     // se queden trancados con un run que murió sin finalizar.
     await clearStaleRunning(lock.empresaKey, lock.syncType);
   }
-  const [runningStartedAt, lastSuccessFinishedAt] = await Promise.all([
-    lock ? fetchRunningStartedAt(lock.empresaKey, lock.syncType) : Promise.resolve(null),
+  const [running, lastSuccessFinishedAt] = await Promise.all([
+    lock
+      ? fetchRunningDeEmpresa(lock.empresaKey, lock.syncType)
+      : Promise.resolve({ mismo: null, otro: null }),
     fetchLastSuccessFinishedAt(lock?.empresaKey ?? null, lock?.syncType ?? null),
   ]);
   const bloqueo = precheckSyncNow({
     ahora,
-    runningStartedAt,
+    runningStartedAt: running.mismo,
+    runningOtroStartedAt: running.otro,
     lastSuccessFinishedAt,
-    proximo: proximoCronDe(modulo, empresa, ahora),
   });
   if (bloqueo) {
     return NextResponse.json(bloqueo, { status: 409 });

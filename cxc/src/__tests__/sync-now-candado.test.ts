@@ -1,7 +1,10 @@
 /**
  * Candado del sync manual "Actualizar ahora" (/api/admin/sync-now):
- *   - los 3 motivos de 409 (running / cron-proximo / cooldown) y su orden,
- *   - el cronograma espejo de vercel.json (proximoCronParaEmpresa),
+ *   - los 2 motivos de 409 (running —mismo tipo o cross-type— / cooldown) y su
+ *     orden. La ventana "cron-proximo" se ELIMINÓ (jul-2026): el clic siempre
+ *     actualiza; la concurrencia real la cubre el running cross-type.
+ *   - el cronograma espejo de vercel.json (proximoCronParaEmpresa, que queda
+ *     en cron-telemetry para telemetría),
  *   - la llave de lock por módulo (lockKeyDe) y la detección del conflicto
  *     del índice único (isRunningLockConflict).
  */
@@ -21,35 +24,34 @@ vi.mock("@/lib/telegram", () => ({
 import { proximoCronParaEmpresa } from "@/lib/cron-telemetry";
 import {
   precheckSyncNow,
-  proximoCronDe,
   lockKeyDe,
   isSyncNowModulo,
   moduloConfig,
   rolesSyncNow,
   SYNC_NOW_MODULOS,
   SYNC_NOW_COOLDOWN_MIN,
-  SYNC_NOW_VENTANA_CRON_MIN,
 } from "@/lib/switch-api/sync-now";
 import { isRunningLockConflict } from "@/lib/switch-api/sync-log";
 
 const minAntes = (base: Date, min: number) => new Date(base.getTime() - min * 60_000).toISOString();
 
-// 12:00 UTC = 7:00 Panamá. Para vistana el próximo cron a esa hora es la
-// reconciliación de las 14:00 UTC (120 min después) → lejos de la ventana de
-// 40 min: los tests de running/cooldown no se contaminan con cron-proximo.
+// 12:00 UTC = 7:00 Panamá — instante de referencia arbitrario para los tests
+// de running/cooldown (el precheck ya no mira el cronograma de crons).
 const AHORA = new Date("2026-07-23T12:00:00Z");
 
-describe("precheckSyncNow — motivo running", () => {
+describe("precheckSyncNow — motivo running (mismo tipo)", () => {
   it("409 running con corrida fresca (<30 min), con el 'hace X min' en el detalle", () => {
     const r = precheckSyncNow({
       ahora: AHORA,
       runningStartedAt: minAntes(AHORA, 5),
       lastSuccessFinishedAt: null,
-      proximo: null,
     });
     expect(r?.motivo).toBe("running");
     expect(r?.detalle).toContain("actualización en curso");
     expect(r?.detalle).toContain("hace 5 min");
+    // El cliente se engancha al running: el detalle NO trae instrucciones de
+    // esperar ("espera", "sync de las HH:MM").
+    expect(r?.detalle.toLowerCase()).not.toContain("espera");
   });
 
   it("una fila running huérfana (>30 min) NO bloquea", () => {
@@ -57,46 +59,53 @@ describe("precheckSyncNow — motivo running", () => {
       ahora: AHORA,
       runningStartedAt: minAntes(AHORA, 45),
       lastSuccessFinishedAt: null,
-      proximo: null,
     });
     expect(r).toBeNull();
   });
 
-  it("running gana sobre cooldown y cron-proximo (orden de capas)", () => {
+  it("running gana sobre cooldown (orden de capas)", () => {
     const r = precheckSyncNow({
       ahora: AHORA,
       runningStartedAt: minAntes(AHORA, 2),
       lastSuccessFinishedAt: minAntes(AHORA, 3),
-      proximo: { cron: "sync-recibos", hhmmUtc: "1210", horaPanama: "7:10", enMinutos: 10 },
     });
     expect(r?.motivo).toBe("running");
   });
 });
 
-describe("precheckSyncNow — motivo cron-proximo", () => {
-  it("409 si el próximo cron de la empresa cae dentro de la ventana de 40 min", () => {
+describe("precheckSyncNow — running cross-type (misma empresa, otro sync_type)", () => {
+  it("409 running si OTRO sync_type de la empresa corre fresco (ej. cron tipo=all)", () => {
     const r = precheckSyncNow({
       ahora: AHORA,
       runningStartedAt: null,
+      runningOtroStartedAt: minAntes(AHORA, 3),
       lastSuccessFinishedAt: null,
-      proximo: { cron: "switch-sync estadocuenta", hhmmUtc: "1610", horaPanama: "11:10", enMinutos: 25 },
     });
-    expect(r?.motivo).toBe("cron-proximo");
-    expect(r?.detalle).toContain("11:10");
-    expect(r?.detalle).toContain("hora Panamá");
+    expect(r?.motivo).toBe("running");
+    expect(r?.detalle).toContain("actualización en curso");
   });
 
-  it("no bloquea si el próximo cron está fuera de la ventana", () => {
+  it("un running cross-type huérfano (>30 min) NO bloquea", () => {
     const r = precheckSyncNow({
       ahora: AHORA,
       runningStartedAt: null,
+      runningOtroStartedAt: minAntes(AHORA, 40),
       lastSuccessFinishedAt: null,
-      proximo: {
-        cron: "switch-sync estadocuenta",
-        hhmmUtc: "1610",
-        horaPanama: "11:10",
-        enMinutos: SYNC_NOW_VENTANA_CRON_MIN + 5,
-      },
+    });
+    expect(r).toBeNull();
+  });
+});
+
+describe("precheckSyncNow — la cercanía de un cron YA NO bloquea (Ajuste 3, jul-2026)", () => {
+  it("con un cron a 25 min (vistana 15:45 → estadocuenta 16:10) el precheck deja pasar", () => {
+    // El precheck ya ni conoce el cronograma: solo running + cooldown. Se fija
+    // acá con un instante que ANTES caía dentro de la ventana de 40 min.
+    const ahora = new Date("2026-07-23T15:45:00Z");
+    expect(proximoCronParaEmpresa("vistana", ahora)?.enMinutos).toBe(25);
+    const r = precheckSyncNow({
+      ahora,
+      runningStartedAt: null,
+      lastSuccessFinishedAt: null,
     });
     expect(r).toBeNull();
   });
@@ -108,7 +117,6 @@ describe("precheckSyncNow — motivo cooldown", () => {
       ahora: AHORA,
       runningStartedAt: null,
       lastSuccessFinishedAt: minAntes(AHORA, SYNC_NOW_COOLDOWN_MIN - 2),
-      proximo: null,
     });
     expect(r?.motivo).toBe("cooldown");
     expect(r?.detalle).toContain("hace 8 min");
@@ -119,7 +127,6 @@ describe("precheckSyncNow — motivo cooldown", () => {
       ahora: AHORA,
       runningStartedAt: null,
       lastSuccessFinishedAt: minAntes(AHORA, SYNC_NOW_COOLDOWN_MIN + 1),
-      proximo: null,
     });
     expect(r).toBeNull();
   });
@@ -151,16 +158,15 @@ describe("proximoCronParaEmpresa — espejo de vercel.json", () => {
   });
 });
 
-describe("proximoCronDe / lockKeyDe / config por módulo", () => {
-  it("clientes-master está exento de la ventana (no toca Switch) y no tiene lock", () => {
-    expect(proximoCronDe("clientes-master", null, AHORA)).toBeNull();
+describe("lockKeyDe / config por módulo", () => {
+  it("clientes-master no toca Switch y no tiene lock", () => {
+    expect(moduloConfig("clientes-master").tocaSwitch).toBe(false);
     expect(lockKeyDe("clientes-master", null)).toBeNull();
   });
 
   it("catálogos fijan su empresa: reebok=active_shoes, joybees=joystep", () => {
     expect(lockKeyDe("catalogo-reebok", null)).toEqual({ empresaKey: "active_shoes", syncType: "catalogo_reebok" });
     expect(lockKeyDe("catalogo-joybees", null)).toEqual({ empresaKey: "joystep", syncType: "catalogo_joybees" });
-    expect(proximoCronDe("catalogo-reebok", null, new Date("2026-07-23T11:50:00Z"))?.cron).toBe("reebok-catalogo");
   });
 
   it("estadocuenta/facturas/recibos usan la empresa del body como llave", () => {

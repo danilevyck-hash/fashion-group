@@ -16,12 +16,14 @@
 //      el botón se oculta. sessionStorage manipulado no alcanza.
 // Además este componente NO se importa desde /catalogo-publico ni /pedido-*.
 //
-// Los 409 del candado del endpoint (running / cron-proximo / cooldown) traen
-// `detalle` legible en español → se muestran tal cual en el toast.
+// 409 del candado: "running" (sync corriendo YA) NO se muestra — el botón se
+// engancha al sync en curso (syncConEnganche, ver syncNowClient.ts) y refresca
+// al terminar. El cooldown directo sí muestra su detalle tal cual.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { syncConEnganche } from "./syncNowClient";
 
 const ROLES_PERMITIDOS = ["admin", "secretaria", "vendedor"];
 
@@ -101,26 +103,19 @@ export default function CatalogoSyncNow({ catalogo, onSuccess, className }: Cata
     if (running) return;
     setRunning(true);
     try {
-      const res = await fetch("/api/admin/sync-now", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modulo }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | { ok?: boolean; resumen?: string; detalle?: string; error?: string }
-        | null;
-      if (res.ok && json?.ok) {
-        showToast(json.resumen ? `Listo, actualizado. ${json.resumen}` : "Listo, actualizado", false);
+      // syncConEnganche absorbe el 409 running (sync corriendo YA): el botón
+      // queda en "Actualizando…" y se resuelve solo cuando el sync terminó.
+      const r = await syncConEnganche({ modulo });
+      if (r.tipo === "ok") {
+        showToast(r.resumen ? `Listo, actualizado. ${r.resumen}` : "Listo, actualizado", false);
         await fetchStatus();
         await onSuccess?.();
-      } else if (res.status === 409 && json?.detalle) {
-        showToast(json.detalle, true);
+      } else if (r.tipo === "fresco") {
+        showToast(r.detalle, true);
+        await fetchStatus();
       } else {
-        showToast(json?.error || "No se pudo actualizar. Intenta de nuevo en unos segundos.", true);
+        showToast(r.mensaje, true);
       }
-    } catch {
-      showToast("No se pudo actualizar. Revisa tu conexión e intenta de nuevo.", true);
     } finally {
       setRunning(false);
     }

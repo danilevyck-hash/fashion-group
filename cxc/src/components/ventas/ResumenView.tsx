@@ -340,9 +340,9 @@ export function ResumenView({
             prefix="Data actualizada al"
           />
           {/* "Actualizar ahora" (admin/secretaria) — la vista es de todas las
-              empresas, así que el botón abre un menú para elegir cuál
-              sincronizar (facturas, una por disparo — sesión única Switch). */}
-          <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} onSuccess={onReloadData} />
+              empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
+              menú; sesión única Switch — nunca 2 a la vez). */}
+          <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} secuencial onSuccess={onReloadData} />
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
