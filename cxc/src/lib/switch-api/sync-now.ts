@@ -35,6 +35,10 @@ import {
 import { RECIBOS_EMPRESA_KEYS } from "./sync-recibos";
 import { empresasConFacturas, empresasConCxp } from "./empresas";
 import { RUNNING_STALE_MIN } from "./sync-log";
+import {
+  REFRESH_VISTAS_HEARTBEAT,
+  REFRESH_VISTAS_CRON_HEARTBEAT,
+} from "@/lib/refresh-vistas";
 
 export const SYNC_NOW_MODULOS = [
   "estadocuenta",
@@ -44,6 +48,7 @@ export const SYNC_NOW_MODULOS = [
   "catalogo-reebok",
   "catalogo-joybees",
   "proveedores",
+  "refresh-vistas",
 ] as const;
 
 export type SyncNowModulo = (typeof SYNC_NOW_MODULOS)[number];
@@ -77,6 +82,9 @@ interface ModuloConfig {
   empresaFija?: string;
   /** ¿Toca Switch? (false = exento de la ventana de cronograma). */
   tocaSwitch: boolean;
+  /** Módulos SIN switch_sync_log: cron_name(s) de cron_heartbeats cuyo
+   *  last_success_at más reciente alimenta el cooldown de 10 min. */
+  cooldownHeartbeats?: readonly string[];
 }
 
 /** Config por módulo. Los catálogos fijan su empresa (active_shoes / joystep). */
@@ -89,7 +97,12 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
     case "recibos":
       return { empresas: RECIBOS_EMPRESA_KEYS, syncType: "recibos", tocaSwitch: true };
     case "clientes-master":
-      return { empresas: null, syncType: null, tocaSwitch: false };
+      return {
+        empresas: null,
+        syncType: null,
+        tocaSwitch: false,
+        cooldownHeartbeats: ["sync-clientes-master"],
+      };
     case "catalogo-reebok":
       return { empresas: null, syncType: "catalogo_reebok", empresaFija: "active_shoes", tocaSwitch: true };
     case "catalogo-joybees":
@@ -97,6 +110,16 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
     case "proveedores":
       // CxP por empresa: 6 B2B + Multifashion (empresasConCxp; Boston no tiene).
       return { empresas: empresasConCxp(), syncType: "proveedores", tocaSwitch: true };
+    case "refresh-vistas":
+      // DB-only (RPCs de MVs de Ventas): sin empresa, sin Switch, sin lock de
+      // switch_sync_log (CONCURRENTLY tolera corridas simultáneas). El cooldown
+      // mira el heartbeat manual Y el del cron de las 07:35.
+      return {
+        empresas: null,
+        syncType: null,
+        tocaSwitch: false,
+        cooldownHeartbeats: [REFRESH_VISTAS_HEARTBEAT, REFRESH_VISTAS_CRON_HEARTBEAT],
+      };
   }
 }
 

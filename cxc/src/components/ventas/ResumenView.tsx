@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ChevronRight, Info } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_FACTURAS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import {
   SWITCH_FACTURAS_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -341,8 +341,9 @@ export function ResumenView({
           />
           {/* "Actualizar ahora" (admin/secretaria) — la vista es de todas las
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
-              menú; sesión única Switch — nunca 2 a la vez). */}
-          <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} secuencial onSuccess={onReloadData} />
+              menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas
+              como paso final (rollup mensual y vw de clientes al día). */}
+          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={onReloadData} />
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">

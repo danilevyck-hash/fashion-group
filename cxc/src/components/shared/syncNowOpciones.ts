@@ -40,6 +40,14 @@ export const SYNC_NOW_FACTURAS_OPCIONES: SyncNowOpcion[] = FACTURAS_KEYS.map((k)
   label: EMPRESA_KEY_TO_NAME[k] ?? k,
 }));
 
+/** Secuencia 1-clic de Ventas: facturas de las 8 empresas + refresh-vistas
+ *  como PASO FINAL (DB-only: rollup mensual + vw de clientes) — así el tab
+ *  Clientes y los meses cerrados quedan al día y el botón es honesto. */
+export const SYNC_NOW_VENTAS_SECUENCIA: SyncNowOpcion[] = [
+  ...SYNC_NOW_FACTURAS_OPCIONES,
+  { modulo: "refresh-vistas", label: "Vistas de ventas" },
+];
+
 export const SYNC_NOW_RECIBOS_OPCIONES: SyncNowOpcion[] = RECIBOS_KEYS.map((k) => ({
   modulo: "recibos",
   empresa: k,

@@ -182,6 +182,16 @@ describe("lockKeyDe / config por módulo", () => {
     expect(moduloConfig("facturas").empresas).toContain("confecciones_boston");
   });
 
+  it("refresh-vistas: DB-only — sin empresa, sin Switch, sin lock; cooldown por heartbeats", () => {
+    expect(isSyncNowModulo("refresh-vistas")).toBe(true);
+    const cfg = moduloConfig("refresh-vistas");
+    expect(cfg.empresas).toBeNull();
+    expect(cfg.tocaSwitch).toBe(false);
+    expect(lockKeyDe("refresh-vistas", null)).toBeNull();
+    // Cooldown mira el heartbeat manual Y el del cron de las 07:35.
+    expect(cfg.cooldownHeartbeats).toEqual(["sync-now-refresh-vistas", "refresh-clientes-views"]);
+  });
+
   it("proveedores: por empresa (universo empresasConCxp = 6 B2B + Multifashion, sin Boston)", () => {
     expect(isSyncNowModulo("proveedores")).toBe(true);
     const cfg = moduloConfig("proveedores");
@@ -221,6 +231,10 @@ describe("rolesSyncNow — roles por módulo", () => {
 
   it("vendedor NO dispara proveedores", () => {
     expect(rolesSyncNow("proveedores")).not.toContain("vendedor");
+  });
+
+  it("refresh-vistas queda en admin+secretaria (ni vendedor ni contabilidad)", () => {
+    expect(rolesSyncNow("refresh-vistas")).toEqual(["admin", "secretaria"]);
   });
 });
 

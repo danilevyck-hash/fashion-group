@@ -154,6 +154,10 @@ export default function SyncNowButton({
   // (sesión única Switch — nunca 2 a la vez). Un 409 (running/cooldown) NO
   // aborta: esa empresa se salta (quedará fresca por el sync que ya corre o
   // recién corrió) y se acumula como omitida. Al final, UN toast resumen.
+  //
+  // Los pasos SIN empresa (finales técnicos como refresh-vistas o
+  // clientes-master) no entran al conteo de "empresas actualizadas": su 409
+  // (cooldown = ya está fresco) es silencioso; solo un ERROR suma a fallidas.
   const dispararSecuencia = async () => {
     setRunning(true);
     let actualizadas = 0;
@@ -162,11 +166,14 @@ export default function SyncNowButton({
     try {
       for (let i = 0; i < opciones.length; i++) {
         setProgreso({ actual: i + 1, total: opciones.length });
+        const esEmpresa = !!opciones[i].empresa;
         try {
           const { status, json } = await postSyncNow(opciones[i]);
-          if (status === 200 && json?.ok) actualizadas++;
-          else if (status === 409) omitidas++;
-          else fallidas++;
+          if (status === 200 && json?.ok) {
+            if (esEmpresa) actualizadas++;
+          } else if (status === 409) {
+            if (esEmpresa) omitidas++;
+          } else fallidas++;
         } catch {
           fallidas++;
         }
@@ -174,7 +181,11 @@ export default function SyncNowButton({
       const partes: string[] = [];
       if (omitidas === 0 && fallidas === 0) {
         partes.push(
-          actualizadas === 1 ? "Listo, 1 empresa actualizada" : `Listo, ${actualizadas} empresas actualizadas`,
+          actualizadas === 1
+            ? "Listo, 1 empresa actualizada"
+            : actualizadas === 0
+              ? "Listo, actualizado"
+              : `Listo, ${actualizadas} empresas actualizadas`,
         );
       } else {
         partes.push(`${actualizadas} actualizadas`);
