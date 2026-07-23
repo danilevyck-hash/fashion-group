@@ -56,6 +56,7 @@ export interface ProveedorSyncResult {
   ok: boolean;
   proveedores: number;   // proveedores upserted
   fallidos: number;      // proveedores con shape inválido (HTML-200) o sin id
+  purgados?: number;     // filas locales cuyo proveedor ya no existe en Switch
   error?: string;
 }
 
@@ -125,7 +126,7 @@ function aggregateElements(elements: SwitchProveedorElement[], anioActual: numbe
  */
 export async function buildProveedorRows(
   empresaKey: EmpresaKey,
-): Promise<{ rows: ProveedorCxpRow[]; fallidos: number }> {
+): Promise<{ rows: ProveedorCxpRow[]; fallidos: number; listedIds: number[]; listaCompleta: boolean }> {
   const client = createSwitchClient(empresaKey);
   const anioActual = new Date().getUTCFullYear();
 
@@ -185,7 +186,15 @@ export async function buildProveedorRows(
     });
   }
 
-  return { rows, fallidos };
+  // listedIds = TODOS los ids que Switch listó (incluye fallidos de /info): la
+  // purga de ausentes se decide contra la LISTA, no contra los upserted — un
+  // proveedor cuyo /info falló hoy sigue existiendo y NO debe borrarse.
+  const listedIds = proveedores.filter((p) => typeof p.id === "number").map((p) => p.id);
+  // Purga segura solo si la paginación cubrió el total reportado (o Switch no
+  // reportó total). Lista incompleta → no purgar (borraría proveedores vivos).
+  const listaCompleta = totalReportado === 0 || proveedores.length >= totalReportado;
+
+  return { rows, fallidos, listedIds, listaCompleta };
 }
 
 // ─── Logging a switch_sync_log (tolerante: no bloquea si falla) ───────────────
@@ -230,7 +239,7 @@ export async function syncEmpresaProveedores(
 ): Promise<ProveedorSyncResult> {
   const logId = await createLog(empresaKey, triggeredBy);
   try {
-    const { rows, fallidos } = await buildProveedorRows(empresaKey);
+    const { rows, fallidos, listedIds, listaCompleta } = await buildProveedorRows(empresaKey);
 
     const now = new Date().toISOString();
     let upserted = 0;
@@ -243,8 +252,32 @@ export async function syncEmpresaProveedores(
       upserted += slice.length;
     }
 
+    // Purga de AUSENTES (audit jul-2026): la tabla es un snapshot puro de
+    // /apiproveedor (se reconstruye completa en cada corrida, sin FKs ni
+    // histórico propio) → DELETE de las filas cuyo proveedor ya no está en la
+    // lista de Switch (proveedores borrados dejaban filas fantasma con saldo
+    // viejo para siempre). Guard: solo con lista completa y no-vacía.
+    let purgados = 0;
+    if (listaCompleta && listedIds.length > 0) {
+      const { data: borrados, error: delErr } = await supabaseServer
+        .from("switch_proveedor_estadocuenta")
+        .delete()
+        .eq("empresa_key", empresaKey)
+        .not("proveedor_switch_id", "in", `(${listedIds.join(",")})`)
+        .select("proveedor_switch_id");
+      if (delErr) {
+        // La purga no invalida el sync (los datos upserted ya están frescos).
+        console.error(`[sync ${empresaKey} proveedores] purga de ausentes falló: ${delErr.message}`);
+      } else {
+        purgados = (borrados ?? []).length;
+        if (purgados > 0) {
+          console.error(`[sync ${empresaKey} proveedores] purgados ${purgados} proveedores ausentes en Switch`);
+        }
+      }
+    }
+
     await finishLog(logId, "success", upserted);
-    return { empresaKey, ok: true, proveedores: upserted, fallidos };
+    return { empresaKey, ok: true, proveedores: upserted, fallidos, purgados };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await finishLog(logId, "error", 0, msg);
