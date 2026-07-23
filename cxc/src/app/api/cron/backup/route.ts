@@ -8,8 +8,22 @@
 // de PostgREST sin .range()) y recortaba por ventanas de 30d/3m/6m.
 //
 // Cobertura: TODAS las tablas con datos creados a mano en la app o config
-// (no re-derivables de Switch). Las tablas switch_* NO se respaldan a
-// propósito: se re-hidratan desde la API de Switch (scripts/switch-backfill).
+// (no re-derivables de Switch), en la corrida CORE (sin params).
+//
+// GRUPO SWITCH (?grupo=switch, audit jul-2026): las tablas switch_* +
+// multifashion_tickets SÍ se respaldan ahora, en una SEGUNDA invocación del
+// mismo path (entradas propias en vercel.json, patrón de entradas repetidas).
+// Motivo del split, con números (medidos 23-jul-2026): ~310K filas extra
+// (switch_articulo_diario 197K × ~370B + switch_facturas 52K × ~1.1KB + resto)
+// ≈ ~160-175MB NDJSON → ~310 páginas de fetch (~60-150s) + gzip + doble upload
+// (Supabase + R2, ~20-40MB gz). La corrida core ya presupuesta hasta 280s de
+// los 300s de Hobby (réplica Storage 240s + R2 280s) → meterlas ahí arriesga
+// recortar la réplica a diario. En invocación aparte cada grupo tiene sus 300s.
+// Prioridad del grupo: switch_articulo_diario es IRRECUPERABLE de Switch (el
+// API solo da el stock del día — el histórico diario solo existe acá); el
+// resto es re-hidratable por backfill pero costoso (sesión única, horas).
+// La corrida switch NO repite la réplica de Storage ni la retención (las hace
+// core); sí replica sus archivos a R2. Heartbeat propio: "backup-switch".
 //
 // Passwords: fg_users se respalda SIN password en fg_users.ndjson.gz y los
 // hashes van aparte en fg_users_auth.ndjson.gz (mismo bucket privado) para que
@@ -125,6 +139,20 @@ const DATASETS: Dataset[] = [
   { table: "fg_users", select: "id, name, password", file: "fg_users_auth" },
 ];
 
+// Tablas del grupo SWITCH (?grupo=switch) — cachés sincronizadas desde Switch.
+// switch_articulo_diario primero: es la irrecuperable (si la corrida muriera a
+// mitad, lo más valioso ya quedó subido).
+const SWITCH_DATASETS: Dataset[] = [
+  { table: "switch_articulo_diario" },
+  { table: "switch_facturas" },
+  { table: "switch_recibos" },
+  { table: "switch_estadocuenta" },
+  { table: "switch_factura_utilidad" },
+  { table: "switch_proveedor_estadocuenta" },
+  { table: "switch_clientes" },
+  { table: "multifashion_tickets" },
+];
+
 // ── Réplica incremental de buckets de Storage ────────────────────────────────
 // Copia archivos nuevos/cambiados de los buckets fuente a backups/_storage/
 // (prefijo estable, fuera del patrón YYYY-MM-DD → la retención no lo toca).
@@ -158,19 +186,24 @@ const ORDER_BY: Record<string, string[]> = {
   app_settings: ["key"],
 };
 
-/** Trae TODAS las filas de una tabla paginando de a PAGE con orden estable. */
-async function fetchAllRows(table: string, select: string): Promise<unknown[]> {
+/** Trae TODAS las filas de una tabla paginando de a PAGE con orden estable,
+ *  acumulando NDJSON por página. No retiene los objetos: switch_articulo_diario
+ *  son ~197K filas (~72MB de NDJSON) — retener el array de objetos y además el
+ *  string duplicaría el pico de memoria de la función. */
+async function fetchTableNdjson(table: string, select: string): Promise<{ ndjson: string; rows: number }> {
   const orderCols = ORDER_BY[table] || ["id"];
-  const rows: unknown[] = [];
+  const parts: string[] = [];
+  let count = 0;
   for (let from = 0; ; from += PAGE) {
     let query = supabaseServer.from(table).select(select);
     for (const col of orderCols) query = query.order(col, { ascending: true });
     const { data, error } = await query.range(from, from + PAGE - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
-    rows.push(...(data ?? []));
+    for (const r of data ?? []) parts.push(JSON.stringify(r));
+    count += (data ?? []).length;
     if (!data || data.length < PAGE) break;
   }
-  return rows;
+  return { ndjson: parts.join("\n"), rows: count };
 }
 
 interface FileEntry {
@@ -274,11 +307,22 @@ export async function GET(req: NextRequest) {
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Segunda oportunidad (jul-2026): el cron tiene 2 entradas (06:00 y 18:30
-  // UTC). Si la 1ª ya registró success HOY (día UTC), la 2ª no repite el
-  // trabajo — responde no-op. Una corrida manual (?force=1) lo salta.
-  if (req.nextUrl.searchParams.get("force") !== "1" && (await cronSuccessHoyUtc(CRON_NAME))) {
-    return NextResponse.json({ ok: true, skipped: "ya corrió con éxito hoy (2ª entrada no-op)" });
+  // Grupo de tablas: sin param = CORE (manuales/config); ?grupo=switch = cachés
+  // switch_* + multifashion_tickets en invocación aparte (ver header).
+  const grupoParam = req.nextUrl.searchParams.get("grupo");
+  if (grupoParam !== null && grupoParam !== "switch") {
+    return NextResponse.json({ error: "grupo inválido (solo: switch)" }, { status: 400 });
+  }
+  const esGrupoSwitch = grupoParam === "switch";
+  const cronName = esGrupoSwitch ? "backup-switch" : CRON_NAME;
+  const datasets = esGrupoSwitch ? SWITCH_DATASETS : DATASETS;
+
+  // Segunda oportunidad (jul-2026): cada grupo tiene 2 entradas en vercel.json
+  // (core 06:00/18:30, switch 06:45/19:15 UTC). Si la 1ª ya registró success
+  // HOY (día UTC), la 2ª no repite el trabajo — responde no-op. Una corrida
+  // manual (?force=1) lo salta. El guard es por-grupo (heartbeat propio).
+  if (req.nextUrl.searchParams.get("force") !== "1" && (await cronSuccessHoyUtc(cronName))) {
+    return NextResponse.json({ ok: true, grupo: grupoParam ?? "core", skipped: "ya corrió con éxito hoy (2ª entrada no-op)" });
   }
 
   const startMs = Date.now();
@@ -294,11 +338,10 @@ export async function GET(req: NextRequest) {
 
   // Un dataset a la vez: fetch paginado → NDJSON → gzip → upload → liberar.
   // Si uno falla, se registra y se sigue con el resto (backup parcial > nada).
-  for (const ds of DATASETS) {
+  for (const ds of datasets) {
     const file = ds.file || ds.table;
     try {
-      const rows = await fetchAllRows(ds.table, ds.select || "*");
-      const ndjson = rows.map((r) => JSON.stringify(r)).join("\n");
+      const { ndjson, rows } = await fetchTableNdjson(ds.table, ds.select || "*");
       const gz = gzipSync(Buffer.from(ndjson, "utf-8"));
       const { error: upErr } = await supabaseServer.storage
         .from(BUCKET)
@@ -307,7 +350,7 @@ export async function GET(req: NextRequest) {
           upsert: true,
         });
       if (upErr) throw new Error(`upload ${file}: ${upErr.message}`);
-      results.push({ file, table: ds.table, rows: rows.length, bytes: gz.length });
+      results.push({ file, table: ds.table, rows, bytes: gz.length });
       totalBytes += gz.length;
       r2Files.push({ key: `data/${file}.ndjson.gz`, body: gz });
     } catch (e) {
@@ -316,8 +359,11 @@ export async function GET(req: NextRequest) {
   }
 
   // Réplica incremental de buckets (con presupuesto de tiempo; lo pendiente
-  // se copia en la próxima corrida).
-  const storage = await replicateStorage(startMs + REPLICA_DEADLINE_MS);
+  // se copia en la próxima corrida). Solo la corrida CORE: la de switch no
+  // toca Storage (sería trabajo duplicado el mismo día).
+  const storage = esGrupoSwitch
+    ? { copiados: 0, bytes: 0, pendientes: 0, errores: [] as string[] }
+    : await replicateStorage(startMs + REPLICA_DEADLINE_MS);
   for (const err of storage.errores) {
     errores.push({ file: `storage:${err.slice(0, 120)}`, error: err });
   }
@@ -330,14 +376,17 @@ export async function GET(req: NextRequest) {
   const r2 = await replicateBackupToR2(r2Files, startMs + R2_DEADLINE_MS);
   if (r2.enabled && r2.errores.length > 0) {
     const detalleR2 = r2.errores.join("; ");
-    console.error("[backup] réplica R2 con errores:", detalleR2);
-    await logCronError("backup_r2", detalleR2);
+    console.error(`[${cronName}] réplica R2 con errores:`, detalleR2);
+    await logCronError(`${cronName.replace(/-/g, "_")}_r2`, detalleR2);
   }
 
-  // meta.json — índice del backup del día (lo lee scripts/restore.mjs).
+  // Índice del backup del día (lo lee scripts/restore.mjs): meta.json para el
+  // core, meta-switch.json para el grupo switch (mismo folder de fecha).
+  const metaFile = esGrupoSwitch ? "meta-switch.json" : "meta.json";
   const meta = {
     format: "v2-ndjson-gz",
     date: today,
+    grupo: grupoParam ?? "core",
     timestamp: now.toISOString(),
     datasets: results,
     storage: { copiados: storage.copiados, bytes: storage.bytes, pendientes: storage.pendientes },
@@ -346,26 +395,28 @@ export async function GET(req: NextRequest) {
   };
   const { error: metaErr } = await supabaseServer.storage
     .from(BUCKET)
-    .upload(`${today}/meta.json`, Buffer.from(JSON.stringify(meta, null, 2), "utf-8"), {
+    .upload(`${today}/${metaFile}`, Buffer.from(JSON.stringify(meta, null, 2), "utf-8"), {
       contentType: "application/json",
       upsert: true,
     });
-  if (metaErr) errores.push({ file: "meta.json", error: metaErr.message });
+  if (metaErr) errores.push({ file: metaFile, error: metaErr.message });
 
   if (errores.length > 0) {
     const detalle = errores.map((e) => `${e.file}: ${e.error}`).join("; ");
-    console.error("[backup] datasets con error:", detalle);
+    console.error(`[${cronName}] datasets con error:`, detalle);
     // Backup incompleto → alerta Telegram y 500 (sin heartbeat → health-crons lo marca stale).
-    await logCronError("backup_incompleto", detalle);
+    await logCronError(`${cronName.replace(/-/g, "_")}_incompleto`, detalle);
     return NextResponse.json(
-      { ok: false, date: today, datasets: results.length, errores },
+      { ok: false, grupo: grupoParam ?? "core", date: today, datasets: results.length, errores },
       { status: 500 },
     );
   }
 
   // Limpieza de backups > RETENTION_DAYS (carpetas de fecha + legacy flat files).
+  // Solo la corrida CORE (borra la carpeta de fecha completa, incluye los
+  // archivos del grupo switch del mismo día — no hace falta duplicarla).
   // Housekeeping: si falla, solo log a consola (se reintenta mañana, no alerta).
-  try {
+  if (!esGrupoSwitch) try {
     const cutoff = new Date(now.getTime() - RETENTION_DAYS * 86400000).toISOString().slice(0, 10);
     const { data: entries } = await supabaseServer.storage.from(BUCKET).list("", { limit: 1000 });
     const removePaths: string[] = [];
@@ -386,9 +437,10 @@ export async function GET(req: NextRequest) {
     console.error("[backup] cleanup error:", e instanceof Error ? e.message : String(e));
   }
 
-  await recordCronHeartbeat(CRON_NAME);
+  await recordCronHeartbeat(cronName);
   return NextResponse.json({
     ok: true,
+    grupo: grupoParam ?? "core",
     date: today,
     datasets: results.length,
     totalRows: results.reduce((s, r) => s + r.rows, 0),
