@@ -28,12 +28,15 @@ interface ReebokProduct {
   existencia: number | null;
   disponibilidad: number | null;
   created_at: string;
+  /** Toggle "Ocultar del catálogo" — puede faltar pre-migración (DDL 20260723120000). */
+  oculto_manual?: boolean | null;
 }
 
 type Tab = "faltan-foto" | "completo" | "pedidos";
 type CategoriaFilter = "todas" | "footwear" | "apparel" | "accessories";
 type FotoFilter = "todos" | "con" | "sin";
 type BadgeFilter = "todas" | "ninguno" | "nuevo" | "oferta" | "proximamente";
+type VisibilidadFilter = "visibles" | "ocultos";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -110,10 +113,11 @@ function ReebokCatalogoInner() {
     setTimeout(() => setToast(null), 3500);
   }, []);
 
-  // Solo productos ACTIVOS (el catálogo vivo; el cron oculta los de existencia 0).
+  // scope=admin: catálogo vivo (active=true) + ocultados a mano (oculto_manual)
+  // para poder revertir el toggle "Ocultar del catálogo" desde aquí.
   const { data: productsData, isLoading: productsLoading, mutate: mutateProducts } = useSWR<ReebokProduct[]>(
     authChecked ? "reebok-catalogo-products" : null,
-    () => fetchJson<ReebokProduct[]>("/api/catalogo/reebok/products?active=true", []),
+    () => fetchJson<ReebokProduct[]>("/api/catalogo/reebok/products?scope=admin", []),
     REEBOK_SWR_OPTS,
   );
   const { data: pedidosData, mutate: mutatePedidos } = useSWR<UnifiedPedido[]>(
@@ -128,23 +132,26 @@ function ReebokCatalogoInner() {
   );
 
   const products = useMemo(() => productsData ?? [], [productsData]);
+  // Visibles = catálogo vivo (los ocultados a mano solo aparecen en el filtro
+  // "Ocultos" del catálogo completo — no ensucian métricas ni cola de fotos).
+  const visibles = useMemo(() => products.filter((p) => p.oculto_manual !== true), [products]);
   const pedidos = pedidosData ?? [];
   const loading = productsLoading && !productsData;
 
   const metrics = useMemo(() => {
-    const total = products.length;
-    const sinFoto = products.filter((p) => !tieneFoto(p)).length;
-    const footwear = products.filter((p) => p.category === "footwear").length;
-    const apparel = products.filter((p) => p.category === "apparel").length;
-    const accessories = products.filter((p) => p.category === "accessories").length;
+    const total = visibles.length;
+    const sinFoto = visibles.filter((p) => !tieneFoto(p)).length;
+    const footwear = visibles.filter((p) => p.category === "footwear").length;
+    const apparel = visibles.filter((p) => p.category === "apparel").length;
+    const accessories = visibles.filter((p) => p.category === "accessories").length;
     return { total, sinFoto, footwear, apparel, accessories };
-  }, [products]);
+  }, [visibles]);
 
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
   const reloadPedidos = useCallback(async () => { await mutatePedidos(); }, [mutatePedidos]);
 
   async function excelSinFoto() {
-    const sin = products.filter((p) => !tieneFoto(p));
+    const sin = visibles.filter((p) => !tieneFoto(p));
     if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
     try {
       // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
@@ -247,7 +254,7 @@ function ReebokCatalogoInner() {
         ) : (
           <>
             {tab === "faltan-foto" && (
-              <FaltanFotoTab products={products} onPhotoSaved={reloadProducts} showToast={showToast} />
+              <FaltanFotoTab products={visibles} onPhotoSaved={reloadProducts} showToast={showToast} />
             )}
             {tab === "completo" && (
               <CatalogoCompletoTab products={products} onPhotoSaved={reloadProducts} showToast={showToast} />
@@ -323,10 +330,18 @@ function CatalogoCompletoTab({
   const [categoria, setCategoria] = useState<CategoriaFilter>("todas");
   const [foto, setFoto] = useState<FotoFilter>("todos");
   const [badge, setBadge] = useState<BadgeFilter>("todas");
+  const [visibilidad, setVisibilidad] = useState<VisibilidadFilter>("visibles");
   const [search, setSearch] = useState("");
+
+  const ocultosCount = products.filter((p) => p.oculto_manual === true).length;
+  // Si ya no queda ningún oculto (se re-mostró el último), el filtro vuelve solo
+  // a "visibles" — el segmented desaparece y la lista no queda vacía.
+  const visibilidadEfectiva: VisibilidadFilter = ocultosCount === 0 ? "visibles" : visibilidad;
 
   const filtered = products
     .filter((p) => {
+      const oculto = p.oculto_manual === true;
+      if (visibilidadEfectiva === "visibles" ? oculto : !oculto) return false;
       if (categoria !== "todas" && p.category !== categoria) return false;
       if (foto === "con" && !tieneFoto(p)) return false;
       if (foto === "sin" && tieneFoto(p)) return false;
@@ -382,6 +397,17 @@ function CatalogoCompletoTab({
         <Segmented options={categoriaTabs} value={categoria} onChange={setCategoria} />
         <Segmented options={fotoTabs} value={foto} onChange={setFoto} />
         <Segmented options={badgeTabs} value={badge} onChange={setBadge} />
+        {/* Filtro del toggle "Ocultar del catálogo" — solo aparece si hay ocultos. */}
+        {ocultosCount > 0 && (
+          <Segmented
+            options={[
+              { key: "visibles" as VisibilidadFilter, label: "Visibles" },
+              { key: "ocultos" as VisibilidadFilter, label: `Ocultos (${ocultosCount})` },
+            ]}
+            value={visibilidadEfectiva}
+            onChange={setVisibilidad}
+          />
+        )}
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>
 
@@ -478,7 +504,82 @@ function useProductActions(
     }
   }
 
-  return { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange };
+  // Toggle "Ocultar del catálogo / Mostrar en catálogo" (oculto_manual).
+  // Confirmación simple inline (dos clicks); el flag sobrevive al sync.
+  const oculto = product.oculto_manual === true;
+  const [confirmandoOculto, setConfirmandoOculto] = useState(false);
+  const [savingOculto, setSavingOculto] = useState(false);
+
+  async function toggleOculto() {
+    setSavingOculto(true);
+    try {
+      const res = await fetch("/api/catalogo/reebok/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: product.id, oculto: !oculto }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error || "No se pudo actualizar el producto.");
+      }
+      showToast(oculto ? "Listo — el producto vuelve a verse en el catálogo" : "Listo — producto oculto del catálogo");
+      await onPhotoSaved(); // revalida la lista
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo actualizar el producto.");
+    } finally {
+      setSavingOculto(false);
+      setConfirmandoOculto(false);
+    }
+  }
+
+  return {
+    inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange,
+    oculto, confirmandoOculto, setConfirmandoOculto, savingOculto, toggleOculto,
+  };
+}
+
+// Botón del toggle con confirmación simple inline (compartido tarjeta/fila).
+function OcultarToggle({
+  oculto, confirmando, saving, onConfirmStart, onCancel, onConfirm,
+}: {
+  oculto: boolean;
+  confirmando: boolean;
+  saving: boolean;
+  onConfirmStart: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (confirmando) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs">
+        <span className="text-gray-500">{oculto ? "¿Mostrar en catálogo?" : "¿Ocultar del catálogo?"}</span>
+        <button
+          onClick={onConfirm}
+          disabled={saving}
+          className="px-2 py-1 rounded-md font-semibold bg-[#1A2656] text-white hover:bg-[#1A2656]/90 active:scale-[0.97] disabled:opacity-50 transition"
+        >
+          {saving ? "…" : "Sí"}
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          className="px-2 py-1 rounded-md font-semibold border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition"
+        >
+          No
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={onConfirmStart}
+      className={`text-xs font-medium underline-offset-2 hover:underline transition ${
+        oculto ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
+      }`}
+    >
+      {oculto ? "Mostrar en catálogo" : "Ocultar del catálogo"}
+    </button>
+  );
 }
 
 // ── Tarjeta de producto con subida de foto ────────────────────────────────────
@@ -490,16 +591,23 @@ function ProductPhotoCard({
   onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
 }) {
-  const { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange } =
-    useProductActions(product, onPhotoSaved, showToast);
+  const {
+    inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange,
+    oculto, confirmandoOculto, setConfirmandoOculto, savingOculto, toggleOculto,
+  } = useProductActions(product, onPhotoSaved, showToast);
   const disp = product.disponibilidad;
   const exist = product.existencia;
   const agotado = disp == null || disp <= 0;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+    <div className={`bg-white rounded-xl border overflow-hidden flex flex-col ${oculto ? "border-gray-100 opacity-80" : "border-gray-200"}`}>
       {/* Imagen / placeholder */}
       <div className="relative aspect-square bg-[#F5F0E8]">
+        {oculto && (
+          <span className="absolute top-2 right-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">
+            Oculto
+          </span>
+        )}
         {chip && (
           <span className={`absolute top-2 left-2 z-10 text-[10px] font-bold px-1.5 py-0.5 rounded ${chip.cls}`}>
             {chip.label}
@@ -593,6 +701,18 @@ function ProductPhotoCard({
             ))}
           </select>
         </div>
+
+        {/* Ocultar / mostrar en el catálogo (sobrevive al sync). */}
+        <div className="mt-1.5 pt-2 border-t border-[#1A2656]/10">
+          <OcultarToggle
+            oculto={oculto}
+            confirmando={confirmandoOculto}
+            saving={savingOculto}
+            onConfirmStart={() => setConfirmandoOculto(true)}
+            onCancel={() => setConfirmandoOculto(false)}
+            onConfirm={toggleOculto}
+          />
+        </div>
       </div>
     </div>
   );
@@ -607,14 +727,16 @@ function ProductListRow({
   onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
 }) {
-  const { inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange } =
-    useProductActions(product, onPhotoSaved, showToast);
+  const {
+    inputRef, uploading, error, handleFile, currentBadge, savingBadge, badgeSaved, chip, handleBadgeChange,
+    oculto, confirmandoOculto, setConfirmandoOculto, savingOculto, toggleOculto,
+  } = useProductActions(product, onPhotoSaved, showToast);
   const disp = product.disponibilidad;
   const exist = product.existencia;
   const agotado = disp == null || disp <= 0;
 
   return (
-    <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-2.5">
+    <div className={`flex items-center gap-3 bg-white border rounded-lg p-2.5 ${oculto ? "border-gray-100 opacity-80" : "border-gray-200"}`}>
       {/* Miniatura */}
       <div className="relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-[#F5F0E8]">
         {chip && (
@@ -643,6 +765,9 @@ function ProductListRow({
             <span className="shrink-0 text-[11px] bg-[#F5F0E8] text-[#1A2656]/60 px-1.5 py-0.5 rounded font-medium tabular-nums">{product.sku}</span>
           )}
           <h3 className="text-sm font-semibold text-[#1A2656] truncate">{product.name}</h3>
+          {oculto && (
+            <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-700 text-white">Oculto</span>
+          )}
         </div>
         <div className="flex items-center gap-3 mt-1 text-xs">
           {product.price != null && (
@@ -690,6 +815,14 @@ function ProductListRow({
           ) : badgeSaved ? (
             <span className="text-[10px] text-emerald-600 font-medium">✓ Guardado</span>
           ) : null}
+          <OcultarToggle
+            oculto={oculto}
+            confirmando={confirmandoOculto}
+            saving={savingOculto}
+            onConfirmStart={() => setConfirmandoOculto(true)}
+            onCancel={() => setConfirmandoOculto(false)}
+            onConfirm={toggleOculto}
+          />
         </div>
       </div>
     </div>

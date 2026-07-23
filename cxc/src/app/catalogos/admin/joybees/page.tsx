@@ -24,6 +24,8 @@ interface JoybeesProduct {
   active: boolean;
   badge: string | null;
   created_at: string;
+  /** Toggle "Ocultar del catálogo" — puede faltar pre-migración (DDL 20260723120000). */
+  oculto_manual?: boolean | null;
 }
 
 interface ImportRow {
@@ -164,8 +166,13 @@ function JoybeesAdminInner() {
       .catch(() => {});
   }, [authChecked, loadProducts]);
 
+  // Visibles = sin los ocultados a mano (el toggle "Ocultar del catálogo"):
+  // los ocultos no ensucian métricas ni la cola de fotos; solo aparecen en el
+  // filtro "Ocultos" del catálogo completo, para poder revertirlos.
+  const visibles = products.filter((p) => p.oculto_manual !== true);
+
   async function excelSinFoto() {
-    const sin = products.filter((p) => !tieneFoto(p));
+    const sin = visibles.filter((p) => !tieneFoto(p));
     if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
     try {
       // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
@@ -194,13 +201,13 @@ function JoybeesAdminInner() {
 
   if (!authChecked) return null;
 
-  const sinFotoCount = products.filter((p) => !p.image_url?.trim()).length;
+  const sinFotoCount = visibles.filter((p) => !p.image_url?.trim()).length;
   const metrics = {
-    total: products.length,
+    total: visibles.length,
     sinFoto: sinFotoCount,
-    clogs: products.filter((p) => tipoJoybees(p.name) === "Clogs").length,
-    sandalias: products.filter((p) => tipoJoybees(p.name) === "Sandalias").length,
-    flips: products.filter((p) => tipoJoybees(p.name) === "Flips").length,
+    clogs: visibles.filter((p) => tipoJoybees(p.name) === "Clogs").length,
+    sandalias: visibles.filter((p) => tipoJoybees(p.name) === "Sandalias").length,
+    flips: visibles.filter((p) => tipoJoybees(p.name) === "Flips").length,
   };
   // "importar" (carga por plantilla) ya no se muestra: el catálogo se sincroniza
   // por API desde Switch (cron joybees-catalogo). El flujo queda como respaldo,
@@ -280,7 +287,7 @@ function JoybeesAdminInner() {
         ) : (
           <>
             {tab === "faltan-foto" && (
-              <FaltanFotoTab products={products} showToast={showToast} onComplete={loadProducts} />
+              <FaltanFotoTab products={visibles} showToast={showToast} onComplete={loadProducts} />
             )}
             {tab === "completo" && (
               <ProductosTab products={products} showToast={showToast} onComplete={loadProducts} />
@@ -327,8 +334,16 @@ function ProductosTab({
   onComplete: () => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
+  const [visibilidad, setVisibilidad] = useState<"visibles" | "ocultos">("visibles");
+
+  const ocultosCount = products.filter((p) => p.oculto_manual === true).length;
+  // Si ya no queda ningún oculto (se re-mostró el último), el filtro vuelve solo
+  // a "visibles" — el selector desaparece y la lista no queda vacía.
+  const visibilidadEfectiva = ocultosCount === 0 ? "visibles" : visibilidad;
 
   const filtered = products.filter((p) => {
+    const oculto = p.oculto_manual === true;
+    if (visibilidadEfectiva === "visibles" ? oculto : !oculto) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -358,6 +373,26 @@ function ProductosTab({
         />
       </div>
 
+      {/* Filtro del toggle "Ocultar del catálogo" — solo aparece si hay ocultos. */}
+      {ocultosCount > 0 && (
+        <div className="inline-flex bg-gray-100 rounded-lg p-0.5 mb-4">
+          {([
+            { key: "visibles", label: "Visibles" },
+            { key: "ocultos", label: `Ocultos (${ocultosCount})` },
+          ] as const).map((o) => (
+            <button
+              key={o.key}
+              onClick={() => setVisibilidad(o.key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition ${
+                visibilidadEfectiva === o.key ? "bg-white text-[#404041] shadow-sm" : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <p className="text-sm text-gray-500 mb-4">
         {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
         {search && ` (de ${products.length})`}
@@ -386,6 +421,34 @@ function ProductRow({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Toggle "Ocultar del catálogo / Mostrar en catálogo" (oculto_manual) —
+  // espejo EXACTO de Reebok: confirmación simple inline, sobrevive al sync.
+  const oculto = product.oculto_manual === true;
+  const [confirmandoOculto, setConfirmandoOculto] = useState(false);
+  const [savingOculto, setSavingOculto] = useState(false);
+
+  async function toggleOculto() {
+    setSavingOculto(true);
+    try {
+      const res = await fetch("/api/catalogo/joybees/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku: product.sku, oculto: !oculto }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => null);
+        throw new Error(d?.error || "No se pudo actualizar el producto.");
+      }
+      showToast(oculto ? "Listo — el producto vuelve a verse en el catálogo" : "Listo — producto oculto del catálogo");
+      await onComplete();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo actualizar el producto.");
+    } finally {
+      setSavingOculto(false);
+      setConfirmandoOculto(false);
+    }
+  }
 
   const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
 
@@ -451,6 +514,9 @@ function ProductRow({
             {product.stock === 0 && (
               <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
             )}
+            {oculto && (
+              <span className="text-xs font-bold bg-gray-700 text-white px-1.5 py-0.5 rounded">Oculto</span>
+            )}
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
             {product.sku} &middot; {product.category} &middot; {product.gender} &middot; Stock: {product.stock}
@@ -479,6 +545,36 @@ function ProductRow({
         >
           {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar" : "Subir foto"}
         </button>
+
+        {/* Ocultar / mostrar en el catálogo (sobrevive al sync). */}
+        {confirmandoOculto ? (
+          <div className="flex-shrink-0 flex items-center gap-1.5 text-xs">
+            <span className="text-gray-500 whitespace-nowrap">{oculto ? "¿Mostrar?" : "¿Ocultar?"}</span>
+            <button
+              onClick={toggleOculto}
+              disabled={savingOculto}
+              className="px-2 py-1 rounded-md font-semibold bg-[#404041] text-white hover:bg-[#404041]/90 active:scale-[0.97] disabled:opacity-50 transition"
+            >
+              {savingOculto ? "…" : "Sí"}
+            </button>
+            <button
+              onClick={() => setConfirmandoOculto(false)}
+              disabled={savingOculto}
+              className="px-2 py-1 rounded-md font-semibold border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50 transition"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmandoOculto(true)}
+            className={`flex-shrink-0 text-xs font-medium underline-offset-2 hover:underline transition whitespace-nowrap ${
+              oculto ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            {oculto ? "Mostrar en catálogo" : "Ocultar del catálogo"}
+          </button>
+        )}
       </div>
     </div>
   );
