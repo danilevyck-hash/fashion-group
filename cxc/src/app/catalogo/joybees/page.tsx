@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { JoybeesProduct } from "@/components/joybees/JoybeesProductCard";
 import { Toast, ModalOverlay } from "@/components/ui";
 import JoybeesHeader from "@/components/joybees/JoybeesHeader";
+import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
 import JoybeesFilters from "@/components/joybees/JoybeesFilters";
 import JoybeesGroupedCard from "@/components/joybees/JoybeesGroupedCard";
 import JoybeesStickyCartBar from "@/components/joybees/JoybeesStickyCartBar";
@@ -99,22 +100,24 @@ function JoybeesCatalog() {
     window.history.replaceState(null, "", newUrl);
   }, [gender, category, search]);
 
-  // Load products
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch("/api/catalogo/joybees/products?active=true");
-        if (!res.ok) throw new Error("fetch failed");
-        const data: JoybeesProduct[] = await res.json();
-        setProducts(data.filter(p => p.stock > 0 || p.is_regalia));
-      } catch {
-        setProducts([]);
-      }
-      setLoading(false);
+  // Load products — loadProducts también lo reusa el botón "Actualizar ahora"
+  // (CatalogoSyncNow) para refrescar la vista tras un sync manual exitoso.
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/catalogo/joybees/products?active=true");
+      if (!res.ok) throw new Error("fetch failed");
+      const data: JoybeesProduct[] = await res.json();
+      setProducts(data.filter(p => p.stock > 0 || p.is_regalia));
+    } catch {
+      setProducts([]);
     }
-    load();
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Share
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -346,6 +349,13 @@ function JoybeesCatalog() {
           filteredCount={filteredCount}
           onClearAll={handleClearAll}
         />
+
+        {/* ── Sync row (espejo de Reebok) ── */}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          {/* "Actualizar ahora" del catálogo (solo con sesión admin/secretaria/
+              vendedor — el catálogo público jamás lo ve). */}
+          <CatalogoSyncNow catalogo="joybees" onSuccess={loadProducts} />
+        </div>
 
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}
 

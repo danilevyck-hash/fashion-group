@@ -44,6 +44,14 @@ export function isSyncNowModulo(s: string): s is SyncNowModulo {
   return (SYNC_NOW_MODULOS as readonly string[]).includes(s);
 }
 
+/** Roles que pueden disparar cada módulo. Vendedor SOLO catálogos (los usa
+ *  para armar pedidos); el resto de módulos sigue admin+secretaria. */
+export function rolesSyncNow(modulo: SyncNowModulo): string[] {
+  return modulo === "catalogo-reebok" || modulo === "catalogo-joybees"
+    ? ["admin", "secretaria", "vendedor"]
+    : ["admin", "secretaria"];
+}
+
 /** Minutos de cooldown tras un success del mismo (módulo, empresa). */
 export const SYNC_NOW_COOLDOWN_MIN = 10;
 

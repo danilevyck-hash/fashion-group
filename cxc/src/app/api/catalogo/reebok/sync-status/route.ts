@@ -5,9 +5,10 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 // Última corrida exitosa del cron `reebok-catalogo` (cron_heartbeats), para el
-// indicador "Sincronizado con Switch hace X" del catálogo admin. Read-only.
+// indicador "Sincronizado con Switch hace X" del catálogo (admin y vista de
+// vendedores — botón "Actualizar ahora"). Read-only.
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data } = await supabaseServer
