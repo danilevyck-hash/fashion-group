@@ -1,4 +1,5 @@
-// Cron fidelización ACS — 08:15 UTC (1×/día, plan Hobby).
+// Cron fidelización ACS — 11:30 UTC + 2ª entrada 16:30 (segunda oportunidad:
+// no-op si la 1ª ya registró success hoy).
 //
 // 1) Baja el directorio de clientes de la instancia MULTI → switch_clientes
 //    (american_classic): teléfono/celular/email para WhatsApp en la pestaña
@@ -7,8 +8,10 @@
 //    200/corrida) → descuento_global_pct (detección del 5% de fidelización).
 //
 // Horario elegido por SESIÓN ÚNICA de Switch (1 token por empresa/instancia):
-// multifashion-sync corre 05:00 y switch-sync american_classic 06:30 — a las
-// 08:15 nadie más está logueado en la instancia MULTI.
+// a las 11:30 nadie más toca la instancia MULTI/american_classic — esquiva
+// sync-recibos (07:50), switch-articulos (08:40) y la pasada de reconciliación
+// de las 10:00 (termina ≤10:05). La 2ª entrada (16:30) cae tras el facturas ACS
+// de las 15:00 (~1 min) y antes de la reconciliación de las 18:00.
 
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";

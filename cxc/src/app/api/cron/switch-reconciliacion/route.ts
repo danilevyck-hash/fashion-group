@@ -13,16 +13,18 @@
 // `fetch(${origin}/api/cron/switch-sync?...)` en lotes de 2 con maxDuration=300:
 // 6 empresas × ~200s excedían el límite → la mataban a media recuperación y los
 // switch-sync self-fetched no sobrevivían a la muerte del caller → recuperó 0/16.
-// Ahora ejecuta el trabajo dentro de ESTA invocación (maxDuration=800), serial
-// por empresa (token único de Switch), idempotente (upserts), acotado por un
-// presupuesto de tiempo. Lo que no entre en una pasada lo toma la siguiente:
-// corre 3×/día (10:00, 14:00, 18:00 UTC), todas idempotentes.
+// Ahora ejecuta el trabajo dentro de ESTA invocación (maxDuration=300, techo del
+// plan Hobby), serial por empresa (token único de Switch), idempotente
+// (upserts), acotado por un presupuesto de tiempo. Lo que no entre en una pasada
+// lo toma la siguiente: corre 3×/día (10:00, 14:00, 18:00 UTC), todas
+// idempotentes.
 //
 // COBERTURA: switch-sync (facturas/estadocuenta/costo, por par vía
-// switch_sync_log) + los crons "de una sola unidad" (clientes-master, utilidad,
-// recibos, articulos, detectados por cron_heartbeats sin success hoy). NO cubre
-// multifashion-sync (no registra heartbeat → sin señal fiable; su data igual
-// entra por american_classic en switch-sync).
+// switch_sync_log) + los crons colaterales de COLATERAL_CRONS (clientes-master,
+// utilidad, recibos, articulos, multifashion-sync, proveedores, catálogos,
+// alertas y resúmenes — detectados por cron_heartbeats sin success hoy). NO
+// cubre backup ni acs-fidelizacion (pesados / sesión propia): esos tienen su
+// propia 2ª entrada del día en vercel.json como segunda oportunidad.
 //
 // Telegram (Opción A, jun-2026 — SOLO fallos reales):
 //   - Algo sigue sin success / sin tiempo → ALERTA (qué falló + último error;

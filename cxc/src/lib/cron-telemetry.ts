@@ -96,7 +96,7 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   // en camino" (demasiado esporádico para asumirla).
   "grupo-resumen-mensual": 14,
   "joybees-catalogo": 12, // su cron corre 11:00 UTC
-  "reebok-catalogo": 8, // slot temprano 06:45 + 1h
+  "reebok-catalogo": 13, // slot temprano 12:10 + ~1h (no adelantarse a su run normal)
 };
 
 /**

@@ -9,6 +9,9 @@ const CRON_NAME = "cheques-alert";
 const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const dynamic = "force-dynamic";
+// Query + Telegram: corre en segundos. Explícito para no depender del default
+// de Vercel (10s) — margen si Supabase/Telegram se ponen lentos.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.nextUrl.searchParams.get("secret");
