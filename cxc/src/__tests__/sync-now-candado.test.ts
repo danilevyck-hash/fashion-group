@@ -25,6 +25,8 @@ import {
   lockKeyDe,
   isSyncNowModulo,
   moduloConfig,
+  rolesSyncNow,
+  SYNC_NOW_MODULOS,
   SYNC_NOW_COOLDOWN_MIN,
   SYNC_NOW_VENTANA_CRON_MIN,
 } from "@/lib/switch-api/sync-now";
@@ -172,6 +174,24 @@ describe("proximoCronDe / lockKeyDe / config por módulo", () => {
     expect(moduloConfig("estadocuenta").empresas).toContain("joystep");
     expect(moduloConfig("recibos").empresas).not.toContain("joystep");
     expect(moduloConfig("facturas").empresas).toContain("confecciones_boston");
+  });
+});
+
+describe("rolesSyncNow — roles por módulo", () => {
+  it("vendedor puede disparar SOLO los catálogos", () => {
+    expect(rolesSyncNow("catalogo-reebok")).toContain("vendedor");
+    expect(rolesSyncNow("catalogo-joybees")).toContain("vendedor");
+    for (const m of SYNC_NOW_MODULOS) {
+      if (m === "catalogo-reebok" || m === "catalogo-joybees") continue;
+      expect(rolesSyncNow(m)).not.toContain("vendedor");
+    }
+  });
+
+  it("admin y secretaria siguen en TODOS los módulos", () => {
+    for (const m of SYNC_NOW_MODULOS) {
+      expect(rolesSyncNow(m)).toContain("admin");
+      expect(rolesSyncNow(m)).toContain("secretaria");
+    }
   });
 });
 

@@ -8,6 +8,7 @@ import { getBultoSize } from "@/lib/reebok-bulto";
 import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder, genderFilterLabel } from "@/lib/reebok-gender";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
+import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
 import CatalogFilters, { SaleFilter } from "@/components/reebok/CatalogFilters";
 import CatalogProductCard from "@/components/reebok/CatalogProductCard";
 import StickyCartBar from "@/components/reebok/StickyCartBar";
@@ -100,31 +101,34 @@ function Productos() {
     window.history.replaceState(null, "", newUrl);
   }, [gender, category, search]);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const [pRes, iRes] = await Promise.all([
-          fetch("/api/catalogo/reebok/products?active=true"),
-          fetch("/api/catalogo/reebok/inventory"),
-        ]);
-        const prods: Product[] = pRes.ok ? await pRes.json() : [];
-        const inv: { product_id: string; size: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
-        const stockMap: Record<string, number> = {};
-        const sizesMap: Record<string, Set<string>> = {};
-        inv.forEach(i => {
-          stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
-          if (i.quantity > 0 && i.size) {
-            if (!sizesMap[i.product_id]) sizesMap[i.product_id] = new Set();
-            sizesMap[i.product_id].add(i.size);
-          }
-        });
-        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => p._stock > 0 || p.badge === "proximamente"));
-      } catch { setProducts([]); }
-      setLoading(false);
-    }
-    load();
+  // loadProducts también lo reusa el botón "Actualizar ahora" (CatalogoSyncNow)
+  // para refrescar la vista tras un sync manual exitoso.
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [pRes, iRes] = await Promise.all([
+        fetch("/api/catalogo/reebok/products?active=true"),
+        fetch("/api/catalogo/reebok/inventory"),
+      ]);
+      const prods: Product[] = pRes.ok ? await pRes.json() : [];
+      const inv: { product_id: string; size: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
+      const stockMap: Record<string, number> = {};
+      const sizesMap: Record<string, Set<string>> = {};
+      inv.forEach(i => {
+        stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
+        if (i.quantity > 0 && i.size) {
+          if (!sizesMap[i.product_id]) sizesMap[i.product_id] = new Set();
+          sizesMap[i.product_id].add(i.size);
+        }
+      });
+      setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => p._stock > 0 || p.badge === "proximamente"));
+    } catch { setProducts([]); }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // ── Derived state ──
   const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
@@ -540,9 +544,12 @@ function Productos() {
         onClearAll={handleClearAll}
       />
 
-      {/* ── Share/Download row ── */}
-      {filtered.length > 0 && (
-        <div className="flex items-center justify-end gap-2 mb-4">
+      {/* ── Sync + Share/Download row ── */}
+      <div className="flex items-center justify-between gap-2 mb-4">
+        {/* "Actualizar ahora" del catálogo (solo con sesión admin/secretaria/
+            vendedor — el catálogo público jamás lo ve). */}
+        <CatalogoSyncNow catalogo="reebok" onSuccess={loadProducts} />
+        {filtered.length > 0 && (
           <div className="relative" ref={shareRef}>
             <button onClick={() => setShowShareMenu(prev => !prev)}
               className="text-xs border border-[#1A2656]/10 text-[#1A2656]/40 px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 hover:text-[#1A2656]/60 transition flex items-center gap-1.5 min-h-[44px]">
@@ -564,8 +571,8 @@ function Productos() {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Grid ── */}
       {loading ? skeletonGrid : filtered.length === 0 ? emptyState : productGrid}

@@ -42,6 +42,7 @@ import {
   precheckSyncNow,
   proximoCronDe,
   nombreEmpresa,
+  rolesSyncNow,
   type SyncNowModulo,
 } from "@/lib/switch-api/sync-now";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -185,7 +186,9 @@ async function ejecutar(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  // Universo de roles con acceso a ALGÚN módulo (401/403 primero, como siempre);
+  // el permiso fino por módulo se valida más abajo con rolesSyncNow.
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: { modulo?: unknown; empresa?: unknown };
@@ -198,6 +201,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const modulo = typeof body.modulo === "string" ? body.modulo : "";
   if (!isSyncNowModulo(modulo)) {
     return NextResponse.json({ error: `modulo inválido: ${modulo}` }, { status: 400 });
+  }
+
+  // Vendedor SOLO puede disparar catálogos; los demás módulos siguen
+  // admin+secretaria (admin siempre pasa requireRole).
+  if (auth.role !== "admin" && !rolesSyncNow(modulo).includes(auth.role)) {
+    return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
   const cfg = moduloConfig(modulo);
