@@ -316,10 +316,12 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Refresh de las MVs de Ventas: clientes_empresa_12m_vw (tab Clientes) +
-    // ventas_rollup_mensual_mv (rollup mensual del dashboard). Idempotente:
+    // Refresh de las 3 MVs del cron: clientes_empresa_12m_vw (tab Clientes) +
+    // ventas_rollup_mensual_mv (rollup mensual del dashboard) +
+    // switch_estadocuenta_aging_mv (aging de CXC — antes faltaba aquí y una
+    // recuperación dejaba el aging del día sin refrescar). Idempotente:
     // REFRESH ... CONCURRENTLY recomputa las mismas vistas, no duplica nada. No
-    // dispara alerta y corre temprano (06:30 UTC) → sin guard de hora. Ambas RPC
+    // dispara alerta y corre temprano (07:35 UTC) → sin guard de hora. Las 3 RPC
     // ligeras; falla si cualquiera falla.
     cronName: "refresh-clientes-views",
     label: "refresh-clientes-views",
@@ -328,7 +330,9 @@ const COLATERAL_CRONS: ColateralCron[] = [
       if (e1) return { ok: false, detail: `clientes_12m: ${e1.message}` };
       const { error: e2 } = await supabaseServer.rpc("refresh_ventas_rollup_mensual_mv");
       if (e2) return { ok: false, detail: `ventas_rollup: ${e2.message}` };
-      return { ok: true, detail: "vistas refrescadas (clientes_12m + ventas_rollup)" };
+      const { error: e3 } = await supabaseServer.rpc("refresh_switch_estadocuenta_aging_mv");
+      if (e3) return { ok: false, detail: `cxc_aging: ${e3.message}` };
+      return { ok: true, detail: "vistas refrescadas (clientes_12m + ventas_rollup + cxc_aging)" };
     },
   },
   {
