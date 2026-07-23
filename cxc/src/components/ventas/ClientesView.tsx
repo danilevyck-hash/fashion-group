@@ -16,6 +16,8 @@ import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { SortSheet } from "./SortSheet";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
 type SortDir = "asc" | "desc";
@@ -113,6 +115,23 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
       setLoading(false);
     }
   };
+
+  // Reload de la lista tras "Actualizar ahora" (misma empresa/año vigentes).
+  // La data del tab sale de clientes_empresa_12m_vw → el refetch recién tiene
+  // sentido DESPUÉS del paso final refresh-vistas de la secuencia.
+  const reloadData = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(empresa)}&year=${selectedYear}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) return;
+      const fresh = (await res.json()) as Clientes;
+      startTransition(() => setData(fresh));
+    } catch {
+      /* el toast del botón ya informó; la lista queda con lo que había */
+    }
+  }, [empresa, selectedYear]);
 
   // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
   // popula al primer hover/tap sobre cada cliente. El CXC aging se fetchea
@@ -314,6 +333,11 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
             <span>Ordenar</span>
           </button>
+
+          {/* "Actualizar ahora" (admin/secretaria) — la data de este tab sale
+              del vw clientes_empresa_12m: misma secuencia completa que Resumen
+              (facturas de las 8 + refresh-vistas al final) y refetch. */}
+          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={reloadData} />
 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 md:flex">

@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
-import { SYNC_NOW_FACTURAS_OPCIONES } from "@/components/shared/syncNowOpciones";
+import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
 
@@ -90,8 +90,9 @@ export function ResumenViewMobile({
           variant="pill"
           prefix="Data al"
         />
-        {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en secuencia. */}
-        <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} secuencial onSuccess={onReloadData} />
+        {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
+            secuencia + refresh-vistas como paso final. */}
+        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={onReloadData} />
       </div>
       <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
       <MobileToggles

@@ -33,8 +33,12 @@ import {
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
 import { RECIBOS_EMPRESA_KEYS } from "./sync-recibos";
-import { empresasConFacturas } from "./empresas";
+import { empresasConFacturas, empresasConCxp } from "./empresas";
 import { RUNNING_STALE_MIN } from "./sync-log";
+import {
+  REFRESH_VISTAS_HEARTBEAT,
+  REFRESH_VISTAS_CRON_HEARTBEAT,
+} from "@/lib/refresh-vistas";
 
 export const SYNC_NOW_MODULOS = [
   "estadocuenta",
@@ -43,6 +47,8 @@ export const SYNC_NOW_MODULOS = [
   "clientes-master",
   "catalogo-reebok",
   "catalogo-joybees",
+  "proveedores",
+  "refresh-vistas",
 ] as const;
 
 export type SyncNowModulo = (typeof SYNC_NOW_MODULOS)[number];
@@ -51,12 +57,20 @@ export function isSyncNowModulo(s: string): s is SyncNowModulo {
   return (SYNC_NOW_MODULOS as readonly string[]).includes(s);
 }
 
-/** Roles que pueden disparar cada módulo. Vendedor SOLO catálogos (los usa
- *  para armar pedidos); el resto de módulos sigue admin+secretaria. */
+/** Roles que pueden disparar cada módulo (el permiso de SERVER; el gate de UI
+ *  de cada botón se parametriza aparte en SyncNowButton):
+ *   - vendedor: catálogos (arma pedidos) + los 4 módulos de la ficha de
+ *     cliente (estadocuenta/recibos/facturas/clientes-master — arma cobranza
+ *     y pedido con esos datos). NO proveedores ni refresh-vistas.
+ *   - contabilidad SOLO proveedores (es quien vive en /proveedores);
+ *   - el resto (refresh-vistas) queda admin+secretaria.
+ *  El gate de UI decide DÓNDE ve cada rol su botón: vendedor solo lo ve en
+ *  catálogos y en la ficha de cliente (los botones de Ventas/CXC/Clientes
+ *  lista siguen admin+secretaria). */
 export function rolesSyncNow(modulo: SyncNowModulo): string[] {
-  return modulo === "catalogo-reebok" || modulo === "catalogo-joybees"
-    ? ["admin", "secretaria", "vendedor"]
-    : ["admin", "secretaria"];
+  if (modulo === "proveedores") return ["admin", "secretaria", "contabilidad"];
+  if (modulo === "refresh-vistas") return ["admin", "secretaria"];
+  return ["admin", "secretaria", "vendedor"];
 }
 
 /** Minutos de cooldown tras un success del mismo (módulo, empresa). */
@@ -71,6 +85,9 @@ interface ModuloConfig {
   empresaFija?: string;
   /** ¿Toca Switch? (false = exento de la ventana de cronograma). */
   tocaSwitch: boolean;
+  /** Módulos SIN switch_sync_log: cron_name(s) de cron_heartbeats cuyo
+   *  last_success_at más reciente alimenta el cooldown de 10 min. */
+  cooldownHeartbeats?: readonly string[];
 }
 
 /** Config por módulo. Los catálogos fijan su empresa (active_shoes / joystep). */
@@ -83,11 +100,29 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
     case "recibos":
       return { empresas: RECIBOS_EMPRESA_KEYS, syncType: "recibos", tocaSwitch: true };
     case "clientes-master":
-      return { empresas: null, syncType: null, tocaSwitch: false };
+      return {
+        empresas: null,
+        syncType: null,
+        tocaSwitch: false,
+        cooldownHeartbeats: ["sync-clientes-master"],
+      };
     case "catalogo-reebok":
       return { empresas: null, syncType: "catalogo_reebok", empresaFija: "active_shoes", tocaSwitch: true };
     case "catalogo-joybees":
       return { empresas: null, syncType: "catalogo_joybees", empresaFija: "joystep", tocaSwitch: true };
+    case "proveedores":
+      // CxP por empresa: 6 B2B + Multifashion (empresasConCxp; Boston no tiene).
+      return { empresas: empresasConCxp(), syncType: "proveedores", tocaSwitch: true };
+    case "refresh-vistas":
+      // DB-only (RPCs de MVs de Ventas): sin empresa, sin Switch, sin lock de
+      // switch_sync_log (CONCURRENTLY tolera corridas simultáneas). El cooldown
+      // mira el heartbeat manual Y el del cron de las 07:35.
+      return {
+        empresas: null,
+        syncType: null,
+        tocaSwitch: false,
+        cooldownHeartbeats: [REFRESH_VISTAS_HEARTBEAT, REFRESH_VISTAS_CRON_HEARTBEAT],
+      };
   }
 }
 

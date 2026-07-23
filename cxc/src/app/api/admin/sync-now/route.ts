@@ -2,10 +2,11 @@
  * POST /api/admin/sync-now — sync manual on-demand ("Actualizar ahora").
  *
  * Body: { modulo, empresa? } con modulo ∈ estadocuenta | facturas | recibos |
- * clientes-master | catalogo-reebok | catalogo-joybees. estadocuenta/facturas/
- * recibos exigen empresa (UNA por disparo — sesión única de Switch);
- * clientes-master y catálogos no llevan empresa (catálogos fijan la suya:
- * active_shoes / joystep).
+ * clientes-master | catalogo-reebok | catalogo-joybees | proveedores |
+ * refresh-vistas. estadocuenta/facturas/recibos/proveedores exigen empresa
+ * (UNA por disparo — sesión única de Switch); clientes-master, catálogos y
+ * refresh-vistas no llevan empresa (catálogos fijan la suya: active_shoes /
+ * joystep; refresh-vistas es DB-only — RPCs de MVs de Ventas, sin Switch).
  *
  * Candado de 2 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
  *   a) running (fila 'running' fresca de esa EMPRESA en switch_sync_log — del
@@ -38,6 +39,8 @@ import {
   syncEmpresaEstadoCuenta,
 } from "@/lib/switch-api/sync-empresa";
 import { syncEmpresaRecibos, mesesCronRecibos } from "@/lib/switch-api/sync-recibos";
+import { syncEmpresaProveedores } from "@/lib/switch-api/sync-proveedores";
+import { runRefreshVistas } from "@/lib/refresh-vistas";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
@@ -104,6 +107,7 @@ async function fetchRunningDeEmpresa(
 async function fetchLastSuccessFinishedAt(
   empresaKey: string | null,
   syncType: string | null,
+  cooldownHeartbeats: readonly string[] | undefined,
 ): Promise<string | null> {
   if (empresaKey && syncType) {
     const { data, error } = await supabaseServer
@@ -121,14 +125,18 @@ async function fetchLastSuccessFinishedAt(
     }
     return (data as { finished_at: string } | null)?.finished_at ?? null;
   }
-  // clientes-master no escribe switch_sync_log → cooldown por su heartbeat de cron.
+  // Módulos sin switch_sync_log (clientes-master, refresh-vistas) → cooldown
+  // por heartbeat(s) de cron_heartbeats: manda el más reciente.
+  if (!cooldownHeartbeats || cooldownHeartbeats.length === 0) return null;
   const { data, error } = await supabaseServer
     .from("cron_heartbeats")
     .select("last_success_at")
-    .eq("cron_name", "sync-clientes-master")
+    .in("cron_name", cooldownHeartbeats as string[])
+    .order("last_success_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (error) {
-    console.error(`[sync-now] no pude leer heartbeat sync-clientes-master: ${error.message}`);
+    console.error(`[sync-now] no pude leer heartbeats ${cooldownHeartbeats.join(", ")}: ${error.message}`);
     return null;
   }
   return (data as { last_success_at: string } | null)?.last_success_at ?? null;
@@ -183,6 +191,22 @@ async function ejecutar(
       if (!r.ok) return { error: r.error ?? "sync de clientes falló" };
       return { resumen: `${r.upserted} clientes actualizados` };
     }
+    case "proveedores": {
+      // CxP de UNA empresa (~7s). La lib escribe su propia fila running en
+      // switch_sync_log (sync_type=proveedores) → mismo lock real que los crons.
+      const r = await syncEmpresaProveedores(empresa as EmpresaKey, "manual");
+      if (!r.ok) return { error: r.error ?? "sync de proveedores falló" };
+      return {
+        resumen: `${nombreEmpresa(r.empresaKey)}: cuentas por pagar al día (${r.proveedores} proveedores)`,
+      };
+    }
+    case "refresh-vistas": {
+      // DB-only: rollup mensual + vw de clientes (paso final de la secuencia
+      // de Ventas — así el tab Clientes y los meses cerrados quedan al día).
+      const r = await runRefreshVistas();
+      if (!r.ok) return { error: r.error };
+      return { resumen: "Vistas de ventas y clientes al día" };
+    }
     case "catalogo-reebok":
     case "catalogo-joybees": {
       const r = await (modulo === "catalogo-reebok"
@@ -202,7 +226,7 @@ async function ejecutar(
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Universo de roles con acceso a ALGÚN módulo (401/403 primero, como siempre);
   // el permiso fino por módulo se valida más abajo con rolesSyncNow.
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: { modulo?: unknown; empresa?: unknown };
@@ -217,8 +241,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: `modulo inválido: ${modulo}` }, { status: 400 });
   }
 
-  // Vendedor SOLO puede disparar catálogos; los demás módulos siguen
-  // admin+secretaria (admin siempre pasa requireRole).
+  // Permiso fino por módulo (vendedor: catálogos + ficha de cliente;
+  // contabilidad: solo proveedores; admin siempre pasa requireRole).
   if (auth.role !== "admin" && !rolesSyncNow(modulo).includes(auth.role)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
@@ -248,7 +272,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     lock
       ? fetchRunningDeEmpresa(lock.empresaKey, lock.syncType)
       : Promise.resolve({ mismo: null, otro: null }),
-    fetchLastSuccessFinishedAt(lock?.empresaKey ?? null, lock?.syncType ?? null),
+    fetchLastSuccessFinishedAt(
+      lock?.empresaKey ?? null,
+      lock?.syncType ?? null,
+      cfg.cooldownHeartbeats,
+    ),
   ]);
   const bloqueo = precheckSyncNow({
     ahora,

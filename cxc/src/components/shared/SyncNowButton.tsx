@@ -3,9 +3,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // <SyncNowButton /> — botón "Actualizar ahora" (sync manual on-demand).
 //
-// Dispara POST /api/admin/sync-now con {modulo, empresa?}. Visible SOLO para
-// admin y secretaria (lee el rol de sessionStorage tras montar, igual que
-// useAuth — nunca en el primer render para no romper la hidratación).
+// Dispara POST /api/admin/sync-now con {modulo, empresa?}. Visible según el
+// gate de UI por uso (prop `roles`, default admin+secretaria — lee el rol de
+// sessionStorage tras montar, igual que useAuth — nunca en el primer render
+// para no romper la hidratación). El permiso real lo valida el server.
 //
 //   - 1 opción  → botón directo.
 //   - 2+ opciones → botón que abre un menú (elige empresa / módulo).
@@ -37,7 +38,7 @@ import { postSyncNow, syncConEnganche } from "./syncNowClient";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
-   *  catalogo-reebok | catalogo-joybees. */
+   *  catalogo-reebok | catalogo-joybees | proveedores | refresh-vistas. */
   modulo: string;
   empresa?: string;
   /** Label del item en el menú (solo aplica con 2+ opciones). */
@@ -49,6 +50,20 @@ interface SyncNowButtonProps {
   /** Con 2+ opciones: true = un clic las dispara TODAS en secuencia (sin
    *  menú). false/omitido = menú para elegir una (comportamiento clásico). */
   secuencial?: boolean;
+  /** Gate de UI POR USO (default admin+secretaria). Cada vista decide quién VE
+   *  su botón (ej. /proveedores agrega contabilidad; la ficha de cliente,
+   *  vendedor) sin abrir los demás botones. El permiso real por módulo lo
+   *  valida el server igual (rolesSyncNow → 403). */
+  roles?: string[];
+  /** En secuencia: cada paso usa syncConEnganche — un 409 "running" NO salta
+   *  el paso, se ENGANCHA al sync en curso y sigue cuando termina (ficha de
+   *  cliente: pocas opciones, todas de la misma empresa). El cooldown directo
+   *  sí se salta y acumula como omitida. */
+  engancharRunning?: boolean;
+  /** Toast de éxito TOTAL de la secuencia (fallidas=0), en vez del conteo de
+   *  empresas (ej. "Listo, cliente actualizado" — los pasos son módulos, no
+   *  empresas). Las omitidas por cooldown cuentan como éxito: data fresca. */
+  resumenExito?: string;
   /** Si viene, el botón queda deshabilitado con este tooltip. */
   disabledReason?: string | null;
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
@@ -58,11 +73,14 @@ interface SyncNowButtonProps {
   className?: string;
 }
 
-const ROLES_PERMITIDOS = ["admin", "secretaria"];
+const ROLES_DEFAULT = ["admin", "secretaria"];
 
 export default function SyncNowButton({
   opciones,
   secuencial,
+  roles,
+  engancharRunning,
+  resumenExito,
   disabledReason,
   subtext,
   onSuccess,
@@ -77,10 +95,13 @@ export default function SyncNowButton({
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Gate por rol tras montar (browser-only; nunca en useState inicial — SSR).
+  // rolesKey (string) como dep: el array `roles` suele venir inline y cambiaría
+  // de identidad en cada render.
+  const rolesKey = (roles ?? ROLES_DEFAULT).join(",");
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role") || "";
-    setVisible(ROLES_PERMITIDOS.includes(role));
-  }, []);
+    setVisible(rolesKey.split(",").includes(role));
+  }, [rolesKey]);
 
   // Cerrar el menú al hacer click afuera / Escape.
   useEffect(() => {
@@ -144,6 +165,10 @@ export default function SyncNowButton({
   // (sesión única Switch — nunca 2 a la vez). Un 409 (running/cooldown) NO
   // aborta: esa empresa se salta (quedará fresca por el sync que ya corre o
   // recién corrió) y se acumula como omitida. Al final, UN toast resumen.
+  //
+  // Los pasos SIN empresa (finales técnicos como refresh-vistas o
+  // clientes-master) no entran al conteo de "empresas actualizadas": su 409
+  // (cooldown = ya está fresco) es silencioso; solo un ERROR suma a fallidas.
   const dispararSecuencia = async () => {
     setRunning(true);
     let actualizadas = 0;
@@ -152,19 +177,39 @@ export default function SyncNowButton({
     try {
       for (let i = 0; i < opciones.length; i++) {
         setProgreso({ actual: i + 1, total: opciones.length });
+        const esEmpresa = !!opciones[i].empresa;
         try {
-          const { status, json } = await postSyncNow(opciones[i]);
-          if (status === 200 && json?.ok) actualizadas++;
-          else if (status === 409) omitidas++;
-          else fallidas++;
+          if (engancharRunning) {
+            // Enganche por paso: un "running" ajeno no se salta — se espera a
+            // que termine (o se corre al liberarse el lock) antes de seguir.
+            const r = await syncConEnganche(opciones[i]);
+            if (r.tipo === "ok") {
+              if (esEmpresa) actualizadas++;
+            } else if (r.tipo === "fresco") {
+              if (esEmpresa) omitidas++;
+            } else fallidas++;
+          } else {
+            const { status, json } = await postSyncNow(opciones[i]);
+            if (status === 200 && json?.ok) {
+              if (esEmpresa) actualizadas++;
+            } else if (status === 409) {
+              if (esEmpresa) omitidas++;
+            } else fallidas++;
+          }
         } catch {
           fallidas++;
         }
       }
       const partes: string[] = [];
-      if (omitidas === 0 && fallidas === 0) {
+      if (fallidas === 0 && resumenExito) {
+        partes.push(resumenExito);
+      } else if (omitidas === 0 && fallidas === 0) {
         partes.push(
-          actualizadas === 1 ? "Listo, 1 empresa actualizada" : `Listo, ${actualizadas} empresas actualizadas`,
+          actualizadas === 1
+            ? "Listo, 1 empresa actualizada"
+            : actualizadas === 0
+              ? "Listo, actualizado"
+              : `Listo, ${actualizadas} empresas actualizadas`,
         );
       } else {
         partes.push(`${actualizadas} actualizadas`);
