@@ -200,6 +200,17 @@ async function restoreStorage() {
     console.warn(`⚠️  Ese backup se generó con errores en: ${meta.errores.map(e => e.file).join(', ')}`);
   }
 
+  // Grupo switch (meta-switch.json, generado por /api/cron/backup?grupo=switch):
+  // si existe, sus datasets se suman al índice — restaurables con --tables igual
+  // que los del core. Backups anteriores al split no lo tienen (tolerante).
+  try {
+    const metaSwitch = JSON.parse((await storageDownload(`${date}/meta-switch.json`)).toString('utf-8'));
+    if (metaSwitch.errores?.length) {
+      console.warn(`⚠️  El grupo switch se generó con errores en: ${metaSwitch.errores.map(e => e.file).join(', ')}`);
+    }
+    meta.datasets = [...meta.datasets, ...(metaSwitch.datasets || [])];
+  } catch { /* sin grupo switch ese día — ok */ }
+
   let datasets = meta.datasets;
   if (!includeAuth) datasets = datasets.filter(d => d.file !== 'fg_users_auth');
   if (onlyTables) datasets = datasets.filter(d => onlyTables.includes(d.file) || onlyTables.includes(d.table));

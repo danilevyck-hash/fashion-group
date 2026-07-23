@@ -4,13 +4,30 @@
  * Fuente: /apireporte/recibos (API JSON, mismo token que facturas). Un row por
  * recibo (fechaCreacion, cliente, vendedor que registró, total). El endpoint NO
  * da id/secuencial → estrategia delete+insert por (empresa, mes) en cada corrida
- * (los recibos de un mes cerrado no cambian; re-sincronizar reemplaza limpio).
+ * (re-sincronizar un mes reemplaza limpio TODO el mes).
  *
- * Usos: último pago CXC (switch_ultimo_pago_cliente_v2) y, a futuro, comisión
- * sobre cobro. Tolerante a fallos: una empresa falla → las demás siguen.
+ * VENTANA RODANTE (jul-2026, audit sync): el cron re-sincroniza SIEMPRE los
+ * últimos 3 meses (mesesCronRecibos). A diferencia de facturas/utilidad (upsert
+ * incremental), los recibos SÍ cambian dentro de la ventana: Switch permite
+ * anular, editar o retro-cargar recibos con fecha pasada, y el delete+insert
+ * por mes es la única forma de corregirlos (detectados 4 faltantes + 1 anulado
+ * en may-jun 2026 que la ventana de 1 mes nunca corrigió). Duración medida:
+ * mediana ~5.1s por empresa-mes → 3 meses × 6 empresas ≈ 90-120s, holgado bajo
+ * maxDuration 300.
+ *
+ * RECIBOS CON TOTAL $0: son cobros por APLICACIÓN/CRUCE (el recibo aplica saldo
+ * a favor / NC contra facturas, sin plata nueva) o recibos ANULADOS. Por
+ * decisión de negocio (Daniel, 23-jul-2026) NO comisionan: se persisten tal
+ * cual (total=0) y las RPC de comisiones (comision_b2b_v5 / comision_detalle)
+ * los suman por total → aportan $0 a la base de cobro. NO filtrarlos ni
+ * "corregirles" el total.
+ *
+ * Usos: último pago CXC (switch_ultimo_pago_cliente_v2) y comisión sobre cobro.
+ * Tolerante a fallos: una empresa falla → las demás siguen.
  */
 
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
 import type { Mes } from "./sync-utilidad";
@@ -24,6 +41,32 @@ export const RECIBOS_EMPRESA_KEYS: EmpresaKey[] = [
   "active_wear",
   "american_classic",
 ];
+
+/** Meses de la ventana rodante del cron de recibos (mes en curso + 2 anteriores). */
+const RECIBOS_VENTANA_MESES = 3;
+
+/**
+ * Ventana del cron diario de RECIBOS: mes en curso + los 2 meses anteriores,
+ * SIEMPRE (orden viejo → nuevo). Distinta de mesesCronDiario (facturas/utilidad:
+ * mes en curso + anterior solo los días 1-5): los recibos se corrigen por
+ * delete+insert por mes, así que re-sincronizar la ventana completa repara solo
+ * anulaciones/ediciones/retro-cargas de hasta ~3 meses atrás. NO cambiar la
+ * semántica de mesesCronDiario — facturas/utilidad la comparten.
+ */
+export function mesesCronRecibos(now: Date = new Date()): Mes[] {
+  const meses: Mes[] = [];
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth() + 1;
+  for (let i = 0; i < RECIBOS_VENTANA_MESES; i++) {
+    meses.unshift({ year, month });
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return meses;
+}
 
 export interface SyncRecibosResult {
   empresaKey: EmpresaKey;
@@ -101,16 +144,24 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
 /** cliente_switch_id → facturas [{fecha, impuesto}] para la heurística de retención. */
 type ImpuestoMap = Map<number, { fecha: string; imp: number }[]>;
 
-/** Carga impuesto de facturas (switch_facturas) del rango para detectar retenciones. */
-async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, to: string): Promise<ImpuestoMap> {
+/** Carga impuesto de facturas (switch_facturas) del rango para detectar
+ *  retenciones. `from` inclusivo y `toExcl` EXCLUSIVO, ambos YYYY-MM-DD en día
+ *  Panamá. Gotcha (fix audit jul-2026): switch_facturas.fecha es timestamptz
+ *  UTC — filtrarla con date pelado corría el rango 5h (los docs nocturnos de
+ *  Panamá caen al día UTC siguiente) y PERDÍA los bordes: una factura del
+ *  último día del rango emitida en la noche quedaba fuera y su retención no se
+ *  clasificaba. El rango se ancla a medianoche Panamá (offset -05:00 explícito)
+ *  y la fecha del doc se normaliza a día Panamá (fechaPanamaDe), que es el
+ *  mismo calendario que la fecha de los recibos del API. */
+async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toExcl: string): Promise<ImpuestoMap> {
   const map: ImpuestoMap = new Map();
   const { data, error } = await supabaseServer
     .from("switch_facturas")
     .select("cliente_switch_id,fecha,impuesto")
     .eq("empresa_key", empresaKey)
     .eq("tipo_comprobante", "Factura")
-    .gte("fecha", from)
-    .lte("fecha", to)
+    .gte("fecha", `${from}T00:00:00-05:00`)
+    .lt("fecha", `${toExcl}T00:00:00-05:00`)
     .range(0, 99999);
   if (error) {
     console.error(`[sync-recibos ${empresaKey}] loadImpuestoMap: ${error.message}`);
@@ -120,7 +171,7 @@ async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, to: string)
     const k = f.cliente_switch_id;
     if (k == null) continue;
     if (!map.has(k)) map.set(k, []);
-    map.get(k)!.push({ fecha: String(f.fecha).slice(0, 10), imp: num(f.impuesto) });
+    map.get(k)!.push({ fecha: fechaPanamaDe(String(f.fecha)), imp: num(f.impuesto) });
   }
   return map;
 }

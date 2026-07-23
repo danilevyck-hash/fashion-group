@@ -107,6 +107,7 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
  */
 export const SECOND_ENTRY_HOUR_UTC: Record<string, number> = {
   backup: 18.5,
+  "backup-switch": 19.25, // 2ª entrada 19:15 UTC (vercel.json)
   "acs-fidelizacion": 16.5,
 };
 
@@ -154,6 +155,18 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
 // la siembra solo en <24h tras el deploy; sin esto, el primer día daría un 503
 // falso con los 13 slots "ausentes"). Solo alerta si la fila EXISTE y está
 // vieja (umbral 26h).
+/**
+ * Crons NUEVOS con vigilancia seed-tolerante (misma regla que los slots de
+ * switch-sync): fila de heartbeat ausente = aún no sembrada (el cron la crea
+ * solo en <24h tras el deploy) → NO es stale; solo alerta si la fila EXISTE y
+ * está vieja. Evita el 503 falso el día del deploy. Cuando el cron ya lleve
+ * días sembrado se puede promover a EXPECTED_CRONS (fail-closed) en
+ * health-crons si se quiere la garantía dura.
+ */
+export const SEED_TOLERANT_CRONS = [
+  "backup-switch", // backup de tablas switch_* (2 entradas: 06:45 / 19:15 UTC)
+];
+
 export const SWITCH_SYNC_SLOT_HEARTBEATS = [
   "switch-sync:all-0530",
   "switch-sync:all-0535",

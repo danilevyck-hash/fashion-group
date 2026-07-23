@@ -34,6 +34,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
   syncEmpresaFacturas,
@@ -214,6 +215,23 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // entrada intradía perdida (antes cualquier entrada exitosa refrescaba el
   // base y tapaba a las demás). Corridas manuales/reconciliación sin ?slot= no
   // registran slot (no crean filas huérfanas que luego quedarían stale).
+  // Refresh intradía del aging de CXC (audit jul-2026): la MV
+  // switch_estadocuenta_aging_mv se refrescaba solo 1×/día (07:35), pero
+  // estadocuenta sincroniza 3×/día → la pantalla CXC no veía los intradía.
+  // Se dispara SOLO en corridas tipo=estadocuenta con al menos una empresa OK
+  // (tipo=all ya tiene el cron refresh-clientes-views 07:35 justo después).
+  // Barata (~seg, 218 filas). Tolerante: si falla, NO marca el sync como
+  // fallido ni alerta por Telegram — solo log (el refresh de 07:35 y la
+  // reconciliación lo recuperan).
+  if (tipo === "estadocuenta" && results.length > 0) {
+    try {
+      const { error: mvErr } = await supabaseServer.rpc("refresh_switch_estadocuenta_aging_mv");
+      if (mvErr) console.error(`[switch-sync] refresh aging_mv falló (no fatal): ${mvErr.message}`);
+    } catch (err) {
+      console.error(`[switch-sync] refresh aging_mv threw (no fatal): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   const slotParam = sp.get("slot");
   const slot = slotParam && /^(all|facturas|estadocuenta)-\d{4}$/.test(slotParam) ? slotParam : null;
   if (errors.length === 0) {

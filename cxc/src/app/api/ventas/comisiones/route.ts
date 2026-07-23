@@ -5,6 +5,11 @@
  * las VENTAS se atribuyen al VENDEDOR DE LA FACTURA (switch_facturas, la NC
  * usa su propio vendedor); los COBROS siguen por cartera (los recibos no
  * exponen a qué facturas se aplican).
+ *
+ * COBROS $0 (switch_recibos.total = 0): son aplicaciones/cruces (saldo a favor
+ * o NC aplicada contra facturas) o recibos anulados. Por decisión de negocio
+ * (Daniel, 23-jul-2026) NO comisionan — las RPC suman por total, así que
+ * aportan $0 a base_cobro. Comportamiento correcto: no "arreglarlo".
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";

@@ -585,10 +585,47 @@ function mapEstadoCuentaElement(
  * clientes_master. Incluye clientes de contado que NO aparecen en
  * switch_estadocuenta (ver migration 20260601000000_switch_clientes.sql).
  *
- * Upsert atómico por (empresa_key, cliente_switch_id). No reconcilia/borra: el
+ * Upsert atómico por (empresa_key, cliente_switch_id). No BORRA nunca: el
  * directorio es acumulativo (un cliente que deja de listarse mantiene su mapeo
  * histórico para no romper facturas viejas que lo referencien).
+ *
+ * MARCA de ausentes (audit jul-2026): los clientes borrados en Switch (ej.
+ * vistana id193 D-135, active_shoes id180 D-30) quedaban indistinguibles de los
+ * vivos. Con la columna `activo` (DDL 20260723110000, correr manual) el sync
+ * marca activo=false + ausente_desde a los que ya no vienen en /apicliente/lista
+ * y revive (activo=true) a los que reaparecen. Tolerante: si la columna aún no
+ * existe, solo loguea un warning — el upsert del directorio no se ve afectado.
+ * Guard: solo marca con lista completa (paginación cubierta) y no-vacía.
  */
+async function marcarClientesAusentes(
+  empresaKey: string,
+  presentIds: number[],
+  runStamp: string,
+): Promise<void> {
+  const idsCsv = `(${presentIds.join(",")})`;
+  const { error: offErr } = await supabaseServer
+    .from("switch_clientes")
+    .update({ activo: false, ausente_desde: runStamp })
+    .eq("empresa_key", empresaKey)
+    .eq("activo", true)
+    .not("cliente_switch_id", "in", idsCsv);
+  if (offErr) {
+    // Columna `activo` ausente (DDL 20260723110000 pendiente) u otro fallo: no
+    // rompe el sync — el directorio ya quedó upserted.
+    console.error(`[sync ${empresaKey} cxc] WARNING marcarClientesAusentes (¿DDL activo pendiente?): ${offErr.message}`);
+    return;
+  }
+  const { error: onErr } = await supabaseServer
+    .from("switch_clientes")
+    .update({ activo: true, ausente_desde: null })
+    .eq("empresa_key", empresaKey)
+    .eq("activo", false)
+    .in("cliente_switch_id", presentIds);
+  if (onErr) {
+    console.error(`[sync ${empresaKey} cxc] WARNING revivir clientes presentes: ${onErr.message}`);
+  }
+}
+
 async function persistClientesDirectorio(
   empresaKey: string,
   clientes: SwitchCliente[],
@@ -738,6 +775,13 @@ export async function syncEmpresaEstadoCuenta(
     try {
       const dirCount = await persistClientesDirectorio(empresaKey, clientes, runStamp);
       console.error(`[sync ${empresaKey} cxc] switch_clientes: ${dirCount} clientes upserted (puente id→codigo)`);
+      // Marca de ausentes (activo=false) SOLO si la lista vino completa: con
+      // paginación incompleta marcaríamos como ausentes a clientes vivos.
+      const presentIds = clientes.filter((c) => typeof c.id === "number").map((c) => c.id);
+      const listaCompleta = clientesTotalReportado === 0 || clientes.length >= clientesTotalReportado;
+      if (listaCompleta && presentIds.length > 0) {
+        await marcarClientesAusentes(empresaKey, presentIds, runStamp);
+      }
     } catch (err) {
       console.error(`[sync ${empresaKey} cxc] WARNING persistClientesDirectorio: ${err instanceof Error ? err.message : String(err)}`);
       skipDetails.push({ facturaId: null, secuencial: null, campo: "persistClientesDirectorio", valorCrudo: err instanceof Error ? err.message : String(err) });

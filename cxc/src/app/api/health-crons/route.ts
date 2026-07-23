@@ -37,6 +37,7 @@ import {
   CRON_STALE_HOURS_DEFAULT,
   cronStaleThresholdHours,
   staleEsPendingRecovery,
+  SEED_TOLERANT_CRONS,
   SWITCH_SYNC_SLOT_HEARTBEATS,
 } from "@/lib/cron-telemetry";
 
@@ -206,6 +207,29 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       }
     } else {
       fresh.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
+    }
+  }
+
+  // Crons nuevos seed-tolerantes (backup-switch): misma regla que los slots —
+  // fila ausente = aún no sembrada (NO stale); solo alerta si existe y está
+  // vieja. A diferencia de los slots, el pendingRecovery usa su PROPIO nombre
+  // (2ª entrada propia en SECOND_ENTRY_HOUR_UTC, no la reconciliación).
+  for (const cron of SEED_TOLERANT_CRONS) {
+    const last = beats.get(cron);
+    if (last === undefined || last === null) {
+      slotsUnseeded.push(cron);
+      continue;
+    }
+    const t = new Date(last).getTime();
+    const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;
+    if (!Number.isFinite(t) || t < now - cronStaleThresholdHours(cron) * 3600 * 1000) {
+      if (staleEsPendingRecovery(cron, last, now)) {
+        pendingRecovery.push({ cron, last_success_at: last, hours_ago: hoursAgo as number });
+      } else {
+        stale.push({ cron, last_success_at: last, hours_ago: hoursAgo });
+      }
+    } else {
+      fresh.push({ cron, last_success_at: last, hours_ago: hoursAgo as number });
     }
   }
 
