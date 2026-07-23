@@ -1,13 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { ALL_COMPANIES } from "@/lib/companies";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import {
+  opcionesFichaCliente,
+  ROLES_SYNC_FICHA_CLIENTE,
+} from "@/components/shared/syncNowOpciones";
 
 interface Cliente {
   id: string;
@@ -56,9 +62,20 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
     allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
   });
   const canEdit = EDITABLE_ROLES.includes(role);
+  const router = useRouter();
 
   const [cliente, setCliente] = useState<Cliente>(initialData.cliente);
   const [editing, setEditing] = useState(false);
+
+  // La página es server-rendered: tras "Actualizar ahora" se hace
+  // router.refresh() y llega un initialData fresco — re-sembrar el estado
+  // local del cliente (datos fiscales / last_synced_at), salvo en plena
+  // edición de contacto (no pisar lo que se está tipeando).
+  useEffect(() => {
+    if (!editing) setCliente(initialData.cliente);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData.cliente]);
+
   const [form, setForm] = useState({
     telefono: cliente.telefono ?? "",
     celular:  cliente.celular  ?? "",
@@ -79,6 +96,10 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   const hasActividad = (e: EmpresaTotals) => e.ventas_ytd !== 0 || e.cobrado_ytd !== 0 || e.cxc !== 0;
   const empresasActivas = initialData.empresas.filter(hasActividad);
   const empresasInactivas = initialData.empresas.filter((e) => !hasActividad(e));
+
+  // "Actualizar ahora" de la ficha: estadocuenta → recibos → facturas de las
+  // empresas donde el cliente tiene actividad + clientes-master al final.
+  const opcionesSync = opcionesFichaCliente(empresasActivas.map((e) => e.empresa));
 
   // (2) Dedup de teléfono: si TELÉFONO === CELULAR, mostrar uno solo (lectura).
   const telTrim = (cliente.telefono ?? "").trim();
@@ -142,14 +163,28 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               <div className="text-sm text-gray-500 mt-0.5">{cliente.razon_social}</div>
             )}
           </div>
-          {canEdit && !editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition"
-            >
-              Editar contacto
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* "Actualizar ahora" (admin/secretaria/vendedor; bodega ve la
+                ficha pero NO el botón): secuencia de la empresa del cliente
+                con enganche al sync en curso; al terminar, router.refresh()
+                re-renderiza la página server-side con los datos frescos. */}
+            <SyncNowButton
+              opciones={opcionesSync}
+              secuencial
+              engancharRunning
+              roles={ROLES_SYNC_FICHA_CLIENTE}
+              resumenExito="Listo, cliente actualizado"
+              onSuccess={() => router.refresh()}
+            />
+            {canEdit && !editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="bg-black text-white text-sm rounded-md px-4 py-2 active:scale-[0.97] transition"
+              >
+                Editar contacto
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Datos fiscales (read-only) */}

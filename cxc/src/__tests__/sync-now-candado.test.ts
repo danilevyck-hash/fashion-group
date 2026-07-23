@@ -205,13 +205,18 @@ describe("lockKeyDe / config por módulo", () => {
 });
 
 describe("rolesSyncNow — roles por módulo", () => {
-  it("vendedor puede disparar SOLO los catálogos", () => {
+  it("vendedor: catálogos + los 4 módulos de la ficha de cliente (ampliación jul-2026)", () => {
+    // Catálogos (arma pedidos) — desde #246.
     expect(rolesSyncNow("catalogo-reebok")).toContain("vendedor");
     expect(rolesSyncNow("catalogo-joybees")).toContain("vendedor");
-    for (const m of SYNC_NOW_MODULOS) {
-      if (m === "catalogo-reebok" || m === "catalogo-joybees") continue;
-      expect(rolesSyncNow(m)).not.toContain("vendedor");
+    // Ficha de cliente (arma cobranza/pedido): estadocuenta → recibos →
+    // facturas → clientes-master. El gate de UI restringe DÓNDE lo ve.
+    for (const m of ["estadocuenta", "recibos", "facturas", "clientes-master"] as const) {
+      expect(rolesSyncNow(m)).toContain("vendedor");
     }
+    // Fuera del alcance de vendedor.
+    expect(rolesSyncNow("proveedores")).not.toContain("vendedor");
+    expect(rolesSyncNow("refresh-vistas")).not.toContain("vendedor");
   });
 
   it("admin y secretaria siguen en TODOS los módulos", () => {

@@ -241,8 +241,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: `modulo inválido: ${modulo}` }, { status: 400 });
   }
 
-  // Vendedor SOLO puede disparar catálogos; los demás módulos siguen
-  // admin+secretaria (admin siempre pasa requireRole).
+  // Permiso fino por módulo (vendedor: catálogos + ficha de cliente;
+  // contabilidad: solo proveedores; admin siempre pasa requireRole).
   if (auth.role !== "admin" && !rolesSyncNow(modulo).includes(auth.role)) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }

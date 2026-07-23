@@ -55,6 +55,15 @@ interface SyncNowButtonProps {
    *  vendedor) sin abrir los demás botones. El permiso real por módulo lo
    *  valida el server igual (rolesSyncNow → 403). */
   roles?: string[];
+  /** En secuencia: cada paso usa syncConEnganche — un 409 "running" NO salta
+   *  el paso, se ENGANCHA al sync en curso y sigue cuando termina (ficha de
+   *  cliente: pocas opciones, todas de la misma empresa). El cooldown directo
+   *  sí se salta y acumula como omitida. */
+  engancharRunning?: boolean;
+  /** Toast de éxito TOTAL de la secuencia (fallidas=0), en vez del conteo de
+   *  empresas (ej. "Listo, cliente actualizado" — los pasos son módulos, no
+   *  empresas). Las omitidas por cooldown cuentan como éxito: data fresca. */
+  resumenExito?: string;
   /** Si viene, el botón queda deshabilitado con este tooltip. */
   disabledReason?: string | null;
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
@@ -70,6 +79,8 @@ export default function SyncNowButton({
   opciones,
   secuencial,
   roles,
+  engancharRunning,
+  resumenExito,
   disabledReason,
   subtext,
   onSuccess,
@@ -168,18 +179,31 @@ export default function SyncNowButton({
         setProgreso({ actual: i + 1, total: opciones.length });
         const esEmpresa = !!opciones[i].empresa;
         try {
-          const { status, json } = await postSyncNow(opciones[i]);
-          if (status === 200 && json?.ok) {
-            if (esEmpresa) actualizadas++;
-          } else if (status === 409) {
-            if (esEmpresa) omitidas++;
-          } else fallidas++;
+          if (engancharRunning) {
+            // Enganche por paso: un "running" ajeno no se salta — se espera a
+            // que termine (o se corre al liberarse el lock) antes de seguir.
+            const r = await syncConEnganche(opciones[i]);
+            if (r.tipo === "ok") {
+              if (esEmpresa) actualizadas++;
+            } else if (r.tipo === "fresco") {
+              if (esEmpresa) omitidas++;
+            } else fallidas++;
+          } else {
+            const { status, json } = await postSyncNow(opciones[i]);
+            if (status === 200 && json?.ok) {
+              if (esEmpresa) actualizadas++;
+            } else if (status === 409) {
+              if (esEmpresa) omitidas++;
+            } else fallidas++;
+          }
         } catch {
           fallidas++;
         }
       }
       const partes: string[] = [];
-      if (omitidas === 0 && fallidas === 0) {
+      if (fallidas === 0 && resumenExito) {
+        partes.push(resumenExito);
+      } else if (omitidas === 0 && fallidas === 0) {
         partes.push(
           actualizadas === 1
             ? "Listo, 1 empresa actualizada"

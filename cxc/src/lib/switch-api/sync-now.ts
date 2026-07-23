@@ -59,15 +59,18 @@ export function isSyncNowModulo(s: string): s is SyncNowModulo {
 
 /** Roles que pueden disparar cada módulo (el permiso de SERVER; el gate de UI
  *  de cada botón se parametriza aparte en SyncNowButton):
- *   - vendedor SOLO catálogos (los usa para armar pedidos);
+ *   - vendedor: catálogos (arma pedidos) + los 4 módulos de la ficha de
+ *     cliente (estadocuenta/recibos/facturas/clientes-master — arma cobranza
+ *     y pedido con esos datos). NO proveedores ni refresh-vistas.
  *   - contabilidad SOLO proveedores (es quien vive en /proveedores);
- *   - el resto de módulos sigue admin+secretaria. */
+ *   - el resto (refresh-vistas) queda admin+secretaria.
+ *  El gate de UI decide DÓNDE ve cada rol su botón: vendedor solo lo ve en
+ *  catálogos y en la ficha de cliente (los botones de Ventas/CXC/Clientes
+ *  lista siguen admin+secretaria). */
 export function rolesSyncNow(modulo: SyncNowModulo): string[] {
-  if (modulo === "catalogo-reebok" || modulo === "catalogo-joybees") {
-    return ["admin", "secretaria", "vendedor"];
-  }
   if (modulo === "proveedores") return ["admin", "secretaria", "contabilidad"];
-  return ["admin", "secretaria"];
+  if (modulo === "refresh-vistas") return ["admin", "secretaria"];
+  return ["admin", "secretaria", "vendedor"];
 }
 
 /** Minutos de cooldown tras un success del mismo (módulo, empresa). */
