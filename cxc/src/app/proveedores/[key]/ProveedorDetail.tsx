@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -10,6 +10,13 @@ import { telHref, mailtoHref } from "@/lib/contact-links";
 import { getCompanyDisplay } from "@/lib/companies";
 import { AGING } from "@/lib/cxc-aging";
 import { agingKeyForBucket } from "@/lib/proveedores-aging";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
+import { empresasConCxp } from "@/lib/switch-api/empresas";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+
+// Universo válido del módulo proveedores (7 empresas con CxP).
+const EMPRESAS_CXP = empresasConCxp() as readonly string[];
 
 interface EmpresaTotals {
   empresa: string;
@@ -52,19 +59,30 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/proveedores/${encodeURIComponent(fichaKey)}`, { cache: "no-store" });
-        if (res.status === 404) { setNotFound(true); return; }
-        if (res.ok) setData(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/proveedores/${encodeURIComponent(fichaKey)}`, { cache: "no-store" });
+      if (res.status === 404) { setNotFound(true); return; }
+      if (res.ok) setData(await res.json());
+    } finally {
+      setLoading(false);
+    }
   }, [fichaKey]);
 
+  useEffect(() => { void load(); }, [load]);
+
   if (!authChecked) return null;
+
+  // "Actualizar ahora" de la ficha: SOLO las empresas donde este proveedor
+  // tiene cuenta (normalmente 1-2), en secuencia si son varias.
+  const sincronizables = (data?.empresas ?? [])
+    .map((e) => e.empresa)
+    .filter((k) => EMPRESAS_CXP.includes(k));
+  const syncOpciones = sincronizables.map((k) => ({
+    modulo: "proveedores",
+    empresa: k,
+    label: EMPRESA_KEY_TO_NAME[k] ?? getCompanyDisplay(k),
+  }));
 
   return (
     <div className="min-h-screen bg-white">
@@ -85,9 +103,21 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
         ) : (
           <>
             {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold tracking-tight">{data.nombre}</h1>
-              {data.tipo_proveedor && <div className="text-sm text-gray-500 mt-0.5">{data.tipo_proveedor}</div>}
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">{data.nombre}</h1>
+                {data.tipo_proveedor && <div className="text-sm text-gray-500 mt-0.5">{data.tipo_proveedor}</div>}
+              </div>
+              {/* Actualiza el CxP de las empresas de ESTE proveedor (en
+                  secuencia si son varias) y recarga la ficha. */}
+              {syncOpciones.length > 0 && (
+                <SyncNowButton
+                  opciones={syncOpciones}
+                  secuencial
+                  roles={ROLES_SYNC_PROVEEDORES}
+                  onSuccess={load}
+                />
+              )}
             </div>
 
             {/* Total grupo: Por pagar + aging */}

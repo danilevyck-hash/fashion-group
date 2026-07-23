@@ -2,10 +2,10 @@
  * POST /api/admin/sync-now — sync manual on-demand ("Actualizar ahora").
  *
  * Body: { modulo, empresa? } con modulo ∈ estadocuenta | facturas | recibos |
- * clientes-master | catalogo-reebok | catalogo-joybees. estadocuenta/facturas/
- * recibos exigen empresa (UNA por disparo — sesión única de Switch);
- * clientes-master y catálogos no llevan empresa (catálogos fijan la suya:
- * active_shoes / joystep).
+ * clientes-master | catalogo-reebok | catalogo-joybees | proveedores.
+ * estadocuenta/facturas/recibos/proveedores exigen empresa (UNA por disparo —
+ * sesión única de Switch); clientes-master y catálogos no llevan empresa
+ * (catálogos fijan la suya: active_shoes / joystep).
  *
  * Candado de 2 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
  *   a) running (fila 'running' fresca de esa EMPRESA en switch_sync_log — del
@@ -38,6 +38,7 @@ import {
   syncEmpresaEstadoCuenta,
 } from "@/lib/switch-api/sync-empresa";
 import { syncEmpresaRecibos, mesesCronRecibos } from "@/lib/switch-api/sync-recibos";
+import { syncEmpresaProveedores } from "@/lib/switch-api/sync-proveedores";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
@@ -183,6 +184,15 @@ async function ejecutar(
       if (!r.ok) return { error: r.error ?? "sync de clientes falló" };
       return { resumen: `${r.upserted} clientes actualizados` };
     }
+    case "proveedores": {
+      // CxP de UNA empresa (~7s). La lib escribe su propia fila running en
+      // switch_sync_log (sync_type=proveedores) → mismo lock real que los crons.
+      const r = await syncEmpresaProveedores(empresa as EmpresaKey, "manual");
+      if (!r.ok) return { error: r.error ?? "sync de proveedores falló" };
+      return {
+        resumen: `${nombreEmpresa(r.empresaKey)}: cuentas por pagar al día (${r.proveedores} proveedores)`,
+      };
+    }
     case "catalogo-reebok":
     case "catalogo-joybees": {
       const r = await (modulo === "catalogo-reebok"
@@ -202,7 +212,7 @@ async function ejecutar(
 export async function POST(req: NextRequest): Promise<NextResponse> {
   // Universo de roles con acceso a ALGÚN módulo (401/403 primero, como siempre);
   // el permiso fino por módulo se valida más abajo con rolesSyncNow.
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: { modulo?: unknown; empresa?: unknown };

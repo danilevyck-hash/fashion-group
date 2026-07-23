@@ -45,3 +45,7 @@ export const SYNC_NOW_RECIBOS_OPCIONES: SyncNowOpcion[] = RECIBOS_KEYS.map((k) =
   empresa: k,
   label: EMPRESA_KEY_TO_NAME[k] ?? k,
 }));
+
+/** Gate de UI de los botones de CxP (/proveedores): espejo de
+ *  rolesSyncNow("proveedores") — contabilidad SOLO ve el botón acá. */
+export const ROLES_SYNC_PROVEEDORES = ["admin", "secretaria", "contabilidad"];

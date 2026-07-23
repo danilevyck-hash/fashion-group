@@ -13,10 +13,20 @@ import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import AgingLegend from "@/app/admin/components/AgingLegend";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { exportProveedoresExcel } from "./excel-proveedores";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
+
+// "Actualizar ahora" de la lista: UN clic = CxP de las 7 empresas EN SECUENCIA
+// (sesión única Switch — nunca 2 a la vez; ~7s por empresa).
+const SYNC_PROVEEDORES_OPCIONES = EMPRESAS.map((k) => ({
+  modulo: "proveedores",
+  empresa: k as string,
+  label: EMPRESA_KEY_TO_NAME[k] ?? k,
+}));
 
 // Nombre legible por empresa_key. EMPRESA_KEY_TO_NAME cubre las 7 (incl.
 // american_classic → "Multifashion", que companies.ts/getCompanyDisplay no conoce).
@@ -150,11 +160,23 @@ function ProveedoresList() {
       <AppHeader module="Proveedores" breadcrumbs={[{ label: "Proveedores" }]} />
       <PullToRefresh onRefresh={() => fetchList(empresa, q)}>
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-          <div className="mb-5">
-            <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Cuentas por pagar por empresa: saldo, antigüedad y pagos.
-            </p>
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Cuentas por pagar por empresa: saldo, antigüedad y pagos.
+              </p>
+            </div>
+            {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
+                es quien vive acá): un clic actualiza el CxP de las 7 empresas
+                en secuencia desde Switch. */}
+            <SyncNowButton
+              opciones={SYNC_PROVEEDORES_OPCIONES}
+              secuencial
+              roles={ROLES_SYNC_PROVEEDORES}
+              subtext="tarda ~1 min"
+              onSuccess={async () => { await fetchList(empresa, q); }}
+            />
           </div>
 
           {/* Total por pagar (grupo o empresa filtrada) */}

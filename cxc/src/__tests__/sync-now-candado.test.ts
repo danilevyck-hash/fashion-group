@@ -181,6 +181,17 @@ describe("lockKeyDe / config por módulo", () => {
     expect(moduloConfig("recibos").empresas).not.toContain("joystep");
     expect(moduloConfig("facturas").empresas).toContain("confecciones_boston");
   });
+
+  it("proveedores: por empresa (universo empresasConCxp = 6 B2B + Multifashion, sin Boston)", () => {
+    expect(isSyncNowModulo("proveedores")).toBe(true);
+    const cfg = moduloConfig("proveedores");
+    expect(cfg.tocaSwitch).toBe(true);
+    expect(cfg.empresas).toContain("american_classic");
+    expect(cfg.empresas).toContain("joystep");
+    expect(cfg.empresas).not.toContain("confecciones_boston");
+    expect(cfg.empresas).toHaveLength(7);
+    expect(lockKeyDe("proveedores", "vistana")).toEqual({ empresaKey: "vistana", syncType: "proveedores" });
+  });
 });
 
 describe("rolesSyncNow — roles por módulo", () => {
@@ -198,6 +209,18 @@ describe("rolesSyncNow — roles por módulo", () => {
       expect(rolesSyncNow(m)).toContain("admin");
       expect(rolesSyncNow(m)).toContain("secretaria");
     }
+  });
+
+  it("contabilidad puede disparar SOLO proveedores (es quien vive en /proveedores)", () => {
+    expect(rolesSyncNow("proveedores")).toContain("contabilidad");
+    for (const m of SYNC_NOW_MODULOS) {
+      if (m === "proveedores") continue;
+      expect(rolesSyncNow(m)).not.toContain("contabilidad");
+    }
+  });
+
+  it("vendedor NO dispara proveedores", () => {
+    expect(rolesSyncNow("proveedores")).not.toContain("vendedor");
   });
 });
 

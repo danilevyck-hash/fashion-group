@@ -3,9 +3,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // <SyncNowButton /> — botón "Actualizar ahora" (sync manual on-demand).
 //
-// Dispara POST /api/admin/sync-now con {modulo, empresa?}. Visible SOLO para
-// admin y secretaria (lee el rol de sessionStorage tras montar, igual que
-// useAuth — nunca en el primer render para no romper la hidratación).
+// Dispara POST /api/admin/sync-now con {modulo, empresa?}. Visible según el
+// gate de UI por uso (prop `roles`, default admin+secretaria — lee el rol de
+// sessionStorage tras montar, igual que useAuth — nunca en el primer render
+// para no romper la hidratación). El permiso real lo valida el server.
 //
 //   - 1 opción  → botón directo.
 //   - 2+ opciones → botón que abre un menú (elige empresa / módulo).
@@ -37,7 +38,7 @@ import { postSyncNow, syncConEnganche } from "./syncNowClient";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
-   *  catalogo-reebok | catalogo-joybees. */
+   *  catalogo-reebok | catalogo-joybees | proveedores | refresh-vistas. */
   modulo: string;
   empresa?: string;
   /** Label del item en el menú (solo aplica con 2+ opciones). */
@@ -49,6 +50,11 @@ interface SyncNowButtonProps {
   /** Con 2+ opciones: true = un clic las dispara TODAS en secuencia (sin
    *  menú). false/omitido = menú para elegir una (comportamiento clásico). */
   secuencial?: boolean;
+  /** Gate de UI POR USO (default admin+secretaria). Cada vista decide quién VE
+   *  su botón (ej. /proveedores agrega contabilidad; la ficha de cliente,
+   *  vendedor) sin abrir los demás botones. El permiso real por módulo lo
+   *  valida el server igual (rolesSyncNow → 403). */
+  roles?: string[];
   /** Si viene, el botón queda deshabilitado con este tooltip. */
   disabledReason?: string | null;
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
@@ -58,11 +64,12 @@ interface SyncNowButtonProps {
   className?: string;
 }
 
-const ROLES_PERMITIDOS = ["admin", "secretaria"];
+const ROLES_DEFAULT = ["admin", "secretaria"];
 
 export default function SyncNowButton({
   opciones,
   secuencial,
+  roles,
   disabledReason,
   subtext,
   onSuccess,
@@ -77,10 +84,13 @@ export default function SyncNowButton({
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Gate por rol tras montar (browser-only; nunca en useState inicial — SSR).
+  // rolesKey (string) como dep: el array `roles` suele venir inline y cambiaría
+  // de identidad en cada render.
+  const rolesKey = (roles ?? ROLES_DEFAULT).join(",");
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role") || "";
-    setVisible(ROLES_PERMITIDOS.includes(role));
-  }, []);
+    setVisible(rolesKey.split(",").includes(role));
+  }, [rolesKey]);
 
   // Cerrar el menú al hacer click afuera / Escape.
   useEffect(() => {

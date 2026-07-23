@@ -33,7 +33,7 @@ import {
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
 import { RECIBOS_EMPRESA_KEYS } from "./sync-recibos";
-import { empresasConFacturas } from "./empresas";
+import { empresasConFacturas, empresasConCxp } from "./empresas";
 import { RUNNING_STALE_MIN } from "./sync-log";
 
 export const SYNC_NOW_MODULOS = [
@@ -43,6 +43,7 @@ export const SYNC_NOW_MODULOS = [
   "clientes-master",
   "catalogo-reebok",
   "catalogo-joybees",
+  "proveedores",
 ] as const;
 
 export type SyncNowModulo = (typeof SYNC_NOW_MODULOS)[number];
@@ -51,12 +52,17 @@ export function isSyncNowModulo(s: string): s is SyncNowModulo {
   return (SYNC_NOW_MODULOS as readonly string[]).includes(s);
 }
 
-/** Roles que pueden disparar cada módulo. Vendedor SOLO catálogos (los usa
- *  para armar pedidos); el resto de módulos sigue admin+secretaria. */
+/** Roles que pueden disparar cada módulo (el permiso de SERVER; el gate de UI
+ *  de cada botón se parametriza aparte en SyncNowButton):
+ *   - vendedor SOLO catálogos (los usa para armar pedidos);
+ *   - contabilidad SOLO proveedores (es quien vive en /proveedores);
+ *   - el resto de módulos sigue admin+secretaria. */
 export function rolesSyncNow(modulo: SyncNowModulo): string[] {
-  return modulo === "catalogo-reebok" || modulo === "catalogo-joybees"
-    ? ["admin", "secretaria", "vendedor"]
-    : ["admin", "secretaria"];
+  if (modulo === "catalogo-reebok" || modulo === "catalogo-joybees") {
+    return ["admin", "secretaria", "vendedor"];
+  }
+  if (modulo === "proveedores") return ["admin", "secretaria", "contabilidad"];
+  return ["admin", "secretaria"];
 }
 
 /** Minutos de cooldown tras un success del mismo (módulo, empresa). */
@@ -88,6 +94,9 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
       return { empresas: null, syncType: "catalogo_reebok", empresaFija: "active_shoes", tocaSwitch: true };
     case "catalogo-joybees":
       return { empresas: null, syncType: "catalogo_joybees", empresaFija: "joystep", tocaSwitch: true };
+    case "proveedores":
+      // CxP por empresa: 6 B2B + Multifashion (empresasConCxp; Boston no tiene).
+      return { empresas: empresasConCxp(), syncType: "proveedores", tocaSwitch: true };
   }
 }
 
