@@ -30,6 +30,7 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
+import { clearStaleRunning, isRunningLockConflict } from "./sync-log";
 import type { Mes } from "./sync-utilidad";
 
 /** Recibos se sincronizan para las 5 B2B + Multifashion (american_classic). */
@@ -90,6 +91,9 @@ function monthBounds(year: number, month: number): { inicio: string; finExcl: st
 }
 
 async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: string): Promise<string | null> {
+  // Auto-sana logs huérfanos antes del insert: con el índice único de 'running'
+  // (DDL 20260723120000) una fila atascada bloquearía este insert para siempre.
+  await clearStaleRunning(empresaKey, "recibos");
   const s = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
   const f = s[0];
   const l = s[s.length - 1];
@@ -109,6 +113,13 @@ async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: stri
     .select("id")
     .single();
   if (error || !data) {
+    // Conflicto del lock = otra corrida fresca de recibos de esta empresa en
+    // curso → mutex: se lanza y syncEmpresaRecibos devuelve ok:false limpio.
+    if (error && isRunningLockConflict(error)) {
+      throw new Error(
+        `Ya hay una corrida de recibos en curso para ${empresaKey} (lock switch_sync_log_running_lock)`,
+      );
+    }
     console.error(`[sync-recibos ${empresaKey}] no pude crear log: ${error?.message}`);
     return null;
   }
@@ -238,8 +249,12 @@ export async function syncEmpresaRecibos(
   meses: Mes[],
   triggeredBy = "manual",
 ): Promise<SyncRecibosResult> {
-  const logId = await createLog(empresaKey, meses, triggeredBy);
+  // createLog va DENTRO del try: con el lock de 'running' puede lanzar si ya
+  // hay una corrida en curso → esta empresa devuelve ok:false limpio y
+  // syncAllRecibos sigue con las demás.
+  let logId: string | null = null;
   try {
+    logId = await createLog(empresaKey, meses, triggeredBy);
     // Mapa de impuestos para clasificar retenciones: cubre los meses + 35 días antes
     // (una factura puede preceder a su recibo de retención).
     const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));

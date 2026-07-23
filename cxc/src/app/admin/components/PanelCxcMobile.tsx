@@ -16,6 +16,7 @@ import Link from "next/link";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import {
   SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
@@ -56,6 +57,8 @@ interface PanelCxcMobileProps {
   canExport: boolean;
   onExportarCsv: () => void;
   empresaRestriction: string | null;
+  /** Reload de datos tras un "Actualizar ahora" exitoso. */
+  onSyncedNow?: () => void;
 }
 
 export default function PanelCxcMobile({
@@ -78,6 +81,7 @@ export default function PanelCxcMobile({
   canExport,
   onExportarCsv,
   empresaRestriction,
+  onSyncedNow,
 }: PanelCxcMobileProps) {
   // Totales del resumen de buckets. roleClients aquí ya viene filtrado por
   // empresa (kpiClients en page.tsx): con "Todas" es el universo accesible,
@@ -132,6 +136,8 @@ export default function PanelCxcMobile({
         <MobileHeader
           canExport={canExport}
           onExportar={onExportarCsv}
+          companyFilter={companyFilter}
+          onSyncedNow={onSyncedNow}
         />
 
         <MobileHero total={totals.total} clientCount={roleClients.length} />
@@ -205,9 +211,13 @@ export default function PanelCxcMobile({
 function MobileHeader({
   canExport,
   onExportar,
+  companyFilter,
+  onSyncedNow,
 }: {
   canExport: boolean;
   onExportar: () => void;
+  companyFilter: string;
+  onSyncedNow?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -237,6 +247,14 @@ function MobileHeader({
           empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
           className="mt-0.5"
+        />
+        {/* "Actualizar ahora" (admin/secretaria) — estadocuenta de la empresa
+            del filtro; con "Todas" queda deshabilitado. */}
+        <SyncNowButton
+          className="mt-2"
+          opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
+          disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
+          onSuccess={onSyncedNow}
         />
       </div>
       {canExport && (

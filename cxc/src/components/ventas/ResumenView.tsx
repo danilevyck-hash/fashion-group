@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronRight, Info } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { SYNC_NOW_FACTURAS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import {
   SWITCH_FACTURAS_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -131,10 +133,12 @@ interface ResumenViewProps {
   loading: boolean;
   error: string | null;
   onYearChange: (year: number) => void;
+  /** Reload del bundle tras un "Actualizar ahora" exitoso (mutate del SWR del shell). */
+  onReloadData?: () => void;
 }
 
 export function ResumenView({
-  data, multi, selectedYear, isClosedYear, loading, error,
+  data, multi, selectedYear, isClosedYear, loading, error, onReloadData,
 }: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
   const [viewMode, setViewMode] = useState<ViewMode>("ventas");
@@ -279,6 +283,7 @@ export function ResumenView({
         anualData={anualData}
         anualError={anualError}
         onOpenEmpresa={setPanelEmpresaId}
+        onReloadData={onReloadData}
         multiMayoreoLabel={
           multi && multi.wholesale.ytdVentas > 0
             ? multi.wholesale.totalClientes > 1
@@ -334,6 +339,10 @@ export function ResumenView({
             variant="pill"
             prefix="Data actualizada al"
           />
+          {/* "Actualizar ahora" (admin/secretaria) — la vista es de todas las
+              empresas, así que el botón abre un menú para elegir cuál
+              sincronizar (facturas, una por disparo — sesión única Switch). */}
+          <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} onSuccess={onReloadData} />
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">

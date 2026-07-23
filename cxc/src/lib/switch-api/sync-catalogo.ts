@@ -143,7 +143,7 @@ async function fetchAllArticulos(empresaKey: string): Promise<SwitchArticulo[]> 
 
 export async function syncCatalogo(
   config: CatalogoSyncConfig,
-  opts: { dryRun?: boolean } = {},
+  opts: { dryRun?: boolean; triggeredBy?: "cron" | "manual" | "backfill" } = {},
 ): Promise<CatalogoSyncResult> {
   const dryRun = !!opts.dryRun;
   const { db, productsTable, inventoryTable } = config;
@@ -157,10 +157,18 @@ export async function syncCatalogo(
     };
     // Corrida por empresa en switch_sync_log (streak 401 de alert-policy.ts).
     // Los dry-run no se registran: no son corridas reales y ensuciarían el streak.
-    const logId = dryRun
-      ? null
-      : await createSwitchSyncLog({ empresaKey: emp.empresaKey, syncType: config.syncLogType });
+    // El insert va DENTRO del try: con el lock de 'running' (índice único,
+    // DDL 20260723120000) puede lanzar si ya hay una corrida en curso → la
+    // empresa falla limpio (out.error) sin tumbar el resto.
+    let logId: string | null = null;
     try {
+      if (!dryRun) {
+        logId = await createSwitchSyncLog({
+          empresaKey: emp.empresaKey,
+          syncType: config.syncLogType,
+          triggeredBy: opts.triggeredBy ?? "cron",
+        });
+      }
       const client = createSwitchClient(emp.empresaKey);
 
       // (1) /lista bulk → universo + disponible.

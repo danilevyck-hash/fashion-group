@@ -31,7 +31,9 @@ function isReebokArticulo(a: SwitchArticulo): boolean {
   return true;
 }
 
-export function syncCatalogoReebok(opts: { dryRun?: boolean } = {}): Promise<CatalogoSyncResult> {
+export function syncCatalogoReebok(
+  opts: { dryRun?: boolean; triggeredBy?: "cron" | "manual" | "backfill" } = {},
+): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: reebokServer,
     syncLogType: "catalogo_reebok",

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob, stripBom } from "@/lib/csv-export";
@@ -241,6 +242,23 @@ function JoybeesAdminInner() {
                 Se llena solo desde Switch por existencia · tú solo subes fotos
                 {lastSync && ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}
               </p>
+              {/* "Actualizar ahora" (admin/secretaria) — sync del catálogo desde
+                  Switch (joystep). */}
+              <SyncNowButton
+                className="mt-1.5"
+                opciones={[{ modulo: "catalogo-joybees" }]}
+                subtext="tarda ~1-2 min"
+                onSuccess={async () => {
+                  await loadProducts();
+                  try {
+                    const r = await fetch("/api/catalogo/joybees/sync-status");
+                    if (r.ok) {
+                      const d = await r.json();
+                      setLastSync(d.lastSync ?? null);
+                    }
+                  } catch { /* ignore */ }
+                }}
+              />
             </div>
           </div>
           <button
