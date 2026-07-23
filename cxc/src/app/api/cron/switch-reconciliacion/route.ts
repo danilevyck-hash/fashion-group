@@ -55,7 +55,12 @@ import { runChequesAlert } from "@/lib/cheques-alert";
 import { calcularResumenDiario, buildMensaje } from "@/lib/acs-resumen-diario";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
-import { recordCronHeartbeat, cronIsStale } from "@/lib/cron-telemetry";
+import {
+  recordCronHeartbeat,
+  cronIsStale,
+  staleEsPendingRecovery,
+  COLATERAL_RECOVER_AFTER_HOUR_UTC,
+} from "@/lib/cron-telemetry";
 import { colateralDayStartIso } from "@/lib/fecha-panama";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
@@ -64,11 +69,9 @@ const CRON_NAME = "switch-reconciliacion";
 // defecto, propio para crons no diarios como grupo-resumen-mensual) vive en
 // cron-telemetry.ts y lo comparte con health-crons — así los dos vigías nunca
 // vuelven a divergir (antes este tenía 26h plano y alertaba falsamente que el
-// resumen mensual estaba caído entre corridas).
-// Horas UTC de las pasadas de reconciliación (espejo de vercel.json). El watchdog
-// las usa para saber si un colateral stale TODAVÍA tiene una pasada de
-// recuperación hoy → si la tiene, no alerta (se va a auto-recuperar).
-const RECONCILIACION_PASS_HOURS = [10, 14, 18];
+// resumen mensual estaba caído entre corridas). Lo mismo aplica a la metadata
+// de recuperación (RECONCILIACION_PASS_HOURS + COLATERAL_RECOVER_AFTER_HOUR_UTC
+// + staleEsPendingRecovery): fuente única en cron-telemetry.ts.
 
 export const dynamic = "force-dynamic";
 // El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
@@ -185,12 +188,10 @@ interface ColateralCron {
   cronName: string;
   label: string;
   recover: () => Promise<{ ok: boolean; detail: string }>;
-  // Hora UTC mínima para recuperar (idempotencia de crons que corren TARDE en el
-  // día y/o disparan una alerta única). Si la pasada de reconciliación ocurre
-  // antes de esta hora, NO se recupera (el run normal del cron aún puede correr,
-  // y recuperarlo antes duplicaría la alerta). Sin valor = recuperable siempre
-  // (caso de los Switch syncs, que corren temprano: 05:30–09:30 UTC).
-  recoverAfterHourUtc?: number;
+  // La hora UTC mínima para recuperar cada colateral (idempotencia de crons que
+  // corren TARDE en el día y/o disparan una alerta única) vive en
+  // COLATERAL_RECOVER_AFTER_HOUR_UTC (cron-telemetry.ts) — fuente única
+  // compartida con health-crons. 0 = recuperable en cualquier pasada.
   // Cron programado entre 00:00 y 05:00 UTC (ANTES de la medianoche Panamá). Su
   // "success de hoy" se mide contra el inicio del día UTC, no del día Panamá —
   // si no, su heartbeat (p.ej. 01:01 UTC) siempre cae antes del umbral de 05:00
@@ -287,14 +288,13 @@ const COLATERAL_CRONS: ColateralCron[] = [
   },
   {
     // Alerta de cheques por vencer (Telegram). NO toca data (query + Telegram).
-    // Su cron corre 13:00 UTC → recoverAfterHourUtc=14 para NO recuperarlo antes
-    // de su hora normal (si no, la pasada de las 10:00 mandaría la alerta y luego
-    // el run de las 13:00 la duplicaría). Idempotente: solo se re-ejecuta si NO
-    // hubo success hoy → manda la alerta perdida UNA vez (las pasadas siguientes
-    // ven el heartbeat de hoy y lo saltan).
+    // Su cron corre 13:00 UTC → hora mínima 14 (en el mapa compartido) para NO
+    // recuperarlo antes de su hora normal (si no, la pasada de las 10:00 mandaría
+    // la alerta y luego el run de las 13:00 la duplicaría). Idempotente: solo se
+    // re-ejecuta si NO hubo success hoy → manda la alerta perdida UNA vez (las
+    // pasadas siguientes ven el heartbeat de hoy y lo saltan).
     cronName: "cheques-alert",
     label: "cheques-alert",
-    recoverAfterHourUtc: 14,
     recover: async () => {
       const r = await runChequesAlert();
       return { ok: r.ok, detail: r.ok ? (r.count === 0 ? "sin cheques por vencer" : `${r.count} por vencer`) : r.detail };
@@ -302,14 +302,14 @@ const COLATERAL_CRONS: ColateralCron[] = [
   },
   {
     // Checks de integridad (Telegram SOLO si hay críticos). Su cron corre 12:00
-    // UTC → recoverAfterHourUtc=13 para NO adelantarse a su run normal: sin el
-    // guard, la pasada de las 10:00 lo correría y mandaría la alerta crítica
-    // antes de tiempo, y el run de las 12:00 la duplicaría. El persist es append
-    // (igual que el botón "Correr ahora" del dashboard) → re-correr no corrompe
-    // data, solo agrega un snapshot del día. Lo recuperan las pasadas 14:00/18:00.
+    // UTC → hora mínima 13 (mapa compartido) para NO adelantarse a su run
+    // normal: sin el guard, la pasada de las 10:00 lo correría y mandaría la
+    // alerta crítica antes de tiempo, y el run de las 12:00 la duplicaría. El
+    // persist es append (igual que el botón "Correr ahora" del dashboard) →
+    // re-correr no corrompe data, solo agrega un snapshot del día. Lo recuperan
+    // las pasadas 14:00/18:00.
     cronName: "integrity-check",
     label: "integrity-check",
-    recoverAfterHourUtc: 13,
     recover: async () => {
       const r = await runIntegrityCheck();
       return { ok: r.ok, detail: r.ok ? (r.criticalCount > 0 ? `${r.criticalCount} críticos` : "ok") : r.detail };
@@ -372,14 +372,14 @@ const COLATERAL_CRONS: ColateralCron[] = [
   // RECOVERY_BUDGET_MS de los colaterales anteriores. Lo que no entre en una
   // pasada lo toma la siguiente.
   {
-    // Catálogo Joybees (joystep). Su cron corre 11:00 UTC → recoverAfterHourUtc=12
-    // para no adelantarse al run normal (la pasada de las 10:00 lo saltaría igual,
-    // pero el guard lo hace explícito). Idempotente y fail-safe: un fallo de
-    // Switch NO modifica el catálogo (incidente 4-jul-2026: ráfaga de deploys en
-    // su ventana 11:00-12:00 le comió la invocación y nadie lo reintentaba).
+    // Catálogo Joybees (joystep). Su cron corre 11:00 UTC → hora mínima 12
+    // (mapa compartido) para no adelantarse al run normal (la pasada de las
+    // 10:00 lo saltaría igual, pero el guard lo hace explícito). Idempotente y
+    // fail-safe: un fallo de Switch NO modifica el catálogo (incidente
+    // 4-jul-2026: ráfaga de deploys en su ventana 11:00-12:00 le comió la
+    // invocación y nadie lo reintentaba).
     cronName: "joybees-catalogo",
     label: "joybees-catalogo",
-    recoverAfterHourUtc: 12,
     recover: async () => {
       const r = await syncCatalogoJoybees();
       const bad = r.empresas.filter((e) => e.error);
@@ -392,16 +392,14 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Catálogo Reebok (active_shoes). DOS slots diarios (06:45 y 17:00 UTC) pero
-    // el heartbeat es de granularidad diaria → la reconciliación solo detecta
-    // "cero success HOY". recoverAfterHourUtc=8 (slot temprano 06:45 + 1h, patrón
-    // cheques-alert): solo recuperar cuando el primer slot ya debió correr. Si el
-    // slot de las 17:00 se pierde con el de 06:45 exitoso, no hay señal (heartbeat
-    // fresco) — aceptable: ese slot es solo refresh intradía. Idempotente y
-    // fail-safe igual que Joybees.
+    // Catálogo Reebok (active_shoes). DOS slots diarios pero el heartbeat es de
+    // granularidad diaria → la reconciliación solo detecta "cero success HOY".
+    // Hora mínima en el mapa compartido (patrón cheques-alert): solo recuperar
+    // cuando el primer slot ya debió correr. Si el slot de la tarde se pierde
+    // con el primero exitoso, no hay señal (heartbeat fresco) — aceptable: ese
+    // slot es solo refresh intradía. Idempotente y fail-safe igual que Joybees.
     cronName: "reebok-catalogo",
     label: "reebok-catalogo",
-    recoverAfterHourUtc: 8,
     recover: async () => {
       const r = await syncCatalogoReebok();
       const bad = r.empresas.filter((e) => e.error);
@@ -438,42 +436,30 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
       })
       .map((h) => h.cron_name),
   );
-  // No recuperar un colateral antes de su hora programada (recoverAfterHourUtc):
-  // su run normal aún puede correr; recuperarlo antes duplicaría su alerta.
+  // No recuperar un colateral antes de su hora programada (mapa compartido
+  // COLATERAL_RECOVER_AFTER_HOUR_UTC): su run normal aún puede correr;
+  // recuperarlo antes duplicaría su alerta.
   const nowHourUtc = new Date().getUTCHours();
   return COLATERAL_CRONS.filter(
     (c) =>
       !successHoy.has(c.cronName) &&
-      (c.recoverAfterHourUtc === undefined || nowHourUtc >= c.recoverAfterHourUtc),
+      nowHourUtc >= (COLATERAL_RECOVER_AFTER_HOUR_UTC[c.cronName] ?? 0),
   );
 }
 
 /**
  * Watchdog de heartbeats: revisa cron_heartbeats y alerta por Telegram si algún
- * cron lleva más de WATCHDOG_STALE_HOURS sin un success. No lanza.
+ * cron lleva más de su umbral stale sin un success. No lanza.
+ *
+ * Anti alerta-fantasma: un cron stale cuya recuperación AÚN viene hoy (pasada
+ * de reconciliación posterior, o la 2ª entrada del día de backup/
+ * acs-fidelizacion) NO alerta — la lógica (staleEsPendingRecovery, con tope
+ * duro de 30h) vive en cron-telemetry.ts, compartida con health-crons. Estricto
+ * con la pasada en curso: esta pasada NO cuenta como "por venir" — si su
+ * recuperación falla, el alert de failedColaterales/skipped lo reporta con
+ * mensaje preciso (caso real 4-jul-2026: sync-clientes-master stale silenciado
+ * para siempre por contarse la pasada a sí misma).
  */
-// ¿este cron stale TODAVÍA se va a auto-recuperar hoy? → no alertar (alerta
-// fantasma). Solo aplica a colaterales (los que la reconciliación recupera). Un
-// colateral se recupera en las pasadas cuya hora >= recoverAfterHourUtc; si aún
-// queda alguna pasada elegible hoy (ahora o más tarde), la recuperación está por
-// venir → silenciar. Si su fallo es real, el alert de failedColaterales/skipped
-// de la propia reconciliación lo reporta (mensaje preciso, no fantasma). Los
-// crons SIN recuperación (no colaterales) nunca se silencian → alerta normal.
-function autoRecoveryStillComingToday(cronName: string, nowHourUtc: number): boolean {
-  const col = COLATERAL_CRONS.find((c) => c.cronName === cronName);
-  if (!col) return false; // sin recuperación → alertar normal
-  const after = col.recoverAfterHourUtc ?? 0;
-  const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
-  if (eligible.length === 0) return false; // nunca elegible hoy → alertar
-  // Estricto (>): solo silenciar si queda una pasada POSTERIOR a esta. Con >=
-  // la última pasada del día (18:00) se contaba a sí misma como "recuperación
-  // por venir" y el stale de colaterales sin recoverAfterHourUtc quedaba
-  // silenciado PARA SIEMPRE (caso real 4-jul-2026: sync-clientes-master stale
-  // sin alerta de watchdog). Si el fallo persiste tras la recuperación de esta
-  // pasada, además lo reporta el alert de failedColaterales/skipped.
-  return Math.max(...eligible) > nowHourUtc; // queda una pasada MÁS TARDE hoy → silenciar
-}
-
 async function checkStaleCrons(): Promise<string[]> {
   const { data, error } = await supabaseServer
     .from("cron_heartbeats")
@@ -483,13 +469,12 @@ async function checkStaleCrons(): Promise<string[]> {
     return [];
   }
   const now = Date.now();
-  const nowHourUtc = new Date().getUTCHours();
   const stale = (data || [])
     // Umbral por-cron compartido (cronIsStale): un cron mensual como
     // grupo-resumen-mensual usa 33 días, no las 26h del default.
     .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
     // Silenciar los que aún se van a auto-recuperar hoy (anti alerta-fantasma).
-    .filter((h) => !autoRecoveryStillComingToday(h.cron_name, nowHourUtc))
+    .filter((h) => !staleEsPendingRecovery(h.cron_name, h.last_success_at, now))
     .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
   if (stale.length > 0) {
     await sendTelegramAlert(

@@ -55,6 +55,107 @@ export function cronIsStale(
   return t < now - cronStaleThresholdHours(cronName) * 3600 * 1000;
 }
 
+// ─── Metadata de recuperación (fuente ÚNICA para AMBOS watchdogs) ─────────────
+// Un cron stale NO amerita alerta si su recuperación AÚN viene hoy: la
+// reconciliación (para los colaterales) o su propia 2ª entrada del día en
+// vercel.json (backup / acs-fidelizacion). Antes esta metadata vivía duplicada
+// (recoverAfterHourUtc inline en COLATERAL_CRONS de switch-reconciliacion y
+// nada en health-crons, que alertaba 503 aunque la recuperación estuviera a
+// horas de distancia). Ahora ambos leen de aquí.
+
+/** Horas UTC de las pasadas de switch-reconciliacion (espejo de vercel.json). */
+export const RECONCILIACION_PASS_HOURS = [10, 14, 18];
+
+/**
+ * Crons cuya recuperación es una pasada de reconciliación, con su hora UTC
+ * mínima de recuperación (0 = recuperable en cualquier pasada). Debe reflejar
+ * COLATERAL_CRONS de switch-reconciliacion (que lee de aquí, no al revés) más
+ * "switch-sync", cuyos pares faltantes la reconciliación también recupera
+ * (detección por switch_sync_log, no por heartbeat).
+ *
+ * Hora mínima > 0 = crons que corren TARDE y/o disparan una alerta única:
+ * recuperarlos antes de su hora normal duplicaría la alerta (ver comentarios
+ * por-colateral en switch-reconciliacion).
+ */
+export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
+  "switch-sync": 0,
+  "sync-clientes-master": 0,
+  "sync-utilidad": 0,
+  "sync-recibos": 0,
+  "switch-articulos": 0,
+  "multifashion-sync": 0,
+  "sync-proveedores": 0,
+  "refresh-clientes-views": 0,
+  "cleanup-packing-lists": 0,
+  "acs-resumen-diario": 0,
+  "integrity-check": 13, // su cron corre 12:00 UTC
+  "cheques-alert": 14, // su cron corre 13:00 UTC
+  "joybees-catalogo": 12, // su cron corre 11:00 UTC
+  "reebok-catalogo": 8, // slot temprano 06:45 + 1h
+};
+
+/**
+ * Crons con 2ª entrada del día en vercel.json (hora UTC fraccional, ej. 18.5 =
+ * 18:30). No los recupera la reconciliación (pesados / sesión Switch propia):
+ * su "recuperación que viene" es su propia 2ª corrida, que solo trabaja si la
+ * 1ª no registró success hoy (guard no-op en el route).
+ */
+export const SECOND_ENTRY_HOUR_UTC: Record<string, number> = {
+  backup: 18.5,
+  "acs-fidelizacion": 16.5,
+};
+
+/** Crons que JAMÁS se silencian por "recuperación en camino": la reconciliación
+ *  es el propio recuperador (si está caída no hay red de seguridad) y el
+ *  resumen mensual es demasiado esporádico para asumir auto-recuperación. */
+export const NUNCA_SILENCIAR = new Set(["switch-reconciliacion", "grupo-resumen-mensual"]);
+
+/**
+ * ¿La recuperación de este cron AÚN viene hoy? (nowHourUtc puede ser
+ * fraccional: 14.5 = 14:30 UTC.)
+ *   - 2ª entrada propia: viene si aún no es la hora de esa entrada.
+ *   - Colateral: viene si queda una pasada de reconciliación POSTERIOR a ahora
+ *     entre las elegibles (hora >= su recoverAfterHourUtc). Estricto (>): la
+ *     pasada en curso no cuenta como "por venir" — si su recuperación falla, la
+ *     propia reconciliación alerta con mensaje preciso (failedColaterales).
+ */
+export function recoveryStillComingToday(cronName: string, nowHourUtc: number): boolean {
+  if (NUNCA_SILENCIAR.has(cronName)) return false;
+  const secondEntry = SECOND_ENTRY_HOUR_UTC[cronName];
+  if (secondEntry !== undefined) return nowHourUtc < secondEntry;
+  const after = COLATERAL_RECOVER_AFTER_HOUR_UTC[cronName];
+  if (after === undefined) return false; // sin recuperación conocida → alertar normal
+  const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
+  if (eligible.length === 0) return false;
+  return Math.max(...eligible) > nowHourUtc;
+}
+
+/** Tope duro de silenciamiento: pasado esto, stale alerta SIEMPRE aunque la
+ *  metadata prometa recuperación (protege contra recuperaciones que fallan día
+ *  tras día o metadata desactualizada). */
+export const PENDING_RECOVERY_MAX_HOURS = 30;
+
+/**
+ * ¿Un cron stale califica como "pendingRecovery" (recuperación en camino) en
+ * vez de contar como caído? Requiere: (a) recuperación conocida que AÚN viene
+ * hoy, y (b) stale hace MENOS de PENDING_RECOVERY_MAX_HOURS. Un cron sin
+ * heartbeat jamás (fecha ausente/ inválida = fail-closed → caído). Compartida:
+ * health-crons (no cuenta para el 503) y watchdog Telegram de la reconciliación
+ * (no manda alerta fantasma).
+ */
+export function staleEsPendingRecovery(
+  cronName: string,
+  lastSuccessAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  const t = lastSuccessAt ? new Date(lastSuccessAt).getTime() : NaN;
+  if (!Number.isFinite(t)) return false;
+  if (now - t >= PENDING_RECOVERY_MAX_HOURS * 3600 * 1000) return false;
+  const d = new Date(now);
+  const nowHourUtc = d.getUTCHours() + d.getUTCMinutes() / 60;
+  return recoveryStillComingToday(cronName, nowHourUtc);
+}
+
 /** Marca al cron como exitoso ahora (upsert por cron_name). No lanza. */
 export async function recordCronHeartbeat(cronName: string): Promise<void> {
   try {
