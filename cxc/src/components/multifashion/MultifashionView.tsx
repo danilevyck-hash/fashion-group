@@ -22,9 +22,11 @@ interface MultifashionViewProps {
   data: Multifashion;
   selectedYear: number;
   isClosedYear: boolean;
+  /** Revalida el overview (SWR mutate del shell) tras un "Actualizar ahora". */
+  onReloadData?: () => void | Promise<void>;
 }
 
-export function MultifashionView({ data, selectedYear, isClosedYear }: MultifashionViewProps) {
+export function MultifashionView({ data, selectedYear, isClosedYear, onReloadData }: MultifashionViewProps) {
   // Sub-tab activo en la URL (?subtab=resumen|vendedoras|clientes). Key distinta
   // a "tab" del shell para no chocar. Persiste en refresh/back-forward. Los tabs
   // viejos "overview" y "mes" (fusionados en "resumen") se normalizan acá para no
@@ -183,6 +185,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
             selectedYear={selectedYear}
             isClosedYear={isClosedYear}
             mes={mes}
+            onReloadData={onReloadData}
           />
         </TabsContent>
         <TabsContent value="vendedoras" className="mt-5">

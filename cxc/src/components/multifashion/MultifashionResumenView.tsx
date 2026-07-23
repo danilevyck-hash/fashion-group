@@ -43,6 +43,7 @@ const CumulativeChartCard = dynamic(
 import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 interface DiaRow {
@@ -131,6 +132,8 @@ interface MultifashionResumenViewProps {
   isClosedYear: boolean;
   /** Mes (1-12) del selector único de período en el shell de Multifashion. */
   mes: number;
+  /** Revalida el overview del año (SWR mutate del shell) tras un sync manual. */
+  onReloadData?: () => void | Promise<void>;
 }
 
 const MESES_FULL = [
@@ -265,7 +268,7 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
 
 
 export function MultifashionResumenView({
-  overview, selectedYear, isClosedYear, mes,
+  overview, selectedYear, isClosedYear, mes, onReloadData,
 }: MultifashionResumenViewProps) {
   const year = selectedYear;
   const prevYear = year - 1;
@@ -274,6 +277,9 @@ export function MultifashionResumenView({
   const [error, setError] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"mes" | "anio">("mes");
   const [panoramaOpen, setPanoramaOpen] = useState(false);
+  // Re-dispara el fetch del detalle mensual tras un "Actualizar ahora" (el
+  // efecto de abajo depende de él — mismos year/mes, data nueva).
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -298,7 +304,7 @@ export function MultifashionResumenView({
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [year, mes]);
+  }, [year, mes, refreshTick]);
 
   // ── Panorama del año (prop overview, siempre disponible) ──────────────────
   const serieAct = overview.serieActual;
@@ -329,13 +335,25 @@ export function MultifashionResumenView({
         </div>
         <div>
           <h2 className="font-display text-xl font-semibold leading-tight text-gray-950">{overview.tienda}</h2>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <SyncStatus
               tabla="facturas"
               empresasEsperadas={["american_classic"]}
               empresaLabels={EMPRESA_KEY_TO_NAME}
               variant="pill"
               prefix="Data actualizada al"
+            />
+            {/* "Actualizar ahora" (admin/secretaria; gerente_acs NO lo ve — el
+                gate de rol vive en SyncNowButton): un clic = sync de facturas
+                de american_classic, mismo candado/cooldown del endpoint. Tras
+                el éxito se revalida el overview (SWR del shell) y se re-pide
+                el detalle mensual; SyncStatus se refresca solo (evento focus). */}
+            <SyncNowButton
+              opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+              onSuccess={async () => {
+                await onReloadData?.();
+                setRefreshTick((t) => t + 1);
+              }}
             />
           </div>
         </div>

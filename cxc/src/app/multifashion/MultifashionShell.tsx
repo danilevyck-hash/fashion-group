@@ -109,7 +109,12 @@ export function MultifashionShell({
       )}
 
       {multi ? (
-        <MultifashionView data={multi} selectedYear={selectedYear} isClosedYear={isClosedYear} />
+        <MultifashionView
+          data={multi}
+          selectedYear={selectedYear}
+          isClosedYear={isClosedYear}
+          onReloadData={async () => { await mutate(); }}
+        />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
           <p className="text-sm text-gray-700">

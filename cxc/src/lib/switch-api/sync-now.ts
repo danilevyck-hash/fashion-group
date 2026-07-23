@@ -1,26 +1,33 @@
 /**
  * Candado del sync manual on-demand ("Actualizar ahora", /api/admin/sync-now).
  *
- * Tres capas, evaluadas ANTES de disparar el sync (y en este orden):
- *   a) running  — ya hay una corrida fresca (<30 min) del mismo (empresa, tipo)
- *                 en switch_sync_log. El lock REAL es el índice único parcial
+ * Dos capas, evaluadas ANTES de disparar el sync (y en este orden):
+ *   a) running  — ya hay una corrida fresca (<30 min) de esa EMPRESA en
+ *                 switch_sync_log: del mismo (empresa, tipo) O de cualquier
+ *                 otro sync_type de la misma empresa (un cron corriendo YA).
+ *                 El lock REAL es el índice único parcial
  *                 switch_sync_log_running_lock (DDL 20260723150000, manual):
  *                 si dos disparos pasan el pre-check a la vez, el 2º insert de
  *                 fila 'running' falla (23505) y también responde 409. Mientras
  *                 la DDL no corra, queda solo el pre-check (tolerante).
- *   b) cron-proximo — el próximo cron que toca el Switch de esa empresa corre
- *                 en <= 40 min (SWITCH_CRON_ENTRADAS, espejo de vercel.json).
- *                 Sesión ÚNICA por empresa: un sync manual pegado al cron le
- *                 mataría el token (code 0006). clientes-master está EXENTO
- *                 (solo lee nuestra DB, jamás toca Switch).
- *   c) cooldown — el último success del (módulo, empresa) fue hace <10 min.
+ *                 El CLIENTE (SyncNowButton) NO muestra este 409: se engancha
+ *                 al sync en curso (spinner + re-intento cada ~5s) y refresca
+ *                 la vista cuando termina, como si el clic lo hubiera lanzado.
+ *   b) cooldown — el último success del (módulo, empresa) fue hace <10 min.
  *                 Datos recién frescos: no tiene sentido re-pegarle a Switch.
  *
+ * La ventana "cron-proximo" (rechazar si el próximo cron de la empresa corría
+ * en <=40 min) SE ELIMINÓ (jul-2026, decisión de Daniel): el clic siempre
+ * actualiza. Trade-off aceptado y documentado: un sync manual pegado a la
+ * ventana de un cron de la MISMA empresa puede matarle el token al otro
+ * (sesión única Switch, code 0006) — el que pierda falla limpio y la
+ * reconciliación (cron switch-reconciliacion) lo recupera; ambos flujos son
+ * fail-safe. proximoCronParaEmpresa sigue en cron-telemetry para telemetría.
+ *
  * La lógica de decisión es PURA (precheckSyncNow) — el route hace las queries
- * y ejecuta; los tests cubren los 3 motivos de 409 sin tocar DB.
+ * y ejecuta; los tests cubren los motivos de 409 sin tocar DB.
  */
 
-import { proximoCronParaEmpresa, type ProximoCron } from "@/lib/cron-telemetry";
 import {
   SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -54,9 +61,6 @@ export function rolesSyncNow(modulo: SyncNowModulo): string[] {
 
 /** Minutos de cooldown tras un success del mismo (módulo, empresa). */
 export const SYNC_NOW_COOLDOWN_MIN = 10;
-
-/** Ventana (min) antes del próximo cron de la empresa en la que el manual se rechaza. */
-export const SYNC_NOW_VENTANA_CRON_MIN = 40;
 
 interface ModuloConfig {
   /** Empresas válidas para el módulo; null = el módulo no lleva empresa. */
@@ -100,7 +104,7 @@ export function lockKeyDe(
   return { empresaKey, syncType: cfg.syncType };
 }
 
-export type SyncNowMotivo = "running" | "cron-proximo" | "cooldown";
+export type SyncNowMotivo = "running" | "cooldown";
 
 export interface SyncNow409 {
   motivo: SyncNowMotivo;
@@ -118,39 +122,39 @@ function minutosDesde(iso: string, ahora: Date): number {
  *  - runningStartedAt: started_at de la fila 'running' más reciente del
  *    (empresa, tipo), o null si no hay. Las filas huérfanas (>30 min) NO
  *    cuentan (el route ya las limpió / el insert las limpia).
+ *  - runningOtroStartedAt: started_at de la fila 'running' más reciente de la
+ *    MISMA empresa con OTRO sync_type (ej. un cron tipo=all corriendo YA).
+ *    También bloquea (sesión única Switch por empresa) — cubre el hueco que
+ *    antes tapaba la ventana cron-proximo.
  *  - lastSuccessFinishedAt: finished_at del último success del (módulo, empresa).
- *  - proximo: resultado de proximoCronParaEmpresa (null = sin cron que toque
- *    la empresa o módulo exento).
+ *
+ * OJO: el detalle del motivo "running" casi nunca se ve — SyncNowButton lo
+ * trata como éxito-en-progreso (se engancha al sync en curso). No poner acá
+ * instrucciones tipo "espera al sync de las HH:MM".
  */
 export function precheckSyncNow(input: {
   ahora: Date;
   runningStartedAt: string | null;
+  runningOtroStartedAt?: string | null;
   lastSuccessFinishedAt: string | null;
-  proximo: ProximoCron | null;
 }): SyncNow409 | null {
-  const { ahora, runningStartedAt, lastSuccessFinishedAt, proximo } = input;
+  const { ahora, runningStartedAt, runningOtroStartedAt, lastSuccessFinishedAt } = input;
 
-  // a) corrida en curso (fresca <30 min; las más viejas son huérfanas).
-  if (runningStartedAt) {
-    const min = minutosDesde(runningStartedAt, ahora);
+  // a) corrida en curso de la empresa (fresca <30 min; las más viejas son
+  //    huérfanas). Mismo tipo primero; luego cualquier otro sync_type.
+  for (const startedAt of [runningStartedAt, runningOtroStartedAt ?? null]) {
+    if (!startedAt) continue;
+    const min = minutosDesde(startedAt, ahora);
     if (min < RUNNING_STALE_MIN) {
       const hace = min <= 0 ? "hace menos de 1 min" : `hace ${min} min`;
       return {
         motivo: "running",
-        detalle: `Ya hay una actualización en curso (empezó ${hace}). Espera a que termine.`,
+        detalle: `Ya hay una actualización en curso (empezó ${hace}).`,
       };
     }
   }
 
-  // b) cron a la vuelta de la esquina.
-  if (proximo && proximo.enMinutos <= SYNC_NOW_VENTANA_CRON_MIN) {
-    return {
-      motivo: "cron-proximo",
-      detalle: `El sync automático corre a las ${proximo.horaPanama} (hora Panamá) — espera unos minutos y los datos se actualizan solos.`,
-    };
-  }
-
-  // c) cooldown 10 min tras el último success.
+  // b) cooldown 10 min tras el último success.
   if (lastSuccessFinishedAt) {
     const min = minutosDesde(lastSuccessFinishedAt, ahora);
     if (min < SYNC_NOW_COOLDOWN_MIN) {
@@ -163,19 +167,6 @@ export function precheckSyncNow(input: {
   }
 
   return null;
-}
-
-/** Próximo cron relevante para el candado (null si el módulo no toca Switch). */
-export function proximoCronDe(
-  modulo: SyncNowModulo,
-  empresa: string | null,
-  ahora: Date,
-): ProximoCron | null {
-  const cfg = moduloConfig(modulo);
-  if (!cfg.tocaSwitch) return null;
-  const empresaKey = cfg.empresaFija ?? empresa;
-  if (!empresaKey) return null;
-  return proximoCronParaEmpresa(empresaKey, ahora);
 }
 
 /** Nombre legible de la empresa para mensajes ("Active Shoes"). */

@@ -9,16 +9,31 @@
 //
 //   - 1 opción  → botón directo.
 //   - 2+ opciones → botón que abre un menú (elige empresa / módulo).
+//   - 2+ opciones + secuencial → SIN menú: un clic dispara TODAS las opciones
+//     EN SECUENCIA (nunca 2 a la vez — sesión única Switch), con progreso
+//     "Actualizando… (N/8)" y UN toast resumen al final. Los 409 individuales
+//     (running/cooldown) no abortan: esa empresa se salta y se acumula como
+//     omitida.
 //   - disabledReason → deshabilitado con tooltip (ej. "Elige una empresa").
 //
 // Mientras corre: spinner + disabled. Tras éxito: toast "Listo, actualizado",
 // se dispara un evento focus (SyncStatus y los fetchers SWR revalidan solos en
 // focus) y se llama onSuccess (reload de datos de la página, si lo expone).
-// Un 409 del endpoint trae el detalle legible en español → se muestra tal cual.
+//
+// 409 motivo "running" (sync de esa empresa corriendo YA — manual o cron): NO
+// se muestra nada. El botón queda en "Actualizando…" y SE ENGANCHA al sync en
+// curso re-intentando el POST cada ~5s:
+//   - si el running termina en success → el re-intento cae en cooldown → se
+//     trata como éxito (la data quedó fresca) y se refresca la vista;
+//   - si el running termina en error → el re-intento adquiere el lock y corre
+//     el sync manual (reintento automático único) antes de mostrar error.
+// Cero mensajes tipo "espera al sync de las HH:MM" en todo el sistema.
+// El 409 cooldown DIRECTO (primer intento) sí muestra su detalle tal cual.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { postSyncNow, syncConEnganche } from "./syncNowClient";
 
 export interface SyncNowOpcion {
   /** Módulo del endpoint: estadocuenta | facturas | recibos | clientes-master |
@@ -31,6 +46,9 @@ export interface SyncNowOpcion {
 
 interface SyncNowButtonProps {
   opciones: SyncNowOpcion[];
+  /** Con 2+ opciones: true = un clic las dispara TODAS en secuencia (sin
+   *  menú). false/omitido = menú para elegir una (comportamiento clásico). */
+  secuencial?: boolean;
   /** Si viene, el botón queda deshabilitado con este tooltip. */
   disabledReason?: string | null;
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
@@ -44,6 +62,7 @@ const ROLES_PERMITIDOS = ["admin", "secretaria"];
 
 export default function SyncNowButton({
   opciones,
+  secuencial,
   disabledReason,
   subtext,
   onSuccess,
@@ -51,6 +70,7 @@ export default function SyncNowButton({
 }: SyncNowButtonProps) {
   const [visible, setVisible] = useState(false);
   const [running, setRunning] = useState(false);
+  const [progreso, setProgreso] = useState<{ actual: number; total: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; error: boolean } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,39 +112,76 @@ export default function SyncNowButton({
     toastTimer.current = setTimeout(() => setToast(null), error ? 8000 : 3000);
   };
 
+  // Refresca "hace X min" (SyncStatus + fetchers SWR revalidan en focus) y los
+  // datos de la vista (onSuccess) — un solo lugar para ambos disparos.
+  const refrescarVista = async () => {
+    window.dispatchEvent(new Event("focus"));
+    await onSuccess?.();
+  };
+
   const disparar = async (opcion: SyncNowOpcion) => {
     setMenuOpen(false);
     setRunning(true);
     try {
-      const res = await fetch("/api/admin/sync-now", {
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modulo: opcion.modulo, empresa: opcion.empresa }),
-      });
-      const json = (await res.json().catch(() => null)) as
-        | { ok?: boolean; resumen?: string; detalle?: string; error?: string }
-        | null;
-      if (res.ok && json?.ok) {
-        showToast(json.resumen ? `Listo, actualizado. ${json.resumen}` : "Listo, actualizado", false);
-        // SyncStatus y los fetchers SWR revalidan en focus → un solo disparo
-        // refresca el "actualizado hace X" en toda la página.
-        window.dispatchEvent(new Event("focus"));
-        await onSuccess?.();
-      } else if (res.status === 409 && json?.detalle) {
-        showToast(json.detalle, true);
+      // syncConEnganche absorbe el 409 running: el botón queda en
+      // "Actualizando…" y se resuelve solo cuando el sync (propio o ajeno)
+      // terminó — sin toasts de "espera".
+      const r = await syncConEnganche(opcion);
+      if (r.tipo === "ok") {
+        showToast(r.resumen ? `Listo, actualizado. ${r.resumen}` : "Listo, actualizado", false);
+        await refrescarVista();
+      } else if (r.tipo === "fresco") {
+        showToast(r.detalle, true);
       } else {
-        showToast(json?.error || "No se pudo actualizar. Intenta de nuevo en unos segundos.", true);
+        showToast(r.mensaje, true);
       }
-    } catch {
-      showToast("No se pudo actualizar. Revisa tu conexión e intenta de nuevo.", true);
     } finally {
       setRunning(false);
     }
   };
 
+  // Modo secuencial (Ventas): un clic recorre TODAS las opciones, una por una
+  // (sesión única Switch — nunca 2 a la vez). Un 409 (running/cooldown) NO
+  // aborta: esa empresa se salta (quedará fresca por el sync que ya corre o
+  // recién corrió) y se acumula como omitida. Al final, UN toast resumen.
+  const dispararSecuencia = async () => {
+    setRunning(true);
+    let actualizadas = 0;
+    let omitidas = 0;
+    let fallidas = 0;
+    try {
+      for (let i = 0; i < opciones.length; i++) {
+        setProgreso({ actual: i + 1, total: opciones.length });
+        try {
+          const { status, json } = await postSyncNow(opciones[i]);
+          if (status === 200 && json?.ok) actualizadas++;
+          else if (status === 409) omitidas++;
+          else fallidas++;
+        } catch {
+          fallidas++;
+        }
+      }
+      const partes: string[] = [];
+      if (omitidas === 0 && fallidas === 0) {
+        partes.push(
+          actualizadas === 1 ? "Listo, 1 empresa actualizada" : `Listo, ${actualizadas} empresas actualizadas`,
+        );
+      } else {
+        partes.push(`${actualizadas} actualizadas`);
+        if (omitidas > 0) partes.push(`${omitidas} omitidas (en espera o recién actualizadas)`);
+        if (fallidas > 0) partes.push(`${fallidas} con error`);
+      }
+      showToast(partes.join(" · "), fallidas > 0);
+      await refrescarVista();
+    } finally {
+      setProgreso(null);
+      setRunning(false);
+    }
+  };
+
   const disabled = running || !!disabledReason || opciones.length === 0;
-  const esMenu = opciones.length > 1;
+  const esSecuencia = !!secuencial && opciones.length > 1;
+  const esMenu = !esSecuencia && opciones.length > 1;
 
   return (
     <div className={`relative inline-flex flex-col ${className ?? ""}`} ref={menuRef}>
@@ -133,7 +190,8 @@ export default function SyncNowButton({
         title={disabledReason ?? undefined}
         disabled={disabled}
         onClick={() => {
-          if (esMenu) setMenuOpen((o) => !o);
+          if (esSecuencia) dispararSecuencia();
+          else if (esMenu) setMenuOpen((o) => !o);
           else disparar(opciones[0]);
         }}
         aria-haspopup={esMenu ? "menu" : undefined}
@@ -141,7 +199,11 @@ export default function SyncNowButton({
         className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
-        {running ? "Actualizando…" : "Actualizar ahora"}
+        {running
+          ? progreso
+            ? `Actualizando… (${progreso.actual}/${progreso.total})`
+            : "Actualizando…"
+          : "Actualizar ahora"}
       </button>
       {subtext && <span className="mt-0.5 text-[11px] text-gray-400">{subtext}</span>}
 

@@ -90,8 +90,8 @@ export function ResumenViewMobile({
           variant="pill"
           prefix="Data al"
         />
-        {/* "Actualizar ahora" (admin/secretaria) — menú para elegir la empresa. */}
-        <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} onSuccess={onReloadData} />
+        {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en secuencia. */}
+        <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} secuencial onSuccess={onReloadData} />
       </div>
       <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
       <MobileToggles
