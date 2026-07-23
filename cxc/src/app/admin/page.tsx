@@ -23,6 +23,7 @@ import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import {
   SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -523,17 +524,25 @@ function AdminDashboardInner() {
         canExport={canExport}
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}
+        onSyncedNow={() => loadData()}
       />
 
       <div className="hidden md:block max-w-6xl mx-auto px-6 py-8">
 
       {/* Sync status — MAX(synced_at) por empresa del cron switch-sync, con
-          warning si alguna empresa lleva >26h sin actualizar. */}
-      <div className="mb-4">
+          warning si alguna empresa lleva >26h sin actualizar. El botón
+          "Actualizar ahora" (admin/secretaria) dispara estadocuenta de la
+          empresa seleccionada en el filtro; con "Todas" queda deshabilitado. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <SyncStatus
           tabla="estadocuenta"
           empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
+        />
+        <SyncNowButton
+          opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
+          disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
+          onSuccess={() => loadData()}
         />
       </div>
 

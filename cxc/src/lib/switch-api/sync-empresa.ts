@@ -94,7 +94,7 @@ async function finalizeSyncLog(
  * timeouts ya no deberían pasar, pero esto auto-sana los logs huérfanos que dejó
  * el cron monolítico viejo y cualquier muerte futura.
  */
-async function markStaleRunningLogs(
+export async function markStaleRunningLogs(
   empresaKey: EmpresaKey,
   syncType: "facturas" | "estadocuenta" | "costo",
 ): Promise<void> {
@@ -361,6 +361,9 @@ export async function syncEmpresaFacturas(
   opts: SyncOptions,
 ): Promise<EmpresaSyncResult> {
   const startedAt = Date.now();
+  // Auto-sana logs huérfanos ANTES del insert: con el índice único de 'running'
+  // (DDL 20260723150000) una fila atascada bloquearía este insert para siempre.
+  await markStaleRunningLogs(empresaKey, "facturas");
   const logId = await createSyncLog(empresaKey, "facturas", opts);
 
   const counters = { inserted: 0, updated: 0, skipped: 0 };

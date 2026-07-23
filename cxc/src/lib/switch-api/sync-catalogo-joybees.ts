@@ -34,7 +34,9 @@ function isJoybeesArticulo(a: SwitchArticulo): boolean {
   return (a.proveedor ?? "").trim().toUpperCase() === JOYBEES_PROVEEDOR;
 }
 
-export function syncCatalogoJoybees(opts: { dryRun?: boolean } = {}): Promise<CatalogoSyncResult> {
+export function syncCatalogoJoybees(
+  opts: { dryRun?: boolean; triggeredBy?: "cron" | "manual" | "backfill" } = {},
+): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: joybeesServer,
     syncLogType: "catalogo_joybees",

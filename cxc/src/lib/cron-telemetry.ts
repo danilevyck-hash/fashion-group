@@ -183,6 +183,116 @@ export const SWITCH_SYNC_SLOT_HEARTBEATS = [
   "switch-sync:facturas-0015",
 ];
 
+// ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
+// Espejo de vercel.json (SOLO las entradas que abren sesión en el Switch de
+// alguna empresa — sesión ÚNICA por empresa: un 2º login mata el token del 1º).
+// Fuente única para el candado del sync manual (/api/admin/sync-now): si el
+// próximo cron que toca una empresa está a <40 min, el manual se rechaza con
+// 409 para no matarle la sesión. Al agregar/mover una entrada en vercel.json
+// que toque Switch, actualizar AQUÍ también.
+
+const CRON_EMPRESAS_B2B5 = [
+  "vistana",
+  "fashion_wear",
+  "fashion_shoes",
+  "active_shoes",
+  "active_wear",
+] as const;
+const CRON_EMPRESAS_RECIBOS = [...CRON_EMPRESAS_B2B5, "american_classic"] as const;
+const CRON_EMPRESAS_CXP = [...CRON_EMPRESAS_B2B5, "joystep", "american_classic"] as const;
+const CRON_EMPRESAS_TODAS = [
+  ...CRON_EMPRESAS_B2B5,
+  "joystep",
+  "confecciones_boston",
+  "american_classic",
+] as const;
+
+export interface SwitchCronEntrada {
+  /** Nombre legible del cron (para logs/mensajes). */
+  cron: string;
+  /** Hora UTC "hhmm" del schedule en vercel.json. */
+  hhmmUtc: string;
+  /** Empresas cuyo Switch toca esa entrada. */
+  empresas: readonly string[];
+}
+
+/** Espejo de vercel.json — entradas que tocan Switch, con sus empresas. */
+export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
+  { cron: "multifashion-sync", hhmmUtc: "0500", empresas: ["american_classic"] },
+  { cron: "switch-sync all", hhmmUtc: "0530", empresas: ["vistana", "active_wear"] },
+  { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
+  { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
+  { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
+  { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_B2B5 },
+  { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },
+  { cron: "switch-articulos", hhmmUtc: "0840", empresas: CRON_EMPRESAS_TODAS },
+  { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
+  // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
+  { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
+  { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },
+  { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
+  { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
+  { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
+  { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: ["american_classic"] },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "1600", empresas: ["active_shoes", "joystep"] },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "1605", empresas: ["fashion_shoes", "fashion_wear"] },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "1610", empresas: ["vistana", "active_wear"] },
+  { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
+  { cron: "reebok-catalogo", hhmmUtc: "1700", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "1705", empresas: ["joystep"] },
+  { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
+  { cron: "sync-recibos", hhmmUtc: "2010", empresas: CRON_EMPRESAS_RECIBOS },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "2115", empresas: ["fashion_shoes", "fashion_wear"] },
+  { cron: "switch-sync estadocuenta", hhmmUtc: "2120", empresas: ["active_shoes", "joystep"] },
+  { cron: "sync-recibos", hhmmUtc: "2220", empresas: CRON_EMPRESAS_RECIBOS },
+  { cron: "switch-sync facturas", hhmmUtc: "2315", empresas: ["american_classic"] },
+  { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
+];
+
+export interface ProximoCron {
+  cron: string;
+  hhmmUtc: string;
+  /** Hora local Panamá "H:MM" (UTC-5 fijo, sin DST) para mensajes al usuario. */
+  horaPanama: string;
+  /** Minutos (redondeo arriba) desde `ahora` hasta esa corrida. */
+  enMinutos: number;
+}
+
+function hhmmToUtcDate(hhmm: string, ahora: Date): Date {
+  const h = Number(hhmm.slice(0, 2));
+  const m = Number(hhmm.slice(2, 4));
+  const d = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate(), h, m, 0, 0));
+  if (d.getTime() <= ahora.getTime()) d.setUTCDate(d.getUTCDate() + 1); // ya pasó hoy → mañana
+  return d;
+}
+
+function hhmmUtcAPanama(hhmm: string): string {
+  const h = (Number(hhmm.slice(0, 2)) - 5 + 24) % 24;
+  return `${h}:${hhmm.slice(2, 4)}`;
+}
+
+/**
+ * Próxima corrida de cron que toca el Switch de `empresaKey` (la más cercana
+ * en el futuro, mirando hoy y mañana en UTC). null si ninguna entrada del
+ * cronograma toca esa empresa (no debería pasar con las keys canónicas).
+ */
+export function proximoCronParaEmpresa(empresaKey: string, ahora: Date = new Date()): ProximoCron | null {
+  let best: { entrada: SwitchCronEntrada; date: Date } | null = null;
+  for (const entrada of SWITCH_CRON_ENTRADAS) {
+    if (!entrada.empresas.includes(empresaKey)) continue;
+    const date = hhmmToUtcDate(entrada.hhmmUtc, ahora);
+    if (!best || date.getTime() < best.date.getTime()) best = { entrada, date };
+  }
+  if (!best) return null;
+  return {
+    cron: best.entrada.cron,
+    hhmmUtc: best.entrada.hhmmUtc,
+    horaPanama: hhmmUtcAPanama(best.entrada.hhmmUtc),
+    enMinutos: Math.ceil((best.date.getTime() - ahora.getTime()) / 60_000),
+  };
+}
+
 /**
  * ¿Un cron stale califica como "pendingRecovery" (recuperación en camino) en
  * vez de contar como caído? Requiere: (a) recuperación conocida que AÚN viene

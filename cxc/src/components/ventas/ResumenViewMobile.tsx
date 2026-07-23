@@ -22,6 +22,8 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { SYNC_NOW_FACTURAS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
 
@@ -58,6 +60,8 @@ interface ResumenViewMobileProps {
   /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
    *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
   multiMayoreoLabel?: string | null;
+  /** Reload del bundle tras un "Actualizar ahora" exitoso. */
+  onReloadData?: () => void;
 }
 
 export function ResumenViewMobile({
@@ -72,18 +76,23 @@ export function ResumenViewMobile({
   anualError,
   onOpenEmpresa,
   multiMayoreoLabel,
+  onReloadData,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
 
   return (
     <div className="md:hidden space-y-4">
-      <SyncStatus
-        tabla="facturas"
-        empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
-        empresaLabels={EMPRESA_KEY_TO_NAME}
-        variant="pill"
-        prefix="Data al"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <SyncStatus
+          tabla="facturas"
+          empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
+          empresaLabels={EMPRESA_KEY_TO_NAME}
+          variant="pill"
+          prefix="Data al"
+        />
+        {/* "Actualizar ahora" (admin/secretaria) — menú para elegir la empresa. */}
+        <SyncNowButton opciones={SYNC_NOW_FACTURAS_OPCIONES} onSuccess={onReloadData} />
+      </div>
       <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
       <MobileToggles
         viewMode={viewMode}

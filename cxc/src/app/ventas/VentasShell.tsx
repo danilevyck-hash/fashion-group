@@ -242,6 +242,7 @@ export function VentasShell({
               loading={loading}
               error={fetchError}
               onYearChange={onYearChange}
+              onReloadData={() => mutate()}
             />
           ) : <ErrorState scope="resumen" />}
         </TabsContent>

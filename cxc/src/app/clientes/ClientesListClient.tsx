@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 
 export interface Cliente {
@@ -120,11 +121,19 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
       <AppHeader module="Reportes" breadcrumbs={[{ label: "Clientes" }]} />
       <PullToRefresh onRefresh={onRefresh}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Datos fiscales y de contacto, ventas YTD y CXC actual por las 6 empresas B2B.
-          </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Datos fiscales y de contacto, ventas YTD y CXC actual por las 6 empresas B2B.
+            </p>
+          </div>
+          {/* "Actualizar ahora" (admin/secretaria) — refresca clientes_master
+              desde el espejo de Switch (solo DB, no toca Switch). */}
+          <SyncNowButton
+            opciones={[{ modulo: "clientes-master" }]}
+            onSuccess={async () => { await mutate(); }}
+          />
         </div>
 
         {/* Filtros */}

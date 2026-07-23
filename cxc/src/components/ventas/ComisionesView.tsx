@@ -10,6 +10,8 @@ import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import { ComisionesCriterios } from "./ComisionesCriterios";
 import dynamic from "next/dynamic";
 
@@ -113,6 +115,10 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           variant="pill"
           prefix="Data actualizada al"
         />
+        {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
+            sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
+            disparo — sesión única Switch). */}
+        <SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} />
       </div>
 
       <ComisionesCriterios />

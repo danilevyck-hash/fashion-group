@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import SyncNowButton from "@/components/shared/SyncNowButton";
 import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
 import BulkPhotoUpload from "./BulkPhotoUpload";
 import { validateProductPhoto, uploadProductPhoto, updateProductBadge } from "./photoUpload";
@@ -125,7 +126,7 @@ function ReebokCatalogoInner() {
     () => fetchJson<UnifiedPedido[]>("/api/catalogo/reebok/pedidos-unificado", []),
     REEBOK_SWR_OPTS,
   );
-  const { data: syncData } = useSWR<{ lastSync: string | null }>(
+  const { data: syncData, mutate: mutateSyncStatus } = useSWR<{ lastSync: string | null }>(
     authChecked ? "reebok-sync-status" : null,
     () => fetchJson<{ lastSync: string | null }>("/api/catalogo/reebok/sync-status", { lastSync: null }),
     REEBOK_SWR_OPTS,
@@ -205,6 +206,16 @@ function ReebokCatalogoInner() {
               <p className="text-xs text-gray-400">
                 Sincronizado con Switch {relativo(syncData?.lastSync ?? null)} · 1×/día
               </p>
+              {/* "Actualizar ahora" (admin/secretaria) — sync del catálogo desde
+                  Switch (active_shoes). Es el sync más pesado (~3 min). */}
+              <SyncNowButton
+                className="mt-1.5"
+                opciones={[{ modulo: "catalogo-reebok" }]}
+                subtext="tarda ~3 min"
+                onSuccess={async () => {
+                  await Promise.all([mutateProducts(), mutateSyncStatus()]);
+                }}
+              />
             </div>
           </div>
           <button

@@ -17,6 +17,7 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
+import { clearStaleRunning } from "./sync-log";
 import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
 
 /** Empresas B2B con comisión sobre venta (excluye Multifashion/Boston/Joystep). */
@@ -249,6 +250,11 @@ async function upsertCacheRows(rows: ReturnType<typeof toCacheRow>[]): Promise<v
 // ─── Log (best-effort) ───────────────────────────────────────────────────────
 
 async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: string): Promise<string | null> {
+  // Auto-sana logs huérfanos antes del insert: con el índice único de 'running'
+  // (DDL 20260723150000) una fila atascada bloquearía este insert para siempre.
+  // Un conflicto con corrida FRESCA degrada como antes (logId null, sin mutex —
+  // utilidad no está en el sync manual).
+  await clearStaleRunning(empresaKey, "utilidad");
   const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
   const f = sorted[0];
   const l = sorted[sorted.length - 1];

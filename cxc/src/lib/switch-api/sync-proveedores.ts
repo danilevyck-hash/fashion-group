@@ -19,6 +19,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, type SwitchProveedorElement } from "./client";
+import { clearStaleRunning } from "./sync-log";
 import { empresasConCxp } from "./empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
@@ -199,6 +200,9 @@ export async function buildProveedorRows(
 
 // ─── Logging a switch_sync_log (tolerante: no bloquea si falla) ───────────────
 async function createLog(empresaKey: string, triggeredBy: string): Promise<string | null> {
+  // Auto-sana logs huérfanos antes del insert: con el índice único de 'running'
+  // (DDL 20260723150000) una fila atascada bloquearía este insert para siempre.
+  await clearStaleRunning(empresaKey, "proveedores");
   const { data, error } = await supabaseServer
     .from("switch_sync_log")
     .insert({
