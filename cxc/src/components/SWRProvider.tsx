@@ -18,8 +18,8 @@ import { SWRConfig } from "swr";
  *
  * La caché vive en memoria a nivel de la app (Map por defecto de SWR) y persiste
  * entre navegaciones del SPA — eso es lo que elimina el re-fetch desde cero al
- * volver a un módulo. La durabilidad offline sigue en offlineCache.ts (Modo
- * viaje), que SWR usa como capa de siembra/persistencia por-módulo.
+ * volver a un módulo. (La capa de snapshots offline del Modo Viaje se eliminó
+ * en jul 2026 — la app es siempre online.)
  */
 export default function SWRProvider({ children }: { children: React.ReactNode }) {
   return (

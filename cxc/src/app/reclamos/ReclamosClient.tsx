@@ -6,10 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
-import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
-import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { Reclamo, RItem, Foto, LocalFoto, Contacto, RView } from "./components/types";
 import { validateFotoFile, uploadReclamoFoto, compressImage } from "./components/fotoUpload";
 
@@ -61,9 +59,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
   const [error, setError] = useState<string | null>(null);
-  // Modo viaje: timestamp del snapshot mostrado + si vino del cache (offline).
-  const [dataTs, setDataTs] = useState<number | null>(null);
-  const [fromCache, setFromCache] = useState(false);
   const [current, setCurrent] = useState<Reclamo | null>(initialData.detail);
   const [saving, setSaving] = useState(false);
 
@@ -110,8 +105,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // del SSR entra como fallbackData → primer paint instantáneo del server, luego
   // SWR revalida en cliente. Clave condicional por auth (null hasta authChecked):
   // no pega a /api/reclamos antes de confirmar rol. dedupingInterval 60s evita
-  // refetch redundante en re-navegaciones rápidas; onSuccess persiste el snapshot
-  // de Modo viaje (NO se toca la key de offlineCache). keepPreviousData (global,
+  // refetch redundante en re-navegaciones rápidas. keepPreviousData (global,
   // SWRProvider) mantiene en pantalla el último dato al revalidar (cero flash).
   const { data: reclamosData, isLoading: reclamosLoading, mutate: mutateReclamos } = useSWR<Reclamo[]>(
     authChecked ? SWR_KEY : null,
@@ -120,20 +114,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       fallbackData: initialData.reclamos,
       dedupingInterval: 60_000,
       revalidateOnFocus: true,
-      onSuccess: (arr) => {
-        persistentCacheSet(CACHE_KEYS.RECLAMOS, arr);
-        setDataTs(Date.now());
-        setFromCache(false);
-      },
       onError: (err: FetchError) => {
         // 401 mid-sesión: limpiar y volver al login (igual que el loadReclamos viejo).
         if (err?.status === 401) { sessionStorage.clear(); router.push("/"); return; }
-        // Sin red: keepPreviousData ya mantiene el último dato; marcar que es
-        // stale para el chip de frescura (Modo viaje) y avisar.
-        const cached = persistentCacheGet<Reclamo[]>(CACHE_KEYS.RECLAMOS);
-        if (cached) setDataTs(cached.ts);
-        setFromCache(true);
-        setToast("Sin conexión. Mostrando datos guardados."); setTimeout(() => setToast(null), 3000);
+        // Sin red: keepPreviousData ya mantiene el último dato en pantalla.
+        setToast("No se pudo actualizar. Verifica tu conexión."); setTimeout(() => setToast(null), 3000);
       },
     },
   );
@@ -246,14 +231,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   const loadContactos = useCallback(async () => {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
-  }, []);
-
-  // initialData viene del SSR fresco al cargar la página → sembrar el snapshot
-  // y el timestamp para que el chip de frescura aparezca de inmediato.
-  useEffect(() => {
-    persistentCacheSet(CACHE_KEYS.RECLAMOS, initialData.reclamos);
-    setDataTs(Date.now());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Skipear el primer mount cuando ya tenemos initialData del SSR.
@@ -626,7 +603,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
             onNewReclamo={() => { resetForm(); setView("form"); }}
             onSelectEmpresa={(empresa) => { changeEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
             onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
-            freshness={<FreshnessChip ts={dataTs} fromCache={fromCache} />}
           />
           {deleteModal}
         </PullToRefresh>

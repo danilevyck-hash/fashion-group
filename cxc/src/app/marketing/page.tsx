@@ -13,9 +13,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import FreshnessChip from "@/components/FreshnessChip";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import type { MkMarca } from "@/lib/marketing/types";
 import ProyectosHomeView from "./components/ProyectosHomeView";
 import MarcaSelector from "./components/MarcaSelector";
@@ -64,10 +62,6 @@ function MarketingPage() {
   const [nombreProyectoActual, setNombreProyectoActual] = useState<string | null>(
     null,
   );
-  // Modo viaje: timestamp del snapshot mostrado + si vino del cache (offline).
-  const [dataTs, setDataTs] = useState<number | null>(null);
-  const [fromCache, setFromCache] = useState(false);
-
   useEffect(() => {
     let cancelado = false;
     (async () => {
@@ -76,22 +70,10 @@ function MarketingPage() {
         if (!res.ok) throw new Error();
         const data = (await res.json()) as MkMarca[];
         if (cancelado) return;
-        const arr = Array.isArray(data) ? data : [];
-        setMarcas(arr);
-        persistentCacheSet(CACHE_KEYS.MARKETING_MARCAS, arr);
-        setDataTs(Date.now());
-        setFromCache(false);
+        setMarcas(Array.isArray(data) ? data : []);
       } catch {
         if (cancelado) return;
-        // Sin red: mostrar el último snapshot guardado (modo viaje).
-        const cached = persistentCacheGet<MkMarca[]>(CACHE_KEYS.MARKETING_MARCAS);
-        if (cached) {
-          setMarcas(cached.data);
-          setDataTs(cached.ts);
-          setFromCache(true);
-        } else {
-          setMarcas([]);
-        }
+        setMarcas([]);
       }
     })();
     return () => {
@@ -165,11 +147,6 @@ function MarketingPage() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Marketing" breadcrumbs={breadcrumbs} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {dataTs != null && (
-          <div className="flex justify-end -mt-2 mb-3">
-            <FreshnessChip ts={dataTs} fromCache={fromCache} />
-          </div>
-        )}
         {mostrandoVistaExtra ? (
           <div className="space-y-4">
             <button

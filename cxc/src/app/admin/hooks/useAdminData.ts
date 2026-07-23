@@ -3,7 +3,6 @@ import useSWR from "swr";
 import { VENDOR_MAP } from "@/lib/vendors";
 import type { VendorMap } from "@/lib/vendors";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
-import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 
 // Clave de caché SWR del módulo CXC. La caché vive a nivel de la app
 // (SWRProvider) y persiste entre navegaciones → volver a CXC pinta al instante
@@ -24,12 +23,13 @@ interface AdminData {
  * Trae y consolida todo el estado de CXC. Es la misma lógica que tenía el
  * loadData() de fetch-on-mount, ahora como fetcher puro de SWR: todas las
  * lecturas EN PARALELO; vendors/upload opcionales (.catch→null); aging NO se
- * atrapa (si la red falla, rechaza → SWR marca error y caemos al snapshot).
+ * atrapa (si la red falla, rechaza → SWR marca error y muestra la caché en
+ * memoria si la hay).
  */
 async function fetchAdminData(): Promise<AdminData> {
   // overrides/últimopago/contact-log: antes eran lecturas anon directas a Supabase;
   // ahora rutas server con service_role (RLS de esas tablas cerrada). No-críticas
-  // (resuelven a [] si fallan); solo /api/cxc/aging puede rechazar → error/snapshot.
+  // (resuelven a [] si fallan); solo /api/cxc/aging puede rechazar → error.
   const [vendorRows, upRows, agingJson, overrides, pagos, log] =
     await Promise.all([
       fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -180,27 +180,11 @@ export default function useAdminData(authReady: boolean = true) {
     {
       // CXC cambia poco entre saltos pero importa al cobrar: dedupe 60s (evita
       // refetch redundante en re-navegaciones rápidas), revalida al volver a la
-      // pestaña, y snapshot persistente fresco en cada éxito (Modo viaje).
+      // pestaña.
       dedupingInterval: 60_000,
       revalidateOnFocus: true,
-      onSuccess: (d) => persistentCacheSet(CACHE_KEYS.CXC_AGING, d.clients),
     },
   );
-
-  // Siembra instantánea desde el snapshot persistente (Modo viaje) SIN
-  // revalidar, para el arranque en frío (primera carga / reload). Se lee TRAS
-  // montar (no en render) para no romper SSR/hidratación. En navegaciones de
-  // vuelta no hace falta: la caché SWR en memoria ya tiene el dato.
-  useEffect(() => {
-    if (!authReady || data) return;
-    const snap = persistentCacheGet<ConsolidatedClient[]>(CACHE_KEYS.CXC_AGING);
-    if (snap) {
-      mutate(
-        { clients: snap.data, uploads: {}, contactLog: {}, ts: snap.ts },
-        { revalidate: false },
-      );
-    }
-  }, [authReady, data, mutate]);
 
   // contactLog como estado local para conservar la actualización OPTIMISTA del
   // page (setContactLog al marcar contactado). Se re-sincroniza cuando llega
@@ -221,16 +205,16 @@ export default function useAdminData(authReady: boolean = true) {
     clients: data?.clients ?? [],
     uploads: data?.uploads ?? {},
     contactLog,
-    // Solo "cargando" cuando no hay nada que mostrar todavía (primer arranque
-    // sin snapshot). Al volver, data ya está en caché → sin spinner.
+    // Solo "cargando" cuando no hay nada que mostrar todavía (primer arranque).
+    // Al volver, data ya está en la caché SWR en memoria → sin spinner.
     loading: isLoading && !data,
-    // Mostrar error solo si NO hay dato utilizable; si hay snapshot/caché se
+    // Mostrar error solo si NO hay dato utilizable; si hay caché SWR se
     // muestra eso (stale) en vez de un error en blanco.
     loadError: error && !hasData ? "Error al cargar datos. Intenta de nuevo." : null,
     loadData,
     setContactLog,
     dataTs: data?.ts ?? null,
-    // Estamos mostrando caché/snapshot offline cuando hubo error pero hay dato.
+    // Mostrando la caché en memoria (dato viejo) porque el refetch falló.
     fromCache: !!error && hasData,
   };
 }

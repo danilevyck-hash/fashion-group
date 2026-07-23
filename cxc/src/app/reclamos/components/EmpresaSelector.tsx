@@ -23,13 +23,12 @@ interface Props {
   onNewReclamo: () => void;
   onSelectEmpresa: (empresa: string) => void;
   onLoadDetail: (id: string, empresa: string) => void;
-  freshness?: React.ReactNode;
 }
 
 export default function EmpresaSelector({
   role, reclamos, loading, contactos, globalSearch, setGlobalSearch,
   expandedHistorial, setExpandedHistorial, totalPendiente, pendientes, alertas,
-  onNewReclamo, onSelectEmpresa, onLoadDetail, freshness,
+  onNewReclamo, onSelectEmpresa, onLoadDetail,
 }: Props) {
   const [excelBusy, setExcelBusy] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
@@ -109,7 +108,6 @@ export default function EmpresaSelector({
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
-            {freshness}
           </div>
           <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
         </div>

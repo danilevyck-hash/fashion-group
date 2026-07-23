@@ -20,8 +20,6 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
-import FreshnessChip from "@/components/FreshnessChip";
-import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { useOnline } from "@/lib/OnlineContext";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
@@ -106,9 +104,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const searchParams = useSearchParams();
   const isOnline = useOnline();
   const [cheques, setCheques] = useState<Cheque[]>(initialData.cheques);
-  const [chequesCached, setChequesCached] = useState(false);
-  // Modo viaje: timestamp del snapshot mostrado (para el chip "datos de hace X").
-  const [dataTs, setDataTs] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   usePersistedScroll("cheques", !loading && cheques.length > 0);
   const [error, setError] = useState<string | null>(null);
@@ -242,6 +237,10 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   }
 
   const loadingRef = useRef(false);
+  // Espejo en ref para leer el largo actual dentro del callback (deps vacías)
+  // sin recrearlo cuando cambian los cheques.
+  const chequesLenRef = useRef(initialData.cheques.length);
+  useEffect(() => { chequesLenRef.current = cheques.length; }, [cheques]);
   const loadCheques = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -252,19 +251,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         const d = await res.json();
         const arr = Array.isArray(d) ? d : [];
         setCheques(arr);
-        setChequesCached(false);
-        // Snapshot persistente (localStorage, 7d) — últimos 50 para uso offline.
-        persistentCacheSet(CACHE_KEYS.CHEQUES_SNAP, arr.slice(0, 50));
-        setDataTs(Date.now());
       }
     } catch {
-      // Offline — mostrar el último snapshot guardado.
-      const cached = persistentCacheGet<Cheque[]>(CACHE_KEYS.CHEQUES_SNAP);
-      if (cached) {
-        setCheques(cached.data);
-        setChequesCached(true);
-        setDataTs(cached.ts);
-        showToast("Mostrando datos guardados. No se pudo actualizar.");
+      // Sin red: mantener lo que ya está en pantalla y avisar.
+      if (chequesLenRef.current > 0) {
+        showToast("No se pudo actualizar. Verifica tu conexión.");
       } else {
         setError("No se pudieron cargar los cheques. Recarga la página.");
       }
@@ -272,16 +263,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     finally { setLoading(false); loadingRef.current = false; }
   }, []);
 
-  // Skipear el primer mount cuando ya tenemos initialData del SSR.
-  // Pre-cachear el initialData para uso offline y solo refetch en mounts subsiguientes.
+  // Skipear el primer mount cuando ya tenemos initialData del SSR (fresco);
+  // solo refetch en mounts subsiguientes.
   const initialLoadRef = useRef(true);
   useEffect(() => {
     if (!authChecked) return;
     if (initialLoadRef.current) {
       initialLoadRef.current = false;
-      // Pre-cachear el SSR data (fresco) para soporte offline + sembrar el chip.
-      persistentCacheSet(CACHE_KEYS.CHEQUES_SNAP, initialData.cheques.slice(0, 50));
-      setDataTs(Date.now());
       return;
     }
     loadCheques();
@@ -591,7 +579,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
-          <FreshnessChip ts={dataTs} fromCache={chequesCached} financial />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
