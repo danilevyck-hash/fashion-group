@@ -471,10 +471,13 @@ export type Database = {
           referencia: string | null
           descripcion: string | null
           talla: string | null
+          genero: string | null
           cantidad: number | null
           precio_unitario: number | null
-          subtotal: number | null
           motivo: string | null
+          nro_factura: string | null
+          nro_orden_compra: string | null
+          deleted: boolean | null
           created_at: string | null
         }
         Insert: {
@@ -483,10 +486,13 @@ export type Database = {
           referencia?: string | null
           descripcion?: string | null
           talla?: string | null
+          genero?: string | null
           cantidad?: number | null
           precio_unitario?: number | null
-          subtotal?: number | null
           motivo?: string | null
+          nro_factura?: string | null
+          nro_orden_compra?: string | null
+          deleted?: boolean | null
           created_at?: string | null
         }
         Update: {
@@ -495,10 +501,13 @@ export type Database = {
           referencia?: string | null
           descripcion?: string | null
           talla?: string | null
+          genero?: string | null
           cantidad?: number | null
           precio_unitario?: number | null
-          subtotal?: number | null
           motivo?: string | null
+          nro_factura?: string | null
+          nro_orden_compra?: string | null
+          deleted?: boolean | null
           created_at?: string | null
         }
       }

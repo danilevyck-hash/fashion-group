@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
       rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, "", "", "", "", "", "", "", "", "", "", r.notas]);
     } else {
       for (const item of items) {
-        const sub = item.subtotal || 0;
+        // subtotal no existe en la tabla — se deriva cantidad × precio.
+        const sub = (Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0);
         // Impuestos por empresa (Active Shoes: importación 15%, sin ITBMS).
         const tx = reclamoTaxes(r.empresa, sub);
         rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, pedido, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), tx.importacion.toFixed(2), tx.itbms.toFixed(2), tx.total.toFixed(2), item.motivo, r.notas]);
