@@ -7,8 +7,15 @@
 //   1. Existencia >= 1 → visible (active=true); <= 0 → oculto (active=false, NO
 //      se borra); si vuelve a tener existencia, reaparece.
 //   2. Auto-agregar: codigo nuevo (no en la tabla) con existencia >= 1.
-//   3. Refrescar precio + existencia + disponibilidad cada corrida.
+//   3. Refrescar precio + existencia + disponibilidad cada corrida. El PRECIO se
+//      alinea a Switch para TODO el universo matcheado (decisión 22-jul-2026):
+//      los productos fuera del set /stock (ocultos con disponible=0) se alinean
+//      con el precio del bulk /lista, y cada cambio de precio queda logueado en
+//      cron_email_errors (tipo catalogo_precio_cambios, SIN Telegram).
 //   4. keep_visible / badge "proximamente" fuerzan visible aunque existencia=0.
+//      oculto_manual=true (toggle admin "Ocultar del catálogo") GANA sobre todo:
+//      el producto queda active=false aunque tenga existencia — el toggle
+//      sobrevive al sync. Regla única en lib/catalogos/visibilidad.ts.
 //   5. Huérfanos del filtro: un producto PUBLICADO cuyo SKU ya no está en el
 //      conjunto FILTRADO de Switch (cambió de proveedor, pasó a KL, o desapareció
 //      de /lista) se oculta (active=false); si vuelve a entrar al filtro con
@@ -32,6 +39,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSwitchClient, type SwitchArticulo } from "./client";
 import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
+import { logCronError } from "@/lib/cron-telemetry";
+import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 
 const PER_PAGE = 50;
 const MAX_PAGES = 80;
@@ -77,10 +86,20 @@ interface ExistingProduct {
   id: string;
   sku: string;
   name: string | null;
+  price: number | null;
   active: boolean;
   image_url: string | null;
   badge: string | null;
   keep_visible: boolean | null;
+  /** Toggle admin "Ocultar del catálogo" (DDL 20260723120000). Puede venir
+   *  undefined pre-migración (fallback de lectura) → se trata como false. */
+  oculto_manual?: boolean | null;
+}
+
+export interface CatalogoPrecioCambio {
+  sku: string;
+  antes: number | null;
+  despues: number;
 }
 
 export interface CatalogoSyncResultEmpresa {
@@ -92,6 +111,9 @@ export interface CatalogoSyncResultEmpresa {
   ocultados: number;
   reactivados: number;
   nuevosSinFoto: string[];
+  /** Precios que esta corrida alineó a Switch (antes → después), logueados
+   *  además en cron_email_errors (tipo catalogo_precio_cambios). */
+  preciosCambiados: CatalogoPrecioCambio[];
   error?: string;        // si está, NO se tocó el catálogo de esta empresa
 }
 
@@ -131,6 +153,7 @@ export async function syncCatalogo(
     const out: CatalogoSyncResultEmpresa = {
       empresaKey: emp.empresaKey, switchCount: 0, stockChecks: 0,
       actualizados: 0, agregados: 0, ocultados: 0, reactivados: 0, nuevosSinFoto: [],
+      preciosCambiados: [],
     };
     // Corrida por empresa en switch_sync_log (streak 401 de alert-policy.ts).
     // Los dry-run no se registran: no son corridas reales y ensuciarían el streak.
@@ -149,13 +172,25 @@ export async function syncCatalogo(
       const arts = artsAll.filter(config.articuloFilter);
 
       // Productos existentes (por categoría, o TODA la tabla si categories=[]).
-      let q = db.from(productsTable).select("id, sku, name, active, image_url, badge, keep_visible");
-      if (emp.categories.length > 0) q = q.in("category", emp.categories as string[]);
-      const { data: existing, error: exErr } = await q;
+      // `oculto_manual` (toggle admin, DDL 20260723120000) puede no existir aún:
+      // fallback pre-migración — se relee sin la columna y se trata como false,
+      // para que la migración manual pendiente NO tumbe el cron del catálogo.
+      const readExisting = (cols: string) => {
+        let q = db.from(productsTable).select(cols);
+        if (emp.categories.length > 0) q = q.in("category", emp.categories as string[]);
+        return q;
+      };
+      const COLS_BASE = "id, sku, name, price, active, image_url, badge, keep_visible";
+      let { data: existing, error: exErr } = await readExisting(`${COLS_BASE}, oculto_manual`);
+      if (exErr && exErr.message.includes("oculto_manual")) {
+        ({ data: existing, error: exErr } = await readExisting(COLS_BASE));
+      }
       if (exErr) throw new Error(`leer ${productsTable}: ${exErr.message}`);
       const bySku = new Map<string, ExistingProduct>();
       const activeSkus = new Set<string>();
-      for (const p of (existing ?? []) as ExistingProduct[]) {
+      // Cast vía unknown: el select dinámico (fallback oculto_manual) hace que
+      // supabase-js no pueda inferir las columnas.
+      for (const p of (existing ?? []) as unknown as ExistingProduct[]) {
         if (!p.sku) continue;
         bySku.set(String(p.sku), p);
         if (p.active) activeSkus.add(String(p.sku));
@@ -183,9 +218,19 @@ export async function syncCatalogo(
         const precio = num(art.precio);
 
         if (p) {
-          const keepVisible = p.keep_visible === true || p.badge === "proximamente";
-          const shouldShow = existencia >= 1 || keepVisible;
+          // Regla única de visibilidad (lib/catalogos/visibilidad.ts):
+          // oculto_manual=true (toggle admin) gana SIEMPRE → el toggle sobrevive
+          // al sync; si no, existencia>=1 o keep_visible/proximamente.
+          const shouldShow = esVisibleEnCatalogo({
+            existencia,
+            keepVisible: p.keep_visible,
+            badge: p.badge,
+            ocultoManual: p.oculto_manual,
+          });
           const nameFinal = p.name && p.name.trim() ? p.name : (art.descripcion ?? p.name);
+          if (p.price == null || Math.abs(Number(p.price) - precio) > 0.004) {
+            out.preciosCambiados.push({ sku: codigo, antes: p.price, despues: precio });
+          }
           if (!dryRun) {
             // supabase-js NO lanza ante error de DB: devuelve { error }. Si no lo
             // chequeamos, un fallo de escritura (p.ej. columna inexistente) queda
@@ -243,6 +288,30 @@ export async function syncCatalogo(
         // existencia<=0 y no está en catálogo → no entra (correcto).
       }
 
+      // (4b) PRECIO SIEMPRE ALINEADO A SWITCH (decisión Daniel 22-jul-2026): el
+      // loop (4) solo toca artículos con /stock (activos ∪ disponible>=1). Un
+      // producto OCULTO con disponible=0 conservaba su precio local para siempre
+      // (audit 22-jul: 100256061 local 45 vs Switch 46). El bulk /lista ya trae
+      // `precio` para TODO el universo filtrado → aquí se alinea el precio del
+      // resto de los productos matcheados SIN llamadas extra a Switch. Solo se
+      // escribe `price` (no se toca active/stock/foto).
+      for (const a of arts) {
+        const codigo = String(a.codigo);
+        if (stockByCodigo.has(codigo)) continue; // ya alineado en (4)
+        const p = bySku.get(codigo);
+        if (!p) continue;
+        const precio = num(a.precio);
+        if (p.price != null && Math.abs(Number(p.price) - precio) <= 0.004) continue;
+        if (!dryRun) {
+          const { error: prErr } = await db
+            .from(productsTable)
+            .update({ price: precio })
+            .eq("id", p.id);
+          if (prErr) throw new Error(`precio ${productsTable} sku=${codigo}: ${prErr.message}`);
+        }
+        out.preciosCambiados.push({ sku: codigo, antes: p.price, despues: precio });
+      }
+
       // (5) HUÉRFANOS DEL FILTRO: el loop (4) solo toca lo que está en
       // stockByCodigo (artículos que PASAN articuloFilter). Un producto PUBLICADO
       // cuyo SKU ya no está en el conjunto FILTRADO (el artículo cambió de
@@ -270,6 +339,22 @@ export async function syncCatalogo(
           }
           out.ocultados++;
         }
+      }
+
+      // Log CONSULTABLE de cambios de precio (cron_email_errors, SIN Telegram —
+      // no es un error, es rastro auditable): cada corrida que movió precios
+      // deja una fila con el detalle sku: antes → después. Consultar por
+      // tipo='catalogo_precio_cambios'. Best-effort: logCronError nunca lanza.
+      if (!dryRun && out.preciosCambiados.length > 0) {
+        const detalle = out.preciosCambiados
+          .map((c) => `${c.sku}: ${c.antes ?? "s/precio"} → ${c.despues}`)
+          .join(", ");
+        await logCronError(
+          "catalogo_precio_cambios",
+          `${config.syncLogType} ${emp.empresaKey}: ${out.preciosCambiados.length} precio(s) alineado(s) a Switch — ${detalle}`.slice(0, 1900),
+          `${config.syncLogType}:${emp.empresaKey}`,
+          { telegram: false },
+        );
       }
     } catch (err) {
       out.error = err instanceof Error ? err.message : String(err);
