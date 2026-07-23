@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
 import { GeistMono } from "geist/font/mono";
 import { Playfair_Display } from "next/font/google";
 
@@ -14,7 +13,7 @@ const playfair = Playfair_Display({
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import InstallPrompt from "@/components/InstallPrompt";
-import UpdatePrompt from "@/components/UpdatePrompt";
+import SWUpdater from "@/components/SWUpdater";
 import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import PageTransition from "@/components/PageTransition";
@@ -71,19 +70,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </SidebarAwareMain>
             </ContextMenuProviderWrapper>
             <InstallPrompt />
-            {/* Suspense: UpdatePrompt usa useSearchParams() (detecta navegación
-                para aplicar el SW nuevo). El boundary contiene el bailout a CSR a
-                este componente (que renderiza null), sin degradar el SSR del resto. */}
-            <Suspense fallback={null}>
-              <UpdatePrompt />
-            </Suspense>
+            <SWUpdater />
           </OnlineProvider>
         </SWRProvider>
-        {/* El SW (Serwist) lo registra UpdatePrompt vía @serwist/window
-            (next.config tiene register:false) para controlar el ciclo
-            waiting→controlling y ofrecer el toast "Nueva versión" (PR-4).
-            Antes había aquí un <script> que en cada carga desregistraba el SW y
-            borraba todos los caches — removido en Modo viaje PR-1. */}
+        {/* El SW (Serwist) lo registra SWUpdater vía @serwist/window
+            (next.config tiene register:false): actualización silenciosa
+            (swap + reload inmediato con guard de formulario sucio) y
+            recovery una-sola-vez ante ChunkLoadError tras un deploy. */}
       </body>
     </html>
   );
