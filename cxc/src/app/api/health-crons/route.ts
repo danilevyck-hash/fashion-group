@@ -8,9 +8,21 @@
 // watchdog interno tampoco corre → solo un observador EXTERNO lo nota).
 //
 // Respuesta:
-//   - 200 { ok: true, ... }   → todos los crons frescos (success en <26h).
+//   - 200 { ok: true, ... }   → todos los crons frescos (success en <26h) o
+//     stale pero con recuperación EN CAMINO hoy (pendingRecovery, ver abajo).
 //   - 503 { ok: false, stale: [...] } → ≥1 cron viejo o sin heartbeat nunca.
 //   El monitor externo alerta cuando el status ≠ 200 (o cuando ok=false).
+//
+// Recovery-aware (jul-2026): un cron stale NO cuenta para el 503 si (a) tiene
+// recuperación conocida (colateral de la reconciliación 10/14/18 UTC, o 2ª
+// entrada propia de backup/acs-fidelizacion), (b) esa recuperación AÚN viene
+// hoy, y (c) lleva stale <30h (tope duro). Se reporta como pendingRecovery[]
+// con 200 — así el monitor no despierta a nadie por algo que el sistema va a
+// arreglar solo en horas; pasada la última oportunidad del día vuelve el 503
+// normal. La metadata y la lógica (staleEsPendingRecovery) viven en
+// cron-telemetry.ts, compartidas con el watchdog Telegram de la reconciliación.
+// switch-reconciliacion y grupo-resumen-mensual JAMÁS se silencian; un cron sin
+// heartbeat (fila ausente) tampoco (fail-closed).
 //
 // Protección: token simple (?token= o header x-healthcheck-token), comparado en
 // tiempo constante contra HEALTHCHECK_TOKEN. NO usa CRON_SECRET a propósito: un
@@ -24,6 +36,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   CRON_STALE_HOURS_DEFAULT,
   cronStaleThresholdHours,
+  staleEsPendingRecovery,
+  SWITCH_SYNC_SLOT_HEARTBEATS,
 } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -148,6 +162,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const stale: Array<{ cron: string; last_success_at: string | null; hours_ago: number | null }> = [];
   const fresh: Array<{ cron: string; last_success_at: string; hours_ago: number }> = [];
+  // Stale pero con recuperación en camino hoy → NO cuenta para el 503 (200 con
+  // detalle). Un cron SIN heartbeat nunca entra aquí (fail-closed → stale).
+  const pendingRecovery: Array<{ cron: string; last_success_at: string; hours_ago: number }> = [];
 
   for (const cron of EXPECTED_CRONS) {
     const cutoffMs = now - cronStaleThresholdHours(cron) * 3600 * 1000;
@@ -155,9 +172,40 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const t = last ? new Date(last).getTime() : NaN;
     const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;
     if (!Number.isFinite(t) || t < cutoffMs) {
-      stale.push({ cron, last_success_at: last, hours_ago: hoursAgo });
+      if (staleEsPendingRecovery(cron, last, now)) {
+        pendingRecovery.push({ cron, last_success_at: last as string, hours_ago: hoursAgo as number });
+      } else {
+        stale.push({ cron, last_success_at: last, hours_ago: hoursAgo });
+      }
     } else {
       fresh.push({ cron, last_success_at: last as string, hours_ago: hoursAgo as number });
+    }
+  }
+
+  // Slots granulares de switch-sync (switch-sync:<tipo>-<hhmm>, ver
+  // cron-telemetry.ts). Regla DISTINTA del fail-closed de los nombres base:
+  // fila ausente = aún no sembrada (el cron la crea solo en <24h tras el
+  // deploy) → NO es stale; solo alerta si la fila EXISTE y está vieja. Así el
+  // primer día post-deploy no dispara un 503 falso con los 13 slots ausentes.
+  const slotsUnseeded: string[] = [];
+  for (const slot of SWITCH_SYNC_SLOT_HEARTBEATS) {
+    const last = beats.get(slot);
+    if (last === undefined || last === null) {
+      slotsUnseeded.push(slot);
+      continue;
+    }
+    const t = new Date(last).getTime();
+    const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;
+    if (!Number.isFinite(t) || t < now - cronStaleThresholdHours(slot) * 3600 * 1000) {
+      // Los slots también son recuperables por la reconciliación (los pares que
+      // cubren) — misma semántica pendingRecovery que el base "switch-sync".
+      if (staleEsPendingRecovery("switch-sync", last, now)) {
+        pendingRecovery.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
+      } else {
+        stale.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo });
+      }
+    } else {
+      fresh.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
     }
   }
 
@@ -171,6 +219,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       freshCount: fresh.length,
       staleCount: stale.length,
       stale,
+      pendingRecoveryCount: pendingRecovery.length,
+      pendingRecovery,
+      slotsUnseeded,
     },
     { status: ok ? 200 : 503 },
   );

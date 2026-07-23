@@ -4,6 +4,9 @@ import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 
 export const dynamic = "force-dynamic";
+// Purga acotada (snapshot + delete de pocos registros): corre en segundos.
+// Explícito para no depender del default de Vercel (10s).
+export const maxDuration = 60;
 
 const CRON_NAME = "cleanup-packing-lists";
 
