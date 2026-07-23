@@ -44,7 +44,7 @@ import {
   syncCostoDiario,
 } from "@/lib/switch-api/sync-empresa";
 import { syncAllUtilidad, mesesCronDiario } from "@/lib/switch-api/sync-utilidad";
-import { syncAllRecibos } from "@/lib/switch-api/sync-recibos";
+import { syncAllRecibos, mesesCronRecibos } from "@/lib/switch-api/sync-recibos";
 import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
@@ -245,7 +245,9 @@ const COLATERAL_CRONS: ColateralCron[] = [
     cronName: "sync-recibos",
     label: "recibos",
     recover: async () => {
-      const rs = await syncAllRecibos(mesesCronDiario());
+      // Misma ventana rodante de 3 meses que el cron diario (mesesCronRecibos):
+      // la recuperación repara también anulados/retro-cargas de la ventana.
+      const rs = await syncAllRecibos(mesesCronRecibos());
       const bad = rs.filter((r) => !r.ok);
       return {
         ok: bad.length === 0,

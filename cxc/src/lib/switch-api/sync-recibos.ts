@@ -4,10 +4,26 @@
  * Fuente: /apireporte/recibos (API JSON, mismo token que facturas). Un row por
  * recibo (fechaCreacion, cliente, vendedor que registró, total). El endpoint NO
  * da id/secuencial → estrategia delete+insert por (empresa, mes) en cada corrida
- * (los recibos de un mes cerrado no cambian; re-sincronizar reemplaza limpio).
+ * (re-sincronizar un mes reemplaza limpio TODO el mes).
  *
- * Usos: último pago CXC (switch_ultimo_pago_cliente_v2) y, a futuro, comisión
- * sobre cobro. Tolerante a fallos: una empresa falla → las demás siguen.
+ * VENTANA RODANTE (jul-2026, audit sync): el cron re-sincroniza SIEMPRE los
+ * últimos 3 meses (mesesCronRecibos). A diferencia de facturas/utilidad (upsert
+ * incremental), los recibos SÍ cambian dentro de la ventana: Switch permite
+ * anular, editar o retro-cargar recibos con fecha pasada, y el delete+insert
+ * por mes es la única forma de corregirlos (detectados 4 faltantes + 1 anulado
+ * en may-jun 2026 que la ventana de 1 mes nunca corrigió). Duración medida:
+ * mediana ~5.1s por empresa-mes → 3 meses × 6 empresas ≈ 90-120s, holgado bajo
+ * maxDuration 300.
+ *
+ * RECIBOS CON TOTAL $0: son cobros por APLICACIÓN/CRUCE (el recibo aplica saldo
+ * a favor / NC contra facturas, sin plata nueva) o recibos ANULADOS. Por
+ * decisión de negocio (Daniel, 23-jul-2026) NO comisionan: se persisten tal
+ * cual (total=0) y las RPC de comisiones (comision_b2b_v5 / comision_detalle)
+ * los suman por total → aportan $0 a la base de cobro. NO filtrarlos ni
+ * "corregirles" el total.
+ *
+ * Usos: último pago CXC (switch_ultimo_pago_cliente_v2) y comisión sobre cobro.
+ * Tolerante a fallos: una empresa falla → las demás siguen.
  */
 
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -24,6 +40,32 @@ export const RECIBOS_EMPRESA_KEYS: EmpresaKey[] = [
   "active_wear",
   "american_classic",
 ];
+
+/** Meses de la ventana rodante del cron de recibos (mes en curso + 2 anteriores). */
+const RECIBOS_VENTANA_MESES = 3;
+
+/**
+ * Ventana del cron diario de RECIBOS: mes en curso + los 2 meses anteriores,
+ * SIEMPRE (orden viejo → nuevo). Distinta de mesesCronDiario (facturas/utilidad:
+ * mes en curso + anterior solo los días 1-5): los recibos se corrigen por
+ * delete+insert por mes, así que re-sincronizar la ventana completa repara solo
+ * anulaciones/ediciones/retro-cargas de hasta ~3 meses atrás. NO cambiar la
+ * semántica de mesesCronDiario — facturas/utilidad la comparten.
+ */
+export function mesesCronRecibos(now: Date = new Date()): Mes[] {
+  const meses: Mes[] = [];
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth() + 1;
+  for (let i = 0; i < RECIBOS_VENTANA_MESES; i++) {
+    meses.unshift({ year, month });
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return meses;
+}
 
 export interface SyncRecibosResult {
   empresaKey: EmpresaKey;

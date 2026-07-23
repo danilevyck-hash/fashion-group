@@ -4,18 +4,20 @@
  *
  * Auth: Authorization: Bearer ${CRON_SECRET}.
  * Params (opcionales): empresas=a,b,c · year=YYYY · mes=1..12 · backfill=1
- * sin params → modo cron diario: mes en curso, todas (RECIBOS_EMPRESA_KEYS);
- * los días 1-5 del mes incluye también el mes anterior (cierra el gap del
- * último día del mes, ver mesesCronDiario).
+ * sin params → modo cron diario: VENTANA RODANTE de 3 meses (mes en curso + 2
+ * anteriores, ver mesesCronRecibos), todas (RECIBOS_EMPRESA_KEYS). El
+ * delete+insert por (empresa, mes) corrige solo anulados/editados/retro-cargas
+ * dentro de la ventana.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import {
   syncEmpresaRecibos,
+  mesesCronRecibos,
   RECIBOS_EMPRESA_KEYS,
   type SyncRecibosResult,
 } from "@/lib/switch-api/sync-recibos";
-import { mesActual, mesesCronDiario, mesesDeAnio, type Mes } from "@/lib/switch-api/sync-utilidad";
+import { mesActual, mesesDeAnio, type Mes } from "@/lib/switch-api/sync-utilidad";
 import { isEmpresaKey } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -58,7 +60,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     if (!Number.isInteger(mes) || mes < 1 || mes > 12) return NextResponse.json({ ok: false, error: "mes inválido (1..12)" }, { status: 400 });
     meses = [{ year, month: mes }];
   } else {
-    meses = mesesCronDiario(); // cron diario: mes en curso (+ mes anterior los días 1-5)
+    meses = mesesCronRecibos(); // cron diario: ventana rodante de 3 meses
   }
 
   const triggeredBy = hasParams ? "manual" : "cron";
