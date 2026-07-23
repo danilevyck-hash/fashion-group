@@ -53,6 +53,12 @@ import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
 import { calcularResumenDiario, buildMensaje } from "@/lib/acs-resumen-diario";
+import {
+  calcularResumenMensual,
+  buildMensajeMensual,
+  mesAnterior,
+  fmtMesLabel,
+} from "@/lib/grupo-resumen-mensual";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import {
@@ -61,7 +67,7 @@ import {
   staleEsPendingRecovery,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
 } from "@/lib/cron-telemetry";
-import { colateralDayStartIso } from "@/lib/fecha-panama";
+import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
@@ -199,6 +205,15 @@ interface ColateralCron {
   // 17-jul-2026: "(recuperado)" duplicado del resumen ACS). Ver
   // colateralDayStartIso en fecha-panama.ts.
   earlyUtcRun?: boolean;
+  // Solo intentar recuperar si esta condición se cumple (default: siempre).
+  // Caso grupo-resumen-mensual: corre el día 3 del mes → solo recuperable los
+  // días 3-4; el resto del mes ni siquiera cuenta como "faltante".
+  recoverOnlyIf?: () => boolean;
+  // Ventana propia de "ya corrió" (ISO). Default: inicio del día Panamá (o UTC
+  // si earlyUtcRun). Caso grupo-resumen-mensual: inicio del día 3 del mes — su
+  // heartbeat del día 3 debe contar como success también el día 4 (con la
+  // ventana diaria, el día 4 lo re-enviaría duplicado).
+  successSinceIso?: () => string;
 }
 
 const COLATERAL_CRONS: ColateralCron[] = [
@@ -349,6 +364,32 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
+    // Resumen mensual del grupo a Telegram (corre el día 3 a las 13:00 UTC).
+    // Único cron NO diario: su recuperación solo aplica los días 3-4 del mes
+    // (recoverOnlyIf) y su ventana de "ya corrió" es el inicio del día 3
+    // (successSinceIso) — así el día 4 NO re-envía un resumen que sí salió el 3.
+    // Hora mínima 14 en el mapa compartido (su run normal es 13:00 → patrón
+    // cheques-alert, no adelantarse). Prefijo "(recuperado)" como el resumen
+    // ACS. Solo lee la DB (RPC sobre la MV), no toca Switch.
+    cronName: "grupo-resumen-mensual",
+    label: "grupo-resumen-mensual",
+    recoverOnlyIf: () => {
+      const dia = Number(hoyPanama().slice(8, 10));
+      return dia === 3 || dia === 4;
+    },
+    successSinceIso: () => new Date(`${hoyPanama().slice(0, 7)}-03T00:00:00-05:00`).toISOString(),
+    recover: async () => {
+      const { anio, mes } = mesAnterior(hoyPanama());
+      const resumen = await calcularResumenMensual(anio, mes);
+      // Misma guardia anti-ruido que su route: $0 = MV sin el mes → fallo real.
+      if (resumen.total === 0) {
+        return { ok: false, detail: `sin data para ${fmtMesLabel(anio, mes)} — ¿ventas_rollup_mensual_mv sin refrescar?` };
+      }
+      const sent = await sendTelegramAlert(`(recuperado) ${buildMensajeMensual(resumen)}`);
+      return { ok: sent, detail: sent ? `resumen ${fmtMesLabel(anio, mes)} reenviado` : "Telegram no aceptó el mensaje" };
+    },
+  },
+  {
     // Resumen diario ACS a Telegram (incidente 11-jul-2026: la invocación de la
     // 01:00 UTC se perdió tras una promoción de deploy, cero rastro). Recupera
     // reportando AYER Panamá, NO hoyPanama(): las pasadas de reconciliación
@@ -425,14 +466,20 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
     return []; // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
   }
   // Umbral por-cron: los earlyUtcRun (00:00-05:00 UTC) se miden contra el inicio
-  // del día UTC; el resto contra el inicio del día Panamá (dayStartIso).
+  // del día UTC; ventana propia (successSinceIso) si el colateral la define; el
+  // resto contra el inicio del día Panamá (dayStartIso).
   const earlyStartIso = colateralDayStartIso(true);
   const successHoy = new Set(
     (data ?? [])
       .filter((h) => {
         if (!h.last_success_at) return false;
         const col = COLATERAL_CRONS.find((c) => c.cronName === h.cron_name);
-        return h.last_success_at >= (col?.earlyUtcRun ? earlyStartIso : dayStartIso);
+        const since = col?.successSinceIso
+          ? col.successSinceIso()
+          : col?.earlyUtcRun
+            ? earlyStartIso
+            : dayStartIso;
+        return h.last_success_at >= since;
       })
       .map((h) => h.cron_name),
   );
@@ -442,6 +489,7 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
   const nowHourUtc = new Date().getUTCHours();
   return COLATERAL_CRONS.filter(
     (c) =>
+      (c.recoverOnlyIf?.() ?? true) &&
       !successHoy.has(c.cronName) &&
       nowHourUtc >= (COLATERAL_RECOVER_AFTER_HOUR_UTC[c.cronName] ?? 0),
   );

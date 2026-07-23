@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { runAcsFidelizacionSync } from "@/lib/switch-api/sync-acs-fidelizacion";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -28,6 +28,14 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const auth = req.headers.get("authorization") ?? "";
   if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Segunda oportunidad (jul-2026): el cron tiene 2 entradas (11:30 y 16:30
+  // UTC). Si la 1ª ya registró success HOY (día UTC), la 2ª no repite el
+  // trabajo — responde no-op (evita tocar la sesión Switch MULTI sin necesidad).
+  // Una corrida manual (?force=1) lo salta.
+  if (req.nextUrl.searchParams.get("force") !== "1" && (await cronSuccessHoyUtc(CRON_NAME))) {
+    return NextResponse.json({ ok: true, skipped: "ya corrió con éxito hoy (2ª entrada no-op)" });
   }
 
   try {

@@ -29,7 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { gzipSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
-import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { replicateBackupToR2, type R2BackupFile } from "@/lib/backup/r2";
 
@@ -273,6 +273,13 @@ export async function GET(req: NextRequest) {
     } catch { /* */ }
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Segunda oportunidad (jul-2026): el cron tiene 2 entradas (06:00 y 18:30
+  // UTC). Si la 1ª ya registró success HOY (día UTC), la 2ª no repite el
+  // trabajo — responde no-op. Una corrida manual (?force=1) lo salta.
+  if (req.nextUrl.searchParams.get("force") !== "1" && (await cronSuccessHoyUtc(CRON_NAME))) {
+    return NextResponse.json({ ok: true, skipped: "ya corrió con éxito hoy (2ª entrada no-op)" });
+  }
 
   const startMs = Date.now();
   const now = new Date();

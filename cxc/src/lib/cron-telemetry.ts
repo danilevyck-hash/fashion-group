@@ -90,6 +90,11 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "acs-resumen-diario": 0,
   "integrity-check": 13, // su cron corre 12:00 UTC
   "cheques-alert": 14, // su cron corre 13:00 UTC
+  // grupo-resumen-mensual: su run normal es el día 3 a las 13:00 UTC y su
+  // recuperación solo aplica los días 3-4 (recoverOnlyIf en la reconciliación).
+  // Sigue en NUNCA_SILENCIAR: los watchdogs jamás lo silencian por "recuperación
+  // en camino" (demasiado esporádico para asumirla).
+  "grupo-resumen-mensual": 14,
   "joybees-catalogo": 12, // su cron corre 11:00 UTC
   "reebok-catalogo": 8, // slot temprano 06:45 + 1h
 };
@@ -154,6 +159,26 @@ export function staleEsPendingRecovery(
   const d = new Date(now);
   const nowHourUtc = d.getUTCHours() + d.getUTCMinutes() / 60;
   return recoveryStillComingToday(cronName, nowHourUtc);
+}
+
+/**
+ * ¿El cron ya registró un success HOY (día UTC)? Guard de las 2ª entradas del
+ * día (backup 18:30, acs-fidelizacion 16:30): si la 1ª corrida ya fue exitosa,
+ * la 2ª responde no-op sin trabajar. Fail-open: si la lectura falla, devuelve
+ * false → el cron trabaja (mejor un run de más que un día sin backup). No lanza.
+ */
+export async function cronSuccessHoyUtc(cronName: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseServer
+      .from("cron_heartbeats")
+      .select("last_success_at")
+      .eq("cron_name", cronName)
+      .maybeSingle();
+    if (error || !data?.last_success_at) return false;
+    return data.last_success_at >= `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+  } catch {
+    return false;
+  }
 }
 
 /** Marca al cron como exitoso ahora (upsert por cron_name). No lanza. */
