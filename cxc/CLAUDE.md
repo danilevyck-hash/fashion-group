@@ -112,6 +112,8 @@ Fuente única de navegación + permisos de UI. Agrupados:
 
 > **Plan Vercel Hobby:** cada entrada de cron corre 1×/día y las funciones tienen tope `maxDuration` 300s. Para frecuencia sub-diaria se agregan entradas separadas del mismo path (patrón `switch-reconciliacion`).
 >
+> **Heartbeats por-slot de switch-sync:** cada entrada de switch-sync lleva `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de su schedule, ej. `estadocuenta-2110`) y registra un heartbeat granular `switch-sync:<slot>` además del base. La lista espejo vive en `SWITCH_SYNC_SLOT_HEARTBEATS` (src/lib/cron-telemetry.ts) — al agregar/mover una entrada de switch-sync, actualizar ambas. health-crons NO alerta por filas de slot que aún no existen (se siembran solas en <24h).
+>
 > **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van ≥50 min separados (un 2do login mata el token del 1ro → code 0006). Crons de empresas disjuntas pueden ir a 5 min (patrón 05:30/05:35/05:40). Ojo: `sync-recibos` toca las 5 B2B + american_classic → las entradas intradía de ACS (15:00/23:15) y de estadocuenta esquivan sus corridas de 20:10/22:20 y la reconciliación de 14:00/18:00.
 
 ## PWA (iOS)

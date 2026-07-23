@@ -29,19 +29,19 @@
       "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=all&empresas=vistana,active_wear",
+      "path": "/api/cron/switch-sync?tipo=all&empresas=vistana,active_wear&slot=all-0530",
       "schedule": "30 5 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=all&empresas=fashion_shoes,fashion_wear",
+      "path": "/api/cron/switch-sync?tipo=all&empresas=fashion_shoes,fashion_wear&slot=all-0535",
       "schedule": "35 5 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=all&empresas=active_shoes,joystep",
+      "path": "/api/cron/switch-sync?tipo=all&empresas=active_shoes,joystep&slot=all-0540",
       "schedule": "40 5 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=all&empresas=american_classic,confecciones_boston",
+      "path": "/api/cron/switch-sync?tipo=all&empresas=american_classic,confecciones_boston&slot=all-0630",
       "schedule": "30 6 * * *"
     },
     {
@@ -93,19 +93,19 @@
       "schedule": "0 18 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic",
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1500",
       "schedule": "0 15 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep&slot=estadocuenta-1600",
       "schedule": "0 16 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear&slot=estadocuenta-1605",
       "schedule": "5 16 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear&slot=estadocuenta-1610",
       "schedule": "10 16 * * *"
     },
     {
@@ -121,15 +121,15 @@
       "schedule": "10 20 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear&slot=estadocuenta-2110",
       "schedule": "10 21 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=fashion_shoes,fashion_wear&slot=estadocuenta-2115",
       "schedule": "15 21 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep",
+      "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep&slot=estadocuenta-2120",
       "schedule": "20 21 * * *"
     },
     {
@@ -137,11 +137,11 @@
       "schedule": "20 22 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic",
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-2315",
       "schedule": "15 23 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic",
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-0015",
       "schedule": "15 0 * * *"
     },
     {

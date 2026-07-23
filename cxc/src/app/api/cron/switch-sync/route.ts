@@ -207,8 +207,18 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // vía alertSwitchCronErrors: los errores NO-401 alertan de inmediato como
   // siempre; un 401/token (transitorio de sesión única) solo alerta si la misma
   // empresa+tipo acumula 2+ corridas consecutivas con 401 en switch_sync_log.
+  //
+  // Heartbeat por-slot (jul-2026): cada entrada de cron en vercel.json trae
+  // `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de su schedule). Además del heartbeat
+  // base se registra "switch-sync:<slot>" para que health-crons detecte una
+  // entrada intradía perdida (antes cualquier entrada exitosa refrescaba el
+  // base y tapaba a las demás). Corridas manuales/reconciliación sin ?slot= no
+  // registran slot (no crean filas huérfanas que luego quedarían stale).
+  const slotParam = sp.get("slot");
+  const slot = slotParam && /^(all|facturas|estadocuenta)-\d{4}$/.test(slotParam) ? slotParam : null;
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
+    if (slot) await recordCronHeartbeat(`${CRON_NAME}:${slot}`);
   } else {
     await alertSwitchCronErrors(
       CRON_NAME,

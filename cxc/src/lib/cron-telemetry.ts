@@ -140,6 +140,36 @@ export function recoveryStillComingToday(cronName: string, nowHourUtc: number): 
  *  tras día o metadata desactualizada). */
 export const PENDING_RECOVERY_MAX_HOURS = 30;
 
+// ─── Heartbeats por-slot de switch-sync ──────────────────────────────────────
+// El heartbeat base "switch-sync" lo refresca CUALQUIERA de las ~13 entradas
+// diarias del path → una entrada intradía perdida (ej. estadocuenta de las
+// 21:10) era invisible para health-crons. Cada entrada de vercel.json lleva
+// ahora `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de SU schedule, ej.
+// estadocuenta-2110) y el route registra, ADEMÁS del heartbeat base, uno
+// granular "switch-sync:<slot>". Esta lista es espejo de vercel.json — al
+// agregar/mover una entrada de switch-sync, actualizar aquí.
+//
+// Regla de vigilancia en health-crons (distinta del fail-closed de los 18
+// nombres base): si la fila del slot NO existe todavía → NO es stale (el cron
+// la siembra solo en <24h tras el deploy; sin esto, el primer día daría un 503
+// falso con los 13 slots "ausentes"). Solo alerta si la fila EXISTE y está
+// vieja (umbral 26h).
+export const SWITCH_SYNC_SLOT_HEARTBEATS = [
+  "switch-sync:all-0530",
+  "switch-sync:all-0535",
+  "switch-sync:all-0540",
+  "switch-sync:all-0630",
+  "switch-sync:facturas-1500",
+  "switch-sync:estadocuenta-1600",
+  "switch-sync:estadocuenta-1605",
+  "switch-sync:estadocuenta-1610",
+  "switch-sync:estadocuenta-2110",
+  "switch-sync:estadocuenta-2115",
+  "switch-sync:estadocuenta-2120",
+  "switch-sync:facturas-2315",
+  "switch-sync:facturas-0015",
+];
+
 /**
  * ¿Un cron stale califica como "pendingRecovery" (recuperación en camino) en
  * vez de contar como caído? Requiere: (a) recuperación conocida que AÚN viene

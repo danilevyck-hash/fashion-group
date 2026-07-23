@@ -37,6 +37,7 @@ import {
   CRON_STALE_HOURS_DEFAULT,
   cronStaleThresholdHours,
   staleEsPendingRecovery,
+  SWITCH_SYNC_SLOT_HEARTBEATS,
 } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -181,6 +182,33 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // Slots granulares de switch-sync (switch-sync:<tipo>-<hhmm>, ver
+  // cron-telemetry.ts). Regla DISTINTA del fail-closed de los nombres base:
+  // fila ausente = aún no sembrada (el cron la crea solo en <24h tras el
+  // deploy) → NO es stale; solo alerta si la fila EXISTE y está vieja. Así el
+  // primer día post-deploy no dispara un 503 falso con los 13 slots ausentes.
+  const slotsUnseeded: string[] = [];
+  for (const slot of SWITCH_SYNC_SLOT_HEARTBEATS) {
+    const last = beats.get(slot);
+    if (last === undefined || last === null) {
+      slotsUnseeded.push(slot);
+      continue;
+    }
+    const t = new Date(last).getTime();
+    const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;
+    if (!Number.isFinite(t) || t < now - cronStaleThresholdHours(slot) * 3600 * 1000) {
+      // Los slots también son recuperables por la reconciliación (los pares que
+      // cubren) — misma semántica pendingRecovery que el base "switch-sync".
+      if (staleEsPendingRecovery("switch-sync", last, now)) {
+        pendingRecovery.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
+      } else {
+        stale.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo });
+      }
+    } else {
+      fresh.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
+    }
+  }
+
   const ok = stale.length === 0;
   return NextResponse.json(
     {
@@ -193,6 +221,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       stale,
       pendingRecoveryCount: pendingRecovery.length,
       pendingRecovery,
+      slotsUnseeded,
     },
     { status: ok ? 200 : 503 },
   );
