@@ -14,6 +14,7 @@
  */
 
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
 import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
@@ -70,10 +71,6 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
 // timing) queda con switch_id null — por eso la LLAVE del upsert es
 // (empresa_key, secuencial, fecha), no el switch_id.
 
-/** Fecha local Panamá (UTC-5 fijo, sin DST) de un timestamptz ISO. */
-const fechaPanama = (iso: string): string =>
-  new Date(new Date(iso).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
-
 /** (secuencial|fechaPanama) → switch_factura_id de los meses a sincronizar.
  *  Ambigüedad (mismo secuencial+fecha con ids distintos) → se descarta (null). */
 async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<Map<string, number>> {
@@ -104,7 +101,7 @@ async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<M
   const ambiguos = new Set<string>();
   for (const r of (data ?? []) as { secuencial: string | null; fecha: string; switch_factura_id: number }[]) {
     if (!r.secuencial || typeof r.switch_factura_id !== "number") continue;
-    const key = `${r.secuencial}|${fechaPanama(r.fecha)}`;
+    const key = `${r.secuencial}|${fechaPanamaDe(r.fecha)}`;
     const prev = map.get(key);
     if (prev !== undefined && prev !== r.switch_factura_id) ambiguos.add(key);
     else map.set(key, r.switch_factura_id);

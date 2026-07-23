@@ -11,6 +11,13 @@ export function hoyPanama(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(now);
 }
 
+/** Fecha (YYYY-MM-DD) en hora Panamá de un timestamptz ISO (UTC-5 fijo).
+ *  Para columnas timestamptz de Switch (ej. switch_facturas.fecha): un doc
+ *  nocturno cae al día UTC siguiente — la fecha de negocio es la de Panamá. */
+export function fechaPanamaDe(iso: string): string {
+  return new Date(new Date(iso).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
+}
+
 /**
  * Inicio de la ventana "success de HOY" para los colaterales de la
  * reconciliación (findMissingColaterales en switch-reconciliacion).

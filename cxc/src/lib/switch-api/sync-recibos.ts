@@ -27,6 +27,7 @@
  */
 
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
 import type { Mes } from "./sync-utilidad";
@@ -143,16 +144,24 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
 /** cliente_switch_id → facturas [{fecha, impuesto}] para la heurística de retención. */
 type ImpuestoMap = Map<number, { fecha: string; imp: number }[]>;
 
-/** Carga impuesto de facturas (switch_facturas) del rango para detectar retenciones. */
-async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, to: string): Promise<ImpuestoMap> {
+/** Carga impuesto de facturas (switch_facturas) del rango para detectar
+ *  retenciones. `from` inclusivo y `toExcl` EXCLUSIVO, ambos YYYY-MM-DD en día
+ *  Panamá. Gotcha (fix audit jul-2026): switch_facturas.fecha es timestamptz
+ *  UTC — filtrarla con date pelado corría el rango 5h (los docs nocturnos de
+ *  Panamá caen al día UTC siguiente) y PERDÍA los bordes: una factura del
+ *  último día del rango emitida en la noche quedaba fuera y su retención no se
+ *  clasificaba. El rango se ancla a medianoche Panamá (offset -05:00 explícito)
+ *  y la fecha del doc se normaliza a día Panamá (fechaPanamaDe), que es el
+ *  mismo calendario que la fecha de los recibos del API. */
+async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toExcl: string): Promise<ImpuestoMap> {
   const map: ImpuestoMap = new Map();
   const { data, error } = await supabaseServer
     .from("switch_facturas")
     .select("cliente_switch_id,fecha,impuesto")
     .eq("empresa_key", empresaKey)
     .eq("tipo_comprobante", "Factura")
-    .gte("fecha", from)
-    .lte("fecha", to)
+    .gte("fecha", `${from}T00:00:00-05:00`)
+    .lt("fecha", `${toExcl}T00:00:00-05:00`)
     .range(0, 99999);
   if (error) {
     console.error(`[sync-recibos ${empresaKey}] loadImpuestoMap: ${error.message}`);
@@ -162,7 +171,7 @@ async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, to: string)
     const k = f.cliente_switch_id;
     if (k == null) continue;
     if (!map.has(k)) map.set(k, []);
-    map.get(k)!.push({ fecha: String(f.fecha).slice(0, 10), imp: num(f.impuesto) });
+    map.get(k)!.push({ fecha: fechaPanamaDe(String(f.fecha)), imp: num(f.impuesto) });
   }
   return map;
 }
