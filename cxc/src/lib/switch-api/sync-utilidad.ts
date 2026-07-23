@@ -60,6 +60,59 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
   return map;
 }
 
+// ─── Resolución del id real de Switch (blindaje de llave, audit jul-2026) ─────
+// Switch REINICIÓ numeraciones de secuenciales (40 duplicados cross-era en
+// switch_facturas) → (empresa_key, secuencial) NO es identidad estable. El id
+// real vive en switch_facturas.switch_factura_id; se resuelve por
+// (secuencial, fecha Panamá) — la fecha separa las eras (verificado 23-jul-2026:
+// 1,485/1,499 match exacto y las 14 restantes eran solo el desfase nocturno
+// UTC↔Panamá, 0 ambiguos). Un doc sin match (factura aún no sincronizada por
+// timing) queda con switch_id null — por eso la LLAVE del upsert es
+// (empresa_key, secuencial, fecha), no el switch_id.
+
+/** Fecha local Panamá (UTC-5 fijo, sin DST) de un timestamptz ISO. */
+const fechaPanama = (iso: string): string =>
+  new Date(new Date(iso).getTime() - 5 * 3600_000).toISOString().slice(0, 10);
+
+/** (secuencial|fechaPanama) → switch_factura_id de los meses a sincronizar.
+ *  Ambigüedad (mismo secuencial+fecha con ids distintos) → se descarta (null). */
+async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (meses.length === 0) return map;
+  const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+  const f = sorted[0];
+  const l = sorted[sorted.length - 1];
+  const desde = `${f.year}-${String(f.month).padStart(2, "0")}-01T00:00:00-05:00`;
+  const finY = l.month === 12 ? l.year + 1 : l.year;
+  const finM = l.month === 12 ? 1 : l.month + 1;
+  const hastaExcl = `${finY}-${String(finM).padStart(2, "0")}-01T00:00:00-05:00`;
+  // Rango timestamptz con offset Panamá explícito (gotcha: date pelado pierde
+  // los docs nocturnos — ver loadImpuestoMap en sync-recibos).
+  const { data, error } = await supabaseServer
+    .from("switch_facturas")
+    .select("secuencial,fecha,switch_factura_id")
+    .eq("empresa_key", empresaKey)
+    .gte("fecha", desde)
+    .lt("fecha", hastaExcl)
+    .range(0, 99999);
+  if (error) {
+    // Best-effort: sin mapa, los docs quedan con switch_id null (la llave del
+    // upsert no depende de él).
+    console.error(`[sync-utilidad ${empresaKey}] buildSwitchIdMap: ${error.message}`);
+    return map;
+  }
+  const ambiguos = new Set<string>();
+  for (const r of (data ?? []) as { secuencial: string | null; fecha: string; switch_factura_id: number }[]) {
+    if (!r.secuencial || typeof r.switch_factura_id !== "number") continue;
+    const key = `${r.secuencial}|${fechaPanama(r.fecha)}`;
+    const prev = map.get(key);
+    if (prev !== undefined && prev !== r.switch_factura_id) ambiguos.add(key);
+    else map.set(key, r.switch_factura_id);
+  }
+  for (const key of ambiguos) map.delete(key);
+  return map;
+}
+
 // ─── Mapeo fila reporte → fila cache (con atribución por cartera) ────────────
 
 // pct_utilidad es numeric(8,4) → rango ±9999.9999. Docs basura (subtotal≈0 con
@@ -69,13 +122,21 @@ const PCT_CAP = 9999.9999;
 const clampPct = (p: number | null): number | null =>
   p == null ? null : Math.max(-PCT_CAP, Math.min(PCT_CAP, p));
 
-function toCacheRow(empresaKey: EmpresaKey, r: UtilidadRow, cartera: Map<number, string>) {
+function toCacheRow(
+  empresaKey: EmpresaKey,
+  r: UtilidadRow,
+  cartera: Map<number, string>,
+  switchIds: Map<string, number>,
+) {
   const vendedorCartera =
     (r.clienteSwitchId != null ? cartera.get(r.clienteSwitchId) : undefined) ?? r.vendedor;
   return {
     empresa_key: empresaKey,
     secuencial: r.secuencial,
     fecha: r.fecha,
+    // Id real de Switch (columna de DDL 20260723120000; el upsert la descarta
+    // en modo legacy si la DDL aún no corrió). Null si no se pudo resolver.
+    switch_id: r.fecha != null ? switchIds.get(`${r.secuencial}|${r.fecha}`) ?? null : null,
     tipo_comprobante: r.tipoComprobante,
     vendedor: vendedorCartera, // ← dueño de cartera (fallback: vendedor de factura)
     cliente: r.cliente,
@@ -145,15 +206,46 @@ async function seedTasasGlobal(vendedores: Set<string>): Promise<number> {
 }
 
 // ─── Persistencia ────────────────────────────────────────────────────────────
+// Llave preferida: (empresa_key, secuencial, fecha) — separa las ERAS de
+// secuenciales reiniciados (DDL 20260723120000, índice único
+// ux_sfu_empresa_secuencial_fecha + columna switch_id). TOLERANTE a que la DDL
+// aún no haya corrido: si el upsert falla con 42P10 (índice único ausente) o
+// PGRST204 (columna switch_id desconocida), cae a la llave legacy
+// (empresa_key, secuencial) sin switch_id. El flag es por-proceso (serverless:
+// se re-evalúa en cada invocación; cuando Daniel corra la DDL, el siguiente
+// sync usa la llave nueva solo).
+
+let llaveEraDisponible: boolean | null = null; // null = aún no probada en este proceso
+
+const ES_ERROR_DDL_PENDIENTE = (code: string | undefined): boolean =>
+  code === "42P10" || code === "PGRST204";
 
 async function upsertCacheRows(rows: ReturnType<typeof toCacheRow>[]): Promise<void> {
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
+    if (llaveEraDisponible !== false) {
+      const { error } = await supabaseServer
+        .from("switch_factura_utilidad")
+        .upsert(chunk, { onConflict: "empresa_key,secuencial,fecha" });
+      if (!error) {
+        llaveEraDisponible = true;
+        continue;
+      }
+      if (!ES_ERROR_DDL_PENDIENTE(error.code)) {
+        throw new Error(`upsert switch_factura_utilidad: ${error.message}`);
+      }
+      console.error(
+        `[sync-utilidad] llave por era no disponible (DDL 20260723120000 pendiente): ${error.message} — fallback a llave legacy (empresa_key, secuencial)`,
+      );
+      llaveEraDisponible = false;
+    }
+    // Modo legacy: sin columna switch_id y con la llave vieja.
+    const legacy = chunk.map(({ switch_id: _switchId, ...r }) => r);
     const { error } = await supabaseServer
       .from("switch_factura_utilidad")
-      .upsert(chunk, { onConflict: "empresa_key,secuencial" });
-    if (error) throw new Error(`upsert switch_factura_utilidad: ${error.message}`);
+      .upsert(legacy, { onConflict: "empresa_key,secuencial" });
+    if (error) throw new Error(`upsert switch_factura_utilidad (legacy): ${error.message}`);
   }
 }
 
@@ -216,6 +308,8 @@ export async function syncEmpresaUtilidad(
     // Maestro de vendedores (API JSON, no usa el login web). Alimenta el universo
     // del tab Comisiones v2 + siembra tasas globales de los nombres del maestro.
     const vendedoresMaestro = await syncVendedores(empresaKey);
+    // Id real de Switch por (secuencial, fecha Panamá) — best-effort, ver arriba.
+    const switchIds = await buildSwitchIdMap(empresaKey, meses);
     const session = await loginSwitchWeb(empresaKey);
 
     const cacheRows: ReturnType<typeof toCacheRow>[] = [];
@@ -223,22 +317,35 @@ export async function syncEmpresaUtilidad(
     for (const { year, month } of meses) {
       const rows = await fetchUtilidadMes(session, year, month);
       for (const r of rows) {
-        const cr = toCacheRow(empresaKey, r, cartera);
+        // Sin fecha no hay llave (empresa, secuencial, fecha) ni filtro de mes
+        // en las RPC — se omite con log (0 casos observados a la fecha).
+        if (!r.fecha) {
+          console.error(`[sync-utilidad ${empresaKey}] doc sin fecha omitido: secuencial=${r.secuencial}`);
+          continue;
+        }
+        const cr = toCacheRow(empresaKey, r, cartera, switchIds);
         cacheRows.push(cr);
         if (cr.vendedor) vendedores.add(cr.vendedor);
       }
     }
 
-    await upsertCacheRows(cacheRows);
+    // Dedupe within-run por la llave (empresa, secuencial, fecha): dos filas
+    // idénticas en el mismo lote romperían el ON CONFLICT del upsert ("cannot
+    // affect row a second time"). Última gana (mismo criterio que el upsert).
+    const byKey = new Map<string, ReturnType<typeof toCacheRow>>();
+    for (const cr of cacheRows) byKey.set(`${cr.secuencial}|${cr.fecha}`, cr);
+    const uniqueRows = [...byKey.values()];
+
+    await upsertCacheRows(uniqueRows);
     // Siembra tasas globales (0.5%) para nombres del maestro + atribuidos por cartera.
     const vendedoresNuevos = await seedTasasGlobal(vendedores);
 
-    await finishLog(logId, "success", cacheRows.length);
+    await finishLog(logId, "success", uniqueRows.length);
     return {
       empresaKey,
       ok: true,
       meses: meses.length,
-      documentos: cacheRows.length,
+      documentos: uniqueRows.length,
       vendedoresNuevos,
     };
   } catch (err) {
