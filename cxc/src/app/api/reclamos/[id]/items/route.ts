@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { validateReclamoItems } from "@/lib/reclamos/validate";
+import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -22,17 +23,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
   if (items?.length > 0) {
-    const rows = items.map((item: Record<string, unknown>) => ({
-      reclamo_id: params.id,
-      referencia: String(item.referencia || ""),
-      descripcion: String(item.descripcion || ""),
-      talla: String(item.talla || ""),
-      genero: item.genero ? String(item.genero) : null,
-      cantidad: Number(item.cantidad) || 1,
-      precio_unitario: Number(item.precio_unitario) || 0,
-      subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
-      motivo: String(item.motivo || "Faltante de Mercancía"),
-    }));
+    // subtotal NO se envía (la columna no existe en la tabla — se deriva al vuelo)
+    // y nro_factura/nro_orden_compra SÍ (antes se perdían al editar).
+    const rows = buildReclamoItemRows(params.id, items);
     const { error: insErr } = await supabaseServer.from("reclamo_items").insert(rows);
     if (insErr) {
       // Restore backup if insert fails

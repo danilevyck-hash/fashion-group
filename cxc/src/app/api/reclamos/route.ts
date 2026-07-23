@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdmin } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 import { validateReclamoFull } from "@/lib/reclamos/validate";
+import { buildReclamoItemRows } from "@/lib/reclamos/item-rows";
 import { reclamoInitials } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
@@ -94,43 +95,16 @@ export async function POST(req: NextRequest) {
 
   let itemsWarning = "";
   if (items && items.length > 0) {
-    // First attempt: with subtotal
-    const rowsFull = items.map((item: Record<string, unknown>) => ({
-      reclamo_id: reclamo.id,
-      referencia: String(item.referencia || ""),
-      descripcion: String(item.descripcion || ""),
-      talla: String(item.talla || ""),
-      genero: item.genero ? String(item.genero) : null,
-      cantidad: Number(item.cantidad) || 1,
-      precio_unitario: Number(item.precio_unitario) || 0,
-      subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
-      motivo: String(item.motivo || "Faltante de Mercancía"),
-      nro_factura: String(item.nro_factura || ""),
-      nro_orden_compra: String(item.nro_orden_compra || ""),
-    }));
-    const { error: err1 } = await supabaseServer.from("reclamo_items").insert(rowsFull);
-    if (err1) {
-      console.error("Items insert error:", JSON.stringify(err1));
-      // Retry without subtotal in case column type mismatch
-      const rowsMin = items.map((item: Record<string, unknown>) => ({
-        reclamo_id: reclamo.id,
-        referencia: String(item.referencia || ""),
-        descripcion: String(item.descripcion || ""),
-        talla: String(item.talla || ""),
-        genero: item.genero ? String(item.genero) : null,
-        cantidad: Number(item.cantidad) || 1,
-        precio_unitario: Number(item.precio_unitario) || 0,
-        motivo: String(item.motivo || "Faltante de Mercancía"),
-        nro_factura: String(item.nro_factura || ""),
-        nro_orden_compra: String(item.nro_orden_compra || ""),
-      }));
-      const { error: err2 } = await supabaseServer.from("reclamo_items").insert(rowsMin);
-      if (err2) {
-        console.error("Items retry error:", JSON.stringify(err2));
-        // Rollback: delete the orphan reclamo
-        await supabaseServer.from("reclamos").delete().eq("id", reclamo.id);
-        return NextResponse.json({ error: "Error al crear items del reclamo. No se guardo el reclamo." }, { status: 500 });
-      }
+    // subtotal NO se envía (la columna no existe en la tabla — se deriva al
+    // vuelo cantidad × precio donde se necesite). Antes se enviaba y un retry
+    // sin subtotal enmascaraba el PGRST204 solo en este path (editar fallaba).
+    const rows = buildReclamoItemRows(reclamo.id, items);
+    const { error: insErr } = await supabaseServer.from("reclamo_items").insert(rows);
+    if (insErr) {
+      console.error("Items insert error:", JSON.stringify(insErr));
+      // Rollback: delete the orphan reclamo
+      await supabaseServer.from("reclamos").delete().eq("id", reclamo.id);
+      return NextResponse.json({ error: "Error al crear items del reclamo. No se guardo el reclamo." }, { status: 500 });
     }
   }
 
