@@ -7,6 +7,9 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
+// Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
+// catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
+export const fetchCache = "force-no-store";
 
 // Roles del módulo Catálogos (admin/secretaria gestionan; vendedor/bodega
 // consultan el catálogo interno). El catálogo PÚBLICO usa /joybees/public.

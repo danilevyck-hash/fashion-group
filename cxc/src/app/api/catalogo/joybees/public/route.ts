@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+// Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
+// catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
+export const fetchCache = "force-no-store";
 export const revalidate = 0;
 
 function getSupabase() {
