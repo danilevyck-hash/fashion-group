@@ -18,3 +18,14 @@ comment on column products.oculto_manual is
 
 comment on column joybees_products.oculto_manual is
   'Toggle admin "Ocultar del catálogo": true = oculto siempre (el sync lo respeta y mantiene active=false). Reversible.';
+
+-- Primer caso APROBADO por Daniel (22-jul-2026): Reebok 100256591
+-- ("basketball ball": activo, sin foto, precio 0, con stock — no vendible).
+-- Se oculta en la misma migración para que quede permanente apenas corra la
+-- DDL (mientras tanto está con active=false puesto a mano, que el cron
+-- revertiría al no existir aún la columna). Reversible desde el admin.
+
+update products
+  set oculto_manual = true, active = false
+  where sku = '100256591';
+
