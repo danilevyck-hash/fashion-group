@@ -120,7 +120,9 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`
 - Standalone mode, start_url: `/home`
-- Service worker ACTIVO (Serwist) — Modo Viaje / lectura cacheada offline; registrado vía `UpdatePrompt` (@serwist/window, `next.config` con `register:false`); toast "Nueva versión · Recargar" sin auto-reload (`src/app/sw.ts`, `src/components/UpdatePrompt.tsx`)
+- Service worker MÍNIMO (Serwist, `src/app/sw.ts`) — la app es SIEMPRE online (Modo Viaje / lectura offline ELIMINADO jul 2026, nunca se usó). Solo cachea assets inmutables (`/_next/static` CacheFirst, imágenes/fuentes SWR); navegación y APIs van directo a la red (sin handler). Sin precache del app shell.
+- Actualización automática y SILENCIOSA: `skipWaiting`+`clientsClaim` en sw.ts + `SWUpdater` (`src/components/SWUpdater.tsx`, registra el SW; `next.config` con `register:false`) → al haber build nuevo, swap + reload inmediato SIN UI de versión, con guard de formulario sucio (si hay un input con foco y contenido, difiere hasta blur/submit/ocultar app) y guard anti-loop en sessionStorage.
+- Recovery una-sola-vez: ChunkLoadError / import dinámico fallido tras un deploy → `src/lib/chunk-recovery.ts` (listeners globales en SWUpdater + `error.tsx`/`global-error.tsx` raíz). Guard sessionStorage `fg_chunk_recovery` (1/min); si se repite, error boundary visible "Algo salió mal" con botón Recargar.
 - Roles con 1 solo módulo auto-redirigen desde home (ej: Bodega → Guías)
 - Sin bottom tab bar — navegación por módulos del home + drawer del header
 
@@ -177,7 +179,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - **Hover preview:** cards ricas en CXC al hover 500ms sobre nombre de cliente
 - **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
 - **UI persistence:** filas expandidas y scroll position sobreviven navegación (sessionStorage)
-- **Offline:** banner "Sin conexión", cache 30min en dashboard/cheques, botones deshabilitados
+- **Offline:** banner "Sin conexión" (informativo) + botones deshabilitados sin red. NO hay lectura offline: el Modo Viaje (snapshots localStorage + cache de páginas del SW) se eliminó en jul 2026
 
 ## Exports
 - Todos los PDFs tienen logo Fashion Group (src/lib/pdf-logo.ts, base64)

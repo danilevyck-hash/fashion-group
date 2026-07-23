@@ -1,10 +1,10 @@
 "use client";
 
-// Chip de frescura "datos de hace X · sin conexión" (Modo viaje — Fase 1).
+// Chip de frescura "datos de hace X · sin conexión".
 //
-// SIEMPRE visible cuando hay un timestamp (online y offline). Muestra qué tan
-// viejo es el dato que se está viendo. Agrega "· sin conexión" cuando no hay
-// red. En vistas financieras (financial), si el snapshot pasa de 24h se pone
+// Hoy solo lo usa CXC: muestra cuándo se materializó la MV del aging (dato de
+// negocio real, no la hora del request). Agrega "· sin conexión" cuando no hay
+// red. En vistas financieras (financial), si el dato pasa de 24h se pone
 // ROJO — nunca mostrar cifras financieras viejas como si fueran frescas.
 
 import { useEffect, useState } from "react";
@@ -23,11 +23,11 @@ function formatAgo(ts: number): string {
 }
 
 interface FreshnessChipProps {
-  /** Timestamp (ms) del snapshot que se está mostrando. null = aún sin dato → no renderiza. */
+  /** Timestamp (ms) del dato que se está mostrando. null = aún sin dato → no renderiza. */
   ts: number | null;
-  /** true cuando el dato viene del cache (no se pudo refrescar de la red). */
+  /** true cuando el dato viene de la caché en memoria (no se pudo refrescar de la red). */
   fromCache?: boolean;
-  /** Vista financiera: si el snapshot pasa de 24h, el chip se pone rojo. */
+  /** Vista financiera: si el dato pasa de 24h, el chip se pone rojo. */
   financial?: boolean;
   className?: string;
 }

@@ -1,13 +1,13 @@
 "use client";
 
-// Modo viaje PR-3 — install prompt + hint iOS + aviso de priming.
+// Install prompt de la PWA.
 // - Chromium/Android: captura `beforeinstallprompt`, lo difiere y ofrece un
 //   botón "Instalar app".
 // - iOS Safari (no tiene beforeinstallprompt): hint manual "Compartir →
 //   Agregar a inicio", solo fuera de standalone.
-// - Para todos: recordatorio de "primar" las vistas con señal antes de viajar
-//   (iOS evicta el cache tras ~7d; el snapshot solo existe si se abrió la vista).
-// Se oculta en páginas públicas y en login, y una vez descartado.
+// Se oculta en páginas públicas, en login, en standalone (ya instalada) y una
+// vez descartado. (El copy de Modo Viaje / offline se eliminó — la app es
+// siempre online.)
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,8 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+// OJO: key legacy (nació con el Modo Viaje). Se conserva el MISMO valor para
+// no volver a mostrar el prompt a quien ya lo descartó.
 const DISMISS_KEY = "fg_modoviaje_install_dismissed";
 const PUBLIC_PREFIXES = ["/catalogo-publico", "/pedido-reebok"];
 
@@ -103,23 +105,21 @@ export default function InstallPrompt() {
   // Qué mostrar:
   //  - instalable (Chromium) → botón Instalar
   //  - iOS Safari no-standalone → hint A2HS
-  //  - ya instalada (standalone) → solo el recordatorio de priming
+  //  - ya instalada (standalone) o desktop sin soporte → nada
   const installable = !standalone && !!deferred;
   const showIosHint = !standalone && iosHint;
-  if (!installable && !showIosHint && !standalone) return null; // desktop sin soporte ni instalada
+  if (!installable && !showIosHint) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
       <div className="pointer-events-auto mx-auto max-w-md rounded-xl border border-gray-200 bg-white shadow-lg p-3.5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900">
-              {standalone ? "Modo viaje" : "Instala Fashion Group"}
-            </p>
+            <p className="text-sm font-semibold text-gray-900">Instala Fashion Group</p>
 
             {installable && (
               <p className="text-xs text-gray-500 mt-0.5">
-                Instálala para abrirla como app y consultar tus datos sin conexión.
+                Instálala para abrirla como una app desde tu pantalla de inicio.
               </p>
             )}
 
@@ -127,16 +127,9 @@ export default function InstallPrompt() {
               <p className="text-xs text-gray-500 mt-0.5">
                 Toca <span className="font-medium text-gray-700">Compartir</span> y luego{" "}
                 <span className="font-medium text-gray-700">&ldquo;Agregar a inicio&rdquo;</span> para
-                instalarla y usarla sin conexión.
+                abrirla como una app.
               </p>
             )}
-
-            {/* Priming — siempre presente */}
-            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-              Antes de viajar, abre <span className="font-medium">Cuentas por Cobrar</span>,{" "}
-              <span className="font-medium">Cheques</span>, <span className="font-medium">Reclamos</span> y{" "}
-              <span className="font-medium">Marketing</span> con señal — así quedan disponibles sin conexión.
-            </p>
           </div>
 
           <button
