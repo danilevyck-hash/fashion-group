@@ -24,7 +24,7 @@
 UPDATE switch_sync_log
 SET status = 'error',
     finished_at = now(),
-    error_message = 'Run atascado en running; cerrado por la migracion del lock (20260723120000).'
+    error_message = 'Run atascado en running; cerrado por la migracion del lock (20260723150000).'
 WHERE status = 'running'
   AND started_at < now() - interval '30 minutes';
 

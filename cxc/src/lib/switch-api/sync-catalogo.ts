@@ -158,7 +158,7 @@ export async function syncCatalogo(
     // Corrida por empresa en switch_sync_log (streak 401 de alert-policy.ts).
     // Los dry-run no se registran: no son corridas reales y ensuciarían el streak.
     // El insert va DENTRO del try: con el lock de 'running' (índice único,
-    // DDL 20260723120000) puede lanzar si ya hay una corrida en curso → la
+    // DDL 20260723150000) puede lanzar si ya hay una corrida en curso → la
     // empresa falla limpio (out.error) sin tumbar el resto.
     let logId: string | null = null;
     try {

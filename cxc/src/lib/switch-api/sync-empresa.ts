@@ -362,7 +362,7 @@ export async function syncEmpresaFacturas(
 ): Promise<EmpresaSyncResult> {
   const startedAt = Date.now();
   // Auto-sana logs huérfanos ANTES del insert: con el índice único de 'running'
-  // (DDL 20260723120000) una fila atascada bloquearía este insert para siempre.
+  // (DDL 20260723150000) una fila atascada bloquearía este insert para siempre.
   await markStaleRunningLogs(empresaKey, "facturas");
   const logId = await createSyncLog(empresaKey, "facturas", opts);
 

@@ -4,7 +4,7 @@
  * Tres capas, evaluadas ANTES de disparar el sync (y en este orden):
  *   a) running  — ya hay una corrida fresca (<30 min) del mismo (empresa, tipo)
  *                 en switch_sync_log. El lock REAL es el índice único parcial
- *                 switch_sync_log_running_lock (DDL 20260723120000, manual):
+ *                 switch_sync_log_running_lock (DDL 20260723150000, manual):
  *                 si dos disparos pasan el pre-check a la vez, el 2º insert de
  *                 fila 'running' falla (23505) y también responde 409. Mientras
  *                 la DDL no corra, queda solo el pre-check (tolerante).

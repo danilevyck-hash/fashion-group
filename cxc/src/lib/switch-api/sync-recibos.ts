@@ -92,7 +92,7 @@ function monthBounds(year: number, month: number): { inicio: string; finExcl: st
 
 async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: string): Promise<string | null> {
   // Auto-sana logs huérfanos antes del insert: con el índice único de 'running'
-  // (DDL 20260723120000) una fila atascada bloquearía este insert para siempre.
+  // (DDL 20260723150000) una fila atascada bloquearía este insert para siempre.
   await clearStaleRunning(empresaKey, "recibos");
   const s = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
   const f = s[0];

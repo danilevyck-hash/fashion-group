@@ -9,7 +9,7 @@
  *
  * Candado de 3 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
  *   a) running (fila 'running' fresca en switch_sync_log; el lock REAL es el
- *      índice único parcial switch_sync_log_running_lock — DDL 20260723120000,
+ *      índice único parcial switch_sync_log_running_lock — DDL 20260723150000,
  *      manual; mientras no corra, queda el pre-check),
  *   b) cron-proximo (próximo cron de esa empresa en <= 40 min),
  *   c) cooldown (último success hace < 10 min).

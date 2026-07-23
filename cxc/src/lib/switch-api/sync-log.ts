@@ -19,7 +19,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export type SwitchSyncTriggeredBy = "cron" | "manual" | "backfill";
 
 // ─── Lock de corrida en curso (índice único parcial) ─────────────────────────
-// DDL 20260723120000_switch_sync_running_lock.sql (manual): índice único
+// DDL 20260723150000_switch_sync_running_lock.sql (manual): índice único
 // parcial sobre (empresa_key, sync_type) WHERE status='running'. Con el índice
 // aplicado, el INSERT de la fila 'running' se vuelve MUTEX: dos corridas
 // simultáneas del mismo (empresa, tipo) → la 2ª falla con 23505. Mientras la
