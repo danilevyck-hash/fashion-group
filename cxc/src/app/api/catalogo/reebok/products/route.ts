@@ -7,6 +7,9 @@ import { getSession } from '@/lib/require-auth'
 import { esVisibleEnCatalogo } from '@/lib/catalogos/visibilidad'
 
 export const dynamic = "force-dynamic";
+// Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): el
+// catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
+export const fetchCache = "force-no-store";
 
 // Columnas explícitas (no select('*')): blinda contra fugas de columnas futuras
 // agregadas a `products`.
