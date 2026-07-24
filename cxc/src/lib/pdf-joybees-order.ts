@@ -130,6 +130,9 @@ export async function generateJoybeesOrderPdf(cart: OrderItem[]): Promise<void> 
       4: { cellWidth: 24, halign: "right" as const },
       5: { cellWidth: 24, halign: "right" as const },
     },
+    // El TOTAL va UNA sola vez al final del documento — sin esto,
+    // jspdf-autotable repite el foot en cada página (default 'everyPage').
+    showFoot: "lastPage",
     foot: [
       [
         { content: "", styles: { fillColor: WHITE_RGB } },

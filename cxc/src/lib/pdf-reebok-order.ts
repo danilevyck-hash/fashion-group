@@ -155,6 +155,9 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
       bodyStyles: { fontSize: 8, cellPadding: 3, textColor: [30, 30, 30] },
       alternateRowStyles: { fillColor: CREAM_RGB },
       columnStyles: baseColumnStyles,
+      // El TOTAL va UNA sola vez al final del documento — sin esto,
+      // jspdf-autotable repite el foot en cada página (default 'everyPage').
+      showFoot: "lastPage",
       foot: showTotalFoot
         ? [
             [
