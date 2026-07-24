@@ -22,6 +22,15 @@ interface CartItem {
   is_preorder?: boolean;
 }
 
+interface StockLinea {
+  product_id: string;
+  name: string;
+  sku: string;
+  pedido_bultos: number;
+  pedido_pzas: number;
+  disponible_pzas: number;
+}
+
 export default function PublicCatalogPage() {
   return <Suspense><PublicCatalog /></Suspense>;
 }
@@ -178,9 +187,12 @@ function PublicCatalog() {
 
   const [sendingOrder, setSendingOrder] = useState(false);
   const [clientName, setClientName] = useState("");
-  // Si el navegador bloquea window.open (común en iOS), el pedido YA quedó
-  // guardado en el server; guardamos el mensaje para reintentar/copiar.
-  const [failedOrder, setFailedOrder] = useState<{ msg: string; url: string } | null>(null);
+  // Aviso de stock (S2): líneas con menos piezas disponibles que las pedidas,
+  // devueltas por el endpoint confirmar (409).
+  const [stockAviso, setStockAviso] = useState<StockLinea[] | null>(null);
+  // short_id del pedido YA creado en el server: si el cliente ve el aviso de
+  // stock y luego confirma de todas formas, se reusa (no se duplica el pedido).
+  const [pendingShortId, setPendingShortId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -193,80 +205,66 @@ function PublicCatalog() {
     try { localStorage.setItem("reebok_public_client_name", clientName); } catch { /* */ }
   }, [clientName]);
 
-  // WhatsApp send with shareable link
-  async function handleSendWhatsApp() {
+  // Si el cliente cambia el carrito o su nombre, el pedido pendiente ya no
+  // representa lo que ve → se creará uno nuevo al confirmar.
+  useEffect(() => {
+    setPendingShortId(null);
+    setStockAviso(null);
+  }, [cart, clientName]);
+
+  // Confirmar pedido (flujo nuevo): 1) crea el pedido en el server (precios
+  // validados server-side), 2) lo CONFIRMA (auto-convierte a PED-###) y 3) lleva
+  // al cliente a su página permanente /pedido-reebok/[short_id], donde puede
+  // avisar por WhatsApp (opcional). Si hay stock corto, el server responde 409 y
+  // se muestra el aviso con "Confirmar de todas formas".
+  async function handleConfirmarPedido(aceptarStock = false) {
     if (cart.length === 0 || sendingOrder) return;
     const trimmedName = clientName.trim();
     if (!trimmedName) {
-      setToast("Escribe tu nombre antes de enviar el pedido");
+      setToast("Escribe tu nombre antes de confirmar el pedido");
       return;
     }
     setSendingOrder(true);
     try {
-      const res = await fetch("/api/catalogo/reebok/pedido-publico", {
+      let shortId = pendingShortId;
+      if (!shortId) {
+        const res = await fetch("/api/catalogo/reebok/pedido-publico", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.short_id) {
+          setToast((data?.error as string) || "Error al enviar el pedido. Intenta de nuevo.");
+          return;
+        }
+        shortId = data.short_id as string;
+        setPendingShortId(shortId);
+      }
+
+      const conf = await fetch(`/api/catalogo/reebok/pedido-publico/${shortId}/confirmar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
+        body: JSON.stringify({ aceptar_stock: aceptarStock }),
       });
-      if (!res.ok) throw new Error("save failed");
-      const { short_id } = await res.json();
-
-      const total = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * i.unit_price, 0);
-      const formatLine = (i: CartItem) => {
-        const bs = getBultoSize(i.category);
-        return `${i.name} x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * bs} pzas) — $${(i.quantity * bs * i.unit_price).toFixed(2)}`;
-      };
-      const regular = cart.filter(i => !i.is_preorder);
-      const preorders = cart.filter(i => i.is_preorder);
-      const sections: string[] = [];
-      if (regular.length > 0) {
-        sections.push(`*PEDIDO*\n${regular.map(formatLine).join("\n")}`);
-      }
-      if (preorders.length > 0) {
-        sections.push(`*PRE-ORDEN*\n${preorders.map(formatLine).join("\n")}`);
-      }
-      const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
-      const msg = `Hola, soy ${trimmedName}. Quiero hacer un pedido de Reebok:\n\n${sections.join("\n\n")}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
-      const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-      const win = window.open(url, "_blank");
-
-      // El pedido ya quedó guardado en el server (short_id), así que vaciar el
-      // carrito es seguro aunque WhatsApp no haya abierto.
-      setCart([]);
-      try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
-
-      if (!win) {
-        setFailedOrder({ msg, url });
-        setToast("Recibimos tu pedido. Ábrelo en WhatsApp para confirmar o cópialo.");
+      const confData = await conf.json().catch(() => null);
+      if (conf.status === 409 && confData?.lineas) {
+        setStockAviso(confData.lineas as StockLinea[]);
         return;
       }
-      setFailedOrder(null);
-      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
+      if (!conf.ok || !confData?.numero) {
+        setToast((confData?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo.");
+        return;
+      }
+
+      // Confirmado → vaciar carrito y abrir su página permanente del pedido.
+      setCart([]);
+      try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
+      window.location.href = `/pedido-reebok/${shortId}`;
     } catch {
       setToast("Error al enviar el pedido. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
-    }
-  }
-
-  function retryWhatsApp() {
-    if (!failedOrder) return;
-    const win = window.open(failedOrder.url, "_blank");
-    if (win) {
-      setFailedOrder(null);
-      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
-    } else {
-      setToast("Tu navegador bloqueó WhatsApp. Copia el pedido y pégalo en el chat.");
-    }
-  }
-
-  async function copyOrder() {
-    if (!failedOrder) return;
-    try {
-      await navigator.clipboard.writeText(failedOrder.msg);
-      setToast("Pedido copiado. Pégalo en WhatsApp al +507 6674-5522");
-    } catch {
-      setToast("No se pudo copiar. Toma una captura de tu pedido.");
     }
   }
 
@@ -393,35 +391,44 @@ function PublicCatalog() {
           onQtyChange={handleQtyChange}
           onClearCart={handleClearCart}
           variant="public"
-          onSendWhatsApp={handleSendWhatsApp}
+          onSubmitOrder={() => handleConfirmarPedido(false)}
           clientName={clientName}
           onClientNameChange={setClientName}
           saving={sendingOrder}
-          actionLabel={sendingOrder ? "Enviando..." : undefined}
+          actionLabel={sendingOrder ? "Confirmando..." : undefined}
           formatTotal={fmt}
         />
 
-        {failedOrder && (
+        {stockAviso && stockAviso.length > 0 && (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#1A2656]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+            className="fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#1A2656]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
             style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
           >
-            <p className="text-sm font-semibold text-[#1A2656]">Recibimos tu pedido — falta confirmarlo</p>
-            <p className="text-xs text-[#1A2656]/60 mt-0.5 mb-3">
-              WhatsApp no se abrió. Ábrelo de nuevo o copia tu pedido y pégalo en el chat al +507 6674-5522.
+            <p className="text-sm font-semibold text-[#1A2656]">Algunos productos no tienen todas las piezas disponibles</p>
+            <ul className="mt-1.5 mb-2 space-y-0.5 max-h-32 overflow-y-auto">
+              {stockAviso.map((l) => (
+                <li key={l.product_id} className="text-xs text-[#1A2656]/70">
+                  <span className="font-medium">{l.name}</span> — pediste {l.pedido_pzas} pzas, hay {l.disponible_pzas}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-[#1A2656]/60 mb-3">
+              Puedes confirmarlo igual y te contactamos por la diferencia.
             </p>
             <div className="flex gap-2">
               <button
-                onClick={retryWhatsApp}
-                className="flex-1 bg-[#25D366] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+                onClick={() => handleConfirmarPedido(true)}
+                disabled={sendingOrder}
+                className="flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50"
               >
-                Abrir WhatsApp
+                {sendingOrder ? "Confirmando..." : "Confirmar de todas formas"}
               </button>
               <button
-                onClick={copyOrder}
-                className="flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+                onClick={() => setStockAviso(null)}
+                disabled={sendingOrder}
+                className="flex-1 bg-white border border-[#1A2656]/20 text-[#1A2656] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50"
               >
-                Copiar pedido
+                Cambiar mi pedido
               </button>
             </div>
           </div>

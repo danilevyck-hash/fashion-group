@@ -432,7 +432,7 @@ function JoybeesCatalog() {
           onQtyChange={handleQtyChange}
           onClearCart={handleClearCart}
           variant="vendor"
-          onSendWhatsApp={goCheckout}
+          onSubmitOrder={goCheckout}
           saving={false}
           actionLabel="Ver pedido"
           formatTotal={fmt}
