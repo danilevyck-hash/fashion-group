@@ -70,6 +70,7 @@ import {
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
 } from "@/lib/cron-telemetry";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
+import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const CRON_NAME = "switch-reconciliacion";
@@ -563,8 +564,12 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const missingPairs = findMissing(expected, logBefore);
   const missingColaterales = await findMissingColaterales(sinceIso);
 
-  // Todo OK desde el inicio → cero ruido, no se toca nada.
+  // Todo OK desde el inicio → cero ruido de alertas. Único envío posible: el
+  // resumen post-recuperación de una caída de Switch que ya sanó SIN esta
+  // pasada (ej. el propio slot siguiente del cron recuperó el par) y aún no se
+  // reportó (dedup por watermark en cron_email_errors). Best-effort, no lanza.
   if (missingPairs.length === 0 && missingColaterales.length === 0) {
+    const outage = await enviarResumenCaidaSiAplica();
     return NextResponse.json({
       ok: true,
       fecha,
@@ -572,6 +577,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       reconciled: [],
       stillFailing: [],
       telegram: "none",
+      outageResumen: outage.resumen,
       staleCrons,
     });
   }
@@ -650,6 +656,15 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const hayProblemas = stillMissingPairs.length > 0 || failedColaterales.length > 0 || skipped.length > 0;
   let telegram: "alert" | "none" = "none";
 
+  // Pasada 100% verde tras recuperar → si lo recuperado fue una CAÍDA de
+  // Switch (HTML-auth / red / 5xx), mandar EL resumen informativo único
+  // post-recuperación (ventana + syncs afectados). Con problemas pendientes NO
+  // se manda nada: la caída sigue activa y la alerta de abajo ya la cubre.
+  let outageResumen = "sin_caida";
+  if (!hayProblemas) {
+    outageResumen = (await enviarResumenCaidaSiAplica()).resumen;
+  }
+
   if (hayProblemas) {
     telegram = "alert";
     const lineasPares = stillMissingPairs.map(
@@ -690,6 +705,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       ],
       skipped,
       telegram,
+      outageResumen,
       staleCrons,
     },
     { status: hayProblemas ? 207 : 200 },
