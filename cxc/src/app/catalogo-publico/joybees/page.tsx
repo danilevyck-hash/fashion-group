@@ -22,6 +22,15 @@ interface CartItem {
   unit_price: number;
 }
 
+interface StockLinea {
+  product_id: string;
+  name: string;
+  sku: string;
+  pedido_bultos: number;
+  pedido_pzas: number;
+  disponible_pzas: number;
+}
+
 export default function PublicJoybeesCatalogPage() {
   return <Suspense><PublicJoybeesCatalog /></Suspense>;
 }
@@ -177,9 +186,12 @@ function PublicJoybeesCatalog() {
 
   const [sendingOrder, setSendingOrder] = useState(false);
   const [clientName, setClientName] = useState("");
-  // Si el navegador bloquea window.open (común en iOS), el pedido YA quedó
-  // guardado en el server; guardamos el mensaje para reintentar/copiar.
-  const [failedOrder, setFailedOrder] = useState<{ msg: string; url: string } | null>(null);
+  // Aviso de stock (S2): líneas con menos piezas disponibles que las pedidas,
+  // devueltas por el endpoint confirmar (409).
+  const [stockAviso, setStockAviso] = useState<StockLinea[] | null>(null);
+  // short_id del pedido YA creado en el server: si el cliente ve el aviso de
+  // stock y luego confirma de todas formas, se reusa (no se duplica el pedido).
+  const [pendingShortId, setPendingShortId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -192,71 +204,67 @@ function PublicJoybeesCatalog() {
     try { localStorage.setItem("joybees_public_client_name", clientName); } catch { /* */ }
   }, [clientName]);
 
-  // WhatsApp send con link compartible: PRIMERO persiste el pedido en el server
-  // (precios validados server-side), y solo si el POST fue OK abre WhatsApp.
-  async function handleSendWhatsApp() {
+  // Si el cliente cambia el carrito o su nombre, el pedido pendiente ya no
+  // representa lo que ve → se creará uno nuevo al confirmar.
+  useEffect(() => {
+    setPendingShortId(null);
+    setStockAviso(null);
+  }, [cart, clientName]);
+
+  // Confirmar pedido (flujo nuevo, espejo de Reebok): 1) crea el pedido en el
+  // server (precios validados server-side), 2) lo CONFIRMA (auto-convierte a
+  // JBP-###) y 3) lleva al cliente a su página permanente
+  // /pedido-joybees/[short_id], donde puede avisar por WhatsApp (opcional). Si
+  // hay stock corto, el server responde 409 y se muestra el aviso con
+  // "Confirmar de todas formas".
+  async function handleConfirmarPedido(aceptarStock = false) {
     if (cart.length === 0 || sendingOrder) return;
     const trimmedName = clientName.trim();
     if (!trimmedName) {
-      setToast("Escribe tu nombre antes de enviar el pedido");
+      setToast("Escribe tu nombre antes de confirmar el pedido");
       return;
     }
     setSendingOrder(true);
     try {
-      const res = await fetch("/api/catalogo/joybees/pedido-publico", {
+      let shortId = pendingShortId;
+      if (!shortId) {
+        const res = await fetch("/api/catalogo/joybees/pedido-publico", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.short_id) {
+          setToast((data?.error as string) || "Error al enviar el pedido. Intenta de nuevo.");
+          return;
+        }
+        shortId = data.short_id as string;
+        setPendingShortId(shortId);
+      }
+
+      const conf = await fetch(`/api/catalogo/joybees/pedido-publico/${shortId}/confirmar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
+        body: JSON.stringify({ aceptar_stock: aceptarStock }),
       });
-      if (!res.ok) throw new Error("save failed");
-      const { short_id } = await res.json();
-
-      const total = cart.reduce((s, i) => s + i.quantity * BULTO_SIZE * i.unit_price, 0);
-      const itemLines = cart.map(i => {
-        return `${i.name} (${i.sku}) x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * BULTO_SIZE} pzas) — $${(i.quantity * BULTO_SIZE * i.unit_price).toFixed(2)}`;
-      }).join("\n");
-      const link = `https://www.fashiongr.com/pedido-joybees/${short_id}`;
-      const msg = `Hola, soy ${trimmedName}. Quiero hacer un pedido de Joybees:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
-      const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-      const win = window.open(url, "_blank");
-
-      // El pedido ya quedó guardado en el server (short_id), así que vaciar el
-      // carrito es seguro aunque WhatsApp no haya abierto.
-      setCart([]);
-      try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
-
-      if (!win) {
-        setFailedOrder({ msg, url });
-        setToast("Recibimos tu pedido. Ábrelo en WhatsApp para confirmar o cópialo.");
+      const confData = await conf.json().catch(() => null);
+      if (conf.status === 409 && confData?.lineas) {
+        setStockAviso(confData.lineas as StockLinea[]);
         return;
       }
-      setFailedOrder(null);
-      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
+      if (!conf.ok || !confData?.numero) {
+        setToast((confData?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo.");
+        return;
+      }
+
+      // Confirmado → vaciar carrito y abrir su página permanente del pedido.
+      setCart([]);
+      try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
+      window.location.href = `/pedido-joybees/${shortId}`;
     } catch {
       setToast("Error al enviar el pedido. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
-    }
-  }
-
-  function retryWhatsApp() {
-    if (!failedOrder) return;
-    const win = window.open(failedOrder.url, "_blank");
-    if (win) {
-      setFailedOrder(null);
-      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
-    } else {
-      setToast("Tu navegador bloqueó WhatsApp. Copia el pedido y pégalo en el chat.");
-    }
-  }
-
-  async function copyOrder() {
-    if (!failedOrder) return;
-    try {
-      await navigator.clipboard.writeText(failedOrder.msg);
-      setToast("Pedido copiado. Pégalo en WhatsApp al +507 6674-5522");
-    } catch {
-      setToast("No se pudo copiar. Toma una captura de tu pedido.");
     }
   }
 
@@ -369,35 +377,44 @@ function PublicJoybeesCatalog() {
           onQtyChange={handleQtyChange}
           onClearCart={handleClearCart}
           variant="public"
-          onSendWhatsApp={handleSendWhatsApp}
+          onSubmitOrder={() => handleConfirmarPedido(false)}
           clientName={clientName}
           onClientNameChange={setClientName}
           saving={sendingOrder}
-          actionLabel={sendingOrder ? "Enviando..." : undefined}
+          actionLabel={sendingOrder ? "Confirmando..." : undefined}
           formatTotal={fmt}
         />
 
-        {failedOrder && (
+        {stockAviso && stockAviso.length > 0 && (
           <div
-            className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#404041]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+            className="fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#404041]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
             style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
           >
-            <p className="text-sm font-semibold text-[#404041]">Recibimos tu pedido — falta confirmarlo</p>
-            <p className="text-xs text-[#404041]/60 mt-0.5 mb-3">
-              WhatsApp no se abrió. Ábrelo de nuevo o copia tu pedido y pégalo en el chat al +507 6674-5522.
+            <p className="text-sm font-semibold text-[#404041]">Algunos productos no tienen todas las piezas disponibles</p>
+            <ul className="mt-1.5 mb-2 space-y-0.5 max-h-32 overflow-y-auto">
+              {stockAviso.map((l) => (
+                <li key={l.product_id} className="text-xs text-[#404041]/70">
+                  <span className="font-medium">{l.name}</span> — pediste {l.pedido_pzas} pzas, hay {l.disponible_pzas}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-[#404041]/60 mb-3">
+              Puedes confirmarlo igual y te contactamos por la diferencia.
             </p>
             <div className="flex gap-2">
               <button
-                onClick={retryWhatsApp}
-                className="flex-1 bg-[#25D366] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+                onClick={() => handleConfirmarPedido(true)}
+                disabled={sendingOrder}
+                className="flex-1 bg-[#404041] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50"
               >
-                Abrir WhatsApp
+                {sendingOrder ? "Confirmando..." : "Confirmar de todas formas"}
               </button>
               <button
-                onClick={copyOrder}
-                className="flex-1 bg-[#404041] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+                onClick={() => setStockAviso(null)}
+                disabled={sendingOrder}
+                className="flex-1 bg-white border border-[#404041]/20 text-[#404041] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50"
               >
-                Copiar pedido
+                Cambiar mi pedido
               </button>
             </div>
           </div>

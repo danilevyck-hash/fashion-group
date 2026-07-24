@@ -18,6 +18,9 @@ export interface UnifiedPedido {
   // borrado usan `fuente` (una pública convertida vive en reebok_orders pero se
   // muestra como "Del link").
   fuente?: "orders" | "publicos";
+  // Cuándo confirmó el CLIENTE desde el link (null/ausente si no ha confirmado
+  // o si la migración 20260724120000 aún no corrió).
+  confirmado_cliente_at?: string | null;
 }
 
 function fmtMoney(n: number) {
@@ -29,13 +32,32 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 }
 
+// Agrupación por MES (fecha local, igual que fmtDate).
+function mesKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function mesLabel(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-PA", { month: "long", year: "numeric" });
+}
+
 type OrigenFilter = "todos" | "link" | "mio";
 
-function OrigenBadge({ origen }: { origen: "mio" | "link" }) {
+function OrigenBadge({ origen, confirmadoCliente }: { origen: "mio" | "link"; confirmadoCliente?: boolean }) {
   if (origen === "link") {
     return (
-      <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+      <span
+        title={confirmadoCliente ? "Del link · Confirmado por el cliente" : undefined}
+        className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700"
+      >
         Del link
+        {confirmadoCliente && (
+          <svg className="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        )}
       </span>
     );
   }
@@ -43,6 +65,43 @@ function OrigenBadge({ origen }: { origen: "mio" | "link" }) {
     <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
       Mío
     </span>
+  );
+}
+
+// Header de mes colapsable (patrón TimeGroupHeader). Mes actual abierto por
+// defecto; los demás cerrados.
+function MesGroup({
+  label,
+  count,
+  defaultOpen,
+  children,
+}: {
+  label: string;
+  count: number;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-1 py-2 text-left"
+      >
+        <svg
+          className={`w-3 h-3 text-gray-400 transition-transform shrink-0 ${open ? "rotate-90" : ""}`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path d="M6 4l8 6-8 6V4z" />
+        </svg>
+        <span className="text-sm font-semibold text-gray-700 capitalize">{label}</span>
+        <span className="text-xs text-gray-400 tabular-nums">
+          ({count} {count === 1 ? "pedido" : "pedidos"})
+        </span>
+      </button>
+      {open && children}
+    </div>
   );
 }
 
@@ -169,6 +228,17 @@ export default function PedidosTab({
     { key: "mio", label: `Míos (${counts.mio})` },
   ];
 
+  // Agrupar por mes (el API ya viene ordenado por fecha desc → los grupos salen
+  // en orden descendente). Mes actual expandido, los demás colapsados.
+  const grupos: { key: string; label: string; items: UnifiedPedido[] }[] = [];
+  for (const p of filtered) {
+    const k = mesKey(p.created_at);
+    const last = grupos[grupos.length - 1];
+    if (last && last.key === k) last.items.push(p);
+    else grupos.push({ key: k, label: mesLabel(p.created_at), items: [p] });
+  }
+  const mesActual = mesKey(new Date().toISOString());
+
   return (
     <div>
       {/* Acciones */}
@@ -225,6 +295,13 @@ export default function PedidosTab({
           </p>
         </div>
       ) : (
+        grupos.map((grupo) => (
+        <MesGroup
+          key={grupo.key}
+          label={grupo.label}
+          count={grupo.items.length}
+          defaultOpen={grupo.key === mesActual}
+        >
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -237,14 +314,14 @@ export default function PedidosTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((pedido) => (
+              {grupo.items.map((pedido) => (
                 <tr
                   key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
                   onClick={() => router.push(detailHref(pedido))}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
                   <td className="px-4 py-3">
-                    <OrigenBadge origen={pedido.origen} />
+                    <OrigenBadge origen={pedido.origen} confirmadoCliente={!!pedido.confirmado_cliente_at} />
                   </td>
                   <td className="px-4 py-3 text-gray-900">
                     {pedido.cliente === "Sin nombre" ? (
@@ -288,6 +365,8 @@ export default function PedidosTab({
             </tbody>
           </table>
         </div>
+        </MesGroup>
+        ))
       )}
 
       <ConfirmModal
