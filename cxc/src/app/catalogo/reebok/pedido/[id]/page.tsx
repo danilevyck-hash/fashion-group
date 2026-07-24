@@ -425,73 +425,31 @@ export default function OrderDetailPage() {
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [justConfirmed, setJustConfirmed] = useState(false);
 
-  async function fetchImageB64(url: string): Promise<string | null> {
-    try { const r = await fetch(url); const b = await r.blob(); return new Promise(res => { const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.readAsDataURL(b); }); } catch { return null; }
-  }
-
   async function downloadPDF() {
     if (!order) return;
     showToast("Generando PDF...");
-    const { jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
-    const { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } = await import("@/lib/reebok-logo");
-    const doc = new jsPDF("portrait");
-
-    // Pre-fetch product images EN PARALELO (antes: for con await por imagen →
-    // la generación del PDF se sentía colgada con N imágenes). fetchImageB64
-    // ya devuelve null ante error, así que el Promise.all no rechaza.
-    const imgs: Record<number, string> = {};
-    const fetched = await Promise.all(
-      items.map((it) => (it.image_url ? fetchImageB64(it.image_url) : Promise.resolve(null))),
-    );
-    fetched.forEach((b, i) => { if (b) imgs[i] = b; });
-
-    doc.setFillColor(26, 26, 26);
-    doc.rect(0, 0, 210, 18, "F");
-    try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* skip logo */ }
-    doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
-
-    doc.setTextColor(100); doc.setFontSize(9);
-    doc.text(`Cliente: ${clientName}`, 14, 26);
-    doc.text(`Pedido: ${order.order_number}`, 90, 26);
-    doc.text(`Fecha: ${new Date(order.created_at).toLocaleDateString("es-PA")}`, 150, 26);
-
-    autoTable(doc, {
-      startY: 32,
-      head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: items.map(i => {
-        const b = bs(i);
-        return ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * b), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * b * Number(i.unit_price))}`];
-      }),
-      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
-      headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [249, 249, 249] },
-      columnStyles: { 0: { cellWidth: 12, minCellHeight: 12 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
-      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number; height: number; width: number } }) => {
-        if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
-          const imgSize = 10;
-          const xOffset = data.cell.x + (data.cell.width - imgSize) / 2;
-          const yOffset = data.cell.y + (data.cell.height - imgSize) / 2;
-          try { doc.addImage(imgs[data.row.index], "JPEG", xOffset, yOffset, imgSize, imgSize); } catch { /* skip */ }
-        }
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fy = (doc as any).lastAutoTable.finalY + 8;
-    doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-    doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
-    doc.text(`$${fmt(totalMoney)}`, 196, fy, { align: "right" });
-    doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group Panama · Reebok Authorized Distributor", 14, fy + 10);
-
-    const prefix = order.status === "confirmado" ? "Pedido" : "Cotizacion";
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const filename = `${prefix}-${order.order_number}-${dateStr}.pdf`;
-    const url = URL.createObjectURL(doc.output("blob"));
-    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-    showToast("PDF listo — revisa tu carpeta de descargas");
+    try {
+      // Lib única de PDF de pedido (mismo layout que el endpoint /pdf y el
+      // adjunto de send-order). Imágenes reducidas a ~200px antes de embeber.
+      const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
+      const prefix = order.status === "confirmado" ? "Pedido" : "Cotizacion";
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await downloadCatalogoOrderPdf({
+        marca: "reebok",
+        orderNumber: order.order_number,
+        clientName,
+        createdAt: order.created_at,
+        items: items.map(i => ({
+          sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
+          image_url: i.image_url || "", category: i.category || FALLBACK_CATEGORY,
+        })),
+        bultoSize: (c) => getBultoSize(c || FALLBACK_CATEGORY),
+        filename: `${prefix}-${order.order_number}-${dateStr}.pdf`,
+      });
+      showToast("PDF listo — revisa tu carpeta de descargas");
+    } catch {
+      showToast("No se pudo generar el PDF. Intenta de nuevo.");
+    }
   }
 
   async function sendToClient() {

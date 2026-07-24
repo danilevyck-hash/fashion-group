@@ -63,8 +63,20 @@ export default function PedidoJoybeesPage() {
     if (!order || generatingPdf) return;
     setGeneratingPdf(true);
     try {
-      const { generateJoybeesOrderPdf } = await import("@/lib/pdf-joybees-order");
-      await generateJoybeesOrderPdf(order.items);
+      // Lib única de PDF de pedido (mismo layout que el flujo interno).
+      const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
+      await downloadCatalogoOrderPdf({
+        marca: "joybees",
+        orderNumber: order.short_id || "PEDIDO",
+        clientName: order.cliente_nombre || "Sin nombre",
+        createdAt: order.created_at,
+        items: order.items.map((i) => ({
+          sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
+          image_url: i.image_url || "", category: "footwear",
+        })),
+        bultoSize: () => getBultoSize(),
+        filename: `Pedido-Joybees-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
     } catch {
       // silent fail
     } finally {

@@ -39,9 +39,13 @@ export async function POST(req: NextRequest) {
     ? `joybees/${skuKey}`
     : `joybees/${Date.now()}-${file.name}`;
 
+  // cacheControl 1 año: la URL guardada lleva `?v=` nuevo en cada re-subida,
+  // así que el objeto puede cachearse como inmutable (browser + CDN). Sin esto
+  // Supabase sirve `cache-control: no-cache` y cada PDF/catálogo re-descarga
+  // TODAS las fotos en cada generación. Espejo de reebok/upload.
   const { error: uploadError } = await supabaseServer.storage
     .from("product-images")
-    .upload(filename, buffer, { contentType: file.type, upsert: true });
+    .upload(filename, buffer, { contentType: file.type, upsert: true, cacheControl: "31536000" });
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
