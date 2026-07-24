@@ -86,7 +86,7 @@ export default function PedidoReebokPage() {
       const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
       await downloadCatalogoOrderPdf({
         marca: "reebok",
-        orderNumber: order.short_id || "PEDIDO",
+        orderNumber: order.ped_order_number || order.short_id || "PEDIDO",
         clientName: order.cliente_nombre || "Sin nombre",
         createdAt: order.created_at,
         items: order.items.map((i) => ({
