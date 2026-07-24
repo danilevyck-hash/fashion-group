@@ -422,8 +422,23 @@ export default function OrderDetailPage() {
     if (!order) return;
     showToast("Generando PDF...");
     try {
-      const { generateJoybeesOrderPdf } = await import("@/lib/pdf-joybees-order");
-      await generateJoybeesOrderPdf(items);
+      // Lib única de PDF de pedido (mismo layout que el endpoint /pdf y el
+      // adjunto de send-order). Imágenes reducidas a ~200px antes de embeber.
+      const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
+      const prefix = order.status === "confirmado" ? "Pedido" : "Cotizacion";
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await downloadCatalogoOrderPdf({
+        marca: "joybees",
+        orderNumber: order.order_number,
+        clientName,
+        createdAt: order.created_at,
+        items: items.map(i => ({
+          sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
+          image_url: i.image_url || "", category: "footwear",
+        })),
+        bultoSize: () => BULTO,
+        filename: `${prefix}-${order.order_number}-${dateStr}.pdf`,
+      });
       showToast("PDF listo — revisa tu carpeta de descargas");
     } catch {
       showToast("No se pudo generar el PDF. Intenta de nuevo.");

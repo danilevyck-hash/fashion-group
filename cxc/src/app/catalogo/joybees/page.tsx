@@ -150,6 +150,56 @@ function JoybeesCatalog() {
     setShowShareMenu(false);
   }
 
+  // ── Descargar catálogo como PDF (espejo de Reebok, lib compartida) ──
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadCatalog() {
+    if (!sortedGroups.length || downloading) return;
+
+    setDownloading(true);
+    setToast("Generando catalogo PDF...");
+
+    try {
+      const { downloadCatalogPdf } = await import("@/lib/catalogo/catalog-pdf");
+
+      const filterDesc: string[] = [];
+      if (gender) filterDesc.push(SECTION_LABELS[gender as DisplaySection] || gender);
+      if (category) filterDesc.push(category);
+      if (search) filterDesc.push(`“${search}”`);
+      const subtitle = filterDesc.length > 0 ? filterDesc.join("  ·  ") : "Todos los productos";
+
+      // Secciones canónicas por SECTION_ORDER (mismo orden que la vista).
+      const bySection = new Map<DisplaySection, GroupedProduct[]>();
+      for (const gs of sortedGroups) {
+        if (!bySection.has(gs.section)) bySection.set(gs.section, []);
+        bySection.get(gs.section)!.push(gs.group);
+      }
+      const sections = [...bySection.entries()]
+        .sort((a, b) => (SECTION_ORDER[a[0]] ?? 99) - (SECTION_ORDER[b[0]] ?? 99))
+        .map(([section, groups]) => ({
+          label: SECTION_LABELS[section] || section,
+          items: groups.map(g => ({
+            name: g.name, sku: g.baseSku, price: g.price,
+            image_url: g.image_url, badge: null,
+          })),
+        }));
+
+      await downloadCatalogPdf({
+        marca: "joybees",
+        sections,
+        subtitle,
+        totalCount: sortedGroups.length,
+        filename: `catalogo-joybees-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
+      setToast("Catalogo descargado");
+    } catch (e) {
+      console.error(e);
+      setToast("Error al generar PDF");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   // Derived: group by model first, then assign display sections
   const allGrouped = groupByModel(
     products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
@@ -330,6 +380,11 @@ function JoybeesCatalog() {
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
                   </svg>
                   Copiar link publico
+                </button>
+                <button onClick={() => { setShowShareMenu(false); handleDownloadCatalog(); }} disabled={downloading}
+                  className="w-full text-left px-4 py-2.5 text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  {downloading ? "Generando..." : "Descargar PDF"}
                 </button>
               </div>
             )}

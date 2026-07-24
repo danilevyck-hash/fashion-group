@@ -65,8 +65,21 @@ export default function PedidoReebokPage() {
     if (!order || generatingPdf) return;
     setGeneratingPdf(true);
     try {
-      const { generateReebokOrderPdf } = await import("@/lib/pdf-reebok-order");
-      await generateReebokOrderPdf(order.items);
+      // Lib única de PDF de pedido (mismo layout que el flujo interno).
+      const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
+      await downloadCatalogoOrderPdf({
+        marca: "reebok",
+        orderNumber: order.short_id || "PEDIDO",
+        clientName: order.cliente_nombre || "Sin nombre",
+        createdAt: order.created_at,
+        items: order.items.map((i) => ({
+          sku: i.sku || "", name: i.name, quantity: i.quantity, unit_price: Number(i.unit_price),
+          image_url: i.image_url || "", is_preorder: i.is_preorder === true,
+          category: i.category || "footwear",
+        })),
+        bultoSize: (c) => getBultoSize(c || "footwear"),
+        filename: `Pedido-Reebok-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
     } catch {
       // silent fail
     } finally {

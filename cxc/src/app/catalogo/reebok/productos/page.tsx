@@ -210,111 +210,8 @@ function Productos() {
     setToast("Generando catalogo PDF...");
 
     try {
-      const { jsPDF } = await import("jspdf");
-      const { REEBOK_LOGO_BASE64 } = await import("@/lib/reebok-logo");
-
-      const NAVY: [number, number, number] = [26, 38, 86];
-      const RED: [number, number, number] = [228, 0, 43];
-      const CREAM: [number, number, number] = [245, 240, 232];
-      const GRAY_LIGHT: [number, number, number] = [160, 160, 165];
-      const GRAY_MID: [number, number, number] = [120, 120, 125];
-      const WHITE: [number, number, number] = [255, 255, 255];
-
-      const PW = 215.9, PH = 279.4;
-      const M = 18;
-      const CONTENT_W = PW - 2 * M;
-      const COLS = 3, GAP = 8;
-      const CW = (CONTENT_W - (COLS - 1) * GAP) / COLS;
-      const IH = 54;
-      const TH = 22;
-      const CH = IH + TH;
-      const RGAP = 10;
-      const GENDER_H = 14;
-      const FOOTER_H = 10;
-
-      function loadImg(url: string): Promise<{ data: string; w: number; h: number }> {
-        return new Promise(resolve => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-            const c = document.createElement("canvas");
-            c.width = img.naturalWidth; c.height = img.naturalHeight;
-            c.getContext("2d")!.drawImage(img, 0, 0);
-            try { resolve({ data: c.toDataURL("image/jpeg", 0.82), w: img.naturalWidth, h: img.naturalHeight }); }
-            catch { resolve({ data: "", w: 0, h: 0 }); }
-          };
-          img.onerror = () => resolve({ data: "", w: 0, h: 0 });
-          img.src = url;
-        });
-      }
-
-      const urls = [...new Set(items.filter(p => p.image_url).map(p => p.image_url!))];
-      const imgCache: Record<string, { data: string; w: number; h: number }> = {};
-      await Promise.all(urls.map(u => loadImg(u).then(r => { imgCache[u] = r; })));
-
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-      let y = M;
-      let pageNum = 1;
-
-      function drawFooter() {
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...GRAY_LIGHT);
-        doc.text(`${pageNum}`, PW / 2, PH - 8, { align: "center" });
-        doc.setFontSize(6);
-        doc.setTextColor(...GRAY_MID);
-        doc.text("Fashion Group \u2014 Panam\u00e1", PW / 2, PH - 4.5, { align: "center" });
-      }
-
-      function drawPageHeader() {
-        if (REEBOK_LOGO_BASE64) {
-          doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, 8, 18, 5);
-        }
-        doc.setDrawColor(...RED);
-        doc.setLineWidth(0.4);
-        doc.line(M, 15, PW - M, 15);
-        y = 20;
-      }
-
-      function needPage(h: number): boolean {
-        if (y + h > PH - M - FOOTER_H) {
-          drawFooter();
-          doc.addPage();
-          pageNum++;
-          drawPageHeader();
-          return true;
-        }
-        return false;
-      }
-
-      if (REEBOK_LOGO_BASE64) {
-        doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, y, 24, 6.7);
-      }
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...NAVY);
-      doc.text("CAT\u00c1LOGO", PW - M, y + 5.5, { align: "right" });
-      y += 11;
-      doc.setDrawColor(...RED);
-      doc.setLineWidth(0.5);
-      doc.line(M, y, PW - M, y);
-      y += 6;
-
-      const dateStr = new Date().toLocaleDateString("es-PA", {
-        day: "numeric", month: "long", year: "numeric",
-      });
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...GRAY_MID);
-      doc.text(dateStr, M, y);
-
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...NAVY);
-      doc.text(`${items.length} productos`, PW - M, y, { align: "right" });
-
-      y += 5;
+      // Lib compartida Reebok/Joybees (src/lib/catalogo/catalog-pdf.ts).
+      const { downloadCatalogPdf } = await import("@/lib/catalogo/catalog-pdf");
 
       const filterDesc: string[] = [];
       if (gender) filterDesc.push(genderFilterLabel(gender));
@@ -323,11 +220,6 @@ function Productos() {
       if (saleFilter === "nuevo") filterDesc.push("Nuevo");
       if (search) filterDesc.push(`\u201c${search}\u201d`);
       const subtitle = filterDesc.length > 0 ? filterDesc.join("  \u00b7  ") : "Todos los productos";
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...GRAY_LIGHT);
-      doc.text(subtitle.toUpperCase(), M, y);
-      y += 8;
 
       // Agrupaci\u00f3n can\u00f3nica (women+female \u2192 Mujer; unisex propio). "otros" cierra
       // el catch-all para que ning\u00fan producto con g\u00e9nero no contemplado se caiga
@@ -339,88 +231,21 @@ function Productos() {
         { key: "unisex", label: "UNISEX" },
         { key: "otros", label: "OTROS" },
       ];
+      const sections = genders.map(g => ({
+        label: g.label,
+        items: items.filter(p => genderGroupKey(p.gender) === g.key).map(p => ({
+          name: p.name, sku: p.sku || "", color: p.color, price: p.price,
+          image_url: p.image_url || null, badge: p.badge,
+        })),
+      }));
 
-      for (const g of genders) {
-        const gItems = items.filter(p => genderGroupKey(p.gender) === g.key);
-        if (!gItems.length) continue;
-        needPage(GENDER_H + CH);
-        doc.setFillColor(...NAVY);
-        doc.roundedRect(M, y, CONTENT_W, 8, 1, 1, "F");
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...WHITE);
-        doc.text(g.label, M + 5, y + 5.8);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(200, 200, 210);
-        doc.text(`${gItems.length} productos`, PW - M - 5, y + 5.8, { align: "right" });
-        y += GENDER_H;
-
-        for (let i = 0; i < gItems.length; i += COLS) {
-          needPage(CH);
-          const row = gItems.slice(i, i + COLS);
-          for (let j = 0; j < row.length; j++) {
-            const p = row[j];
-            const x = M + j * (CW + GAP);
-            doc.setFillColor(...CREAM);
-            doc.roundedRect(x, y, CW, IH, 2, 2, "F");
-            const cached = p.image_url ? imgCache[p.image_url] : null;
-            if (cached?.data) {
-              const pad = 4;
-              const boxW = CW - pad * 2, boxH = IH - pad * 2;
-              const scale = Math.min(boxW / cached.w, boxH / cached.h);
-              const dw = cached.w * scale, dh = cached.h * scale;
-              const dx = x + pad + (boxW - dw) / 2;
-              const dy = y + pad + (boxH - dh) / 2;
-              doc.addImage(cached.data, "JPEG", dx, dy, dw, dh);
-            }
-            if (p.badge === "oferta") {
-              doc.setFillColor(...RED);
-              doc.roundedRect(x + 2, y + 2, 14, 4.5, 1, 1, "F");
-              doc.setFontSize(6);
-              doc.setTextColor(...WHITE);
-              doc.setFont("helvetica", "bold");
-              doc.text("OFERTA", x + 3.2, y + 5.2);
-            } else if (p.badge === "nuevo") {
-              doc.setFillColor(...NAVY);
-              doc.roundedRect(x + 2, y + 2, 13, 4.5, 1, 1, "F");
-              doc.setFontSize(6);
-              doc.setTextColor(...WHITE);
-              doc.setFont("helvetica", "bold");
-              doc.text("NUEVO", x + 3.2, y + 5.2);
-            }
-            let ty = y + IH + 5;
-            doc.setTextColor(...NAVY);
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            const maxNameLen = Math.floor(CW / 1.8);
-            const name = p.name.length > maxNameLen
-              ? p.name.substring(0, maxNameLen - 1) + "\u2026"
-              : p.name;
-            doc.text(name.toUpperCase(), x + 1, ty);
-            ty += 4;
-            doc.setFontSize(6.5);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(...GRAY_LIGHT);
-            const skuText = p.sku || "";
-            const colorText = p.color ? `  \u00b7  ${p.color}` : "";
-            doc.text(skuText + colorText, x + 1, ty);
-            ty += 5.5;
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            if (p.badge === "oferta") {
-              doc.setTextColor(...RED);
-            } else {
-              doc.setTextColor(...NAVY);
-            }
-            doc.text(p.price ? `$${p.price.toFixed(0)}` : "\u2014", x + 1, ty);
-          }
-          y += CH + RGAP;
-        }
-      }
-
-      drawFooter();
-      doc.save(`catalogo-reebok-${new Date().toISOString().slice(0, 10)}.pdf`);
+      await downloadCatalogPdf({
+        marca: "reebok",
+        sections,
+        subtitle,
+        totalCount: items.length,
+        filename: `catalogo-reebok-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
       setToast("Catalogo descargado");
     } catch (e) {
       console.error(e);
