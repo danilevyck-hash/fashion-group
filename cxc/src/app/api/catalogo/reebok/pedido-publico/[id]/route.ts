@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer as supabase } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js): sin esto
+// el GET servía un snapshot viejo del pedido (p.ej. seguía respondiendo 200
+// tras un soft-delete, o convertida=false tras confirmar). supabaseServer ya
+// trae cache:'no-store'; fetchCache refuerza a nivel de ruta.
+export const fetchCache = "force-no-store";
 
 // Columnas del link público. confirmado_cliente_at es de la migración
 // 20260724120000 — si aún no corrió, se reintenta sin ella (tolerante).

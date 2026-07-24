@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { joybeesServer } from "@/lib/joybees-supabase-server";
 
 export const dynamic = "force-dynamic";
+// Sin Data Cache en los fetch internos (gotcha Next.js + supabase-js), espejo
+// del GET Reebok. joybeesServer ya trae cache:'no-store'; esto refuerza.
+export const fetchCache = "force-no-store";
 
 // Columnas del link público. confirmado_cliente_at es de la migración
 // 20260724120000 — si aún no corrió, se reintenta sin ella (tolerante).
