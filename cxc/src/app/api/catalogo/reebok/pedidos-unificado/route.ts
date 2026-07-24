@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
@@ -78,6 +79,27 @@ export async function GET(req: NextRequest) {
   const allProductIds = rows.flatMap((r) => (r.items || []).map((i) => i.product_id));
   const categoryMap = await fetchReebokCategoryMap(allProductIds);
 
+  // Números de Switch de los envíos ACTIVOS ('enviado'/'verificado', mismo
+  // criterio que el candado #236/#237) — la eliminación masiva los muestra en
+  // el modal ("siguen en Switch: anúlalos en el panel"). Solo filas 'orders'
+  // pueden tener envío. Tolerante: si la tabla no responde, todo queda null.
+  const orderIds = rows
+    .filter((r) => (r.fuente ?? (r.origen === "link" ? "publicos" : "orders")) === "orders")
+    .map((r) => r.id_natural);
+  const switchNumeros = new Map<string, string>();
+  if (orderIds.length > 0) {
+    const { data: envios, error: enviosError } = await reebokServer
+      .from("reebok_switch_envios")
+      .select("order_id, numero_interno, pedido_switch_id")
+      .in("order_id", orderIds)
+      .in("estado", ["enviado", "verificado"]);
+    if (!enviosError) {
+      for (const e of envios || []) {
+        switchNumeros.set(String(e.order_id), String(e.numero_interno || e.pedido_switch_id || "?"));
+      }
+    }
+  }
+
   const result = rows.map((r) => {
     const items = r.items || [];
     const itemsForTotal = items.map((i) => ({
@@ -95,6 +117,7 @@ export async function GET(req: NextRequest) {
       item_count: items.length,
       fuente: r.fuente ?? (r.origen === "link" ? "publicos" : "orders"),
       confirmado_cliente_at: r.confirmado_cliente_at ?? null,
+      switch_numero: switchNumeros.get(r.id_natural) ?? null,
     };
   });
 

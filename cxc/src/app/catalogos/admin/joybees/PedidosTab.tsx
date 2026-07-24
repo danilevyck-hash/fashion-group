@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDeleteModal } from "@/components/ui";
+import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal";
 
 // Fila de la vista unificada (presenciales + del link) que devuelve
 // GET /api/catalogo/joybees/pedidos-unificado. El total ya viene recalculado
@@ -22,6 +23,9 @@ export interface JoybeesUnifiedPedido {
   // Cuándo confirmó el CLIENTE desde el link (null/ausente si no ha confirmado
   // o si la migración 20260724120000 aún no corrió).
   confirmado_cliente_at?: string | null;
+  // numero_interno del envío ACTIVO en Switch (null si nunca se envió). La
+  // eliminación masiva lo usa para avisar "sigue en Switch — anúlalo allá".
+  switch_numero?: string | null;
 }
 
 type OrigenFilter = "todos" | "link" | "mio";
@@ -70,23 +74,26 @@ function OrigenBadge({ origen, confirmadoCliente }: { origen: "mio" | "link"; co
 }
 
 // Header de mes colapsable (patrón TimeGroupHeader). Mes actual abierto por
-// defecto; los demás cerrados. Espejo de Reebok.
+// defecto; los demás cerrados. Controlado por el padre: la selección masiva
+// necesita saber qué meses están expandidos ("Seleccionar todos" solo toma
+// filas visibles — un mes colapsado no aporta). Espejo de Reebok.
 function MesGroup({
   label,
   count,
-  defaultOpen,
+  open,
+  onToggle,
   children,
 }: {
   label: string;
   count: number;
-  defaultOpen: boolean;
+  open: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mb-3">
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onToggle}
         className="w-full flex items-center gap-2 px-1 py-2 text-left"
       >
         <svg
@@ -116,6 +123,14 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [converting, setConverting] = useState<string | null>(null);
+  // Selección masiva. `selected` guarda keys fuente-id; qué cuenta de verdad
+  // es la intersección con las filas VISIBLES (filtro actual + mes expandido)
+  // — lo que no se ve nunca se elimina. `openMeses` controla los MesGroup
+  // (default: solo el mes actual abierto). Espejo de Reebok.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [openMeses, setOpenMeses] = useState<Record<string, boolean>>({});
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const loadPedidos = useCallback(async () => {
     try {
@@ -250,6 +265,69 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
   }
   const mesActual = mesKey(new Date().toISOString());
 
+  const isMesOpen = (k: string) => openMeses[k] ?? (k === mesActual);
+  const rowKey = (p: JoybeesUnifiedPedido) => `${p.fuente ?? p.origen}-${p.id_natural}`;
+  const clienteLabel = (p: JoybeesUnifiedPedido) =>
+    p.cliente === "Sin nombre" || !p.cliente?.trim() ? "Sin nombre" : p.cliente;
+
+  // Filas elegibles para selección masiva = las VISIBLES ahora mismo: pasan el
+  // filtro/búsqueda actual Y su mes está expandido. Cambiar filtro o colapsar
+  // un mes las saca de la selección efectiva automáticamente.
+  const visibleRows = grupos.filter((g) => isMesOpen(g.key)).flatMap((g) => g.items);
+  const selectedRows = visibleRows.filter((p) => selected.has(rowKey(p)));
+  const allSelected = visibleRows.length > 0 && selectedRows.length === visibleRows.length;
+  const selEnviados = selectedRows.filter((p) => !!p.switch_numero);
+  const selSinEnviar = selectedRows.length - selEnviados.length;
+
+  function toggleRow(p: JoybeesUnifiedPedido) {
+    const k = rowKey(p);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(visibleRows.map(rowKey)));
+  }
+
+  // Eliminación masiva: soft-delete por fuente en un solo POST. Igual que el
+  // individual, NUNCA toca Switch — los ya enviados solo se ocultan.
+  async function handleBulkDelete() {
+    if (bulkLoading || selectedRows.length === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/catalogo/joybees/orders/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedidos: selectedRows.map((p) => ({
+            id: p.id_natural,
+            fuente: isOrdersRow(p) ? "orders" : "publicos",
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error("bulk delete failed");
+      const data = await res.json();
+      const n = Number(data?.eliminados) || 0;
+      const f = Number(data?.fallidos) || 0;
+      showToast(
+        f > 0
+          ? `${n} ${n === 1 ? "pedido eliminado" : "pedidos eliminados"} — ${f} no se ${f === 1 ? "pudo" : "pudieron"} eliminar`
+          : `${n} ${n === 1 ? "pedido eliminado" : "pedidos eliminados"}`,
+      );
+      setBulkOpen(false);
+      setSelected(new Set());
+      await loadPedidos();
+    } catch {
+      showToast("No se pudieron eliminar los pedidos. Intenta de nuevo.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -314,17 +392,41 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
           </p>
         </div>
       ) : (
-        grupos.map((grupo) => (
+        <>
+        {/* Selección masiva: "todos" = filas visibles (filtro actual + meses
+            expandidos). El botón rojo aparece solo con selección. */}
+        <div className="flex items-center justify-between gap-3 mb-3 min-h-[38px]">
+          <label className="inline-flex items-center gap-2 px-1 text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="w-4 h-4 accent-black cursor-pointer"
+            />
+            Seleccionar todos
+          </label>
+          {selectedRows.length > 0 && (
+            <button
+              onClick={() => setBulkOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] transition"
+            >
+              Eliminar seleccionados ({selectedRows.length})
+            </button>
+          )}
+        </div>
+        {grupos.map((grupo) => (
         <MesGroup
           key={grupo.key}
           label={grupo.label}
           count={grupo.items.length}
-          defaultOpen={grupo.key === mesActual}
+          open={isMesOpen(grupo.key)}
+          onToggle={() => setOpenMeses((prev) => ({ ...prev, [grupo.key]: !isMesOpen(grupo.key) }))}
         >
         <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="w-8 pl-4 pr-1 py-3"></th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Origen</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
@@ -339,6 +441,15 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
                   onClick={() => router.push(detailHref(pedido))}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
+                  <td className="w-8 pl-4 pr-1 py-3" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(rowKey(pedido))}
+                      onChange={() => toggleRow(pedido)}
+                      className="w-4 h-4 accent-black cursor-pointer align-middle"
+                      aria-label={`Seleccionar pedido de ${clienteLabel(pedido)}`}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <OrigenBadge origen={pedido.origen} confirmadoCliente={!!pedido.confirmado_cliente_at} />
                   </td>
@@ -385,8 +496,22 @@ export default function PedidosTab({ showToast }: { showToast: (msg: string) => 
           </table>
         </div>
         </MesGroup>
-        ))
+        ))}
+        </>
       )}
+
+      <BulkDeletePedidosModal
+        open={bulkOpen}
+        sinEnviar={selSinEnviar}
+        enviados={selEnviados.map((p) => ({
+          key: rowKey(p),
+          cliente: clienteLabel(p),
+          numero: p.switch_numero as string,
+        }))}
+        onConfirm={handleBulkDelete}
+        onCancel={() => !bulkLoading && setBulkOpen(false)}
+        loading={bulkLoading}
+      />
 
       <ConfirmDeleteModal
         open={!!deleting}
