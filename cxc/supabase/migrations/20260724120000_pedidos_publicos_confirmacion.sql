@@ -177,10 +177,22 @@ GRANT SELECT ON joybees_pedidos_unificado_vw TO service_role;
 -- bypassa RLS); estas políticas son defensa en profundidad contra accesos con
 -- la anon key desde fuera de la app.
 ALTER TABLE reebok_pedidos_publicos ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS public_read      ON reebok_pedidos_publicos;
-DROP POLICY IF EXISTS public_insert    ON reebok_pedidos_publicos;
-DROP POLICY IF EXISTS public_select    ON reebok_pedidos_publicos;
-DROP POLICY IF EXISTS service_role_all ON reebok_pedidos_publicos;
+
+-- Se eliminan TODAS las políticas existentes de la tabla (los nombres de las
+-- viejas public_read/public_insert se crearon ad-hoc y podrían variar).
+DO $do$
+DECLARE
+  pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'reebok_pedidos_publicos'
+  LOOP
+    EXECUTE format('DROP POLICY %I ON reebok_pedidos_publicos', pol.policyname);
+  END LOOP;
+END
+$do$;
+
 CREATE POLICY service_role_all ON reebok_pedidos_publicos
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 
