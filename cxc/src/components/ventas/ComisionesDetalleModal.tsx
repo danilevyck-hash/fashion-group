@@ -465,7 +465,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                       {data.ventas.length === 0 ? (
                         <tr><td colSpan={6} className="px-3 py-4 text-center text-gray-400">Sin ventas comisionables.</td></tr>
                       ) : data.ventas.map((v, i) => (
-                        <tr key={i} className={`border-b border-gray-100 last:border-0 ${v.subtotal < 0 ? "text-rose-600" : "text-gray-800"}`}>
+                        // Facturas con utilidad ≤20% no comisionan: se listan con
+                        // $0.00 (atribuidas al vendedor de la factura) pero en gris.
+                        <tr key={i} className={`border-b border-gray-100 last:border-0 ${v.subtotal < 0 ? "text-rose-600" : v.subtotal === 0 && v.tipo === "Factura" ? "text-gray-400" : "text-gray-800"}`}>
                           <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(v.fecha)}</td>
                           <td className="px-3 py-1.5">{v.cliente}</td>
                           <td className="px-3 py-1.5 tabular-nums text-gray-500">{v.secuencial}</td>
