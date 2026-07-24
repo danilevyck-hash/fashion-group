@@ -8,7 +8,6 @@ import {
   type ProductPriceInfo,
 } from "@/lib/reebok-pedido-publico-validate";
 import { checkPedidoRateLimit } from "@/lib/reebok-pedido-rate-limit";
-import { sendTelegramAlert } from "@/lib/telegram";
 
 // Endpoint PÚBLICO (sin auth, RLS public_insert): nada del body se confía.
 // Validación estructural + precios reales de la DB en
@@ -22,8 +21,6 @@ const SHORT_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 function generateShortId(): string {
   return Array.from({ length: 8 }, () => SHORT_ID_ALPHABET[randomInt(36)]).join("");
 }
-
-const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +97,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No se pudo guardar el pedido" }, { status: 500 });
     }
 
-    await sendTelegramAlert(`🛒 Nuevo pedido Reebok (público) — ${parsed.cliente_nombre} — ${money(priced.total)}`);
+    // Sin alerta Telegram al CREAR: con el flujo de 1 toque (crear+confirmar juntos)
+    // la única alerta es la de "✅ CONFIRMADO" (con número PED-### y monto) en
+    // pedido-publico/[id]/confirmar. Consecuencia consciente: un pedido creado pero
+    // NO confirmado (ej. el cliente abandona tras el aviso de stock corto) ya no
+    // alerta a Telegram — decisión explícita de Daniel, 24-jul-2026.
 
     return NextResponse.json({ short_id });
   } catch (err) {
