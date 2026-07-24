@@ -40,9 +40,13 @@ export async function POST(req: NextRequest) {
     ? `products/${skuKey}`
     : `products/${Date.now()}-${file.name}`
 
+  // cacheControl 1 año: la URL guardada lleva `?v=` nuevo en cada re-subida,
+  // así que el objeto puede cachearse como inmutable (browser + CDN). Sin esto
+  // Supabase sirve `cache-control: no-cache` y cada PDF/catálogo re-descarga
+  // TODAS las fotos en cada generación.
   const { error: uploadError } = await reebokServer.storage
     .from('product-images')
-    .upload(filename, buffer, { contentType: file.type, upsert: true })
+    .upload(filename, buffer, { contentType: file.type, upsert: true, cacheControl: '31536000' })
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 })
 
@@ -52,7 +56,9 @@ export async function POST(req: NextRequest) {
 
   // Cache-buster: the deterministic path means the URL is stable; without `?v=`
   // the browser would keep serving the old cached bytes after a re-upload.
-  const url = `${publicUrl}?v=${Date.now()}`
+  // El `v` se fija UNA vez aquí y queda persistido en products.image_url —
+  // solo cambia cuando cambia la foto (nunca por render).
+  const url = skuKey ? `${publicUrl}?v=${Date.now()}` : publicUrl
 
   return NextResponse.json({ url })
 }
