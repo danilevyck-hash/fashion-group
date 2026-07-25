@@ -1,6 +1,7 @@
 // Vocabulario único de aging para el módulo CXC (desktop /admin).
 // Fuente de verdad de los 3 términos + colores; consumido por KpiCards,
-// AgingLegend, ClientTable, ClientRow, ContactPanel para evitar duplicación.
+// ClientTable, ClientRow y ContactPanel para evitar duplicación.
+// (AgingLegend se eliminó en jul-2026 al quitar la leyenda de CXC y Proveedores.)
 
 export type AgingKey = "current" | "watch" | "overdue";
 

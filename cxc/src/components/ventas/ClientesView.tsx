@@ -184,12 +184,8 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   const vistaChipLong = isClosedYear
     ? `Año ${selectedYear}`
     : (is12mView ? "Últimos 12 meses" : `YTD ${selectedYear}`);
-  const vistaSubtitleText = isClosedYear
-    ? `clientes con compras en ${selectedYear}`
-    : (is12mView ? "últimos 12 meses" : `Compras YTD ${selectedYear}`);
-  const vistaSubtitleTextShort = isClosedYear
-    ? `año ${selectedYear}`
-    : (is12mView ? "últimos 12m" : `YTD ${selectedYear}`);
+  // El período NO se repite en el contador de clientes (limpieza jul-2026): el
+  // chip "Vista: …" de al lado ya lo dice y además es clicable para cambiarlo.
   const vistaChipTitle = isClosedYear
     ? `Vista anual: clientes con compras en ${selectedYear} y delta vs ${selectedYear - 1}.`
     : (is12mView
@@ -342,7 +338,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 md:flex">
             <p>
-              <span className="font-mono text-gray-950">{filtered.length}</span> clientes activos · {vistaSubtitleText} · ordenados por {SORT_LABELS[sortBy]}
+              <span className="font-mono text-gray-950">{filtered.length}</span> clientes activos · ordenados por {SORT_LABELS[sortBy]}
             </p>
             {isClosedYear ? (
               <span
@@ -369,7 +365,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             al texto y dé sensación de amontonamiento. */}
         <div className="md:hidden">
           <div className="text-xs text-gray-500">
-            <span className="font-mono text-gray-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
+            <span className="font-mono text-gray-950">{filtered.length}</span> clientes
           </div>
           {isClosedYear ? (
             <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-xs font-medium", vistaChipTone)}>

@@ -192,7 +192,7 @@ export function VentasShell({
             Ventas
           </h1>
           <p className="mt-1 text-xs text-gray-500">
-            8 empresas · año fiscal {selectedYear} · {mesesLabel}
+            8 empresas · {mesesLabel}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

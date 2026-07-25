@@ -18,6 +18,9 @@ import AppHeader from "@/components/AppHeader";
 import { PullToRefresh } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
+import SyncStatus from "@/components/shared/SyncStatus";
+import SyncNowButton from "@/components/shared/SyncNowButton";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import type { Multifashion } from "@/components/ventas/types";
 
 // Fetcher puro del overview por año. Misma llamada que tenía el onYearChange
@@ -47,6 +50,9 @@ export function MultifashionShell({
 
   // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
   const [selectedYear, setSelectedYear] = useState(initialYear);
+  // Señal de "acabo de sincronizar": el botón del header la incrementa y el tab
+  // Resumen la usa para re-pedir el detalle del mes (mismos year/mes).
+  const [syncTick, setSyncTick] = useState(0);
 
   // Overview por año vía SWR (clave null hasta authChecked → respeta el gate
   // admin-only). fallbackData = el SSR SOLO para el año inicial; los demás años
@@ -82,9 +88,35 @@ export function MultifashionShell({
           <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
             Multifashion
           </h1>
-          <p className="mt-1 text-xs text-gray-500">
-            Retail tienda física · año fiscal {selectedYear}
-          </p>
+          {/* Nombre comercial de la tienda + frescura del sync + "Actualizar
+              ahora". Antes vivían en una card de identidad dentro del tab
+              Resumen; acá se ven desde cualquier sub-tab y sin repetir el
+              bloque. El nombre se conserva porque el módulo se llama
+              Multifashion pero la tienda se conoce por su nombre comercial. */}
+          {multi?.tienda && (
+            <p className="mt-1 text-sm font-medium text-gray-700">{multi.tienda}</p>
+          )}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <SyncStatus
+              tabla="facturas"
+              empresasEsperadas={["american_classic"]}
+              empresaLabels={EMPRESA_KEY_TO_NAME}
+              variant="pill"
+              prefix="Sincronizado"
+            />
+            {/* gerente_acs NO lo ve — el gate de rol vive en SyncNowButton. Un
+                clic = sync de facturas de american_classic (mismo candado y
+                cooldown del endpoint). Al terminar se revalida el overview y
+                sube syncTick para que el Resumen re-pida el detalle del mes;
+                SyncStatus se refresca solo (evento focus). */}
+            <SyncNowButton
+              opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
+              onSuccess={async () => {
+                await mutate();
+                setSyncTick((t) => t + 1);
+              }}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v, 10))}>
@@ -113,7 +145,7 @@ export function MultifashionShell({
           data={multi}
           selectedYear={selectedYear}
           isClosedYear={isClosedYear}
-          onReloadData={async () => { await mutate(); }}
+          syncTick={syncTick}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

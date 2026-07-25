@@ -159,7 +159,7 @@ export function CajaSubtab() {
           </div>
 
           <p className="text-xs text-gray-400">
-            Cifras según Switch al momento de la actualización. El día en curso se refresca cada 10 minutos.
+            El día en curso se refresca cada 10 minutos.
           </p>
         </>
       ) : null}

@@ -281,7 +281,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-display text-base font-semibold text-gray-950">Clientes · {periodoStr}</h3>
-              <p className="mt-0.5 text-xs text-gray-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
+              <p className="mt-0.5 text-xs text-gray-400">Mostrador anónimo va aparte</p>
             </div>
             <div className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5">
               {RANGO_OPCIONES.map(opt => (
@@ -664,7 +664,7 @@ function ClienteSparkline({
         })}
       </div>
       <p className="mt-2 text-xs text-gray-500">
-        Histórico mensual del rango. Escala compartida entre wholesale y retail.
+        Escala compartida entre mayoreo y retail
       </p>
     </div>
   );

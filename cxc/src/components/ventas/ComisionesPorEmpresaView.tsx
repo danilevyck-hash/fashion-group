@@ -15,7 +15,7 @@ import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Coins, FileSpreadsheet, Settings } from "lucide-react";
+import { FileSpreadsheet, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
@@ -219,11 +219,6 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
           </table>
         )}
       </Card>
-
-      <p className="flex items-center gap-1.5 text-xs text-gray-400">
-        <Coins className="h-3.5 w-3.5" />
-        Los vendedores sin venta ni cobro del mes se agrupan en una línea al pie.
-      </p>
 
       {canConfig && (
         <ComisionesConfigModal

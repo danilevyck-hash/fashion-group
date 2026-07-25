@@ -256,7 +256,7 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Cada celda es la comisión total de esa empresa (ya neteada). El TOTAL suma la fila. Toca una celda para ver su detalle.
+        Cada celda ya viene neteada · Toca una celda para ver su detalle
       </p>
 
       {detalle && (

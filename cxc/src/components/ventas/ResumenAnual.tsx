@@ -85,6 +85,14 @@ const toneClassDark: Record<string, string> = {
   stone: "text-gray-400",
 };
 
+/** Leyenda del Δ interanual como TOOLTIP (antes era una línea fija bajo la
+ *  tabla). Explica a partir de qué umbral cambia el color de la flecha. */
+function leyendaDeltaAnual(mode: ViewMode): string {
+  return mode === "margen"
+    ? "▲ Δ interanual mayor a +0.5 pts · ▼ menor a −0.5 pts"
+    : "▲ Δ interanual mayor a +5% · ▼ menor a −5%";
+}
+
 // Una celda año: valor primario + Δ YoY debajo. En la columna TOTAL (varios
 // años) no hay Δ.
 function AnualCell({ cur, prev, mode, dark = false, showDelta = true }: {
@@ -96,7 +104,10 @@ function AnualCell({ cur, prev, mode, dark = false, showDelta = true }: {
     <td className={cn("border-b px-2.5 py-3.5 text-right align-top", dark ? "border-gray-800" : "border-gray-200")}>
       <div className={cn("font-mono text-sm tabular-nums", dark ? "text-white" : "text-gray-950")}>{val}</div>
       {d && (d.arrow !== null || d.displayValue !== "—") && (
-        <div className={cn("font-mono text-xs tabular-nums", dark ? toneClassDark[d.tone] : toneClass[d.tone])}>
+        <div
+          className={cn("font-mono text-xs tabular-nums", dark ? toneClassDark[d.tone] : toneClass[d.tone])}
+          title={leyendaDeltaAnual(mode)}
+        >
           {d.arrow ? `${d.arrow} ` : ""}{d.displayValue}
         </div>
       )}
@@ -171,16 +182,8 @@ export function ResumenAnual({ data, error, viewMode }: {
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="text-emerald-700">▲</span>
-          {viewMode === "margen" ? "Δ interanual mayor a +0.5 pts" : "Δ interanual mayor a +5%"}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="text-red-700">▼</span>
-          {viewMode === "margen" ? "menor a −0.5 pts" : "menor a −5%"}
-        </span>
-      </div>
+      {/* La leyenda del Δ (umbral del color) pasó a tooltip sobre cada flecha
+          — ver leyendaDeltaAnual(). */}
     </>
   );
 }

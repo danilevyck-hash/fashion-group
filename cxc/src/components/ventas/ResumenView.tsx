@@ -120,8 +120,6 @@ export function ResumenView({
       : null;
   const k = data.kpis;
   const prevYear = selectedYear - 1;
-  const isUtil = viewMode === "utilidad";
-  const isMargen = viewMode === "margen";
 
   const onToggleMode = (mode: ViewMode) => {
     startTransition(() => setViewMode(mode));
@@ -286,7 +284,7 @@ export function ResumenView({
             empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
             empresaLabels={EMPRESA_KEY_TO_NAME}
             variant="pill"
-            prefix="Data actualizada al"
+            prefix="Sincronizado"
           />
           {/* "Actualizar ahora" (admin/secretaria) — la vista es de todas las
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
@@ -465,21 +463,9 @@ export function ResumenView({
         )}
       </Card>
 
-      {/* Legend simple — solo arrow + dirección del delta. Sin swatch
-          (la matriz ya no tiene fondos heatmap). */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="text-emerald-700">▲</span>
-          {isMargen ? `vs ${prevYear} mayor a +0.5 pts` : `vs ${prevYear} mayor a +5%`}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="text-red-700">▼</span>
-          {isMargen ? "menor a −0.5 pts" : "menor a −5%"}
-        </span>
-        {!isClosedYear && (
-          <span className="inline-flex items-center gap-1.5"><span className="text-gray-400">—</span>sin data</span>
-        )}
-      </div>
+      {/* La leyenda del delta (▲/▼ y su umbral) ya no ocupa una línea fija bajo
+          la tabla: vive como tooltip (title=) sobre cada flecha — ver
+          leyendaDelta(). El umbral se sigue pudiendo consultar, sin el ruido. */}
       </>
       )}
 
@@ -509,7 +495,8 @@ export function ResumenView({
 
 /** Tarjeta "mes en curso vs mismo mes del año anterior" (suma del grupo).
  *  Suma ventas2026/ventas2025 de todas las empresas en el índice del mes actual.
- *  El mes en curso puede ir parcial → se rotula "(en curso)" para no confundir. */
+ *  El "(en curso)" del rótulo se quitó (limpieza jul-2026): el footer del
+ *  heatmap ya declara "Datos hasta el <día>", que es el corte real. */
 function MesVsMesCard({
   empresas, mesActual, year,
 }: { empresas: EmpresaMonthlySales[]; mesActual: number; year: number }) {
@@ -522,7 +509,7 @@ function MesVsMesCard({
   return (
     <Card className="border-gray-200 bg-white p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-        {mes} {year} <span className="text-gray-400">(en curso)</span> vs {mes} {year - 1}
+        {mes} {year} vs {mes} {year - 1}
       </p>
       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{fmtMoney(curr)}</span>
@@ -711,6 +698,15 @@ function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
   );
 }
 
+/** Leyenda del delta como TOOLTIP (antes era una línea fija bajo la matriz).
+ *  Explica qué significa el color de la flecha y a partir de qué umbral cambia.
+ *  Se cuelga con title= de cada ▲/▼ para que siga siendo consultable. */
+export function leyendaDelta(mode: ViewMode, prevYear: number): string {
+  return mode === "margen"
+    ? `▲ vs ${prevYear} mayor a +0.5 pts · ▼ menor a −0.5 pts`
+    : `▲ vs ${prevYear} mayor a +5% · ▼ menor a −5%`;
+}
+
 function HeatCell({
   cell, mode, prevYear, titulo, onOpen,
 }: {
@@ -767,7 +763,7 @@ function HeatCell({
           <span className="text-gray-400">{renderCellValue(cur, mode)}</span>
         ) : (
           <span className="inline-flex items-baseline gap-1.5">
-            {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+            {fmt.arrow && <span className={cn("text-xs", tone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
             <span className="text-gray-950">{renderCellValue(cur, mode)}</span>
           </span>
         )}
@@ -845,7 +841,7 @@ function EmpresaTotalCell({
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
         <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+          {fmt.arrow && <span className={cn("text-xs", tone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
           <span className="text-sm font-medium text-gray-950">{displayValue}</span>
         </span>
       </button>
@@ -901,7 +897,7 @@ function TotalGroupCell({
         className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
         <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", arrowTone)}>{fmt.arrow}</span>}
+          {fmt.arrow && <span className={cn("text-xs", arrowTone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
           <span className="text-white">{renderCellValue(cur, mode)}</span>
         </span>
       </button>
@@ -952,7 +948,7 @@ function TotalGroupAnnualCell({
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
         <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", arrowTone)}>{fmt.arrow}</span>}
+          {fmt.arrow && <span className={cn("text-xs", arrowTone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
           <span className="text-white">{displayValue}</span>
         </span>
       </button>
@@ -1020,9 +1016,13 @@ function buildPrevYtdRange(data: VentasResumen, prevYear: number): string {
 }
 
 // Footer al pie del heatmap. Texto adaptado según granularidad activa:
-//   mensual:    "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
-//   trimestral: "Q2 2026 parcial · cierra al 9 may · Comparativo vs Q2 2025 mismo período"
+//   mensual:    "Datos hasta el 9 may · Comparativo vs Mayo 1–9 2025"
+//   trimestral: "Datos hasta el 9 may · Comparativo vs Q2 2025 mismo período"
 // Solo cuando el año en curso tiene mes parcial.
+//
+// VOCABULARIO (limpieza jul-2026): el pill de arriba dice "Sincronizado <fecha>"
+// (cuándo corrió el sync) y este footer "Datos hasta el <día>" (hasta dónde
+// llega la data). Son dos cosas distintas y se leen distinto a propósito.
 function buildPartialFooter(
   data: VentasResumen,
   year: number,
@@ -1031,14 +1031,13 @@ function buildPartialFooter(
   if (!data.es_periodo_parcial || !data.fecha_corte || !data.dia_corte_anio_anterior) return null;
   const cur = parseIsoDateResumen(data.fecha_corte);
   const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
+  const corte = `Datos hasta el ${cur.getDate()} ${MONTHS[cur.getMonth()].toLowerCase()}`;
   if (granularity === "trimestral") {
     const q = Math.ceil((cur.getMonth() + 1) / 3);
-    const curMesShort = MONTHS[cur.getMonth()].toLowerCase();
-    return `Q${q} ${year} parcial · cierra al ${cur.getDate()} ${curMesShort} · Comparativo vs Q${q} ${prev.getFullYear()} mismo período`;
+    return `${corte} · Comparativo vs Q${q} ${prev.getFullYear()} mismo período`;
   }
-  const curMonth = MES_FULL_RESUMEN[cur.getMonth()];
   const prevMonth = MES_FULL_RESUMEN[prev.getMonth()];
-  return `${curMonth} ${year} en curso · Comparativo vs ${prevMonth} 1–${prev.getDate()} ${prev.getFullYear()}`;
+  return `${corte} · Comparativo vs ${prevMonth} 1–${prev.getDate()} ${prev.getFullYear()}`;
 }
 
 function buildRow(

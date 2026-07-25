@@ -92,7 +92,7 @@ export function ResumenViewMobile({
           empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
           variant="pill"
-          prefix="Data al"
+          prefix="Sincronizado"
         />
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
