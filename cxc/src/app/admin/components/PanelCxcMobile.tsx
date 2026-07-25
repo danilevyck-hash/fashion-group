@@ -195,10 +195,6 @@ export default function PanelCxcMobile({
             })}
           </ul>
         )}
-
-        <p className="pt-4 text-center text-xs leading-relaxed text-gray-400">
-          Política: 0-90d por vencer · 91-120d vencido reciente · +120d vencido crítico
-        </p>
       </div>
     </div>
   );
@@ -240,7 +236,7 @@ function MobileHeader({
     <header className="flex items-start justify-between gap-3">
       <div>
         <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-gray-900">
-          Panel CXC
+          Cuentas por Cobrar
         </h1>
         <SyncStatus
           tabla="estadocuenta"

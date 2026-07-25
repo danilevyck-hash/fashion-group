@@ -74,15 +74,15 @@ export const GROUPS: AppGroup[] = [
 export const ALL_MODULES: AppModule[] = [
   // Plata que entra
   { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "plata-entra" },
-  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "plata-entra" },
-  { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "plata-entra" },
+  { key: "cheques",       label: "Cheques",                                                                            href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "plata-entra" },
+  { key: "comisiones",    label: "Comisiones",          subtitle: "Por vendedor: venta y cobro",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "plata-entra" },
 
   // Plata que sale
-  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo, aging y pagos",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
+  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo y antigüedad",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
   { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "plata-sale" },
   { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "plata-sale" },
-  { key: "gastos-empresa", label: "Gastos de Empresa",  subtitle: "Gastos mensuales por empresa y saldos bancarios",    href: "/gastos-empresa", icon: Receipt,          roles: ["admin", "contabilidad"],                           group: "plata-sale" },
+  { key: "gastos-empresa", label: "Gastos de Empresa",  subtitle: "Gastos del mes y saldos de banco",    href: "/gastos-empresa", icon: Receipt,          roles: ["admin", "contabilidad"],                           group: "plata-sale" },
 
   // Ventas y Clientes
   { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas-clientes" },
@@ -100,7 +100,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "cargar",        label: "Cargar Productos",    subtitle: "Excel del proveedor → plantilla de Switch",          href: "/productos/cargar",icon: PackagePlus,     roles: ["admin", "secretaria"],                             group: "productos" },
 
   // Sistema
-  { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                           group: "sistema" },
+  { key: "usuarios",      label: "Usuarios",            subtitle: "Permisos por rol",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                           group: "sistema" },
   { key: "data-health",   label: "Data Health",         subtitle: "Monitoreo automático de integridad de datos",        href: "/admin/data-health", icon: ShieldCheck,   roles: ["admin"],                                           group: "sistema" },
 ];
 
@@ -157,11 +157,11 @@ export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: 
 }
 
 export const GROUP_ORDER: ModuleGroup[] = ["plata-entra", "plata-sale", "ventas-clientes", "operacion", "productos", "sistema"];
-export const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
-  "plata-entra":     { title: "Plata que entra",   description: "Cobros, cheques y comisiones" },
-  "plata-sale":      { title: "Plata que sale",    description: "Pagos a proveedores, gastos y préstamos" },
-  "ventas-clientes": { title: "Ventas y Clientes", description: "Ventas, resumen ejecutivo y clientes" },
-  operacion:         { title: "Operación",         description: "Despachos, bultos y reclamos" },
-  productos:         { title: "Productos",         description: "Catálogos y carga de productos" },
-  sistema:           { title: "Sistema",           description: "Configuración y administración" },
+export const GROUP_LABELS: Record<ModuleGroup, { title: string }> = {
+  "plata-entra":     { title: "Plata que entra" },
+  "plata-sale":      { title: "Plata que sale" },
+  "ventas-clientes": { title: "Ventas y Clientes" },
+  operacion:         { title: "Operación" },
+  productos:         { title: "Productos" },
+  sistema:           { title: "Sistema" },
 };

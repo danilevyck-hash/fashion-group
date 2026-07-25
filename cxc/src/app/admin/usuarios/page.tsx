@@ -193,7 +193,7 @@ export default function UsuariosPage() {
             >
               Usuarios
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Crea usuarios y define qué módulos ve cada uno</p>
+            <p className="text-sm text-gray-600 mt-1">Define qué módulos ve cada quien</p>
           </div>
           <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -206,7 +206,7 @@ export default function UsuariosPage() {
           {loadingUsers ? (
             <SkeletonTable rows={3} cols={4} />
           ) : fgUsers.length === 0 ? (
-            <EmptyState title="No hay usuarios" subtitle="Crea el primer usuario del sistema" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
+            <EmptyState title="No hay usuarios" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {fgUsers.map(u => {

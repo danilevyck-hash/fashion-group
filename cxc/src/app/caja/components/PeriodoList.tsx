@@ -145,7 +145,6 @@ export default function PeriodoList({
       ) : periodos.length === 0 ? (
         <EmptyState
           title="No hay períodos registrados"
-          subtitle="Crea un nuevo período de caja menuda"
           actionLabel="+ Nuevo período"
           onAction={onCreatePeriodo}
         />

@@ -75,7 +75,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
               const Icon = currentNav.icon;
               return <Icon size={14} strokeWidth={1.5} className={`flex-shrink-0 ${moduleColor!.text}`} />;
             })()}
-            <span className="truncate">{module}</span>
+            {/* El nombre del módulo solo se pinta acá en móvil. En desktop lo
+                dice el breadcrumb de abajo, así que repetirlo en la barra era
+                ruido (nombre 3×: chip + breadcrumb + h1). En móvil no hay
+                breadcrumb, y esta barra es sticky: al hacer scroll es lo único
+                que recuerda en qué módulo estás. */}
+            <span className="truncate sm:hidden">{module}</span>
             {/* breadcrumbs inline removidos — fuente única: breadcrumb bar inferior */}
           </div>
           <div className="hidden sm:block">

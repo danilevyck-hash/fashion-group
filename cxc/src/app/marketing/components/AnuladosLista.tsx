@@ -276,8 +276,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
       <div>
         <h1 className="text-xl font-semibold text-gray-900">Anulados</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Proyectos y facturas anulados. Puedes restaurarlos o eliminarlos
-          permanentemente.
+          Puedes restaurarlos o eliminarlos permanentemente.
         </p>
       </div>
 

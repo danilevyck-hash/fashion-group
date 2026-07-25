@@ -11,11 +11,9 @@ import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
-import FreshnessChip from "@/components/FreshnessChip";
 import { Toast, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
-import AgingLegend from "./components/AgingLegend";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
@@ -115,7 +113,7 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
-  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog, dataTs, fromCache } = useAdminData(authChecked);
+  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
@@ -495,13 +493,7 @@ function AdminDashboardInner() {
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
-      <AppHeader module="Panel CXC" />
-
-      {dataTs != null && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-3 flex justify-end">
-          <FreshnessChip ts={dataTs} fromCache={fromCache} financial />
-        </div>
-      )}
+      <AppHeader module="Cuentas por Cobrar" />
 
       <PanelCxcMobile
         filtered={filtered}
@@ -644,9 +636,6 @@ function AdminDashboardInner() {
 
       {/* Clickable KPI chips = risk filter */}
       <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
-
-      {/* Leyenda / clave de colores del aging, arriba de la lista */}
-      <AgingLegend />
 
       <ClientTable
         filtered={filtered}

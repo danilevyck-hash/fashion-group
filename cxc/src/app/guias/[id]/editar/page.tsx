@@ -24,7 +24,7 @@ export default function GuiaEditarPage() {
   if (!s.loaded) {
     return (
       <div>
-        <AppHeader module="Guías de Transporte" breadcrumbs={[{ label: "Editar guía" }]} />
+        <AppHeader module="Guías de Despacho" breadcrumbs={[{ label: "Editar guía" }]} />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <div className="h-24 bg-gray-100 rounded-lg animate-pulse mb-4" />
           <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
@@ -36,7 +36,7 @@ export default function GuiaEditarPage() {
   return (
     <div>
       <AppHeader
-        module="Guías de Transporte"
+        module="Guías de Despacho"
         breadcrumbs={[{ label: `GT-${String(s.formNumero).padStart(3, "0")}` }]}
       />
       <GuiaForm

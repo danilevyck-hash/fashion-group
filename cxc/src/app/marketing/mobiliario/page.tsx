@@ -374,9 +374,6 @@ export default function MobiliarioPage() {
             <h1 className="text-xl font-semibold text-gray-900">
               Mobiliario
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Productos, entregas a tiendas y reparto por marca
-            </p>
           </div>
           <button
             type="button"
@@ -523,9 +520,6 @@ export default function MobiliarioPage() {
               <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
                 Resumen por tienda
               </h2>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Total de paneles y gasto por marca, con totales
-              </p>
             </div>
             <button
               type="button"

@@ -111,7 +111,7 @@ export default function GuiasList({
     <div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <h1 className="text-xl font-light tracking-tight">Guías de Transporte</h1>
+          <h1 className="text-xl font-light tracking-tight">Guías de Despacho</h1>
           <div className="flex items-center gap-2 flex-wrap">
             {selectionMode ? (
               <>
@@ -198,7 +198,6 @@ export default function GuiasList({
         ) : guias.length === 0 ? (
           <EmptyState
             title="No hay guías registradas"
-            subtitle="Crea tu primera guía para registrar un despacho"
             actionLabel={canCreate ? "+ Nueva Guía" : undefined}
             onAction={canCreate ? onNewGuia : undefined}
           />

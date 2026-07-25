@@ -126,9 +126,6 @@ export default function MarcaSelector({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Gastos de mercadeo por marca
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
           <button type="button" onClick={onOpenInventario} className="text-gray-600 hover:text-black transition">

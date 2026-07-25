@@ -86,7 +86,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Proveedores" breadcrumbs={[{ label: "Proveedores" }, { label: data?.nombre ?? "…" }]} />
+      <AppHeader module="Proveedores" breadcrumbs={[{ label: data?.nombre ?? "…" }]} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-2">
           <Link href="/proveedores" className="text-xs text-gray-500 hover:text-black transition">← Proveedores</Link>

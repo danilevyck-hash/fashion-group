@@ -52,8 +52,7 @@ export default function ReglasView() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Reglas del depurador</h2>
-        <p className="mt-1.5 text-sm text-stone-500">
+        <p className="text-sm text-stone-500">
           Referencia de cómo se limpian y mapean las descripciones. Si el proveedor cambia algo, manda
           captura a Daniel para actualizar estas reglas en el código.
         </p>

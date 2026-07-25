@@ -143,7 +143,7 @@ function VistaGeneralInner() {
         {/* Encabezado + navegación de mes */}
         <div className="mb-8">
           <h1 className="font-serif text-2xl sm:text-3xl tracking-tight text-stone-900">
-            Vista General · Fashion Group
+            Vista General
           </h1>
           <div className="flex items-center gap-1 mt-3 -ml-3">
             <button

@@ -581,11 +581,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   return (
     <PullToRefresh onRefresh={loadCheques}>
     <div>
-      <AppHeader module="Cheques Posfechados" />
+      <AppHeader module="Cheques" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
+          <h1 className="text-xl font-light tracking-tight">Cheques</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
@@ -1023,7 +1023,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         cheques.length === 0 ? (
           <EmptyState
             title="No hay cheques registrados"
-            subtitle="Registra el primer cheque posfechado"
             actionLabel="+ Nuevo Cheque"
             onAction={() => setShowForm(true)}
           />

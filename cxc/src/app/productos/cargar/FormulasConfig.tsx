@@ -235,22 +235,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Configuración de fórmulas</h2>
-      </div>
-
-      {scope === "tienda" ? (
-        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
-          <b className="text-teal-800">Fórmulas de TIENDA (Facturas Tienda):</b> precio = TECHO(Costo ÷ divisor) + extra,
-          redondeado hacia arriba. El costo es el PRECIO de la factura (lo que la empresa le cobra a la tienda).
-          Este set es SEPARADO de las fórmulas del Depurador.
-        </div>
-      ) : (
-        <div className="mb-4 rounded-lg border border-stone-200 bg-white px-3.5 py-2.5 text-[13px] text-stone-600">
-          <b className="text-teal-800">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
-          hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
-        </div>
-      )}
+      <FormulasAyuda scope={scope} />
 
       {scope === "depurador" && <BulkExcel catalogo={catalogoDescs} onDone={() => setReloadKey((k) => k + 1)} />}
 
@@ -271,12 +256,6 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           </button>
         </div>
       )}
-
-      <p className="mb-4 text-[13px] text-stone-500">
-        Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
-        vacía = hereda la de la marca. Una descripción también puede tener <b className="text-amber-700">precio fijo</b>
-        {" "}(un monto en dólares directo) que gana a cualquier fórmula.
-      </p>
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
 
@@ -470,5 +449,47 @@ function SaveBtn({ label, dirty, onClick, disabled, flashed, compact }: { label:
       </button>
       {flashed && <span className="ml-1 text-[11px] font-semibold text-emerald-600">✓</span>}
     </span>
+  );
+}
+
+// ── Ayuda de fórmulas ────────────────────────────────────────────────────────
+// Los tres bloques de texto que antes vivían siempre abiertos arriba de la
+// tabla ahora van dentro de un disclosure, mismo patrón que ComisionesCriterios.
+function FormulasAyuda({ scope }: { scope: FormulasScope }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 text-[13px] text-stone-600">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-stone-100 active:scale-[0.99]"
+        aria-expanded={open}
+      >
+        <span aria-hidden className="shrink-0 text-stone-400">ⓘ</span>
+        <span className="font-medium text-stone-700">Cómo funcionan las fórmulas</span>
+        <span className={`ml-auto shrink-0 text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {open && (
+        <div className="space-y-2 border-t border-stone-200 px-3 py-2.5">
+          {scope === "tienda" ? (
+            <p>
+              <b className="text-teal-800">Fórmulas de TIENDA (Facturas Tienda):</b> precio = TECHO(Costo ÷ divisor) + extra,
+              redondeado hacia arriba. El costo es el PRECIO de la factura (lo que la empresa le cobra a la tienda).
+            </p>
+          ) : (
+            <p>
+              <b className="text-teal-800">Fórmula:</b> precio = TECHO(Costo CIF ÷ divisor) + extra, redondeado
+              hacia arriba (al entero o a .50). El Costo CIF ya es costo × 1.1.
+            </p>
+          )}
+          <p>
+            Cada marca tiene su fórmula (siempre visible). Ábrela para dar fórmula propia a una descripción;
+            vacía = hereda la de la marca. Una descripción también puede tener <b className="text-amber-700">precio fijo</b>
+            {" "}(un monto en dólares directo) que gana a cualquier fórmula.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

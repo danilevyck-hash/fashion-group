@@ -47,7 +47,7 @@ export default function GuiaImprimirPage() {
     return (
       <div>
         <div className="print:hidden">
-          <AppHeader module="Guías de Transporte" breadcrumbs={[{ label: "Cargando..." }]} />
+          <AppHeader module="Guías de Despacho" breadcrumbs={[{ label: "Cargando..." }]} />
         </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
           <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
@@ -60,7 +60,7 @@ export default function GuiaImprimirPage() {
     return (
       <div>
         <div className="print:hidden">
-          <AppHeader module="Guías de Transporte" breadcrumbs={[{ label: "Error" }]} />
+          <AppHeader module="Guías de Despacho" breadcrumbs={[{ label: "Error" }]} />
         </div>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 text-center">
           <p className="text-sm text-red-500">{error || "No encontrada"}</p>
@@ -73,7 +73,7 @@ export default function GuiaImprimirPage() {
     <div>
       <div className="print:hidden">
         <AppHeader
-          module="Guías de Transporte"
+          module="Guías de Despacho"
           breadcrumbs={[
             { label: `GT-${String(guia.numero).padStart(3, "0")}` },
             { label: "Imprimir" },

@@ -50,7 +50,6 @@ export default function GroupPage({ group }: GroupPageProps) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">{meta.title}</h1>
-          <p className="text-sm text-gray-400 mt-1">{meta.description}</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
