@@ -7,7 +7,7 @@
 //   - Null in a monthly array means "no data yet" (future month).
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { withDbRetry } from "@/lib/supabase-retry";
+import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -88,6 +88,10 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
         { label: "ventas_dashboard_prev_same_period_v2" },
       );
       if (!v2.error) return v2;
+      // El fallback existe SOLO para el caso "la migración de _v2 aún no corrió"
+      // (función inexistente). Si _v2 falló por timeout, la v1 es la MISMA
+      // consulta pero más lenta: reintentarla solo duplicaría la espera.
+      if (isTransientDbError(v2.error)) return v2;
       return withDbRetry(
         () => supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
         { label: "ventas_dashboard_prev_same_period" },
@@ -444,6 +448,10 @@ export async function fetchMultifashion({
         { label: "multifashion_mensual_v7" },
       );
       if (!v7.error) return v7;
+      // Igual que arriba: el fallback a v6 cubre "la migración de v7 no corrió",
+      // no un timeout. v6 hace MÁS trabajo que v7 (agrega en vivo lo que v7 lee
+      // del MV), así que ante un timeout intentarla es garantía de otro timeout.
+      if (isTransientDbError(v7.error)) return v7;
       return withDbRetry(
         () => supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes }),
         { label: "multifashion_mensual_v6" },

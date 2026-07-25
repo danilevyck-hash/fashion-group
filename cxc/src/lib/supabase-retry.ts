@@ -56,6 +56,29 @@ export function isTransientDbError(error: SupabaseLikeError | null | undefined):
 export interface RetryDbOptions {
   /** Intentos TOTALES. Default 3. */
   attempts?: number;
+  /**
+   * No se ARRANCA un intento nuevo si ya se consumió este presupuesto. Default
+   * 14000, elegido con la medición en la mano:
+   *
+   *   - Caché fría (caso que el reintento existe para salvar): el 1er intento
+   *     muere a los ~9-10s < 14s ⇒ hay 2do intento, y con la caché caliente
+   *     responde en <1s. Total ~11s y el usuario no ve nada.
+   *   - DB saturada (medido 25-jul 16:23 UTC, 8/8 fallos, algunos de 20-50s):
+   *     el 1er intento ya se pasa del presupuesto ⇒ NO se reintenta. Falla
+   *     parecido a como fallaba antes, sin sumarle medio minuto de espera.
+   *
+   * La regla es "reintentar solo si queda margen para que el 2do intento sirva".
+   * Nunca dejar el reintento peor que no tenerlo.
+   *
+   * Por qué hace falta: cuando los crons de sync están escribiendo
+   * switch_facturas (16:00-16:10 y 21:10-21:20 UTC), estas RPC se pasan del
+   * statement_timeout en TODOS los intentos. Sin tope, 3 intentos × ~10s + la
+   * cadena de fallback v7→v6 se comían más de 100s y se llevaban por delante el
+   * maxDuration de la función — peor que fallar rápido. Con tope, el reintento
+   * sigue salvando el caso común (caché fría: falla una y pasa a la segunda) y
+   * el caso malo falla acotado.
+   */
+  deadlineMs?: number;
   /** Espera base en ms. Backoff lineal: 0, base, base×2. Default 300. */
   baseDelayMs?: number;
   /** Inyectable para tests. */
@@ -84,6 +107,7 @@ export async function withDbRetry<T>(
 ): Promise<SupabaseLikeResult<T>> {
   const {
     attempts = 3,
+    deadlineMs = 14_000,
     baseDelayMs = 300,
     sleepImpl = defaultSleep,
     label = "db",
@@ -91,9 +115,16 @@ export async function withDbRetry<T>(
   } = options;
 
   let last: SupabaseLikeResult<T> = { data: null, error: { message: "sin intentos" } };
+  const inicio = Date.now();
 
   for (let i = 0; i < attempts; i++) {
-    if (i > 0) await sleepImpl(baseDelayMs * i);
+    if (i > 0) {
+      if (Date.now() - inicio >= deadlineMs) {
+        logger(`[db-retry] ${label}: presupuesto agotado (${Date.now() - inicio}ms) — sin más reintentos`);
+        return last;
+      }
+      await sleepImpl(baseDelayMs * i);
+    }
     try {
       last = await run();
     } catch (err) {

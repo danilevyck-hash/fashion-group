@@ -17,6 +17,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
 import type { FilaMetrica } from "@/lib/ventas/celda";
 
@@ -50,28 +51,25 @@ export function CeldaDetallePanel({
 
   useEffect(() => setMounted(true), []);
   useBodyScrollLock(open);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  // Hooks de la casa (#277): Escape + clic fuera del cuadro. El backdrop exige
+  // que mousedown Y click hayan caído en él, así un arrastre que empieza dentro
+  // del panel no lo cierra.
+  useEscapeClose(open, onClose);
+  const backdrop = useBackdropDismiss(onClose);
 
   if (!mounted || !detalle) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-end animate-[fadeIn_150ms_ease-out]"
+      // El fondo va en ESTE div (no en un hijo): useBackdropDismiss exige que el
+      // clic haya caído sobre el elemento que lleva los handlers.
+      className="fixed inset-0 z-50 flex items-end bg-black/40 sm:items-stretch sm:justify-end animate-[fadeIn_150ms_ease-out]"
       role="dialog"
       aria-modal="true"
       aria-label={`${detalle.titulo} · ${detalle.subtitulo}`}
+      {...backdrop}
     >
-      {/* Clic fuera cierra. */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-
       <div
-        onClick={(e) => e.stopPropagation()}
         className={cn(
           "relative flex w-full flex-col border-gray-200 bg-white",
           // Celular: sheet desde abajo, con respeto al home indicator.

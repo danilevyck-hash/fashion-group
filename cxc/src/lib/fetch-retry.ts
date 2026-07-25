@@ -38,6 +38,14 @@ export function isRetryableStatus(status: number): boolean {
 export interface FetchRetryOptions {
   /** Intentos TOTALES (no reintentos extra). Default 3. */
   attempts?: number;
+  /**
+   * No se arranca un intento nuevo si ya se consumió este presupuesto.
+   * Default 30000.
+   * El servidor ya reintenta por su cuenta (src/lib/supabase-retry.ts), así que
+   * sin tope los dos niveles se multiplican y el usuario queda mirando un
+   * spinner eterno. Mejor un error honesto con botón de reintentar.
+   */
+  deadlineMs?: number;
   /** Espera base entre intentos en ms. Backoff lineal: 0, base, base×2. Default 400. */
   baseDelayMs?: number;
   signal?: AbortSignal;
@@ -65,6 +73,7 @@ export async function fetchJsonWithRetry<T>(
 ): Promise<T> {
   const {
     attempts = 3,
+    deadlineMs = 30_000,
     baseDelayMs = 400,
     signal,
     fetchImpl = fetch,
@@ -72,10 +81,14 @@ export async function fetchJsonWithRetry<T>(
   } = options;
 
   let lastError: unknown = new Error("sin intentos");
+  const inicio = Date.now();
 
   for (let i = 0; i < attempts; i++) {
     // Backoff corto ANTES de cada reintento (el primer intento sale de una).
-    if (i > 0) await sleepImpl(baseDelayMs * i);
+    if (i > 0) {
+      if (Date.now() - inicio >= deadlineMs) break;
+      await sleepImpl(baseDelayMs * i);
+    }
 
     try {
       const res = await fetchImpl(url, { cache: "no-store", signal });

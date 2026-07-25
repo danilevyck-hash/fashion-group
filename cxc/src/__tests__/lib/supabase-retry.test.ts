@@ -102,3 +102,76 @@ describe("withDbRetry", () => {
     expect(esperas).toEqual([300, 600]);
   });
 });
+
+describe("presupuesto total (deadlineMs)", () => {
+  it("deja de reintentar cuando se agota el presupuesto, aunque queden intentos", async () => {
+    // Simula la ventana de los crons de sync: cada intento tarda ~10s y falla.
+    // Sin tope serían 3 intentos (~30s) más la cadena de fallback; con tope, 2.
+    let ahora = 0;
+    const originalNow = Date.now;
+    Date.now = () => ahora;
+    try {
+      const run = vi.fn().mockImplementation(async () => {
+        ahora += 10_000;
+        return { data: null, error: { message: "canceling statement due to statement timeout" } };
+      });
+      const out = await withDbRetry(run, {
+        deadlineMs: 20_000,
+        sleepImpl: async () => {},
+        logger: () => {},
+      });
+      expect(out.error?.message).toContain("statement timeout");
+      expect(run).toHaveBeenCalledTimes(2);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+
+  it("con consultas rápidas el presupuesto no estorba: usa los 3 intentos", async () => {
+    const run = vi.fn().mockResolvedValue({ data: null, error: { message: "statement timeout" } });
+    await withDbRetry(run, { deadlineMs: 20_000, sleepImpl: async () => {}, logger: () => {} });
+    expect(run).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("el reintento nunca deja las cosas peor que no tenerlo", () => {
+  it("si el 1er intento ya se comió el presupuesto, no hay 2do", async () => {
+    // DB saturada: el intento tarda 15s (> 14s de presupuesto) y falla.
+    let ahora = 0;
+    const originalNow = Date.now;
+    Date.now = () => ahora;
+    try {
+      const run = vi.fn().mockImplementation(async () => {
+        ahora += 15_000;
+        return { data: null, error: { message: "canceling statement due to statement timeout" } };
+      });
+      await withDbRetry(run, { sleepImpl: async () => {}, logger: () => {} });
+      expect(run).toHaveBeenCalledTimes(1);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+
+  it("caché fría: el 1er intento cabe en el presupuesto y el 2do salva la consulta", async () => {
+    let ahora = 0;
+    const originalNow = Date.now;
+    Date.now = () => ahora;
+    try {
+      const run = vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          ahora += 9_500; // medido en producción
+          return { data: null, error: { message: "canceling statement due to statement timeout" } };
+        })
+        .mockImplementationOnce(async () => {
+          ahora += 550; // caché caliente
+          return { data: [{ ok: true }], error: null };
+        });
+      const out = await withDbRetry(run, { sleepImpl: async () => {}, logger: () => {} });
+      expect(out.error).toBeNull();
+      expect(run).toHaveBeenCalledTimes(2);
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+});
