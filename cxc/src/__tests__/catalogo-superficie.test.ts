@@ -50,6 +50,10 @@ const CORE_MARCA = [
   "pedidos-publicos/[short_id]/convertir",
   "pedidos-unificado",
   "products",
+  // Selector de foto por variantes + subida del ZIP del banco B2B (25-jul-2026).
+  "products/variantes",
+  "products/variantes/firmar",
+  "products/variantes/manifiesto",
   "public",
   "send-order",
   "sync-status",

@@ -19,6 +19,7 @@ import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas"
 import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
+import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 
 type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
 
@@ -68,6 +69,13 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
     () => fetchJson<{ lastSync: string | null }>(`${theme.api}/sync-status`, { lastSync: null }),
     ADMIN_SWR_OPTS,
   );
+  // Qué SKUs tienen fotos del banco B2B guardadas — UNA petición para todo el
+  // catálogo (en vez de una por fila) que habilita el botón "Cambiar foto".
+  const { data: variantesData, mutate: mutateVariantes } = useSWR<{ skus: string[] }>(
+    authChecked ? `${marca}-catalogo-variantes` : null,
+    () => fetchJson<{ skus: string[] }>(`${theme.api}/products/variantes`, { skus: [] }),
+    ADMIN_SWR_OPTS,
+  );
 
   const products = useMemo(() => productsData ?? [], [productsData]);
   // Visibles = catálogo vivo: sin ocultados a mano (oculto_manual) NI ocultos
@@ -87,8 +95,22 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const metrics = useMemo(() => theme.admin.metrics(visibles), [theme, visibles]);
   const sinFotoCount = sinFoto.length;
 
+  // Set de SKUs normalizados con variantes (misma normalización que Storage).
+  const skusConVariantes = useMemo(
+    () => new Set(variantesData?.skus ?? []),
+    [variantesData],
+  );
+  const tieneVariantes = useCallback(
+    (sku: string | null) => (sku ? skusConVariantes.has(normalizarSkuStorage(sku)) : false),
+    [skusConVariantes],
+  );
+
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
   const reloadPedidos = useCallback(async () => { await mutatePedidos(); }, [mutatePedidos]);
+  // Tras el ZIP hay que revalidar productos Y la lista de variantes.
+  const reloadTrasZip = useCallback(async () => {
+    await Promise.all([mutateProducts(), mutateVariantes()]);
+  }, [mutateProducts, mutateVariantes]);
 
   async function excelSinFoto() {
     // Mismo conjunto y orden que la pestaña "Faltan foto" (cola sinFoto).
@@ -189,16 +211,16 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
           <>
             {tab === "faltan-foto" && (
               theme.admin.productosStyle === "tarjetas" ? (
-                <FaltanFotoTarjetasTab marca={marca} products={visibles} sinFoto={sinFoto} onPhotoSaved={reloadProducts} showToast={showToast} />
+                <FaltanFotoTarjetasTab marca={marca} products={visibles} sinFoto={sinFoto} onPhotoSaved={reloadProducts} onZipDone={reloadTrasZip} tieneVariantes={tieneVariantes} showToast={showToast} />
               ) : (
-                <FaltanFotoBatchTab marca={marca} products={visibles} sinFoto={sinFoto} showToast={showToast} onComplete={reloadProducts} />
+                <FaltanFotoBatchTab marca={marca} products={visibles} sinFoto={sinFoto} showToast={showToast} onComplete={reloadProducts} onZipDone={reloadTrasZip} tieneVariantes={tieneVariantes} />
               )
             )}
             {tab === "completo" && (
               theme.admin.productosStyle === "tarjetas" ? (
-                <CatalogoCompletoTab marca={marca} products={products} onPhotoSaved={reloadProducts} showToast={showToast} />
+                <CatalogoCompletoTab marca={marca} products={products} onPhotoSaved={reloadProducts} tieneVariantes={tieneVariantes} showToast={showToast} />
               ) : (
-                <ProductosBatchListTab marca={marca} products={products} showToast={showToast} onComplete={reloadProducts} />
+                <ProductosBatchListTab marca={marca} products={products} showToast={showToast} onComplete={reloadProducts} tieneVariantes={tieneVariantes} />
               )
             )}
             {tab === "pedidos" && (

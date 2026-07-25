@@ -38,6 +38,7 @@ import {
 } from "@/lib/tommy-pedido-publico-validate";
 import { checkPedidoRateLimit as tommyCheckPedidoRateLimit } from "@/lib/tommy-pedido-rate-limit";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
+import { STORAGE_PREFIX } from "@/lib/catalogos/variantes-paths";
 
 export type MarcaKey = "reebok" | "joybees" | "tommy";
 
@@ -265,7 +266,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "REEBOK — Pedidos",
     listaFiltraDeleted: false, // quirk heredado, unificar con OK de Daniel
     createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
-    upload: { roles: ["admin", "secretaria"], storage: "marca", pathPrefix: "products" }, // quirk heredado
+    upload: { roles: ["admin", "secretaria"], storage: "marca", pathPrefix: STORAGE_PREFIX.reebok }, // quirk heredado
     telegramEmoji: "🛒",
     switchDirectorioLabel: "Active Shoes",
     sendOrder: {
@@ -336,7 +337,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "JOYBEES — Pedidos",
     listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
-    upload: { roles: ["admin"], storage: "main", pathPrefix: "joybees" }, // quirk heredado
+    upload: { roles: ["admin"], storage: "main", pathPrefix: STORAGE_PREFIX.joybees }, // quirk heredado
     telegramEmoji: "🐝",
     switchDirectorioLabel: "Joystep",
     sendOrder: {
@@ -409,7 +410,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "TOMMY HILFIGER — Pedidos",
     listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
-    upload: { roles: ["admin"], storage: "main", pathPrefix: "tommy" },
+    upload: { roles: ["admin"], storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
     telegramEmoji: "🔵",
     switchDirectorioLabel: "Fashion Shoes",
     sendOrder: {

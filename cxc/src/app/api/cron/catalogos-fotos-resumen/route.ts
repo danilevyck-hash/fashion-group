@@ -19,12 +19,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
+import { limpiarVariantesRetiradas } from "@/lib/catalogos/variantes-limpieza";
+import { lineaHousekeeping } from "@/lib/catalogos/variantes-housekeeping";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const CRON_NAME = "catalogos-fotos-resumen";
 
@@ -40,7 +42,21 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const resumen = await calcularFotosResumen();
-    const sent = await sendTelegramAlert(resumen.mensaje);
+
+    // Housekeeping de variantes en el mismo pase. Va DESPUÉS del cálculo del
+    // resumen y envuelto en try/catch: si falla, el resumen semanal igual sale
+    // (es la función principal de este cron).
+    let limpieza = { productos: 0, bytes: 0, fallos: 0 };
+    try {
+      limpieza = await limpiarVariantesRetiradas();
+    } catch (err) {
+      console.error("housekeeping variantes:", err);
+      limpieza = { productos: 0, bytes: 0, fallos: 1 };
+    }
+    const linea = lineaHousekeeping(limpieza);
+    const mensaje = linea ? `${resumen.mensaje}\n\n${linea}` : resumen.mensaje;
+
+    const sent = await sendTelegramAlert(mensaje);
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);
@@ -52,7 +68,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         sinFoto: m.codigos.length,
         pendiente: m.pendiente ?? false,
       })),
-      mensaje: resumen.mensaje,
+      limpieza,
+      mensaje,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
