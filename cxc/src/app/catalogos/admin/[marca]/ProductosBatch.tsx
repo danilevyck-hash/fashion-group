@@ -49,15 +49,19 @@ function downloadCSV(products: { sku: string; name: string; price: number; stock
 export function FaltanFotoBatchTab({
   marca,
   products,
+  sinFoto,
   showToast,
   onComplete,
 }: {
   marca: MarcaUiKey;
+  /** Catálogo visible completo — para la subida masiva (permite reemplazar fotos). */
   products: AdminProducto[];
+  /** Cola precomputada (AdminCatalogoClient): activos sin foto, orden
+   *  disponibilidad desc — lo más vendible primero. */
+  sinFoto: AdminProducto[];
   showToast: (msg: string) => void;
   onComplete: () => Promise<void>;
 }) {
-  const sinFoto = products.filter((p) => !p.image_url?.trim());
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500">

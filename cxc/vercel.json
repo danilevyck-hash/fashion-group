@@ -167,6 +167,10 @@
     {
       "path": "/api/cron/grupo-resumen-mensual",
       "schedule": "0 13 3 * *"
+    },
+    {
+      "path": "/api/cron/catalogos-fotos-resumen",
+      "schedule": "30 13 * * 1"
     }
   ]
 }
