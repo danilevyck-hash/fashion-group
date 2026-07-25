@@ -1,7 +1,14 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Migration (PASO 2 de 2): ventas_dashboard_summary — mes en curso SARGABLE
 --
--- Aplicar DESPUÉS de 20260725170000_ventas_indices_cobertura.sql.
+-- Aplicar DESPUÉS de 20260725170000_ventas_indices_cobertura.sql. EL ORDEN NO ES
+-- OPCIONAL: hoy NO existe ningún índice que lidere con `fecha`, así que sin el
+-- PASO 1 el filtro de rango de esta función cae igual en seq scan del heap.
+-- Medido 25-jul con la base cargada: leer switch_facturas del mes en curso
+-- (1.160 filas de 52.222) por rango de fecha MURIÓ con statement timeout — sin
+-- índice ese "filtro barato" sigue barriendo los ~58 MB de la tabla. El índice
+-- es el que convierte el rango en un seek; la función es la que hace que el
+-- rango exista.
 --
 -- ── EL PROBLEMA ─────────────────────────────────────────────────────────────
 -- La versión de 20260609120100 ya movió los meses CERRADOS a
