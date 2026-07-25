@@ -108,6 +108,74 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "catalogos-fotos-resumen": 14,
 };
 
+// ─── Ciclo de los catálogos (ventana de "ya está al día") ────────────────────
+// Los 3 catálogos (Reebok/Joybees/Tommy) son los colaterales CAROS: cada corrida
+// hace 1 llamada /stock por artículo en Switch (Tommy son ~490 → minutos). Que
+// la reconciliación los re-corra sin necesidad se come el RECOVERY_BUDGET_MS y
+// puede tumbar la pasada entera por FUNCTION_INVOCATION_TIMEOUT (incidente
+// 25-jul-2026: tommy-catalogo re-sincronizado en cada pasada desde las 13:00).
+//
+// CAUSA: la ventana de "ya corrió" era el inicio del día PANAMÁ (05:00 UTC), un
+// corte que no tiene NADA que ver con el horario del catálogo (12:40/17:40). El
+// success de siembra de las 04:52 UTC quedó 8 min del lado de "ayer" → cada
+// pasada lo veía como perdido y lo re-corría, aunque el catálogo tenía 9 horas
+// de frescura. El mismo corte falla al revés: un sync manual a las 06:00 UTC
+// contaba como "ya corrió hoy" y SILENCIABA la pérdida real del slot de 12:40.
+//
+// REGLA (jul-2026): para los catálogos la pregunta correcta no es "¿corrió en
+// el día calendario?" sino "¿está fresco para su propio ritmo?". Un catálogo
+// está al día si tuvo un success dentro de su CICLO = el intervalo más largo
+// entre dos corridas consecutivas de su horario (dando la vuelta al día).
+// Pasado ese tiempo perdió al menos una corrida completa → recuperar. La hora
+// mínima de COLATERAL_RECOVER_AFTER_HOUR_UTC sigue mandando: nunca se recupera
+// antes de su primer slot del día.
+
+/** Horarios UTC (HH:MM) de los crons de catálogo — espejo de vercel.json (2
+ *  entradas cada uno). Un test compara ambos para que no diverjan. */
+export const CATALOGO_CRON_SLOTS_UTC: Record<string, readonly string[]> = {
+  "joybees-catalogo": ["11:00", "17:05"],
+  "reebok-catalogo": ["12:10", "17:00"],
+  "tommy-catalogo": ["12:40", "17:40"],
+};
+
+/** Ciclo del catálogo en horas: el hueco MÁS LARGO entre dos corridas
+ *  consecutivas de su horario, dando la vuelta al día (Tommy 12:40/17:40 → 19h,
+ *  el salto de la tarde a la mañana siguiente). null si el cron no es un
+ *  catálogo con horario declarado. */
+export function catalogoCicloHoras(cronName: string): number | null {
+  const slots = CATALOGO_CRON_SLOTS_UTC[cronName];
+  if (!slots || slots.length === 0) return null;
+  const minutos = slots
+    .map((s) => {
+      const [h, m] = s.split(":").map(Number);
+      return h * 60 + m;
+    })
+    .sort((a, b) => a - b);
+  let maxGap = 0;
+  for (let i = 0; i < minutos.length; i++) {
+    const siguiente = i + 1 < minutos.length ? minutos[i + 1] : minutos[0] + 24 * 60;
+    maxGap = Math.max(maxGap, siguiente - minutos[i]);
+  }
+  return maxGap / 60;
+}
+
+/**
+ * Inicio de la ventana "el catálogo ya está al día" (ISO) — lo consume
+ * `successSinceIso` de COLATERAL_CRONS en switch-reconciliacion. Un
+ * last_success_at anterior a este instante = perdió al menos una corrida
+ * completa de su horario → la reconciliación lo recupera.
+ *
+ * Es una ventana RODANTE (ahora − ciclo), no un corte de día: así ningún
+ * success queda del lado equivocado de una medianoche que el cron ni siquiera
+ * usa. Devuelve null si el cron no tiene horario de catálogo declarado (el
+ * caller cae a su ventana por defecto).
+ */
+export function catalogoCicloSinceIso(cronName: string, now: Date = new Date()): string | null {
+  const horas = catalogoCicloHoras(cronName);
+  if (horas === null) return null;
+  return new Date(now.getTime() - horas * 3600 * 1000).toISOString();
+}
+
 /**
  * Crons con entradas EXTRA del día en vercel.json (horas UTC fraccionales, ej.
  * 18.5 = 18:30; espejo de vercel.json, en orden). No los recupera la
