@@ -32,6 +32,15 @@
 //   - Ciclo 100% exitoso (con o SIN recuperaciones) → NO envía nada. Recuperar
 //     es el sistema funcionando bien, no un fallo → silencio.
 //
+// SLOTS HUÉRFANOS (jul-2026): además de recuperar pares, cada pasada barre los
+// heartbeats por-slot de switch-sync ("switch-sync:<tipo>-<hhmm>"). Un slot cuya
+// invocación se perdió pero cuyos pares SÍ quedaron al día (por esta
+// recuperación o por otra entrada que cubre los mismos pares) recibe la marca
+// "switch-sync:<slot>#recuperado" — nunca su heartbeat propio, que sigue siendo
+// la verdad de "la entrada se invocó y salió OK". Sin esto el watchdog reportaba
+// slots stale con los datos perfectamente al día (25-jul-2026: facturas-2315,
+// facturas-0015 y all-0535). Ver slotsHuerfanos en cron-telemetry.ts.
+//
 // Auth: Bearer con CRON_SECRET (igual que el resto de crons).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -69,7 +78,12 @@ import {
   recordCronHeartbeat,
   cronIsStale,
   staleEsPendingRecovery,
+  slotCubiertoPorRecuperacion,
+  reconciliarSlotsSwitchSync,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
+  SWITCH_SYNC_SLOT_PREFIX,
+  SLOT_RECUPERADO_SUFFIX,
+  slotRecuperadoName,
 } from "@/lib/cron-telemetry";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
@@ -573,12 +587,42 @@ async function checkStaleCrons(): Promise<string[]> {
     return [];
   }
   const now = Date.now();
+  const beats = new Map<string, string | null>(
+    (data || []).map((h) => [h.cron_name as string, h.last_success_at as string | null]),
+  );
+  const esSlot = (n: string) =>
+    n.startsWith(SWITCH_SYNC_SLOT_PREFIX) && !n.endsWith(SLOT_RECUPERADO_SUFFIX);
   const stale = (data || [])
+    // Las marcas "#recuperado" NO son crons: las escribe esta misma
+    // reconciliación para certificar que cubrió un slot huérfano. Vigilarlas
+    // como si fueran un cron generaría una alerta eterna por su propia marca.
+    .filter((h) => !String(h.cron_name).endsWith(SLOT_RECUPERADO_SUFFIX))
     // Umbral por-cron compartido (cronIsStale): un cron mensual como
     // grupo-resumen-mensual usa 33 días, no las 26h del default.
     .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
+    // Slot de switch-sync cubierto por una recuperación (su ocurrencia se perdió
+    // pero sus pares quedaron al día) → no alertar. El tope duro de 50h sobre su
+    // heartbeat propio impide que una entrada muerta quede tapada para siempre.
+    .filter(
+      (h) =>
+        !esSlot(h.cron_name) ||
+        !slotCubiertoPorRecuperacion(
+          h.last_success_at,
+          beats.get(slotRecuperadoName(h.cron_name.slice(SWITCH_SYNC_SLOT_PREFIX.length))),
+          now,
+        ),
+    )
     // Silenciar los que aún se van a auto-recuperar hoy (anti alerta-fantasma).
-    .filter((h) => !staleEsPendingRecovery(h.cron_name, h.last_success_at, now))
+    // Los slots se evalúan con el nombre base "switch-sync" (los recupera la
+    // reconciliación por par), igual que en health-crons.
+    .filter(
+      (h) =>
+        !staleEsPendingRecovery(
+          esSlot(h.cron_name) ? "switch-sync" : h.cron_name,
+          h.last_success_at,
+          now,
+        ),
+    )
     .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
   if (stale.length > 0) {
     await sendTelegramAlert(
@@ -606,7 +650,12 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const sinceIso = panamaDayStartIso();
   const expected = expectedPairs();
 
-  // 0. Watchdog de heartbeats + registrar el propio.
+  // 0. Slots huérfanos de switch-sync: certificar (marca "#recuperado") los que
+  //    perdieron su invocación pero cuyos pares SÍ quedaron al día. Va ANTES del
+  //    watchdog para que este ya no los reporte en esta misma pasada.
+  const slotsCubiertos = await reconciliarSlotsSwitchSync();
+
+  // 0b. Watchdog de heartbeats + registrar el propio.
   const staleCrons = await checkStaleCrons();
   await recordCronHeartbeat(CRON_NAME);
 
@@ -630,6 +679,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram: "none",
       outageResumen: outage.resumen,
       staleCrons,
+      slotsCubiertos,
     });
   }
 
@@ -687,6 +737,11 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // Si switch-sync recuperó algo OK, refrescar su heartbeat (el watchdog usa el
   // heartbeat 'switch-sync'; las funciones lib no lo tocan).
   if (switchSyncRecoveryRan) await recordCronHeartbeat("switch-sync");
+  // Segunda pasada de slots: los pares que se acaban de recuperar ya tienen su
+  // success en switch_sync_log → los slots que perdieron su invocación y esta
+  // recuperación compensó quedan certificados YA, sin esperar a la pasada
+  // siguiente (la de las 18:00 no tendría otra hasta las 10:00 del día próximo).
+  if (switchSyncRecoveryRan) slotsCubiertos.push(...(await reconciliarSlotsSwitchSync()));
 
   // 3. Re-consultar: fuente de verdad del estado final.
   const logAfter = await fetchTodayLog(sinceIso);
@@ -758,6 +813,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram,
       outageResumen,
       staleCrons,
+      slotsCubiertos,
     },
     { status: hayProblemas ? 207 : 200 },
   );

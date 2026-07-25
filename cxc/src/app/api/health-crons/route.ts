@@ -24,6 +24,13 @@
 // switch-reconciliacion y grupo-resumen-mensual JAMÁS se silencian; un cron sin
 // heartbeat (fila ausente) tampoco (fail-closed).
 //
+// Slots huérfanos (jul-2026): un slot de switch-sync cuya invocación se perdió
+// pero cuyo trabajo la reconciliación certificó como hecho (marca
+// "switch-sync:<slot>#recuperado") sale en slotsCubiertos[] con 200. Tope duro:
+// si su ENTRADA propia lleva >50h (2 ocurrencias) sin correr, vuelve a `stale`
+// aunque la marca esté fresca — una entrada que Vercel dejó de invocar NO queda
+// tapada por la recuperación diaria.
+//
 // Protección: token simple (?token= o header x-healthcheck-token), comparado en
 // tiempo constante contra HEALTHCHECK_TOKEN. NO usa CRON_SECRET a propósito: un
 // monitor de terceros no debe poder disparar crons. Fail-closed: sin la env var
@@ -38,7 +45,10 @@ import {
   cronStaleThresholdHours,
   staleEsPendingRecovery,
   SEED_TOLERANT_CRONS,
-  SWITCH_SYNC_SLOT_HEARTBEATS,
+  SWITCH_SYNC_SLOTS,
+  slotHeartbeatName,
+  slotRecuperadoName,
+  slotCubiertoPorRecuperacion,
 } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -190,7 +200,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // deploy) → NO es stale; solo alerta si la fila EXISTE y está vieja. Así el
   // primer día post-deploy no dispara un 503 falso con los 13 slots ausentes.
   const slotsUnseeded: string[] = [];
-  for (const slot of SWITCH_SYNC_SLOT_HEARTBEATS) {
+  // Slots cuya invocación se perdió pero cuyo trabajo la reconciliación certificó
+  // como hecho (marca "switch-sync:<slot>#recuperado"): NO cuentan para el 503,
+  // se informan aparte. El tope duro de 50h sobre el heartbeat PROPIO del slot
+  // (slotCubiertoPorRecuperacion) impide que una entrada que Vercel dejó de
+  // invocar del todo quede tapada: al 2º día vuelve a `stale`.
+  const slotsCubiertos: Array<{ cron: string; last_success_at: string; hours_ago: number }> = [];
+  for (const s of SWITCH_SYNC_SLOTS) {
+    const slot = slotHeartbeatName(s.slot);
     const last = beats.get(slot);
     if (last === undefined || last === null) {
       slotsUnseeded.push(slot);
@@ -199,9 +216,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const t = new Date(last).getTime();
     const hoursAgo = Number.isFinite(t) ? Math.round((now - t) / 3600000) : null;
     if (!Number.isFinite(t) || t < now - cronStaleThresholdHours(slot) * 3600 * 1000) {
-      // Los slots también son recuperables por la reconciliación (los pares que
-      // cubren) — misma semántica pendingRecovery que el base "switch-sync".
-      if (staleEsPendingRecovery("switch-sync", last, now)) {
+      if (slotCubiertoPorRecuperacion(last, beats.get(slotRecuperadoName(s.slot)), now)) {
+        slotsCubiertos.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
+      } else if (staleEsPendingRecovery("switch-sync", last, now)) {
+        // Los slots también son recuperables por la reconciliación (los pares que
+        // cubren) — misma semántica pendingRecovery que el base "switch-sync".
         pendingRecovery.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo as number });
       } else {
         stale.push({ cron: slot, last_success_at: last, hours_ago: hoursAgo });
@@ -248,6 +267,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       pendingRecoveryCount: pendingRecovery.length,
       pendingRecovery,
       slotsUnseeded,
+      slotsCubiertosCount: slotsCubiertos.length,
+      slotsCubiertos,
     },
     { status: ok ? 200 : 503 },
   );
