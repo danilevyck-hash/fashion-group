@@ -675,7 +675,7 @@ const REEBOK: MarcaTheme = {
       "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },
   admin: {
-    titulo: "Catálogo Reebok",
+    titulo: "Administrar",
     subtituloSync: (lastSync) => {
       const rel = relativo(lastSync);
       return `Sincronizado con Switch ${rel} · 1×/día`;
@@ -979,7 +979,7 @@ const JOYBEES: MarcaTheme = {
       "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },
   admin: {
-    titulo: "JOYBEES",
+    titulo: "Administrar",
     subtituloSync: (lastSync) =>
       `Se llena solo desde Switch por existencia · tú solo subes fotos${
         lastSync
@@ -1313,7 +1313,7 @@ const TOMMY: MarcaTheme = {
       "w-full bg-[#152342] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },
   admin: {
-    titulo: "Catálogo Tommy Hilfiger",
+    titulo: "Administrar",
     subtituloSync: (lastSync) =>
       `Se llena solo desde Switch por existencia · tú solo subes fotos${
         lastSync
