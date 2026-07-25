@@ -148,7 +148,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Reportes" breadcrumbs={[{ label: "Clientes" }, { label: cliente.codigo }]} />
+      <AppHeader module="Clientes" breadcrumbs={[{ label: cliente.codigo }]} />
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-2">
           <Link href="/clientes" className="text-xs text-gray-500 hover:text-black transition">← Clientes</Link>

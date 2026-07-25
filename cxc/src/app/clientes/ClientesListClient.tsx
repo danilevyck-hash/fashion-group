@@ -118,7 +118,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Reportes" breadcrumbs={[{ label: "Clientes" }]} />
+      <AppHeader module="Clientes" />
       <PullToRefresh onRefresh={onRefresh}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">

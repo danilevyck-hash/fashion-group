@@ -495,7 +495,7 @@ function AdminDashboardInner() {
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
-      <AppHeader module="Panel CXC" />
+      <AppHeader module="Cuentas por Cobrar" />
 
       {dataTs != null && (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-3 flex justify-end">

@@ -240,7 +240,7 @@ function MobileHeader({
     <header className="flex items-start justify-between gap-3">
       <div>
         <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-gray-900">
-          Panel CXC
+          Cuentas por Cobrar
         </h1>
         <SyncStatus
           tabla="estadocuenta"

@@ -234,7 +234,7 @@ export default function ReclamoDetail({
   return (
     <div>
       <AppHeader
-        module="Reclamos a Proveedores"
+        module="Reclamos"
         breadcrumbs={[
           { label: current.empresa, onClick: onBackToEmpresa ?? onBack },
           { label: current.nro_reclamo || "Reclamo" },

@@ -157,7 +157,7 @@ function ProveedoresList() {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Proveedores" breadcrumbs={[{ label: "Proveedores" }]} />
+      <AppHeader module="Proveedores" />
       <PullToRefresh onRefresh={() => fetchList(empresa, q)}>
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">

@@ -135,7 +135,7 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Administrar Catalogos" />
+      <AppHeader module="Catálogos" />
 
       {toast && (
         <div className={theme.admin.toastBg}>

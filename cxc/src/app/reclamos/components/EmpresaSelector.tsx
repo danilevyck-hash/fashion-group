@@ -103,7 +103,7 @@ export default function EmpresaSelector({
 
   return (
     <div>
-      <AppHeader module="Reclamos a Proveedores" />
+      <AppHeader module="Reclamos" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">

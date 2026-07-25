@@ -408,7 +408,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Préstamos a Colaboradores" />
+      <AppHeader module="Préstamos" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Resumen: 2 chips + acción de quincena masiva (confirmación con resumen) */}

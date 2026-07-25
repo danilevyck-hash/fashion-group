@@ -98,7 +98,7 @@ export default function GuiasPage() {
   return (
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
-        <AppHeader module="Guías de Transporte" />
+        <AppHeader module="Guías de Despacho" />
         <GuiasList
           guias={s.guias}
           loading={s.loading}
