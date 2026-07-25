@@ -97,6 +97,7 @@ export async function syncCatalogoTommy(
   return syncCatalogo(
     {
       db: tommyServer,
+      marca: "tommy",
       syncLogType: "catalogo_tommy",
       productsTable: "tommy_products",
       empresas: EMPRESAS,

@@ -92,10 +92,14 @@ const reebokProductsAnonDb: LazyDb = async () =>
   (await import("@/components/reebok/supabase")).supabase;
 // Joybees products/public crean su client por request (patrón original
 // getSupabase(): proyecto principal, service-role con fallback a anon).
+// `cache: "no-store"` en cada fetch igual que reebok/joybees/tommy-supabase-
+// server: este client era el único sin el blindaje y fue justo la forma del bug
+// #253 (createClient propio → snapshot viejo del Data Cache de Next).
 const joybeesProductsDb: LazyDb = async () =>
   createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) } },
   );
 // POST /pedido-publico: ambas marcas insertan con un client al proyecto
 // principal con service-role (RLS public_insert), patrón original del route.

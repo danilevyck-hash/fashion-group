@@ -36,6 +36,7 @@ export function syncCatalogoReebok(
 ): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: reebokServer,
+    marca: "reebok",
     syncLogType: "catalogo_reebok",
     productsTable: "products",
     empresas: EMPRESAS,

@@ -41,6 +41,8 @@ import { createSwitchClient, type SwitchArticulo } from "./client";
 import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
 import { logCronError } from "@/lib/cron-telemetry";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
+import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
+import type { MarcaKey } from "@/lib/catalogo/marcas";
 
 const PER_PAGE = 50;
 const MAX_PAGES = 80;
@@ -55,6 +57,10 @@ export interface CatalogoEmpresaScope {
 }
 
 export interface CatalogoSyncConfig {
+  /** Marca del catálogo — obligatoria: es la tag que se invalida al terminar
+   *  (`catalogo:<marca>`). Al agregar una marca nueva el compilador la exige,
+   *  así que no se puede olvidar la invalidación de su catálogo público. */
+  marca: MarcaKey;
   /** Cliente Supabase del proyecto donde vive la tabla del catálogo. */
   db: SupabaseClient;
   /** sync_type con el que cada corrida por empresa se registra en switch_sync_log
@@ -407,6 +413,14 @@ export async function syncCatalogo(
     }
     empresasOut.push(out);
   }
+
+  // Invalidación del catálogo público de ESTA marca (lib/catalogo/cache.ts).
+  // Incondicional en corridas reales: el sync es el mayor write path del
+  // catálogo (precio, nombre, active, stock) y una corrida "sin cambios"
+  // solo cuesta una consulta fría extra. Los dry-run no escriben → no invalidan.
+  // Cubre de una sola vez los 3 crons, "Actualizar ahora" y la reconciliación,
+  // porque todos entran por aquí.
+  if (!dryRun) invalidarCatalogoPublico(config.marca);
 
   return {
     dryRun,

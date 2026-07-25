@@ -47,6 +47,21 @@ vi.mock("@/lib/log-activity", () => ({
   logActivity: (...a: unknown[]) => mockLogActivity(...a),
 }));
 
+// `unstable_cache` y `revalidateTag` exigen el runtime de Next (incrementalCache
+// + staticGenerationStore); fuera de él lanzan. Aquí `unstable_cache` pasa
+// derecho —así estas pruebas siguen midiendo el CONTRATO del endpoint— y
+// `revalidateTag` se espía para verificar que cada write path invalida la tag de
+// SU marca. El diseño de la caché se prueba aparte en
+// catalogo-cache-invalidacion.test.ts.
+const mockRevalidateTag = vi.fn();
+vi.mock("next/cache", () => ({
+  unstable_cache:
+    (cb: (...a: unknown[]) => unknown) =>
+    (...a: unknown[]) =>
+      cb(...a),
+  revalidateTag: (...a: unknown[]) => mockRevalidateTag(...a),
+}));
+
 // PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
 // inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
 import type { NextRequest } from "next/server";
@@ -323,5 +338,69 @@ describe("GET /public — catálogo público (sin login)", () => {
     expect("inventory" in json).toBe(false);
     expect(res.headers.get("cache-control")).toContain("no-store");
     expect(mainDb.chainsFor("joybees_products")[0]._calls.eq).toContainEqual(["active", true]);
+  });
+});
+
+// ─── Invalidación de la caché del catálogo público ───────────────────────────
+// Cada write path que toca algo que el público VE debe invalidar la tag de SU
+// marca (y solo la suya). Sin esto, el catálogo cacheado sigue mostrando el
+// producto ocultado o la foto vieja — el bug de #244/#253 pero con caché.
+
+describe("caché pública: invalidación por write path", () => {
+  it("PATCH oculto_manual invalida SOLO la tag de su marca", async () => {
+    reebokDb.queue(
+      "products",
+      { data: { id: PID, sku: "S1", existencia: 10, keep_visible: false, badge: null, oculto_manual: false } },
+      { data: { id: PID, sku: "S1", active: false, oculto_manual: true } },
+    );
+    await rProductsPatch(makeReq("/x", { method: "PATCH", body: { id: PID, oculto: true }, role: "admin" }));
+    expect(mockRevalidateTag).toHaveBeenCalledWith("catalogo:reebok");
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith("catalogo:joybees");
+
+    vi.clearAllMocks();
+    mainDb.queue(
+      "joybees_products",
+      { data: { id: PID, sku: "S1", existencia: 0, keep_visible: false, badge: null, oculto_manual: true } },
+      { data: { id: PID, sku: "S1", active: false, oculto_manual: false } },
+    );
+    await jProductsPatch(makeReq("/x", { method: "PATCH", body: { sku: "S1", oculto: false }, role: "admin" }));
+    expect(mockRevalidateTag).toHaveBeenCalledWith("catalogo:joybees");
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith("catalogo:reebok");
+  });
+
+  it("editar la foto (image_url) invalida — reebok PUT y joybees POST", async () => {
+    reebokDb.queue("products", { data: { id: PID, image_url: "https://x/foto.jpg?v=1" } });
+    await rProductsPut(
+      makeReq("/x", { method: "PUT", body: { id: PID, image_url: "https://x/foto.jpg?v=1" }, role: "admin" }),
+    );
+    expect(mockRevalidateTag).toHaveBeenCalledWith("catalogo:reebok");
+
+    vi.clearAllMocks();
+    mainDb.queue("joybees_products", { data: { id: PID, image_url: "https://x/f.jpg?v=2" } });
+    await jProductsPost(
+      makeReq("/x", { method: "POST", body: { sku: "S1", image_url: "https://x/f.jpg?v=2" }, role: "admin" }),
+    );
+    expect(mockRevalidateTag).toHaveBeenCalledWith("catalogo:joybees");
+  });
+
+  it("DELETE (soft) invalida; un GET público NO invalida nada", async () => {
+    reebokDb.queue("products", { data: { id: PID } });
+    await rProductsDelete(makeReq(`/api/x?id=${PID}`, { method: "DELETE", role: "admin" }));
+    expect(mockRevalidateTag).toHaveBeenCalledWith("catalogo:reebok");
+
+    vi.clearAllMocks();
+    reebokDb = makeDb();
+    reebokDb.queue("products", { data: [] });
+    reebokDb.queue("inventory", { data: [] });
+    await rPublicGet();
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("una edición RECHAZADA (400) no invalida — no cambió nada", async () => {
+    const res = await rProductsPut(
+      makeReq("/x", { method: "PUT", body: { id: PID, price: 99 }, role: "admin" }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
   });
 });
