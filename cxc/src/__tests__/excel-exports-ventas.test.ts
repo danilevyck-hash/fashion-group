@@ -19,6 +19,8 @@ import {
   buildComisionDetalleSheet,
   buildComisionesResumenSheet,
   buildComisionesConsolidadoSheet,
+  comisionLinea,
+  ventasPagables,
   type ComisionDetalle,
   type ComisionResumen,
   type ComisionConsolidado,
@@ -174,6 +176,78 @@ describe("excel exports Ventas/Comisiones — estilo de la casa", () => {
     expect(s["A20"].v).toBe("Total a pagar");
     expect(s["D20"].t).toBe("n");
     expect(s["D20"].v).toBeCloseTo(1635.34, 2); // 3208.42 − 1400 − 173.08
+  });
+
+  // El RPC lista las facturas con utilidad ≤20% con aporte $0.00 para que el
+  // vendedor las VEA en pantalla (en gris) y entienda por qué no comisionan.
+  // El Excel es el papel de lo PAGABLE: esas filas no van. Como aportan 0, el
+  // total no se mueve.
+  it("comisión detalle Excel — omite las facturas con aporte $0 y el total no cambia", async () => {
+    const d: ComisionDetalle = {
+      empresa_key: "vistana", year: 2026, mes: 7, vendedor: "DANIEL LEVY",
+      tasa_venta: 0.005, tasa_cobro: 0.005,
+      ventas: [
+        { fecha: "2026-07-02", cliente: "Dana Mall", secuencial: "11-000002973", tipo: "Factura", subtotal: 1000, pct_utilidad: 30 },
+        // Utilidad ≤20% → aporte 0: NO debe salir en el Excel.
+        { fecha: "2026-07-03", cliente: "R.J.A.S.A.", secuencial: "11-000002995", tipo: "Factura", subtotal: 0, pct_utilidad: 12.5 },
+        { fecha: "2026-07-04", cliente: "City Mall", secuencial: "13-000000800", tipo: "Nota de Crédito", subtotal: -200, pct_utilidad: null },
+      ],
+      cobros: [{ fecha: "2026-07-10", cliente: "Dana Mall", monto: 500 }],
+      ventas_base: 800, cobros_base: 500,
+      comision_venta: 4, comision_cobro: 2.5, comision_total: 6.5,
+    };
+
+    // El helper es la fuente del filtro (lo comparte el builder).
+    expect(ventasPagables(d.ventas).map((v) => v.secuencial))
+      .toEqual(["11-000002973", "13-000000800"]);
+
+    const ws = await buildComisionDetalleSheet(d, "Vistana International");
+    const wb = roundtrip([{ name: "Comisión", ws }]);
+    const s = wb.Sheets["Comisión"];
+
+    // VENTAS: hdr en 5, dos filas (6 y 7), total en 8 — la de $0 no ocupa fila.
+    expect(s["A5"].v).toBe("Fecha");
+    expect(s["C6"].v).toBe("11-000002973");
+    expect(s["C7"].v).toBe("13-000000800");
+    expect(s["E7"].v).toBe(-200);
+    expect(s["D8"].v).toBe("Total ventas");
+    // El secuencial de la factura no pagable no aparece en NINGUNA celda.
+    const secuenciales = Object.keys(s)
+      .filter((k) => !k.startsWith("!"))
+      .map((k) => s[k].v);
+    expect(secuenciales).not.toContain("11-000002995");
+
+    // El total sigue siendo la base del RPC (quitar filas de $0 no la mueve) y
+    // coincide con la suma de las filas que SÍ quedaron.
+    expect(s["E8"].t).toBe("n");
+    expect(s["E8"].v).toBe(800);
+    expect(Number(s["E6"].v) + Number(s["E7"].v)).toBe(800);
+    // CIERRE (15 sección · 16 ventas · 17 cobros · 18 total) intacto.
+    expect(s["A18"].v).toBe("Comisión total");
+    expect(s["D18"].v).toBe(6.5);
+  });
+
+  // Columna nueva de PANTALLA: cuánto comisiona cada línea. Es informativa —
+  // el total pagado sale del RPC, que redondea la BASE, no cada documento.
+  describe("comisionLinea (columna Comisión del modal)", () => {
+    it("aporte × tasa a 2 decimales, con NC negativas y $0 en gris", () => {
+      expect(comisionLinea(1000, 0.005)).toBe(5);
+      expect(comisionLinea(-200, 0.005)).toBe(-1);
+      expect(comisionLinea(0, 0.005)).toBe(0);
+      expect(comisionLinea(5706, 0.01)).toBe(57.06);
+      expect(comisionLinea(1234.56, 0.005)).toBe(6.17); // 6.1728 → 6.17
+    });
+
+    it("la suma de líneas puede diferir del total del RPC (por eso el pie NO la usa)", () => {
+      const lineas = [12.345, 12.345];
+      const tasa = 0.01;
+      const sumaLineas = lineas.reduce((s, n) => s + comisionLinea(n, tasa), 0);
+      const base = lineas.reduce((s, n) => s + n, 0); // 24.69
+      const totalRpc = Math.round(base * tasa * 100) / 100; // ROUND(0.2469) = 0.25
+      expect(sumaLineas).toBeCloseTo(0.24, 2);
+      expect(totalRpc).toBe(0.25);
+      expect(sumaLineas).not.toBe(totalRpc);
+    });
   });
 
   it("comisiones resumen por empresa", async () => {

@@ -25,7 +25,7 @@ import { createPortal } from "react-dom";
 import { X, Download, Printer } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
-import { exportComisionDetalle, tipoDocCorto, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
+import { exportComisionDetalle, tipoDocCorto, comisionLinea, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -42,6 +42,16 @@ const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+// La columna "Comisión" de cada tabla es informativa: muestra cuánto aporta ese
+// renglón. El total que se paga NO es la suma de esos renglones — el RPC redondea
+// la BASE del mes (ROUND(base × tasa)), no documento por documento, así que la
+// suma de líneas redondeadas puede diferir 1-2 centavos. Los pies de tabla
+// muestran SIEMPRE el número del RPC (el mismo del cierre), y esta nota explica
+// por qué "de a poquito" puede no dar exacto.
+const NOTA_COMISION_LINEA =
+  "La comisión de cada línea es referencial. El total se calcula sobre el total del mes, " +
+  "por eso puede diferir unos centavos de la suma de las líneas.";
 
 // ── Layout de impresión: letter PORTRAIT, fuente FIJA ────────────────────────
 // Sin tiers que achiquen la letra: el reporte fluye a las hojas que necesite.
@@ -459,11 +469,12 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                         <th className="px-3 py-2 text-center font-medium">Tipo</th>
                         <th className="px-3 py-2 text-right font-medium">Subtotal</th>
                         <th className="px-3 py-2 text-right font-medium">% Util.</th>
+                        <th className="px-3 py-2 text-right font-medium">Comisión</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.ventas.length === 0 ? (
-                        <tr><td colSpan={6} className="px-3 py-4 text-center text-gray-400">Sin ventas comisionables.</td></tr>
+                        <tr><td colSpan={7} className="px-3 py-4 text-center text-gray-400">Sin ventas comisionables.</td></tr>
                       ) : data.ventas.map((v, i) => (
                         // Facturas con utilidad ≤20% no comisionan: se listan con
                         // $0.00 (atribuidas al vendedor de la factura) pero en gris.
@@ -474,18 +485,23 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                           <td className="px-3 py-1.5 text-center tabular-nums text-gray-500">{tipoDocCorto(v.tipo)}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(v.subtotal)}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(comisionLinea(v.subtotal, data.tasa_venta))}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
+                      {/* El pie de "Comisión" muestra el número del RPC (el mismo
+                          del cierre), NO la suma de las líneas: un solo total. */}
                       <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
                         <td className="px-3 py-2" colSpan={4}>TOTAL VENTAS</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.ventas_base)}</td>
                         <td></td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.comision_venta)}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
+                <p className="mt-1 text-xs text-gray-400">Comisión de cada línea = subtotal × {pctTasaV}%. {NOTA_COMISION_LINEA}</p>
 
               </section>
 
@@ -500,28 +516,33 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                         <th className="px-3 py-2 font-medium">Fecha</th>
                         <th className="px-3 py-2 font-medium">Cliente</th>
                         <th className="px-3 py-2 text-right font-medium">Monto</th>
+                        <th className="px-3 py-2 text-right font-medium">Comisión</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.cobros.length === 0 ? (
-                        <tr><td colSpan={3} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
+                        <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">Sin cobros comisionables.</td></tr>
                       ) : data.cobros.map((c, i) => (
                         <tr key={i} className="border-b border-gray-100 last:border-0 text-gray-800">
                           <td className="px-3 py-1.5 whitespace-nowrap">{fmtDate(c.fecha)}</td>
                           <td className="px-3 py-1.5">{c.cliente}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(c.monto)}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(comisionLinea(c.monto, data.tasa_cobro))}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
+                      {/* Igual que en VENTAS: el pie es el número del RPC. */}
                       <tr className="border-t border-gray-200 bg-gray-50 font-semibold text-gray-900">
                         <td className="px-3 py-2" colSpan={2}>TOTAL COBROS</td>
                         <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.cobros_base)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(data.comision_cobro)}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
                 <p className="mt-1 text-xs text-gray-400 print:hidden">El API de Switch no expone el número de recibo.</p>
+                <p className="mt-0.5 text-xs text-gray-400 print:hidden">Comisión de cada línea = monto × {pctTasaC}%. {NOTA_COMISION_LINEA}</p>
 
                 {/* Suma de las BASES sobre las que se comisiona (no de las comisiones). */}
                 <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 print:hidden">
