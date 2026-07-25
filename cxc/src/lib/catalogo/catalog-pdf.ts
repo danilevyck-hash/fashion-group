@@ -10,6 +10,7 @@
 
 import { jsPDF } from "jspdf";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
+import { TOMMY_LOGO_BASE64 } from "@/lib/tommy-logo";
 
 export interface CatalogPdfProduct {
   name: string;
@@ -28,7 +29,7 @@ export interface CatalogPdfSection {
 export interface CatalogImage { data: string; w: number; h: number }
 
 export interface CatalogPdfOpts {
-  marca: "reebok" | "joybees";
+  marca: "reebok" | "joybees" | "tommy";
   sections: CatalogPdfSection[];
   /** Descripción de filtros activos (ej. "Hombre · Calzado") o "Todos los productos". */
   subtitle: string;
@@ -57,8 +58,10 @@ const GRAY_MID: [number, number, number] = [120, 120, 125];
 const WHITE: [number, number, number] = [255, 255, 255];
 const JB_DARK: [number, number, number] = [64, 64, 65];
 const JB_YELLOW: [number, number, number] = [255, 228, 67];
+const TH_NAVY: [number, number, number] = [21, 35, 66];
+const TH_RED: [number, number, number] = [174, 0, 41];
 
-const THEMES: Record<"reebok" | "joybees", BrandTheme> = {
+const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
   reebok: {
     primary: NAVY,
     accent: RED,
@@ -84,6 +87,20 @@ const THEMES: Record<"reebok" | "joybees", BrandTheme> = {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...JB_DARK);
       doc.text("JOYBEES", x, y + (big ? 5.5 : 4));
+    },
+  },
+  tommy: {
+    primary: TH_NAVY,
+    accent: TH_RED,
+    cellBg: [246, 247, 249],
+    bandFill: TH_NAVY,
+    bandText: WHITE,
+    bandCount: [185, 190, 205],
+    drawLogo: (doc, x, y, big) => {
+      // Wordmark oscuro (#102039) sobre página clara. Aspecto ~14.5:1.
+      if (TOMMY_LOGO_BASE64) {
+        try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 50 : 38, big ? 3.4 : 2.6); } catch { /* */ }
+      }
     },
   },
 };

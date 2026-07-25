@@ -16,11 +16,14 @@
 import type { ReactNode } from "react";
 import { getBultoSize as reebokBulto } from "@/lib/reebok-bulto";
 import { getBultoSize as joybeesBulto } from "@/lib/joybees-bulto";
+import { getBultoSize as tommyBulto } from "@/lib/tommy-bulto";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
+import { calculateTommyOrderTotal } from "@/lib/tommy-order-total";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
+import { TOMMY_CATEGORIA_LABEL, TOMMY_GENERO_LABEL } from "@/lib/tommy-nombres";
 
-export type MarcaUiKey = "reebok" | "joybees";
+export type MarcaUiKey = "reebok" | "joybees" | "tommy";
 
 /** Producto tal como lo ve el ADMIN de catálogos (superset de las marcas). */
 export interface AdminProducto {
@@ -42,6 +45,8 @@ export interface AdminProducto {
   created_at?: string;
   /** Toggle "Ocultar del catálogo" — puede faltar pre-migración. */
   oculto_manual?: boolean | null;
+  /** Tommy: true = nombre editado a mano (el sync no lo pisa). */
+  nombre_manual?: boolean | null;
 }
 
 function tieneFotoAdmin(p: AdminProducto): boolean {
@@ -288,8 +293,11 @@ export interface MarcaTheme {
     metricHighlightBox: string;
     metricHighlightValue: string;
     /** Estilo del tab de fotos/productos: "tarjetas" (Reebok, badge+stock+bulk)
-     *  o "batch" (Joybees, batch simple + import respaldo). */
+     *  o "batch" (Joybees/Tommy, batch simple). */
     productosStyle: "tarjetas" | "batch";
+    /** Solo Tommy: nombre editable inline en las filas del admin (al guardarlo
+     *  el endpoint marca nombre_manual=true y el sync deja de pisarlo). */
+    nombreEditable: boolean;
     /** Import por plantilla como respaldo (?tab=importar) — solo Joybees. */
     importarTab: boolean;
     /** Edición de etiqueta (badge) por producto — solo Reebok. */
@@ -588,6 +596,7 @@ const REEBOK: MarcaTheme = {
     metricHighlightBox: "border-[#E4002B]/30 bg-[#E4002B]/5",
     metricHighlightValue: "text-[#E4002B]",
     productosStyle: "tarjetas",
+    nombreEditable: false,
     importarTab: false,
     badgeEditable: true,
     productEdit: { idField: "id", verb: "PUT" },
@@ -894,6 +903,7 @@ const JOYBEES: MarcaTheme = {
     metricHighlightBox: "border-amber-300 bg-amber-50",
     metricHighlightValue: "text-amber-600",
     productosStyle: "batch",
+    nombreEditable: false,
     importarTab: true,
     badgeEditable: false,
     productEdit: { idField: "sku", verb: "POST" },
@@ -931,6 +941,315 @@ const JOYBEES: MarcaTheme = {
   },
 };
 
+// ─── TOMMY HILFIGER ──────────────────────────────────────────────────────────
+// Paleta: navy #152342, rojo #AE0029, blanco (wordmark #102039). Página casi
+// blanca (#F6F7F9) con cards blancas — look limpio "prep" de la marca. Grid
+// PLANA (sin agrupación por modelo), ficha simple por variantes, admin estilo
+// batch (648 productos calzado con TODAS las fotos pendientes → subida masiva
+// nombre-de-archivo=SKU es el flujo dominante). Sin pre-orden ni saleFilter.
+// Chips de categoría = las categorías parseadas de Switch (tommy-nombres.ts).
+const TOMMY: MarcaTheme = {
+  marca: "tommy",
+  label: "Tommy Hilfiger",
+  labelUpper: "TOMMY HILFIGER",
+  empresaKey: "fashion_shoes",
+  switchDirectorioLabel: "Fashion Shoes",
+
+  api: "/api/catalogo/tommy",
+  catalogoHref: "/catalogo/tommy",
+  pedidosHref: "/catalogo/tommy/pedidos",
+  checkoutHref: "/catalogo/tommy/checkout",
+  confirmacionBase: "/catalogo/tommy/confirmacion",
+  clientesHref: "/catalogo/tommy/clientes",
+  publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/tommy",
+  pedidoPublicoBase: "/pedido-tommy",
+
+  cartKeyLocal: "tommy_cart",
+  cartKeySession: null,
+  publicCartKey: "tommy_public_cart",
+  publicClientNameKey: "tommy_public_client_name",
+  draftIdKey: "tommy_draft_id",
+  checkoutTokenKey: "tommy_checkout_token",
+
+  bulto: () => tommyBulto(),
+  calcTotal: calculateTommyOrderTotal,
+  sortOrderItems: null,
+  pdfFallbackCategory: "footwear",
+  itemsField: "tommy_order_items",
+  vendorFmtDecimals: 2,
+
+  features: {
+    preorder: false,        // sin pre-orden (decisión Daniel, como Joybees)
+    saleFilter: false,
+    agrupacionPorModelo: false, // grid PLANA
+    inventarioPorTalla: false,
+    categoryChips: true,    // categorías parseadas de la descripcion Switch
+    roleClienteGuard: false,
+    navInicioRequiereRol: false,
+  },
+
+  metaTitle: "Tommy Hilfiger Panamá - Catálogo",
+  metaDescription: "Catálogo de calzado Tommy Hilfiger Panamá.",
+
+  checkoutAccent: "#152342",
+
+  logos: {
+    navbar: () => <img src="/tommy/tommy-horizontal.svg" alt="Tommy Hilfiger" className="h-3.5 w-auto" />,
+    header: () => (
+      <div className="flex items-center gap-2.5">
+        <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain" />
+        <div>
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto" />
+          <p className="text-xs text-[#152342]/40 uppercase tracking-[0.25em] leading-none mt-1">
+            Catalogo Panama
+          </p>
+        </div>
+      </div>
+    ),
+    admin: () => (
+      <div className="w-10 h-10 rounded-xl bg-white border border-[#152342]/15 flex items-center justify-center">
+        <img src="/tommy/tommy-flag.png" alt="Tommy" className="w-7 h-5 object-contain" />
+      </div>
+    ),
+    pedidoPublico: () => (
+      <div>
+        <h1 className="text-white font-bold text-xl tracking-[0.08em]">TOMMY HILFIGER</h1>
+        <p className="text-white/50 text-xs mt-0.5">Panama</p>
+      </div>
+    ),
+  },
+
+  navbar: {
+    accentBar: "bg-[#AE0029]",
+    inicioLink: "text-xs text-[#152342] hover:text-[#AE0029] transition flex-shrink-0 py-2",
+    pedidosLink: "text-sm text-[#152342] hover:text-[#AE0029] transition py-2 px-2 font-medium",
+  },
+  header: {
+    fashionGroupBar: "w-1 h-4 bg-[#AE0029] rounded-full",
+    fashionGroupText: "text-xs font-medium uppercase tracking-wide text-[#152342]/30",
+  },
+  filtros: {
+    searchIcon: "absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#152342]/30",
+    searchInput:
+      "w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-[#152342]/10 text-sm outline-none focus:border-[#152342]/30 focus:ring-2 focus:ring-[#152342]/5 transition placeholder:text-[#152342]/25",
+    searchClear:
+      "absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#152342]/40 hover:text-[#152342] transition",
+    searchPlaceholder: "Buscar por nombre o codigo...",
+    chipLabel: "text-xs font-semibold text-[#152342]/40 uppercase tracking-wide mr-0.5",
+    chipActive: "bg-[#152342] text-white shadow-sm",
+    chipInactive: "bg-white text-[#152342]/60 border border-[#152342]/10 hover:border-[#152342]/25",
+    divider: "w-px h-5 bg-[#152342]/10 shrink-0",
+    clearAll: "text-xs text-[#152342]/40 hover:text-[#AE0029] transition min-h-[44px] px-2",
+    sortSelect:
+      "text-xs border border-[#152342]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#152342]/30 transition bg-white text-[#152342]/60 min-h-[44px]",
+    count: "text-xs text-[#152342]/30 tabular-nums",
+    // Valores de FILTRO de matchesGenderFilter (male/female/kids — el pipeline
+    // flat filtra por grupo canónico de reebok-gender.ts, que ya normaliza los
+    // slugs de tommy_products: women→Mujer, men→Hombre, boys/girls→Niños).
+    genderOptions: [
+      { value: "", label: "Todos" },
+      { value: "female", label: "Mujer" },
+      { value: "male", label: "Hombre" },
+      { value: "kids", label: "Niños" },
+    ],
+    categoryOptions: [
+      { value: "", label: "Todos" },
+      { value: "sneakers", label: "Sneakers" },
+      { value: "flip_flops", label: "Flip Flops" },
+      { value: "sandals", label: "Sandalias" },
+      { value: "shoes", label: "Zapatos" },
+      { value: "slippers", label: "Pantuflas" },
+      { value: "boots", label: "Botas" },
+    ],
+  },
+  grid: {
+    pageBg: "min-h-screen bg-[#F6F7F9]",
+    sectionTitle: "text-xs font-bold uppercase tracking-wide text-[#152342]",
+    sectionRule: "flex-1 h-px bg-[#152342]/10",
+    sectionCount: "text-xs text-[#152342]/25 tabular-nums",
+    emptyIconWrap: "w-16 h-16 rounded-full bg-[#152342]/5 flex items-center justify-center mx-auto mb-4",
+    emptyIcon: (
+      <svg className="w-8 h-8 text-[#152342]/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+    emptyText: "text-[#152342]/40 text-sm font-medium",
+    emptyClear: "mt-3 text-sm text-[#AE0029] hover:text-[#8c0021] font-medium transition",
+    scrollTopBtn:
+      "fixed bottom-24 right-4 z-30 w-10 h-10 bg-white border border-[#152342]/10 rounded-full shadow-md flex items-center justify-center text-[#152342]/40 hover:text-[#152342] transition min-w-[44px] min-h-[44px]",
+  },
+  cart: {
+    tituloMini: "text-xs font-semibold text-[#152342]/50 uppercase tracking-wide",
+    itemName: "text-sm text-[#152342] truncate block font-medium",
+    itemMeta: "text-xs text-[#152342]/40",
+    qtyBtn:
+      "w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#152342] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]",
+    qtyNum: "text-sm tabular-nums text-[#152342] w-6 text-center font-semibold",
+    lineTotal: "text-sm tabular-nums text-[#152342]/60 w-20 text-right font-medium",
+    totalText: "text-sm font-bold text-[#152342]",
+    vaciarBtn: "text-xs text-gray-400 hover:text-[#AE0029] transition",
+    summaryBtn:
+      "flex items-center gap-2 px-3 py-3.5 rounded-xl bg-[#152342]/5 text-[#152342] text-sm tabular-nums shrink-0 hover:bg-[#152342]/10 transition min-h-[56px]",
+    summaryMeta: "text-xs text-[#152342]/50",
+    badge:
+      "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#AE0029] text-white text-xs font-bold flex items-center justify-center",
+    nameLabel: "block text-xs font-semibold uppercase tracking-wide text-[#152342]/50 mb-1",
+    nameInput:
+      "w-full rounded-lg border border-gray-200 bg-[#F6F7F9] px-3 py-2 text-sm text-[#152342] placeholder:text-[#152342]/30 focus:border-[#152342] focus:bg-white focus:outline-none transition",
+    actionPublic: "bg-[#152342] hover:bg-[#0e1830]",
+    actionVendor: "bg-[#152342] hover:bg-[#0e1830]",
+    checkIconAlways: true,
+    vendorArrow: false,
+  },
+  card: {
+    ring: "ring-2 ring-[#152342] scale-[1.02]",
+    checkBubble: "w-10 h-10 rounded-full bg-[#152342] flex items-center justify-center shadow-lg",
+    checkStroke: "white",
+    imageBg: "aspect-square bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
+    imageFit: "w-full h-full object-contain p-3",
+    placeholder: (
+      <div className="w-full h-full flex items-center justify-center text-gray-300">
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    ),
+    name: "text-sm font-semibold text-[#152342] line-clamp-2 leading-snug min-h-[2.5em]",
+    priceNormal: "text-xl font-bold tabular-nums text-[#152342]",
+    priceMeta: "text-xs text-[#152342]/40",
+    bultoMeta: "text-xs text-[#152342]/50",
+    addBtn: "bg-[#152342] text-white hover:bg-[#0e1830] active:scale-[0.97]",
+    qtyWrap: "flex items-center justify-between bg-[#152342]/5 rounded-lg px-1 border border-[#152342]/15",
+    qtyBtn: "text-[#152342] hover:bg-[#152342]/10",
+    qtyNum: "text-base font-bold text-[#152342] tabular-nums",
+    qtyUnit: "text-xs text-[#152342]/60 ml-1",
+  },
+  groupedCategoryLabels: {},
+  vendorShare: {
+    enHeader: true,
+    verPedidoBtn:
+      "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#152342] hover:bg-[#0e1830] transition px-3 py-2 rounded-lg min-h-[44px]",
+    btn: "flex items-center gap-1.5 text-xs text-[#152342]/50 hover:text-[#152342] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20",
+    iconSize: 14,
+    panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
+    item: "w-full text-left px-4 py-2.5 text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
+    copyLabel: "Copiar link publico",
+    stickyActionColor: "bg-[#AE0029] hover:bg-[#8c0021]",
+  },
+  stockAviso: {
+    panel: "fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#152342]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]",
+    title: "text-sm font-semibold text-[#152342]",
+    line: "text-xs text-[#152342]/70",
+    note: "text-xs text-[#152342]/60 mb-3",
+    confirmBtn:
+      "flex-1 bg-[#152342] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
+    cancelBtn:
+      "flex-1 bg-white border border-[#152342]/20 text-[#152342] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
+  },
+  publico: { confirmingLabel: "Confirmando..." },
+  pedidoPublico: {
+    pageBg: "min-h-screen bg-[#F6F7F9]",
+    spinner: "w-8 h-8 border-2 border-[#152342] border-t-transparent rounded-full animate-spin",
+    itemImageBg: "w-14 h-14 rounded-lg bg-[#F6F7F9] flex-shrink-0 overflow-hidden",
+    totalValue: "text-white font-bold text-xl tabular-nums",
+    stockConfirmBtn:
+      "flex-1 bg-[#152342] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
+    confirmBtn:
+      "w-full bg-[#152342] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+  },
+  admin: {
+    titulo: "Catálogo Tommy Hilfiger",
+    subtituloSync: (lastSync) =>
+      `Se llena solo desde Switch por existencia · tú solo subes fotos${
+        lastSync
+          ? ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          : ""
+      }`,
+    productsUrl: "/api/catalogo/tommy/products",
+    metrics: (visibles) => {
+      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
+      return [
+        { label: "Productos", value: visibles.length },
+        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
+        { label: "Sneakers", value: visibles.filter((p) => p.category === "sneakers").length },
+        { label: "Flip Flops", value: visibles.filter((p) => p.category === "flip_flops").length },
+        { label: "Sandalias", value: visibles.filter((p) => p.category === "sandals").length },
+      ];
+    },
+    excelSinFoto: async (sin) => {
+      // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, REEBOK_PALETTE } =
+        await import("@/lib/excel-export");
+      const ws = buildReportSheet({
+        title: "TOMMY HILFIGER — Productos sin foto",
+        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
+        columns: [
+          { header: "Código", wch: 18 },
+          { header: "Nombre", wch: 40 },
+          { header: "Categoría", wch: 14 },
+          { header: "Género", wch: 12 },
+          { header: "Stock", wch: 10, align: "right", fmt: "0" },
+        ],
+        rows: sin.map((p) => [
+          p.sku || "",
+          p.name || "",
+          TOMMY_CATEGORIA_LABEL[p.category || ""] ?? (p.category || ""),
+          TOMMY_GENERO_LABEL[p.gender || ""] ?? (p.gender || ""),
+          p.stock ?? "",
+        ]),
+        palette: REEBOK_PALETTE,
+      });
+      const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
+      downloadWorkbook(wb, exportFilename("tommy-sin-foto"));
+    },
+    fotoTabBadge: "inline",
+    syncModulo: "catalogo-tommy",
+    syncSubtext: "tarda ~2-3 min",
+    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#152342] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
+    tabActive: "bg-white text-[#152342] shadow-sm",
+    spinner: "w-8 h-8 border-2 border-[#AE0029] border-t-transparent rounded-full animate-spin",
+    metricValue: "text-[#152342]",
+    metricHighlightBox: "border-[#AE0029]/30 bg-[#AE0029]/5",
+    metricHighlightValue: "text-[#AE0029]",
+    productosStyle: "batch",
+    nombreEditable: true,
+    importarTab: false,
+    badgeEditable: false,
+    productEdit: { idField: "sku", verb: "POST" },
+    pedidos: {
+      linkBadge: "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#152342]/10 text-[#152342]",
+      linkBadgeCheck: "w-3 h-3 text-emerald-600",
+      filterActive: "text-[#152342] border-[#152342]",
+      searchFocus: "w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#152342]/30 transition",
+      deleteModal: "confirm-delete",
+      exportFilename: "Pedidos-Tommy",
+    },
+  },
+  producto: {
+    estilo: "variantes",
+    volverClass: "text-sm text-[#152342] hover:underline mb-6 inline-block",
+    imageWrap: "aspect-square bg-[#F6F7F9] border border-[#152342]/10 rounded-lg overflow-hidden",
+    price: "text-2xl font-bold text-[#152342] mb-4",
+    sizeActive: "bg-[#152342] text-white border-[#152342]",
+    sizeInactive: "border-gray-300 hover:border-[#152342]",
+    addBtn:
+      "w-full bg-[#152342] text-white py-3 rounded font-bold text-sm uppercase tracking-wide hover:bg-[#0e1830] transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+    consultaWrap: "bg-[#F6F7F9] border border-[#152342]/10 p-4 rounded text-center",
+  },
+  pedido: {
+    qtyInputClass: "w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums",
+    suggDropdownClass: "absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto",
+    suggItemClass: "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition",
+    suggLimit: null,
+    clientNamePlaceholder: "Nombre del cliente",
+    nameRefEnContenedor: false,
+  },
+  clientes: {
+    nuevoBtn: "bg-[#152342] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#0e1830] transition",
+    saveBtn: "flex-1 py-2 bg-[#152342] text-white rounded-full text-sm font-semibold hover:bg-[#0e1830] transition disabled:opacity-50",
+  },
+};
+
 // "hace X" relativo del subtítulo del admin Reebok (heredado tal cual).
 function relativo(iso: string | null): string {
   if (!iso) return "nunca";
@@ -947,6 +1266,7 @@ function relativo(iso: string | null): string {
 export const MARCA_THEME: Record<string, MarcaTheme> = {
   reebok: REEBOK,
   joybees: JOYBEES,
+  tommy: TOMMY,
 };
 
 /** Marca del segmento dinámico [marca] → tema; null si no existe (→ 404). */
@@ -956,4 +1276,4 @@ export function getMarcaTheme(marca: string | undefined | null): MarcaTheme | nu
 }
 
 /** Lista de marcas con catálogo (para generateStaticParams si hace falta). */
-export const MARCAS_UI: MarcaUiKey[] = ["reebok", "joybees"];
+export const MARCAS_UI: MarcaUiKey[] = ["reebok", "joybees", "tommy"];

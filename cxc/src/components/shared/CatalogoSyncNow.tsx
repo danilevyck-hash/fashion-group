@@ -28,11 +28,17 @@ import { syncConEnganche } from "./syncNowClient";
 const ROLES_PERMITIDOS = ["admin", "secretaria", "vendedor"];
 
 interface CatalogoSyncNowProps {
-  catalogo: "reebok" | "joybees";
+  catalogo: "reebok" | "joybees" | "tommy";
   /** Reload de los productos de la vista tras un sync exitoso. */
   onSuccess?: () => void | Promise<void>;
   className?: string;
 }
+
+const MODULO_POR_CATALOGO = {
+  reebok: "catalogo-reebok",
+  joybees: "catalogo-joybees",
+  tommy: "catalogo-tommy",
+} as const;
 
 function relativo(iso: string | null): string {
   if (!iso) return "sin datos";
@@ -46,7 +52,7 @@ function relativo(iso: string | null): string {
 }
 
 export default function CatalogoSyncNow({ catalogo, onSuccess, className }: CatalogoSyncNowProps) {
-  const modulo = catalogo === "reebok" ? "catalogo-reebok" : "catalogo-joybees";
+  const modulo = MODULO_POR_CATALOGO[catalogo];
   const [visible, setVisible] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [running, setRunning] = useState(false);

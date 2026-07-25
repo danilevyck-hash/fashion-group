@@ -138,7 +138,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       } catch {
         setProducts([]);
       }
-    } else {
+    } else if (theme.features.inventarioPorTalla) {
       try {
         const [pRes, iRes] = await Promise.all([
           fetch(`${theme.api}/products?active=true`),
@@ -157,6 +157,15 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         });
         setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => (p._stock || 0) > 0 || p.badge === "proximamente"));
       } catch { setProducts([]); }
+    } else {
+      // Grid PLANA sin inventario por talla (Tommy): stock en la fila del
+      // producto (columna stock, patrón Joybees) — sin endpoint /inventory.
+      try {
+        const res = await fetch(`${theme.api}/products?active=true`);
+        if (!res.ok) throw new Error("fetch failed");
+        const prods: CatalogoProducto[] = await res.json();
+        setProducts(prods.map(p => ({ ...p, _stock: p.stock ?? 0, _sizes: [] as string[] })).filter(p => (p._stock || 0) > 0 || p.badge === "proximamente"));
+      } catch { setProducts([]); }
     }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,8 +176,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   }, [loadProducts]);
 
   // ── Derived state — pipeline FLAT (categoría + género) ──
-  const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
-  const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
+  // Orden y label de categoría desde el theme (chips de la marca): Reebok
+  // conserva Calzado/Ropa/Accesorios; Tommy usa sus categorías parseadas.
+  const catOrder: Record<string, number> = {};
+  const catLabel: Record<string, string> = {};
+  theme.filtros.categoryOptions.forEach((o, i) => {
+    if (o.value) { catOrder[o.value] = i; catLabel[o.value] = o.label; }
+  });
 
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))

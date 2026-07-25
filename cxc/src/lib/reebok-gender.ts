@@ -27,7 +27,9 @@ export type GenderGroup = "hombre" | "mujer" | "ninos" | "unisex";
 // resolver las colisiones de inclusión female⊃male y women⊃men).
 const GROUP_ROOTS: Array<{ group: GenderGroup; roots: string[] }> = [
   { group: "mujer", roots: ["wom", "female", "mujer", "dama"] },
-  { group: "ninos", roots: ["nino", "kid", "junior"] },
+  // boy/girl: slugs del catálogo Tommy (boys/girls, parseados de la descripcion
+  // de Switch) — caen en Niños. Aditivo: la data Reebok no usa esas formas.
+  { group: "ninos", roots: ["nino", "kid", "junior", "boy", "girl"] },
   { group: "hombre", roots: ["male", "men", "hombre"] },
   { group: "unisex", roots: ["unisex"] },
 ];

@@ -25,12 +25,17 @@ const SUFFIX_LABELS: Record<string, string> = {
   JUNIOR: "Junior",
 };
 
-/** DB gender field → Spanish label (fallback) */
+/** DB gender field → Spanish label (fallback). Incluye los slugs de Tommy
+ *  (men/boys/girls) — su ficha usa el estilo "variantes" con grupos de una
+ *  sola variante y muestra este label. */
 const GENDER_FIELD_LABELS: Record<string, string> = {
   adults_m: "Hombre",
   women: "Mujer",
   kids: "Kids",
   junior: "Junior",
+  men: "Hombre",
+  boys: "Niño",
+  girls: "Niña",
 };
 
 /** Known gender suffixes (longest first so JUNIOR matches before J, etc.) */

@@ -30,9 +30,16 @@ import {
   applyDbPrices as joybeesApplyDbPrices,
 } from "@/lib/joybees-pedido-publico-validate";
 import { checkPedidoRateLimit as joybeesCheckPedidoRateLimit } from "@/lib/joybees-pedido-rate-limit";
+import { getBultoSize as tommyBulto } from "@/lib/tommy-bulto";
+import { calculateTommyOrderTotal } from "@/lib/tommy-order-total";
+import {
+  validatePedidoBody as tommyValidatePedidoBody,
+  applyDbPrices as tommyApplyDbPrices,
+} from "@/lib/tommy-pedido-publico-validate";
+import { checkPedidoRateLimit as tommyCheckPedidoRateLimit } from "@/lib/tommy-pedido-rate-limit";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
-export type MarcaKey = "reebok" | "joybees";
+export type MarcaKey = "reebok" | "joybees" | "tommy";
 
 /** Client Supabase resuelto de forma lazy (ver nota de cabecera). */
 export type LazyDb = () => Promise<SupabaseClient>;
@@ -75,6 +82,8 @@ const reebokServerDb: LazyDb = async () =>
   (await import("@/lib/reebok-supabase-server")).reebokServer;
 const joybeesServerDb: LazyDb = async () =>
   (await import("@/lib/joybees-supabase-server")).joybeesServer;
+const tommyServerDb: LazyDb = async () =>
+  (await import("@/lib/tommy-supabase-server")).tommyServer;
 const mainServerDb: LazyDb = async () =>
   (await import("@/lib/supabase-server")).supabaseServer;
 // GET /products de Reebok lee con el client ANON del catálogo (patrón original).
@@ -201,6 +210,11 @@ export interface MarcaConfig {
     writeDb: LazyDb;
     /** DELETE (soft, active=false) existe solo en Reebok. */
     hasDelete: boolean;
+    /** Solo Tommy: `name` es editable a mano en el admin; al editarlo el
+     *  endpoint marca nombre_manual=true y el sync deja de pisarlo (patrón
+     *  oculto_manual). Reebok/Joybees mantienen la allow-list clásica
+     *  (image_url/badge). */
+    nombreEditable?: boolean;
   };
   publicCatalog: {
     db: LazyDb;
@@ -354,6 +368,82 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     publicCatalog: {
       db: joybeesProductsDb,
       cols: "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge",
+      conInventario: false,
+    },
+    fallback: null,
+  },
+  // ── TOMMY HILFIGER (empresa Switch fashion_shoes, artículos marcaId=3) ──────
+  // Tercera marca sobre el motor generalizado — modelo Joybees SIN quirks
+  // legacy (marca nueva, no hay comportamiento pre-refactor que preservar):
+  // bulto 12 fijo, sin pre-orden, publicos en el client de la marca (que hoy
+  // cae al proyecto principal vía tommy-supabase-server), edición por sku vía
+  // POST. Diferencia propia: `name` editable en el admin (nombre_manual).
+  // NO expuesta en el hub /catalogos/marcas todavía (PR "encender" posterior).
+  tommy: {
+    marca: "tommy",
+    label: "Tommy Hilfiger",
+    empresaKey: "fashion_shoes",
+    ordersTable: "tommy_orders",
+    itemsRelation: "tommy_order_items",
+    enviosTable: "tommy_switch_envios",
+    productsTable: "tommy_products",
+    publicosTable: "tommy_pedidos_publicos",
+    unificadoView: "tommy_pedidos_unificado_vw",
+    createOrderRpc: "tommy_create_order",
+    replaceItemsRpc: "tommy_order_replace_items",
+    convertRpc: "convert_tommy_pedido_publico",
+    numeroPrefijo: "TOM",
+    cronName: "tommy-catalogo",
+    db: tommyServerDb,
+    mainDb: mainServerDb,
+    publicosDb: tommyServerDb,
+    publicosInsertClient,
+    bultoSize: () => tommyBulto(),
+    calcTotal: calculateTommyOrderTotal,
+    categoryLookup: null,
+    fallbackCategory: null,
+    pdfFallbackCategory: "footwear",
+    itemsHasPreorder: false,
+    ordersSelectExtra: "",
+    exportCols: "origen, cliente, vendor, items, created_at",
+    exportTitulo: "TOMMY HILFIGER — Pedidos",
+    listaFiltraDeleted: true,
+    createRoles: ["admin", "secretaria", "vendedor"],
+    upload: { roles: ["admin"], storage: "main", pathPrefix: "tommy" },
+    telegramEmoji: "🔵",
+    switchDirectorioLabel: "Fashion Shoes",
+    sendOrder: {
+      from: "Tommy Hilfiger Panama <pedidos@fashiongr.com>",
+      headerHtml: (orderNumber, clientName, fechaLabel) => `
+      <div style="background:#152342;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0;font-size:18px;letter-spacing:0.08em">TOMMY HILFIGER</h2>
+        <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      tableHeadBg: "#152342",
+    },
+    sortEmailItems: null,
+    pedidoPublico: {
+      validateBody: tommyValidatePedidoBody,
+      applyDbPrices: tommyApplyDbPrices as PedidoPublicoApplyPrices,
+      checkRateLimit: tommyCheckPedidoRateLimit,
+      priceCols: "id, price",
+    },
+    products: {
+      authStyle: "roles-modulo",
+      editVerb: "POST",
+      idField: "sku",
+      // Select explícito = TODAS las columnas reales de tommy_products (regla
+      // admin round-trip; el DDL 20260724150000 es la fuente).
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,keep_visible,image_url,active,badge,nombre_manual,created_at",
+      readDb: tommyServerDb,
+      writeDb: tommyServerDb,
+      hasDelete: false,
+      nombreEditable: true,
+    },
+    publicCatalog: {
+      db: tommyServerDb,
+      cols: "id,sku,name,category,gender,price,stock,image_url,active,badge",
       conInventario: false,
     },
     fallback: null,

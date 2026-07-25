@@ -31,9 +31,17 @@ export const fetchCache = "force-no-store";
 const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 
 // Allow-list de columnas editables a mano. TODO lo demás (active, existencia,
-// disponibilidad, stock, price, name…) lo maneja el cron de catálogo y se
-// RECHAZA aquí — la edición manual nunca debe pisar el estado del sync.
+// disponibilidad, stock, price…) lo maneja el cron de catálogo y se RECHAZA
+// aquí — la edición manual nunca debe pisar el estado del sync. Tommy además
+// permite `name` (cfg.products.nombreEditable): su nombre viene DERIVADO de la
+// descripcion genérica de Switch, y editarlo marca nombre_manual=true para que
+// el sync deje de pisarlo (patrón oculto_manual).
 const EDITABLE_FIELDS = ["image_url", "badge"] as const;
+const MAX_NAME_LEN = 200;
+
+function editableFieldsDe(cfg: MarcaConfig): readonly string[] {
+  return cfg.products.nombreEditable ? [...EDITABLE_FIELDS, "name"] : EDITABLE_FIELDS;
+}
 // badge = etiqueta visual manual. null = sin etiqueta; o uno de estos valores.
 const VALID_BADGES = new Set(["nuevo", "oferta", "proximamente"]);
 
@@ -130,15 +138,16 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
   }
 
   // Rechaza cualquier columna fuera de la allow-list (no la ignora en silencio).
+  const editableFields = editableFieldsDe(cfg);
   const rejected = Object.keys(body).filter(
-    (k) => k !== pcfg.idField && !(EDITABLE_FIELDS as readonly string[]).includes(k),
+    (k) => k !== pcfg.idField && !editableFields.includes(k),
   );
   if (rejected.length > 0) {
     return NextResponse.json({ error: `Campos no editables: ${rejected.join(", ")}` }, { status: 400 });
   }
 
   const updates: Record<string, unknown> = {};
-  for (const key of EDITABLE_FIELDS) {
+  for (const key of editableFields) {
     if (key in body) updates[key] = (body as Record<string, unknown>)[key];
   }
   if (Object.keys(updates).length === 0) {
@@ -158,6 +167,21 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
     if (u !== null && typeof u !== "string") {
       return NextResponse.json({ error: "image_url inválido" }, { status: 400 });
     }
+  }
+  // Validar name (solo marcas con nombreEditable): string no vacío. Editar el
+  // nombre marca nombre_manual=true → el sync deja de pisarlo. No hay forma de
+  // "volver al automático" desde aquí (a propósito: simple; revertir = poner el
+  // flag en false a mano en la DB).
+  if ("name" in updates) {
+    const n = updates.name;
+    if (typeof n !== "string" || !n.trim() || n.trim().length > MAX_NAME_LEN) {
+      return NextResponse.json(
+        { error: `Nombre inválido (1 a ${MAX_NAME_LEN} caracteres).` },
+        { status: 400 },
+      );
+    }
+    updates.name = n.trim();
+    updates.nombre_manual = true;
   }
 
   const db = await pcfg.writeDb();

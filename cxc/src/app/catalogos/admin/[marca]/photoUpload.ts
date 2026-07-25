@@ -100,6 +100,32 @@ export async function updateProductBadge(marca: MarcaUiKey, productId: string, b
 }
 
 /**
+ * Renombra un producto (solo marcas con nombreEditable — Tommy). El endpoint
+ * marca nombre_manual=true → el sync deja de pisar el nombre. Lanza Error con
+ * mensaje legible si falla.
+ */
+export async function editProductName(
+  marca: MarcaUiKey,
+  producto: { id: string; sku: string },
+  name: string,
+): Promise<void> {
+  const theme = getMarcaTheme(marca)!;
+  const body =
+    theme.admin.productEdit.idField === "id"
+      ? { id: producto.id, name }
+      : { sku: producto.sku, name };
+  const res = await fetch(`${theme.api}/products`, {
+    method: theme.admin.productEdit.verb,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => null);
+    throw new Error(d?.error || "No se pudo guardar el nombre.");
+  }
+}
+
+/**
  * Toggle "Ocultar del catálogo / Mostrar en catálogo" (oculto_manual) vía
  * PATCH { id|sku, oculto } según la marca. El flag sobrevive al sync.
  */
