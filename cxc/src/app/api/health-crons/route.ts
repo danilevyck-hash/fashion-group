@@ -211,10 +211,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // Crons nuevos seed-tolerantes (backup-switch): misma regla que los slots —
-  // fila ausente = aún no sembrada (NO stale); solo alerta si existe y está
-  // vieja. A diferencia de los slots, el pendingRecovery usa su PROPIO nombre
-  // (2ª entrada propia en SECOND_ENTRY_HOUR_UTC, no la reconciliación).
+  // Crons nuevos seed-tolerantes (backup-switch, backup-storage): misma regla
+  // que los slots — fila ausente = aún no sembrada (NO stale); solo alerta si
+  // existe y está vieja. A diferencia de los slots, el pendingRecovery usa su
+  // PROPIO nombre (entradas extra propias en EXTRA_ENTRY_HOURS_UTC, no la
+  // reconciliación).
   for (const cron of SEED_TOLERANT_CRONS) {
     const last = beats.get(cron);
     if (last === undefined || last === null) {

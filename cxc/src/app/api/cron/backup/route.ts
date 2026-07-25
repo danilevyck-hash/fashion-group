@@ -33,11 +33,34 @@
 // (comprobantes, fotos, adjuntos) a backups/_storage/<bucket>/<path>, guiada
 // por un manifest — solo copia lo nuevo/cambiado desde el último backup.
 //
-// Off-site: réplica de los mismos NDJSON.gz a Cloudflare R2 (S3-compatible),
-// incremental por manifest de hashes (src/lib/backup/r2.ts). Si faltan las
-// env vars R2_* se omite sin afectar el backup a Supabase.
+// GRUPO STORAGE (?grupo=storage, jul-2026): réplica OFF-SITE de esos mismos
+// archivos a R2 (_storage/<bucket>/<path>). Hasta ahora los ~3.2K archivos
+// (198 MB: fotos de producto, facturas de reclamos, adjuntos de marketing) solo
+// existían dentro de Supabase — la "réplica" era bucket→bucket del MISMO
+// proyecto, es decir cero red de seguridad si se pierde el proyecto. Va en
+// invocación aparte y no en la corrida core con números medidos (25-jul-2026):
+// la core arrancó 08:33:12 y registró heartbeat 08:37:20 → 248s de los 300s de
+// Hobby, con la réplica a Supabase agotando sus 240s de presupuesto y dejando
+// 2.765 archivos pendientes. No hay hueco: meter R2+Storage ahí recortaría el
+// backup de datos. Heartbeat propio: "backup-storage".
+//
+// Off-site: réplica de los NDJSON.gz + los meta.json a Cloudflare R2
+// (S3-compatible), incremental por manifest de hashes (src/lib/backup/r2.ts),
+// con paths POR FECHA (data/YYYY-MM-DD/...) y verificación HEAD post-subida.
+// Si faltan las env vars R2_* se omite sin afectar el backup a Supabase.
+//
+// Retención:
+// - Supabase Storage: RETENTION_DAYS = 21 días (bajó de 30 en jul-2026 — el
+//   histórico largo vive ahora en R2, que es gratis hasta 10 GB).
+// - R2: política propuesta RETENCION_R2 (14 diarios + 8 semanales/lunes + 24
+//   mensuales/día 1 ≈ 46 carpetas × ~30 MB ≈ 1.4 GB). Este cron la CALCULA y la
+//   reporta (campo `retencionR2` de la respuesta) pero NO BORRA NADA en R2. Un
+//   lifecycle rule de Cloudflare no sabe hacer abuelo-padre-hijo (es por
+//   prefijo+edad), así que la poda tiene que ser código: queda para un PR
+//   aparte, con la lógica ya escrita y testeada en r2RetentionPlan().
 //
 // Restore: scripts/restore.mjs (ver header del script para uso y prueba).
+// Desde jul-2026 acepta --source r2 (lee los mismos objetos desde R2).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -45,11 +68,24 @@ import { gzipSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
-import { replicateBackupToR2, type R2BackupFile } from "@/lib/backup/r2";
+import {
+  replicateBackupToR2,
+  replicateStorageToR2,
+  r2DataKey,
+  listR2DataDates,
+  r2RetentionPlan,
+  type R2BackupFile,
+  type R2LazyFile,
+  type R2ReplicaResult,
+} from "@/lib/backup/r2";
 
 const CRON_NAME = "backup";
 const BUCKET = "backups";
-const RETENTION_DAYS = 30;
+// Retención del histórico DENTRO de Supabase Storage. Bajó de 30 a 21 días
+// (jul-2026): 3 semanas cubren cualquier "esto se rompió y nadie lo vio" con
+// colchón, y el histórico largo ahora vive en R2 con política propia
+// (RETENCION_R2: 14 diarios + 8 semanales + 24 mensuales).
+const RETENTION_DAYS = 21;
 const PAGE = 1000;
 
 export const dynamic = "force-dynamic";
@@ -177,6 +213,18 @@ const REPLICA_DEADLINE_MS = 240_000;
 // que 280s desde el arranque deja 20s de headroom para meta.json + limpieza.
 // Lo que no alcance queda pendiente y el manifest lo recupera mañana.
 const R2_DEADLINE_MS = 280_000;
+// Presupuesto del grupo ?grupo=storage (invocación propia, 300s enteros para
+// él): ~60s se van listando los 5 buckets (~420 llamadas list, el árbol de
+// tommy tiene 389 subcarpetas) y el resto copia archivos. Lo que no entre queda
+// pendiente y lo toma la corrida siguiente (manifest = catch-up automático).
+const STORAGE_R2_DEADLINE_MS = 275_000;
+// Ventana del manifest de DATOS en R2. Solo sirve para el catch-up del mismo
+// día (paths con fecha ⇒ mañana son keys nuevos): 7 días bastan y evitan que
+// crezca ~57 keys/día para siempre.
+const R2_MANIFEST_DIAS = 7;
+/** Path (estable, fuera de las carpetas de fecha) del resumen de la réplica
+ *  off-site de Storage — para poder auditarla sin credenciales de R2. */
+const STORAGE_R2_META_PATH = `${STORAGE_PREFIX}/meta-r2.json`;
 
 // Columna(s) de orden para paginación estable (PostgREST Range sin order NO es
 // determinista). Default: "id". Excepciones = tablas cuya PK no es "id".
@@ -294,6 +342,51 @@ async function replicateStorage(deadline: number) {
   return { copiados, bytes, pendientes, errores };
 }
 
+// ── Réplica OFF-SITE de los buckets de Storage a R2 (?grupo=storage) ─────────
+/**
+ * Lista los mismos buckets que replicateStorage() y los replica a R2 bajo
+ * `_storage/<bucket>/<path>`, con descarga PEREZOSA: la firma (`size|updated_at`)
+ * se conoce del listado, así que solo se baja de Supabase lo que de verdad hay
+ * que subir. Lee de los buckets ORIGEN (no de la réplica backups/_storage/) a
+ * propósito: encadenar dos réplicas que van atrasadas dejaría R2 esperando a que
+ * la de Supabase se ponga al día.
+ */
+async function replicateStorageOffsite(deadline: number) {
+  const files: R2LazyFile[] = [];
+  const errores: string[] = [];
+  let inventarioBytes = 0;
+
+  for (const bucket of STORAGE_REPLICA_BUCKETS) {
+    let entradas: FileEntry[];
+    try {
+      entradas = await listAllFiles(bucket);
+    } catch (e) {
+      errores.push(e instanceof Error ? e.message : String(e));
+      continue;
+    }
+    for (const f of entradas) {
+      inventarioBytes += f.size;
+      files.push({
+        key: `${STORAGE_PREFIX}/${bucket}/${f.path}`,
+        sig: `${f.size}|${f.updated_at}`,
+        contentType: f.mimetype,
+        load: async () => {
+          const { data: blob, error } = await supabaseServer.storage.from(bucket).download(f.path);
+          if (error || !blob) throw new Error(error?.message || "download vacío");
+          return Buffer.from(await blob.arrayBuffer());
+        },
+      });
+    }
+  }
+
+  const r2 = await replicateStorageToR2(files, deadline);
+  return {
+    inventario: { archivos: files.length, bytes: inventarioBytes },
+    r2,
+    errores: [...errores, ...r2.errores],
+  };
+}
+
 export async function GET(req: NextRequest) {
   // Auth: cron secret or admin session
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.headers.get("x-cron-secret") || req.nextUrl.searchParams.get("secret");
@@ -307,33 +400,75 @@ export async function GET(req: NextRequest) {
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Grupo de tablas: sin param = CORE (manuales/config); ?grupo=switch = cachés
-  // switch_* + multifashion_tickets en invocación aparte (ver header).
+  // Grupo: sin param = CORE (manuales/config); ?grupo=switch = cachés switch_*
+  // + multifashion_tickets; ?grupo=storage = réplica off-site de los buckets a
+  // R2. Cada uno en invocación aparte (ver header).
   const grupoParam = req.nextUrl.searchParams.get("grupo");
-  if (grupoParam !== null && grupoParam !== "switch") {
-    return NextResponse.json({ error: "grupo inválido (solo: switch)" }, { status: 400 });
+  if (grupoParam !== null && grupoParam !== "switch" && grupoParam !== "storage") {
+    return NextResponse.json({ error: "grupo inválido (solo: switch, storage)" }, { status: 400 });
   }
   const esGrupoSwitch = grupoParam === "switch";
-  const cronName = esGrupoSwitch ? "backup-switch" : CRON_NAME;
+  const esGrupoStorage = grupoParam === "storage";
+  const cronName = esGrupoSwitch ? "backup-switch" : esGrupoStorage ? "backup-storage" : CRON_NAME;
   const datasets = esGrupoSwitch ? SWITCH_DATASETS : DATASETS;
 
-  // Segunda oportunidad (jul-2026): cada grupo tiene 2 entradas en vercel.json
-  // (core 06:00/18:30, switch 06:45/19:15 UTC). Si la 1ª ya registró success
-  // HOY (día UTC), la 2ª no repite el trabajo — responde no-op. Una corrida
-  // manual (?force=1) lo salta. El guard es por-grupo (heartbeat propio).
+  // Segunda oportunidad (jul-2026): cada grupo tiene ≥2 entradas en vercel.json
+  // (core 06:00/10:30/18:30, switch 06:45/11:15/19:15, storage 04:00/15:30 UTC).
+  // Si una ya registró success HOY (día UTC), las siguientes no repiten el
+  // trabajo — responden no-op. Una corrida manual (?force=1) lo salta. El guard
+  // es por-grupo (heartbeat propio).
   if (req.nextUrl.searchParams.get("force") !== "1" && (await cronSuccessHoyUtc(cronName))) {
-    return NextResponse.json({ ok: true, grupo: grupoParam ?? "core", skipped: "ya corrió con éxito hoy (2ª entrada no-op)" });
+    return NextResponse.json({ ok: true, grupo: grupoParam ?? "core", skipped: "ya corrió con éxito hoy (entrada extra no-op)" });
   }
 
   const startMs = Date.now();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
+  // ── Grupo STORAGE: solo réplica off-site de archivos a R2 ─────────────────
+  // Sin datasets, sin réplica interna a Supabase y sin retención (esas son de
+  // la corrida core). Salvo que R2 no esté configurado: ahí no hay nada que
+  // hacer y responde no-op explícito (no registra heartbeat: no hubo backup).
+  if (esGrupoStorage) {
+    const storageR2 = await replicateStorageOffsite(startMs + STORAGE_R2_DEADLINE_MS);
+    if (!storageR2.r2.enabled) {
+      return NextResponse.json({ ok: true, grupo: "storage", skipped: storageR2.r2.nota });
+    }
+    // Resumen auditable sin credenciales de R2 (path estable, la retención de
+    // carpetas de fecha no lo toca). Si falla, es housekeeping: no tumba nada.
+    const metaStorage = {
+      grupo: "storage",
+      timestamp: now.toISOString(),
+      destino: "cloudflare-r2",
+      inventario: storageR2.inventario,
+      r2: storageR2.r2,
+    };
+    const { error: metaErr } = await supabaseServer.storage
+      .from(BUCKET)
+      .upload(STORAGE_R2_META_PATH, Buffer.from(JSON.stringify(metaStorage, null, 2), "utf-8"), {
+        contentType: "application/json",
+        upsert: true,
+      });
+    if (metaErr) console.error("[backup-storage] meta-r2.json:", metaErr.message);
+
+    if (storageR2.errores.length > 0) {
+      const detalle = storageR2.errores.join("; ");
+      console.error("[backup-storage] réplica R2 con errores:", detalle);
+      await logCronError("backup_storage_r2", detalle);
+    }
+    // Éxito aunque queden pendientes: el manifest los recupera en la corrida
+    // siguiente (mismo contrato que la réplica interna). Solo un fallo de
+    // listado/subida generalizado (errores) queda registrado arriba.
+    await recordCronHeartbeat(cronName);
+    return NextResponse.json({ ok: true, grupo: "storage", date: today, ...storageR2 });
+  }
+
   const results: Array<{ file: string; table: string; rows: number; bytes: number }> = [];
   const errores: Array<{ file: string; error: string }> = [];
   let totalBytes = 0;
-  // Mismos bytes que van a Supabase, para la réplica off-site a R2 (paths
-  // estables data/<archivo>.ndjson.gz — sin fecha; R2 guarda "el último").
+  // Mismos bytes que van a Supabase, para la réplica off-site a R2. Paths CON
+  // FECHA (data/YYYY-MM-DD/<archivo>): antes eran estables y cada corrida
+  // sobreescribía → R2 tenía un único punto en el tiempo.
   const r2Files: R2BackupFile[] = [];
 
   // Un dataset a la vez: fetch paginado → NDJSON → gzip → upload → liberar.
@@ -352,7 +487,7 @@ export async function GET(req: NextRequest) {
       if (upErr) throw new Error(`upload ${file}: ${upErr.message}`);
       results.push({ file, table: ds.table, rows, bytes: gz.length });
       totalBytes += gz.length;
-      r2Files.push({ key: `data/${file}.ndjson.gz`, body: gz });
+      r2Files.push({ key: r2DataKey(today, `${file}.ndjson.gz`), body: gz });
     } catch (e) {
       errores.push({ file, error: e instanceof Error ? e.message : String(e) });
     }
@@ -373,12 +508,12 @@ export async function GET(req: NextRequest) {
   // a salvo → alerta Telegram SIN marcar el backup como fallido (nada de R2
   // entra a `errores`, que dispararía el 500). El manifest en R2 hace
   // catch-up de lo pendiente/fallido en la corrida siguiente.
-  const r2 = await replicateBackupToR2(r2Files, startMs + R2_DEADLINE_MS);
-  if (r2.enabled && r2.errores.length > 0) {
-    const detalleR2 = r2.errores.join("; ");
-    console.error(`[${cronName}] réplica R2 con errores:`, detalleR2);
-    await logCronError(`${cronName.replace(/-/g, "_")}_r2`, detalleR2);
-  }
+  const manifestCutoff = new Date(now.getTime() - R2_MANIFEST_DIAS * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const r2 = await replicateBackupToR2(r2Files, startMs + R2_DEADLINE_MS, {
+    pruneBefore: manifestCutoff,
+  });
 
   // Índice del backup del día (lo lee scripts/restore.mjs): meta.json para el
   // core, meta-switch.json para el grupo switch (mismo folder de fecha).
@@ -390,16 +525,45 @@ export async function GET(req: NextRequest) {
     timestamp: now.toISOString(),
     datasets: results,
     storage: { copiados: storage.copiados, bytes: storage.bytes, pendientes: storage.pendientes },
+    // Nota: refleja la fase de DATOS. La subida del propio meta a R2 va después
+    // (no puede contarse a sí misma) y su resultado sale en la respuesta HTTP.
     r2,
     errores,
   };
+  const metaBuf = Buffer.from(JSON.stringify(meta, null, 2), "utf-8");
   const { error: metaErr } = await supabaseServer.storage
     .from(BUCKET)
-    .upload(`${today}/${metaFile}`, Buffer.from(JSON.stringify(meta, null, 2), "utf-8"), {
+    .upload(`${today}/${metaFile}`, metaBuf, {
       contentType: "application/json",
       upsert: true,
     });
   if (metaErr) errores.push({ file: metaFile, error: metaErr.message });
+
+  // El meta TAMBIÉN va a R2 (bloqueante duro que faltaba: sin él restore.mjs no
+  // puede correr desde R2 — es su índice de datasets y de filas esperadas).
+  // Bytes idénticos a los de Supabase para que ambas copias coincidan.
+  const r2Meta = await replicateBackupToR2([{ key: r2DataKey(today, metaFile), body: metaBuf }], startMs + R2_DEADLINE_MS, {
+    pruneBefore: manifestCutoff,
+  });
+  const r2Total: R2ReplicaResult = {
+    ...r2,
+    subidos: r2.subidos + r2Meta.subidos,
+    bytes: r2.bytes + r2Meta.bytes,
+    omitidos: r2.omitidos + r2Meta.omitidos,
+    verificados: r2.verificados + r2Meta.verificados,
+    reparados: r2.reparados + r2Meta.reparados,
+    pendientes: r2.pendientes + r2Meta.pendientes,
+    errores: [...r2.errores, ...r2Meta.errores],
+  };
+
+  // Errores de R2 (best-effort): el backup a Supabase ya está a salvo → alerta
+  // Telegram SIN marcar el backup como fallido (nada de R2 entra a `errores`,
+  // que dispararía el 500). El manifest hace catch-up en la corrida siguiente.
+  if (r2Total.enabled && r2Total.errores.length > 0) {
+    const detalleR2 = r2Total.errores.join("; ");
+    console.error(`[${cronName}] réplica R2 con errores:`, detalleR2);
+    await logCronError(`${cronName.replace(/-/g, "_")}_r2`, detalleR2);
+  }
 
   if (errores.length > 0) {
     const detalle = errores.map((e) => `${e.file}: ${e.error}`).join("; ");
@@ -411,6 +575,9 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
+
+  // Inventario de fechas en R2 (lectura pura, para el informe de retención).
+  const fechasR2 = esGrupoSwitch ? [] : await listR2DataDates();
 
   // Limpieza de backups > RETENTION_DAYS (carpetas de fecha + legacy flat files).
   // Solo la corrida CORE (borra la carpeta de fecha completa, incluye los
@@ -437,6 +604,15 @@ export async function GET(req: NextRequest) {
     console.error("[backup] cleanup error:", e instanceof Error ? e.message : String(e));
   }
 
+  // Retención en R2, SOLO INFORME (este PR no borra nada allá): cuántas
+  // carpetas de fecha conservaría RETENCION_R2 y cuáles sobran. Ver header.
+  const retencionR2 = esGrupoSwitch
+    ? undefined
+    : (() => {
+        const plan = r2RetentionPlan(fechasR2);
+        return { presentes: fechasR2.length, conservaria: plan.keep.length, sobrarian: plan.borrar };
+      })();
+
   await recordCronHeartbeat(cronName);
   return NextResponse.json({
     ok: true,
@@ -446,7 +622,8 @@ export async function GET(req: NextRequest) {
     totalRows: results.reduce((s, r) => s + r.rows, 0),
     totalBytes,
     storage,
-    r2,
+    r2: r2Total,
+    retencionR2,
     counts: Object.fromEntries(results.map((r) => [r.file, r.rows])),
   });
 }
