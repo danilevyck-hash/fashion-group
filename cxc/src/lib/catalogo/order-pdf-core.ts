@@ -15,6 +15,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
+import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
 export interface PdfOrderItem {
@@ -28,7 +29,7 @@ export interface PdfOrderItem {
 }
 
 export interface OrderPdfOpts {
-  marca: "reebok" | "joybees";
+  marca: "reebok" | "joybees" | "tommy";
   orderNumber: string;
   clientName: string;
   createdAt: string;
@@ -64,6 +65,11 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     doc.setFillColor(26, 26, 26);
     doc.rect(0, 0, 210, 18, "F");
     try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* */ }
+  } else if (marca === "tommy") {
+    // Banda navy Tommy + wordmark BLANCO (el oscuro no se ve sobre navy).
+    doc.setFillColor(21, 35, 66);
+    doc.rect(0, 0, 210, 18, "F");
+    try { doc.addImage(TOMMY_LOGO_BLANCO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
   } else {
     doc.setFillColor(26, 38, 86);
     doc.rect(0, 0, 210, 18, "F");
@@ -78,7 +84,8 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   doc.text(`Pedido: ${orderNumber}`, 90, 26);
   doc.text(`Fecha: ${fechaLabel}`, 150, 26);
 
-  const headFill: [number, number, number] = marca === "reebok" ? [26, 26, 26] : [26, 38, 86];
+  const headFill: [number, number, number] =
+    marca === "reebok" ? [26, 26, 26] : marca === "tommy" ? [21, 35, 66] : [26, 38, 86];
 
   function drawSectionTable(title: string, startY: number, sectionItems: PdfOrderItem[]) {
     doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
@@ -126,7 +133,11 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   doc.text(`$${fmt(total)}`, 196, fy, { align: "right" });
   doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
   doc.text(
-    marca === "reebok" ? "Fashion Group Panama · Reebok Authorized Distributor" : "Fashion Group Panama · Joybees",
+    marca === "reebok"
+      ? "Fashion Group Panama · Reebok Authorized Distributor"
+      : marca === "tommy"
+        ? "Fashion Group Panama · Tommy Hilfiger"
+        : "Fashion Group Panama · Joybees",
     14,
     fy + 10,
   );

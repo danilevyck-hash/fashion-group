@@ -1,4 +1,4 @@
-// GET /api/catalogo/switch-clientes?marca=reebok|joybees — directorio de
+// GET /api/catalogo/switch-clientes?marca=reebok|joybees|tommy — directorio de
 // clientes de la instancia Switch de la marca, desde la tabla switch_clientes
 // (sincronizada a diario por el sync de estado de cuenta — NO toca la API de
 // Switch). Lo usa el selector de cliente del checkout; default = Contado (id 1).
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 const EMPRESA_POR_MARCA: Record<string, string> = {
   reebok: "active_shoes",
   joybees: "joystep",
+  tommy: "fashion_shoes",
 };
 
 export async function GET(req: NextRequest): Promise<NextResponse> {

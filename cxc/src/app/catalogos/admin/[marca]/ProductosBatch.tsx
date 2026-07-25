@@ -10,7 +10,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob } from "@/lib/csv-export";
-import { validateProductPhoto, uploadProductPhoto, toggleProductOculto } from "./photoUpload";
+import { validateProductPhoto, uploadProductPhoto, toggleProductOculto, editProductName } from "./photoUpload";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 function fmtMoney(n: number) {
@@ -191,9 +191,36 @@ function ProductRow({
   showToast: (msg: string) => void;
   onComplete: () => Promise<void>;
 }) {
+  const theme = getMarcaTheme(marca)!;
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Nombre editable inline (solo marcas con nombreEditable — Tommy): al guardar,
+  // el endpoint marca nombre_manual=true y el sync deja de pisar el nombre.
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [nombreDraft, setNombreDraft] = useState(product.name);
+  const [savingNombre, setSavingNombre] = useState(false);
+
+  async function guardarNombre() {
+    const n = nombreDraft.trim();
+    if (!n || n === product.name) {
+      setEditandoNombre(false);
+      setNombreDraft(product.name);
+      return;
+    }
+    setSavingNombre(true);
+    try {
+      await editProductName(marca, { id: product.id, sku: product.sku || "" }, n);
+      showToast("Listo, nombre guardado — el sync ya no lo cambia");
+      setEditandoNombre(false);
+      await onComplete();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el nombre.");
+    } finally {
+      setSavingNombre(false);
+    }
+  }
 
   // Toggle "Ocultar del catálogo / Mostrar en catálogo" (oculto_manual) —
   // espejo EXACTO del estilo tarjetas: confirmación simple inline, sobrevive al sync.
@@ -266,7 +293,46 @@ function ProductRow({
         {/* Info */}
         <div className={`flex-1 min-w-0 ${product.stock === 0 ? "opacity-60" : ""}`}>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+            {editandoNombre ? (
+              <input
+                value={nombreDraft}
+                onChange={(e) => setNombreDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void guardarNombre();
+                  if (e.key === "Escape") {
+                    setEditandoNombre(false);
+                    setNombreDraft(product.name);
+                  }
+                }}
+                onBlur={() => void guardarNombre()}
+                disabled={savingNombre}
+                autoFocus
+                maxLength={200}
+                className="w-full max-w-xs text-sm font-semibold text-gray-900 bg-transparent border-b border-gray-300 outline-none focus:border-gray-500 py-0.5"
+              />
+            ) : (
+              <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+            )}
+            {theme.admin.nombreEditable && !editandoNombre && (
+              <button
+                type="button"
+                title="Editar nombre (el sync deja de cambiarlo)"
+                onClick={() => {
+                  setNombreDraft(product.name);
+                  setEditandoNombre(true);
+                }}
+                className="text-gray-300 hover:text-gray-500 transition flex-shrink-0 min-w-[28px] min-h-[28px] flex items-center justify-center"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+            )}
+            {theme.admin.nombreEditable && product.nombre_manual === true && !editandoNombre && (
+              <span className="text-[10px] font-medium bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded" title="Nombre editado a mano — el sync no lo cambia">
+                editado
+              </span>
+            )}
             {badgeLabel && (
               <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                 product.badge === "oferta"
