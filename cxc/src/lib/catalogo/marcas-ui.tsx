@@ -310,7 +310,11 @@ export interface MarcaTheme {
     /** Contenedor de la foto — 4:3 en las 3 marcas: el calzado es ancho y en
      *  cuadrado sobraba fondo blanco arriba y abajo (Daniel, 25-jul-2026). */
     imageBg: string;
-    /** object-contain SIEMPRE: el 4:3 recorta fondo, nunca producto. */
+    /** object-contain SIEMPRE y SIN padding en las 3 marcas: la foto ocupa el
+     *  marco 4:3 completo (el p-3 de Reebok/Tommy encogía el producto ~14% y
+     *  además era una divergencia con Joybees). NO se usa object-cover: se
+     *  midieron las 608 fotos activas y cover corta PRODUCTO (no margen) en
+     *  67/138 de Reebok y 16/81 de Joybees — ver PR de la card unificada. */
     imageFit: string;
     placeholder: ReactNode;
     name: string;
@@ -611,7 +615,7 @@ const REEBOK: MarcaTheme = {
     checkBubble: "w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg",
     checkStroke: "white",
     imageBg: "aspect-[4/3] bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
-    imageFit: "w-full h-full object-contain p-3",
+    imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
         <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1252,7 +1256,7 @@ const TOMMY: MarcaTheme = {
     checkBubble: "w-10 h-10 rounded-full bg-[#152342] flex items-center justify-center shadow-lg",
     checkStroke: "white",
     imageBg: "aspect-[4/3] bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
-    imageFit: "w-full h-full object-contain p-3",
+    imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
         <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">

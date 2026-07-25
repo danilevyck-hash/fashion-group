@@ -37,10 +37,13 @@ interface CatalogoProductCardProps {
   disabled?: boolean;
   showBultos?: boolean; // vendor mode shows "bultos"
   showStock?: boolean;  // catálogo interno: muestra disponibilidad + existencia (NO en público)
+  /** Cards del primer viewport: la foto se pide YA y con prioridad alta (LCP).
+   *  El resto va lazy — es lo que evita bajar cientos de fotos al abrir. */
+  priority?: boolean;
 }
 
 export default function CatalogoProductCard({
-  marca, product, qty, onQtyChange, disabled, showBultos, showStock,
+  marca, product, qty, onQtyChange, disabled, showBultos, showStock, priority,
 }: CatalogoProductCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -144,9 +147,11 @@ export default function CatalogoProductCard({
                   key={`${imageStatus}-${useThumb}`}
                   src={useThumb ? (supabaseThumb(product.image_url, 600) ?? product.image_url) : product.image_url}
                   alt={product.name}
-                  width={300}
+                  width={400}
                   height={300}
-                  loading="lazy"
+                  loading={priority ? "eager" : "lazy"}
+                  fetchPriority={priority ? "high" : "auto"}
+                  decoding="async"
                   className={t.imageFit}
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => {

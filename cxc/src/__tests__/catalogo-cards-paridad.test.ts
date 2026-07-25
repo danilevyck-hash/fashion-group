@@ -134,7 +134,32 @@ describe("card de producto — paridad en las 3 marcas", () => {
       expect(card.imageBg, m).toContain("aspect-[4/3]");
       expect(card.imageBg, m).not.toContain("aspect-square");
       expect(card.imageFit, m).toContain("object-contain");
+      // object-cover NO: medidas 25-jul-2026 sobre las 608 fotos activas — cover
+      // corta PRODUCTO (no margen) en 67/138 Reebok y 16/81 Joybees.
       expect(card.imageFit, m).not.toContain("object-cover");
+    }
+  });
+
+  it("la foto llena el marco: ninguna marca mete padding al <img>", () => {
+    for (const m of MARCAS) {
+      // El p-3 de Reebok/Tommy encogía el producto ~14% y no existía en Joybees.
+      expect(MARCA_THEME[m].card.imageFit, m).not.toMatch(/\bp-\d/);
+      expect(MARCA_THEME[m].card.imageFit, m).toBe("w-full h-full object-contain");
+    }
+  });
+
+  it("solo las fotos del primer viewport son eager; el resto lazy", () => {
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      expect(code, nombre).toContain('loading={priority ? "eager" : "lazy"}');
+      expect(code, nombre).toContain('fetchPriority={priority ? "high" : "auto"}');
+      // width/height explícitos en 4:3 → sin reflow al cargar.
+      expect(code, nombre).toContain("width={400}");
+      expect(code, nombre).toContain("height={300}");
+    }
+    for (const [nombre, code] of [["vendedor", VENDEDOR], ["publico", PUBLICO]] as const) {
+      expect(code, nombre).toContain("FOTOS_PRIORITARIAS");
+      // Las 4 grids de cada página marcan prioridad (2 planas + 2 agrupadas).
+      expect(code.split("priority={").length - 1, `${nombre}: grids con priority`).toBe(4);
     }
   });
 });

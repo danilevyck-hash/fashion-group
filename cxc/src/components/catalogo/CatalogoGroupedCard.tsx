@@ -30,10 +30,13 @@ interface CatalogoGroupedCardProps {
   disabled?: boolean;
   showBultos?: boolean; // vendor mode: cantidad tecleable (tap sobre el número)
   showStock?: boolean;  // catálogo interno: Disponibilidad + Existencia (NO en público)
+  /** Cards del primer viewport: foto eager + prioridad alta (LCP). Ver
+   *  CatalogoProductCard — misma regla en las dos cards. */
+  priority?: boolean;
 }
 
 export default function CatalogoGroupedCard({
-  marca, group, cartMap, onQtyChange, disabled, showBultos, showStock,
+  marca, group, cartMap, onQtyChange, disabled, showBultos, showStock, priority,
 }: CatalogoGroupedCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -146,9 +149,11 @@ export default function CatalogoGroupedCard({
                   key={`${imageStatus}-${useThumb}`}
                   src={useThumb ? (supabaseThumb(group.image_url, 600) ?? group.image_url) : group.image_url}
                   alt={group.name}
-                  width={300}
+                  width={400}
                   height={300}
-                  loading="lazy"
+                  loading={priority ? "eager" : "lazy"}
+                  fetchPriority={priority ? "high" : "auto"}
+                  decoding="async"
                   className={t.imageFit}
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => {
