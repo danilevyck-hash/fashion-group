@@ -195,10 +195,6 @@ export default function PanelCxcMobile({
             })}
           </ul>
         )}
-
-        <p className="pt-4 text-center text-xs leading-relaxed text-gray-400">
-          Política: 0-90d por vencer · 91-120d vencido reciente · +120d vencido crítico
-        </p>
       </div>
     </div>
   );
