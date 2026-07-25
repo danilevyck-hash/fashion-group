@@ -22,7 +22,8 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia }:
   const s = getMarcaTheme(marca)!.card.stock;
   const agotado = disponibilidad == null || disponibilidad <= 0;
   return (
-    <div className={`mt-2 pt-2 border-t ${s.divider}`}>
+    /* mt-1.5 pt-1.5 (antes mt-2 pt-2): card compacta — Daniel, 25-jul-2026. */
+    <div className={`mt-1.5 pt-1.5 border-t ${s.divider}`}>
       {/* 11px + nowrap en xl: a 5 columnas la línea completa mide ~182px contra
           200px de card — entra justa en UNA línea (medido en la app real). En
           iPad/móvil la card es de ~150px y NINGÚN tamaño legible cabe, así que

@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { type JoybeesProduct, type GroupedProduct } from "./groupByModel";
+import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 
@@ -174,9 +175,12 @@ export default function CatalogoGroupedCard({
             foto · nombre · código (píldora) · precio · bulto · stock · Agregar.
             Los chips de categoría y de género se quitaron (Daniel, 25-jul-2026):
             la sección del grid ya dice el género y el tipo ya vive en el nombre
-            del producto. */}
-        <div className="p-3">
-          <h3 className={t.name}>{group.name}</h3>
+            del producto.
+            COMPACTA (Daniel, 25-jul-2026): p-2.5 y márgenes bajados un escalón,
+            EXACTAMENTE los mismos valores que CatalogoProductCard. */}
+        <div className="p-2.5">
+          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName. */}
+          <CatalogoProductName nombre={group.name} className={t.name} />
 
           {/* Código (píldora) — mismo componente visual que la card plana. */}
           <div className="flex flex-wrap items-center gap-1 mt-1">
@@ -185,15 +189,15 @@ export default function CatalogoGroupedCard({
 
           {/* Price — Regalia fluye como producto normal (precio + Agregar).
               Sin "/unidad" (Daniel, 25-jul-2026). */}
-          <div className="mt-2">
+          <div className="mt-1.5">
             <div className="flex items-baseline gap-2">
               <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
             </div>
             {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
                 quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
-                CatalogoProductCard. */}
+                CatalogoProductCard, incluida la línea DISCRETA de 10px gris. */}
             <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className={`${t.bultoMeta} font-medium`}>Bulto de {BULTO_SIZE}</span>
+              <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {BULTO_SIZE}</span>
             </div>
           </div>
 
@@ -209,7 +213,7 @@ export default function CatalogoGroupedCard({
           )}
 
           {/* Action buttons — Regalia usa Agregar como cualquier producto normal */}
-          <div className={`mt-2.5 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
+          <div className={`mt-2 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
               {group.variants.map(v => {
                 const qty = cartMap.get(v.product.id) || 0;
                 const inOrder = qty > 0;
@@ -261,7 +265,7 @@ export default function CatalogoGroupedCard({
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
                     disabled={disabled || v.product.stock === 0}
-                    className={`w-full py-3 rounded-lg text-sm font-semibold transition min-h-[44px] ${
+                    className={`w-full py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px] ${
                       disabled || v.product.stock === 0
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn

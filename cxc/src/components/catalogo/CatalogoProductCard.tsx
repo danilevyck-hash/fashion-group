@@ -9,6 +9,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { CatalogoProducto } from "./types";
+import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 
@@ -169,10 +170,12 @@ export default function CatalogoProductCard({
         </div>
 
         {/* Product info — ESQUELETO CANÓNICO (idéntico en CatalogoGroupedCard):
-            foto · nombre · código (píldora) · precio · bulto · stock · Agregar. */}
-        <div className="p-3">
-          {/* Name */}
-          <h3 className={t.name}>{product.name}</h3>
+            foto · nombre · código (píldora) · precio · bulto · stock · Agregar.
+            COMPACTA (Daniel, 25-jul-2026): p-2.5 y los márgenes entre bloques
+            bajados un escalón — misma medida EXACTA en las 3 marcas. */}
+        <div className="p-2.5">
+          {/* Name — SIEMPRE una línea (alto fijo): ver CatalogoProductName. */}
+          <CatalogoProductName nombre={product.name} className={t.name} />
 
           {/* Código (píldora) — mt-1: nombre y código van juntos (Daniel,
               25-jul-2026; antes mt-2). El color, cuando existe, viaja como un
@@ -194,7 +197,7 @@ export default function CatalogoProductCard({
 
           {/* Price — sin "/unidad" (Daniel, 25-jul-2026): la unidad ya la dice
               la línea del bulto y el sufijo solo ensuciaba el precio. */}
-          <div className="mt-2">
+          <div className="mt-1.5">
             <div className="flex items-baseline gap-2">
               <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
                 {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
@@ -209,9 +212,12 @@ export default function CatalogoProductCard({
               /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
                  25-jul-2026) — competía con el precio unitario, que es el que
                  el vendedor cotiza. El indicador "● N" (bultos en stock) también
-                 se quitó: la línea de Disponibilidad/Existencia ya da el dato. */
+                 se quitó: la línea de Disponibilidad/Existencia ya da el dato.
+                 DISCRETA (Daniel, 25-jul-2026): 10px gris — es un dato de apoyo,
+                 no puede competir con el precio. Clase LITERAL e idéntica en las
+                 dos cards (no sale del tema: aquí no hay color de marca). */
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className={`${t.bultoMeta} font-medium`}>Bulto de {bultoSize}</span>
+                <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {bultoSize}</span>
               </div>
             )}
           </div>
@@ -229,7 +235,7 @@ export default function CatalogoProductCard({
 
           {/* Add/Qty button */}
           {inOrder ? (
-            <div className="mt-2.5">
+            <div className="mt-2">
               <div className={t.qtyWrap}>
                 <button
                   onClick={() => setQty(qty - 1)}
@@ -265,7 +271,7 @@ export default function CatalogoProductCard({
             <button
               onClick={() => { if (!disabled) setQty(1); }}
               disabled={disabled}
-              className={`w-full mt-2.5 py-3 rounded-lg text-sm font-semibold transition min-h-[44px] ${
+              className={`w-full mt-2 py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px] ${
                 disabled
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : isPreOrder
