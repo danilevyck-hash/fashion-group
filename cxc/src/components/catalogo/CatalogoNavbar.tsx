@@ -26,9 +26,14 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
         {showInicio && (
           <Link href="/home" className={theme.navbar.inicioLink}>← Inicio</Link>
         )}
-        <Link href={theme.catalogoHref} className="flex-shrink-0">
-          {theme.logos.navbar()}
-        </Link>
+        {/* Logo de marca: opcional. Las marcas cuya identidad ya vive completa
+            en el header grande (theme.logos.navbar === null) no lo repiten
+            aquí — su navbar queda solo con "← Inicio". */}
+        {theme.logos.navbar && (
+          <Link href={theme.catalogoHref} className="flex-shrink-0">
+            {theme.logos.navbar()}
+          </Link>
+        )}
         <div className="flex-1" />
         {/* El pedido se arma en el carrito → "Ver pedido" → checkout. Aquí solo
             queda "Pedidos" como acceso secundario a la lista (no crea nada). */}

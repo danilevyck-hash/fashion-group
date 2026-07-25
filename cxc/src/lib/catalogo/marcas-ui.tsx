@@ -233,7 +233,13 @@ export interface MarcaTheme {
 
   // ── Logos (bloques JSX por superficie) ──
   logos: {
-    navbar: () => ReactNode;
+    /**
+     * Logo de la navbar del catálogo con sesión.
+     * `null` = la marca NO pone logo en la navbar porque su identidad ya vive
+     * en el header grande de abajo (evita ver el mismo logo dos veces en la
+     * misma pantalla). Con `null`, la navbar queda solo con "← Inicio".
+     */
+    navbar: (() => ReactNode) | null;
     header: () => ReactNode;
     admin: () => ReactNode;
     pedidoPublico: () => ReactNode;
@@ -1117,10 +1123,12 @@ const TOMMY: MarcaTheme = {
   },
 
   logos: {
-    // Navbar: SOLO la bandera. El wordmark TOMMY HILFIGER vive en el header
-    // grande de abajo ("CATALOGO PANAMA") — tenerlo en los dos lo repetía dos
-    // veces en la misma pantalla (Daniel, 25-jul-2026).
-    navbar: () => <img src="/tommy/tommy-flag.png" alt="Tommy Hilfiger" className="h-5 w-auto" />,
+    // Navbar SIN logo: la navbar de Tommy queda solo con "← Inicio". La
+    // identidad (bandera + wordmark TOMMY HILFIGER) vive ENTERA en el header
+    // grande de abajo ("CATALOGO PANAMA"). Antes la bandera estaba en los dos
+    // lugares y se veía el mismo logo repetido en la misma pantalla
+    // (Daniel, 25-jul-2026).
+    navbar: null,
     header: () => (
       <div className="flex items-center gap-2.5">
         <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain" />
