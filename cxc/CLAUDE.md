@@ -25,12 +25,13 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 > Roles reales del sistema = los 6 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
 
 ## Módulos (src/lib/modules.ts)
-Fuente única de navegación + permisos de UI. Agrupados:
-- **Ventas:** CXC (`/admin`), Ventas, Multifashion, Clientes/Directorio (`/clientes`), Marketing
-- **Finanzas:** Cheques, Caja, Préstamos, Comisiones, Proveedores
-- **Operación:** Guías, Packing Lists, Reclamos
-- **Productos:** Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
-- **Sistema:** Usuarios, Data Health
+Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
+- **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
+- **Operación:** Guías de Despacho, Packing Lists, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, Gastos de Empresa, Préstamos, Cheques
+- **Administración:** Usuarios, Data Health
+
+> Las fichas del home y del sidebar NO llevan subtítulo (auditoría de textos, #278): el campo `subtitle` se eliminó de `AppModule`.
+> Páginas de grupo: `/g/[grupo]` con los 3 slugs nuevos. Los slugs viejos redirigen en `next.config.js` (`/g/sistema` → `/g/administracion`; `/g/plata-entra`, `/g/plata-sale`, `/g/productos` → `/home`).
 
 ## Guías — máquina de estados
 - Estado en `guia_transporte.estado` (TEXT, **sin CHECK constraint** — valores válidos por convención de código).

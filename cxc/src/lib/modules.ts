@@ -1,11 +1,14 @@
 // Catálogo único de módulos de la app. Fuente de verdad para:
-//   - /home (cards de grupos)
+//   - /home (fichas por grupo)
 //   - Páginas de grupo (ruta dinámica /g/[grupo])
 //   - AppHeader (drawer mobile)
 //   - Sidebar (desktop persistente, acordeón: Inicio + grupos)
 //
 // Mantener sincronizado con src/app/api/auth/route.ts (permisos por rol)
 // y src/middleware.ts (protección de rutas).
+//
+// REGLA: las fichas NO llevan subtítulo descriptivo. El nombre del módulo
+// tiene que bastar (auditoría de textos, PR #278). No reintroducir `subtitle`.
 
 import {
   CircleDollarSign,
@@ -30,23 +33,17 @@ import {
   Coins,
   Building2,
   LayoutDashboard,
-  ArrowDownToLine,
-  ArrowUpFromLine,
   type LucideIcon,
 } from "lucide-react";
 
 export type ModuleGroup =
-  | "plata-entra"
-  | "plata-sale"
   | "ventas-clientes"
   | "operacion"
-  | "productos"
-  | "sistema";
+  | "administracion";
 
 export interface AppModule {
   key: string;
   label: string;
-  subtitle?: string;
   href: string;
   icon: LucideIcon;
   roles: string[];
@@ -62,46 +59,38 @@ export interface AppGroup {
 
 // Las páginas de grupo viven en una ruta dinámica /g/[grupo] para evitar
 // colisión con rutas de módulo (ej: grupo "ventas" vs módulo /ventas).
+// Los slugs viejos de 6 grupos redirigen en next.config.js.
 export const GROUPS: AppGroup[] = [
-  { key: "plata-entra",     label: "Plata que entra",   href: "/g/plata-entra",     icon: ArrowDownToLine },
-  { key: "plata-sale",      label: "Plata que sale",    href: "/g/plata-sale",      icon: ArrowUpFromLine },
-  { key: "ventas-clientes", label: "Ventas y Clientes", href: "/g/ventas-clientes", icon: BarChart3 },
+  { key: "ventas-clientes", label: "Ventas y clientes", href: "/g/ventas-clientes", icon: BarChart3 },
   { key: "operacion",       label: "Operación",         href: "/g/operacion",       icon: Briefcase },
-  { key: "productos",       label: "Productos",         href: "/g/productos",       icon: ShoppingBag },
-  { key: "sistema",         label: "Sistema",           href: "/g/sistema",         icon: Settings },
+  { key: "administracion",  label: "Administración",    href: "/g/administracion",  icon: Settings },
 ];
 
 export const ALL_MODULES: AppModule[] = [
-  // Plata que entra
-  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "plata-entra" },
-  { key: "cheques",       label: "Cheques",                                                                            href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "plata-entra" },
-  { key: "comisiones",    label: "Comisiones",          subtitle: "Por vendedor: venta y cobro",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "plata-entra" },
-
-  // Plata que sale
-  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo y antigüedad",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "plata-sale" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "plata-sale" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "plata-sale" },
-  { key: "gastos-empresa", label: "Gastos de Empresa",  subtitle: "Gastos del mes y saldos de banco",    href: "/gastos-empresa", icon: Receipt,          roles: ["admin", "contabilidad"],                           group: "plata-sale" },
-
-  // Ventas y Clientes
-  { key: "vista-general", label: "Vista General",       subtitle: "Resumen ejecutivo de las 8 empresas",                href: "/vista-general",  icon: LayoutDashboard,  roles: ["admin"],                                           group: "ventas-clientes" },
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas-clientes" },
-  { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                            group: "ventas-clientes" },
-  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor"],                 group: "ventas-clientes" },
+  // Ventas y clientes
+  { key: "vista-general", label: "Vista General",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
+  { key: "ventas",        label: "Ventas",             href: "/ventas",           icon: TrendingUp,       roles: ["admin"],                                     group: "ventas-clientes" },
+  { key: "cxc",           label: "Cuentas por Cobrar", href: "/admin",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
+  { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
+  { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: ["admin", "secretaria", "vendedor"],           group: "ventas-clientes" },
+  { key: "proveedores",   label: "Proveedores",        href: "/proveedores",      icon: Building2,        roles: ["admin", "contabilidad"],                     group: "ventas-clientes" },
+  { key: "catalogos",     label: "Catálogos",          href: "/catalogos/marcas", icon: BookOpen,         roles: ["admin", "secretaria", "vendedor", "bodega"], group: "ventas-clientes" },
 
   // Operación
-  { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "vendedor"],       group: "operacion" },
-  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",                       href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "secretaria", "bodega"],                   group: "operacion" },
-  { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",                         href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria"],                             group: "operacion" },
+  { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
+  { key: "packing-lists",  label: "Packing Lists",     href: "/packing-lists",    icon: ClipboardList, roles: ["admin", "secretaria", "bodega"],             group: "operacion" },
+  { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "comisiones",     label: "Comisiones",        href: "/comisiones",       icon: Coins,         roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
+  { key: "gastos-empresa", label: "Gastos de Empresa", href: "/gastos-empresa",   icon: Receipt,       roles: ["admin", "contabilidad"],                     group: "operacion" },
+  { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
+  { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
-  // Productos
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees y Tommy",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "productos" },
-  { key: "cargar",        label: "Cargar Productos",    subtitle: "Excel del proveedor → plantilla de Switch",          href: "/productos/cargar",icon: PackagePlus,     roles: ["admin", "secretaria"],                             group: "productos" },
-
-  // Sistema
-  { key: "usuarios",      label: "Usuarios",            subtitle: "Permisos por rol",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                           group: "sistema" },
-  { key: "data-health",   label: "Data Health",         subtitle: "Monitoreo automático de integridad de datos",        href: "/admin/data-health", icon: ShieldCheck,   roles: ["admin"],                                           group: "sistema" },
+  // Administración
+  { key: "usuarios",    label: "Usuarios",    href: "/admin/usuarios",    icon: Users,       roles: ["admin"], group: "administracion" },
+  { key: "data-health", label: "Data Health", href: "/admin/data-health", icon: ShieldCheck, roles: ["admin"], group: "administracion" },
 ];
 
 /** Lista de keys de todos los módulos del sistema. */
@@ -156,12 +145,9 @@ export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: 
   return getVisibleModules(role, fgModules).filter(m => m.group === group);
 }
 
-export const GROUP_ORDER: ModuleGroup[] = ["plata-entra", "plata-sale", "ventas-clientes", "operacion", "productos", "sistema"];
+export const GROUP_ORDER: ModuleGroup[] = ["ventas-clientes", "operacion", "administracion"];
 export const GROUP_LABELS: Record<ModuleGroup, { title: string }> = {
-  "plata-entra":     { title: "Plata que entra" },
-  "plata-sale":      { title: "Plata que sale" },
-  "ventas-clientes": { title: "Ventas y Clientes" },
+  "ventas-clientes": { title: "Ventas y clientes" },
   operacion:         { title: "Operación" },
-  productos:         { title: "Productos" },
-  sistema:           { title: "Sistema" },
+  administracion:    { title: "Administración" },
 };

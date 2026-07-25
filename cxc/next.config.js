@@ -27,6 +27,19 @@ const nextConfig = {
   },
   compress: true,
   poweredByHeader: false,
+  // Slugs de grupo viejos (6 grupos → 3). "ventas-clientes" y "operacion"
+  // sobreviven con el mismo slug; "sistema" pasó a llamarse "administracion"
+  // con los mismos módulos; "plata-entra", "plata-sale" y "productos" se
+  // repartieron entre los grupos nuevos, así que van al home. Temporales
+  // (307) para no quemar el redirect en el caché del navegador.
+  async redirects() {
+    return [
+      { source: "/g/sistema", destination: "/g/administracion", permanent: false },
+      { source: "/g/plata-entra", destination: "/home", permanent: false },
+      { source: "/g/plata-sale", destination: "/home", permanent: false },
+      { source: "/g/productos", destination: "/home", permanent: false },
+    ];
+  },
   experimental: {
     // sharp es un binario nativo: externalizarlo evita que webpack lo empaquete
     // (requerido para que funcione en las funciones serverless de Vercel).
