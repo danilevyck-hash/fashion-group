@@ -29,7 +29,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - **Ventas:** CXC (`/admin`), Ventas, Multifashion, Clientes/Directorio (`/clientes`), Marketing
 - **Finanzas:** Cheques, Caja, Préstamos, Comisiones, Proveedores
 - **Operación:** Guías, Packing Lists, Reclamos
-- **Productos:** Catálogos (Reebok, Joybees)
+- **Productos:** Catálogos (Reebok, Joybees, Tommy Hilfiger — Tommy aún SIN tarjeta en el hub /catalogos/marcas ni anuncio: se enciende en un PR posterior con OK de Daniel; sus rutas /catalogo/tommy resuelven para usuarios logueados)
 - **Sistema:** Usuarios, Data Health
 
 ## Guías — máquina de estados
@@ -82,7 +82,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-38 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
+42 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -102,6 +102,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 | /api/cron/reebok-catalogo | 12:10, 17:00 (2 entradas — solo toca active_shoes en Switch; 12:10 esquiva sync-utilidad 07:00 en active_shoes) |
 | /api/cron/sync-proveedores | 09:30 |
 | /api/cron/joybees-catalogo | 11:00, 17:05 (2 entradas — solo toca joystep en Switch) |
+| /api/cron/tommy-catalogo | 12:40, 17:40 (2 entradas — solo toca fashion_shoes; artículos marcaId=3; mientras la DDL 20260724150000 no corra se omite limpio sin tocar Switch) |
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
