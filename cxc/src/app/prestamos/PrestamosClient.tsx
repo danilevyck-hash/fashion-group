@@ -455,10 +455,13 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               <div className="flex items-center justify-between bg-amber-50 px-4 py-2">
                 <div className="flex items-center gap-3">
                   <input type="checkbox" checked={allPendingSelected} onChange={() => { if (allPendingSelected) setSelectedPending(new Set()); else setSelectedPending(new Set(allPendingIds)); }} className="accent-black" title="Seleccionar todos" />
-                  <span className="text-xs uppercase tracking-wide text-amber-700 font-medium">
-                    Movimientos pendientes de aprobacion
-                    {selectedPending.size > 0 && <span className="ml-2 normal-case">({selectedPending.size} seleccionado{selectedPending.size !== 1 ? "s" : ""})</span>}
-                  </span>
+                  {/* El banner que abre esta sección ya dice "pendientes de
+                      aprobación"; acá solo hace falta el conteo de seleccionados. */}
+                  {selectedPending.size > 0 && (
+                    <span className="text-xs text-amber-700 font-medium">
+                      {selectedPending.size} seleccionado{selectedPending.size !== 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedPending.size > 0 ? (

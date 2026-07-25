@@ -447,7 +447,7 @@ export default function PackingListDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-lg font-semibold">
-              Indice de Estilos por Bulto — PL #{pl.numero_pl || "—"}
+              Índice de Estilos por Bulto — PL #{pl.numero_pl || "—"}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {pl.empresa}
@@ -462,8 +462,6 @@ export default function PackingListDetailPage() {
               {pl.total_estilos > 0 && ` · ${pl.total_estilos} estilos`}
               {pl.total_piezas > 0 && ` · ${pl.total_piezas.toLocaleString()} piezas`}
               {pl.total_bultos > 0 && ` · ${pl.total_bultos} bultos`}
-              {" · "}
-              <span className="text-gray-400">Muestra = bulto con talla M o 32 · OS = otro tamaño</span>
             </p>
           </div>
           <div className="flex gap-2 print:hidden">
@@ -586,6 +584,11 @@ export default function PackingListDetailPage() {
             </p>
           </div>
         )}
+
+        {/* Clave de lectura de la tabla — línea propia, debajo de los datos. */}
+        <p className="text-xs text-gray-400">
+          Muestra = bulto con talla M o 32 · OS = otro tamaño
+        </p>
 
         </div>{/* close pl-print-area */}
       </div>
