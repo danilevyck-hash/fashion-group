@@ -58,6 +58,19 @@ const serwist = new Serwist({
       matcher: /\/_next\/static\/.+/i,
       handler: new CacheFirst({
         cacheName: STATIC_CACHE,
+        // ignoreSearch: desde que activamos Skew Protection (Vercel Pro),
+        // next.config define `deploymentId` y Next estampa `?dpl=<id>` en TODAS
+        // las URLs de /_next/static. Ese query cambia en cada deploy, así que
+        // sin esto la clave de caché cambiaba también y los chunks pesados
+        // (vendors) se re-descargaban una vez tras cada promoción — data tirada
+        // a la basura en los iPads y celulares del equipo.
+        // Es seguro porque el nombre del archivo LLEVA el hash del contenido:
+        // mismo path ⇒ mismo bytes. El `?dpl=` no aporta identidad al asset;
+        // solo sirve para que el edge de Vercel enrute al deploy correcto, y
+        // eso se conserva: en un MISS el fetch a la red sale con la URL
+        // original (?dpl= incluido) — el ignoreSearch aplica solo al
+        // cache.match. Lo que se evita es la re-descarga, no el ruteo.
+        matchOptions: { ignoreSearch: true },
         plugins: [new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 })],
       }),
     },
