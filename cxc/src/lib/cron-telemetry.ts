@@ -108,15 +108,25 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
 };
 
 /**
- * Crons con 2ª entrada del día en vercel.json (hora UTC fraccional, ej. 18.5 =
- * 18:30). No los recupera la reconciliación (pesados / sesión Switch propia):
- * su "recuperación que viene" es su propia 2ª corrida, que solo trabaja si la
- * 1ª no registró success hoy (guard no-op en el route).
+ * Crons con entradas EXTRA del día en vercel.json (horas UTC fraccionales, ej.
+ * 18.5 = 18:30; espejo de vercel.json, en orden). No los recupera la
+ * reconciliación (pesados / sesión Switch propia): su "recuperación que viene"
+ * es su propia siguiente corrida, que solo trabaja si una anterior no registró
+ * success hoy (guard no-op en el route).
+ *
+ * El backup pasó de 2 a 3 entradas (jul-2026, incidente del 25-jul): Vercel
+ * re-registra los crons contra el deployment de producción más nuevo y las
+ * invocaciones que caen en esa ventana se pierden — ese día se perdieron la de
+ * 00:15, la de 01:00 y la de backup 06:00, todas a 2-9 min de un deploy. Con
+ * solo dos entradas (06:00/18:30) la exposición era de 12.5h; la entrada del
+ * medio la baja a ~4.5h. La recuperación in-process desde la reconciliación NO
+ * es viable: la corrida core midió 248s de los 300s de Hobby el 25-jul.
  */
-export const SECOND_ENTRY_HOUR_UTC: Record<string, number> = {
-  backup: 18.5,
-  "backup-switch": 19.25, // 2ª entrada 19:15 UTC (vercel.json)
-  "acs-fidelizacion": 16.5,
+export const EXTRA_ENTRY_HOURS_UTC: Record<string, number[]> = {
+  backup: [10.5, 18.5],
+  "backup-switch": [11.25, 19.25],
+  "backup-storage": [15.5],
+  "acs-fidelizacion": [16.5],
 };
 
 /** Crons que JAMÁS se silencian por "recuperación en camino": la reconciliación
@@ -132,7 +142,7 @@ export const NUNCA_SILENCIAR = new Set([
 /**
  * ¿La recuperación de este cron AÚN viene hoy? (nowHourUtc puede ser
  * fraccional: 14.5 = 14:30 UTC.)
- *   - 2ª entrada propia: viene si aún no es la hora de esa entrada.
+ *   - Entradas extra propias: viene si aún queda alguna por delante.
  *   - Colateral: viene si queda una pasada de reconciliación POSTERIOR a ahora
  *     entre las elegibles (hora >= su recoverAfterHourUtc). Estricto (>): la
  *     pasada en curso no cuenta como "por venir" — si su recuperación falla, la
@@ -140,8 +150,8 @@ export const NUNCA_SILENCIAR = new Set([
  */
 export function recoveryStillComingToday(cronName: string, nowHourUtc: number): boolean {
   if (NUNCA_SILENCIAR.has(cronName)) return false;
-  const secondEntry = SECOND_ENTRY_HOUR_UTC[cronName];
-  if (secondEntry !== undefined) return nowHourUtc < secondEntry;
+  const extras = EXTRA_ENTRY_HOURS_UTC[cronName];
+  if (extras !== undefined) return extras.some((h) => h > nowHourUtc);
   const after = COLATERAL_RECOVER_AFTER_HOUR_UTC[cronName];
   if (after === undefined) return false; // sin recuperación conocida → alertar normal
   const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
@@ -177,7 +187,11 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
  * health-crons si se quiere la garantía dura.
  */
 export const SEED_TOLERANT_CRONS = [
-  "backup-switch", // backup de tablas switch_* (2 entradas: 06:45 / 19:15 UTC)
+  "backup-switch", // backup de tablas switch_* (3 entradas: 06:45 / 11:15 / 19:15 UTC)
+  // Réplica off-site de los buckets de Storage a R2 (2 entradas: 04:00 / 15:30
+  // UTC). Seed-tolerante hasta que lleve días sembrado; después se puede
+  // promover a EXPECTED_CRONS en health-crons.
+  "backup-storage",
   // NOTA: tommy-catalogo se PROMOVIÓ a EXPECTED_CRONS (health-crons, vigilancia
   // fail-closed 26h como reebok/joybees-catalogo) en el PR "encender Tommy":
   // la DDL 20260724150000 ya corrió y el heartbeat lleva días sembrado.

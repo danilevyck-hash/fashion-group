@@ -20,7 +20,7 @@ import {
   PENDING_RECOVERY_MAX_HOURS,
   RECONCILIACION_PASS_HOURS,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
-  SECOND_ENTRY_HOUR_UTC,
+  EXTRA_ENTRY_HOURS_UTC,
 } from "@/lib/cron-telemetry";
 
 const H = 3600 * 1000;
@@ -47,13 +47,22 @@ describe("recoveryStillComingToday", () => {
     expect(recoveryStillComingToday("switch-sync", 20)).toBe(false);
   });
 
-  it("2ª entrada propia: backup 18:30 y acs-fidelizacion 16:30 (hora fraccional)", () => {
-    expect(SECOND_ENTRY_HOUR_UTC["backup"]).toBe(18.5);
-    expect(recoveryStillComingToday("backup", 10)).toBe(true);
+  it("entradas extra propias: backup 10:30+18:30, acs-fidelizacion 16:30 (hora fraccional)", () => {
+    expect(EXTRA_ENTRY_HOURS_UTC["backup"]).toEqual([10.5, 18.5]);
+    expect(recoveryStillComingToday("backup", 8)).toBe(true); // vienen 10:30 y 18:30
+    expect(recoveryStillComingToday("backup", 10.75)).toBe(true); // pasó la de 10:30, viene la de 18:30
     expect(recoveryStillComingToday("backup", 18.25)).toBe(true); // 18:15 < 18:30
     expect(recoveryStillComingToday("backup", 18.75)).toBe(false); // 18:45 ya pasó
     expect(recoveryStillComingToday("acs-fidelizacion", 12)).toBe(true);
     expect(recoveryStillComingToday("acs-fidelizacion", 17)).toBe(false);
+  });
+
+  it("los 3 grupos de backup tienen sus propias entradas extra (espejo de vercel.json)", () => {
+    expect(EXTRA_ENTRY_HOURS_UTC["backup-switch"]).toEqual([11.25, 19.25]);
+    expect(EXTRA_ENTRY_HOURS_UTC["backup-storage"]).toEqual([15.5]);
+    // backup-storage corre 04:00 y 15:30 → a las 05:00 su 2ª entrada aún viene.
+    expect(recoveryStillComingToday("backup-storage", 5)).toBe(true);
+    expect(recoveryStillComingToday("backup-storage", 16)).toBe(false);
   });
 
   it("switch-reconciliacion y grupo-resumen-mensual JAMÁS se silencian", () => {
@@ -75,7 +84,7 @@ describe("recoveryStillComingToday", () => {
 describe("staleEsPendingRecovery", () => {
   // 08:00 UTC — antes de la primera pasada del día (10:00).
   const now8 = Date.parse("2026-07-23T08:00:00.000Z");
-  // 19:00 UTC — después de la última pasada (18:00) y de la 2ª entrada de backup.
+  // 19:00 UTC — después de la última pasada (18:00) y de la última entrada de backup.
   const now19 = Date.parse("2026-07-23T19:00:00.000Z");
 
   it("colateral stale 27h con pasadas por venir → pendingRecovery", () => {
@@ -97,7 +106,7 @@ describe("staleEsPendingRecovery", () => {
     expect(staleEsPendingRecovery("backup", last, now19)).toBe(false);
   });
 
-  it("backup stale por la mañana → pendiente (su 2ª entrada 18:30 aún viene)", () => {
+  it("backup stale por la mañana → pendiente (sus entradas 10:30/18:30 aún vienen)", () => {
     const last = new Date(now8 - 27 * H).toISOString();
     expect(staleEsPendingRecovery("backup", last, now8)).toBe(true);
   });
