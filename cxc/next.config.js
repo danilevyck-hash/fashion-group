@@ -27,6 +27,14 @@ const nextConfig = {
   },
   compress: true,
   poweredByHeader: false,
+  // Skew Protection (Vercel Pro, ventana 12h). Next 14 no lo activa solo: hay
+  // que pasarle el id del deployment para que estampe `?dpl=<id>` en cada
+  // request de asset y de server action. Vercel enruta ese request al
+  // deployment que sirvió el HTML → una pestaña vieja sigue encontrando sus
+  // chunks aunque ya se haya promovido otro deploy. VERCEL_DEPLOYMENT_ID es
+  // variable de sistema de Vercel (existe en build y en runtime); fuera de
+  // Vercel queda undefined y Next se comporta como antes.
+  deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
   // Slugs de grupo viejos (6 grupos → 3). "ventas-clientes" y "operacion"
   // sobreviven con el mismo slug; "sistema" pasó a llamarse "administracion"
   // con los mismos módulos; "plata-entra", "plata-sale" y "productos" se
