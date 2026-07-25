@@ -4,7 +4,11 @@
 // Los ajustes de UI aprobados por Daniel viven en componentes ÚNICOS y en el
 // tema, no por marca. Estos tests fijan el contrato para que nadie los
 // reintroduzca por marca ni los pierda en un refactor:
-//   · la card no muestra el precio del bulto (solo "Bulto de N"),
+//   · la card no muestra el precio del bulto (solo "Bulto de N"), y esa línea
+//     es DISCRETA (10px gris) — no compite con el precio,
+//   · el nombre va SIEMPRE en una sola línea de alto fijo (20px): se achica
+//     14px→11px y, si ni así cabe, corta con "…" (card compacta, 25-jul-2026),
+//   · la card es COMPACTA: p-2.5 y los mismos márgenes en las dos cards,
 //   · el stock interno sale en UNA línea "Disponibilidad N · Existencia N",
 //   · la foto es 4:3 con object-contain en las 3 marcas,
 //   · el grid sube a 5 columnas SOLO en xl (iPad y móvil intactos),
@@ -29,6 +33,7 @@ vi.mock("@/lib/tommy-supabase-server", () => ({ tommyServer: {} }));
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
 import { MARCA_THEME } from "@/lib/catalogo/marcas-ui";
+import { NOMBRE_PX_BASE, NOMBRE_PX_MIN } from "@/lib/catalogo/fit-one-line";
 
 const MARCAS = ["reebok", "joybees", "tommy"] as const;
 
@@ -120,8 +125,71 @@ describe("card de producto — paridad en las 3 marcas", () => {
 
   it("el botón Agregar tiene el mismo tamaño en las dos cards", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
-      expect(code, nombre).toContain("py-3 rounded-lg text-sm font-semibold transition min-h-[44px]");
+      // py-2.5 (antes py-3) — card compacta, 25-jul-2026. min-h-[44px] NO se
+      // toca: es el mínimo táctil de la app.
+      expect(code, nombre).toContain("py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px]");
     }
+  });
+
+  it("el nombre va en el componente compartido, nunca en un <h3> suelto", () => {
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      expect(code, nombre).toContain("import CatalogoProductName");
+      expect(code, nombre).toContain("<CatalogoProductName");
+      expect(code, nombre).not.toMatch(/<h3 className=\{t\.name\}/);
+    }
+  });
+
+  it("el nombre es de UNA línea y de alto FIJO, idéntico en las 3 marcas", () => {
+    const geometrias = new Set<string>();
+    for (const m of MARCAS) {
+      const name = MARCA_THEME[m].card.name;
+      // Alto fijo (h-5) + una línea (truncate = nowrap + ellipsis).
+      expect(name, m).toContain("leading-5");
+      expect(name, m).toContain("h-5");
+      expect(name, m).toContain("truncate");
+      // Lo que rompía la altura de la card: 2 líneas y alto en em.
+      expect(name, m).not.toContain("line-clamp");
+      expect(name, m).not.toContain("min-h-[2.5em]");
+      geometrias.add(name.split(" ").filter((c) => !c.startsWith("text-[#")).sort().join(" "));
+    }
+    // Solo el COLOR puede cambiar entre marcas.
+    expect(geometrias.size, "geometría del nombre distinta entre marcas").toBe(1);
+  });
+
+  it("el ajuste de tamaño del nombre respeta el piso legible (11px)", () => {
+    expect(NOMBRE_PX_BASE).toBe(14);
+    expect(NOMBRE_PX_MIN).toBe(11);
+  });
+
+  it("'Bulto de N' es una línea discreta (10px gris) igual en las dos cards", () => {
+    const BULTO = 'className="text-[10px] leading-[14px] text-gray-500">Bulto de ';
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      expect(code, nombre).toContain(BULTO);
+      // Ya no usa el color de marca (competía con el precio).
+      expect(code, nombre).not.toContain("${t.bultoMeta} font-medium`}>Bulto");
+    }
+  });
+
+  it("la card compacta usa los MISMOS espaciados en las dos cards", () => {
+    // Cada par: qué es, y el literal que debe aparecer en ambas cards.
+    const ESPACIADOS: [string, string][] = [
+      ["padding del bloque de info", '<div className="p-2.5">'],
+      ["margen del precio", 'className="mt-1.5"'],
+      ["margen del bloque de acción", "mt-2"],
+      ["separación del bulto", 'className="flex items-baseline gap-1.5 mt-0.5"'],
+    ];
+    for (const [que, literal] of ESPACIADOS) {
+      for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+        expect(code, `${nombre}: ${que}`).toContain(literal);
+      }
+    }
+    // Los valores viejos (más aireados) no pueden volver por una sola card.
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      expect(code, nombre).not.toContain('<div className="p-3">');
+      expect(code, nombre).not.toContain("mt-2.5");
+    }
+    // La línea de stock (componente compartido) baja el mismo escalón.
+    expect(STOCK_LINE).toContain("mt-1.5 pt-1.5 border-t");
   });
 
   it("el catálogo PÚBLICO nunca pide el stock interno", () => {

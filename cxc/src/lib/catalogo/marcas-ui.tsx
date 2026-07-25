@@ -317,6 +317,10 @@ export interface MarcaTheme {
      *  67/138 de Reebok y 16/81 de Joybees — ver PR de la card unificada. */
     imageFit: string;
     placeholder: ReactNode;
+    /** Nombre del producto. Solo el COLOR cambia por marca; la geometría es
+     *  idéntica en las 3 y es un contrato: `leading-5 h-5 truncate` = una sola
+     *  línea de alto fijo (20px). El ajuste de tamaño 14px→11px y el "…" los
+     *  hace CatalogoProductName (Daniel, 25-jul-2026). */
     name: string;
     /** Píldora del CÓDIGO (misma posición y forma en las 3 marcas; solo cambia
      *  el color del tema). Antes vivía hardcodeada con los colores de Reebok
@@ -623,7 +627,7 @@ const REEBOK: MarcaTheme = {
         </svg>
       </div>
     ),
-    name: "text-sm font-semibold text-[#1A2656] line-clamp-2 leading-snug min-h-[2.5em]",
+    name: "text-sm font-semibold text-[#1A2656] leading-5 h-5 truncate",
     skuPill: "text-xs bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#1A2656]",
     priceMeta: "text-xs text-[#1A2656]/40",
@@ -929,7 +933,7 @@ const JOYBEES: MarcaTheme = {
         <div className="text-4xl">🐝</div>
       </div>
     ),
-    name: "text-sm font-semibold text-[#404041] line-clamp-2 leading-snug min-h-[2.5em]",
+    name: "text-sm font-semibold text-[#404041] leading-5 h-5 truncate",
     skuPill: "text-xs bg-[#FFE443]/25 text-[#404041]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#404041]",
     priceMeta: "text-xs text-[#404041]/40",
@@ -1264,7 +1268,7 @@ const TOMMY: MarcaTheme = {
         </svg>
       </div>
     ),
-    name: "text-sm font-semibold text-[#152342] line-clamp-2 leading-snug min-h-[2.5em]",
+    name: "text-sm font-semibold text-[#152342] leading-5 h-5 truncate",
     skuPill: "text-xs bg-[#F6F7F9] text-[#152342]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#152342]",
     priceMeta: "text-xs text-[#152342]/40",
