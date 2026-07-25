@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import FGLogo from "@/components/FGLogo";
 import SearchBar, { SEARCH_ROLES } from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -53,6 +54,12 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
 
   // Lock body scroll when drawer open (hook compartido con ref-count).
   useBodyScrollLock(drawerOpen);
+
+  // El drawer de módulos se cierra con clic fuera (sobre el fondo oscuro) y con
+  // Escape, igual que el resto de los modales del sistema.
+  const cerrarDrawer = useCallback(() => setDrawerOpen(false), []);
+  const backdropDrawer = useBackdropDismiss(cerrarDrawer);
+  useEscapeClose(drawerOpen, cerrarDrawer);
 
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
@@ -139,7 +146,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
       {/* Mobile drawer */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 sm:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
+          <div {...backdropDrawer} className="absolute inset-0 bg-black/40" />
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between px-5 h-14 border-b border-gray-200">
               <span className="text-sm font-medium">Módulos</span>

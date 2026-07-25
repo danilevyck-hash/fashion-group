@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ModalOverlay } from "@/components/ui";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 
 type Severity = "ok" | "info" | "warning" | "critical";
 
@@ -114,6 +115,9 @@ export default function DataHealthPage() {
   const [running, setRunning] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedCheck, setSelectedCheck] = useState<CheckRow | null>(null);
+  // El detalle del check cierra con clic fuera (abajo) y con Escape.
+  const cerrarDetalle = useCallback(() => setSelectedCheck(null), []);
+  useEscapeClose(!!selectedCheck, cerrarDetalle);
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
@@ -314,9 +318,8 @@ export default function DataHealthPage() {
 
         {/* Modal con detalles JSON */}
         {selectedCheck && (
-          <ModalOverlay onBackdropClick={() => setSelectedCheck(null)} backdropClassName="bg-black/40" align="middle">
+          <ModalOverlay onBackdropClick={cerrarDetalle} backdropClassName="bg-black/40" align="middle">
             <div
-              onClick={(e) => e.stopPropagation()}
               className="bg-white rounded-lg shadow-xl border border-gray-200 w-[min(720px,calc(100vw-2rem))] max-h-[80vh] overflow-hidden flex flex-col"
             >
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">

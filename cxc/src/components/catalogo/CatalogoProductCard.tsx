@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import type { CatalogoProducto } from "./types";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
@@ -66,6 +67,11 @@ export default function CatalogoProductCard({
     }
     prevQtyRef.current = qty;
   }, [qty]);
+
+  // Escape cierra igual que el clic fuera (que ya existe en los dos overlays):
+  // en la cantidad equivale a Cancelar — nunca guarda lo tecleado.
+  useEscapeClose(showQtyInput, () => setShowQtyInput(false));
+  useEscapeClose(showLightbox, () => setShowLightbox(false));
 
   function setQty(n: number) {
     onQtyChange(product.id, Math.max(0, n), product);

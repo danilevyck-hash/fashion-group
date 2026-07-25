@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import type { AnuladoItem } from "@/lib/marketing/types";
 
 type FiltroTipo = "todos" | "proyecto" | "factura";
@@ -55,6 +56,20 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
   const [confirmBulkEliminar, setConfirmBulkEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [textoConfirm, setTextoConfirm] = useState("");
+
+  // Cerrar el modal de eliminar permanente (equivale a Cancelar).
+  const cerrarEliminar = useCallback(() => {
+    setConfirmEliminarItem(null);
+    setConfirmBulkEliminar(false);
+    setTextoConfirm("");
+  }, []);
+  // Escape cierra igual que el clic fuera; lo tipeado ("ELIMINAR") no es un
+  // dato que perder, así que no se protege.
+  useEscapeClose(
+    confirmEliminarItem !== null || confirmBulkEliminar,
+    cerrarEliminar,
+    !eliminando,
+  );
 
   const cargar = useCallback(async () => {
     setLoading(true);

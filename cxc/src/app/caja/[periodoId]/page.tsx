@@ -14,6 +14,7 @@ import DeletedGastosModal from "../components/DeletedGastosModal";
 import NuevoGastoDrawer from "../components/NuevoGastoDrawer";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
+import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { useState, useCallback } from "react";
 import "../skin.css";
 
@@ -78,6 +79,26 @@ export default function PeriodoDetailPage() {
   }, [current, requestClosePeriodo]);
 
   const { suggestion: cajaSuggestion, dismiss: dismissCaja } = useSmartSuggestions(cajaSuggestions);
+
+  // Confirmaciones artesanales de gasto: Escape y clic fuera = Cancelar (nunca
+  // confirman). Los hooks van antes de cualquier return condicional.
+  useEscapeClose(!!pendingDeleteGasto, cancelDeleteGasto);
+  const deleteBackdrop = useBackdropDismiss(pendingDeleteGasto ? cancelDeleteGasto : undefined);
+  const restoreBackdrop = useBackdropDismiss(pendingRestoreGasto ? cancelRestoreGasto : undefined);
+  // La confirmación de restaurar se abre ENCIMA de "Gastos eliminados", que
+  // escucha Escape en `window` (fase de burbuja). Para que Escape cierre solo la
+  // confirmación y deje abierta la lista, escuchamos en `document` en fase de
+  // CAPTURA y cortamos la propagación antes de que llegue a ese listener.
+  useEffect(() => {
+    if (!pendingRestoreGasto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      cancelRestoreGasto();
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [pendingRestoreGasto, cancelRestoreGasto]);
 
   if (!authChecked) return null;
 
@@ -195,8 +216,10 @@ export default function PeriodoDetailPage() {
         destructive
       />
       {pendingDeleteGasto && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={cancelDeleteGasto}>
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...deleteBackdrop}>
+          {/* El cuadro ya no necesita stopPropagation: el hook solo cierra si el
+              mousedown Y el click cayeron sobre el fondo mismo. */}
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
             <h3 className="text-base font-medium mb-3">¿Eliminar este gasto?</h3>
             <p className="text-sm text-gray-800 mb-2">
               Gasto &ldquo;{pendingDeleteGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingDeleteGasto.total)} · {pendingDeleteGasto.categoria || "Sin categoría"} · {pendingDeleteGasto.responsable || "Sin responsable"} · {fmtDate(pendingDeleteGasto.fecha)}
@@ -222,8 +245,9 @@ export default function PeriodoDetailPage() {
         </div>
       )}
       {pendingRestoreGasto && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={cancelRestoreGasto}>
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...restoreBackdrop}>
+          {/* Ver nota del modal de eliminar: el fondo se encarga del cierre. */}
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
             <h3 className="text-base font-medium mb-3">¿Restaurar este gasto?</h3>
             <p className="text-sm text-gray-800 mb-6">
               Gasto &ldquo;{pendingRestoreGasto.descripcion?.trim() || "Sin descripción"}&rdquo; · ${fmt(pendingRestoreGasto.total)} · {pendingRestoreGasto.categoria || "Sin categoría"} · {pendingRestoreGasto.responsable || "Sin responsable"} · {fmtDate(pendingRestoreGasto.fecha)}

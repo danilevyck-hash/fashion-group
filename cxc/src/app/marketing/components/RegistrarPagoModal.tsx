@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { pedirUploadUrl, subirArchivoAStorage } from "./uploadHelpers";
 import { etiquetaMes } from "@/lib/marketing/meses";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -116,12 +117,24 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Clic fuera + Escape. Si ya cambió mes/monto, no cierra (sale con Cancelar).
+  // El comprobante ya subido no es un input, así que se bloquea aparte: con un
+  // comprobante cargado tampoco cierra por accidente.
+  // El hook va ANTES del return condicional (reglas de hooks).
+  const { panelRef, backdrop } = useFormModalDismiss(
+    mounted,
+    onClose,
+    !guardando && !subiendo && !comprobante,
+  );
+
   if (!mounted) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-[fadeIn_150ms_ease-out]">
-      <div className="absolute inset-0 bg-black/40" onClick={() => !guardando && !subiendo && onClose()} />
+      <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
+        ref={panelRef}
         className="relative bg-white w-full sm:max-w-lg sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >

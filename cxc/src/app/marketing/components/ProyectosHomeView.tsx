@@ -11,6 +11,7 @@ import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 // Solo usado para inicializar el estado fijo; ya no hay UI de filtro por estado.
 type FiltroEstado = "todos";
@@ -119,6 +120,15 @@ export default function ProyectosHomeView({
   // ya que los pagos de impulsadora son gastos sueltos (no aparecen como
   // proyectos en la lista).
   const [impulsadoraTotal, setImpulsadoraTotal] = useState(0);
+
+  // Clic fuera + Escape para el modal de anular. Como lleva un motivo escrito,
+  // si el usuario ya tipeó algo NO cierra (se sale con Cancelar).
+  const cerrarAnular = useCallback(() => setAnularPendiente(null), []);
+  const anularDismiss = useFormModalDismiss(
+    anularPendiente !== null,
+    cerrarAnular,
+    !anulando,
+  );
 
   // Exporta los gastos visibles (respeta búsqueda + marca; sin filtro baja todo)
   // a un ZIP: carpeta por cliente → proyecto → fotos + gasto, con Excel resumen.
@@ -630,12 +640,10 @@ export default function ProyectosHomeView({
       )}
 
       {anularPendiente && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-          onClick={() => !anulando && setAnularPendiente(null)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" {...anularDismiss.backdrop} />
           <div
+            ref={anularDismiss.panelRef}
             className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >

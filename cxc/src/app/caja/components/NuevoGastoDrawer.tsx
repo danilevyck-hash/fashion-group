@@ -6,6 +6,7 @@ import { fmt } from "@/lib/format";
 import GastoForm, { normalizeStr } from "./GastoForm";
 import { CajaResponsable } from "./types";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
+import { useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 
 interface PeriodoLike {
   id: string;
@@ -154,6 +155,25 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
   }
   function cancelNeg() { setPendingNeg(null); }
 
+  // Clic fuera del cuadro de confirmación = Cancelar (nunca guarda).
+  const negBackdrop = useBackdropDismiss(pendingNeg && !addingGasto ? cancelNeg : undefined);
+
+  // Escape con la confirmación anidada abierta: cierra SOLO la confirmación y
+  // deja el Drawer abierto. El Drawer escucha keydown en `window` en fase de
+  // burbuja, así que aquí escuchamos en `document` en fase de CAPTURA: corre
+  // antes y cortamos la propagación, de modo que el listener del Drawer nunca
+  // ve la tecla y no se cierra el formulario de atrás.
+  useEffect(() => {
+    if (!pendingNeg || addingGasto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setPendingNeg(null);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [pendingNeg, addingGasto]);
+
   const canSave =
     !!gDescripcion.trim() &&
     subtotalNum > 0 &&
@@ -223,8 +243,10 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
       </div>
 
       {pendingNeg && (
-        <div className="skin-caja fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60]" onClick={cancelNeg}>
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4" style={{ border: "1px solid var(--caja-border-default)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="skin-caja fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60]" {...negBackdrop}>
+          {/* Sin stopPropagation: el hook del fondo solo cierra si el mousedown Y
+              el click cayeron sobre el fondo mismo. */}
+          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4" style={{ border: "1px solid var(--caja-border-default)" }}>
             <h3 className="text-base font-medium mb-3" style={{ color: "var(--caja-fg-strong)" }}>¿Continuar con saldo negativo?</h3>
             <p className="text-sm mb-2" style={{ color: "var(--caja-fg-default)" }}>
               Este gasto deja el fondo en <strong className="caja-mono">${fmt(pendingNeg.saldoFuturo)}</strong> (fondo <span className="caja-mono">${fmt(pendingNeg.fondo)}</span>, gastos <span className="caja-mono">${fmt(pendingNeg.gastado)}</span>, nuevo <span className="caja-mono">${fmt(pendingNeg.nuevo)}</span>).

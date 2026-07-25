@@ -11,6 +11,7 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import { supabaseThumb } from "@/lib/image-thumb";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
@@ -94,6 +95,13 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // mande datos viejos por culpa de closures de un render anterior.
   const itemsRef = useRef<OrderItem[]>([]);
   const clientNameRef = useRef("");
+
+  // Escape cierra los dos modales de Switch igual que el clic fuera, con el
+  // MISMO guard: mientras hay algo en vuelo no se puede cerrar. Escape nunca
+  // envia nada al ERP, solo cancela. Los hooks van ANTES del early return de
+  // `loading` (reglas de hooks).
+  useEscapeClose(showSwitchModal, () => setShowSwitchModal(false), !switchSending);
+  useEscapeClose(showClienteModal, () => setShowClienteModal(false), !clienteGuardando);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 

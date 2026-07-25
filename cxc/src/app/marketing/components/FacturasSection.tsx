@@ -23,6 +23,11 @@ import {
   subirArchivoAStorage,
 } from "./uploadHelpers";
 import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
+import {
+  useBackdropDismiss,
+  useEscapeClose,
+  useFormModalDismiss,
+} from "@/lib/hooks/useModalDismiss";
 
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
@@ -71,6 +76,20 @@ export default function FacturasSection({
     setRole(sessionStorage.getItem("cxc_role") ?? "");
   }, []);
   const esAdmin = role === "admin";
+
+  // ---- Cierre de modales con clic fuera + Escape ----
+  // Anular lleva un motivo escrito: si el usuario ya tipeó algo, el clic fuera
+  // y el Escape no cierran (se sale con Cancelar).
+  const cerrarAnular = useCallback(() => setAnulando(null), []);
+  const anularDismiss = useFormModalDismiss(
+    anulando !== null,
+    cerrarAnular,
+    !anulandoLoading,
+  );
+  // El de duplicados es solo confirmación: no hay nada que perder.
+  const cerrarConfirmDup = useCallback(() => setConfirmDup(false), []);
+  const confirmDupBackdrop = useBackdropDismiss(cerrarConfirmDup);
+  useEscapeClose(confirmDup, cerrarConfirmDup);
 
   // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
   useEffect(() => {
@@ -698,12 +717,10 @@ export default function FacturasSection({
       )}
 
       {anulando && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-          onClick={() => !anulandoLoading && setAnulando(null)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" {...anularDismiss.backdrop} />
           <div
+            ref={anularDismiss.panelRef}
             className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
@@ -766,7 +783,10 @@ export default function FacturasSection({
 
       {/* Modal de confirmación de duplicados (bulk) */}
       {confirmDup && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+          {...confirmDupBackdrop}
+        >
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl">
             <h3 className="text-base font-semibold mb-1">
               ¿Guardar facturas duplicadas?

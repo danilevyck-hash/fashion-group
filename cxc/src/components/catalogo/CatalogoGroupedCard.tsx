@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { type JoybeesProduct, type GroupedProduct } from "./groupByModel";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
@@ -76,6 +77,12 @@ export default function CatalogoGroupedCard({
 
   const isRegalia = group.is_regalia || group.price === 0;
   const isSingleVariant = group.variants.length === 1;
+
+  // Escape cierra igual que el clic fuera (que ya existe en los dos overlays):
+  // en la cantidad equivale a Cancelar — nunca guarda lo tecleado.
+  // Espejo exacto de CatalogoProductCard.
+  useEscapeClose(!!qtyInputFor, () => setQtyInputFor(null));
+  useEscapeClose(showLightbox, () => setShowLightbox(false));
 
   function setQty(productId: string, product: JoybeesProduct, n: number) {
     onQtyChange(productId, Math.max(0, n), product);

@@ -22,6 +22,7 @@ import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartS
 import SuggestionCard from "@/components/SuggestionCard";
 import { useOnline } from "@/lib/OnlineContext";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 export interface ChequesInitialData {
   cheques: Cheque[];
@@ -334,6 +335,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   }, [vencidos]);
 
   const { suggestion: chequeSuggestion, dismiss: dismissCheque } = useSmartSuggestions(chequeSuggestions);
+
+  // Modal de rebotado: tiene el motivo escrito a mano, así que usa el cierre de
+  // formulario — si ya escribió algo, el clic fuera y el Escape no se lo borran.
+  // Cerrar siempre equivale a Cancelar, nunca marca el cheque como rebotado.
+  const cerrarRebote = useCallback(() => { setRebotandoId(null); setMotivoRebote(""); }, []);
+  const { panelRef: rebotePanelRef, backdrop: reboteBackdrop } = useFormModalDismiss(!!rebotandoId, cerrarRebote);
 
   if (!authChecked) return null;
 
@@ -834,8 +841,10 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
 
       {/* Rebotado modal */}
       {rebotandoId && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setRebotandoId(null); setMotivoRebote(""); }}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" {...reboteBackdrop}>
+          {/* Sin stopPropagation: el hook del fondo solo cierra si el mousedown Y
+              el click cayeron sobre el fondo mismo. */}
+          <div ref={rebotePanelRef} className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200">
             <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
             <textarea
@@ -847,7 +856,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             />
             <div className="flex items-center gap-3 mt-4">
               <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
-              <button onClick={() => { setRebotandoId(null); setMotivoRebote(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+              <button onClick={cerrarRebote} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </div>
           </div>
         </div>

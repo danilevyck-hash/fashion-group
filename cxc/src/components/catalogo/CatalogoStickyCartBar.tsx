@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 
 interface CatalogoStickyCartBarProps {
@@ -42,6 +43,10 @@ export default function CatalogoStickyCartBar({
   const theme = getMarcaTheme(marca)!;
   const c = theme.cart;
   const [miniCartOpen, setMiniCartOpen] = useState(false);
+
+  // Escape cierra el mini-carrito igual que el clic en el backdrop. El hook va
+  // ANTES del early return de cartCount (reglas de hooks).
+  useEscapeClose(miniCartOpen, () => setMiniCartOpen(false));
 
   if (cartCount === 0) return null;
 

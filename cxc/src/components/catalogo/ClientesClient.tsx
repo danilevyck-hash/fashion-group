@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Toast, EmptyState } from "@/components/ui";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface Cliente { id: string; nombre: string; empresa: string; correo: string; whatsapp: string; }
@@ -28,6 +29,10 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
   const [fCorreo, setFCorreo] = useState("");
   const [fWhatsapp, setFWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
+  // Clic fuera / Escape cierran el modal, salvo que ya haya datos escritos sin
+  // guardar (alta o edición de cliente): ahí solo se sale con Cancelar/Guardar.
+  const cerrarModal = useCallback(() => setShowModal(false), []);
+  const { panelRef, backdrop } = useFormModalDismiss(showModal, cerrarModal, !saving);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -136,8 +141,8 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div {...backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div ref={panelRef} className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h2 className="font-medium mb-4">{editingId ? "Editar Cliente" : "Nuevo Cliente"}</h2>
             <div className="space-y-3">
               <div>

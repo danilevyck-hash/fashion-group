@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, ReactNode, createContext, use
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -139,9 +140,14 @@ export function ModalOverlay({
     pathname.startsWith("/catalogo-publico") ||
     pathname.startsWith("/pedido-reebok");
   const sidebarPad = isPublic ? "" : collapsed ? "md:pl-16" : "md:pl-56";
+  // El clic fuera solo cuenta si el mousedown Y el click cayeron sobre el
+  // backdrop mismo — así un clic dentro del panel nunca cierra (aunque el panel
+  // olvide stopPropagation) y arrastrar para seleccionar texto desde adentro
+  // tampoco pierde el formulario. Ver src/lib/hooks/useModalDismiss.ts.
+  const backdrop = useBackdropDismiss(onBackdropClick);
   return (
     <div
-      onClick={onBackdropClick}
+      {...backdrop}
       className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} print:!pl-0 ${backdropClassName} ${className}`}
     >
       {children}
@@ -155,31 +161,37 @@ export function Modal({
   title,
   children,
   maxWidth = "max-w-md",
+  dismissOnBackdrop = true,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: ReactNode;
   maxWidth?: string;
+  /** Cerrar con clic fuera del cuadro. Solo apagarlo si perder lo escrito
+   *  sería grave y el modal no tiene su propio aviso. */
+  dismissOnBackdrop?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // Modal es el contenedor genérico de formularios del sistema, así que el
+  // cierre por clic fuera / Escape va con el guard de "formulario tocado": si
+  // el usuario ya escribió algo, no se cierra solo. useFormGuard ya registra
+  // el Escape con la misma protección.
+  const { panelRef: ref, intentarCerrar } = useFormGuard(open, onClose);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
     // Focus first input
-    setTimeout(() => {
+    const t = setTimeout(() => {
       const input = ref.current?.querySelector("input, textarea, select") as HTMLElement;
       input?.focus();
     }, 100);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+    return () => clearTimeout(t);
+  }, [open, ref]);
 
   if (!open) return null;
 
   return (
-    <ModalOverlay>
+    <ModalOverlay onBackdropClick={dismissOnBackdrop ? intentarCerrar : undefined}>
       <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto`}>
         {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
         {children}
@@ -210,10 +222,13 @@ export function ConfirmModal({
   destructive?: boolean;
   loading?: boolean;
 }) {
+  // Escape cancela (nunca confirma). El hook va ANTES del return condicional
+  // por las reglas de hooks; internamente no hace nada si `open` es false.
+  useEscapeClose(open, onClose, !loading);
   if (!open) return null;
   return (
-    <ModalOverlay onBackdropClick={onClose}>
-      <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay onBackdropClick={loading ? undefined : onClose}>
+      <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
         <h3 className="text-base font-medium mb-1">{title}</h3>
         {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
         <div className="flex gap-3 mt-4">
@@ -279,8 +294,8 @@ export function ConfirmDeleteModal({
   if (!open) return null;
 
   return (
-    <ModalOverlay onBackdropClick={onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
-      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay onBackdropClick={loading ? undefined : onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-6">{description}</p>
         <div className="flex gap-3">
@@ -342,8 +357,8 @@ export function ConfirmTypeNameModal({
   const matches = typed.trim() === expectedName.trim();
 
   return (
-    <ModalOverlay onBackdropClick={onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
-      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+    <ModalOverlay onBackdropClick={loading ? undefined : onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200">
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-4">{description}</p>
         <label className="block text-xs text-gray-500 mb-1">

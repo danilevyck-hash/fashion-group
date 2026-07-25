@@ -18,6 +18,7 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
@@ -200,6 +201,10 @@ export function FacturaForm({
   const [duplicados, setDuplicados] = useState<DuplicadoItem[]>([]);
   const [checkingDup, setCheckingDup] = useState(false);
   const [showConfirmDup, setShowConfirmDup] = useState(false);
+  // Escape cierra el aviso de duplicado igual que el clic fuera: equivale a
+  // Cancelar (nunca confirma el guardado).
+  const cerrarConfirmDup = useCallback(() => setShowConfirmDup(false), []);
+  useEscapeClose(showConfirmDup, cerrarConfirmDup, !enviando);
   // ID de la factura que estamos editando — se excluye del match para no
   // auto-reportarse como duplicado de sí misma.
   const editandoId = initial?.id ?? null;

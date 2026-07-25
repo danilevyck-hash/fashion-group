@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ProyectoForm } from "@/components/marketing";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type { MkMarca, MkProyecto } from "@/lib/marketing/types";
 
 interface Props {
@@ -18,6 +19,10 @@ export default function NuevoProyectoModal({
 }: Props) {
   const { toast } = useToast();
   const [guardando, setGuardando] = useState(false);
+
+  // Clic fuera + Escape. El modal solo existe mientras está abierto, así que
+  // `open` es siempre true. Si ya escribió algo, no cierra (sale con Cancelar).
+  const { panelRef, backdrop } = useFormModalDismiss(true, onClose, !guardando);
 
   const handleSubmit = async (data: {
     tienda: string;
@@ -53,12 +58,10 @@ export default function NuevoProyectoModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      onClick={() => !guardando && onClose()}
-    >
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
+        ref={panelRef}
         className="relative bg-white w-full sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
