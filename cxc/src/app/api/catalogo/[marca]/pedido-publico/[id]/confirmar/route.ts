@@ -3,9 +3,12 @@ import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import {
   checkConfirmRateLimit,
   confirmarPedidoPublico,
+  soloCortas,
   type ConfirmarDeps,
   type PedidoPublicoRow,
+  type StockLineaCorta,
 } from "@/lib/catalogo/confirmar-pedido";
+import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { sendTelegramAlert } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +16,15 @@ export const dynamic = "force-dynamic";
 // Endpoint PÚBLICO (sin sesión): el cliente confirma su pedido desde el link
 // /pedido-<marca>/[short_id]. La confirmación AUTO-CONVIERTE a <prefijo>-###
 // vía la RPC atómica existente (cfg.convertRpc) — el pedido entra directo al
-// pipeline del admin. Idempotente; con aviso de stock (S2): si hay líneas
-// cortas responde 409 con el detalle y el cliente puede reenviar con
-// aceptar_stock=true. Lógica testeable en src/lib/catalogo/confirmar-pedido.ts.
+// pipeline del admin. Idempotente.
+//
+// SIN modal de stock (25-jul-2026): ya no hay 409 'stock_corto' ni
+// aceptar_stock. En su lugar se guarda la FOTO del stock del momento
+// (stock_confirmacion) para mostrarle al cliente y a la secretaria la cantidad
+// REAL disponible. Lógica testeable en src/lib/catalogo/confirmar-pedido.ts.
 //
 // Stock por marca: Reebok suma `inventory` (piezas por talla) en su proyecto;
-// Joybees lee la columna stock de joybees_products.
+// Joybees y Tommy leen la columna stock de su tabla de catálogo.
 
 const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -56,9 +62,6 @@ export async function POST(
     if (!shortId) {
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     }
-
-    const body = await req.json().catch(() => null);
-    const aceptarStock = !!body && (body as Record<string, unknown>).aceptar_stock === true;
 
     const publicosDb = await cfg.publicosDb();
     const db = await cfg.db();
@@ -139,19 +142,23 @@ export async function POST(
       getBulto: (category) =>
         cfg.marca === "reebok" ? cfg.bultoSize(category || "footwear") : cfg.bultoSize(),
 
-      // TOLERANTE a la migración 20260724120000 pendiente: si la columna
-      // confirmado_cliente_at no existe aún, solo se loguea — la conversión
+      // TOLERANTE a migraciones pendientes: primero se intenta con la foto de
+      // stock (columna stock_confirmacion, DDL 20260725130000) y, si esa
+      // columna no existe, se reintenta solo con confirmado_cliente_at (DDL
+      // 20260724120000). Si tampoco existe, solo se loguea — la conversión
       // (que es la confirmación real) sigue igual.
-      async marcarConfirmado(sid) {
-        const patch: Record<string, unknown> = { confirmado_cliente_at: new Date().toISOString() };
-        if (rate.ipHash) patch.confirmado_ip_hash = rate.ipHash;
-        const { error } = await publicosDb
-          .from(cfg.publicosTable)
-          .update(patch)
-          .eq("short_id", sid);
-        if (error) {
+      async marcarConfirmado(sid, stock) {
+        const base: Record<string, unknown> = { confirmado_cliente_at: new Date().toISOString() };
+        if (rate.ipHash) base.confirmado_ip_hash = rate.ipHash;
+        const intentos: Record<string, unknown>[] = [{ ...base, stock_confirmacion: stock }, base];
+        for (const patch of intentos) {
+          const { error } = await publicosDb
+            .from(cfg.publicosTable)
+            .update(patch)
+            .eq("short_id", sid);
+          if (!error) return;
           console.warn(
-            `[${cfg.marca}/confirmar] no se pudo registrar confirmado_cliente_at (¿migración pendiente?):`,
+            `[${cfg.marca}/confirmar] update de confirmación falló (¿migración pendiente?):`,
             error.message,
           );
         }
@@ -180,21 +187,36 @@ export async function POST(
       },
     };
 
-    const result = await confirmarPedidoPublico(deps, shortId, aceptarStock);
+    const result = await confirmarPedidoPublico(deps, shortId);
 
     if (result.status === 404) {
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     }
-    if (result.status === 409) {
-      return NextResponse.json({ error: "stock_corto", lineas: result.lineas }, { status: 409 });
-    }
     if (result.status === 500) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
+
+    // Aviso a Telegram cuando el pedido entra con menos piezas de las pedidas:
+    // ya no hay modal que frene al cliente, así que el aviso va al equipo.
+    const cortas: StockLineaCorta[] = soloCortas(result.stock);
+    if (!result.ya_confirmado && cortas.length > 0) {
+      const detalle = cortas
+        .slice(0, 5)
+        .map(
+          (l) =>
+            `${l.sku || l.name}: pidió ${formatBultosPiezas(l.pedido_pzas, l.bulto_pzas || 12)}, hay ${formatBultosPiezas(l.disponible_pzas, l.bulto_pzas || 12)}`,
+        )
+        .join(" · ");
+      await sendTelegramAlert(
+        `⚠️ ${cfg.label} ${result.numero}: ${cortas.length} producto(s) con menos piezas de las pedidas — ${detalle}`,
+      );
+    }
+
     return NextResponse.json({
       numero: result.numero,
       estado: "confirmado",
       ya_confirmado: result.ya_confirmado,
+      stock: result.stock,
     });
   } catch (err) {
     console.error(`[${params.marca}/confirmar] error:`, err);
