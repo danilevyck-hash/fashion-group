@@ -9,7 +9,6 @@ import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { CatalogoCartItem, CatalogoProducto, StockLinea } from "./types";
-import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder } from "@/lib/reebok-gender";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoFilters, { type SaleFilter } from "./CatalogoFilters";
@@ -169,7 +168,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
-    .filter(p => matchesGenderFilter(p.gender, gender))
+    .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
@@ -178,7 +177,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
       const ca = catOrder[a.category || ""] ?? 9, cb = catOrder[b.category || ""] ?? 9;
       if (ca !== cb) return ca - cb;
-      const ga = genderGroupOrder(a.gender), gb = genderGroupOrder(b.gender);
+      const ga = theme.genero.groupOrder(a.gender), gb = theme.genero.groupOrder(b.gender);
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
@@ -191,9 +190,9 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   if (!agrupado) {
     let lastKey = "";
     for (const p of filtered) {
-      const key = `${p.category}|${genderGroupKey(p.gender)}`;
+      const key = `${p.category}|${theme.genero.groupKey(p.gender)}`;
       if (key !== lastKey) {
-        groups.push({ label: `${catLabel[p.category || ""] || p.category} — ${genderGroupLabel(p.gender)}`, items: [] });
+        groups.push({ label: `${catLabel[p.category || ""] || p.category} — ${theme.genero.groupLabel(p.gender)}`, items: [] });
         lastKey = key;
       }
       groups[groups.length - 1].items.push(p);

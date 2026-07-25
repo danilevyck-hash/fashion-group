@@ -22,6 +22,21 @@ import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
 import { calculateTommyOrderTotal } from "@/lib/tommy-order-total";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { TOMMY_CATEGORIA_LABEL, TOMMY_GENERO_LABEL } from "@/lib/tommy-nombres";
+import {
+  matchesGenderFilter as reebokMatchesGenderFilter,
+  genderGroupKey as reebokGenderGroupKey,
+  genderGroupLabel as reebokGenderGroupLabel,
+  genderGroupOrder as reebokGenderGroupOrder,
+  genderFilterLabel as reebokGenderFilterLabel,
+} from "@/lib/reebok-gender";
+import {
+  matchesTommyGenderFilter,
+  tommyGenderGroupKey,
+  tommyGenderGroupLabel,
+  tommyGenderGroupOrder,
+  tommyGenderFilterLabel,
+  TOMMY_PDF_GENDER_SECTIONS,
+} from "@/lib/tommy-gender";
 
 export type MarcaUiKey = "reebok" | "joybees" | "tommy";
 
@@ -81,6 +96,24 @@ const JOYBEES_GENERO_LABEL: Record<string, string> = {
   kids: "Niños",
 };
 
+/** Taxonomía de género histórica (Reebok y Joybees) — español, boys+girls
+ *  colapsados en "Niños". Se comparte por referencia: las dos marcas leen la
+ *  MISMA fuente, así no puede haber deriva entre ellas. */
+const REEBOK_GENERO = {
+  match: reebokMatchesGenderFilter,
+  groupKey: reebokGenderGroupKey,
+  groupLabel: reebokGenderGroupLabel,
+  groupOrder: reebokGenderGroupOrder,
+  filterLabel: reebokGenderFilterLabel,
+  pdfSections: [
+    { key: "hombre", label: "HOMBRE" },
+    { key: "mujer", label: "MUJER" },
+    { key: "ninos", label: "NIÑOS" },
+    { key: "unisex", label: "UNISEX" },
+    { key: "otros", label: "OTROS" },
+  ],
+};
+
 export interface MarcaTheme {
   marca: MarcaUiKey;
   /** "Reebok" — título corto para copys. */
@@ -128,6 +161,27 @@ export interface MarcaTheme {
   /** Decimales del total en la barra del carrito del catálogo VENDEDOR
    *  (quirk heredado: Reebok 0, Joybees 2; el público siempre usa 2). */
   vendorFmtDecimals: 0 | 2;
+
+  /** Taxonomía de GÉNERO de la marca — filtro, agrupación de secciones del
+   *  grid plano y secciones del PDF del catálogo. Reebok y Joybees usan la
+   *  histórica de `reebok-gender.ts` (Hombre/Mujer/Niños/Unisex, en español);
+   *  Tommy usa la suya (`tommy-gender.ts`: Women/Men/Boys/Girls, el vocabulario
+   *  de Switch). Los componentes leen SIEMPRE de aquí — nunca importan un
+   *  módulo de género directo. */
+  genero: {
+    /** ¿El producto cae bajo el chip seleccionado? "" = Todos. */
+    match: (rawGender: string | null | undefined, filterValue: string) => boolean;
+    /** Clave de agrupación de secciones (desconocido → "otros"). */
+    groupKey: (rawGender: string | null | undefined) => string;
+    /** Label del encabezado de sección ("SLIPPERS — WOMEN"). */
+    groupLabel: (rawGender: string | null | undefined) => string;
+    /** Orden de las secciones. */
+    groupOrder: (rawGender: string | null | undefined) => number;
+    /** Label del chip activo, para el subtítulo del PDF. */
+    filterLabel: (filterValue: string) => string;
+    /** Secciones del PDF del catálogo plano, en orden (key = groupKey). */
+    pdfSections: { key: string; label: string }[];
+  };
 
   // ── Features (diferencias FUNCIONALES reales) ──
   features: {
@@ -394,6 +448,7 @@ const REEBOK: MarcaTheme = {
   pdfFallbackCategory: "apparel",
   itemsField: "reebok_order_items",
   vendorFmtDecimals: 0,
+  genero: REEBOK_GENERO,
 
   features: {
     preorder: true,
@@ -697,6 +752,7 @@ const JOYBEES: MarcaTheme = {
   pdfFallbackCategory: "footwear",
   itemsField: "joybees_order_items",
   vendorFmtDecimals: 2,
+  genero: REEBOK_GENERO,
 
   features: {
     preorder: false,
@@ -1022,6 +1078,14 @@ const TOMMY: MarcaTheme = {
   pdfFallbackCategory: "footwear",
   itemsField: "tommy_order_items",
   vendorFmtDecimals: 2,
+  genero: {
+    match: matchesTommyGenderFilter,
+    groupKey: tommyGenderGroupKey,
+    groupLabel: tommyGenderGroupLabel,
+    groupOrder: tommyGenderGroupOrder,
+    filterLabel: tommyGenderFilterLabel,
+    pdfSections: TOMMY_PDF_GENDER_SECTIONS,
+  },
 
   features: {
     preorder: false,        // sin pre-orden (decisión Daniel, como Joybees)
@@ -1099,23 +1163,25 @@ const TOMMY: MarcaTheme = {
     sortSelect:
       "text-xs border border-[#152342]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#152342]/30 transition bg-white text-[#152342]/60 min-h-[44px]",
     count: "text-xs text-[#152342]/30 tabular-nums",
-    // Valores de FILTRO de matchesGenderFilter (male/female/kids — el pipeline
-    // flat filtra por grupo canónico de reebok-gender.ts, que ya normaliza los
-    // slugs de tommy_products: women→Mujer, men→Hombre, boys/girls→Niños).
+    // Tommy filtra por los CUATRO géneros de Switch (tommy-gender.ts), no por
+    // los grupos de Reebok: aquí Boys y Girls son secciones distintas y las
+    // etiquetas son las de Switch, coherentes con el nombre del producto
+    // ("Women-Slippers") y con el encabezado de sección ("SLIPPERS — WOMEN").
     genderOptions: [
       { value: "", label: "Todos" },
-      { value: "female", label: "Mujer" },
-      { value: "male", label: "Hombre" },
-      { value: "kids", label: "Niños" },
+      { value: "women", label: "Women" },
+      { value: "men", label: "Men" },
+      { value: "boys", label: "Boys" },
+      { value: "girls", label: "Girls" },
     ],
     categoryOptions: [
       { value: "", label: "Todos" },
       { value: "sneakers", label: "Sneakers" },
       { value: "flip_flops", label: "Flip Flops" },
-      { value: "sandals", label: "Sandalias" },
-      { value: "shoes", label: "Zapatos" },
-      { value: "slippers", label: "Pantuflas" },
-      { value: "boots", label: "Botas" },
+      { value: "sandals", label: "Sandals" },
+      { value: "shoes", label: "Shoes" },
+      { value: "slippers", label: "Slippers" },
+      { value: "boots", label: "Boots" },
     ],
   },
   grid: {

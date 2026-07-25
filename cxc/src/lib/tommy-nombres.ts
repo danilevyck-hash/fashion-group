@@ -1,26 +1,35 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Parser de nombres del catálogo Tommy Hilfiger (empresa Switch fashion_shoes).
 //
-// Switch NO trae nombres reales: `descripcion` es genérica con 23 valores tipo
-// "Women-Flip Flops" (verificado contra switch_articulo_diario 24-jul-2026) —
-// el "nombre" real del producto es su código. El sync arma el name automático:
+// Switch trae `descripcion` genérica con 23 valores tipo "Women-Flip Flops"
+// (verificado contra switch_articulo_diario 24-jul-2026). ESE es el nombre del
+// producto: se muestra TAL CUAL, en el vocabulario de Switch.
 //
-//     "{codigo} · {categoría} {género}"   →  "TH1234 · Sneakers Hombre"
+//     name = "{Género}-{Categoría}"   →  "Women-Slippers", "Men-Flip Flops"
 //
-// parseando la descripcion por el PRIMER guión:
+// (Decisión Daniel 25-jul-2026. ANTES el sync armaba "{codigo} · {categoría}
+// {género}" traducido al español — el código salía DUPLICADO en la card, porque
+// ya vive en su propia píldora de SKU como en Reebok/Joybees. Se eliminó.)
+//
+// Se parsea la descripcion por el PRIMER guión:
 //   prefijo = género  (Women / Men / Boys / Girls — case-insensitive: existe
 //                      "women-Sneakers" real en los datos)
 //   sufijo  = categoría (Sneakers / Flip Flops / Sandals / Shoes / Slippers /
 //                      Boots)
 //
+// El name se re-arma desde los labels canónicos en vez de copiar la descripcion
+// byte a byte: son las MISMAS palabras de Switch, solo con la capitalización
+// normalizada — así "women-Sneakers" no rompe la vista con una sección en
+// minúscula al lado de "Women-Sandals". Todo lo demás sale intacto.
+//
 // Los valores que NO parsean (basura contable tipo "MERCANCIA DEFECTUOSA",
 // "THERMO", "RETENCION DE N/C" — que además el filtro marcaId=3 excluye del
-// catálogo) caen al fallback: name = codigo (+ descripcion si la hay),
-// category = "otros", gender = null.
+// catálogo) caen al fallback: name = descripcion cruda (o el codigo si no hay
+// descripcion), category = "otros", gender = null.
 //
 // category/gender de tommy_products guardan los SLUGS (sneakers/flip_flops/…
-// y women/men/boys/girls); los labels en español simple viven aquí y los usa
-// el theme (chips de filtros, Excel, admin).
+// y women/men/boys/girls); los labels que muestra la UI viven aquí y los usa el
+// theme (chips de filtros, encabezados de sección, Excel, admin).
 //
 // Funciones PURAS (sin I/O) — testeadas en __tests__/lib/tommy-nombres.test.ts
 // con los 23 valores reales.
@@ -52,23 +61,24 @@ const CATEGORIAS: Record<string, TommyCategoria> = {
   boots: "boots",
 };
 
-/** Labels en español simple por slug de género (UI/Excel/nombres). */
+/** Labels por slug de género — el vocabulario de Switch, sin traducir
+ *  (UI/Excel/nombres). Los usa MARCA_THEME.tommy. */
 export const TOMMY_GENERO_LABEL: Record<string, string> = {
-  women: "Mujer",
-  men: "Hombre",
-  boys: "Niño",
-  girls: "Niña",
+  women: "Women",
+  men: "Men",
+  boys: "Boys",
+  girls: "Girls",
 };
 
-/** Labels por slug de categoría (UI/Excel/nombres). "Sneakers"/"Flip Flops" se
- *  quedan como se usan en Panamá; el resto en español simple. */
+/** Labels por slug de categoría — el vocabulario de Switch, sin traducir
+ *  (UI/Excel/nombres). "Otros" es el catch-all, no viene de Switch. */
 export const TOMMY_CATEGORIA_LABEL: Record<string, string> = {
   sneakers: "Sneakers",
   flip_flops: "Flip Flops",
-  sandals: "Sandalias",
-  shoes: "Zapatos",
-  slippers: "Pantuflas",
-  boots: "Botas",
+  sandals: "Sandals",
+  shoes: "Shoes",
+  slippers: "Slippers",
+  boots: "Boots",
   otros: "Otros",
 };
 
@@ -100,9 +110,10 @@ export interface TommyDerivedFields {
   gender: TommyGenero | null;
 }
 
-/** Campos derivados para el sync: name "{codigo} · {categoría} {género}" +
- *  category/gender parseados. Fallback si no parsea: name = codigo
- *  (+ descripcion cruda si existe), category "otros", gender null. */
+/** Campos derivados para el sync: name = la descripcion de Switch ("{Género}-
+ *  {Categoría}") + category/gender parseados. Fallback si no parsea: name =
+ *  descripcion cruda (o el codigo si viene vacía), category "otros", gender
+ *  null. El CÓDIGO nunca entra al nombre: vive en su píldora de SKU. */
 export function buildTommyDerivedFields(
   codigo: string,
   descripcion: string | null | undefined,
@@ -111,10 +122,10 @@ export function buildTommyDerivedFields(
   const p = parseTommyDescripcion(descripcion);
   if (!p) {
     const d = (descripcion ?? "").trim();
-    return { name: d ? `${cod} · ${d}` : cod, category: "otros", gender: null };
+    return { name: d || cod, category: "otros", gender: null };
   }
   return {
-    name: `${cod} · ${TOMMY_CATEGORIA_LABEL[p.categoria]} ${TOMMY_GENERO_LABEL[p.genero]}`,
+    name: `${TOMMY_GENERO_LABEL[p.genero]}-${TOMMY_CATEGORIA_LABEL[p.categoria]}`,
     category: p.categoria,
     gender: p.genero,
   };

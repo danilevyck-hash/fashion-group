@@ -117,25 +117,51 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
     });
   });
 
-  it("chips de filtros: categorías = slugs del sync; género = filtros canónicos", () => {
-    // Género: valores de matchesGenderFilter (male/female/kids); el pipeline
-    // flat normaliza los slugs women/men/boys/girls vía reebok-gender.ts.
-    expect(t.filtros.genderOptions.map((o) => o.value)).toEqual([
-      "", "female", "male", "kids",
+  // 25-jul-2026: Tommy habla el vocabulario de Switch — los 4 géneros son los
+  // slugs de tommy_products (Boys y Girls SEPARADOS, no colapsados en "Niños")
+  // y las categorías salen en inglés, coherentes con el nombre del producto.
+  it("chips de filtros: género = los 4 slugs de Switch; categorías = slugs del sync", () => {
+    expect(t.filtros.genderOptions).toEqual([
+      { value: "", label: "Todos" },
+      { value: "women", label: "Women" },
+      { value: "men", label: "Men" },
+      { value: "boys", label: "Boys" },
+      { value: "girls", label: "Girls" },
     ]);
-    expect(t.filtros.categoryOptions.map((o) => o.value)).toEqual([
-      "", "sneakers", "flip_flops", "sandals", "shoes", "slippers", "boots",
+    expect(t.filtros.categoryOptions).toEqual([
+      { value: "", label: "Todos" },
+      { value: "sneakers", label: "Sneakers" },
+      { value: "flip_flops", label: "Flip Flops" },
+      { value: "sandals", label: "Sandals" },
+      { value: "shoes", label: "Shoes" },
+      { value: "slippers", label: "Slippers" },
+      { value: "boots", label: "Boots" },
     ]);
   });
 
-  it("los slugs de género de tommy_products caen en los filtros correctos", async () => {
-    const { matchesGenderFilter } = await import("@/lib/reebok-gender");
-    expect(matchesGenderFilter("women", "female")).toBe(true);
-    expect(matchesGenderFilter("men", "male")).toBe(true);
-    expect(matchesGenderFilter("boys", "kids")).toBe(true);
-    expect(matchesGenderFilter("girls", "kids")).toBe(true);
-    expect(matchesGenderFilter("women", "male")).toBe(false);
-    expect(matchesGenderFilter("men", "female")).toBe(false);
+  it("los slugs de género de tommy_products caen en su propio chip", () => {
+    for (const g of ["women", "men", "boys", "girls"]) {
+      expect(t.genero.match(g, g)).toBe(true);
+      expect(t.genero.match(g, "")).toBe(true); // "Todos"
+      for (const otro of ["women", "men", "boys", "girls"].filter((x) => x !== g)) {
+        expect(t.genero.match(g, otro)).toBe(false);
+      }
+    }
+  });
+
+  it("encabezado de sección con el vocabulario de Switch ('SLIPPERS — WOMEN')", () => {
+    const catLabel = Object.fromEntries(
+      t.filtros.categoryOptions.filter((o) => o.value).map((o) => [o.value, o.label]),
+    );
+    expect(`${catLabel.slippers} — ${t.genero.groupLabel("women")}`).toBe("Slippers — Women");
+    expect(`${catLabel.flip_flops} — ${t.genero.groupLabel("men")}`).toBe("Flip Flops — Men");
+    expect(t.genero.groupLabel(null)).toBe("Otros");
+  });
+
+  it("secciones del PDF: los 4 géneros + catch-all, en orden", () => {
+    expect(t.genero.pdfSections.map((s) => s.key)).toEqual([
+      "women", "men", "boys", "girls", "otros",
+    ]);
   });
 
   it("admin: estilo batch, nombre editable, sync manual catalogo-tommy", () => {
