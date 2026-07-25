@@ -119,7 +119,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const cerrarEmpModal = useCallback(() => setShowEmpModal(false), []);
   const empModal = useFormModalDismiss(showEmpModal, cerrarEmpModal, !saving);
   const cerrarMovModal = useCallback(() => setShowMovModal(false), []);
-  const movModal = useFormModalDismiss(showMovModal, cerrarMovModal, !savingMov);
+  // El modal de movimiento tiene dos pasos (elegir empleado → formulario) y el
+  // contenido cambia entero, así que la foto se retoma al cambiar de paso.
+  const movModal = useFormModalDismiss(showMovModal, cerrarMovModal, !savingMov, movStep);
 
   // Bottom sheet (mobile detail preview)
   const [sheetEmp, setSheetEmp] = useState<Empleado | null>(null);

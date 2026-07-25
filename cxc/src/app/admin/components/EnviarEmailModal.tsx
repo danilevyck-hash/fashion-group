@@ -49,8 +49,10 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
   const [cuerpo, setCuerpo] = useState("");
   const [sending, setSending] = useState(false);
   // Clic fuera y Escape cierran, salvo que ya se haya editado el mensaje: el
-  // cuerpo del correo es editable y un clic accidental no debe borrarlo.
-  const { panelRef, intentarCerrar } = useFormGuard(open, onClose, !sending);
+  // cuerpo del correo es editable y un clic accidental no debe borrarlo. La
+  // foto se retoma cuando llega el borrador del servidor (destinatario, asunto
+  // y cuerpo se llenan async); si no, esa precarga se leería como "escribió".
+  const { panelRef, intentarCerrar } = useFormGuard(open, onClose, !sending, preview);
 
   useEffect(() => {
     if (!open || !codigo) return;

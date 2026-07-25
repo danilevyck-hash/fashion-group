@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { validateComprobanteFile } from "./fotoUpload";
 
 export interface SettlementInput {
@@ -57,14 +58,24 @@ export default function SettlementModal({
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Reset al abrir.
-  useEffect(() => {
+  // Reset al abrir — EN RENDER, no en un efecto: el modal se queda montado con
+  // `open=false`, así que un efecto limpiaría los campos un render TARDE y
+  // useFormModalDismiss tomaría su foto sobre los valores viejos (creería que
+  // hay cambios sin guardar y ya no dejaría cerrar con clic fuera / Escape).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
     if (open) {
       setRows([{ monto: "", nota_credito: "", fecha: hoyPanama() }]);
       setError(null);
       setFile(null);
     }
-  }, [open]);
+  }
+
+  // Clic fuera + Escape = Cancelar. Si el usuario ya escribió algo (o adjuntó
+  // el comprobante), ninguno de los dos cierra: se sale con Cancelar o
+  // guardando. Bloqueado mientras se envía, igual que antes.
+  const { panelRef, backdrop } = useFormModalDismiss(open, onClose, !submitting);
 
   if (!open) return null;
 
@@ -105,12 +116,12 @@ export default function SettlementModal({
 
   return createPortal(
     <div
+      {...backdrop}
       className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40"
-      onClick={() => { if (!submitting) onClose(); }}
     >
       <div
+        ref={panelRef}
         className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold">{title}</h2>
         {reclamado != null && (

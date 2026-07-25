@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, ReactNode, createContext, use
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
-import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
+import { useBackdropDismiss, useEscapeClose, useFormGuard } from "@/lib/hooks/useModalDismiss";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -172,24 +172,26 @@ export function Modal({
    *  sería grave y el modal no tiene su propio aviso. */
   dismissOnBackdrop?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // Modal es el contenedor genérico de formularios del sistema, así que el
+  // cierre por clic fuera / Escape va con el guard de "formulario tocado": si
+  // el usuario ya escribió algo, no se cierra solo. useFormGuard ya registra
+  // el Escape con la misma protección.
+  const { panelRef: ref, intentarCerrar } = useFormGuard(open, onClose);
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
     // Focus first input
-    setTimeout(() => {
+    const t = setTimeout(() => {
       const input = ref.current?.querySelector("input, textarea, select") as HTMLElement;
       input?.focus();
     }, 100);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+    return () => clearTimeout(t);
+  }, [open, ref]);
 
   if (!open) return null;
 
   return (
-    <ModalOverlay onBackdropClick={dismissOnBackdrop ? onClose : undefined}>
+    <ModalOverlay onBackdropClick={dismissOnBackdrop ? intentarCerrar : undefined}>
       <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto`}>
         {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
         {children}

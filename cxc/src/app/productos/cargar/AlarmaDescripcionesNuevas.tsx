@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { useEscapeClose, useBackdropDismiss, useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { marcasCandidatasDeEmpresa } from "@/lib/depurador/tienda";
 
 // Alarma bloqueante de descripciones NUEVAS (no catalogadas), compartida por el
@@ -51,6 +52,20 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
     setRole(sessionStorage.getItem("cxc_role") || "");
   }, []);
 
+  // Cierre por clic fuera + Escape. Los hooks van ANTES del early return de
+  // `mounted` (reglas de hooks). La alarma de atrás se guardea con `!confirm`:
+  // con la confirmación abierta, Escape cierra SOLO la de encima.
+  const cerrarConfirm = () => setConfirm(null);
+  const backdropAlarma = useBackdropDismiss(confirm ? undefined : onClose);
+  useEscapeClose(mounted, onClose, !confirm);
+  // La confirmación tiene campos (marca + checkbox) → si el usuario ya tocó
+  // algo, el clic fuera y Escape no la cierran; sale con Cancelar.
+  const { panelRef: confirmPanelRef, backdrop: backdropConfirm } = useFormModalDismiss(
+    !!confirm,
+    cerrarConfirm,
+    !confirm?.enviando,
+  );
+
   if (!mounted) return null;
 
   const puedeAprobar = role === "admin" || role === "secretaria";
@@ -89,7 +104,7 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
   };
 
   return createPortal(
-    <div className="fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+    <div {...backdropAlarma} className="fade-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-lg rounded-2xl border-4 border-red-500 bg-white p-6">
         <div className="mb-2 text-center text-5xl">⚠️</div>
         <h2 className="text-center text-xl font-bold text-red-700">
@@ -136,8 +151,8 @@ export default function AlarmaDescripcionesNuevas({ items, onAprobada, onClose }
 
       {/* Confirmación de aprobación (encima de la alarma) */}
       {confirm && (
-        <div className="fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6">
+        <div {...backdropConfirm} className="fade-in fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
+          <div ref={confirmPanelRef} className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6">
             <h3 className="text-center text-lg font-bold text-stone-900">Aprobar descripción</h3>
             <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
               ⚠️ Esta descripción quedará <b>PERMANENTE</b> en el catálogo de{" "}

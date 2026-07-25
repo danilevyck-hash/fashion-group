@@ -14,6 +14,7 @@ import { ConfirmDeleteModal, ConfirmModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -70,6 +71,15 @@ export default function MobiliarioPage() {
 
   const [editEntrega, setEditEntrega] = useState<EntregaConItems | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  // Clic fuera + Escape en el modal de producto. Si ya editó algún campo, no
+  // cierra (se sale con Cancelar) para no perder lo escrito.
+  const cerrarEditProd = useCallback(() => setEditProd(null), []);
+  const editProdDismiss = useFormModalDismiss(
+    editProd !== null,
+    cerrarEditProd,
+    !savingProd,
+  );
 
 
   const cargar = useCallback(async () => {
@@ -642,12 +652,13 @@ export default function MobiliarioPage() {
 
       {/* Modal edit/nuevo producto */}
       {editProd && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-          onClick={() => !savingProd && setEditProd(null)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div
+            className="absolute inset-0 bg-black/40"
+            {...editProdDismiss.backdrop}
+          />
+          <div
+            ref={editProdDismiss.panelRef}
             className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >

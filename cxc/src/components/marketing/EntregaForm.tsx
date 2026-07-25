@@ -23,6 +23,7 @@ import type {
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 interface Props {
   open: boolean;
@@ -160,10 +161,17 @@ export default function EntregaForm({
   });
   const [otrosCant, setOtrosCant] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
+  // La "foto" de los campos para el cierre por clic fuera solo puede tomarse
+  // DESPUÉS de hidratar el form; si no, la hidratación se vería como si el
+  // usuario hubiera escrito y el modal nunca cerraría.
+  const [hidratado, setHidratado] = useState(false);
 
   // ---- Hidratar al abrir / cuando cambia initial ----
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setHidratado(false);
+      return;
+    }
     if (initial) {
       const productoNombreById = new Map(
         productos.map((p) => [p.id, p.nombre]),
@@ -257,6 +265,7 @@ export default function EntregaForm({
       });
       setOtrosCant({});
     }
+    setHidratado(true);
   }, [open, initial, productos]);
 
   // ---- Auto-fill al cambiar paneles ----
@@ -275,6 +284,17 @@ export default function EntregaForm({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelesStr]);
+
+  // ---- Cierre por clic fuera + Escape ----
+  // El form es largo (nombre, marcas, paneles, accesorios): solo cierra si el
+  // usuario no ha tocado nada. Si ya escribió, se sale con Cancelar/Cerrar.
+  // Va después de los efectos de hidratación para que la foto se tome sobre
+  // los valores ya hidratados. Antes del return condicional (reglas de hooks).
+  const { panelRef, backdrop } = useFormModalDismiss(
+    open && hidratado,
+    onClose,
+    !guardando,
+  );
 
   // ---- Productos por categoría (para mapear accesorios → productoId) ----
   const productosByCat = useMemo(() => {
@@ -504,11 +524,9 @@ export default function EntregaForm({
   // ---- Render ----
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
-        className="absolute inset-0 bg-black/40"
-        onClick={() => !guardando && onClose()}
-      />
-      <div
+        ref={panelRef}
         className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-2xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
