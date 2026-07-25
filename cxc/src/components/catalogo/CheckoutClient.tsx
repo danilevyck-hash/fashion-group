@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
+import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -25,6 +26,8 @@ export interface CheckoutCartItem {
   is_preorder?: boolean;
 }
 
+// Config por marca vía MARCA_THEME (PR-2): label, rutas, storage keys del
+// carrito, bulto y acento vienen del tema — cero switches por marca aquí.
 interface BrandCfg {
   label: string;
   catalogHref: string;
@@ -32,41 +35,29 @@ interface BrandCfg {
   /** storage keys que contienen el carrito (se leen en orden, se escriben todas) */
   cartLocal: string;
   cartSession: string | null;
-  /** llaves extra a limpiar tras crear el pedido (flujo viejo reebok) */
-  clearKeys: string[];
   bulto: (category?: string) => number;
   accent: string;
 }
 
-const BRANDS: Record<string, BrandCfg> = {
-  reebok: {
-    label: "REEBOK",
-    catalogHref: "/catalogo/reebok/productos",
-    confirmBase: "/catalogo/reebok/confirmacion",
-    cartLocal: "reebok_cart",
-    cartSession: "reebok_cart",
-    clearKeys: [], // draft keys viejos eliminados (flujo crear-pedido-primero muerto)
-    bulto: (c) => (c === "footwear" ? 12 : 6),
-    accent: "#1A2656",
-  },
-  joybees: {
-    label: "JOYBEES",
-    catalogHref: "/catalogo/joybees",
-    confirmBase: "/catalogo/joybees/confirmacion",
-    cartLocal: "joybees_cart",
-    cartSession: null,
-    clearKeys: [],
-    bulto: () => 12,
-    accent: "#404041",
-  },
-};
+function brandCfg(theme: MarcaTheme): BrandCfg {
+  return {
+    label: theme.labelUpper,
+    catalogHref: theme.catalogoHref,
+    confirmBase: theme.confirmacionBase,
+    cartLocal: theme.cartKeyLocal,
+    cartSession: theme.cartKeySession,
+    bulto: theme.bulto,
+    accent: theme.checkoutAccent,
+  };
+}
 
 interface Cliente { id: number; codigo: string | null; nombre: string }
 
 const CONTADO: Cliente = { id: 1, codigo: null, nombre: "Contado" };
 
-export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" }) {
-  const cfg = BRANDS[marca];
+export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
+  const theme = getMarcaTheme(marca)!;
+  const cfg = brandCfg(theme);
   const router = useRouter();
 
   const [cart, setCart] = useState<CheckoutCartItem[]>([]);
@@ -103,7 +94,7 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
 
   // ── Vendedor automático por login ──
   useEffect(() => {
-    const empresa = marca === "reebok" ? "active_shoes" : "joystep";
+    const empresa = theme.empresaKey;
     fetch(`/api/catalogo/mi-vendedor?empresa=${empresa}`)
       .then((r) => (r.ok ? r.json() : { vendedor: null }))
       .then((d) => setVendedor(d.vendedor ?? null))
@@ -174,7 +165,6 @@ export default function CheckoutClient({ marca }: { marca: "reebok" | "joybees" 
         localStorage.removeItem(cfg.cartLocal);
         if (cfg.cartSession) sessionStorage.removeItem(cfg.cartSession);
         sessionStorage.removeItem(`${marca}_checkout_token`);
-        for (const k of cfg.clearKeys) { sessionStorage.removeItem(k); localStorage.removeItem(k); }
       } catch { /* */ }
       router.push(`${cfg.confirmBase}/${data.order_id}`);
     } catch {

@@ -8,19 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
-
-const BRANDS = {
-  reebok: {
-    label: "REEBOK",
-    catalogHref: "/catalogo/reebok/productos",
-    api: "/api/catalogo/reebok",
-  },
-  joybees: {
-    label: "JOYBEES",
-    catalogHref: "/catalogo/joybees",
-    api: "/api/catalogo/joybees",
-  },
-};
+import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface Envio {
   estado: string;
@@ -30,8 +18,10 @@ interface Envio {
 }
 interface Order { id: string; order_number: string; client_name: string; total: number }
 
-export default function ConfirmacionClient({ marca, orderId }: { marca: "reebok" | "joybees"; orderId: string }) {
-  const cfg = BRANDS[marca];
+export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiKey; orderId: string }) {
+  // Config por marca vía MARCA_THEME (PR-2).
+  const theme = getMarcaTheme(marca)!;
+  const cfg = { catalogHref: theme.catalogoHref, api: theme.api };
   const [order, setOrder] = useState<Order | null>(null);
   const [envio, setEnvio] = useState<Envio | null | undefined>(undefined);
   const [retrying, setRetrying] = useState(false);
