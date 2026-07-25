@@ -7,8 +7,20 @@
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { type JoybeesProduct, type GroupedProduct } from "./groupByModel";
-import BultosBadge from "@/components/shared/BultosBadge";
+import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
+
+/** Suma un campo de stock del grupo; null si NINGUNA variante lo trae (pre-sync
+ *  → la línea muestra "—" en vez de un 0 que se leería como agotado). */
+function sumaStock(group: GroupedProduct, campo: "existencia" | "disponibilidad"): number | null {
+  let total = 0;
+  let hay = false;
+  for (const v of group.variants) {
+    const n = v.product[campo];
+    if (n != null) { total += n; hay = true; }
+  }
+  return hay ? total : null;
+}
 
 interface CatalogoGroupedCardProps {
   marca: MarcaUiKey;
@@ -16,20 +28,25 @@ interface CatalogoGroupedCardProps {
   cartMap: Map<string, number>;
   onQtyChange: (productId: string, qty: number, product: JoybeesProduct) => void;
   disabled?: boolean;
-  showBultos?: boolean;
+  showBultos?: boolean; // vendor mode: cantidad tecleable (tap sobre el número)
+  showStock?: boolean;  // catálogo interno: Disponibilidad + Existencia (NO en público)
 }
 
 export default function CatalogoGroupedCard({
-  marca, group, cartMap, onQtyChange, disabled, showBultos,
+  marca, group, cartMap, onQtyChange, disabled, showBultos, showStock,
 }: CatalogoGroupedCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
   const BULTO_SIZE = theme.bulto();
-  const groupStock = group.variants.reduce((s, v) => s + (v.product.stock || 0), 0);
+  const groupDisponibilidad = sumaStock(group, "disponibilidad");
+  const groupExistencia = sumaStock(group, "existencia");
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
   // Thumbnail (render transform); si falla, cae a la URL original una vez.
   const [useThumb, setUseThumb] = useState(true);
   const [showLightbox, setShowLightbox] = useState(false);
+  // Cantidad tecleable (espejo de CatalogoProductCard): tap sobre el número.
+  const [qtyInputFor, setQtyInputFor] = useState<{ product: JoybeesProduct } | null>(null);
+  const [qtyInputVal, setQtyInputVal] = useState("");
 
   // Track "just added" per variant
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
@@ -58,6 +75,16 @@ export default function CatalogoGroupedCard({
 
   function setQty(productId: string, product: JoybeesProduct, n: number) {
     onQtyChange(productId, Math.max(0, n), product);
+  }
+
+  function openQtyInput(product: JoybeesProduct, qty: number) {
+    setQtyInputVal(String(qty));
+    setQtyInputFor({ product });
+  }
+  function submitQtyInput() {
+    const n = parseInt(qtyInputVal);
+    if (qtyInputFor && !isNaN(n) && n >= 0) setQty(qtyInputFor.product.id, qtyInputFor.product, n);
+    setQtyInputFor(null);
   }
 
   return (
@@ -138,48 +165,43 @@ export default function CatalogoGroupedCard({
           )}
         </div>
 
-        {/* Product info */}
+        {/* Product info — ESQUELETO CANÓNICO (idéntico a CatalogoProductCard):
+            foto · nombre · código (píldora) · precio · bulto · stock · Agregar.
+            Los chips de categoría y de género se quitaron (Daniel, 25-jul-2026):
+            la sección del grid ya dice el género y el tipo ya vive en el nombre
+            del producto. */}
         <div className="p-3">
           <h3 className={t.name}>{group.name}</h3>
 
-          <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-xs text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
-              {theme.groupedCategoryLabels[group.category] || group.category}
-            </span>
-            {isSingleVariant && (
-              <span className="text-xs text-[#404041]/40">
-                {group.variants[0].genderLabel}
-              </span>
-            )}
+          {/* Código (píldora) — mismo componente visual que la card plana. */}
+          <div className="flex flex-wrap items-center gap-1 mt-1">
+            <span className={t.skuPill}>{group.baseSku}</span>
           </div>
 
-          <div className="text-xs text-[#404041]/35 mt-1 font-mono">{group.baseSku}</div>
-
-          {/* Gender badges for multi-variant */}
-          {!isSingleVariant && (
-            <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-              <span className="text-xs text-[#404041]/40">Disponible en:</span>
-              {group.variants.map(v => (
-                <span key={v.product.id} className="text-xs font-semibold text-[#404041]/70 bg-[#404041]/5 px-1.5 py-0.5 rounded">
-                  {v.genderLabel}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Price — Regalia fluye como producto normal (precio + Agregar) */}
+          {/* Price — Regalia fluye como producto normal (precio + Agregar).
+              Sin "/unidad" (Daniel, 25-jul-2026). */}
           <div className="mt-2">
             <div className="flex items-baseline gap-2">
               <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
-              <span className={t.priceMeta}>/unidad</span>
             </div>
-            {/* Solo "Bulto de N" — el precio del bulto se quitó en las 3 marcas
-                (Daniel, 25-jul-2026). Espejo exacto de CatalogoProductCard. */}
-            <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+            {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
+                quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
+                CatalogoProductCard. */}
+            <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className={`${t.bultoMeta} font-medium`}>Bulto de {BULTO_SIZE}</span>
-              {showBultos && <BultosBadge stock={groupStock} bultoSize={BULTO_SIZE} />}
             </div>
           </div>
+
+          {/* Stock interno (Switch) — componente COMPARTIDO con la card plana.
+              El grupo agrega sus variantes (una card = un modelo). Solo
+              catálogo interno (showStock); NUNCA en el público. */}
+          {showStock && (
+            <CatalogoStockLine
+              marca={marca}
+              disponibilidad={groupDisponibilidad}
+              existencia={groupExistencia}
+            />
+          )}
 
           {/* Action buttons — Regalia usa Agregar como cualquier producto normal */}
           <div className={`mt-2.5 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
@@ -214,10 +236,13 @@ export default function CatalogoGroupedCard({
                           <span className="text-xl leading-none">&minus;</span>
                         )}
                       </button>
-                      <div className="text-center min-w-[48px] py-1">
+                      <button
+                        onClick={showBultos ? () => openQtyInput(v.product, qty) : undefined}
+                        className="text-center min-w-[48px] py-1"
+                      >
                         <span className={t.qtyNum}>{qty}</span>
                         <span className={t.qtyUnit}>{qty === 1 ? "bulto" : "bultos"}</span>
-                      </div>
+                      </button>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty + 1)}
                         className={`w-11 h-11 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
@@ -231,7 +256,7 @@ export default function CatalogoGroupedCard({
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
                     disabled={disabled || v.product.stock === 0}
-                    className={`w-full py-2.5 rounded-lg text-sm font-semibold transition min-h-[40px] ${
+                    className={`w-full py-3 rounded-lg text-sm font-semibold transition min-h-[44px] ${
                       disabled || v.product.stock === 0
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn
@@ -244,6 +269,25 @@ export default function CatalogoGroupedCard({
             </div>
         </div>
       </div>
+
+      {/* Qty input modal — espejo exacto de CatalogoProductCard. */}
+      {qtyInputFor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" onClick={() => setQtyInputFor(null)}>
+          <div className="bg-white rounded-xl p-5 w-56 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <p className="text-sm text-gray-600 mb-3">Cantidad de bultos</p>
+            <input
+              type="number" min={0} autoFocus value={qtyInputVal}
+              onChange={e => setQtyInputVal(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") submitQtyInput(); }}
+              className="w-full border-b-2 border-[#1A2656] text-2xl text-center font-semibold py-2 outline-none tabular-nums"
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setQtyInputFor(null)} className="flex-1 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+              <button onClick={submitQtyInput} className="flex-1 py-2 text-sm bg-[#1A2656] text-white rounded-lg hover:bg-[#0f1a3d] transition">Listo</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox */}
       {showLightbox && group.image_url && (

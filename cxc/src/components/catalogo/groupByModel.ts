@@ -10,6 +10,11 @@ export interface JoybeesProduct {
   gender: string;
   price: number;
   stock: number;
+  /** Saldo físico en Switch (lo escribe el cron de catálogo). Puede faltar
+   *  pre-sync → la línea de stock de la card muestra "—". */
+  existencia?: number | null;
+  /** Vendible (saldo − apartado). Mismo caso que `existencia`. */
+  disponibilidad?: number | null;
   image_url: string | null;
   active: boolean;
   popular: boolean;

@@ -419,6 +419,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                       cartMap={cartMap}
                       onQtyChange={handleQtyChange}
                       showBultos
+                      showStock
                     />
                   ))}
                 </div>
@@ -434,6 +435,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 group={gs.group}
                 cartMap={cartMap}
                 onQtyChange={handleQtyChange}
+                showBultos
+                showStock
               />
             ))}
           </div>
