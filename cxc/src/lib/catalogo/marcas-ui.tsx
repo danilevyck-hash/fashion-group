@@ -1043,12 +1043,14 @@ const TOMMY: MarcaTheme = {
     sortSelect:
       "text-xs border border-[#152342]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#152342]/30 transition bg-white text-[#152342]/60 min-h-[44px]",
     count: "text-xs text-[#152342]/30 tabular-nums",
+    // Valores de FILTRO de matchesGenderFilter (male/female/kids — el pipeline
+    // flat filtra por grupo canónico de reebok-gender.ts, que ya normaliza los
+    // slugs de tommy_products: women→Mujer, men→Hombre, boys/girls→Niños).
     genderOptions: [
       { value: "", label: "Todos" },
-      { value: "women", label: "Mujer" },
-      { value: "men", label: "Hombre" },
-      { value: "boys", label: "Niño" },
-      { value: "girls", label: "Niña" },
+      { value: "female", label: "Mujer" },
+      { value: "male", label: "Hombre" },
+      { value: "kids", label: "Niños" },
     ],
     categoryOptions: [
       { value: "", label: "Todos" },

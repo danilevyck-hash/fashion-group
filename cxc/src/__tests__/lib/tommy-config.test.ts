@@ -117,13 +117,25 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
     });
   });
 
-  it("chips de filtros = slugs que escribe el sync (tommy-nombres)", () => {
+  it("chips de filtros: categorías = slugs del sync; género = filtros canónicos", () => {
+    // Género: valores de matchesGenderFilter (male/female/kids); el pipeline
+    // flat normaliza los slugs women/men/boys/girls vía reebok-gender.ts.
     expect(t.filtros.genderOptions.map((o) => o.value)).toEqual([
-      "", "women", "men", "boys", "girls",
+      "", "female", "male", "kids",
     ]);
     expect(t.filtros.categoryOptions.map((o) => o.value)).toEqual([
       "", "sneakers", "flip_flops", "sandals", "shoes", "slippers", "boots",
     ]);
+  });
+
+  it("los slugs de género de tommy_products caen en los filtros correctos", async () => {
+    const { matchesGenderFilter } = await import("@/lib/reebok-gender");
+    expect(matchesGenderFilter("women", "female")).toBe(true);
+    expect(matchesGenderFilter("men", "male")).toBe(true);
+    expect(matchesGenderFilter("boys", "kids")).toBe(true);
+    expect(matchesGenderFilter("girls", "kids")).toBe(true);
+    expect(matchesGenderFilter("women", "male")).toBe(false);
+    expect(matchesGenderFilter("men", "female")).toBe(false);
   });
 
   it("admin: estilo batch, nombre editable, sync manual catalogo-tommy", () => {

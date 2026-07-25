@@ -122,7 +122,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
         if (agrupado) {
           const prods: JoybeesProduct[] = data.products || [];
           setProducts(prods.filter(p => p.stock > 0 || p.is_regalia));
-        } else {
+        } else if (theme.features.inventarioPorTalla) {
           const prods: CatalogoProducto[] = data.products || [];
           const inv: { product_id: string; size: string; quantity: number }[] = data.inventory || [];
           const stockMap: Record<string, number> = {};
@@ -139,6 +139,15 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
               .map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] }))
               .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
           );
+        } else {
+          // Grid PLANA sin inventario por talla (Tommy): el stock vive en la
+          // fila del producto (columna stock, patrón Joybees) — sin /inventory.
+          const prods: CatalogoProducto[] = data.products || [];
+          setProducts(
+            prods
+              .map(p => ({ ...p, _stock: p.stock ?? 0, _sizes: [] as string[] }))
+              .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
+          );
         }
       } catch {
         setProducts([]);
@@ -150,8 +159,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   }, []);
 
   // ── Derived state — pipeline FLAT ──
-  const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
-  const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
+  // Orden y label de categoría desde el theme (chips de la marca): Reebok
+  // conserva Calzado/Ropa/Accesorios; Tommy usa sus categorías parseadas.
+  const catOrder: Record<string, number> = {};
+  const catLabel: Record<string, string> = {};
+  theme.filtros.categoryOptions.forEach((o, i) => {
+    if (o.value) { catOrder[o.value] = i; catLabel[o.value] = o.label; }
+  });
 
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
