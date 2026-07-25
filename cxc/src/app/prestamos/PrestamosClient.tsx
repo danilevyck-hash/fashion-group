@@ -11,6 +11,7 @@ import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomS
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 // ── Types ──
 interface Movimiento {
@@ -112,6 +113,13 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [mNotas, setMNotas] = useState("");
   const [savingMov, setSavingMov] = useState(false);
   const [movStep, setMovStep] = useState("form");
+
+  // Cierre por clic fuera + Escape. Los dos son formularios: si ya hay algo
+  // escrito sin guardar, el clic fuera no cierra (se sale con Cancelar).
+  const cerrarEmpModal = useCallback(() => setShowEmpModal(false), []);
+  const empModal = useFormModalDismiss(showEmpModal, cerrarEmpModal, !saving);
+  const cerrarMovModal = useCallback(() => setShowMovModal(false), []);
+  const movModal = useFormModalDismiss(showMovModal, cerrarMovModal, !savingMov);
 
   // Bottom sheet (mobile detail preview)
   const [sheetEmp, setSheetEmp] = useState<Empleado | null>(null);
@@ -596,8 +604,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
       {/* ── Modal: New/Edit Employee ── */}
       {showEmpModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div {...empModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div ref={empModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h2 className="font-medium mb-4">{editingEmp ? "Editar Empleado" : "Nuevo Empleado"}</h2>
             <div className="space-y-4">
               <div>
@@ -633,8 +641,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
       {/* ── Modal: New Movement ── */}
       {showMovModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div {...movModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div ref={movModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             {movStep === "employee" && !mEmpleadoId ? (<>
               <h2 className="font-medium mb-4">Seleccionar Empleado</h2>
               <div className="space-y-1 max-h-80 overflow-y-auto">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
+import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import type { ConsolidatedClient } from "@/lib/types";
 import { composeEmailHtml } from "@/lib/cxc/estado-cuenta-email";
 
@@ -47,6 +48,9 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
   const [asunto, setAsunto] = useState("");
   const [cuerpo, setCuerpo] = useState("");
   const [sending, setSending] = useState(false);
+  // Clic fuera y Escape cierran, salvo que ya se haya editado el mensaje: el
+  // cuerpo del correo es editable y un clic accidental no debe borrarlo.
+  const { panelRef, intentarCerrar } = useFormGuard(open, onClose, !sending);
 
   useEffect(() => {
     if (!open || !codigo) return;
@@ -119,9 +123,9 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
     : "";
 
   return (
-    <ModalOverlay onBackdropClick={sending ? undefined : onClose} align="start">
+    <ModalOverlay onBackdropClick={intentarCerrar} align="start">
       <div
-        onClick={(e) => e.stopPropagation()}
+        ref={panelRef}
         className="bg-white sm:rounded-lg rounded-t-2xl w-full sm:max-w-2xl mx-0 sm:mx-4 my-0 sm:my-8 border border-gray-200 max-h-[92vh] flex flex-col"
       >
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100">

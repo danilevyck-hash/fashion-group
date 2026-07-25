@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { useBackdropDismiss, useEscapeClose } from '@/lib/hooks/useModalDismiss'
 
 type ToastType = 'success' | 'error' | 'warning'
 
@@ -49,6 +50,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  // Clic fuera y Escape = Cancelar (nunca confirman). El confirm resuelve la
+  // promesa en false, igual que el botón Cancelar.
+  const cancelConfirm = useCallback(() => { confirmState?.onCancel() }, [confirmState])
+  useEscapeClose(!!confirmState, cancelConfirm)
+  const backdropConfirm = useBackdropDismiss(confirmState ? cancelConfirm : undefined)
+
   const colors: Record<ToastType, string> = {
     success: 'bg-green-600',
     error: 'bg-red-600',
@@ -72,7 +79,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
       {/* Confirm modal */}
       {confirmState && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-150">
+        <div {...backdropConfirm} className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] animate-in fade-in duration-150">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl animate-in zoom-in-95 duration-200">
             <p className="text-sm text-gray-800 mb-5">{confirmState.message}</p>
             <div className="flex gap-2 justify-end">

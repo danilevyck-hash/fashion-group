@@ -16,6 +16,7 @@ import {
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmTypeNameModal, ModalOverlay } from "@/components/ui";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import {
   formatearFecha,
@@ -71,6 +72,11 @@ export default function ProyectoOverlay({
   const [eliminandoLoading, setEliminandoLoading] = useState(false);
   const [role, setRole] = useState<string>("");
   const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
+
+  // Escape cierra el overlay del proyecto, pero NO cuando hay un modal encima
+  // (editar / eliminar): ahí el Escape le toca al de arriba, si no se cerrarían
+  // los dos de un golpe. El clic fuera se pasa como onBackdropClick abajo.
+  useEscapeClose(true, onClose, !editando && !eliminando);
 
   useEffect(() => {
     setRole(sessionStorage.getItem("cxc_role") ?? "");
@@ -170,7 +176,7 @@ export default function ProyectoOverlay({
 
   if (loading || !proyecto) {
     return (
-      <ModalOverlay backdropClassName="bg-black/30">
+      <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
         <div className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200 p-6">
           <div className="space-y-4">
             <div className="h-24 bg-gray-100 rounded-lg animate-pulse" />
@@ -206,7 +212,7 @@ export default function ProyectoOverlay({
   };
 
   return (
-    <ModalOverlay backdropClassName="bg-black/30">
+    <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
       <div
         className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}

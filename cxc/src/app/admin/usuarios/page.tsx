@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import VendedorSwitchSection from "./VendedorSwitchSection";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
+import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -60,15 +61,18 @@ export default function UsuariosPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [sessionRange, setSessionRange] = useState<"today" | "7d" | "30d" | "all">("7d");
 
-  // Modal: toggle ver/ocultar contraseña + cierre por ESC
+  // Modal: toggle ver/ocultar contraseña
   const [showModalPw, setShowModalPw] = useState(false);
   useEffect(() => {
     if (!showUserModal) return;
     setShowModalPw(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowUserModal(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
   }, [showUserModal]);
+
+  // Clic fuera y Escape cierran el modal de usuario, salvo que ya se hayan
+  // escrito datos sin guardar (nombre, contraseña, permisos): ahí solo se sale
+  // con Cancelar o Guardar, para no perder el alta a medio llenar.
+  const cerrarUserModal = useCallback(() => setShowUserModal(false), []);
+  const userModal = useFormModalDismiss(showUserModal, cerrarUserModal, !savingUser);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -271,10 +275,11 @@ export default function UsuariosPage() {
         {/* User modal */}
         {showUserModal && (
           <div
+            {...userModal.backdrop}
             className="fixed inset-0 bg-gray-900/40 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowUserModal(false); }}
           >
             <div
+              ref={userModal.panelRef}
               className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-md w-full max-h-[90vh] overflow-y-auto"
               role="dialog"
               aria-modal="true"
