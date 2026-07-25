@@ -280,7 +280,7 @@ export default function CatalogoProductCard({
             <button
               onClick={() => { if (!disabled) setQty(1); }}
               disabled={disabled}
-              className={`w-full mt-1.5 py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px] ${
+              className={`w-full mt-1.5 py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px] ${
                 disabled
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : isPreOrder

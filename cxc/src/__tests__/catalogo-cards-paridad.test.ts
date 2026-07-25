@@ -170,13 +170,15 @@ describe("card de producto — paridad en las 3 marcas", () => {
     expect(GROUPED_CARD.slice(0, GROUPED_CARD.indexOf("Action buttons")).includes("genderLabel")).toBe(false);
   });
 
-  it("el botón Agregar mide 38px y es idéntico en las dos cards", () => {
+  it("el botón Agregar: 44px táctil en móvil/tablet, 38px desde xl", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
-      // 38px = py-[9px] + leading-5 del text-sm (Daniel, 25-jul-2026; antes
-      // py-2.5 + min-h-[44px] = 44). OJO: 44px es el mínimo táctil recomendado
-      // en iOS — este 38 es una decisión explícita de Daniel, no un descuido.
-      expect(code, nombre).toContain("py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px]");
-      expect(code, nombre).not.toContain("min-h-[44px]");
+      // 38px en escritorio (py-[9px] + leading-5 del text-sm) para que la card
+      // cierre en 328px, pero 44px hasta xl: es el mínimo táctil de iOS/Android
+      // y el catálogo se usa desde el celular con el cliente al frente
+      // (Daniel, 25-jul-2026 — revirtió el 38 plano del mismo día).
+      expect(code, nombre).toContain("py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px]");
+      // el 38 nunca debe quedar suelto sin el 44 táctil delante
+      expect(code, nombre).not.toMatch(/transition min-h-\[38px\]/);
     }
   });
 

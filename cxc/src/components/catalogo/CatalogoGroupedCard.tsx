@@ -271,7 +271,7 @@ export default function CatalogoGroupedCard({
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
                     disabled={disabled || v.product.stock === 0}
-                    className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px] ${
+                    className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px] ${
                       disabled || v.product.stock === 0
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn
