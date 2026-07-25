@@ -27,9 +27,12 @@ vi.mock("@/lib/log-activity", () => ({
   logActivity: (...args: unknown[]) => mockLogActivity(...args),
 }));
 
-import { POST as reebokPost } from "@/app/api/catalogo/reebok/orders/bulk-delete/route";
-import { POST as joybeesPost } from "@/app/api/catalogo/joybees/orders/bulk-delete/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import { POST as bulkDeletePost } from "@/app/api/catalogo/[marca]/orders/bulk-delete/route";
 import { NextRequest } from "next/server";
+const reebokPost = (req: NextRequest) => bulkDeletePost(req, { params: { marca: "reebok" } });
+const joybeesPost = (req: NextRequest) => bulkDeletePost(req, { params: { marca: "joybees" } });
 import { signSession } from "@/lib/session-cookie";
 
 beforeAll(() => {

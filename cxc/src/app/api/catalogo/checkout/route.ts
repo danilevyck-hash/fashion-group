@@ -37,6 +37,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   const body = await req.json().catch(() => null);
   const cfg = MARCAS_CONFIG[body?.marca || ""];
   if (!cfg) return NextResponse.json({ error: "marca inválida" }, { status: 400 });
+  const db = await cfg.db();
 
   const clienteId = Number(body?.cliente?.id);
   const clienteNombre = typeof body?.cliente?.nombre === "string" ? body.cliente.nombre.trim() : "";
@@ -74,7 +75,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Categorías (bulto) + total server-side ──
-  const { data: prods } = await cfg.db
+  const { data: prods } = await db
     .from(cfg.productsTable)
     .select("id, category")
     .in("id", items.map((i) => i.product_id));
@@ -85,7 +86,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   );
 
   // ── 1) Crear pedido en DB (RPC idempotente de la marca) ──
-  const { data: created, error: rpcErr } = await cfg.db.rpc(cfg.createOrderRpc, {
+  const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: clienteNombre,
     p_vendor_name: mapping.vendedor_nombre || auth.userName || null,
     p_client_email: null,
@@ -117,13 +118,13 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   // Confirmado + cliente/vendedor de Switch guardados (para el Reintentar).
   // Tolerante a DDL 20260705120000 pendiente: sin las columnas, el envío de
   // ESTE request igual usa los ids explícitos de abajo.
-  const { error: updErr } = await cfg.db
+  const { error: updErr } = await db
     .from(cfg.ordersTable)
     .update({ status: "confirmado", cliente_switch_id: clienteId, vendedor_switch_id: mapping.vendedor_id })
     .eq("id", orderId);
   if (updErr) {
     console.error(`[checkout] update cliente/vendedor falló (${updErr.message}) — reintento solo status`);
-    const { error: updErr2 } = await cfg.db.from(cfg.ordersTable).update({ status: "confirmado" }).eq("id", orderId);
+    const { error: updErr2 } = await db.from(cfg.ordersTable).update({ status: "confirmado" }).eq("id", orderId);
     if (updErr2) console.error(`[checkout] update status también falló: ${updErr2.message}`);
   }
 
@@ -131,7 +132,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   const result = await enviarPedidoSwitch({
     empresaKey: cfg.empresaKey,
     enviosTable: cfg.enviosTable,
-    db: cfg.db,
+    db,
     orderId,
     orderNumber,
     marcaLabel: cfg.label,

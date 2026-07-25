@@ -26,8 +26,13 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
-import { POST as rDuplicar } from "@/app/api/catalogo/reebok/orders/[id]/duplicar/route";
-import { POST as jDuplicar } from "@/app/api/catalogo/joybees/orders/[id]/duplicar/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { POST as duplicarPost } from "@/app/api/catalogo/[marca]/orders/[id]/duplicar/route";
+type IdCtx = { params: { id: string } };
+const rDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "reebok", ...ctx.params } });
+const jDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "joybees", ...ctx.params } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {

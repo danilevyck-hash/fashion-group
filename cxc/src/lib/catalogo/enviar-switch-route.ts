@@ -26,12 +26,13 @@ interface OrderRow {
 
 async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | null> {
   const cfg = MARCAS_CONFIG[marca];
+  const db = await cfg.db();
   const itemCols = `product_id, sku, name, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`;
   // cliente/vendedor_switch_id pueden no existir aún (DDL 20260705120000
   // pendiente) → reintentar sin esas columnas (modo legacy).
   for (const withIds of [true, false]) {
     const cols = `id, order_number, client_name, status${withIds ? ", cliente_switch_id, vendedor_switch_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
-    const { data, error } = await cfg.db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
+    const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
     if (!error && data) {
       const row = data as unknown as Record<string, unknown>;
       return {
@@ -53,7 +54,8 @@ export async function handleGetEnvio(req: NextRequest, marca: string, orderId: s
   const auth = requireRole(req, SEND_ROLES);
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
-  const { data, error } = await cfg.db
+  const db = await cfg.db();
+  const { data, error } = await db
     .from(cfg.enviosTable)
     .select("estado, pedido_switch_id, numero_interno, error_detalle, created_at, updated_at")
     .eq("order_id", orderId)
@@ -74,6 +76,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   const auth = requireRole(req, SEND_ROLES);
   if (auth instanceof NextResponse) return auth;
   const cfg = MARCAS_CONFIG[marca];
+  const db = await cfg.db();
 
   let dry = false;
   try {
@@ -124,7 +127,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   }
 
   // Categorías para el bulto (Switch trabaja en PIEZAS, el pedido en bultos).
-  const { data: prods } = await cfg.db
+  const { data: prods } = await db
     .from(cfg.productsTable)
     .select("id, category")
     .in("id", order.items.map((i) => i.product_id));
@@ -133,7 +136,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   const result = await enviarPedidoSwitch({
     empresaKey: cfg.empresaKey,
     enviosTable: cfg.enviosTable,
-    db: cfg.db,
+    db,
     orderId: order.id,
     orderNumber: order.order_number,
     marcaLabel: cfg.label,

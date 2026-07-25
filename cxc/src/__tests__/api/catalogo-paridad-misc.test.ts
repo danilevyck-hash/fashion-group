@@ -43,12 +43,19 @@ vi.mock("@/lib/supabase-server", () => ({
   },
 }));
 
-import { GET as rSyncStatus } from "@/app/api/catalogo/reebok/sync-status/route";
-import { GET as jSyncStatus } from "@/app/api/catalogo/joybees/sync-status/route";
-import { POST as rUpload } from "@/app/api/catalogo/reebok/upload/route";
-import { POST as jUpload } from "@/app/api/catalogo/joybees/upload/route";
-import { GET as rPdf } from "@/app/api/catalogo/reebok/orders/[id]/pdf/route";
-import { GET as jPdf } from "@/app/api/catalogo/joybees/orders/[id]/pdf/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { GET as syncStatusGet } from "@/app/api/catalogo/[marca]/sync-status/route";
+import { POST as uploadPost } from "@/app/api/catalogo/[marca]/upload/route";
+import { GET as pdfGet } from "@/app/api/catalogo/[marca]/orders/[id]/pdf/route";
+type IdCtx = { params: { id: string } };
+const rSyncStatus = (req: NextRequest) => syncStatusGet(req, { params: { marca: "reebok" } });
+const jSyncStatus = (req: NextRequest) => syncStatusGet(req, { params: { marca: "joybees" } });
+const rUpload = (req: NextRequest) => uploadPost(req, { params: { marca: "reebok" } });
+const jUpload = (req: NextRequest) => uploadPost(req, { params: { marca: "joybees" } });
+const rPdf = (req: NextRequest, ctx: IdCtx) => pdfGet(req, { params: { marca: "reebok", ...ctx.params } });
+const jPdf = (req: NextRequest, ctx: IdCtx) => pdfGet(req, { params: { marca: "joybees", ...ctx.params } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {

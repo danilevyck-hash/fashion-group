@@ -34,10 +34,15 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
-import { GET as rUnificado } from "@/app/api/catalogo/reebok/pedidos-unificado/route";
-import { GET as jUnificado } from "@/app/api/catalogo/joybees/pedidos-unificado/route";
-import { POST as rExport } from "@/app/api/catalogo/reebok/pedidos-export/route";
-import { POST as jExport } from "@/app/api/catalogo/joybees/pedidos-export/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { GET as unificadoGet } from "@/app/api/catalogo/[marca]/pedidos-unificado/route";
+import { POST as exportPost } from "@/app/api/catalogo/[marca]/pedidos-export/route";
+const rUnificado = (req: NextRequest) => unificadoGet(req, { params: { marca: "reebok" } });
+const jUnificado = (req: NextRequest) => unificadoGet(req, { params: { marca: "joybees" } });
+const rExport = (req: NextRequest) => exportPost(req, { params: { marca: "reebok" } });
+const jExport = (req: NextRequest) => exportPost(req, { params: { marca: "joybees" } });
 import { XLSX_MIME } from "@/lib/excel-export";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 

@@ -55,9 +55,10 @@ export async function handleDuplicarPedido(
   if (auth instanceof NextResponse) return auth;
   const session = getSession(req);
   const cfg = MARCAS_CONFIG[marca];
+  const db = await cfg.db();
 
   // ── DDL disponible? (probe barato de la columna reemplaza_a) ──
-  const probe = await cfg.db.from(cfg.ordersTable).select("id, reemplaza_a").eq("id", orderId).maybeSingle();
+  const probe = await db.from(cfg.ordersTable).select("id, reemplaza_a").eq("id", orderId).maybeSingle();
   if (probe.error) {
     if (/reemplaza_a|column/i.test(probe.error.message)) {
       return NextResponse.json(
@@ -70,7 +71,7 @@ export async function handleDuplicarPedido(
   if (!probe.data) return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
 
   // ── Solo pedidos realmente bloqueados por Switch se duplican ──
-  const envio = await getEnvioActivo(cfg.db, cfg.enviosTable, orderId);
+  const envio = await getEnvioActivo(db, cfg.enviosTable, orderId);
   if (!envio) {
     return NextResponse.json(
       { error: "Este pedido no está en Switch — se puede editar directamente, no hace falta duplicarlo." },
@@ -79,7 +80,7 @@ export async function handleDuplicarPedido(
   }
 
   // ── ¿Ya existe un reemplazo activo? → devolver ese, no crear otro ──
-  const { data: existente } = await cfg.db
+  const { data: existente } = await db
     .from(cfg.ordersTable)
     .select("id, order_number")
     .eq("reemplaza_a", orderId)
@@ -96,7 +97,7 @@ export async function handleDuplicarPedido(
   let original: OriginalRow | null = null;
   for (const withIds of [true, false]) {
     const cols = `id, order_number, client_name, vendor_name, client_email, comment${withIds ? ", cliente_switch_id, vendedor_switch_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
-    const { data, error } = await cfg.db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
+    const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
     if (!error && data) {
       const row = data as unknown as Record<string, unknown>;
       original = {
@@ -139,7 +140,7 @@ export async function handleDuplicarPedido(
   // ── Creación atómica vía RPC de la marca (numera PED-### sin race). El
   //    dedupe real es el chequeo de reemplazo activo de arriba; el token
   //    lleva sufijo para no chocar con reemplazos borrados y re-duplicados. ──
-  const { data: created, error: rpcErr } = await cfg.db.rpc(cfg.createOrderRpc, {
+  const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: original.client_name || "Sin nombre",
     p_vendor_name: original.vendor_name || session?.userName || null,
     p_client_email: original.client_email || null,
@@ -165,11 +166,11 @@ export async function handleDuplicarPedido(
   if (original.comment) update.comment = original.comment;
   if (original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
   if (original.vendedor_switch_id != null) update.vendedor_switch_id = original.vendedor_switch_id;
-  let upErr = (await cfg.db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
+  let upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
   if (upErr && /cliente_switch_id|vendedor_switch_id/i.test(upErr.message)) {
     const soloTraza: Record<string, unknown> = { reemplaza_a: orderId };
     if (original.comment) soloTraza.comment = original.comment;
-    upErr = (await cfg.db.from(cfg.ordersTable).update(soloTraza).eq("id", order_id)).error;
+    upErr = (await db.from(cfg.ordersTable).update(soloTraza).eq("id", order_id)).error;
   }
   if (upErr) {
     // El duplicado quedó creado pero SIN marca de reemplazo → avisar claro
