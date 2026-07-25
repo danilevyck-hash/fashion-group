@@ -65,6 +65,65 @@ La lógica estaba inline en el route. Se extrajo a
 invocarla in-process. El route quedó como caller de producción (auth + heartbeat +
 mapeo HTTP); la lógica vive una sola vez.
 
+## Ancla de ocurrencia para los slots intradía (jul-2026)
+
+Los tres defectos medidos el 25-jul-2026 tenían la MISMA raíz: la reconciliación
+razona por **par** (empresa, sync_type) contra el **día Panamá**. Correcto para
+un cron diario; ciego para uno **intradía**, cuyo trabajo es "refrescar otra vez
+lo mismo" — el par ya tiene el success de la mañana.
+
+| # | Síntoma medido | Por qué nadie lo vio |
+|---|---|---|
+| 1 | `facturas-1500` (ventas ACS) perdió su invocación en el deploy de las 15:00. Ventas sin refrescar 06:52 → 23:15 (16.4h) | El par `american_classic/facturas` tenía success de 05:09 y 06:52 → la reconciliación de las 18:00 lo vio sano. `slotsHuerfanos` tampoco lo certificaba (regla 4), pero nadie lo **re-ejecutaba** |
+| 2 | `fashion_shoes/estadocuenta` 16:20 `statement timeout`; `fashion_wear` y `active_wear` colgados en `running` hasta las 21:1x | La invocación **murió** sin llegar a `alertSwitchCronErrors` → cero filas en `cron_email_errors`, cero Telegram. Y el success de las 10:28-10:30 tapaba el par |
+| 3 | `switch-sync:all-0540` sin fila de heartbeat propia desde que se introdujeron los slots (#239, 23-jul 14:08 UTC) | Su entrada corrió y **falló** el 24-jul (joystep, auth devolvió HTML) y el 25-jul Vercel perdió la invocación: dos oportunidades, dos malas. La regla seed-tolerante ("fila ausente = aún no sembrada") **no tenía vencimiento** → invisible para health-crons Y para el watchdog (que solo recorre filas existentes) |
+
+**Fix**: `clasificarSlots()` en `cron-telemetry.ts` cambia la pregunta de "¿el par
+tuvo success hoy?" a **"¿hay un success POSTERIOR a MI ocurrencia?"**. Devuelve
+`cubiertos` (huérfano con el trabajo al día → marca `#recuperado`, sin alarma) y
+`desatendidos` (el trabajo de esa ocurrencia NO está hecho → re-ejecutar sus
+pares aunque tengan un success previo del día, y reportar si corrió y falló).
+`slotsHuerfanos()` queda como wrapper: su semántica no cambió.
+
+Opciones descartadas:
+
+- **Marcar los slots como "intradía" en `SWITCH_CRON_ENTRADAS` y darles una regla
+  propia**: sería una segunda fuente de verdad que mantener sincronizada, y no
+  arregla nada — `all-0535` y `all-0540` (matutinos, "diarios") se perdieron el
+  mismo día con el mismo síntoma. El ancla de ocurrencia es uniforme y no
+  necesita el flag.
+- **Bajar la ventana de jitter o agregar más pasadas de reconciliación**: ataca
+  el síntoma, cuesta invocaciones y sesiones de Switch todos los días.
+
+Cuidados de costo y seguridad, verificados con tests:
+
+- **Día sano = no-op total** (cero llamadas a Switch): si cada entrada corrió y
+  dejó sus pares al día, no hay `desatendidos` ni `cubiertos`.
+- **Ventana de jitter** (`SLOT_RUN_WINDOW_MIN`=120 min) para `sin-invocacion`: no
+  adelantarse a una entrada que Vercel puede invocar tarde. NO aplica a
+  `corrio-y-fallo` (ya no hay a quién esperar) — si aplicara, la ronda de las
+  16:0x quedaría otra vez sin reportar, porque su única pasada posterior (18:00)
+  cae dentro de sus 120 min.
+- **Guarda de concurrencia**: una fila `running` más joven que `RUNNING_STALE_MIN`
+  (30 min, misma constante que el lock de `switch_sync_log`) congela el slot — no
+  se re-ejecuta encima de una corrida viva (sesión única + índice mutex).
+- **Sesión única**: los pares de slot se suman al MISMO mapa por empresa que los
+  pares faltantes → la recuperación sigue serial y con un solo token por empresa.
+- **Anti-ruido**: el reporte de `corrio-y-fallo` delega en `alertSwitchCronErrors`
+  (401/red/5xx siguen silenciándose a la 1ª y escalando a las 2 corridas
+  consecutivas; un `statement timeout` no es silenciable → alerta ya) y hace
+  dedup contra `cron_email_errors` para no duplicar lo que el route ya alertó.
+- **Gracia de siembra acotada**: marca `switch-sync:<slot>#visto` (insert-if-absent,
+  nunca se pisa) + `SLOT_SEED_GRACE_HOURS`=50h. Un slot que nunca logró un
+  success propio deja de ser invisible.
+
+Pendiente relacionado (NO tocado aquí): `tommy-catalogo` corre 17:40 y toca
+`fashion_shoes`; la pasada de reconciliación de las 18:00 queda a 20 min, por
+debajo de la regla de ≥50 min de la sesión única. Es previo a este cambio (la
+reconciliación ya podía recuperar pares de fashion_shoes a las 18:00), pero ahora
+se activa más seguido. Mover uno de los dos horarios requiere tocar `vercel.json`
++ `SWITCH_CRON_ENTRADAS` + `RECONCILIACION_PASS_HOURS`.
+
 ## Fuera de alcance / decisiones
 
 - **`multifashion-sync` NO se auto-recupera**: no registra heartbeat → sin señal

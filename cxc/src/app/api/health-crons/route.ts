@@ -48,7 +48,10 @@ import {
   SWITCH_SYNC_SLOTS,
   slotHeartbeatName,
   slotRecuperadoName,
+  slotVistoName,
   slotCubiertoPorRecuperacion,
+  slotNuncaSembradoVencido,
+  SLOT_SEED_GRACE_HOURS,
 } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -210,7 +213,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const slot = slotHeartbeatName(s.slot);
     const last = beats.get(slot);
     if (last === undefined || last === null) {
-      slotsUnseeded.push(slot);
+      // Fila ausente. La tolerancia de siembra ya NO es eterna: la
+      // reconciliación fecha con la marca "#visto" cuándo vio el slot por
+      // primera vez y, pasadas SLOT_SEED_GRACE_HOURS (50h = dos ocurrencias +
+      // jitter), un slot que nunca logró un success propio se reporta como
+      // caído. Sin este vencimiento, switch-sync:all-0540 llevaba desde el
+      // 23-jul-2026 sin fila propia (su entrada corrió y falló el 24, y el 25
+      // Vercel perdió la invocación) y NINGÚN vigía lo notaba.
+      if (slotNuncaSembradoVencido(beats.get(slotVistoName(s.slot)), now)) {
+        stale.push({ cron: slot, last_success_at: null, hours_ago: null });
+      } else {
+        slotsUnseeded.push(slot);
+      }
       continue;
     }
     const t = new Date(last).getTime();
@@ -260,6 +274,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ok,
       checkedAt: new Date(now).toISOString(),
       staleHours: STALE_HOURS,
+      slotSeedGraceHours: SLOT_SEED_GRACE_HOURS,
       totalExpected: EXPECTED_CRONS.length,
       freshCount: fresh.length,
       staleCount: stale.length,
