@@ -47,6 +47,7 @@ export const SYNC_NOW_MODULOS = [
   "clientes-master",
   "catalogo-reebok",
   "catalogo-joybees",
+  "catalogo-tommy",
   "proveedores",
   "refresh-vistas",
 ] as const;
@@ -110,6 +111,8 @@ export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
       return { empresas: null, syncType: "catalogo_reebok", empresaFija: "active_shoes", tocaSwitch: true };
     case "catalogo-joybees":
       return { empresas: null, syncType: "catalogo_joybees", empresaFija: "joystep", tocaSwitch: true };
+    case "catalogo-tommy":
+      return { empresas: null, syncType: "catalogo_tommy", empresaFija: "fashion_shoes", tocaSwitch: true };
     case "proveedores":
       // CxP por empresa: 6 B2B + Multifashion (empresasConCxp; Boston no tiene).
       return { empresas: empresasConCxp(), syncType: "proveedores", tocaSwitch: true };

@@ -80,6 +80,22 @@ export interface CatalogoSyncConfig {
    *  (Reebok: {codigo_barra_id}). Opcional — omitir si la tabla no tiene las
    *  columnas (Joybees). */
   articuloFields?: (a: SwitchArticulo) => Record<string, unknown>;
+  /** Hook por-marca de campos DERIVADOS del artículo (Tommy: name/category/
+   *  gender parseados de `descripcion`). A diferencia de articuloFields, puede
+   *  PISAR defaults del motor (name/category) y decidir por-fila en el UPDATE
+   *  mirando la fila existente (respeta flags tipo nombre_manual):
+   *    - insertFields: se aplica en el INSERT, después de los defaults.
+   *    - updateFields: se aplica en el UPDATE, después de nameFinal; recibe la
+   *      fila existente (con extraCols). {} = no derivar nada en esa fila.
+   *    - extraCols: columnas adicionales a leer de la tabla para ese update
+   *      (fallback pre-migración igual que oculto_manual: si la columna no
+   *      existe aún, se relee sin ella y el hook las ve como undefined).
+   *  Reebok/Joybees no lo usan — comportamiento intacto. */
+  derive?: {
+    extraCols?: readonly string[];
+    insertFields: (a: SwitchArticulo) => Record<string, unknown>;
+    updateFields?: (a: SwitchArticulo, existing: Record<string, unknown>) => Record<string, unknown>;
+  };
 }
 
 interface ExistingProduct {
@@ -189,8 +205,13 @@ export async function syncCatalogo(
         return q;
       };
       const COLS_BASE = "id, sku, name, price, active, image_url, badge, keep_visible";
-      let { data: existing, error: exErr } = await readExisting(`${COLS_BASE}, oculto_manual`);
-      if (exErr && exErr.message.includes("oculto_manual")) {
+      // Columnas opcionales: oculto_manual + las extraCols del hook derive
+      // (p.ej. nombre_manual de Tommy). Mismo fallback pre-migración para todas.
+      const optionalCols = ["oculto_manual", ...(config.derive?.extraCols ?? [])];
+      let { data: existing, error: exErr } = await readExisting(
+        [COLS_BASE, ...optionalCols].join(", "),
+      );
+      if (exErr && optionalCols.some((c) => exErr!.message.includes(c))) {
         ({ data: existing, error: exErr } = await readExisting(COLS_BASE));
       }
       if (exErr) throw new Error(`leer ${productsTable}: ${exErr.message}`);
@@ -250,6 +271,11 @@ export async function syncCatalogo(
               active: shouldShow,
               ...config.stockFields(existencia, disponibilidad),
               ...(config.articuloFields ? config.articuloFields(art) : {}),
+              // Hook derive por-marca (Tommy): puede pisar name mirando la fila
+              // existente (respeta nombre_manual). {} en Reebok/Joybees.
+              ...(config.derive?.updateFields
+                ? config.derive.updateFields(art, p as unknown as Record<string, unknown>)
+                : {}),
               // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
             }).eq("id", p.id);
             if (upErr) throw new Error(`update ${productsTable} sku=${codigo}: ${upErr.message}`);
@@ -279,6 +305,9 @@ export async function syncCatalogo(
               ...config.stockFields(existencia, disponibilidad),
               ...(config.articuloFields ? config.articuloFields(art) : {}),
               ...(config.insertExtras ?? {}),
+              // Hook derive por-marca (Tommy): name/category/gender parseados
+              // de la descripcion — pisa el name/category default del motor.
+              ...(config.derive ? config.derive.insertFields(art) : {}),
             }).select("id").single();
             // Antes: `if (!insErr && ...)` tragaba el error del INSERT en silencio
             // (contaba el producto como agregado + alerta "nuevo sin foto" aunque no

@@ -50,6 +50,7 @@ import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
+import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
@@ -448,6 +449,29 @@ const COLATERAL_CRONS: ColateralCron[] = [
     label: "reebok-catalogo",
     recover: async () => {
       const r = await syncCatalogoReebok();
+      const bad = r.empresas.filter((e) => e.error);
+      return {
+        ok: !r.hadError,
+        detail: !r.hadError
+          ? `${r.empresas.length} empresa(s), catálogo actualizado`
+          : `falló: ${bad.map((e) => `${e.empresaKey}: ${e.error}`).join("; ")}`,
+      };
+    },
+  },
+  {
+    // Catálogo Tommy Hilfiger (fashion_shoes). DOS slots diarios (12:40/17:40),
+    // mismas reglas que reebok-catalogo (hora mínima 13 en el mapa compartido).
+    // PRE-DDL (migración 20260724150000 pendiente): syncCatalogoTommy se omite
+    // limpio SIN tocar Switch (ddlPendiente) → se reporta ok con detalle para
+    // NO alertar a diario por una migración que ya se sabe pendiente (el
+    // heartbeat sembrado se vuelve real apenas la DDL corra).
+    cronName: "tommy-catalogo",
+    label: "tommy-catalogo",
+    recover: async () => {
+      const r = await syncCatalogoTommy();
+      if (r.ddlPendiente) {
+        return { ok: true, detail: "DDL 20260724150000 pendiente — sync omitido (sin tocar Switch)" };
+      }
       const bad = r.empresas.filter((e) => e.error);
       return {
         ok: !r.hadError,

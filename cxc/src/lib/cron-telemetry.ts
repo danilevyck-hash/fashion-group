@@ -97,6 +97,7 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "grupo-resumen-mensual": 14,
   "joybees-catalogo": 12, // su cron corre 11:00 UTC
   "reebok-catalogo": 13, // slot temprano 12:10 + ~1h (no adelantarse a su run normal)
+  "tommy-catalogo": 13, // slot temprano 12:40 (no adelantarse a su run normal)
 };
 
 /**
@@ -165,6 +166,11 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
  */
 export const SEED_TOLERANT_CRONS = [
   "backup-switch", // backup de tablas switch_* (2 entradas: 06:45 / 19:15 UTC)
+  // Catálogo Tommy (2 entradas: 12:40 / 17:40 UTC). Seed-tolerante mientras la
+  // DDL 20260724150000 esté pendiente (sin ella el sync se omite limpio y no
+  // siembra heartbeat). Promover a EXPECTED_CRONS (health-crons, fail-closed)
+  // en el PR "encender", con la DDL corrida y días de siembra.
+  "tommy-catalogo",
 ];
 
 export const SWITCH_SYNC_SLOT_HEARTBEATS = [
@@ -232,6 +238,7 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
   { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
+  { cron: "tommy-catalogo", hhmmUtc: "1240", empresas: ["fashion_shoes"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
   { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: ["american_classic"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1600", empresas: ["active_shoes", "joystep"] },
@@ -240,6 +247,7 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
   { cron: "reebok-catalogo", hhmmUtc: "1700", empresas: ["active_shoes"] },
   { cron: "joybees-catalogo", hhmmUtc: "1705", empresas: ["joystep"] },
+  { cron: "tommy-catalogo", hhmmUtc: "1740", empresas: ["fashion_shoes"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-recibos", hhmmUtc: "2010", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },

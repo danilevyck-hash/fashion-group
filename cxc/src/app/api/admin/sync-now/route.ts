@@ -2,11 +2,12 @@
  * POST /api/admin/sync-now — sync manual on-demand ("Actualizar ahora").
  *
  * Body: { modulo, empresa? } con modulo ∈ estadocuenta | facturas | recibos |
- * clientes-master | catalogo-reebok | catalogo-joybees | proveedores |
- * refresh-vistas. estadocuenta/facturas/recibos/proveedores exigen empresa
- * (UNA por disparo — sesión única de Switch); clientes-master, catálogos y
- * refresh-vistas no llevan empresa (catálogos fijan la suya: active_shoes /
- * joystep; refresh-vistas es DB-only — RPCs de MVs de Ventas, sin Switch).
+ * clientes-master | catalogo-reebok | catalogo-joybees | catalogo-tommy |
+ * proveedores | refresh-vistas. estadocuenta/facturas/recibos/proveedores
+ * exigen empresa (UNA por disparo — sesión única de Switch); clientes-master,
+ * catálogos y refresh-vistas no llevan empresa (catálogos fijan la suya:
+ * active_shoes / joystep / fashion_shoes; refresh-vistas es DB-only — RPCs de
+ * MVs de Ventas, sin Switch).
  *
  * Candado de 2 capas ANTES de disparar (ver lib/switch-api/sync-now.ts):
  *   a) running (fila 'running' fresca de esa EMPRESA en switch_sync_log — del
@@ -44,6 +45,7 @@ import { runRefreshVistas } from "@/lib/refresh-vistas";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
+import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
 import { clearStaleRunning, isRunningLockConflict } from "@/lib/switch-api/sync-log";
 import {
   isSyncNowModulo,
@@ -208,10 +210,13 @@ async function ejecutar(
       return { resumen: "Vistas de ventas y clientes al día" };
     }
     case "catalogo-reebok":
-    case "catalogo-joybees": {
+    case "catalogo-joybees":
+    case "catalogo-tommy": {
       const r = await (modulo === "catalogo-reebok"
         ? syncCatalogoReebok({ triggeredBy: "manual" })
-        : syncCatalogoJoybees({ triggeredBy: "manual" }));
+        : modulo === "catalogo-joybees"
+          ? syncCatalogoJoybees({ triggeredBy: "manual" })
+          : syncCatalogoTommy({ triggeredBy: "manual" }));
       const emp = r.empresas[0];
       if (r.hadError || !emp || emp.error) {
         return { error: emp?.error ?? "sync de catálogo falló" };
