@@ -169,9 +169,17 @@ describe("registro del cron tommy-catalogo en todos los sitios", () => {
     for (const e of entradas) expect(e.empresas).toEqual(["fashion_shoes"]);
   });
 
-  it("recuperación colateral desde las 13 UTC + seed-tolerante en health", () => {
+  it("recuperación colateral desde las 13 UTC + vigilancia estricta en health", () => {
     expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["tommy-catalogo"]).toBe(13);
-    expect(SEED_TOLERANT_CRONS).toContain("tommy-catalogo");
+    // Promovido en el PR "encender Tommy": ya NO es seed-tolerante (la DDL corrió
+    // y el heartbeat lleva días sembrado) → vigilancia fail-closed 26h en
+    // health-crons EXPECTED_CRONS, como reebok/joybees-catalogo.
+    expect(SEED_TOLERANT_CRONS).not.toContain("tommy-catalogo");
+    const healthRoute = readFileSync(
+      path.join(process.cwd(), "src/app/api/health-crons/route.ts"),
+      "utf8",
+    );
+    expect(healthRoute).toMatch(/"tommy-catalogo"/);
   });
 
   it("sync manual: modulo catalogo-tommy con empresa fija y rol vendedor", () => {
