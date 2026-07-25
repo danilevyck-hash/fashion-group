@@ -8,10 +8,20 @@
 // Correr ANTES y DESPUÉS de aplicar las migraciones 20260725170000 (índices) y
 // 20260725170100 (RPC sargable) para comparar. Solo LECTURA: no escribe nada.
 //
-// Baseline medido 25-jul-2026 (antes de las migraciones):
-//   summary(2026) en frío  8.233 ms / 8.801 ms   |  una corrida murió con
-//   57014 "canceling statement due to statement timeout" a los 11.988 ms.
-//   summary(2020) -> devuelve [] (0 filas) y aun así tarda 3.354 ms.
+// Baseline medido 25-jul-2026 (ANTES de las migraciones):
+//
+//   Base tranquila:
+//     summary(2026) en frío   8.233 ms / 8.801 ms
+//     summary(2020) -> devuelve [] (0 filas) y aun así tarda 3.354 ms
+//
+//   Base cargada (esta misma corrida del bench la satura, igual que la ventana
+//   real de las 16:23 UTC en que Daniel vio 8 de 8 fallos):
+//     summary(2026)               9.051 / 10.545 / 9.906 / 10.428 / 11.977 / 19.411 ms   ok=0/6
+//     summary(2020) [cero filas]  12.593 / 9.718 / 9.702 ms                              ok=0/3
+//     ventas_proyeccion_cierre_v6 10.580 / 10.480 / 13.215 ms                             ok=0/3
+//     prev_same_period_v2          5.995 / 1.875 / 1.139 / 2.444 / 1.690 / 3.142 ms       ok=6/6
+//     4 en paralelo x3 rondas ->  12 de 12 fallidas (57014)
+//   Hasta leer switch_ventas_unificado_vw con filtro de mes murió por timeout.
 // ─────────────────────────────────────────────────────────────────────────────
 import fs from "fs";
 import path from "path";
@@ -96,11 +106,20 @@ if (!process.argv.includes("--paridad")) process.exit(0);
 // ── PARIDAD del mes en curso: recalculo en JS la fórmula de la RPC nueva desde
 // las tablas base y la comparo contra las vistas de hoy. Debe dar 0 diferencias.
 console.log("\n=== PARIDAD mes en curso (tablas base vs vistas) ===");
-const get = async (p) => {
-  const r = await fetch(`${U}/rest/v1/${p}`, { headers: H });
-  const t = await r.text();
-  if (r.status >= 400) throw new Error(t);
-  return JSON.parse(t);
+// Las vistas sin filtro pueden morir con statement timeout cuando la base está
+// cargada (justamente lo que este PR arregla) -> reintentar con espera.
+const get = async (p, intentos = 4) => {
+  let ultimo = "";
+  for (let i = 0; i < intentos; i++) {
+    const r = await fetch(`${U}/rest/v1/${p}`, { headers: H });
+    const t = await r.text();
+    if (r.status < 400) return JSON.parse(t);
+    ultimo = t;
+    if (!/57014|statement timeout/.test(t)) break;
+    console.log(`    (statement timeout leyendo ${p.slice(0, 40)}... reintento ${i + 1})`);
+    await new Promise((res) => setTimeout(res, 5000 * (i + 1)));
+  }
+  throw new Error(ultimo);
 };
 const paginar = async (base) => {
   const out = [];
