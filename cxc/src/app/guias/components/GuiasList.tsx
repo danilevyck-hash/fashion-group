@@ -198,7 +198,6 @@ export default function GuiasList({
         ) : guias.length === 0 ? (
           <EmptyState
             title="No hay guías registradas"
-            subtitle="Crea tu primera guía para registrar un despacho"
             actionLabel={canCreate ? "+ Nueva Guía" : undefined}
             onAction={canCreate ? onNewGuia : undefined}
           />

@@ -1023,7 +1023,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         cheques.length === 0 ? (
           <EmptyState
             title="No hay cheques registrados"
-            subtitle="Registra el primer cheque posfechado"
             actionLabel="+ Nuevo Cheque"
             onAction={() => setShowForm(true)}
           />

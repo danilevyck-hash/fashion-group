@@ -117,12 +117,6 @@ export default function InstallPrompt() {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-gray-900">Instala Fashion Group</p>
 
-            {installable && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                Instálala para abrirla como una app desde tu pantalla de inicio.
-              </p>
-            )}
-
             {showIosHint && (
               <p className="text-xs text-gray-500 mt-0.5">
                 Toca <span className="font-medium text-gray-700">Compartir</span> y luego{" "}
