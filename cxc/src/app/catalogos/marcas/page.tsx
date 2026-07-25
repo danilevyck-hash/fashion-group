@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus dos acciones adentro
 // (Ver catálogo · Administrar) + contadores en vivo (productos, sin foto). Elimina
 // los pasos intermedios (elegir marca → Administrar → elegir marca otra vez).
+//
+// Los COLORES de cada tarjeta salen del tema de la marca (MARCA_THEME.hub) —
+// aquí solo vive la identidad no-visual (nombre, tagline, rutas). Agregar una
+// marca = agregar una entrada a BRANDS + su tema.
 
 interface BrandCounters {
   total: number;
@@ -15,7 +20,7 @@ interface BrandCounters {
 }
 
 interface Brand {
-  key: "reebok" | "joybees";
+  key: MarcaUiKey;
   name: string;
   tagline: string;
   productsUrl: string;   // endpoint para contar (active=true)
@@ -39,6 +44,14 @@ const BRANDS: Brand[] = [
     productsUrl: "/api/catalogo/joybees/products?active=true",
     catalogoHref: "/catalogo/joybees",
     adminHref: "/catalogos/admin/joybees",
+  },
+  {
+    key: "tommy",
+    name: "TOMMY HILFIGER",
+    tagline: "Calzado casual",
+    productsUrl: "/api/catalogo/tommy/products?active=true",
+    catalogoHref: "/catalogo/tommy",
+    adminHref: "/catalogos/admin/tommy",
   },
 ];
 
@@ -76,36 +89,23 @@ export default function CatalogosMarcasPage() {
       <AppHeader module="Catalogos" breadcrumbs={[{ label: "Marcas" }]} />
       <div className="max-w-3xl mx-auto px-4 py-10">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Catálogos</h1>
-        <p className="text-sm text-gray-400 mb-8">Reebok y Joybees</p>
+        <p className="text-sm text-gray-400 mb-8">Reebok, Joybees y Tommy</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {BRANDS.map((b) => {
-            const isReebok = b.key === "reebok";
             const c = counters[b.key];
-            // Paletas por marca (Reebok navy + rojo; Joybees amarillo + gris).
-            const cardBg = isReebok ? "bg-[#1A2656] border-[#1A2656]/10" : "bg-[#FFE443] border-[#FFE443]/30";
-            const nameColor = isReebok ? "text-white" : "text-[#404041]";
-            const tagColor = isReebok ? "text-white/50" : "text-[#404041]/50";
-            const counterColor = isReebok ? "text-white/70" : "text-[#404041]/70";
-            const blobBg = isReebok ? "bg-[#E4002B]/15" : "bg-[#404041]/10";
-            // Botón primario (Ver catálogo): contraste fuerte sobre la marca.
-            const primaryBtn = isReebok
-              ? "bg-white text-[#1A2656] hover:bg-white/90"
-              : "bg-[#404041] text-white hover:bg-[#404041]/90";
-            // Botón secundario (Administrar): outline.
-            const outlineBtn = isReebok
-              ? "border border-white/40 text-white hover:bg-white/10"
-              : "border border-[#404041]/40 text-[#404041] hover:bg-[#404041]/10";
+            // Paleta de la tarjeta desde el tema de la marca (no hardcodear).
+            const hub = getMarcaTheme(b.key)!.hub;
 
             return (
-              <div key={b.key} className={`relative overflow-hidden rounded-2xl border p-6 ${cardBg}`}>
-                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-10 translate-x-10 ${blobBg}`} />
+              <div key={b.key} className={`relative overflow-hidden rounded-2xl border p-6 ${hub.card}`}>
+                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-10 translate-x-10 ${hub.blob}`} />
                 <div className="relative">
-                  <h2 className={`text-3xl font-extrabold tracking-tight ${nameColor}`}>{b.name}</h2>
-                  <p className={`text-sm mt-1 ${tagColor}`}>{b.tagline}</p>
+                  <h2 className={`text-3xl font-extrabold tracking-tight ${hub.name}`}>{b.name}</h2>
+                  <p className={`text-sm mt-1 ${hub.tag}`}>{b.tagline}</p>
 
                   {/* Contadores */}
-                  <div className={`mt-4 text-sm font-medium tabular-nums ${counterColor}`}>
+                  <div className={`mt-4 text-sm font-medium tabular-nums ${hub.counter}`}>
                     {c === undefined ? (
                       <span className="opacity-50">Cargando…</span>
                     ) : c === null ? (
@@ -116,7 +116,7 @@ export default function CatalogosMarcasPage() {
                         {c.sinFoto > 0 && (
                           <>
                             {" · "}
-                            <span className={isReebok ? "text-[#FFD1D1] font-semibold" : "text-[#8a1a1a] font-semibold"}>
+                            <span className={hub.sinFoto}>
                               {c.sinFoto} sin foto
                             </span>
                           </>
@@ -129,7 +129,7 @@ export default function CatalogosMarcasPage() {
                   <div className="mt-5 flex flex-wrap gap-2.5">
                     <Link
                       href={b.catalogoHref}
-                      className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${primaryBtn}`}
+                      className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${hub.primaryBtn}`}
                     >
                       Ver catálogo
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -139,7 +139,7 @@ export default function CatalogosMarcasPage() {
                     {isAdmin && (
                       <Link
                         href={b.adminHref}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${outlineBtn}`}
+                        className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${hub.outlineBtn}`}
                       >
                         Administrar
                       </Link>

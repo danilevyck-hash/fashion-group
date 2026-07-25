@@ -112,6 +112,7 @@ const EXPECTED_CRONS = [
   "sync-proveedores",
   "sync-recibos",
   "sync-utilidad",
+  "tommy-catalogo",
 ] as const;
 
 /** Compara tokens en tiempo constante (evita fuga por timing). */

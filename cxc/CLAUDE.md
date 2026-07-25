@@ -29,7 +29,7 @@ Fuente única de navegación + permisos de UI. Agrupados:
 - **Ventas:** CXC (`/admin`), Ventas, Multifashion, Clientes/Directorio (`/clientes`), Marketing
 - **Finanzas:** Cheques, Caja, Préstamos, Comisiones, Proveedores
 - **Operación:** Guías, Packing Lists, Reclamos
-- **Productos:** Catálogos (Reebok, Joybees, Tommy Hilfiger — Tommy aún SIN tarjeta en el hub /catalogos/marcas ni anuncio: se enciende en un PR posterior con OK de Daniel; sus rutas /catalogo/tommy resuelven para usuarios logueados)
+- **Productos:** Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
 - **Sistema:** Usuarios, Data Health
 
 ## Guías — máquina de estados

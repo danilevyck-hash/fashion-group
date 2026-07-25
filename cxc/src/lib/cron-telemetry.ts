@@ -178,11 +178,9 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
  */
 export const SEED_TOLERANT_CRONS = [
   "backup-switch", // backup de tablas switch_* (2 entradas: 06:45 / 19:15 UTC)
-  // Catálogo Tommy (2 entradas: 12:40 / 17:40 UTC). Seed-tolerante mientras la
-  // DDL 20260724150000 esté pendiente (sin ella el sync se omite limpio y no
-  // siembra heartbeat). Promover a EXPECTED_CRONS (health-crons, fail-closed)
-  // en el PR "encender", con la DDL corrida y días de siembra.
-  "tommy-catalogo",
+  // NOTA: tommy-catalogo se PROMOVIÓ a EXPECTED_CRONS (health-crons, vigilancia
+  // fail-closed 26h como reebok/joybees-catalogo) en el PR "encender Tommy":
+  // la DDL 20260724150000 ya corrió y el heartbeat lleva días sembrado.
   // Resumen semanal de fotos faltantes (lunes 13:30 UTC). Seed-tolerante para
   // NO disparar un 503 falso antes de su primera corrida (puede tardar hasta
   // una semana en sembrar la fila). Umbral propio semanal de 8 días en

@@ -96,7 +96,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",                         href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria"],                             group: "operacion" },
 
   // Productos
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "productos" },
+  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees y Tommy",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "productos" },
   { key: "cargar",        label: "Cargar Productos",    subtitle: "Excel del proveedor → plantilla de Switch",          href: "/productos/cargar",icon: PackagePlus,     roles: ["admin", "secretaria"],                             group: "productos" },
 
   // Sistema

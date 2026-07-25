@@ -154,6 +154,29 @@ export interface MarcaTheme {
   /** Acento (hex) del borde del total en el checkout. */
   checkoutAccent: string;
 
+  /** Paleta de la TARJETA del hub /catalogos/marcas (strings Tailwind literales,
+   *  ver nota JIT de cabecera). Cada marca aporta aquí su identidad de tarjeta —
+   *  así el hub NO hardcodea colores por marca: agregar una marca = agregar su
+   *  entrada de tema y su card sale sola. */
+  hub: {
+    /** Fondo + borde de la tarjeta. */
+    card: string;
+    /** Color del nombre grande de la marca. */
+    name: string;
+    /** Color del tagline bajo el nombre. */
+    tag: string;
+    /** Color de la línea de contadores (productos · sin foto). */
+    counter: string;
+    /** Blob decorativo de la esquina. */
+    blob: string;
+    /** Botón primario "Ver catálogo" (contraste fuerte sobre la tarjeta). */
+    primaryBtn: string;
+    /** Botón secundario "Administrar" (outline). */
+    outlineBtn: string;
+    /** Énfasis del "N sin foto". */
+    sinFoto: string;
+  };
+
   // ── Logos (bloques JSX por superficie) ──
   logos: {
     navbar: () => ReactNode;
@@ -386,6 +409,17 @@ const REEBOK: MarcaTheme = {
   metaDescription: "Catálogo de productos Reebok Panamá.",
 
   checkoutAccent: "#1A2656",
+
+  hub: {
+    card: "bg-[#1A2656] border-[#1A2656]/10",
+    name: "text-white",
+    tag: "text-white/50",
+    counter: "text-white/70",
+    blob: "bg-[#E4002B]/15",
+    primaryBtn: "bg-white text-[#1A2656] hover:bg-white/90",
+    outlineBtn: "border border-white/40 text-white hover:bg-white/10",
+    sinFoto: "text-[#FFD1D1] font-semibold",
+  },
 
   logos: {
     navbar: () => <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />,
@@ -678,6 +712,17 @@ const JOYBEES: MarcaTheme = {
   metaDescription: "Catalogo de productos Joybees Panama.",
 
   checkoutAccent: "#404041",
+
+  hub: {
+    card: "bg-[#FFE443] border-[#FFE443]/30",
+    name: "text-[#404041]",
+    tag: "text-[#404041]/50",
+    counter: "text-[#404041]/70",
+    blob: "bg-[#404041]/10",
+    primaryBtn: "bg-[#404041] text-white hover:bg-[#404041]/90",
+    outlineBtn: "border border-[#404041]/40 text-[#404041] hover:bg-[#404041]/10",
+    sinFoto: "text-[#8a1a1a] font-semibold",
+  },
 
   logos: {
     navbar: () => (
@@ -992,6 +1037,17 @@ const TOMMY: MarcaTheme = {
   metaDescription: "Catálogo de calzado Tommy Hilfiger Panamá.",
 
   checkoutAccent: "#152342",
+
+  hub: {
+    card: "bg-[#152342] border-[#152342]/10",
+    name: "text-white",
+    tag: "text-white/50",
+    counter: "text-white/70",
+    blob: "bg-[#AE0029]/15",
+    primaryBtn: "bg-white text-[#152342] hover:bg-white/90",
+    outlineBtn: "border border-white/40 text-white hover:bg-white/10",
+    sinFoto: "text-[#FFD1D1] font-semibold",
+  },
 
   logos: {
     navbar: () => <img src="/tommy/tommy-horizontal.svg" alt="Tommy Hilfiger" className="h-3.5 w-auto" />,
