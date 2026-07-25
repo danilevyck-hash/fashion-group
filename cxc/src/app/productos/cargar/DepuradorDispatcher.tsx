@@ -69,13 +69,6 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      {/* Masthead único */}
-      <div className="mb-4 border-b border-stone-300 pb-2.5">
-        <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
-          Depurador de Productos
-        </h1>
-      </div>
-
       <label
             onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -102,7 +95,7 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
             />
           </label>
       <p className="text-center text-[12px] text-stone-500">
-        Detecta solo si el Excel es CK/TH/KL o Reebok y aplica el flujo correcto.
+        Arrastra el Excel del proveedor — se detecta la marca sola.
       </p>
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>

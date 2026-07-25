@@ -46,13 +46,7 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-700">
-          Fashion Group · Carga a Switch
-        </div>
-        <h2 className="mt-1 font-serif text-2xl font-semibold tracking-tight text-stone-900">
-          Historial de cargas
-        </h2>
-        <p className="mt-1.5 text-sm text-stone-500">
+        <p className="text-sm text-stone-500">
           Cada plantilla descargada queda registrada aquí, de la más reciente a la más antigua.
         </p>
       </div>
