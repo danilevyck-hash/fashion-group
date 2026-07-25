@@ -84,6 +84,7 @@ import {
   SWITCH_SYNC_SLOT_PREFIX,
   SLOT_RECUPERADO_SUFFIX,
   slotRecuperadoName,
+  catalogoCicloSinceIso,
 } from "@/lib/cron-telemetry";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
@@ -229,10 +230,20 @@ interface ColateralCron {
   // días 3-4; el resto del mes ni siquiera cuenta como "faltante".
   recoverOnlyIf?: () => boolean;
   // Ventana propia de "ya corrió" (ISO). Default: inicio del día Panamá (o UTC
-  // si earlyUtcRun). Caso grupo-resumen-mensual: inicio del día 3 del mes — su
-  // heartbeat del día 3 debe contar como success también el día 4 (con la
-  // ventana diaria, el día 4 lo re-enviaría duplicado).
+  // si earlyUtcRun). Dos casos:
+  //   - grupo-resumen-mensual: inicio del día 3 del mes — su heartbeat del día 3
+  //     debe contar como success también el día 4 (con la ventana diaria, el día
+  //     4 lo re-enviaría duplicado).
+  //   - catálogos: ventana RODANTE del ciclo de su propio horario
+  //     (cicloCatalogo, ver CATALOGO_CRON_SLOTS_UTC en cron-telemetry.ts).
   successSinceIso?: () => string;
+}
+
+/** Ventana "ya está al día" de un catálogo: su ciclo (hueco más largo entre sus
+ *  dos corridas diarias). Fallback defensivo al inicio del día Panamá si el
+ *  cron no está en CATALOGO_CRON_SLOTS_UTC — nunca deja la ventana indefinida. */
+function cicloCatalogo(cronName: string): () => string {
+  return () => catalogoCicloSinceIso(cronName) ?? colateralDayStartIso(false);
 }
 
 const COLATERAL_CRONS: ColateralCron[] = [
@@ -459,6 +470,14 @@ const COLATERAL_CRONS: ColateralCron[] = [
   // por artículo en Switch (puede tomar varios minutos) y no debe comerse el
   // RECOVERY_BUDGET_MS de los colaterales anteriores. Lo que no entre en una
   // pasada lo toma la siguiente.
+  //
+  // Los 3 llevan `successSinceIso: cicloCatalogo(...)`: su ventana de "ya está
+  // al día" es el CICLO de su propio horario (hueco más largo entre sus dos
+  // corridas), no el inicio del día Panamá. Ver CATALOGO_CRON_SLOTS_UTC en
+  // cron-telemetry.ts — ahí está el porqué (incidente 25-jul-2026: el success de
+  // siembra de tommy-catalogo a las 04:52 UTC caía 8 min ANTES del corte de las
+  // 05:00, así que cada pasada desde las 13:00 re-corría los ~490 /stock del
+  // catálogo y tumbaba la pasada por FUNCTION_INVOCATION_TIMEOUT).
   {
     // Catálogo Joybees (joystep). Su cron corre 11:00 UTC → hora mínima 12
     // (mapa compartido) para no adelantarse al run normal (la pasada de las
@@ -468,6 +487,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // invocación y nadie lo reintentaba).
     cronName: "joybees-catalogo",
     label: "joybees-catalogo",
+    successSinceIso: cicloCatalogo("joybees-catalogo"), // ciclo 17:55h (11:00/17:05)
     recover: async () => {
       const r = await syncCatalogoJoybees();
       const bad = r.empresas.filter((e) => e.error);
@@ -480,14 +500,16 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Catálogo Reebok (active_shoes). DOS slots diarios pero el heartbeat es de
-    // granularidad diaria → la reconciliación solo detecta "cero success HOY".
+    // Catálogo Reebok (active_shoes). DOS slots diarios (12:10/17:00) pero el
+    // heartbeat es de granularidad diaria → la reconciliación detecta "catálogo
+    // fuera de su ciclo" (>19:10h sin success), no cada slot por separado.
     // Hora mínima en el mapa compartido (patrón cheques-alert): solo recuperar
     // cuando el primer slot ya debió correr. Si el slot de la tarde se pierde
     // con el primero exitoso, no hay señal (heartbeat fresco) — aceptable: ese
     // slot es solo refresh intradía. Idempotente y fail-safe igual que Joybees.
     cronName: "reebok-catalogo",
     label: "reebok-catalogo",
+    successSinceIso: cicloCatalogo("reebok-catalogo"), // ciclo 19:10h (12:10/17:00)
     recover: async () => {
       const r = await syncCatalogoReebok();
       const bad = r.empresas.filter((e) => e.error);
@@ -501,13 +523,16 @@ const COLATERAL_CRONS: ColateralCron[] = [
   },
   {
     // Catálogo Tommy Hilfiger (fashion_shoes). DOS slots diarios (12:40/17:40),
-    // mismas reglas que reebok-catalogo (hora mínima 13 en el mapa compartido).
+    // mismas reglas que reebok-catalogo (hora mínima 13 en el mapa compartido,
+    // ciclo de 19h). Es el más caro de los tres (~490 artículos = ~490 /stock),
+    // así que va último y su ventana de ciclo es la que evita el re-sync inútil.
     // PRE-DDL (migración 20260724150000 pendiente): syncCatalogoTommy se omite
     // limpio SIN tocar Switch (ddlPendiente) → se reporta ok con detalle para
     // NO alertar a diario por una migración que ya se sabe pendiente (el
     // heartbeat sembrado se vuelve real apenas la DDL corra).
     cronName: "tommy-catalogo",
     label: "tommy-catalogo",
+    successSinceIso: cicloCatalogo("tommy-catalogo"), // ciclo 19h (12:40/17:40)
     recover: async () => {
       const r = await syncCatalogoTommy();
       if (r.ddlPendiente) {
@@ -535,8 +560,9 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
     console.error(`[reconciliacion] no pude leer cron_heartbeats: ${error.message}`);
     return []; // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
   }
-  // Umbral por-cron: los earlyUtcRun (00:00-05:00 UTC) se miden contra el inicio
-  // del día UTC; ventana propia (successSinceIso) si el colateral la define; el
+  // Umbral por-cron: ventana propia (successSinceIso) si el colateral la define
+  // —los 3 catálogos usan el ciclo de su horario, grupo-resumen-mensual el día 3
+  // del mes—; los earlyUtcRun (00:00-05:00 UTC) contra el inicio del día UTC; el
   // resto contra el inicio del día Panamá (dayStartIso).
   const earlyStartIso = colateralDayStartIso(true);
   const successHoy = new Set(
