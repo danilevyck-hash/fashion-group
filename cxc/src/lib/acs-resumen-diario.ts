@@ -13,6 +13,22 @@
 //     del año pasado (un viernes se compara con viernes — estándar retail).
 //   - "Mes vs año pasado": acumulado 1..D vs 1..D del año anterior (mismo día
 //     de corte en AMBOS lados, la convención YoY del módulo).
+//   - "Año (YTD) vs año pasado": acumulado 1-ene..corte vs 1-ene..MISMA fecha
+//     de calendario del año anterior (mismo mes-día de corte en ambos lados).
+//
+// POR QUÉ EL YTD USA CALENDARIO Y NO −364d (decisión 25-jul-2026):
+//   El Día usa −364d porque a escala de UN día el día de la semana lo domina
+//   todo (un viernes factura muy distinto a un jueves). En un acumulado de
+//   ~200 días esa distorsión se diluye: ambas ventanas ya contienen
+//   prácticamente el mismo número de lunes, martes, etc. En cambio −364d SÍ
+//   rompería la simetría del acumulado, porque solo desplaza el EXTREMO
+//   DERECHO de la ventana: el arranque sigue siendo 1-ene, así que
+//   1-ene..(corte−364d) es un día MÁS LARGO que 1-ene..corte (206 vs 205 días
+//   al 24-jul-2026) e infla el año pasado. Calendario 1-ene..mismo mes-día
+//   mantiene las dos ventanas del mismo largo, es la convención YTD estándar
+//   en retail y es la que ya usa la línea de "Mes" (cortePrev). Además es
+//   literalmente lo que dice la etiqueta aprobada: "1 ene al 24 jul 2025".
+//   El recorte 29-feb → 28-feb de cortePrev aplica igual al YTD.
 //
 // GUARDIA ANTI-RUIDO (incidente 5-jul-2026): los crons de Vercel Hobby tienen
 // jitter — el sync de cierre (00:15) puede correr tarde o no correr. Si el
@@ -44,6 +60,8 @@ export interface AcsResumenDiario {
   fechaComparable: string;
   mes: number;            // acumulado 1..corte
   mesPrev: number;        // acumulado 1..corte del año anterior (mismo D)
+  anio: number;           // YTD: acumulado 1-ene..corte
+  anioPrev: number;       // YTD del año anterior: 1-ene..cortePrev (calendario)
 }
 
 export function addDays(fecha: string, days: number): string {
@@ -58,9 +76,13 @@ export interface VentanasResumen {
   inicioMes: string;       // día 1 del mes de corte
   inicioMesPrev: string;   // día 1 del mismo mes, año anterior
   cortePrev: string;       // misma fecha de corte, año anterior (29-feb → 28-feb)
+  inicioAnio: string;      // 1-ene del año de corte (arranque del YTD)
+  inicioAnioPrev: string;  // 1-ene del año anterior (arranque del YTD comparable)
 }
 
-/** Ventanas same-period ESTRICTAS: 1..D vs 1..D con el MISMO D en ambos lados. */
+/** Ventanas same-period ESTRICTAS: 1..D vs 1..D con el MISMO D en ambos lados.
+ *  El YTD reusa `cortePrev` como cierre — misma convención de calendario que
+ *  el mes (ver cabecera del archivo para el porqué frente a −364d). */
 export function ventanasResumen(corte: string): VentanasResumen {
   const prevYear = String(Number(corte.slice(0, 4)) - 1);
   const mmdd = corte.slice(5) === "02-29" ? "02-28" : corte.slice(5);
@@ -69,6 +91,8 @@ export function ventanasResumen(corte: string): VentanasResumen {
     inicioMes: `${corte.slice(0, 7)}-01`,
     inicioMesPrev: `${prevYear}-${corte.slice(5, 7)}-01`,
     cortePrev: `${prevYear}-${mmdd}`,
+    inicioAnio: `${corte.slice(0, 4)}-01-01`,
+    inicioAnioPrev: `${prevYear}-01-01`,
   };
 }
 
@@ -131,29 +155,52 @@ export async function calcularResumenDiario(
   const corte = syncFresco ? fecha : addDays(fecha, -1);
   const v = ventanasResumen(corte);
 
-  const [hoy, hoyPrev, mes, mesPrev] = await Promise.all([
+  const [hoy, hoyPrev, mes, mesPrev, anio, anioPrev] = await Promise.all([
     syncFresco ? sumRetail(corte, corte) : Promise.resolve(0),
     syncFresco ? sumRetail(v.fechaComparable, v.fechaComparable) : Promise.resolve(0),
     sumRetail(v.inicioMes, corte),
     sumRetail(v.inicioMesPrev, v.cortePrev),
+    sumRetail(v.inicioAnio, corte),
+    sumRetail(v.inicioAnioPrev, v.cortePrev),
   ]);
 
-  return { fecha, corte, syncFresco, hoy, hoyPrev, fechaComparable: v.fechaComparable, mes, mesPrev };
+  return {
+    fecha, corte, syncFresco,
+    hoy, hoyPrev, fechaComparable: v.fechaComparable,
+    mes, mesPrev,
+    anio, anioPrev,
+  };
 }
 
-// ── Formato del mensaje (formato exacto validado por Daniel, 11-jul-2026) ────
-//   Sync fresco:
-//   🏪 ACS · viernes 10 jul
-//   Día:  $1,112  vs  $1,854 (vie 11-jul-25) · -40%
-//   Mes:  $15,576  vs  $9,820 (1-10 jul-25) · +58.6%
+// ── Formato del mensaje (formato exacto aprobado por Daniel, 25-jul-2026) ────
+//   Tabla de dos bloques: el año en curso arriba (monto + variación YoY) y el
+//   año pasado abajo (monto + a qué periodo corresponde). Va a Telegram con
+//   parse_mode HTML dentro de un <pre> — sin monoespaciado las columnas no
+//   cuadran en el móvil. Ver buildMensajeHtml.
 //
-//   Sync viejo / no corrió (guardia anti-ruido, corte recortado a D-1):
-//   🏪 ACS · viernes 10 jul
-//   ⏳ Ventas del día aún sincronizando
-//   Mes (al 9-jul):  $14,464  vs  $8,700 (1-9 jul-25) · +66.3%
+//   🏪 ACS · viernes 24 jul
+//   ━━━━━━━━━━━━━━━━━━
+//   Día    $1,761      ▲ +18%
+//   Mes    $34,278     ▲ +38.9%
+//   Año    $298,582    ▲ +13.4%
+//   ━━━━━━━━━━━━━━━━━━
+//   Año pasado
+//   Día    $1,494      viernes 25 jul 2025
+//   Mes    $24,683     1 al 24 de julio 2025
+//   Año    $263,407    1 ene al 24 jul 2025
 //
-//   Sin datos del año pasado (prev ≤ 0): la línea omite el "vs …":
-//   Día:  $1,112 · s/d año pasado
+//   Sync viejo / no corrió (guardia anti-ruido, corte recortado a D-1): se cae
+//   la fila "Día" de ambos bloques y el aviso dice hasta qué día llega el corte
+//   (ese dato lo llevaba el viejo label "Mes (al 9-jul)"):
+//   🏪 ACS · viernes 24 jul
+//   ━━━━━━━━━━━━━━━━━━
+//   ⏳ Ventas del día aún sincronizando (al 23-jul)
+//   Mes    $32,517     ▲ +36.2%
+//   …
+//
+//   Sin dato del año pasado en una métrica (prev ≤ 0): esa fila muestra
+//   "s/d año pasado" en vez de la flecha y NO aparece en el bloque de abajo.
+//   Si ninguna métrica tiene comparable, el bloque "Año pasado" se omite entero.
 
 export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
@@ -166,14 +213,50 @@ export function fmtPct(cur: number, prev: number, decimales: number): string {
   return `${pct >= 0 ? "+" : ""}${val}%`;
 }
 
-export function fmtDiaLabel(fecha: string): string {
-  const d = new Date(`${fecha}T12:00:00Z`);
-  const wd = new Intl.DateTimeFormat("es-PA", { weekday: "short", timeZone: "UTC" }).format(d).replace(".", "");
-  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
-  return `${wd} ${d.getUTCDate()}-${mes}`;
+/** "▲ +18%" / "▼ -40%" / "= 0%" / "s/d año pasado".
+ *
+ *  La flecha se decide sobre el porcentaje YA REDONDEADO a `decimales`, no
+ *  sobre el crudo: así nunca sale un "▲ +0.0%" (que se lee como subida sin
+ *  serlo) ni un "▼ -0%". Empate exacto tras redondear → "=" y "0%" sin signo.
+ *  Sin base comparable (prev ≤ 0) no hay variación que mostrar: "s/d año
+ *  pasado" — un +∞% no diría nada útil. */
+export function fmtVariacion(cur: number, prev: number, decimales: number): string {
+  if (prev <= 0) return "s/d año pasado";
+  const txt = (((cur - prev) / prev) * 100).toFixed(decimales);
+  const redondeado = Number(txt);
+  if (redondeado === 0) return `= ${(0).toFixed(decimales)}%`; // cubre "-0" y "0.0"
+  return `${redondeado > 0 ? `▲ +${txt}` : `▼ ${txt}`}%`;
 }
 
-/** "3-jul" — sin día de semana, para el label "Mes (al …)". */
+/** "viernes 25 jul 2025" — el día comparable del año pasado (−364d). Lleva su
+ *  día de la semana justamente para que se vea que es el MISMO día de semana. */
+export function fmtDiaPrevLargo(fecha: string): string {
+  const d = new Date(`${fecha}T12:00:00Z`);
+  const wd = new Intl.DateTimeFormat("es-PA", { weekday: "long", timeZone: "UTC" }).format(d);
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
+  return `${wd} ${d.getUTCDate()} ${mes} ${d.getUTCFullYear()}`;
+}
+
+/** "1 al 24 de julio 2025" — ventana same-period del mes, año anterior.
+ *  Mismo recorte 29-feb → 28-feb que ventanasResumen.cortePrev. */
+export function fmtRangoMesPrevLargo(corte: string): string {
+  const d = new Date(`${corte}T12:00:00Z`);
+  const dia = corte.slice(5) === "02-29" ? 28 : d.getUTCDate();
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "long", timeZone: "UTC" }).format(d);
+  const yPrev = Number(corte.slice(0, 4)) - 1;
+  return dia === 1 ? `1 de ${mes} ${yPrev}` : `1 al ${dia} de ${mes} ${yPrev}`;
+}
+
+/** "1 ene al 24 jul 2025" — ventana YTD del año anterior (cierre = cortePrev). */
+export function fmtRangoAnioPrev(corte: string): string {
+  const d = new Date(`${corte}T12:00:00Z`);
+  const dia = corte.slice(5) === "02-29" ? 28 : d.getUTCDate();
+  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
+  const yPrev = Number(corte.slice(0, 4)) - 1;
+  return corte.slice(5) === "01-01" ? `1 ene ${yPrev}` : `1 ene al ${dia} ${mes} ${yPrev}`;
+}
+
+/** "3-jul" — sin día de semana, para el aviso "⏳ … (al …)". */
 export function fmtDiaCorto(fecha: string): string {
   const d = new Date(`${fecha}T12:00:00Z`);
   const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
@@ -188,40 +271,67 @@ export function fmtDiaTitulo(fecha: string): string {
   return `${wd} ${d.getUTCDate()} ${mes}`;
 }
 
-/** "vie 11-jul-25" — el día comparable del año pasado (−364d), con su día de
- *  semana para que se vea que es el MISMO día de semana. */
-export function fmtComparableDia(fecha: string): string {
-  return `${fmtDiaLabel(fecha)}-${fecha.slice(2, 4)}`;
+const SEPARADOR = "━".repeat(18);
+const ANCHO_LABEL = 7; // "Día"/"Mes"/"Año" + relleno hasta la columna del monto
+
+interface FilaResumen {
+  label: string;
+  monto: number;
+  /** columna derecha: la variación (bloque de arriba) o el periodo (abajo). */
+  resto: string;
 }
 
-/** "1-10 jul-25" — rango same-period del año pasado (1..D del mes de `corte`).
- *  Mismo recorte 29-feb → 28-feb que ventanasResumen.cortePrev. */
-export function fmtRangoMesPrev(corte: string): string {
-  const d = new Date(`${corte}T12:00:00Z`);
-  const dia = corte.slice(5) === "02-29" ? 28 : d.getUTCDate();
-  const mes = new Intl.DateTimeFormat("es-PA", { month: "short", timeZone: "UTC" }).format(d).replace(".", "");
-  const yyPrev = String(Number(corte.slice(0, 4)) - 1).slice(2);
-  return `1-${dia} ${mes}-${yyPrev}`;
-}
+/** Arma la tabla en TEXTO PLANO. El monoespaciado se lo pone buildMensajeHtml;
+ *  aquí solo se rellena a columnas fijas (padEnd) para que al renderizarse en
+ *  monoespaciado los montos y las flechas queden alineados. El ancho de la
+ *  columna de montos se calcula sobre TODAS las filas de los dos bloques, para
+ *  que la tabla completa comparta una sola rejilla. */
+export function buildMensaje(r: AcsResumenDiario, prefijo = ""): string {
+  const actual: FilaResumen[] = [];
+  const pasado: FilaResumen[] = [];
 
-export function buildMensaje(r: AcsResumenDiario): string {
-  const titulo = `🏪 ACS · ${fmtDiaTitulo(r.fecha)}`;
-  // "Label:  $cur  vs  $prev (comparable) · ±%" — sin año pasado (prev ≤ 0) se
-  // omite el "vs …" y fmtPct pone "s/d año pasado".
-  const lineaMes = (label: string) =>
-    r.mesPrev > 0
-      ? `${label}:  ${fmtMonto(r.mes)}  vs  ${fmtMonto(r.mesPrev)} (${fmtRangoMesPrev(r.corte)}) · ${fmtPct(r.mes, r.mesPrev, 1)}`
-      : `${label}:  ${fmtMonto(r.mes)} · ${fmtPct(r.mes, r.mesPrev, 1)}`;
-  if (!r.syncFresco) {
-    return [
-      titulo,
-      `⏳ Ventas del día aún sincronizando`,
-      lineaMes(`Mes (al ${fmtDiaCorto(r.corte)})`),
-    ].join("\n");
+  // Sin sync fresco el día `fecha` está incompleto: se cae la fila "Día" entera
+  // (mostrar $0 · -100% sería un falso negativo — es la guardia anti-ruido).
+  if (r.syncFresco) {
+    actual.push({ label: "Día", monto: r.hoy, resto: fmtVariacion(r.hoy, r.hoyPrev, 0) });
+    if (r.hoyPrev > 0) {
+      pasado.push({ label: "Día", monto: r.hoyPrev, resto: fmtDiaPrevLargo(r.fechaComparable) });
+    }
   }
-  const lineaDia =
-    r.hoyPrev > 0
-      ? `Día:  ${fmtMonto(r.hoy)}  vs  ${fmtMonto(r.hoyPrev)} (${fmtComparableDia(r.fechaComparable)}) · ${fmtPct(r.hoy, r.hoyPrev, 0)}`
-      : `Día:  ${fmtMonto(r.hoy)} · ${fmtPct(r.hoy, r.hoyPrev, 0)}`;
-  return [titulo, lineaDia, lineaMes("Mes")].join("\n");
+  actual.push({ label: "Mes", monto: r.mes, resto: fmtVariacion(r.mes, r.mesPrev, 1) });
+  actual.push({ label: "Año", monto: r.anio, resto: fmtVariacion(r.anio, r.anioPrev, 1) });
+  if (r.mesPrev > 0) {
+    pasado.push({ label: "Mes", monto: r.mesPrev, resto: fmtRangoMesPrevLargo(r.corte) });
+  }
+  if (r.anioPrev > 0) {
+    pasado.push({ label: "Año", monto: r.anioPrev, resto: fmtRangoAnioPrev(r.corte) });
+  }
+
+  const anchoMonto =
+    Math.max(...[...actual, ...pasado].map((f) => fmtMonto(f.monto).length)) + 2;
+  const fila = (f: FilaResumen) =>
+    `${f.label.padEnd(ANCHO_LABEL)}${fmtMonto(f.monto).padEnd(anchoMonto)}${f.resto}`.trimEnd();
+
+  const lineas = [`${prefijo}🏪 ACS · ${fmtDiaTitulo(r.fecha)}`, SEPARADOR];
+  if (!r.syncFresco) {
+    // El "(al D)" conserva el dato que llevaba el viejo label "Mes (al 9-jul)":
+    // hasta qué día llegan los acumulados cuando el corte se recorta a D-1.
+    lineas.push(`⏳ Ventas del día aún sincronizando (al ${fmtDiaCorto(r.corte)})`);
+  }
+  lineas.push(...actual.map(fila));
+  // Sin ninguna métrica comparable el bloque de abajo sobra, y con él su cierre.
+  if (pasado.length > 0) lineas.push(SEPARADOR, "Año pasado", ...pasado.map(fila));
+  return lineas.join("\n");
+}
+
+/** Escapa lo mínimo que exige el parse_mode HTML de Telegram. */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** El mensaje tal cual se manda: `<pre>` para que Telegram lo pinte
+ *  monoespaciado y las columnas cuadren también en el móvil. Va SIEMPRE con
+ *  `sendTelegramAlert(…, "HTML")` — en texto plano se verían las etiquetas. */
+export function buildMensajeHtml(r: AcsResumenDiario, prefijo = ""): string {
+  return `<pre>${escapeHtml(buildMensaje(r, prefijo))}</pre>`;
 }
