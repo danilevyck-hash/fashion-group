@@ -29,7 +29,7 @@
  * todo serial) y empresas distintas no comparten sesión (cero colisión cross-cron,
  * aunque Vercel los agrupe → ya NO depende de horarios). Duraciones medidas
  * (~85-120s/empresa en estadocuenta; facturas/costo ~2-12s) → 2 B2B/run ≈ 210-225s,
- * holgado bajo maxDuration=300. El backfill (scripts/switch-backfill.ts) sigue
+ * holgado bajo maxDuration=800. El backfill (scripts/switch-backfill.ts) sigue
  * disponible para corridas masivas.
  */
 
@@ -55,7 +55,7 @@ import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 // Los errors[] por-empresa son transientes esperados (la reconciliación de las
 // 10:00 los reintenta) → NO disparan alerta aquí. Solo registramos heartbeat de
 // liveness; el watchdog avisa si el cron deja de correr del todo.

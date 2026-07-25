@@ -13,8 +13,9 @@
 // `fetch(${origin}/api/cron/switch-sync?...)` en lotes de 2 con maxDuration=300:
 // 6 empresas × ~200s excedían el límite → la mataban a media recuperación y los
 // switch-sync self-fetched no sobrevivían a la muerte del caller → recuperó 0/16.
-// Ahora ejecuta el trabajo dentro de ESTA invocación (maxDuration=300, techo del
-// plan Hobby), serial por empresa (token único de Switch), idempotente
+// Ahora ejecuta el trabajo dentro de ESTA invocación (maxDuration=800, techo del
+// plan Pro desde el 25-jul-2026; bajo Hobby eran 300), serial por empresa
+// (token único de Switch), idempotente
 // (upserts), acotado por un presupuesto de tiempo. Lo que no entre en una pasada
 // lo toma la siguiente: corre 3×/día (10:00, 14:00, 18:00 UTC), todas
 // idempotentes.
@@ -104,13 +105,16 @@ export const dynamic = "force-dynamic";
 // internos de supabase-js. Sin esto, la re-consulta del log devuelve datos stale.
 export const fetchCache = "force-no-store";
 // Recuperación in-process: una corrida puede re-ejecutar varios syncs pesados en
-// serie (estadocuenta ~85-120s/empresa). 300s es el TECHO del plan (Hobby con
+// serie (estadocuenta ~85-120s/empresa). 800s es el TECHO del plan (Pro con
 // Fluid Compute; ver docs/cron-reliability-recovery.md). Lo que no entre en una
 // pasada lo toma la siguiente (10:00/14:00/18:00) — todas idempotentes.
-export const maxDuration = 300;
+export const maxDuration = 800;
 // Dejar de ARRANCAR trabajo nuevo pasado este umbral (headroom antes del kill a
-// 300s). El trabajo ya iniciado termina; lo no arrancado lo toma la otra pasada.
-const RECOVERY_BUDGET_MS = 270_000;
+// 800s). El trabajo ya iniciado termina; lo no arrancado lo toma la otra pasada.
+// El margen (60s) es mayor que el viejo de 30s a propósito: con más presupuesto
+// caben unidades de trabajo más grandes — un catálogo entero, no media empresa —
+// y el margen tiene que cubrir a la más lenta que ya haya arrancado.
+const RECOVERY_BUDGET_MS = 740_000;
 
 // sync_type que el cron switch-sync (tipo=all) escribe a switch_sync_log.
 const DAILY_SYNC_TYPES = ["facturas", "estadocuenta", "costo"] as const;

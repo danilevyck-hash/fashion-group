@@ -19,7 +19,7 @@ import { runAcsFidelizacionSync } from "@/lib/switch-api/sync-acs-fidelizacion";
 import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 
 const CRON_NAME = "acs-fidelizacion";
 

@@ -189,7 +189,8 @@ export function catalogoCicloSinceIso(cronName: string, now: Date = new Date()):
  * 00:15, la de 01:00 y la de backup 06:00, todas a 2-9 min de un deploy. Con
  * solo dos entradas (06:00/18:30) la exposición era de 12.5h; la entrada del
  * medio la baja a ~4.5h. La recuperación in-process desde la reconciliación NO
- * es viable: la corrida core midió 248s de los 300s de Hobby el 25-jul.
+ * era viable bajo Hobby: la corrida core midió 248s de los 300s disponibles el
+ * 25-jul. Con Pro (800s) vuelve a ser evaluable — pendiente en el plan Pro.
  */
 export const EXTRA_ENTRY_HOURS_UTC: Record<string, number[]> = {
   backup: [10.5, 18.5],

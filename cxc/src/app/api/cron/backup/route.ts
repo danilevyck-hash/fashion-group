@@ -16,9 +16,11 @@
 // Motivo del split, con números (medidos 23-jul-2026): ~310K filas extra
 // (switch_articulo_diario 197K × ~370B + switch_facturas 52K × ~1.1KB + resto)
 // ≈ ~160-175MB NDJSON → ~310 páginas de fetch (~60-150s) + gzip + doble upload
-// (Supabase + R2, ~20-40MB gz). La corrida core ya presupuesta hasta 280s de
-// los 300s de Hobby (réplica Storage 240s + R2 280s) → meterlas ahí arriesga
-// recortar la réplica a diario. En invocación aparte cada grupo tiene sus 300s.
+// (Supabase + R2, ~20-40MB gz). El corte en grupos nació bajo el techo de 300s
+// de Hobby: la corrida core presupuestaba 280s de esos 300 (réplica Storage 240s
+// + R2 280s), así que meter los datasets grandes ahí recortaba la réplica a
+// diario. Con Pro el techo es 800s y cada grupo tiene 800s propios — si los tres
+// grupos deberían volver a ser uno se decide con datos (plan Pro), no acá.
 // Prioridad del grupo: switch_articulo_diario es IRRECUPERABLE de Switch (el
 // API solo da el stock del día — el histórico diario solo existe acá); el
 // resto es re-hidratable por backfill pero costoso (sesión única, horas).
@@ -94,7 +96,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 // Tope del plan Hobby. El backup completo (~60 páginas + ~45 uploads) corre en
 // mucho menos, pero sin esto Vercel corta a los 10s default.
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 
 interface Dataset {
   table: string;
@@ -206,18 +208,20 @@ const MANIFEST_PATH = `${STORAGE_PREFIX}/manifest.json`;
 // Presupuesto de tiempo de la réplica (arranca tras los datasets): si no
 // alcanza, lo que falte queda "pendiente" y se copia en la corrida siguiente
 // (el manifest solo registra lo efectivamente copiado). Deja headroom para
-// meta.json + limpieza dentro de los 300s de Hobby.
-const REPLICA_DEADLINE_MS = 240_000;
+// meta.json + limpieza dentro de los 800s de Pro (antes 240s de 300).
+const REPLICA_DEADLINE_MS = 700_000;
 // Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): corre tras la
 // réplica de Storage; el set completo pesa ~7 MB gz (~10-25s en subir), así
-// que 280s desde el arranque deja 20s de headroom para meta.json + limpieza.
+// que 740s desde el arranque deja 60s de headroom para meta.json + limpieza.
 // Lo que no alcance queda pendiente y el manifest lo recupera mañana.
-const R2_DEADLINE_MS = 280_000;
-// Presupuesto del grupo ?grupo=storage (invocación propia, 300s enteros para
+// (La corrida core midió 248s el 25-jul: estos topes son protección, no el
+// camino normal — subirlos solo agranda el margen antes de dejar pendientes.)
+const R2_DEADLINE_MS = 740_000;
+// Presupuesto del grupo ?grupo=storage (invocación propia, 800s enteros para
 // él): ~60s se van listando los 5 buckets (~420 llamadas list, el árbol de
 // tommy tiene 389 subcarpetas) y el resto copia archivos. Lo que no entre queda
 // pendiente y lo toma la corrida siguiente (manifest = catch-up automático).
-const STORAGE_R2_DEADLINE_MS = 275_000;
+const STORAGE_R2_DEADLINE_MS = 740_000;
 // Ventana del manifest de DATOS en R2. Solo sirve para el catch-up del mismo
 // día (paths con fecha ⇒ mañana son keys nuevos): 7 días bastan y evitan que
 // crezca ~57 keys/día para siempre.
