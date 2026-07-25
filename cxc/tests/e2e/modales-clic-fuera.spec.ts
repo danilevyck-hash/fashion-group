@@ -39,50 +39,52 @@ async function clicEnBackdrop(page: Page, backdrop: ReturnType<Page["locator"]>)
   await page.mouse.up();
 }
 
-// ── 1. Catálogo público (sin sesión): modal "Cantidad de bultos" ──
-test("catálogo: el modal de cantidad cierra con clic fuera", async ({ page }) => {
+// ── 1. Catálogo público (sin sesión): lightbox de la foto del producto ──
+test("catálogo: el lightbox cierra con clic fuera", async ({ page }) => {
   await page.goto(`${BASE}/catalogo-publico/reebok`);
-  const agregar = page.getByRole("button", { name: /agregar/i }).first();
-  await agregar.waitFor({ timeout: 20_000 });
-  await agregar.click();
+  await page.getByRole("button", { name: /^agregar$/i }).first().waitFor({ timeout: 25_000 });
 
-  const modal = page.locator("div.fixed.inset-0").filter({ hasText: /bultos|cantidad/i }).last();
-  await expect(modal).toBeVisible();
-  await clicEnBackdrop(page, modal);
-  await expect(modal).toBeHidden();
+  await page.locator("img").nth(1).click();
+  const lightbox = page.locator("div.fixed.inset-0.z-\\[100\\]").first();
+  await expect(lightbox).toBeVisible();
+  await clicEnBackdrop(page, lightbox);
+  await expect(lightbox).toBeHidden();
 });
 
 // ── 2. Cheques: modal de detalle (Modal genérico, antes NO cerraba) ──
 conSesion("cheques: el detalle cierra con clic fuera", async ({ context, page }) => {
   await autenticar(context, page);
   await page.goto(`${BASE}/cheques`);
+  // La pestaña por defecto puede venir vacía; Depositados siempre tiene datos.
+  await page.getByRole("button", { name: /depositados/i }).first().click({ timeout: 25_000 });
   await page.waitForSelector("tbody tr", { timeout: 25_000 });
-  await page.locator("tbody tr").first().click();
+  // La fila 0 es el encabezado del grupo "Anteriores"; la 1 es un cheque real.
+  await page.locator("tbody tr").nth(1).click();
 
   const modal = page.locator("div.fixed.inset-0.z-50").first();
   await expect(modal).toBeVisible({ timeout: 10_000 });
+  await expect(modal).toContainText(/detalle del cheque/i);
   await clicEnBackdrop(page, modal);
   await expect(modal).toBeHidden();
 });
 
 // ── 3. Destructivo: el clic fuera CANCELA, nunca ejecuta ──
-conSesion("destructivo: el clic fuera cancela y no elimina", async ({ context, page }) => {
+conSesion("destructivo: el clic fuera cancela y no desactiva", async ({ context, page }) => {
   await autenticar(context, page);
-  await page.goto(`${BASE}/cheques`);
-  await page.waitForSelector("tbody tr", { timeout: 25_000 });
-  const filasAntes = await page.locator("tbody tr").count();
+  await page.goto(`${BASE}/admin/usuarios`);
+  const desactivar = page.getByRole("button", { name: /desactivar/i });
+  await desactivar.first().waitFor({ timeout: 25_000 });
+  const antes = await desactivar.count();
 
-  // Abre el confirm de eliminar desde el menú de acciones de la fila.
-  await page.locator("tbody tr").first().click({ button: "right" });
-  const eliminar = page.getByText(/eliminar/i).first();
-  await eliminar.click();
-
-  const modal = page.locator("div.fixed.inset-0").filter({ hasText: /eliminar/i }).last();
+  await desactivar.first().click();
+  const modal = page.locator("div.fixed.inset-0.z-50").first();
   await expect(modal).toBeVisible();
+  await expect(modal).toContainText(/desactivar usuario/i);
+
   await clicEnBackdrop(page, modal);
   await expect(modal).toBeHidden();
-  // Nada se borró: mismo número de filas.
-  await expect(page.locator("tbody tr")).toHaveCount(filasAntes);
+  // Nadie quedó desactivado: el mismo número de usuarios sigue activo.
+  await expect(desactivar).toHaveCount(antes);
 });
 
 // ── 4. BottomSheet móvil (390px) ──
