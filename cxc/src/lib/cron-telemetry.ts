@@ -17,6 +17,7 @@
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert, shortError } from "@/lib/telegram";
 
 // ─── Umbrales de "staleness" del watchdog (fuente ÚNICA para AMBOS watchdogs) ──
@@ -170,8 +171,10 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
 // 21:10) era invisible para health-crons. Cada entrada de vercel.json lleva
 // ahora `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de SU schedule, ej.
 // estadocuenta-2110) y el route registra, ADEMÁS del heartbeat base, uno
-// granular "switch-sync:<slot>". Esta lista es espejo de vercel.json — al
-// agregar/mover una entrada de switch-sync, actualizar aquí.
+// granular "switch-sync:<slot>". La lista (SWITCH_SYNC_SLOTS /
+// SWITCH_SYNC_SLOT_HEARTBEATS) se DERIVA de SWITCH_CRON_ENTRADAS más abajo —
+// fuente ÚNICA, espejo de vercel.json: al agregar/mover una entrada de
+// switch-sync basta actualizar SWITCH_CRON_ENTRADAS (y vercel.json).
 //
 // Regla de vigilancia en health-crons (distinta del fail-closed de los 18
 // nombres base): si la fila del slot NO existe todavía → NO es stale (el cron
@@ -200,22 +203,6 @@ export const SEED_TOLERANT_CRONS = [
   // una semana en sembrar la fila). Umbral propio semanal de 8 días en
   // CRON_STALE_HOURS_POR_CRON. Promover a EXPECTED_CRONS con semanas de siembra.
   "catalogos-fotos-resumen",
-];
-
-export const SWITCH_SYNC_SLOT_HEARTBEATS = [
-  "switch-sync:all-0530",
-  "switch-sync:all-0535",
-  "switch-sync:all-0540",
-  "switch-sync:all-0630",
-  "switch-sync:facturas-1500",
-  "switch-sync:estadocuenta-1600",
-  "switch-sync:estadocuenta-1605",
-  "switch-sync:estadocuenta-1610",
-  "switch-sync:estadocuenta-2110",
-  "switch-sync:estadocuenta-2115",
-  "switch-sync:estadocuenta-2120",
-  "switch-sync:facturas-2315",
-  "switch-sync:facturas-0015",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -286,6 +273,216 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "2315", empresas: ["american_classic"] },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
 ];
+
+// ─── Slots de switch-sync (derivados de SWITCH_CRON_ENTRADAS) ────────────────
+// Cada entrada de switch-sync en vercel.json lleva `&slot=<tipo>-<hhmm>`; el
+// route registra el heartbeat granular "switch-sync:<slot>". El cronograma de
+// arriba ya tiene tipo (en `cron`), hora y empresas de cada entrada → los slots
+// se derivan de ahí en vez de repetir la lista (una sola fuente que actualizar).
+
+export type SwitchSyncSlotTipo = "all" | "facturas" | "estadocuenta";
+/** sync_type que switch-sync escribe a switch_sync_log. */
+export type SwitchSyncTipo = "facturas" | "estadocuenta" | "costo";
+
+export interface SwitchSyncSlot {
+  /** Valor de ?slot= y sufijo del heartbeat: "<tipo>-<hhmm>". */
+  slot: string;
+  tipo: SwitchSyncSlotTipo;
+  hhmmUtc: string;
+  empresas: readonly string[];
+}
+
+const SWITCH_SYNC_CRON_PREFIX = "switch-sync ";
+
+/** Las 13 entradas de switch-sync de vercel.json, con su tipo y sus empresas. */
+export const SWITCH_SYNC_SLOTS: SwitchSyncSlot[] = SWITCH_CRON_ENTRADAS.filter((e) =>
+  e.cron.startsWith(SWITCH_SYNC_CRON_PREFIX),
+).map((e) => {
+  const tipo = e.cron.slice(SWITCH_SYNC_CRON_PREFIX.length) as SwitchSyncSlotTipo;
+  return { slot: `${tipo}-${e.hhmmUtc}`, tipo, hhmmUtc: e.hhmmUtc, empresas: e.empresas };
+});
+
+export const SWITCH_SYNC_SLOT_PREFIX = "switch-sync:";
+/** Sufijo de la marca que escribe la reconciliación (NO la entrada del cron). */
+export const SLOT_RECUPERADO_SUFFIX = "#recuperado";
+
+/** Heartbeat que registra la PROPIA entrada del cron (verdad de terreno). */
+export const slotHeartbeatName = (slot: string) => `${SWITCH_SYNC_SLOT_PREFIX}${slot}`;
+/** Marca que registra la reconciliación cuando compensa una ocurrencia perdida. */
+export const slotRecuperadoName = (slot: string) =>
+  `${SWITCH_SYNC_SLOT_PREFIX}${slot}${SLOT_RECUPERADO_SUFFIX}`;
+
+/** Nombres de heartbeat de los slots (los que vigila health-crons). */
+export const SWITCH_SYNC_SLOT_HEARTBEATS = SWITCH_SYNC_SLOTS.map((s) => slotHeartbeatName(s.slot));
+
+/**
+ * Minutos tras la hora programada dentro de los cuales se considera que la
+ * ENTRADA sí se invocó. El scheduler de Vercel tiene jitter grande (medido:
+ * 21:10 → 22:11, 06:30 → 06:52) → 120 min cubre lo observado con margen. Ser
+ * generoso aquí es el lado SEGURO: si dudamos, la entrada cuenta como "corrió"
+ * y la reconciliación NO la cubre (el slot sigue reportándose).
+ */
+export const SLOT_RUN_WINDOW_MIN = 120;
+
+/**
+ * Tope duro anti-enmascaramiento: por muchas marcas #recuperado que haya, si la
+ * ENTRADA propia del slot lleva más de esto sin un success, el slot vuelve a
+ * contar como caído. 50h = dos ocurrencias diarias + margen de jitter → una
+ * entrada que Vercel dejó de invocar del todo se reporta al segundo día, en vez
+ * de quedar tapada para siempre por la recuperación diaria de la reconciliación.
+ */
+export const SLOT_ENTRY_DEAD_HOURS = 50;
+
+/** ¿Un slot de tipo `slotTipo` es responsable del sync_type `syncType`? */
+export function slotCubreTipo(slotTipo: SwitchSyncSlotTipo, syncType: SwitchSyncTipo): boolean {
+  // tipo=all corre facturas → estadocuenta (solo empresas con CXC) → costo.
+  return slotTipo === "all" ? true : slotTipo === syncType;
+}
+
+/** Ocurrencia programada más reciente del slot (siempre <= now), en UTC. */
+export function ultimaOcurrenciaUtc(hhmmUtc: string, now: Date): Date {
+  const h = Number(hhmmUtc.slice(0, 2));
+  const m = Number(hhmmUtc.slice(2, 4));
+  const d = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m, 0, 0),
+  );
+  if (d.getTime() > now.getTime()) d.setUTCDate(d.getUTCDate() - 1); // aún no llega hoy → ayer
+  return d;
+}
+
+/** Pares (empresa, sync_type) de los que responde una ocurrencia del slot. */
+export function paresDelSlot(
+  slot: SwitchSyncSlot,
+  empresasConCxc: readonly string[],
+): Array<{ empresa: string; syncType: SwitchSyncTipo }> {
+  const cxc = new Set(empresasConCxc);
+  const pares: Array<{ empresa: string; syncType: SwitchSyncTipo }> = [];
+  for (const empresa of slot.empresas) {
+    if (slot.tipo === "all") {
+      pares.push({ empresa, syncType: "facturas" });
+      if (cxc.has(empresa)) pares.push({ empresa, syncType: "estadocuenta" });
+      pares.push({ empresa, syncType: "costo" });
+    } else {
+      pares.push({ empresa, syncType: slot.tipo });
+    }
+  }
+  return pares;
+}
+
+export interface SyncLogRowMin {
+  empresa_key: string;
+  sync_type: string;
+  status: string;
+  started_at: string;
+}
+
+export interface SlotHuerfano {
+  /** "<tipo>-<hhmm>". */
+  slot: string;
+  /** Nombre del heartbeat a escribir (la marca #recuperado). */
+  heartbeat: string;
+  /** ISO de la ocurrencia que se perdió. */
+  ocurrencia: string;
+  /** Pares que sí quedaron al día después de esa ocurrencia. */
+  pares: string[];
+}
+
+/**
+ * Slots HUÉRFANOS: su ocurrencia programada más reciente NO se invocó (ninguna
+ * corrida en switch_sync_log dentro de su ventana) PERO el trabajo del que eran
+ * responsables sí quedó hecho después (por la recuperación de la reconciliación
+ * o por otra entrada que cubre los mismos pares). Su heartbeat propio quedó
+ * congelado en la última vez que la entrada sí corrió → el watchdog los reporta
+ * stale con los datos perfectamente al día (falso positivo medido el 25-jul-2026
+ * con facturas-2315 39.7h, facturas-0015 38.9h y all-0535 33.5h).
+ *
+ * Reglas — pensadas para NO tapar un fallo real:
+ *  1. Solo la ocurrencia YA VENCIDA (ultimaOcurrenciaUtc): un slot cuya hora de
+ *     hoy aún no llega se evalúa contra la de ayer, que si corrió bien lo saca.
+ *  2. Si la entrada YA registró su heartbeat propio en/después de la ocurrencia
+ *     → corrió, no hay nada que cubrir.
+ *  3. Si hay CUALQUIER corrida (success o error) en la ventana de la ocurrencia
+ *     → la entrada SÍ se invocó. Si falló, el slot NO se cubre: un slot roto de
+ *     verdad (corrió y falló) sigue reportándose.
+ *  4. Solo se cubre si TODOS sus pares tienen un success posterior a la
+ *     ocurrencia. Cubrir con el trabajo a medias sería tapar datos atrasados.
+ * Y aun cubierto, el tope duro SLOT_ENTRY_DEAD_HOURS lo devuelve a "caído" si su
+ * entrada propia lleva 2 días sin invocarse (ver slotCubiertoPorRecuperacion).
+ */
+export function slotsHuerfanos(args: {
+  now: Date;
+  rows: SyncLogRowMin[];
+  heartbeats: Map<string, string | null | undefined>;
+  empresasConCxc: readonly string[];
+  slots?: SwitchSyncSlot[];
+}): SlotHuerfano[] {
+  const { now, rows, heartbeats, empresasConCxc } = args;
+  const slots = args.slots ?? SWITCH_SYNC_SLOTS;
+  const out: SlotHuerfano[] = [];
+
+  for (const s of slots) {
+    const occ = ultimaOcurrenciaUtc(s.hhmmUtc, now);
+    const occMs = occ.getTime();
+    const finVentanaMs = occMs + SLOT_RUN_WINDOW_MIN * 60_000;
+
+    // (2) la entrada ya registró success en/después de su ocurrencia.
+    const hb = heartbeats.get(slotHeartbeatName(s.slot));
+    const hbMs = hb ? Date.parse(hb) : NaN;
+    if (Number.isFinite(hbMs) && hbMs >= occMs) continue;
+
+    const pares = paresDelSlot(s, empresasConCxc);
+    const relevantes = rows.filter((r) =>
+      pares.some((p) => p.empresa === r.empresa_key && p.syncType === r.sync_type),
+    );
+
+    // (3) alguien corrió en la ventana → la entrada se invocó (aunque fallara).
+    const corrioEnVentana = relevantes.some((r) => {
+      const t = Date.parse(r.started_at);
+      return Number.isFinite(t) && t >= occMs && t <= finVentanaMs;
+    });
+    if (corrioEnVentana) continue;
+
+    // (4) todos los pares con un success POSTERIOR a la ocurrencia perdida.
+    const cubiertos = pares.filter((p) =>
+      relevantes.some((r) => {
+        if (r.empresa_key !== p.empresa || r.sync_type !== p.syncType) return false;
+        if (r.status !== "success") return false;
+        const t = Date.parse(r.started_at);
+        return Number.isFinite(t) && t >= occMs;
+      }),
+    );
+    if (cubiertos.length !== pares.length) continue;
+
+    out.push({
+      slot: s.slot,
+      heartbeat: slotRecuperadoName(s.slot),
+      ocurrencia: occ.toISOString(),
+      pares: pares.map((p) => `${p.empresa}/${p.syncType}`),
+    });
+  }
+  return out;
+}
+
+/**
+ * ¿Un slot stale está CUBIERTO por una recuperación de la reconciliación (y por
+ * tanto no debe alertar)? Exige las dos cosas:
+ *   (a) marca #recuperado fresca (dentro del umbral diario normal), y
+ *   (b) que su ENTRADA propia haya corrido hace menos de SLOT_ENTRY_DEAD_HOURS.
+ * (b) es el anti-enmascaramiento: la marca nunca pisa el heartbeat real, así que
+ * una entrada que dejó de invocarse envejece igual y vuelve a alertar al 2º día.
+ */
+export function slotCubiertoPorRecuperacion(
+  entryLastSuccessAt: string | null | undefined,
+  recuperadoAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  const e = entryLastSuccessAt ? Date.parse(entryLastSuccessAt) : NaN;
+  if (!Number.isFinite(e)) return false; // sin heartbeat propio nunca → no cubrir
+  if (now - e >= SLOT_ENTRY_DEAD_HOURS * 3600 * 1000) return false;
+  const c = recuperadoAt ? Date.parse(recuperadoAt) : NaN;
+  if (!Number.isFinite(c)) return false;
+  return now - c < CRON_STALE_HOURS_DEFAULT * 3600 * 1000;
+}
 
 export interface ProximoCron {
   cron: string;
@@ -387,6 +584,61 @@ export async function recordCronHeartbeat(cronName: string): Promise<void> {
     console.error(
       `[cron-telemetry] heartbeat ${cronName} threw: ${err instanceof Error ? err.message : String(err)}`,
     );
+  }
+}
+
+/** Horas de switch_sync_log que necesita la reconciliación de slots: la
+ *  ocurrencia más vieja que evalúa está a <24h + su ventana + margen. */
+const SLOT_LOG_LOOKBACK_HOURS = 30;
+
+/**
+ * Reconciliación de los heartbeats por-slot de switch-sync (fix jul-2026 de los
+ * slots huérfanos). Detecta los slots cuya ocurrencia se perdió pero cuyo
+ * trabajo sí quedó al día (ver slotsHuerfanos) y les escribe la marca
+ * "switch-sync:<slot>#recuperado" — NUNCA el heartbeat propio del slot, que
+ * sigue siendo la verdad de terreno de "la entrada se invocó y salió OK".
+ *
+ * La llama switch-reconciliacion en TODAS sus salidas (incluida la pasada
+ * "allHealthy"): el caso medido —facturas-2315 / facturas-0015 de
+ * american_classic— no genera pares faltantes, porque la entrada de las 06:30
+ * ya dejó el par al día antes de la primera pasada. Best-effort: no lanza.
+ */
+export async function reconciliarSlotsSwitchSync(now: Date = new Date()): Promise<SlotHuerfano[]> {
+  try {
+    const desdeIso = new Date(now.getTime() - SLOT_LOG_LOOKBACK_HOURS * 3600 * 1000).toISOString();
+    const [logRes, hbRes] = await Promise.all([
+      supabaseServer
+        .from("switch_sync_log")
+        .select("empresa_key,sync_type,status,started_at")
+        .gte("started_at", desdeIso)
+        .in("sync_type", ["facturas", "estadocuenta", "costo"]),
+      supabaseServer
+        .from("cron_heartbeats")
+        .select("cron_name,last_success_at")
+        .in("cron_name", SWITCH_SYNC_SLOT_HEARTBEATS),
+    ]);
+    if (logRes.error || hbRes.error) {
+      console.error(
+        `[cron-telemetry] slots huérfanos: ${logRes.error?.message ?? ""} ${hbRes.error?.message ?? ""}`.trim(),
+      );
+      return []; // sin señal fiable → no cubrir a ciegas
+    }
+    const heartbeats = new Map<string, string | null | undefined>(
+      (hbRes.data ?? []).map((h) => [h.cron_name as string, h.last_success_at as string | null]),
+    );
+    const huerfanos = slotsHuerfanos({
+      now,
+      rows: (logRes.data ?? []) as SyncLogRowMin[],
+      heartbeats,
+      empresasConCxc: empresasConCxc(),
+    });
+    for (const h of huerfanos) await recordCronHeartbeat(h.heartbeat);
+    return huerfanos;
+  } catch (err) {
+    console.error(
+      `[cron-telemetry] slots huérfanos threw: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
   }
 }
 
