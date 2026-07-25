@@ -187,33 +187,39 @@ export default function CatalogoGroupedCard({
             <span className={t.skuPill}>{group.baseSku}</span>
           </div>
 
-          {/* Price — Regalia fluye como producto normal (precio + Agregar).
-              Sin "/unidad" (Daniel, 25-jul-2026). */}
-          <div className="mt-1.5">
-            <div className="flex items-baseline gap-2">
-              <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
+          {/* Precio + stock en el MISMO renglón (Daniel, 25-jul-2026): espejo
+              EXACTO de CatalogoProductCard — izquierda precio con "Bulto de N"
+              debajo, derecha el stock, sin línea divisoria. Regalia fluye como
+              producto normal (precio + Agregar). Sin "/unidad". */}
+          <div className="mt-1.5 flex flex-col gap-y-1 xl:flex-row xl:items-start xl:justify-between xl:gap-x-2 xl:gap-y-0">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
+              </div>
+              {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
+                  quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
+                  CatalogoProductCard, incluida la línea DISCRETA de 10px gris. */}
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {BULTO_SIZE}</span>
+              </div>
             </div>
-            {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
-                quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
-                CatalogoProductCard, incluida la línea DISCRETA de 10px gris. */}
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {BULTO_SIZE}</span>
-            </div>
+
+            {/* Stock interno (Switch) — componente COMPARTIDO con la card plana.
+                El grupo agrega sus variantes (una card = un modelo). Solo
+                catálogo interno (showStock); NUNCA en el público. */}
+            {showStock && (
+              <CatalogoStockLine
+                marca={marca}
+                disponibilidad={groupDisponibilidad}
+                existencia={groupExistencia}
+              />
+            )}
           </div>
 
-          {/* Stock interno (Switch) — componente COMPARTIDO con la card plana.
-              El grupo agrega sus variantes (una card = un modelo). Solo
-              catálogo interno (showStock); NUNCA en el público. */}
-          {showStock && (
-            <CatalogoStockLine
-              marca={marca}
-              disponibilidad={groupDisponibilidad}
-              existencia={groupExistencia}
-            />
-          )}
-
-          {/* Action buttons — Regalia usa Agregar como cualquier producto normal */}
-          <div className={`mt-2 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
+          {/* Action buttons — Regalia usa Agregar como cualquier producto normal.
+              38px de alto y márgenes apretados (Daniel, 25-jul-2026); el control
+              de cantidad mide lo MISMO (h-9 + 1px de borde arriba y abajo = 38). */}
+          <div className={`mt-1.5 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
               {group.variants.map(v => {
                 const qty = cartMap.get(v.product.id) || 0;
                 const inOrder = qty > 0;
@@ -229,7 +235,7 @@ export default function CatalogoGroupedCard({
                     <div className={t.qtyWrap}>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty - 1)}
-                        className={`h-11 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                        className={`h-9 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                           qty === 1 ? "px-2 gap-1" : "w-11"
                         }`}
                       >
@@ -254,7 +260,7 @@ export default function CatalogoGroupedCard({
                       </button>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty + 1)}
-                        className={`w-11 h-11 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                        className={`w-11 h-9 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                       >
                         +
                       </button>
@@ -265,7 +271,7 @@ export default function CatalogoGroupedCard({
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
                     disabled={disabled || v.product.stock === 0}
-                    className={`w-full py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px] ${
+                    className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px] ${
                       disabled || v.product.stock === 0
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn

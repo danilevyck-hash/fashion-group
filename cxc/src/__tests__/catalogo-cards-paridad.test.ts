@@ -9,7 +9,12 @@
 //   · el nombre va SIEMPRE en una sola línea de alto fijo (20px): se achica
 //     14px→11px y, si ni así cabe, corta con "…" (card compacta, 25-jul-2026),
 //   · la card es COMPACTA: p-2.5 y los mismos márgenes en las dos cards,
-//   · el stock interno sale en UNA línea "Disponibilidad N · Existencia N",
+//   · el precio y el stock comparten RENGLÓN (precio a la izquierda con "Bulto
+//     de N" debajo, stock a la derecha) y entre ellos no hay línea divisoria,
+//   · el stock usa las palabras completas ("Disponibilidad N" / "Existencia N")
+//     en dos renglones apilados — medido: en una sola línea no cabe (ver
+//     CatalogoStockLine),
+//   · el botón Agregar mide 38px y el control de cantidad mide lo mismo,
 //   · la foto es 4:3 con object-contain en las 3 marcas,
 //   · el grid sube a 5 columnas SOLO en xl (iPad y móvil intactos),
 //   · el menú Compartir tiene Copiar link + Descargar PDF en las 3 marcas.
@@ -41,6 +46,12 @@ function src(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
 
+/** Clases Tailwind realmente aplicadas: solo las líneas con `className`, para
+ *  que un comentario que NOMBRA una clase vieja no dispare un falso positivo. */
+function clasesAplicadas(code: string): string {
+  return code.split("\n").filter((l) => l.includes("className")).join("\n");
+}
+
 const PRODUCT_CARD = src("src/components/catalogo/CatalogoProductCard.tsx");
 const GROUPED_CARD = src("src/components/catalogo/CatalogoGroupedCard.tsx");
 const STOCK_LINE = src("src/components/catalogo/CatalogoStockLine.tsx");
@@ -60,12 +71,48 @@ describe("card de producto — paridad en las 3 marcas", () => {
     expect(GROUPED_CARD).toContain("Bulto de {BULTO_SIZE}");
   });
 
-  it("stock interno en UNA línea con el vocabulario del sistema", () => {
+  it("stock interno con el vocabulario del sistema, palabras COMPLETAS", () => {
     expect(STOCK_LINE).toContain("Disponibilidad {");
     expect(STOCK_LINE).toContain("Existencia {");
     // Los copys viejos de dos bloques quedaron fuera.
     expect(STOCK_LINE).not.toContain("Disponible: ");
     expect(STOCK_LINE).not.toContain("En bodega:");
+    // Nunca abreviado: la palabra completa es el contrato (Daniel, 25-jul-2026).
+    expect(STOCK_LINE).not.toMatch(/Disp\.|Exist\./);
+  });
+
+  it("el stock va en DOS renglones apilados, sin el separador '·'", () => {
+    // Medido: "Disponibilidad 191 · Existencia 191" son 190.5px a 11px y el
+    // contenido de la card mide 204px con el precio ya ocupando 61.2px — en una
+    // sola línea NO cabe. Apilado, el renglón más ancho mide 97.2px y entra.
+    expect(STOCK_LINE).toContain("whitespace-nowrap");
+    expect(STOCK_LINE).not.toContain("&middot;");
+    expect(STOCK_LINE).not.toContain("flex items-baseline");
+    // Alineado a la derecha del precio de xl para arriba.
+    expect(STOCK_LINE).toContain("xl:text-right");
+    expect(STOCK_LINE).toContain("shrink-0");
+  });
+
+  it("entre el precio y el stock NO hay línea divisoria", () => {
+    expect(clasesAplicadas(STOCK_LINE)).not.toContain("border-t");
+    // El color del separador se retiró del tema: nadie puede reintroducirlo.
+    for (const m of MARCAS) {
+      expect(MARCA_THEME[m].card.stock, m).not.toHaveProperty("divider");
+      expect(MARCA_THEME[m].card.stock, m).not.toHaveProperty("dot");
+    }
+  });
+
+  it("precio y stock viven en el MISMO renglón en las dos cards", () => {
+    const FILA = 'className="mt-1.5 flex flex-col gap-y-1 xl:flex-row xl:items-start xl:justify-between xl:gap-x-2 xl:gap-y-0"';
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      expect(code, nombre).toContain(FILA);
+      // El <CatalogoStockLine> tiene que estar DENTRO de esa fila, no después.
+      const fila = code.slice(code.indexOf(FILA));
+      const stock = fila.indexOf("<CatalogoStockLine");
+      const cierre = fila.indexOf("Add/Qty button") >= 0 ? fila.indexOf("Add/Qty button") : fila.indexOf("Action buttons");
+      expect(stock, `${nombre}: stock dentro de la fila del precio`).toBeGreaterThan(0);
+      expect(stock, `${nombre}: stock antes del bloque de acción`).toBeLessThan(cierre);
+    }
   });
 
   it("la línea de stock es UN componente compartido, no dos copias", () => {
@@ -123,11 +170,27 @@ describe("card de producto — paridad en las 3 marcas", () => {
     expect(GROUPED_CARD.slice(0, GROUPED_CARD.indexOf("Action buttons")).includes("genderLabel")).toBe(false);
   });
 
-  it("el botón Agregar tiene el mismo tamaño en las dos cards", () => {
+  it("el botón Agregar mide 38px y es idéntico en las dos cards", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
-      // py-2.5 (antes py-3) — card compacta, 25-jul-2026. min-h-[44px] NO se
-      // toca: es el mínimo táctil de la app.
-      expect(code, nombre).toContain("py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px]");
+      // 38px = py-[9px] + leading-5 del text-sm (Daniel, 25-jul-2026; antes
+      // py-2.5 + min-h-[44px] = 44). OJO: 44px es el mínimo táctil recomendado
+      // en iOS — este 38 es una decisión explícita de Daniel, no un descuido.
+      expect(code, nombre).toContain("py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px]");
+      expect(code, nombre).not.toContain("min-h-[44px]");
+    }
+  });
+
+  it("el control de cantidad mide lo MISMO que el botón (la fila no crece)", () => {
+    for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
+      // h-9 (36) + 1px de borde arriba y abajo del qtyWrap = 38, igual que el
+      // botón Agregar: meter un producto al pedido no puede estirar la fila.
+      expect(code, nombre).toContain("h-9 flex items-center justify-center");
+      expect(code, nombre).toContain("w-11 h-9 flex items-center justify-center");
+      expect(code, nombre).not.toContain("h-11 flex items-center");
+      expect(code, nombre).not.toContain("w-11 h-11");
+    }
+    for (const m of MARCAS) {
+      expect(MARCA_THEME[m].card.qtyWrap, m).toContain("border");
     }
   });
 
@@ -174,8 +237,8 @@ describe("card de producto — paridad en las 3 marcas", () => {
     // Cada par: qué es, y el literal que debe aparecer en ambas cards.
     const ESPACIADOS: [string, string][] = [
       ["padding del bloque de info", '<div className="p-2.5">'],
-      ["margen del precio", 'className="mt-1.5"'],
-      ["margen del bloque de acción", "mt-2"],
+      ["margen de la fila precio+stock", 'className="mt-1.5 flex flex-col'],
+      ["margen del bloque de acción", "mt-1.5"],
       ["separación del bulto", 'className="flex items-baseline gap-1.5 mt-0.5"'],
     ];
     for (const [que, literal] of ESPACIADOS) {
@@ -187,9 +250,9 @@ describe("card de producto — paridad en las 3 marcas", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
       expect(code, nombre).not.toContain('<div className="p-3">');
       expect(code, nombre).not.toContain("mt-2.5");
+      // El bloque de acción ya no cuelga a mt-2 (márgenes apretados).
+      expect(clasesAplicadas(code), nombre).not.toMatch(/\bmt-2\b(?![.\d])/);
     }
-    // La línea de stock (componente compartido) baja el mismo escalón.
-    expect(STOCK_LINE).toContain("mt-1.5 pt-1.5 border-t");
   });
 
   it("el catálogo PÚBLICO nunca pide el stock interno", () => {
