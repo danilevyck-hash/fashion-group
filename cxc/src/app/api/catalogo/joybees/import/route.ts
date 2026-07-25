@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/api-auth";
+import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,10 @@ export async function POST(req: NextRequest) {
 
       zeroed = missingSkus.length;
     }
+
+    // Import masivo: pisa precio, nombre, categoría y active de todo el
+    // catálogo Joybees — el write path más agresivo de la marca.
+    if (upsertRows.length > 0 || missingSkus.length > 0) invalidarCatalogoPublico("joybees");
 
     return NextResponse.json({
       success: true,

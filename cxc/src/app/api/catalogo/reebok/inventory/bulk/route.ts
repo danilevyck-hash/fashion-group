@@ -4,6 +4,7 @@ import { reebokServer } from '@/lib/reebok-supabase-server'
 import { logActivity } from '@/lib/log-activity'
 import { getSession } from '@/lib/require-auth'
 import { requireRole } from '@/lib/requireRole'
+import { invalidarCatalogoPublico } from '@/lib/catalogo/cache'
 
 // POST: bulk update inventory from CSV (SKU + quantity)
 export async function POST(req: NextRequest) {
@@ -48,6 +49,10 @@ export async function POST(req: NextRequest) {
         results.updated++
       }
     }
+
+    // Carga masiva de existencias: el payload público de Reebok lleva
+    // `inventory`, así que el catálogo cambió.
+    if (results.updated > 0) invalidarCatalogoPublico('reebok')
 
     const session = getSession(req)
     await logActivity(session?.role || 'unknown', 'inventory_upload', 'reebok', { updated: results.updated, skipped: results.skipped }, session?.userName)

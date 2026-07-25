@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { seedJoybeesProducts } from "@/lib/joybees-seed";
+import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const results = await seedJoybeesProducts();
+    // El seed crea/pisa productos (precio, stock, is_regalia, active).
+    invalidarCatalogoPublico("joybees");
     return NextResponse.json(results);
   } catch (err) {
     console.error("Joybees seed error:", err);

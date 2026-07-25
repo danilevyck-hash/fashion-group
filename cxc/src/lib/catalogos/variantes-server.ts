@@ -14,6 +14,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarcaConfig } from "@/lib/catalogo/marcas";
+import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import {
   STORAGE_PREFIX,
   variantesRoot,
@@ -193,6 +194,11 @@ export async function guardarFotoElegida(
     .maybeSingle();
   if (!conFlag.error) {
     if (!conFlag.data) throw new Error("Producto no encontrado");
+    // La foto es lo primero que ve el cliente: invalidar aquí cubre de un solo
+    // punto el selector de variantes Y la carga masiva por ZIP (manifiesto),
+    // que es el otro llamador. revalidateTag deduplica por request, así que un
+    // ZIP de 5000 SKUs invalida la tag UNA vez.
+    invalidarCatalogoPublico(cfg.marca);
     return;
   }
   if (!conFlag.error.message.includes("foto_manual")) throw new Error(conFlag.error.message);
@@ -206,6 +212,7 @@ export async function guardarFotoElegida(
     .maybeSingle();
   if (sinFlag.error) throw new Error(sinFlag.error.message);
   if (!sinFlag.data) throw new Error("Producto no encontrado");
+  invalidarCatalogoPublico(cfg.marca);
 }
 
 /**

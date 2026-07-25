@@ -39,6 +39,7 @@ export function syncCatalogoJoybees(
 ): Promise<CatalogoSyncResult> {
   return syncCatalogo({
     db: joybeesServer,
+    marca: "joybees",
     syncLogType: "catalogo_joybees",
     productsTable: "joybees_products",
     empresas: EMPRESAS,

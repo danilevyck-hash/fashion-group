@@ -18,6 +18,7 @@ import { requireAdmin } from "@/lib/api-auth";
 import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
+import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 
@@ -195,6 +196,8 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  // Foto / etiqueta / nombre son campos que el catálogo público muestra.
+  invalidarCatalogoPublico(cfg.marca);
   return NextResponse.json(data);
 }
 
@@ -266,6 +269,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Es EL toggle de visibilidad: sin invalidar, el público seguiría viendo el
+  // producto ocultado (bug #244).
+  invalidarCatalogoPublico(cfg.marca);
+
   const s = getSession(req);
   const detalle = pcfg.idField === "id" ? { productId: idValue, sku: prod.sku } : { sku: idValue };
   await logActivity(
@@ -303,6 +310,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { marca: st
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 });
+  invalidarCatalogoPublico(cfg.marca);
   const s = getSession(req);
   await logActivity(s?.role || "admin", "product_soft_delete", cfg.marca, { productId: id }, s?.userName);
   return NextResponse.json({ success: true, deleted: data.id });

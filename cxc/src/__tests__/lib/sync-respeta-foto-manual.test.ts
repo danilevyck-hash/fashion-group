@@ -78,6 +78,7 @@ const ART = {
 
 function config(db: unknown) {
   return {
+    marca: "tommy" as const,
     syncLogType: "catalogo_test",
     productsTable: "tommy_products",
     db: db as never,
