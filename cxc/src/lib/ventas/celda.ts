@@ -1,0 +1,134 @@
+// Matemática de una celda del heatmap de Ventas — pura y compartida.
+//
+// Vivía duplicada en ResumenView (desktop) y ResumenViewMobile (mobile), con
+// dos implementaciones equivalentes pero separadas. Al mover el detalle de la
+// celda del tooltip flotante al panel lateral, las dos vistas y el panel tienen
+// que dar EXACTAMENTE el mismo número, así que la matemática vive acá.
+
+import { fmtMoney, fmtMoneyCompact } from "./format";
+import { formatDeltaRatio } from "./formatDelta";
+
+export type ViewMode = "ventas" | "utilidad" | "margen";
+
+/** Las 4 fuentes de una celda: período actual + mismo período del año previo. */
+export interface CeldaBase {
+  ventas: number | null;
+  ventasPrev: number;
+  utilidad: number | null;
+  utilidadPrev: number;
+}
+
+// Por debajo de $100 de ventas el ratio utilidad/ventas no es informativo
+// (mismo guard que Detalle Mensual).
+export const MARGEN_VENTAS_MIN = 100;
+
+export function marginRatio(ventas: number, utilidad: number): number | null {
+  if (ventas < MARGEN_VENTAS_MIN) return null;
+  return utilidad / ventas;
+}
+
+/** Valor de la celda en el modo activo. Margen: ratio 0..1, o null sin base. */
+export function cellValue(c: Pick<CeldaBase, "ventas" | "utilidad">, mode: ViewMode): number | null {
+  if (c.ventas == null || c.utilidad == null) {
+    return mode === "margen" ? null : (mode === "utilidad" ? c.utilidad : c.ventas);
+  }
+  if (mode === "margen") return marginRatio(c.ventas, c.utilidad);
+  if (mode === "utilidad") return c.utilidad;
+  return c.ventas;
+}
+
+export function cellPrevValue(c: Pick<CeldaBase, "ventasPrev" | "utilidadPrev">, mode: ViewMode): number {
+  if (mode === "margen") return marginRatio(c.ventasPrev, c.utilidadPrev) ?? 0;
+  if (mode === "utilidad") return c.utilidadPrev;
+  return c.ventasPrev;
+}
+
+/**
+ * Delta cur vs prev en el modo activo:
+ *   margen             → diferencia de ratios (−0.038 = −3.8 pts)
+ *   ventas / utilidad  → ratio (cur−prev)/prev
+ * null cuando no es comparable.
+ */
+export function cellDelta(c: CeldaBase, mode: ViewMode): number | null {
+  const cur = cellValue(c, mode);
+  if (cur == null) return null;
+  if (mode === "margen") {
+    const prevMargen = marginRatio(c.ventasPrev, c.utilidadPrev);
+    if (prevMargen == null) return null;
+    return cur - prevMargen;
+  }
+  const prev = cellPrevValue(c, mode);
+  if (prev <= 0) return null;
+  return (cur - prev) / prev;
+}
+
+/** Hay valor actual pero no hay base comparativa → "n/a". */
+export function isNaComparison(c: Pick<CeldaBase, "ventasPrev" | "utilidadPrev">, mode: ViewMode): boolean {
+  if (mode === "margen") return marginRatio(c.ventasPrev, c.utilidadPrev) == null;
+  return cellPrevValue(c, mode) <= 0;
+}
+
+export function deltaModeFor(mode: ViewMode): "pct" | "pts" {
+  return mode === "margen" ? "pts" : "pct";
+}
+
+/** Valor compacto para la celda de la tabla ("$1.2M"). */
+export function renderCellValue(v: number | null, mode: ViewMode): string {
+  if (v == null) return "—";
+  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  return fmtMoneyCompact(v);
+}
+
+/** Valor completo para el panel de detalle ("$1,234,567.89"). */
+export function renderCellValueFull(v: number | null, mode: ViewMode): string {
+  if (v == null) return "—";
+  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  return fmtMoney(v);
+}
+
+/** Una fila del panel de detalle: métrica, año actual, año previo y Δ. */
+export interface FilaMetrica {
+  mode: ViewMode;
+  label: string;
+  /** Valor del período actual, ya formateado. */
+  cur: string;
+  /** Valor del mismo período del año previo, ya formateado. */
+  prev: string;
+  /** Δ ya formateado ("▲ +12%", "n/a", "—"). */
+  delta: string;
+  tone: "emerald" | "orange" | "neutral";
+  /** true en la métrica que corresponde al toggle activo de la tabla. */
+  destacado: boolean;
+}
+
+const FILAS: Array<{ mode: ViewMode; label: string }> = [
+  { mode: "ventas", label: "Ventas" },
+  { mode: "utilidad", label: "Utilidad" },
+  { mode: "margen", label: "Margen" },
+];
+
+/**
+ * Las 3 métricas de una celda (Ventas, Utilidad, Margen) con su valor del año
+ * actual, el del año previo y el Δ. Es el contenido del panel lateral.
+ */
+export function buildFilasMetrica(cell: CeldaBase, highlight: ViewMode): FilaMetrica[] {
+  return FILAS.map(({ mode, label }) => {
+    const cur = cellValue(cell, mode);
+    const prev = cellPrevValue(cell, mode);
+    const delta = cellDelta(cell, mode);
+    const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
+    const na = isNaComparison(cell, mode);
+    return {
+      mode,
+      label,
+      cur: cur != null ? renderCellValueFull(cur, mode) : "—",
+      prev: prev > 0 ? renderCellValueFull(prev, mode) : "—",
+      delta:
+        delta == null
+          ? (na && cur != null ? "n/a" : "—")
+          : `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
+      tone: delta == null ? "neutral" : fmt.tone === "emerald" ? "emerald" : fmt.tone === "orange" ? "orange" : "neutral",
+      destacado: mode === highlight,
+    };
+  });
+}

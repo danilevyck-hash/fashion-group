@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { PullToRefresh } from "@/components/ui";
 import AppHeader from "@/components/AppHeader";
+import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
 // Tabs cargados LAZY: cada vista va en su propio chunk y solo se descarga al
@@ -42,36 +43,42 @@ const UtilidadView = dynamic(
 );
 
 // Bundle del tab Resumen: las 3 lecturas que dependen del año seleccionado.
+//
+// CADA LECTURA ES INDEPENDIENTE. Antes las 3 iban en un Promise.all que rechazaba
+// si CUALQUIERA fallaba, así que un 500 transitorio en /api/multifashion/overview
+// (que aquí solo alimenta el indicador de mayoreo de una fila) tumbaba el tab
+// Resumen entero con "No se pudieron cargar los datos de resumen". Ahora cada
+// endpoint guarda su propio error y solo apaga lo suyo.
 interface VentasBundle {
-  resumen: VentasResumen;
-  clientes: Clientes;
-  multi: Multifashion;
+  resumen: VentasResumen | null;
+  clientes: Clientes | null;
+  multi: Multifashion | null;
+  resumenError: string | null;
+  clientesError: string | null;
 }
 
-// Fetcher puro keyed por año: refetch EN PARALELO de resumen + clientes + multi.
-// resumen + clientes son los tabs visibles; multi (overview Multifashion) ya no
-// tiene tab propio aquí, pero ResumenView lo usa para el tooltip de desglose
-// retail/mayoreo de la fila Multifashion del heatmap, así que se sigue
-// refetcheando con el año. Rechaza si algún endpoint falla → SWR marca error.
+// Fetcher keyed por año. NUNCA rechaza: reintenta cada endpoint por separado
+// (fetchJsonWithRetry, 3 intentos con backoff corto — los timeouts de statement
+// de Postgres en caché fría se curan solos al segundo intento) y devuelve lo que
+// haya logrado traer. Lo que falló definitivamente viaja como mensaje.
 async function fetchVentasBundle(year: number): Promise<VentasBundle> {
-  const [resumenRes, clientesRes, multiRes] = await Promise.all([
-    fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" }),
-    fetch(`/api/ventas/clientes-12m?year=${year}`, { cache: "no-store" }),
-    fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" }),
+  const settle = async <T,>(p: Promise<T>): Promise<[T, null] | [null, string]> => {
+    try {
+      return [await p, null];
+    } catch (err) {
+      return [null, describeFetchError(err)];
+    }
+  };
+
+  const [[resumen, resumenError], [clientes, clientesError], [multi]] = await Promise.all([
+    settle(fetchJsonWithRetry<VentasResumen>(`/api/ventas/resumen?year=${year}`)),
+    settle(fetchJsonWithRetry<Clientes>(`/api/ventas/clientes-12m?year=${year}`)),
+    // Multifashion overview: SOLO alimenta el indicador de mayoreo de la fila
+    // Multifashion. Su fallo se traga en silencio — nunca debe apagar el Resumen.
+    settle(fetchJsonWithRetry<Multifashion>(`/api/multifashion/overview?year=${year}`)),
   ]);
 
-  const errors: string[] = [];
-  if (!resumenRes.ok) errors.push(`resumen: HTTP ${resumenRes.status}`);
-  if (!clientesRes.ok) errors.push(`clientes: HTTP ${clientesRes.status}`);
-  if (!multiRes.ok) errors.push(`multifashion: HTTP ${multiRes.status}`);
-  if (errors.length) throw new Error(errors.join(" · "));
-
-  const [resumen, clientes, multi] = await Promise.all([
-    resumenRes.json() as Promise<VentasResumen>,
-    clientesRes.json() as Promise<Clientes>,
-    multiRes.json() as Promise<Multifashion>,
-  ]);
-  return { resumen, clientes, multi };
+  return { resumen, clientes, multi, resumenError, clientesError };
 }
 
 interface VentasShellProps {
@@ -101,26 +108,36 @@ export function VentasShell({
   // fallbackData del SSR solo aplica al año inicial (no servir el initial de un
   // año distinto). dedupe 5min + sin revalidar al volver a la pestaña (módulo
   // pesado). La caché vive a nivel app (SWRProvider).
-  const { data, error, isLoading, mutate } = useSWR<VentasBundle>(
+  const { data, isLoading, mutate } = useSWR<VentasBundle>(
     ["ventas-bundle", selectedYear],
     () => fetchVentasBundle(selectedYear),
     {
       dedupingInterval: 5 * 60_000,
       revalidateOnFocus: false,
       fallbackData:
-        selectedYear === initialYear && initialResumen && initialClientes && initialMulti
-          ? { resumen: initialResumen, clientes: initialClientes, multi: initialMulti }
+        selectedYear === initialYear && initialResumen
+          ? {
+              resumen: initialResumen,
+              clientes: initialClientes,
+              multi: initialMulti,
+              resumenError: null,
+              clientesError: null,
+            }
           : undefined,
     },
   );
 
-  const resumen = data?.resumen ?? null;
-  const clientes = data?.clientes ?? null;
-  const multi = data?.multi ?? null;
+  // Red de seguridad: si el refetch del año inicial falló pero el SSR sí trajo
+  // data, se sigue mostrando la del SSR (stale) en vez de una pantalla de error.
+  const isInitialYear = selectedYear === initialYear;
+  const resumen = data?.resumen ?? (isInitialYear ? initialResumen : null);
+  const clientes = data?.clientes ?? (isInitialYear ? initialClientes : null);
+  const multi = data?.multi ?? (isInitialYear ? initialMulti : null);
   // "Cargando" solo cuando aún no hay nada que mostrar (deshabilita el selector).
   const loading = isLoading && !data;
-  // Error solo si no hay dato utilizable; con caché/SSR se muestra eso (stale).
-  const fetchError = error && !data ? (error instanceof Error ? error.message : "error inesperado") : null;
+  // Banner ámbar de "data vieja": solo cuando hay algo que mostrar Y el último
+  // refresh falló. Si no hay nada que mostrar, manda el ErrorState del tab.
+  const fetchError = resumen ? (data?.resumenError ?? null) : null;
 
   const onYearChange = useCallback((year: number) => {
     if (year === selectedYear) return;
@@ -244,7 +261,7 @@ export function VentasShell({
               onYearChange={onYearChange}
               onReloadData={() => mutate()}
             />
-          ) : <ErrorState scope="resumen" />}
+          ) : <ErrorState scope="resumen" detail={data?.resumenError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           {clientes ? (
@@ -256,7 +273,7 @@ export function VentasShell({
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}
             />
-          ) : <ErrorState scope="clientes" />}
+          ) : <ErrorState scope="clientes" detail={data?.clientesError ?? null} onRetry={() => mutate()} />}
         </TabsContent>
         <TabsContent value="productos" className="mt-5">
           {/* key={selectedYear} remonta al cambiar año global → resetea empresa/
@@ -275,13 +292,29 @@ export function VentasShell({
   );
 }
 
-function ErrorState({ scope }: { scope: string }) {
+// Solo se ve cuando el reintento automático (3 intentos) YA se agotó: el fallo
+// es definitivo, no un timeout de caché fría. Por eso ofrece un botón explícito.
+function ErrorState({
+  scope, detail, onRetry,
+}: {
+  scope: string;
+  detail?: string | null;
+  onRetry?: () => void;
+}) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
       <p className="text-sm text-gray-700">
         No se pudieron cargar los datos de <strong>{scope}</strong>.
       </p>
-      <p className="mt-1 text-xs text-gray-500">Intenta recargar en unos segundos.</p>
+      <p className="mt-1 text-xs text-gray-500">
+        Ya lo intentamos varias veces. Vuelve a probar en unos segundos.
+      </p>
+      {onRetry && (
+        <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+          Reintentar
+        </Button>
+      )}
+      {detail && <p className="mt-2 font-mono text-xs text-gray-400">{detail}</p>}
     </div>
   );
 }

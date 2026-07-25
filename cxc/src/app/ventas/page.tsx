@@ -6,6 +6,10 @@ import { VentasShell } from "./VentasShell";
 import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
+// El SSR de esta página cruza el empalme switch_facturas/ventas_raw (blend
+// pesado) y en caché fría pasa de 10s. Sin maxDuration explícito, la función
+// se corta antes de que el reintento de withDbRetry alcance a salvarla.
+export const maxDuration = 60;
 
 // Ventas es admin-only. Guard SSR (antes de cargar data) para que ningún otro
 // rol (ej. secretaria) vea Resumen/Clientes ni escribiendo la URL.

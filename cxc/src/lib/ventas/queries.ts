@@ -7,6 +7,7 @@
 //   - Null in a monthly array means "no data yet" (future month).
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -24,7 +25,6 @@ import type {
   EmpresaMonthlySales,
   MonthlySeries,
   ProyeccionResp,
-  ProyeccionMensualEmpresa,
 } from "@/components/ventas/types";
 
 interface DashboardSummaryRow {
@@ -67,11 +67,11 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const nowD = new Date();
-  const isCurrentYear = year === nowD.getFullYear();
-  const curMonth = nowD.getMonth() + 1;
-  const [curRes, prevRes, metaRes, proyRes, syncedRes, retailMensualRes, mayoristaMensualRes] = await Promise.all([
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
+  const [curRes, prevRes, metaRes, proyRes, syncedRes] = await Promise.all([
+    // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
+    // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
+    // Ver src/lib/supabase-retry.ts para la medición.
+    withDbRetry(() => supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }), { label: "ventas_dashboard_summary" }),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
     // anterior, y los meses posteriores no se emiten. Si `year` no es el
@@ -83,9 +83,19 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // función vigente si la migración aún no se aplicó → deploy sin orden forzado
     // (sin _v2 funciona igual que hoy; con _v2 va rápido).
     (async () => {
-      const v2 = await supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year });
+      const v2 = await withDbRetry(
+        () => supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year }),
+        { label: "ventas_dashboard_prev_same_period_v2" },
+      );
       if (!v2.error) return v2;
-      return supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year });
+      // El fallback existe SOLO para el caso "la migración de _v2 aún no corrió"
+      // (función inexistente). Si _v2 falló por timeout, la v1 es la MISMA
+      // consulta pero más lenta: reintentarla solo duplicaría la espera.
+      if (isTransientDbError(v2.error)) return v2;
+      return withDbRetry(
+        () => supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
+        { label: "ventas_dashboard_prev_same_period" },
+      );
     })(),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
     // Proyección de cierre por empresa + agregado del grupo. v5 agrega
@@ -93,21 +103,18 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // El hero del Resumen muestra realidad vs realidad (2026 proyectado
     // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
     // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
-    supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }),
+    withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
     // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
     // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
     // el subtitle cae a fecha_corte (lógica vieja) vía null.
-    supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1),
-    // Proyección de cierre MENSUAL por régimen (solo año en curso). Retail = método-b
-    // (pico fuera + run-rate plano + mayoreo); mayorista = run-rate plano + nota volátil.
-    // Aditivo: si falla, la columna mensual simplemente no se muestra.
-    isCurrentYear
-      ? supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: curMonth })
-      : Promise.resolve({ data: null, error: null }),
-    isCurrentYear
-      ? supabaseServer.rpc("proyeccion_mensual_mayorista_v1", { p_anio: year, p_mes: curMonth })
-      : Promise.resolve({ data: null, error: null }),
+    withDbRetry(() => supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1), { label: "switch_facturas.synced_at" }),
+    // NOTA (25-jul-2026): acá vivían proyeccion_mensual_retail_v1 y
+    // proyeccion_mensual_mayorista_v1, que alimentaban la columna "Cierre <mes>
+    // (proy.)". Se quitaron: el negocio B2B factura por embarques, no parejo, así
+    // que la proyección del mes salía marcada "estimación volátil" en las 8
+    // empresas y no ayudaba a decidir. La proyección de Multifashion (retail
+    // diario, sí confiable) sigue viva en su propio módulo.
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
@@ -244,26 +251,6 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const syncedRow = (syncedRes.data as Array<{ synced_at: string }> | null) ?? [];
   const dataActualizadaAt = syncedRow[0]?.synced_at ?? null;
 
-  // Proyección de cierre MENSUAL por empresa (clave = ventas id, igual que el anual).
-  // Solo año en curso. Retail (proyeccion_total = método-b + mayoreo) + mayorista
-  // (proyeccion = run-rate plano). Aditivo: si falla, el mapa queda vacío.
-  let proyeccionMensual: Record<string, ProyeccionMensualEmpresa> | null = null;
-  if (isCurrentYear) {
-    proyeccionMensual = {};
-    if (retailMensualRes.error) console.error("[ventas/proyeccion_mensual_retail]", retailMensualRes.error.message);
-    if (mayoristaMensualRes.error) console.error("[ventas/proyeccion_mensual_mayorista]", mayoristaMensualRes.error.message);
-    const retailRows = (retailMensualRes.data ?? []) as Array<{ empresa_key: string; proyeccion_total: number | null; acumulado: number; suficiente_data: boolean; nota: string | null }>;
-    const mayoristaRows = (mayoristaMensualRes.data ?? []) as Array<{ empresa_key: string; proyeccion: number | null; acumulado: number; suficiente_data: boolean; volatil: boolean; nota: string | null }>;
-    for (const r of retailRows) {
-      const id = EMPRESA_KEY_TO_VENTAS_ID[r.empresa_key] ?? r.empresa_key;
-      proyeccionMensual[id] = { regimen: "retail", proyeccion: r.proyeccion_total, acumulado: r.acumulado, suficiente_data: r.suficiente_data, volatil: false, nota: r.nota };
-    }
-    for (const r of mayoristaRows) {
-      const id = EMPRESA_KEY_TO_VENTAS_ID[r.empresa_key] ?? r.empresa_key;
-      proyeccionMensual[id] = { regimen: "mayorista", proyeccion: r.proyeccion, acumulado: r.acumulado, suficiente_data: r.suficiente_data, volatil: !!r.volatil, nota: r.nota };
-    }
-  }
-
   return {
     year,
     mesActual,
@@ -283,8 +270,6 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
     data_actualizada_at:     dataActualizadaAt,
     proyeccion,
-    proyeccionMensual,
-    mesProyeccion: isCurrentYear ? curMonth : null,
   };
 }
 
@@ -451,47 +436,40 @@ export async function fetchMultifashion({
   // v6 = shape Multifashion (retail/wholesale/total). serie_v1 ×2 (year y year-1)
   // alimenta la línea acumulada diaria del Overview; proyeccion_cierre_v1 la
   // proyección ponderada por temporada del header. Todo en paralelo.
-  const [mv6, serieAct, seriePrev, proy, mayPrev] = await Promise.all([
+  const [mv6, serieAct, seriePrev, proy] = await Promise.all([
     // v7 = v6 con el bloque de margen tienda-completa leído de ventas_rollup_mensual_mv
     // (híbrido: cerrados=MV, mes en curso=vivo) → quita 2 agregaciones en vivo de
     // switch_ventas_unificado_vw (~2.2s c/u). Mismo número exacto. Migración:
     // 20260623130000_multifashion_margen_desde_mv.sql. Fallback a v6 si aún no se
     // aplicó (deploy sin orden forzado).
     (async () => {
-      const v7 = await supabaseServer.rpc("multifashion_mensual_v7", { p_year: year, p_mes: mes });
+      const v7 = await withDbRetry(
+        () => supabaseServer.rpc("multifashion_mensual_v7", { p_year: year, p_mes: mes }),
+        { label: "multifashion_mensual_v7" },
+      );
       if (!v7.error) return v7;
-      return supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes });
+      // Igual que arriba: el fallback a v6 cubre "la migración de v7 no corrió",
+      // no un timeout. v6 hace MÁS trabajo que v7 (agrega en vivo lo que v7 lee
+      // del MV), así que ante un timeout intentarla es garantía de otro timeout.
+      if (isTransientDbError(v7.error)) return v7;
+      return withDbRetry(
+        () => supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes }),
+        { label: "multifashion_mensual_v6" },
+      );
     })(),
-    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }),
-    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }),
-    supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }),
-    // Mayoreo TOTAL del año anterior (is_wholesale=true). Para llevar la proyección
-    // de cierre y su delta a tienda-completa (el año previo ya cerró → total real).
-    // Aditivo: si falla, queda 0 y la proyección cae a su comportamiento retail.
-    supabaseServer
-      .from("_multifashion_sf_vw")
-      .select("subtotal")
-      .eq("anio", year - 1)
-      .eq("is_wholesale", true),
+    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }), { label: "multifashion_overview_serie_v1" }),
+    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }), { label: "multifashion_overview_serie_v1(prev)" }),
+    withDbRetry(() => supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }), { label: "multifashion_proyeccion_cierre_v1" }),
   ]);
   if (mv6.error) throw new Error(`multifashion_mensual_v7/v6: ${mv6.error.message}`);
   if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);
   if (seriePrev.error) throw new Error(`multifashion_overview_serie_v1(${year - 1}): ${seriePrev.error.message}`);
   if (proy.error) throw new Error(`multifashion_proyeccion_cierre_v1: ${proy.error.message}`);
-  if (mayPrev.error) console.error("[ventas/fetchMultifashion] mayoreo año previo:", mayPrev.error.message);
-
-  const mayoreoPrevYearTotal = mayPrev.error
-    ? 0
-    : ((mayPrev.data ?? []) as Array<{ subtotal: number | null }>).reduce(
-        (s, r) => s + Number(r.subtotal ?? 0),
-        0,
-      );
 
   return {
     ...(mv6.data as Multifashion),
     serieActual: serieAct.data as MultifashionSerieAnio,
     seriePrevio: seriePrev.data as MultifashionSerieAnio,
     proyeccionCierre: proy.data as MultifashionProyeccion,
-    mayoreoPrevYearTotal,
   };
 }

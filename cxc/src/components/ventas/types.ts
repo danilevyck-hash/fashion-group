@@ -120,17 +120,6 @@ export type ProyeccionResp = {
 
 /** Proyección de cierre del MES en curso por empresa (método-b retail / run-rate
  *  mayorista). Clave del mapa = ventas id (igual que ProyeccionEmpresa). */
-export type ProyeccionMensualEmpresa = {
-  regimen: "retail" | "mayorista";
-  /** Cierre proyectado del mes. null si datos insuficientes. */
-  proyeccion: number | null;
-  acumulado: number;
-  suficiente_data: boolean;
-  /** true para mayoristas (venta lumpy → estimación volátil). */
-  volatil: boolean;
-  /** "estimación volátil" | "datos insuficientes" | null */
-  nota: string | null;
-};
 
 export type VentasResumen = {
   year: number;
@@ -158,9 +147,6 @@ export type VentasResumen = {
   proyeccion: ProyeccionResp | null;
   /** Proyección de cierre del MES en curso por empresa (clave = ventas id).
    *  null para años cerrados. */
-  proyeccionMensual: Record<string, ProyeccionMensualEmpresa> | null;
-  /** Mes (1-12) al que corresponde proyeccionMensual. null si año cerrado. */
-  mesProyeccion: number | null;
 };
 
 export type Cliente = {
@@ -415,7 +401,4 @@ export type Multifashion = {
   retail: MultifashionRetail;
   wholesale: MultifashionWholesale;
   total: MultifashionTotal;
-  /** Mayoreo TOTAL del año anterior (cerrado). Lo agrega fetchMultifashion para
-   *  llevar la proyección de cierre del Panorama a tienda-completa (valor + delta). */
-  mayoreoPrevYearTotal?: number;
 };

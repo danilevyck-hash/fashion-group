@@ -7,15 +7,14 @@
 // Estructura: pill de frescura → 3 KPI cards (Ventas/Utilidad/Margen YTD) →
 // Toggles segmented → Heatmap con sticky col + mes actual highlighted +
 // total grupo dark row.
-// Sin tooltips (no hover en touch); drill-down al detalle queda para el
-// siguiente sprint.
+// Sin tooltips (no hay hover en touch): tocar una celda abre el panel de
+// detalle (sheet desde abajo) con Ventas, Utilidad y Margen del período.
 
 import type {
   VentasResumen,
   EmpresaMonthlySales,
   ProyeccionResp,
   ProyeccionEmpresa,
-  ProyeccionMensualEmpresa,
 } from "./types";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
@@ -26,11 +25,11 @@ import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
+import { buildFilasMetrica, cellValue, cellDelta, renderCellValue, type CeldaBase } from "@/lib/ventas/celda";
+import type { CeldaDetalle } from "./CeldaDetallePanel";
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
-
-const MARGEN_VENTAS_MIN = 100;
 
 const VENTAS_ID_TO_EMPRESA_KEY: Record<string, string> = {
   vistana: "vistana",
@@ -57,9 +56,13 @@ interface ResumenViewMobileProps {
   /** Abre el panel mes × año de una empresa (id ventas corto). El panel lo
    *  renderiza ResumenView (único en el árbol). */
   onOpenEmpresa: (id: string) => void;
-  /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
-   *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
-  multiMayoreoLabel?: string | null;
+  /** Abre el panel de detalle de UNA celda. El panel lo renderiza ResumenView
+   *  (único en el árbol), igual que el de empresa. */
+  onOpenCelda: (d: CeldaDetalle) => void;
+  /** Nota de mayoreo de Multifashion (american_classic), ya formateada por
+   *  buildNotaMayoreo: "incluye $X de mayoreo · Y". null si no hubo mayoreo en
+   *  el período → no se muestra nada. */
+  multiMayoreoNota?: string | null;
   /** Reload del bundle tras un "Actualizar ahora" exitoso. */
   onReloadData?: () => void;
 }
@@ -75,7 +78,8 @@ export function ResumenViewMobile({
   anualData,
   anualError,
   onOpenEmpresa,
-  multiMayoreoLabel,
+  onOpenCelda,
+  multiMayoreoNota,
   onReloadData,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
@@ -109,8 +113,10 @@ export function ResumenViewMobile({
           viewMode={viewMode}
           granularity={granularity}
           isClosedYear={isClosedYear}
-          multiMayoreoLabel={multiMayoreoLabel}
+          multiMayoreoNota={multiMayoreoNota}
           onOpenEmpresa={onOpenEmpresa}
+          onOpenCelda={onOpenCelda}
+          selectedYear={selectedYear}
         />
       )}
     </div>
@@ -255,27 +261,26 @@ function SegmentedRow<T extends string>({
 // Heatmap mobile — sticky col + mes actual highlight + total grupo dark row
 // ─────────────────────────────────────────────────────────────────────────────
 
-type CellData = {
-  ventas: number | null;
-  ventasPrev: number;
-  utilidad: number | null;
-  utilidadPrev: number;
-};
+type CellData = CeldaBase;
 
 function MobileHeatmap({
   data,
   viewMode,
   granularity,
   isClosedYear,
-  multiMayoreoLabel,
+  multiMayoreoNota,
   onOpenEmpresa,
+  onOpenCelda,
+  selectedYear,
 }: {
   data: VentasResumen;
   viewMode: ViewMode;
   granularity: Granularity;
   isClosedYear: boolean;
-  multiMayoreoLabel?: string | null;
+  multiMayoreoNota?: string | null;
   onOpenEmpresa: (id: string) => void;
+  onOpenCelda: (d: CeldaDetalle) => void;
+  selectedYear: number;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
 
@@ -293,6 +298,14 @@ function MobileHeatmap({
     nombre: e.empresa.nombre,
     cells: buildCells(e, granularity),
     ytdTotal: yearlyTotal(e, viewMode),
+    // Las 4 fuentes del YTD, para que el panel de la columna Total muestre
+    // Ventas + Utilidad + Margen igual que en desktop.
+    ytdCell: {
+      ventas: sumSeries(e.ventas2026),
+      ventasPrev: sumSeries(e.ventas2025),
+      utilidad: sumSeries(e.utilidad2026),
+      utilidadPrev: sumSeries(e.utilidad2025),
+    } as CellData,
     margenPct: e.margenPct,
     margenPctPrev: e.margenPctPrev,
   }));
@@ -328,8 +341,6 @@ function MobileHeatmap({
   );
 
   const showProy = !isClosedYear && !!data.proyeccion;
-  const showMensual = !isClosedYear && !!data.proyeccionMensual;
-  const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
 
   return (
     <div className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -368,14 +379,6 @@ function MobileHeatmap({
                 Proyección
               </th>
             )}
-            {showMensual && (
-              <th
-                scope="col"
-                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
-              >
-                Cierre {mesProyLabel} (proy.)
-              </th>
-            )}
           </tr>
         </thead>
         <tbody>
@@ -386,22 +389,22 @@ function MobileHeatmap({
             return (
               <tr
                 key={r.id}
-                onClick={() => onOpenEmpresa(r.id)}
-                aria-haspopup="dialog"
-                className="cursor-pointer border-b border-gray-100 last:border-b-0 active:bg-gray-50"
+                className="border-b border-gray-100 last:border-b-0"
               >
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] border-r border-gray-200 bg-white px-3 py-3 text-left text-xs font-medium text-gray-900"
+                  onClick={() => onOpenEmpresa(r.id)}
+                  aria-haspopup="dialog"
+                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] cursor-pointer border-r border-gray-200 bg-white px-3 py-3 text-left text-xs font-medium text-gray-900 active:bg-gray-50"
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{r.nombre}</span>
-                      {r.id === "multi" && multiMayoreoLabel && (
+                      {r.id === "multi" && multiMayoreoNota && (
                         /* Nota VISIBLE (paridad con desktop): la fila es american_classic
-                           COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */
+                           COMPLETA (tienda + mayoreo). Declara CUÁNTO es mayoreo. */
                         <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-gray-500">
-                          incluye mayoreo · {multiMayoreoLabel}
+                          {multiMayoreoNota}
                         </span>
                       )}
                     </span>
@@ -415,6 +418,10 @@ function MobileHeatmap({
                     cell={c}
                     mode={viewMode}
                     highlighted={ci === currentColIdx}
+                    titulo={r.nombre}
+                    periodLabel={`${cols[ci]} ${selectedYear}`}
+                    prevPeriodLabel={`${cols[ci]} ${selectedYear - 1}`}
+                    onOpen={onOpenCelda}
                   />
                 ))}
                 <MobileTotalCell
@@ -423,9 +430,12 @@ function MobileHeatmap({
                   mode={viewMode}
                   margenPct={r.margenPct}
                   margenPctPrev={r.margenPctPrev}
+                  cell={r.ytdCell}
+                  titulo={r.nombre}
+                  selectedYear={selectedYear}
+                  onOpen={onOpenCelda}
                 />
                 {showProy && <MobileProyCell proyeccion={proy} />}
-                {showMensual && <MobileMensualCell pm={data.proyeccionMensual![r.id]} />}
               </tr>
             );
           })}
@@ -442,6 +452,9 @@ function MobileHeatmap({
                 cell={agg}
                 mode={viewMode}
                 highlighted={ci === currentColIdx}
+                periodLabel={`${cols[ci]} ${selectedYear}`}
+                prevPeriodLabel={`${cols[ci]} ${selectedYear - 1}`}
+                onOpen={onOpenCelda}
               />
             ))}
             <MobileTotalGrupoYtdCell
@@ -451,11 +464,12 @@ function MobileHeatmap({
               prevUtil={groupYtd.up}
               mode={viewMode}
               data={data}
+              selectedYear={selectedYear}
+              onOpen={onOpenCelda}
             />
             {showProy && (
               <MobileProyGrupoCell proyeccion={data.proyeccion!} />
             )}
-            {showMensual && <MobileMensualGrupoCell pm={data.proyeccionMensual!} />}
           </tr>
         </tbody>
       </table>
@@ -464,15 +478,17 @@ function MobileHeatmap({
 }
 
 function MobileCell({
-  cell,
-  mode,
-  highlighted,
+  cell, mode, highlighted, titulo, periodLabel, prevPeriodLabel, onOpen,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
+  titulo: string;
+  periodLabel: string;
+  prevPeriodLabel: string;
+  onOpen: (d: CeldaDetalle) => void;
 }) {
-  const cur = cellNumber(cell, mode);
+  const cur = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.06)]" : "";
 
@@ -484,32 +500,46 @@ function MobileCell({
     );
   }
 
-  // Bloque alineado a la derecha: monto suave arriba (stone-600, sin negrita —
-  // deja de ser el grito principal), delta chiquito y discreto debajo con un
-  // poco de aire (gap-0.5). flex-col items-end alinea a la derecha sin centrar.
-  // Sin comparativo → DeltaPct no renderiza nada, queda solo el monto.
+  // Solo el monto y la flecha de dirección: el Δ numérico vive en el panel.
+  // Área táctil de 44px de alto (min-h en el botón) para el pulgar.
+  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
+  const tone = delta == null ? "text-gray-400"
+             : fmt.tone === "emerald" ? "text-emerald-700"
+             : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
   return (
-    <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-xs text-gray-600">{renderCell(cur, mode)}</span>
-        <DeltaPct delta={delta} mode={mode} />
-      </span>
+    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen({
+          kind: "metricas",
+          titulo,
+          subtitulo: periodLabel,
+          prevPeriod: prevPeriodLabel,
+          curPeriod: periodLabel,
+          filas: buildFilasMetrica(cell, mode),
+        })}
+        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-gray-100"
+      >
+        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+        <span className="text-xs text-gray-600">{renderCellValue(cur, mode)}</span>
+      </button>
     </td>
   );
 }
 
 function MobileTotalCell({
-  ventas,
-  prev,
-  mode,
-  margenPct,
-  margenPctPrev,
+  ventas, prev, mode, margenPct, margenPctPrev, cell, titulo, selectedYear, onOpen,
 }: {
   ventas: number;
   prev: number;
   mode: ViewMode;
   margenPct: number;
   margenPctPrev: number;
+  cell: CellData;
+  titulo: string;
+  selectedYear: number;
+  onOpen: (d: CeldaDetalle) => void;
 }) {
   let cur: number;
   let delta: number | null;
@@ -523,41 +553,28 @@ function MobileTotalCell({
     delta = prev > 0 ? (ventas - prev) / prev : null;
     display = formatCompactCurrency(cur);
   }
+  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
+  const tone = delta == null ? "text-gray-400"
+             : fmt.tone === "emerald" ? "text-emerald-700"
+             : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
   return (
-    <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono tabular-nums text-gray-950">
-      <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-xs font-semibold">{display}</span>
-        <DeltaPct delta={delta} mode={mode} />
-      </span>
-    </td>
-  );
-}
-
-/** Celda mobile de proyección de cierre del MES (método-b retail / run-rate mayorista).
- *  Paridad con la columna desktop. */
-function MobileMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
-  if (!pm || pm.proyeccion == null) {
-    return (
-      <td className="border-l border-gray-200 px-2.5 py-3 text-right text-xs text-gray-400">
-        datos insuf.
-      </td>
-    );
-  }
-  return (
-    <td className="border-l border-gray-200 px-2.5 py-3 text-right">
-      <span className="block font-mono text-xs font-semibold tabular-nums text-gray-900">{formatCompactCurrency(pm.proyeccion)}</span>
-      {pm.volatil && <span className="mt-0.5 block text-xs text-amber-600">volátil</span>}
-    </td>
-  );
-}
-
-/** Total grupo mobile de la proyección mensual: suma las empresas con dato suficiente. */
-function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEmpresa> }) {
-  const vals = Object.values(pm);
-  const total = vals.reduce((s, e) => s + (e.suficiente_data && e.proyeccion != null ? e.proyeccion : 0), 0);
-  return (
-    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-white">
-      {formatCompactCurrency(total)}
+    <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums text-gray-950">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen({
+          kind: "metricas",
+          titulo,
+          subtitulo: `Total ${selectedYear}`,
+          prevPeriod: `YTD ${selectedYear - 1}`,
+          curPeriod: `YTD ${selectedYear}`,
+          filas: buildFilasMetrica(cell, mode),
+        })}
+        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-gray-100"
+      >
+        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+        <span className="text-xs font-semibold">{display}</span>
+      </button>
     </td>
   );
 }
@@ -578,15 +595,16 @@ function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }
 }
 
 function MobileTotalGrupoCell({
-  cell,
-  mode,
-  highlighted,
+  cell, mode, highlighted, periodLabel, prevPeriodLabel, onOpen,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
+  periodLabel: string;
+  prevPeriodLabel: string;
+  onOpen: (d: CeldaDetalle) => void;
 }) {
-  const cur = cellNumber(cell, mode);
+  const cur = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
@@ -594,23 +612,34 @@ function MobileTotalGrupoCell({
     return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-500", bgCls)}>—</td>;
   }
 
+  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
+  const tone = delta == null ? "text-gray-400"
+             : fmt.tone === "emerald" ? "text-emerald-300"
+             : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
   return (
-    <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-xs font-medium text-white">{renderCell(cur, mode)}</span>
-        <DeltaPct delta={delta} mode={mode} dark />
-      </span>
+    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen({
+          kind: "metricas",
+          titulo: "Total grupo",
+          subtitulo: periodLabel,
+          prevPeriod: prevPeriodLabel,
+          curPeriod: periodLabel,
+          filas: buildFilasMetrica(cell, mode),
+        })}
+        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-white/10"
+      >
+        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+        <span className="text-xs font-medium text-white">{renderCellValue(cur, mode)}</span>
+      </button>
     </td>
   );
 }
 
 function MobileTotalGrupoYtdCell({
-  cur,
-  prev,
-  curUtil,
-  prevUtil,
-  mode,
-  data,
+  cur, prev, curUtil, prevUtil, mode, data, selectedYear, onOpen,
 }: {
   cur: number;
   prev: number;
@@ -618,6 +647,8 @@ function MobileTotalGrupoYtdCell({
   prevUtil: number;
   mode: ViewMode;
   data: VentasResumen;
+  selectedYear: number;
+  onOpen: (d: CeldaDetalle) => void;
 }) {
   let v: number;
   let d: number | null;
@@ -635,12 +666,29 @@ function MobileTotalGrupoYtdCell({
     d = prev > 0 ? (cur - prev) / prev : null;
     display = formatCompactCurrency(v);
   }
+  const fmt = formatDeltaRatio(d, mode === "margen" ? "pts" : "pct");
+  const tone = d == null ? "text-gray-400"
+             : fmt.tone === "emerald" ? "text-emerald-300"
+             : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
+  const ytdCell: CellData = { ventas: cur, ventasPrev: prev, utilidad: curUtil, utilidadPrev: prevUtil };
   return (
-    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
-      <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-xs font-semibold">{display}</span>
-        <DeltaPct delta={d} mode={mode} dark />
-      </span>
+    <td className="border-l border-gray-700 p-0 text-right font-mono tabular-nums text-white">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        onClick={() => onOpen({
+          kind: "metricas",
+          titulo: "Total grupo",
+          subtitulo: `Total ${selectedYear}`,
+          prevPeriod: `YTD ${selectedYear - 1}`,
+          curPeriod: `YTD ${selectedYear}`,
+          filas: buildFilasMetrica(ytdCell, mode),
+        })}
+        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-white/10"
+      >
+        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
+        <span className="text-xs font-semibold">{display}</span>
+      </button>
     </td>
   );
 }
@@ -650,41 +698,6 @@ function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
     <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-200">
       {formatCompactCurrency(proyeccion.totales_grupo.proyeccion_cierre)}
     </td>
-  );
-}
-
-// Flecha + % numérico vs 2025, compacto debajo del monto. En todas las celdas
-// del heatmap (mensual/trimestral por empresa, total grupo y columna TOTAL),
-// para igualar al desktop, que muestra monto + flecha + Δ%. Usa el mismo delta
-// ya calculado por la celda (ventas/utilidad = ratio %, margen = puntos),
-// formateado con el helper compartido formatDeltaRatio.
-function DeltaPct({
-  delta,
-  mode,
-  dark,
-}: {
-  delta: number | null;
-  mode: ViewMode;
-  dark?: boolean;
-}) {
-  // Sin comparativo (RPC no devolvió prev) → no renderiza nada: queda solo el
-  // monto, sin segunda línea suelta. La zona neutral (delta dentro del umbral)
-  // sí muestra el % en stone, sin flecha.
-  if (delta == null) return null;
-  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
-  const tone =
-    fmt.tone === "emerald"
-      ? dark ? "text-emerald-300" : "text-emerald-700"
-      : fmt.tone === "orange"
-        ? dark ? "text-rose-300" : "text-rose-600"
-        : dark ? "text-gray-400" : "text-gray-500";
-  // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio. Discreto
-  // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
-  // grilla vibre.
-  return (
-    <span className={cn("block w-full text-right text-xs font-normal leading-tight", tone)}>
-      {fmt.arrow ?? ""}{fmt.displayValue}
-    </span>
   );
 }
 
@@ -712,32 +725,6 @@ function buildCells(e: EmpresaMonthlySales, granularity: Granularity): CellData[
       utilidadPrev: q.reduce((s, i) => s + (e.utilidad2025[i] ?? 0), 0),
     };
   });
-}
-
-function cellNumber(c: CellData, mode: ViewMode): number | null {
-  if (mode === "margen") {
-    if (c.ventas == null || c.utilidad == null || c.ventas < MARGEN_VENTAS_MIN) return null;
-    return c.utilidad / c.ventas;
-  }
-  return mode === "utilidad" ? c.utilidad : c.ventas;
-}
-
-function cellDelta(c: CellData, mode: ViewMode): number | null {
-  const cur = cellNumber(c, mode);
-  if (cur == null) return null;
-  if (mode === "margen") {
-    if (c.ventasPrev < MARGEN_VENTAS_MIN) return null;
-    const prevM = c.utilidadPrev / c.ventasPrev;
-    return cur - prevM;
-  }
-  const prev = mode === "utilidad" ? c.utilidadPrev : c.ventasPrev;
-  if (prev <= 0) return null;
-  return (cur - prev) / prev;
-}
-
-function renderCell(v: number, mode: ViewMode): string {
-  if (mode === "margen") return (v * 100).toFixed(1) + "%";
-  return formatCompactCurrency(v);
 }
 
 function sumSeries(arr: (number | null)[]): number {
