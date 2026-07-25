@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PR-0 paridad catálogos — SNAPSHOT de la superficie API por marca.
+// Paridad catálogos — SNAPSHOT de la superficie API por marca.
 //
-// Enumera los route.ts existentes bajo /api/catalogo/{reebok,joybees} y los
-// compara contra la lista FIJA del estado pre-refactor. Si el refactor a rutas
-// dinámicas [marca] pierde o renombra una ruta sin querer, este test lo grita.
+// PR-1 (rutas dinámicas [marca]): el núcleo compartido vive UNA sola vez bajo
+// /api/catalogo/[marca]/** y resuelve la marca desde MARCAS_CONFIG; las rutas
+// EXCLUSIVAS de una marca siguen como rutas estáticas bajo su directorio.
+// Los paths públicos NO cambiaron: /api/catalogo/reebok/... y
+// /api/catalogo/joybees/... resuelven vía el segmento dinámico.
 //
 // Si una ruta se elimina/renombra A PROPÓSITO, actualizar la lista aquí en el
 // MISMO PR con la justificación en la descripción.
@@ -28,39 +30,11 @@ function collectRoutes(base: string): string[] {
 
 const API_BASE = path.join(process.cwd(), "src/app/api/catalogo");
 
-// Estado ACTUAL (jul-2026, pre-refactor). Rutas relativas a /api/catalogo/<marca>.
-const REEBOK_ROUTES = [
+// Núcleo COMPARTIDO generalizado a [marca] — un solo route.ts por endpoint,
+// dirigido por MARCAS_CONFIG. Misma lista que el CORE_COMPARTIDO de PR-0.
+const CORE_MARCA = [
   "clientes-search",
   "clientes-switch",
-  "inventory",
-  "inventory/bulk",
-  "orders",
-  "orders/[id]",
-  "orders/[id]/duplicar",
-  "orders/[id]/enviar-switch",
-  "orders/[id]/item",
-  "orders/[id]/pdf",
-  "orders/bulk-delete",
-  "pedido-publico",
-  "pedido-publico/[id]",
-  "pedido-publico/[id]/confirmar",
-  "pedidos-export",
-  "pedidos-publicos",
-  "pedidos-publicos/[short_id]",
-  "pedidos-publicos/[short_id]/convertir",
-  "pedidos-unificado",
-  "products",
-  "public",
-  "send-order",
-  "stats",
-  "sync-status",
-  "upload",
-].sort();
-
-const JOYBEES_ROUTES = [
-  "clientes-search",
-  "clientes-switch",
-  "import",
   "orders",
   "orders/[id]",
   "orders/[id]/duplicar",
@@ -77,65 +51,36 @@ const JOYBEES_ROUTES = [
   "pedidos-unificado",
   "products",
   "public",
-  "seed",
   "send-order",
   "sync-status",
   "upload",
 ].sort();
 
-// Núcleo COMPARTIDO que el refactor generaliza a [marca] — debe existir en
-// AMBAS marcas antes y después.
-const CORE_COMPARTIDO = [
-  "clientes-search",
-  "clientes-switch",
-  "orders",
-  "orders/[id]",
-  "orders/[id]/duplicar",
-  "orders/[id]/enviar-switch",
-  "orders/[id]/item",
-  "orders/[id]/pdf",
-  "orders/bulk-delete",
-  "pedido-publico",
-  "pedido-publico/[id]",
-  "pedido-publico/[id]/confirmar",
-  "pedidos-export",
-  "pedidos-publicos/[short_id]",
-  "pedidos-publicos/[short_id]/convertir",
-  "pedidos-unificado",
-  "products",
-  "public",
-  "send-order",
-  "sync-status",
-  "upload",
-];
+// Rutas EXCLUSIVAS de una marca — siguen estáticas bajo su directorio (el
+// snapshot de PR-0 las esperaba ahí y el PR-1 no las generaliza).
+const SOLO_REEBOK = ["inventory", "inventory/bulk", "pedidos-publicos", "stats"].sort();
+const SOLO_JOYBEES = ["import", "seed"].sort();
 
-describe("superficie API de catálogos — snapshot pre-refactor", () => {
-  it("reebok expone exactamente sus rutas conocidas", () => {
-    expect(collectRoutes(path.join(API_BASE, "reebok"))).toEqual(REEBOK_ROUTES);
+describe("superficie API de catálogos — snapshot post-refactor [marca]", () => {
+  it("[marca] expone exactamente el núcleo compartido", () => {
+    expect(collectRoutes(path.join(API_BASE, "[marca]"))).toEqual(CORE_MARCA);
   });
 
-  it("joybees expone exactamente sus rutas conocidas", () => {
-    expect(collectRoutes(path.join(API_BASE, "joybees"))).toEqual(JOYBEES_ROUTES);
+  it("reebok conserva SOLO sus rutas exclusivas como estáticas", () => {
+    expect(collectRoutes(path.join(API_BASE, "reebok"))).toEqual(SOLO_REEBOK);
   });
 
-  it("el núcleo compartido existe en AMBAS marcas (lo que el refactor generaliza)", () => {
+  it("joybees conserva SOLO sus rutas exclusivas como estáticas", () => {
+    expect(collectRoutes(path.join(API_BASE, "joybees"))).toEqual(SOLO_JOYBEES);
+  });
+
+  it("ninguna ruta del núcleo quedó duplicada como estática (conflicto de routing)", () => {
     const reebok = new Set(collectRoutes(path.join(API_BASE, "reebok")));
     const joybees = new Set(collectRoutes(path.join(API_BASE, "joybees")));
-    for (const ruta of CORE_COMPARTIDO) {
-      expect(reebok.has(ruta), `falta en reebok: ${ruta}`).toBe(true);
-      expect(joybees.has(ruta), `falta en joybees: ${ruta}`).toBe(true);
+    for (const ruta of CORE_MARCA) {
+      expect(reebok.has(ruta), `duplicada en reebok: ${ruta}`).toBe(false);
+      expect(joybees.has(ruta), `duplicada en joybees: ${ruta}`).toBe(false);
     }
-  });
-
-  it("diferencias conocidas entre marcas (solo-Reebok / solo-Joybees)", () => {
-    const reebok = new Set(collectRoutes(path.join(API_BASE, "reebok")));
-    const joybees = new Set(collectRoutes(path.join(API_BASE, "joybees")));
-    const soloReebok = [...reebok].filter((r) => !joybees.has(r)).sort();
-    const soloJoybees = [...joybees].filter((r) => !reebok.has(r)).sort();
-    // inventory/stats/pedidos-publicos(lista) son solo-Reebok hoy;
-    // import/seed son solo-Joybees. Cambios aquí = decisión consciente.
-    expect(soloReebok).toEqual(["inventory", "inventory/bulk", "pedidos-publicos", "stats"]);
-    expect(soloJoybees).toEqual(["import", "seed"]);
   });
 
   it("los crons de catálogo por marca existen", () => {

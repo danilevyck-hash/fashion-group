@@ -47,19 +47,29 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
-import { GET as rListGet, POST as rListPost } from "@/app/api/catalogo/reebok/orders/route";
-import { GET as jListGet, POST as jListPost } from "@/app/api/catalogo/joybees/orders/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { GET as listGet, POST as listPost } from "@/app/api/catalogo/[marca]/orders/route";
 import {
-  GET as rOrderGet,
-  PUT as rOrderPut,
-  DELETE as rOrderDel,
-} from "@/app/api/catalogo/reebok/orders/[id]/route";
-import {
-  PUT as jOrderPut,
-  DELETE as jOrderDel,
-} from "@/app/api/catalogo/joybees/orders/[id]/route";
-import { PATCH as rItemPatch } from "@/app/api/catalogo/reebok/orders/[id]/item/route";
-import { PATCH as jItemPatch } from "@/app/api/catalogo/joybees/orders/[id]/item/route";
+  GET as orderGet,
+  PUT as orderPut,
+  DELETE as orderDel,
+} from "@/app/api/catalogo/[marca]/orders/[id]/route";
+import { PATCH as itemPatch } from "@/app/api/catalogo/[marca]/orders/[id]/item/route";
+
+type IdCtx = { params: { id: string } };
+const rListGet = (req: NextRequest) => listGet(req, { params: { marca: "reebok" } });
+const jListGet = (req: NextRequest) => listGet(req, { params: { marca: "joybees" } });
+const rListPost = (req: NextRequest) => listPost(req, { params: { marca: "reebok" } });
+const jListPost = (req: NextRequest) => listPost(req, { params: { marca: "joybees" } });
+const rOrderGet = (req: NextRequest, ctx: IdCtx) => orderGet(req, { params: { marca: "reebok", ...ctx.params } });
+const rOrderPut = (req: NextRequest, ctx: IdCtx) => orderPut(req, { params: { marca: "reebok", ...ctx.params } });
+const jOrderPut = (req: NextRequest, ctx: IdCtx) => orderPut(req, { params: { marca: "joybees", ...ctx.params } });
+const rOrderDel = (req: NextRequest, ctx: IdCtx) => orderDel(req, { params: { marca: "reebok", ...ctx.params } });
+const jOrderDel = (req: NextRequest, ctx: IdCtx) => orderDel(req, { params: { marca: "joybees", ...ctx.params } });
+const rItemPatch = (req: NextRequest, ctx: IdCtx) => itemPatch(req, { params: { marca: "reebok", ...ctx.params } });
+const jItemPatch = (req: NextRequest, ctx: IdCtx) => itemPatch(req, { params: { marca: "joybees", ...ctx.params } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {

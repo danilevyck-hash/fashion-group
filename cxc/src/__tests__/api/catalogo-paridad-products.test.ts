@@ -47,20 +47,28 @@ vi.mock("@/lib/log-activity", () => ({
   logActivity: (...a: unknown[]) => mockLogActivity(...a),
 }));
 
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
 import {
-  GET as rProductsGet,
-  PUT as rProductsPut,
-  PATCH as rProductsPatch,
-  DELETE as rProductsDelete,
-} from "@/app/api/catalogo/reebok/products/route";
-import {
-  GET as jProductsGet,
-  POST as jProductsPost,
-  PATCH as jProductsPatch,
-} from "@/app/api/catalogo/joybees/products/route";
-import { GET as rPublicGet } from "@/app/api/catalogo/reebok/public/route";
-import { GET as jPublicGet } from "@/app/api/catalogo/joybees/public/route";
+  GET as productsGet,
+  PUT as productsPut,
+  POST as productsPost,
+  PATCH as productsPatch,
+  DELETE as productsDelete,
+} from "@/app/api/catalogo/[marca]/products/route";
+import { GET as publicGet } from "@/app/api/catalogo/[marca]/public/route";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
+
+const rProductsGet = (req: NextRequest) => productsGet(req, { params: { marca: "reebok" } });
+const jProductsGet = (req: NextRequest) => productsGet(req, { params: { marca: "joybees" } });
+const rProductsPut = (req: NextRequest) => productsPut(req, { params: { marca: "reebok" } });
+const jProductsPost = (req: NextRequest) => productsPost(req, { params: { marca: "joybees" } });
+const rProductsPatch = (req: NextRequest) => productsPatch(req, { params: { marca: "reebok" } });
+const jProductsPatch = (req: NextRequest) => productsPatch(req, { params: { marca: "joybees" } });
+const rProductsDelete = (req: NextRequest) => productsDelete(req, { params: { marca: "reebok" } });
+const rPublicGet = () => publicGet(makeReq("/x"), { params: { marca: "reebok" } });
+const jPublicGet = () => publicGet(makeReq("/x"), { params: { marca: "joybees" } });
 
 beforeAll(() => {
   process.env.SESSION_SECRET = TEST_SECRET;

@@ -32,8 +32,13 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
-import { POST as rConvertir } from "@/app/api/catalogo/reebok/pedidos-publicos/[short_id]/convertir/route";
-import { POST as jConvertir } from "@/app/api/catalogo/joybees/pedidos-publicos/[short_id]/convertir/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { POST as convertirPost } from "@/app/api/catalogo/[marca]/pedidos-publicos/[short_id]/convertir/route";
+type SidCtx = { params: { short_id: string } };
+const rConvertir = (req: NextRequest, ctx: SidCtx) => convertirPost(req, { params: { marca: "reebok", ...ctx.params } });
+const jConvertir = (req: NextRequest, ctx: SidCtx) => convertirPost(req, { params: { marca: "joybees", ...ctx.params } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {

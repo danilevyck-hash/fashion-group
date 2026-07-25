@@ -1,27 +1,222 @@
-// Config por marca de catálogo para el flujo de pedidos (checkout + envío a
-// Switch). SERVER-ONLY (importa los clients service-role) — no importar desde
-// componentes cliente.
+// ─────────────────────────────────────────────────────────────────────────────
+// Config por marca del motor de catálogos (PR-1: rutas dinámicas [marca]).
+// SERVER-ONLY — resuelve clients service-role; no importar desde componentes
+// cliente.
+//
+// Los clients Supabase son LAZY (funciones async con dynamic import): importar
+// este módulo NUNCA construye un client. Esto es deliberado y load-bearing:
+// el arnés de paridad mockea los módulos client POR ARCHIVO de test; un import
+// eager arrastraría clients reales (sin env → throw) en los tests que no
+// mockean el client de la otra marca.
+//
+// Los QUIRKS marcados abajo son divergencias reales heredadas del estado
+// pre-refactor (fijadas por el arnés de PR-0). Se preservan a propósito:
+// unificarlas requiere OK de Daniel, no es decisión de un refactor.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { reebokServer } from "@/lib/reebok-supabase-server";
-import { joybeesServer } from "@/lib/joybees-supabase-server";
+import { createClient } from "@supabase/supabase-js";
 import { getBultoSize as reebokBulto } from "@/lib/reebok-bulto";
 import { getBultoSize as joybeesBulto } from "@/lib/joybees-bulto";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
+import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
+import {
+  validatePedidoBody as reebokValidatePedidoBody,
+  applyDbPrices as reebokApplyDbPrices,
+} from "@/lib/reebok-pedido-publico-validate";
+import { checkPedidoRateLimit as reebokCheckPedidoRateLimit } from "@/lib/reebok-pedido-rate-limit";
+import {
+  validatePedidoBody as joybeesValidatePedidoBody,
+  applyDbPrices as joybeesApplyDbPrices,
+} from "@/lib/joybees-pedido-publico-validate";
+import { checkPedidoRateLimit as joybeesCheckPedidoRateLimit } from "@/lib/joybees-pedido-rate-limit";
+import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
+
+export type MarcaKey = "reebok" | "joybees";
+
+/** Client Supabase resuelto de forma lazy (ver nota de cabecera). */
+export type LazyDb = () => Promise<SupabaseClient>;
+
+export interface ItemForTotal {
+  quantity: number;
+  unit_price: number;
+  category?: string;
+}
+
+/** Item saneado del pedido público (superset de las dos marcas: category e
+ *  is_preorder son opcionales y solo-Reebok). */
+export interface PedidoPublicoItem {
+  product_id: string;
+  sku: string;
+  name: string;
+  image_url: string | null;
+  quantity: number;
+  unit_price: number;
+  category?: string;
+  is_preorder?: boolean;
+}
+
+export type PedidoPublicoValidacion =
+  | { ok: true; items: PedidoPublicoItem[]; cliente_nombre: string }
+  | { ok: false; error: string };
+
+export type PedidoPublicoPreciado =
+  | { ok: true; items: PedidoPublicoItem[]; total: number; adjusted: boolean }
+  | { ok: false; error: string };
+
+export type PedidoPublicoApplyPrices = (
+  items: PedidoPublicoItem[],
+  products: Map<string, { price: number; category: string | null }>,
+) => PedidoPublicoPreciado;
+
+// ── Getters lazy de clients ──────────────────────────────────────────────────
+
+const reebokServerDb: LazyDb = async () =>
+  (await import("@/lib/reebok-supabase-server")).reebokServer;
+const joybeesServerDb: LazyDb = async () =>
+  (await import("@/lib/joybees-supabase-server")).joybeesServer;
+const mainServerDb: LazyDb = async () =>
+  (await import("@/lib/supabase-server")).supabaseServer;
+// GET /products de Reebok lee con el client ANON del catálogo (patrón original).
+const reebokProductsAnonDb: LazyDb = async () =>
+  (await import("@/components/reebok/supabase")).supabase;
+// Joybees products/public crean su client por request (patrón original
+// getSupabase(): proyecto principal, service-role con fallback a anon).
+const joybeesProductsDb: LazyDb = async () =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+// POST /pedido-publico: ambas marcas insertan con un client al proyecto
+// principal con service-role (RLS public_insert), patrón original del route.
+const publicosInsertClient = (): SupabaseClient =>
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
 
 export interface MarcaConfig {
-  marca: "reebok" | "joybees";
+  marca: MarcaKey;
   label: string;
   empresaKey: string;
-  db: SupabaseClient;
+
+  // ── Tablas / vistas / RPCs ──
   ordersTable: string;
   itemsRelation: string; // nombre de la relación embebida en selects
   enviosTable: string;
   productsTable: string;
+  publicosTable: string;
+  unificadoView: string;
   createOrderRpc: string;
-  bultoSize: (category: string | null | undefined) => number;
+  replaceItemsRpc: string;
+  convertRpc: string;
+  /** Prefijo de numeración que asigna la RPC (PED-### / JBP-###). */
+  numeroPrefijo: string;
+  /** Nombre del cron de catálogo en cron_heartbeats (sync-status). */
+  cronName: string;
+
+  // ── Clients (lazy) ──
+  /** Proyecto de la marca: orders/items/envios/products server-side. */
+  db: LazyDb;
+  /** Proyecto principal: directorio, switch_clientes, cron_heartbeats. */
+  mainDb: LazyDb;
+  /** QUIRK heredado, unificar con OK de Daniel: reebok_pedidos_publicos y su
+   *  vista unificada viven en el proyecto PRINCIPAL (supabaseServer); en
+   *  Joybees viven en su client (que hoy cae al principal por env). */
+  publicosDb: LazyDb;
+  /** Insert del POST público (pedido del link) — ver publicosInsertClient. */
+  publicosInsertClient: () => SupabaseClient;
+
+  // ── Totales / categorías ──
+  bultoSize: (category?: string | null) => number;
+  calcTotal: (items: ItemForTotal[]) => number;
+  /** Solo Reebok: category por product_id (define bulto 6/12). null = la marca
+   *  no maneja categorías (Joybees es 100% footwear, bulto 12 fijo). */
+  categoryLookup:
+    | ((ids: (string | null | undefined)[]) => Promise<Map<string, string>>)
+    | null;
+  /** Fallback al calcular TOTALES cuando la category no resuelve (apparel=6:
+   *  nunca inflar el cobro asumiendo footwear=12 a ciegas). */
+  fallbackCategory: string | null;
+  /** Fallback de category para el PDF del pedido (patrón original por marca). */
+  pdfFallbackCategory: string;
+
+  // ── Columnas / flags de datos ──
+  /** is_preorder (pre-venta) es concepto solo-Reebok: columna en items, RPCs y
+   *  secciones del correo. */
+  itemsHasPreorder: boolean;
+  /** Columnas extra de la tabla orders en los selects (origen_* solo Reebok). */
+  ordersSelectExtra: string;
+  /** Select del POST /pedidos-export (col `total` vestigial solo en Reebok). */
+  exportCols: string;
+  exportTitulo: string;
+
+  // ── QUIRKS de negocio heredados (unificar con OK de Daniel) ──
+  /** QUIRK 1: la lista GET /orders de Joybees filtra deleted=false en la
+   *  query; la de Reebok NO filtra (comportamiento pre-refactor). */
+  listaFiltraDeleted: boolean;
+  /** QUIRK 2: Reebok aún acepta el rol legacy 'cliente' al crear pedidos. */
+  createRoles: string[];
+  /** QUIRK 3: upload con roles y Storage distintos por marca (Reebok:
+   *  admin+secretaria → Storage del proyecto Reebok, path products/;
+   *  Joybees: solo admin → Storage del proyecto principal, path joybees/). */
+  upload: { roles: string[]; storage: "marca" | "main"; pathPrefix: string };
+
+  // ── Presentación / mensajes ──
+  telegramEmoji: string;
+  /** Nombre del directorio Switch en mensajes de error (clientes-switch). */
+  switchDirectorioLabel: string;
+  sendOrder: {
+    from: string;
+    headerHtml: (orderNumber: string, clientName: string, fechaLabel: string) => string;
+    tableHeadBg: string;
+  };
+  /** Solo Reebok: orden canónico categoría+SKU de items en correo/PDF. */
+  sortEmailItems: (<T extends { sku: string; category?: string }>(items: T[]) => T[]) | null;
+
+  // ── Endpoint /pedido-publico (libs de validación por marca) ──
+  pedidoPublico: {
+    validateBody: (body: unknown) => PedidoPublicoValidacion;
+    applyDbPrices: PedidoPublicoApplyPrices;
+    checkRateLimit: (
+      db: SupabaseClient,
+      ip: string,
+    ) => Promise<{ allowed: boolean; ipHash: string | null }>;
+    /** Columnas de precio a leer de products ("id, price, category" en Reebok). */
+    priceCols: string;
+  };
+
+  // ── Endpoint /products y /public (QUIRKS 4 y 5) ──
+  products: {
+    /** QUIRK 4: 'publico-scope-admin' = GET legible SIN sesión salvo
+     *  scope=admin (Reebok); 'roles-modulo' = sesión SIEMPRE con roles del
+     *  módulo Catálogos (Joybees, incluye bodega). */
+    authStyle: "publico-scope-admin" | "roles-modulo";
+    /** QUIRK 5: edición por `id` vía PUT (Reebok) o por `sku` vía POST
+     *  (Joybees). El verbo no configurado responde 405. */
+    editVerb: "PUT" | "POST";
+    idField: "id" | "sku";
+    cols: string;
+    readDb: LazyDb;
+    writeDb: LazyDb;
+    /** DELETE (soft, active=false) existe solo en Reebok. */
+    hasDelete: boolean;
+  };
+  publicCatalog: {
+    db: LazyDb;
+    cols: string;
+    /** Reebok responde {products, inventory}; Joybees {products} (stock en fila). */
+    conInventario: boolean;
+  };
+
   /** Defaults del piloto — SOLO Reebok legacy (pedidos creados antes del
    *  checkout, sin cliente/vendedor guardados). Joybees no tiene legacy. */
-  fallback: { clienteId: number; clienteNombre: string; vendedorId: number; vendedorNombre: string } | null;
+  fallback: {
+    clienteId: number;
+    clienteNombre: string;
+    vendedorId: number;
+    vendedorNombre: string;
+  } | null;
 }
 
 export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
@@ -29,26 +224,144 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     marca: "reebok",
     label: "Reebok",
     empresaKey: "active_shoes",
-    db: reebokServer,
     ordersTable: "reebok_orders",
     itemsRelation: "reebok_order_items",
     enviosTable: "reebok_switch_envios",
     productsTable: "products",
+    publicosTable: "reebok_pedidos_publicos",
+    unificadoView: "reebok_pedidos_unificado_vw",
     createOrderRpc: "reebok_create_order",
+    replaceItemsRpc: "reebok_order_replace_items",
+    convertRpc: "convert_reebok_pedido_publico",
+    numeroPrefijo: "PED",
+    cronName: "reebok-catalogo",
+    db: reebokServerDb,
+    mainDb: mainServerDb,
+    publicosDb: mainServerDb, // quirk heredado: publicos de Reebok en el principal
+    publicosInsertClient,
     bultoSize: (c) => reebokBulto(c || "apparel"),
-    fallback: { clienteId: 1, clienteNombre: "Contado", vendedorId: 2, vendedorNombre: "Reinaldo Espinosa" },
+    calcTotal: calculateReebokOrderTotal,
+    categoryLookup: async (ids) =>
+      (await import("@/lib/reebok-category-lookup")).fetchReebokCategoryMap(ids),
+    fallbackCategory: "apparel",
+    pdfFallbackCategory: "apparel",
+    itemsHasPreorder: true,
+    ordersSelectExtra: ", origen_original, origen_short_id",
+    exportCols: "origen, cliente, vendor, items, total, created_at",
+    exportTitulo: "REEBOK — Pedidos",
+    listaFiltraDeleted: false, // quirk heredado, unificar con OK de Daniel
+    createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
+    upload: { roles: ["admin", "secretaria"], storage: "marca", pathPrefix: "products" }, // quirk heredado
+    telegramEmoji: "🛒",
+    switchDirectorioLabel: "Active Shoes",
+    sendOrder: {
+      from: "Reebok Panama <pedidos@fashiongr.com>",
+      headerHtml: (orderNumber, clientName, fechaLabel) => `
+      <div style="background:#1a1a1a;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/reebok/reebok-logo.png" alt="Reebok" width="60" height="17" style="display:block;margin-bottom:8px" />
+        <h2 style="margin:0;font-size:18px">Pedido ${orderNumber} — ${clientName}</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      tableHeadBg: "#1a1a1a",
+    },
+    sortEmailItems: sortReebokOrderItems,
+    pedidoPublico: {
+      validateBody: reebokValidatePedidoBody,
+      applyDbPrices: reebokApplyDbPrices as PedidoPublicoApplyPrices,
+      checkRateLimit: reebokCheckPedidoRateLimit,
+      priceCols: "id, price, category",
+    },
+    products: {
+      authStyle: "publico-scope-admin", // quirk heredado, unificar con OK de Daniel
+      editVerb: "PUT", // quirk heredado: edición por id
+      idField: "id",
+      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
+      readDb: reebokProductsAnonDb,
+      writeDb: reebokServerDb,
+      hasDelete: true,
+    },
+    publicCatalog: {
+      db: reebokServerDb,
+      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at",
+      conInventario: true,
+    },
+    fallback: {
+      clienteId: 1,
+      clienteNombre: "Contado",
+      vendedorId: 2,
+      vendedorNombre: "Reinaldo Espinosa",
+    },
   },
   joybees: {
     marca: "joybees",
     label: "Joybees",
     empresaKey: "joystep",
-    db: joybeesServer,
     ordersTable: "joybees_orders",
     itemsRelation: "joybees_order_items",
     enviosTable: "joybees_switch_envios",
     productsTable: "joybees_products",
+    publicosTable: "joybees_pedidos_publicos",
+    unificadoView: "joybees_pedidos_unificado_vw",
     createOrderRpc: "joybees_create_order",
+    replaceItemsRpc: "joybees_order_replace_items",
+    convertRpc: "convert_joybees_pedido_publico",
+    numeroPrefijo: "JBP",
+    cronName: "joybees-catalogo",
+    db: joybeesServerDb,
+    mainDb: mainServerDb,
+    publicosDb: joybeesServerDb,
+    publicosInsertClient,
     bultoSize: () => joybeesBulto(),
+    calcTotal: calculateJoybeesOrderTotal,
+    categoryLookup: null,
+    fallbackCategory: null,
+    pdfFallbackCategory: "footwear",
+    itemsHasPreorder: false,
+    ordersSelectExtra: "",
+    exportCols: "origen, cliente, vendor, items, created_at",
+    exportTitulo: "JOYBEES — Pedidos",
+    listaFiltraDeleted: true,
+    createRoles: ["admin", "secretaria", "vendedor"],
+    upload: { roles: ["admin"], storage: "main", pathPrefix: "joybees" }, // quirk heredado
+    telegramEmoji: "🐝",
+    switchDirectorioLabel: "Joystep",
+    sendOrder: {
+      from: "Joybees Panama <pedidos@fashiongr.com>",
+      headerHtml: (orderNumber, clientName, fechaLabel) => `
+      <div style="background:#1a2656;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <h2 style="margin:0;font-size:18px;color:#ffe443">Joybees</h2>
+        <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      tableHeadBg: "#1a2656",
+    },
+    sortEmailItems: null,
+    pedidoPublico: {
+      validateBody: joybeesValidatePedidoBody,
+      applyDbPrices: joybeesApplyDbPrices as PedidoPublicoApplyPrices,
+      checkRateLimit: joybeesCheckPedidoRateLimit,
+      priceCols: "id, price",
+    },
+    products: {
+      authStyle: "roles-modulo",
+      editVerb: "POST", // quirk heredado: edición por sku
+      idField: "sku",
+      cols: "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge,created_at",
+      readDb: joybeesProductsDb,
+      writeDb: joybeesProductsDb,
+      hasDelete: false,
+    },
+    publicCatalog: {
+      db: joybeesProductsDb,
+      cols: "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge",
+      conInventario: false,
+    },
     fallback: null,
   },
 };
+
+/** Marca del segmento dinámico [marca] → config; null si no existe (→ 404). */
+export function getMarcaConfig(marca: string | undefined | null): MarcaConfig | null {
+  if (!marca) return null;
+  return MARCAS_CONFIG[marca] ?? null;
+}

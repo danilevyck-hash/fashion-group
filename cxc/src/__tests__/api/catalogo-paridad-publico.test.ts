@@ -65,12 +65,19 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
-import { POST as rPubPost } from "@/app/api/catalogo/reebok/pedido-publico/route";
-import { POST as jPubPost } from "@/app/api/catalogo/joybees/pedido-publico/route";
-import { GET as rPubGet } from "@/app/api/catalogo/reebok/pedido-publico/[id]/route";
-import { GET as jPubGet } from "@/app/api/catalogo/joybees/pedido-publico/[id]/route";
-import { POST as rConfirmar } from "@/app/api/catalogo/reebok/pedido-publico/[id]/confirmar/route";
-import { POST as jConfirmar } from "@/app/api/catalogo/joybees/pedido-publico/[id]/confirmar/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { POST as pubPost } from "@/app/api/catalogo/[marca]/pedido-publico/route";
+import { GET as pubGet } from "@/app/api/catalogo/[marca]/pedido-publico/[id]/route";
+import { POST as confirmarPost } from "@/app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route";
+type IdCtx = { params: { id: string } };
+const rPubPost = (req: NextRequest) => pubPost(req, { params: { marca: "reebok" } });
+const jPubPost = (req: NextRequest) => pubPost(req, { params: { marca: "joybees" } });
+const rPubGet = (req: NextRequest, ctx: IdCtx) => pubGet(req, { params: { marca: "reebok", ...ctx.params } });
+const jPubGet = (req: NextRequest, ctx: IdCtx) => pubGet(req, { params: { marca: "joybees", ...ctx.params } });
+const rConfirmar = (req: NextRequest, ctx: IdCtx) => confirmarPost(req, { params: { marca: "reebok", ...ctx.params } });
+const jConfirmar = (req: NextRequest, ctx: IdCtx) => confirmarPost(req, { params: { marca: "joybees", ...ctx.params } });
 import { makeReq } from "../helpers/catalogo-request";
 
 const P1 = "11111111-1111-4111-8111-111111111111";

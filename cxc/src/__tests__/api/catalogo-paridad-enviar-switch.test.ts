@@ -38,8 +38,15 @@ vi.mock("@/lib/switch-api/client", () => ({
   logoutAllSwitchSessions: (...a: unknown[]) => mockLogout(...a),
 }));
 
-import { GET as rEnvioGet, POST as rEnvioPost } from "@/app/api/catalogo/reebok/orders/[id]/enviar-switch/route";
-import { GET as jEnvioGet, POST as jEnvioPost } from "@/app/api/catalogo/joybees/orders/[id]/enviar-switch/route";
+// PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
+// inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
+import type { NextRequest } from "next/server";
+import { GET as envioGet, POST as envioPost } from "@/app/api/catalogo/[marca]/orders/[id]/enviar-switch/route";
+type IdCtx = { params: { id: string } };
+const rEnvioGet = (req: NextRequest, ctx: IdCtx) => envioGet(req, { params: { marca: "reebok", ...ctx.params } });
+const jEnvioGet = (req: NextRequest, ctx: IdCtx) => envioGet(req, { params: { marca: "joybees", ...ctx.params } });
+const rEnvioPost = (req: NextRequest, ctx: IdCtx) => envioPost(req, { params: { marca: "reebok", ...ctx.params } });
+const jEnvioPost = (req: NextRequest, ctx: IdCtx) => envioPost(req, { params: { marca: "joybees", ...ctx.params } });
 import { envioResultToResponse } from "@/lib/catalogo/enviar-switch-route";
 import type { EnvioResult } from "@/lib/catalogo/switch-envio";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
