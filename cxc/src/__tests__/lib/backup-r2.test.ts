@@ -56,6 +56,9 @@ interface MockOpts {
   existentes?: Record<string, number>;
   /** PUT "exitoso" pero que no deja el objeto (simula el 200-mentiroso). */
   putFantasma?: boolean;
+  /** HEAD que responde 200 SIN content-length (R2 sirve los .json comprimidos
+   *  y undici borra el header al descomprimir — visto en producción 25-jul). */
+  headSinLargo?: boolean;
 }
 
 /**
@@ -63,7 +66,7 @@ interface MockOpts {
  * Devuelve el mock y el mapa de objetos para inspeccionarlo.
  */
 function mockFetch(manifest: Record<string, string> | null, opts: MockOpts = {}) {
-  const { putStatus = 200, existentes = {}, putFantasma = false } = opts;
+  const { putStatus = 200, existentes = {}, putFantasma = false, headSinLargo = false } = opts;
   const objetos = new Map<string, number>(Object.entries(existentes));
   const fn = vi.fn(async (input: Request | string | URL) => {
     const req = input as Request;
@@ -75,6 +78,7 @@ function mockFetch(manifest: Record<string, string> | null, opts: MockOpts = {})
     if (req.method === "HEAD") {
       const size = objetos.get(key);
       if (size === undefined) return new Response(null, { status: 404 });
+      if (headSinLargo) return new Response(null, { status: 200 });
       return new Response(null, { status: 200, headers: { "content-length": String(size) } });
     }
     // PUT
@@ -307,6 +311,33 @@ describe("verificación post-subida y agujero del manifest", () => {
     expect(res.subidos).toBe(0);
     expect(res.errores[0]).toMatch(/se esperaban 1/);
     expect(urlsDe(fn, "HEAD")).toHaveLength(1);
+  });
+
+  it("HEAD 200 sin content-length → vale como verificado (R2 sirve los .json comprimidos)", async () => {
+    stubEnv(ENV);
+    // Regresión del 25-jul contra el R2 real: los 8 .ndjson.gz verificaban bien
+    // y meta-switch.json fallaba con "subido con 0 bytes, se esperaban 1463".
+    const { fn, objetos } = mockFetch(null, { headSinLargo: true });
+    const metaBuf = Buffer.from(JSON.stringify({ format: "v2-ndjson-gz", datasets: [] }), "utf-8");
+    const key = r2DataKey("2026-07-25", "meta-switch.json");
+    const res = await replicateBackupToR2([{ key, body: metaBuf }], Date.now() + 10_000);
+
+    expect(res.errores).toEqual([]);
+    expect(res.subidos).toBe(1);
+    expect(objetos.has(key)).toBe(true);
+    const manifestReq = calls(fn).filter((r) => r.method === "PUT").slice(-1)[0];
+    expect(JSON.parse(await manifestReq.text())[key]).toBe(fileSignature(metaBuf));
+  });
+
+  it("el HEAD pide Accept-Encoding: identity para que R2 no comprima la respuesta", async () => {
+    stubEnv(ENV);
+    const { fn } = mockFetch(null);
+    await replicateBackupToR2(
+      [{ key: r2DataKey("2026-07-25", "meta.json"), body: Buffer.from("{}") }],
+      Date.now() + 10_000,
+    );
+    const head = calls(fn).find((r) => r.method === "HEAD");
+    expect(head?.headers.get("accept-encoding")).toBe("identity");
   });
 });
 
