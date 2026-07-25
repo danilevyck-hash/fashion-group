@@ -7,8 +7,13 @@
 import { useState, useRef } from "react";
 import Image from "next/image";
 import BulkPhotoUpload from "./BulkPhotoUpload";
+import ZipB2BUpload from "./ZipB2BUpload";
+import VariantePicker from "./VariantePicker";
 import { validateProductPhoto, uploadProductPhoto, updateProductBadge, toggleProductOculto } from "./photoUpload";
 import type { AdminProducto, MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+
+/** Saber si un SKU tiene fotos del banco B2B guardadas (lo calcula el shell). */
+export type TieneVariantes = (sku: string | null) => boolean;
 
 type CategoriaFilter = "todas" | "footwear" | "apparel" | "accessories";
 type FotoFilter = "todos" | "con" | "sin";
@@ -36,7 +41,7 @@ const BADGE_CHIP: Record<string, { label: string; cls: string }> = {
 // ── Tab: Faltan foto (cola de trabajo) ────────────────────────────────────────
 
 export function FaltanFotoTarjetasTab({
-  marca, products, sinFoto, onPhotoSaved, showToast,
+  marca, products, sinFoto, onPhotoSaved, onZipDone, tieneVariantes, showToast,
 }: {
   marca: MarcaUiKey;
   /** Catálogo visible completo — para la subida masiva (permite reemplazar fotos). */
@@ -45,10 +50,16 @@ export function FaltanFotoTarjetasTab({
    *  disponibilidad desc — lo más vendible primero. */
   sinFoto: AdminProducto[];
   onPhotoSaved: () => Promise<void>;
+  onZipDone: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
   showToast: (msg: string) => void;
 }) {
   return (
     <div>
+      {/* ZIP del banco B2B: guarda TODAS las vistas de cada código y elige la
+          mejor sola. Se procesa en el navegador (ver zip-b2b-client.ts). */}
+      <ZipB2BUpload marca={marca} products={products} onDone={onZipDone} showToast={showToast} />
+
       {/* Subida masiva: asigna por nombre=SKU contra TODOS los productos (permite
           también reemplazar fotos existentes). La subida por tarjeta sigue abajo. */}
       <BulkPhotoUpload marca={marca} products={products} onDone={onPhotoSaved} showToast={showToast} />
@@ -66,7 +77,7 @@ export function FaltanFotoTarjetasTab({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {sinFoto.map((p) => (
-            <ProductPhotoCard key={p.id} marca={marca} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+            <ProductPhotoCard key={p.id} marca={marca} product={p} onPhotoSaved={onPhotoSaved} tieneVariantes={tieneVariantes} showToast={showToast} />
           ))}
         </div>
       )}
@@ -77,18 +88,25 @@ export function FaltanFotoTarjetasTab({
 // ── Tab: Catálogo completo ────────────────────────────────────────────────────
 
 export function CatalogoCompletoTab({
-  marca, products, onPhotoSaved, showToast,
+  marca, products, onPhotoSaved, tieneVariantes, showToast,
 }: {
   marca: MarcaUiKey;
   products: AdminProducto[];
   onPhotoSaved: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
   showToast: (msg: string) => void;
 }) {
   const [categoria, setCategoria] = useState<CategoriaFilter>("todas");
   const [foto, setFoto] = useState<FotoFilter>("todos");
   const [badge, setBadge] = useState<BadgeFilter>("todas");
   const [visibilidad, setVisibilidad] = useState<VisibilidadFilter>("visibles");
+  const [soloSneakers, setSoloSneakers] = useState(false);
   const [search, setSearch] = useState("");
+
+  // Chip "Solo sneakers": data-driven — solo aparece si la marca de verdad
+  // tiene esa categoría (hoy Tommy). Sirve para repasar rápido los que peor
+  // salen con la vista lateral del banco.
+  const sneakersCount = products.filter((p) => p.category === "sneakers").length;
 
   const ocultosCount = products.filter((p) => p.oculto_manual === true).length;
   // Si ya no queda ningún oculto (se re-mostró el último), el filtro vuelve solo
@@ -99,6 +117,7 @@ export function CatalogoCompletoTab({
     .filter((p) => {
       const oculto = p.oculto_manual === true;
       if (visibilidadEfectiva === "visibles" ? oculto : !oculto) return false;
+      if (soloSneakers && p.category !== "sneakers") return false;
       if (categoria !== "todas" && p.category !== categoria) return false;
       if (foto === "con" && !tieneFoto(p)) return false;
       if (foto === "sin" && tieneFoto(p)) return false;
@@ -152,6 +171,9 @@ export function CatalogoCompletoTab({
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Segmented options={categoriaTabs} value={categoria} onChange={setCategoria} />
+        {sneakersCount > 0 && (
+          <SneakersChip activo={soloSneakers} count={sneakersCount} onToggle={() => setSoloSneakers((v) => !v)} />
+        )}
         <Segmented options={fotoTabs} value={foto} onChange={setFoto} />
         <Segmented options={badgeTabs} value={badge} onChange={setBadge} />
         {/* Filtro del toggle "Ocultar del catálogo" — solo aparece si hay ocultos. */}
@@ -175,11 +197,36 @@ export function CatalogoCompletoTab({
       ) : (
         <div className="space-y-2">
           {filtered.map((p) => (
-            <ProductListRow key={p.id} marca={marca} product={p} onPhotoSaved={onPhotoSaved} showToast={showToast} />
+            <ProductListRow key={p.id} marca={marca} product={p} onPhotoSaved={onPhotoSaved} tieneVariantes={tieneVariantes} showToast={showToast} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/** Chip on/off "Solo sneakers" — filtro rápido, no un segmented de 2 opciones. */
+export function SneakersChip({
+  activo, count, onToggle,
+}: {
+  activo: boolean;
+  count: number;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={activo}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.97] ${
+        activo
+          ? "bg-gray-900 text-white"
+          : "bg-gray-100 text-gray-500 hover:text-gray-700"
+      }`}
+    >
+      Solo sneakers
+      <span className={`tabular-nums ${activo ? "text-white/60" : "text-gray-400"}`}>{count}</span>
+    </button>
   );
 }
 
@@ -335,11 +382,12 @@ function OcultarToggle({
 // ── Tarjeta de producto con subida de foto ────────────────────────────────────
 
 function ProductPhotoCard({
-  marca, product, onPhotoSaved, showToast,
+  marca, product, onPhotoSaved, tieneVariantes, showToast,
 }: {
   marca: MarcaUiKey;
   product: AdminProducto;
   onPhotoSaved: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
   showToast: (msg: string) => void;
 }) {
   const {
@@ -420,9 +468,20 @@ function ProductPhotoCard({
               : "bg-[#1A2656] text-white hover:bg-[#1A2656]/90"
           }`}
         >
-          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar foto" : "Subir foto"}
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Subir otra foto" : "Subir foto"}
         </button>
         {error && <p className="text-[11px] text-[#E4002B] leading-tight">{error}</p>}
+
+        {/* Elegir entre las fotos que ya trajo el ZIP del B2B. */}
+        <div className="mt-1.5">
+          <VariantePicker
+            marca={marca}
+            product={product}
+            tieneVariantes={tieneVariantes(product.sku)}
+            onSaved={onPhotoSaved}
+            showToast={showToast}
+          />
+        </div>
 
         {/* Etiqueta manual (badge). No toca inventario — solo la etiqueta visual. */}
         <div className="mt-1.5 pt-2 border-t border-[#1A2656]/10">
@@ -472,11 +531,12 @@ function ProductPhotoCard({
 // ── Fila de producto (vista lista densa) ──────────────────────────────────────
 
 function ProductListRow({
-  marca, product, onPhotoSaved, showToast,
+  marca, product, onPhotoSaved, tieneVariantes, showToast,
 }: {
   marca: MarcaUiKey;
   product: AdminProducto;
   onPhotoSaved: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
   showToast: (msg: string) => void;
 }) {
   const {
@@ -488,7 +548,8 @@ function ProductListRow({
   const agotado = disp == null || disp <= 0;
 
   return (
-    <div className={`flex items-center gap-3 bg-white border rounded-lg p-2.5 ${oculto ? "border-gray-100 opacity-80" : "border-gray-200"}`}>
+    <div className={`bg-white border rounded-lg p-2.5 ${oculto ? "border-gray-100 opacity-80" : "border-gray-200"}`}>
+      <div className="flex items-center gap-3">
       {/* Miniatura */}
       <div className="relative w-[88px] h-[88px] shrink-0 rounded-md overflow-hidden bg-[#F5F0E8]">
         {chip && (
@@ -548,7 +609,7 @@ function ProductListRow({
           disabled={uploading}
           className="px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50 transition whitespace-nowrap"
         >
-          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar" : "Subir foto"}
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Subir otra" : "Subir foto"}
         </button>
         <div className="flex flex-col items-end gap-0.5">
           <select
@@ -576,6 +637,20 @@ function ProductListRow({
             onConfirm={toggleOculto}
           />
         </div>
+      </div>
+      </div>
+
+      {/* Elegir entre las fotos que ya trajo el ZIP del B2B (tira debajo de la
+          fila, alineada con los datos, para que las miniaturas quepan a lo ancho). */}
+      <div className="mt-2 pl-[100px]">
+        <VariantePicker
+          marca={marca}
+          product={product}
+          tieneVariantes={tieneVariantes(product.sku)}
+          onSaved={onPhotoSaved}
+          showToast={showToast}
+          compacto
+        />
       </div>
     </div>
   );

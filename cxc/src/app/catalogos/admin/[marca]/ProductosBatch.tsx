@@ -11,6 +11,9 @@ import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob } from "@/lib/csv-export";
 import { validateProductPhoto, uploadProductPhoto, toggleProductOculto, editProductName } from "./photoUpload";
+import ZipB2BUpload from "./ZipB2BUpload";
+import VariantePicker from "./VariantePicker";
+import { SneakersChip, type TieneVariantes } from "./ProductosTarjetas";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 function fmtMoney(n: number) {
@@ -52,6 +55,8 @@ export function FaltanFotoBatchTab({
   sinFoto,
   showToast,
   onComplete,
+  onZipDone,
+  tieneVariantes,
 }: {
   marca: MarcaUiKey;
   /** Catálogo visible completo — para la subida masiva (permite reemplazar fotos). */
@@ -61,14 +66,20 @@ export function FaltanFotoBatchTab({
   sinFoto: AdminProducto[];
   showToast: (msg: string) => void;
   onComplete: () => Promise<void>;
+  onZipDone: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
 }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-500">
         {sinFoto.length === 0
           ? "Todos los productos tienen foto 🎉"
-          : `${sinFoto.length} producto${sinFoto.length === 1 ? "" : "s"} sin foto. Sube los archivos con el nombre = SKU; se emparejan solos.`}
+          : `${sinFoto.length} producto${sinFoto.length === 1 ? "" : "s"} sin foto. Sube el ZIP del B2B y se emparejan solos.`}
       </p>
+
+      {/* ZIP del banco B2B: guarda TODAS las vistas de cada código y elige la
+          mejor sola. Se procesa en el navegador (ver zip-b2b-client.ts). */}
+      <ZipB2BUpload marca={marca} products={products} onDone={onZipDone} showToast={showToast} />
 
       <BatchPhotosSection marca={marca} products={products} showToast={showToast} onComplete={onComplete} />
 
@@ -82,7 +93,16 @@ export function FaltanFotoBatchTab({
                   sin foto
                 </div>
                 <p className="text-[11px] font-mono text-gray-500 truncate" title={p.sku || ""}>{p.sku}</p>
-                <p className="text-sm text-gray-900 truncate" title={p.name}>{p.name}</p>
+                <p className="text-sm text-gray-900 truncate mb-2" title={p.name}>{p.name}</p>
+                {/* Si el ZIP ya guardó fotos de este código, se puede elegir una
+                    sin salir de la cola de pendientes. */}
+                <VariantePicker
+                  marca={marca}
+                  product={p}
+                  tieneVariantes={tieneVariantes(p.sku)}
+                  onSaved={onComplete}
+                  showToast={showToast}
+                />
               </div>
             ))}
           </div>
@@ -101,15 +121,23 @@ export function ProductosBatchListTab({
   products,
   showToast,
   onComplete,
+  tieneVariantes,
 }: {
   marca: MarcaUiKey;
   products: AdminProducto[];
   showToast: (msg: string) => void;
   onComplete: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
 }) {
   const theme = getMarcaTheme(marca)!;
   const [search, setSearch] = useState("");
   const [visibilidad, setVisibilidad] = useState<"visibles" | "ocultos">("visibles");
+  const [soloSneakers, setSoloSneakers] = useState(false);
+
+  // Chip "Solo sneakers": data-driven — solo aparece si la marca de verdad
+  // tiene esa categoría (hoy Tommy). Sirve para repasar rápido los que peor
+  // salen con la vista lateral del banco.
+  const sneakersCount = products.filter((p) => p.category === "sneakers").length;
 
   const ocultosCount = products.filter((p) => p.oculto_manual === true).length;
   // Si ya no queda ningún oculto (se re-mostró el último), el filtro vuelve solo
@@ -119,6 +147,7 @@ export function ProductosBatchListTab({
   const filtered = products.filter((p) => {
     const oculto = p.oculto_manual === true;
     if (visibilidadEfectiva === "visibles" ? oculto : !oculto) return false;
+    if (soloSneakers && p.category !== "sneakers") return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -148,6 +177,12 @@ export function ProductosBatchListTab({
         />
       </div>
 
+      {sneakersCount > 0 && (
+        <div className="mb-4">
+          <SneakersChip activo={soloSneakers} count={sneakersCount} onToggle={() => setSoloSneakers((v) => !v)} />
+        </div>
+      )}
+
       {/* Filtro del toggle "Ocultar del catálogo" — solo aparece si hay ocultos. */}
       {ocultosCount > 0 && (
         <div className="inline-flex bg-gray-100 rounded-lg p-0.5 mb-4">
@@ -175,7 +210,7 @@ export function ProductosBatchListTab({
 
       <div className="space-y-2">
         {sorted.map((product) => (
-          <ProductRow key={product.id} marca={marca} product={product} showToast={showToast} onComplete={onComplete} />
+          <ProductRow key={product.id} marca={marca} product={product} showToast={showToast} onComplete={onComplete} tieneVariantes={tieneVariantes} />
         ))}
       </div>
     </div>
@@ -189,11 +224,13 @@ function ProductRow({
   product,
   showToast,
   onComplete,
+  tieneVariantes,
 }: {
   marca: MarcaUiKey;
   product: AdminProducto;
   showToast: (msg: string) => void;
   onComplete: () => Promise<void>;
+  tieneVariantes: TieneVariantes;
 }) {
   const theme = getMarcaTheme(marca)!;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -378,7 +415,7 @@ function ProductRow({
           disabled={uploading}
           className="flex-shrink-0 px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50 transition whitespace-nowrap"
         >
-          {uploading ? "Subiendo…" : tieneFoto(product) ? "Cambiar" : "Subir foto"}
+          {uploading ? "Subiendo…" : tieneFoto(product) ? "Subir otra" : "Subir foto"}
         </button>
 
         {/* Ocultar / mostrar en el catálogo (sobrevive al sync). */}
@@ -410,6 +447,19 @@ function ProductRow({
             {oculto ? "Mostrar en catálogo" : "Ocultar del catálogo"}
           </button>
         )}
+      </div>
+
+      {/* Elegir entre las fotos que ya trajo el ZIP del B2B (tira debajo de la
+          fila, alineada con los datos, para que las miniaturas quepan a lo ancho). */}
+      <div className="mt-2 pl-[60px]">
+        <VariantePicker
+          marca={marca}
+          product={product}
+          tieneVariantes={tieneVariantes(product.sku)}
+          onSaved={onComplete}
+          showToast={showToast}
+          compacto
+        />
       </div>
     </div>
   );
