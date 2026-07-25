@@ -415,7 +415,4 @@ export type Multifashion = {
   retail: MultifashionRetail;
   wholesale: MultifashionWholesale;
   total: MultifashionTotal;
-  /** Mayoreo TOTAL del año anterior (cerrado). Lo agrega fetchMultifashion para
-   *  llevar la proyección de cierre del Panorama a tienda-completa (valor + delta). */
-  mayoreoPrevYearTotal?: number;
 };

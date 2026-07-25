@@ -57,9 +57,10 @@ interface ResumenViewMobileProps {
   /** Abre el panel mes × año de una empresa (id ventas corto). El panel lo
    *  renderiza ResumenView (único en el árbol). */
   onOpenEmpresa: (id: string) => void;
-  /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
-   *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
-  multiMayoreoLabel?: string | null;
+  /** Nota de mayoreo de Multifashion (american_classic), ya formateada por
+   *  buildNotaMayoreo: "incluye $X de mayoreo · Y". null si no hubo mayoreo en
+   *  el período → no se muestra nada. */
+  multiMayoreoNota?: string | null;
   /** Reload del bundle tras un "Actualizar ahora" exitoso. */
   onReloadData?: () => void;
 }
@@ -75,7 +76,7 @@ export function ResumenViewMobile({
   anualData,
   anualError,
   onOpenEmpresa,
-  multiMayoreoLabel,
+  multiMayoreoNota,
   onReloadData,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
@@ -109,7 +110,7 @@ export function ResumenViewMobile({
           viewMode={viewMode}
           granularity={granularity}
           isClosedYear={isClosedYear}
-          multiMayoreoLabel={multiMayoreoLabel}
+          multiMayoreoNota={multiMayoreoNota}
           onOpenEmpresa={onOpenEmpresa}
         />
       )}
@@ -267,14 +268,14 @@ function MobileHeatmap({
   viewMode,
   granularity,
   isClosedYear,
-  multiMayoreoLabel,
+  multiMayoreoNota,
   onOpenEmpresa,
 }: {
   data: VentasResumen;
   viewMode: ViewMode;
   granularity: Granularity;
   isClosedYear: boolean;
-  multiMayoreoLabel?: string | null;
+  multiMayoreoNota?: string | null;
   onOpenEmpresa: (id: string) => void;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
@@ -397,11 +398,11 @@ function MobileHeatmap({
                   <div className="flex items-center gap-1.5">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{r.nombre}</span>
-                      {r.id === "multi" && multiMayoreoLabel && (
+                      {r.id === "multi" && multiMayoreoNota && (
                         /* Nota VISIBLE (paridad con desktop): la fila es american_classic
-                           COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */
+                           COMPLETA (tienda + mayoreo). Declara CUÁNTO es mayoreo. */
                         <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-gray-500">
-                          incluye mayoreo · {multiMayoreoLabel}
+                          {multiMayoreoNota}
                         </span>
                       )}
                     </span>

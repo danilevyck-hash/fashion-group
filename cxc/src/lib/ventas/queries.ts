@@ -451,7 +451,7 @@ export async function fetchMultifashion({
   // v6 = shape Multifashion (retail/wholesale/total). serie_v1 ×2 (year y year-1)
   // alimenta la línea acumulada diaria del Overview; proyeccion_cierre_v1 la
   // proyección ponderada por temporada del header. Todo en paralelo.
-  const [mv6, serieAct, seriePrev, proy, mayPrev] = await Promise.all([
+  const [mv6, serieAct, seriePrev, proy] = await Promise.all([
     // v7 = v6 con el bloque de margen tienda-completa leído de ventas_rollup_mensual_mv
     // (híbrido: cerrados=MV, mes en curso=vivo) → quita 2 agregaciones en vivo de
     // switch_ventas_unificado_vw (~2.2s c/u). Mismo número exacto. Migración:
@@ -465,33 +465,16 @@ export async function fetchMultifashion({
     supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }),
     supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }),
     supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }),
-    // Mayoreo TOTAL del año anterior (is_wholesale=true). Para llevar la proyección
-    // de cierre y su delta a tienda-completa (el año previo ya cerró → total real).
-    // Aditivo: si falla, queda 0 y la proyección cae a su comportamiento retail.
-    supabaseServer
-      .from("_multifashion_sf_vw")
-      .select("subtotal")
-      .eq("anio", year - 1)
-      .eq("is_wholesale", true),
   ]);
   if (mv6.error) throw new Error(`multifashion_mensual_v7/v6: ${mv6.error.message}`);
   if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);
   if (seriePrev.error) throw new Error(`multifashion_overview_serie_v1(${year - 1}): ${seriePrev.error.message}`);
   if (proy.error) throw new Error(`multifashion_proyeccion_cierre_v1: ${proy.error.message}`);
-  if (mayPrev.error) console.error("[ventas/fetchMultifashion] mayoreo año previo:", mayPrev.error.message);
-
-  const mayoreoPrevYearTotal = mayPrev.error
-    ? 0
-    : ((mayPrev.data ?? []) as Array<{ subtotal: number | null }>).reduce(
-        (s, r) => s + Number(r.subtotal ?? 0),
-        0,
-      );
 
   return {
     ...(mv6.data as Multifashion),
     serieActual: serieAct.data as MultifashionSerieAnio,
     seriePrevio: seriePrev.data as MultifashionSerieAnio,
     proyeccionCierre: proy.data as MultifashionProyeccion,
-    mayoreoPrevYearTotal,
   };
 }

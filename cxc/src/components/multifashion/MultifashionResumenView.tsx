@@ -4,7 +4,7 @@
 // mensual" en una sola página con scroll:
 //   1) Header de identidad (lo aporta MultifashionView: nombre + ubicación +
 //      gerente + selector de mes).
-//   2) Titular del mes (tienda completa = retail + mayoreo) + 2 comparativos
+//   2) Titular del mes (RETAIL PURO; el mayoreo se declara aparte) + 2 comparativos
 //      con monto + línea de tickets/ticket promedio/proyección.
 //   3) Gráfico "Ventas día por día" con toggle Mes/Año (Año = acumulado vs prev).
 //   4) Banda de 3 cards: mejor/peor día · mejor día de semana · hora pico.
@@ -12,7 +12,7 @@
 //
 // NO toca cálculos ni vistas: cada número sale de la MISMA fuente que ya usaban
 // Overview (prop `overview`, server → multifashion_mensual_v6) y Detalle mensual
-// (endpoint /api/multifashion/detalle-mensual). El titular reusa ventas_total
+// (endpoint /api/multifashion/detalle-mensual). El titular usa `ventas` (retail)
 // (PR #131); los comparativos siguen sobre retail (sus % no cambian).
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -42,6 +42,7 @@ const CumulativeChartCard = dynamic(
 
 import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
+import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -122,6 +123,10 @@ interface DetalleMensualResp {
   hora_pico_ventas?: number | null;
   /** Cliente(s) de mayoreo del mes, para la nota del titular. null si no hay. */
   mayoreo_cliente?: string | null;
+  /** Lista de clientes distintos de mayoreo del mes (detalle de la nota). */
+  mayoreo_clientes?: string[];
+  /** Facturas de mayoreo del mes (resumen "N facturas" de la nota). */
+  mayoreo_facturas?: number;
 }
 
 interface MultifashionResumenViewProps {
@@ -310,15 +315,23 @@ export function MultifashionResumenView({
   const serieAct = overview.serieActual;
   const seriePrev = overview.seriePrevio;
   const cierreActual = serieAct.dias.length ? serieAct.dias[serieAct.dias.length - 1].acumulado : 0;
-  // Proyección/cierre del Panorama a TIENDA-COMPLETA: + mayoreo REAL del año a la
-  // fecha (sin extrapolar lo grumoso). El delta se recalcula vs cierre del año previo
-  // también tienda-completa (cierre_prev retail + mayoreo total del año previo, ya cerrado).
+  // RETAIL PURO (25-jul-2026). Antes el Panorama sumaba el mayoreo a la
+  // proyección y al cierre ("tienda completa"). Ahora Multifashion mide SOLO la
+  // tienda: proyección, cierre y ventas del año van sin mayoreo, y el mayoreo se
+  // declara aparte con la nota "no incluye $X de mayoreo · …".
   const mayActualYear = overview.wholesale.ytdVentas;
-  const mayPrevYear = overview.mayoreoPrevYearTotal ?? 0;
-  const proyTienda = (overview.proyeccionCierre.proyeccion ?? 0) + mayActualYear;
-  const cierrePrevTienda = overview.proyeccionCierre.cierre_prev + mayPrevYear;
-  const deltaCierreTienda = cierrePrevTienda > 0 ? (proyTienda - cierrePrevTienda) / cierrePrevTienda : null;
-  const cierreActualTienda = cierreActual + mayActualYear;
+  const proyRetail = overview.proyeccionCierre.proyeccion ?? 0;
+  const cierrePrevRetail = overview.proyeccionCierre.cierre_prev;
+  const deltaCierreRetail = cierrePrevRetail > 0 ? (proyRetail - cierrePrevRetail) / cierrePrevRetail : null;
+  // Nota YTD del año: monto, cantidad de facturas y cliente representativo salen
+  // del bloque wholesale del overview (mismo bucket que la fila de Ventas).
+  const notaMayoreoAnio = buildNotaMayoreo({
+    incluido: false,
+    monto: mayActualYear,
+    clientesCount: overview.wholesale.totalClientes,
+    clienteNombre: overview.wholesale.topClienteName,
+    facturas: overview.wholesale.ytdTickets,
+  });
   const cumChart = useMemo(() => buildCumulativeChart(serieAct, seriePrev), [serieAct, seriePrev]);
   const mesMapAct = useMemo(() => new Map<number, MultifashionSerieMes>(serieAct.meses.map((m) => [m.mes, m])), [serieAct]);
   const mesMapPrev = useMemo(() => new Map<number, MultifashionSerieMes>(seriePrev.meses.map((m) => [m.mes, m])), [seriePrev]);
@@ -396,15 +409,12 @@ export function MultifashionResumenView({
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <MiniKpi
                     label={`VENTAS ${ytdSuffix}`}
-                    value={fmtMoney(overview.total.ytdVentas)}
+                    value={fmtMoney(overview.retail.ytdVentas)}
                     sub={
                       <>
                         {retailYtdSub}
-                        {overview.wholesale.ytdVentas > 0 && (
-                          <span className="block text-gray-500">
-                            incluye {fmtMoney(overview.wholesale.ytdVentas)} en mayoreo
-                            {overview.wholesale.topClienteName ? ` · ${overview.wholesale.topClienteName}` : ""}
-                          </span>
+                        {notaMayoreoAnio && (
+                          <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
                         )}
                       </>
                     }
@@ -412,15 +422,15 @@ export function MultifashionResumenView({
                   {overview.proyeccionCierre.tiene_proyeccion ? (
                     <MiniKpi
                       label={`PROYECCIÓN CIERRE ${year}`}
-                      value={fmtMoney(proyTienda)}
+                      value={fmtMoney(proyRetail)}
                       sub={
                         <>
-                          <span className={deltaToneCierre(deltaCierreTienda)}>
-                            {deltaStrCierre(deltaCierreTienda)}{" "}
+                          <span className={deltaToneCierre(deltaCierreRetail)}>
+                            {deltaStrCierre(deltaCierreRetail)}{" "}
                             <span className="text-gray-500">vs cierre {prevYear}</span>
                           </span>
-                          {mayActualYear > 0 && (
-                            <span className="block text-gray-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
+                          {notaMayoreoAnio && (
+                            <span className="block text-gray-500">{notaMayoreoAnio.texto} a la fecha</span>
                           )}
                         </>
                       }
@@ -428,12 +438,12 @@ export function MultifashionResumenView({
                   ) : (
                     <MiniKpi
                       label={`CIERRE ${year}`}
-                      value={fmtMoney(cierreActualTienda)}
+                      value={fmtMoney(cierreActual)}
                       sub={
                         <>
                           acumulado del año
-                          {mayActualYear > 0 && (
-                            <span className="block text-gray-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
+                          {notaMayoreoAnio && (
+                            <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
                           )}
                         </>
                       }
@@ -466,10 +476,19 @@ export function MultifashionResumenView({
   );
 }
 
-// 2. Titular del mes: tienda completa (retail + mayoreo) + 2 comparativos con
-// monto + línea de tickets/ticket promedio/proyección.
+// 2. Titular del mes: RETAIL PURO (la tienda) + 2 comparativos con monto +
+// línea de tickets/ticket promedio/proyección. El mayoreo del mes (venta
+// intercompañía / Frontera facturada por la caja) NO entra al número y se
+// declara debajo con "no incluye $X de mayoreo · …".
 function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
   const { totales, mes_anterior, yoy, mes_label, is_mes_actual } = data;
+  const notaMayoreo = buildNotaMayoreo({
+    incluido: false,
+    monto: totales.mayoreo ?? 0,
+    clientes: data.mayoreo_clientes,
+    clienteNombre: data.mayoreo_cliente,
+    facturas: data.mayoreo_facturas,
+  });
   const deltaMoM = calcDeltaPct(totales.ventas, mes_anterior);
   const deltaYoy = calcDeltaPct(totales.ventas, yoy);
 
@@ -485,13 +504,15 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
               Ventas del mes · {headerTitle}
             </p>
             <p className="mt-1 font-mono text-3xl font-semibold leading-tight tabular-nums text-gray-950">
-              {fmtMoney(totales.ventas_total ?? totales.ventas)}
+              {fmtMoney(totales.ventas)}
             </p>
-            {(totales.mayoreo ?? 0) > 0 && (
-              <p className="mt-1 text-xs text-gray-500">
-                incluye {fmtMoney(totales.mayoreo ?? 0)} en mayoreo
-                {data.mayoreo_cliente ? ` · ${data.mayoreo_cliente}` : ""}
-              </p>
+            {notaMayoreo && (
+              <>
+                <p className="mt-1 text-xs text-gray-500">{notaMayoreo.texto}</p>
+                {notaMayoreo.detalle && (
+                  <p className="mt-0.5 text-xs text-gray-400">{notaMayoreo.detalle}</p>
+                )}
+              </>
             )}
           </div>
           <div className="flex gap-6">

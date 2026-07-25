@@ -127,10 +127,13 @@ export async function GET(req: NextRequest) {
   if (mayoreoRes.error) {
     console.error("[multifashion/detalle-mensual] mayoreo query error", mayoreoRes.error);
   }
-  const mayoreoMes = mayoreoRes.error
-    ? 0
-    : ((mayoreoRes.data ?? []) as Array<{ subtotal: number | null }>)
-        .reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  const mayoreoFilas = mayoreoRes.error
+    ? []
+    : ((mayoreoRes.data ?? []) as Array<{ subtotal: number | null }>);
+  const mayoreoMes = mayoreoFilas.reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  // Cantidad de facturas de mayoreo del mes — alimenta el resumen "N facturas"
+  // de la nota cuando hay más de un cliente.
+  const mayoreoFacturas = mayoreoFilas.length;
   const retailVentas = Number(totales.ventas ?? 0);
 
   // Etiqueta del cliente de mayoreo (solo para la nota). 1 cliente → su nombre;
@@ -179,17 +182,22 @@ export async function GET(req: NextRequest) {
   // Gate de mes en curso = el RPC lineal del detalle solo devuelve proyección para el
   // mes actual; en meses cerrados queda null y la respetamos.
   const esMesEnCurso = totales.proyeccion_cierre != null;
+  //
+  // RETAIL PURO (25-jul-2026): Multifashion mide la tienda, y el mayoreo
+  // (intercompañía + Frontera) no es retail de mostrador. Por eso se usa
+  // `proyeccion_retail` y NO `proyeccion_total` (que suma el mayoreo del mes).
+  // Así la proyección queda en la misma base que el titular VENTAS MES.
   const retailProy = retailProyRes.error
     ? []
     : ((retailProyRes.data ?? []) as Array<{
         empresa_key: string;
-        proyeccion_total: number | null;
+        proyeccion_retail: number | null;
         suficiente_data: boolean;
       }>);
   const acProy = retailProy.find((r) => r.empresa_key === "american_classic");
-  const proyeccionTienda =
-    esMesEnCurso && acProy?.suficiente_data && acProy.proyeccion_total != null
-      ? Number(acProy.proyeccion_total)
+  const proyeccionRetail =
+    esMesEnCurso && acProy?.suficiente_data && acProy.proyeccion_retail != null
+      ? Number(acProy.proyeccion_retail)
       : null;
   if (retailProyRes.error) {
     console.error("[multifashion/detalle-mensual] proyeccion_mensual_retail_v1", retailProyRes.error.message);
@@ -205,9 +213,13 @@ export async function GET(req: NextRequest) {
       margen: margenMes,
       mayoreo: mayoreoMes,
       ventas_total: retailVentas + mayoreoMes,
-      proyeccion_cierre: proyeccionTienda,
+      proyeccion_cierre: proyeccionRetail,
     },
     mayoreo_cliente: mayoreoCliente,
+    // Lista completa y conteo de facturas: la nota de Multifashion resume
+    // ("N facturas") y deja el detalle de clientes accesible debajo.
+    mayoreo_clientes: clientesMayoreo,
+    mayoreo_facturas: mayoreoFacturas,
     ...(horas as Record<string, unknown>),
   });
 }

@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
+import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import { cn } from "@/lib/utils";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
@@ -260,6 +261,20 @@ export function ResumenView({
 
   const kpiVentasLabel   = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
   const kpiUtilidadLabel = isClosedYear ? `UTILIDAD ${selectedYear}`     : "UTILIDAD YTD";
+  // Indicador de mayoreo de la fila Multifashion. En VENTAS el total INCLUYE el
+  // mayoreo (es venta del grupo), así que la nota lo declara con su monto para
+  // que se entienda la diferencia contra el módulo Multifashion, que muestra
+  // retail puro. Monto y conteos son YTD (la fila del heatmap también lo es).
+  const multiMayoreoNota = multi
+    ? buildNotaMayoreo({
+        incluido: true,
+        monto: multi.wholesale.ytdVentas,
+        clientesCount: multi.wholesale.totalClientes,
+        clienteNombre: multi.wholesale.topClienteName,
+        facturas: multi.wholesale.ytdTickets,
+      })
+    : null;
+
   const kpiVentasSub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
   const kpiUtilidadSub = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
   const kpiMargenSub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
@@ -284,13 +299,7 @@ export function ResumenView({
         anualError={anualError}
         onOpenEmpresa={setPanelEmpresaId}
         onReloadData={onReloadData}
-        multiMayoreoLabel={
-          multi && multi.wholesale.ytdVentas > 0
-            ? multi.wholesale.totalClientes > 1
-              ? `${multi.wholesale.totalClientes} clientes wholesale`
-              : (multi.wholesale.topClienteName ?? "—")
-            : null
-        }
+        multiMayoreoNota={multiMayoreoNota?.texto ?? null}
       />
 
       <div className="hidden md:block space-y-5">
@@ -436,11 +445,12 @@ export function ResumenView({
                     isMulti ? "bg-teal-50" : isOpen ? "bg-gray-50" : "bg-white"
                   )}>
                     <div className="flex items-center gap-1.5">
-                      {isMulti && multi && multi.wholesale.ytdVentas > 0 ? (
+                      {isMulti && multi && multiMayoreoNota ? (
                         <MultifashionNameWithBreakdown
                           nombre={r.empresa.nombre}
                           retailYtd={multi.retail.ytdVentas}
                           wholesale={multi.wholesale}
+                          nota={multiMayoreoNota.texto}
                         />
                       ) : (
                         <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
@@ -1186,11 +1196,13 @@ function TotalGroupAnnualCell({
  *  celda numérica del heatmap (el total YTD agregado) no cambia — sigue
  *  mostrando retail + mayoreo combinados. */
 function MultifashionNameWithBreakdown({
-  nombre, retailYtd, wholesale,
+  nombre, retailYtd, wholesale, nota,
 }: {
   nombre: string;
   retailYtd: number;
   wholesale: { ytdVentas: number; topClienteName: string | null; totalClientes: number };
+  /** Nota visible: "incluye $X de mayoreo · Y" (buildNotaMayoreo). */
+  nota: string;
 }) {
   const clienteLabel = wholesale.totalClientes > 1
     ? `${wholesale.totalClientes} clientes wholesale`
@@ -1226,10 +1238,11 @@ function MultifashionNameWithBreakdown({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      {/* Nota VISIBLE (no solo tooltip): deja claro que esta fila es american_classic
-          COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */}
-      <span className="block max-w-[170px] whitespace-normal text-xs font-normal leading-tight text-gray-500">
-        incluye mayoreo · {clienteLabel}
+      {/* Nota VISIBLE: esta fila es american_classic COMPLETA (tienda + mayoreo).
+          Declara CUÁNTO es mayoreo para que se entienda la diferencia contra el
+          módulo Multifashion, que muestra retail puro. */}
+      <span className="block max-w-[190px] whitespace-normal text-xs font-normal leading-tight text-gray-500">
+        {nota}
       </span>
     </div>
   );
