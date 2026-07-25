@@ -689,19 +689,25 @@ async function checkStaleCrons(): Promise<string[]> {
 const SWITCH_SYNC_CRON_NAME = "switch-sync";
 
 /**
- * ¿Alguien ya dejó rastro de un fallo de switch-sync en cron_email_errors desde
- * `desdeIso`? Es el dedup del reporte de slots fallados: cuando el route de
- * switch-sync sobrevive a la corrida, él mismo alerta y persiste; solo hay que
- * cubrir el caso en que la invocación MUERE sin poder reportar. Fail-CERRADO a
- * "no reportado" (=> reportamos) si la consulta falla: mejor un aviso de más que
- * un fallo intradía en silencio.
+ * ¿Esta ocurrencia de slot YA quedó reportada en cron_email_errors? Dedup del
+ * reporte de slots fallados, mirando DOS tipos desde la ocurrencia:
+ *   - "switch-sync"        → el route alcanzó a alertar él mismo (caso normal:
+ *     el 24-jul-2026 dejó su fila a las 06:06 por el fallo de joystep). Solo hay
+ *     que cubrir el caso en que la invocación MUERE sin poder reportar.
+ *   - "switch-sync:<slot>" → lo reportó una pasada ANTERIOR de esta misma
+ *     reconciliación; no repetir en cada pasada mientras el fallo persista.
+ * El filtro es POR SLOT a propósito: con un filtro genérico, el reporte del
+ * slot 1605 taparía al del 1610 dentro de la misma pasada.
+ *
+ * Fail-CERRADO a "no reportado" (=> reportamos) si la consulta falla: mejor un
+ * aviso de más que un fallo intradía en silencio.
  */
-async function switchSyncYaReportado(desdeIso: string): Promise<boolean> {
+async function slotFalladoYaReportado(slot: string, desdeIso: string): Promise<boolean> {
   try {
     const { data, error } = await supabaseServer
       .from("cron_email_errors")
       .select("id")
-      .eq("tipo", SWITCH_SYNC_CRON_NAME)
+      .in("tipo", [SWITCH_SYNC_CRON_NAME, `${SWITCH_SYNC_CRON_NAME}:${slot}`])
       .gte("created_at", desdeIso)
       .limit(1);
     if (error) return false;
@@ -728,7 +734,7 @@ async function reportarSlotsFallados(desatendidos: SlotDesatendido[]): Promise<v
   if (fallados.length === 0) return;
   try {
     for (const d of fallados) {
-      if (await switchSyncYaReportado(d.ocurrencia)) continue;
+      if (await slotFalladoYaReportado(d.slot, d.ocurrencia)) continue;
       await alertSwitchCronErrors(
         `${SWITCH_SYNC_CRON_NAME}:${d.slot}`,
         d.paresPendientes.map((p) => ({
