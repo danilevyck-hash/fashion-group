@@ -3,6 +3,10 @@ import { fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
 import { MultifashionShell } from "./MultifashionShell";
 
 export const dynamic = "force-dynamic";
+// El SSR de esta página cruza el empalme switch_facturas/ventas_raw (blend
+// pesado) y en caché fría pasa de 10s. Sin maxDuration explícito, la función
+// se corta antes de que el reintento de withDbRetry alcance a salvarla.
+export const maxDuration = 60;
 
 export default async function MultifashionPage() {
   const now = new Date();

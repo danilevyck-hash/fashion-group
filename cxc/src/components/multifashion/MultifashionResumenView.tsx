@@ -430,7 +430,7 @@ export function MultifashionResumenView({
                             <span className="text-gray-500">vs cierre {prevYear}</span>
                           </span>
                           {notaMayoreoAnio && (
-                            <span className="block text-gray-500">{notaMayoreoAnio.texto} a la fecha</span>
+                            <span className="block text-gray-500">{notaMayoreoAnio.texto}</span>
                           )}
                         </>
                       }

@@ -7,6 +7,7 @@
 //   - Null in a monthly array means "no data yet" (future month).
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { withDbRetry } from "@/lib/supabase-retry";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -67,7 +68,10 @@ function buildEmpresa(key: string): Empresa {
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
   const [curRes, prevRes, metaRes, proyRes, syncedRes] = await Promise.all([
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
+    // withDbRetry: en caché fría estas RPC se pasan del statement_timeout y
+    // Postgres las cancela; al segundo intento (caché caliente) pasan en <1s.
+    // Ver src/lib/supabase-retry.ts para la medición.
+    withDbRetry(() => supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }), { label: "ventas_dashboard_summary" }),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
     // anterior, y los meses posteriores no se emiten. Si `year` no es el
@@ -79,9 +83,15 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // función vigente si la migración aún no se aplicó → deploy sin orden forzado
     // (sin _v2 funciona igual que hoy; con _v2 va rápido).
     (async () => {
-      const v2 = await supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year });
+      const v2 = await withDbRetry(
+        () => supabaseServer.rpc("ventas_dashboard_prev_same_period_v2", { p_year: year }),
+        { label: "ventas_dashboard_prev_same_period_v2" },
+      );
       if (!v2.error) return v2;
-      return supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year });
+      return withDbRetry(
+        () => supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
+        { label: "ventas_dashboard_prev_same_period" },
+      );
     })(),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
     // Proyección de cierre por empresa + agregado del grupo. v5 agrega
@@ -89,12 +99,12 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // El hero del Resumen muestra realidad vs realidad (2026 proyectado
     // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
     // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
-    supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }),
+    withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
     // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
     // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
     // el subtitle cae a fecha_corte (lógica vieja) vía null.
-    supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1),
+    withDbRetry(() => supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1), { label: "switch_facturas.synced_at" }),
     // NOTA (25-jul-2026): acá vivían proyeccion_mensual_retail_v1 y
     // proyeccion_mensual_mayorista_v1, que alimentaban la columna "Cierre <mes>
     // (proy.)". Se quitaron: el negocio B2B factura por embarques, no parejo, así
@@ -429,13 +439,19 @@ export async function fetchMultifashion({
     // 20260623130000_multifashion_margen_desde_mv.sql. Fallback a v6 si aún no se
     // aplicó (deploy sin orden forzado).
     (async () => {
-      const v7 = await supabaseServer.rpc("multifashion_mensual_v7", { p_year: year, p_mes: mes });
+      const v7 = await withDbRetry(
+        () => supabaseServer.rpc("multifashion_mensual_v7", { p_year: year, p_mes: mes }),
+        { label: "multifashion_mensual_v7" },
+      );
       if (!v7.error) return v7;
-      return supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes });
+      return withDbRetry(
+        () => supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes }),
+        { label: "multifashion_mensual_v6" },
+      );
     })(),
-    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }),
-    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }),
-    supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }),
+    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }), { label: "multifashion_overview_serie_v1" }),
+    withDbRetry(() => supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }), { label: "multifashion_overview_serie_v1(prev)" }),
+    withDbRetry(() => supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }), { label: "multifashion_proyeccion_cierre_v1" }),
   ]);
   if (mv6.error) throw new Error(`multifashion_mensual_v7/v6: ${mv6.error.message}`);
   if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);
