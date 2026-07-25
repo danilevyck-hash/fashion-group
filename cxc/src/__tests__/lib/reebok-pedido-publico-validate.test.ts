@@ -76,9 +76,12 @@ describe("validatePedidoBody", () => {
     expect(res.error).toContain("nombre");
   });
 
-  it("rechaza nombre de 1 caracter y acepta el mínimo de 2", () => {
+  // El mínimo subió de 2 a 3 LETRAS (25-jul-2026): con 2 entraron pedidos
+  // reales con cliente_nombre "ff". Regla única en lib/catalogo/nombre-cliente.
+  it("rechaza nombres de 1 y 2 letras y acepta el mínimo de 3", () => {
     expect(validatePedidoBody(validBody({ cliente_nombre: "A" })).ok).toBe(false);
-    expect(validatePedidoBody(validBody({ cliente_nombre: "Al" })).ok).toBe(true);
+    expect(validatePedidoBody(validBody({ cliente_nombre: "ff" })).ok).toBe(false);
+    expect(validatePedidoBody(validBody({ cliente_nombre: "Ana" })).ok).toBe(true);
   });
 
   it("rechaza nombre de más de 120 caracteres", () => {

@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
+import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 
 interface CatalogoStickyCartBarProps {
@@ -49,6 +50,17 @@ export default function CatalogoStickyCartBar({
   useEscapeClose(miniCartOpen, () => setMiniCartOpen(false));
 
   if (cartCount === 0) return null;
+
+  // ── Nombre del cliente (variante pública) ──
+  // El campo es OBLIGATORIO y tiene que LEERSE como obligatorio: antes solo se
+  // apagaba el botón (opacity-50) sin decir por qué y entraban pedidos con
+  // nombres basura ("ff"). Regla única de las 3 marcas en lib/catalogo/
+  // nombre-cliente; los colores del estado de error son semánticos (rojo), no
+  // de marca, así que van literales igual que el ámbar de "Pre-orden".
+  const pideNombre = variant === "public" && onClientNameChange !== undefined;
+  const nombreCheck = validarNombreCliente(clientName || "");
+  const nombreInvalido = pideNombre && !nombreCheck.ok;
+  const motivoBloqueo = nombreInvalido && !nombreCheck.ok ? nombreCheck.error : null;
 
   const defaultActionColor = variant === "public" ? c.actionPublic : c.actionVendor;
   const defaultActionLabel = variant === "public" ? "Confirmar pedido" : "Crear pedido";
@@ -160,18 +172,49 @@ export default function CatalogoStickyCartBar({
         </div>
       </div>
 
-      {/* Client name input (public variant) */}
-      {variant === "public" && onClientNameChange && (
-        <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100">
-          <label className={c.nameLabel}>Tu nombre</label>
+      {/* Nombre del cliente (variante pública) — OBLIGATORIO y visible ANTES
+          del botón de confirmar, con el motivo del bloqueo escrito. */}
+      {pideNombre && onClientNameChange && (
+        <div
+          className={`px-3 pt-3 pb-2 border-t ${
+            nombreInvalido ? "bg-red-50 border-red-200" : "bg-white border-gray-100"
+          }`}
+        >
+          <label htmlFor="catalogo-cliente-nombre" className={c.nameLabel}>
+            Tu nombre <span className="text-red-600">*</span>
+            <span className="ml-1 font-normal normal-case tracking-normal text-red-600">
+              obligatorio
+            </span>
+          </label>
           <input
+            id="catalogo-cliente-nombre"
             type="text"
             value={clientName || ""}
             onChange={(e) => onClientNameChange(e.target.value)}
-            placeholder="Escribe tu nombre"
+            placeholder="Ej: María Pérez"
             autoComplete="name"
-            className={c.nameInput}
+            required
+            aria-required="true"
+            aria-invalid={nombreInvalido}
+            aria-describedby={nombreInvalido ? "catalogo-cliente-nombre-error" : undefined}
+            className={
+              nombreInvalido
+                ? "w-full rounded-lg border-2 border-red-400 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-red-500 focus:outline-none transition"
+                : c.nameInput
+            }
           />
+          {motivoBloqueo && (
+            <p
+              id="catalogo-cliente-nombre-error"
+              role="alert"
+              className="mt-1.5 flex items-start gap-1 text-xs font-semibold text-red-700"
+            >
+              <svg className="w-3.5 h-3.5 mt-px shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {motivoBloqueo}
+            </p>
+          )}
         </div>
       )}
 
@@ -209,15 +252,20 @@ export default function CatalogoStickyCartBar({
         {/* Main action button */}
         <button
           onClick={handleAction}
-          disabled={saving || (variant === "public" && onClientNameChange !== undefined && !(clientName || "").trim())}
+          disabled={saving || nombreInvalido}
+          title={motivoBloqueo || undefined}
           className={`flex-1 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition min-h-[56px] disabled:opacity-50 text-white ${btnColor} active:scale-[0.98]`}
         >
-          {showCheck && (
+          {showCheck && !nombreInvalido && (
             <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           )}
-          <span className="truncate">{saving ? "Guardando..." : btnLabel}</span>
+          {/* El botón nunca queda "muerto" sin explicación: si falta el nombre
+              lo dice el propio botón (y el detalle está arriba, en rojo). */}
+          <span className="truncate">
+            {saving ? "Guardando..." : nombreInvalido ? "Falta tu nombre" : btnLabel}
+          </span>
           {showArrow && <span>&rarr;</span>}
         </button>
       </div>

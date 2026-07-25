@@ -8,6 +8,7 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto, StockLinea } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
@@ -280,11 +281,15 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // 409 y se muestra el aviso con "Confirmar de todas formas".
   async function handleConfirmarPedido(aceptarStock = false) {
     if (cart.length === 0 || sendingOrder) return;
-    const trimmedName = clientName.trim();
-    if (!trimmedName) {
-      setToast("Escribe tu nombre antes de confirmar el pedido");
+    // Nombre OBLIGATORIO — misma regla que el server (lib/catalogo/
+    // nombre-cliente): la barra ya bloquea el botón y escribe el motivo; esto
+    // es el cinturón por si el estado llega sucio desde localStorage.
+    const nombre = validarNombreCliente(clientName);
+    if (!nombre.ok) {
+      setToast(nombre.error);
       return;
     }
+    const trimmedName = nombre.nombre;
     setSendingOrder(true);
     try {
       let shortId = pendingShortId;
