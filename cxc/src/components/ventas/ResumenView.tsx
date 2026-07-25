@@ -12,7 +12,7 @@ import {
 } from "@/lib/empresa-mapping";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
-  EmpresaMonthlySales, ProyeccionMensualEmpresa,
+  EmpresaMonthlySales,
 } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
@@ -184,9 +184,6 @@ export function ResumenView({
   // La columna "Proyección" en la tabla + el hero al final sólo aplican al
   // año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
   const showProyeccionCol = !isClosedYear && !!data.proyeccion;
-  // Columna "Cierre de mes (proy.)" — método-b retail / run-rate mayorista. Solo año en curso.
-  const showMensualCol = !isClosedYear && !!data.proyeccionMensual;
-  const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
 
   // KPIs YTD del grupo — deltas vs prev year same-period.
   //   ventasDelta   = ratio decimal (0.05 = +5%)
@@ -361,11 +358,6 @@ export function ResumenView({
                 {showProyeccionCol && (
                   <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Proyección</th>
                 )}
-                {showMensualCol && (
-                  <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">
-                    Cierre {mesProyLabel} (proy.)
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -436,7 +428,6 @@ export function ResumenView({
                       onOpen={setCeldaDetalle}
                     />
                   )}
-                  {showMensualCol && <EmpresaMensualCell pm={data.proyeccionMensual![r.empresa.id]} />}
                 </tr>
                 );
               })}
@@ -463,7 +454,6 @@ export function ResumenView({
                 {showProyeccionCol && (
                   <TotalGroupProjectionCell totales={data.proyeccion!.totales_grupo} />
                 )}
-                {showMensualCol && <TotalGroupMensualCell pm={data.proyeccionMensual!} />}
               </tr>
             </tbody>
           </table>
@@ -557,36 +547,6 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
       <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-gray-950">{value}</p>
       {sub && <p className="mt-1.5 text-xs text-gray-500">{sub}</p>}
     </Card>
-  );
-}
-
-/** Celda de proyección de cierre del MES por empresa (método-b retail / run-rate
- *  mayorista). Mayoristas marcan "volátil"; las de poca data "datos insuf." */
-function EmpresaMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
-  return (
-    <td className="border-b border-gray-200 px-3.5 py-3.5 text-right align-middle">
-      {pm && pm.proyeccion != null ? (
-        <>
-          <span className="block font-mono text-sm tabular-nums text-gray-950">{fmtMoneyCompact(pm.proyeccion)}</span>
-          {pm.volatil && <span className="mt-0.5 block text-xs text-amber-600">estimación volátil</span>}
-        </>
-      ) : (
-        <span className="text-xs text-gray-400">datos insuf.</span>
-      )}
-    </td>
-  );
-}
-
-/** Total grupo de la proyección mensual: suma las empresas con dato suficiente. */
-function TotalGroupMensualCell({ pm }: { pm: Record<string, ProyeccionMensualEmpresa> }) {
-  const vals = Object.values(pm);
-  const total = vals.reduce((s, e) => s + (e.suficiente_data && e.proyeccion != null ? e.proyeccion : 0), 0);
-  const nInsuf = vals.filter((e) => !e.suficiente_data || e.proyeccion == null).length;
-  return (
-    <td className="px-3.5 py-3.5 text-right">
-      <span className="block font-mono text-sm font-medium tabular-nums">{fmtMoneyCompact(total)}</span>
-      {nInsuf > 0 && <span className="text-xs text-gray-300">{nInsuf} sin proy.</span>}
-    </td>
   );
 }
 
