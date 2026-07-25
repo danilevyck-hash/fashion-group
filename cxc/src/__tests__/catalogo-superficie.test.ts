@@ -87,5 +87,6 @@ describe("superficie API de catálogos — snapshot post-refactor [marca]", () =
     const cronBase = path.join(process.cwd(), "src/app/api/cron");
     expect(statSync(path.join(cronBase, "reebok-catalogo/route.ts")).isFile()).toBe(true);
     expect(statSync(path.join(cronBase, "joybees-catalogo/route.ts")).isFile()).toBe(true);
+    expect(statSync(path.join(cronBase, "tommy-catalogo/route.ts")).isFile()).toBe(true);
   });
 });
