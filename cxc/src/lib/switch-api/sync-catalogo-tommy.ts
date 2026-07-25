@@ -51,12 +51,13 @@ export interface CatalogoTommySyncResult extends CatalogoSyncResult {
   ddlPendiente?: boolean;
 }
 
-/** ¿tommy_products existe ya? (probe barato, jamás lanza). */
+/** ¿tommy_products existe ya? (probe barato, jamás lanza). OJO: tiene que ser
+ *  un SELECT real con limit — un HEAD (head:true) contra una tabla ausente
+ *  devuelve ok sin error en PostgREST (verificado contra prod 24-jul-2026) y
+ *  daría falso "existe". */
 async function tommyDdlPendiente(): Promise<boolean> {
   try {
-    const { error } = await tommyServer
-      .from("tommy_products")
-      .select("id", { count: "exact", head: true });
+    const { error } = await tommyServer.from("tommy_products").select("id").limit(1);
     if (!error) return false;
     return /does not exist|schema cache|42P01/i.test(error.message);
   } catch {
