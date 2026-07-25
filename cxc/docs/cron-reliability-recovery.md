@@ -30,19 +30,22 @@ evaluar después.
   EstadoCuenta`, `syncCostoDiario`, `syncAllUtilidad`, `syncAllRecibos`,
   `syncArticulosDiario`, `syncClientesMaster`) — **sin self-fetch**. Elimina el
   fallo "el caller muere y el callee no sobrevive".
-- **`maxDuration=300`** — es el TECHO del plan. La cuenta está en **Hobby**
-  (descubierto al fallar el deploy con la regla cron once-per-day): Hobby con
-  Fluid Compute permite hasta 300s; `800` se rechaza en deploy. El diseño
-  budget-aware + 3 pasadas/día absorbe el menor presupuesto por pasada.
+- **`maxDuration=800`** — es el TECHO del plan. La cuenta pasó a **Pro** el
+  25-jul-2026; con Fluid Compute el tope sube de 300s a 800s. (Bajo Hobby el
+  valor `800` se rechazaba en deploy, y por eso este archivo describía 300s.)
+  El diseño budget-aware + 3 pasadas/día se mantiene igual — más presupuesto por
+  pasada, misma red de seguridad.
 - **Serial por empresa** (token único de Switch — un 2º login por empresa mata el
   1º). Orden por empresa: facturas → estadocuenta → costo (reusa el token).
-- **Presupuesto de tiempo** (`RECOVERY_BUDGET_MS=760_000`): deja de **arrancar**
-  trabajo nuevo pasado el umbral; lo ya iniciado termina. Lo no arrancado lo toma
-  la siguiente pasada.
+- **Presupuesto de tiempo** (`RECOVERY_BUDGET_MS=740_000`, 60s de margen bajo el
+  techo de 800s): deja de **arrancar** trabajo nuevo pasado el umbral; lo ya
+  iniciado termina. Lo no arrancado lo toma la siguiente pasada.
 - **Multi-pasada**: **3 entradas de cron separadas (10:00, 14:00, 18:00 UTC)**, cada
-  una corre 1×/día (requisito Hobby: una expresión multi-hora `10,14,18` falla el
-  deploy). En una mañana mala, la 1ª recupera lo que entre en presupuesto; las
-  siguientes terminan el resto. Todas idempotentes (upserts) → re-correr es seguro.
+  una corre 1×/día. En una mañana mala, la 1ª recupera lo que entre en presupuesto;
+  las siguientes terminan el resto. Todas idempotentes (upserts) → re-correr es
+  seguro. (Bajo Hobby una expresión multi-hora `10,14,18` fallaba el deploy; con
+  Pro ya es válida y las 3 entradas se podrían fusionar en una — está en el plan
+  Pro como P2, no se hizo en este cambio.)
 - **Cobertura total**:
   - switch-sync (facturas/estadocuenta/costo): detección **por par** vía
     `switch_sync_log` (las funciones escriben ahí; re-query = fuente de verdad).

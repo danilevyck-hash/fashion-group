@@ -24,7 +24,7 @@ import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 
 const CRON_NAME = "sync-recibos";
 

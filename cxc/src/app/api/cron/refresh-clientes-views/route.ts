@@ -18,7 +18,7 @@
 //
 // Resiliencia (jul-2026, incidentes 4-jul y 23-jul: "canceling statement due to
 // statement timeout", transitorio — el reintento manual horas después pasó):
-//   - maxDuration=300 (antes corría con el default de 10s de Vercel).
+//   - maxDuration=800 (antes corría con el default de 10s de Vercel).
 //   - UN reintento interno tras una espera corta si la RPC falla con error
 //     transitorio (statement timeout / red), respetando el presupuesto de tiempo.
 //   - Sin Telegram inmediato ({telegram:false}): es colateral de la
@@ -38,7 +38,7 @@ import { verifySession } from "@/lib/session-cookie";
 export const dynamic = "force-dynamic";
 // Tope del plan Hobby. Sin esto Vercel corta a los 10s default — un REFRESH
 // lento (contención) moría sin margen ni chance de reintento.
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 
 const CRON_NAME = "refresh-clientes-views";
 

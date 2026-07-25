@@ -26,7 +26,7 @@ import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
-export const maxDuration = 300;
+export const maxDuration = 800; // techo del plan (Pro + Fluid)
 
 const CRON_NAME = "catalogos-fotos-resumen";
 
