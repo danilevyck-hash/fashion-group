@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { calcularResumenDiario, buildMensaje, hoyPanama, ventasAcsSyncFresco } from "@/lib/acs-resumen-diario";
+import { calcularResumenDiario, buildMensajeHtml, hoyPanama, ventasAcsSyncFresco } from "@/lib/acs-resumen-diario";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
@@ -46,8 +46,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // en la DB por definición, no depende del sync de cierre de anoche.
     const syncFresco = fecha === hoyPanama() ? await ventasAcsSyncFresco(fecha) : true;
     const resumen = await calcularResumenDiario(fecha, syncFresco);
-    const mensaje = buildMensaje(resumen);
-    const sent = await sendTelegramAlert(mensaje);
+    // HTML (no texto plano): el mensaje es una tabla dentro de un <pre> y sin
+    // monoespaciado las columnas no cuadran en el móvil.
+    const mensaje = buildMensajeHtml(resumen);
+    const sent = await sendTelegramAlert(mensaje, "HTML");
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

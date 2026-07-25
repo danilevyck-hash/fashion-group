@@ -55,7 +55,7 @@ import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
-import { calcularResumenDiario, buildMensaje } from "@/lib/acs-resumen-diario";
+import { calcularResumenDiario, buildMensajeHtml } from "@/lib/acs-resumen-diario";
 import {
   calcularResumenMensual,
   buildMensajeMensual,
@@ -411,7 +411,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
     recover: async () => {
       const ayer = panamaDate(-1);
       const resumen = await calcularResumenDiario(ayer, true);
-      const sent = await sendTelegramAlert(`(recuperado) ${buildMensaje(resumen)}`);
+      // El prefijo va DENTRO del <pre> (buildMensajeHtml lo antepone al título)
+      // y el envío en "HTML", igual que el run normal: concatenar por fuera
+      // dejaría las etiquetas <pre> visibles como texto.
+      const sent = await sendTelegramAlert(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
       return { ok: sent, detail: sent ? `resumen ${ayer} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },
