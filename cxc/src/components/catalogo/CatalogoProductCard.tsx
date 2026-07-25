@@ -195,51 +195,60 @@ export default function CatalogoProductCard({
             </div>
           )}
 
-          {/* Price — sin "/unidad" (Daniel, 25-jul-2026): la unidad ya la dice
-              la línea del bulto y el sufijo solo ensuciaba el precio. */}
-          <div className="mt-1.5">
-            <div className="flex items-baseline gap-2">
-              <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
-                {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
-              </span>
-              {product.badge === "oferta" && (
-                <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                  Oferta
+          {/* Precio + stock en el MISMO renglón (Daniel, 25-jul-2026): a la
+              izquierda el precio con "Bulto de N" debajo, a la derecha el stock
+              interno. Sin línea divisoria entre ellos — el stock dejó de ser
+              una franja aparte. Debajo de xl la card mide ~173px y el stock no
+              cabe al lado de ningún tamaño legible, así que baja bajo el precio
+              (ver la medición en CatalogoStockLine). */}
+          <div className="mt-1.5 flex flex-col gap-y-1 xl:flex-row xl:items-start xl:justify-between xl:gap-x-2 xl:gap-y-0">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
+                  {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
                 </span>
+                {product.badge === "oferta" && (
+                  <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                    Oferta
+                  </span>
+                )}
+              </div>
+              {product.price != null && (
+                /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
+                   25-jul-2026) — competía con el precio unitario, que es el que
+                   el vendedor cotiza. El indicador "● N" (bultos en stock) también
+                   se quitó: la línea de Disponibilidad/Existencia ya da el dato.
+                   DISCRETA (Daniel, 25-jul-2026): 10px gris — es un dato de apoyo,
+                   no puede competir con el precio. Clase LITERAL e idéntica en las
+                   dos cards (no sale del tema: aquí no hay color de marca). */
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {bultoSize}</span>
+                </div>
               )}
             </div>
-            {product.price != null && (
-              /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
-                 25-jul-2026) — competía con el precio unitario, que es el que
-                 el vendedor cotiza. El indicador "● N" (bultos en stock) también
-                 se quitó: la línea de Disponibilidad/Existencia ya da el dato.
-                 DISCRETA (Daniel, 25-jul-2026): 10px gris — es un dato de apoyo,
-                 no puede competir con el precio. Clase LITERAL e idéntica en las
-                 dos cards (no sale del tema: aquí no hay color de marca). */
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[10px] leading-[14px] text-gray-500">Bulto de {bultoSize}</span>
-              </div>
+
+            {/* Stock interno (Switch) — componente COMPARTIDO con la card
+                agrupada (CatalogoStockLine). Solo catálogo interno (showStock);
+                NUNCA en el catálogo público. */}
+            {showStock && (
+              <CatalogoStockLine
+                marca={marca}
+                disponibilidad={product.disponibilidad}
+                existencia={product.existencia}
+              />
             )}
           </div>
 
-          {/* Stock interno (Switch) — componente COMPARTIDO con la card
-              agrupada (CatalogoStockLine). Solo catálogo interno (showStock);
-              NUNCA en el catálogo público. */}
-          {showStock && (
-            <CatalogoStockLine
-              marca={marca}
-              disponibilidad={product.disponibilidad}
-              existencia={product.existencia}
-            />
-          )}
-
-          {/* Add/Qty button */}
+          {/* Add/Qty button — 38px de alto y márgenes apretados (Daniel,
+              25-jul-2026). El control de cantidad mide lo MISMO (h-9 + 1px de
+              borde arriba y abajo = 38) para que la fila del grid no crezca
+              cuando un producto entra al pedido. */}
           {inOrder ? (
-            <div className="mt-2">
+            <div className="mt-1.5">
               <div className={t.qtyWrap}>
                 <button
                   onClick={() => setQty(qty - 1)}
-                  className={`h-11 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                  className={`h-9 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                     qty === 1 ? "px-2 gap-1" : "w-11"
                   }`}
                 >
@@ -261,7 +270,7 @@ export default function CatalogoProductCard({
                 </button>
                 <button
                   onClick={() => setQty(qty + 1)}
-                  className={`w-11 h-11 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                  className={`w-11 h-9 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                 >
                   +
                 </button>
@@ -271,7 +280,7 @@ export default function CatalogoProductCard({
             <button
               onClick={() => { if (!disabled) setQty(1); }}
               disabled={disabled}
-              className={`w-full mt-2 py-2.5 rounded-lg text-sm font-semibold transition min-h-[44px] ${
+              className={`w-full mt-1.5 py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[38px] ${
                 disabled
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : isPreOrder

@@ -329,13 +329,13 @@ export interface MarcaTheme {
     priceNormal: string;
     priceMeta: string;
     bultoMeta: string;
-    /** Línea "Disponibilidad N · Existencia N" del catálogo interno
-     *  (CatalogoStockLine): estructura única, colores por marca. */
+    /** Bloque "Disponibilidad N" / "Existencia N" del catálogo interno
+     *  (CatalogoStockLine): estructura única, colores por marca. Ya no hay
+     *  `divider` ni `dot`: el stock dejó de ser una franja con línea propia y
+     *  pasó a la derecha del precio, en dos renglones (Daniel, 25-jul-2026). */
     stock: {
-      divider: string;
       strong: string;
       soft: string;
-      dot: string;
       agotado: string;
     };
     addBtn: string;
@@ -633,10 +633,8 @@ const REEBOK: MarcaTheme = {
     priceMeta: "text-xs text-[#1A2656]/40",
     bultoMeta: "text-xs text-[#1A2656]/50",
     stock: {
-      divider: "border-[#1A2656]/10",
       strong: "text-[#1A2656]",
       soft: "text-[#1A2656]/45",
-      dot: "text-[#1A2656]/30",
       agotado: "text-[#1A2656]/40",
     },
     addBtn: "bg-[#1A2656] text-white hover:bg-[#0f1a3d] active:scale-[0.97]",
@@ -939,10 +937,8 @@ const JOYBEES: MarcaTheme = {
     priceMeta: "text-xs text-[#404041]/40",
     bultoMeta: "text-xs text-[#404041]/50",
     stock: {
-      divider: "border-[#404041]/10",
       strong: "text-[#404041]",
       soft: "text-[#404041]/45",
-      dot: "text-[#404041]/30",
       agotado: "text-[#404041]/40",
     },
     addBtn: "bg-[#404041] text-white hover:bg-[#2a2a2b] active:scale-[0.97]",
@@ -1274,10 +1270,8 @@ const TOMMY: MarcaTheme = {
     priceMeta: "text-xs text-[#152342]/40",
     bultoMeta: "text-xs text-[#152342]/50",
     stock: {
-      divider: "border-[#152342]/10",
       strong: "text-[#152342]",
       soft: "text-[#152342]/45",
-      dot: "text-[#152342]/30",
       agotado: "text-[#152342]/40",
     },
     addBtn: "bg-[#152342] text-white hover:bg-[#0e1830] active:scale-[0.97]",
