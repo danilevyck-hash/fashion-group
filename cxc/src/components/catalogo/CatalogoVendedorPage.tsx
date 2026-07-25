@@ -370,7 +370,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   // Skeleton
   const skeletonGrid = (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
       {[...Array(12)].map((_, i) => (
         <div key={i} className="bg-white overflow-hidden rounded-xl">
           <div className="aspect-square shimmer" />
@@ -410,7 +410,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                   <div className={theme.grid.sectionRule} />
                   <span className={theme.grid.sectionCount}>{s.items.length}</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {s.items.map(g => (
                     <CatalogoGroupedCard
                       key={g.baseSku}
@@ -426,7 +426,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {sortedGroups.map(gs => (
               <CatalogoGroupedCard
                 key={gs.group.baseSku}
@@ -447,7 +447,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 <div className={theme.grid.sectionRule} />
                 <span className={theme.grid.sectionCount}>{g.items.length}</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {g.items.map(p => (
                   <CatalogoProductCard
                     key={p.id}
@@ -464,7 +464,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filtered.map(p => (
             <CatalogoProductCard
               key={p.id}

@@ -301,7 +301,10 @@ export interface MarcaTheme {
     ring: string;
     checkBubble: string;
     checkStroke: string;
+    /** Contenedor de la foto — 4:3 en las 3 marcas: el calzado es ancho y en
+     *  cuadrado sobraba fondo blanco arriba y abajo (Daniel, 25-jul-2026). */
     imageBg: string;
+    /** object-contain SIEMPRE: el 4:3 recorta fondo, nunca producto. */
     imageFit: string;
     placeholder: ReactNode;
     name: string;
@@ -590,7 +593,7 @@ const REEBOK: MarcaTheme = {
     ring: "ring-2 ring-emerald-400 scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg",
     checkStroke: "white",
-    imageBg: "aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
+    imageBg: "aspect-[4/3] bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
     imageFit: "w-full h-full object-contain p-3",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -891,7 +894,7 @@ const JOYBEES: MarcaTheme = {
     ring: "ring-2 ring-[#FFE443] scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-[#FFE443] flex items-center justify-center shadow-lg",
     checkStroke: "#404041",
-    imageBg: "aspect-square bg-[#FFFEF5] relative overflow-hidden cursor-pointer",
+    imageBg: "aspect-[4/3] bg-[#FFFEF5] relative overflow-hidden cursor-pointer",
     imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center">
@@ -1230,7 +1233,7 @@ const TOMMY: MarcaTheme = {
     ring: "ring-2 ring-[#152342] scale-[1.02]",
     checkBubble: "w-10 h-10 rounded-full bg-[#152342] flex items-center justify-center shadow-lg",
     checkStroke: "white",
-    imageBg: "aspect-square bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
+    imageBg: "aspect-[4/3] bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
     imageFit: "w-full h-full object-contain p-3",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
