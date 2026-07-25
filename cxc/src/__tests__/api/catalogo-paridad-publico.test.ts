@@ -59,6 +59,19 @@ vi.mock("@/lib/joybees-supabase-server", () => ({
 const mockTelegram = vi.fn(async () => {});
 vi.mock("@/lib/telegram", () => ({
   sendTelegramAlert: (...a: unknown[]) => mockTelegram(...a),
+  shortError: (m: string) => m,
+}));
+
+// Envío al ERP: aquí solo interesa QUE se dispare y con qué cliente/vendedor.
+// El motor tiene sus propios tests (catalogo-paridad-enviar-switch).
+const mockEnviar = vi.fn(async () => ({ kind: "ok" as const, numeroInterno: "16-000000999", pedidoSwitchId: 1, verificado: true, warnings: [] }));
+vi.mock("@/lib/catalogo/switch-envio", () => ({
+  enviarPedidoSwitch: (...a: unknown[]) => mockEnviar(...(a as [])),
+}));
+const mockLogout = vi.fn(async () => {});
+vi.mock("@/lib/switch-api/client", () => ({
+  logoutAllSwitchSessions: () => mockLogout(),
+  createSwitchClient: () => ({}),
 }));
 
 let categoryMap = new Map<string, string>();
@@ -82,6 +95,7 @@ const jConfirmar = (req: NextRequest, ctx: IdCtx) => confirmarPost(req, { params
 import { makeReq } from "../helpers/catalogo-request";
 
 const P1 = "11111111-1111-4111-8111-111111111111";
+const ORDER_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const P2 = "22222222-2222-4222-8222-222222222222";
 
 beforeEach(() => {
@@ -90,7 +104,22 @@ beforeEach(() => {
   reebokDb = makeDb();
   joybeesDb = makeDb();
   categoryMap = new Map();
+  mockEnviar.mockResolvedValue({
+    kind: "ok", numeroInterno: "16-000000999", pedidoSwitchId: 1, verificado: true, warnings: [],
+  });
 });
+
+/** Deja listo lo que necesita el envío a Switch del pedido del link: la fila
+ *  del pedido recién numerado y los ids REALES de cliente/vendedor (contado
+ *  TCKCTA + vendedor DEFAULT) que resuelve publico-switch-actor. */
+function seedEnvio(marcaDb: MockDb, ordersTable: string, orderNumber: string) {
+  marcaDb.queue(ordersTable, { data: { id: ORDER_ID, order_number: orderNumber } });
+  marcaDb.queue(`${ordersTable.replace("_orders", "")}_order_items`, {
+    data: [{ product_id: P1, sku: "S1", name: "P", quantity: 2, unit_price: 10 }],
+  });
+  mainDb.queue("switch_clientes", { data: { cliente_switch_id: 1, nombre: "Contado" } });
+  mainDb.queue("vendedores", { data: { switch_id: 3, nombre: "DEFAULT" } });
+}
 
 // ─── POST /pedido-publico ────────────────────────────────────────────────────
 
@@ -327,6 +356,7 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     reebokDb.queue("inventory", { data: [{ product_id: P1, quantity: 8 }] });
     categoryMap = new Map([[P1, "footwear"]]);
     mainDb.queueRpc({ data: { order_number: "PED-050", already_converted: false } });
+    seedEnvio(reebokDb, "reebok_orders", "PED-050");
 
     const res = await rConfirmar(makeReq("/x", { method: "POST", body: {} }), {
       params: { id: "abc12345" },
@@ -371,6 +401,7 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     mainDb.queue("reebok_pedidos_publicos", {
       data: pedidoRow({ convertida: true, ped_order_number: "PED-040" }),
     });
+    seedEnvio(reebokDb, "reebok_orders", "PED-040");
     const res = await rConfirmar(makeReq("/x", { method: "POST", body: {} }), {
       params: { id: "abc12345" },
     });
@@ -383,6 +414,9 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     });
     expect(mainDb.rpc).not.toHaveBeenCalled();
     expect(mockTelegram).not.toHaveBeenCalled();
+    // …pero el envío al ERP SÍ se reintenta: es idempotente aguas abajo, así se
+    // recupera solo un pedido que se convirtió y nunca llegó a Switch.
+    expect(mockEnviar).toHaveBeenCalledOnce();
   });
 
   it("fail-open de stock: si inventory no responde, confirma sin aviso (reebok)", async () => {

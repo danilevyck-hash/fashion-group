@@ -169,6 +169,17 @@ export interface ConfirmarDeps {
   marcarConfirmado(shortId: string, stock: StockLineaCorta[]): Promise<void>;
   /** RPC atómica de conversión existente. Idempotente. */
   convertir(pedido: PedidoPublicoRow): Promise<{ numero: string; yaConvertida: boolean }>;
+  /**
+   * Envío del pedido ya convertido al ERP Switch (motor enviarPedidoSwitch).
+   * REGLAS:
+   *   · NUNCA rompe la confirmación: el core lo llama dentro de try/catch. El
+   *     pedido ya está guardado; si Switch está caído queda el "Reintentar"
+   *     del admin (y la alerta a Telegram del propio motor).
+   *   · Idempotente aguas abajo (índice parcial + 'ya_enviado'), por eso se
+   *     llama TAMBIÉN cuando el pedido ya estaba convertido: así un reintento
+   *     del cliente tras un timeout recupera un envío que nunca salió.
+   */
+  enviarSwitch(numero: string, pedido: PedidoPublicoRow): Promise<void>;
 }
 
 export type ConfirmarResult =
@@ -190,8 +201,10 @@ export async function confirmarPedidoPublico(
 
   // Idempotente: ya convertido → mismo número, sin tocar nada (la foto de
   // stock ya quedó guardada en la confirmación original: no se re-escribe con
-  // el stock de hoy).
+  // el stock de hoy). El envío a Switch SÍ se reintenta: es idempotente y así
+  // se recupera solo un envío que se perdió por timeout o por Switch caído.
   if (pedido.convertida && pedido.ped_order_number) {
+    await enviarSinRomper(deps, pedido.ped_order_number, pedido);
     return { status: 200, numero: pedido.ped_order_number, ya_confirmado: true, stock: [] };
   }
 
@@ -210,11 +223,30 @@ export async function confirmarPedidoPublico(
   await deps.marcarConfirmado(shortId, stock);
 
   // AUTO-CONVERSIÓN → PED-### / JBP-### / TOM-### (entra directo al pipeline).
+  let numero: string;
+  let yaConvertida: boolean;
   try {
-    const { numero, yaConvertida } = await deps.convertir(pedido);
-    return { status: 200, numero, ya_confirmado: yaConvertida, stock };
+    ({ numero, yaConvertida } = await deps.convertir(pedido));
   } catch (err) {
     console.error("[confirmar-pedido] conversión falló:", err);
     return { status: 500, error: "No se pudo confirmar el pedido. Intenta de nuevo." };
+  }
+
+  // Y de ahí DERECHO al ERP. Un fallo aquí no le quita el pedido al cliente.
+  await enviarSinRomper(deps, numero, pedido);
+
+  return { status: 200, numero, ya_confirmado: yaConvertida, stock };
+}
+
+/** El envío al ERP jamás puede tumbar la confirmación del cliente. */
+async function enviarSinRomper(
+  deps: ConfirmarDeps,
+  numero: string,
+  pedido: PedidoPublicoRow,
+): Promise<void> {
+  try {
+    await deps.enviarSwitch(numero, pedido);
+  } catch (err) {
+    console.error("[confirmar-pedido] envío a Switch falló (el pedido queda guardado):", err);
   }
 }
