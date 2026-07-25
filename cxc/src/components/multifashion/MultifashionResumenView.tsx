@@ -2,8 +2,9 @@
 
 // Vista unificada de Multifashion — reemplaza los subtabs "Overview" + "Detalle
 // mensual" en una sola página con scroll:
-//   1) Header de identidad (lo aporta MultifashionView: nombre + ubicación +
-//      gerente + selector de mes).
+//   1) (El nombre de la tienda, el pill de sync y "Actualizar ahora" viven en el
+//      header de la página — MultifashionShell; el selector de mes, en
+//      MultifashionView.)
 //   2) Titular del mes (RETAIL PURO; el mayoreo se declara aparte) + 2 comparativos
 //      con monto + línea de tickets/ticket promedio/proyección.
 //   3) Gráfico "Ventas día por día" con toggle Mes/Año (Año = acumulado vs prev).
@@ -18,7 +19,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import {
-  Award, AlertTriangle, Info, TrendingUp, Clock, CalendarDays, ChevronDown,
+  Award, AlertTriangle, Info, Clock, CalendarDays, ChevronDown,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import type {
@@ -43,9 +44,6 @@ const CumulativeChartCard = dynamic(
 import { fmtMoney, fmtMoneyCompact, fmtPct, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
-import SyncStatus from "@/components/shared/SyncStatus";
-import SyncNowButton from "@/components/shared/SyncNowButton";
-import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 interface DiaRow {
   dia: number;
@@ -130,15 +128,17 @@ interface DetalleMensualResp {
 }
 
 interface MultifashionResumenViewProps {
-  /** Datos YTD/serie del año (server → multifashion_mensual_v6). Para el titular
-   *  de identidad y el bloque "Panorama del año". */
+  /** Datos YTD/serie del año (server → multifashion_mensual_v6). Alimentan el
+   *  bloque "Panorama del año". */
   overview: Multifashion;
   selectedYear: number;
   isClosedYear: boolean;
   /** Mes (1-12) del selector único de período en el shell de Multifashion. */
   mes: number;
-  /** Revalida el overview del año (SWR mutate del shell) tras un sync manual. */
-  onReloadData?: () => void | Promise<void>;
+  /** Contador que incrementa el shell tras un "Actualizar ahora" exitoso. El
+   *  botón vive ahora en el header de la página (junto al nombre de la tienda),
+   *  así que la orden de re-pedir el detalle del mes llega por esta señal. */
+  syncTick?: number;
 }
 
 const MESES_FULL = [
@@ -273,7 +273,7 @@ function buildCumulativeChart(act: MultifashionSerieAnio, prev: MultifashionSeri
 
 
 export function MultifashionResumenView({
-  overview, selectedYear, isClosedYear, mes, onReloadData,
+  overview, selectedYear, isClosedYear, mes, syncTick = 0,
 }: MultifashionResumenViewProps) {
   const year = selectedYear;
   const prevYear = year - 1;
@@ -282,9 +282,6 @@ export function MultifashionResumenView({
   const [error, setError] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"mes" | "anio">("mes");
   const [panoramaOpen, setPanoramaOpen] = useState(false);
-  // Re-dispara el fetch del detalle mensual tras un "Actualizar ahora" (el
-  // efecto de abajo depende de él — mismos year/mes, data nueva).
-  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -309,7 +306,9 @@ export function MultifashionResumenView({
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [year, mes, refreshTick]);
+    // syncTick: lo incrementa el shell tras un "Actualizar ahora" → re-pide el
+    // detalle del mismo year/mes con la data recién sincronizada.
+  }, [year, mes, syncTick]);
 
   // ── Panorama del año (prop overview, siempre disponible) ──────────────────
   const serieAct = overview.serieActual;
@@ -341,36 +340,10 @@ export function MultifashionResumenView({
 
   return (
     <div className={cn("space-y-5", loading && data && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* 1. HEADER de identidad (el selector de mes lo monta MultifashionView) */}
-      <Card className="flex flex-wrap items-center gap-3.5 p-4">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700">
-          <TrendingUp className="h-5 w-5" />
-        </div>
-        <div>
-          <h2 className="font-display text-xl font-semibold leading-tight text-gray-950">{overview.tienda}</h2>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <SyncStatus
-              tabla="facturas"
-              empresasEsperadas={["american_classic"]}
-              empresaLabels={EMPRESA_KEY_TO_NAME}
-              variant="pill"
-              prefix="Data actualizada al"
-            />
-            {/* "Actualizar ahora" (admin/secretaria; gerente_acs NO lo ve — el
-                gate de rol vive en SyncNowButton): un clic = sync de facturas
-                de american_classic, mismo candado/cooldown del endpoint. Tras
-                el éxito se revalida el overview (SWR del shell) y se re-pide
-                el detalle mensual; SyncStatus se refresca solo (evento focus). */}
-            <SyncNowButton
-              opciones={[{ modulo: "facturas", empresa: "american_classic" }]}
-              onSuccess={async () => {
-                await onReloadData?.();
-                setRefreshTick((t) => t + 1);
-              }}
-            />
-          </div>
-        </div>
-      </Card>
+      {/* La card de identidad (ícono + nombre de la tienda + pill de sync +
+          "Actualizar ahora") se eliminó en la limpieza de jul-2026: el nombre
+          comercial y esos dos controles viven ahora en el header de la página
+          (MultifashionShell), sin repetir el bloque en cada visita al tab. */}
 
       {error && (
         <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
@@ -493,7 +466,7 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
   const deltaYoy = calcDeltaPct(totales.ventas, yoy);
 
   const headerTitle = is_mes_actual
-    ? `${mes_label} ${year} · al día ${data.dia_actual} (data más reciente)`
+    ? `${mes_label} ${year} · al día ${data.dia_actual}`
     : `${mes_label} ${year}`;
 
   return (
@@ -516,8 +489,10 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
             )}
           </div>
           <div className="flex gap-6">
-            <ComparativoStat label={`vs mes anterior${is_mes_actual ? ` (al día ${data.dia_actual})` : ""}`} delta={deltaMoM} comp={mes_anterior} />
-            <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}${is_mes_actual ? ` (al día ${data.dia_actual})` : ""}`} delta={deltaYoy} comp={yoy} />
+            {/* El "(al día N)" salió de los dos labels: el título de la card ya
+                dice "· al día N" y aplica a los dos comparativos. */}
+            <ComparativoStat label="vs mes anterior" delta={deltaMoM} comp={mes_anterior} />
+            <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}`} delta={deltaYoy} comp={yoy} />
           </div>
         </div>
         {/* Línea inferior: tickets retail · ticket promedio · proyección/margen */}
@@ -582,7 +557,7 @@ function ComparativoInteranualCard({
       <div className="border-b border-gray-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">Mes a mes vs {prevYear}</h4>
         <p className="mt-0.5 text-xs text-gray-400">
-          Retail (sin mayoreo) · mismo corte. El mes en curso se compara al día {diaActual}.
+          Retail (sin mayoreo) · mismo corte
         </p>
       </div>
       <div className={cn(GRID, "border-b border-gray-200 bg-gray-50 py-2 text-xs font-medium uppercase tracking-[0.04em] text-gray-500")}>
