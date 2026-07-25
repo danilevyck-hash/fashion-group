@@ -12,7 +12,6 @@ import { empresasConCxp } from "@/lib/switch-api/empresas";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
-import AgingLegend from "@/app/admin/components/AgingLegend";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
 import { exportProveedoresExcel } from "./excel-proveedores";
@@ -163,9 +162,6 @@ function ProveedoresList() {
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
-              <p className="text-sm text-gray-500 mt-0.5">
-                Cuentas por pagar por empresa: saldo, antigüedad y pagos.
-              </p>
             </div>
             {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
                 es quien vive acá): un clic actualiza el CxP de las 7 empresas
@@ -214,7 +210,6 @@ function ProveedoresList() {
             <EmptyState title="Sin proveedores" subtitle={q ? "Probá con otra búsqueda." : "No hay datos sincronizados aún."} />
           ) : (
             <>
-              <AgingLegend />
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="text-xs text-gray-500 tabular-nums">
                   {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto

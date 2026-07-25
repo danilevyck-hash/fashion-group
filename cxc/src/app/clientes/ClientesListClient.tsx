@@ -124,9 +124,6 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
         <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Datos fiscales y de contacto, ventas YTD y CXC actual por las 6 empresas B2B.
-            </p>
           </div>
           {/* "Actualizar ahora" (admin/secretaria) — refresca clientes_master
               desde el espejo de Switch (solo DB, no toca Switch). */}
