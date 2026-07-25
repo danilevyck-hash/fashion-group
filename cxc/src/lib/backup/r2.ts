@@ -280,11 +280,27 @@ interface ReplicaOpts {
   concurrency?: number;
 }
 
-async function headSize(cfg: R2Config, key: string): Promise<number | null> {
-  const res = await cfg.client.fetch(`${cfg.baseUrl}/${key}`, { method: "HEAD" });
+/**
+ * HEAD del objeto. `null` = no existe (404). `size: null` = existe pero R2 no
+ * devolvió un content-length utilizable → se verifica solo la EXISTENCIA.
+ *
+ * El `Accept-Encoding: identity` no es decorativo: R2 sirve comprimidos los
+ * tipos comprimibles (los .json del meta) y undici, al descomprimir, borra el
+ * content-length. Sin esto el HEAD del meta reportaba 0 bytes y la verificación
+ * lo daba por fallido — visto en vivo el 25-jul contra el R2 de producción:
+ * "data/2026-07-25/meta-switch.json: subido con 0 bytes, se esperaban 1463"
+ * mientras los 8 .ndjson.gz de la misma corrida verificaban perfecto.
+ */
+async function headObject(cfg: R2Config, key: string): Promise<{ size: number | null } | null> {
+  const res = await cfg.client.fetch(`${cfg.baseUrl}/${key}`, {
+    method: "HEAD",
+    headers: { "Accept-Encoding": "identity" },
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HEAD ${key}: HTTP ${res.status}`);
-  return Number(res.headers.get("content-length") ?? "0");
+  const raw = res.headers.get("content-length");
+  const n = raw === null ? NaN : Number(raw);
+  return { size: Number.isFinite(n) ? n : null };
 }
 
 async function putObject(cfg: R2Config, f: R2LazyFile, body: Buffer, sha256: string) {
@@ -305,10 +321,13 @@ async function putObject(cfg: R2Config, f: R2LazyFile, body: Buffer, sha256: str
     },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} ${await readBodySafe(res)}`);
-  // Verificación post-subida: R2 debe devolver el objeto con el tamaño exacto.
-  const size = await headSize(cfg, f.key);
-  if (size === null) throw new Error("subido pero HEAD devuelve 404 (no quedó en R2)");
-  if (size !== body.length) throw new Error(`subido con ${size} bytes, se esperaban ${body.length}`);
+  // Verificación post-subida: el objeto tiene que existir y, cuando R2 informa
+  // el tamaño, coincidir con lo subido.
+  const head = await headObject(cfg, f.key);
+  if (head === null) throw new Error("subido pero HEAD devuelve 404 (no quedó en R2)");
+  if (head.size !== null && head.size !== body.length) {
+    throw new Error(`subido con ${head.size} bytes, se esperaban ${body.length}`);
+  }
 }
 
 async function replicarLazy(
@@ -374,8 +393,8 @@ async function replicarLazy(
         continue;
       }
       try {
-        const size = await headSize(cfg, f.key);
-        if (size === null) {
+        const head = await headObject(cfg, f.key);
+        if (head === null) {
           delete manifest[f.key];
           aSubir.push(f);
           result.reparados++;
