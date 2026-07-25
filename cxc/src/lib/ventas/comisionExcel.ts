@@ -52,6 +52,32 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Comisión de UNA línea = aporte (o monto cobrado) × tasa, a 2 decimales.
+ *
+ * OJO (redondeo): el total del mes NO es la suma de estas líneas. El RPC calcula
+ * `comision_total = ROUND(ventas_base × tasa) + ROUND(cobros_base × tasa)` —
+ * redondea los COMPONENTES, no cada documento. Sumar las líneas redondeadas
+ * puede diferir 1-2 centavos. Por eso esta función es solo para MOSTRAR el
+ * aporte de cada renglón; los totales que se pagan siempre salen del RPC
+ * (`comision_venta` / `comision_cobro` / `comision_total`).
+ */
+export function comisionLinea(monto: number, tasa: number): number {
+  return round2(monto * tasa);
+}
+
+/**
+ * Documentos que EFECTIVAMENTE comisionan. El RPC lista las facturas con
+ * utilidad ≤20% con aporte $0.00 a propósito (en pantalla salen en gris para
+ * que el vendedor vea el documento y entienda por qué no le paga), pero el
+ * Excel es el papel de lo PAGABLE: ahí no van.
+ *
+ * Quitar filas de $0 NO altera ningún total: no suman a `ventas_base`.
+ */
+export function ventasPagables(ventas: VentaDoc[]): VentaDoc[] {
+  return ventas.filter((v) => v.subtotal !== 0);
+}
+
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -98,12 +124,15 @@ export async function buildComisionDetalleSheet(
   const spacer = () => { heights[r] = 8; r++; };
 
   // ── VENTAS ── (columna Tipo FA/NC; SIN % utilidad en el reporte físico)
+  // Solo lo PAGABLE: las facturas con aporte $0 (utilidad ≤20%) se omiten —
+  // siguen visibles en el modal, pero no en el Excel que firma el vendedor.
+  const ventasExcel = ventasPagables(d.ventas);
   section("VENTAS");
   ["Fecha", "Cliente", "Factura", "Tipo", "Subtotal"].forEach((h, i) => {
     ws[addr(r, i)] = hdr(h, i === 4 ? "right" : i === 3 ? "center" : "left");
   });
   heights[r] = 22; r++;
-  d.ventas.forEach((v, idx) => {
+  ventasExcel.forEach((v, idx) => {
     const alt = idx % 2 === 0;
     ws[addr(r, 0)] = td(fmtDate(v.fecha), alt);
     ws[addr(r, 1)] = td(v.cliente, alt);
