@@ -307,11 +307,11 @@ export default function ProyectosHomeView({
           <h1 className="text-xl font-semibold text-gray-900">
             {enBucket ? bucketLabel || "Marketing" : "Marketing"}
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {bucketEsLegacy
-              ? "Archivo congelado (Tommy + Calvin) · solo lectura"
-              : "Registro de gastos de mercadeo por cliente"}
-          </p>
+          {bucketEsLegacy && (
+            <p className="text-sm text-gray-500 mt-0.5">
+              Archivo congelado (Tommy + Calvin) · solo lectura
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
           <button
