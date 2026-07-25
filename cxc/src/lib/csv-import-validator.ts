@@ -26,7 +26,7 @@ const EXPECTED_HEADERS = ["SKU", "Nombre", "Precio", "Cantidad", "Genero", "Esta
 // Note: "Categoria" is optional — read inline below, only meaningful for active_wear imports.
 
 // Joybees-specific gender values that reebok-gender.ts does NOT map to a canonical
-// group (it has its own label mapping in src/components/joybees), but are valid here.
+// group (it has its own label mapping in src/components/catalogo), but are valid here.
 const EXTRA_VALID_GENDERS = new Set(["adults", "adults_m"]);
 
 // A gender is recognized if it maps to a canonical group by ROOT (via reebok-gender:

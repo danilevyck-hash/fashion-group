@@ -1,0 +1,221 @@
+"use client";
+
+// Barra sticky del carrito (catálogo vendedor y público), parametrizada por
+// MARCA_THEME. Las secciones Pedido/Pre-orden del mini-carrito son feature
+// (preorder, hoy solo Reebok).
+
+import { useState } from "react";
+import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import type { CatalogoCartItem, CatalogoProducto } from "./types";
+
+interface CatalogoStickyCartBarProps {
+  marca: MarcaUiKey;
+  cart: CatalogoCartItem[];
+  cartCount: number;
+  cartTotal: number;
+  onQtyChange: (productId: string, qty: number, product: CatalogoProducto) => void;
+  onClearCart: () => void;
+  variant: "public" | "vendor";
+  // Public variant: crea + confirma el pedido (WhatsApp ya no es el paso final;
+  // queda como aviso opcional en la página del pedido).
+  onSubmitOrder?: () => void;
+  clientName?: string;
+  onClientNameChange?: (v: string) => void;
+  // Vendor variant
+  onCreateOrder?: () => void;
+  saving?: boolean;
+  actionLabel?: string;
+  actionColor?: string;
+  // Mini cart link (vendor)
+  miniCartLink?: React.ReactNode;
+  // Format function
+  formatTotal: (n: number) => string;
+}
+
+export default function CatalogoStickyCartBar({
+  marca, cart, cartCount, cartTotal,
+  onQtyChange, onClearCart,
+  variant, onSubmitOrder, clientName, onClientNameChange, onCreateOrder,
+  saving, actionLabel, actionColor,
+  miniCartLink, formatTotal,
+}: CatalogoStickyCartBarProps) {
+  const theme = getMarcaTheme(marca)!;
+  const c = theme.cart;
+  const [miniCartOpen, setMiniCartOpen] = useState(false);
+
+  if (cartCount === 0) return null;
+
+  const defaultActionColor = variant === "public" ? c.actionPublic : c.actionVendor;
+  const defaultActionLabel = variant === "public" ? "Confirmar pedido" : "Crear pedido";
+  const btnColor = actionColor || defaultActionColor;
+  const btnLabel = actionLabel || defaultActionLabel;
+  const showCheck = c.checkIconAlways || variant === "public";
+  const showArrow = c.vendorArrow && variant === "vendor";
+
+  function handleAction() {
+    if (variant === "public" && onSubmitOrder) {
+      onSubmitOrder();
+    } else if (onCreateOrder) {
+      onCreateOrder();
+    } else if (onSubmitOrder) {
+      onSubmitOrder();
+    }
+  }
+
+  const renderItem = (item: CatalogoCartItem) => {
+    // Fallback "footwear" heredado del StickyCartBar original de Reebok (solo
+    // aplica a items viejos sin category en storage; Joybees ignora el arg).
+    const bs = theme.bulto(item.category || "footwear");
+    const lineTotal = item.quantity * bs * item.unit_price;
+    const asProduct = (i: CatalogoCartItem): CatalogoProducto =>
+      ({ id: i.product_id, name: i.name, sku: i.sku, price: i.unit_price, image_url: i.image_url });
+    return (
+      <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+        <div className="flex-1 min-w-0 mr-3">
+          <span className={c.itemName}>{item.name}</span>
+          <span className={c.itemMeta}>x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => onQtyChange(item.product_id, item.quantity - 1, asProduct(item))}
+              className={c.qtyBtn}
+            >
+              &minus;
+            </button>
+            <span className={c.qtyNum}>{item.quantity}</span>
+            <button
+              onClick={() => onQtyChange(item.product_id, item.quantity + 1, asProduct(item))}
+              className={c.qtyBtn}
+            >
+              +
+            </button>
+          </div>
+          <span className={c.lineTotal}>${lineTotal.toFixed(2)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const regular = theme.features.preorder ? cart.filter(i => !i.is_preorder) : cart;
+  const preorders = theme.features.preorder ? cart.filter(i => i.is_preorder) : [];
+  const hasPreorders = preorders.length > 0;
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-40"
+      style={{ animation: "slideUp 0.25s ease-out" }}
+    >
+      {/* Backdrop */}
+      {miniCartOpen && (
+        <div className="fixed inset-0 bg-black/20 z-[-1]" onClick={() => setMiniCartOpen(false)} />
+      )}
+
+      {/* Mini cart panel */}
+      <div
+        className="bg-white border-t border-gray-200 overflow-hidden"
+        style={{ maxHeight: miniCartOpen ? "320px" : "0px", transition: "max-height 250ms ease-out" }}
+      >
+        <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className={c.tituloMini}>Tu pedido</span>
+              <button
+                onClick={() => setMiniCartOpen(false)}
+                className="text-gray-400 hover:text-black transition p-1 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
+            {hasPreorders && regular.length > 0 && (
+              <div className="px-1 pt-1 pb-0.5 text-xs font-bold uppercase tracking-wide text-[#1A2656]/40">Pedido</div>
+            )}
+            {regular.map(renderItem)}
+            {hasPreorders && (
+              <>
+                <div className="px-1 pt-3 pb-0.5 text-xs font-bold uppercase tracking-wide text-amber-600">Pre-orden</div>
+                {preorders.map(renderItem)}
+              </>
+            )}
+          </div>
+        </div>
+        <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">
+          <span className={c.totalText}>Total: ${formatTotal(cartTotal)}</span>
+          <div className="flex items-center gap-3">
+            {miniCartLink}
+            <button
+              onClick={() => { onClearCart(); setMiniCartOpen(false); }}
+              className={c.vaciarBtn}
+            >
+              Vaciar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Client name input (public variant) */}
+      {variant === "public" && onClientNameChange && (
+        <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100">
+          <label className={c.nameLabel}>Tu nombre</label>
+          <input
+            type="text"
+            value={clientName || ""}
+            onChange={(e) => onClientNameChange(e.target.value)}
+            placeholder="Escribe tu nombre"
+            autoComplete="name"
+            className={c.nameInput}
+          />
+        </div>
+      )}
+
+      {/* Bottom bar */}
+      <div className="p-3 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
+        {/* Cart summary button */}
+        <button
+          onClick={() => setMiniCartOpen(prev => !prev)}
+          className={c.summaryBtn}
+        >
+          {/* Cart icon */}
+          <div className="relative">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
+            </svg>
+            <span className={c.badge}>
+              {cartCount > 9 ? "9+" : cartCount}
+            </span>
+          </div>
+          <div className="flex flex-col items-start leading-tight">
+            <span className={c.summaryMeta}>{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
+            <span className="font-bold text-sm">${formatTotal(cartTotal)}</span>
+          </div>
+          <svg
+            xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className="transition-transform duration-200 ml-0.5"
+            style={{ transform: miniCartOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+          >
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+        </button>
+
+        {/* Main action button */}
+        <button
+          onClick={handleAction}
+          disabled={saving || (variant === "public" && onClientNameChange !== undefined && !(clientName || "").trim())}
+          className={`flex-1 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition min-h-[56px] disabled:opacity-50 text-white ${btnColor} active:scale-[0.98]`}
+        >
+          {showCheck && (
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+          <span className="truncate">{saving ? "Guardando..." : btnLabel}</span>
+          {showArrow && <span>&rarr;</span>}
+        </button>
+      </div>
+    </div>
+  );
+}
