@@ -11,7 +11,6 @@ import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
-import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder, genderFilterLabel } from "@/lib/reebok-gender";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
@@ -186,7 +185,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
-    .filter(p => matchesGenderFilter(p.gender, gender))
+    .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
@@ -195,7 +194,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
       const ca = catOrder[a.category || ""] ?? 9, cb = catOrder[b.category || ""] ?? 9;
       if (ca !== cb) return ca - cb;
-      const ga = genderGroupOrder(a.gender), gb = genderGroupOrder(b.gender);
+      const ga = theme.genero.groupOrder(a.gender), gb = theme.genero.groupOrder(b.gender);
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
@@ -208,9 +207,9 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   if (!agrupado) {
     let lastKey = "";
     for (const p of filtered) {
-      const key = `${p.category}|${genderGroupKey(p.gender)}`;
+      const key = `${p.category}|${theme.genero.groupKey(p.gender)}`;
       if (key !== lastKey) {
-        groups.push({ label: `${catLabel[p.category || ""] || p.category} — ${genderGroupLabel(p.gender)}`, items: [] });
+        groups.push({ label: `${catLabel[p.category || ""] || p.category} — ${theme.genero.groupLabel(p.gender)}`, items: [] });
         lastKey = key;
       }
       groups[groups.length - 1].items.push(p);
@@ -303,7 +302,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         if (category) filterDesc.push(category);
         if (search) filterDesc.push(`“${search}”`);
       } else {
-        if (gender) filterDesc.push(genderFilterLabel(gender));
+        if (gender) filterDesc.push(theme.genero.filterLabel(gender));
         if (category) filterDesc.push(catLabel[category] || category);
         if (saleFilter === "oferta") filterDesc.push("Oferta");
         if (saleFilter === "nuevo") filterDesc.push("Nuevo");
@@ -329,19 +328,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             })),
           }));
       } else {
-        // Agrupación canónica (women+female → Mujer; unisex propio). "otros" cierra
-        // el catch-all para que ningún producto con género no contemplado se caiga
-        // del PDF en silencio.
-        const genders = [
-          { key: "hombre", label: "HOMBRE" },
-          { key: "mujer", label: "MUJER" },
-          { key: "ninos", label: "NIÑOS" },
-          { key: "unisex", label: "UNISEX" },
-          { key: "otros", label: "OTROS" },
-        ];
-        pdfSections = genders.map(g => ({
+        // Agrupación canónica de la marca (theme.genero.pdfSections): Reebok
+        // Hombre/Mujer/Niños/Unisex, Tommy Women/Men/Boys/Girls. "otros" cierra
+        // el catch-all para que ningún producto con género no contemplado se
+        // caiga del PDF en silencio.
+        pdfSections = theme.genero.pdfSections.map(g => ({
           label: g.label,
-          items: filtered.filter(p => genderGroupKey(p.gender) === g.key).map(p => ({
+          items: filtered.filter(p => theme.genero.groupKey(p.gender) === g.key).map(p => ({
             name: p.name, sku: p.sku || "", color: p.color, price: p.price,
             image_url: p.image_url || null, badge: p.badge ?? null,
           })),
@@ -377,7 +370,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   // Skeleton
   const skeletonGrid = (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
       {[...Array(12)].map((_, i) => (
         <div key={i} className="bg-white overflow-hidden rounded-xl">
           <div className="aspect-square shimmer" />
@@ -417,7 +410,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                   <div className={theme.grid.sectionRule} />
                   <span className={theme.grid.sectionCount}>{s.items.length}</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {s.items.map(g => (
                     <CatalogoGroupedCard
                       key={g.baseSku}
@@ -433,7 +426,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {sortedGroups.map(gs => (
               <CatalogoGroupedCard
                 key={gs.group.baseSku}
@@ -454,7 +447,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 <div className={theme.grid.sectionRule} />
                 <span className={theme.grid.sectionCount}>{g.items.length}</span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                 {g.items.map(p => (
                   <CatalogoProductCard
                     key={p.id}
@@ -471,7 +464,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filtered.map(p => (
             <CatalogoProductCard
               key={p.id}

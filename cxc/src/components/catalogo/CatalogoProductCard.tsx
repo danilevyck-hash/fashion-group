@@ -76,7 +76,6 @@ export default function CatalogoProductCard({
 
   const inOrder = qty > 0;
   const bultoSize = theme.bulto(product.category);
-  const bultoTotal = (product.price || 0) * bultoSize;
 
   return (
     <>
@@ -203,18 +202,19 @@ export default function CatalogoProductCard({
               )}
             </div>
             {product.price != null && (
+              /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
+                 25-jul-2026) — competía con el precio unitario, que es el que
+                 el vendedor cotiza. */
               <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
-                <div className="flex items-baseline gap-1.5">
-                  <span className={`${t.bultoMeta} font-medium`}>Bulto de {bultoSize}</span>
-                  <span className="text-xs text-[#1A2656]/30">&middot;</span>
-                  <span className={`${t.bultoMeta} font-semibold tabular-nums`}>${bultoTotal.toFixed(2)}/bulto</span>
-                </div>
+                <span className={`${t.bultoMeta} font-medium`}>Bulto de {bultoSize}</span>
                 {showBultos && <BultosBadge stock={product._stock ?? 0} bultoSize={bultoSize} />}
               </div>
             )}
           </div>
 
-          {/* Stock interno (Switch): Disponible = principal, Existencia = secundario.
+          {/* Stock interno (Switch) en UNA línea con el vocabulario del
+              sistema: "Disponibilidad 48 · Existencia 48" (Daniel, 25-jul-2026
+              — antes eran dos bloques con otro vocabulario).
               Solo catálogo interno (showStock); NUNCA en el catálogo público. */}
           {showStock && (() => {
             const disp = product.disponibilidad;
@@ -222,12 +222,18 @@ export default function CatalogoProductCard({
             const agotado = disp == null || disp <= 0;
             return (
               <div className="mt-2 pt-2 border-t border-[#1A2656]/10">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className={`text-sm font-semibold tabular-nums ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]"}`}>
-                    {agotado ? "Agotado" : `Disponible: ${disp}`}
+                {/* 11px + nowrap en xl: a 5 columnas la línea completa mide
+                    ~182px contra 200px de card — entra justa en UNA línea
+                    (medido en la app real). En iPad/móvil la card es de
+                    ~150px y NINGÚN tamaño legible cabe, así que ahí se deja
+                    fluir a dos líneas en vez de recortar el número. */}
+                <div className="flex items-baseline gap-1.5 text-[11px] tabular-nums xl:flex-nowrap xl:whitespace-nowrap">
+                  <span className={`font-semibold whitespace-nowrap ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]"}`}>
+                    Disponibilidad {disp ?? "—"}
                   </span>
-                  <span className="text-xs text-[#1A2656]/45 tabular-nums">
-                    En bodega: {exist == null ? "—" : exist}
+                  <span className="text-[#1A2656]/30">&middot;</span>
+                  <span className="text-[#1A2656]/45 whitespace-nowrap">
+                    Existencia {exist ?? "—"}
                   </span>
                 </div>
               </div>

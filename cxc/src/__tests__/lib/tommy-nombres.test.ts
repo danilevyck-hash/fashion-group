@@ -82,33 +82,46 @@ describe("parseTommyDescripcion — 23 valores reales de fashion_shoes", () => {
   });
 });
 
-describe("buildTommyDerivedFields — name '{codigo} · {categoría} {género}'", () => {
-  it("arma el name con labels en español simple", () => {
+describe("buildTommyDerivedFields — name = la descripcion de Switch tal cual", () => {
+  // 25-jul-2026: el nombre es la descripcion de Switch, SIN el código (que ya
+  // sale en su píldora de SKU) y SIN traducir.
+  it("name = '{Género}-{Categoría}' con el vocabulario de Switch", () => {
     expect(buildTommyDerivedFields("TH1234", "Women-Flip Flops")).toEqual({
-      name: "TH1234 · Flip Flops Mujer",
+      name: "Women-Flip Flops",
       category: "flip_flops",
       gender: "women",
     });
     expect(buildTommyDerivedFields("CHIPOTLA-973", "Men-Sneakers")).toEqual({
-      name: "CHIPOTLA-973 · Sneakers Hombre",
+      name: "Men-Sneakers",
       category: "sneakers",
       gender: "men",
     });
     expect(buildTommyDerivedFields("A1", "Girls-Sandals")).toEqual({
-      name: "A1 · Sandalias Niña",
+      name: "Girls-Sandals",
       category: "sandals",
       gender: "girls",
     });
     expect(buildTommyDerivedFields("B2", "Boys-Boots")).toEqual({
-      name: "B2 · Botas Niño",
+      name: "Boys-Boots",
       category: "boots",
       gender: "boys",
     });
   });
 
-  it("fallback: descripcion no parseable → codigo · descripcion, otros, null", () => {
+  it("el código NUNCA entra al nombre (vive en la píldora de SKU)", () => {
+    for (const cod of ["TH1234", "CHIPOTLA-973", "FM03971-OGY"]) {
+      expect(buildTommyDerivedFields(cod, "Women-Slippers").name).not.toContain(cod);
+    }
+  });
+
+  it("normaliza la capitalización de Switch ('women-Sneakers' es real)", () => {
+    expect(buildTommyDerivedFields("X1", "women-Sneakers").name).toBe("Women-Sneakers");
+    expect(buildTommyDerivedFields("X2", "  Men - Flip Flops  ").name).toBe("Men-Flip Flops");
+  });
+
+  it("fallback: descripcion no parseable → la descripcion cruda, otros, null", () => {
     expect(buildTommyDerivedFields("AJUSTE", "MERCANCIA DEFECTUOSA")).toEqual({
-      name: "AJUSTE · MERCANCIA DEFECTUOSA",
+      name: "MERCANCIA DEFECTUOSA",
       category: "otros",
       gender: null,
     });

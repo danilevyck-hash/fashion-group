@@ -54,7 +54,6 @@ export default function CatalogoGroupedCard({
   }, [cartMap, group.variants]);
 
   const isRegalia = group.is_regalia || group.price === 0;
-  const bultoTotal = group.price * BULTO_SIZE;
   const isSingleVariant = group.variants.length === 1;
 
   function setQty(productId: string, product: JoybeesProduct, n: number) {
@@ -174,12 +173,10 @@ export default function CatalogoGroupedCard({
               <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
               <span className={t.priceMeta}>/unidad</span>
             </div>
+            {/* Solo "Bulto de N" — el precio del bulto se quitó en las 3 marcas
+                (Daniel, 25-jul-2026). Espejo exacto de CatalogoProductCard. */}
             <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
-              <div className="flex items-baseline gap-1.5">
-                <span className={`${t.bultoMeta} font-medium`}>Bulto de {BULTO_SIZE}</span>
-                <span className="text-xs text-[#404041]/30">&middot;</span>
-                <span className={`${t.bultoMeta} font-semibold tabular-nums`}>${bultoTotal.toFixed(2)}/bulto</span>
-              </div>
+              <span className={`${t.bultoMeta} font-medium`}>Bulto de {BULTO_SIZE}</span>
               {showBultos && <BultosBadge stock={groupStock} bultoSize={BULTO_SIZE} />}
             </div>
           </div>
