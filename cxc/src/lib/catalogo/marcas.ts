@@ -361,7 +361,11 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       authStyle: "roles-modulo",
       editVerb: "POST", // quirk heredado: edición por sku
       idField: "sku",
-      cols: "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge,created_at",
+      // Select explícito = TODAS las columnas reales de joybees_products
+      // (regla admin round-trip). existencia/disponibilidad/keep_visible las
+      // agregó el DDL 20260629140000 y las escribe el cron de catálogo; el
+      // catálogo interno las necesita para la línea "Disponibilidad · Existencia".
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,keep_visible,image_url,active,popular,is_regalia,badge,created_at",
       readDb: joybeesProductsDb,
       writeDb: joybeesProductsDb,
       hasDelete: false,

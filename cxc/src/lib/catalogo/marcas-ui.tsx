@@ -310,21 +310,36 @@ export interface MarcaTheme {
     /** Contenedor de la foto — 4:3 en las 3 marcas: el calzado es ancho y en
      *  cuadrado sobraba fondo blanco arriba y abajo (Daniel, 25-jul-2026). */
     imageBg: string;
-    /** object-contain SIEMPRE: el 4:3 recorta fondo, nunca producto. */
+    /** object-contain SIEMPRE y SIN padding en las 3 marcas: la foto ocupa el
+     *  marco 4:3 completo (el p-3 de Reebok/Tommy encogía el producto ~14% y
+     *  además era una divergencia con Joybees). NO se usa object-cover: se
+     *  midieron las 608 fotos activas y cover corta PRODUCTO (no margen) en
+     *  67/138 de Reebok y 16/81 de Joybees — ver PR de la card unificada. */
     imageFit: string;
     placeholder: ReactNode;
     name: string;
+    /** Píldora del CÓDIGO (misma posición y forma en las 3 marcas; solo cambia
+     *  el color del tema). Antes vivía hardcodeada con los colores de Reebok
+     *  en la card plana y como texto mono suelto en la agrupada. */
+    skuPill: string;
     priceNormal: string;
     priceMeta: string;
     bultoMeta: string;
+    /** Línea "Disponibilidad N · Existencia N" del catálogo interno
+     *  (CatalogoStockLine): estructura única, colores por marca. */
+    stock: {
+      divider: string;
+      strong: string;
+      soft: string;
+      dot: string;
+      agotado: string;
+    };
     addBtn: string;
     qtyWrap: string;
     qtyBtn: string;
     qtyNum: string;
     qtyUnit: string;
   };
-  /** Labels de categoría del grid agrupado (marcas con agrupacionPorModelo). */
-  groupedCategoryLabels: Record<string, string>;
   /** Grid vendedor: dónde vive el menú Compartir y el botón "Ver pedido". */
   vendorShare: {
     /** true (layout Joybees): share + "Ver pedido" junto al header; false
@@ -600,7 +615,7 @@ const REEBOK: MarcaTheme = {
     checkBubble: "w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg",
     checkStroke: "white",
     imageBg: "aspect-[4/3] bg-[#F5F0E8] relative overflow-hidden cursor-pointer",
-    imageFit: "w-full h-full object-contain p-3",
+    imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
         <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -609,16 +624,23 @@ const REEBOK: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#1A2656] line-clamp-2 leading-snug min-h-[2.5em]",
+    skuPill: "text-xs bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#1A2656]",
     priceMeta: "text-xs text-[#1A2656]/40",
     bultoMeta: "text-xs text-[#1A2656]/50",
+    stock: {
+      divider: "border-[#1A2656]/10",
+      strong: "text-[#1A2656]",
+      soft: "text-[#1A2656]/45",
+      dot: "text-[#1A2656]/30",
+      agotado: "text-[#1A2656]/40",
+    },
     addBtn: "bg-[#1A2656] text-white hover:bg-[#0f1a3d] active:scale-[0.97]",
     qtyWrap: "flex items-center justify-between bg-emerald-50 rounded-lg px-1 border border-emerald-100",
     qtyBtn: "text-emerald-700 hover:bg-emerald-100",
     qtyNum: "text-base font-bold text-emerald-700 tabular-nums",
     qtyUnit: "text-xs text-emerald-600 ml-1",
   },
-  groupedCategoryLabels: {},
   vendorShare: {
     enHeader: false,
     verPedidoBtn: null,
@@ -908,30 +930,22 @@ const JOYBEES: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#404041] line-clamp-2 leading-snug min-h-[2.5em]",
+    skuPill: "text-xs bg-[#FFE443]/25 text-[#404041]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#404041]",
     priceMeta: "text-xs text-[#404041]/40",
     bultoMeta: "text-xs text-[#404041]/50",
+    stock: {
+      divider: "border-[#404041]/10",
+      strong: "text-[#404041]",
+      soft: "text-[#404041]/45",
+      dot: "text-[#404041]/30",
+      agotado: "text-[#404041]/40",
+    },
     addBtn: "bg-[#404041] text-white hover:bg-[#2a2a2b] active:scale-[0.97]",
     qtyWrap: "flex items-center justify-between bg-[#FFE443]/20 rounded-lg px-1 border border-[#FFE443]/40",
     qtyBtn: "text-[#404041] hover:bg-[#FFE443]/30",
     qtyNum: "text-base font-bold text-[#404041] tabular-nums",
     qtyUnit: "text-xs text-[#404041]/60 ml-1",
-  },
-  groupedCategoryLabels: {
-    active_clog: "Active Clog",
-    casual_flip: "Casual Flip",
-    varsity_clog: "Varsity Clog",
-    trekking_slide: "Trekking Slide",
-    trekking_shoe: "Trekking Shoe",
-    work_clog: "Work Clog",
-    friday_flat: "Friday Flat",
-    garden_grove_clog: "Garden Grove",
-    lakeshore_sandal: "Lakeshore",
-    riviera_sandal: "Riviera",
-    everyday_sandal: "Everyday Sandal",
-    varsity_flip: "Varsity Flip",
-    studio_clog: "Studio Clog",
-    popinz: "Popinz",
   },
   vendorShare: {
     enHeader: true,
@@ -1242,7 +1256,7 @@ const TOMMY: MarcaTheme = {
     checkBubble: "w-10 h-10 rounded-full bg-[#152342] flex items-center justify-center shadow-lg",
     checkStroke: "white",
     imageBg: "aspect-[4/3] bg-[#F6F7F9] relative overflow-hidden cursor-pointer",
-    imageFit: "w-full h-full object-contain p-3",
+    imageFit: "w-full h-full object-contain",
     placeholder: (
       <div className="w-full h-full flex items-center justify-center text-gray-300">
         <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1251,16 +1265,23 @@ const TOMMY: MarcaTheme = {
       </div>
     ),
     name: "text-sm font-semibold text-[#152342] line-clamp-2 leading-snug min-h-[2.5em]",
+    skuPill: "text-xs bg-[#F6F7F9] text-[#152342]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
     priceNormal: "text-xl font-bold tabular-nums text-[#152342]",
     priceMeta: "text-xs text-[#152342]/40",
     bultoMeta: "text-xs text-[#152342]/50",
+    stock: {
+      divider: "border-[#152342]/10",
+      strong: "text-[#152342]",
+      soft: "text-[#152342]/45",
+      dot: "text-[#152342]/30",
+      agotado: "text-[#152342]/40",
+    },
     addBtn: "bg-[#152342] text-white hover:bg-[#0e1830] active:scale-[0.97]",
     qtyWrap: "flex items-center justify-between bg-[#152342]/5 rounded-lg px-1 border border-[#152342]/15",
     qtyBtn: "text-[#152342] hover:bg-[#152342]/10",
     qtyNum: "text-base font-bold text-[#152342] tabular-nums",
     qtyUnit: "text-xs text-[#152342]/60 ml-1",
   },
-  groupedCategoryLabels: {},
   vendorShare: {
     enHeader: true,
     verPedidoBtn:

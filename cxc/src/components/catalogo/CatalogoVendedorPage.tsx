@@ -23,6 +23,12 @@ import {
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
 
+// Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
+// del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
+// el resto va lazy y solo baja al hacer scroll (medido: la carga inicial pasa de
+// cientos de fotos a ~10). Ver PR de la card unificada.
+const FOTOS_PRIORITARIAS = 10;
+
 export default function CatalogoVendedorPage({ marca }: { marca: MarcaUiKey }) {
   return <Suspense><CatalogoVendedor marca={marca} /></Suspense>;
 }
@@ -403,7 +409,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       {agrupado ? (
         isGrouped ? (
           <div className="space-y-8">
-            {sections.map(s => (
+            {sections.map((s, si) => (
               <div key={s.section}>
                 <div className="flex items-center gap-3 mb-4">
                   <h2 className={theme.grid.sectionTitle}>{s.label}</h2>
@@ -411,14 +417,16 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                   <span className={theme.grid.sectionCount}>{s.items.length}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                  {s.items.map(g => (
+                  {s.items.map((g, i) => (
                     <CatalogoGroupedCard
                       key={g.baseSku}
+                      priority={si === 0 && i < FOTOS_PRIORITARIAS}
                       marca={marca}
                       group={g}
                       cartMap={cartMap}
                       onQtyChange={handleQtyChange}
                       showBultos
+                      showStock
                     />
                   ))}
                 </div>
@@ -427,20 +435,23 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-            {sortedGroups.map(gs => (
+            {sortedGroups.map((gs, i) => (
               <CatalogoGroupedCard
                 key={gs.group.baseSku}
+                priority={i < FOTOS_PRIORITARIAS}
                 marca={marca}
                 group={gs.group}
                 cartMap={cartMap}
                 onQtyChange={handleQtyChange}
+                showBultos
+                showStock
               />
             ))}
           </div>
         )
       ) : isGrouped ? (
         <div className="space-y-8">
-          {groups.map(g => (
+          {groups.map((g, gi) => (
             <div key={g.label}>
               <div className="flex items-center gap-3 mb-4">
                 <h2 className={theme.grid.sectionTitle}>{g.label}</h2>
@@ -448,9 +459,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 <span className={theme.grid.sectionCount}>{g.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-                {g.items.map(p => (
+                {g.items.map((p, i) => (
                   <CatalogoProductCard
                     key={p.id}
+                    priority={gi === 0 && i < FOTOS_PRIORITARIAS}
                     marca={marca}
                     product={p}
                     qty={cartMap.get(p.id) || 0}
@@ -465,9 +477,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-          {filtered.map(p => (
+          {filtered.map((p, i) => (
             <CatalogoProductCard
               key={p.id}
+              priority={i < FOTOS_PRIORITARIAS}
               marca={marca}
               product={p}
               qty={cartMap.get(p.id) || 0}

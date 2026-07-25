@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { CatalogoProducto } from "./types";
-import BultosBadge from "@/components/shared/BultosBadge";
+import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 
 const COLOR_DOT_MAP: Record<string, string> = {
@@ -37,10 +37,13 @@ interface CatalogoProductCardProps {
   disabled?: boolean;
   showBultos?: boolean; // vendor mode shows "bultos"
   showStock?: boolean;  // catálogo interno: muestra disponibilidad + existencia (NO en público)
+  /** Cards del primer viewport: la foto se pide YA y con prioridad alta (LCP).
+   *  El resto va lazy — es lo que evita bajar cientos de fotos al abrir. */
+  priority?: boolean;
 }
 
 export default function CatalogoProductCard({
-  marca, product, qty, onQtyChange, disabled, showBultos, showStock,
+  marca, product, qty, onQtyChange, disabled, showBultos, showStock, priority,
 }: CatalogoProductCardProps) {
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
@@ -144,9 +147,11 @@ export default function CatalogoProductCard({
                   key={`${imageStatus}-${useThumb}`}
                   src={useThumb ? (supabaseThumb(product.image_url, 600) ?? product.image_url) : product.image_url}
                   alt={product.name}
-                  width={300}
+                  width={400}
                   height={300}
-                  loading="lazy"
+                  loading={priority ? "eager" : "lazy"}
+                  fetchPriority={priority ? "high" : "auto"}
+                  decoding="async"
                   className={t.imageFit}
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => {
@@ -163,38 +168,37 @@ export default function CatalogoProductCard({
           )}
         </div>
 
-        {/* Product info */}
+        {/* Product info — ESQUELETO CANÓNICO (idéntico en CatalogoGroupedCard):
+            foto · nombre · código (píldora) · precio · bulto · stock · Agregar. */}
         <div className="p-3">
           {/* Name */}
           <h3 className={t.name}>{product.name}</h3>
 
-          {/* Color dot + name */}
-          {product.color && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <span
-                className="w-3 h-3 rounded-full border border-black/10 shrink-0"
-                style={{ backgroundColor: getColorDot(product.color) }}
-              />
-              <span className={t.priceMeta}>{product.color}</span>
+          {/* Código (píldora) — mt-1: nombre y código van juntos (Daniel,
+              25-jul-2026; antes mt-2). El color, cuando existe, viaja como un
+              chip MÁS de esta misma fila para no abrir otra línea. */}
+          {(product.sku || product.color) && (
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              {product.sku && <span className={t.skuPill}>{product.sku}</span>}
+              {product.color && (
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="w-3 h-3 rounded-full border border-black/10 shrink-0"
+                    style={{ backgroundColor: getColorDot(product.color) }}
+                  />
+                  <span className={t.priceMeta}>{product.color}</span>
+                </span>
+              )}
             </div>
           )}
 
-          {/* SKU / código */}
-          {product.sku && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              <span className="text-xs bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums">
-                {product.sku}
-              </span>
-            </div>
-          )}
-
-          {/* Price */}
+          {/* Price — sin "/unidad" (Daniel, 25-jul-2026): la unidad ya la dice
+              la línea del bulto y el sufijo solo ensuciaba el precio. */}
           <div className="mt-2">
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold tabular-nums ${product.badge === "oferta" ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
+              <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
                 {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
               </span>
-              {product.price && <span className={t.priceMeta}>/unidad</span>}
               {product.badge === "oferta" && (
                 <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
                   Oferta
@@ -204,41 +208,24 @@ export default function CatalogoProductCard({
             {product.price != null && (
               /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,
                  25-jul-2026) — competía con el precio unitario, que es el que
-                 el vendedor cotiza. */
-              <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+                 el vendedor cotiza. El indicador "● N" (bultos en stock) también
+                 se quitó: la línea de Disponibilidad/Existencia ya da el dato. */
+              <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className={`${t.bultoMeta} font-medium`}>Bulto de {bultoSize}</span>
-                {showBultos && <BultosBadge stock={product._stock ?? 0} bultoSize={bultoSize} />}
               </div>
             )}
           </div>
 
-          {/* Stock interno (Switch) en UNA línea con el vocabulario del
-              sistema: "Disponibilidad 48 · Existencia 48" (Daniel, 25-jul-2026
-              — antes eran dos bloques con otro vocabulario).
-              Solo catálogo interno (showStock); NUNCA en el catálogo público. */}
-          {showStock && (() => {
-            const disp = product.disponibilidad;
-            const exist = product.existencia;
-            const agotado = disp == null || disp <= 0;
-            return (
-              <div className="mt-2 pt-2 border-t border-[#1A2656]/10">
-                {/* 11px + nowrap en xl: a 5 columnas la línea completa mide
-                    ~182px contra 200px de card — entra justa en UNA línea
-                    (medido en la app real). En iPad/móvil la card es de
-                    ~150px y NINGÚN tamaño legible cabe, así que ahí se deja
-                    fluir a dos líneas en vez de recortar el número. */}
-                <div className="flex items-baseline gap-1.5 text-[11px] tabular-nums xl:flex-nowrap xl:whitespace-nowrap">
-                  <span className={`font-semibold whitespace-nowrap ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]"}`}>
-                    Disponibilidad {disp ?? "—"}
-                  </span>
-                  <span className="text-[#1A2656]/30">&middot;</span>
-                  <span className="text-[#1A2656]/45 whitespace-nowrap">
-                    Existencia {exist ?? "—"}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
+          {/* Stock interno (Switch) — componente COMPARTIDO con la card
+              agrupada (CatalogoStockLine). Solo catálogo interno (showStock);
+              NUNCA en el catálogo público. */}
+          {showStock && (
+            <CatalogoStockLine
+              marca={marca}
+              disponibilidad={product.disponibilidad}
+              existencia={product.existencia}
+            />
+          )}
 
           {/* Add/Qty button */}
           {inOrder ? (
