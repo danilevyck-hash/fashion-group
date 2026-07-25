@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Variantes de foto por producto (las que trae el ZIP del banco B2B).
 //
-//   GET  ?sku=XXX  → { variantes: [{ vista, url }] }  tira de miniaturas
+//   GET  ?sku=XXX  → { variantes: [{ vista, url }], actual }  tira + cuál lleva ✓
 //   GET  (sin sku) → { skus: [...] }                  qué SKUs tienen variantes
 //                                                     (habilita el botón sin
 //                                                      N peticiones)
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const sku = new URL(req.url).searchParams.get("sku")?.trim();
   try {
     if (!sku) return NextResponse.json({ skus: await listarSkusConVariantes(cfg) });
-    return NextResponse.json({ variantes: await listarVariantesDeSku(cfg, sku) });
+    return NextResponse.json(await listarVariantesDeSku(cfg, sku));
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "No se pudieron leer las fotos guardadas." }, { status: 500 });

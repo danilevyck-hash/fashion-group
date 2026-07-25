@@ -47,13 +47,18 @@ export function VariantePicker({
   const [guardando, setGuardando] = useState<number | null>(null);
   // Optimista: se pinta el ✓ en la recién elegida mientras el server confirma.
   const [elegidaOptimista, setElegidaOptimista] = useState<number | null>(null);
+  // Cuál está puesta según el server (resuelve también las fotos que copió la
+  // carga masiva, cuya URL no nombra la variante — ver variantes-server.ts).
+  const [actualServer, setActualServer] = useState<number | null>(null);
   const vivo = useRef(true);
 
   useEffect(() => () => { vivo.current = false; }, []);
 
   const sku = product.sku || "";
   const vistaActual =
-    elegidaOptimista ?? vistaActualDeImageUrl(product.image_url, marca as StorageMarcaKey, sku);
+    elegidaOptimista ??
+    vistaActualDeImageUrl(product.image_url, marca as StorageMarcaKey, sku) ??
+    actualServer;
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -61,8 +66,11 @@ export function VariantePicker({
     try {
       const res = await fetch(`${theme.api}/products/variantes?sku=${encodeURIComponent(sku)}`);
       if (!res.ok) throw new Error("No se pudieron cargar las fotos.");
-      const { variantes: v } = (await res.json()) as { variantes: Variante[] };
-      if (vivo.current) setVariantes(v);
+      const { variantes: v, actual } = (await res.json()) as { variantes: Variante[]; actual: number | null };
+      if (vivo.current) {
+        setVariantes(v);
+        setActualServer(actual ?? null);
+      }
     } catch (e) {
       if (vivo.current) setError(e instanceof Error ? e.message : "No se pudieron cargar las fotos.");
     } finally {

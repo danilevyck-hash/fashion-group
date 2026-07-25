@@ -15,10 +15,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MarcaConfig } from "@/lib/catalogo/marcas";
 import {
+  STORAGE_PREFIX,
   variantesRoot,
   variantesPrefix,
   variantePath,
+  fotoElegidaPath,
   vistaDesdeNombre,
+  vistaActualDeImageUrl,
   type StorageMarcaKey,
 } from "./variantes-paths";
 
@@ -69,24 +72,68 @@ export interface VarianteInfo {
   url: string;
 }
 
-/** Variantes de un SKU, ordenadas por número de vista ascendente. */
-export async function listarVariantesDeSku(cfg: MarcaConfig, sku: string): Promise<VarianteInfo[]> {
+export interface VariantesDeSku {
+  variantes: VarianteInfo[];
+  /** Vista que el producto está usando hoy, o null si no se pudo determinar. */
+  actual: number | null;
+}
+
+/**
+ * Variantes de un SKU (orden ascendente) + cuál está puesta.
+ *
+ * Cómo se determina la actual — dos caminos, porque hay dos formas de que un
+ * producto haya recibido su foto:
+ *   1. La eligió el selector o el ZIP → `image_url` apunta al objeto de la
+ *      variante y la vista se lee de la ruta. Camino normal y exacto.
+ *   2. La copió el proceso de carga masiva a `{prefijo}/{sku}.jpg` → la ruta no
+ *      dice nada, pero los BYTES son los mismos que los de la variante de
+ *      origen. Se compara el tamaño del objeto: si coincide con una sola
+ *      variante, esa es. Si empata con varias (dos vistas idénticas) se
+ *      devuelve null antes que marcar la equivocada.
+ */
+export async function listarVariantesDeSku(cfg: MarcaConfig, sku: string): Promise<VariantesDeSku> {
   const db = await storageDbDe(cfg);
   const marca = cfg.marca as StorageMarcaKey;
+
   let archivos: { name: string; size: number }[];
   try {
     archivos = await listarTodo(db, variantesPrefix(marca, sku));
   } catch {
-    return [];
+    return { variantes: [], actual: null };
   }
-  return archivos
-    .map((f) => ({ vista: vistaDesdeNombre(f.name) }))
-    .filter((v): v is { vista: number } => v.vista != null)
-    .sort((a, b) => a.vista - b.vista)
-    .map(({ vista }) => ({
-      vista,
-      url: db.storage.from(BUCKET).getPublicUrl(variantePath(marca, sku, vista)).data.publicUrl,
-    }));
+
+  const conVista = archivos
+    .map((f) => ({ vista: vistaDesdeNombre(f.name), size: f.size }))
+    .filter((v): v is { vista: number; size: number } => v.vista != null)
+    .sort((a, b) => a.vista - b.vista);
+
+  const variantes = conVista.map(({ vista }) => ({
+    vista,
+    url: db.storage.from(BUCKET).getPublicUrl(variantePath(marca, sku, vista)).data.publicUrl,
+  }));
+  if (variantes.length === 0) return { variantes, actual: null };
+
+  // image_url del producto (select explícito).
+  const pdb = await cfg.products.writeDb();
+  const { data: prod } = await pdb
+    .from(cfg.productsTable)
+    .select("sku,image_url")
+    .eq("sku", sku)
+    .maybeSingle();
+  const imageUrl = (prod as { image_url: string | null } | null)?.image_url ?? null;
+
+  // Camino 1: la ruta nombra la variante.
+  const porRuta = vistaActualDeImageUrl(imageUrl, marca, sku);
+  if (porRuta != null) return { variantes, actual: porRuta };
+
+  // Camino 2: comparar bytes con la foto elegida (copia de la carga masiva).
+  if (!imageUrl) return { variantes, actual: null };
+  const elegida = await listarTodo(db, STORAGE_PREFIX[marca]).catch(() => []);
+  const nombreElegida = fotoElegidaPath(marca, sku).split("/").pop()!;
+  const size = elegida.find((f) => f.name === nombreElegida)?.size ?? 0;
+  if (!size) return { variantes, actual: null };
+  const iguales = conVista.filter((v) => v.size === size);
+  return { variantes, actual: iguales.length === 1 ? iguales[0].vista : null };
 }
 
 /**
