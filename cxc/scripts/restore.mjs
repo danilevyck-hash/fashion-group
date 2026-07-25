@@ -8,18 +8,27 @@
 // Upsert = idempotente: filas existentes se sobreescriben con la versión del
 // backup, filas borradas se re-crean, filas nuevas (post-backup) NO se tocan.
 //
+// FUENTE (--source): de dónde se LEE el backup.
+//   supabase (default) → bucket privado "backups" del propio proyecto.
+//   r2                 → Cloudflare R2, la copia OFF-SITE. Es la que sirve el
+//                        día que el proyecto de Supabase es el problema.
+// El destino de la escritura es SIEMPRE Supabase (PostgREST / Storage): la
+// fuente solo cambia de dónde salen los bytes.
+//
 // USO:
-//   node scripts/restore.mjs --list
-//       Lista los backups disponibles (carpetas de fecha en el bucket).
-//   node scripts/restore.mjs [--date YYYY-MM-DD] [--tables t1,t2] [--dry-run]
+//   node scripts/restore.mjs --list [--source r2]
+//       Lista los backups disponibles (carpetas de fecha).
+//   node scripts/restore.mjs [--source r2] [--date YYYY-MM-DD] [--tables t1,t2]
 //       Sin --yes corre en modo plan: descarga, valida y muestra qué haría.
 //   node scripts/restore.mjs --date 2026-07-04 --tables transportistas --yes
 //       Restaura de verdad (solo con --yes explícito).
 //   node scripts/restore.mjs --date 2026-07-04 --target tabla_staging --tables cheques --yes
 //       Restaura UN dataset en OTRA tabla (staging con el mismo schema).
 //
-// BUCKETS DE STORAGE (réplica en backups/_storage/<bucket>/, ver api/cron/backup):
+// BUCKETS DE STORAGE (réplica en backups/_storage/<bucket>/ en Supabase y en
+// _storage/<bucket>/ en R2, ver api/cron/backup):
 //   node scripts/restore.mjs --storage reclamo-fotos [--prefix carpeta/] [--yes]
+//   node scripts/restore.mjs --source r2 --storage reclamo-fotos [--yes]
 //       Restaura los archivos replicados de ese bucket a su bucket original
 //       (upsert: sobreescribe si existe). Sin --yes solo muestra el plan.
 //
@@ -28,14 +37,21 @@
 //
 // PRUEBA (validada 4-jul-2026): restore real de `transportistas` con datos
 // idénticos → upsert no-op, hash de la tabla intacto antes/después. Ver
-// memoria/PR para el detalle.
+// memoria/PR para el detalle. La prueba equivalente con --source r2 está
+// PENDIENTE: las credenciales R2_* están marcadas Sensitive en Vercel y no se
+// pueden leer ni con `vercel env pull` ni con la API — hay que copiarlas a mano
+// desde el panel de Cloudflare a .env.local.
 //
 // Requiere: .env.local en la raíz del repo (NEXT_PUBLIC_SUPABASE_URL +
-// SUPABASE_SERVICE_ROLE_KEY). Node 18+ (fetch y zlib nativos), sin deps.
+// SUPABASE_SERVICE_ROLE_KEY; para --source r2 además R2_ACCESS_KEY_ID,
+// R2_SECRET_ACCESS_KEY, R2_BUCKET y R2_ACCOUNT_ID o R2_ENDPOINT).
+// Node 18+ (fetch y zlib nativos); --source r2 usa aws4fetch, que ya es
+// dependencia del proyecto (la misma que firma las subidas del cron).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
+import { AwsClient } from 'aws4fetch';
 
 const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf-8');
 const vars = Object.fromEntries(
@@ -62,6 +78,12 @@ const onlyTables = opt('tables')?.split(',').map(s => s.trim()).filter(Boolean);
 const targetOverride = opt('target');
 const storageBucket = opt('storage');
 const pathPrefix = opt('prefix') || '';
+const source = opt('source') || 'supabase';
+if (source !== 'supabase' && source !== 'r2') {
+  console.error(`--source inválido: "${source}" (valores: supabase, r2)`);
+  process.exit(1);
+}
+const desdeR2 = source === 'r2';
 let date = opt('date');
 
 // ── storage helpers ──────────────────────────────────────────────────────────
@@ -79,6 +101,121 @@ async function storageDownload(path) {
   const r = await fetch(`${BASE}/storage/v1/object/${BUCKET}/${path}`, { headers: HEADERS });
   if (!r.ok) throw new Error(`download ${path}: ${r.status} ${await r.text()}`);
   return Buffer.from(await r.arrayBuffer());
+}
+
+// ── Fuente R2 (copia off-site) ───────────────────────────────────────────────
+// Los mismos objetos que sube /api/cron/backup: data/<fecha>/<archivo> para los
+// datasets y el meta, _storage/<bucket>/<path> para los archivos.
+const R2_BUCKET = vars.R2_BUCKET;
+const R2_ENDPOINT =
+  vars.R2_ENDPOINT || (vars.R2_ACCOUNT_ID ? `https://${vars.R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : '');
+const R2_BASE = R2_BUCKET && R2_ENDPOINT ? `${R2_ENDPOINT.replace(/\/+$/, '')}/${R2_BUCKET}` : '';
+
+let r2Client = null;
+function r2() {
+  if (r2Client) return r2Client;
+  if (!vars.R2_ACCESS_KEY_ID || !vars.R2_SECRET_ACCESS_KEY || !R2_BASE) {
+    console.error(
+      'Faltan credenciales de R2 en .env.local: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET\n' +
+        'y R2_ACCOUNT_ID (o R2_ENDPOINT). Están marcadas Sensitive en Vercel — copiarlas del panel\n' +
+        'de Cloudflare (R2 → Manage API tokens).',
+    );
+    process.exit(1);
+  }
+  r2Client = new AwsClient({
+    accessKeyId: vars.R2_ACCESS_KEY_ID,
+    secretAccessKey: vars.R2_SECRET_ACCESS_KEY,
+    region: 'auto',
+    service: 's3',
+  });
+  return r2Client;
+}
+
+async function r2Download(key) {
+  const r = await r2().fetch(`${R2_BASE}/${key}`, { method: 'GET' });
+  if (!r.ok) throw new Error(`r2 download ${key}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+/** ListObjectsV2 paginado. Con `delimiter` devuelve además los CommonPrefixes. */
+async function r2List(prefix, delimiter = '') {
+  const keys = [];
+  const prefixes = [];
+  let token = '';
+  for (;;) {
+    const qs = new URLSearchParams({ 'list-type': '2', prefix, 'max-keys': '1000' });
+    if (delimiter) qs.set('delimiter', delimiter);
+    if (token) qs.set('continuation-token', token);
+    const r = await r2().fetch(`${R2_BASE}?${qs}`, { method: 'GET' });
+    if (!r.ok) throw new Error(`r2 list ${prefix}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+    const xml = await r.text();
+    for (const m of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+      const key = (m[1].match(/<Key>([\s\S]*?)<\/Key>/) || [])[1];
+      const size = Number((m[1].match(/<Size>(\d+)<\/Size>/) || [])[1] || 0);
+      if (key) keys.push({ key, size });
+    }
+    for (const m of xml.matchAll(/<CommonPrefixes>\s*<Prefix>([\s\S]*?)<\/Prefix>\s*<\/CommonPrefixes>/g)) {
+      prefixes.push(m[1]);
+    }
+    if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) break;
+    token = (xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/) || [])[1];
+    if (!token) break;
+  }
+  return { keys, prefixes };
+}
+
+/** Mimetype por extensión (R2 no lo devuelve en el listado). */
+function mimeDe(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  return {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    gif: 'image/gif', pdf: 'application/pdf', json: 'application/json',
+    gz: 'application/gzip', zip: 'application/zip', csv: 'text/csv',
+  }[ext] || 'application/octet-stream';
+}
+
+// ── Fuente unificada (supabase | r2) ─────────────────────────────────────────
+/** Descarga un archivo del backup: `relPath` es relativo a la raíz del backup
+ *  ("<fecha>/meta.json"); cada fuente sabe dónde vive de verdad. */
+async function backupDownload(relPath) {
+  return desdeR2 ? r2Download(`data/${relPath}`) : storageDownload(relPath);
+}
+
+/** Fechas de backup disponibles, ordenadas ascendente. */
+async function listarFechas() {
+  if (desdeR2) {
+    const { prefixes } = await r2List('data/', '/');
+    return prefixes
+      .map((p) => (p.match(/^data\/(\d{4}-\d{2}-\d{2})\/$/) || [])[1])
+      .filter(Boolean)
+      .sort();
+  }
+  const entries = await storageList('');
+  return entries.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map((e) => e.name).sort();
+}
+
+/** Archivos replicados de un bucket de Storage: `dest` es la ruta DENTRO del
+ *  bucket original, `src` la ruta en la fuente. */
+async function listarReplicaStorage(bucket) {
+  if (desdeR2) {
+    const raiz = `_storage/${bucket}/`;
+    const { keys } = await r2List(raiz);
+    return keys.map((k) => ({
+      src: k.key,
+      dest: k.key.slice(raiz.length),
+      size: k.size,
+      mimetype: mimeDe(k.key),
+    }));
+  }
+  const raiz = `_storage/${bucket}`;
+  return (await walkStorage(raiz))
+    .filter((f) => f.path !== '_storage/manifest.json')
+    .map((f) => ({ src: f.path, dest: f.path.slice(raiz.length + 1), size: f.size, mimetype: f.mimetype }));
+}
+
+/** Bytes de un archivo de la réplica de Storage. */
+async function replicaDownload(src) {
+  return desdeR2 ? r2Download(src) : storageDownload(src);
 }
 
 // ── PKs reales desde el OpenAPI de PostgREST (para on_conflict) ──────────────
@@ -138,26 +275,22 @@ async function storageUpload(bucket, path, buf, contentType) {
   if (!r.ok) throw new Error(`upload ${bucket}/${path}: ${r.status} ${await r.text()}`);
 }
 
-/** Restaura archivos de backups/_storage/<bucket>/ al bucket original. */
+/** Restaura archivos de la réplica de <bucket> (Supabase o R2) al bucket original. */
 async function restoreStorage() {
-  const replicaRoot = `_storage/${storageBucket}`;
-  const files = (await walkStorage(replicaRoot))
-    .filter(f => f.path !== '_storage/manifest.json')
-    .map(f => ({ ...f, dest: f.path.slice(replicaRoot.length + 1) }))
-    .filter(f => f.dest.startsWith(pathPrefix));
+  const files = (await listarReplicaStorage(storageBucket)).filter(f => f.dest && f.dest.startsWith(pathPrefix));
   if (!files.length) {
-    console.error(`No hay réplica para "${storageBucket}"${pathPrefix ? ` con prefijo "${pathPrefix}"` : ''}. ¿Corrió ya el backup con réplica de storage?`);
+    console.error(`No hay réplica para "${storageBucket}"${pathPrefix ? ` con prefijo "${pathPrefix}"` : ''} en ${source}. ¿Corrió ya el backup con réplica de storage?`);
     process.exit(1);
   }
   const totalMB = (files.reduce((s, f) => s + f.size, 0) / 1048576).toFixed(1);
-  console.log(`\n═ Restore de storage → bucket "${storageBucket}" ${dryRun ? '(DRY-RUN — usá --yes para restaurar)' : '⚠️  ESCRITURA REAL'} ═`);
+  console.log(`\n═ Restore de storage (fuente: ${source}) → bucket "${storageBucket}" ${dryRun ? '(DRY-RUN — usá --yes para restaurar)' : '⚠️  ESCRITURA REAL'} ═`);
   console.log(`  ${files.length} archivos, ${totalMB} MB\n`);
 
   let fallos = 0;
   for (const f of files) {
     if (dryRun) { console.log(`  ✓ ${f.dest} (${(f.size / 1024).toFixed(1)} KB)`); continue; }
     try {
-      const buf = await storageDownload(f.path);
+      const buf = await replicaDownload(f.src);
       await storageUpload(storageBucket, f.dest, buf, f.mimetype);
       console.log(`  ✓ ${f.dest} (${(buf.length / 1024).toFixed(1)} KB)`);
     } catch (e) {
@@ -174,24 +307,22 @@ async function restoreStorage() {
   if (storageBucket) return restoreStorage();
 
   if (doList) {
-    const entries = await storageList('');
-    const fechas = entries.filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map(e => e.name);
-    console.log('Backups disponibles:');
+    const fechas = await listarFechas();
+    console.log(`Backups disponibles (fuente: ${source}):`);
     for (const f of fechas) console.log(`  ${f}`);
     if (!fechas.length) console.log('  (ninguno en formato carpeta YYYY-MM-DD)');
     return;
   }
 
   if (!date) {
-    const entries = await storageList('');
-    const fechas = entries.filter(e => /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map(e => e.name).sort();
+    const fechas = await listarFechas();
     date = fechas[fechas.length - 1];
     if (!date) { console.error('No hay backups. Corré primero /api/cron/backup.'); process.exit(1); }
   }
 
-  console.log(`\n═ Restore desde backup ${date} ${dryRun ? '(DRY-RUN — sin escrituras; usá --yes para restaurar)' : '⚠️  ESCRITURA REAL'} ═\n`);
+  console.log(`\n═ Restore desde backup ${date} (fuente: ${source}) ${dryRun ? '(DRY-RUN — sin escrituras; usá --yes para restaurar)' : '⚠️  ESCRITURA REAL'} ═\n`);
 
-  const meta = JSON.parse((await storageDownload(`${date}/meta.json`)).toString('utf-8'));
+  const meta = JSON.parse((await backupDownload(`${date}/meta.json`)).toString('utf-8'));
   if (meta.format !== 'v2-ndjson-gz') {
     console.error(`Backup ${date} en formato "${meta.format || 'v1 (backup.json monolítico)'}" — este script solo restaura v2.`);
     process.exit(1);
@@ -204,7 +335,7 @@ async function restoreStorage() {
   // si existe, sus datasets se suman al índice — restaurables con --tables igual
   // que los del core. Backups anteriores al split no lo tienen (tolerante).
   try {
-    const metaSwitch = JSON.parse((await storageDownload(`${date}/meta-switch.json`)).toString('utf-8'));
+    const metaSwitch = JSON.parse((await backupDownload(`${date}/meta-switch.json`)).toString('utf-8'));
     if (metaSwitch.errores?.length) {
       console.warn(`⚠️  El grupo switch se generó con errores en: ${metaSwitch.errores.map(e => e.file).join(', ')}`);
     }
@@ -227,7 +358,7 @@ async function restoreStorage() {
     const target = targetOverride || ds.table;
     const pkCols = pks[target];
     try {
-      const gz = await storageDownload(`${date}/${ds.file}.ndjson.gz`);
+      const gz = await backupDownload(`${date}/${ds.file}.ndjson.gz`);
       const ndjson = gunzipSync(gz).toString('utf-8');
       const rows = ndjson ? ndjson.split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
       if (rows.length !== ds.rows) {
