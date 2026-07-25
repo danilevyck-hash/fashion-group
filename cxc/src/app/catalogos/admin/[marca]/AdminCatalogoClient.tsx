@@ -18,6 +18,7 @@ import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
 import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas";
 import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 
 type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
 
@@ -31,10 +32,6 @@ async function fetchJson<T>(url: string, fallback: T): Promise<T> {
   } catch {
     return fallback;
   }
-}
-
-function tieneFoto(p: AdminProducto): boolean {
-  return !!(p.image_url && p.image_url.trim());
 }
 
 export default function AdminCatalogoClient({ marca }: { marca: MarcaUiKey }) {
@@ -73,23 +70,31 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   );
 
   const products = useMemo(() => productsData ?? [], [productsData]);
-  // Visibles = catálogo vivo (los ocultados a mano solo aparecen en el filtro
-  // "Ocultos" del catálogo completo — no ensucian métricas ni cola de fotos).
-  const visibles = useMemo(() => products.filter((p) => p.oculto_manual !== true), [products]);
+  // Visibles = catálogo vivo: sin ocultados a mano (oculto_manual) NI ocultos
+  // por el sync (active=false — en Joybees/Tommy el GET admin también trae los
+  // inactivos, que no deben ensuciar métricas ni cola de fotos; en Reebok el
+  // scope=admin ya filtra y esto es no-op).
+  const visibles = useMemo(
+    () => products.filter((p) => p.oculto_manual !== true && p.active !== false),
+    [products],
+  );
+  // Cola "Faltan foto": visibles sin foto, ordenados por disponibilidad desc
+  // (lo más vendible primero). Regla única en lib/catalogos/fotos-faltantes.ts.
+  const sinFoto = useMemo(() => colaSinFoto(visibles), [visibles]);
   const pedidos = pedidosData ?? [];
   const loading = productsLoading && !productsData;
 
   const metrics = useMemo(() => theme.admin.metrics(visibles), [theme, visibles]);
-  const sinFotoCount = visibles.filter((p) => !tieneFoto(p)).length;
+  const sinFotoCount = sinFoto.length;
 
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);
   const reloadPedidos = useCallback(async () => { await mutatePedidos(); }, [mutatePedidos]);
 
   async function excelSinFoto() {
-    const sin = visibles.filter((p) => !tieneFoto(p));
-    if (sin.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
+    // Mismo conjunto y orden que la pestaña "Faltan foto" (cola sinFoto).
+    if (sinFoto.length === 0) { showToast("No hay productos sin foto — todo al día."); return; }
     try {
-      await theme.admin.excelSinFoto(sin);
+      await theme.admin.excelSinFoto(sinFoto);
       showToast("Excel listo — revisa tu carpeta de descargas");
     } catch {
       showToast("No se pudo generar el Excel. Intenta de nuevo.");
@@ -184,9 +189,9 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
           <>
             {tab === "faltan-foto" && (
               theme.admin.productosStyle === "tarjetas" ? (
-                <FaltanFotoTarjetasTab marca={marca} products={visibles} onPhotoSaved={reloadProducts} showToast={showToast} />
+                <FaltanFotoTarjetasTab marca={marca} products={visibles} sinFoto={sinFoto} onPhotoSaved={reloadProducts} showToast={showToast} />
               ) : (
-                <FaltanFotoBatchTab marca={marca} products={visibles} showToast={showToast} onComplete={reloadProducts} />
+                <FaltanFotoBatchTab marca={marca} products={visibles} sinFoto={sinFoto} showToast={showToast} onComplete={reloadProducts} />
               )
             )}
             {tab === "completo" && (

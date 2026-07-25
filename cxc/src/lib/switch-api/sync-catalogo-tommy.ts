@@ -54,8 +54,9 @@ export interface CatalogoTommySyncResult extends CatalogoSyncResult {
 /** ¿tommy_products existe ya? (probe barato, jamás lanza). OJO: tiene que ser
  *  un SELECT real con limit — un HEAD (head:true) contra una tabla ausente
  *  devuelve ok sin error en PostgREST (verificado contra prod 24-jul-2026) y
- *  daría falso "existe". */
-async function tommyDdlPendiente(): Promise<boolean> {
+ *  daría falso "existe". Exportado: lo reúsa el resumen semanal de fotos
+ *  (lib/catalogos/fotos-resumen.ts) para reportar "pendiente de activación". */
+export async function tommyDdlPendiente(): Promise<boolean> {
   try {
     const { error } = await tommyServer.from("tommy_products").select("id").limit(1);
     if (!error) return false;

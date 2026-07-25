@@ -32,9 +32,11 @@ export const CRON_STALE_HOURS_DEFAULT = 26;
 
 /** Umbrales propios por cron NO diario. El default de 26h marcaría un cron
  *  mensual como caído ~29 días/mes; grupo-resumen-mensual corre el día 3 → 33
- *  días cubren el gap más largo entre corridas aun con jitter. */
+ *  días cubren el gap más largo entre corridas aun con jitter. El resumen
+ *  semanal de fotos corre los lunes → 8 días cubren el ciclo con margen. */
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
+  "catalogos-fotos-resumen": 8 * 24,
 };
 
 /** Horas de umbral stale para un cron (su override propio o el default). */
@@ -98,6 +100,11 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "joybees-catalogo": 12, // su cron corre 11:00 UTC
   "reebok-catalogo": 13, // slot temprano 12:10 + ~1h (no adelantarse a su run normal)
   "tommy-catalogo": 13, // slot temprano 12:40 (no adelantarse a su run normal)
+  // catalogos-fotos-resumen: run normal lunes 13:30 UTC → hora mínima 14
+  // (patrón cheques-alert, no adelantarse) y su recuperación solo aplica los
+  // lunes (recoverOnlyIf en la reconciliación). Sigue en NUNCA_SILENCIAR:
+  // semanal = demasiado esporádico para asumir "recuperación en camino hoy".
+  "catalogos-fotos-resumen": 14,
 };
 
 /**
@@ -113,9 +120,14 @@ export const SECOND_ENTRY_HOUR_UTC: Record<string, number> = {
 };
 
 /** Crons que JAMÁS se silencian por "recuperación en camino": la reconciliación
- *  es el propio recuperador (si está caída no hay red de seguridad) y el
- *  resumen mensual es demasiado esporádico para asumir auto-recuperación. */
-export const NUNCA_SILENCIAR = new Set(["switch-reconciliacion", "grupo-resumen-mensual"]);
+ *  es el propio recuperador (si está caída no hay red de seguridad) y los
+ *  resúmenes mensual/semanal son demasiado esporádicos para asumir
+ *  auto-recuperación (su recovery solo aplica el día 3-4 / los lunes). */
+export const NUNCA_SILENCIAR = new Set([
+  "switch-reconciliacion",
+  "grupo-resumen-mensual",
+  "catalogos-fotos-resumen",
+]);
 
 /**
  * ¿La recuperación de este cron AÚN viene hoy? (nowHourUtc puede ser
@@ -171,6 +183,11 @@ export const SEED_TOLERANT_CRONS = [
   // siembra heartbeat). Promover a EXPECTED_CRONS (health-crons, fail-closed)
   // en el PR "encender", con la DDL corrida y días de siembra.
   "tommy-catalogo",
+  // Resumen semanal de fotos faltantes (lunes 13:30 UTC). Seed-tolerante para
+  // NO disparar un 503 falso antes de su primera corrida (puede tardar hasta
+  // una semana en sembrar la fila). Umbral propio semanal de 8 días en
+  // CRON_STALE_HOURS_POR_CRON. Promover a EXPECTED_CRONS con semanas de siembra.
+  "catalogos-fotos-resumen",
 ];
 
 export const SWITCH_SYNC_SLOT_HEARTBEATS = [

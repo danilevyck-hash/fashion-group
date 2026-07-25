@@ -62,6 +62,7 @@ import {
   mesAnterior,
   fmtMesLabel,
 } from "@/lib/grupo-resumen-mensual";
+import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import {
@@ -412,6 +413,29 @@ const COLATERAL_CRONS: ColateralCron[] = [
       const resumen = await calcularResumenDiario(ayer, true);
       const sent = await sendTelegramAlert(`(recuperado) ${buildMensaje(resumen)}`);
       return { ok: sent, detail: sent ? `resumen ${ayer} reenviado` : "Telegram no aceptó el mensaje" };
+    },
+  },
+  {
+    // Resumen SEMANAL de fotos faltantes de los catálogos (lunes 13:30 UTC).
+    // Solo lee las DBs de los catálogos (sin Switch). Único cron SEMANAL: su
+    // recuperación solo aplica los LUNES (recoverOnlyIf, patrón día 3-4 del
+    // grupo-resumen-mensual) y su hora mínima es 14 en el mapa compartido (su
+    // run normal es 13:30 → no adelantarse, patrón cheques-alert). Ventana de
+    // "ya corrió" = día Panamá (default): el run normal cae el mismo lunes
+    // Panamá (08:30). Tommy pendiente de DDL se reporta sin fallar. Prefijo
+    // "(recuperado)" como los otros resúmenes.
+    cronName: "catalogos-fotos-resumen",
+    label: "catalogos-fotos-resumen",
+    recoverOnlyIf: () => new Date(`${hoyPanama()}T00:00:00Z`).getUTCDay() === 1, // lunes
+    recover: async () => {
+      const r = await calcularFotosResumen();
+      const sent = await sendTelegramAlert(`(recuperado) ${r.mensaje}`);
+      return {
+        ok: sent,
+        detail: sent
+          ? `resumen semanal reenviado (${r.totalSinFoto} sin foto)`
+          : "Telegram no aceptó el mensaje",
+      };
     },
   },
   // ⚠️ Los catálogos van AL FINAL a propósito: cada run hace 1 llamada /stock

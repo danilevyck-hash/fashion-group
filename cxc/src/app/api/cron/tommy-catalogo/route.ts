@@ -26,6 +26,7 @@ import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
 import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { sendTelegramAlert } from "@/lib/telegram";
+import { buildNuevosSinFotoMsg } from "@/lib/catalogos/fotos-faltantes";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
@@ -84,14 +85,11 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
         { nota: "El catálogo NO se modificó (fail-safe)." },
       );
     }
-    const cods = result.nuevosSinFotoTotal;
-    if (cods.length > 0) {
-      const lista = cods.slice(0, 40).join(", ") + (cods.length > 40 ? `, +${cods.length - 40} más` : "");
-      await sendTelegramAlert(
-        `🔵 Tommy: ${cods.length} producto${cods.length === 1 ? "" : "s"} nuevo${cods.length === 1 ? "" : "s"} sin foto — ${lista}. ` +
-        `Súbelas en el catálogo.`,
-      );
-    }
+    // Alerta de productos NUEVOS sin foto — UNA por corrida, nada si 0
+    // (anti-ruido; los viejos sin foto los cubre el resumen semanal). Mensaje
+    // compartido por las 3 marcas: lib/catalogos/fotos-faltantes.ts.
+    const msgSinFoto = buildNuevosSinFotoMsg("Tommy", result.nuevosSinFotoTotal);
+    if (msgSinFoto) await sendTelegramAlert(msgSinFoto);
     if (!result.hadError) await recordCronHeartbeat(CRON_NAME);
   }
 

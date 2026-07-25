@@ -36,15 +36,17 @@ const BADGE_CHIP: Record<string, { label: string; cls: string }> = {
 // ── Tab: Faltan foto (cola de trabajo) ────────────────────────────────────────
 
 export function FaltanFotoTarjetasTab({
-  marca, products, onPhotoSaved, showToast,
+  marca, products, sinFoto, onPhotoSaved, showToast,
 }: {
   marca: MarcaUiKey;
+  /** Catálogo visible completo — para la subida masiva (permite reemplazar fotos). */
   products: AdminProducto[];
+  /** Cola precomputada (AdminCatalogoClient): activos sin foto, orden
+   *  disponibilidad desc — lo más vendible primero. */
+  sinFoto: AdminProducto[];
   onPhotoSaved: () => Promise<void>;
   showToast: (msg: string) => void;
 }) {
-  const sinFoto = products.filter((p) => !tieneFoto(p));
-
   return (
     <div>
       {/* Subida masiva: asigna por nombre=SKU contra TODOS los productos (permite
