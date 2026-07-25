@@ -1114,7 +1114,10 @@ const TOMMY: MarcaTheme = {
   },
 
   logos: {
-    navbar: () => <img src="/tommy/tommy-horizontal.svg" alt="Tommy Hilfiger" className="h-3.5 w-auto" />,
+    // Navbar: SOLO la bandera. El wordmark TOMMY HILFIGER vive en el header
+    // grande de abajo ("CATALOGO PANAMA") — tenerlo en los dos lo repetía dos
+    // veces en la misma pantalla (Daniel, 25-jul-2026).
+    navbar: () => <img src="/tommy/tommy-flag.png" alt="Tommy Hilfiger" className="h-5 w-auto" />,
     header: () => (
       <div className="flex items-center gap-2.5">
         <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain" />
