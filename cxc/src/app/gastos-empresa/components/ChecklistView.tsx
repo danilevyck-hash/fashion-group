@@ -164,11 +164,11 @@ export default function ChecklistView({ data, mes, hoyMes, onCambiarMes, onAbrir
 
 function EstadoChip({ cargado }: { cargado: boolean }) {
   return cargado ? (
-    <span className="inline-block mt-0.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px">
+    <span className="inline-block mt-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-px">
       ✓ Cargado
     </span>
   ) : (
-    <span className="inline-block mt-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-px">
+    <span className="inline-block mt-0.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-px">
       Pendiente
     </span>
   );
