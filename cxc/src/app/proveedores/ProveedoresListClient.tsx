@@ -14,7 +14,6 @@ import { fmt } from "@/lib/format";
 import { AGING, type AgingKey } from "@/lib/cxc-aging";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { ROLES_SYNC_PROVEEDORES } from "@/components/shared/syncNowOpciones";
-import { exportProveedoresExcel } from "./excel-proveedores";
 
 // Las empresas con CxP (empresasConCxp): 6 B2B + Multifashion (american_classic).
 const EMPRESAS = empresasConCxp();
@@ -77,6 +76,7 @@ function ProveedoresList() {
   const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [showSinSaldo, setShowSinSaldo] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const fetchList = useCallback(async (emp: string, query: string) => {
     setLoading(true);
@@ -103,6 +103,26 @@ function ProveedoresList() {
   if (!authChecked) return null;
 
   const goFicha = (key: string) => router.push(`/proveedores/${encodeURIComponent(key)}`);
+
+  // El motor de Excel (xlsx-js-style) pesaba 310 kB gzip del arranque de la
+  // ruta — más que todo el resto junto — solo para tener el botón. Se carga
+  // en el clic, igual que en Guías y Cheques. El botón muestra "Preparando…"
+  // mientras baja el chunk para que no parezca que no pasó nada.
+  const exportarExcel = async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const { exportProveedoresExcel } = await import("./excel-proveedores");
+      const scope = empresa ? empresaLabel(empresa) : "Todo el grupo";
+      exportProveedoresExcel(
+        items,
+        `${scope}${q ? ` — búsqueda: ${q}` : ""} — ${items.length} proveedores`,
+        empresa ? empresaLabel(empresa) : undefined
+      );
+    } finally {
+      setExportando(false);
+    }
+  };
 
   // Proveedores sin saldo (por pagar = $0) se colapsan bajo un toggle; los que
   // tienen saldo (incluido "a favor" negativo) siempre se muestran.
@@ -217,14 +237,14 @@ function ProveedoresList() {
                 <div className="text-xs text-gray-500 tabular-nums">
                   {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
                 </div>
+                {/* min-w fijo: el texto cambia a "Preparando…" mientras baja
+                    el chunk de Excel y sin ancho fijo el botón daría un salto. */}
                 <button
-                  onClick={() => {
-                    const scope = empresa ? empresaLabel(empresa) : "Todo el grupo";
-                    exportProveedoresExcel(items, `${scope}${q ? ` — búsqueda: ${q}` : ""} — ${items.length} proveedores`, empresa ? empresaLabel(empresa) : undefined);
-                  }}
-                  className="shrink-0 inline-flex min-h-[44px] items-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97]"
+                  onClick={exportarExcel}
+                  disabled={exportando}
+                  className="shrink-0 inline-flex min-h-[44px] min-w-[132px] items-center justify-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97] disabled:text-gray-400 disabled:active:scale-100"
                 >
-                  Exportar Excel
+                  {exportando ? "Preparando…" : "Exportar Excel"}
                 </button>
               </div>
 
