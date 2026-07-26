@@ -158,10 +158,6 @@ export interface MarcaTheme {
   pdfFallbackCategory: string;
   /** Relación embebida de items en la respuesta de orders. */
   itemsField: string;
-  /** Decimales del total en la barra del carrito del catálogo VENDEDOR
-   *  (quirk heredado: Reebok 0, Joybees 2; el público siempre usa 2). */
-  vendorFmtDecimals: 0 | 2;
-
   /** Taxonomía de GÉNERO de la marca — filtro, agrupación de secciones del
    *  grid plano y secciones del PDF del catálogo. Reebok y Joybees usan la
    *  histórica de `reebok-gender.ts` (Hombre/Mujer/Niños/Unisex, en español);
@@ -502,7 +498,6 @@ const REEBOK: MarcaTheme = {
   sortOrderItems: sortReebokOrderItems,
   pdfFallbackCategory: "apparel",
   itemsField: "reebok_order_items",
-  vendorFmtDecimals: 0,
   genero: REEBOK_GENERO,
 
   features: {
@@ -828,7 +823,6 @@ const JOYBEES: MarcaTheme = {
   sortOrderItems: null,
   pdfFallbackCategory: "footwear",
   itemsField: "joybees_order_items",
-  vendorFmtDecimals: 2,
   genero: REEBOK_GENERO,
 
   features: {
@@ -1143,7 +1137,6 @@ const TOMMY: MarcaTheme = {
   sortOrderItems: null,
   pdfFallbackCategory: "footwear",
   itemsField: "tommy_order_items",
-  vendorFmtDecimals: 2,
   genero: {
     match: matchesTommyGenderFilter,
     groupKey: tommyGenderGroupKey,

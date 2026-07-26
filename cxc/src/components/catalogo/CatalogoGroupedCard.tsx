@@ -12,6 +12,7 @@ import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 /** Suma un campo de stock del grupo; null si NINGUNA variante lo trae (pre-sync
  *  → la línea muestra "—" en vez de un 0 que se leería como agotado). */
@@ -202,7 +203,7 @@ export default function CatalogoGroupedCard({
           <div className="mt-1.5 flex flex-col gap-y-1 xl:flex-row xl:items-start xl:justify-between xl:gap-x-2 xl:gap-y-0">
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className={t.priceNormal}>${group.price.toFixed(2)}</span>
+                <span className={t.priceNormal}>{fmtPrecio(group.price)}</span>
               </div>
               {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
                   quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de

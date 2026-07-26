@@ -16,7 +16,19 @@
 //     va como bloque con un `<span>` inline-block al lado.
 //   - Todo lo que viene de la base (nombre, SKU, nota, URL de la foto) se
 //     escapa: un producto con comillas en el nombre rompía el `alt="…"`.
+//
+// DOS AUDIENCIAS, UNA SOLA MAQUETA (26-jul-2026). El route `send-order` tiene
+// dos botones que le pegan: "Confirmar pedido" (sin clientEmail → avisa al
+// equipo) y "Enviar por email al cliente" (con clientEmail → le llega AL
+// CLIENTE). Hasta hoy los dos mandaban el MISMO texto, escrito para adentro:
+// el cliente recibía "Estimado equipo Fashion Group" y la instrucción de "no
+// mezclar en bodega". `audiencia` cambia SOLO los párrafos de texto (saludo,
+// nota de pre-orden, cierre y pie); la tabla, el CSS y las media queries son
+// exactamente los mismos objetos para las dos — así el arreglo de ancho de
+// 375 px del PR #310 no se puede romper en una sola de las dos versiones.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { precioTexto } from "@/lib/catalogo/precio";
 
 export interface OrderEmailItem {
   sku: string;
@@ -28,10 +40,19 @@ export interface OrderEmailItem {
   category?: string;
 }
 
+/** Quién va a leer el correo. Decide los textos, no la maqueta. */
+export type OrderEmailAudiencia = "equipo" | "cliente";
+
 export interface OrderEmailOpts {
+  /** "equipo" (aviso interno, default histórico) o "cliente" (confirmación
+   *  que le llega al mayorista). */
+  audiencia?: OrderEmailAudiencia;
   /** Nombre de la marca tal cual va en el texto ("Reebok", "Joybees", …). */
   marcaLabel: string;
-  /** Cabecera de marca (banda con logo) — viene de cfg.sendOrder.headerHtml. */
+  /** Nombre del cliente — solo se usa para saludarlo en el correo a cliente. */
+  clientName?: string;
+  /** Cabecera de marca (banda con logo) — viene de cfg.sendOrder.headerHtml
+   *  o de cfg.sendOrder.headerClienteHtml según la audiencia. */
   headerHtml: string;
   /** Color de fondo del encabezado de la tabla — cfg.sendOrder.tableHeadBg. */
   tableHeadBg: string;
@@ -54,16 +75,17 @@ export function escapeHtml(s: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-const fmt = (n: number) =>
-  n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Precio como en la vitrina: `35`, `12.50`, `4,422`. Sin `.00`, sin redondeo.
+const fmt = precioTexto;
 
 const CELL = "padding:6px 4px;vertical-align:middle";
 
 export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   const {
-    marcaLabel, headerHtml, tableHeadBg, itemsHasPreorder,
-    items, bultoSize, comment, totalBultos, totalPiezas, total,
+    audiencia = "equipo", marcaLabel, clientName = "", headerHtml, tableHeadBg,
+    itemsHasPreorder, items, bultoSize, comment, totalBultos, totalPiezas, total,
   } = opts;
+  const esCliente = audiencia === "cliente";
 
   const regularItems = items.filter((i) => !i.is_preorder);
   const preorderItems = items.filter((i) => i.is_preorder);
@@ -111,23 +133,58 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
       : `${renderSection("Detalle", regularItems, tableHeadBg)}`
     : tabla(items.map(renderRow).join(""));
 
+  // ── Textos por audiencia ──────────────────────────────────────────────────
+  // Al CLIENTE: se le agradece, se le confirma qué pidió y por cuánto, y se le
+  // dice qué pasa ahora. Cero jerga interna, cero instrucciones de bodega.
+  // Español simple de Panamá (tuteo), cálido pero corto: es un mayorista.
+  const saludoCliente = clientName
+    ? `Hola <strong>${escapeHtml(clientName)}</strong>,<br>`
+    : "";
+
+  const introHtml = esCliente
+    ? `<p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
+          ${saludoCliente}Recibimos tu pedido del catálogo ${escapeHtml(marcaLabel)}. Este es el detalle — también te lo adjuntamos en PDF.
+        </p>`
+    : `<p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
+          Estimado equipo Fashion Group,<br>
+          Se ha recibido un nuevo pedido del catálogo ${escapeHtml(marcaLabel)}. A continuación el detalle:
+        </p>`;
+
+  const preordenHtml = !hasPreorders
+    ? ""
+    : esCliente
+      ? `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos marcados como <strong>Pre-orden</strong> todavía no están en stock. Te avisamos apenas lleguen.</p>`
+      : `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos en <strong>Pre-orden</strong> aún no tienen stock disponible. No deben mezclarse con el pedido regular en bodega.</p>`;
+
+  const queSigueHtml = esCliente
+    ? `<p style="color:#333;font-size:13px;line-height:1.6;margin:16px 0 0">
+          <strong>¿Qué sigue?</strong><br>
+          Un vendedor de Fashion Group te contacta para confirmar la disponibilidad y coordinar el pago y la entrega.
+          Si algo no está bien, responde este correo y lo corregimos.
+        </p>`
+    : "";
+
+  const pieHtml = esCliente
+    ? `<p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
+          Fashion Group · Panamá · pedidos@fashiongr.com
+        </p>`
+    : `<p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
+          Este pedido fue generado automáticamente desde fashiongr.com
+        </p>`;
+
   const body = `
     <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">
       ${headerHtml}
       <div class="fg-pad" style="padding:20px;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px">
-        <p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
-          Estimado equipo Fashion Group,<br>
-          Se ha recibido un nuevo pedido del catálogo ${escapeHtml(marcaLabel)}. A continuación el detalle:
-        </p>
+        ${introHtml}
         ${comment ? `<p style="color:#666;font-size:13px;margin:0 0 12px"><strong>Nota:</strong> ${escapeHtml(comment)}</p>` : ""}
         ${sectionsHtml}
-        ${hasPreorders ? `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los artículos en <strong>Pre-orden</strong> aún no tienen stock disponible. No deben mezclarse con el pedido regular en bodega.</p>` : ""}
+        ${preordenHtml}
         <div style="background:#f5f5f5;padding:12px 16px;border-radius:6px;margin:16px 0">
           <strong style="font-size:14px">Total: ${totalBultos} bultos (${totalPiezas} piezas) — $${fmt(total)}</strong>
         </div>
-        <p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
-          Este pedido fue generado automáticamente desde fashiongr.com
-        </p>
+        ${queSigueHtml}
+        ${pieHtml}
       </div>
     </div>`;
 

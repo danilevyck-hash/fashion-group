@@ -67,16 +67,17 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     const pages = await extractPagesText(docBytes(doc));
     expect(pages.length).toBeGreaterThan(1);
 
-    // Línea de total: "120 bultos · 1440 piezas" y "$14,400.00"
+    // Línea de total: "120 bultos · 1440 piezas" y "$14,400" (sin `.00`:
+    // los catálogos usan el formato de precio de src/lib/catalogo/precio.ts)
     const totalLine = "120 bultos · 1440 piezas";
     const withTotal = pages.filter((t) => t.includes(totalLine));
     expect(withTotal.length).toBe(1);
     expect(pages[pages.length - 1]).toContain(totalLine);
-    expect(pages[pages.length - 1]).toContain("$14,400.00");
+    expect(pages[pages.length - 1]).toContain("$14,400");
     // Ninguna página intermedia repite el total (regresión del foot everyPage)
     for (const p of pages.slice(0, -1)) {
       expect(p).not.toContain(totalLine);
-      expect(p).not.toContain("$14,400.00");
+      expect(p).not.toContain("$14,400");
     }
   });
 

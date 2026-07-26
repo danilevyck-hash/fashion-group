@@ -41,9 +41,10 @@ export interface PedidoWhatsappInfo {
   link: string;
 }
 
-function fmtMoney(n: number): string {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { precioTexto } from "@/lib/catalogo/precio";
+
+// Mismo formato que la vitrina: `$4,422`, `$37.50`. Sin `.00`.
+const fmtMoney = precioTexto;
 
 export function buildPedidoWhatsappMsg(p: PedidoWhatsappInfo): string {
   const items = `${p.itemCount} ${p.itemCount === 1 ? "producto" : "productos"}`;

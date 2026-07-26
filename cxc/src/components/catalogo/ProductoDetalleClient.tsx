@@ -15,6 +15,7 @@ import Link from "next/link";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { supabase, type Product, type InventoryItem } from "@/components/reebok/supabase";
 import { groupByModel, type GroupedProduct, type JoybeesProduct } from "./groupByModel";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
@@ -111,7 +112,7 @@ function DetallePorTallas({ marca }: { marca: MarcaUiKey }) {
           {product.sku && <p className="text-sm text-gray-500 mb-1">SKU: {product.sku}</p>}
           {product.color && <p className="text-sm text-gray-500 mb-4">Color: {product.color}</p>}
           <p className={theme.producto.price}>
-            {product.price ? `$${product.price.toFixed(2)}` : "Consultar precio"}
+            {product.price ? fmtPrecio(product.price) : "Consultar precio"}
           </p>
           {product.description && <p className="text-gray-600 mb-6">{product.description}</p>}
 
@@ -258,7 +259,7 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
           <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
           {product.sku && <p className="text-sm text-gray-500 mb-4">SKU: {product.sku}</p>}
           <p className={theme.producto.price}>
-            {product.price ? `$${product.price.toFixed(2)}` : "Consultar precio"}
+            {product.price ? fmtPrecio(product.price) : "Consultar precio"}
           </p>
 
           {availableVariants.length > 0 ? (

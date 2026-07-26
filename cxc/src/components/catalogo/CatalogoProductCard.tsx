@@ -13,6 +13,7 @@ import type { CatalogoProducto } from "./types";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 const COLOR_DOT_MAP: Record<string, string> = {
   black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
@@ -211,7 +212,7 @@ export default function CatalogoProductCard({
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
-                  {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
+                  {product.price ? fmtPrecio(product.price) : "Consultar"}
                 </span>
                 {product.badge === "oferta" && (
                   <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">

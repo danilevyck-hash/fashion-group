@@ -24,6 +24,7 @@ import {
   groupByModel, getDisplaySection, type DisplaySection, SECTION_ORDER, SECTION_LABELS,
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
+import { precioTexto } from "@/lib/catalogo/precio";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -282,7 +283,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   const filteredCount = agrupado ? sortedGroups.length : filtered.length;
 
-  const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Precio de catálogo, igual en las 3 marcas: sin `.00` y sin redondear.
+  const fmt = precioTexto;
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
