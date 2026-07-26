@@ -40,13 +40,15 @@ interface DashboardSummaryRow {
 
 const RETAIL_KEYS = new Set(["american_classic"]);
 
-// ⚠️ INVARIANTE (auditoría 🟡-14): american_classic (Multifashion) vive a
-// propósito en DOS tablas: switch_facturas (vía switch_ventas_unificado_vw, base
-// del Resumen) Y multifashion_tickets (legacy). NUNCA sumar las dos fuentes en un
-// mismo total — sería doble conteo (~$300-800K YTD). El Resumen (fetchVentasResumen
-// → ventas_dashboard_summary → switch_ventas_unificado_vw) ya incluye
-// american_classic UNA vez; el tab Multifashion (fetchMultifashion →
-// multifashion_mensual_v6) es su propia vista y NO debe agregarse al total grupo.
+// ⚠️ INVARIANTE (auditoría 🟡-14): american_classic (Multifashion) NO se suma
+// dos veces. El Resumen (fetchVentasResumen → ventas_dashboard_summary →
+// switch_ventas_unificado_vw) ya lo incluye UNA vez; el tab Multifashion
+// (fetchMultifashion → multifashion_mensual_v6/v7) es su propia vista sobre la
+// MISMA switch_facturas y NO debe agregarse al total del grupo (~$300-800K YTD
+// de doble conteo si se hiciera).
+// La segunda fuente histórica, multifashion_tickets, quedó CONGELADA el
+// 26-jul-2026: nadie la leía y su cron se retiró. Los datos siguen en la tabla,
+// pero ya no es una fuente viva. Ver CLAUDE.md.
 
 function toNum(v: number | string | null | undefined): number {
   return typeof v === "number" ? v : Number(v ?? 0) || 0;

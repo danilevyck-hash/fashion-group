@@ -11,7 +11,7 @@
 // (no re-derivables de Switch), en la corrida CORE (sin params).
 //
 // GRUPO SWITCH (?grupo=switch, audit jul-2026): las tablas switch_* +
-// multifashion_tickets SÍ se respaldan ahora, en una SEGUNDA invocación del
+// multifashion_tickets (congelada, ver más abajo) SÍ se respaldan ahora, en una SEGUNDA invocación del
 // mismo path (entradas propias en vercel.json, patrón de entradas repetidas).
 // Motivo del split, con números (medidos 23-jul-2026): ~310K filas extra
 // (switch_articulo_diario 197K × ~370B + switch_facturas 52K × ~1.1KB + resto)
@@ -202,6 +202,12 @@ const SWITCH_DATASETS: Dataset[] = [
   { table: "switch_factura_utilidad" },
   { table: "switch_proveedor_estadocuenta" },
   { table: "switch_clientes" },
+  // multifashion_tickets — tabla CONGELADA el 26-jul-2026 (ya no se escribe; ver
+  // CLAUDE.md). SE MANTIENE en el backup a propósito: mientras las 15.819 filas
+  // existan, esta es la única copia que las protege, y una tabla congelada
+  // comprime igual todos los días (~16 MB crudos, chica al lado de
+  // switch_articulo_diario). Cuando se decida borrar la tabla, se saca de acá en
+  // el MISMO cambio — nunca antes.
   { table: "multifashion_tickets" },
 ];
 

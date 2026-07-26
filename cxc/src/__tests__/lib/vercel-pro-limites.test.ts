@@ -6,9 +6,9 @@
  *
  *  - `integrity-check` es el ÚNICO cron con caller HUMANO (el botón "Correr
  *    ahora" de /admin/data-health espera la respuesta para mostrar el resumen).
- *  - `multifashion-sync` toca Switch (american_classic) y era el techo más bajo
- *    de todos los crons que abren sesión; su override manual acepta rangos de
- *    hasta 365 días.
+ *  - `multifashion-sync` — la otra. Se RETIRÓ el 26-jul-2026 junto con la
+ *    escritura de `multifashion_tickets` (tabla congelada, ver CLAUDE.md), así
+ *    que sus casos salieron de acá: no queda ruta que verificar.
  *
  * Se verifica leyendo la fuente porque `maxDuration` es un export estático que
  * Next lee en build (importar el route arrastraría supabase y Switch).
@@ -32,19 +32,14 @@ describe("maxDuration de las rutas que subieron con Pro", () => {
     expect(maxDuration(code)).toBe(300);
   });
 
-  it("multifashion-sync va al techo del plan, como el resto de los crons de Switch", () => {
-    const code = routeSrc("multifashion-sync");
-    expect(maxDuration(code)).toBe(800);
-  });
-
-  it("ninguna de las dos quedó en el default de 60", () => {
-    for (const p of ["integrity-check", "multifashion-sync"]) {
+  it("ninguna quedó en el default de 60", () => {
+    for (const p of ["integrity-check", "switch-reconciliacion"]) {
       expect(maxDuration(routeSrc(p)), p).toBeGreaterThan(60);
     }
   });
 
   it("800 es el techo: nadie pide más", () => {
-    for (const p of ["integrity-check", "multifashion-sync", "switch-reconciliacion"]) {
+    for (const p of ["integrity-check", "switch-reconciliacion"]) {
       expect(maxDuration(routeSrc(p)) ?? 0, p).toBeLessThanOrEqual(800);
     }
   });

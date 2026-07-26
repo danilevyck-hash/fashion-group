@@ -22,7 +22,7 @@
 //
 // COBERTURA: switch-sync (facturas/estadocuenta/costo, por par vía
 // switch_sync_log) + los crons colaterales de COLATERAL_CRONS (clientes-master,
-// utilidad, recibos, articulos, multifashion-sync, proveedores, catálogos,
+// utilidad, recibos, articulos, proveedores, catálogos,
 // alertas y resúmenes — detectados por cron_heartbeats sin success hoy). NO
 // cubre backup ni acs-fidelizacion (pesados / sesión propia): esos tienen su
 // propia 2ª entrada del día en vercel.json como segunda oportunidad.
@@ -57,7 +57,6 @@ import { syncAllUtilidad, mesesCronDiario } from "@/lib/switch-api/sync-utilidad
 import { syncAllRecibos, mesesCronRecibos } from "@/lib/switch-api/sync-recibos";
 import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
-import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
@@ -312,23 +311,12 @@ const COLATERAL_CRONS: ColateralCron[] = [
       return { ok: bad.length === 0, detail: bad.length === 0 ? "ok" : `falló: ${bad.join(",")}` };
     },
   },
-  {
-    // Sync legacy de multifashion_tickets (Switch american_classic). Su route ya
-    // registra heartbeat, pero como cualquier otro colateral puede perder su
-    // invocación de cron → aquí la reconciliación lo detecta (sin heartbeat hoy) y
-    // lo re-ejecuta in-process con la MISMA ventana de 7 días que su cron diario,
-    // lo que además rellena cualquier hueco de días saltados.
-    cronName: "multifashion-sync",
-    label: "multifashion",
-    recover: async () => {
-      const r = await syncMultifashionTickets({
-        desde: panamaDate(-7),
-        hasta: panamaDate(0),
-        triggeredBy: "cron",
-      });
-      return { ok: true, detail: `${r.inserted}+${r.updated} tickets` };
-    },
-  },
+  // multifashion_tickets — RETIRADO el 26-jul-2026. La tabla está CONGELADA (los
+  // datos quedan, nadie los lee; el módulo Multifashion vive de switch_facturas
+  // vía _multifashion_sf_vw). Su cron y este colateral se eliminaron juntos: si
+  // el colateral hubiera quedado, la reconciliación lo vería sin heartbeat en
+  // CADA pasada (3×/día) y volvería a escribir la tabla — peor que antes. Para
+  // reencenderlo: revertir el PR "retirar multifashion_tickets".
   {
     // Cuentas por Pagar (proveedores). Itera /apiproveedor/info por las 6 B2B y
     // upserta switch_proveedor_estadocuenta. Igual que los demás colaterales: si

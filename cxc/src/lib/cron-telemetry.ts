@@ -87,7 +87,6 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "sync-utilidad": 0,
   "sync-recibos": 0,
   "switch-articulos": 0,
-  "multifashion-sync": 0,
   "sync-proveedores": 0,
   "refresh-clientes-views": 0,
   "cleanup-packing-lists": 0,
@@ -347,7 +346,10 @@ export interface SwitchCronEntrada {
 
 /** Espejo de vercel.json — entradas que tocan Switch, con sus empresas. */
 export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
-  { cron: "multifashion-sync", hhmmUtc: "0500", empresas: ["american_classic"] },
+  // multifashion-sync (05:00, american_classic) se RETIRÓ el 26-jul-2026 junto
+  // con la escritura de multifashion_tickets (tabla congelada, ver CLAUDE.md).
+  // Era la única entrada de la madrugada que tocaba american_classic antes del
+  // bloque `all` de las 06:30; su baja libera esa sesión de Switch.
   { cron: "switch-sync all", hhmmUtc: "0530", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },

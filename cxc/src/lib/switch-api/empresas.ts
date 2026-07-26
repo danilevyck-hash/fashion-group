@@ -8,10 +8,9 @@
  *      MULTIFASHION aunque su empresa_key sea american_classic). El cliente
  *      resuelve vía esta tabla en vez de derivar el env key del empresa_key.
  *   2. EMPRESA_SYNC_CAPABILITIES — qué sincroniza cada empresa:
- *      - facturas → switch_facturas. Multifashion=true: alimenta switch_facturas
- *        (base del tab Multifashion desde fase 2.1b) además de su tabla legacy
- *        multifashion_tickets (que su cron propio sigue manteniendo). Vive en ambas
- *        a propósito (invariante 🟡-14: nunca sumar las dos fuentes → doble conteo).
+ *      - facturas → switch_facturas. Multifashion=true: alimenta switch_facturas,
+ *        ÚNICA fuente viva del tab Multifashion (vía _multifashion_sf_vw). Su
+ *        tabla legacy multifashion_tickets quedó CONGELADA el 26-jul-2026.
  *      - cxc → switch_estadocuenta. Boston=false (su CXC se maneja por otro lado,
  *        probablemente Brand It).
  */
@@ -42,12 +41,12 @@ export interface EmpresaSyncCapability {
 
 export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability> = {
   // facturas:true → switch_facturas recibe facturas+NCs+NDs de Multifashion para
-  // que switch_ventas_netas_vw cubra las 8 empresas (fase 2). El sync legacy
-  // multifashion_tickets + su cron + el tab actual quedan INTACTOS (MF queda
-  // duplicada entre ambas tablas a propósito). cxc:false (retail, sin CXC central).
-  // ⚠️ INVARIANTE (🟡-14): MF vive en switch_facturas Y multifashion_tickets a la
-  // vez. NUNCA sumar ambas fuentes en un total → doble conteo. Ver el comentario
-  // en src/lib/ventas/queries.ts (RETAIL_KEYS).
+  // que las vistas unificadas cubran las 8 empresas (fase 2). cxc:false (retail,
+  // sin CXC central).
+  // La tabla legacy multifashion_tickets se CONGELÓ el 26-jul-2026 (su cron se
+  // retiró; los datos quedan). Ya no hay dos fuentes vivas de MF, pero sigue
+  // valiendo la regla del tab: el Resumen del grupo cuenta a american_classic UNA
+  // vez. Ver el comentario en src/lib/ventas/queries.ts (RETAIL_KEYS).
   // MF: retail sin CXC central (cxc:false) PERO sí paga proveedores en Switch
   // (cxp:true, verificado: 13 proveedores / $77K en /apiproveedor) → su CxP entra a
   // switch_proveedor_estadocuenta como las B2B.

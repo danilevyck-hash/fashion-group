@@ -389,9 +389,14 @@ verdad es lo que ve la gente al llegar:
 
 ## Fuera de alcance / decisiones
 
-- **`multifashion-sync` NO se auto-recupera**: no registra heartbeat → sin señal
-  fiable. Su data igual entra por `american_classic` en switch-sync (cubierto).
-  Candidato a follow-up (agregarle heartbeat primero).
+- **`multifashion-sync` ya no existe (retirado 26-jul-2026)**: escribía la tabla
+  `multifashion_tickets`, que nadie leía — el módulo Multifashion vive de
+  `switch_facturas` vía `_multifashion_sf_vw`. Se dieron de baja juntos la entrada
+  de `vercel.json`, el colateral de la reconciliación, su fila de `EXPECTED_CRONS`
+  y su entrada en `SWITCH_CRON_ENTRADAS`. Los datos de la tabla NO se borraron
+  (candidata a borrar si en unos meses nadie los extraña). Su data sigue entrando
+  por `american_classic` en switch-sync, que sí está cubierto. Para reencenderlo:
+  revertir el PR "retirar multifashion_tickets".
 - **"Horarios redundantes" (stopgap Fase 0)**: se interpretó como las **3 pasadas
   in-process** de la reconciliación (re-ejecutan el trabajo faltante hasta 3× más
   al día, idempotente, **solo cuando falta** — cero desperdicio en días sanos), en
