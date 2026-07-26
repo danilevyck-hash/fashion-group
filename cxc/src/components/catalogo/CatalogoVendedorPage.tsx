@@ -151,12 +151,20 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   // para refrescar la vista tras un sync manual exitoso.
   const loadProducts = useCallback(async () => {
     setLoading(true);
+    // En las 3 marcas `_stock` es DISPONIBILIDAD (lo vendible = saldo −
+    // apartado), igual que en el catálogo público (26-jul-2026): antes esta
+    // página decidía por EXISTENCIA (la columna `stock`, espejo del saldo
+    // físico) y vendedor y cliente podían ver catálogos distintos —distinta
+    // visibilidad y distinto orden— en los productos donde ambos números
+    // difieren. Regla única en lib/catalogos/disponible (cae a existencia si el
+    // sync todavía no escribió la columna, para no esconder producto por un
+    // dato faltante).
     if (agrupado) {
       try {
         const res = await fetch(`${theme.api}/products?active=true`);
         if (!res.ok) throw new Error("fetch failed");
         const data: JoybeesProduct[] = await res.json();
-        setProducts(data.filter(p => p.stock > 0 || p.is_regalia));
+        setProducts(data.filter(p => disponibleVendible(p) > 0 || p.is_regalia));
       } catch {
         setProducts([]);
       }
@@ -177,16 +185,32 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             sizesMap[i.product_id].add(i.size);
           }
         });
-        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => (p._stock || 0) > 0 || p.badge === "proximamente"));
+        // Reebok: `inventory.quantity` es EXISTENCIA (el sync escribe
+        // quantity: existencia bajo la talla "UNICA"), así que solo sirve de
+        // fallback y para las tallas; la disponibilidad correcta es la agregada
+        // de la fila del producto.
+        setProducts(
+          prods
+            .map(p => ({
+              ...p,
+              _stock: disponibleVendible(p, stockMap[p.id] ?? 0),
+              _sizes: [...(sizesMap[p.id] || [])],
+            }))
+            .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
+        );
       } catch { setProducts([]); }
     } else {
-      // Grid PLANA sin inventario por talla (Tommy): stock en la fila del
-      // producto (columna stock, patrón Joybees) — sin endpoint /inventory.
+      // Grid PLANA sin inventario por talla (Tommy): el stock vive en la fila
+      // del producto (patrón Joybees) — sin endpoint /inventory.
       try {
         const res = await fetch(`${theme.api}/products?active=true`);
         if (!res.ok) throw new Error("fetch failed");
         const prods: CatalogoProducto[] = await res.json();
-        setProducts(prods.map(p => ({ ...p, _stock: p.stock ?? 0, _sizes: [] as string[] })).filter(p => (p._stock || 0) > 0 || p.badge === "proximamente"));
+        setProducts(
+          prods
+            .map(p => ({ ...p, _stock: disponibleVendible(p), _sizes: [] as string[] }))
+            .filter(p => (p._stock || 0) > 0 || p.badge === "proximamente")
+        );
       } catch { setProducts([]); }
     }
     setLoading(false);
@@ -212,11 +236,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
     // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
-    // vendible), nunca la existencia — ojo que en esta página `_stock` es
-    // existencia (espejo de `stock`), por eso acá se llama a
-    // disponibleVendible y no se reusa `_stock`: si no, el vendedor vería 369
-    // productos donde el link público muestra 367. El tamaño de bulto sale del
-    // tema — el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
+    // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
+    // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
     .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category)))
     .filter(p => precioEnRango(p.price, precioRango))
     .sort((a, b) => {

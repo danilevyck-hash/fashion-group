@@ -82,6 +82,34 @@ export default function CatalogoFilters({
 
       {/* Chip filters row */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+        {conBultos && (
+          <>
+            {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila
+                (Daniel, 26-jul-2026): al final quedaba detrás del Género y de
+                las 7 categorías, y en móvil había que arrastrar la fila para
+                encontrarlo. "Un filtro que no se ve no existe" — y este corta
+                123 de 490 productos en Tommy, no es decorativo.
+                Dice la REGLA y no un juicio de valor sobre el inventario: la
+                card no muestra Disponibilidad ni Existencia, así que el cliente
+                no tendría cómo saber por qué desaparecieron productos. "Bulto"
+                ya es vocabulario de la card. Umbral: 2 bultos COMPLETOS
+                (Tommy = 24 pzas). */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => onBultosFilterChange!(!bultosFilter)}
+                aria-pressed={bultosFilter}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+                  bultosFilter ? f.chipActive : f.chipInactive
+                }`}
+              >
+                {BULTOS_CHIP_LABEL}
+              </button>
+            </div>
+
+            <div className={f.divider} />
+          </>
+        )}
+
         {/* Gender chips */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={f.chipLabel}>Genero</span>
@@ -153,29 +181,6 @@ export default function CatalogoFilters({
                 }`}
               >
                 Próximamente
-              </button>
-            </div>
-          </>
-        )}
-
-        {conBultos && (
-          <>
-            <div className={f.divider} />
-
-            {/* Chip "2 bultos o más" (feature filtroBultos). Dice la REGLA y no
-                un juicio de valor sobre el inventario: la card no muestra
-                Disponibilidad ni Existencia, así que el cliente no tendría cómo
-                saber por qué desaparecieron productos. "Bulto" ya es vocabulario
-                de la card. Umbral: 2 bultos COMPLETOS (Tommy = 24 pzas). */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => onBultosFilterChange!(!bultosFilter)}
-                aria-pressed={bultosFilter}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                  bultosFilter ? f.chipActive : f.chipInactive
-                }`}
-              >
-                {BULTOS_CHIP_LABEL}
               </button>
             </div>
           </>

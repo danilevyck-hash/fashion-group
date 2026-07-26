@@ -197,6 +197,36 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
     expect(filtros).toContain('className="flex flex-wrap items-center justify-end gap-2 ml-auto"');
   });
 
+  // ── Posición del chip en la fila (Daniel, 26-jul-2026) ──────────────────────
+  // Nació al FINAL de la fila y en móvil había que arrastrarla horizontalmente
+  // (Género + 7 categorías por delante) para descubrirlo. "Un filtro que no se
+  // ve no existe" — y corta 123 de 490 productos en Tommy. Va PRIMERO.
+  function chipsDeLaFila(container: HTMLElement): string[] {
+    const fila = container.querySelector(".overflow-x-auto");
+    if (!fila) throw new Error("no se encontró la fila de chips");
+    return [...fila.querySelectorAll("button")].map(b => (b.textContent || "").trim());
+  }
+
+  it("en Tommy el chip de bultos es el PRIMERO de la fila, antes de Género", () => {
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    const chips = chipsDeLaFila(container);
+    expect(chips[0]).toBe(BULTOS_CHIP_LABEL);
+    const generos = MARCA_THEME.tommy.filtros.genderOptions.map(o => o.label);
+    expect(chips.indexOf(generos[0])).toBeGreaterThan(0);
+    // Y sigue apareciendo UNA sola vez (no quedó duplicado al moverlo).
+    expect(chips.filter(c => c === BULTOS_CHIP_LABEL).length).toBe(1);
+  });
+
+  it("Reebok y Joybees arrancan la fila con Género, exactamente como antes", () => {
+    for (const marca of ["reebok", "joybees"] as const) {
+      const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
+      const chips = chipsDeLaFila(container);
+      expect(chips[0], marca).toBe(MARCA_THEME[marca].filtros.genderOptions[0].label);
+      expect(chips, marca).not.toContain(BULTOS_CHIP_LABEL);
+      unmount();
+    }
+  });
+
   it("el chip usa el label exacto aprobado (no 'buen stock')", () => {
     // La card pública no muestra Disponibilidad ni Existencia: el label tiene
     // que declarar la REGLA para que se entienda por qué desaparecen productos.
@@ -215,9 +245,10 @@ describe("las dos páginas aplican el filtro igual", () => {
     }
   });
 
-  it("miden DISPONIBILIDAD (nunca `_stock`, que en vendedor es existencia)", () => {
-    // En CatalogoVendedorPage `_stock` viene de `p.stock` = espejo de
-    // existencia; usarlo daría 369 productos donde el link público da 367.
+  it("miden DISPONIBILIDAD llamando a la regla única, nunca `_stock`", () => {
+    // Desde el 26-jul-2026 `_stock` YA es disponibilidad en las dos páginas,
+    // pero el filtro sigue llamando a disponibleVendible: así no depende de
+    // cómo se armó `_stock` en la rama de datos de cada marca.
     for (const code of [PUBLICO, VENDEDOR]) {
       expect(code).toContain("import { disponibleVendible }");
       expect(code).not.toContain("cumpleBultosMinimos(p._stock");
