@@ -15,13 +15,13 @@ import type {
   EmpresaMonthlySales,
 } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
-import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
   cellValue, cellPrevValue, cellDelta, isNaComparison,
-  renderCellValue, deltaModeFor, buildSlotsMetrica, celdaKey,
-  type CeldaBase, type SlotDetalle,
+  renderCellValue, buildSlotsMetrica, celdaKey, deltaCelda,
+  type CeldaBase, type DeltaCelda,
 } from "@/lib/ventas/celda";
+import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
@@ -463,6 +463,7 @@ export function ResumenView({
                     <EmpresaProjectionCell
                       proyeccion={findProyeccionForEmpresa(data.proyeccion!, r.empresa.id)}
                       prevYear={prevYear}
+                      fechaCorte={data.fecha_corte}
                       filaId={r.empresa.id}
                       titulo={r.empresa.nombre}
                       onAbrir={setFilaDetalle}
@@ -587,19 +588,22 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 }
 
 /** Celda de proyección por empresa (al lado del Total YTD).
- *  v5: monto principal + Δ absoluto vs cierre del año anterior. Sin dots de
- *  status, sin comparativo con meta. Hover muestra desglose del cálculo
- *  (algoritmo + fórmula) — transparencia para Daniel.
+ *  Monto principal + Δ absoluto vs cierre del año anterior. Al tocarla, la fila
+ *  se transforma y el SUBTÍTULO explica en castellano llano de dónde sale el
+ *  número (ver lib/ventas/proyeccion-texto.ts).
  */
 function EmpresaProjectionCell({
   proyeccion,
   prevYear,
+  fechaCorte,
   filaId,
   titulo,
   onAbrir,
 }: {
   proyeccion: ProyeccionEmpresa | null;
   prevYear: number;
+  /** YYYY-MM-DD del último día con datos. Da el "al 26 jul" de la explicación. */
+  fechaCorte: string | null;
   filaId: string;
   titulo: string;
   onAbrir: AbrirFila;
@@ -622,8 +626,8 @@ function EmpresaProjectionCell({
           filaId,
           focoCelda: foco,
           titulo,
-          subtitulo: `PROYECCIÓN ${prevYear + 1}`,
-          slots: buildSlotsProyeccion(proyeccion, prevYear),
+          subtitulo: explicacionProyeccion(proyeccion, prevYear, { fechaCorte }),
+          slots: buildSlotsProyeccion(proyeccion, prevYear, { fechaCorte }),
           ...medirFila(e),
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
@@ -640,37 +644,6 @@ function EmpresaProjectionCell({
       </button>
     </td>
   );
-}
-
-/**
- * Desglose de la proyección como slots de la fila transformada. Reemplaza al
- * bloque oscuro que vivía en el panel lateral: los mismos números (algoritmo,
- * YTD de los dos años, Δ, cierre del año anterior y el parámetro del método)
- * en el mismo renglón que el resto de los detalles.
- */
-function buildSlotsProyeccion(p: ProyeccionEmpresa, prevYear: number): SlotDetalle[] {
-  const ytd = p.ventas_ytd;
-  const ytdP = p.ventas_prev_ytd_sp;
-  const ratio = ytdP > 0 ? (ytd - ytdP) / ytdP : null;
-  const algo = p.es_fallback_lineal
-    ? "Lineal (datos insuficientes)"
-    : p.algoritmo === "estacional" ? "Estacional"
-    : p.algoritmo === "mixto" ? "Mixto"
-    : "Lineal";
-  const slots: SlotDetalle[] = [
-    { key: "cierre", label: "Cierre proyectado", valor: fmtMoneyCompact(p.proyeccion_cierre), prev: fmtMoneyCompact(p.cierre_anio_anterior), delta: "", tone: "neutral", destacado: true },
-    { key: "ytd", label: `YTD ${prevYear + 1}`, valor: fmtMoneyCompact(ytd), prev: ytdP > 0 ? fmtMoneyCompact(ytdP) : null,
-      delta: ratio == null ? "—" : `${ratio >= 0 ? "+" : ""}${(ratio * 100).toFixed(1)}%`,
-      tone: ratio == null ? "neutral" : ratio >= 0 ? "emerald" : "orange", destacado: false },
-    { key: "algo", label: "Método", valor: algo, prev: null, delta: "", tone: "neutral", destacado: false },
-  ];
-  if (p.algoritmo === "estacional" && p.frac_ytd_estacional != null) {
-    slots.push({ key: "frac", label: `Fracción ${prevYear} al mismo día`, valor: `${(p.frac_ytd_estacional * 100).toFixed(1)}%`, prev: null, delta: "", tone: "neutral", destacado: false });
-  }
-  if (p.algoritmo === "mixto" && p.factor_final != null) {
-    slots.push({ key: "factor", label: "Factor de crecimiento", valor: `×${p.factor_final.toFixed(3)}`, prev: null, delta: "", tone: "neutral", destacado: false });
-  }
-  return slots;
 }
 
 function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
@@ -718,11 +691,6 @@ function HeatCell({
 }) {
   const cur   = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
-  const fmt   = formatDeltaRatio(delta, deltaModeFor(mode));
-  const tone  = delta == null ? "text-gray-500"
-              : fmt.tone === "emerald" ? "text-emerald-700"
-              : fmt.tone === "orange"  ? "text-red-700"
-              : "text-gray-500";
 
   // Mes futuro sin nada del año anterior: no hay nada que abrir.
   const hasPrev = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
@@ -736,10 +704,11 @@ function HeatCell({
 
   const foco = celdaKey("d", filaId, columna);
   const isNa = cur != null && isNaComparison(cell, mode);
+  const dc = cur == null ? null : deltaCelda(delta, mode, isNa);
 
-  // La celda muestra SOLO el valor (y la flecha de direccion, explicada en la
-  // leyenda). El delta numerico y el comparativo aparecen al transformarse la
-  // fila: la tabla queda limpia y legible de un vistazo.
+  // Monto arriba, % del cambio contra el mismo mes del año anterior abajo. El
+  // % tiene que estar A LA VISTA (ver DeltaCelda en lib/ventas/celda.ts): con
+  // solo la flecha hay que tocar celda por celda para saber cuánto subió.
   return (
     <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
       <button
@@ -757,17 +726,29 @@ function HeatCell({
       >
         {cur == null ? (
           <span className="text-gray-400">—</span>
-        ) : isNa ? (
-          <span className="text-gray-400">{renderCellValue(cur, mode)}</span>
         ) : (
-          <span className="inline-flex items-baseline gap-1.5">
-            {fmt.arrow && <span className={cn("text-xs", tone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
-            <span className="text-gray-950">{renderCellValue(cur, mode)}</span>
+          <span className="flex flex-col items-end leading-tight">
+            <span className={isNa ? "text-gray-400" : "text-gray-950"}>{renderCellValue(cur, mode)}</span>
+            {dc && (
+              <span className={cn("mt-0.5", toneDelta(dc.tone))} title={leyendaDelta(mode, prevYear)}>
+                {dc.texto}
+              </span>
+            )}
           </span>
         )}
       </button>
     </td>
   );
+}
+
+/** Color del % bajo el monto en filas claras. */
+function toneDelta(tone: DeltaCelda["tone"]): string {
+  return tone === "emerald" ? "text-emerald-700" : tone === "orange" ? "text-red-700" : "text-gray-500";
+}
+
+/** Idem en la fila oscura del TOTAL GRUPO. */
+function toneDeltaOscuro(tone: DeltaCelda["tone"]): string {
+  return tone === "emerald" ? "text-emerald-400" : tone === "orange" ? "text-orange-400" : "text-gray-400";
 }
 
 /**
@@ -819,9 +800,7 @@ function EmpresaTotalCell({
     delta = ventasPrevTotal > 0 ? (ventasTotal - ventasPrevTotal) / ventasPrevTotal : null;
     displayValue = fmtMoney(cur);
   }
-  const dMode = deltaModeFor(mode);
-  const fmt = formatDeltaRatio(delta, dMode);
-  const tone = deltaTextTone(delta, dMode);
+  const dc = deltaCelda(delta, mode, delta == null);
   const foco = celdaKey("d", filaId, "total");
 
   return (
@@ -839,9 +818,13 @@ function EmpresaTotalCell({
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
-        <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", tone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
+        <span className="flex flex-col items-end leading-tight">
           <span className="text-sm font-medium text-gray-950">{displayValue}</span>
+          {dc && (
+            <span className={cn("mt-0.5 text-xs", toneDelta(dc.tone))} title={leyendaDelta(mode, prevYear)}>
+              {dc.texto}
+            </span>
+          )}
         </span>
       </button>
     </td>
@@ -873,11 +856,7 @@ function TotalGroupCell({
   }
   const cellLike: Cell = { ...agg, periodLabel };
   const delta = cellDelta(cellLike, mode);
-  const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
-  const arrowTone =
-    delta == null              ? "text-gray-300"  :
-    fmt.tone === "emerald"     ? "text-emerald-400" :
-    fmt.tone === "orange"      ? "text-orange-400"  : "text-gray-300";
+  const dc = deltaCelda(delta, mode, isNaComparison(agg, mode));
   const foco = celdaKey("d", TOTAL_GRUPO_ID, columna);
 
   return (
@@ -895,9 +874,13 @@ function TotalGroupCell({
         })}
         className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
-        <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", arrowTone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
+        <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{renderCellValue(cur, mode)}</span>
+          {dc && (
+            <span className={cn("mt-0.5", toneDeltaOscuro(dc.tone))} title={leyendaDelta(mode, prevYear)}>
+              {dc.texto}
+            </span>
+          )}
         </span>
       </button>
     </td>
@@ -917,11 +900,7 @@ function TotalGroupAnnualCell({
   const cellLike: Cell = { ...agg, periodLabel: `YTD ${selectedYear}` };
   const cur = cellValue(agg, mode);
   const delta = cellDelta(cellLike, mode);
-  const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
-  const arrowTone =
-    delta == null            ? "text-gray-300"  :
-    fmt.tone === "emerald"   ? "text-emerald-300" :
-    fmt.tone === "orange"    ? "text-orange-300"  : "text-gray-300";
+  const dc = cur == null ? null : deltaCelda(delta, mode, isNaComparison(agg, mode));
   const displayValue = cur == null
     ? "—"
     : mode === "margen" ? (cur * 100).toFixed(1) + "%" : fmtMoney(cur);
@@ -942,9 +921,13 @@ function TotalGroupAnnualCell({
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
-        <span className="inline-flex items-baseline gap-1.5">
-          {fmt.arrow && <span className={cn("text-xs", arrowTone)} title={leyendaDelta(mode, prevYear)}>{fmt.arrow}</span>}
+        <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{displayValue}</span>
+          {dc && (
+            <span className={cn("mt-0.5 text-xs font-medium", toneDeltaOscuro(dc.tone))} title={leyendaDelta(mode, prevYear)}>
+              {dc.texto}
+            </span>
+          )}
         </span>
       </button>
     </td>
@@ -984,16 +967,6 @@ const MES_FULL_RESUMEN = [
 function parseIsoDateResumen(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
-}
-
-// Mapping tonal para delta texto (light bg, estilo Clientes tab).
-// El threshold se ajusta según mode: 0.05 (5%) para pct, 0.005 (0.5 pts) para pts.
-function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): string {
-  if (delta == null) return "text-gray-500";
-  const threshold = mode === "pts" ? 0.005 : 0.05;
-  if (delta > threshold)  return "text-emerald-700";
-  if (delta < -threshold) return "text-red-600";
-  return "text-gray-500";
 }
 
 // Footer al pie del heatmap. Texto adaptado según granularidad activa:

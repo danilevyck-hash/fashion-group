@@ -79,6 +79,37 @@ export function renderCellValue(v: number | null, mode: ViewMode): string {
   return fmtMoneyCompact(v);
 }
 
+/**
+ * El Δ tal como se pinta DEBAJO del monto, en la propia celda del heatmap.
+ *
+ * Por qué existe: Daniel escanea la fila de una empresa para saber QUÉ MESES
+ * subieron y CUÁNTO ("en mayo 2026 Vistana salía 5%"). Con solo la flecha ▲/▼
+ * sabe la dirección pero no la magnitud, y tiene que tocar celda por celda.
+ * El % estuvo a la vista entre el 1-jun y el 25-jul-2026 (f81455a5) y se perdió
+ * como daño colateral del #279, que reemplazó el tooltip por el panel lateral.
+ *
+ * `null` = no hay nada honesto que pintar (mes futuro, o sin base comparativa
+ * cuando ni siquiera hay valor actual): la celda queda con el monto solo.
+ */
+export interface DeltaCelda {
+  /** Ya listo para pintar: "▲ +36%", "-12%", "+2.1 pts", "≈0 pts", "n/a". */
+  texto: string;
+  tone: "emerald" | "orange" | "neutral";
+}
+
+/**
+ * @param delta Δ ya calculado (cellDelta o el que arme el caller para totales).
+ * @param na    true cuando hay valor actual pero NO hay base del año previo.
+ */
+export function deltaCelda(delta: number | null, mode: ViewMode, na = false): DeltaCelda | null {
+  if (delta == null) return na ? { texto: "n/a", tone: "neutral" } : null;
+  const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
+  return {
+    texto: `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
+    tone: fmt.tone === "emerald" ? "emerald" : fmt.tone === "orange" ? "orange" : "neutral",
+  };
+}
+
 /** Un dato de la fila transformada: etiqueta + Δ arriba, valor abajo. */
 export interface SlotDetalle {
   key: string;
