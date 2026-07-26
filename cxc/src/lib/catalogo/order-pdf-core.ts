@@ -8,7 +8,7 @@
 //   - order-pdf-client.ts → browser: fetch + downscale con canvas, descarga
 //
 // Estilo por marca: Reebok = banda negra con logo + secciones Pedido/Pre-orden;
-// Joybees = banda navy tipográfica con amarillo. El TOTAL se dibuja UNA sola
+// Joybees = banda navy con el logo blanco. El TOTAL se dibuja UNA sola
 // vez con doc.text al final (nunca foot de autotable → no se repite por página).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
+import { JOYBEES_LOGO_BLANCO_BASE64, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT } from "@/lib/joybees-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
 export interface PdfOrderItem {
@@ -71,10 +72,10 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     doc.rect(0, 0, 210, 18, "F");
     try { doc.addImage(TOMMY_LOGO_BLANCO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
   } else {
+    // Banda navy Joybees + logo BLANCO (el wordmark #404041 no se ve sobre navy).
     doc.setFillColor(26, 38, 86);
     doc.rect(0, 0, 210, 18, "F");
-    doc.setFontSize(13); doc.setTextColor(255, 228, 67); doc.setFont("helvetica", "bold");
-    doc.text("JOYBEES", 14, 12);
+    try { doc.addImage(JOYBEES_LOGO_BLANCO_BASE64, "PNG", 14, 9 - JOYBEES_LOGO_HEIGHT / 2, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT); } catch { /* */ }
   }
   doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
   doc.text("Fashion Group · Panama", 196, 12, { align: "right" });

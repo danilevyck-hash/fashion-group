@@ -28,6 +28,16 @@ function docBytes(doc: { output: (t: "arraybuffer") => ArrayBuffer }): Uint8Arra
   return new Uint8Array(doc.output("arraybuffer"));
 }
 
+/** ¿El PDF embebe al menos una imagen? Con `images: {}` (sin fotos de
+ *  producto) la única posible es el logo de la marca — y `doc.addImage` vive
+ *  dentro de un try/catch, así que sin esto un logo roto pasaría inadvertido. */
+function tieneImagenEmbebida(doc: { output: (t: "arraybuffer") => ArrayBuffer }): boolean {
+  // OJO: se pide una copia FRESCA del PDF. pdf.js (extractPagesText) transfiere
+  // el ArrayBuffer al worker y lo deja detached — reusar esos bytes da vacío.
+  const raw = new TextDecoder("latin1").decode(docBytes(doc));
+  return /\/Subtype\s*\/Image/.test(raw);
+}
+
 function makeItems(n: number, opts: { preorderEvery?: number } = {}): PdfOrderItem[] {
   return Array.from({ length: n }, (_, i) => ({
     sku: `SKU-${1000 + i}`,
@@ -70,7 +80,7 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     }
   });
 
-  it("pedido largo Joybees: multipágina, header propio y TOTAL una vez al final", async () => {
+  it("pedido largo Joybees: multipágina, logo en la banda y TOTAL una vez al final", async () => {
     const items = makeItems(55);
     const doc = buildOrderPdfDoc({
       marca: "joybees",
@@ -81,9 +91,12 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
       bultoSize: () => 12,
       images: {},
     });
+    // La banda navy lleva el logo BLANCO de Joybees (antes era la palabra
+    // "JOYBEES" en texto): ya no hay texto de marca que buscar, hay imagen.
+    expect(tieneImagenEmbebida(doc)).toBe(true);
     const pages = await extractPagesText(docBytes(doc));
     expect(pages.length).toBeGreaterThan(1);
-    expect(pages[0]).toContain("JOYBEES");
+    expect(pages[0]).not.toContain("JOYBEES");
 
     const totalLine = "110 bultos · 1320 piezas";
     expect(pages.filter((t) => t.includes(totalLine)).length).toBe(1);
@@ -156,7 +169,7 @@ describe("catalog-pdf — PDF del catálogo completo compartido", () => {
     for (const p of pages) expect(p).toContain("Fashion Group — Panamá");
   });
 
-  it("Joybees: header tipográfico propio (sin logo Reebok)", async () => {
+  it("Joybees: logo propio en el header (no el de Reebok, no texto)", async () => {
     const doc = buildCatalogPdfDoc({
       marca: "joybees",
       sections: [section("CLOGS", 3)],
@@ -164,8 +177,10 @@ describe("catalog-pdf — PDF del catálogo completo compartido", () => {
       totalCount: 3,
       images: {},
     });
+    // Sin fotos de producto (images: {}), la única imagen posible es el logo.
+    expect(tieneImagenEmbebida(doc)).toBe(true);
     const text = (await extractPagesText(docBytes(doc))).join(" ");
-    expect(text).toContain("JOYBEES");
+    expect(text).not.toContain("JOYBEES");
     expect(text).toContain("CLOGS");
     expect(text).toContain("3 productos");
   });

@@ -11,6 +11,7 @@
 import { jsPDF } from "jspdf";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BASE64 } from "@/lib/tommy-logo";
+import { JOYBEES_LOGO_BASE64 } from "@/lib/joybees-logo";
 
 export interface CatalogPdfProduct {
   name: string;
@@ -83,10 +84,10 @@ const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
     bandText: JB_DARK,
     bandCount: GRAY_MID,
     drawLogo: (doc, x, y, big) => {
-      doc.setFontSize(big ? 14 : 11);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...JB_DARK);
-      doc.text("JOYBEES", x, y + (big ? 5.5 : 4));
+      // Abeja + wordmark en color sobre página blanca. Aspecto ~3.81:1.
+      if (JOYBEES_LOGO_BASE64) {
+        try { doc.addImage(JOYBEES_LOGO_BASE64, "PNG", x, y, big ? 24 : 18, big ? 6.3 : 4.7); } catch { /* */ }
+      }
     },
   },
   tommy: {
