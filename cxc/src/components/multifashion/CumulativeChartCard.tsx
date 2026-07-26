@@ -45,14 +45,14 @@ export function CumulativeChartCard({
               domain={[1, 366]}
               ticks={MONTH_TICKS}
               tickFormatter={(d) => MONTH_ABBR[doyToMonthIndex(Number(d))] ?? ""}
-              tick={{ fontSize: 10, fill: "#78716c" }}
+              tick={{ fontSize: 12, fill: "#78716c" }}
               axisLine={{ stroke: "#e7e5e4" }}
               tickLine={false}
             />
             <YAxis
               width={48}
               tickFormatter={(v) => fmtMoneyCompact(Number(v))}
-              tick={{ fontSize: 10, fill: "#78716c" }}
+              tick={{ fontSize: 12, fill: "#78716c" }}
               axisLine={false}
               tickLine={false}
             />

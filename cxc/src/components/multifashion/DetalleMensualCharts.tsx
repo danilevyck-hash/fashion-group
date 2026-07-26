@@ -54,14 +54,14 @@ export function VentasDiariasChart({
         <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <XAxis
             dataKey="dia"
-            tick={{ fontSize: 10, fill: "#78716c" }}
+            tick={{ fontSize: 12, fill: "#78716c" }}
             axisLine={{ stroke: "#e7e5e4" }}
             tickLine={false}
           />
           <YAxis
             domain={[0, "dataMax"]}
             allowDataOverflow={false}
-            tick={{ fontSize: 10, fill: "#78716c" }}
+            tick={{ fontSize: 12, fill: "#78716c" }}
             axisLine={{ stroke: "#e7e5e4" }}
             tickLine={false}
             tickFormatter={(v: number) => fmtMoneyCompact(v)}
@@ -112,14 +112,14 @@ export function HorasChart({
           <XAxis
             dataKey="label"
             interval={0}
-            tick={{ fontSize: 10, fill: "#78716c" }}
+            tick={{ fontSize: 12, fill: "#78716c" }}
             axisLine={{ stroke: "#e7e5e4" }}
             tickLine={false}
           />
           <YAxis
             domain={[0, "dataMax"]}
             allowDataOverflow={false}
-            tick={{ fontSize: 10, fill: "#78716c" }}
+            tick={{ fontSize: 12, fill: "#78716c" }}
             axisLine={{ stroke: "#e7e5e4" }}
             tickLine={false}
             tickFormatter={(v: number) => fmtMoneyCompact(v)}
