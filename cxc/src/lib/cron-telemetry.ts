@@ -304,7 +304,11 @@ const CRON_EMPRESAS_TODAS = [
  * 7 B2B (las 5 con CXC + joystep + confecciones_boston). Un test lo verifica
  * contra `empresasConFacturas()` para que no se desincronice.
  *
- * Por qué ACS y B2B viajan en la MISMA entrada a las 15/19/23 UTC: el slot de
+ * Horarios: 11:50 (06:50 Panamá — la corrida temprana, para que quien entra a
+ * las 8 a.m. no vea el dato de la madrugada) y 15/19/23 UTC (10:00/14:00/18:00
+ * Panamá).
+ *
+ * Por qué ACS y B2B viajan en la MISMA entrada a esas horas: el slot de
  * heartbeat es `<tipo>-<hhmm>` y se deriva del horario, así que dos entradas de
  * `tipo=facturas` a la misma hora colisionarían en el mismo nombre de slot
  * (`facturas-1500`) y el detector de ocurrencias perdidas dejaría de saber cuál
@@ -343,6 +347,9 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
   { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
+  // Ventas de la mañana temprana (06:50 Panamá): quien entra a trabajar a las
+  // 8 a.m. ya no ve el dato de la madrugada. Ver CRON_EMPRESAS_VENTAS.
+  { cron: "switch-sync facturas", hhmmUtc: "1150", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
   { cron: "tommy-catalogo", hhmmUtc: "1240", empresas: ["fashion_shoes"] },
   { cron: "switch-sync facturas", hhmmUtc: "1300", empresas: ["american_classic"] },

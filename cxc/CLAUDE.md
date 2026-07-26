@@ -83,7 +83,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-52 entradas configuradas. **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+53 entradas configuradas. **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -112,12 +112,14 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
-| /api/cron/switch-sync tipo=facturas — **ventas** | 13:00, 15:00, 17:00, 19:00, 21:00, 23:00, 00:15 (7 entradas). **13/17/21 y 00:15 = solo american_classic** (ventas ACS cada 2h; 00:15 = sync de cierre, tras cerrar tienda 7pm Panamá — de él depende el resumen de la 01:00). **15/19/23 = las 8 empresas con facturas** (ACS + las 7 B2B): ventas B2B cada 4h, 10:00/14:00/18:00 Panamá |
+| /api/cron/switch-sync tipo=facturas — **ventas** | 11:50, 13:00, 15:00, 17:00, 19:00, 21:00, 23:00, 00:15 (8 entradas). **13/17/21 y 00:15 = solo american_classic** (ventas ACS cada 2h; 00:15 = sync de cierre, tras cerrar tienda 7pm Panamá — de él depende el resumen de la 01:00). **11:50/15/19/23 = las 8 empresas con facturas** (ACS + las 7 B2B): 06:50, 10:00, 14:00 y 18:00 Panamá |
 | /api/cron/acs-resumen-diario | 01:00 (resumen diario ventas ACS a Telegram; 20:00 Panamá = 8pm, tras el sync de cierre de 00:15) |
 | /api/cron/grupo-resumen-mensual | 13:00 el día 3 de cada mes (`0 13 3 * *` — resumen mensual del grupo a Telegram; único cron NO diario, umbral propio en health-crons) |
 | /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO para dar 60 min a reebok-catalogo 17:00) |
 
-> **Ventas B2B y ventas ACS a la misma hora, en UNA sola entrada (26-jul-2026):** a las 15/19/23 UTC el sync de facturas cubre las 8 empresas en una entrada, no dos. Dos entradas de `tipo=facturas` a la misma hora producirían el MISMO nombre de slot (`facturas-1500`, derivado de `<tipo>-<hhmm>`) → heartbeats pisados y `slotsHuerfanos` sin poder decir cuál ocurrencia se perdió. Las empresas se procesan serialmente dentro del route (sesión única) con american_classic primero; la corrida completa mide ~1 min (facturas son 4-8 s por empresa).
+> **Corrida temprana de ventas 11:50 UTC = 06:50 Panamá (26-jul-2026):** las 8 empresas, `tipo=facturas`, slot `facturas-1150`. Cierra el hueco entre el bloque `tipo=all` de la madrugada (00:30-01:30 Panamá) y las 10:00 a.m.: quien entraba a trabajar a las 8 a.m. veía datos de 7h30 atrás; ahora ve los de las 6:50 a.m. (1h10). **Por qué 11:50 y no 12:00:** a las 12:10 corre `reebok-catalogo` (active_shoes) — 12:00 dejaría 10 min, por debajo de los 15 de `SEPARACION_MINIMA_MIN`. 11:50 queda a 20 min de sus dos vecinos (`acs-fidelizacion` 11:30 y `reebok-catalogo` 12:10) y la corrida dura ~1 min. `integrity-check` 12:00 no toca Switch.
+>
+> **Ventas B2B y ventas ACS a la misma hora, en UNA sola entrada (26-jul-2026):** a las 11:50/15/19/23 UTC el sync de facturas cubre las 8 empresas en una entrada, no dos. Dos entradas de `tipo=facturas` a la misma hora producirían el MISMO nombre de slot (`facturas-1500`, derivado de `<tipo>-<hhmm>`) → heartbeats pisados y `slotsHuerfanos` sin poder decir cuál ocurrencia se perdió. Las empresas se procesan serialmente dentro del route (sesión única) con american_classic primero; la corrida completa mide ~1 min (facturas son 4-8 s por empresa).
 >
 > **Por qué 15/19/23 y no 14/18/22 (las 09:00/13:00/17:00 Panamá que se pidieron):** 14:00 y 18:00 son EXACTAMENTE las pasadas de `switch-reconciliacion`, que puede abrir la sesión de cualquier empresa hasta 12 min (`RECOVERY_BUDGET_MS` = 740 s). Se corrió todo una hora → 10:00/14:00/18:00 Panamá.
 >
@@ -139,7 +141,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **`#visto` es además el PISO de ocurrencias (26-jul-2026).** `ultimaOcurrenciaUtc` ancla en la ocurrencia programada más reciente y, para una hora que hoy aún no llegó, esa ocurrencia cae AYER. Para una entrada creada HOY —el calendario pasó de 47 a 52 entradas a las 06:14 UTC— eso es una ocurrencia en la que la entrada no existía: la pasada de las 10:02 evaluó `facturas-1300/1700/1900/2100` contra las 13:00-21:00 del día anterior y, como american_classic/facturas tenía corridas posteriores, les escribió `#recuperado` certificando corridas que jamás estuvieron programadas. La rama simétrica era peor: con esos pares atrasados los mismos slots habrían salido `sin-invocacion` → re-sync contra Switch y alerta 🚨. Ahora `slotConocidoDesdeMs()` = el más antiguo de {heartbeat propio, `#visto`} y **ninguna ocurrencia anterior a ese instante se clasifica** —ni cubierta ni desatendida—. La marca se agrega al mapa en la misma pasada en que se escribe, así que el piso ya rige la primera vez. Sin ningún rastro (NaN) no hay piso: fail-abierto, para no volver ciego al clasificador si la escritura falla.
 >
-> **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van **≥15 min** separados (`SEPARACION_MINIMA_MIN` en cron-telemetry.ts; era 50 y bajó el 26-jul-2026 con las duraciones medidas bajo Pro: facturas 4-8 s/empresa, costo 1-2 s, y el route cierra sesiones con `/cierresesion` en su `finally`). Crons de empresas disjuntas pueden ir a la misma hora (patrón 05:30/05:35/05:40, y ventas ACS 17:00 junto a reebok-catalogo 17:00). **`src/__tests__/lib/cron-calendario.test.ts` recorre los 417 pares de `SWITCH_CRON_ENTRADAS` que comparten empresa y falla si alguien mete un choque** — es la red que protege el calendario a futuro.
+> **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van **≥15 min** separados (`SEPARACION_MINIMA_MIN` en cron-telemetry.ts; era 50 y bajó el 26-jul-2026 con las duraciones medidas bajo Pro: facturas 4-8 s/empresa, costo 1-2 s, y el route cierra sesiones con `/cierresesion` en su `finally`). Crons de empresas disjuntas pueden ir a la misma hora (patrón 05:30/05:35/05:40, y ventas ACS 17:00 junto a reebok-catalogo 17:00). **`src/__tests__/lib/cron-calendario.test.ts` recorre los 453 pares de `SWITCH_CRON_ENTRADAS` que comparten empresa y falla si alguien mete un choque** — es la red que protege el calendario a futuro.
 >
 > Ojo con los crons LARGOS, donde el margen real es menor que la distancia inicio-contra-inicio que mide el test: `estadocuenta` ~152 s/empresa (máx), catálogos 79 s (joybees) / 162 s (reebok) / **433 s (tommy)**, y la reconciliación hasta 740 s. Esas parejas se dejaron a ≥50 min a propósito. Las dos más ajustadas son pre-existentes o benignas: `tommy-catalogo` 17:40 → reconciliación 18:00 (20 min, documentado en docs/cron-reliability-recovery.md) y `acs-fidelizacion` 16:30 → ventas ACS 17:00 (30 min, y la de 16:30 es no-op si la de 11:30 salió bien).
 >
@@ -147,8 +149,8 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > | Dato | Antes | Ahora | En horario laboral (10:00-18:00 Panamá) |
 > |---|---|---|---|
-> | Ventas B2B | 24h (solo el bloque `all` de madrugada) | **9h30** (05:3x → 15:00, de noche) | **4h** |
-> | Ventas ACS | 8h30 | **6h30** (06:30 → 13:00) | **2h** |
+> | Ventas B2B | 24h (solo el bloque `all` de madrugada) | **7h30** (23:00 → 06:30 de confecciones_boston, de noche; vistana 6h30) | **4h** |
+> | Ventas ACS | 8h30 | **6h15** (00:15 → 06:30, de madrugada) | **2h** |
 > | Pagos (recibos) | 12h20 | **8h35** (23:15 → 07:50) | 4h |
 > | Saldos CXC (estadocuenta) | sin cambio | 10h40 (vistana 05:30 → 16:10) | 5h |
 >

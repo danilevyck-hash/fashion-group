@@ -77,6 +77,10 @@
       "schedule": "50 7 * * *"
     },
     {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-1150",
+      "schedule": "50 11 * * *"
+    },
+    {
       "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1300",
       "schedule": "0 13 * * *"
     },
