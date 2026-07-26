@@ -57,7 +57,7 @@ describe("las constantes de la RPC son las que se midieron", () => {
     expect(r.coberturaMinima).toBe(0.1);
   });
 
-  it("un año sirve de base de crecimiento si la empresa ya vendía en sus primeros 31 días", () => {
+  it("un año entra al crecimiento de la META si la empresa ya vendía en sus primeros 31 días", () => {
     expect(constanteSql("c_dias_anio_base")).toBe(r.diasAnioBase);
     expect(r.diasAnioBase).toBe(31);
   });
@@ -77,7 +77,7 @@ describe("el backtest de 120 cortes (2024 y 2025)", () => {
     expect(antes.total.n + 0).toBe(120);
   });
 
-  it("los cuatro arreglos juntos mejoran TODAS las bandas contra el estado actual", () => {
+  it("mejora TODAS las bandas contra el estado actual, en grupo y por empresa", () => {
     for (const banda of ["ene-feb", "mar-may", "jun-dic", "total"] as const) {
       expect(
         despues[banda].errorEmpresaPct,
@@ -88,33 +88,43 @@ describe("el backtest de 120 cortes (2024 y 2025)", () => {
     expect(despues.total.errorEmpresaPct).toBeLessThan(antes.total.errorEmpresaPct);
   });
 
-  it("el error por empresa baja de 32.8% a 22.8% y el del grupo de 7.4% a 6.6%", () => {
+  it("el error por empresa baja de 32.8% a 23.2% y el del grupo de 7.4% a 5.8%", () => {
     expect(antes.total.errorEmpresaPct).toBe(32.8);
-    expect(despues.total.errorEmpresaPct).toBe(22.8);
+    expect(despues.total.errorEmpresaPct).toBe(23.2);
     expect(antes.total.errorGrupoPct).toBe(7.4);
-    expect(despues.total.errorGrupoPct).toBe(6.6);
+    expect(despues.total.errorGrupoPct).toBe(5.8);
   });
 
   it("el pico de marzo-mayo por empresa se corta casi a la mitad", () => {
     expect(antes["mar-may"].errorEmpresaPct).toBe(68.7);
-    expect(despues["mar-may"].errorEmpresaPct).toBe(41.1);
+    expect(despues["mar-may"].errorEmpresaPct).toBe(41.2);
   });
 
-  it("el clamp solo es lo que más aporta; el resto del costo en ene-feb lo pone la regla de año base", () => {
-    // El crecimiento inflado (+50% contra un 2022 de dos meses) venía tapando,
-    // por casualidad, el sesgo a la baja que la proyección tiene en ene-feb.
+  it("toda la precisión la pone el clamp; el resto son arreglos de correctitud", () => {
+    // Contra el backtest, (B) (C) y (D) quedan planos: sacan números inventados
+    // (joystep, la meta sugerida) sin mover la aguja del error medio.
     expect(soloClamp.total.errorGrupoPct).toBe(5.8);
-    expect(soloClamp["ene-feb"].errorGrupoPct).toBeLessThan(despues["ene-feb"].errorGrupoPct);
-    // Aun así, contra el estado actual ene-feb mejora.
-    expect(despues["ene-feb"].errorGrupoPct).toBeLessThan(antes["ene-feb"].errorGrupoPct);
+    expect(soloClamp.total.errorEmpresaPct).toBe(23.1);
+    expect(Math.abs(despues.total.errorEmpresaPct - soloClamp.total.errorEmpresaPct)).toBeLessThan(0.5);
+    expect(despues.total.errorGrupoPct).toBe(soloClamp.total.errorGrupoPct);
   });
 
-  it("las tres variantes que se probaron y se descartaron eran peores", () => {
+  it("cada variante descartada es peor en el eje por el que se descartó", () => {
+    // Ninguna es peor en TODO — por eso el fixture guarda en qué eje pierde cada
+    // una, y el test lo verifica ahí y no en un promedio que la tape.
     for (const [nombre, v] of Object.entries(descartados)) {
-      expect(v.total.errorEmpresaPct, `variante ${nombre}`).toBeGreaterThan(
-        despues.total.errorEmpresaPct,
-      );
+      const eje = v.porQueSeDescarto as "errorGrupoPct" | "errorEmpresaPct";
+      expect(v.total[eje], `variante ${nombre} en ${eje}`).toBeGreaterThan(despues.total[eje]);
     }
+  });
+
+  it("aplicar la regla de año base también a la proyección empeora el grupo", () => {
+    // Es la decisión que más se pensó: el crecimiento inflado de +50% venía
+    // tapando por casualidad el sesgo a la baja de enero-febrero.
+    const v = descartados.anioBaseTambienEnLaProyeccion;
+    expect(v.total.errorGrupoPct).toBe(6.5);
+    expect(v["ene-feb"].errorGrupoPct).toBe(14.3);
+    expect(despues["ene-feb"].errorGrupoPct).toBe(10.2);
   });
 });
 
@@ -134,12 +144,28 @@ describe("qué cambia en pantalla el 25-jul-2026", () => {
     expect(j.algoritmoDespues).toBe("fallback_lineal");
   });
 
+  it("joystep tampoco queda con un piso falso en el resto del año", () => {
+    // Sin la cobertura, el clamp lo habría dejado clavado en $124,273 (el 75%
+    // del cierre de 2025) desde enero hasta julio.
+    const serie = fixture.joystepDuranteElAnio;
+    expect(serie.map((x) => x.algoritmo)).toEqual(["fallback_lineal", "fallback_lineal", "fallback_lineal"]);
+    for (const punto of serie) {
+      expect(punto.proyeccion, punto.corte).toBeLessThan(124273);
+      expect(punto.proyeccion, punto.corte).toBeGreaterThan(punto.ventasYtd);
+    }
+  });
+
   it("el total del grupo se mueve solo lo que se mueve joystep", () => {
     const j = empresas.find((e) => e.empresa === "joystep")!;
     const deltaJoystep = j.proyeccionDespues - j.proyeccionAntes;
     expect(grupoDespues - grupoAntes).toBeCloseTo(deltaJoystep, 0);
     expect(grupoAntes).toBe(12501905.9);
     expect(grupoDespues).toBe(12340341.5);
+  });
+
+  it("grupoAntes es el número que devolvió la RPC viva, no una cuenta aparte", () => {
+    // ventas_proyeccion_cierre_v6(2026) contra producción: 12501905.913054144
+    expect(grupoAntes).toBe(12501905.9);
   });
 
   it("el clamp no toca a ninguna empresa hoy: las otras 7 quedan al centavo", () => {
@@ -161,6 +187,18 @@ describe("qué cambia en pantalla el 25-jul-2026", () => {
     expect(ac.metaSugeridaAntes).toBe(857554.6);
     expect(ac.metaSugeridaDespues).toBeNull();
   });
+
+  it("arreglar la meta NO movió ninguna proyección", () => {
+    // La regla de año base vive en su propia cadena de crecimiento; si alguien
+    // la conecta al factor de la proyección, esto falla.
+    const cambiaMeta = empresas.filter((e) => e.metaSugeridaAntes !== e.metaSugeridaDespues);
+    expect(cambiaMeta.map((e) => e.empresa).sort()).toEqual([
+      "active_wear",
+      "american_classic",
+      "confecciones_boston",
+    ]);
+    for (const e of cambiaMeta) expect(e.proyeccionDespues, e.empresa).toBe(e.proyeccionAntes);
+  });
 });
 
 describe("el cierre del año pasado sigue siendo un hecho, no una estimación", () => {
@@ -170,7 +208,16 @@ describe("el cierre del año pasado sigue siendo un hecho, no una estimación", 
     // "Cerró 2025: $0" cuando en realidad cerró en $165,697.
     expect(sql).toMatch(/'cierre_anio_anterior',\s*f\.total_prev_year/);
     expect(sql).toMatch(/'ventas_prev_year',\s*f\.total_prev_year/);
-    expect(sql).not.toMatch(/'cierre_anio_anterior',\s*.*base_crecimiento/);
+  });
+
+  it("la meta y la proyección miden el crecimiento por caminos separados", () => {
+    // `totales` (sin filtrar) alimenta la proyección; `totales_base` (solo años
+    // completos) alimenta la meta. Mezclarlas fue lo que empeoró el grupo.
+    expect(sql).toContain("totales_base");
+    expect(sql).toMatch(/ritmo_meta/);
+    expect(sql).toMatch(/r\.ritmo_meta \* 0\.7\)\) END AS meta_sugerida/);
+    // El factor de la proyección sigue usando ritmo_historico, no ritmo_meta.
+    expect(sql).toMatch(/1 \+ b\.ritmo_historico \* 0\.7/);
   });
 
   it("la etiqueta del método la decide la rama que de verdad calculó el número", () => {

@@ -3,81 +3,94 @@
 --
 -- PROBLEMA
 -- --------
--- Un backtest de 120 cortes (2024 y 2025) midió que la proyección de cierre es
--- confiable a nivel GRUPO (7.4% de error) pero floja POR EMPRESA (32.8%), con
--- un pico de 68.7% entre marzo y mayo. Cuatro causas, todas medidas:
+-- Un backtest de 120 cortes (días 5/11/17/23/29 de cada mes de 2024 y 2025)
+-- midió que la proyección es confiable a nivel GRUPO (7.4% de error) pero floja
+-- POR EMPRESA (32.8%), con un pico de 68.7% entre marzo y mayo.
 --
 --  1. La rama "estacional" divide por `frac_ytd` (qué porcentaje del año pasado
 --     llevaba la empresa a esta misma altura) con un piso de 0.05. Dividir por
---     0.05 es multiplicar el ruido por 20. Caso real: active_shoes proyectó
---     $2.06M el 15-mar-2025 y cerró $788K.
+--     0.05 es multiplicar el ruido por 20. Caso real medido: active_shoes
+--     proyectó $2,064,947 el 15-mar-2025 y cerró $788,032.
 --
 --  2. `ritmo_actual` = ventas_ytd / ventas_del_año_pasado_a_esta_altura. Si el
---     año pasado la empresa casi no había vendido a esta altura, ese cociente
---     no mide nada. Joystep, que abrió el 21-jul-2025, comparaba sus $26,575 de
+--     año pasado la empresa casi no había vendido a esta altura, ese cociente no
+--     mide nada. Joystep, que abrió el 21-jul-2025, comparaba sus $26,575 de
 --     2026 contra $133 de 2025 → ritmo 200x → factor pegado al tope 1.25 →
---     proyectaba $207K con $26.5K vendidos en 7 meses.
+--     proyectaba $207,122 con $26.5K vendidos en 7 meses.
 --
---  3. El crecimiento año-contra-año se calcula contra años que son un pedazo de
---     año. `ventas_raw` arranca en oct-2022, así que "2023 vs 2022" comparaba
---     12 meses contra 2 y daba crecimientos absurdos (+827% en Confecciones
---     Boston, +13568% en Active Wear). Tres empresas quedaron pegadas al tope
---     del clamp del ritmo histórico y su `meta_sugerida` salió inflada. Lo
---     mismo le pasa a American Classic, que abrió en may-2024.
+--  3. `meta_sugerida` = cierre_previo x f(crecimiento), sin más defensas. Ese
+--     crecimiento se calcula contra años que son un pedazo de año: `ventas_raw`
+--     arranca en oct-2022, así que "2023 vs 2022" comparaba 12 meses contra 2 y
+--     daba +827% en Confecciones Boston y +13568% en Active Wear. Tres empresas
+--     quedaron pegadas al tope del clamp del ritmo histórico.
 --
 --  4. `algoritmo` y `es_fallback_lineal` podían mentir: la etiqueta decía
---     "mixto" mientras el número se calculaba con la rama lineal (cuando el
---     cierre del año previo era 0). La UI explicaba mal el número.
+--     "mixto" mientras el número salía de la rama lineal.
 --
 -- QUÉ HACE
 -- --------
 --  A) CLAMP de la proyección a `cierre_año_previo × [0.75, 1.60]`, y SOLO
---     mientras `frac_ytd < 0.5`. Pasada la mitad del año la rama estacional ya
---     es confiable y acotarla empeora (medido: error por empresa jun-dic sube
---     de 13.2% a 16.7% si el clamp queda siempre prendido).
+--     mientras `frac_ytd < 0.5`. Pasada la mitad del año previo la rama
+--     estacional ya es confiable y acotarla empeora (medido: el error por
+--     empresa de jun-dic sube de 13.2% a 16.7% si el clamp queda siempre
+--     prendido). Este es el arreglo que compra casi toda la precisión.
 --
 --  B) COBERTURA: el año pasado solo sirve de referencia si, a esta altura, ya
 --     llevaba una fracción razonable de sí mismo. `cobertura` = cuánto llevaba
 --     el año pasado a esta altura, dividido por lo que el calendario dice que
 --     debería llevar. ~1 es normal; joystep hoy da 0.001. Por debajo de
---     COBERTURA_MINIMA (0.10) se apagan `ritmo_actual` y la rama estacional.
---     Joystep pasa a la rama lineal honesta: $45,557 en vez de $207,122.
+--     COBERTURA_MINIMA (0.10) se apagan `ritmo_actual`, la rama estacional y el
+--     clamp — sin año previo comparable no hay contra qué acotar.
+--     El juicio solo corre desde MARZO (misma frontera donde arranca la rama
+--     estacional): un cero el 5 de enero es ruido de cinco días, un cero el 31
+--     de marzo es que la empresa no operaba. Sin ese piso, el clamp se apagaba
+--     en enero-febrero y el error de grupo de esa banda saltaba de 10.2% a 16.8%.
 --
---  C) AÑO BASE: un año solo entra al cálculo de crecimiento si la empresa ya
---     vendía dentro de los primeros 31 días de ese año. Saca 2022 (que arranca
---     en octubre), 2024 de American Classic (arranca en mayo) y 2025 de Joystep
---     (arranca en julio). No hay ningún año hardcodeado: la regla mira la
---     primera venta real de cada empresa en cada año.
---     OJO: `cierre_anio_anterior` (el dato que se muestra en pantalla) sigue
---     siendo el cierre REAL del año pasado. Esta regla solo decide qué años
---     sirven para MEDIR CRECIMIENTO, no cambia ningún hecho.
+--  C) AÑO BASE — SOLO PARA `meta_sugerida`: un año entra al crecimiento que
+--     alimenta la meta solo si la empresa ya vendía en sus primeros 31 días.
+--     Saca 2022 (arranca en octubre), el 2024 de American Classic (abrió en
+--     mayo) y el 2025 de Joystep (abrió en julio). No hay años hardcodeados: la
+--     regla mira la primera venta real de cada empresa en cada año.
 --
---  D) `algoritmo` y `es_fallback_lineal` ahora se derivan de la rama que de
---     verdad calculó el número, no de la intención.
+--     Por qué SOLO la meta y no también la proyección: se midió aplicarlo a las
+--     dos y la proyección EMPEORA (error de grupo del año 5.8% → 6.9%, y en
+--     enero-febrero 10.2% → 16.8%). El crecimiento inflado de +50% venía
+--     tapando, por casualidad, un sesgo a la baja que la proyección ya tiene en
+--     enero-febrero. La meta no tiene esa suerte ni esas defensas: es una
+--     multiplicación directa, y ahí el número contaminado sale entero.
+--     Si algún día se arregla el sesgo de enero-febrero, conviene volver a medir
+--     si la proyección también debería usar solo años completos.
+--
+--  D) `algoritmo` y `es_fallback_lineal` se derivan de la rama que de verdad
+--     calculó el número.
 --
 --  E) La búsqueda de `fecha_corte` pasa a ser sargable (`fecha >= inicio AND
---     fecha < inicio_del_siguiente` en vez de `EXTRACT(YEAR FROM fecha)`), que
---     sí puede usar el índice de switch_facturas. Es marginal hoy (52K filas,
---     350-525 ms) pero sale gratis.
+--     fecha < inicio_del_siguiente` en vez de `EXTRACT(YEAR FROM fecha)`). Es
+--     marginal hoy (52K filas, 350-525 ms) pero sale gratis.
 --
--- RESULTADO MEDIDO (backtest, mismos 120 cortes de 2024 y 2025)
--- -------------------------------------------------------------
+-- RESULTADO MEDIDO (mismos 120 cortes)
+-- ------------------------------------
 --   banda      error grupo          error por empresa
---   ene-feb    16.8%  →  15.1%      38.0%  →  28.9%
---   mar-may     4.5%  →   4.9%      68.7%  →  41.1%
+--   ene-feb    16.8%  →  10.2%      38.0%  →  31.2%
+--   mar-may     4.5%  →   4.9%      68.7%  →  41.2%
 --   jun-dic     6.0%  →   4.9%      16.0%  →  13.2%
---   TOTAL       7.4%  →   6.6%      32.8%  →  22.8%
+--   TOTAL       7.4%  →   5.8%      32.8%  →  23.2%
 --
---   Solo el clamp (A): grupo 5.8%, empresa 23.1%. El resto del costo en el
---   error de grupo lo pone (C): el crecimiento inflado de +50% venía tapando,
---   por casualidad, el sesgo a la baja que la proyección tiene en ene-feb.
+--   Toda la precisión la pone (A). (B), (C) y (D) son arreglos de CORRECTITUD:
+--   contra el backtest quedan planos (23.1% con solo el clamp vs 23.2% con
+--   todo), pero son los que sacan los números inventados.
 --
 -- QUÉ CAMBIA EN PANTALLA HOY (corte 25-jul-2026)
 -- ----------------------------------------------
 --   Joystep:  $207,122  →  $45,557   (única empresa que cambia)
 --   Grupo:    $12,501,906 → $12,340,341  (−$161,564, −1.3%)
---   El clamp no toca a ninguna empresa hoy: ninguna proyección se sale de su
---   banda. Las otras 7 empresas quedan idénticas al centavo.
+--   El clamp no toca a ninguna empresa hoy. Las otras 7 quedan al centavo.
+--
+--   meta_sugerida: Confecciones Boston $859,343 → $696,220, Active Wear
+--   $249,645 → $246,860, American Classic $857,555 → sin sugerencia (abrió en
+--   may-2024: no le queda historia completa). NO se ve en pantalla — esas 7
+--   empresas tienen meta manual en `ventas_metas`, así que `meta_efectiva` no
+--   se mueve.
 --
 -- VERIFICACIÓN
 -- ------------
@@ -86,13 +99,17 @@
 --   Esperado (25-jul-2026):
 --     joystep       → proyeccion_cierre ≈ 45557, algoritmo 'fallback_lineal',
 --                     es_fallback_lineal true, ritmo_actual null, frac_ytd null,
+--                     cobertura_anio_previo ≈ 0.0014,
 --                     cierre_anio_anterior 165697.23  (el hecho NO cambia)
---     las otras 7   → idénticas a ventas_proyeccion_cierre_v6(2026)
+--     las otras 7   → proyeccion_cierre idéntica a v6(2026)
 --     totales_grupo → proyeccion_cierre ≈ 12340341
 --
 --   Diff contra v6, empresa por empresa:
---     SELECT e6->>'empresa', (e6->>'proyeccion_cierre')::numeric AS v6,
---            (e7->>'proyeccion_cierre')::numeric AS v7
+--     SELECT e6->>'empresa',
+--            (e6->>'proyeccion_cierre')::numeric AS v6,
+--            (e7->>'proyeccion_cierre')::numeric AS v7,
+--            (e6->>'meta_sugerida')::numeric     AS meta_v6,
+--            (e7->>'meta_sugerida')::numeric     AS meta_v7
 --     FROM jsonb_array_elements(ventas_proyeccion_cierre_v6(2026)->'empresas') e6
 --     JOIN jsonb_array_elements(ventas_proyeccion_cierre_v7(2026)->'empresas') e7
 --       ON e6->>'empresa' = e7->>'empresa';
@@ -193,8 +210,15 @@ BEGIN
     GROUP BY 1, 2
     HAVING SUM(ventas_netas) > 0
   ),
-  -- (C) Solo los años que cubren casi todo el año sirven para medir crecimiento.
+  -- La proyección sigue usando TODOS los años (igual que v6): acá el crecimiento
+  -- se mezcla con ritmo_actual y queda acotado por el clamp.
   totales AS (
+    SELECT t.empresa, t.anio, t.total FROM totales_raw t
+  ),
+  -- (C) La META SUGERIDA no tiene esas defensas: es v_prev x f(crecimiento) y
+  -- listo. Para ella, un año solo cuenta si la empresa ya vendía en sus primeros
+  -- 31 días — un pedazo de año no mide crecimiento.
+  totales_base AS (
     SELECT t.empresa, t.anio, t.total
     FROM totales_raw t
     JOIN primer_dia pd ON pd.empresa_key = t.empresa AND pd.anio = t.anio
@@ -228,12 +252,19 @@ BEGIN
       t0.total AS v_prev,
       CASE WHEN t0.total IS NOT NULL AND t1.total > 0 THEN t0.total / t1.total - 1 ELSE NULL END AS c1,
       CASE WHEN t1.total IS NOT NULL AND t2.total > 0 THEN t1.total / t2.total - 1 ELSE NULL END AS c2,
-      CASE WHEN t2.total IS NOT NULL AND t3.total > 0 THEN t2.total / t3.total - 1 ELSE NULL END AS c3
+      CASE WHEN t2.total IS NOT NULL AND t3.total > 0 THEN t2.total / t3.total - 1 ELSE NULL END AS c3,
+      CASE WHEN b0.total IS NOT NULL AND b1.total > 0 THEN b0.total / b1.total - 1 ELSE NULL END AS m1,
+      CASE WHEN b1.total IS NOT NULL AND b2.total > 0 THEN b1.total / b2.total - 1 ELSE NULL END AS m2,
+      CASE WHEN b2.total IS NOT NULL AND b3.total > 0 THEN b2.total / b3.total - 1 ELSE NULL END AS m3
     FROM empresas_set e
     LEFT JOIN totales t0 ON t0.empresa = e.empresa AND t0.anio = p_anio - 1
     LEFT JOIN totales t1 ON t1.empresa = e.empresa AND t1.anio = p_anio - 2
     LEFT JOIN totales t2 ON t2.empresa = e.empresa AND t2.anio = p_anio - 3
     LEFT JOIN totales t3 ON t3.empresa = e.empresa AND t3.anio = p_anio - 4
+    LEFT JOIN totales_base b0 ON b0.empresa = e.empresa AND b0.anio = p_anio - 1
+    LEFT JOIN totales_base b1 ON b1.empresa = e.empresa AND b1.anio = p_anio - 2
+    LEFT JOIN totales_base b2 ON b2.empresa = e.empresa AND b2.anio = p_anio - 3
+    LEFT JOIN totales_base b3 ON b3.empresa = e.empresa AND b3.anio = p_anio - 4
   ),
   ritmo_hist_raw AS (
     SELECT
@@ -249,21 +280,27 @@ BEGIN
         WHEN c1 IS NOT NULL AND c2 IS NOT NULL THEN 2
         WHEN c1 IS NOT NULL THEN 1
         ELSE 0
-      END AS historia_disponible
+      END AS historia_disponible,
+      CASE
+        WHEN m1 IS NOT NULL AND m2 IS NOT NULL AND m3 IS NOT NULL THEN (m1*3 + m2*2 + m3*1) / 6
+        WHEN m1 IS NOT NULL AND m2 IS NOT NULL THEN (m1*3 + m2*2) / 5
+        WHEN m1 IS NOT NULL THEN m1
+        ELSE NULL
+      END AS ritmo_meta_raw
     FROM crec c
   ),
   ritmo_hist AS (
     SELECT r.empresa, r.v_prev, r.historia_disponible,
       CASE WHEN r.ritmo_historico_raw IS NULL THEN NULL
-           ELSE LEAST(0.50, GREATEST(-0.30, r.ritmo_historico_raw)) END AS ritmo_historico
+           ELSE LEAST(0.50, GREATEST(-0.30, r.ritmo_historico_raw)) END AS ritmo_historico,
+      CASE WHEN r.ritmo_meta_raw IS NULL THEN NULL
+           ELSE LEAST(0.50, GREATEST(-0.30, r.ritmo_meta_raw)) END AS ritmo_meta
     FROM ritmo_hist_raw r
   ),
   sugerida_calc AS (
-    SELECT r.empresa, r.v_prev, r.ritmo_historico, r.historia_disponible,
-      CASE WHEN r.ritmo_historico IS NULL THEN NULL
-           ELSE LEAST(1.25, GREATEST(0.90, 1 + r.ritmo_historico * 0.7)) END AS factor_sugerida,
-      CASE WHEN r.ritmo_historico IS NULL OR COALESCE(r.v_prev, 0) <= 0 THEN NULL
-           ELSE r.v_prev * LEAST(1.25, GREATEST(0.90, 1 + r.ritmo_historico * 0.7)) END AS meta_sugerida
+    SELECT r.empresa, r.v_prev, r.ritmo_historico, r.ritmo_meta, r.historia_disponible,
+      CASE WHEN r.ritmo_meta IS NULL OR COALESCE(r.v_prev, 0) <= 0 THEN NULL
+           ELSE r.v_prev * LEAST(1.25, GREATEST(0.90, 1 + r.ritmo_meta * 0.7)) END AS meta_sugerida
     FROM ritmo_hist r
   ),
   base_raw AS (
@@ -272,8 +309,7 @@ BEGIN
       COALESCE(yc.ventas_ytd, 0)         AS ventas_ytd,
       COALESCE(ys.ventas_prev_ytd_sp, 0) AS ventas_prev_ytd_sp,
       COALESCE(tp.total_prev_year, 0)    AS total_prev_year,
-      s.v_prev                            AS base_crecimiento,
-      s.ritmo_historico, s.historia_disponible, s.meta_sugerida
+      s.ritmo_historico, s.ritmo_meta, s.historia_disponible, s.meta_sugerida
     FROM empresas_set e
     LEFT JOIN ytd_cur     yc ON yc.empresa = e.empresa
     LEFT JOIN ytd_prev_sp ys ON ys.empresa = e.empresa
@@ -285,13 +321,18 @@ BEGIN
   -- había vendido, no hay con qué comparar.
   base AS (
     SELECT b.*,
-      CASE WHEN b.total_prev_year > 0 AND b.ventas_prev_ytd_sp > 0
-           THEN (b.ventas_prev_ytd_sp / b.total_prev_year) / v_frac_calendario END AS cobertura
+      CASE WHEN b.total_prev_year > 0
+           THEN CASE WHEN b.ventas_prev_ytd_sp > 0
+                     THEN (b.ventas_prev_ytd_sp / b.total_prev_year) / v_frac_calendario
+                     ELSE 0 END
+      END AS cobertura
     FROM base_raw b
   ),
   base_util AS (
     SELECT b.*,
-      (b.cobertura IS NULL OR b.cobertura >= c_cobertura_min) AS prev_util
+      -- Antes de marzo no hay año suficiente para juzgar la cobertura: un cero
+      -- el 5 de enero es ruido, un cero el 31 de marzo es que no operaba.
+      (v_mes_corte < 3 OR b.cobertura IS NULL OR b.cobertura >= c_cobertura_min) AS prev_util
     FROM base b
   ),
   base_final AS (
@@ -328,7 +369,7 @@ BEGIN
       CASE
         WHEN p.usa_estacional AND p.ventas_ytd > 0 THEN 'estacional'
         WHEN NOT p.usa_estacional AND p.factor_final IS NOT NULL
-             AND COALESCE(p.base_crecimiento, 0) > 0 THEN 'mixto'
+             AND p.total_prev_year > 0 THEN 'mixto'
         ELSE 'fallback_lineal'
       END AS algoritmo
     FROM proyectado p
@@ -337,7 +378,7 @@ BEGIN
     SELECT r.*,
       CASE
         WHEN r.algoritmo = 'estacional' THEN r.ventas_ytd / r.frac_ytd
-        WHEN r.algoritmo = 'mixto'      THEN r.base_crecimiento * r.factor_final
+        WHEN r.algoritmo = 'mixto'      THEN r.total_prev_year * r.factor_final
         WHEN v_mes_corte > 0 AND r.ventas_ytd > 0 THEN r.ventas_ytd * 12.0 / v_mes_corte
         ELSE 0
       END AS proyeccion_cruda
@@ -350,10 +391,10 @@ BEGIN
       CASE
         WHEN c.frac_ytd IS NOT NULL
          AND c.frac_ytd < c_frac_sin_clamp
-         AND COALESCE(c.base_crecimiento, 0) > 0
+         AND c.total_prev_year > 0
          AND c.proyeccion_cruda > 0
-        THEN LEAST(c.base_crecimiento * c_clamp_max,
-                   GREATEST(c.base_crecimiento * c_clamp_min, c.proyeccion_cruda))
+        THEN LEAST(c.total_prev_year * c_clamp_max,
+                   GREATEST(c.total_prev_year * c_clamp_min, c.proyeccion_cruda))
         ELSE c.proyeccion_cruda
       END AS proyeccion_cierre,
       (c.algoritmo = 'fallback_lineal') AS es_fallback_lineal
