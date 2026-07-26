@@ -208,6 +208,15 @@ export interface MarcaTheme {
   // ── Metadata del layout ──
   metaTitle: string;
   metaDescription: string;
+  /** Imagen de la VISTA PREVIA del link en WhatsApp (1200x630, relación
+   *  1.91:1 = la que WhatsApp recorta sin cortar nada). Se genera con
+   *  `node scripts/generar-og-catalogos.mjs` a partir de los logos reales.
+   *
+   *  URL ABSOLUTA a propósito: el layout raíz NO define `metadataBase`, así
+   *  que una ruta relativa la resolvería Next contra la URL del deploy de
+   *  Vercel y no contra fashiongr.com — el scraper de WhatsApp se quedaría
+   *  sin imagen. PNG y no SVG: WhatsApp no renderiza SVG en og:image. */
+  ogImage: string;
 
   /** Acento (hex) del borde del total en el checkout. */
   checkoutAccent: string;
@@ -512,6 +521,7 @@ const REEBOK: MarcaTheme = {
 
   metaTitle: "Reebok Panamá - Catálogo",
   metaDescription: "Catálogo de productos Reebok Panamá.",
+  ogImage: "https://www.fashiongr.com/og/catalogo-reebok.png",
 
   checkoutAccent: "#1A2656",
 
@@ -546,7 +556,7 @@ const REEBOK: MarcaTheme = {
             Reebok
           </h1>
           <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1">
-            Catalogo Panama
+            Catálogo Panamá
           </p>
         </div>
       </div>
@@ -569,7 +579,7 @@ const REEBOK: MarcaTheme = {
             Reebok
           </span>
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panama</p>
+        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },
@@ -589,7 +599,7 @@ const REEBOK: MarcaTheme = {
       "w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-[#1A2656]/10 text-sm outline-none focus:border-[#1A2656]/30 focus:ring-2 focus:ring-[#1A2656]/5 transition placeholder:text-[#1A2656]/25",
     searchClear:
       "absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-500 hover:text-gray-700 transition",
-    searchPlaceholder: "Buscar por nombre, codigo o color...",
+    searchPlaceholder: "Buscar por nombre, código o color...",
     chipLabel: "text-xs font-semibold text-[#1A2656]/40 uppercase tracking-wide mr-0.5",
     chipActive: "bg-[#1A2656] text-white shadow-sm",
     chipInactive: "bg-white text-[#1A2656]/60 border border-[#1A2656]/10 hover:border-[#1A2656]/25",
@@ -686,7 +696,7 @@ const REEBOK: MarcaTheme = {
     iconSize: 12,
     panel: "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 w-48 z-50",
     item: "w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link",
+    copyLabel: "Copiar link público",
     stickyActionColor: "bg-[#E4002B] hover:bg-[#c90025]",
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -835,8 +845,9 @@ const JOYBEES: MarcaTheme = {
     navInicioRequiereRol: false,
   },
 
-  metaTitle: "Joybees Panama - Catalogo",
-  metaDescription: "Catalogo de productos Joybees Panama.",
+  metaTitle: "Joybees Panamá - Catálogo",
+  metaDescription: "Catálogo de productos Joybees Panamá.",
+  ogImage: "https://www.fashiongr.com/og/catalogo-joybees.png",
 
   checkoutAccent: "#404041",
 
@@ -863,7 +874,7 @@ const JOYBEES: MarcaTheme = {
       <div className="shrink-0">
         <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-8 w-auto shrink-0" />
         <p className="text-xs text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
-          Catalogo Panama
+          Catálogo Panamá
         </p>
       </div>
     ),
@@ -880,7 +891,7 @@ const JOYBEES: MarcaTheme = {
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
           <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-6 w-auto shrink-0" />
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panama</p>
+        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },
@@ -900,7 +911,7 @@ const JOYBEES: MarcaTheme = {
       "w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-[#404041]/10 text-sm outline-none focus:border-[#FFE443] focus:ring-2 focus:ring-[#FFE443]/20 transition placeholder:text-[#404041]/25",
     searchClear:
       "absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#404041]/40 hover:text-[#404041] transition",
-    searchPlaceholder: "Buscar por nombre o codigo...",
+    searchPlaceholder: "Buscar por nombre o código...",
     chipLabel: "text-xs font-semibold text-[#404041]/40 uppercase tracking-wide mr-0.5",
     chipActive: "bg-[#404041] text-white shadow-sm",
     chipInactive: "bg-white text-[#404041]/60 border border-[#404041]/10 hover:border-[#404041]/25",
@@ -988,7 +999,7 @@ const JOYBEES: MarcaTheme = {
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link publico",
+    copyLabel: "Copiar link público",
     stickyActionColor: null,
   },
   publico: { confirmingLabel: "Confirmando..." },
@@ -1156,6 +1167,7 @@ const TOMMY: MarcaTheme = {
 
   metaTitle: "Tommy Hilfiger Panamá - Catálogo",
   metaDescription: "Catálogo de calzado Tommy Hilfiger Panamá.",
+  ogImage: "https://www.fashiongr.com/og/catalogo-tommy.png",
 
   checkoutAccent: "#152342",
 
@@ -1183,7 +1195,7 @@ const TOMMY: MarcaTheme = {
         <div className="shrink-0">
           <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto shrink-0" />
           <p className="text-xs text-[#152342]/40 uppercase tracking-[0.25em] leading-none mt-1">
-            Catalogo Panama
+            Catálogo Panamá
           </p>
         </div>
       </div>
@@ -1202,7 +1214,7 @@ const TOMMY: MarcaTheme = {
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
           <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto shrink-0" />
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panama</p>
+        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },
@@ -1222,7 +1234,7 @@ const TOMMY: MarcaTheme = {
       "w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-[#152342]/10 text-sm outline-none focus:border-[#152342]/30 focus:ring-2 focus:ring-[#152342]/5 transition placeholder:text-[#152342]/25",
     searchClear:
       "absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#152342]/40 hover:text-[#152342] transition",
-    searchPlaceholder: "Buscar por nombre o codigo...",
+    searchPlaceholder: "Buscar por nombre o código...",
     chipLabel: "text-xs font-semibold text-[#152342]/40 uppercase tracking-wide mr-0.5",
     chipActive: "bg-[#152342] text-white shadow-sm",
     chipInactive: "bg-white text-[#152342]/60 border border-[#152342]/10 hover:border-[#152342]/25",
@@ -1328,7 +1340,7 @@ const TOMMY: MarcaTheme = {
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
-    copyLabel: "Copiar link publico",
+    copyLabel: "Copiar link público",
     stickyActionColor: "bg-[#AE0029] hover:bg-[#8c0021]",
   },
   publico: { confirmingLabel: "Confirmando..." },

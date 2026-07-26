@@ -59,8 +59,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Dos fallas MUY distintas: el link no existe (404) vs. no hubo red. Antes
+  // las dos caían en la misma pantalla "Pedido no encontrado · Este enlace
+  // puede haber expirado" — o sea que a quien se le cayó el 4G se le decía que
+  // su pedido no existe. `error` incluso se calculaba y no se mostraba nunca.
+  const [error, setError] = useState<"no-existe" | "sin-red" | null>(null);
+  const [reintento, setReintento] = useState(0);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   // Barra de progreso del guardado. Medido: ~5 s entre crear el pedido y
@@ -84,27 +90,32 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`${theme.api}/pedido-publico/${id}`);
         if (!res.ok) {
-          setError("Pedido no encontrado");
+          // 5xx = el servidor tuvo un problema, el pedido puede existir
+          // perfectamente: no se le dice al cliente que su link está vencido.
+          setError(res.status >= 500 ? "sin-red" : "no-existe");
           return;
         }
         const data = await res.json();
         setOrder(data);
       } catch {
-        setError("Error al cargar el pedido");
+        setError("sin-red");
       } finally {
         setLoading(false);
       }
     }
     if (id) load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, reintento]);
 
   async function handleDownloadPdf() {
     if (!order || generatingPdf) return;
     setGeneratingPdf(true);
+    setPdfError(false);
     try {
       // Lib única de PDF de pedido (mismo layout que el flujo interno).
       const { downloadCatalogoOrderPdf } = await import("@/lib/catalogo/order-pdf-client");
@@ -123,7 +134,10 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         filename: `Pedido-${theme.label}-${new Date().toISOString().slice(0, 10)}.pdf`,
       });
     } catch {
-      // silent fail
+      // Antes esto era un `silent fail`: el botón volvía a decir "Descargar
+      // PDF" y no pasaba NADA. El cliente lo tocaba una y otra vez sin saber
+      // que había fallado.
+      setPdfError(true);
     } finally {
       setGeneratingPdf(false);
     }
@@ -185,16 +199,31 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   }
 
   if (error || !order) {
+    const sinRed = error === "sin-red";
     return (
       <div className={`${theme.pedidoPublico.pageBg} flex items-center justify-center p-4`}>
-        <div className="bg-white rounded-xl p-8 text-center max-w-sm w-full">
+        <div className="bg-white rounded-xl p-8 text-center max-w-sm w-full" role="alert">
           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
             <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className={`${theme.pedidoPublico.textStrong} font-semibold text-lg mb-1`}>Pedido no encontrado</p>
-          <p className={`${theme.pedidoPublico.textSoft} text-sm`}>Este enlace puede haber expirado o ser incorrecto.</p>
+          <p className={`${theme.pedidoPublico.textStrong} font-semibold text-lg mb-1`}>
+            {sinRed ? "No pudimos abrir tu pedido" : "Pedido no encontrado"}
+          </p>
+          <p className={`${theme.pedidoPublico.textSoft} text-sm`}>
+            {sinRed
+              ? "Revisa tu conexión a internet y vuelve a intentar. Tu pedido no se perdió."
+              : "Este enlace puede haber expirado o ser incorrecto."}
+          </p>
+          {sinRed && (
+            <button
+              onClick={() => setReintento((n) => n + 1)}
+              className={`${theme.pedidoPublico.confirmBtn} mt-5`}
+            >
+              Reintentar
+            </button>
+          )}
         </div>
       </div>
     );
@@ -443,7 +472,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         )}
 
         {/* Download PDF button */}
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 flex flex-col items-center gap-2">
           <button
             onClick={handleDownloadPdf}
             disabled={generatingPdf}
@@ -454,6 +483,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             </svg>
             {generatingPdf ? "Generando..." : "Descargar PDF"}
           </button>
+          {pdfError && (
+            <p role="alert" className="text-xs text-red-600 text-center">
+              No se pudo generar el PDF. Intenta de nuevo en unos segundos.
+            </p>
+          )}
         </div>
 
         {/* Footer */}

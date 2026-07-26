@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { MARCA_THEME, MARCAS_UI } from "@/lib/catalogo/marcas-ui";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,7 +21,21 @@ interface BeforeInstallPromptEvent extends Event {
 // OJO: key legacy (nació con el Modo Viaje). Se conserva el MISMO valor para
 // no volver a mostrar el prompt a quien ya lo descartó.
 const DISMISS_KEY = "fg_modoviaje_install_dismissed";
-const PUBLIC_PREFIXES = ["/catalogo-publico", "/pedido-reebok"];
+
+// Rutas donde está el CLIENTE de Daniel, no un empleado: ahí nunca se le
+// ofrece instalar el ERP interno.
+//
+// Las bases de los pedidos se DERIVAN del tema de cada marca en vez de
+// escribirse a mano. Hasta jul-2026 la lista decía `["/catalogo-publico",
+// "/pedido-reebok"]` —de cuando Reebok era la única marca con página pública—
+// así que al cliente de Joybees y al de Tommy les salía "Instala Fashion
+// Group · Toca Compartir y luego Agregar a inicio" tapando, desde abajo de la
+// pantalla, los botones de WhatsApp de su propio pedido. Derivándolo, una
+// marca nueva queda cubierta sola.
+const PUBLIC_PREFIXES = [
+  "/catalogo-publico",
+  ...MARCAS_UI.map((m) => MARCA_THEME[m].pedidoPublicoBase),
+];
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;

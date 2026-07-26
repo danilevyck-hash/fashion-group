@@ -218,6 +218,23 @@ export default function CatalogoStickyCartBar({
         </div>
       )}
 
+      {/* Guardando: el cliente tiene que saber que NO cierre la pantalla.
+          Confirmar desde el catálogo crea el pedido Y lo manda a Switch (~5 s);
+          el aviso vivía solo en la página del pedido, que casi nadie ve porque
+          este es el paso donde todo el mundo confirma. */}
+      {saving && variant === "public" && (
+        <div
+          className="px-4 py-2.5 bg-emerald-50 border-t border-emerald-200"
+          role="status"
+          aria-live="assertive"
+        >
+          <p className="text-sm font-bold text-emerald-800">
+            Guardando tu pedido, no cierres esta pantalla
+          </p>
+          <p className="text-xs text-emerald-700/80 mt-0.5">Puede tardar unos segundos.</p>
+        </div>
+      )}
+
       {/* Bottom bar */}
       <div className="p-3 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
         {/* Cart summary button */}
