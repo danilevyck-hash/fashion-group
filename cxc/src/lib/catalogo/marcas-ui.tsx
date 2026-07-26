@@ -497,20 +497,17 @@ const REEBOK: MarcaTheme = {
 
   logos: {
     navbar: () => <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />,
+    // Logo REAL de la marca. Antes había aquí un <svg> de un triángulo dibujado
+    // a mano (que NO es el logo de Reebok) junto a la palabra en texto; el
+    // wordmark ya viene dentro del PNG, así que el texto sobraba. El <h1> se
+    // conserva por semántica: su texto accesible es el alt de la imagen.
     header: () => (
-      <div className="flex items-center gap-1">
-        <div className="relative w-8 h-8">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg viewBox="0 0 32 32" className="w-7 h-7 text-[#E4002B]" fill="currentColor">
-              <path d="M4 24L16 4l12 20H4z" opacity="0.9" />
-            </svg>
-          </div>
-        </div>
+      <div className="flex items-center gap-2">
         <div>
-          <h1 className="text-lg font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
-            REEBOK
+          <h1 className="leading-none">
+            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto" />
           </h1>
-          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
+          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
             Catalogo Panama
           </p>
         </div>
@@ -521,10 +518,15 @@ const REEBOK: MarcaTheme = {
         <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
       </div>
     ),
+    // Logo REAL sobre placa blanca: la banda del header del pedido público es
+    // oscura y el logo es rojo (#E4002B) — la placa garantiza que se lea igual
+    // que en la web de la marca. Antes decía "REEBOK" en texto.
     pedidoPublico: () => (
       <div>
-        <h1 className="text-white font-bold text-xl tracking-wide">REEBOK</h1>
-        <p className="text-white/50 text-xs mt-0.5">Panama</p>
+        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-1.5">
+          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
     ),
   },
@@ -1126,10 +1128,16 @@ const TOMMY: MarcaTheme = {
         <img src="/tommy/tommy-flag.png" alt="Tommy" className="w-7 h-5 object-contain" />
       </div>
     ),
+    // Logo REAL sobre placa blanca. El wordmark del SVG es casi negro
+    // (#231F20) y la banda del header del pedido público es navy: sin la placa
+    // el logo desaparecería. Antes decía "TOMMY HILFIGER" en texto — es el
+    // lugar que Daniel vio en el link público (25-jul-2026).
     pedidoPublico: () => (
-      <div>
-        <h1 className="text-white font-bold text-xl tracking-[0.08em]">TOMMY HILFIGER</h1>
-        <p className="text-white/50 text-xs mt-0.5">Panama</p>
+      <div className="min-w-0">
+        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
     ),
   },
