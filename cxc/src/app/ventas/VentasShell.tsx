@@ -198,8 +198,11 @@ export function VentasShell({
         <div className="flex flex-wrap items-center gap-2">
           {/* Bug #1 fix: selector año visible desde cualquier tab (antes solo
               en Resumen). State global ya existía — solo cambio de placement. */}
+          {/* iPhone: el trigger medía 88×36 — por debajo de los 44 de alto de la
+              regla táctil. h-11 = 44px exactos. En desktop solo crece 8px y
+              queda alineado con el botón Excel (que también va a 44). */}
           <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
-            <SelectTrigger className="h-9 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
+            <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -213,7 +216,10 @@ export function VentasShell({
           {/* Excel global = export del Resumen. En el tab Productos se oculta
               porque ese tab trae su propio export (por empresa + período). */}
           {tab !== "productos" && tab !== "utilidad" && (
-            <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
+            /* iPhone: medía 79×32. size="sm" fija h-8; el min-h-[44px] gana
+               sobre `height` en CSS (min-height siempre manda) sin tocar el
+               tamaño de letra ni el padding horizontal. */
+            <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen} className="min-h-[44px]">
               <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
             </Button>
           )}
@@ -310,7 +316,8 @@ function ErrorState({
         Ya lo intentamos varias veces. Vuelve a probar en unos segundos.
       </p>
       {onRetry && (
-        <Button variant="outline" size="sm" className="mt-3" onClick={onRetry}>
+        /* min-h-[44px]: mismo motivo que el botón Excel — size="sm" da 32px. */
+        <Button variant="outline" size="sm" className="mt-3 min-h-[44px]" onClick={onRetry}>
           Reintentar
         </Button>
       )}

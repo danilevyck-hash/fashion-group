@@ -119,8 +119,10 @@ export function MultifashionShell({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* iPhone: el trigger medía 88×36. h-11 = 44px exactos (regla táctil),
+              igual que el selector de mes de MultifashionView, que ya iba en 44. */}
           <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v, 10))}>
-            <SelectTrigger className="h-9 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
+            <SelectTrigger className="h-11 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

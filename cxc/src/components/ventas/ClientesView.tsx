@@ -307,12 +307,17 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
       <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-gray-200 bg-gray-50 px-1 pb-2.5 pt-2.5">
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="relative min-w-[180px] max-w-full flex-1 md:max-w-[360px]">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-500" />
+            {/* La lupa se centra con top-1/2 (antes top-2.5 asumía el h-9 del
+                Input; ahora el campo mide 44 y quedaría alta). */}
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar cliente o código…"
-              className="w-full pl-8"
+              /* h-11 = 44px táctiles (el default del Input es h-9 = 36) y
+                 text-base en móvil para que Safari no haga zoom al enfocar
+                 (el default text-sm son 14px). Desde sm vuelve a text-sm. */
+              className="h-11 w-full pl-8 text-base sm:text-sm"
             />
           </div>
 
@@ -399,7 +404,10 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     // para que el activo no crezca 1px respecto al inactivo.
                     // Sólo cambian bg, text, y el color del border (mismo
                     // color que el bg en activo para que sea invisible).
-                    "min-h-[40px] whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
+                    // 44px, no 40: las pills de empresa son una tira scrollable
+                    // y en iPhone se tocan de pasada — 4px de más evitan el
+                    // filtro equivocado.
+                    "min-h-[44px] whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
                     active
                       ? "border-teal-700 bg-teal-700 text-white"
                       : "border-gray-200 bg-white text-gray-700"

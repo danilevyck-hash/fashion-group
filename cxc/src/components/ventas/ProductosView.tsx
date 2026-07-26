@@ -140,10 +140,12 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
 
   return (
     <div>
-      {/* Toolbar */}
+      {/* Toolbar — todos los controles a 44px de alto (h-11 / min-h-[44px]):
+          los defaults del design system (h-9 en Select/Input, h-8 en
+          size="sm") quedan 8-12px por debajo del mínimo táctil en iPhone. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Select value={empresa} onValueChange={onEmpresaChange}>
-          <SelectTrigger className="h-9 w-auto min-w-[150px] text-xs" disabled={loading}>
+          <SelectTrigger className="h-11 w-auto min-w-[150px] text-xs" disabled={loading}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -154,7 +156,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         </Select>
 
         <Select value={mes ? String(mes) : "ytd"} onValueChange={v => { setMes(v === "ytd" ? null : parseInt(v, 10)); setVisible(PAGE); }}>
-          <SelectTrigger className="h-9 w-auto min-w-[120px] text-xs font-mono tabular-nums" disabled={loading}>
+          <SelectTrigger className="h-11 w-auto min-w-[120px] text-xs font-mono tabular-nums" disabled={loading}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -171,11 +173,13 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
             value={search}
             onChange={e => { setSearch(e.target.value); setVisible(PAGE); }}
             placeholder="Buscar descripción…"
-            className="h-9 pl-8 text-xs"
+            /* text-base en móvil: Safari hace zoom al enfocar un input con
+               letra < 16px (text-xs = 12px). Desde sm vuelve al text-xs. */
+            className="h-11 pl-8 text-base sm:text-xs"
           />
         </div>
 
-        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading}>
+        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
           <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
         </Button>
       </div>
@@ -243,7 +247,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       {/* Mostrar más */}
       {data && !loading && !error && rows.length > visible && (
         <div className="mt-3 text-center">
-          <Button variant="outline" size="sm" onClick={() => setVisible(v => v + PAGE)}>
+          {/* size="sm" da 32px de alto — min-h-[44px] lo lleva al mínimo. */}
+          <Button variant="outline" size="sm" onClick={() => setVisible(v => v + PAGE)} className="min-h-[44px]">
             Mostrar más ({rows.length - visible} restantes)
           </Button>
         </div>
