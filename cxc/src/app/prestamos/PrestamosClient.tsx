@@ -552,21 +552,44 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               const saldado = saldo <= 0 && prestado > 0;
               const deducida = emp.deduccion_quincenal > 0 && hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end);
               const pendienteDed = emp.deduccion_quincenal > 0 && !deducida && saldo > 0;
+
+              // Chips de la fila. En iPhone (358px) NO caben en la línea del
+              // nombre: el saldo, el "···" y los gaps ya se llevan 149px, así
+              // que con el chip de quincena al lado el nombre se quedaba con
+              // 90px y ninguno de los 12 entraba. Bajan a la línea 2, junto a
+              // la empresa, y conservan su TEXTO COMPLETO ("⚠ Pendiente" vs
+              // "✓ Deducida" no se distinguen solo por color: ambos son chips
+              // pastel y el estado hay que poder leerlo). En desktop no cambia
+              // nada: siguen en la línea 1 y en su columna de w-24.
+              const badges = [
+                pendientes > 0 ? <span key="pend" className="shrink-0 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span> : null,
+                saldado ? <span key="saldado" className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span> : null,
+                !emp.activo ? <span key="archivado" className="shrink-0 text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span> : null,
+              ].filter(Boolean);
+
+              const chipQuincena = emp.deduccion_quincenal <= 0 ? null
+                : deducida ? <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
+                : pendienteDed ? <span className="shrink-0 text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
+                : null;
+
               return (
                 <li
                   key={emp.id}
                   onClick={() => handleRowClick(emp)}
-                  className={`flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors ${pendientes > 0 ? "border-l-4 border-l-amber-400" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
+                  className={`flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors ${pendientes > 0 ? "border-l-4 border-l-amber-400" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
                 >
-                  {/* 1 · Nombre + empresa */}
+                  {/* 1 · Nombre + empresa (+ chips en mobile) */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium truncate">{emp.nombre}</span>
-                      {pendientes > 0 && <span className="shrink-0 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span>}
-                      {saldado && <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
-                      {!emp.activo && <span className="shrink-0 text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                      <span className="font-medium truncate tracking-tight">{emp.nombre}</span>
+                      {badges.length > 0 && <div className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</div>}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">{emp.empresa || "Sin empresa"}</div>
+                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
+                      <span className="truncate">{emp.empresa || "Sin empresa"}</span>
+                      {(badges.length > 0 || chipQuincena) && (
+                        <div className="flex shrink-0 items-center gap-1.5 sm:hidden">{badges}{chipQuincena}</div>
+                      )}
+                    </div>
                   </div>
 
                   {/* 2 · Progreso (fino) — desktop */}
@@ -577,12 +600,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                     <span className="text-xs text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
                   </div>
 
-                  {/* 3 · Chip quincena */}
-                  <div className="shrink-0 text-center sm:w-24">
-                    {emp.deduccion_quincenal <= 0 ? null
-                      : deducida ? <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
-                      : pendienteDed ? <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
-                      : null}
+                  {/* 3 · Chip quincena — columna propia solo en desktop */}
+                  <div className="hidden shrink-0 text-center sm:block sm:w-24">
+                    {chipQuincena}
                   </div>
 
                   {/* 4 · SALDO héroe */}
