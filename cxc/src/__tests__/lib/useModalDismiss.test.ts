@@ -16,6 +16,7 @@ import {
   useEscapeClose,
   useFormModalDismiss,
 } from "@/lib/hooks/useModalDismiss";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 // Modal simple: backdrop con el panel adentro (el layout real del repo).
 function ModalSimple({ onClose, enabled = true }: { onClose: () => void; enabled?: boolean }) {
@@ -160,5 +161,79 @@ describe("useFormModalDismiss", () => {
     fireEvent.change(getByTestId("campo"), { target: { value: "" } });
     clicEn(getByTestId("backdrop"));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Scroll del fondo.
+//
+// Estos modales pintan su propio backdrop `fixed` (no pasan por ModalOverlay),
+// y sin lock el body sigue scrolleando por detrás: en iOS se arrastra el fondo
+// con el modal abierto y al cerrar la página quedó en otro lado. El lock vive
+// dentro del hook para que los ~14 consumidores lo hereden sin tocarlos.
+
+/** ¿Está el body congelado? El hook usa el patrón iOS: position:fixed. */
+function bodyBloqueado() {
+  return document.body.style.position === "fixed" && document.body.style.overflow === "hidden";
+}
+
+/** Modal cuyo `open` lo maneja el test (para probar abrir/cerrar sin desmontar). */
+function ModalControlado({ open }: { open: boolean }) {
+  const { panelRef, backdrop } = useFormModalDismiss(open, () => {});
+  if (!open) return null;
+  return createElement(
+    "div",
+    { "data-testid": "backdrop", ...backdrop },
+    createElement("div", { "data-testid": "panel", ref: panelRef }),
+  );
+}
+
+/** Consumidor que ADEMÁS bloquea por su cuenta (el caso de los modales de
+ *  Marketing). El contador de referencias debe tolerarlo. */
+function ModalConLockPropio({ onClose }: { onClose: () => void }) {
+  useBodyScrollLock(true);
+  const { panelRef, backdrop } = useFormModalDismiss(true, onClose);
+  return createElement(
+    "div",
+    { "data-testid": "backdrop", ...backdrop },
+    createElement("div", { "data-testid": "panel", ref: panelRef }),
+  );
+}
+
+describe("useFormModalDismiss — scroll del fondo", () => {
+  it("el body queda libre si no hay ningún modal", () => {
+    expect(bodyBloqueado()).toBe(false);
+  });
+
+  it("bloquea el body mientras el modal está abierto y lo suelta al cerrar", () => {
+    const { rerender, unmount } = render(createElement(ModalControlado, { open: true }));
+    expect(bodyBloqueado()).toBe(true);
+    rerender(createElement(ModalControlado, { open: false }));
+    expect(bodyBloqueado()).toBe(false);
+    unmount();
+  });
+
+  it("lo suelta también si el modal se desmonta abierto", () => {
+    const { unmount } = render(createElement(ModalControlado, { open: true }));
+    expect(bodyBloqueado()).toBe(true);
+    unmount();
+    expect(bodyBloqueado()).toBe(false);
+  });
+
+  it("con dos modales apilados, el fondo sigue bloqueado hasta que cierra el último", () => {
+    const primero = render(createElement(ModalControlado, { open: true }));
+    const segundo = render(createElement(ModalControlado, { open: true }));
+    expect(bodyBloqueado()).toBe(true);
+    segundo.unmount();
+    expect(bodyBloqueado()).toBe(true); // el de abajo sigue abierto
+    primero.unmount();
+    expect(bodyBloqueado()).toBe(false);
+  });
+
+  it("un consumidor que ya llamaba a useBodyScrollLock no deja el body trabado", () => {
+    const { unmount } = render(createElement(ModalConLockPropio, { onClose: vi.fn() }));
+    expect(bodyBloqueado()).toBe(true);
+    unmount();
+    expect(bodyBloqueado()).toBe(false);
   });
 });

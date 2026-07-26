@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getVisibleModules } from "@/lib/modules";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface CxcResult { id: string; nombre_normalized: string; total: number; company_key: string }
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
@@ -315,6 +316,13 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [compact, query]);
+
+  // El buscador móvil es un overlay a pantalla completa: el fondo no debe
+  // scrollear por detrás (en iOS se nota apenas se arrastra sobre el listado, y
+  // al cerrar la página queda en otro lugar). Este componente solo se monta con
+  // fullScreen cuando el overlay está abierto, así que el lock se toma al montar
+  // y se suelta al desmontar. El hook lleva contador de referencias.
+  useBodyScrollLock(!!fullScreen);
 
   // Rol sin búsqueda global (ej. gerente_acs): no renderizar la caja.
   // Va después de TODOS los hooks (regla de hooks).
