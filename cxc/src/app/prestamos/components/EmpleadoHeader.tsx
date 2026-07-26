@@ -27,17 +27,17 @@ export default function EmpleadoHeader({ empleado, saldo, saldado, onEdit, onTog
         </div>
       </div>
       <div className="flex flex-wrap gap-3">
-        <button onClick={onEdit} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Editar</button>
+        <button onClick={onEdit} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">Editar</button>
         {empleado.activo && saldo === 0 && (
-          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Archivar</button>
+          <button onClick={onToggleArchive} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">Archivar</button>
         )}
         {empleado.activo && saldo > 0 && (
-          <button disabled title={`Saldo pendiente de $${saldo.toFixed(2)} — paga el saldo para archivar`} className="border border-gray-200 px-4 py-2 rounded-md text-sm text-gray-300 cursor-not-allowed">Archivar</button>
+          <button disabled title={`Saldo pendiente de $${saldo.toFixed(2)} — paga el saldo para archivar`} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm text-gray-300 cursor-not-allowed">Archivar</button>
         )}
         {!empleado.activo && (
-          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Reactivar</button>
+          <button onClick={onToggleArchive} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">Reactivar</button>
         )}
-        <button onClick={onBack} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">← Colaboradores</button>
+        <button onClick={onBack} className="inline-flex min-h-[44px] items-center justify-center border border-gray-200 px-4 rounded-md text-sm hover:border-gray-400 transition">← Colaboradores</button>
       </div>
     </div>
   );

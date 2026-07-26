@@ -424,7 +424,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           {quincenaPendientesN > 0 && (
             <button
               onClick={() => setConfirmAplicarQ(true)}
-              className="sm:ml-auto bg-emerald-600 text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
+              className="sm:ml-auto inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
             >
               Aplicar quincena ({quincenaPendientesN})
             </button>
@@ -454,7 +454,12 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             <div className="mb-6 border border-amber-200 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between bg-amber-50 px-4 py-2">
                 <div className="flex items-center gap-3">
-                  <input type="checkbox" checked={allPendingSelected} onChange={() => { if (allPendingSelected) setSelectedPending(new Set()); else setSelectedPending(new Set(allPendingIds)); }} className="accent-black" title="Seleccionar todos" />
+                  {/* El cuadradito nativo mide 13×13. El target de 44 lo pone
+                      la <label> que lo envuelve, no el checkbox. */}
+                  <label className="-ml-2.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center px-2.5">
+                    <input type="checkbox" checked={allPendingSelected} onChange={() => { if (allPendingSelected) setSelectedPending(new Set()); else setSelectedPending(new Set(allPendingIds)); }} className="h-[18px] w-[18px] accent-black" />
+                    <span className="sr-only">Seleccionar todos</span>
+                  </label>
                   {/* El banner que abre esta sección ya dice "pendientes de
                       aprobación"; acá solo hace falta el conteo de seleccionados. */}
                   {selectedPending.size > 0 && (
@@ -466,17 +471,17 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                 <div className="flex items-center gap-2">
                   {selectedPending.size > 0 ? (
                     <>
-                      <button onClick={() => setConfirmBatchApprove(true)} disabled={batchProcessing} className="text-xs bg-green-600 text-white px-4 py-1.5 rounded-md hover:bg-green-700 transition disabled:opacity-50">
+                      <button onClick={() => setConfirmBatchApprove(true)} disabled={batchProcessing} className="inline-flex min-h-[44px] items-center justify-center text-xs bg-green-600 text-white px-4 rounded-md hover:bg-green-700 transition disabled:opacity-50">
                         {batchProcessing ? "Procesando..." : `Aprobar ${selectedPending.size}`}
                       </button>
-                      <button onClick={() => setConfirmBatchReject(true)} disabled={batchProcessing} className="text-xs text-red-500 hover:text-red-700 transition px-3 py-1.5 disabled:opacity-50">
+                      <button onClick={() => setConfirmBatchReject(true)} disabled={batchProcessing} className="inline-flex min-h-[44px] items-center justify-center text-xs text-red-500 hover:text-red-700 transition px-3 disabled:opacity-50">
                         Rechazar {selectedPending.size}
                       </button>
                     </>
                   ) : (
                     <>
-                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchApprove(true); }} className="text-xs bg-green-600 text-white px-4 py-1.5 rounded-md hover:bg-green-700 transition">Aprobar todos</button>
-                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchReject(true); }} className="text-xs text-red-500 hover:text-red-700 transition px-3 py-1.5">Rechazar todos</button>
+                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchApprove(true); }} className="inline-flex min-h-[44px] items-center justify-center text-xs bg-green-600 text-white px-4 rounded-md hover:bg-green-700 transition">Aprobar todos</button>
+                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchReject(true); }} className="inline-flex min-h-[44px] items-center justify-center text-xs text-red-500 hover:text-red-700 transition px-3">Rechazar todos</button>
                     </>
                   )}
                 </div>
@@ -484,7 +489,10 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               {pendingMovs.map(m => (
                 <div key={m.id} className="flex items-center justify-between px-4 py-3 border-t border-amber-100 text-sm border-l-4 border-l-amber-400 bg-amber-50/20">
                   <div className="flex items-center gap-3">
-                    <input type="checkbox" checked={selectedPending.has(m.id)} onChange={() => togglePendingSelect(m.id)} className="accent-black" />
+                    <label className="-ml-2.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center px-2.5">
+                      <input type="checkbox" checked={selectedPending.has(m.id)} onChange={() => togglePendingSelect(m.id)} className="h-[18px] w-[18px] accent-black" />
+                      <span className="sr-only">Seleccionar {m.empNombre}</span>
+                    </label>
                     <span className="text-amber-500 flex-shrink-0">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                     </span>
@@ -510,7 +518,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
+          <button onClick={openNewMov} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
           <OverflowMenu
             align="left"
             items={[
@@ -525,18 +533,21 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empleado..."
-            className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition w-40"
+            className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition w-40"
           />
           <select
             value={filterEmpresa}
             onChange={e => setFilterEmpresa(e.target.value)}
-            className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition"
+            className="min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition"
           >
             <option value="all">Todas las empresas</option>
             {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
-            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="accent-black" />
+          {/* El target de 44 lo da la <label> entera — el texto "Ver archivados"
+              también activa el checkbox (nativo: el input está adentro). Un
+              cuadradito de 44px se vería mal; el nativo se queda en 18. */}
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-[18px] w-[18px] accent-black" />
             Ver archivados
           </label>
         </div>
@@ -635,18 +646,18 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-gray-400 uppercase">Nombre *</label>
-                <input value={fNombre} onChange={e => setFNombre(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="Nombre completo" />
+                <input value={fNombre} onChange={e => setFNombre(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="Nombre completo" />
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Empresa</label>
-                <select value={fEmpresa} onChange={e => setFEmpresa(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+                <select value={fEmpresa} onChange={e => setFEmpresa(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
                   <option value="">Sin asignar</option>
                   {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Deducción Quincenal ($)</label>
-                <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+                <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
                 <p className="text-xs text-gray-400 mt-1">Monto que se deduce cada quincena del salario del colaborador</p>
               </div>
               <div>
@@ -655,8 +666,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowEmpModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveEmp} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
+              <button onClick={() => setShowEmpModal(false)} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={saveEmp} disabled={saving} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {saving ? "Guardando..." : editingEmp ? "Guardar Cambios" : "Crear Empleado"}
               </button>
             </div>
@@ -698,25 +709,25 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                 })}
               </div>
               <div className="mt-4">
-                <button onClick={() => setShowMovModal(false)} className="w-full py-2 border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={() => setShowMovModal(false)} className="w-full min-h-[44px] border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               </div>
             </>) : (<>
             <h2 className="font-medium mb-4">Nuevo Movimiento</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-gray-400 uppercase">Empleado *</label>
-                <select value={mEmpleadoId} onChange={e => setMEmpleadoId(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+                <select value={mEmpleadoId} onChange={e => setMEmpleadoId(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
                   <option value="">Seleccionar...</option>
                   {empleados.filter(e => e.activo).map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
                 </select>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-                <input type="date" value={mFecha} onChange={e => setMFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                <input type="date" value={mFecha} onChange={e => setMFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Concepto *</label>
-                <select value={mConcepto} onChange={e => setMConcepto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+                <select value={mConcepto} onChange={e => setMConcepto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
                   <option value="Préstamo">Préstamo</option>
                   <option value="Pago">Pago</option>
                   <option value="Abono extra">Abono extra</option>
@@ -726,7 +737,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
               </div>
               {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
@@ -739,8 +750,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
+              <button onClick={() => setShowMovModal(false)} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={saveMov} disabled={savingMov} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {savingMov ? "Guardando..." : "Registrar"}
               </button>
             </div>

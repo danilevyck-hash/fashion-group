@@ -52,13 +52,13 @@ export default function MovimientoModal({
               ))}
             </div>
             <div className="mt-4">
-              <button onClick={onClose} className="w-full py-2 border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={onClose} className="w-full min-h-[44px] border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
             </div>
           </>
         ) : (
           <>
             <div className="flex items-center gap-2 mb-4">
-              <button onClick={onBack} className="text-gray-400 hover:text-black transition">
+              <button onClick={onBack} className="-ml-2.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-black transition">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
               </button>
               <h2 className="font-medium">{mLabel}</h2>
@@ -66,11 +66,11 @@ export default function MovimientoModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-                <input type="date" value={mFecha} onChange={e => onChangeFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                <input type="date" value={mFecha} onChange={e => onChangeFecha(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => onChangeMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => onChangeMonto(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
               </div>
               {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 sm:col-span-2">
@@ -83,8 +83,8 @@ export default function MovimientoModal({
               </div>
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={onSave} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
+              <button onClick={onClose} className="flex-1 inline-flex min-h-[44px] items-center justify-center border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={onSave} disabled={saving} className="flex-1 inline-flex min-h-[44px] items-center justify-center bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {saving ? "Guardando..." : "Registrar"}
               </button>
             </div>
