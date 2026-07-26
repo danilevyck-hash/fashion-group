@@ -134,9 +134,18 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   }, [gender, category, search, saleFilter, bultosFilter, precioRango]);
 
   // Load products
+  // `loadError` separa "no cargó" de "no hay resultados": hasta jul-2026 el
+  // catch dejaba products=[] y el cliente veía "No encontramos productos con
+  // estos filtros" con CERO filtros puestos — un botón "Limpiar filtros" que
+  // no arreglaba nada. En 4G panameño el fetch se cae, y ese es justo el
+  // momento en que el texto tiene que decir la verdad y ofrecer reintentar.
+  const [loadError, setLoadError] = useState(false);
+  const [reintento, setReintento] = useState(0);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setLoadError(false);
       try {
         const res = await fetch(`${theme.api}/public`);
         if (!res.ok) throw new Error("fetch failed");
@@ -186,12 +195,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
         }
       } catch {
         setProducts([]);
+        setLoadError(true);
       }
       setLoading(false);
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reintento]);
 
   // ── Derived state — pipeline FLAT ──
   // Orden y label de categoría desde el theme (chips de la marca): Reebok
@@ -285,6 +295,20 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // short_id del pedido YA creado en el server: si la confirmación falla y el
   // cliente reintenta, se reusa (no se duplica el pedido).
   const [pendingShortId, setPendingShortId] = useState<string | null>(null);
+
+  // Confirmar desde el catálogo hace DOS llamadas (crear + confirmar) y la
+  // segunda sale a Switch: son ~5 s en los que cerrar la pestaña deja el
+  // pedido a medias. La página del pedido ya avisaba y frenaba el cierre; este
+  // camino —el que usa TODO el mundo— no hacía ninguna de las dos cosas.
+  useEffect(() => {
+    if (!sendingOrder) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [sendingOrder]);
 
   useEffect(() => {
     try {
@@ -386,8 +410,35 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     </div>
   );
 
-  // Empty state
-  const emptyState = (
+  // ¿El cliente puso ALGÚN filtro? Decide cuál de los tres vacíos se muestra.
+  const hayFiltros = !!(
+    search || gender || category || saleFilter || bultosFilter || precioRango
+  );
+
+  // Tres estados distintos, porque las tres causas se arreglan distinto:
+  //   1. no cargó (red)          → Reintentar
+  //   2. cargó y no hay nada     → no es culpa del cliente, no ofrecer filtros
+  //   3. cargó y los filtros cortan todo → Limpiar filtros
+  const emptyState = loadError ? (
+    <div className="text-center py-20" role="alert">
+      <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
+      <p className={theme.grid.emptyText}>No pudimos cargar el catálogo</p>
+      <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
+        Revisa tu conexión a internet y vuelve a intentar.
+      </p>
+      <button onClick={() => setReintento((n) => n + 1)} className={theme.grid.emptyClear}>
+        Reintentar
+      </button>
+    </div>
+  ) : !hayFiltros ? (
+    <div className="text-center py-20">
+      <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
+      <p className={theme.grid.emptyText}>Por ahora no hay productos disponibles</p>
+      <p className={`${theme.grid.emptyText} mt-1 font-normal`}>
+        Vuelve a entrar más tarde o escríbenos por WhatsApp.
+      </p>
+    </div>
+  ) : (
     <div className="text-center py-20">
       <div className={theme.grid.emptyIconWrap}>{theme.grid.emptyIcon}</div>
       <p className={theme.grid.emptyText}>No encontramos productos con estos filtros</p>
