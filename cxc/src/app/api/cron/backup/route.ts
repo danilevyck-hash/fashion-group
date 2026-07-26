@@ -54,12 +54,23 @@
 // Retención:
 // - Supabase Storage: RETENTION_DAYS = 21 días (bajó de 30 en jul-2026 — el
 //   histórico largo vive ahora en R2, que es gratis hasta 10 GB).
-// - R2: política propuesta RETENCION_R2 (14 diarios + 8 semanales/lunes + 24
-//   mensuales/día 1 ≈ 46 carpetas × ~30 MB ≈ 1.4 GB). Este cron la CALCULA y la
-//   reporta (campo `retencionR2` de la respuesta) pero NO BORRA NADA en R2. Un
-//   lifecycle rule de Cloudflare no sabe hacer abuelo-padre-hijo (es por
-//   prefijo+edad), así que la poda tiene que ser código: queda para un PR
-//   aparte, con la lógica ya escrita y testeada en r2RetentionPlan().
+// - R2: política propuesta RETENCION_R2 (21 diarios —los mismos 21 días que
+//   Supabase, aprobado por Daniel— + 8 semanales/lunes + 24 mensuales/día 1
+//   ≈ 53 carpetas × ~30 MB ≈ 1.6 GB). Este cron la CALCULA y la reporta (campo
+//   `retencionR2` de la respuesta) pero NO BORRA NADA en R2. Un lifecycle rule
+//   de Cloudflare no sabe hacer abuelo-padre-hijo (es por prefijo+edad), así
+//   que la poda tiene que ser código: queda para un PR aparte, con la lógica ya
+//   escrita y testeada en r2RetentionPlan().
+//
+// SALUD DE LA RÉPLICA (campo `saludR2`, jul-2026): una carpeta data/<fecha>/ la
+// escriben DOS invocaciones —core (meta.json) y ?grupo=switch (meta-switch.json)—
+// y con una sola de las dos el día NO se restaura. Pasó el 25-jul-2026: el
+// deploy que estrenó los paths con fecha entró a las 09:24 UTC, DESPUÉS de la
+// corrida core del día, y las entradas extra de 10:30/18:30 son no-op (el core
+// ya había registrado success) → data/2026-07-25/ quedó con el grupo switch
+// solo, y `restore.mjs --list` la mostraba como backup disponible mientras el
+// restore moría con 404 en meta.json. Ahora la corrida core evalúa AYER (hoy el
+// hueco core→switch es normal) y alerta por Telegram si quedó a medias.
 //
 // Restore: scripts/restore.mjs (ver header del script para uso y prueba).
 // Desde jul-2026 acepta --source r2 (lee los mismos objetos desde R2).
@@ -74,7 +85,8 @@ import {
   replicateBackupToR2,
   replicateStorageToR2,
   r2DataKey,
-  listR2DataDates,
+  listR2DataKeys,
+  evaluarFechasR2,
   r2RetentionPlan,
   type R2BackupFile,
   type R2LazyFile,
@@ -580,8 +592,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Inventario de fechas en R2 (lectura pura, para el informe de retención).
-  const fechasR2 = esGrupoSwitch ? [] : await listR2DataDates();
+  // Inventario de objetos en R2 (lectura pura): de las keys salen las fechas
+  // para el informe de retención Y el diagnóstico de completitud de cada día.
+  const keysR2 = esGrupoSwitch ? [] : await listR2DataKeys();
+  const estadosR2 = evaluarFechasR2(keysR2);
+  const fechasR2 = estadosR2.map((e) => e.fecha);
 
   // Limpieza de backups > RETENTION_DAYS (carpetas de fecha + legacy flat files).
   // Solo la corrida CORE (borra la carpeta de fecha completa, incluye los
@@ -617,6 +632,34 @@ export async function GET(req: NextRequest) {
         return { presentes: fechasR2.length, conservaria: plan.keep.length, sobrarian: plan.borrar };
       })();
 
+  // ── Salud de la réplica off-site ────────────────────────────────────────
+  // Una carpeta data/<fecha>/ solo es restaurable con los DOS metas (core +
+  // switch). Se evalúa AYER, no hoy: hoy la corrida core (06:00 UTC) va antes
+  // que la de switch (06:45) y el hueco es normal. Un día cerrado que quedó a
+  // medias es una red de seguridad rota reportándose sana → alerta Telegram.
+  // Solo la corrida core alerta (la de switch ni lista las keys).
+  const ayer = new Date(now.getTime() - 86400000).toISOString().slice(0, 10);
+  const estadoAyer = estadosR2.find((e) => e.fecha === ayer);
+  const saludR2 = esGrupoSwitch
+    ? undefined
+    : {
+        fechas: estadosR2.length,
+        completas: estadosR2.filter((e) => e.completo).length,
+        incompletas: estadosR2.filter((e) => !e.completo).map((e) => ({ fecha: e.fecha, faltan: e.faltan })),
+        ayer: estadoAyer ?? null,
+      };
+  if (!esGrupoSwitch && r2Total.enabled) {
+    const detalle = !estadoAyer
+      ? `R2 no tiene la carpeta data/${ayer}/ (backup off-site del día anterior ausente)`
+      : !estadoAyer.completo
+        ? `R2 data/${ayer}/ incompleta: falta el grupo ${estadoAyer.faltan.join(" y ")} (${estadoAyer.faltan.map((g) => (g === "switch" ? "meta-switch.json" : "meta.json")).join(", ")}). Ese día NO se puede restaurar entero.`
+        : null;
+    if (detalle) {
+      console.error(`[${cronName}] réplica R2 incompleta:`, detalle);
+      await logCronError("backup_r2_incompleto", detalle);
+    }
+  }
+
   await recordCronHeartbeat(cronName);
   return NextResponse.json({
     ok: true,
@@ -628,6 +671,7 @@ export async function GET(req: NextRequest) {
     storage,
     r2: r2Total,
     retencionR2,
+    saludR2,
     counts: Object.fromEntries(results.map((r) => [r.file, r.rows])),
   });
 }
