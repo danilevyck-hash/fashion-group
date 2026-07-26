@@ -7,7 +7,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["src/__tests__/**/*.test.ts"],
+    // .tsx habilitado para los tests que renderizan componentes de verdad
+    // (@testing-library/react), no solo lógica pura.
+    include: ["src/__tests__/**/*.test.ts", "src/__tests__/**/*.test.tsx"],
     setupFiles: [],
   },
   resolve: {
