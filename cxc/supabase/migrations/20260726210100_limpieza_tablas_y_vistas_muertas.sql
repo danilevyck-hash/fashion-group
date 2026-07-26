@@ -1,0 +1,161 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: borrar 5 tablas y 3 vistas MUERTAS
+--
+-- ── PROBLEMA ────────────────────────────────────────────────────────────────
+-- Ocho objetos quedaron en la base después de que se retirara la feature o se
+-- los reemplazara por un sucesor. Ninguno tiene lector vivo. No pesan casi nada
+-- (ver "ESPACIO" abajo): esto es HIGIENE, no ahorro de disco. El valor real es
+-- que cada uno de estos objetos es una trampa — se respalda, se audita, aparece
+-- en los tipos generados, y el día que alguien lo vea va a creer que sirve.
+--
+-- ── VERIFICACIÓN HECHA ANTES DE ESCRIBIR ESTO (26-jul-2026) ────────────────
+-- Para CADA objeto se buscó en TODO el repo: código TS (.from(...)), cuerpos de
+-- funciones SQL (CREATE OR REPLACE FUNCTION ... $$ ... $$), definiciones de
+-- vistas y MVs, triggers, políticas RLS, migraciones, scripts, crons, listas de
+-- backup (DATASETS/SWITCH_DATASETS en src/app/api/cron/backup/route.ts) y
+-- restore.mjs. Además se contaron las filas contra producción vía PostgREST.
+--
+--   objeto                             tipo   filas   lector vivo
+--   ─────────────────────────────────  ─────  ─────   ───────────────────────
+--   webauthn_credentials               tabla      6   NINGUNO. La feature Face ID
+--                                                     se eliminó de todas las apps;
+--                                                     no queda ni una referencia,
+--                                                     ni siquiera la migración que
+--                                                     la creó.
+--   chat_history                       tabla      0   NINGUNO. Cero apariciones en
+--                                                     todo el repo, ni en docs.
+--   backup_clientes_master_20260509    tabla    167   NINGUNO. Snapshot de rollback
+--                                                     del sprint del 9-may-2026
+--                                                     (backups/sprint1-20260509/
+--                                                     backup_clientes_master.sql:24).
+--                                                     Ese rollback ya no aplica.
+--   fg_audit_log                       tabla      0   Solo POST /api/audit, que NO
+--                                                     tiene ni un llamador en todo
+--                                                     el repo. Y la tabla está VACÍA
+--                                                     -> nunca se escribió nada. La
+--                                                     ruta se borra en este mismo PR.
+--                                                     (OJO: no confundir con
+--                                                     src/lib/marketing/audit.ts, que
+--                                                     es otra tabla y sí está viva.)
+--   ventas_clientes                    tabla      0   Solo GET/POST /api/ventas/
+--                                                     clientes (legacy), sin ningún
+--                                                     llamador: la UI usa
+--                                                     /api/ventas/clientes-12m, que
+--                                                     lee otra fuente. Tabla VACÍA.
+--                                                     La ruta se borra en este PR.
+--                                                     (OJO: la RPC
+--                                                     ventas_clientes_detalle_summary
+--                                                     NO lee esta tabla — lee Switch.
+--                                                     Esa RPC sigue viva.)
+--   cxc_aging                          vista    228   NINGUNO. Su último lector
+--                                                     estructural era
+--                                                     home_dashboard_summary, que
+--                                                     pasó a switch_estadocuenta_aging
+--                                                     en 20260530000100 (la propia
+--                                                     migración lo dice en su línea 4).
+--                                                     La definición vigente de
+--                                                     home_dashboard_summary
+--                                                     (20260622130100) no la menciona.
+--   switch_ultimo_pago_cliente         vista     56   NINGUNO. Es la v1; quedó
+--                                                     abandonada A PROPÓSITO al crear
+--                                                     la v2 (20260603040000:36-41 —
+--                                                     no se reemplazó para no servir
+--                                                     definición vieja cacheada por
+--                                                     PostgREST). El CXC lee
+--                                                     switch_ultimo_pago_cliente_v2,
+--                                                     que NO se toca.
+--   switch_ventas_netas_vw             vista    300   NINGUNO. Se creó en la fase 2.1
+--                                                     (20260529000100) y se descartó
+--                                                     en la MISMA tanda por base
+--                                                     contable equivocada: incluye
+--                                                     ITBMS. Lo dice
+--                                                     20260529000300:22 ("NO usamos
+--                                                     switch_ventas_netas_vw ... para
+--                                                     no inflar ~7% los números").
+--                                                     Ventas usa
+--                                                     switch_ventas_unificado_vw, que
+--                                                     lee switch_facturas directo y NO
+--                                                     se toca.
+--
+-- ── QUÉ NO SE BORRA (parecidos peligrosos) ──────────────────────────────────
+--   switch_ultimo_pago_cliente_v2   VIVA — la lee /api/cxc/ultimo-pago
+--   switch_ventas_unificado_vw      VIVA — la lee todo el módulo Ventas
+--   ventas_clientes_detalle_summary VIVA — RPC, la lee /api/ventas/v2
+--   switch_estadocuenta_aging(_mv)  VIVAS — sucesoras de cxc_aging
+--   ventas_raw                      VIVA — la lee costo (no confundir con ventas_clientes)
+--
+-- ── ESPACIO QUE LIBERA ──────────────────────────────────────────────────────
+-- Las 3 vistas ocupan CERO bytes (una vista no almacena nada). De las 5 tablas,
+-- 2 están vacías. Lo único con contenido:
+--   backup_clientes_master_20260509   167 filas   ~64-96 kB
+--   webauthn_credentials                6 filas       ~16 kB
+--   chat_history / fg_audit_log / ventas_clientes  vacías, ~8-16 kB c/u de catálogo
+--   TOTAL: ~0,1 MB.
+-- Repito, para que no haya sorpresa: esto NO libera espacio. Limpia el mapa.
+--
+-- ── CÓMO VERIFICAR ──────────────────────────────────────────────────────────
+--   SELECT c.relname, c.relkind
+--   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+--   WHERE n.nspname = 'public' AND c.relname IN (
+--     'webauthn_credentials','chat_history','backup_clientes_master_20260509',
+--     'fg_audit_log','ventas_clientes','cxc_aging',
+--     'switch_ultimo_pago_cliente','switch_ventas_netas_vw');
+--   -- esperado: 0 filas
+--
+-- Y que los sucesores siguen respondiendo:
+--   SELECT count(*) FROM switch_ultimo_pago_cliente_v2;  -- ~1.225
+--   SELECT count(*) FROM switch_ventas_unificado_vw;     -- > 0
+--   SELECT * FROM home_dashboard_summary();              -- sin error
+--
+-- ── CÓMO APLICAR ────────────────────────────────────────────────────────────
+-- TRANSACCIONAL: pegar el archivo COMPLETO de una sola vez en el SQL Editor.
+-- No hay CONCURRENTLY ni VACUUM acá.
+--
+-- Los DROP van SIN CASCADE a propósito. Si algo dependiera de estos objetos —
+-- algo que no encontré — el DROP FALLA con el nombre del dependiente y NO se
+-- borra nada (la transacción entera revierte). Ese error es la última red de
+-- seguridad: si aparece, mandámelo en vez de agregarle CASCADE.
+--
+-- Correr DESPUÉS de mergear el PR (borra /api/audit y /api/ventas/clientes),
+-- para que no quede la ruta apuntando a una tabla inexistente ni un minuto.
+-- Fuera de 23:50-00:20 y 05:50-06:10 UTC.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+SET lock_timeout = '5s';
+
+-- ── Vistas primero (por si alguna tabla de abajo las sostuviera) ────────────
+DROP VIEW IF EXISTS switch_ventas_netas_vw;
+DROP VIEW IF EXISTS switch_ultimo_pago_cliente;
+DROP VIEW IF EXISTS cxc_aging;
+
+-- ── Tablas ──────────────────────────────────────────────────────────────────
+DROP TABLE IF EXISTS webauthn_credentials;
+DROP TABLE IF EXISTS chat_history;
+DROP TABLE IF EXISTS backup_clientes_master_20260509;
+DROP TABLE IF EXISTS fg_audit_log;
+DROP TABLE IF EXISTS ventas_clientes;
+
+NOTIFY pgrst, 'reload schema';
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ROLLBACK
+--
+-- Las 5 TABLAS solo se pueden recuperar del backup diario a R2 — dos de ellas
+-- (webauthn_credentials, chat_history) ni siquiera tienen migración de creación
+-- en el repo, así que su DDL vive únicamente en el backup:
+--   node scripts/restore.mjs --list
+--   node scripts/restore.mjs --source r2 --date <YYYY-MM-DD> --table <tabla>
+-- Las 5 están vacías o son un snapshot congelado, así que perder su contenido
+-- no pierde nada de negocio.
+--
+-- Las 3 VISTAS se recrean copiando TAL CUAL el bloque CREATE OR REPLACE VIEW
+-- (más su GRANT) del archivo original, que sigue versionado en el repo y NO se
+-- borra en este PR. No transcribo el SQL acá a propósito: son vistas de 25-40
+-- líneas con FILTER por tipo_comprobante y una transcripción a mano es
+-- exactamente la clase de error que arruina un rollback.
+--
+--   switch_ventas_netas_vw      -> supabase/migrations/20260529000100_switch_ventas_netas_vw.sql   (líneas 18-46)
+--   switch_ultimo_pago_cliente  -> supabase/migrations/20260602000200_switch_ultimo_pago_cliente.sql (líneas 29-43)
+--   cxc_aging                   -> supabase/backups/sprint1-20260509/migration_fase4_cxc.sql        (líneas 96-135)
+-- ─────────────────────────────────────────────────────────────────────────────

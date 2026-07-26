@@ -47,6 +47,23 @@
 // Horario 02:30 UTC: vecinos a ≥30 min (acs-resumen-diario 01:00,
 //   cleanup-packing-lists 03:00). No toca el API de Switch, así que la regla de
 //   SEPARACION_MINIMA_MIN (sesión única por empresa) no aplica.
+//
+// ── PASO 4 (jul-2026): poda de switch_sync_log ─────────────────────────────
+//   `switch_sync_log` crecía sin techo: 3.247 filas y nada que las borrara, a
+//   ~200-400 filas/día entre las 54 entradas de cron (~20 K filas/año). Este es
+//   el único cron de limpieza puramente de DB que ya existía, así que la poda se
+//   engancha acá en vez de agregar una entrada nueva a vercel.json.
+//
+//   Es un paso DELIBERADAMENTE NO FATAL y va SEPARADO de los 3 pasos de sesiones:
+//   si la RPC falla (p. ej. la migración 20260726210200 todavía no corrió), se
+//   registra en el log y ya — NO suma a `errores`, NO cambia el status HTTP y NO
+//   afecta el heartbeat. El contrato de este cron sigue siendo "está sano si los
+//   tres pasos de sesiones salieron"; un log operativo sin podar no es una razón
+//   para que el watchdog lo dé por caído.
+//
+//   La regla de retención (90 días, conservando siempre las 10 últimas de cada
+//   par empresa+tipo y nunca las filas 'running') vive en la función SQL
+//   podar_switch_sync_log, no acá — está explicada en su migración.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -62,6 +79,10 @@ export const fetchCache = "force-no-store";
 export const maxDuration = 60;
 
 const CRON_NAME = "cleanup-sessions";
+
+/** Días de historia que conserva switch_sync_log. El lector que más atrás mira
+ *  son los slots de cron-telemetry (30 h), así que 90 días es holgadísimo. */
+const RETENCION_SYNC_LOG_DIAS = 90;
 
 /** ¿El caller es el cron de Vercel (o un admin corriéndolo a mano)? */
 function autorizado(req: NextRequest): boolean {
@@ -125,6 +146,20 @@ export async function GET(req: NextRequest) {
     else revocadasPorAntiguedad = data?.length ?? 0;
   }
 
+  // ── Paso 4: poda de switch_sync_log. NO FATAL a propósito (ver cabecera):
+  //    no entra en `errores` ni afecta el heartbeat.
+  let syncLogPodadas: number | null = null;
+  {
+    const { data, error } = await supabaseServer.rpc("podar_switch_sync_log", {
+      p_dias: RETENCION_SYNC_LOG_DIAS,
+    });
+    if (error) {
+      console.error(`[cron/cleanup-sessions] poda switch_sync_log falló (no fatal): ${error.message}`);
+    } else {
+      syncLogPodadas = typeof data === "number" ? data : 0;
+    }
+  }
+
   const durationMs = Date.now() - startedAt;
 
   if (errores.length > 0) {
@@ -143,6 +178,7 @@ export async function GET(req: NextRequest) {
         revocadasPorInactividad,
         revocadasPorAntiguedad,
         borradas,
+        syncLogPodadas,
         durationMs,
       },
       { status: 500 },
@@ -150,7 +186,7 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(
-    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas}`,
+    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas} syncLogPodadas:${syncLogPodadas ?? "n/a"}`,
   );
   await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({
@@ -158,6 +194,7 @@ export async function GET(req: NextRequest) {
     revocadasPorInactividad,
     revocadasPorAntiguedad,
     borradas,
+    syncLogPodadas,
     cortes,
     durationMs,
   });

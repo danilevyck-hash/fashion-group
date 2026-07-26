@@ -631,32 +631,6 @@ export type Database = {
       }
 
       // ─── VENTAS ──────────────────────────────────────────────────────────────
-      ventas_clientes: {
-        Row: {
-          id: string
-          empresa: string
-          año: number
-          mes: number
-          cliente: string
-          ventas: number
-        }
-        Insert: {
-          id?: string
-          empresa: string
-          año: number
-          mes: number
-          cliente: string
-          ventas?: number
-        }
-        Update: {
-          id?: string
-          empresa?: string
-          año?: number
-          mes?: number
-          cliente?: string
-          ventas?: number
-        }
-      }
       ventas_metas: {
         Row: {
           id: string
@@ -1037,35 +1011,6 @@ export type Database = {
           id?: string
           user_id?: string | null
           module_order?: string[] | null
-        }
-      }
-      fg_audit_log: {
-        Row: {
-          id: string
-          user_id: string | null
-          user_name: string | null
-          action: string
-          module: string | null
-          details: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          user_name?: string | null
-          action: string
-          module?: string | null
-          details?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          user_name?: string | null
-          action?: string
-          module?: string | null
-          details?: string | null
-          created_at?: string | null
         }
       }
     }

@@ -1,0 +1,133 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: VACUUM de las 3 tablas infladas
+--
+-- ⚠️⚠️  ESTE ARCHIVO **NO** SE PEGA ENTERO  ⚠️⚠️
+--
+-- VACUUM no puede correr dentro de una transacción, y el SQL Editor de Supabase
+-- manda TODA la pestaña como un bloque implícito. Si pegás el archivo completo
+-- falla con "VACUUM cannot run inside a transaction block".
+--
+--   >>> Copiar UNA sola línea de VACUUM, ejecutar, esperar, y recién ahí la
+--   >>> siguiente. Una corrida por línea. <<<
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+-- ── PROBLEMA ────────────────────────────────────────────────────────────────
+-- Medido el 26-jul-2026 contra producción:
+--   switch_recibos         6.824 filas muertas / 37.255 vivas = 18,3 %
+--   multifashion_tickets   2.799 / 15.819 = 17,7 %
+--   switch_facturas        1.265 / 52.269 =  2,4 %
+-- La causa (DELETE+INSERT en recibos, UPDATE ciego en tickets, upsert no
+-- selectivo en facturas) está explicada en detalle en la migración anterior,
+-- 20260726210200_switch_sync_log_poda_y_autovacuum.sql. Esa baja el umbral de
+-- autovacuum para que no vuelva a inflarse. ESTA le devuelve el espacio que ya
+-- se infló.
+--
+-- ── LA DIFERENCIA ENTRE LAS DOS CORRIDAS (importa) ──────────────────────────
+--
+--   CORRIDA A — VACUUM (ANALYZE)      → NO bloquea nada. NO achica el archivo.
+--     Marca el espacio muerto como reutilizable y refresca las estadísticas del
+--     planner. La tabla deja de crecer, pero los MB no vuelven al disco.
+--     Bonus: puebla el visibility map, que es lo que hace que los índices de
+--     cobertura idx_sf_fecha_cover / idx_sad_fecha_cover resuelvan de verdad por
+--     INDEX ONLY SCAN sin tocar el heap (lo pedía 20260725170000, corrida 3).
+--
+--   CORRIDA B — VACUUM FULL           → SÍ BLOQUEA la tabla entera (ACCESS
+--     EXCLUSIVE) mientras la reescribe. Es lo ÚNICO que devuelve MB al disco.
+--
+-- ── CUÁNTO LIBERA CADA UNA ──────────────────────────────────────────────────
+--   CORRIDA A:  0 MB de disco (por diseño). Es la que hay que correr igual.
+--   CORRIDA B: ~6 MB estimados, repartidos así (filas muertas x tamaño de fila
+--              medido + sus entradas de índice):
+--                switch_recibos        ~2,1 MB
+--                multifashion_tickets  ~2,6 MB   (raw_data jsonb, fila pesada)
+--                switch_facturas       ~1,7 MB   (fila promedio ~1.116 B)
+--
+-- Seamos claros con el número: son ~6 MB sobre una base de 250 MB. VACUUM FULL
+-- acá NO es lo que te salva del límite de 500 MB — es prolijidad. Si preferís no
+-- arriesgar el bloqueo, corré SOLO la corrida A: con el autovacuum ya ajustado,
+-- ese espacio se reusa igual y la base deja de inflarse. Esa es mi recomendación.
+--
+-- ── SI CORRÉS LA B, LEE ESTO ────────────────────────────────────────────────
+--   · VACUUM FULL reescribe la tabla entera: necesita transitoriamente HASTA EL
+--     DOBLE del tamaño de la tabla en disco libre. switch_facturas son ~58 MB de
+--     heap, o sea que hacen falta ~60 MB libres. Con la base en 250/500 hay
+--     margen de sobra, pero es el motivo por el que va tabla por tabla y no las
+--     tres juntas.
+--   · Mientras corre, TODA lectura y escritura de esa tabla espera. En estas
+--     escalas son segundos, no minutos, pero un sync que caiga justo ahí se
+--     puede comer el statement_timeout.
+--   · Correr con la base calma: fuera de 23:50-00:20 y 05:50-06:10 UTC, y fuera
+--     de las ventanas de sync (05:30-07:35, 11:50, 13:00, 15:00-15:15, 17:00,
+--     19:00-19:15, 21:00, 23:00-23:15 UTC).
+--   · switch_recibos y multifashion_tickets primero (chicas). switch_facturas
+--     al final, porque es la tabla más leída de toda la base.
+--
+-- ── CÓMO VERIFICAR ──────────────────────────────────────────────────────────
+-- ANTES y DESPUÉS, la misma consulta:
+--   SELECT relname,
+--          n_live_tup, n_dead_tup,
+--          pg_size_pretty(pg_total_relation_size(relid)) AS total,
+--          last_vacuum, last_autovacuum
+--   FROM pg_stat_user_tables
+--   WHERE relname IN ('switch_recibos','multifashion_tickets','switch_facturas');
+--
+-- Tras la corrida A: n_dead_tup ≈ 0, `total` IGUAL que antes (es lo esperado).
+-- Tras la corrida B: `total` más chico.
+--
+-- Y el total de la base:
+--   SELECT pg_size_pretty(pg_database_size(current_database()));
+--
+-- ── ROLLBACK ────────────────────────────────────────────────────────────────
+-- No aplica: VACUUM no cambia ni un dato ni una definición, solo reorganiza el
+-- almacenamiento. No hay nada que revertir.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- CORRIDA A — sin bloqueo. ESTA CORRELA SÍ O SÍ. Una línea por vez.
+-- ════════════════════════════════════════════════════════════════════════════
+
+VACUUM (ANALYZE) switch_recibos;
+
+VACUUM (ANALYZE) multifashion_tickets;
+
+VACUUM (ANALYZE) switch_facturas;
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- CORRIDA B — OPCIONAL y BLOQUEANTE. Solo si querés recuperar los ~6 MB.
+-- Están comentadas a propósito: hay que descomentar y correr UNA por vez.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- VACUUM (FULL, ANALYZE) switch_recibos;          -- ~2,1 MB, tabla chica
+-- VACUUM (FULL, ANALYZE) multifashion_tickets;    -- ~2,6 MB, tabla chica
+-- VACUUM (FULL, ANALYZE) switch_facturas;         -- ~1,7 MB, LA MÁS LEÍDA: al final
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- NO INCLUIDO A PROPÓSITO — requiere tu OK
+--
+-- switch_articulo_diario tiene 39 MB de índices contra 29 MB de datos. Después
+-- de que 20260726210000 le borre idx_sad_empresa_fecha quedan ~32 MB, que sigue
+-- siendo más índice que dato. Parte de eso puede ser bloat de índice, que
+-- VACUUM no recupera (solo REINDEX lo hace).
+--
+-- NO lo meto acá porque no puedo medir el bloat sin acceso al catálogo, y
+-- reindexar a ciegas 32 MB en la tabla que guarda el ÚNICO histórico de
+-- artículos no es algo que haga sin mirar el número antes. Si querés evaluarlo:
+--
+--   SELECT indexrelname,
+--          pg_size_pretty(pg_relation_size(indexrelid)) AS tam,
+--          idx_scan
+--   FROM pg_stat_user_indexes
+--   WHERE relname = 'switch_articulo_diario'
+--   ORDER BY pg_relation_size(indexrelid) DESC;
+--
+-- Y si alguno resulta desproporcionado, se reconstruye SIN bloquear (una
+-- corrida por índice, tampoco corre en transacción):
+--
+--   REINDEX INDEX CONCURRENTLY <nombre_del_indice>;
+--
+-- Pasame la salida de esa consulta y te digo cuáles valen la pena.
+-- ─────────────────────────────────────────────────────────────────────────────
