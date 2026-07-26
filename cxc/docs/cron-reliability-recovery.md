@@ -225,12 +225,13 @@ contra 4-8 s de `facturas`, y son los que el 25-jul reventaron la base con
 
 | UTC | Panamá | Qué | Empresas |
 |---|---|---|---|
-| 15:00 · 19:00 · 23:00 | 10:00 · 14:00 · 18:00 | **Ventas** (`tipo=facturas`) | las 8 con facturas = ACS + las 7 B2B |
+| 11:50 · 15:00 · 19:00 · 23:00 | 06:50 · 10:00 · 14:00 · 18:00 | **Ventas** (`tipo=facturas`) | las 8 con facturas = ACS + las 7 B2B |
 | 13:00 · 17:00 · 21:00 | 08:00 · 12:00 · 16:00 | **Ventas ACS** | american_classic |
 | 00:15 | 19:15 | Cierre de ACS — **NO TOCAR** (el resumen de la 01:00 depende de él) | american_classic |
 | 07:50 · 15:15 · 19:15 · 23:15 | 02:50 · 10:15 · 14:15 · 18:15 | **Pagos** (`sync-recibos`) | las 5 B2B con CXC + ACS |
 
-Entradas de `vercel.json`: **47 → 52**. Límite del plan Pro: 100.
+Entradas de `vercel.json`: **47 → 52** (y **53** con la corrida temprana de las
+11:50, ver la sección siguiente). Límite del plan Pro: 100.
 
 ### Tres cosas que se verificaron, no se asumieron
 
@@ -302,7 +303,7 @@ las 8 empresas termina en ~1 min y cierra sus sesiones
 (`logoutAllSwitchSessions()` en el `finally` del route). Los pagos van 15 min
 después de las ventas porque sí comparten 6 empresas.
 
-`src/__tests__/lib/cron-calendario.test.ts` recorre los **417 pares** de
+`src/__tests__/lib/cron-calendario.test.ts` recorre los **453 pares** de
 `SWITCH_CRON_ENTRADAS` que comparten al menos una empresa y falla si alguno queda
 por debajo del umbral. Mide **inicio contra inicio**, así que para los crons
 LARGOS el margen real es menor y esas parejas se dejaron a ≥50 min a propósito.
@@ -331,10 +332,60 @@ vuelta al día:
 a **9 h 30**, y el de ventas ACS no baja a 2 h sino a **6 h 30**. Los números de 4
 h y 2 h son el ritmo DENTRO de la ventana de trabajo; el hueco largo es el
 nocturno, entre el bloque `all` de la madrugada y la primera pasada de la mañana
-(15:00 UTC = 10:00 Panamá). Si se quisiera un peor caso absoluto de 4 h habría que
-agregar una pasada de ventas ~11:00 UTC (06:00 Panamá) — **no se hizo**: nadie
-consulta a esa hora y cada pasada cuesta sesiones de Switch. Queda como opción
-para el paso 2. El cálculo de pagos (12 h 20 → 8 h 35) sí da exacto.
+(15:00 UTC = 10:00 Panamá). El cálculo de pagos (12 h 20 → 8 h 35) sí da exacto.
+La corrida temprana que cierra ese hueco nocturno es la sección siguiente.
+
+## Corrida temprana de ventas — 11:50 UTC (26-jul-2026)
+
+El paso 1 dejó la primera pasada de ventas del día a las 15:00 UTC = **10:00
+Panamá**. Quien entra a trabajar a las **8 a.m.** veía el dato del bloque `all` de
+la madrugada (05:3x UTC): **7 h 30 de antigüedad**. Se agregó **una** entrada más,
+misma forma que las de 15/19/23 —`tipo=facturas`, las 8 empresas,
+`&slot=facturas-1150`— a las **11:50 UTC = 06:50 Panamá**.
+
+### Por qué 11:50 y no 12:00
+
+`SEPARACION_MINIMA_MIN` = 15 min entre entradas que comparten empresa (sesión
+única de Switch). La entrada toca las 8 empresas, así que compite con TODO el
+cronograma. Los vecinos:
+
+| Vecino | UTC | Empresa | Distancia desde 11:50 |
+|---|---|---|---|
+| `joybees-catalogo` | 11:00 | joystep | 50 min |
+| `acs-fidelizacion` | 11:30 | american_classic | **20 min** |
+| `reebok-catalogo` | 12:10 | active_shoes | **20 min** |
+| `tommy-catalogo` | 12:40 | fashion_shoes | 50 min |
+| ventas ACS | 13:00 | american_classic | 70 min |
+
+A las **12:00** la distancia con `reebok-catalogo` (12:10) sería de **10 min** —
+por debajo del mínimo, y el test de los pares que comparten empresa lo rechazaría.
+11:50 es el punto medio del hueco 11:30-12:10: 20 min de cada lado, con una
+corrida que mide ~1 min (facturas 4-8 s por empresa) y cierra sus sesiones en el
+`finally` del route. `integrity-check` (12:00) **no toca Switch** — es solo DB — y
+para cuando arranca, el sync ya terminó.
+
+No se usó una lista de horas (`0 11,15,19,23 * * *`): una entrada = una ocurrencia
+= un slot, o el detector de ocurrencias perdidas deja de saber cuál se perdió.
+
+**Los saldos de CXC (`estadocuenta`) siguen sin tocarse** — es el paso 2.
+
+### Frescura recalculada con la corrida de las 11:50
+
+| Dato | Paso 1 | Con la corrida temprana | En horario laboral |
+|---|---|---|---|
+| Ventas B2B | 9 h 30 (05:3x → 15:00) | **7 h 30** (23:00 → 06:30, confecciones_boston; vistana 6 h 30) | 4 h (sin cambio) |
+| Ventas ACS | 6 h 30 (06:30 → 13:00) | **6 h 15** (00:15 → 06:30) | 2 h (sin cambio) |
+
+El hueco largo que queda es **nocturno** (después del último sync de las 23:00
+hasta el bloque `all` de la madrugada) — nadie trabaja ahí. Lo que cambió de
+verdad es lo que ve la gente al llegar:
+
+| Quien entra a las… | Antigüedad de las ventas B2B — antes | ahora |
+|---|---|---|
+| 7:00 a.m. | 6 h 30 | 10 min |
+| 8:00 a.m. | 7 h 30 | **1 h 10** |
+| 9:00 a.m. | 8 h 30 | 2 h 10 |
+| 10:00 a.m. | 9 h 30 → 0 (llega el sync de las 15:00 UTC) | 0 |
 
 ## Fuera de alcance / decisiones
 

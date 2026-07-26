@@ -199,7 +199,8 @@ describe("ventas intradía — cobertura de empresas", () => {
 
   it("las entradas grandes cubren TODAS las empresas con facturas (7 B2B + ACS)", () => {
     const completas = ventas.filter((e) => e.empresas.length > 1);
-    expect(completas.map((e) => e.hhmmUtc)).toEqual(["1500", "1900", "2300"]);
+    // 11:50 = corrida temprana (06:50 Panamá) agregada el 26-jul-2026.
+    expect(completas.map((e) => e.hhmmUtc)).toEqual(["1150", "1500", "1900", "2300"]);
     for (const e of completas) {
       expect([...e.empresas].sort()).toEqual([...empresasConFacturas()].sort());
     }
@@ -217,7 +218,7 @@ describe("ventas intradía — cobertura de empresas", () => {
       .filter((e) => e.empresas.includes("american_classic"))
       .map((e) => e.hhmmUtc)
       .sort();
-    expect(acs).toEqual(["0015", "1300", "1500", "1700", "1900", "2100", "2300"]);
+    expect(acs).toEqual(["0015", "1150", "1300", "1500", "1700", "1900", "2100", "2300"]);
   });
 
   it("el sync de CIERRE de ACS (00:15) sigue en pie — el resumen de la 01:00 depende de él", () => {
@@ -254,18 +255,34 @@ describe("frescura — hueco MÁS LARGO entre dos refrescos consecutivos", () =>
   // Ventas B2B: antes SOLO el bloque `tipo=all` de la madrugada (1×/día → 24h).
   const VENTAS = ["switch-sync all", "switch-sync facturas"];
 
-  it("ventas B2B: de 24h a ≤9h30 (y ≤4h dentro del horario laboral)", () => {
+  it("ventas B2B: de 9h30 a ≤7h30 con la corrida de las 11:50", () => {
+    // La corrida temprana (11:50 UTC = 06:50 Panamá) parte el hueco nocturno
+    // 05:3x → 15:00 que valía 9h30. El peor caso que queda es el de
+    // confecciones_boston (23:00 → 06:30, de noche); vistana queda en 6h30.
     for (const empresa of empresasConFacturas().filter((e) => e !== "american_classic")) {
-      expect(peorHueco(empresa, VENTAS), `${empresa}`).toBeLessThanOrEqual(9.5);
+      expect(peorHueco(empresa, VENTAS), `${empresa}`).toBeLessThanOrEqual(7.5);
     }
-    // El hueco largo es el NOCTURNO (05:3x → 15:00). Entre 15:00 y 23:00 UTC
-    // (10:00-18:00 Panamá, horario de oficina) el ritmo es de 4h.
+    expect(peorHueco("vistana", VENTAS)).toBeCloseTo(6.5, 5);
+    expect(peorHueco("confecciones_boston", VENTAS)).toBeCloseTo(7.5, 5);
+    // Entre 15:00 y 23:00 UTC (10:00-18:00 Panamá, horario de oficina) el ritmo
+    // sigue siendo de 4h, y el que entra a las 8 a.m. (13:00 UTC) tiene el dato
+    // de las 11:50, o sea 1h10 de antigüedad en vez de 7h30.
     expect(distanciaCircularMin("1500", "1900") / 60).toBe(4);
     expect(distanciaCircularMin("1900", "2300") / 60).toBe(4);
+    expect(distanciaCircularMin("1150", "1300") / 60).toBeCloseTo(1 + 10 / 60, 5);
   });
 
-  it("ventas ACS: de 8h30 a ≤6h30 (2h entre las 13:00 y las 23:00 UTC)", () => {
-    expect(peorHueco("american_classic", VENTAS)).toBeLessThanOrEqual(6.5);
+  it("la corrida temprana respeta la separación con sus vecinos de Switch", () => {
+    // Los dos vecinos más cercanos son acs-fidelizacion 11:30 (american_classic)
+    // y reebok-catalogo 12:10 (active_shoes): 20 min de cada lado, por encima
+    // del mínimo. NO se puso a las 12:00 justo por reebok (habrían sido 10 min).
+    expect(distanciaCircularMin("1150", "1130")).toBe(20);
+    expect(distanciaCircularMin("1150", "1210")).toBe(20);
+    expect(distanciaCircularMin("1200", "1210")).toBeLessThan(SEPARACION_MINIMA_MIN);
+  });
+
+  it("ventas ACS: de 6h30 a ≤6h15 (2h entre las 13:00 y las 23:00 UTC)", () => {
+    expect(peorHueco("american_classic", VENTAS)).toBeCloseTo(6.25, 5);
     for (const [a, b] of [["1300", "1500"], ["1500", "1700"], ["1700", "1900"], ["1900", "2100"], ["2100", "2300"]]) {
       expect(distanciaCircularMin(a, b) / 60).toBe(2);
     }

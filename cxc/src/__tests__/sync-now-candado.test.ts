@@ -140,11 +140,14 @@ describe("proximoCronParaEmpresa — espejo de vercel.json", () => {
     expect(p?.horaPanama).toBe("11:10");
   });
 
-  it("active_shoes a las 11:50 UTC → reebok-catalogo 12:10", () => {
-    const p = proximoCronParaEmpresa("active_shoes", new Date("2026-07-23T11:50:00Z"));
+  it("active_shoes a las 11:55 UTC → reebok-catalogo 12:10", () => {
+    // Era 11:50, pero desde el 26-jul-2026 esa es la hora de la corrida
+    // temprana de ventas (las 8 empresas) → el instante quedaba justo sobre un
+    // cron y el resultado dependía del empate. 11:55 no tiene esa ambigüedad.
+    const p = proximoCronParaEmpresa("active_shoes", new Date("2026-07-23T11:55:00Z"));
     expect(p?.cron).toBe("reebok-catalogo");
     expect(p?.hhmmUtc).toBe("1210");
-    expect(p?.enMinutos).toBe(20);
+    expect(p?.enMinutos).toBe(15);
   });
 
   it("american_classic tarde en la noche cruza al 00:15 del día siguiente", () => {
