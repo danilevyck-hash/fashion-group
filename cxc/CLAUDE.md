@@ -41,6 +41,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
 - Middleware: `src/middleware.ts` valida sesión contra `user_sessions` table
+- **Expiración de sesión — vive SOLO en el cron (26-jul-2026).** `user_sessions` **no tiene `expires_at`** (columnas reales: id, user_name, user_role, session_token, ip_address, last_seen, created_at, revoked) y la cookie firmada tampoco lleva claim de expiración: del lado del servidor una sesión no vencía nunca. Lo único que la mataba era el `maxAge` de 7 días de la cookie en el navegador — un control del CLIENTE, que quien se quede con el valor de la cookie ignora. Medido antes del fix: 1.190 filas, 259 sin revocar para 9 usuarios (daniel 73, Angela 66), y solo 3 usadas en 24h. Ahora `/api/cron/cleanup-sessions` (02:30 UTC) revoca a los **14 días** sin `last_seen` (el doble de los 7 del `maxAge` → no desloguea a nadie que todavía pudiera estar usando la app), pone un **tope duro de 90 días** de vida por sesión aunque se la mantenga viva a pings, y **borra** las revocadas con `last_seen` > 90 días. Constantes en `src/lib/session-retention.ts`. Si se agrega un `expires_at` algún día, el middleware tiene que respetarlo — hoy no existe nada que respetar.
 - Session health check: `/api/auth/check` — pinged cada 2 min, warning banner antes de expirar
 - API auth: `src/lib/requireRole.ts` — admin siempre pasa, verifica rol contra array
 - Rate limiting: login en Supabase (tabla `login_attempts` + RPC `register_login_failure`/`clear_login_attempts`), por IP — 5 fallos en ventana de 15 min → lockout 15 min (`src/lib/login-rate-limit.ts`, fail-open). Reemplazó el Map en-memoria (inefectivo en serverless)
@@ -83,10 +84,11 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-53 entradas configuradas. **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+54 entradas configuradas. **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
+| /api/cron/cleanup-sessions | 02:30 (revoca sesiones inactivas — ver nota abajo) |
 | /api/cron/cleanup-packing-lists | 03:00 |
 | /api/cron/multifashion-sync | 05:00 |
 | /api/cron/switch-sync tipo=all (vistana, active_wear) | 05:30 |

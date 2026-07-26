@@ -37,6 +37,10 @@
       "schedule": "30 15 * * *"
     },
     {
+      "path": "/api/cron/cleanup-sessions",
+      "schedule": "30 2 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-packing-lists",
       "schedule": "0 3 * * *"
     },
