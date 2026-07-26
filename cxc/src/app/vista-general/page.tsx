@@ -466,6 +466,16 @@ function SemaforoFila({ e, pill, abierta, onToggle, mes }: {
 
 // ── Requiere tu atención ─────────────────────────────────────────────────────
 
+// Filas de "Requiere tu atención": eran links de 33px de alto (iPhone 390x844).
+// min-h-[44px] las lleva a la regla de la casa sin cambiar el ritmo visual de la
+// card (py-1.5 seguía dando 33px con una sola línea de texto).
+const FILA_ALERTA =
+  "flex min-h-[44px] items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-stone-50 transition";
+// Decisión de Daniel: letra más chica antes que cortar el nombre (ni dos líneas
+// ni acortar). text-sm (14px) cortaba hasta 46px; text-xs (13px en este repo) es
+// lo JUSTO — por debajo de 12px no se baja, es el piso de legibilidad.
+const NOMBRE_ALERTA = "text-xs text-stone-700";
+
 function Atencion({ data }: { data: VistaGeneral }) {
   return (
     <div>
@@ -477,8 +487,8 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Nada vencido a +90 días.</Empty>
           ) : (
             data.cxc.topClientes.map((c) => (
-              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-stone-50 transition">
-                <span className="text-sm text-stone-700 truncate">{c.nombre}<span className="text-stone-400 text-xs"> · {c.empresa}</span></span>
+              <Link key={`${c.empresa}-${c.codigo}-${c.nombre}`} href="/admin" className={FILA_ALERTA}>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{c.nombre}<span className="text-stone-400 text-[11px]"> · {c.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(c.saldo)}</span>
               </Link>
             ))
@@ -491,8 +501,8 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Nada vencido a +90 días.</Empty>
           ) : (
             data.cxp.topProveedores.map((p) => (
-              <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-stone-50 transition">
-                <span className="text-sm text-stone-700 truncate">{p.nombre}<span className="text-stone-400 text-xs"> · {p.empresa}</span></span>
+              <Link key={`${p.empresa}-${p.nombre}`} href="/proveedores" className={FILA_ALERTA}>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{p.nombre}<span className="text-stone-400 text-[11px]"> · {p.empresa}</span></span>
                 <span className="text-sm font-semibold text-red-600 tabular-nums shrink-0">{moneyK(p.saldo)}</span>
               </Link>
             ))
@@ -505,8 +515,8 @@ function Atencion({ data }: { data: VistaGeneral }) {
             <Empty>Sin reclamos antiguos pendientes.</Empty>
           ) : (
             data.reclamos.antiguos.map((r) => (
-              <Link key={r.id} href={`/reclamos?id=${r.id}`} className="flex items-center justify-between gap-2 py-1.5 px-2 -mx-2 rounded-md hover:bg-stone-50 transition">
-                <span className="text-sm text-stone-700 truncate">{r.nro}<span className="text-stone-400 text-xs"> · {r.empresa}</span></span>
+              <Link key={r.id} href={`/reclamos?id=${r.id}`} className={FILA_ALERTA}>
+                <span className={`${NOMBRE_ALERTA} truncate`}>{r.nro}<span className="text-stone-400 text-[11px]"> · {r.empresa}</span></span>
                 <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">{r.dias}d</span>
               </Link>
             ))
@@ -525,7 +535,9 @@ function AlertCard({ title, href, linkLabel, count, children }: { title: string;
         {count > 0 && <span className="text-[11px] font-bold text-white bg-stone-900 rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">{count}</span>}
       </div>
       <div className="flex-1">{children}</div>
-      <Link href={href} className="text-xs text-teal-600 hover:text-teal-700 font-medium mt-3">{linkLabel} →</Link>
+      {/* "Ir a CXC →" medía 18px de alto. self-start + min-h-[44px] lo lleva a
+          44 sin estirarlo a todo el ancho de la card. */}
+      <Link href={href} className="text-xs text-teal-600 hover:text-teal-700 font-medium mt-1 inline-flex min-h-[44px] min-w-[44px] items-center self-start">{linkLabel} →</Link>
     </div>
   );
 }

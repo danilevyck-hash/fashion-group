@@ -433,7 +433,7 @@ function MobileEmpresaSelect({
         value={value}
         onChange={e => onChange(e.target.value)}
         disabled={disabled}
-        className="w-full appearance-none rounded-lg border border-gray-200 bg-white py-2.5 pl-3 pr-8 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
+        className="w-full appearance-none rounded-lg border border-gray-200 bg-white min-h-[44px] pl-3 pr-8 text-sm text-gray-900 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
       >
         <option value="all">Todas mis empresas</option>
         {options.map(o => (
@@ -496,18 +496,29 @@ function MobileClientCard({
       >
         <div className="flex items-start justify-between gap-3 px-3 py-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            {/* gap-0 a propósito: la estrella ya mide 44x44 (regla de la casa)
+                y su caja termina EXACTAMENTE donde arranca el nombre — el aire
+                que se ve alrededor del ☆ es parte de su área de tap, así que
+                errarle no expande la fila. El `-ml-3` la saca hacia el padding
+                de la card para que crecer de 36 a 44 le cueste al nombre 8px y
+                no 20. */}
+            <div className="flex items-center gap-0">
               <span
                 role="button"
                 tabIndex={0}
                 onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); } }}
                 aria-label={isFavorite ? "Quitar favorito" : "Marcar favorito"}
-                className="shrink-0 cursor-pointer text-base leading-none p-2.5 -m-2.5"
+                className="-my-3 -ml-3 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center text-base leading-none"
               >
                 {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-gray-300">☆</span>}
               </span>
-              <span className="truncate text-sm font-medium text-gray-900">
+              {/* Decisión de Daniel: letra más chica antes que cortar el nombre.
+                  text-sm (14px) cortaba hasta 80px. 12px es el PISO de
+                  legibilidad y no se baja de ahí: los 4 nombres más largos
+                  necesitarían ~10px, así que siguen cortando con "…" (queda
+                  como decisión de producto, no se rompe el piso). */}
+              <span className="truncate text-[12px] font-medium leading-5 text-gray-900">
                 {client.nombre_normalized}
               </span>
             </div>

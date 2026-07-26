@@ -140,12 +140,12 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
             placeholder="Buscar por nombre o código (D-XXX)…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition"
+            className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition"
           />
           <select
             value={provincia}
             onChange={(e) => setProvincia(e.target.value)}
-            className="border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition sm:w-48"
+            className="border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition sm:w-48"
           >
             <option value="">Todas las provincias</option>
             {provincias.map(p => <option key={p} value={p}>{p}</option>)}
@@ -221,9 +221,20 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                       <span className="font-medium truncate">{c.nombre}</span>
                       <span className="shrink-0 text-xs tabular-nums text-gray-400">{c.codigo}</span>
                     </div>
+                    {/* Llamar es LA acción del módulo en el celular y el link
+                        medía 18px de alto. Ahora 44x44 (min-w-[44px] cubre los
+                        teléfonos cortos) sin estirar la card: el alto extra se
+                        absorbe con -my-1.5. */}
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
                       {tHref ? (
-                        <a href={tHref} className="text-blue-600" onClick={(e) => e.stopPropagation()}>{tel}</a>
+                        <a
+                          href={tHref}
+                          aria-label={`Llamar a ${c.nombre}`}
+                          className="-my-1.5 inline-flex min-h-[44px] min-w-[44px] items-center text-blue-600"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {tel}
+                        </a>
                       ) : (
                         <span>{tel || "Sin teléfono"}</span>
                       )}

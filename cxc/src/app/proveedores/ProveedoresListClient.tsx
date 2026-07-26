@@ -136,7 +136,10 @@ function ProveedoresList() {
       className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-medium truncate">{it.nombre}</span>
+        {/* Heredaba 16px del body y cortaba hasta 46px. text-xs (13px en este
+            repo) es lo JUSTO para que entren los 3 nombres largos que se
+            cortaban — decisión de Daniel: letra más chica, no dos líneas. */}
+        <span className="font-medium truncate text-xs">{it.nombre}</span>
         <span className={`shrink-0 text-sm font-medium tabular-nums ${it.saldo_total < 0 ? "text-blue-600" : it.saldo_total > 0 ? "text-purple-700" : "text-gray-400"}`}>
           {it.saldo_total < 0 ? `+$${fmt(Math.abs(it.saldo_total))}` : `$${fmt(it.saldo_total)}`}
         </span>
@@ -201,7 +204,7 @@ function ProveedoresList() {
             placeholder="Buscar proveedor…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-4"
+            className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition mb-4"
           />
 
           {loading ? (
@@ -219,7 +222,7 @@ function ProveedoresList() {
                     const scope = empresa ? empresaLabel(empresa) : "Todo el grupo";
                     exportProveedoresExcel(items, `${scope}${q ? ` — búsqueda: ${q}` : ""} — ${items.length} proveedores`, empresa ? empresaLabel(empresa) : undefined);
                   }}
-                  className="shrink-0 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97]"
+                  className="shrink-0 inline-flex min-h-[44px] items-center rounded-md border border-gray-200 px-4 text-xs font-medium text-gray-700 hover:border-gray-300 transition active:scale-[0.97]"
                 >
                   Exportar Excel
                 </button>
@@ -248,7 +251,7 @@ function ProveedoresList() {
                           <td colSpan={colsCount} className="py-1">
                             <button
                               onClick={() => setShowSinSaldo((v) => !v)}
-                              className="text-xs text-gray-400 hover:text-gray-600 transition"
+                              className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
                             >
                               {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
                             </button>
@@ -268,7 +271,7 @@ function ProveedoresList() {
                   <li className="px-1 py-2">
                     <button
                       onClick={() => setShowSinSaldo((v) => !v)}
-                      className="text-xs text-gray-400 hover:text-gray-600 transition"
+                      className="inline-flex min-h-[44px] items-center text-xs text-gray-400 hover:text-gray-600 transition"
                     >
                       {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
                     </button>
@@ -288,7 +291,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium border transition active:scale-[0.97] ${
+      // min-h-[44px]: los chips medían 28px de alto (iPhone 390x844).
+      className={`inline-flex min-h-[44px] items-center rounded-full px-4 text-xs font-medium border transition active:scale-[0.97] ${
         active ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
       }`}
     >

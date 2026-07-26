@@ -195,7 +195,7 @@ export default function UsuariosPage() {
             </h1>
             <p className="text-sm text-gray-600 mt-1">Define qué módulos ve cada quien</p>
           </div>
-          <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition flex items-center gap-1.5">
+          <button onClick={openNewUser} className="text-sm bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition flex items-center gap-1.5 active:scale-[0.97]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
             Nuevo Usuario
           </button>
@@ -243,23 +243,28 @@ export default function UsuariosPage() {
                           {lastSeen ? `Última sesión ${relativeTime(lastSeen)}` : "Nunca ha entrado"}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity shrink-0">
+                      {/* Editar y Desactivar: 44x44 con 8px de separación. Antes
+                          eran 26x26 pegados a 4px y uno es DESTRUCTIVO — el peor
+                          combo del sistema en iPhone (auditoría 390x844). */}
+                      <div className="flex items-center gap-2 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity shrink-0">
                         <button
                           onClick={() => openEditUser(u)}
                           title="Editar"
-                          className="text-gray-400 hover:text-gray-700 p-1.5 rounded transition-colors"
+                          aria-label={`Editar ${u.name}`}
+                          className="text-gray-400 hover:text-gray-700 h-11 w-11 inline-flex items-center justify-center rounded transition-colors"
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
                         </button>
                         <button
                           onClick={() => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
                           title={u.active ? "Desactivar" : "Reactivar"}
-                          className="text-gray-400 hover:text-red-600 p-1.5 rounded transition-colors"
+                          aria-label={`${u.active ? "Desactivar" : "Reactivar"} ${u.name}`}
+                          className="text-gray-400 hover:text-red-600 h-11 w-11 inline-flex items-center justify-center rounded transition-colors"
                         >
                           {u.active ? (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
                           ) : (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                           )}
                         </button>
                       </div>
@@ -285,7 +290,9 @@ export default function UsuariosPage() {
               aria-modal="true"
               aria-labelledby="usuario-modal-title"
             >
-              <div className="px-6 pt-6 pb-2">
+              {/* La ✕ es OBLIGATORIA: en iPhone no hay tecla Escape y el
+                  backdrop era la única salida del modal. 44x44. */}
+              <div className="px-6 pt-6 pb-2 flex items-start justify-between gap-3">
                 <h2
                   id="usuario-modal-title"
                   className="text-gray-900 leading-tight"
@@ -293,6 +300,16 @@ export default function UsuariosPage() {
                 >
                   {editUserId ? "Editar usuario" : "Nuevo usuario"}
                 </h2>
+                <button
+                  type="button"
+                  onClick={cerrarUserModal}
+                  disabled={savingUser}
+                  aria-label="Cerrar"
+                  title="Cerrar"
+                  className="-mr-3 -mt-2 h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
               </div>
 
               <div className="px-6 py-5 space-y-4">
@@ -459,7 +476,7 @@ export default function UsuariosPage() {
               <>
                 <button
                   onClick={() => setSessionsOpen(o => !o)}
-                  className="w-full flex items-center justify-between gap-3 py-2 text-left"
+                  className="w-full flex min-h-[44px] items-center justify-between gap-3 py-2 text-left"
                   aria-expanded={sessionsOpen}
                 >
                   <div className="flex items-center gap-3">
