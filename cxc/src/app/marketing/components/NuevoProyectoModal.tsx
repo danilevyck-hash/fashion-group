@@ -65,17 +65,20 @@ export default function NuevoProyectoModal({
         className="relative bg-white w-full sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-100 pl-6 pr-3 py-2.5 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-gray-900">
             Nuevo proyecto
           </h2>
+          {/* Era texto suelto sin caja (13.2×20 px): el target más chico de toda
+              la app. Ahora 44×44 como manda la regla de la casa. */}
           <button
             type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-gray-500 hover:text-black text-xl leading-none"
+            aria-label="Cerrar"
+            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-md text-gray-500 hover:text-black active:scale-[0.97] transition disabled:opacity-40"
           >
-            ×
+            <span aria-hidden="true" className="text-xl leading-none">&times;</span>
           </button>
         </div>
         <div className="p-6">
