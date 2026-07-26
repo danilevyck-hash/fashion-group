@@ -9,7 +9,7 @@
 // que el link de Joybees y el de Tommy le mostraban al cliente los colores de
 // Reebok. Si agregás un color nuevo, va al tema — no acá.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -63,6 +63,24 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  // Barra de progreso del guardado. Medido: ~5 s entre crear el pedido y
+  // verificar el envío a Switch, así que el cliente se queda mirando una
+  // pantalla que antes no decía nada y podía cerrarla (Daniel, 25-jul-2026).
+  const [progreso, setProgreso] = useState(0);
+  // Candado de doble toque: `confirming` es estado y no se ve hasta el
+  // siguiente render — dos taps rápidos entrarían los dos. El ref sí.
+  const confirmandoRef = useRef(false);
+
+  // Mientras se guarda, el navegador pregunta antes de cerrar la pestaña.
+  useEffect(() => {
+    if (!confirming) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [confirming]);
 
   useEffect(() => {
     async function load() {
@@ -117,9 +135,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   // respuesta trae la cantidad REAL disponible del momento, que se muestra en
   // cada línea (misma foto que ve la secretaria en el admin).
   async function handleConfirm() {
-    if (!order || confirming) return;
+    if (!order || confirmandoRef.current) return;
+    confirmandoRef.current = true;
     setConfirming(true);
     setConfirmError(null);
+    // Arranca visible y avanza hacia 92% durante la espera: nunca miente
+    // llegando a 100 antes de que el servidor conteste.
+    setProgreso(8);
+    const arranque = setTimeout(() => setProgreso(92), 60);
     try {
       const res = await fetch(`${theme.api}/pedido-publico/${order.short_id}/confirmar`, {
         method: "POST",
@@ -128,11 +151,13 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.numero) {
+        setProgreso(0);
         setConfirmError(
           (data?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo en unos segundos.",
         );
         return;
       }
+      setProgreso(100);
       const stock = Array.isArray(data.stock) ? (data.stock as StockLinea[]) : null;
       setOrder({
         ...order,
@@ -142,8 +167,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         stock_confirmacion: stock?.length ? stock : order.stock_confirmacion ?? null,
       });
     } catch {
+      setProgreso(0);
       setConfirmError("No se pudo confirmar el pedido. Revisa tu conexión e intenta de nuevo.");
     } finally {
+      clearTimeout(arranque);
+      confirmandoRef.current = false;
       setConfirming(false);
     }
   }
@@ -304,13 +332,42 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             <button
               onClick={() => handleConfirm()}
               disabled={confirming}
+              aria-busy={confirming}
               className={theme.pedidoPublico.confirmBtn}
             >
-              {confirming ? "Confirmando..." : "Confirmar pedido"}
+              {confirming ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Guardando...
+                </span>
+              ) : (
+                "Confirmar pedido"
+              )}
             </button>
-            <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-2.5`}>
-              Al confirmar, tu pedido entra a proceso con Fashion Group.
-            </p>
+
+            {/* Mientras guarda: el cliente tiene que saber que NO cierre la
+                pantalla. Son ~5 s reales — al confirmar también sale el pedido
+                a Switch — así que el silencio de antes lo invitaba a cerrar. */}
+            {confirming ? (
+              <div className="mt-3" role="status" aria-live="assertive">
+                <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-[6000ms] ease-out"
+                    style={{ width: `${progreso}%` }}
+                  />
+                </div>
+                <p className="text-sm font-bold text-emerald-700 mt-2">
+                  Guardando tu pedido, no cierres esta pantalla
+                </p>
+                <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-0.5`}>
+                  Puede tardar unos segundos.
+                </p>
+              </div>
+            ) : (
+              <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-2.5`}>
+                Al confirmar, tu pedido entra a proceso con Fashion Group.
+              </p>
+            )}
             {confirmError && (
               <p className="text-xs text-red-600 mt-2">{confirmError}</p>
             )}
