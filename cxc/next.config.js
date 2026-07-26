@@ -27,7 +27,10 @@ const nextConfig = {
   },
   compress: true,
   poweredByHeader: false,
-  // Skew Protection (Vercel Pro, ventana 12h). Next 14 no lo activa solo: hay
+  // Skew Protection (Vercel Pro). La ventana la fija el "Maximum Age" del
+  // proyecto en el panel de Vercel: por defecto 1 día, y se puede subir hasta la
+  // retención de deployments del plan. (El límite fijo de 12h dejó de existir en
+  // nov-2025; no hay nada que configurar acá.) Next 14 no lo activa solo: hay
   // que pasarle el id del deployment para que estampe `?dpl=<id>` en cada
   // request de asset y de server action. Vercel enruta ese request al
   // deployment que sirvió el HTML → una pestaña vieja sigue encontrando sus

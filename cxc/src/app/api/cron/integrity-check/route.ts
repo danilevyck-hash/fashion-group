@@ -19,7 +19,15 @@ import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 60 → 300 (Vercel Pro, jul-2026). Los 60s eran el default y mataban el ÚNICO
+// caller humano del sistema: el botón "Correr ahora" de /admin/data-health, que
+// espera la respuesta para mostrar cuántos checks corrieron. No abre sesión de
+// Switch — son 6 consultas agregadas contra cxc_rows, cheques,
+// prestamos_movimientos, switch_estadocuenta y switch_facturas —, así que no
+// necesita el techo de 800 de los crons pesados: 300s da 5x de margen y, si
+// alguna vez no alcanza, el problema es la consulta, no el límite (un humano no
+// va a esperar 13 minutos frente a un spinner).
+export const maxDuration = 300;
 
 const CRON_NAME = "integrity-check";
 

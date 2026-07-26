@@ -439,12 +439,39 @@ export const SWITCH_SYNC_SLOT_HEARTBEATS = SWITCH_SYNC_SLOTS.map((s) => slotHear
 
 /**
  * Minutos tras la hora programada dentro de los cuales se considera que la
- * ENTRADA sí se invocó. El scheduler de Vercel tiene jitter grande (medido:
- * 21:10 → 22:11, 06:30 → 06:52) → 120 min cubre lo observado con margen. Ser
- * generoso aquí es el lado SEGURO: si dudamos, la entrada cuenta como "corrió"
- * y la reconciliación NO la cubre (el slot sigue reportándose).
+ * ENTRADA sí se invocó. Se usa para dos cosas:
+ *   (a) decidir si la entrada llegó (`corrioEnVentana`): si llegó, el slot no se
+ *       "cubre" nunca y un fallo suyo se reporta como `corrio-y-fallo`;
+ *   (b) esperar antes de declarar `sin-invocacion` — re-ejecutar es caro (toca
+ *       Switch, sesión única por empresa), no vale adelantarse a una entrada que
+ *       todavía puede llegar tarde.
+ *
+ * 120 → 30 (26-jul-2026, cuenta en Vercel PRO).
+ *
+ * El 120 venía del jitter del plan Hobby, donde Vercel disparaba con hasta una
+ * hora de retraso. Medido en switch_sync_log del 20-24 jul (Hobby), retraso del
+ * PRIMER run de cada slot respecto de su hora: p50 28.7 min, p90 55 min, máx
+ * 58.4 min. Con Pro el disparo es puntual: en las ocurrencias del 25/26-jul ya
+ * bajo Pro el primer run arrancó a +1s (estadocuenta-2110 21:10:01), +13s
+ * (2115), +22s (2120), +32s (facturas-2315 23:15:32) y +40s (facturas-0015
+ * 00:15:40); la deriva que se ve en el heartbeat (23:15:39, 00:15:47) es la
+ * DURACIÓN del sync, no retraso de disparo. El slot más largo termina entero en
+ * ~4 min (21:10:01 → 21:13:57 con dos empresas).
+ *
+ * Por qué 30 y no 20: los slots `all` (05:30/05:35/05:40/06:30) hacen
+ * facturas+estadocuenta+costo de dos empresas y son los únicos sin muestra bajo
+ * Pro todavía; bajo Hobby su duración medida fue de 2 a 5 min. 30 min deja ~5×
+ * de margen sobre el peor caso observado y coincide con RUNNING_STALE_MIN (una
+ * corrida más vieja que eso ya se considera muerta en el resto del sistema).
+ *
+ * Por qué no dejarlo en 120: la ventana de 2h TAPA pérdidas reales. La ronda de
+ * las 16:0x solo tiene UNA pasada de reconciliación después (18:00): con 120 min
+ * las ocurrencias de 16:05 y 16:10 vencían recién 18:05/18:10, o sea nunca se
+ * re-ejecutaban ese día. Con 30 vencen 16:35/16:40 y la pasada de las 18:00 sí
+ * las atiende. (El caso `corrio-y-fallo` no espera ventana y no cambia: sigue
+ * reportándose de una — ver clasificarSlots.)
  */
-export const SLOT_RUN_WINDOW_MIN = 120;
+export const SLOT_RUN_WINDOW_MIN = 30;
 
 /**
  * Tope duro anti-enmascaramiento: por muchas marcas #recuperado que haya, si la
