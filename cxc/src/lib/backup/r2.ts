@@ -18,7 +18,14 @@
 // - Manifest en R2 (key → "size|sha256") — solo se sube lo que cambió. Con
 //   paths por fecha eso cubre el catch-up del MISMO día (2ª/3ª entrada y
 //   pendientes por deadline); el manifest de datos se poda por fecha para no
-//   crecer sin límite.
+//   crecer sin límite. OJO: el manifest NO es dedup entre días. Las keys llevan
+//   la fecha, así que mañana son keys nuevas y todo se sube de nuevo — dedup e
+//   "historia por fecha" no compiten, el manifest solo evita repetir trabajo
+//   dentro del mismo día.
+// - COMPLETITUD: una carpeta data/<fecha>/ la escriben DOS invocaciones (core y
+//   ?grupo=switch), cada una con su meta. Con una sola de las dos el día NO es
+//   restaurable → evaluarFechasR2() lo detecta y el cron alerta (ver el header
+//   del route). Sin eso, una fecha a medias se veía como backup disponible.
 // - VERIFICACIÓN POST-SUBIDA (HEAD): tras cada PUT se confirma que el objeto
 //   existe y pesa lo esperado. Sin esto un PUT "200 pero vacío" quedaba en el
 //   manifest y jamás se reintentaba.
@@ -143,9 +150,16 @@ async function readBodySafe(res: Response): Promise<string> {
 // ── Poda del manifest de datos ───────────────────────────────────────────────
 /**
  * Quita del manifest las entradas `data/YYYY-MM-DD/...` con fecha ANTERIOR a
- * `cutoff` (YYYY-MM-DD). Las que no son de datos con fecha (ej. `_storage/…`)
- * quedan intactas. Sin esto el manifest crece ~57 keys por día para siempre.
+ * `cutoff` (YYYY-MM-DD). Las que no son de datos (ej. `_storage/…`) quedan
+ * intactas. Sin esto el manifest crece ~65 keys por día para siempre.
  * Pura (devuelve un objeto nuevo) para poder testearla sin red.
+ *
+ * También quita las entradas PLANAS heredadas (`data/<tabla>.ndjson.gz`, sin
+ * carpeta de fecha): son del formato anterior a los paths con fecha, ningún
+ * escritor las produce ya y se quedaban en el manifest para siempre porque no
+ * matchean ninguna fecha (57 entradas muertas medidas en el R2 real, 25-jul).
+ * Borrarlas del manifest no borra los objetos: el manifest es solo la caché de
+ * deduplicación de subidas.
  */
 export function pruneDataManifest(
   manifest: Record<string, string>,
@@ -153,8 +167,11 @@ export function pruneDataManifest(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, sig] of Object.entries(manifest)) {
-    const m = key.match(/^data\/(\d{4}-\d{2}-\d{2})\//);
-    if (m && m[1] < cutoff) continue;
+    if (key.startsWith(`${R2_DATA_PREFIX}/`)) {
+      const m = key.match(/^data\/(\d{4}-\d{2}-\d{2})\//);
+      if (!m) continue; // plana heredada, sin fecha → fuera
+      if (m[1] < cutoff) continue;
+    }
     out[key] = sig;
   }
   return out;
@@ -170,9 +187,11 @@ export interface RetencionR2 {
   mensuales: number;
 }
 
-/** Default: 14 diarios + 8 semanales (lunes) + 24 mensuales (día 1) ≈ 46
- *  carpetas × ~30 MB ≈ 1.4 GB — holgado dentro de los 10 GB gratis de R2. */
-export const RETENCION_R2: RetencionR2 = { diarios: 14, semanales: 8, mensuales: 24 };
+/** Default: 21 diarios (los mismos 21 días que la retención de Supabase
+ *  Storage, aprobado por Daniel jul-2026) + 8 semanales (lunes) + 24 mensuales
+ *  (día 1) ≈ 53 carpetas × ~30 MB ≈ 1.6 GB — holgado dentro de los 10 GB
+ *  gratis de R2. Una carpeta de fecha = core (57 datasets) + switch (8). */
+export const RETENCION_R2: RetencionR2 = { diarios: 21, semanales: 8, mensuales: 24 };
 
 /** Día de la semana en UTC de un YYYY-MM-DD (0=domingo … 1=lunes). */
 function diaSemana(date: string): number {
@@ -222,22 +241,112 @@ export function parseDataDates(xml: string): string[] {
   return [...out].sort();
 }
 
+/** Keys de un XML de ListObjectsV2 (sin delimiter). Pura → testeable sin red. */
+export function parseListKeys(xml: string): string[] {
+  return [...xml.matchAll(/<Key>([\s\S]*?)<\/Key>/g)].map((m) => m[1]);
+}
+
+/** Token de continuación de un XML truncado, o "" si no hay más páginas. */
+function parseContinuation(xml: string): string {
+  if (!/<IsTruncated>true<\/IsTruncated>/.test(xml)) return "";
+  return (xml.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/) || [])[1] || "";
+}
+
 /**
- * Lista las carpetas de fecha que hoy existen en R2 bajo `data/`. Solo LECTURA
- * (ListObjectsV2 con delimiter) — este PR NO borra nada en R2. Devuelve [] si
- * R2 no está configurado o si la llamada falla (nunca lanza).
+ * Lista TODAS las keys bajo `data/` en R2 (paginado). Solo LECTURA. Devuelve []
+ * si R2 no está configurado o si la llamada falla (nunca lanza).
+ *
+ * Con ~65 objetos por día y 21 días de retención son ~1.4K keys = 2 llamadas.
+ * Sustituye al listado por CommonPrefixes: de las keys salen TANTO las fechas
+ * (para la retención) COMO el diagnóstico de completitud (ver evaluarFechasR2).
  */
-export async function listR2DataDates(): Promise<string[]> {
+export async function listR2DataKeys(): Promise<string[]> {
   const cfg = getConfig();
   if (!cfg) return [];
+  const out: string[] = [];
   try {
-    const url = `${cfg.baseUrl}?list-type=2&delimiter=%2F&prefix=${encodeURIComponent(R2_DATA_PREFIX + "/")}&max-keys=1000`;
-    const res = await cfg.client.fetch(url, { method: "GET" });
-    if (!res.ok) return [];
-    return parseDataDates(await res.text());
+    let token = "";
+    for (;;) {
+      const qs = new URLSearchParams({
+        "list-type": "2",
+        prefix: `${R2_DATA_PREFIX}/`,
+        "max-keys": "1000",
+      });
+      if (token) qs.set("continuation-token", token);
+      const res = await cfg.client.fetch(`${cfg.baseUrl}?${qs}`, { method: "GET" });
+      if (!res.ok) return out;
+      const xml = await res.text();
+      out.push(...parseListKeys(xml));
+      token = parseContinuation(xml);
+      if (!token) break;
+    }
   } catch {
-    return [];
+    /* nunca lanza: el informe es best-effort */
   }
+  return out;
+}
+
+// ── Completitud de una carpeta de fecha ──────────────────────────────────────
+// Los datos de un día se escriben en DOS invocaciones distintas del cron
+// (core sin params y ?grupo=switch), cada una con su propio meta:
+//   data/<fecha>/meta.json        ← grupo core (57 datasets)
+//   data/<fecha>/meta-switch.json ← grupo switch (8 datasets)
+// Una carpeta con uno solo de los dos NO es un backup restaurable del día: es
+// exactamente lo que pasó el 25-jul-2026 (el deploy que estrenó los paths con
+// fecha entró DESPUÉS de la corrida core de ese día, y las entradas extra de
+// las 10:30/18:30 son no-op porque el core ya había registrado success). El
+// resultado fue una fecha que `restore.mjs --list` mostraba como disponible y
+// que moría con 404 en meta.json.
+
+/** Archivo meta de cada grupo de datos dentro de `data/<fecha>/`. */
+export const R2_METAS_POR_GRUPO: Record<string, string> = {
+  core: "meta.json",
+  switch: "meta-switch.json",
+};
+
+export interface R2FechaEstado {
+  fecha: string;
+  /** Grupos cuyo meta está presente en la carpeta. */
+  grupos: string[];
+  /** Grupos SIN meta → el día no se puede restaurar entero. */
+  faltan: string[];
+  /** Cuántos .ndjson.gz hay en la carpeta. */
+  datasets: number;
+  completo: boolean;
+}
+
+/**
+ * Diagnóstico por fecha a partir de la lista de keys de `data/`. PURA (sin red)
+ * y barata: mira qué metas existen, no baja ninguno. La verificación profunda
+ * (cada dataset del meta tiene su objeto) la hace scripts/restore.mjs, que sí
+ * necesita leer los metas para restaurar.
+ *
+ * Las keys planas heredadas (`data/<tabla>.ndjson.gz`, sin carpeta de fecha —
+ * el formato anterior a los paths con fecha) se IGNORAN: no pertenecen a
+ * ninguna fecha y no son restaurables por sí solas.
+ */
+export function evaluarFechasR2(keys: string[]): R2FechaEstado[] {
+  const porFecha = new Map<string, Set<string>>();
+  for (const key of keys) {
+    const m = key.match(/^data\/(\d{4}-\d{2}-\d{2})\/(.+)$/);
+    if (!m) continue;
+    if (!porFecha.has(m[1])) porFecha.set(m[1], new Set());
+    porFecha.get(m[1])!.add(m[2]);
+  }
+  const grupos = Object.entries(R2_METAS_POR_GRUPO);
+  return [...porFecha.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([fecha, archivos]) => {
+      const presentes = grupos.filter(([, meta]) => archivos.has(meta)).map(([g]) => g);
+      const faltan = grupos.filter(([, meta]) => !archivos.has(meta)).map(([g]) => g);
+      return {
+        fecha,
+        grupos: presentes,
+        faltan,
+        datasets: [...archivos].filter((a) => a.endsWith(".ndjson.gz")).length,
+        completo: faltan.length === 0,
+      };
+    });
 }
 
 // ── Ventana rotativa de verificación ─────────────────────────────────────────
