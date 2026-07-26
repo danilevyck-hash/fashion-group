@@ -18,6 +18,7 @@ import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib
 import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
 import { JOYBEES_LOGO_BLANCO_BASE64, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT } from "@/lib/joybees-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
+import { precioTexto } from "@/lib/catalogo/precio";
 
 export interface PdfOrderItem {
   sku: string;
@@ -44,7 +45,8 @@ export interface OrderPdfOpts {
  *  10 mm (~57 px) — 200 px da margen de sobra y reduce el PDF ~10-20x. */
 export const ORDER_PDF_IMG_PX = 200;
 
-const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Precio del catálogo: `35` / `12.50` / `4,422` — sin `.00` y sin redondear.
+const fmt = precioTexto;
 
 /** Ancho útil (mm) del nombre del cliente antes de chocar con "Pedido:" (x=90),
  *  descontando la etiqueta "Cliente: " y 2 mm de aire. */

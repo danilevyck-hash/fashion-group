@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ConfirmModal, ConfirmDeleteModal } from "@/components/ui";
 import BulkDeletePedidosModal from "@/components/catalogo/BulkDeletePedidosModal";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { precioTexto } from "@/lib/catalogo/precio";
 
 // Pestaña Pedidos del admin — ÚNICA por marca (PR-2, antes gemelos ~83%
 // idénticos). Fila de la vista unificada (presenciales + del link); el total
@@ -28,9 +29,8 @@ export interface UnifiedPedido {
   switch_numero?: string | null;
 }
 
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+// Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
+const fmtMoney = precioTexto;
 
 function fmtDate(iso: string) {
   const d = new Date(iso);

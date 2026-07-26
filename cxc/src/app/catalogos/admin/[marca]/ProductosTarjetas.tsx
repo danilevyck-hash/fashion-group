@@ -11,6 +11,7 @@ import ZipB2BUpload from "./ZipB2BUpload";
 import VariantePicker from "./VariantePicker";
 import { validateProductPhoto, uploadProductPhoto, updateProductBadge, toggleProductOculto } from "./photoUpload";
 import type { AdminProducto, MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 /** Saber si un SKU tiene fotos del banco B2B guardadas (lo calcula el shell). */
 export type TieneVariantes = (sku: string | null) => boolean;
@@ -439,7 +440,7 @@ function ProductPhotoCard({
         <h3 className="text-sm font-semibold text-[#1A2656] line-clamp-2 leading-snug">{product.name}</h3>
 
         {product.price != null && (
-          <div className="text-sm font-bold text-[#1A2656] tabular-nums">${product.price.toFixed(2)}</div>
+          <div className="text-sm font-bold text-[#1A2656] tabular-nums">{fmtPrecio(product.price)}</div>
         )}
 
         {/* Disponible (principal) + En bodega (secundario) */}
@@ -584,7 +585,7 @@ function ProductListRow({
         </div>
         <div className="flex items-center gap-3 mt-1 text-xs">
           {product.price != null && (
-            <span className="font-bold text-[#1A2656] tabular-nums">${product.price.toFixed(2)}</span>
+            <span className="font-bold text-[#1A2656] tabular-nums">{fmtPrecio(product.price)}</span>
           )}
           <span className={`tabular-nums ${agotado ? "text-[#1A2656]/40" : "text-[#1A2656]/80"}`}>
             {agotado ? "Agotado" : `Disp: ${disp}`}

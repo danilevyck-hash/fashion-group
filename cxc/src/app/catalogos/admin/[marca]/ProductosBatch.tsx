@@ -15,10 +15,10 @@ import ZipB2BUpload from "./ZipB2BUpload";
 import VariantePicker from "./VariantePicker";
 import { SneakersChip, type TieneVariantes } from "./ProductosTarjetas";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { precioTexto } from "@/lib/catalogo/precio";
 
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+// Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
+const fmtMoney = precioTexto;
 
 function tieneFoto(p: AdminProducto): boolean {
   return !!(p.image_url && p.image_url.trim());

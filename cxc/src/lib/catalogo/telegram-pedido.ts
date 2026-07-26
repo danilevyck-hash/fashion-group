@@ -29,12 +29,11 @@
 // que traen origen_short_id y vendor_name NULL.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Monto en el formato de siempre: $1,234.00 */
+import { fmtPrecio } from "@/lib/catalogo/precio";
+
+/** Monto en el formato de los catálogos: $1,234 / $37.50 (sin `.00`). */
 export function money(n: number): string {
-  return `$${Number(n).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return fmtPrecio(Number(n));
 }
 
 const nombreODefecto = (v: string | null | undefined, fallback: string) => {

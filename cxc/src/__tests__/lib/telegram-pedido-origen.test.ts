@@ -39,7 +39,7 @@ describe("avisos de Telegram: origen del pedido", () => {
     expect(t).toContain("DEL LINK");
     expect(t).toContain("lo confirmó el cliente");
     expect(t).toContain("Zapatería Central");
-    expect(t).toContain("$980.00");
+    expect(t).toContain("$980");
     expect(t).toContain("TOM-002");
     expect(t).toContain("Contado");
     expect(t).toMatch(/sin vendedor/i);
@@ -86,10 +86,14 @@ describe("avisos de Telegram: origen del pedido", () => {
     }
   });
 
-  it("money mantiene el formato $#,##0.00 de siempre", () => {
-    expect(money(0)).toBe("$0.00");
+  // 26-jul-2026: los montos de catálogo dejaron de mostrar `.00` (regla de
+  // Daniel, src/lib/catalogo/precio.ts). El separador de miles NO cambia, y un
+  // total que cae en medio dólar conserva los dos decimales.
+  it("money usa el formato de precio de catálogo: miles sí, `.00` no", () => {
+    expect(money(0)).toBe("$0");
+    expect(money(980)).toBe("$980");
     expect(money(1234.5)).toBe("$1,234.50");
-    expect(money(1000000)).toBe("$1,000,000.00");
+    expect(money(1000000)).toBe("$1,000,000");
   });
 
   it("son texto PLANO: sin HTML ni Markdown que sendTelegramAlert deba escapar", () => {

@@ -12,6 +12,7 @@ import { jsPDF } from "jspdf";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BASE64 } from "@/lib/tommy-logo";
 import { JOYBEES_LOGO_BASE64 } from "@/lib/joybees-logo";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 export interface CatalogPdfProduct {
   name: string;
@@ -41,6 +42,16 @@ export interface CatalogPdfOpts {
 
 /** Lado máximo (px) al que se reduce cada foto del catálogo (celda ~54mm). */
 export const CATALOG_PDF_IMG_PX = 480;
+
+/**
+ * Precio de la celda del PDF. Delega en el formato ÚNICO de los catálogos
+ * (src/lib/catalogo/precio.ts) — se re-exporta acá porque este archivo era el
+ * dueño histórico del formato y así no se rompe a nadie que lo importe.
+ *
+ * Antes era `price.toFixed(0)`, que REDONDEABA: $12.50 se imprimía "$13" y el
+ * PDF cotizaba 50 ¢ de más por unidad.
+ */
+export const formatCatalogPrice = fmtPrecio;
 
 interface BrandTheme {
   primary: [number, number, number];
@@ -260,7 +271,7 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...(p.badge === "oferta" ? theme.saleColor : theme.primary));
-        doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 1, ty);
+        doc.text(p.price ? formatCatalogPrice(p.price) : "—", x + 1, ty);
       }
       y += CH + RGAP;
     }

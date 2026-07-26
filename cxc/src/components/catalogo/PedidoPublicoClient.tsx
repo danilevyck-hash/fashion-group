@@ -16,6 +16,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { buildPedidoWhatsappUrl, WHATSAPP_CONTACTOS } from "@/lib/catalogo/whatsapp-msg";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import type { StockLinea } from "./types";
+import { precioTexto } from "@/lib/catalogo/precio";
 
 interface OrderItem {
   product_id: string;
@@ -45,9 +46,8 @@ interface Order {
   stock_confirmacion?: StockLinea[] | null;
 }
 
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+// Precio de catálogo: sin `.00` y sin redondear (`35`, `12.50`, `4,422`).
+const fmtMoney = precioTexto;
 
 function fmtDate(iso: string) {
   const d = new Date(iso);

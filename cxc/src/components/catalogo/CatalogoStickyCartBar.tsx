@@ -9,6 +9,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 interface CatalogoStickyCartBarProps {
   marca: MarcaUiKey;
@@ -108,7 +109,7 @@ export default function CatalogoStickyCartBar({
               +
             </button>
           </div>
-          <span className={c.lineTotal}>${lineTotal.toFixed(2)}</span>
+          <span className={c.lineTotal}>{fmtPrecio(lineTotal)}</span>
         </div>
       </div>
     );

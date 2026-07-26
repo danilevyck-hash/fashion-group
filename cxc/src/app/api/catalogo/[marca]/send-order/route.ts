@@ -98,12 +98,28 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const dateStr = new Date().toISOString().slice(0, 10);
   const pdfFilename = `Pedido-${orderNumber}-${dateStr}.pdf`;
 
+  // ── A quién le va ─────────────────────────────────────────────────────────
+  // Este endpoint sirve a DOS botones del detalle de pedido: "Confirmar
+  // pedido" (sin clientEmail → aviso interno) y "Enviar por email al cliente"
+  // (con clientEmail → le llega al mayorista). Hasta el 26-jul-2026 los dos
+  // mandaban el correo escrito para adentro, así que el cliente recibía
+  // "Estimado equipo Fashion Group" e instrucciones de bodega. El destinatario
+  // define la audiencia y con ella el texto, la banda de marca y el asunto.
+  const to = body.clientEmail ? [body.clientEmail] : ["daniel@fashiongr.com"];
+  const esCliente = Boolean(body.clientEmail);
+
+  // La banda de marca interpola datos del pedido en HTML → se escapan acá (un
+  // nombre con comillas o `<` rompía el encabezado del correo).
+  const headerHtml = esCliente
+    ? cfg.sendOrder.headerClienteHtml(escapeHtml(orderNumber), escapeHtml(fechaLabel))
+    : cfg.sendOrder.headerHtml(escapeHtml(orderNumber), escapeHtml(clientName), escapeHtml(fechaLabel));
+
   // ── Build HTML email (lib pura → se puede renderizar y medir sin enviar) ──
   const html = buildOrderEmailHtml({
+    audiencia: esCliente ? "cliente" : "equipo",
     marcaLabel: cfg.label,
-    // La banda de marca interpola el nombre del cliente en HTML → se escapa
-    // acá (un nombre con comillas o `<` rompía el encabezado del correo).
-    headerHtml: cfg.sendOrder.headerHtml(escapeHtml(orderNumber), escapeHtml(clientName), escapeHtml(fechaLabel)),
+    clientName,
+    headerHtml,
     tableHeadBg: cfg.sendOrder.tableHeadBg,
     itemsHasPreorder: cfg.itemsHasPreorder,
     items,
@@ -114,7 +130,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     total,
   });
 
-  const to = body.clientEmail ? [body.clientEmail] : ["daniel@fashiongr.com"];
+  // Asunto: el del equipo triagea (quién, cuánto); el del cliente confirma.
+  const subject = esCliente
+    ? `Recibimos tu pedido ${orderNumber} — ${cfg.label}`
+    : `Nuevo pedido ${orderNumber} — ${clientName} — $${fmt(total)}`;
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -123,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       body: JSON.stringify({
         from: cfg.sendOrder.from,
         to,
-        subject: `Nuevo pedido ${orderNumber} — ${clientName} — $${fmt(total)}`,
+        subject,
         html,
         attachments: [{ filename: pdfFilename, content: pdfBuffer.toString("base64") }],
       }),

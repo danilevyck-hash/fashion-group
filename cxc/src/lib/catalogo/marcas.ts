@@ -182,7 +182,14 @@ export interface MarcaConfig {
   switchDirectorioLabel: string;
   sendOrder: {
     from: string;
+    /** Banda de marca del correo AL EQUIPO (aviso interno de pedido nuevo). */
     headerHtml: (orderNumber: string, clientName: string, fechaLabel: string) => string;
+    /** Banda de marca del correo AL CLIENTE. No lleva el nombre del cliente
+     *  (a él no le dice nada leer su propio nombre en el encabezado): agradece
+     *  y deja a la vista el número de pedido y la fecha. Las 3 marcas usan la
+     *  MISMA tipografía acá a propósito — bloque nuevo, paridad total; solo
+     *  cambian logo y color. */
+    headerClienteHtml: (orderNumber: string, fechaLabel: string) => string;
     tableHeadBg: string;
   };
   /** Solo Reebok: orden canónico categoría+SKU de items en correo/PDF. */
@@ -281,6 +288,12 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
         <h2 style="margin:0;font-size:18px">Pedido ${orderNumber} — ${clientName}</h2>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>`,
+      headerClienteHtml: (orderNumber, fechaLabel) => `
+      <div style="background:#1a1a1a;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/reebok/reebok-logo.png" alt="Reebok" width="60" height="17" style="display:block;margin-bottom:8px" />
+        <h2 style="margin:0;font-size:18px">Gracias por tu pedido</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
+      </div>`,
       tableHeadBg: "#1a1a1a",
     },
     sortEmailItems: sortReebokOrderItems,
@@ -357,6 +370,12 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
         <img src="https://fashiongr.com/joybees/joybees-logo-blanco.png" alt="Joybees" width="110" height="29" style="display:block;margin-bottom:8px" />
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      headerClienteHtml: (orderNumber, fechaLabel) => `
+      <div style="background:#1a2656;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/joybees/joybees-logo-blanco.png" alt="Joybees" width="110" height="29" style="display:block;margin-bottom:8px" />
+        <h2 style="margin:6px 0 0;font-size:18px">Gracias por tu pedido</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
       </div>`,
       tableHeadBg: "#1a2656",
     },
@@ -436,6 +455,12 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
         <img src="https://fashiongr.com/tommy/tommy-horizontal-blanco.png" alt="TOMMY HILFIGER" width="160" height="9" style="display:block;margin-bottom:8px" />
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      headerClienteHtml: (orderNumber, fechaLabel) => `
+      <div style="background:#152342;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/tommy/tommy-horizontal-blanco.png" alt="TOMMY HILFIGER" width="160" height="9" style="display:block;margin-bottom:8px" />
+        <h2 style="margin:6px 0 0;font-size:18px">Gracias por tu pedido</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
       </div>`,
       tableHeadBg: "#152342",
     },
