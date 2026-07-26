@@ -29,6 +29,7 @@ import {
   slotCubreTipo,
   ultimaOcurrenciaUtc,
   slotsHuerfanos,
+  clasificarSlots,
   slotCubiertoPorRecuperacion,
   slotHeartbeatName,
   slotRecuperadoName,
@@ -212,10 +213,35 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
     expect(s!.pares).toContain("fashion_shoes/estadocuenta");
   });
 
-  it("un slot ROTO de verdad (su entrada corrió y falló) NO se marca — sigue reportándose", () => {
+  it("un slot que corrió y falló NO se marca MIENTRAS su trabajo siga pendiente", () => {
     // 24-jul: la entrada de las 05:40 SÍ se invocó (06:04-06:06) pero joystep
-    // falló con error; a las 10:53 la reconciliación recuperó joystep. Aunque el
-    // par quedó al día, el slot NO se cubre: su entrada corrió y salió mal.
+    // falló con error. Antes de que nadie recupere a joystep, el slot no se
+    // cubre: sale como desatendido (corrio-y-fallo) y se reporta.
+    const rows: SyncLogRowMin[] = [
+      row("2026-07-24T06:04:37Z", "active_shoes", "facturas"),
+      row("2026-07-24T06:04:42Z", "active_shoes", "estadocuenta"),
+      row("2026-07-24T06:06:21Z", "active_shoes", "costo"),
+      row("2026-07-24T06:06:24Z", "joystep", "facturas", "error"),
+      row("2026-07-24T06:06:41Z", "joystep", "estadocuenta", "error"),
+      row("2026-07-24T06:06:42Z", "joystep", "costo", "error"),
+    ];
+    const hb = new Map([["switch-sync:all-0540", "2026-07-23T05:54:00Z"]]);
+    const args = { now: new Date("2026-07-24T10:00:00Z"), rows, heartbeats: hb, empresasConCxc: CXC, slots: SLOTS_JUL2026 };
+    expect(slotsHuerfanos(args).map((s) => s.slot)).not.toContain("all-0540");
+    const d = clasificarSlots(args).desatendidos.find((x) => x.slot === "all-0540");
+    expect(d!.motivo).toBe("corrio-y-fallo");
+    expect(d!.paresPendientes.map((p) => p.empresa)).toEqual(["joystep", "joystep", "joystep"]);
+  });
+
+  it("una vez COMPENSADO el trabajo sí se marca, aunque la entrada haya corrido y fallado", () => {
+    // Continuación del caso de arriba: a las 10:53 la reconciliación recuperó
+    // joystep. El fallo YA se reportó (arriba, como corrio-y-fallo) y ahora los
+    // datos están al día, pero el heartbeat propio del slot sigue congelado en el
+    // 23-jul → sin marca, el watchdog alertaría "sin success reciente" con todo
+    // fresco. Es exactamente el trato que recibía `facturas-1500` (invocación
+    // perdida) y que a `estadocuenta-1605/1610` se les negaba el 26-jul-2026.
+    // El anti-enmascaramiento no vive acá sino en SLOT_ENTRY_DEAD_HOURS (50h
+    // sobre el heartbeat PROPIO, que la marca nunca pisa).
     const rows: SyncLogRowMin[] = [
       row("2026-07-24T06:04:37Z", "active_shoes", "facturas"),
       row("2026-07-24T06:04:42Z", "active_shoes", "estadocuenta"),
@@ -231,6 +257,31 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
       now: new Date("2026-07-24T14:00:00Z"),
       rows,
       heartbeats: new Map([["switch-sync:all-0540", "2026-07-23T05:54:00Z"]]),
+      empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
+    });
+    const s = out.find((x) => x.slot === "all-0540");
+    expect(s).toBeTruthy();
+    expect(s!.entradaCorrio).toBe(true); // se distingue del huérfano clásico
+    expect(s!.heartbeat).toBe("switch-sync:all-0540#recuperado");
+  });
+
+  it("si la entrada resolvió TODO dentro de su ventana no se certifica nada", () => {
+    // Sin fallo ni recuperación no hay huérfano que marcar: un día sano es cero
+    // marcas aunque falte el heartbeat propio (eso sería un bug de telemetría del
+    // route, y taparlo con una marca sería el error opuesto).
+    const rows: SyncLogRowMin[] = [
+      row("2026-07-24T05:41:00Z", "active_shoes", "facturas"),
+      row("2026-07-24T05:41:10Z", "active_shoes", "estadocuenta"),
+      row("2026-07-24T05:41:20Z", "active_shoes", "costo"),
+      row("2026-07-24T05:42:00Z", "joystep", "facturas"),
+      row("2026-07-24T05:42:10Z", "joystep", "estadocuenta"),
+      row("2026-07-24T05:42:20Z", "joystep", "costo"),
+    ];
+    const out = slotsHuerfanos({
+      now: new Date("2026-07-24T10:00:00Z"),
+      rows,
+      heartbeats: new Map(),
       empresasConCxc: CXC,
       slots: SLOTS_JUL2026,
     });

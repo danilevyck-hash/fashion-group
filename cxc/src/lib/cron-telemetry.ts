@@ -581,6 +581,42 @@ export function ultimaOcurrenciaUtc(hhmmUtc: string, now: Date): Date {
   return d;
 }
 
+/**
+ * Instante (ms) desde el cual CONSTA que la entrada del slot existía — el más
+ * antiguo de los dos rastros que deja: su heartbeat propio (corrió y salió OK) y
+ * su marca #visto (la reconciliación la vio en el calendario). NaN si no hay
+ * ninguno de los dos.
+ *
+ * POR QUÉ (incidente 26-jul-2026): `ultimaOcurrenciaUtc` ancla la evaluación en
+ * la ocurrencia programada más reciente, que para un slot cuya hora aún no llegó
+ * hoy cae AYER. Para una entrada creada HOY —el calendario pasó de 47 a 52
+ * entradas a las 06:14 UTC— eso es una ocurrencia en la que la entrada NO
+ * EXISTÍA. La pasada de las 10:02 evaluó así `facturas-1300/1700/1900/2100`
+ * contra las 13:00/17:00/19:00/21:00 de AYER y, como american_classic/facturas
+ * tenía corridas posteriores (23:15, 00:15, 06:30), les escribió la marca
+ * `#recuperado`: una certificación de algo que nunca pasó.
+ *
+ * El daño no es solo cosmético. La rama simétrica es peor: si esos pares NO
+ * hubieran estado frescos, los mismos slots habrían salido `sin-invocacion` →
+ * re-sync contra Switch (sesión única, caro) y alerta 🚨 de Telegram, todo por
+ * ocurrencias anteriores a que la entrada existiera.
+ *
+ * La marca #visto ya existía (acota la gracia de siembra, ver SLOT_VISTO_SUFFIX)
+ * pero `clasificarSlots` no la miraba. Ahora es el PISO: ninguna ocurrencia
+ * anterior a este instante se clasifica —ni como cubierta ni como desatendida—.
+ * Fail-abierto si no hay rastro (NaN): sin evidencia se evalúa como antes, para
+ * no volver ciego al clasificador si la escritura de la marca falla.
+ */
+export function slotConocidoDesdeMs(
+  slot: string,
+  heartbeats: Map<string, string | null | undefined>,
+): number {
+  const marcas = [heartbeats.get(slotHeartbeatName(slot)), heartbeats.get(slotVistoName(slot))]
+    .map((v) => (v ? Date.parse(v) : NaN))
+    .filter((t) => Number.isFinite(t));
+  return marcas.length > 0 ? Math.min(...marcas) : NaN;
+}
+
 /** Pares (empresa, sync_type) de los que responde una ocurrencia del slot. */
 export function paresDelSlot(
   slot: SwitchSyncSlot,
@@ -614,10 +650,18 @@ export interface SlotHuerfano {
   slot: string;
   /** Nombre del heartbeat a escribir (la marca #recuperado). */
   heartbeat: string;
-  /** ISO de la ocurrencia que se perdió. */
+  /** ISO de la ocurrencia cuyo trabajo quedó hecho por otro. */
   ocurrencia: string;
   /** Pares que sí quedaron al día después de esa ocurrencia. */
   pares: string[];
+  /**
+   * ¿La entrada SÍ se invocó en la ventana de la ocurrencia? false = Vercel
+   * perdió la invocación (el huérfano clásico); true = la entrada llegó, no
+   * registró su heartbeat propio (falló a medias) y el trabajo lo completó otra
+   * corrida posterior. Los dos casos se cubren igual —el criterio es el TRABAJO,
+   * no quién lo hizo— pero se distinguen para auditoría.
+   */
+  entradaCorrio: boolean;
 }
 
 /** Por qué la ocurrencia de un slot quedó sin atender. */
@@ -658,15 +702,19 @@ export interface SlotsClasificados {
  * con facturas-2315 39.7h, facturas-0015 38.9h y all-0535 33.5h).
  *
  * Reglas — pensadas para NO tapar un fallo real:
+ *  0. Solo ocurrencias POSTERIORES a que conste que la entrada existía
+ *     (slotConocidoDesdeMs): una entrada nueva no responde por el ayer en que no
+ *     estaba en el calendario.
  *  1. Solo la ocurrencia YA VENCIDA (ultimaOcurrenciaUtc): un slot cuya hora de
  *     hoy aún no llega se evalúa contra la de ayer, que si corrió bien lo saca.
  *  2. Si la entrada YA registró su heartbeat propio en/después de la ocurrencia
  *     → corrió, no hay nada que cubrir.
- *  3. Si hay CUALQUIER corrida (success o error) en la ventana de la ocurrencia
- *     → la entrada SÍ se invocó. Si falló, el slot NO se cubre: un slot roto de
- *     verdad (corrió y falló) sigue reportándose.
- *  4. Solo se cubre si TODOS sus pares tienen un success posterior a la
- *     ocurrencia. Cubrir con el trabajo a medias sería tapar datos atrasados.
+ *  3. Solo se cubre si TODOS sus pares tienen un success posterior a la
+ *     ocurrencia. Cubrir con el trabajo a medias sería tapar datos atrasados —
+ *     mientras algo quede pendiente el slot sale como `desatendido` y se reporta.
+ *  4. Si hubo CUALQUIER corrida (success o error) en la ventana de la ocurrencia,
+ *     la entrada SÍ se invocó: eso decide el `motivo` de un desatendido
+ *     (corrio-y-fallo vs sin-invocacion), NO si se cubre.
  * Y aun cubierto, el tope duro SLOT_ENTRY_DEAD_HOURS lo devuelve a "caído" si su
  * entrada propia lleva 2 días sin invocarse (ver slotCubiertoPorRecuperacion).
  */
@@ -711,11 +759,13 @@ export function slotsHuerfanos(args: {
  *                     no venció (todavía puede llegar tarde).
  *
  * Reglas comunes con la versión anterior (para NO tapar fallos reales):
+ *   0. Ocurrencia posterior a `slotConocidoDesdeMs` (la entrada ya existía).
  *   1. Solo la ocurrencia YA VENCIDA (ultimaOcurrenciaUtc).
  *   2. Heartbeat propio en/después de la ocurrencia → la entrada corrió OK.
- *   3. Corrida (success o error) dentro de la ventana → la entrada SÍ se invocó
- *      → nunca se "cubre"; o quedó al día, o es un fallo que se reporta.
- *   4. "Cubierto" exige que TODOS los pares tengan success posterior.
+ *   3. "Cubierto" exige que TODOS los pares tengan success posterior.
+ *   4. Corrida (success o error) dentro de la ventana → la entrada SÍ se invocó
+ *      → fija el `motivo` del desatendido; ya NO impide cubrir (ver el bloque de
+ *      `cubiertos` más abajo, incidente 26-jul-2026).
  * Regla NUEVA, solo para `desatendidos`: la ventana de jitter
  * (SLOT_RUN_WINDOW_MIN) tiene que haber vencido. Re-ejecutar es CARO (toca
  * Switch, sesión única por empresa) → no adelantarse a una entrada que todavía
@@ -738,6 +788,14 @@ export function clasificarSlots(args: {
     const occMs = occ.getTime();
     const finVentanaMs = occMs + SLOT_RUN_WINDOW_MIN * 60_000;
 
+    // (0) la ocurrencia es ANTERIOR a que conste que la entrada existía → no se
+    // clasifica de ninguna forma. Una entrada creada hoy no es responsable de la
+    // ocurrencia de ayer, ni para bien (marca #recuperado falsa) ni para mal
+    // (re-sync + alerta por una corrida que nunca estuvo programada). Ver
+    // slotConocidoDesdeMs — incidente 26-jul-2026.
+    const conocidoDesdeMs = slotConocidoDesdeMs(s.slot, heartbeats);
+    if (Number.isFinite(conocidoDesdeMs) && occMs < conocidoDesdeMs) continue;
+
     // (2) la entrada ya registró success en/después de su ocurrencia.
     const hb = heartbeats.get(slotHeartbeatName(s.slot));
     const hbMs = hb ? Date.parse(hb) : NaN;
@@ -750,10 +808,22 @@ export function clasificarSlots(args: {
     const ts = (r: SyncLogRowMin) => Date.parse(r.started_at);
 
     // (3) alguien corrió en la ventana → la entrada se invocó (aunque fallara).
-    const corrioEnVentana = relevantes.some((r) => {
+    const enVentana = relevantes.filter((r) => {
       const t = ts(r);
       return Number.isFinite(t) && t >= occMs && t <= finVentanaMs;
     });
+    const corrioEnVentana = enVentana.length > 0;
+    // ¿La entrada dejó TODOS sus pares OK dentro de su propia ventana? Si sí, la
+    // ocurrencia se atendió sola: no hay recuperación que certificar (y si aun
+    // así le falta el heartbeat propio, el problema es la telemetría del route,
+    // no un slot huérfano — taparlo con una marca sería el error opuesto).
+    const entradaHizoTodo =
+      corrioEnVentana &&
+      pares.every((par) =>
+        enVentana.some(
+          (r) => r.empresa_key === par.empresa && r.sync_type === par.syncType && r.status === "success",
+        ),
+      );
 
     // (4) pares SIN success posterior a la ocurrencia = trabajo pendiente.
     const pendientes: ParPendiente[] = [];
@@ -797,14 +867,37 @@ export function clasificarSlots(args: {
     }
 
     if (pendientes.length === 0) {
-      // Trabajo al día. Si además la entrada NO se invocó, es el slot huérfano
-      // clásico → certificarlo para que el watchdog deje de reportarlo.
-      if (!corrioEnVentana) {
+      // Trabajo de la ocurrencia HECHO y sin heartbeat propio (regla 2 ya sacó a
+      // las entradas que salieron OK) → certificarlo para que el watchdog deje
+      // de reportar un slot stale con los datos al día. Se cubre por igual haya
+      // corrido o no la entrada: el criterio es el TRABAJO, no quién lo hizo.
+      //
+      // ANTES exigía `!corrioEnVentana` ("un slot que corrió y falló no se
+      // cubre"). El fallo en sí ya se reporta —en la pasada en que el trabajo
+      // seguía pendiente sale como `desatendido`/`corrio-y-fallo` y va por
+      // alertSwitchCronErrors—, así que la condición no protegía nada; solo
+      // dejaba un hueco: una vez compensado el trabajo, el slot no recibía marca
+      // NI volvía a reportarse como fallo, y su heartbeat congelado disparaba
+      // "sin success reciente" en el watchdog día tras día con los datos
+      // perfectamente frescos. Medido el 26-jul-2026: `facturas-1500` (invocación
+      // perdida) quedó certificado y `estadocuenta-1605`/`1610` (corrieron 25-jul
+      // 16:20/16:22, fallaron, y la ronda de las 21:1x reparó los pares) no —dos
+      // slots en el mismo estado observable, trato distinto—.
+      //
+      // El anti-enmascaramiento NO depende de esta condición sino de
+      // SLOT_ENTRY_DEAD_HOURS: la marca jamás pisa el heartbeat propio, así que
+      // una entrada que falla todos los días vuelve a alertar a las 50h.
+      //
+      // Lo único que sigue vedado es certificar una ocurrencia que la propia
+      // entrada resolvió entera dentro de su ventana (entradaHizoTodo): ahí no
+      // hubo recuperación de nadie y un día sano debe seguir siendo cero marcas.
+      if (!entradaHizoTodo) {
         cubiertos.push({
           slot: s.slot,
           heartbeat: slotRecuperadoName(s.slot),
           ocurrencia: occ.toISOString(),
           pares: pares.map((p) => `${p.empresa}/${p.syncType}`),
+          entradaCorrio: corrioEnVentana,
         });
       }
       continue;
@@ -1020,11 +1113,22 @@ export async function reconciliarSlotsSwitchSync(
     );
     // Marca #visto de los slots que aún NO tienen heartbeat propio: arranca el
     // reloj de la gracia de siembra para que su ausencia no sea eterna (ver
-    // SLOT_VISTO_SUFFIX). insert-if-absent → nunca pisa la primera vez.
+    // SLOT_VISTO_SUFFIX) Y fija el PISO de ocurrencias del slot (ver
+    // slotConocidoDesdeMs). insert-if-absent → nunca pisa la primera vez.
+    //
+    // La marca recién escrita se agrega al mapa para que el piso valga en ESTA
+    // misma pasada: si no, la primera pasada tras desplegar una entrada nueva
+    // seguiría evaluando su "ocurrencia de ayer" —justo el caso del 26-jul-2026,
+    // en el que las 5 entradas nacidas a las 06:14 recibieron marcas por las
+    // 13:00-23:00 del día anterior—. Si la escritura falla, el mapa igual queda
+    // con el valor: el piso es una cota superior de "cuándo la vimos", nunca
+    // certifica un success.
+    const nowIso = now.toISOString();
     for (const s of SWITCH_SYNC_SLOTS) {
       if (heartbeats.get(slotHeartbeatName(s.slot))) continue;
       if (heartbeats.get(slotVistoName(s.slot))) continue;
       await recordCronHeartbeatSiFalta(slotVistoName(s.slot));
+      heartbeats.set(slotVistoName(s.slot), nowIso);
     }
     const clasificados = clasificarSlots({
       now,

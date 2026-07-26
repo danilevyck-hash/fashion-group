@@ -136,6 +136,75 @@ Cuidados de costo y seguridad, verificados con tests:
   nunca se pisa) + `SLOT_SEED_GRACE_HOURS`=50h. Un slot que nunca logró un
   success propio deja de ser invisible.
 
+## Las marcas de slot, corregidas (26-jul-2026)
+
+La primera pasada con el calendario nuevo (10:02:55 UTC, `vercel.json` 47 → 52
+entradas a las 06:14) dejó dos síntomas en `cron_heartbeats`. Los dos eran del
+clasificador, no del calendario.
+
+### A) Marcas `#recuperado` por ocurrencias anteriores a la entrada
+
+`ultimaOcurrenciaUtc` ancla en la ocurrencia programada más reciente; para una
+hora que hoy aún no llegó, esa ocurrencia cae **ayer**. Para las 5 entradas
+nacidas esa mañana, "ayer" es un día en que **la entrada no existía**. Como
+`american_classic/facturas` tenía corridas posteriores (23:15:32, 00:15:40,
+06:30:22), `facturas-1300/1700/1900/2100` recibieron `#recuperado` a las
+10:02:53-54 certificando corridas que jamás estuvieron programadas.
+(`facturas-2300` se salvó por azar: la entrada VIEJA `facturas-2315` corrió a
++15 min de las 23:00, dentro de su ventana.)
+
+Las marcas en sí eran inertes —los dos vigías las ignoran mientras el slot no
+tenga heartbeat propio; su ausencia la cubre la gracia de `#visto`—. El daño real
+es la **rama simétrica**: con esos pares atrasados, los mismos slots habrían
+salido `sin-invocacion` → re-sync contra Switch (sesión única, cara) y alerta 🚨
+de Telegram, todo por ocurrencias que nunca estuvieron en el calendario.
+
+**Fix**: `slotConocidoDesdeMs()` = el más antiguo de {heartbeat propio, `#visto`}.
+Ninguna ocurrencia anterior a ese instante se clasifica —ni cubierta ni
+desatendida—. La marca `#visto` ya existía (acotaba la gracia de siembra) pero
+`clasificarSlots` no la miraba; ahora además se agrega al mapa en la misma pasada
+en que se escribe, para que el piso rija desde la primera. Sin ningún rastro no
+hay piso (fail-abierto): si la escritura de la marca falla, el clasificador se
+comporta como antes en vez de quedar ciego.
+
+### B) Dos slots en el mismo estado con trato distinto
+
+| Slot | Ocurrencia del 25-jul | Qué pasó | Trato viejo |
+|---|---|---|---|
+| `facturas-1500` | 15:00 | Vercel perdió la invocación; los pares quedaron al día con el bloque `all` de la madrugada del 26 | `#recuperado` → silenciado |
+| `estadocuenta-1605` | 16:05 | Corrió 16:20 y **falló** (`statement timeout`); la ronda de las 21:15 reparó los pares | sin marca → **el watchdog alertó** con 41h de heartbeat y datos frescos |
+| `estadocuenta-1610` | 16:10 | Corrió 16:23/16:26, `active_wear` falló; reparado 21:12 | igual que 1605 |
+
+La causa no era `paresDelSlot`, ni `empresasConCxc`, ni `SLOT_RUN_WINDOW_MIN`, ni
+`SLOT_ENTRY_DEAD_HOURS` (estaban en 41 h, bajo el tope de 50). Era la regla
+`!corrioEnVentana` del bloque `cubiertos`: "un slot que corrió y falló no se
+cubre". Esa condición no protegía nada —el fallo se reporta como
+`corrio-y-fallo` **mientras el trabajo esté pendiente**, con la política
+anti-ruido 401, y así se reportó el 25-jul a las 18:00— pero dejaba un hueco:
+compensado el trabajo por otra corrida, el slot no recibía marca **ni** volvía a
+reportarse como fallo, y su heartbeat congelado disparaba "sin success reciente"
+día tras día.
+
+**Fix**: el criterio de "cubierto" es el **trabajo**, no quién lo hizo. Se cubre
+cuando todos los pares tienen un success posterior a la ocurrencia y la entrada
+no dejó su heartbeat propio, haya corrido o no. Lo único que sigue vedado es
+certificar una ocurrencia que la propia entrada resolvió **entera** dentro de su
+ventana (`entradaHizoTodo`): ahí no hubo recuperación de nadie, y un día sano
+tiene que seguir siendo cero marcas y cero re-syncs. `SlotHuerfano.entradaCorrio`
+distingue los dos casos en el JSON de la reconciliación.
+
+El anti-enmascaramiento **no** dependía de la regla retirada: lo da
+`SLOT_ENTRY_DEAD_HOURS` (50 h sobre el heartbeat PROPIO, que la marca nunca
+pisa). Una entrada que falla todos los días vuelve a alertar al segundo día
+aunque reciba `#recuperado` a diario.
+
+Verificado con `RUN_DB_TESTS=1 npx vitest run
+src/__tests__/integration/cron-slots-produccion.test.ts` (dry-run de solo lectura
+contra producción): `estadocuenta-1605`/`1610` pasan de STALE sin marca a
+CUBIERTO, y los 4 slots nuevos dejan de recibir marcas por ayer. Tests
+congelados del incidente en `src/__tests__/lib/cron-slots-26jul.test.ts` +
+`src/__tests__/fixtures/slots-26jul2026.ts`.
+
 Pendiente relacionado (NO tocado aquí): `tommy-catalogo` corre 17:40 y toca
 `fashion_shoes`; la pasada de reconciliación de las 18:00 queda a 20 min, y el
 sync de Tommy mide hasta 433 s → el margen real es de ~13 min. Es previo a este

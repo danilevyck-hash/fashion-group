@@ -16,7 +16,9 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: { from: vi.fn() } }));
 
 import {
   SWITCH_SYNC_SLOTS,
-  SLOT_RUN_WINDOW_MIN,
+
+  slotConocidoDesdeMs,
+  paresDelSlot,
   slotHeartbeatName,
   slotRecuperadoName,
   slotCubiertoPorRecuperacion,
@@ -85,18 +87,33 @@ describe.skipIf(!RUN)("slots huérfanos — dry-run contra producción", () => {
     }
     console.log(lineas.join("\n"));
 
-    // Invariante duro: jamás cubrir un slot cuya entrada SÍ corrió en su ventana
-    // (si corrió y falló, tiene que seguir reportándose).
+    // Invariante duro 1: jamás cubrir una ocurrencia cuyo TRABAJO no esté hecho
+    // (todos los pares del slot con un success POSTERIOR a la ocurrencia). Es lo
+    // que separa "certificar una recuperación" de "tapar datos atrasados".
+    // (Antes el invariante era "nunca cubrir si la entrada corrió en su ventana";
+    // se retiró el 26-jul-2026: dejaba sin marca —y con falsa alerta de watchdog—
+    // a los slots que corrieron, fallaron y cuyo trabajo compensó otra corrida.
+    // El fallo en sí se sigue reportando cuando el trabajo está pendiente, y el
+    // anti-enmascaramiento lo da SLOT_ENTRY_DEAD_HOURS, no esta regla.)
     for (const h of huerfanos) {
       const s = SWITCH_SYNC_SLOTS.find((x) => x.slot === h.slot)!;
       const occ = Date.parse(h.ocurrencia);
-      const corrio = rows.some(
-        (r) =>
-          s.empresas.includes(r.empresa_key) &&
-          Date.parse(r.started_at) >= occ &&
-          Date.parse(r.started_at) <= occ + SLOT_RUN_WINDOW_MIN * 60_000,
-      );
-      expect(corrio, `${h.slot}: se cubrió pese a que su entrada corrió en la ventana`).toBe(false);
+      for (const par of paresDelSlot(s, empresasConCxc())) {
+        const fresco = rows.some(
+          (r) =>
+            r.empresa_key === par.empresa &&
+            r.sync_type === par.syncType &&
+            r.status === "success" &&
+            Date.parse(r.started_at) >= occ,
+        );
+        expect(fresco, `${h.slot}: cubierto con ${par.empresa}/${par.syncType} sin success posterior`).toBe(true);
+      }
+      // Invariante duro 2: nunca cubrir una ocurrencia anterior a la evidencia
+      // más vieja de que la entrada existía (#visto o heartbeat propio).
+      const desde = slotConocidoDesdeMs(s.slot, heartbeats);
+      if (Number.isFinite(desde)) {
+        expect(occ, `${h.slot}: ocurrencia anterior a la creación de la entrada`).toBeGreaterThanOrEqual(desde);
+      }
     }
   });
 });
