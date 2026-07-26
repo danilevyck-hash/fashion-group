@@ -47,7 +47,7 @@ export const CASA_PALETTE: ExcelPalette = {
   altBg: "FFFFFF",
 };
 
-/** Navy de marca Reebok (brandbook) — solo catálogos Reebok/Joybees. */
+/** Navy de marca Reebok (brandbook) — catálogo Reebok. */
 export const REEBOK_PALETTE: ExcelPalette = {
   pri: "1A2656",
   mid: "2A3666",
@@ -56,6 +56,41 @@ export const REEBOK_PALETTE: ExcelPalette = {
   dataBg: "F8F9F9",
   altBg: "FFFFFF",
 };
+
+/** Gris de marca Joybees (#404041) con el amarillo #FFE443 en el separador. */
+export const JOYBEES_PALETTE: ExcelPalette = {
+  pri: "404041",
+  mid: "5C5C5E",
+  sep: "FFE443",
+  brd: "D5DBDB",
+  dataBg: "F8F9F9",
+  altBg: "FFFFFF",
+};
+
+/** Navy de marca Tommy Hilfiger (#152342) con el rojo #AE0029 en el separador. */
+export const TOMMY_PALETTE: ExcelPalette = {
+  pri: "152342",
+  mid: "23355E",
+  sep: "AE0029",
+  brd: "D5DBDB",
+  dataBg: "F8F9F9",
+  altBg: "FFFFFF",
+};
+
+/** Paleta de Excel por marca de catálogo — fuente única. Antes las 3 marcas
+ *  usaban REEBOK_PALETTE, así que el Excel de Joybees y el de Tommy salían con
+ *  el navy de Reebok. */
+export const CATALOGO_PALETTES: Record<string, ExcelPalette> = {
+  reebok: REEBOK_PALETTE,
+  joybees: JOYBEES_PALETTE,
+  tommy: TOMMY_PALETTE,
+};
+
+/** Paleta de la marca; Reebok como red de seguridad si llega una marca nueva
+ *  sin entrada (los catálogos nunca deben caer al navy de la casa). */
+export function paletaDeMarca(marca: string): ExcelPalette {
+  return CATALOGO_PALETTES[marca] ?? REEBOK_PALETTE;
+}
 
 /** Moneda como número real: se ve "$1,234.56" y Excel puede sumar. */
 export const MONEY_FMT = "$#,##0.00";

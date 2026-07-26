@@ -362,12 +362,35 @@ export interface MarcaTheme {
     /** Carga del catálogo público: color del texto vacío etc. reuse grid. */
     confirmingLabel: string;
   };
+  /** Página PERMANENTE del pedido del link (/pedido-<marca>/[short_id]).
+   *  Hasta jul-2026 el navy de Reebok (#1A2656) estaba hardcodeado 16 veces
+   *  dentro de PedidoPublicoClient, así que el pedido de Joybees salía con el
+   *  navy de Reebok en vez de su gris/amarillo y el de Tommy con #1A2656 en
+   *  vez de su #152342. Ahora TODO el color sale de aquí. */
   pedidoPublico: {
     pageBg: string;
     spinner: string;
     itemImageBg: string;
     totalValue: string;
     confirmBtn: string;
+    /** Banda oscura del header y de la barra del total. */
+    headerBg: string;
+    /** Banda de la sección "Pedido" (solo se ve con pre-orden → Reebok). */
+    sectionBg: string;
+    /** Borde lateral del bloque blanco de items. */
+    panelBorder: string;
+    /** Texto principal sobre blanco: nombre del producto, precio, títulos. */
+    textStrong: string;
+    /** Texto secundario: SKU, "c/u", línea de bultos, subtítulos. */
+    textSoft: string;
+    /** Texto de apoyo bajo el botón Confirmar. */
+    textHelp: string;
+    /** Lo más tenue: pie "fashiongr.com". */
+    textFaint: string;
+    /** Icono placeholder cuando el item no tiene foto. */
+    placeholderIcon: string;
+    /** Botón "Descargar PDF" (outline sobre el fondo de página). */
+    pdfBtn: string;
   };
   admin: {
     titulo: string;
@@ -497,20 +520,17 @@ const REEBOK: MarcaTheme = {
 
   logos: {
     navbar: () => <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />,
+    // Logo REAL de la marca. Antes había aquí un <svg> de un triángulo dibujado
+    // a mano (que NO es el logo de Reebok) junto a la palabra en texto; el
+    // wordmark ya viene dentro del PNG, así que el texto sobraba. El <h1> se
+    // conserva por semántica: su texto accesible es el alt de la imagen.
     header: () => (
-      <div className="flex items-center gap-1">
-        <div className="relative w-8 h-8">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg viewBox="0 0 32 32" className="w-7 h-7 text-[#E4002B]" fill="currentColor">
-              <path d="M4 24L16 4l12 20H4z" opacity="0.9" />
-            </svg>
-          </div>
-        </div>
+      <div className="flex items-center gap-2">
         <div>
-          <h1 className="text-lg font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
-            REEBOK
+          <h1 className="leading-none">
+            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
           </h1>
-          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
+          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
             Catalogo Panama
           </p>
         </div>
@@ -521,10 +541,15 @@ const REEBOK: MarcaTheme = {
         <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
       </div>
     ),
+    // Logo REAL sobre placa blanca: la banda del header del pedido público es
+    // oscura y el logo es rojo (#E4002B) — la placa garantiza que se lea igual
+    // que en la web de la marca. Antes decía "REEBOK" en texto.
     pedidoPublico: () => (
-      <div>
-        <h1 className="text-white font-bold text-xl tracking-wide">REEBOK</h1>
-        <p className="text-white/50 text-xs mt-0.5">Panama</p>
+      <div className="shrink-0">
+        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-1.5">
+          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
     ),
   },
@@ -652,6 +677,16 @@ const REEBOK: MarcaTheme = {
     totalValue: "text-white font-bold text-xl tabular-nums",
     confirmBtn:
       "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+    headerBg: "bg-[#1A2656]",
+    sectionBg: "bg-[#1A2656]",
+    panelBorder: "border-[#1A2656]/10",
+    textStrong: "text-[#1A2656]",
+    textSoft: "text-[#1A2656]/40",
+    textHelp: "text-[#1A2656]/45",
+    textFaint: "text-[#1A2656]/25",
+    placeholderIcon: "text-[#1A2656]/20",
+    pdfBtn:
+      "flex items-center gap-2 px-6 py-3 bg-white border border-[#1A2656]/15 text-[#1A2656] rounded-lg font-medium text-sm hover:bg-[#1A2656]/5 active:scale-[0.97] transition disabled:opacity-50",
   },
   admin: {
     titulo: "Administrar",
@@ -820,8 +855,8 @@ const JOYBEES: MarcaTheme = {
       </div>
     ),
     pedidoPublico: () => (
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg">🐝</div>
+      <div className="flex items-center gap-2.5 shrink-0">
+        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg shrink-0">🐝</div>
         <div>
           <h1 className="text-white font-black uppercase tracking-wide text-xl leading-none">JOYBEES</h1>
           <p className="text-white/50 text-xs mt-1">Panama</p>
@@ -939,11 +974,21 @@ const JOYBEES: MarcaTheme = {
   publico: { confirmingLabel: "Confirmando..." },
   pedidoPublico: {
     pageBg: "min-h-screen bg-[#FFFEF5]",
-    spinner: "w-8 h-8 border-2 border-[#1A2656] border-t-transparent rounded-full animate-spin",
+    spinner: "w-8 h-8 border-2 border-[#404041] border-t-transparent rounded-full animate-spin",
     itemImageBg: "w-14 h-14 rounded-lg bg-[#FFFEF5] flex-shrink-0 overflow-hidden",
     totalValue: "text-[#FFE443] font-bold text-xl tabular-nums",
     confirmBtn:
-      "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+      "w-full bg-[#404041] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+    headerBg: "bg-[#404041]",
+    sectionBg: "bg-[#404041]",
+    panelBorder: "border-[#404041]/10",
+    textStrong: "text-[#404041]",
+    textSoft: "text-[#404041]/40",
+    textHelp: "text-[#404041]/45",
+    textFaint: "text-[#404041]/25",
+    placeholderIcon: "text-[#404041]/20",
+    pdfBtn:
+      "flex items-center gap-2 px-6 py-3 bg-white border border-[#404041]/15 text-[#404041] rounded-lg font-medium text-sm hover:bg-[#404041]/5 active:scale-[0.97] transition disabled:opacity-50",
   },
   admin: {
     titulo: "Administrar",
@@ -966,7 +1011,7 @@ const JOYBEES: MarcaTheme = {
     },
     excelSinFoto: async (sin) => {
       // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
-      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, REEBOK_PALETTE } =
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, JOYBEES_PALETTE } =
         await import("@/lib/excel-export");
       const ws = buildReportSheet({
         title: "JOYBEES — Productos sin foto",
@@ -979,7 +1024,7 @@ const JOYBEES: MarcaTheme = {
           { header: "Stock", wch: 10, align: "right", fmt: "0" },
         ],
         rows: sin.map((p) => [p.sku || "", p.name || "", tipoJoybees(p.name) ?? "", JOYBEES_GENERO_LABEL[p.gender || ""] ?? (p.gender || ""), p.stock ?? ""]),
-        palette: REEBOK_PALETTE,
+        palette: JOYBEES_PALETTE,
       });
       const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
       downloadWorkbook(wb, exportFilename("joybees-sin-foto"));
@@ -1111,10 +1156,10 @@ const TOMMY: MarcaTheme = {
     // (Daniel, 25-jul-2026).
     navbar: null,
     header: () => (
-      <div className="flex items-center gap-2.5">
-        <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain" />
-        <div>
-          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto" />
+      <div className="flex items-center gap-2.5 shrink-0">
+        <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain shrink-0" />
+        <div className="shrink-0">
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto shrink-0" />
           <p className="text-xs text-[#152342]/40 uppercase tracking-[0.25em] leading-none mt-1">
             Catalogo Panama
           </p>
@@ -1126,10 +1171,16 @@ const TOMMY: MarcaTheme = {
         <img src="/tommy/tommy-flag.png" alt="Tommy" className="w-7 h-5 object-contain" />
       </div>
     ),
+    // Logo REAL sobre placa blanca. El wordmark del SVG es casi negro
+    // (#231F20) y la banda del header del pedido público es navy: sin la placa
+    // el logo desaparecería. Antes decía "TOMMY HILFIGER" en texto — es el
+    // lugar que Daniel vio en el link público (25-jul-2026).
     pedidoPublico: () => (
-      <div>
-        <h1 className="text-white font-bold text-xl tracking-[0.08em]">TOMMY HILFIGER</h1>
-        <p className="text-white/50 text-xs mt-0.5">Panama</p>
+      <div className="shrink-0">
+        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto shrink-0" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
     ),
   },
@@ -1266,6 +1317,16 @@ const TOMMY: MarcaTheme = {
     totalValue: "text-white font-bold text-xl tabular-nums",
     confirmBtn:
       "w-full bg-[#152342] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+    headerBg: "bg-[#152342]",
+    sectionBg: "bg-[#152342]",
+    panelBorder: "border-[#152342]/10",
+    textStrong: "text-[#152342]",
+    textSoft: "text-[#152342]/40",
+    textHelp: "text-[#152342]/45",
+    textFaint: "text-[#152342]/25",
+    placeholderIcon: "text-[#152342]/20",
+    pdfBtn:
+      "flex items-center gap-2 px-6 py-3 bg-white border border-[#152342]/15 text-[#152342] rounded-lg font-medium text-sm hover:bg-[#152342]/5 active:scale-[0.97] transition disabled:opacity-50",
   },
   admin: {
     titulo: "Administrar",
@@ -1288,7 +1349,7 @@ const TOMMY: MarcaTheme = {
     },
     excelSinFoto: async (sin) => {
       // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
-      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, REEBOK_PALETTE } =
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, TOMMY_PALETTE } =
         await import("@/lib/excel-export");
       const ws = buildReportSheet({
         title: "TOMMY HILFIGER — Productos sin foto",
@@ -1307,7 +1368,7 @@ const TOMMY: MarcaTheme = {
           TOMMY_GENERO_LABEL[p.gender || ""] ?? (p.gender || ""),
           p.stock ?? "",
         ]),
-        palette: REEBOK_PALETTE,
+        palette: TOMMY_PALETTE,
       });
       const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
       downloadWorkbook(wb, exportFilename("tommy-sin-foto"));

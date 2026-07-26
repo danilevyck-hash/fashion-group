@@ -3,14 +3,17 @@
 // Página PERMANENTE del pedido público /pedido-<marca>/[short_id] (link del
 // cliente) — componente único para todas las marcas, parametrizado por
 // MARCA_THEME. Las secciones Pedido/Pre-orden son feature (preorder, Reebok).
-// Nota de fidelidad: la paleta base (navy #1A2656) es compartida por diseño —
-// Joybees solo cambia fondo, logo y el total en amarillo.
+//
+// CERO colores de marca hardcodeados: TODO sale de theme.pedidoPublico. Hasta
+// jul-2026 el navy de Reebok (#1A2656) estaba escrito a mano 16 veces acá, así
+// que el link de Joybees y el de Tommy le mostraban al cliente los colores de
+// Reebok. Si agregás un color nuevo, va al tema — no acá.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import { buildPedidoWhatsappUrl } from "@/lib/catalogo/whatsapp-msg";
+import { buildPedidoWhatsappUrl, WHATSAPP_CONTACTOS } from "@/lib/catalogo/whatsapp-msg";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import type { StockLinea } from "./types";
 
@@ -60,6 +63,24 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  // Barra de progreso del guardado. Medido: ~5 s entre crear el pedido y
+  // verificar el envío a Switch, así que el cliente se queda mirando una
+  // pantalla que antes no decía nada y podía cerrarla (Daniel, 25-jul-2026).
+  const [progreso, setProgreso] = useState(0);
+  // Candado de doble toque: `confirming` es estado y no se ve hasta el
+  // siguiente render — dos taps rápidos entrarían los dos. El ref sí.
+  const confirmandoRef = useRef(false);
+
+  // Mientras se guarda, el navegador pregunta antes de cerrar la pestaña.
+  useEffect(() => {
+    if (!confirming) return;
+    const avisar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [confirming]);
 
   useEffect(() => {
     async function load() {
@@ -114,9 +135,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   // respuesta trae la cantidad REAL disponible del momento, que se muestra en
   // cada línea (misma foto que ve la secretaria en el admin).
   async function handleConfirm() {
-    if (!order || confirming) return;
+    if (!order || confirmandoRef.current) return;
+    confirmandoRef.current = true;
     setConfirming(true);
     setConfirmError(null);
+    // Arranca visible y avanza hacia 92% durante la espera: nunca miente
+    // llegando a 100 antes de que el servidor conteste.
+    setProgreso(8);
+    const arranque = setTimeout(() => setProgreso(92), 60);
     try {
       const res = await fetch(`${theme.api}/pedido-publico/${order.short_id}/confirmar`, {
         method: "POST",
@@ -125,11 +151,13 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.numero) {
+        setProgreso(0);
         setConfirmError(
           (data?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo en unos segundos.",
         );
         return;
       }
+      setProgreso(100);
       const stock = Array.isArray(data.stock) ? (data.stock as StockLinea[]) : null;
       setOrder({
         ...order,
@@ -139,8 +167,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         stock_confirmacion: stock?.length ? stock : order.stock_confirmacion ?? null,
       });
     } catch {
+      setProgreso(0);
       setConfirmError("No se pudo confirmar el pedido. Revisa tu conexión e intenta de nuevo.");
     } finally {
+      clearTimeout(arranque);
+      confirmandoRef.current = false;
       setConfirming(false);
     }
   }
@@ -162,8 +193,8 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-[#1A2656] font-semibold text-lg mb-1">Pedido no encontrado</p>
-          <p className="text-[#1A2656]/50 text-sm">Este enlace puede haber expirado o ser incorrecto.</p>
+          <p className={`${theme.pedidoPublico.textStrong} font-semibold text-lg mb-1`}>Pedido no encontrado</p>
+          <p className={`${theme.pedidoPublico.textSoft} text-sm`}>Este enlace puede haber expirado o ser incorrecto.</p>
         </div>
       </div>
     );
@@ -181,17 +212,16 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const estadoLabel = order.estado_cliente || "Confirmado";
   const totalBultos = order.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
   const totalPedido = theme.calcTotal(order.items);
-  const whatsappUrl = confirmado
-    ? buildPedidoWhatsappUrl({
-        marca: theme.label,
-        clienteNombre: order.cliente_nombre || "cliente",
-        numero: order.ped_order_number || "",
-        itemCount: order.items.length,
-        bultos: totalBultos,
-        total: totalPedido,
-        link: `https://www.fashiongr.com${theme.pedidoPublicoBase}/${order.short_id}`,
-      })
-    : "";
+  // El mensaje es UNO solo; lo que elige el cliente es a QUIÉN se lo manda.
+  const whatsappInfo = {
+    marca: theme.label,
+    clienteNombre: order.cliente_nombre || "cliente",
+    numero: order.ped_order_number || "",
+    itemCount: order.items.length,
+    bultos: totalBultos,
+    total: totalPedido,
+    link: `https://www.fashiongr.com${theme.pedidoPublicoBase}/${order.short_id}`,
+  };
 
   const renderItem = (item: OrderItem, idx: number) => {
     const bs = theme.bulto(item.category || "footwear");
@@ -211,7 +241,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
               unoptimized
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-[#1A2656]/20">
+            <div className={`w-full h-full flex items-center justify-center ${theme.pedidoPublico.placeholderIcon}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -219,8 +249,10 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[#1A2656] truncate">{item.name}</p>
-          <p className="text-xs text-[#1A2656]/40 mt-0.5">{item.sku}</p>
+          <p className={`text-sm font-medium ${theme.pedidoPublico.textStrong} truncate`}>{item.name}</p>
+          {/* truncate: sin esto el código se metía debajo de la línea de
+              bultos en pantalla de teléfono y se leían encimados. */}
+          <p className={`text-xs ${theme.pedidoPublico.textSoft} mt-0.5 truncate`}>{item.sku}</p>
           {corto && stock && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
               Disponible ahora: {formatBultosPiezas(stock.disponible_pzas, stock.bulto_pzas || bs)}
@@ -228,10 +260,10 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-base font-semibold text-[#1A2656] tabular-nums">
-            ${fmtMoney(item.unit_price)}<span className="text-xs font-normal text-[#1A2656]/40"> c/u</span>
+          <p className={`text-base font-semibold ${theme.pedidoPublico.textStrong} tabular-nums`}>
+            ${fmtMoney(item.unit_price)}<span className={`text-xs font-normal ${theme.pedidoPublico.textSoft}`}> c/u</span>
           </p>
-          <p className="text-xs text-[#1A2656]/40 tabular-nums">
+          <p className={`text-xs ${theme.pedidoPublico.textSoft} tabular-nums`}>
             {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) · ${fmtMoney(lineTotal)}
           </p>
         </div>
@@ -253,9 +285,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
     <div className={theme.pedidoPublico.pageBg}>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="bg-[#1A2656] rounded-t-xl px-6 py-5 flex items-center justify-between">
+        {/* `flex-wrap` + hijos `shrink-0`: el logo NUNCA se aplasta. El de
+            Tommy es un wordmark ancho (relación 14:1) y en pantalla de
+            teléfono no cabe al lado del número de pedido — antes flexbox lo
+            comprimía a la mitad y deformaba las letras. Ahora baja de línea.
+            Reebok y Joybees, cuyos logos sí caben, no se mueven. */}
+        <div className={`${theme.pedidoPublico.headerBg} rounded-t-xl px-6 py-5 flex flex-wrap items-center justify-between gap-3`}>
           {theme.logos.pedidoPublico()}
-          <div className="text-right">
+          <div className="text-right shrink-0 grow">
             <p className="text-white/80 text-sm font-medium">
               {confirmado ? `Tu pedido #${order.ped_order_number}` : "Tu pedido"}
             </p>
@@ -275,9 +312,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Items */}
-        <div className="bg-white border-x border-[#1A2656]/10">
+        <div className={`bg-white border-x ${theme.pedidoPublico.panelBorder}`}>
           <div className="divide-y divide-gray-100">
-            {hasPreorders && regular.length > 0 && sectionHeader("Pedido", "bg-[#1A2656]")}
+            {hasPreorders && regular.length > 0 && sectionHeader("Pedido", theme.pedidoPublico.sectionBg)}
             {regular.map(renderItem)}
             {hasPreorders && (
               <>
@@ -289,7 +326,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Total */}
-        <div className="bg-[#1A2656] rounded-b-xl px-6 py-4 flex items-center justify-between">
+        <div className={`${theme.pedidoPublico.headerBg} rounded-b-xl px-6 py-4 flex items-center justify-between`}>
           <span className="text-white/70 text-sm font-medium">Total</span>
           <span className={theme.pedidoPublico.totalValue}>
             ${fmtMoney(totalPedido)}
@@ -302,13 +339,42 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             <button
               onClick={() => handleConfirm()}
               disabled={confirming}
+              aria-busy={confirming}
               className={theme.pedidoPublico.confirmBtn}
             >
-              {confirming ? "Confirmando..." : "Confirmar pedido"}
+              {confirming ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Guardando...
+                </span>
+              ) : (
+                "Confirmar pedido"
+              )}
             </button>
-            <p className="text-xs text-[#1A2656]/45 mt-2.5">
-              Al confirmar, tu pedido entra a proceso con Fashion Group.
-            </p>
+
+            {/* Mientras guarda: el cliente tiene que saber que NO cierre la
+                pantalla. Son ~5 s reales — al confirmar también sale el pedido
+                a Switch — así que el silencio de antes lo invitaba a cerrar. */}
+            {confirming ? (
+              <div className="mt-3" role="status" aria-live="assertive">
+                <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-[6000ms] ease-out"
+                    style={{ width: `${progreso}%` }}
+                  />
+                </div>
+                <p className="text-sm font-bold text-emerald-700 mt-2">
+                  Guardando tu pedido, no cierres esta pantalla
+                </p>
+                <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-0.5`}>
+                  Puede tardar unos segundos.
+                </p>
+              </div>
+            ) : (
+              <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-2.5`}>
+                Al confirmar, tu pedido entra a proceso con Fashion Group.
+              </p>
+            )}
             {confirmError && (
               <p className="text-xs text-red-600 mt-2">{confirmError}</p>
             )}
@@ -324,6 +390,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             </p>
             <p className="text-xs text-emerald-700/70 mt-1 mb-3">
               Ya lo recibimos. Si quieres, avísanos también por WhatsApp (opcional).
+            </p>
+            <p className="sr-only" id="wa-ayuda">
+              Toca a la persona a la que le quieres escribir por WhatsApp.
             </p>
             {lineasCortas.length > 0 && (
               <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-left">
@@ -345,17 +414,31 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
                 </p>
               </div>
             )}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full bg-[#25D366] text-white text-sm font-bold rounded-xl min-h-[48px] active:scale-[0.98] transition"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-              </svg>
-              Avisar por WhatsApp
-            </a>
+            {/* El cliente elige a quién le avisa: las dos personas, con nombre
+                y número visibles, para que sepa a quién le está escribiendo. */}
+            <p className="text-xs font-semibold text-emerald-900 mb-2">¿A quién le avisas?</p>
+            <div className="flex flex-col gap-2">
+              {WHATSAPP_CONTACTOS.map((c) => (
+                <a
+                  key={c.telefono}
+                  href={buildPedidoWhatsappUrl(whatsappInfo, c.telefono)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-describedby="wa-ayuda"
+                  className="flex items-center justify-between gap-3 w-full bg-[#25D366] text-white rounded-xl min-h-[52px] px-4 py-2.5 active:scale-[0.98] transition"
+                >
+                  <span className="flex items-center gap-2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                    </svg>
+                    <span className="text-sm font-bold">Escribirle a {c.nombre}</span>
+                  </span>
+                  <span className="text-xs font-medium text-white/85 tabular-nums whitespace-nowrap">
+                    {c.telefonoLabel}
+                  </span>
+                </a>
+              ))}
+            </div>
           </div>
         )}
 
@@ -364,7 +447,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           <button
             onClick={handleDownloadPdf}
             disabled={generatingPdf}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-[#1A2656]/15 text-[#1A2656] rounded-lg font-medium text-sm hover:bg-[#1A2656]/5 active:scale-[0.97] transition disabled:opacity-50"
+            className={theme.pedidoPublico.pdfBtn}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -374,7 +457,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[#1A2656]/25 text-xs mt-8">fashiongr.com</p>
+        <p className={`text-center ${theme.pedidoPublico.textFaint} text-xs mt-8`}>fashiongr.com</p>
       </div>
     </div>
   );

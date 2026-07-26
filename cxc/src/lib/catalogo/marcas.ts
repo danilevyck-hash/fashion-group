@@ -300,8 +300,14 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       hasDelete: true,
     },
     publicCatalog: {
+      // existencia/disponibilidad: el catálogo público mostraba EXISTENCIA (el
+      // saldo físico, vía la suma de `inventory`) en vez de DISPONIBILIDAD (lo
+      // vendible = saldo − apartado). En Reebok la tabla `inventory` solo
+      // guarda existencia (el sync escribe quantity: existencia bajo la talla
+      // "UNICA"), así que la disponibilidad correcta es la agregada de la fila
+      // del producto — por eso viaja también en el payload público.
       db: reebokServerDb,
-      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at",
+      cols: "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,existencia,disponibilidad,created_at",
       conInventario: true,
     },
     fallback: {
@@ -375,8 +381,10 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       hasDelete: false,
     },
     publicCatalog: {
+      // `stock` es el espejo de EXISTENCIA que escribe el cron; se conserva por
+      // compatibilidad, pero el catálogo público decide con `disponibilidad`.
       db: joybeesProductsDb,
-      cols: "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge",
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,popular,is_regalia,badge",
       conInventario: false,
     },
     fallback: null,
@@ -451,8 +459,10 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       nombreEditable: true,
     },
     publicCatalog: {
+      // Mismo caso que Joybees: `stock` = espejo de existencia; el catálogo
+      // público decide con `disponibilidad`.
       db: tommyServerDb,
-      cols: "id,sku,name,category,gender,price,stock,image_url,active,badge",
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,badge",
       conInventario: false,
     },
     fallback: null,
