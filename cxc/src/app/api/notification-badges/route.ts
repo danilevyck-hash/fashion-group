@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { getEndOfWeek } from "@/lib/cheques-dates";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
@@ -52,22 +53,30 @@ export async function GET(req: NextRequest) {
       .eq("deleted", false),
 
     // CXC: última sincronización del API por empresa (switch_estadocuenta).
-    supabaseServer
-      .from("switch_estadocuenta")
-      .select("empresa_key, synced_at")
-      .order("synced_at", { ascending: false }),
+    // ⚠️ PAGINADO (26-jul-2026): sin paginar traía 1.000 de 1.511 filas en
+    // silencio y, como venían ordenadas por `synced_at` desc y todas las filas
+    // de una corrida comparten el sello, esas 1.000 eran de UNA sola empresa →
+    // el badge sólo podía contar como atrasada a esa. Se leen todas con orden
+    // estable (`id`) y el máximo por empresa se calcula acá.
+    leerTodoPaginado<{ empresa_key: string; synced_at: string }>(
+      "switch_estadocuenta (badge cxcStale)",
+      (pedirCount, desde, hasta) =>
+        supabaseServer
+          .from("switch_estadocuenta")
+          .select("empresa_key, synced_at", pedirCount ? { count: "exact" } : {})
+          .order("id", { ascending: true })
+          .range(desde, hasta),
+    ),
   ]);
 
   // Count CXC stale companies (any company with last sync > 7 days ago)
-  let cxcStale = 0;
-  if (cxcUploadsRes.data) {
-    const seen = new Set<string>();
-    for (const row of cxcUploadsRes.data) {
-      if (seen.has(row.empresa_key)) continue;
-      seen.add(row.empresa_key);
-      if (row.synced_at < sevenDaysAgo) cxcStale++;
-    }
+  const ultimoPorEmpresa = new Map<string, string>();
+  for (const row of cxcUploadsRes) {
+    const prev = ultimoPorEmpresa.get(row.empresa_key);
+    if (!prev || row.synced_at > prev) ultimoPorEmpresa.set(row.empresa_key, row.synced_at);
   }
+  let cxcStale = 0;
+  for (const synced of ultimoPorEmpresa.values()) if (synced < sevenDaysAgo) cxcStale++;
 
   return NextResponse.json({
     cheques: chequesRes.count || 0,

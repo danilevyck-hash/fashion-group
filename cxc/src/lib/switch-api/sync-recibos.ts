@@ -34,6 +34,7 @@
  * Tolerante a fallos: una empresa falla → las demás siguen.
  */
 
+import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
@@ -263,6 +264,41 @@ export async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toEx
 }
 
 const RET_WINDOW_MS = 35 * 864e5;
+
+/**
+ * El cliente de MOSTRADOR nunca retiene ITBMS — y sin este corte la heurística
+ * se vuelve ruido puro sobre él.
+ *
+ * Quién retiene ITBMS es una figura fiscal: un negocio registrado como agente de
+ * retención le retiene el impuesto a su proveedor y se lo paga a la DGI. Quien
+ * paga en efectivo en el mostrador no es eso. Por eso `es_retencion` sobre el
+ * mostrador no puede ser otra cosa que un falso positivo.
+ *
+ * Y es un falso positivo casi garantizado, porque el mostrador es un
+ * PSEUDO-CLIENTE que acumula toda la venta al detalle bajo un solo id: en
+ * american_classic son 25.800 de las ~26.500 facturas de la empresa, 3.455 solo
+ * en la ventana del mapa. Contra ese volumen, "el recibo coincide con impuesto/2
+ * de ALGUNA factura del cliente dentro de ±35 días" deja de ser evidencia y pasa
+ * a ser el problema del cumpleaños: medido el 26-jul-2026, un recibo de $2.00
+ * cuadra con 6 facturas distintas y uno de $0.01 con 4. Un cliente B2B real
+ * tiene 3-50 facturas en la misma ventana y ahí la coincidencia sí significa
+ * algo.
+ *
+ * IDENTIDAD: `cliente_codigo = 'TCKCTA'`, el código con el que Switch marca a su
+ * pseudo-cliente de contado. NO se compara por nombre: el nombre cambia por
+ * empresa ("CONTADO", "Contado", "VENTAS LOCA", "VENTAS LOCAL" — ver
+ * sync-clientes-master.ts, que lo normaliza justamente por eso) y un día alguien
+ * escribe "Contado " con espacio o existe un cliente real que se llame parecido.
+ * El código es el mismo dato que ya usan las RPC de comisión para excluir al
+ * mostrador de la base de cobro (`AND COALESCE(r.cliente_codigo,'') <> 'TCKCTA'`
+ * en comision_b2b_v4/v5, comision_cobro_v3 y comision_detalle) y el que resuelve
+ * el checkout público (CODIGO_CLIENTE_CONTADO). Reusarlo mantiene una sola
+ * definición de "esto no es un cliente de verdad" en todo el sistema.
+ */
+function esClienteMostrador(clienteCodigo: string | null): boolean {
+  return (clienteCodigo ?? "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO;
+}
+
 /** Retención = total ≈ impuesto/2 de una factura del mismo cliente, dentro de ±35d.
  *  Ventana SIMÉTRICA (|rf - ff|): Switch estampa la retención el mismo día o hasta
  *  un día ANTES que su factura, así que exigir factura ≤ recibo perdía esos casos
@@ -303,18 +339,21 @@ function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap:
   const cliId = typeof r.clienteId === "number" ? r.clienteId : null;
   const total = num(r.total);
   const vendedorRegistro = (r.vendedor as string) ?? null;
+  const clienteCodigo = (r.clienteCodigo as string) ?? null;
   return {
     empresa_key: empresaKey,
     fecha,
     fecha_creacion: fc ? fc.replace(" ", "T") : null,
     cliente_switch_id: cliId,
-    cliente_codigo: (r.clienteCodigo as string) ?? null,
+    cliente_codigo: clienteCodigo,
     cliente_nombre: (r.clienteNombre as string) ?? null,
     vendedor_registro: vendedorRegistro,
     // atribución por cartera (dueño del cliente); fallback al vendedor del recibo
     vendedor_cartera: (cliId != null ? carteraMap.get(cliId) : undefined) ?? vendedorRegistro,
     total,
-    es_retencion: esRetencion(cliId, fecha, total, impuestoMap),
+    // El mostrador no retiene ITBMS: sobre él la heurística sólo puede producir
+    // falsos positivos (ver esClienteMostrador).
+    es_retencion: !esClienteMostrador(clienteCodigo) && esRetencion(cliId, fecha, total, impuestoMap),
     synced_at: new Date().toISOString(),
   };
 }

@@ -1,16 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
+  // ⚠️ PAGINADO (26-jul-2026): las tres lecturas de abajo se cortaban en 1.000
+  // filas SIN error y alimentan números que se muestran en pantalla (total de
+  // productos, stock total, total de pedidos). Un conteo hecho sobre una lectura
+  // truncada no es un conteo. Ahora se leen completas y verificadas contra el
+  // COUNT exacto; si no cuadra, revienta en vez de mostrar un número inventado.
+  //
   // Products summary
-  const { data: products } = await reebokServer
-    .from("products")
-    .select("id, active, price, category, on_sale");
+  type FilaProducto = { id: number; active: boolean; price: number | null; category: string | null; on_sale: boolean | null };
+  const products = await leerTodoPaginado<FilaProducto>(
+    "products (stats Reebok)",
+    (pedirCount, desde, hasta) =>
+      reebokServer
+        .from("products")
+        .select("id, active, price, category, on_sale", pedirCount ? { count: "exact" } : {})
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+  );
 
   const totalProducts = products?.length ?? 0;
   const activeProducts = products?.filter((p) => p.active).length ?? 0;
@@ -25,22 +39,40 @@ export async function GET(req: NextRequest) {
   }
 
   // Inventory summary
-  const { data: inventory } = await reebokServer
-    .from("inventory")
-    .select("product_id, quantity");
+  type FilaInv = { product_id: number; quantity: number | null };
+  const inventory = await leerTodoPaginado<FilaInv>(
+    "inventory (stats Reebok)",
+    (pedirCount, desde, hasta) =>
+      reebokServer
+        .from("inventory")
+        .select("product_id, quantity", pedirCount ? { count: "exact" } : {})
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+  );
 
   const totalStock = (inventory || []).reduce((s, i) => s + (i.quantity || 0), 0);
-  const productsWithStock = new Set((inventory || []).filter((i) => i.quantity > 0).map((i) => i.product_id)).size;
+  const productsWithStock = new Set((inventory || []).filter((i) => (i.quantity ?? 0) > 0).map((i) => i.product_id)).size;
   const productsNoStock = activeProducts - productsWithStock;
 
-  // Orders summary. Tope de memoria: 5000 pedidos más recientes (muy por encima
-  // del volumen real). Evita traer la tabla entera a RAM en serverless si crece;
-  // si algún día se superan 5000 pedidos, migrar a agregación en SQL/RPC.
-  const { data: orders } = await reebokServer
-    .from("reebok_orders")
-    .select("id, status, total, client_name, vendor_name, created_at")
-    .order("created_at", { ascending: false })
-    .limit(5000);
+  // Orders summary. El `.limit(5000)` de antes NO era el tope que decía ser: el
+  // corte real lo ponía PostgREST en 1.000 y sin avisar. Se pagina de verdad,
+  // conservando el orden de negocio (created_at desc) con `id` como desempate.
+  // Si algún día el volumen justifica no traerlos a RAM, el camino sigue siendo
+  // agregar en SQL/RPC — pero un tope silencioso no es una defensa.
+  type FilaOrden = {
+    id: number; status: string | null; total: number | null;
+    client_name: string | null; vendor_name: string | null; created_at: string;
+  };
+  const orders = await leerTodoPaginado<FilaOrden>(
+    "reebok_orders (stats Reebok)",
+    (pedirCount, desde, hasta) =>
+      reebokServer
+        .from("reebok_orders")
+        .select("id, status, total, client_name, vendor_name, created_at", pedirCount ? { count: "exact" } : {})
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+  );
 
   const totalOrders = orders?.length ?? 0;
 
