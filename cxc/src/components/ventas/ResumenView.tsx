@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -19,10 +19,11 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { buildNotaMayoreo } from "@/lib/ventas/mayoreo";
 import {
   cellValue, cellPrevValue, cellDelta, isNaComparison,
-  renderCellValue, deltaModeFor, buildFilasMetrica,
-  type CeldaBase,
+  renderCellValue, deltaModeFor, buildSlotsMetrica, celdaKey,
+  type CeldaBase, type SlotDetalle,
 } from "@/lib/ventas/celda";
-import { CeldaDetallePanel, type CeldaDetalle } from "./CeldaDetallePanel";
+import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
+import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
@@ -49,6 +50,9 @@ function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): Proyecci
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
+
+/** Abridor de detalle que recibe cada celda clicable. */
+type AbrirFila = (d: FilaDetalle) => void;
 
 // Una celda de la matriz carga las 4 fuentes siempre: ventas y utilidad
 // para el período actual + año previo. Margen se deriva. Esto habilita el
@@ -85,9 +89,10 @@ export function ResumenView({
   // null = cerrado. Compartido entre la tabla desktop y la mobile.
   const [panelEmpresaId, setPanelEmpresaId] = useState<string | null>(null);
   // Detalle de UNA celda (Ventas/Utilidad/Margen del período, 2026 vs 2025 y Δ).
-  // Vive en un panel LATERAL, no en un tooltip encima de la tabla. Compartido
-  // entre la tabla desktop y la mobile.
-  const [celdaDetalle, setCeldaDetalle] = useState<CeldaDetalle | null>(null);
+  // La FILA de esa empresa se transforma en su propio lugar — ni tooltip encima
+  // de la tabla ni panel lateral (tapaba las columnas de la derecha). Solo una
+  // transformada a la vez, compartida entre la tabla desktop y la mobile.
+  const [filaDetalle, setFilaDetalle] = useState<FilaDetalle | null>(null);
   const [, startTransition] = useTransition();
   // Modo Anual: matriz empresas × años (mismo MV agregado por año). Fetch perezoso
   // compartido entre la vista desktop y la mobile (una sola llamada).
@@ -120,6 +125,23 @@ export function ResumenView({
       : null;
   const k = data.kpis;
   const prevYear = selectedYear - 1;
+  // Al cerrar hay que devolver el foco a la celda que se tocó: esa celda no
+  // existía en el DOM mientras la fila estaba transformada.
+  const raizRef = useRef<HTMLDivElement>(null);
+  const focoPendiente = useRef<string | null>(null);
+  const cerrarFila = useCallback(() => {
+    setFilaDetalle((actual) => {
+      focoPendiente.current = actual?.focoCelda ?? null;
+      return null;
+    });
+  }, []);
+  useEffect(() => {
+    if (filaDetalle || !focoPendiente.current) return;
+    const sel = `[data-celda="${focoPendiente.current}"]`;
+    focoPendiente.current = null;
+    raizRef.current?.querySelector<HTMLElement>(sel)?.focus({ preventScroll: true });
+  }, [filaDetalle]);
+  useEscapeClose(filaDetalle !== null, cerrarFila);
 
   const onToggleMode = (mode: ViewMode) => {
     startTransition(() => setViewMode(mode));
@@ -129,11 +151,11 @@ export function ResumenView({
   // day-by-day ya aplicado en la RPC ventas_dashboard_prev_same_period.
   // El texto se adapta a la granularidad activa (mensual vs trimestral).
   const partialFooter = buildPartialFooter(data, selectedYear, granularity);
-  // Rango formateado del prev YTD ("1 ene – 9 may 2025") para el panel de
-  // las celdas Total. Se calcula UNA vez por render.
-  const prevYtdRange = buildPrevYtdRange(data, prevYear);
 
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
+  // Columnas que abarca la fila transformada: empresa + períodos + Total (+
+  // Proyección cuando aplica).
+  const colSpanTabla = 2 + cols.length + (!isClosedYear && data.proyeccion ? 1 : 0);
   const rows = data.empresas.map(e => {
     // Prev YTD per empresa recortado: la RPC ya devuelve prev[cur_mes]
     // con el cutoff per-empresa aplicado, y omite meses posteriores. Sumar
@@ -215,9 +237,13 @@ export function ResumenView({
   const kpiVentasSub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
   const kpiUtilidadSub = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
   const kpiMargenSub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
+  // El bloque "mes en curso vs mismo mes del año anterior" solo aplica al año
+  // en curso. En un año cerrado el encabezado pegado existe igual, con el
+  // recuadro del detalle solo.
+  const mostrarMesVsMes = !isClosedYear && data.mesActual >= 1;
 
   return (
-    <div className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
+    <div ref={raizRef} className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
       {error && (
         <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo cargar el año {selectedYear}: {error}
@@ -235,7 +261,9 @@ export function ResumenView({
         anualData={anualData}
         anualError={anualError}
         onOpenEmpresa={setPanelEmpresaId}
-        onOpenCelda={setCeldaDetalle}
+        onAbrirFila={setFilaDetalle}
+        filaDetalle={filaDetalle}
+        onCerrarFila={cerrarFila}
         onReloadData={onReloadData}
         multiMayoreoNota={multiMayoreoNota?.texto ?? null}
       />
@@ -265,7 +293,7 @@ export function ResumenView({
 
       {/* Mes en curso vs el mismo mes del año anterior (suma del grupo). Solo
           para año en curso. El mes en curso puede ir parcial → se rotula. */}
-      {!isClosedYear && data.mesActual >= 1 && (
+      {mostrarMesVsMes && (
         <MesVsMesCard
           empresas={data.empresas}
           mesActual={data.mesActual}
@@ -362,6 +390,18 @@ export function ResumenView({
               {rows.map(r => {
                 const isMulti = r.empresa.id === "multi";
                 const isOpen = panelEmpresaId === r.empresa.id;
+                // La fila abierta se TRANSFORMA: mismo lugar, mismo alto, sus
+                // números reemplazados por el detalle. Solo una a la vez.
+                if (filaDetalle?.filaId === r.empresa.id) {
+                  return (
+                    <FilaDetalleTr
+                      key={r.empresa.id}
+                      detalle={filaDetalle}
+                      colSpan={colSpanTabla}
+                      onClose={cerrarFila}
+                    />
+                  );
+                }
                 return (
                 <tr
                   key={r.empresa.id}
@@ -372,7 +412,7 @@ export function ResumenView({
                   )}
                 >
                   {/* El nombre abre el histórico mes × año de la empresa; las
-                      celdas de datos abren el panel de detalle del período. */}
+                      celdas de datos transforman la fila con el detalle. */}
                   <td
                     onClick={() => setPanelEmpresaId(r.empresa.id)}
                     aria-haspopup="dialog"
@@ -399,13 +439,16 @@ export function ResumenView({
                       cell={c}
                       mode={viewMode}
                       prevYear={prevYear}
+                      filaId={r.empresa.id}
+                      columna={String(ci)}
                       titulo={r.empresa.nombre}
-                      onOpen={setCeldaDetalle}
+                      onAbrir={setFilaDetalle}
                     />
                   ))}
                   <EmpresaTotalCell
+                    filaId={r.empresa.id}
                     titulo={r.empresa.nombre}
-                    onOpen={setCeldaDetalle}
+                    onAbrir={setFilaDetalle}
                     ventasTotal={r.ventasTotal}
                     ventasPrevTotal={r.ventasPrevTotal}
                     utilidadTotal={r.utilidadTotal}
@@ -415,20 +458,27 @@ export function ResumenView({
                     mode={viewMode}
                     selectedYear={selectedYear}
                     prevYear={prevYear}
-                    prevYtdRange={prevYtdRange}
                   />
                   {showProyeccionCol && (
                     <EmpresaProjectionCell
                       proyeccion={findProyeccionForEmpresa(data.proyeccion!, r.empresa.id)}
-                      mesCorte={data.proyeccion!.mes_corte}
                       prevYear={prevYear}
+                      filaId={r.empresa.id}
                       titulo={r.empresa.nombre}
-                      onOpen={setCeldaDetalle}
+                      onAbrir={setFilaDetalle}
                     />
                   )}
                 </tr>
                 );
               })}
+              {filaDetalle?.filaId === TOTAL_GRUPO_ID ? (
+                <FilaDetalleTr
+                  detalle={filaDetalle}
+                  colSpan={colSpanTabla}
+                  onClose={cerrarFila}
+                  oscura
+                />
+              ) : (
               <tr className="bg-gray-950 text-white">
                 <td className="sticky left-0 z-10 bg-gray-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
@@ -436,9 +486,11 @@ export function ResumenView({
                     key={ci}
                     agg={agg}
                     mode={viewMode}
+                    columna={String(ci)}
                     periodLabel={`${cols[ci]} ${selectedYear}`}
+                    cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(prevYear).slice(-2)}`}
                     prevYear={prevYear}
-                    onOpen={setCeldaDetalle}
+                    onAbrir={setFilaDetalle}
                   />
                 ))}
                 <TotalGroupAnnualCell
@@ -446,13 +498,13 @@ export function ResumenView({
                   mode={viewMode}
                   selectedYear={selectedYear}
                   prevYear={prevYear}
-                  prevYtdRange={prevYtdRange}
-                  onOpen={setCeldaDetalle}
+                  onAbrir={setFilaDetalle}
                 />
                 {showProyeccionCol && (
                   <TotalGroupProjectionCell totales={data.proyeccion!.totales_grupo} />
                 )}
               </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -472,11 +524,8 @@ export function ResumenView({
       </div>
 
       {/* Panel mes × año de una empresa (drawer desktop / sheet mobile). Único
-          en el árbol; lo abren tanto las filas desktop como las mobile. */}
-      {/* Detalle de la celda — panel lateral (desktop/iPad) o sheet (celular).
-          Reemplaza a los tooltips que se abrían ENCIMA de la tabla. */}
-      <CeldaDetallePanel detalle={celdaDetalle} onClose={() => setCeldaDetalle(null)} />
-
+          en el árbol; lo abren tanto las filas desktop como las mobile.
+          El detalle de la celda ya NO vive acá: está en el encabezado pegado. */}
       <EmpresaMesAnioPanel
         open={panelEmpresaId !== null}
         onClose={() => setPanelEmpresaId(null)}
@@ -544,16 +593,16 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
  */
 function EmpresaProjectionCell({
   proyeccion,
-  mesCorte,
   prevYear,
+  filaId,
   titulo,
-  onOpen,
+  onAbrir,
 }: {
   proyeccion: ProyeccionEmpresa | null;
-  mesCorte: number;
   prevYear: number;
+  filaId: string;
   titulo: string;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   if (!proyeccion) {
     return (
@@ -563,22 +612,19 @@ function EmpresaProjectionCell({
     );
   }
   const delta = proyeccion.delta_vs_anio_anterior;
+  const foco = celdaKey("d", filaId, "proy");
   return (
     <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "bloque",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
           titulo,
-          subtitulo: `Proyeccion de cierre ${prevYear + 1}`,
-          // El desglose del algoritmo conserva su tratamiento oscuro: es un
-          // bloque tecnico dentro del panel, no un tooltip sobre la tabla.
-          contenido: (
-            <div className="rounded-lg bg-gray-950 p-3 text-white">
-              <ProjectionBreakdown proyeccion={proyeccion} mesCorte={mesCorte} prevYear={prevYear} />
-            </div>
-          ),
+          subtitulo: `PROYECCIÓN ${prevYear + 1}`,
+          slots: buildSlotsProyeccion(proyeccion, prevYear),
+          ...medirFila(e),
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
@@ -596,89 +642,35 @@ function EmpresaProjectionCell({
   );
 }
 
-function ProjectionBreakdown({
-  proyeccion,
-  mesCorte,
-  prevYear,
-}: {
-  proyeccion: ProyeccionEmpresa;
-  mesCorte: number;
-  prevYear: number;
-}) {
-  const ytd  = proyeccion.ventas_ytd;
-  const ytdP = proyeccion.ventas_prev_ytd_sp;
+/**
+ * Desglose de la proyección como slots de la fila transformada. Reemplaza al
+ * bloque oscuro que vivía en el panel lateral: los mismos números (algoritmo,
+ * YTD de los dos años, Δ, cierre del año anterior y el parámetro del método)
+ * en el mismo renglón que el resto de los detalles.
+ */
+function buildSlotsProyeccion(p: ProyeccionEmpresa, prevYear: number): SlotDetalle[] {
+  const ytd = p.ventas_ytd;
+  const ytdP = p.ventas_prev_ytd_sp;
   const ratio = ytdP > 0 ? (ytd - ytdP) / ytdP : null;
-  const ratioStr = ratio == null ? "—" : `${ratio >= 0 ? "+" : ""}${(ratio * 100).toFixed(1)}%`;
-  const algoLabel = proyeccion.es_fallback_lineal
-    ? "Extrapolación lineal (datos insuficientes)"
-    : proyeccion.algoritmo === "estacional"
-      ? "Estacional"
-      : proyeccion.algoritmo === "mixto"
-        ? "Mixto"
-        : "Lineal";
-
-  return (
-    <div className="space-y-2 text-xs">
-      <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-300">Algoritmo</span>
-        <span className={cn(
-          "font-medium",
-          proyeccion.es_fallback_lineal ? "text-gray-400" : "text-white",
-        )}>
-          {algoLabel}
-        </span>
-      </div>
-
-      <Row label={`YTD ${prevYear + 1}`} value={fmtMoneyCompact(ytd)} />
-      <Row label={`YTD ${prevYear} mismo período`} value={ytdP > 0 ? fmtMoneyCompact(ytdP) : "—"} />
-      <Row label="Δ vs mismo período" value={ratioStr} />
-      <Row label={`Cierre ${prevYear}`} value={fmtMoneyCompact(proyeccion.cierre_anio_anterior)} />
-
-      {proyeccion.algoritmo === "estacional" && proyeccion.frac_ytd_estacional != null && (
-        <>
-          <Row
-            label={`Fracción ${prevYear} al mismo día`}
-            value={`${(proyeccion.frac_ytd_estacional * 100).toFixed(1)}%`}
-          />
-          <Formula>
-            Proyección = YTD / fracción = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
-          </Formula>
-        </>
-      )}
-
-      {proyeccion.algoritmo === "mixto" && proyeccion.factor_final != null && (
-        <>
-          <Row label="Factor de crecimiento" value={`×${proyeccion.factor_final.toFixed(3)}`} />
-          <Formula>
-            Proyección = Cierre {prevYear} × factor = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
-          </Formula>
-        </>
-      )}
-
-      {(proyeccion.algoritmo === "fallback_lineal" || proyeccion.es_fallback_lineal) && mesCorte > 0 && (
-        <Formula>
-          Proyección = YTD × 12 / {mesCorte} = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
-        </Formula>
-      )}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <span className="text-gray-300">{label}</span>
-      <span className="font-mono tabular-nums text-white">{value}</span>
-    </div>
-  );
-}
-
-function Formula({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mt-1 rounded bg-white/5 px-2 py-1.5 font-mono text-xs leading-snug text-teal-200">
-      {children}
-    </p>
-  );
+  const algo = p.es_fallback_lineal
+    ? "Lineal (datos insuficientes)"
+    : p.algoritmo === "estacional" ? "Estacional"
+    : p.algoritmo === "mixto" ? "Mixto"
+    : "Lineal";
+  const slots: SlotDetalle[] = [
+    { key: "cierre", label: "Cierre proyectado", valor: fmtMoneyCompact(p.proyeccion_cierre), prev: fmtMoneyCompact(p.cierre_anio_anterior), delta: "", tone: "neutral", destacado: true },
+    { key: "ytd", label: `YTD ${prevYear + 1}`, valor: fmtMoneyCompact(ytd), prev: ytdP > 0 ? fmtMoneyCompact(ytdP) : null,
+      delta: ratio == null ? "—" : `${ratio >= 0 ? "+" : ""}${(ratio * 100).toFixed(1)}%`,
+      tone: ratio == null ? "neutral" : ratio >= 0 ? "emerald" : "orange", destacado: false },
+    { key: "algo", label: "Método", valor: algo, prev: null, delta: "", tone: "neutral", destacado: false },
+  ];
+  if (p.algoritmo === "estacional" && p.frac_ytd_estacional != null) {
+    slots.push({ key: "frac", label: `Fracción ${prevYear} al mismo día`, valor: `${(p.frac_ytd_estacional * 100).toFixed(1)}%`, prev: null, delta: "", tone: "neutral", destacado: false });
+  }
+  if (p.algoritmo === "mixto" && p.factor_final != null) {
+    slots.push({ key: "factor", label: "Factor de crecimiento", valor: `×${p.factor_final.toFixed(3)}`, prev: null, delta: "", tone: "neutral", destacado: false });
+  }
+  return slots;
 }
 
 function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
@@ -707,14 +699,22 @@ export function leyendaDelta(mode: ViewMode, prevYear: number): string {
     : `▲ vs ${prevYear} mayor a +5% · ▼ menor a −5%`;
 }
 
+/** "Jul 2026" → "JUL 26 vs 25". El período tocado, en el ancho de un renglón. */
+function labelCorto(periodLabel: string, prevYear: number): string {
+  const [periodo, anio] = periodLabel.split(" ");
+  return `${periodo.toUpperCase()} ${(anio ?? "").slice(-2)} vs ${String(prevYear).slice(-2)}`;
+}
+
 function HeatCell({
-  cell, mode, prevYear, titulo, onOpen,
+  cell, mode, prevYear, filaId, columna, titulo, onAbrir,
 }: {
   cell: Cell;
   mode: ViewMode;
   prevYear: number;
+  filaId: string;
+  columna: string;
   titulo: string;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   const cur   = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
@@ -723,7 +723,6 @@ function HeatCell({
               : fmt.tone === "emerald" ? "text-emerald-700"
               : fmt.tone === "orange"  ? "text-red-700"
               : "text-gray-500";
-  const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   // Mes futuro sin nada del año anterior: no hay nada que abrir.
   const hasPrev = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
@@ -735,26 +734,25 @@ function HeatCell({
     );
   }
 
-  const abrir = () => onOpen({
-    kind: "metricas",
-    titulo,
-    subtitulo: cell.periodLabel,
-    prevPeriod,
-    curPeriod: cell.periodLabel,
-    filas: buildFilasMetrica(cell, mode),
-  });
-
+  const foco = celdaKey("d", filaId, columna);
   const isNa = cur != null && isNaComparison(cell, mode);
 
   // La celda muestra SOLO el valor (y la flecha de direccion, explicada en la
-  // leyenda). El delta numerico y el comparativo viven en el panel lateral: la
-  // tabla queda limpia y legible de un vistazo.
+  // leyenda). El delta numerico y el comparativo aparecen al transformarse la
+  // fila: la tabla queda limpia y legible de un vistazo.
   return (
     <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono text-xs tabular-nums">
       <button
         type="button"
-        onClick={abrir}
-        aria-haspopup="dialog"
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
+          titulo,
+          subtitulo: labelCorto(cell.periodLabel, prevYear),
+          slots: buildSlotsMetrica(cell, mode),
+          ...medirFila(e),
+        })}
         className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
         {cur == null ? (
@@ -773,15 +771,15 @@ function HeatCell({
 }
 
 /**
- * TOTAL anual por empresa (última columna). Muestra monto principal y Δ%
- * YoY en el panel: YTD curYear, YTD prevYear (recortado al
- * mismo día per-empresa), Δ% — los 3 valores cuadran con la RPC
+ * TOTAL anual por empresa (última columna). Muestra monto principal; al tocarla
+ * la fila se transforma con YTD del año, YTD del año previo (recortado al mismo
+ * día per-empresa) y Δ — los 3 cuadran con la RPC
  * ventas_dashboard_prev_same_period.
  */
 function EmpresaTotalCell({
   ventasTotal, ventasPrevTotal, utilidadTotal, utilidadPrevTotal,
   margenPctYtd, margenPctPrevYtd,
-  mode, selectedYear, prevYear, prevYtdRange, titulo, onOpen,
+  mode, selectedYear, prevYear, filaId, titulo, onAbrir,
 }: {
   ventasTotal: number;
   ventasPrevTotal: number;
@@ -794,9 +792,9 @@ function EmpresaTotalCell({
   mode: ViewMode;
   selectedYear: number;
   prevYear: number;
-  prevYtdRange: string;
+  filaId: string;
   titulo: string;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   const agg: Agg = {
     ventas: ventasTotal,
@@ -824,19 +822,20 @@ function EmpresaTotalCell({
   const dMode = deltaModeFor(mode);
   const fmt = formatDeltaRatio(delta, dMode);
   const tone = deltaTextTone(delta, dMode);
+  const foco = celdaKey("d", filaId, "total");
 
   return (
     <td className="whitespace-nowrap border-b border-gray-200 p-0 text-right font-mono tabular-nums">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
           titulo,
-          subtitulo: `Total ${selectedYear}`,
-          prevPeriod: `YTD ${prevYtdRange}`,
-          curPeriod: `YTD ${selectedYear}`,
-          filas: buildFilasMetrica(agg, mode),
+          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(prevYear).slice(-2)}`,
+          slots: buildSlotsMetrica(agg, mode),
+          ...medirFila(e),
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
@@ -851,18 +850,18 @@ function EmpresaTotalCell({
 
 /**
  * Celda de la fila TOTAL GRUPO (fondo bg-gray-950). Muestra monto + arrow
- * inline. El panel detalla prev/actual/delta. Esta función SOLO se usa para
- * las celdas mensuales o trimestrales del total grupo — la celda anual del
- * Total grupo vive en TotalGroupAnnualCell con layout monto+chip apilado.
+ * inline; al tocarla se transforma la fila oscura entera.
  */
 function TotalGroupCell({
-  agg, mode, periodLabel, prevYear, onOpen,
+  agg, mode, columna, periodLabel, cortoLabel, prevYear, onAbrir,
 }: {
   agg: Agg;
   mode: ViewMode;
+  columna: string;
   periodLabel: string;
+  cortoLabel: string;
   prevYear: number;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   const cur = cellValue(agg, mode);
   if (cur == null) {
@@ -879,20 +878,20 @@ function TotalGroupCell({
     delta == null              ? "text-gray-300"  :
     fmt.tone === "emerald"     ? "text-emerald-400" :
     fmt.tone === "orange"      ? "text-orange-400"  : "text-gray-300";
-  const prevPeriod = periodLabel.replace(String(prevYear + 1), String(prevYear));
+  const foco = celdaKey("d", TOTAL_GRUPO_ID, columna);
 
   return (
     <td className="whitespace-nowrap p-0 text-right font-mono text-xs tabular-nums">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId: TOTAL_GRUPO_ID,
+          focoCelda: foco,
           titulo: "Total Grupo",
-          subtitulo: periodLabel,
-          prevPeriod,
-          curPeriod: periodLabel,
-          filas: buildFilasMetrica(agg, mode),
+          subtitulo: cortoLabel,
+          slots: buildSlotsMetrica(agg, mode),
+          ...medirFila(e),
         })}
         className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
@@ -905,20 +904,15 @@ function TotalGroupCell({
   );
 }
 
-/**
- * Celda anual del Total Grupo (esquina inferior derecha). Layout monto +
- * Δ% chip apilado, mismo tratamiento que EmpresaTotalCell pero con fondo
- * oscuro; el detalle va al panel lateral.
- */
+/** Celda anual del Total Grupo (esquina inferior derecha). */
 function TotalGroupAnnualCell({
-  agg, mode, selectedYear, prevYear, prevYtdRange, onOpen,
+  agg, mode, selectedYear, prevYear, onAbrir,
 }: {
   agg: Agg;
   mode: ViewMode;
   selectedYear: number;
   prevYear: number;
-  prevYtdRange: string;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   const cellLike: Cell = { ...agg, periodLabel: `YTD ${selectedYear}` };
   const cur = cellValue(agg, mode);
@@ -931,19 +925,20 @@ function TotalGroupAnnualCell({
   const displayValue = cur == null
     ? "—"
     : mode === "margen" ? (cur * 100).toFixed(1) + "%" : fmtMoney(cur);
+  const foco = celdaKey("d", TOTAL_GRUPO_ID, "total");
 
   return (
     <td className="whitespace-nowrap p-0 text-right font-mono text-sm font-semibold tabular-nums">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId: TOTAL_GRUPO_ID,
+          focoCelda: foco,
           titulo: "Total Grupo",
-          subtitulo: `Total ${selectedYear}`,
-          prevPeriod: `YTD ${prevYtdRange}`,
-          curPeriod: `YTD ${selectedYear}`,
-          filas: buildFilasMetrica(agg, mode),
+          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(prevYear).slice(-2)}`,
+          slots: buildSlotsMetrica(agg, mode),
+          ...medirFila(e),
         })}
         className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
@@ -956,9 +951,6 @@ function TotalGroupAnnualCell({
   );
 }
 
-/** Etiqueta sticky-left de la fila "Multifashion". El icono de ayuda y su
- *  cuadro flotante se quitaron (tapaban la tabla): el dato que importa —cuánto
- *  del total es mayoreo— ahora se lee directo, sin hover ni clic. */
 function MultifashionNameWithBreakdown({
   nombre, nota,
 }: {
@@ -1002,17 +994,6 @@ function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): strin
   if (delta > threshold)  return "text-emerald-700";
   if (delta < -threshold) return "text-red-600";
   return "text-gray-500";
-}
-
-// Rango formateado del prev YTD para el panel de Total: "1 ene – 9 may 2025"
-// cuando hay corte; "todo {prevYear}" cuando se mira un año cerrado.
-function buildPrevYtdRange(data: VentasResumen, prevYear: number): string {
-  if (!data.dia_corte_anio_anterior) {
-    return `${prevYear}`;
-  }
-  const d = parseIsoDateResumen(data.dia_corte_anio_anterior);
-  const mesShort = MONTHS[d.getMonth()].toLowerCase();
-  return `${prevYear} (1 ene – ${d.getDate()} ${mesShort})`;
 }
 
 // Footer al pie del heatmap. Texto adaptado según granularidad activa:

@@ -25,11 +25,14 @@ import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
-import { buildFilasMetrica, cellValue, cellDelta, renderCellValue, type CeldaBase } from "@/lib/ventas/celda";
-import type { CeldaDetalle } from "./CeldaDetallePanel";
+import { buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey, type CeldaBase } from "@/lib/ventas/celda";
+import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
+
+/** Abridor de detalle que recibe cada celda clicable. */
+type AbrirFila = (d: FilaDetalle) => void;
 
 const VENTAS_ID_TO_EMPRESA_KEY: Record<string, string> = {
   vistana: "vistana",
@@ -56,9 +59,12 @@ interface ResumenViewMobileProps {
   /** Abre el panel mes × año de una empresa (id ventas corto). El panel lo
    *  renderiza ResumenView (único en el árbol). */
   onOpenEmpresa: (id: string) => void;
-  /** Abre el panel de detalle de UNA celda. El panel lo renderiza ResumenView
-   *  (único en el árbol), igual que el de empresa. */
-  onOpenCelda: (d: CeldaDetalle) => void;
+  /** Transforma la fila de esa empresa con el detalle. El state vive en
+   *  ResumenView (compartido con la tabla desktop), igual que el panel. */
+  onAbrirFila: AbrirFila;
+  /** Fila transformada, si hay alguna. Solo una a la vez. */
+  filaDetalle: FilaDetalle | null;
+  onCerrarFila: () => void;
   /** Nota de mayoreo de Multifashion (american_classic), ya formateada por
    *  buildNotaMayoreo: "incluye $X de mayoreo · Y". null si no hubo mayoreo en
    *  el período → no se muestra nada. */
@@ -78,7 +84,9 @@ export function ResumenViewMobile({
   anualData,
   anualError,
   onOpenEmpresa,
-  onOpenCelda,
+  onAbrirFila,
+  filaDetalle,
+  onCerrarFila,
   multiMayoreoNota,
   onReloadData,
 }: ResumenViewMobileProps) {
@@ -115,7 +123,9 @@ export function ResumenViewMobile({
           isClosedYear={isClosedYear}
           multiMayoreoNota={multiMayoreoNota}
           onOpenEmpresa={onOpenEmpresa}
-          onOpenCelda={onOpenCelda}
+          onAbrirFila={onAbrirFila}
+          filaDetalle={filaDetalle}
+          onCerrarFila={onCerrarFila}
           selectedYear={selectedYear}
         />
       )}
@@ -270,7 +280,9 @@ function MobileHeatmap({
   isClosedYear,
   multiMayoreoNota,
   onOpenEmpresa,
-  onOpenCelda,
+  onAbrirFila,
+  filaDetalle,
+  onCerrarFila,
   selectedYear,
 }: {
   data: VentasResumen;
@@ -279,7 +291,9 @@ function MobileHeatmap({
   isClosedYear: boolean;
   multiMayoreoNota?: string | null;
   onOpenEmpresa: (id: string) => void;
-  onOpenCelda: (d: CeldaDetalle) => void;
+  onAbrirFila: AbrirFila;
+  filaDetalle: FilaDetalle | null;
+  onCerrarFila: () => void;
   selectedYear: number;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
@@ -341,6 +355,9 @@ function MobileHeatmap({
   );
 
   const showProy = !isClosedYear && !!data.proyeccion;
+  // Columnas que abarca la fila transformada: empresa + períodos + Total (+
+  // Proyección cuando aplica).
+  const colSpanTabla = 2 + cols.length + (showProy ? 1 : 0);
 
   return (
     <div className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -386,6 +403,19 @@ function MobileHeatmap({
             const proy = showProy
               ? findProyeccionForEmpresa(data.proyeccion!, r.id)
               : null;
+            // La fila abierta se TRANSFORMA en su propio lugar (paridad exacta
+            // con desktop). Solo una a la vez.
+            if (filaDetalle?.filaId === r.id) {
+              return (
+                <FilaDetalleTr
+                  key={r.id}
+                  detalle={filaDetalle}
+                  colSpan={colSpanTabla}
+                  onClose={onCerrarFila}
+                  compacto
+                />
+              );
+            }
             return (
               <tr
                 key={r.id}
@@ -418,10 +448,11 @@ function MobileHeatmap({
                     cell={c}
                     mode={viewMode}
                     highlighted={ci === currentColIdx}
+                    filaId={r.id}
+                    columna={String(ci)}
                     titulo={r.nombre}
-                    periodLabel={`${cols[ci]} ${selectedYear}`}
-                    prevPeriodLabel={`${cols[ci]} ${selectedYear - 1}`}
-                    onOpen={onOpenCelda}
+                    cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`}
+                    onAbrir={onAbrirFila}
                   />
                 ))}
                 <MobileTotalCell
@@ -431,14 +462,24 @@ function MobileHeatmap({
                   margenPct={r.margenPct}
                   margenPctPrev={r.margenPctPrev}
                   cell={r.ytdCell}
+                  filaId={r.id}
                   titulo={r.nombre}
                   selectedYear={selectedYear}
-                  onOpen={onOpenCelda}
+                  onAbrir={onAbrirFila}
                 />
                 {showProy && <MobileProyCell proyeccion={proy} />}
               </tr>
             );
           })}
+          {filaDetalle?.filaId === TOTAL_GRUPO_ID ? (
+            <FilaDetalleTr
+              detalle={filaDetalle}
+              colSpan={colSpanTabla}
+              onClose={onCerrarFila}
+              oscura
+              compacto
+            />
+          ) : (
           <tr className="bg-gray-900 text-white">
             <th
               scope="row"
@@ -452,9 +493,10 @@ function MobileHeatmap({
                 cell={agg}
                 mode={viewMode}
                 highlighted={ci === currentColIdx}
+                columna={String(ci)}
                 periodLabel={`${cols[ci]} ${selectedYear}`}
-                prevPeriodLabel={`${cols[ci]} ${selectedYear - 1}`}
-                onOpen={onOpenCelda}
+                cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`}
+                onAbrir={onAbrirFila}
               />
             ))}
             <MobileTotalGrupoYtdCell
@@ -465,12 +507,13 @@ function MobileHeatmap({
               mode={viewMode}
               data={data}
               selectedYear={selectedYear}
-              onOpen={onOpenCelda}
+              onAbrir={onAbrirFila}
             />
             {showProy && (
               <MobileProyGrupoCell proyeccion={data.proyeccion!} />
             )}
           </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -478,15 +521,16 @@ function MobileHeatmap({
 }
 
 function MobileCell({
-  cell, mode, highlighted, titulo, periodLabel, prevPeriodLabel, onOpen,
+  cell, mode, highlighted, filaId, columna, titulo, cortoLabel, onAbrir,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
+  filaId: string;
+  columna: string;
   titulo: string;
-  periodLabel: string;
-  prevPeriodLabel: string;
-  onOpen: (d: CeldaDetalle) => void;
+  cortoLabel: string;
+  onAbrir: AbrirFila;
 }) {
   const cur = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
@@ -500,24 +544,27 @@ function MobileCell({
     );
   }
 
-  // Solo el monto y la flecha de dirección: el Δ numérico vive en el panel.
-  // Área táctil de 44px de alto (min-h en el botón) para el pulgar.
+  // Solo el monto y la flecha de dirección: el Δ numérico aparece al
+  // transformarse la fila. Área táctil de 44px de alto para el pulgar.
   const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
   const tone = delta == null ? "text-gray-400"
              : fmt.tone === "emerald" ? "text-emerald-700"
              : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
+  const foco = celdaKey("m", filaId, columna);
   return (
     <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
           titulo,
-          subtitulo: periodLabel,
-          prevPeriod: prevPeriodLabel,
-          curPeriod: periodLabel,
-          filas: buildFilasMetrica(cell, mode),
+          subtitulo: cortoLabel,
+          // Sin montos del año previo: en 390 px no entran los 3 datos con el
+          // nombre y la ×. El Δ ya dice el cambio.
+          slots: buildSlotsMetrica(cell, mode, false),
+          ...medirFila(e),
         })}
         className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-gray-100"
       >
@@ -529,7 +576,7 @@ function MobileCell({
 }
 
 function MobileTotalCell({
-  ventas, prev, mode, margenPct, margenPctPrev, cell, titulo, selectedYear, onOpen,
+  ventas, prev, mode, margenPct, margenPctPrev, cell, filaId, titulo, selectedYear, onAbrir,
 }: {
   ventas: number;
   prev: number;
@@ -537,9 +584,10 @@ function MobileTotalCell({
   margenPct: number;
   margenPctPrev: number;
   cell: CellData;
+  filaId: string;
   titulo: string;
   selectedYear: number;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   let cur: number;
   let delta: number | null;
@@ -557,18 +605,19 @@ function MobileTotalCell({
   const tone = delta == null ? "text-gray-400"
              : fmt.tone === "emerald" ? "text-emerald-700"
              : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
+  const foco = celdaKey("m", filaId, "total");
   return (
     <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums text-gray-950">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
           titulo,
-          subtitulo: `Total ${selectedYear}`,
-          prevPeriod: `YTD ${selectedYear - 1}`,
-          curPeriod: `YTD ${selectedYear}`,
-          filas: buildFilasMetrica(cell, mode),
+          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`,
+          slots: buildSlotsMetrica(cell, mode, false),
+          ...medirFila(e),
         })}
         className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-gray-100"
       >
@@ -595,14 +644,15 @@ function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }
 }
 
 function MobileTotalGrupoCell({
-  cell, mode, highlighted, periodLabel, prevPeriodLabel, onOpen,
+  cell, mode, highlighted, columna, periodLabel, cortoLabel, onAbrir,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
+  columna: string;
   periodLabel: string;
-  prevPeriodLabel: string;
-  onOpen: (d: CeldaDetalle) => void;
+  cortoLabel: string;
+  onAbrir: AbrirFila;
 }) {
   const cur = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
@@ -616,18 +666,20 @@ function MobileTotalGrupoCell({
   const tone = delta == null ? "text-gray-400"
              : fmt.tone === "emerald" ? "text-emerald-300"
              : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
+  const foco = celdaKey("m", TOTAL_GRUPO_ID, columna);
   return (
     <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        aria-label={`Total grupo ${periodLabel}`}
+        onClick={(e) => onAbrir({
+          filaId: TOTAL_GRUPO_ID,
+          focoCelda: foco,
           titulo: "Total grupo",
-          subtitulo: periodLabel,
-          prevPeriod: prevPeriodLabel,
-          curPeriod: periodLabel,
-          filas: buildFilasMetrica(cell, mode),
+          subtitulo: cortoLabel,
+          slots: buildSlotsMetrica(cell, mode, false),
+          ...medirFila(e),
         })}
         className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-white/10"
       >
@@ -639,7 +691,7 @@ function MobileTotalGrupoCell({
 }
 
 function MobileTotalGrupoYtdCell({
-  cur, prev, curUtil, prevUtil, mode, data, selectedYear, onOpen,
+  cur, prev, curUtil, prevUtil, mode, data, selectedYear, onAbrir,
 }: {
   cur: number;
   prev: number;
@@ -648,7 +700,7 @@ function MobileTotalGrupoYtdCell({
   mode: ViewMode;
   data: VentasResumen;
   selectedYear: number;
-  onOpen: (d: CeldaDetalle) => void;
+  onAbrir: AbrirFila;
 }) {
   let v: number;
   let d: number | null;
@@ -671,18 +723,19 @@ function MobileTotalGrupoYtdCell({
              : fmt.tone === "emerald" ? "text-emerald-300"
              : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
   const ytdCell: CellData = { ventas: cur, ventasPrev: prev, utilidad: curUtil, utilidadPrev: prevUtil };
+  const foco = celdaKey("m", TOTAL_GRUPO_ID, "total");
   return (
     <td className="border-l border-gray-700 p-0 text-right font-mono tabular-nums text-white">
       <button
         type="button"
-        aria-haspopup="dialog"
-        onClick={() => onOpen({
-          kind: "metricas",
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId: TOTAL_GRUPO_ID,
+          focoCelda: foco,
           titulo: "Total grupo",
-          subtitulo: `Total ${selectedYear}`,
-          prevPeriod: `YTD ${selectedYear - 1}`,
-          curPeriod: `YTD ${selectedYear}`,
-          filas: buildFilasMetrica(ytdCell, mode),
+          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`,
+          slots: buildSlotsMetrica(ytdCell, mode, false),
+          ...medirFila(e),
         })}
         className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-white/10"
       >

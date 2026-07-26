@@ -79,56 +79,67 @@ export function renderCellValue(v: number | null, mode: ViewMode): string {
   return fmtMoneyCompact(v);
 }
 
-/** Valor completo para el panel de detalle ("$1,234,567.89"). */
-export function renderCellValueFull(v: number | null, mode: ViewMode): string {
-  if (v == null) return "—";
-  if (mode === "margen") return (v * 100).toFixed(1) + "%";
-  return fmtMoney(v);
-}
-
-/** Una fila del panel de detalle: métrica, año actual, año previo y Δ. */
-export interface FilaMetrica {
-  mode: ViewMode;
+/** Un dato de la fila transformada: etiqueta + Δ arriba, valor abajo. */
+export interface SlotDetalle {
+  key: string;
+  /** "Ventas" / "Utilidad" / "Margen". Se pinta en mayúsculas. */
   label: string;
-  /** Valor del período actual, ya formateado. */
-  cur: string;
-  /** Valor del mismo período del año previo, ya formateado. */
-  prev: string;
-  /** Δ ya formateado ("▲ +12%", "n/a", "—"). */
+  /** Valor del período que se tocó, ya formateado ("$112,631" / "25.2%"). */
+  valor: string;
+  /** Mismo período del año previo. null cuando no hay comparativo o cuando la
+   *  fila va compacta (celular): ahí no entra y se cae este dato primero. */
+  prev: string | null;
+  /** Δ ya formateado ("▲ +36%", "≈0 pts", "n/a", "—"). */
   delta: string;
   tone: "emerald" | "orange" | "neutral";
   /** true en la métrica que corresponde al toggle activo de la tabla. */
   destacado: boolean;
 }
 
-const FILAS: Array<{ mode: ViewMode; label: string }> = [
+const METRICAS: Array<{ mode: ViewMode; label: string }> = [
   { mode: "ventas", label: "Ventas" },
   { mode: "utilidad", label: "Utilidad" },
   { mode: "margen", label: "Margen" },
 ];
 
 /**
- * Las 3 métricas de una celda (Ventas, Utilidad, Margen) con su valor del año
- * actual, el del año previo y el Δ. Es el contenido del panel lateral.
+ * Las 3 métricas de una celda (Ventas, Utilidad, Margen) listas para la fila
+ * transformada: valor del período, del mismo período del año previo y Δ.
+ *
+ * `conPrev=false` (celular) omite el monto del año previo: en 390 px los 3
+ * datos + el nombre + la × no entran de otra forma, y el Δ ya dice el cambio.
  */
-export function buildFilasMetrica(cell: CeldaBase, highlight: ViewMode): FilaMetrica[] {
-  return FILAS.map(({ mode, label }) => {
+export function buildSlotsMetrica(
+  cell: CeldaBase,
+  highlight: ViewMode,
+  conPrev = true,
+): SlotDetalle[] {
+  return METRICAS.map(({ mode, label }) => {
     const cur = cellValue(cell, mode);
     const prev = cellPrevValue(cell, mode);
     const delta = cellDelta(cell, mode);
     const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
     const na = isNaComparison(cell, mode);
     return {
-      mode,
+      key: mode,
       label,
-      cur: cur != null ? renderCellValueFull(cur, mode) : "—",
-      prev: prev > 0 ? renderCellValueFull(prev, mode) : "—",
+      valor: renderCellValue(cur, mode),
+      prev: conPrev && prev > 0 ? renderCellValue(prev, mode) : null,
       delta:
         delta == null
           ? (na && cur != null ? "n/a" : "—")
           : `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
       tone: delta == null ? "neutral" : fmt.tone === "emerald" ? "emerald" : fmt.tone === "orange" ? "orange" : "neutral",
       destacado: mode === highlight,
-    };
+    } satisfies SlotDetalle;
   });
+}
+
+/**
+ * Identidad de la celda que se tocó, para devolverle el foco cuando la fila
+ * transformada se cierra. Lleva prefijo de vista (`d` desktop / `m` celular)
+ * porque las dos tablas viven en el mismo árbol y una está oculta.
+ */
+export function celdaKey(vista: "d" | "m", filaId: string, columna: string): string {
+  return `${vista}:${filaId}:${columna}`;
 }
