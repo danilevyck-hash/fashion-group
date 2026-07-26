@@ -112,7 +112,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
     <div className="space-y-2">
       {pdfUrl && (
         <div className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-2">
-          <span className="text-[11px] text-gray-600 truncate flex items-center gap-1.5 min-w-0">
+          <span className="text-xs text-gray-600 truncate flex items-center gap-1.5 min-w-0">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400 shrink-0">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -122,7 +122,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           <button
             type="button"
             onClick={() => setPdfLightbox(pdfUrl)}
-            className="text-[11px] font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition shrink-0"
+            className="text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition shrink-0"
           >
             Ver factura
           </button>
@@ -161,7 +161,7 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={subiendo}
-          className="text-[11px] font-medium border border-gray-200 rounded px-2 py-1 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50"
+          className="text-xs font-medium border border-gray-200 rounded px-2 py-1 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50"
         >
           {pdfUrl ? "Reemplazar" : "Elegir archivo"}
         </button>

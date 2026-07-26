@@ -366,7 +366,7 @@ export default function EmpresaList({
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{r.nro_factura}</p>
                       {search && matchHint(r, matchReclamo(r, search)) && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</p>
                       )}
                     </div>
                   </div>
@@ -458,7 +458,7 @@ export default function EmpresaList({
                       <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
                     </span>
                     {search && matchHint(r, matchReclamo(r, search)) && (
-                      <span className="block font-normal text-[10px] text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</span>
+                      <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, matchReclamo(r, search))}</span>
                     )}
                   </td>
                   <td className="py-3 text-gray-500">{r.nro_factura}</td>
