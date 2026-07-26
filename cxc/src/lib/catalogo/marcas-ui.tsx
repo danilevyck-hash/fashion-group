@@ -851,26 +851,20 @@ const JOYBEES: MarcaTheme = {
     sinFoto: "text-[#8a1a1a] font-semibold",
   },
 
+  // Logo REAL de la marca (abeja + wordmark, public/joybees/joybees-logo.png,
+  // PNG con transparencia recortado del arte oficial). Antes estos tres
+  // lugares mostraban el emoji 🐝 con la palabra en texto — un placeholder,
+  // no el logo (Daniel consiguió el arte el 26-jul-2026). Patrón Reebok.
   logos: {
-    navbar: () => (
-      <span className="flex items-center gap-2">
-        <span className="text-lg">🐝</span>
-        <span className="font-black text-[#404041] uppercase tracking-wide text-sm">Joybees</span>
-      </span>
-    ),
+    navbar: () => <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-6 w-auto" />,
+    // A diferencia de Reebok, el PNG de Joybees SÍ trae el wordmark dentro:
+    // no hace falta escribir "JOYBEES" al lado (se vería dos veces).
     header: () => (
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg">
-          🐝
-        </div>
-        <div>
-          <h1 className="text-lg font-black uppercase tracking-[0.12em] text-[#404041] leading-none">
-            JOYBEES
-          </h1>
-          <p className="text-xs text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
-            Catalogo Panama
-          </p>
-        </div>
+      <div className="shrink-0">
+        <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-8 w-auto shrink-0" />
+        <p className="text-xs text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
+          Catalogo Panama
+        </p>
       </div>
     ),
     admin: () => (
@@ -878,13 +872,15 @@ const JOYBEES: MarcaTheme = {
         <span className="text-[#404041] font-extrabold text-sm">JB</span>
       </div>
     ),
+    // Placa blanca: la banda del header del pedido público es gris oscuro
+    // (#404041) y el wordmark del logo es exactamente ese gris — sin la placa
+    // desaparecería. Mismo tratamiento que Reebok y Tommy.
     pedidoPublico: () => (
-      <div className="flex items-center gap-2.5 shrink-0">
-        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg shrink-0">🐝</div>
-        <div>
-          <h1 className="text-white font-black uppercase tracking-wide text-xl leading-none">JOYBEES</h1>
-          <p className="text-white/50 text-xs mt-1">Panama</p>
-        </div>
+      <div className="shrink-0">
+        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
+          <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-6 w-auto shrink-0" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
     ),
   },

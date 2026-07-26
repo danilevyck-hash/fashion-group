@@ -17,7 +17,6 @@ import type {
   ProyeccionEmpresa,
 } from "./types";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
-import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -25,8 +24,21 @@ import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
-import { buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey, type CeldaBase } from "@/lib/ventas/celda";
+import {
+  buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
+  deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda,
+} from "@/lib/ventas/celda";
+import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
+
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
+
+/** Color del % bajo el monto en filas claras / en la fila oscura del total. */
+function toneDeltaClaro(tone: DeltaCelda["tone"]): string {
+  return tone === "emerald" ? "text-emerald-700" : tone === "orange" ? "text-rose-600" : "text-gray-400";
+}
+function toneDeltaOscuro(tone: DeltaCelda["tone"]): string {
+  return tone === "emerald" ? "text-emerald-300" : tone === "orange" ? "text-rose-300" : "text-gray-400";
+}
 
 type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -467,7 +479,16 @@ function MobileHeatmap({
                   selectedYear={selectedYear}
                   onAbrir={onAbrirFila}
                 />
-                {showProy && <MobileProyCell proyeccion={proy} />}
+                {showProy && (
+                  <MobileProyCell
+                    proyeccion={proy}
+                    prevYear={selectedYear - 1}
+                    fechaCorte={data.fecha_corte}
+                    filaId={r.id}
+                    titulo={r.nombre}
+                    onAbrir={onAbrirFila}
+                  />
+                )}
               </tr>
             );
           })}
@@ -544,12 +565,9 @@ function MobileCell({
     );
   }
 
-  // Solo el monto y la flecha de dirección: el Δ numérico aparece al
-  // transformarse la fila. Área táctil de 44px de alto para el pulgar.
-  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
-  const tone = delta == null ? "text-gray-400"
-             : fmt.tone === "emerald" ? "text-emerald-700"
-             : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
+  // Monto arriba, % del cambio vs el mismo mes del año anterior abajo (más
+  // chico). Área táctil de 44px de alto para el pulgar.
+  const dc = deltaCelda(delta, mode, isNaComparison(cell, mode));
   const foco = celdaKey("m", filaId, columna);
   return (
     <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
@@ -566,10 +584,10 @@ function MobileCell({
           slots: buildSlotsMetrica(cell, mode, false),
           ...medirFila(e),
         })}
-        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-gray-100"
+        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2 py-2.5 text-right leading-tight active:bg-gray-100"
       >
-        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
         <span className="text-xs text-gray-600">{renderCellValue(cur, mode)}</span>
+        {dc && <span className={cn("text-[10px]", toneDeltaClaro(dc.tone))}>{dc.texto}</span>}
       </button>
     </td>
   );
@@ -601,10 +619,7 @@ function MobileTotalCell({
     delta = prev > 0 ? (ventas - prev) / prev : null;
     display = formatCompactCurrency(cur);
   }
-  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
-  const tone = delta == null ? "text-gray-400"
-             : fmt.tone === "emerald" ? "text-emerald-700"
-             : fmt.tone === "orange" ? "text-rose-600" : "text-gray-400";
+  const dc = deltaCelda(delta, mode, delta == null);
   const foco = celdaKey("m", filaId, "total");
   return (
     <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums text-gray-950">
@@ -619,16 +634,30 @@ function MobileTotalCell({
           slots: buildSlotsMetrica(cell, mode, false),
           ...medirFila(e),
         })}
-        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-gray-100"
+        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2.5 py-2.5 text-right leading-tight active:bg-gray-100"
       >
-        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
         <span className="text-xs font-semibold">{display}</span>
+        {dc && <span className={cn("text-[10px] font-normal", toneDeltaClaro(dc.tone))}>{dc.texto}</span>}
       </button>
     </td>
   );
 }
 
-function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
+/**
+ * Proyección de cierre por empresa. Antes era un `<td>` mudo: el número estaba
+ * pero no había forma de saber de dónde salía en celular. Ahora abre la fila
+ * transformada con la explicación en castellano llano, igual que el escritorio.
+ */
+function MobileProyCell({
+  proyeccion, prevYear, fechaCorte, filaId, titulo, onAbrir,
+}: {
+  proyeccion: ProyeccionEmpresa | null;
+  prevYear: number;
+  fechaCorte: string | null;
+  filaId: string;
+  titulo: string;
+  onAbrir: AbrirFila;
+}) {
   if (!proyeccion) {
     return (
       <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums text-gray-300">
@@ -636,9 +665,24 @@ function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }
       </td>
     );
   }
+  const foco = celdaKey("m", filaId, "proy");
   return (
-    <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-700">
-      {formatCompactCurrency(proyeccion.proyeccion_cierre)}
+    <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums">
+      <button
+        type="button"
+        data-celda={foco}
+        onClick={(e) => onAbrir({
+          filaId,
+          focoCelda: foco,
+          titulo,
+          subtitulo: explicacionProyeccion(proyeccion, prevYear, { fechaCorte, corto: true }),
+          slots: buildSlotsProyeccion(proyeccion, prevYear, { fechaCorte, compacto: true }),
+          ...medirFila(e),
+        })}
+        className="flex min-h-[44px] w-full items-center justify-end px-2.5 py-3 text-right text-xs font-semibold text-teal-700 active:bg-gray-100"
+      >
+        {formatCompactCurrency(proyeccion.proyeccion_cierre)}
+      </button>
     </td>
   );
 }
@@ -662,10 +706,7 @@ function MobileTotalGrupoCell({
     return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-500", bgCls)}>—</td>;
   }
 
-  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
-  const tone = delta == null ? "text-gray-400"
-             : fmt.tone === "emerald" ? "text-emerald-300"
-             : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
+  const dc = deltaCelda(delta, mode, isNaComparison(cell, mode));
   const foco = celdaKey("m", TOTAL_GRUPO_ID, columna);
   return (
     <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
@@ -681,10 +722,10 @@ function MobileTotalGrupoCell({
           slots: buildSlotsMetrica(cell, mode, false),
           ...medirFila(e),
         })}
-        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2 py-3 text-right active:bg-white/10"
+        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2 py-2.5 text-right leading-tight active:bg-white/10"
       >
-        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
         <span className="text-xs font-medium text-white">{renderCellValue(cur, mode)}</span>
+        {dc && <span className={cn("text-[10px] font-normal", toneDeltaOscuro(dc.tone))}>{dc.texto}</span>}
       </button>
     </td>
   );
@@ -718,10 +759,7 @@ function MobileTotalGrupoYtdCell({
     d = prev > 0 ? (cur - prev) / prev : null;
     display = formatCompactCurrency(v);
   }
-  const fmt = formatDeltaRatio(d, mode === "margen" ? "pts" : "pct");
-  const tone = d == null ? "text-gray-400"
-             : fmt.tone === "emerald" ? "text-emerald-300"
-             : fmt.tone === "orange" ? "text-rose-300" : "text-gray-400";
+  const dc = deltaCelda(d, mode, d == null);
   const ytdCell: CellData = { ventas: cur, ventasPrev: prev, utilidad: curUtil, utilidadPrev: prevUtil };
   const foco = celdaKey("m", TOTAL_GRUPO_ID, "total");
   return (
@@ -737,10 +775,10 @@ function MobileTotalGrupoYtdCell({
           slots: buildSlotsMetrica(ytdCell, mode, false),
           ...medirFila(e),
         })}
-        className="flex min-h-[44px] w-full items-center justify-end gap-1 px-2.5 py-3 text-right active:bg-white/10"
+        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2.5 py-2.5 text-right leading-tight active:bg-white/10"
       >
-        {fmt.arrow && <span className={cn("text-xs", tone)}>{fmt.arrow}</span>}
         <span className="text-xs font-semibold">{display}</span>
+        {dc && <span className={cn("text-[10px] font-normal", toneDeltaOscuro(dc.tone))}>{dc.texto}</span>}
       </button>
     </td>
   );

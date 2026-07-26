@@ -354,7 +354,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       from: "Joybees Panama <pedidos@fashiongr.com>",
       headerHtml: (orderNumber, clientName, fechaLabel) => `
       <div style="background:#1a2656;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <h2 style="margin:0;font-size:18px;color:#ffe443">Joybees</h2>
+        <img src="https://fashiongr.com/joybees/joybees-logo-blanco.png" alt="Joybees" width="110" height="29" style="display:block;margin-bottom:8px" />
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>`,
@@ -433,7 +433,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       from: "Tommy Hilfiger Panama <pedidos@fashiongr.com>",
       headerHtml: (orderNumber, clientName, fechaLabel) => `
       <div style="background:#152342;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <h2 style="margin:0;font-size:18px;letter-spacing:0.08em">TOMMY HILFIGER</h2>
+        <img src="https://fashiongr.com/tommy/tommy-horizontal-blanco.png" alt="TOMMY HILFIGER" width="160" height="9" style="display:block;margin-bottom:8px" />
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>`,
