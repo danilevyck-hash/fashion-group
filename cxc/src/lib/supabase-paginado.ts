@@ -30,8 +30,19 @@
  *         .range(desde, hasta));
  *
  * El orden que se le pasa es el de la PAGINACIÓN, no el de presentación: tiene
- * que ser único y estable. Si necesitás otro orden para mostrar, ordená en
- * memoria después — son filas que ya tenés todas.
+ * que ser único y estable. Cuando el orden de presentación importa, NO lo
+ * cambies por uno "más paginable": conservá el de negocio y agregale una
+ * columna única como DESEMPATE (`.order("ultima_compra", …).order("id")`).
+ * Re-ordenar en memoria después también sirve, pero cambia la collation y con
+ * ella el orden que ve el usuario.
+ *
+ * NOTA — `sync-recibos.ts` tiene DOS lectores (`leerMesGuardado` y
+ * `loadImpuestoMap`) con este mismo bucle escrito a mano, y se dejaron así a
+ * propósito: son los originales de los que salió este helper, están cubiertos
+ * por sus propios candados (`recibos-lectura-mes.test.ts` y
+ * `recibos-impuesto-map-paginado.test.ts`) que asertan sus mensajes de error
+ * exactos, y viven en el camino del sync que acaba de cambiar en #315. Migrarlos
+ * es deuda menor y sin urgencia; cualquier lector NUEVO usa este helper.
  */
 
 /** Lo que devuelve un `.range()` de supabase-js, en lo mínimo que nos importa. */
