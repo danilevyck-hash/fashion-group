@@ -9,6 +9,7 @@ import {
   type StockLineaCorta,
 } from "@/lib/catalogo/confirmar-pedido";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
+import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { sendTelegramAlert, shortError } from "@/lib/telegram";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
@@ -221,34 +222,51 @@ async function handleConfirmar(
 
       // Stock por marca (ver cabecera). FAIL-OPEN: si la lectura falla, se
       // confirma sin aviso (es cortesía).
+      //
+      // Lo que se le muestra al cliente dice "Disponible ahora", así que tiene
+      // que ser DISPONIBILIDAD (vendible = saldo − apartado), igual que el
+      // catálogo. Antes salía existencia en las 3 marcas: en Reebok la suma de
+      // `inventory.quantity` (que el sync escribe como quantity: existencia) y
+      // en Joybees/Tommy la columna `stock`, que es el espejo de existencia.
+      // Fallback a existencia si el sync todavía no escribió disponibilidad.
       async getDisponibles(ids) {
         try {
           if (cfg.marca === "reebok") {
-            const { data, error } = await db
-              .from("inventory")
-              .select("product_id, quantity")
-              .in("product_id", ids);
-            if (error) {
-              console.warn(`[${cfg.marca}/confirmar] stock no disponible (fail-open):`, error.message);
+            const [prodRes, invRes] = await Promise.all([
+              db.from(cfg.productsTable).select("id, existencia, disponibilidad").in("id", ids),
+              db.from("inventory").select("product_id, quantity").in("product_id", ids),
+            ]);
+            if (prodRes.error && invRes.error) {
+              console.warn(
+                `[${cfg.marca}/confirmar] stock no disponible (fail-open):`,
+                prodRes.error.message,
+              );
               return null;
             }
-            const map = new Map<string, number>();
-            for (const row of data || []) {
+            // La existencia por talla vive en `inventory`; solo sirve de
+            // fallback cuando la fila del producto no trae disponibilidad.
+            const porInventory = new Map<string, number>();
+            for (const row of invRes.data || []) {
               const pid = row.product_id as string;
-              map.set(pid, (map.get(pid) || 0) + (Number(row.quantity) || 0));
+              porInventory.set(pid, (porInventory.get(pid) || 0) + (Number(row.quantity) || 0));
+            }
+            const map = new Map<string, number>(porInventory);
+            for (const p of prodRes.data || []) {
+              const pid = p.id as string;
+              map.set(pid, disponibleVendible(p, porInventory.get(pid)));
             }
             return map;
           }
           const { data, error } = await db
             .from(cfg.productsTable)
-            .select("id, stock")
+            .select("id, stock, existencia, disponibilidad")
             .in("id", ids);
           if (error) {
             console.warn(`[${cfg.marca}/confirmar] stock no disponible (fail-open):`, error.message);
             return null;
           }
           return new Map<string, number>(
-            (data || []).map((p) => [p.id as string, Number(p.stock) || 0]),
+            (data || []).map((p) => [p.id as string, disponibleVendible(p)]),
           );
         } catch {
           return null;

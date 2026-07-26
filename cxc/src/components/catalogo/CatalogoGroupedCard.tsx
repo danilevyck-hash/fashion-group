@@ -11,6 +11,7 @@ import { type JoybeesProduct, type GroupedProduct } from "./groupByModel";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
+import { disponibleVendible } from "@/lib/catalogos/disponible";
 
 /** Suma un campo de stock del grupo; null si NINGUNA variante lo trae (pre-sync
  *  → la línea muestra "—" en vez de un 0 que se leería como agotado). */
@@ -230,9 +231,14 @@ export default function CatalogoGroupedCard({
               {group.variants.map(v => {
                 const qty = cartMap.get(v.product.id) || 0;
                 const inOrder = qty > 0;
+                // "Agotado" se decide por DISPONIBILIDAD (vendible), no por
+                // existencia: si todo el saldo está apartado no hay nada que
+                // vender aunque la bodega tenga cajas. Antes leía
+                // `v.product.stock`, que es el espejo de existencia.
+                const agotado = disponibleVendible(v.product) === 0;
                 const buttonLabel = isSingleVariant
-                  ? (v.product.stock === 0 ? "Agotado" : "Agregar")
-                  : (v.product.stock === 0 ? `${v.genderLabel} — Agotado` : `Agregar ${v.genderLabel}`);
+                  ? (agotado ? "Agotado" : "Agregar")
+                  : (agotado ? `${v.genderLabel} — Agotado` : `Agregar ${v.genderLabel}`);
 
                 return inOrder ? (
                   <div key={v.product.id}>
@@ -277,9 +283,9 @@ export default function CatalogoGroupedCard({
                   <button
                     key={v.product.id}
                     onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
-                    disabled={disabled || v.product.stock === 0}
+                    disabled={disabled || agotado}
                     className={`w-full py-[9px] rounded-lg text-sm leading-5 font-semibold transition min-h-[44px] xl:min-h-[38px] ${
-                      disabled || v.product.stock === 0
+                      disabled || agotado
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : t.addBtn
                     }`}
