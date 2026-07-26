@@ -494,7 +494,7 @@ function MobileClientCard({
         aria-expanded={isExpanded}
         className="block w-full cursor-pointer text-left active:bg-gray-50"
       >
-        <div className="flex items-start justify-between gap-3 px-3 py-3">
+        <div className="flex items-start justify-between gap-2 px-3 py-3">
           <div className="min-w-0 flex-1">
             {/* gap-0 a propósito: la estrella ya mide 44x44 (regla de la casa)
                 y su caja termina EXACTAMENTE donde arranca el nombre — el aire
@@ -513,27 +513,26 @@ function MobileClientCard({
               >
                 {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-gray-300">☆</span>}
               </span>
-              {/* Decisión de Daniel: letra más chica antes que cortar el nombre.
-                  text-sm (14px) cortaba hasta 80px. 12px es el PISO de
-                  legibilidad y no se baja de ahí: los 4 nombres más largos
-                  necesitarían ~10px, así que siguen cortando con "…" (queda
-                  como decisión de producto, no se rompe el piso). */}
-              <span className="truncate text-[12px] font-medium leading-5 text-gray-900">
+              {/* 12px es el PISO de legibilidad y no se baja de ahí. Lo que
+                  faltaba para que los nombres largos entren se sacó de la
+                  DERECHA (chevron fuera, gaps al mínimo, "···" metido en el
+                  padding) y de `tracking-tight`, que aprieta el interletrado
+                  sin tocar el cuerpo de la letra. */}
+              <span className="truncate text-[12px] font-medium leading-5 tracking-tight text-gray-900">
                 {client.nombre_normalized}
               </span>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          {/* El chevron se eliminó: TODA la fila abre/cierra la card, así que la
+              flecha no era una acción sino un adorno — y costaba 22px (14 del
+              ícono + 8 del gap) del ancho del nombre. El estado abierto ya se ve
+              por el panel desplegado. El "···" conserva sus 44x44 y se mete en
+              el padding con `-mr-3`, espejo del `-ml-3` de la estrella. */}
+          <div className="flex shrink-0 items-center gap-1">
             <span className="font-mono text-base font-semibold tabular-nums text-gray-900">
               {formatCompactCurrency(client.total)}
             </span>
-            {actionsMenu && <span onClick={e => e.stopPropagation()}>{actionsMenu}</span>}
-            <svg
-              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
-            >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+            {actionsMenu && <span className="-mr-3" onClick={e => e.stopPropagation()}>{actionsMenu}</span>}
           </div>
         </div>
 

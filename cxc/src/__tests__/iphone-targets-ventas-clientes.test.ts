@@ -117,7 +117,10 @@ describe("CXC mobile — favorito vs expandir", () => {
 
 describe("Nombres cortados — letra más chica, nunca por debajo de 12px", () => {
   it("CXC mobile: el nombre del cliente baja a 12px", () => {
-    expect(panelCxc).toContain('className="truncate text-[12px] font-medium leading-5 text-gray-900"');
+    // El `tracking-tight` lo agregó el PR de ancho (ver
+    // iphone-ancho-nombres.test.ts): aprieta el interletrado, NO el cuerpo de
+    // la letra — los 12px siguen intactos.
+    expect(panelCxc).toContain('className="truncate text-[12px] font-medium leading-5 tracking-tight text-gray-900"');
     expect(panelCxc).not.toContain('className="truncate text-sm font-medium text-gray-900"');
   });
 

@@ -304,7 +304,13 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
         ))}
       </div>
       <div className={`text-2xl font-bold tabular-nums mt-1 ${valueClass ?? "text-stone-900"}`}>{value}</div>
-      <div className="text-xs mt-1 tabular-nums truncate">
+      {/* El subtítulo ENVUELVE, no se corta. En iPhone la tarjeta mide 175px y
+          "▼ 20.3% vs julio 2025 (parcial)" necesita 148: con `truncate` se
+          perdía justo el "(parcial)", que es el aviso de que la comparación
+          está incompleta. `min-h` reserva las 2 líneas siempre, así todas las
+          tarjetas quedan de la misma altura (y el label de hover, que es de 1
+          sola línea, no la hace saltar). */}
+      <div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">
         <span className="group-hover:hidden">{sub}</span>
         <span className="hidden group-hover:inline text-teal-600 font-medium">{hoverLabel} →</span>
       </div>
