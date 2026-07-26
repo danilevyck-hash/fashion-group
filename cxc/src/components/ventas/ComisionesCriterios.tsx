@@ -13,7 +13,9 @@ export function ComisionesCriterios() {
     <div className="rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-600">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-gray-100 active:scale-[0.99]"
+        // El acordeón medía 34 px de alto (356×34): el ancho sobraba pero el
+        // alto no llegaba al mínimo táctil de 44.
+        className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-gray-100 active:scale-[0.99]"
         aria-expanded={open}
       >
         <Info className="h-4 w-4 shrink-0 text-gray-400" />

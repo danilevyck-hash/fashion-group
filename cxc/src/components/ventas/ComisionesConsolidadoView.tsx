@@ -172,7 +172,8 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
         <button
           onClick={handleExport}
           disabled={empty}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+          /* Medía 81×39: faltaban 5 px de alto para el mínimo táctil. */
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
         </button>
@@ -186,7 +187,7 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
             <p className="text-rose-600">{error}</p>
             <button
               onClick={() => void load()}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
             >
               Reintentar
             </button>
@@ -225,7 +226,10 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
                     <td colSpan={EMPRESAS.length + 2} className="px-4 py-1.5">
                       <button
                         onClick={() => setShowInactivos((v) => !v)}
-                        className="text-xs italic text-gray-400 transition hover:text-gray-600"
+                        /* Era texto suelto de 18 px de alto dentro de la fila.
+                           -my-1 compensa para que la fila de la tabla no crezca
+                           más de lo necesario en escritorio. */
+                        className="inline-flex min-h-[44px] -my-1 items-center text-xs italic text-gray-400 transition hover:text-gray-600"
                       >
                         {showInactivos ? "▾" : "▸"} {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
                       </button>
