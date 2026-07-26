@@ -101,7 +101,9 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     const totalLine = "110 bultos · 1320 piezas";
     expect(pages.filter((t) => t.includes(totalLine)).length).toBe(1);
     expect(pages[pages.length - 1]).toContain(totalLine);
-    expect(pages[pages.length - 1]).toContain("Fashion Group Panama · Joybees");
+    // "Panamá" con tilde (auditoría 26-jul-2026: el pie y la banda del PDF que
+    // recibe el cliente decían "Panama" a secas).
+    expect(pages[pages.length - 1]).toContain("Fashion Group Panamá · Joybees");
   });
 
   it("Reebok con pre-orden: secciones Pedido y Pre-orden separadas", async () => {

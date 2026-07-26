@@ -46,6 +46,20 @@ export const ORDER_PDF_IMG_PX = 200;
 
 const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** Ancho útil (mm) del nombre del cliente antes de chocar con "Pedido:" (x=90),
+ *  descontando la etiqueta "Cliente: " y 2 mm de aire. */
+export const CLIENT_NAME_MAX_MM = 90 - 14 - 2;
+
+/** Recorta el nombre del cliente con "…" para que quepa en su columna. */
+export function fitClientName(doc: jsPDF, name: string): string {
+  const label = doc.getTextWidth("Cliente: ");
+  const max = CLIENT_NAME_MAX_MM - label;
+  if (doc.getTextWidth(name) <= max) return name;
+  let out = name;
+  while (out.length > 1 && doc.getTextWidth(out + "…") > max) out = out.slice(0, -1);
+  return out.trimEnd() + "…";
+}
+
 export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const { marca, orderNumber, clientName, createdAt, bultoSize, images } = opts;
   const items = marca === "reebok" ? sortReebokOrderItems(opts.items) : opts.items;
@@ -78,10 +92,14 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     try { doc.addImage(JOYBEES_LOGO_BLANCO_BASE64, "PNG", 14, 9 - JOYBEES_LOGO_HEIGHT / 2, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT); } catch { /* */ }
   }
   doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
-  doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
+  doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
 
+  // Cliente / Pedido / Fecha en columnas FIJAS (14 / 90 / 150 mm): el nombre del
+  // cliente se recorta al ancho disponible o se montaba encima de "Pedido:"
+  // ("COMERCIAL EL MACHETAZO, S.A. — SUCURSAL VÍA ESPAÑA" pisaba el número de
+  // pedido en el PDF que recibe el cliente).
   doc.setTextColor(100); doc.setFontSize(9);
-  doc.text(`Cliente: ${clientName}`, 14, 26);
+  doc.text(`Cliente: ${fitClientName(doc, clientName)}`, 14, 26);
   doc.text(`Pedido: ${orderNumber}`, 90, 26);
   doc.text(`Fecha: ${fechaLabel}`, 150, 26);
 
@@ -135,10 +153,10 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
   doc.text(
     marca === "reebok"
-      ? "Fashion Group Panama · Reebok Authorized Distributor"
+      ? "Fashion Group Panamá · Reebok Authorized Distributor"
       : marca === "tommy"
-        ? "Fashion Group Panama · Tommy Hilfiger"
-        : "Fashion Group Panama · Joybees",
+        ? "Fashion Group Panamá · Tommy Hilfiger"
+        : "Fashion Group Panamá · Joybees",
     14,
     fy + 10,
   );

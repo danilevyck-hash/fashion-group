@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf } from "@/lib/catalogo/order-pdf";
+import { buildOrderEmailHtml, escapeHtml } from "@/lib/catalogo/order-email";
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -82,10 +83,6 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     items = cfg.sortEmailItems(items as (EmailItem & { sku: string })[]);
   }
 
-  const regularItems = items.filter((i) => !i.is_preorder);
-  const preorderItems = items.filter((i) => i.is_preorder);
-  const hasPreorders = cfg.itemsHasPreorder && preorderItems.length > 0;
-
   // ── PDF adjunto — lib única de pedido (order-pdf), imágenes downscaled ──
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
     .toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
@@ -101,67 +98,21 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const dateStr = new Date().toISOString().slice(0, 10);
   const pdfFilename = `Pedido-${orderNumber}-${dateStr}.pdf`;
 
-  // ── Build HTML email ──
-  const renderRow = (item: EmailItem) => {
-    const bs = cfg.bultoSize(item.category);
-    return `<tr style="border-bottom:1px solid #eee">
-      <td style="padding:8px;vertical-align:middle;width:48px">${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" width="40" height="40" style="display:block;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee">` : `<div style="display:block;width:40px;height:40px;background:#e5e7eb;border-radius:4px"></div>`}</td>
-      <td style="padding:8px;vertical-align:middle"><strong>${item.name}</strong><br><span style="font-size:11px;color:#888">${item.sku}</span></td>
-      <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity}</td>
-      <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity * bs}</td>
-      <td style="padding:8px;text-align:right;vertical-align:middle">$${fmt(item.unit_price)}</td>
-      <td style="padding:8px;text-align:right;vertical-align:middle">$${fmt(item.quantity * bs * Number(item.unit_price))}</td>
-    </tr>`;
-  };
-
-  const headBg = cfg.sendOrder.tableHeadBg;
-  const tableHead = `<thead><tr style="background:${headBg};color:white">
-        <th style="padding:8px;width:48px"></th>
-        <th style="padding:8px;text-align:left">Producto</th>
-        <th style="padding:8px;text-align:center">Bultos</th><th style="padding:8px;text-align:center">Piezas</th>
-        <th style="padding:8px;text-align:right">Precio/u</th><th style="padding:8px;text-align:right">Subtotal</th>
-      </tr></thead>`;
-
-  const renderSection = (title: string, sectionItems: EmailItem[], accent: string) => sectionItems.length === 0 ? "" : `
-    <div style="margin:16px 0 4px;display:flex;align-items:center;gap:8px">
-      <span style="display:inline-block;background:${accent};color:white;font-size:11px;font-weight:bold;padding:4px 10px;border-radius:4px;letter-spacing:0.5px;text-transform:uppercase">${title}</span>
-      <span style="font-size:12px;color:#666">${sectionItems.length} item${sectionItems.length !== 1 ? "s" : ""}</span>
-    </div>
-    <table style="width:100%;border-collapse:collapse;margin:8px 0 16px">
-      ${tableHead}
-      <tbody>${sectionItems.map(renderRow).join("")}</tbody>
-    </table>`;
-
-  // Reebok: secciones Pedido/Pre-orden (o "Detalle" si no hay preventa).
-  // Joybees: una sola tabla sin label de sección (formato heredado).
-  const sectionsHtml = cfg.itemsHasPreorder
-    ? hasPreorders
-      ? `${renderSection("Pedido", regularItems, headBg)}${renderSection("Pre-orden", preorderItems, "#d97706")}`
-      : `${renderSection("Detalle", regularItems, headBg)}`
-    : `<table style="width:100%;border-collapse:collapse;margin:8px 0 16px">
-          ${tableHead}
-          <tbody>${items.map(renderRow).join("")}</tbody>
-        </table>`;
-
-  const html = `
-    <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">
-      ${cfg.sendOrder.headerHtml(orderNumber, clientName, fechaLabel)}
-      <div style="padding:20px;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px">
-        <p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
-          Estimado equipo Fashion Group,<br>
-          Se ha recibido un nuevo pedido del catalogo ${cfg.label}. A continuacion el detalle:
-        </p>
-        ${comment ? `<p style="color:#666;font-size:13px;margin:0 0 12px"><strong>Nota:</strong> ${comment}</p>` : ""}
-        ${sectionsHtml}
-        ${hasPreorders ? `<p style="background:#fef3c7;border-left:3px solid #d97706;padding:10px 14px;color:#92400e;font-size:12px;margin:8px 0 16px">Los items en <strong>Pre-orden</strong> aun no tienen stock disponible. No deben mezclarse con el pedido regular en bodega.</p>` : ""}
-        <div style="background:#f5f5f5;padding:12px 16px;border-radius:6px;margin:16px 0">
-          <strong style="font-size:14px">Total: ${totalBultos} bultos (${totalPiezas} piezas) — $${fmt(total)}</strong>
-        </div>
-        <p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
-          Este pedido fue generado automaticamente desde fashiongr.com
-        </p>
-      </div>
-    </div>`;
+  // ── Build HTML email (lib pura → se puede renderizar y medir sin enviar) ──
+  const html = buildOrderEmailHtml({
+    marcaLabel: cfg.label,
+    // La banda de marca interpola el nombre del cliente en HTML → se escapa
+    // acá (un nombre con comillas o `<` rompía el encabezado del correo).
+    headerHtml: cfg.sendOrder.headerHtml(escapeHtml(orderNumber), escapeHtml(clientName), escapeHtml(fechaLabel)),
+    tableHeadBg: cfg.sendOrder.tableHeadBg,
+    itemsHasPreorder: cfg.itemsHasPreorder,
+    items,
+    bultoSize: cfg.bultoSize,
+    comment,
+    totalBultos,
+    totalPiezas,
+    total,
+  });
 
   const to = body.clientEmail ? [body.clientEmail] : ["daniel@fashiongr.com"];
 
