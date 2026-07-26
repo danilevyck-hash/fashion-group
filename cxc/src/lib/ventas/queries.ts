@@ -8,6 +8,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
+import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -103,7 +104,13 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // El hero del Resumen muestra realidad vs realidad (2026 proyectado
     // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
     // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
-    withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
+    // v7 (jul-2026): clamp de la proyección, cobertura del año previo y regla de
+    // año base. Cae a v6 mientras la migración 20260726120000 no haya corrido.
+    rpcConFallbackDeVersion(
+      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v7", { p_anio: year }), { label: "ventas_proyeccion_cierre_v7" }),
+      () => withDbRetry(() => supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }), { label: "ventas_proyeccion_cierre_v6" }),
+      { label: "ventas_proyeccion_cierre_v7" },
+    ),
     // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
     // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,

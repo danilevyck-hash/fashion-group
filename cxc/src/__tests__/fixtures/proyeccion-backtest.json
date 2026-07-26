@@ -1,0 +1,308 @@
+{
+  "_": "Numeros MEDIDOS con 120 cortes reales. El modelo de medicion reprodujo ventas_proyeccion_cierre_v6(2026) al centavo antes de medir nada. Ver supabase/migrations/20260726120000_ventas_proyeccion_cierre_v7.sql",
+  "reglas": {
+    "clampMin": 0.75,
+    "clampMax": 1.6,
+    "fracSinClamp": 0.5,
+    "coberturaMinima": 0.1,
+    "diasAnioBase": 31,
+    "fracEstacional": 0.05
+  },
+  "backtest": {
+    "descripcion": "120 cortes: dias 5/11/17/23/29 de cada mes de 2024 y 2025",
+    "antes": {
+      "cortes": 120,
+      "ene-feb": {
+        "n": 20,
+        "errorGrupoPct": 16.8,
+        "sesgoGrupoPct": -16.4,
+        "errorEmpresaPct": 38
+      },
+      "mar-may": {
+        "n": 30,
+        "errorGrupoPct": 4.5,
+        "sesgoGrupoPct": -1.2,
+        "errorEmpresaPct": 68.7
+      },
+      "jun-dic": {
+        "n": 70,
+        "errorGrupoPct": 6,
+        "sesgoGrupoPct": -0.4,
+        "errorEmpresaPct": 16
+      },
+      "total": {
+        "n": 120,
+        "errorGrupoPct": 7.4,
+        "sesgoGrupoPct": -3.3,
+        "errorEmpresaPct": 32.8
+      }
+    },
+    "despues": {
+      "cortes": 120,
+      "ene-feb": {
+        "n": 20,
+        "errorGrupoPct": 10.2,
+        "sesgoGrupoPct": -9.8,
+        "errorEmpresaPct": 31.2
+      },
+      "mar-may": {
+        "n": 30,
+        "errorGrupoPct": 4.9,
+        "sesgoGrupoPct": -3.2,
+        "errorEmpresaPct": 41.2
+      },
+      "jun-dic": {
+        "n": 70,
+        "errorGrupoPct": 4.9,
+        "sesgoGrupoPct": -1.6,
+        "errorEmpresaPct": 13.2
+      },
+      "total": {
+        "n": 120,
+        "errorGrupoPct": 5.8,
+        "sesgoGrupoPct": -3.4,
+        "errorEmpresaPct": 23.2
+      }
+    },
+    "soloClamp": {
+      "cortes": 120,
+      "ene-feb": {
+        "n": 20,
+        "errorGrupoPct": 10.2,
+        "sesgoGrupoPct": -9.8,
+        "errorEmpresaPct": 31.2
+      },
+      "mar-may": {
+        "n": 30,
+        "errorGrupoPct": 4.9,
+        "sesgoGrupoPct": -3,
+        "errorEmpresaPct": 40.8
+      },
+      "jun-dic": {
+        "n": 70,
+        "errorGrupoPct": 4.9,
+        "sesgoGrupoPct": -1.5,
+        "errorEmpresaPct": 13.1
+      },
+      "total": {
+        "n": 120,
+        "errorGrupoPct": 5.8,
+        "sesgoGrupoPct": -3.3,
+        "errorEmpresaPct": 23.1
+      }
+    },
+    "descartados": {
+      "anioBaseTambienEnLaProyeccion": {
+        "cortes": 120,
+        "ene-feb": {
+          "n": 20,
+          "errorGrupoPct": 14.3,
+          "sesgoGrupoPct": -14.3,
+          "errorEmpresaPct": 27.8
+        },
+        "mar-may": {
+          "n": 30,
+          "errorGrupoPct": 4.9,
+          "sesgoGrupoPct": -3.2,
+          "errorEmpresaPct": 41.2
+        },
+        "jun-dic": {
+          "n": 70,
+          "errorGrupoPct": 4.9,
+          "sesgoGrupoPct": -1.6,
+          "errorEmpresaPct": 13.2
+        },
+        "total": {
+          "n": 120,
+          "errorGrupoPct": 6.5,
+          "sesgoGrupoPct": -4.1,
+          "errorEmpresaPct": 22.7
+        },
+        "porQueSeDescarto": "errorGrupoPct"
+      },
+      "clampSiempreEncendido": {
+        "cortes": 120,
+        "ene-feb": {
+          "n": 20,
+          "errorGrupoPct": 10.2,
+          "sesgoGrupoPct": -9.8,
+          "errorEmpresaPct": 31.2
+        },
+        "mar-may": {
+          "n": 30,
+          "errorGrupoPct": 4.9,
+          "sesgoGrupoPct": -3.2,
+          "errorEmpresaPct": 41
+        },
+        "jun-dic": {
+          "n": 70,
+          "errorGrupoPct": 4.6,
+          "sesgoGrupoPct": -1.6,
+          "errorEmpresaPct": 16.7
+        },
+        "total": {
+          "n": 120,
+          "errorGrupoPct": 5.6,
+          "sesgoGrupoPct": -3.4,
+          "errorEmpresaPct": 25.2
+        },
+        "porQueSeDescarto": "errorEmpresaPct"
+      },
+      "clampQueSeDesvanece": {
+        "cortes": 120,
+        "ene-feb": {
+          "n": 20,
+          "errorGrupoPct": 10.2,
+          "sesgoGrupoPct": -9.8,
+          "errorEmpresaPct": 31.2
+        },
+        "mar-may": {
+          "n": 30,
+          "errorGrupoPct": 4.8,
+          "sesgoGrupoPct": -3.2,
+          "errorEmpresaPct": 47.2
+        },
+        "jun-dic": {
+          "n": 70,
+          "errorGrupoPct": 5.3,
+          "sesgoGrupoPct": -1.1,
+          "errorEmpresaPct": 14.3
+        },
+        "total": {
+          "n": 120,
+          "errorGrupoPct": 6,
+          "sesgoGrupoPct": -3.1,
+          "errorEmpresaPct": 25.3
+        },
+        "porQueSeDescarto": "errorEmpresaPct"
+      },
+      "sinElGateDeMes3": {
+        "cortes": 120,
+        "ene-feb": {
+          "n": 20,
+          "errorGrupoPct": 15,
+          "sesgoGrupoPct": -9.1,
+          "errorEmpresaPct": 37.3
+        },
+        "mar-may": {
+          "n": 30,
+          "errorGrupoPct": 4.9,
+          "sesgoGrupoPct": -3.2,
+          "errorEmpresaPct": 41.2
+        },
+        "jun-dic": {
+          "n": 70,
+          "errorGrupoPct": 4.9,
+          "sesgoGrupoPct": -1.6,
+          "errorEmpresaPct": 13.2
+        },
+        "total": {
+          "n": 120,
+          "errorGrupoPct": 6.6,
+          "sesgoGrupoPct": -3.3,
+          "errorEmpresaPct": 24.2
+        },
+        "porQueSeDescarto": "errorGrupoPct"
+      }
+    }
+  },
+  "hoy": {
+    "fechaCorte": "2026-07-25",
+    "empresas": [
+      {
+        "empresa": "active_shoes",
+        "proyeccionAntes": 639923.6,
+        "proyeccionDespues": 639923.6,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 855138.8,
+        "metaSugeridaDespues": 855138.8
+      },
+      {
+        "empresa": "active_wear",
+        "proyeccionAntes": 386188.7,
+        "proyeccionDespues": 386188.7,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 249645.4,
+        "metaSugeridaDespues": 246859.9
+      },
+      {
+        "empresa": "american_classic",
+        "proyeccionAntes": 765747.9,
+        "proyeccionDespues": 765747.9,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 857554.6,
+        "metaSugeridaDespues": null
+      },
+      {
+        "empresa": "confecciones_boston",
+        "proyeccionAntes": 754020.7,
+        "proyeccionDespues": 754020.7,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 859343.5,
+        "metaSugeridaDespues": 696220
+      },
+      {
+        "empresa": "fashion_shoes",
+        "proyeccionAntes": 2551469.4,
+        "proyeccionDespues": 2551469.4,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 2397287.6,
+        "metaSugeridaDespues": 2397287.6
+      },
+      {
+        "empresa": "fashion_wear",
+        "proyeccionAntes": 4344718.7,
+        "proyeccionDespues": 4344718.7,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 4562943.7,
+        "metaSugeridaDespues": 4562943.7
+      },
+      {
+        "empresa": "joystep",
+        "proyeccionAntes": 207121.5,
+        "proyeccionDespues": 45557.1,
+        "algoritmoAntes": "mixto",
+        "algoritmoDespues": "fallback_lineal",
+        "metaSugeridaAntes": null,
+        "metaSugeridaDespues": null
+      },
+      {
+        "empresa": "vistana",
+        "proyeccionAntes": 2852715.4,
+        "proyeccionDespues": 2852715.4,
+        "algoritmoAntes": "estacional",
+        "algoritmoDespues": "estacional",
+        "metaSugeridaAntes": 2917307.6,
+        "metaSugeridaDespues": 2917307.6
+      }
+    ],
+    "grupoAntes": 12501905.9,
+    "grupoDespues": 12340341.5
+  },
+  "joystepDuranteElAnio": [
+    {
+      "corte": "2026-03-31",
+      "ventasYtd": 14780.5,
+      "proyeccion": 59122,
+      "algoritmo": "fallback_lineal"
+    },
+    {
+      "corte": "2026-05-31",
+      "ventasYtd": 22217.5,
+      "proyeccion": 53321.9,
+      "algoritmo": "fallback_lineal"
+    },
+    {
+      "corte": "2026-07-25",
+      "ventasYtd": 26575,
+      "proyeccion": 45557.1,
+      "algoritmo": "fallback_lineal"
+    }
+  ]
+}
