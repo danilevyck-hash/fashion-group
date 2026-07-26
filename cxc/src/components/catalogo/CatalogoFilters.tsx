@@ -112,7 +112,7 @@ export default function CatalogoFilters({
 
         {/* Gender chips */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className={f.chipLabel}>Genero</span>
+          <span className={f.chipLabel}>Género</span>
           {f.genderOptions.map(opt => (
             <button
               key={opt.value}
@@ -132,7 +132,7 @@ export default function CatalogoFilters({
 
             {/* Category chips */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className={f.chipLabel}>Cat.</span>
+              <span className={f.chipLabel}>Categoría</span>
               {f.categoryOptions.map(opt => (
                 <button
                   key={opt.value}
@@ -226,7 +226,12 @@ export default function CatalogoFilters({
             <option value="precio-desc">Precio: mayor a menor</option>
             <option value="nombre-az">Nombre A-Z</option>
           </select>
-          <span className={f.count}>{filteredCount}</span>
+          {/* El número suelto ("490") no le decía NADA al cliente: quedaba
+              pegado al select de orden como si fuera parte de él. Con la
+              palabra al lado se lee solo. */}
+          <span className={f.count}>
+            {filteredCount} {filteredCount === 1 ? "producto" : "productos"}
+          </span>
         </div>
       </div>
     </div>
