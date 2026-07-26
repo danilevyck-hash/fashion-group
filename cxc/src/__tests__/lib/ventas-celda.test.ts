@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildFilasMetrica,
   cellValue,
   cellDelta,
   cellPrevValue,
   isNaComparison,
   marginRatio,
   renderCellValue,
-  renderCellValueFull,
+  buildSlotsMetrica,
+  celdaKey,
   MARGEN_VENTAS_MIN,
   type CeldaBase,
 } from "@/lib/ventas/celda";
@@ -54,56 +54,79 @@ describe("matemática de la celda", () => {
     expect(cellDelta(futuro, "ventas")).toBeNull();
   });
 
-  it("formato compacto en la tabla, completo en el panel", () => {
+  it("formato del monto: sin centavos, con separador de miles", () => {
     expect(renderCellValue(null, "ventas")).toBe("—");
-    expect(renderCellValueFull(120_000, "ventas")).toBe("$120,000.00");
-    expect(renderCellValueFull(0.35, "margen")).toBe("35.0%");
+    expect(renderCellValue(120_000, "ventas")).toBe("$120,000");
+    expect(renderCellValue(0.35, "margen")).toBe("35.0%");
   });
 });
 
-describe("buildFilasMetrica — contenido del panel lateral", () => {
+describe("buildSlotsMetrica — contenido de la fila transformada", () => {
   it("siempre trae las 3 métricas, en orden", () => {
-    const filas = buildFilasMetrica(celda, "ventas");
-    expect(filas.map((f) => f.mode)).toEqual(["ventas", "utilidad", "margen"]);
-    expect(filas.map((f) => f.label)).toEqual(["Ventas", "Utilidad", "Margen"]);
+    const slots = buildSlotsMetrica(celda, "ventas");
+    expect(slots.map((s) => s.key)).toEqual(["ventas", "utilidad", "margen"]);
+    expect(slots.map((s) => s.label)).toEqual(["Ventas", "Utilidad", "Margen"]);
   });
 
-  it("cada fila trae año actual, año previo y Δ", () => {
-    const [ventas, utilidad, margen] = buildFilasMetrica(celda, "ventas");
+  it("cada dato trae valor del período, del año previo y Δ", () => {
+    const [ventas, utilidad, margen] = buildSlotsMetrica(celda, "ventas");
 
-    expect(ventas.cur).toBe("$120,000.00");
-    expect(ventas.prev).toBe("$100,000.00");
+    expect(ventas.valor).toBe("$120,000");
+    expect(ventas.prev).toBe("$100,000");
     expect(ventas.delta).toContain("20");
     expect(ventas.tone).toBe("emerald");
 
-    expect(utilidad.cur).toBe("$42,000.00");
-    expect(utilidad.prev).toBe("$30,000.00");
+    expect(utilidad.valor).toBe("$42,000");
+    expect(utilidad.prev).toBe("$30,000");
 
-    expect(margen.cur).toBe("35.0%");
+    expect(margen.valor).toBe("35.0%");
     expect(margen.prev).toBe("30.0%");
   });
 
+  it("en celular (conPrev=false) se cae el monto del año previo, no el Δ", () => {
+    const slots = buildSlotsMetrica(celda, "ventas", false);
+    expect(slots.every((s) => s.prev === null)).toBe(true);
+    expect(slots[0].delta).toContain("20");
+    expect(slots.map((s) => s.valor)).toEqual(["$120,000", "$42,000", "35.0%"]);
+  });
+
   it("destaca la métrica del toggle activo de la tabla", () => {
-    expect(buildFilasMetrica(celda, "margen").map((f) => f.destacado)).toEqual([false, false, true]);
-    expect(buildFilasMetrica(celda, "utilidad").map((f) => f.destacado)).toEqual([false, true, false]);
+    expect(buildSlotsMetrica(celda, "margen").map((s) => s.destacado)).toEqual([false, false, true]);
+    expect(buildSlotsMetrica(celda, "utilidad").map((s) => s.destacado)).toEqual([false, true, false]);
   });
 
   it("una caída se marca en tono naranja", () => {
     const cayo: CeldaBase = { ventas: 50_000, ventasPrev: 100_000, utilidad: 5_000, utilidadPrev: 30_000 };
-    expect(buildFilasMetrica(cayo, "ventas")[0].tone).toBe("orange");
+    expect(buildSlotsMetrica(cayo, "ventas")[0].tone).toBe("orange");
   });
 
   it("sin comparativo muestra n/a en vez de un Δ inventado", () => {
     const sinPrev: CeldaBase = { ventas: 500, ventasPrev: 0, utilidad: 100, utilidadPrev: 0 };
-    expect(buildFilasMetrica(sinPrev, "ventas")[0].delta).toBe("n/a");
-    expect(buildFilasMetrica(sinPrev, "ventas")[0].prev).toBe("—");
+    expect(buildSlotsMetrica(sinPrev, "ventas")[0].delta).toBe("n/a");
+    expect(buildSlotsMetrica(sinPrev, "ventas")[0].prev).toBeNull();
   });
 
   it("mes futuro: sin valor actual pero conserva el del año previo", () => {
     const futuro: CeldaBase = { ventas: null, ventasPrev: 9_000, utilidad: null, utilidadPrev: 2_000 };
-    const [ventas] = buildFilasMetrica(futuro, "ventas");
-    expect(ventas.cur).toBe("—");
-    expect(ventas.prev).toBe("$9,000.00");
+    const [ventas] = buildSlotsMetrica(futuro, "ventas");
+    expect(ventas.valor).toBe("—");
+    expect(ventas.prev).toBe("$9,000");
     expect(ventas.delta).toBe("—");
+  });
+});
+
+describe("celdaKey — a qué celda devolverle el foco al cerrar", () => {
+  it("distingue por fila y por columna", () => {
+    expect(celdaKey("d", "vistana", "6")).toBe(celdaKey("d", "vistana", "6"));
+    expect(celdaKey("d", "vistana", "6")).not.toBe(celdaKey("d", "vistana", "7"));
+    expect(celdaKey("d", "vistana", "6")).not.toBe(celdaKey("d", "fwear", "6"));
+  });
+
+  it("desktop y celular no colisionan (las dos tablas viven en el mismo árbol)", () => {
+    expect(celdaKey("d", "vistana", "6")).not.toBe(celdaKey("m", "vistana", "6"));
+  });
+
+  it("la celda Total no colisiona con la de un mes", () => {
+    expect(celdaKey("d", "vistana", "total")).not.toBe(celdaKey("d", "vistana", "6"));
   });
 });
