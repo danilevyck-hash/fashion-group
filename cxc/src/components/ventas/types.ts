@@ -40,19 +40,7 @@ export type ResumenKpis = {
   metaAnualMultifashion: number;
 };
 
-/** Bloque por empresa que devuelve ventas_meta_sugerida_v1 (RPC). */
-export type MetaSugeridaEmpresa = {
-  empresa: string;                 // empresa key snake_case
-  nombre: string;                  // display name ("Vistana International")
-  ventas_prev_year: number;
-  ritmo_historico: number | null;  // 0.05 = +5% crecimiento promedio histórico
-  historia_disponible: number;     // 0..3 (cuántos crecimientos efectivos)
-  factor_final: number | null;     // ratio clampeado [0.90, 1.25]
-  meta_sugerida: number | null;    // ventas_prev_year * factor_final
-  meta_manual_actual: number | null; // de ventas_metas (NULL si no hay)
-};
-
-/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v5. */
+/** Bloque por empresa que devuelve la proyección viva (v7, con caída a v6). */
 export type ProyeccionEmpresa = {
   empresa: string;
   nombre: string;

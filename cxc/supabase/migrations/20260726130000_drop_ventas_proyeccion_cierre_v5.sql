@@ -1,0 +1,61 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: DROP ventas_proyeccion_cierre_v5 — la proyeccion vieja, sin usuarios.
+--
+-- PROBLEMA
+--   v5 sigue viva en la base y nadie la llama. Su unico llamador era el endpoint
+--   /api/ventas/proyeccion-cierre, que a su vez solo lo consumia la pagina
+--   "Configurar Metas" (/ventas/metas) — pagina que ya no existe. El endpoint se
+--   elimino en este mismo PR. La proyeccion viva del dashboard es v7 (con caida
+--   a v6 mientras 20260726120000 no haya corrido), y v5 daba OTRO numero para la
+--   misma pregunta: mientras siga instalada es una segunda verdad esperando que
+--   alguien la llame por error. Ademas lee ventas_raw, la tabla congelada.
+--
+-- QUE HACE
+--   Un solo DROP FUNCTION IF EXISTS, sin CASCADE (a proposito: si apareciera un
+--   dependiente inesperado preferimos que el DROP falle y revisar, en vez de que
+--   se lleve algo por delante). Idempotente: si ya no esta, es no-op.
+--   NO toca v6 ni v7, NO toca la tabla ventas_metas (las metas manuales cargadas
+--   se siguen leyendo desde v6/v7), NO toca ventas_meta_sugerida_v2.
+--
+-- VERIFICACION PREVIA (correr en el SQL Editor ANTES de aplicar esto)
+--   Las 3 tienen que dar el resultado indicado. Solo SELECT, no modifican nada.
+--
+--   -- V1) Existe y con que firma. Debe devolver 1 fila: (int) -> jsonb.
+--   SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args,
+--          pg_get_function_result(p.oid) AS retorna
+--   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+--   WHERE n.nspname = 'public' AND p.proname = 'ventas_proyeccion_cierre_v5';
+--
+--   -- V2) Ninguna funcion VIVA la invoca en su cuerpo. DEBE dar 0 filas.
+--   --     Este es el caso que mas se escapa: un llamador dentro de otro plpgsql
+--   --     NO crea dependencia en el catalogo, asi que el DROP no lo detectaria.
+--   SELECT p.proname AS llamador, pg_get_function_identity_arguments(p.oid) AS args
+--   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+--   WHERE n.nspname = 'public'
+--     AND p.proname <> 'ventas_proyeccion_cierre_v5'
+--     AND p.prosrc ~* '\mventas_proyeccion_cierre_v5\M'
+--   ORDER BY 1;
+--
+--   -- V3) No esta atada a ningun trigger. DEBE dar 0 filas.
+--   SELECT p.proname AS funcion, t.tgname AS trigger, c.relname AS tabla
+--   FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+--        JOIN pg_class c ON c.oid = t.tgrelid
+--   WHERE NOT t.tgisinternal AND p.proname = 'ventas_proyeccion_cierre_v5';
+--
+--   Ya verificado del lado del repo (26-jul-2026): ningun archivo de src/,
+--   scripts/, docs/ ni supabase/ la nombra fuera de su propia migracion, y las
+--   54 RPCs expuestas en produccion estan todas definidas en supabase/migrations
+--   — ninguna de esas definiciones la invoca. La verificacion V2 es la red por si
+--   alguien creo algo a mano en el panel.
+--
+-- COMO REVERTIRLA
+--   La definicion completa de v5 esta intacta en el repo:
+--     supabase/migrations/20260522000000_ventas_proyeccion_cierre_v5.sql
+--   Para recrearla: correr ese archivo tal cual en el SQL Editor (trae su propio
+--   CREATE OR REPLACE + el GRANT EXECUTE a service_role). No hay estado que
+--   restaurar: v5 no guarda nada, solo lee.
+--
+-- Aplicar manual en Supabase Dashboard -> SQL Editor.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+DROP FUNCTION IF EXISTS public.ventas_proyeccion_cierre_v5(integer);

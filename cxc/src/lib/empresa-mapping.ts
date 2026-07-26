@@ -1,4 +1,8 @@
-import { supabaseServer } from "@/lib/supabase-server";
+// Sin import de supabase-server: al eliminarse getVentasMensuales() este módulo
+// dejó de tocar la base. Los tests que lo mockean siguen siendo válidos (el mock
+// de un módulo no importado es inocuo) y los componentes cliente que hoy inlinean
+// constantes "para no importar server-only de empresa-mapping" pueden seguir
+// haciéndolo — no se cambió ninguno.
 
 export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
   vistana: "Vistana International",
@@ -132,32 +136,7 @@ export function mapEmpresaName(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;
 }
 
-export async function getVentasMensuales(year: number, month?: number): Promise<{
-  empresa: string; mes: number; ventas_netas: number; utilidad: number; costo: number;
-}[]> {
-  // Fuente única switch_facturas vía la vista unificada (switch-only, mensual,
-  // hora-Panamá; Paso 2). utilidad/costo quedan en 0: los consumidores (metas,
-  // metas-auto) solo usan ventas_netas; el costo va al sprint de costo (Opción A).
-  const { data } = await supabaseServer
-    .from("switch_ventas_unificado_vw")
-    .select("empresa_key, mes, ventas_netas")
-    .gte("mes", `${year}-01-01`)
-    .lte("mes", `${year}-12-31`);
-
-  // Aggregate by empresa + mes
-  const map = new Map<string, { ventas_netas: number; utilidad: number; costo: number }>();
-  for (const r of (data ?? []) as { empresa_key: string; mes: string; ventas_netas: number | string }[]) {
-    const m = new Date(r.mes).getUTCMonth() + 1;
-    if (month && m !== month) continue;
-    const name = mapEmpresaName(r.empresa_key);
-    const key = `${name}|${m}`;
-    const entry = map.get(key) ?? { ventas_netas: 0, utilidad: 0, costo: 0 };
-    entry.ventas_netas += Number(r.ventas_netas) || 0;
-    map.set(key, entry);
-  }
-
-  return [...map.entries()].map(([key, v]) => {
-    const [empresa, mes] = key.split("|");
-    return { empresa, mes: parseInt(mes), ...v };
-  });
-}
+// getVentasMensuales() se eliminó con las rutas /api/ventas/metas y
+// /api/ventas/metas-auto (jul-2026): eran sus dos únicos consumidores y ambas
+// estaban muertas. Quien necesite el agregado por empresa × mes lee directo
+// switch_ventas_unificado_vw, que es la fuente que esa función envolvía.
