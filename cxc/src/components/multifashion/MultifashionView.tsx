@@ -123,18 +123,20 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
-        <div className="flex items-center gap-1">
+        {/* iPhone: las flechas medían 36×36 y quedaban a 4px del selector —
+            dedo gordo = mes equivocado. 44×44 y gap-2 (8px) de separación. */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={goPrev}
             disabled={!canPrev}
             aria-label="Mes anterior"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
           <Select value={String(mes)} onValueChange={v => setMes(parseInt(v, 10))}>
-            <SelectTrigger className="h-9 w-auto min-w-[140px] gap-1.5 text-xs">
+            <SelectTrigger className="h-11 w-auto min-w-[132px] gap-1.5 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -150,7 +152,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
             onClick={goNext}
             disabled={!canNext}
             aria-label="Mes siguiente"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
+            className="flex h-11 w-11 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:text-gray-600"
           >
             <ChevronRight className="h-4 w-4" />
           </button>

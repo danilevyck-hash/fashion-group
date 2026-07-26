@@ -573,9 +573,9 @@ function ClienteRowItem({
         {conFidel && (
           <span className="flex justify-center">
             {fidel?.estado5 === "disponible" ? (
-              <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-teal-700">Disponible</span>
+              <span className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">Disponible</span>
             ) : fidel?.estado5 === "usado" ? (
-              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-500">Usado ✓</span>
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-500">Usado ✓</span>
             ) : (
               <span className="text-xs text-gray-300">—</span>
             )}
@@ -595,7 +595,7 @@ function ClienteRowItem({
                 <MessageCircle className="h-3.5 w-3.5" />
               </a>
             ) : (
-              <span className="text-[10px] leading-tight text-gray-300" title="Sin teléfono en el maestro de Switch">sin tel.</span>
+              <span className="text-xs leading-tight text-gray-300" title="Sin teléfono en el maestro de Switch">sin tel.</span>
             )}
           </span>
         )}

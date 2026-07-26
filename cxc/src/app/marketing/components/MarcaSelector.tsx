@@ -179,7 +179,7 @@ export default function MarcaSelector({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-gray-900">Gastos Tommy y Calvin</span>
-                <span className="rounded bg-gray-100 text-gray-500 text-[11px] px-1.5 py-0.5">Archivo</span>
+                <span className="rounded bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5">Archivo</span>
               </div>
               <div className="text-[12px] text-gray-500 mt-0.5">
                 Gastos anteriores al rediseño · congelado
@@ -215,7 +215,7 @@ export default function MarcaSelector({
                         {empresa || (m.tipo === "interna" ? "Interna" : "—")}
                       </div>
                     </div>
-                    <span className="text-[11px] font-bold text-gray-400">{m.codigo}</span>
+                    <span className="text-xs font-bold text-gray-400">{m.codigo}</span>
                   </div>
                   <div className="mt-3 flex items-baseline justify-between">
                     <span className="font-semibold text-gray-900 tabular-nums">

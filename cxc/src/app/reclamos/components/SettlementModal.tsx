@@ -132,7 +132,7 @@ export default function SettlementModal({
 
         {requireComprobante && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-amber-700 font-medium">
+            <div className="text-xs uppercase tracking-[0.05em] text-amber-700 font-medium">
               Comprobante de pago *
             </div>
             <p className="mt-0.5 text-xs text-amber-800">Foto o PDF — obligatorio para marcar Pagado.</p>
@@ -156,18 +156,18 @@ export default function SettlementModal({
           {rows.map((r, i) => (
             <div key={i} className="rounded-md border border-gray-200 p-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                <span className="text-xs uppercase tracking-[0.05em] text-gray-400">
                   Nota de crédito {rows.length > 1 ? i + 1 : ""}
                 </span>
                 {rows.length > 1 && (
-                  <button onClick={() => removeRow(i)} className="text-[11px] text-gray-400 hover:text-red-600 transition">
+                  <button onClick={() => removeRow(i)} className="text-xs text-gray-400 hover:text-red-600 transition">
                     Quitar
                   </button>
                 )}
               </div>
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[11px] text-gray-500">Monto recuperado *</span>
+                  <span className="text-xs text-gray-500">Monto recuperado *</span>
                   <input
                     type="number" inputMode="decimal" min="0" step="0.01"
                     value={r.monto}
@@ -177,7 +177,7 @@ export default function SettlementModal({
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] text-gray-500">Fecha *</span>
+                  <span className="text-xs text-gray-500">Fecha *</span>
                   <input
                     type="date"
                     value={r.fecha}
@@ -186,7 +186,7 @@ export default function SettlementModal({
                   />
                 </label>
                 <label className="col-span-2 block">
-                  <span className="text-[11px] text-gray-500">N° nota de crédito (opcional)</span>
+                  <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
                   <input
                     type="text"
                     value={r.nota_credito}

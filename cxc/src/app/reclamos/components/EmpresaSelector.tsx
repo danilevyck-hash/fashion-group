@@ -144,7 +144,7 @@ export default function EmpresaSelector({
               </div>
               {results.length === 0 ? <EmptyState title="No encontramos nada" subtitle={`Intenta con otro termino en vez de "${globalSearch}"`} /> : (
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                  <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left pb-3 font-medium">N° Reclamo</th>
                     <th className="text-left pb-3 font-medium">Empresa</th>
                     <th className="text-left pb-3 font-medium">Factura</th>
@@ -157,12 +157,12 @@ export default function EmpresaSelector({
                       <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
                         <td className="py-3 font-medium text-xs">
                           {r.nro_reclamo}
-                          {matchHint(r, via) && <span className="block font-normal text-[10px] text-gray-400 mt-0.5">{matchHint(r, via)}</span>}
+                          {matchHint(r, via) && <span className="block font-normal text-xs text-gray-400 mt-0.5">{matchHint(r, via)}</span>}
                         </td>
                         <td className="py-3 text-gray-500">{r.empresa}</td>
                         <td className="py-3 text-gray-500">{r.nro_factura}</td>
                         <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
-                        <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
+                        <td className="py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                         <td className="py-3 text-right tabular-nums">${fmt(reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total)}</td>
                       </tr>
                     ))}
@@ -187,16 +187,18 @@ export default function EmpresaSelector({
                   className={`border border-gray-200 rounded-lg p-6 cursor-pointer hover:border-gray-300 transition ${open.length === 0 ? "opacity-50" : ""}`}>
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
-                    <div className="flex gap-1.5 flex-wrap justify-end">
+                    {/* 36px de alto y 6px de separación: dos targets chicos y
+                        pegados, ×10 empresas. A 44px de alto y gap-2 (8px). */}
+                    <div className="flex gap-2 flex-wrap justify-end">
                       <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} disabled={excelBusy !== null} title="Descargar Excel con links a las facturas y fotos (abren con un clic)"
-                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{excelBusy === empresa ? "Excel…" : "↓ Excel"}</button>
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 min-h-[44px] rounded-full flex-shrink-0 font-medium disabled:opacity-40">{excelBusy === empresa ? "Excel…" : "↓ Excel"}</button>
                       <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} disabled={pdfBusy !== null} title="Descargar PDF consolidado del proveedor (resumen + detalle por reclamo con fotos)"
-                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{pdfBusy === empresa ? "PDF…" : "↓ PDF"}</button>
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 min-h-[44px] rounded-full flex-shrink-0 font-medium disabled:opacity-40">{pdfBusy === empresa ? "PDF…" : "↓ PDF"}</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">
                     <p className="text-xs text-gray-400">{c?.nombre || "Sin contacto"}</p>
-                    {hasAlert && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium border border-red-100">Alerta</span>}
+                    {hasAlert && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium border border-red-100">Alerta</span>}
                   </div>
                   <div className="flex gap-6">
                     <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">facturas</p></div>
@@ -207,7 +209,7 @@ export default function EmpresaSelector({
                     <div className="mt-4 border-t border-gray-200 pt-3" onClick={(ev) => ev.stopPropagation()}>
                       <button
                         onClick={() => setExpandedHistorial((p) => ({ ...p, [empresa]: !p[empresa] }))}
-                        className="text-[11px] text-gray-400 hover:text-black transition flex items-center gap-1 w-full">
+                        className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1 w-full min-h-[44px]">
                         <span className="transition-transform" style={{ display: "inline-block", transform: expandedHistorial[empresa] ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span>
                         Historial ({ers.length})
                       </button>
@@ -216,7 +218,7 @@ export default function EmpresaSelector({
                           {ers.slice(0, 5).map((r) => (
                             <div key={r.id}
                               onClick={() => onLoadDetail(r.id, empresa)}
-                              className="flex items-center justify-between text-[11px] py-1 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                              className="flex items-center justify-between gap-2 text-xs min-h-[44px] py-1 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium text-gray-700">{r.nro_reclamo}</span>
                                 <span className="text-gray-400">{fmtDate(r.fecha_reclamo)}</span>
@@ -228,7 +230,7 @@ export default function EmpresaSelector({
                             </div>
                           ))}
                           {ers.length > 5 && (
-                            <button onClick={() => onSelectEmpresa(empresa)} className="text-[11px] text-gray-400 hover:text-black transition mt-1 block">Ver todos &rarr;</button>
+                            <button onClick={() => onSelectEmpresa(empresa)} className="text-xs text-gray-400 hover:text-black transition mt-1 flex items-center min-h-[44px] px-2">Ver todos &rarr;</button>
                           )}
                         </div>
                       )}

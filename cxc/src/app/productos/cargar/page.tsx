@@ -55,7 +55,11 @@ function CargarInner() {
       <AppHeader module="Depurador" />
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
+        {/* iPhone: 6 pestañas suman ~543px contra 390px de pantalla. Sin
+            `overflow-x-auto` el ancho sobrante empujaba la PÁGINA entera
+            (scrollWidth 547 vs clientWidth 390) y "Reglas"/"Historial" solo se
+            alcanzaban arrastrando todo el layout. Ahora scrollea la barra sola. */}
+        <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
           <TabBtn active={tab === "facturas"} onClick={() => setTab("facturas")}>Facturas Tienda</TabBtn>
           <TabBtn active={tab === "curvas"} onClick={() => setTab("curvas")}>Tallas</TabBtn>
@@ -85,7 +89,7 @@ function CargarInner() {
         <div className="mx-auto max-w-4xl px-4 pt-4">
           {/* Dos sets de fórmulas: Depurador (importación) y Tienda (Facturas Tienda).
               key={scope} remonta el componente para re-sembrar el catálogo. */}
-          <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
+          <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <TabBtn active={formulasScope === "depurador"} onClick={() => setFormulasScope("depurador")}>Depurador (importación)</TabBtn>
             <TabBtn active={formulasScope === "tienda"} onClick={() => setFormulasScope("tienda")}>Tienda (facturas)</TabBtn>
           </div>
@@ -104,7 +108,7 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${
+      className={`shrink-0 whitespace-nowrap rounded-md px-4 min-h-[44px] text-sm font-medium transition ${
         active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"
       }`}
     >

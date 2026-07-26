@@ -242,7 +242,7 @@ export default function EnviarProveedorModal({
               placeholder="correo@proveedor.com"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
-            <p className="text-[10px] text-gray-300 mt-1">Separa varios correos con coma.</p>
+            <p className="text-xs text-gray-300 mt-1">Separa varios correos con coma.</p>
           </div>
 
           <div>
@@ -254,7 +254,7 @@ export default function EnviarProveedorModal({
               placeholder="copia@correo.com (opcional)"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
-            <p className="text-[10px] text-gray-300 mt-1">Separa varios correos con coma.</p>
+            <p className="text-xs text-gray-300 mt-1">Separa varios correos con coma.</p>
           </div>
 
           {/* Libreta global de contactos */}
@@ -296,11 +296,11 @@ export default function EnviarProveedorModal({
                   </button>
                 </div>
 
-                {libretaErr && <p className="text-[11px] text-red-500">{libretaErr}</p>}
+                {libretaErr && <p className="text-xs text-red-500">{libretaErr}</p>}
 
                 {/* Lista de contactos */}
                 {libreta.length === 0 ? (
-                  <p className="text-[11px] text-gray-300 py-1">Aún no hay contactos guardados.</p>
+                  <p className="text-xs text-gray-300 py-1">Aún no hay contactos guardados.</p>
                 ) : (
                   <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
                     {libreta.map((ct) => (
@@ -330,11 +330,11 @@ export default function EnviarProveedorModal({
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
                               {ct.nombre && <p className="text-xs font-medium truncate">{ct.nombre}</p>}
-                              <p className="text-[11px] text-gray-400 truncate">{ct.email}</p>
+                              <p className="text-xs text-gray-400 truncate">{ct.email}</p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              <button type="button" onClick={() => setTo((v) => appendEmail(v, ct.email))} title="Agregar a Para" className="text-[10px] border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ Para</button>
-                              <button type="button" onClick={() => setCc((v) => appendEmail(v, ct.email))} title="Agregar a CC" className="text-[10px] border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ CC</button>
+                              <button type="button" onClick={() => setTo((v) => appendEmail(v, ct.email))} title="Agregar a Para" className="text-xs border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ Para</button>
+                              <button type="button" onClick={() => setCc((v) => appendEmail(v, ct.email))} title="Agregar a CC" className="text-xs border border-gray-200 px-1.5 py-1 rounded text-gray-500 hover:text-black hover:border-gray-400 transition">+ CC</button>
                               <button type="button" onClick={() => { setEditId(ct.id); setEditEmail(ct.email); setEditNombre(ct.nombre || ""); setLibretaErr(null); }} title="Editar" className="p-1 text-gray-400 hover:text-black transition">{IconPencil}</button>
                               <button type="button" onClick={() => deleteContacto(ct.id)} title="Eliminar" className="p-1 text-gray-400 hover:text-red-600 transition">{IconTrash}</button>
                             </div>
@@ -366,7 +366,7 @@ export default function EnviarProveedorModal({
               rows={6}
               className="w-full border border-gray-200 rounded-md px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition resize-y"
             />
-            <p className="text-[10px] text-gray-300 mt-1">Debajo del mensaje se agrega automáticamente la tabla resumen y la descarga.</p>
+            <p className="text-xs text-gray-300 mt-1">Debajo del mensaje se agrega automáticamente la tabla resumen y la descarga.</p>
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}

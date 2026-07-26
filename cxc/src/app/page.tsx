@@ -8,7 +8,8 @@ function ForgotPassword() {
   const [show, setShow] = useState(false);
   return (
     <div className="text-center">
-      <button type="button" onClick={() => setShow(!show)} className="text-xs text-gray-400 hover:text-gray-600 transition">
+      {/* 18px de alto al tacto. min-h-[44px] sin cambiar el tamaño de letra. */}
+      <button type="button" onClick={() => setShow(!show)} className="inline-flex min-h-[44px] items-center justify-center px-4 text-xs text-gray-400 hover:text-gray-600 transition">
         ¿Olvidaste tu contraseña?
       </button>
       {show && <p className="text-xs text-gray-500 mt-2">Contacta al administrador para restablecer tu contraseña.</p>}
@@ -84,14 +85,16 @@ function LoginForm() {
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(""); }}
               placeholder="Contraseña"
-              className="w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black pr-14"
+              className="w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black pr-16"
               autoCapitalize="none"
               autoCorrect="off"
               autoFocus
               disabled={loading}
             />
+            {/* Medía 19×18: imposible de pegarle con el pulgar. 44×44. */}
             <button type="button" onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition text-xs">
+              aria-label={showPassword ? "Ocultar contraseña" : "Ver contraseña"}
+              className="absolute right-1 top-1/2 -translate-y-1/2 flex min-w-[44px] h-11 items-center justify-center px-1 text-gray-300 hover:text-gray-600 transition text-xs">
               {showPassword ? "ocultar" : "ver"}
             </button>
           </div>

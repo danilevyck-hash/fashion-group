@@ -137,7 +137,7 @@ export default function EmpresaGastosForm({
                   <div className="text-sm font-medium text-gray-900 truncate">{c.nombre}</div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span
-                      className={`text-[10px] font-medium rounded-full px-1.5 py-px ${
+                      className={`text-xs font-medium rounded-full px-1.5 py-px ${
                         c.es_fijo ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-500"
                       }`}
                     >
@@ -145,7 +145,7 @@ export default function EmpresaGastosForm({
                     </span>
                     <button
                       onClick={() => setNotaAbierta((p) => ({ ...p, [id]: !p[id] }))}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                      className="text-xs text-gray-400 hover:text-gray-600 transition"
                     >
                       {notaAbierta[id] ? "− nota" : "+ nota"}
                     </button>

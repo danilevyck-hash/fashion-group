@@ -717,7 +717,9 @@ function SegmentedToggle<T extends string>({
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "rounded px-3 py-1 text-xs font-medium transition",
+              // 26px de alto era el target más chico de la vista. min-h-[44px]
+              // con la caja gris de p-0.5 alrededor → 45px reales al tacto.
+              "flex min-h-[44px] items-center justify-center rounded px-3 text-xs font-medium transition",
               active ? "bg-white text-gray-950 shadow-sm" : "text-gray-500 hover:text-gray-700",
             )}
           >
@@ -823,10 +825,12 @@ function MiniBars({
           </div>
         ))}
       </div>
+      {/* Iniciales de día (L M X J V S D) del mini gráfico "Mejor día de la
+          semana". Estaban a 8.5px — el texto más chico de toda la app. */}
       {showLabels && (
         <div className="mt-1 flex gap-px">
           {data.map((d, i) => (
-            <span key={i} className="flex-1 text-center text-[8.5px] uppercase text-gray-400">{d.label.slice(0, 1)}</span>
+            <span key={i} className="flex-1 text-center text-xs leading-tight uppercase text-gray-400">{d.label.slice(0, 1)}</span>
           ))}
         </div>
       )}

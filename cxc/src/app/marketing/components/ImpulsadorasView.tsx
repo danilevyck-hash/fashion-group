@@ -24,7 +24,7 @@ function iniciales(nombre: string): string {
 function ChipMes({ label, pagado }: { label: string; pagado: boolean }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
         pagado ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
       }`}
     >
@@ -119,7 +119,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-gray-900">{imp.nombre}</span>
                   {!imp.activa && (
-                    <span className="rounded bg-gray-100 text-gray-500 text-[11px] px-1.5 py-0.5">
+                    <span className="rounded bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5">
                       Inactiva
                     </span>
                   )}
@@ -140,7 +140,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
                   <div className="font-semibold text-gray-900 tabular-nums">
                     {formatearMonto(imp.monto_mensual)}
                   </div>
-                  <div className="text-[11px] text-gray-400">/ mes</div>
+                  <div className="text-xs text-gray-400">/ mes</div>
                 </div>
                 {!imp.mesActual.pagado && (
                   <button

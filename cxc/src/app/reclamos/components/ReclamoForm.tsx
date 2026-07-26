@@ -393,7 +393,7 @@ export default function ReclamoForm({
                   )}
                   {f.status === "error" && (
                     <div className="absolute inset-0 rounded-lg bg-red-50/80 flex items-center justify-center pointer-events-none">
-                      <span className="text-red-600 text-[11px] font-semibold">Falló</span>
+                      <span className="text-red-600 text-xs font-semibold">Falló</span>
                     </div>
                   )}
                   <button type="button" onClick={() => onRemoveFoto(f)} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
@@ -445,7 +445,7 @@ export default function ReclamoForm({
             {saving ? (
               <span className="w-5 h-5 border-2 border-gray-300 border-t-black rounded-full animate-spin flex-shrink-0" />
             ) : fotosError ? (
-              <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 text-white text-[11px] font-bold leading-none">!</div>
+              <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold leading-none">!</div>
             ) : (
               <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>

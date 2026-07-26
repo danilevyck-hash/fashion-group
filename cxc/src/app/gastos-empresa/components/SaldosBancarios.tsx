@@ -99,7 +99,7 @@ function BancoRow({
         <span className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-medium text-gray-900 truncate">{empresaNombre(empresaKey)}</span>
           {viejo && (
-            <span className="shrink-0 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-px">
+            <span className="shrink-0 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-px">
               dato viejo
             </span>
           )}
@@ -135,7 +135,7 @@ function BancoRow({
         <button
           onClick={guardar}
           disabled={guardando || parsed == null || !fecha}
-          className="shrink-0 rounded-md bg-black text-white px-3 py-2.5 text-sm font-medium active:scale-[0.97] transition disabled:opacity-40"
+          className="shrink-0 rounded-md bg-black text-white px-3 min-h-[44px] py-2.5 text-sm font-medium active:scale-[0.97] transition disabled:opacity-40"
         >
           {guardando ? "…" : "Guardar"}
         </button>
