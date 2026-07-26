@@ -10,8 +10,12 @@
 // Horario elegido por SESIÓN ÚNICA de Switch (1 token por empresa/instancia):
 // a las 11:30 nadie más toca la instancia MULTI/american_classic — esquiva
 // sync-recibos (07:50), switch-articulos (08:40) y la pasada de reconciliación
-// de las 10:00 (termina ≤10:05). La 2ª entrada (16:30) cae tras el facturas ACS
-// de las 15:00 (~1 min) y antes de la reconciliación de las 18:00.
+// de las 10:00 (termina ≤10:05) y queda a 90 min del facturas ACS de las 13:00.
+// La 2ª entrada (16:30) cae entre el facturas ACS de las 15:00 (~1 min) y el de
+// las 17:00, a 30 min de este último. En un día sano es un no-op (guard
+// cronSuccessHoyUtc: si la corrida de las 11:30 salió bien, ni abre sesión);
+// en el peor caso trabaja hasta su maxDuration de 800 s → termina 16:43 y deja
+// 17 min de margen antes de las 17:00.
 
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";

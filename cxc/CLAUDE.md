@@ -83,7 +83,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-47 entradas configuradas (cada entrada corre 1×/día por restricción del plan Hobby; sub-diario = varias entradas del mismo path, ver nota; límite Hobby: 100 cron jobs/proyecto):
+52 entradas configuradas. **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -102,7 +102,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/sync-utilidad | 07:00 |
 | /api/cron/sync-clientes-master | 07:00 |
 | /api/cron/refresh-clientes-views | 07:35 (fuera del minuto 06:30 de switch-sync AC/Boston y de la ráfaga 07:00-07:31 — solo DB, sin Switch) |
-| /api/cron/sync-recibos | 07:50, 20:10, 22:20 (3 entradas) |
+| /api/cron/sync-recibos (pagos) | 07:50, 15:15, 19:15, 23:15 (4 entradas — corridas REALES, no "segunda oportunidad": el route no tiene guard no-op y re-sincroniza la ventana rodante de 3 meses cada vez. Las 3 de la tarde van 15 min DESPUÉS de las ventas porque comparten 6 empresas) |
 | /api/cron/switch-articulos | 08:40 |
 | /api/cron/acs-fidelizacion | 11:30, 16:30 (2 entradas — la 2ª es "segunda oportunidad": no-op si la 1ª ya registró success hoy; 11:30 esquiva sync-recibos 07:50 y switch-articulos 08:40 en american_classic) |
 | /api/cron/reebok-catalogo | 12:10, 17:00 (2 entradas — solo toca active_shoes en Switch; 12:10 esquiva sync-utilidad 07:00 en active_shoes) |
@@ -112,12 +112,16 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | 13:00 |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
-| /api/cron/switch-sync tipo=facturas (american_classic) | 15:00, 23:15, 00:15 (3 entradas — ventas ACS intradía; 00:15 = sync de cierre, tras cerrar tienda 7pm Panamá) |
+| /api/cron/switch-sync tipo=facturas — **ventas** | 13:00, 15:00, 17:00, 19:00, 21:00, 23:00, 00:15 (7 entradas). **13/17/21 y 00:15 = solo american_classic** (ventas ACS cada 2h; 00:15 = sync de cierre, tras cerrar tienda 7pm Panamá — de él depende el resumen de la 01:00). **15/19/23 = las 8 empresas con facturas** (ACS + las 7 B2B): ventas B2B cada 4h, 10:00/14:00/18:00 Panamá |
 | /api/cron/acs-resumen-diario | 01:00 (resumen diario ventas ACS a Telegram; 20:00 Panamá = 8pm, tras el sync de cierre de 00:15) |
 | /api/cron/grupo-resumen-mensual | 13:00 el día 3 de cada mes (`0 13 3 * *` — resumen mensual del grupo a Telegram; único cron NO diario, umbral propio en health-crons) |
 | /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO para dar 60 min a reebok-catalogo 17:00) |
 
-> **Plan Vercel Hobby:** cada entrada de cron corre 1×/día y las funciones tienen tope `maxDuration` 300s. Para frecuencia sub-diaria se agregan entradas separadas del mismo path (patrón `switch-reconciliacion`).
+> **Ventas B2B y ventas ACS a la misma hora, en UNA sola entrada (26-jul-2026):** a las 15/19/23 UTC el sync de facturas cubre las 8 empresas en una entrada, no dos. Dos entradas de `tipo=facturas` a la misma hora producirían el MISMO nombre de slot (`facturas-1500`, derivado de `<tipo>-<hhmm>`) → heartbeats pisados y `slotsHuerfanos` sin poder decir cuál ocurrencia se perdió. Las empresas se procesan serialmente dentro del route (sesión única) con american_classic primero; la corrida completa mide ~1 min (facturas son 4-8 s por empresa).
+>
+> **Por qué 15/19/23 y no 14/18/22 (las 09:00/13:00/17:00 Panamá que se pidieron):** 14:00 y 18:00 son EXACTAMENTE las pasadas de `switch-reconciliacion`, que puede abrir la sesión de cualquier empresa hasta 12 min (`RECOVERY_BUDGET_MS` = 740 s). Se corrió todo una hora → 10:00/14:00/18:00 Panamá.
+>
+> **Plan Vercel Pro:** las funciones tienen tope `maxDuration` 800s (Fluid Compute). Cada entrada de cron sigue siendo 1×/día por diseño del sistema de slots, no por límite del plan.
 >
 > **Heartbeats por-slot de switch-sync:** cada entrada de switch-sync lleva `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de su schedule, ej. `estadocuenta-2110`) y registra un heartbeat granular `switch-sync:<slot>` además del base. Los slots se DERIVAN de `SWITCH_CRON_ENTRADAS` (src/lib/cron-telemetry.ts) — fuente única: al agregar/mover una entrada de switch-sync se actualiza vercel.json y esa constante, y un test compara ambas. health-crons NO alerta por filas de slot que aún no existen (se siembran solas en <24h).
 >
@@ -131,7 +135,20 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **Gracia de siembra acotada (jul-2026):** "fila de slot ausente = todavía no sembrada" ya no es eterno. La reconciliación escribe una vez la marca `switch-sync:<slot>#visto` (insert-if-absent) para los slots sin heartbeat propio; pasadas `SLOT_SEED_GRACE_HOURS` (50h) la ausencia se reporta como caído en health-crons y en el watchdog Telegram. Sin esto, `switch-sync:all-0540` llevaba desde el 23-jul sin fila propia (corrió y falló el 24, invocación perdida el 25) y era invisible para AMBOS vigías. Las marcas `#recuperado`/`#visto` no se vigilan como crons (`esMarcaDeSlot`).
 >
-> **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van ≥50 min separados (un 2do login mata el token del 1ro → code 0006). Crons de empresas disjuntas pueden ir a 5 min (patrón 05:30/05:35/05:40). Ojo: `sync-recibos` toca las 5 B2B + american_classic → las entradas intradía de ACS (15:00/23:15) y de estadocuenta esquivan sus corridas de 20:10/22:20 y la reconciliación de 14:00/18:00.
+> **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van **≥15 min** separados (`SEPARACION_MINIMA_MIN` en cron-telemetry.ts; era 50 y bajó el 26-jul-2026 con las duraciones medidas bajo Pro: facturas 4-8 s/empresa, costo 1-2 s, y el route cierra sesiones con `/cierresesion` en su `finally`). Crons de empresas disjuntas pueden ir a la misma hora (patrón 05:30/05:35/05:40, y ventas ACS 17:00 junto a reebok-catalogo 17:00). **`src/__tests__/lib/cron-calendario.test.ts` recorre los 417 pares de `SWITCH_CRON_ENTRADAS` que comparten empresa y falla si alguien mete un choque** — es la red que protege el calendario a futuro.
+>
+> Ojo con los crons LARGOS, donde el margen real es menor que la distancia inicio-contra-inicio que mide el test: `estadocuenta` ~152 s/empresa (máx), catálogos 79 s (joybees) / 162 s (reebok) / **433 s (tommy)**, y la reconciliación hasta 740 s. Esas parejas se dejaron a ≥50 min a propósito. Las dos más ajustadas son pre-existentes o benignas: `tommy-catalogo` 17:40 → reconciliación 18:00 (20 min, documentado en docs/cron-reliability-recovery.md) y `acs-fidelizacion` 16:30 → ventas ACS 17:00 (30 min, y la de 16:30 es no-op si la de 11:30 salió bien).
+>
+> **Frescura del dato con el calendario del 26-jul-2026** (hueco más largo entre dos refrescos consecutivos):
+>
+> | Dato | Antes | Ahora | En horario laboral (10:00-18:00 Panamá) |
+> |---|---|---|---|
+> | Ventas B2B | 24h (solo el bloque `all` de madrugada) | **9h30** (05:3x → 15:00, de noche) | **4h** |
+> | Ventas ACS | 8h30 | **6h30** (06:30 → 13:00) | **2h** |
+> | Pagos (recibos) | 12h20 | **8h35** (23:15 → 07:50) | 4h |
+> | Saldos CXC (estadocuenta) | sin cambio | 10h40 (vistana 05:30 → 16:10) | 5h |
+>
+> Los saldos de CXC NO se tocaron a propósito (paso 2, pendiente): cuestan ~101-152 s por empresa contra 4-8 s de las ventas, y son los que el 25-jul reventaron la base con `canceling statement due to statement timeout`.
 
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island

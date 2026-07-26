@@ -5,8 +5,9 @@
  *
  * Schedule: 40 12 * * * y 40 17 * * * UTC (2 corridas/día, decisión Daniel).
  * fashion_shoes también la tocan: all 05:35, utilidad 07:00, recibos
- * 07:50/20:10/22:20, articulos 08:40, proveedores 09:30, estadocuenta
- * 16:05/21:15 y la reconciliación 10/14/18. El slot 12:40 va a ≥1h de todos;
+ * 07:50/15:15/19:15/23:15, articulos 08:40, proveedores 09:30, ventas
+ * 15:00/19:00/23:00, estadocuenta 16:05/21:15 y la reconciliación 10/14/18. El
+ * slot 12:40 va a ≥1h de todos;
  * el 17:40 queda a 20 min de la reconciliación de las 18:00 — aceptado: el
  * sync tarda ~2-3 min y cierra su sesión al terminar (/cierresesion), y la
  * reconciliación solo abre fashion_shoes si tiene pares que recuperar.
