@@ -241,7 +241,9 @@ export default function SyncNowButton({
         }}
         aria-haspopup={esMenu ? "menu" : undefined}
         aria-expanded={esMenu ? menuOpen : undefined}
-        className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+        // min-h-[44px]: aparece en 4 pantallas y medía 32px de alto — bajo el
+        // mínimo táctil de la casa.
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${running ? "animate-spin" : ""}`} />
         {running
