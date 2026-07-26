@@ -53,10 +53,6 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/cron/multifashion-sync",
-      "schedule": "0 5 * * *"
-    },
-    {
       "path": "/api/cron/switch-sync?tipo=all&empresas=vistana,active_wear&slot=all-0530",
       "schedule": "30 5 * * *"
     },

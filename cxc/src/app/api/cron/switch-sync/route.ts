@@ -4,10 +4,10 @@
  * Por defecto (sin params): sincroniza FACTURAS incrementales (ventana 7 días)
  * de todas las empresas con facturas=true (empresasConFacturas() = las 6 B2B +
  * Boston + Multifashion/american_classic). Multifashion SÍ entra acá: su data
- * alimenta switch_facturas (base del tab Multifashion desde fase 2.1b) además de
- * su tabla legacy multifashion_tickets, que su cron propio (/api/cron/
- * multifashion-sync) sigue manteniendo. Vive en ambas a propósito (invariante
- * 🟡-14: nunca sumar las dos fuentes → doble conteo).
+ * alimenta switch_facturas, que desde el 26-jul-2026 es su ÚNICA fuente viva
+ * (base del tab Multifashion vía _multifashion_sf_vw). La tabla legacy
+ * multifashion_tickets quedó CONGELADA ese día —su cron se retiró, los datos
+ * históricos quedan— así que ya no hay duplicidad que cuidar. Ver CLAUDE.md.
  *
  * Query params (todos opcionales):
  *   tipo=facturas|estadocuenta|all   (default facturas)

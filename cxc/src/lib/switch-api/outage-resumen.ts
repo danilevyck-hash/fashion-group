@@ -82,7 +82,6 @@ const CRONS_CUBIERTOS_POR_SYNC_LOG = new Set([
   "sync-recibos",
   "sync-utilidad",
   "switch-articulos",
-  "multifashion-sync",
   "reebok-catalogo",
   "joybees-catalogo",
 ]);

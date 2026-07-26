@@ -4,8 +4,11 @@
  *   syncEmpresaFacturas(empresaKey, opts)      → switch_facturas
  *   syncEmpresaEstadoCuenta(empresaKey, opts)  → switch_estadocuenta
  *
- * Multifashion (american_classic) NO usa estas funciones para facturas — sigue
- * en multifashion_tickets vía sync.ts (legacy). Sí participa en CXC.
+ * Multifashion (american_classic) SÍ usa estas funciones para facturas desde el
+ * 26-jul-2026: su tabla legacy multifashion_tickets quedó CONGELADA (nadie la
+ * leía; ver CLAUDE.md) y switch_facturas es su única fuente viva. NO entra en
+ * syncEmpresaEstadoCuenta (cxc:false, retail sin cuenta corriente), pero sí en
+ * CxP (cxp:true) — ver EMPRESA_SYNC_CAPABILITIES en empresas.ts.
  *
  * Reusa parse.ts (parseAmount con fix de coma de miles). Nunca skip silencioso:
  * cada descarte se loguea y se persiste en switch_sync_log.skip_details.

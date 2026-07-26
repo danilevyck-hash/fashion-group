@@ -20,7 +20,7 @@
  *
  * Los routes que usan esto: switch-sync (facturas/estadocuenta/costo),
  * sync-recibos, sync-utilidad y —desde jul-2026, vía sync-log.ts— también
- * switch-articulos (articulos), multifashion-sync (multifashion) y los
+ * switch-articulos (articulos) y los
  * catálogos (catalogo_reebok / catalogo_joybees). Todos registran cada corrida
  * por empresa_key+sync_type en switch_sync_log; ese log es la fuente del streak.
  */

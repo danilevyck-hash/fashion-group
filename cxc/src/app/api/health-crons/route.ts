@@ -116,7 +116,9 @@ const EXPECTED_CRONS = [
   "grupo-resumen-mensual",
   "integrity-check",
   "joybees-catalogo",
-  "multifashion-sync",
+  // "multifashion-sync" — RETIRADO 26-jul-2026 (tabla multifashion_tickets
+  // congelada, ver CLAUDE.md). Sin cron no hay heartbeat: dejarlo acá haría que
+  // health-crons devolviera 503 todos los días por un cron que ya no existe.
   "reebok-catalogo",
   "refresh-clientes-views",
   "switch-articulos",
