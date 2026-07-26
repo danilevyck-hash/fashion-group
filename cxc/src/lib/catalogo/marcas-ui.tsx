@@ -528,7 +528,7 @@ const REEBOK: MarcaTheme = {
       <div className="flex items-center gap-2">
         <div>
           <h1 className="leading-none">
-            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto" />
+            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
           </h1>
           <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
             Catalogo Panama
@@ -545,9 +545,9 @@ const REEBOK: MarcaTheme = {
     // oscura y el logo es rojo (#E4002B) — la placa garantiza que se lea igual
     // que en la web de la marca. Antes decía "REEBOK" en texto.
     pedidoPublico: () => (
-      <div>
+      <div className="shrink-0">
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-1.5">
-          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto" />
+          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
         </h1>
         <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
@@ -855,8 +855,8 @@ const JOYBEES: MarcaTheme = {
       </div>
     ),
     pedidoPublico: () => (
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg">🐝</div>
+      <div className="flex items-center gap-2.5 shrink-0">
+        <div className="w-9 h-9 rounded-full bg-[#FFE443] flex items-center justify-center text-lg shrink-0">🐝</div>
         <div>
           <h1 className="text-white font-black uppercase tracking-wide text-xl leading-none">JOYBEES</h1>
           <p className="text-white/50 text-xs mt-1">Panama</p>
@@ -1156,10 +1156,10 @@ const TOMMY: MarcaTheme = {
     // (Daniel, 25-jul-2026).
     navbar: null,
     header: () => (
-      <div className="flex items-center gap-2.5">
-        <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain" />
-        <div>
-          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto" />
+      <div className="flex items-center gap-2.5 shrink-0">
+        <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain shrink-0" />
+        <div className="shrink-0">
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto shrink-0" />
           <p className="text-xs text-[#152342]/40 uppercase tracking-[0.25em] leading-none mt-1">
             Catalogo Panama
           </p>
@@ -1176,9 +1176,9 @@ const TOMMY: MarcaTheme = {
     // el logo desaparecería. Antes decía "TOMMY HILFIGER" en texto — es el
     // lugar que Daniel vio en el link público (25-jul-2026).
     pedidoPublico: () => (
-      <div className="min-w-0">
+      <div className="shrink-0">
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
-          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto" />
+          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto shrink-0" />
         </h1>
         <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>

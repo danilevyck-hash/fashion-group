@@ -250,7 +250,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-medium ${theme.pedidoPublico.textStrong} truncate`}>{item.name}</p>
-          <p className={`text-xs ${theme.pedidoPublico.textSoft} mt-0.5`}>{item.sku}</p>
+          {/* truncate: sin esto el código se metía debajo de la línea de
+              bultos en pantalla de teléfono y se leían encimados. */}
+          <p className={`text-xs ${theme.pedidoPublico.textSoft} mt-0.5 truncate`}>{item.sku}</p>
           {corto && stock && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
               Disponible ahora: {formatBultosPiezas(stock.disponible_pzas, stock.bulto_pzas || bs)}
@@ -283,9 +285,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
     <div className={theme.pedidoPublico.pageBg}>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className={`${theme.pedidoPublico.headerBg} rounded-t-xl px-6 py-5 flex items-center justify-between gap-3`}>
+        {/* `flex-wrap` + hijos `shrink-0`: el logo NUNCA se aplasta. El de
+            Tommy es un wordmark ancho (relación 14:1) y en pantalla de
+            teléfono no cabe al lado del número de pedido — antes flexbox lo
+            comprimía a la mitad y deformaba las letras. Ahora baja de línea.
+            Reebok y Joybees, cuyos logos sí caben, no se mueven. */}
+        <div className={`${theme.pedidoPublico.headerBg} rounded-t-xl px-6 py-5 flex flex-wrap items-center justify-between gap-3`}>
           {theme.logos.pedidoPublico()}
-          <div className="text-right flex-shrink-0">
+          <div className="text-right shrink-0 grow">
             <p className="text-white/80 text-sm font-medium">
               {confirmado ? `Tu pedido #${order.ped_order_number}` : "Tu pedido"}
             </p>
