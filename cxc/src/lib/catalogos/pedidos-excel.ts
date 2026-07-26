@@ -1,14 +1,14 @@
-// Workbook compartido del export de pedidos de catálogos (Reebok/Joybees).
-// Ambos catálogos usan la MISMA estructura estándar del helper (I11) con el
-// navy de marca Reebok (REEBOK_PALETTE) — decisión: los catálogos conservan
-// su navy 1A2656 en vez del navy de la casa. Reebok agrega la columna Origen
-// (pedidos "míos" vs del link público); Joybees no la tiene.
+// Workbook compartido del export de pedidos de catálogos (las 3 marcas).
+// Todos usan la MISMA estructura estándar del helper (I11), pero cada uno con
+// la paleta de SU marca (paletaDeMarca) — antes las 3 salían con el navy de
+// Reebok. Reebok agrega la columna Origen (pedidos "míos" vs del link
+// público); Joybees no la tiene.
 
 import type XLSX from "xlsx-js-style";
 import {
   buildReportSheet,
   workbookFromSheets,
-  REEBOK_PALETTE,
+  paletaDeMarca,
   MONEY_FMT,
   type ReportCell,
   type ReportColumn,
@@ -25,6 +25,8 @@ export interface PedidoExportRow {
 }
 
 export interface PedidosWorkbookOpts {
+  /** Marca del catálogo — define la paleta del libro. */
+  marca: string;
   /** Banda de título, ej. "REEBOK — Pedidos". */
   titulo: string;
   /** true = incluye la columna Origen (solo Reebok). */
@@ -44,7 +46,7 @@ export function fmtFechaPedido(iso: string): string {
 
 /** Construye el workbook de pedidos (hoja "Pedidos"). Función pura, testeable. */
 export function buildPedidosWorkbook(opts: PedidosWorkbookOpts): XLSX.WorkBook {
-  const { titulo, conOrigen, pedidos } = opts;
+  const { marca, titulo, conOrigen, pedidos } = opts;
 
   const columns: ReportColumn[] = [
     ...(conOrigen ? [{ header: "Origen", wch: 10 } as ReportColumn] : []),
@@ -83,7 +85,7 @@ export function buildPedidosWorkbook(opts: PedidosWorkbookOpts): XLSX.WorkBook {
     columns,
     rows,
     totals,
-    palette: REEBOK_PALETTE,
+    palette: paletaDeMarca(marca),
   });
 
   return workbookFromSheets([{ name: "Pedidos", ws }]);

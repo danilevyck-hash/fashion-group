@@ -1,6 +1,7 @@
 // Tests del export Excel de catálogos (I11): workbook compartido de pedidos
-// (Reebok/Joybees) + sheet "sin foto" del admin Reebok, ambos con la
-// estructura estándar del helper y el navy de marca REEBOK_PALETTE (1A2656).
+// (las 3 marcas) + sheet "sin foto" del admin Reebok, ambos con la estructura
+// estándar del helper. La ESTRUCTURA es compartida; la PALETA es de cada marca
+// (antes las 3 salían con el navy de Reebok).
 //
 // Los estilos se asserten sobre el worksheet EN MEMORIA (antes de write):
 // xlsx-js-style no siempre preserva los estilos en el read de vuelta.
@@ -9,7 +10,13 @@ import { describe, it, expect } from "vitest";
 import XLSX from "xlsx-js-style";
 import { buildPedidosWorkbook, type PedidoExportRow } from "../lib/catalogos/pedidos-excel";
 import { buildReebokSinFotoWorkbook } from "../lib/catalogos/sinfoto-excel";
-import { MONEY_FMT, REEBOK_PALETTE } from "../lib/excel-export";
+import {
+  MONEY_FMT,
+  REEBOK_PALETTE,
+  JOYBEES_PALETTE,
+  TOMMY_PALETTE,
+  paletaDeMarca,
+} from "../lib/excel-export";
 
 const A = (r: number, c: number) => XLSX.utils.encode_cell({ r, c });
 
@@ -41,7 +48,7 @@ const HDR_ROW = 3;
 const DATA_ROW = 4;
 
 describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
-  const wb = buildPedidosWorkbook({ titulo: "REEBOK — Pedidos", conOrigen: true, pedidos: PEDIDOS });
+  const wb = buildPedidosWorkbook({ marca: "reebok", titulo: "REEBOK — Pedidos", conOrigen: true, pedidos: PEDIDOS });
   const ws = wb.Sheets["Pedidos"];
 
   it("hoja única 'Pedidos' con título en banda navy 1A2656", () => {
@@ -108,26 +115,68 @@ describe("buildPedidosWorkbook — Reebok (con Origen)", () => {
 
 describe("buildPedidosWorkbook — Joybees (sin Origen)", () => {
   const pedidos: PedidoExportRow[] = PEDIDOS.map(({ origen: _o, ...p }) => p);
-  const wb = buildPedidosWorkbook({ titulo: "JOYBEES — Pedidos", conOrigen: false, pedidos });
+  const wb = buildPedidosWorkbook({ marca: "joybees", titulo: "JOYBEES — Pedidos", conOrigen: false, pedidos });
   const ws = wb.Sheets["Pedidos"];
 
   it("mismo layout compartido, título propio y 5 columnas (sin Origen)", () => {
     expect(ws[A(0, 0)].v).toBe("JOYBEES — Pedidos");
-    expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(NAVY);
+    // La banda es del GRIS de Joybees, no del navy de Reebok.
+    expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
+    expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
     const headers = ["Cliente", "Vendedor", "Items", "Total", "Fecha"];
     headers.forEach((h, c) => {
       expect(ws[A(HDR_ROW, c)].v).toBe(h);
-      expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(NAVY);
+      expect(ws[A(HDR_ROW, c)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
     });
     expect(ws[A(HDR_ROW, 5)]).toBeUndefined();
   });
 
-  it("moneda numérica y total en banda navy", () => {
+  it("moneda numérica y total en la banda de la marca", () => {
     expect(ws[A(DATA_ROW, 3)].t).toBe("n");
     expect(ws[A(DATA_ROW, 3)].z).toBe(MONEY_FMT);
     const totRow = DATA_ROW + pedidos.length + 1;
     expect(ws[A(totRow, 3)].v).toBeCloseTo(1334.56, 2);
-    expect(ws[A(totRow, 3)].s.fill.fgColor.rgb).toBe(NAVY);
+    expect(ws[A(totRow, 3)].s.fill.fgColor.rgb).toBe(JOYBEES_PALETTE.pri);
+  });
+});
+
+describe("buildPedidosWorkbook — Tommy Hilfiger", () => {
+  const pedidos: PedidoExportRow[] = PEDIDOS.map(({ origen: _o, ...p }) => p);
+  const wb = buildPedidosWorkbook({ marca: "tommy", titulo: "TOMMY HILFIGER — Pedidos", conOrigen: false, pedidos });
+  const ws = wb.Sheets["Pedidos"];
+
+  it("misma estructura, banda con el navy de Tommy (no el de Reebok)", () => {
+    expect(ws[A(0, 0)].v).toBe("TOMMY HILFIGER — Pedidos");
+    expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(TOMMY_PALETTE.pri);
+    expect(ws[A(0, 0)].s.fill.fgColor.rgb).not.toBe(NAVY);
+    expect(ws[A(HDR_ROW, 0)].s.fill.fgColor.rgb).toBe(TOMMY_PALETTE.pri);
+  });
+});
+
+describe("paleta de Excel por marca — cada marca la suya", () => {
+  const MARCAS = ["reebok", "joybees", "tommy"] as const;
+
+  it("las 3 marcas resuelven una paleta DISTINTA", () => {
+    const pris = MARCAS.map((m) => paletaDeMarca(m).pri);
+    expect(new Set(pris).size, `paletas repetidas: ${pris.join(", ")}`).toBe(3);
+  });
+
+  it("cada paleta es la de su marca y conserva la ESTRUCTURA compartida", () => {
+    expect(paletaDeMarca("reebok")).toBe(REEBOK_PALETTE);
+    expect(paletaDeMarca("joybees")).toBe(JOYBEES_PALETTE);
+    expect(paletaDeMarca("tommy")).toBe(TOMMY_PALETTE);
+    // Bordes y zebra son de la casa en las 3: solo cambian pri/mid/sep.
+    for (const m of MARCAS) {
+      const p = paletaDeMarca(m);
+      expect(p.brd, m).toBe(REEBOK_PALETTE.brd);
+      expect(p.dataBg, m).toBe(REEBOK_PALETTE.dataBg);
+      expect(p.altBg, m).toBe(REEBOK_PALETTE.altBg);
+      expect(Object.keys(p).sort(), m).toEqual(Object.keys(REEBOK_PALETTE).sort());
+    }
+  });
+
+  it("una marca desconocida NO cae al navy de la casa", () => {
+    expect(paletaDeMarca("marca-que-no-existe")).toBe(REEBOK_PALETTE);
   });
 });
 

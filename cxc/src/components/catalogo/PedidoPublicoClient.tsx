@@ -3,8 +3,11 @@
 // Página PERMANENTE del pedido público /pedido-<marca>/[short_id] (link del
 // cliente) — componente único para todas las marcas, parametrizado por
 // MARCA_THEME. Las secciones Pedido/Pre-orden son feature (preorder, Reebok).
-// Nota de fidelidad: la paleta base (navy #1A2656) es compartida por diseño —
-// Joybees solo cambia fondo, logo y el total en amarillo.
+//
+// CERO colores de marca hardcodeados: TODO sale de theme.pedidoPublico. Hasta
+// jul-2026 el navy de Reebok (#1A2656) estaba escrito a mano 16 veces acá, así
+// que el link de Joybees y el de Tommy le mostraban al cliente los colores de
+// Reebok. Si agregás un color nuevo, va al tema — no acá.
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -162,8 +165,8 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-[#1A2656] font-semibold text-lg mb-1">Pedido no encontrado</p>
-          <p className="text-[#1A2656]/50 text-sm">Este enlace puede haber expirado o ser incorrecto.</p>
+          <p className={`${theme.pedidoPublico.textStrong} font-semibold text-lg mb-1`}>Pedido no encontrado</p>
+          <p className={`${theme.pedidoPublico.textSoft} text-sm`}>Este enlace puede haber expirado o ser incorrecto.</p>
         </div>
       </div>
     );
@@ -211,7 +214,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
               unoptimized
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-[#1A2656]/20">
+            <div className={`w-full h-full flex items-center justify-center ${theme.pedidoPublico.placeholderIcon}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
@@ -219,8 +222,8 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[#1A2656] truncate">{item.name}</p>
-          <p className="text-xs text-[#1A2656]/40 mt-0.5">{item.sku}</p>
+          <p className={`text-sm font-medium ${theme.pedidoPublico.textStrong} truncate`}>{item.name}</p>
+          <p className={`text-xs ${theme.pedidoPublico.textSoft} mt-0.5`}>{item.sku}</p>
           {corto && stock && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
               Disponible ahora: {formatBultosPiezas(stock.disponible_pzas, stock.bulto_pzas || bs)}
@@ -228,10 +231,10 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
         <div className="text-right flex-shrink-0">
-          <p className="text-base font-semibold text-[#1A2656] tabular-nums">
-            ${fmtMoney(item.unit_price)}<span className="text-xs font-normal text-[#1A2656]/40"> c/u</span>
+          <p className={`text-base font-semibold ${theme.pedidoPublico.textStrong} tabular-nums`}>
+            ${fmtMoney(item.unit_price)}<span className={`text-xs font-normal ${theme.pedidoPublico.textSoft}`}> c/u</span>
           </p>
-          <p className="text-xs text-[#1A2656]/40 tabular-nums">
+          <p className={`text-xs ${theme.pedidoPublico.textSoft} tabular-nums`}>
             {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) · ${fmtMoney(lineTotal)}
           </p>
         </div>
@@ -253,9 +256,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
     <div className={theme.pedidoPublico.pageBg}>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="bg-[#1A2656] rounded-t-xl px-6 py-5 flex items-center justify-between">
+        <div className={`${theme.pedidoPublico.headerBg} rounded-t-xl px-6 py-5 flex items-center justify-between gap-3`}>
           {theme.logos.pedidoPublico()}
-          <div className="text-right">
+          <div className="text-right flex-shrink-0">
             <p className="text-white/80 text-sm font-medium">
               {confirmado ? `Tu pedido #${order.ped_order_number}` : "Tu pedido"}
             </p>
@@ -275,9 +278,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Items */}
-        <div className="bg-white border-x border-[#1A2656]/10">
+        <div className={`bg-white border-x ${theme.pedidoPublico.panelBorder}`}>
           <div className="divide-y divide-gray-100">
-            {hasPreorders && regular.length > 0 && sectionHeader("Pedido", "bg-[#1A2656]")}
+            {hasPreorders && regular.length > 0 && sectionHeader("Pedido", theme.pedidoPublico.sectionBg)}
             {regular.map(renderItem)}
             {hasPreorders && (
               <>
@@ -289,7 +292,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Total */}
-        <div className="bg-[#1A2656] rounded-b-xl px-6 py-4 flex items-center justify-between">
+        <div className={`${theme.pedidoPublico.headerBg} rounded-b-xl px-6 py-4 flex items-center justify-between`}>
           <span className="text-white/70 text-sm font-medium">Total</span>
           <span className={theme.pedidoPublico.totalValue}>
             ${fmtMoney(totalPedido)}
@@ -306,7 +309,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             >
               {confirming ? "Confirmando..." : "Confirmar pedido"}
             </button>
-            <p className="text-xs text-[#1A2656]/45 mt-2.5">
+            <p className={`text-xs ${theme.pedidoPublico.textHelp} mt-2.5`}>
               Al confirmar, tu pedido entra a proceso con Fashion Group.
             </p>
             {confirmError && (
@@ -364,7 +367,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           <button
             onClick={handleDownloadPdf}
             disabled={generatingPdf}
-            className="flex items-center gap-2 px-6 py-3 bg-white border border-[#1A2656]/15 text-[#1A2656] rounded-lg font-medium text-sm hover:bg-[#1A2656]/5 active:scale-[0.97] transition disabled:opacity-50"
+            className={theme.pedidoPublico.pdfBtn}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -374,7 +377,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-[#1A2656]/25 text-xs mt-8">fashiongr.com</p>
+        <p className={`text-center ${theme.pedidoPublico.textFaint} text-xs mt-8`}>fashiongr.com</p>
       </div>
     </div>
   );
