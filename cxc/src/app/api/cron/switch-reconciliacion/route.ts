@@ -83,6 +83,7 @@ import {
   slotNuncaSembradoVencido,
   reconciliarSlotsSwitchSync,
   esMarcaDeSlot,
+  esSlotRetirado,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
   SWITCH_SYNC_SLOT_PREFIX,
   SWITCH_SYNC_SLOTS,
@@ -633,6 +634,13 @@ async function checkStaleCrons(): Promise<string[]> {
     // cuándo lo vio por primera vez. Vigilarlas como si fueran un cron generaría
     // una alerta eterna por su propia marca.
     .filter((h) => !esMarcaDeSlot(String(h.cron_name)))
+    // Slots RETIRADOS del calendario (su entrada se movió o se quitó de
+    // vercel.json): la fila vieja queda en cron_heartbeats envejeciendo para
+    // siempre. health-crons no los ve (vigila la lista derivada), pero este
+    // watchdog recorre TODAS las filas → sin el filtro, cada cambio de horario
+    // deja una alerta diaria eterna por un cron que ya no existe (26-jul-2026:
+    // facturas-2315 → facturas-2300, sync-recibos 20:10/22:20 → 15:15/19:15/23:15).
+    .filter((h) => !esSlotRetirado(String(h.cron_name)))
     // Umbral por-cron compartido (cronIsStale): un cron mensual como
     // grupo-resumen-mensual usa 33 días, no las 26h del default.
     .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))

@@ -77,6 +77,10 @@
       "schedule": "50 7 * * *"
     },
     {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1300",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/cron/switch-articulos",
       "schedule": "40 8 * * *"
     },
@@ -121,8 +125,12 @@
       "schedule": "0 18 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1500",
+      "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-1500",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/sync-recibos",
+      "schedule": "15 15 * * *"
     },
     {
       "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=active_shoes,joystep&slot=estadocuenta-1600",
@@ -141,6 +149,10 @@
       "schedule": "0 17 * * *"
     },
     {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1700",
+      "schedule": "0 17 * * *"
+    },
+    {
       "path": "/api/cron/joybees-catalogo",
       "schedule": "5 17 * * *"
     },
@@ -149,8 +161,16 @@
       "schedule": "40 17 * * *"
     },
     {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-1900",
+      "schedule": "0 19 * * *"
+    },
+    {
       "path": "/api/cron/sync-recibos",
-      "schedule": "10 20 * * *"
+      "schedule": "15 19 * * *"
+    },
+    {
+      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-2100",
+      "schedule": "0 21 * * *"
     },
     {
       "path": "/api/cron/switch-sync?tipo=estadocuenta&empresas=vistana,active_wear&slot=estadocuenta-2110",
@@ -165,11 +185,11 @@
       "schedule": "20 21 * * *"
     },
     {
-      "path": "/api/cron/sync-recibos",
-      "schedule": "20 22 * * *"
+      "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-2300",
+      "schedule": "0 23 * * *"
     },
     {
-      "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-2315",
+      "path": "/api/cron/sync-recibos",
       "schedule": "15 23 * * *"
     },
     {

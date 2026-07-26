@@ -34,6 +34,10 @@ import {
   slotRecuperadoName,
   type SyncLogRowMin,
 } from "@/lib/cron-telemetry";
+// Calendario CONGELADO del 25-jul-2026: estos tests reproducen el incidente de
+// ese día con filas reales, así que se evalúan contra los slots de ENTONCES, no
+// contra el calendario vivo (que cambia y tiene sus propios tests).
+import { SLOTS_JUL2026 } from "../fixtures/slots-jul2026";
 
 const H = 3600 * 1000;
 const CXC = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
@@ -105,10 +109,12 @@ const HB_25 = new Map<string, string | null | undefined>([
 ]);
 
 describe("SWITCH_SYNC_SLOTS — fuente única, espejo de vercel.json", () => {
-  it("los 13 slots derivados coinciden EXACTAMENTE con los ?slot= de vercel.json", () => {
+  it("los slots derivados coinciden EXACTAMENTE con los ?slot= de vercel.json", () => {
     const vercel = fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8");
     const enVercel = [...vercel.matchAll(/switch-sync\?[^"]*?&slot=([a-z]+-\d{4})/g)].map((m) => m[1]);
-    expect(enVercel.length).toBe(13);
+    // Una entrada = una ocurrencia = un slot: ningún nombre de slot repetido.
+    expect(new Set(enVercel).size).toBe(enVercel.length);
+    expect(enVercel.length).toBe(SWITCH_SYNC_SLOTS.length);
     expect([...SWITCH_SYNC_SLOTS.map((s) => s.slot)].sort()).toEqual([...enVercel].sort());
     expect(SWITCH_SYNC_SLOT_HEARTBEATS).toEqual(SWITCH_SYNC_SLOTS.map((s) => `switch-sync:${s.slot}`));
   });
@@ -154,7 +160,7 @@ describe("ultimaOcurrenciaUtc", () => {
 
 describe("slotsHuerfanos — caso REAL del 25-jul-2026 (pasada de las 14:00 UTC)", () => {
   const now = new Date("2026-07-25T14:35:00Z");
-  const marcados = slotsHuerfanos({ now, rows: LOG_24_25, heartbeats: HB_25, empresasConCxc: CXC }).map(
+  const marcados = slotsHuerfanos({ now, rows: LOG_24_25, heartbeats: HB_25, empresasConCxc: CXC, slots: SLOTS_JUL2026 }).map(
     (s) => s.slot,
   );
 
@@ -198,7 +204,7 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
     // all-0535 perdió su invocación de las 05:35; la reconciliación recuperó
     // fashion_shoes/fashion_wear a las 10:28-10:32 → el slot queda certificado.
     const now = new Date("2026-07-25T10:35:00Z");
-    const out = slotsHuerfanos({ now, rows: hasta(now), heartbeats: HB_25, empresasConCxc: CXC });
+    const out = slotsHuerfanos({ now, rows: hasta(now), heartbeats: HB_25, empresasConCxc: CXC, slots: SLOTS_JUL2026 });
     const s = out.find((x) => x.slot === "all-0535");
     expect(s).toBeTruthy();
     expect(s!.ocurrencia).toBe("2026-07-25T05:35:00.000Z");
@@ -226,6 +232,7 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
       rows,
       heartbeats: new Map([["switch-sync:all-0540", "2026-07-23T05:54:00Z"]]),
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     });
     expect(out.map((s) => s.slot)).not.toContain("all-0540");
   });
@@ -234,7 +241,7 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
     // Pasada de las 10:00: active_shoes/estadocuenta seguía en error y joystep
     // ni se había intentado → el slot 05:40 no está compensado todavía.
     const now = new Date("2026-07-25T10:35:00Z");
-    const out = slotsHuerfanos({ now, rows: hasta(now), heartbeats: HB_25, empresasConCxc: CXC });
+    const out = slotsHuerfanos({ now, rows: hasta(now), heartbeats: HB_25, empresasConCxc: CXC, slots: SLOTS_JUL2026 });
     expect(out.map((s) => s.slot)).not.toContain("all-0540");
     // Cuatro horas después, con todo recuperado, sí queda certificado.
     const out2 = slotsHuerfanos({
@@ -242,6 +249,7 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
       rows: LOG_24_25,
       heartbeats: HB_25,
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     });
     expect(out2.map((s) => s.slot)).toContain("all-0540");
   });
@@ -254,6 +262,7 @@ describe("slotsHuerfanos — no tapa fallos legítimos", () => {
       // all-0535 con heartbeat de HOY 05:51 (la entrada sí corrió).
       heartbeats: new Map([["switch-sync:all-0535", "2026-07-25T05:51:52Z"]]),
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     });
     expect(out.map((s) => s.slot)).not.toContain("all-0535");
   });

@@ -137,11 +137,135 @@ Cuidados de costo y seguridad, verificados con tests:
   success propio deja de ser invisible.
 
 Pendiente relacionado (NO tocado aquí): `tommy-catalogo` corre 17:40 y toca
-`fashion_shoes`; la pasada de reconciliación de las 18:00 queda a 20 min, por
-debajo de la regla de ≥50 min de la sesión única. Es previo a este cambio (la
-reconciliación ya podía recuperar pares de fashion_shoes a las 18:00), pero ahora
-se activa más seguido. Mover uno de los dos horarios requiere tocar `vercel.json`
-+ `SWITCH_CRON_ENTRADAS` + `RECONCILIACION_PASS_HOURS`.
+`fashion_shoes`; la pasada de reconciliación de las 18:00 queda a 20 min, y el
+sync de Tommy mide hasta 433 s → el margen real es de ~13 min. Es previo a este
+cambio (la reconciliación ya podía recuperar pares de fashion_shoes a las 18:00),
+pero ahora se activa más seguido. Mover uno de los dos horarios requiere tocar
+`vercel.json` + `SWITCH_CRON_ENTRADAS` + `RECONCILIACION_PASS_HOURS`.
+
+## Paso 1 del calendario nuevo (26-jul-2026) — ventas y pagos intradía
+
+Las ventas B2B se sincronizaban **1×/día**, dentro del bloque `tipo=all` de la
+madrugada: el dato más importante del negocio podía tener 24 h. Este paso lo baja
+a 4 h en horario de oficina. **Los saldos de CXC (`estadocuenta`) NO se tocaron**
+—es el paso 2— a propósito: cuestan 101/121/152 s por empresa (p50/p90/máx)
+contra 4-8 s de `facturas`, y son los que el 25-jul reventaron la base con
+`canceling statement due to statement timeout`.
+
+### Calendario resultante (UTC · Panamá)
+
+| UTC | Panamá | Qué | Empresas |
+|---|---|---|---|
+| 15:00 · 19:00 · 23:00 | 10:00 · 14:00 · 18:00 | **Ventas** (`tipo=facturas`) | las 8 con facturas = ACS + las 7 B2B |
+| 13:00 · 17:00 · 21:00 | 08:00 · 12:00 · 16:00 | **Ventas ACS** | american_classic |
+| 00:15 | 19:15 | Cierre de ACS — **NO TOCAR** (el resumen de la 01:00 depende de él) | american_classic |
+| 07:50 · 15:15 · 19:15 · 23:15 | 02:50 · 10:15 · 14:15 · 18:15 | **Pagos** (`sync-recibos`) | las 5 B2B con CXC + ACS |
+
+Entradas de `vercel.json`: **47 → 52**. Límite del plan Pro: 100.
+
+### Tres cosas que se verificaron, no se asumieron
+
+1. **`switch-sync?tipo=facturas` SÍ acepta `&empresas=a,b,c`** (CSV, con
+   precedencia sobre `&empresa=` singular) y procesa las empresas
+   **serialmente** — requisito de la sesión única. Universo validado contra
+   `empresasConFacturas()`, así que las 8 pasan.
+2. **`sync-recibos` NO tiene guard no-op.** Sus 3 entradas no eran "segundas
+   oportunidades" como las de `backup`/`acs-fidelizacion`: son 3 corridas REALES
+   que re-sincronizan la ventana rodante de 3 meses. Por eso mover sus horas
+   cambia la frescura de verdad. Su heartbeat es plano (sin `slot=`): lo vigila
+   `COLATERAL_RECOVER_AFTER_HOUR_UTC["sync-recibos"] = 0` (recuperable en
+   cualquier pasada) y NO está en `EXTRA_ENTRY_HOURS_UTC`, así que cambiarle las
+   horas no toca la metadata de recuperación.
+3. **Las 7 B2B** = `empresasConFacturas()` menos `american_classic` = vistana,
+   fashion_wear, fashion_shoes, active_shoes, active_wear, joystep y
+   **confecciones_boston** (que tiene `facturas:true`, `cxc:false`).
+
+### Por qué NO están en las horas pedidas originalmente
+
+Se pidieron 09:00/13:00/17:00 Panamá = **14:00/18:00/22:00 UTC**. 14:00 y 18:00
+son EXACTAMENTE las pasadas de `switch-reconciliacion`, que puede abrir la sesión
+de cualquier empresa hasta 12 min (`RECOVERY_BUDGET_MS` = 740 s). Se corrió todo
+una hora → 15:00/19:00/23:00 UTC.
+
+### Choque encontrado y corregido: dos entradas ≠ dos slots
+
+El plan original tenía **entradas separadas** para ventas B2B y ventas ACS a las
+mismas horas (15/19/23), con el argumento de que tocan empresas disjuntas. Eso es
+cierto para la sesión de Switch, pero **rompe el sistema de slots**: el nombre del
+slot es `<tipo>-<hhmm>` y se DERIVA del horario, así que dos entradas de
+`tipo=facturas` a las 15:00 producen las dos el slot `facturas-1500`. Con el
+nombre duplicado:
+
+- `SWITCH_SYNC_SLOT_HEARTBEATS` tendría el mismo nombre dos veces y las dos
+  entradas escribirían/pisarían el MISMO heartbeat,
+- `clasificarSlots()` evaluaría el slot dos veces con universos de empresas
+  distintos → re-ejecuciones espurias,
+- y `slotsHuerfanos` dejaría de poder decir **cuál** de las dos ocurrencias se
+  perdió, que es justo lo que el 25-jul detectó 3 slots caídos.
+
+Solución: a las 15/19/23 va **UNA entrada con las 8 empresas**
+(`american_classic` primero, luego las 7 B2B). Es idéntico en efecto —las mismas
+empresas a las mismas horas, serial dentro del route— y conserva el invariante
+**una entrada = una ocurrencia = un slot**. Un test nuevo lo fija
+(`no hay dos entradas de switch-sync del mismo tipo a la misma hora`).
+
+Por la misma razón **no se usan listas de horas** (`0 15,19,23 * * *`), que Vercel
+Pro sí acepta: una entrada con 3 ocurrencias diarias vuelve indistinguibles las
+tres. Hay un test que rechaza cualquier `schedule` con lista o rango en hora o
+minuto.
+
+### Efecto colateral cerrado: slots retirados que alertan para siempre
+
+Mover `facturas-2315` → `facturas-2300` deja la fila
+`switch-sync:facturas-2315` en `cron_heartbeats` envejeciendo sin dueño.
+`health-crons` no la ve (vigila la lista derivada de `SWITCH_SYNC_SLOTS`), pero el
+**watchdog Telegram de la reconciliación recorre TODAS las filas** → habría
+alertado todos los días por un cron que ya no existe. Se agregó `esSlotRetirado()`
+en `cron-telemetry.ts` y su filtro en `checkStaleCrons`. Es código, no limpieza
+manual de datos: el próximo cambio de horario ya queda cubierto.
+
+### Separación mínima: 50 → 15 min
+
+`SEPARACION_MINIMA_MIN = 15`. El 50 venía de cuando el bloque `tipo=all` (2
+empresas × facturas+estadocuenta+costo, 2-5 min) era la única referencia. Con las
+duraciones medidas —facturas 4-8 s/empresa, costo 1-2 s— una corrida de ventas de
+las 8 empresas termina en ~1 min y cierra sus sesiones
+(`logoutAllSwitchSessions()` en el `finally` del route). Los pagos van 15 min
+después de las ventas porque sí comparten 6 empresas.
+
+`src/__tests__/lib/cron-calendario.test.ts` recorre los **417 pares** de
+`SWITCH_CRON_ENTRADAS` que comparten al menos una empresa y falla si alguno queda
+por debajo del umbral. Mide **inicio contra inicio**, así que para los crons
+LARGOS el margen real es menor y esas parejas se dejaron a ≥50 min a propósito.
+Los pares más ajustados del calendario nuevo:
+
+| Gap | Par | Estado |
+|---|---|---|
+| 15 min | ventas 15/19/23 → pagos 15:15/19:15/23:15 | por diseño (ventas duran ~1 min) |
+| 20 min | tommy-catalogo 17:40 → reconciliación 18:00 | **pre-existente**, ver arriba |
+| 30 min | sync-proveedores 09:30 → reconciliación 10:00 | pre-existente |
+| 30 min | acs-fidelizacion 16:30 → ventas ACS 17:00 | nuevo, benigno: la de 16:30 es no-op si la de 11:30 salió bien; en el peor caso topa en `maxDuration` 800 s → termina 16:43 |
+
+### Frescura recalculada
+
+El hueco más largo entre dos refrescos consecutivos del mismo dato, dando la
+vuelta al día:
+
+| Dato | Antes | Ahora (peor caso absoluto) | En horario laboral |
+|---|---|---|---|
+| Ventas B2B | 24 h | **9 h 30** (05:3x → 15:00) | **4 h** |
+| Ventas ACS | 8 h 30 | **6 h 30** (06:30 → 13:00) | **2 h** |
+| Pagos | 12 h 20 | **8 h 35** (23:15 → 07:50) | 4 h |
+| Saldos CXC | 10 h 40 | 10 h 40 (sin cambio — paso 2) | 5 h |
+
+**Corrección al cálculo del plan**: el peor caso de ventas B2B no baja a 4 h sino
+a **9 h 30**, y el de ventas ACS no baja a 2 h sino a **6 h 30**. Los números de 4
+h y 2 h son el ritmo DENTRO de la ventana de trabajo; el hueco largo es el
+nocturno, entre el bloque `all` de la madrugada y la primera pasada de la mañana
+(15:00 UTC = 10:00 Panamá). Si se quisiera un peor caso absoluto de 4 h habría que
+agregar una pasada de ventas ~11:00 UTC (06:00 Panamá) — **no se hizo**: nadie
+consulta a esa hora y cada pasada cuesta sesiones de Switch. Queda como opción
+para el paso 2. El cálculo de pagos (12 h 20 → 8 h 35) sí da exacto.
 
 ## Fuera de alcance / decisiones
 

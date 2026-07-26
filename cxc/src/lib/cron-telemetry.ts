@@ -236,7 +236,7 @@ export function recoveryStillComingToday(cronName: string, nowHourUtc: number): 
 export const PENDING_RECOVERY_MAX_HOURS = 30;
 
 // ─── Heartbeats por-slot de switch-sync ──────────────────────────────────────
-// El heartbeat base "switch-sync" lo refresca CUALQUIERA de las ~13 entradas
+// El heartbeat base "switch-sync" lo refresca CUALQUIERA de las ~17 entradas
 // diarias del path → una entrada intradía perdida (ej. estadocuenta de las
 // 21:10) era invisible para health-crons. Cada entrada de vercel.json lleva
 // ahora `&slot=<tipo>-<hhmm>` (hhmm = hora UTC de SU schedule, ej.
@@ -249,7 +249,7 @@ export const PENDING_RECOVERY_MAX_HOURS = 30;
 // Regla de vigilancia en health-crons (distinta del fail-closed de los 18
 // nombres base): si la fila del slot NO existe todavía → NO es stale (el cron
 // la siembra solo en <24h tras el deploy; sin esto, el primer día daría un 503
-// falso con los 13 slots "ausentes"). Solo alerta si la fila EXISTE y está
+// falso con los slots "ausentes"). Solo alerta si la fila EXISTE y está
 // vieja (umbral 26h).
 /**
  * Crons NUEVOS con vigilancia seed-tolerante (misma regla que los slots de
@@ -298,6 +298,26 @@ const CRON_EMPRESAS_TODAS = [
   "confecciones_boston",
   "american_classic",
 ] as const;
+/**
+ * Empresas del sync de VENTAS intradía (tipo=facturas) — las 8 con facturas, o
+ * sea `empresasConFacturas()`: american_classic (ACS/Multifashion, retail) + las
+ * 7 B2B (las 5 con CXC + joystep + confecciones_boston). Un test lo verifica
+ * contra `empresasConFacturas()` para que no se desincronice.
+ *
+ * Por qué ACS y B2B viajan en la MISMA entrada a las 15/19/23 UTC: el slot de
+ * heartbeat es `<tipo>-<hhmm>` y se deriva del horario, así que dos entradas de
+ * `tipo=facturas` a la misma hora colisionarían en el mismo nombre de slot
+ * (`facturas-1500`) y el detector de ocurrencias perdidas dejaría de saber cuál
+ * de las dos se perdió. Una entrada = una ocurrencia = un slot. Las empresas se
+ * procesan SERIALMENTE dentro del route (sesión única de Switch), y american_
+ * classic va primero: es el dato con el ritmo más exigente (cada 2h).
+ */
+const CRON_EMPRESAS_VENTAS = [
+  "american_classic",
+  ...CRON_EMPRESAS_B2B5,
+  "joystep",
+  "confecciones_boston",
+] as const;
 
 export interface SwitchCronEntrada {
   /** Nombre legible del cron (para logs/mensajes). */
@@ -325,24 +345,65 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
   { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
   { cron: "tommy-catalogo", hhmmUtc: "1240", empresas: ["fashion_shoes"] },
+  { cron: "switch-sync facturas", hhmmUtc: "1300", empresas: ["american_classic"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
-  { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: ["american_classic"] },
+  { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "sync-recibos", hhmmUtc: "1515", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1600", empresas: ["active_shoes", "joystep"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1605", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1610", empresas: ["vistana", "active_wear"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
   { cron: "reebok-catalogo", hhmmUtc: "1700", empresas: ["active_shoes"] },
+  { cron: "switch-sync facturas", hhmmUtc: "1700", empresas: ["american_classic"] },
   { cron: "joybees-catalogo", hhmmUtc: "1705", empresas: ["joystep"] },
   { cron: "tommy-catalogo", hhmmUtc: "1740", empresas: ["fashion_shoes"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
-  { cron: "sync-recibos", hhmmUtc: "2010", empresas: CRON_EMPRESAS_RECIBOS },
+  { cron: "switch-sync facturas", hhmmUtc: "1900", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "sync-recibos", hhmmUtc: "1915", empresas: CRON_EMPRESAS_RECIBOS },
+  { cron: "switch-sync facturas", hhmmUtc: "2100", empresas: ["american_classic"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2115", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2120", empresas: ["active_shoes", "joystep"] },
-  { cron: "sync-recibos", hhmmUtc: "2220", empresas: CRON_EMPRESAS_RECIBOS },
-  { cron: "switch-sync facturas", hhmmUtc: "2315", empresas: ["american_classic"] },
+  { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
+  { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },
 ];
+
+/**
+ * Separación MÍNIMA (minutos) entre dos entradas del cronograma que tocan la
+ * MISMA empresa en Switch. Switch es sesión única por empresa: un 2º login mata
+ * el token del 1º (code 0006). Un test recorre SWITCH_CRON_ENTRADAS y falla si
+ * alguien mete un choque — es la red que impide que un horario nuevo rompa las
+ * sesiones en producción.
+ *
+ * 50 → 15 (26-jul-2026, cuenta en Vercel Pro). El 50 venía de cuando el bloque
+ * `tipo=all` (facturas+estadocuenta+costo de 2 empresas, ~2-5 min) era la única
+ * referencia de duración. Con las duraciones medidas en 7 días —facturas 4-8 s
+ * por empresa, costo 1-2 s, estadocuenta 101/121/152 s (p50/p90/máx)— una
+ * corrida de `tipo=facturas` de las 8 empresas termina en ~1 min y cierra sus
+ * sesiones (logoutAllSwitchSessions en el finally del route). 15 min deja más
+ * de 10× de margen sobre el peor caso medido de una entrada de ventas.
+ *
+ * OJO: el test mide inicio-contra-inicio. Para los crons LARGOS (estadocuenta
+ * ~152 s/empresa, catálogos hasta 433 s de Tommy, reconciliación hasta
+ * RECOVERY_BUDGET_MS = 740 s) el margen real es menor que el número que ve el
+ * test; esas parejas se dejaron con ≥50 min a propósito.
+ */
+export const SEPARACION_MINIMA_MIN = 15;
+
+/** Minutos desde medianoche UTC de un "hhmm" del cronograma. */
+export function hhmmAMinutos(hhmm: string): number {
+  return Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(2, 4));
+}
+
+/**
+ * Distancia en minutos entre dos horas del día, dando la vuelta al reloj (la
+ * más corta de las dos direcciones). Dos entradas a la misma hora → 0.
+ */
+export function distanciaCircularMin(hhmmA: string, hhmmB: string): number {
+  const d = Math.abs(hhmmAMinutos(hhmmA) - hhmmAMinutos(hhmmB));
+  return Math.min(d, 24 * 60 - d);
+}
 
 // ─── Slots de switch-sync (derivados de SWITCH_CRON_ENTRADAS) ────────────────
 // Cada entrada de switch-sync en vercel.json lleva `&slot=<tipo>-<hhmm>`; el
@@ -364,7 +425,7 @@ export interface SwitchSyncSlot {
 
 const SWITCH_SYNC_CRON_PREFIX = "switch-sync ";
 
-/** Las 13 entradas de switch-sync de vercel.json, con su tipo y sus empresas. */
+/** Las entradas de switch-sync de vercel.json, con su tipo y sus empresas. */
 export const SWITCH_SYNC_SLOTS: SwitchSyncSlot[] = SWITCH_CRON_ENTRADAS.filter((e) =>
   e.cron.startsWith(SWITCH_SYNC_CRON_PREFIX),
 ).map((e) => {
@@ -436,6 +497,27 @@ export function slotNuncaSembradoVencido(
 
 /** Nombres de heartbeat de los slots (los que vigila health-crons). */
 export const SWITCH_SYNC_SLOT_HEARTBEATS = SWITCH_SYNC_SLOTS.map((s) => slotHeartbeatName(s.slot));
+
+/**
+ * ¿`cronName` es el heartbeat de un slot de switch-sync que YA NO EXISTE en el
+ * calendario? (fila vieja en cron_heartbeats de una entrada que se movió o se
+ * quitó de vercel.json).
+ *
+ * POR QUÉ: health-crons vigila la lista DERIVADA (SWITCH_SYNC_SLOTS), así que un
+ * slot retirado le es invisible — pero el watchdog Telegram de
+ * switch-reconciliacion recorre TODAS las filas de cron_heartbeats. Sin este
+ * filtro, mover una entrada (ej. `facturas-2315` → `facturas-2300` el
+ * 26-jul-2026) deja su fila vieja envejeciendo para siempre → alerta diaria
+ * eterna por un cron que ya no existe. Es código, no limpieza manual de datos: la
+ * próxima vez que se mueva un horario no hay que acordarse de borrar filas.
+ *
+ * Las marcas (#recuperado / #visto) NO entran acá: ya las filtra esMarcaDeSlot.
+ */
+export function esSlotRetirado(cronName: string): boolean {
+  if (!cronName.startsWith(SWITCH_SYNC_SLOT_PREFIX)) return false;
+  if (esMarcaDeSlot(cronName)) return false;
+  return !SWITCH_SYNC_SLOT_HEARTBEATS.includes(cronName);
+}
 
 /**
  * Minutos tras la hora programada dentro de los cuales se considera que la

@@ -50,6 +50,11 @@ import {
   type SyncLogRowMin,
 } from "@/lib/cron-telemetry";
 import { isSwitchSilenciable } from "@/lib/switch-api/alert-policy";
+// Calendario CONGELADO del 25-jul-2026 (ver el fixture): los tests D1/D2/D3
+// reproducen el incidente de ese día con filas reales, así que se evalúan contra
+// los slots de ENTONCES —cuando facturas-1500 era solo american_classic y existía
+// facturas-2315—. El calendario vivo se prueba en cron-calendario.test.ts.
+import { SLOTS_JUL2026 } from "../fixtures/slots-jul2026";
 
 const H = 3600 * 1000;
 const CXC = ["vistana", "fashion_wear", "fashion_shoes", "active_shoes", "active_wear", "joystep"];
@@ -127,7 +132,7 @@ const PASADA_14 = new Date("2026-07-25T14:00:00Z");
 const PASADA_18 = new Date("2026-07-25T18:00:00Z");
 
 const clasificar = (now: Date, rows = LOG_25, hb = HB_25) =>
-  clasificarSlots({ now, rows, heartbeats: hb, empresasConCxc: CXC });
+  clasificarSlots({ now, rows, heartbeats: hb, empresasConCxc: CXC, slots: SLOTS_JUL2026 });
 const desatendido = (now: Date, slot: string, rows = LOG_25) =>
   clasificar(now, rows).desatendidos.find((d) => d.slot === slot);
 
@@ -167,6 +172,7 @@ describe("D1 — ocurrencia intradía perdida (facturas-1500, ventas ACS)", () =
       rows: LOG_25,
       heartbeats: HB_25,
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     }).map((s) => s.slot);
     expect(cubiertos).not.toContain("facturas-1500");
   });
@@ -206,6 +212,7 @@ describe("D1 — ocurrencia intradía perdida (facturas-1500, ventas ACS)", () =
       rows: conCierre,
       heartbeats: HB_25,
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     });
     expect(cubiertos.map((s) => s.slot)).toContain("facturas-1500");
   });
@@ -259,6 +266,7 @@ describe("D2 — fallo intradía tapado por el éxito de la mañana", () => {
       rows: LOG_25,
       heartbeats: HB_25,
       empresasConCxc: CXC,
+      slots: SLOTS_JUL2026,
     }).map((s) => s.slot);
     expect(cubiertos).not.toContain("estadocuenta-1605");
     expect(cubiertos).not.toContain("estadocuenta-1610");
@@ -281,6 +289,8 @@ describe("D2 — fallo intradía tapado por el éxito de la mañana", () => {
 describe("D3 — un slot que NUNCA registró su heartbeat propio", () => {
   it("all-0540 no tenía fila propia el 25-jul (solo su marca #recuperado)", () => {
     expect(HB_25.get("switch-sync:all-0540")).toBeUndefined();
+    expect(SLOTS_JUL2026.map((s) => s.slot)).toContain("all-0540");
+    // El slot sigue vivo en el calendario actual (05:40 no se movió).
     expect(SWITCH_SYNC_SLOTS.map((s) => s.slot)).toContain("all-0540");
   });
 
