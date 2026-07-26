@@ -103,8 +103,11 @@ export default function ReclamoForm({
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
-        <button onClick={onCancel} className="hover:text-black transition">Reclamos</button>
+      <nav className="flex items-center gap-1.5 text-xs text-gray-400 -mt-2 mb-2">
+        {/* Medía 59.7×18 y es el único camino de vuelta del formulario. Los
+            márgenes negativos (-my-2 del nav, -ml-2 del botón) absorben el
+            padding nuevo para que el breadcrumb no se mueva de lugar. */}
+        <button onClick={onCancel} className="hover:text-black transition inline-flex items-center min-h-[44px] px-2 -ml-2">Reclamos</button>
         <span className="text-gray-300">/</span>
         <span className="text-gray-600 font-medium">Nuevo Reclamo</span>
       </nav>
@@ -124,7 +127,8 @@ export default function ReclamoForm({
             </div>
             <button
               onClick={() => setShowAll(true)}
-              className="text-xs text-gray-400 hover:text-black transition underline underline-offset-2"
+              /* Medía 125.3×36. -my-2 para no estirar la fila del título. */
+              className="text-xs text-gray-400 hover:text-black transition underline underline-offset-2 inline-flex items-center justify-center min-h-[44px] px-2 -my-2 -mr-2"
             >
               Mostrar todos los campos
             </button>
@@ -201,7 +205,8 @@ export default function ReclamoForm({
                     const idx = fItems.findIndex((i) => !i.motivo);
                     if (idx >= 0) updateItem(idx, "motivo", m);
                   }}
-                  className="text-xs border border-gray-200 rounded-full px-3 py-1.5 text-gray-500 hover:border-gray-400 hover:text-black active:bg-gray-100 transition"
+                  /* Píldoras de motivo: py-1.5 las dejaba en 28 px de alto. */
+                  className="text-xs border border-gray-200 rounded-full px-3 text-gray-500 hover:border-gray-400 hover:text-black active:bg-gray-100 transition inline-flex items-center justify-center min-h-[44px]"
                 >
                   {m}
                 </button>
@@ -274,7 +279,10 @@ export default function ReclamoForm({
           </table>
         </div>
 
-        {/* Mobile: una card por ítem con campos apilados y etiquetados */}
+        {/* Mobile: una card por ítem con campos apilados y etiquetados.
+            Los campos medían 332×38 (inputs) y 332/160×39 (selects): por debajo
+            del mínimo táctil, y con text-sm (14px) Safari hacía zoom al enfocar.
+            Este bloque es sm:hidden, así que text-base no afecta al escritorio. */}
         <div className="sm:hidden space-y-3">
           {fItems.map((item, idx) => (
             <div key={idx} className="rounded-lg border border-gray-200 p-3 space-y-2.5">
@@ -286,22 +294,23 @@ export default function ReclamoForm({
               </div>
               <label className="block">
                 <span className="text-xs text-gray-500">Código *</span>
-                <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
               </label>
               <label className="block">
                 <span className="text-xs text-gray-500">Descripción *</span>
-                <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Talla *</span>
                   {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                     <div className="flex items-center gap-1">
-                      <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
-                      <button type="button" onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs">×</button>
+                      <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
+                      {/* Solo ícono ("×"): sin área mínima quedaba en ~8×16 px. */}
+                      <button type="button" aria-label="Volver a la lista de tallas" title="Volver a la lista de tallas" onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">×</button>
                     </div>
                   ) : (
-                    <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent">
+                    <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent min-h-[44px]">
                       <option value="">—</option>
                       {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -309,12 +318,12 @@ export default function ReclamoForm({
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Cantidad *</span>
-                  <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                  <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
                 </label>
               </div>
               <label className="block">
                 <span className="text-xs text-gray-500">Género *</span>
-                <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black ${item.genero ? "text-black" : "text-gray-400"}`}>
+                <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent focus:border-black min-h-[44px] ${item.genero ? "text-black" : "text-gray-400"}`}>
                   <option value="">Género…</option>
                   {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
@@ -322,7 +331,7 @@ export default function ReclamoForm({
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Precio U. *</span>
-                  <input type="number" inputMode="decimal" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                  <input type="number" inputMode="decimal" step="0.50" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" />
                 </label>
                 <div className="block">
                   <span className="text-xs text-gray-500">Subtotal</span>
@@ -333,12 +342,13 @@ export default function ReclamoForm({
                 <span className="text-xs text-gray-500">Motivo *</span>
                 {addingMotivo === idx ? (
                   <div className="flex items-center gap-1">
-                    <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" autoFocus />
-                    <button type="button" onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-400 hover:text-black px-1">OK</button>
-                    <button type="button" onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black px-1">x</button>
+                    <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-2.5 text-base outline-none focus:border-black min-h-[44px]" autoFocus />
+                    {/* "OK" / "x" medían ~20×16: imposibles de acertar con el dedo. */}
+                    <button type="button" onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-400 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">OK</button>
+                    <button type="button" aria-label="Cancelar el motivo nuevo" onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">x</button>
                   </div>
                 ) : (
-                  <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent">
+                  <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent min-h-[44px]">
                     <option value="">--</option>
                     {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                     <option value="__add__">+ Agregar motivo</option>
@@ -349,7 +359,8 @@ export default function ReclamoForm({
           ))}
         </div>
 
-        <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-3">+ Agregar fila</button>
+        {/* Medía 90.1×21 y es la acción que más se repite al cargar un reclamo. */}
+        <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-1 inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar fila</button>
         <div className="mt-6 text-right text-sm space-y-1">
           <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
           <div className="text-gray-400">Importación ({impLabel(fEmpresa)}): ${fmt(fTax.importacion)}</div>
@@ -396,7 +407,10 @@ export default function ReclamoForm({
                       <span className="text-red-600 text-xs font-semibold">Falló</span>
                     </div>
                   )}
-                  <button type="button" onClick={() => onRemoveFoto(f)} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                  {/* El círculo se ve de 24 px a propósito (más grande taparía la
+                      miniatura), pero el área de toque real llega a 44 con el
+                      pseudo-elemento transparente ::after. */}
+                  <button type="button" aria-label="Quitar foto" title="Quitar foto" onClick={() => onRemoveFoto(f)} className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-black text-white rounded-full text-xs flex items-center justify-center after:absolute after:-inset-2.5 after:rounded-full after:content-['']">×</button>
                 </div>
               );
             })}
@@ -412,7 +426,8 @@ export default function ReclamoForm({
               ))}
             </ul>
             {savedReclamoId && (
-              <button type="button" onClick={onRetryFotos} disabled={saving} className="mt-2 inline-flex items-center gap-1 font-medium border border-red-300 text-red-600 rounded-full px-3 py-1.5 hover:bg-red-50 disabled:opacity-50">
+              // py-1.5 sobre text-xs dejaba el botón en 28 px de alto.
+              <button type="button" onClick={onRetryFotos} disabled={saving} className="mt-2 inline-flex items-center justify-center gap-1 font-medium border border-red-300 text-red-600 rounded-full px-3 min-h-[44px] hover:bg-red-50 disabled:opacity-50">
                 {saving ? "Reintentando…" : "Reintentar fotos"}
               </button>
             )}
@@ -460,8 +475,9 @@ export default function ReclamoForm({
               </p>
             </div>
           </div>
-          <button onClick={onViewSaved} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">Ver reclamo →</button>
-          <button onClick={onResetAndCreateAnother} disabled={saving} className="text-sm text-gray-400 hover:text-black transition ml-4 disabled:opacity-50">Crear otro reclamo</button>
+          {/* py-2.5 daba 40 px; el enlace de al lado, 18. */}
+          <button onClick={onViewSaved} disabled={saving} className="bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]">Ver reclamo →</button>
+          <button onClick={onResetAndCreateAnother} disabled={saving} className="text-sm text-gray-400 hover:text-black transition ml-2 disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] px-2">Crear otro reclamo</button>
         </div>
       ) : (
         <div className="mt-8">
@@ -470,7 +486,8 @@ export default function ReclamoForm({
             <button onClick={onSave} disabled={saving} className="flex-1 sm:flex-none bg-black text-white px-6 py-3 sm:py-2.5 rounded-md text-base sm:text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]">
               {saving ? "Guardando…" : "Guardar Reclamo"}
             </button>
-            <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            {/* Botón de solo texto al lado de "Guardar Reclamo" (que ya es 44). */}
+            <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center justify-center min-h-[44px] px-2">Cancelar</button>
           </div>
         </div>
       )}
