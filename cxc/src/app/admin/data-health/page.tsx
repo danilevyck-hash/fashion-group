@@ -181,7 +181,7 @@ export default function DataHealthPage() {
           <button
             onClick={runChecksNow}
             disabled={running}
-            className="text-sm bg-black text-white px-4 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[40px]"
+            className="text-sm bg-black text-white px-4 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-h-[44px]"
           >
             {running ? (
               <>
@@ -222,44 +222,51 @@ export default function DataHealthPage() {
               No hay resultados todavía. Corre el primer check con el botón de arriba.
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-500 uppercase tracking-wide bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-2 font-medium">Check</th>
-                  <th className="text-left px-4 py-2 font-medium">Tabla</th>
-                  <th className="text-center px-4 py-2 font-medium">Severity</th>
-                  <th className="text-right px-4 py-2 font-medium">Rows</th>
-                  <th className="text-left px-4 py-2 font-medium">Último check</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.latest.map(r => {
-                  const badge = SEVERITY_BADGE[r.severity];
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => setSelectedCheck(r)}
-                      className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer transition"
-                    >
-                      <td className="px-4 py-2.5 font-mono text-xs">{r.check_name}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{r.table_name}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${badge.bg} ${badge.text}`}>
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{r.rows_affected}</td>
-                      <td className="px-4 py-2.5 text-gray-500 text-xs">
-                        <span className="flex items-center justify-between gap-2">
-                          <span title={fmtAbsolute(r.checked_at)}>{fmtRelative(r.checked_at)}</span>
-                          <span className="text-gray-300 group-hover:text-gray-500" aria-hidden>›</span>
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            // Sin este overflow-x-auto la tabla (~690px) queda recortada dentro
+            // del `overflow-hidden` de la card: en iPhone (340px útiles) se
+            // perdían 350px SIN scroll, y lo inalcanzable era justo Severity y
+            // Rows — el dato por el que existe la página. Mismo patrón que la
+            // tabla del historial 30d de más abajo.
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 uppercase tracking-wide bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-2 font-medium">Check</th>
+                    <th className="text-left px-4 py-2 font-medium">Tabla</th>
+                    <th className="text-center px-4 py-2 font-medium">Severity</th>
+                    <th className="text-right px-4 py-2 font-medium">Rows</th>
+                    <th className="text-left px-4 py-2 font-medium">Último check</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data?.latest.map(r => {
+                    const badge = SEVERITY_BADGE[r.severity];
+                    return (
+                      <tr
+                        key={r.id}
+                        onClick={() => setSelectedCheck(r)}
+                        className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer transition"
+                      >
+                        <td className="px-4 py-2.5 font-mono text-xs">{r.check_name}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{r.table_name}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{r.rows_affected}</td>
+                        <td className="px-4 py-2.5 text-gray-500 text-xs">
+                          <span className="flex items-center justify-between gap-2">
+                            <span title={fmtAbsolute(r.checked_at)}>{fmtRelative(r.checked_at)}</span>
+                            <span className="text-gray-300 group-hover:text-gray-500" aria-hidden>›</span>
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
