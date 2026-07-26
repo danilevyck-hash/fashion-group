@@ -52,6 +52,13 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 
 ## Base de datos
 - **Tablas grandes:** cxc_rows (~50K), switch_facturas (historia 2022+, fuente única de ventas), ventas_raw (~100K, congelada — solo la lee costo)
+
+> **REGLA — filtrar por año va por RANGO, nunca con `EXTRACT(YEAR ...)` (26-jul-2026).** `WHERE EXTRACT(YEAR FROM (fecha AT TIME ZONE 'America/Panama'))::int = p_anio` es una función SOBRE la columna: no es sargable, ningún índice de `fecha` se puede usar y Postgres cae en seq scan de `switch_facturas` entera (52.269 filas, ~58 MB de heap por el `raw_data` jsonb) en CADA llamada. Es la causa medida de los picos de /ventas: en frío 2.882-3.493 ms contra 368-451 ms en caliente (8×), y el año anterior casi nunca está en caché. La forma correcta es el intervalo semiabierto en UTC — Panamá es **UTC-5 fijo**, sin horario de verano (verificado fila por fila contra la tzdb en las 52.269 facturas: 0 discrepancias):
+> ```sql
+> WHERE fecha >= (make_date(p_anio,     1, 1)::timestamp AT TIME ZONE 'America/Panama')
+>   AND fecha <  (make_date(p_anio + 1, 1, 1)::timestamp AT TIME ZONE 'America/Panama')
+> ```
+> Los límites van en una CTE leída con subconsulta escalar (InitPlan) para que el planner los vea como constantes. Ya aplicado en `ventas_dashboard_summary` (20260725170100), `ventas_topclientes_summary` y `ventas_clientes_detalle_summary` (20260726190000). **Ojo con las funciones que alimentan a varios consumidores:** `ventas_clientes_detalle_summary` no puede llevar techo porque su CTE `last12m_filtered` no tiene cota superior — solo cota inferior `LEAST(1-ene de p_anio-1, p_twelve_months_ago)`. Índice de cobertura: `idx_sf_fecha_cliente_cover (fecha) INCLUDE (empresa_key, cliente_nombre, tipo_comprobante, subtotal_descuento)` — `idx_sf_fecha_cover` NO sirve para estas dos porque le falta `cliente_nombre`. Candado: `src/__tests__/lib/ventas-reportes-sargable.test.ts`.
 - **Soft delete (`deleted` boolean), por módulo:**
   - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
   - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
@@ -98,9 +105,13 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/switch-sync tipo=all (fashion_shoes, fashion_wear) | 05:35 |
 | /api/cron/switch-sync tipo=all (active_shoes, joystep) | 05:40 |
 | /api/cron/backup | 06:00, 10:30, 18:30 (3 entradas — las 2ª/3ª son "segunda oportunidad": no-op si una anterior ya registró success hoy) |
-| /api/cron/backup?grupo=switch | 06:45, 11:15, 19:15 (3 entradas, mismo guard no-op) |
+| /api/cron/backup?grupo=switch | 06:45, 11:15, **23:30** (3 entradas, mismo guard no-op) |
 | /api/cron/backup?grupo=storage | 04:00, 15:30 (2 entradas — réplica off-site de los buckets de Storage a Cloudflare R2) |
 
+> **`?grupo=switch` salió del horario de oficina: 19:15 → 23:30 UTC (26-jul-2026).** Es el ÚNICO grupo de backup que barre las tablas grandes (`SWITCH_DATASETS`: `switch_articulo_diario` 197k filas + `switch_facturas` 52k; el grupo core NO las incluye), y a las 19:15 UTC = **14:15 Panamá** lo hacía en plena tarde. Movido a 23:30 UTC (18:30 Panamá), **dentro del mismo día UTC** — el guard no-op de la 2ª oportunidad compara contra el día UTC, así que cruzar la medianoche la habría convertido en la corrida primaria del día siguiente — y con margen antes de la ventana de deploy 23:50-00:20. `EXTRA_ENTRY_HOURS_UTC` se actualizó en el mismo commit; `cron-calendario.test.ts` ahora **deriva** esas horas de vercel.json en vez de repetirlas a mano.
+>
+> **Es higiene, NO el arreglo de los picos de /ventas — no confundirlos.** Se probó la hipótesis de que este scan enfriara la caché y disparara los picos: UNA observación lo sugirió (270 ms → 1.514 ms justo después de un scan) pero **3 ensayos controlados no la reprodujeron**, y en uno el pico apareció ANTES del scan. Los picos de /ventas eran el seq scan de las RPC no sargables (ver la regla de rangos en "Base de datos"); eso se arregló aparte. Mover el backup se sostiene solo por sentido común (barrer 250k filas en horario de oficina no aporta nada), no por evidencia causal.
+>
 > **Backup — estructura en R2 y completitud (jul-2026):** los 3 grupos escriben en el MISMO esquema: `data/YYYY-MM-DD/<tabla>.ndjson.gz` + `data/YYYY-MM-DD/meta.json` (core, 49 datasets), `data/YYYY-MM-DD/meta-switch.json` (switch, 8), y `_storage/<bucket>/<path>` con path ESTABLE (binarios inmutables — versionarlos por fecha multiplicaría 198 MB/día sin ganar nada). El `manifest.json` de la raíz NO es dedup entre días: las keys llevan la fecha, así que solo evita repetir trabajo dentro del mismo día (2ª/3ª entrada, pendientes por deadline).
 > **Storage: una sola réplica, y vive en R2 (26-jul-2026).** La copia bucket→bucket DENTRO de Supabase (`backups/_storage/<bucket>/<path>`) se eliminó: eran **1.596 archivos / 103,2 MB** en el MISMO proyecto que decía proteger, el 18% del GB del plan (Storage estaba al 56%), y encima nunca había copiado `marketing` (55,1 MB) ni `joybees-photos` (15,9 MB). R2 sí tiene los 5 buckets completos (3.204 archivos, 198 MB), verificados uno a uno por tamaño + 20 por sha256 antes de borrar. Restore: `node scripts/restore.mjs --source r2 --storage <bucket>` (sin `--source` ya asume r2; con `--source supabase` corta con mensaje). Candado: `src/__tests__/lib/backup-storage-solo-r2.test.ts`. **No reintroducir la copia intra-Supabase.** Lo único que queda bajo ese prefijo es `_storage/meta-r2.json`, el resumen auditable de la réplica a R2.
 >

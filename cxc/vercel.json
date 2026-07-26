@@ -26,7 +26,7 @@
     },
     {
       "path": "/api/cron/backup?grupo=switch",
-      "schedule": "15 19 * * *"
+      "schedule": "30 23 * * *"
     },
     {
       "path": "/api/cron/backup?grupo=storage",
