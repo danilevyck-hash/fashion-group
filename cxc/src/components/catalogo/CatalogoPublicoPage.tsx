@@ -10,6 +10,9 @@ import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
+import {
+  cumpleBultosMinimos, precioEnRango, esPrecioRango, type PrecioRango,
+} from "@/lib/catalogo/filtros-extra";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
@@ -44,6 +47,16 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   const [category, setCategory] = useState(searchParams.get("category") || "");
   const [saleFilter, setSaleFilter] = useState<SaleFilter>(
     theme.features.saleFilter ? ((searchParams.get("filter") as SaleFilter) || "") : "",
+  );
+  // Filtros extra (hoy solo Tommy). El valor del query es dato no confiable:
+  // el rango se valida contra las opciones reales antes de entrar al estado.
+  const [bultosFilter, setBultosFilter] = useState(
+    theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
+  );
+  const [precioRango, setPrecioRango] = useState<PrecioRango>(
+    theme.features.filtroPrecio && esPrecioRango(searchParams.get("precio"))
+      ? (searchParams.get("precio") as PrecioRango)
+      : "",
   );
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
@@ -112,11 +125,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.saleFilter && saleFilter) params.set("filter", saleFilter);
+    if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
+    if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, saleFilter]);
+  }, [gender, category, search, saleFilter, bultosFilter, precioRango]);
 
   // Load products
   useEffect(() => {
@@ -192,6 +207,11 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
+    // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
+    // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
+    // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
+    .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category)))
+    .filter(p => precioEnRango(p.price, precioRango))
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
@@ -256,7 +276,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setSaleFilter(""); setSortBy("relevancia");
+    setSaleFilter(""); setBultosFilter(false); setPrecioRango("");
+    setSortBy("relevancia");
   }
 
   const [sendingOrder, setSendingOrder] = useState(false);
@@ -474,6 +495,10 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onCategoryChange={setCategory}
           saleFilter={saleFilter}
           onSaleFilterChange={theme.features.saleFilter ? setSaleFilter : undefined}
+          bultosFilter={bultosFilter}
+          onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
+          precioRango={precioRango}
+          onPrecioRangoChange={theme.features.filtroPrecio ? setPrecioRango : undefined}
           sortBy={sortBy}
           onSortByChange={setSortBy}
           filteredCount={filteredCount}
