@@ -649,7 +649,19 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         <div {...movModal.backdrop} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div ref={movModal.panelRef} className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             {movStep === "employee" && !mEmpleadoId ? (<>
-              <h2 className="font-medium mb-4">Seleccionar Empleado</h2>
+              {/* En iPhone no hay tecla Escape: sin esta ✕ el único modo de salir
+                  del modal era el botón "Cancelar" del fondo de la lista. */}
+              <div className="flex items-start justify-between mb-4 -mt-2 -mr-2">
+                <h2 className="font-medium mt-2">Seleccionar Empleado</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowMovModal(false)}
+                  aria-label="Cerrar"
+                  className="shrink-0 w-11 h-11 flex items-center justify-center rounded-md text-gray-400 hover:text-black active:scale-[0.97] transition"
+                >
+                  <span aria-hidden="true" className="text-xl leading-none">&times;</span>
+                </button>
+              </div>
               <div className="space-y-1 max-h-80 overflow-y-auto">
                 {empleados.filter(e => e.activo).map(emp => {
                   const c = calcEmpleado(emp);
