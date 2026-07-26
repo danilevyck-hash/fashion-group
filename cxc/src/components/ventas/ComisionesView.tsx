@@ -113,7 +113,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           empresasEsperadas={EMPRESAS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
           variant="pill"
-          prefix="Data actualizada al"
+          prefix="Sincronizado"
         />
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por

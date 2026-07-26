@@ -13,6 +13,7 @@ import { sendTelegramAlert, shortError } from "@/lib/telegram";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
+import { avisoPedidoDelLink } from "@/lib/catalogo/telegram-pedido";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -42,8 +43,6 @@ export const maxDuration = 300;
 // que los aporte) y se dispara enviarPedidoSwitch. Si Switch falla, el pedido
 // YA está guardado y confirmado: el cliente ve su número igual y el envío se
 // recupera con el "Reintentar" del admin (Telegram avisa).
-
-const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Total para la RPC: misma maquinaria que el convertir del admin (Reebok:
  *  categoría real vía products con fallback apparel; Joybees: bulto 12). */
@@ -303,9 +302,19 @@ async function handleConfirmar(
         const numero = (data as { order_number?: string })?.order_number;
         if (!numero) throw new Error("RPC sin order_number");
         const ya = !!(data as { already_converted?: boolean })?.already_converted;
+        // Este endpoint es SIEMPRE el camino del LINK: la RPC de conversión
+        // deja origen_original='link' en la fila del pedido. El aviso lo dice
+        // con todas las letras, y además cómo entra a Switch (contado + vendedor
+        // DEFAULT, ver publico-switch-actor) — es lo que lo diferencia del
+        // pedido que mete un vendedor, que sí lleva cliente y vendedor reales.
         if (!ya) {
           await sendTelegramAlert(
-            `✅ Pedido ${cfg.label} CONFIRMADO por el cliente — ${pedido.cliente_nombre || "Sin nombre"} — ${numero} — ${money(total)}`,
+            avisoPedidoDelLink({
+              label: cfg.label,
+              cliente: pedido.cliente_nombre,
+              total,
+              numero,
+            }),
           );
         }
         return { numero, yaConvertida: ya };

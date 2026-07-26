@@ -7,7 +7,8 @@
 // móviles cuentan N meses hacia atrás desde ese mes (cruzan año solos).
 //
 // Dos secciones:
-//   1. Wholesale: clientes con is_wholesale=true.
+//   1. Mayoreo: clientes con is_wholesale=true (la columna sigue llamándose
+//      así en la DB; la UI dice "Mayoreo" — cero jerga en inglés).
 //   2. Clientes identificados (retail): ranking por monto, nombre real.
 //      Identidad normalizada en el RPC (TRIM + colapsa espacios) para no partir
 //      un cliente por variantes; VENTAS MAHER excluido (revendedor). El bucket
@@ -360,10 +361,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             </section>
           )}
 
-          {/* Sección 1: Wholesale */}
+          {/* Sección 1: Mayoreo (is_wholesale=true) */}
           <ClientesSection
             prefix="ws"
-            title="Wholesale"
+            title="Mayoreo"
             subtitle={wholesale
               ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} ${wholesale.total_tickets === 1 ? "ticket" : "tickets"}`
               : "—"}
@@ -374,7 +375,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             spansYears={spansYears}
             expandedId={expandedId}
             onToggleRow={toggleRow}
-            emptyText={`No hay clientes wholesale en ${periodoStr}.`}
+            emptyText={`No hay clientes de mayoreo en ${periodoStr}.`}
           />
 
           {/* Sección 2: Clientes identificados (retail por monto) */}

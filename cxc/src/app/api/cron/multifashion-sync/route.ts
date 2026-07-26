@@ -19,7 +19,14 @@ import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 60 → 800 (Vercel Pro, jul-2026). Era el techo más bajo de todos los crons que
+// abren sesión de Switch, y Switch es lo impredecible: la corrida diaria de 7
+// días tarda 6-15s (medido en multifashion_sync_log del 1 al 25-jul), pero el
+// override manual acepta hasta 365 días — ~52x esa ventana, o sea varios
+// minutos que NO entran en 300. 800 es el techo del plan y lo que ya usan los 13
+// crons pesados (#285). Un ceiling alto no cuesta nada si la corrida normal
+// termina en segundos; lo que cuesta es que la maten a mitad de un upsert.
+export const maxDuration = 800;
 
 const CRON_NAME = "multifashion-sync";
 

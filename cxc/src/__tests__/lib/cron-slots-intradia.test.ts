@@ -178,13 +178,15 @@ describe("D1 — ocurrencia intradía perdida (facturas-1500, ventas ACS)", () =
   });
 
   it("no se adelanta a la entrada: dentro de la ventana de jitter no re-ejecuta", () => {
-    // Vercel llega tarde (medido: 21:10 → 22:11). Re-sincronizar antes de que
-    // venza la ventana gastaría una sesión de Switch al pedo y podría chocar con
-    // la entrada llegando tarde.
+    // Re-sincronizar antes de que venza la ventana gastaría una sesión de Switch
+    // al pedo y podría chocar con la entrada llegando tarde. Con Pro la ventana
+    // es de 30 min (ver SLOT_RUN_WINDOW_MIN): el disparo medido es de segundos y
+    // el slot más largo termina entero en ~4 min.
+    expect(SLOT_RUN_WINDOW_MIN).toBe(30);
     const finVentana = new Date(Date.parse("2026-07-25T15:00:00Z") + SLOT_RUN_WINDOW_MIN * 60_000);
-    expect(finVentana.toISOString()).toBe("2026-07-25T17:00:00.000Z");
-    expect(desatendido(new Date("2026-07-25T16:59:00Z"), "facturas-1500")).toBeUndefined();
-    expect(desatendido(new Date("2026-07-25T17:00:00Z"), "facturas-1500")).toBeTruthy();
+    expect(finVentana.toISOString()).toBe("2026-07-25T15:30:00.000Z");
+    expect(desatendido(new Date("2026-07-25T15:29:00Z"), "facturas-1500")).toBeUndefined();
+    expect(desatendido(new Date("2026-07-25T15:30:00Z"), "facturas-1500")).toBeTruthy();
   });
 
   it("tras recuperar el par, la ocurrencia deja de estar desatendida", () => {
@@ -385,5 +387,101 @@ describe("guarda de concurrencia — no pisar una corrida viva", () => {
     expect(d).toBeTruthy();
     expect(d!.motivo).toBe("corrio-y-fallo");
     expect(d!.paresPendientes[0].ultimoIntento!.status).toBe("running");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// La ventana de jitter bajó de 120 a 30 min al pasar la cuenta a Vercel PRO
+// (26-jul-2026). El 120 venía del scheduler de Hobby, que disparaba con hasta
+// ~58 min de retraso (medido en switch_sync_log del 20-24 jul). Con Pro el
+// disparo es puntual (+1s a +40s en las ocurrencias del 25/26-jul) y la deriva
+// que se ve en los heartbeats es la DURACIÓN del sync.
+//
+// La ventana de 2h TAPABA pérdidas reales: la ronda de las 16:0x tiene UNA sola
+// pasada de reconciliación después (18:00), y con 120 min las ocurrencias de
+// 16:05 y 16:10 vencían recién a las 18:05/18:10 → ese día no se re-ejecutaban.
+describe("ventana de jitter con Vercel Pro (SLOT_RUN_WINDOW_MIN)", () => {
+  const RONDA_16 = ["estadocuenta-1600", "estadocuenta-1605", "estadocuenta-1610"] as const;
+  const PARES_16 = [
+    ["active_shoes", "1600"], ["joystep", "1600"],
+    ["fashion_shoes", "1605"], ["fashion_wear", "1605"],
+    ["vistana", "1610"], ["active_wear", "1610"],
+  ] as const;
+
+  // Invocaciones de las 16:0x perdidas: los pares solo tienen el success de la
+  // mañana (10:30), que es justo lo que tapaba el agujero.
+  const soloManana: SyncLogRowMin[] = PARES_16.map(([empresa]) =>
+    row("2026-07-25T10:30:00Z", empresa, "estadocuenta"),
+  );
+  // Heartbeats propios de AYER: la entrada de hoy no llegó.
+  const hbAyer = new Map<string, string>(
+    RONDA_16.map((s) => [slotHeartbeatName(s), "2026-07-24T16:40:00Z"]),
+  );
+
+  it("es 30 minutos", () => {
+    expect(SLOT_RUN_WINDOW_MIN).toBe(30);
+  });
+
+  it("la pasada de las 18:00 SÍ alcanza a las tres ocurrencias de las 16:0x", () => {
+    const out = clasificarSlots({
+      now: PASADA_18,
+      rows: soloManana,
+      heartbeats: hbAyer,
+      empresasConCxc: CXC,
+    });
+    for (const slot of RONDA_16) {
+      const d = out.desatendidos.find((x) => x.slot === slot);
+      expect(d, `${slot} debería quedar desatendido a las 18:00`).toBeTruthy();
+      expect(d!.motivo).toBe("sin-invocacion");
+      expect(d!.paresPendientes.length).toBe(2);
+    }
+  });
+
+  it("con la ventana vieja de 120 min, 16:05 y 16:10 no llegaban a la pasada de las 18:00", () => {
+    // Regresión que motivó el cambio: con 120 min el fin de ventana caía DESPUÉS
+    // de la única pasada posterior del día.
+    for (const [, hhmm] of PARES_16) {
+      const occ = Date.parse(`2026-07-25T${hhmm.slice(0, 2)}:${hhmm.slice(2)}:00Z`);
+      expect(occ + 30 * 60_000).toBeLessThan(PASADA_18.getTime());
+      if (hhmm !== "1600") {
+        expect(occ + 120 * 60_000).toBeGreaterThan(PASADA_18.getTime());
+      }
+    }
+  });
+
+  it("sigue cubriendo el disparo real bajo Pro: +40s y ~4 min de duración entran", () => {
+    // estadocuenta-2110 (vistana+active_wear) el 25-jul: 21:10:01 → 21:13:57.
+    const rows = [
+      row("2026-07-25T21:10:01Z", "vistana", "estadocuenta", "error", "boom"),
+      row("2026-07-25T21:12:29Z", "active_wear", "estadocuenta", "error", "boom"),
+    ];
+    const out = clasificarSlots({
+      now: new Date("2026-07-26T10:00:00Z"),
+      rows,
+      heartbeats: new Map(),
+      empresasConCxc: CXC,
+    });
+    const d = out.desatendidos.find((x) => x.slot === "estadocuenta-2110");
+    // Corrió dentro de la ventana (aunque falló) → NO se cubre y se reporta como
+    // fallo, no como invocación perdida.
+    expect(d).toBeTruthy();
+    expect(d!.motivo).toBe("corrio-y-fallo");
+    expect(out.cubiertos.map((c) => c.slot)).not.toContain("estadocuenta-2110");
+  });
+
+  it("un slot 'all' que arranca tarde y dura 5 min sigue contando como invocado", () => {
+    // Los slots `all` (facturas+estadocuenta+costo × 2 empresas) son los más
+    // largos: 2-5 min medidos. Con 30 min de ventana hay ~5x de margen.
+    const rows: SyncLogRowMin[] = [
+      row("2026-07-26T05:31:00Z", "vistana", "facturas", "error", "boom"),
+      row("2026-07-26T05:35:30Z", "active_wear", "facturas", "error", "boom"),
+    ];
+    const out = clasificarSlots({
+      now: new Date("2026-07-26T10:00:00Z"),
+      rows,
+      heartbeats: new Map(),
+      empresasConCxc: CXC,
+    });
+    expect(out.desatendidos.find((x) => x.slot === "all-0530")!.motivo).toBe("corrio-y-fallo");
   });
 });

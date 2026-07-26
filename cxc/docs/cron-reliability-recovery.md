@@ -99,11 +99,30 @@ Cuidados de costo y seguridad, verificados con tests:
 
 - **Día sano = no-op total** (cero llamadas a Switch): si cada entrada corrió y
   dejó sus pares al día, no hay `desatendidos` ni `cubiertos`.
-- **Ventana de jitter** (`SLOT_RUN_WINDOW_MIN`=120 min) para `sin-invocacion`: no
-  adelantarse a una entrada que Vercel puede invocar tarde. NO aplica a
-  `corrio-y-fallo` (ya no hay a quién esperar) — si aplicara, la ronda de las
-  16:0x quedaría otra vez sin reportar, porque su única pasada posterior (18:00)
-  cae dentro de sus 120 min.
+- **Ventana de jitter** (`SLOT_RUN_WINDOW_MIN`=**30 min**) para `sin-invocacion`:
+  no adelantarse a una entrada que Vercel puede invocar tarde. NO aplica a
+  `corrio-y-fallo` (ya no hay a quién esperar).
+  - **120 → 30 el 26-jul-2026, con la cuenta ya en Pro.** El 120 venía del jitter
+    de Hobby: retraso del primer run de cada slot medido en `switch_sync_log` del
+    20-24 jul → p50 28.7 min, p90 55 min, máx 58.4 min. Bajo Pro el disparo es
+    puntual — en las ocurrencias del 25/26-jul el primer run arrancó a +1s
+    (`estadocuenta-2110` 21:10:01), +13s (2115), +22s (2120), +32s
+    (`facturas-2315` 23:15:32) y +40s (`facturas-0015` 00:15:40); la deriva que
+    se ve en el heartbeat (23:15:39, 00:15:47) es la **duración** del sync, no
+    retraso de disparo. El slot más largo termina entero en ~4 min.
+  - **Por qué el 120 era dañino:** tapaba pérdidas reales. La ronda de las 16:0x
+    tiene UNA sola pasada de reconciliación después (18:00); con 120 min las
+    ocurrencias de 16:05 y 16:10 vencían recién 18:05/18:10 → ese día no se
+    re-ejecutaban nunca. Con 30 vencen 16:35/16:40 y la pasada de las 18:00 sí
+    las atiende.
+  - **Por qué 30 y no 20:** los slots `all` (05:30/05:35/05:40/06:30) hacen
+    facturas+estadocuenta+costo de dos empresas y son los únicos sin muestra bajo
+    Pro todavía; bajo Hobby su duración medida fue de 2 a 5 min. 30 deja ~5x de
+    margen y coincide con `RUNNING_STALE_MIN` (una corrida más vieja que eso ya
+    se considera muerta en el resto del sistema).
+  - Verificado contra el incidente REAL del 25-jul: la ronda de las 16:0x arrancó
+    a +15/+29 min y con la ventana de 30 sigue clasificando `corrio-y-fallo`
+    (tests D2 de `cron-slots-intradia.test.ts`, intactos).
 - **Guarda de concurrencia**: una fila `running` más joven que `RUNNING_STALE_MIN`
   (30 min, misma constante que el lock de `switch_sync_log`) congela el slot — no
   se re-ejecuta encima de una corrida viva (sesión única + índice mutex).
