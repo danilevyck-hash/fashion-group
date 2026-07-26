@@ -358,14 +358,6 @@ export interface MarcaTheme {
     /** Color del botón principal de la barra sticky (null = default del tema). */
     stickyActionColor: string | null;
   };
-  stockAviso: {
-    panel: string;
-    title: string;
-    line: string;
-    note: string;
-    confirmBtn: string;
-    cancelBtn: string;
-  };
   publico: {
     /** Carga del catálogo público: color del texto vacío etc. reuse grid. */
     confirmingLabel: string;
@@ -375,7 +367,6 @@ export interface MarcaTheme {
     spinner: string;
     itemImageBg: string;
     totalValue: string;
-    stockConfirmBtn: string;
     confirmBtn: string;
   };
   admin: {
@@ -653,24 +644,12 @@ const REEBOK: MarcaTheme = {
     copyLabel: "Copiar link",
     stickyActionColor: "bg-[#E4002B] hover:bg-[#c90025]",
   },
-  stockAviso: {
-    panel: "fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#1A2656]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]",
-    title: "text-sm font-semibold text-[#1A2656]",
-    line: "text-xs text-[#1A2656]/70",
-    note: "text-xs text-[#1A2656]/60 mb-3",
-    confirmBtn:
-      "flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-    cancelBtn:
-      "flex-1 bg-white border border-[#1A2656]/20 text-[#1A2656] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-  },
   publico: { confirmingLabel: "Confirmando..." },
   pedidoPublico: {
     pageBg: "min-h-screen bg-[#F5F0E8]",
     spinner: "w-8 h-8 border-2 border-[#1A2656] border-t-transparent rounded-full animate-spin",
     itemImageBg: "w-14 h-14 rounded-lg bg-[#F5F0E8] flex-shrink-0 overflow-hidden",
     totalValue: "text-white font-bold text-xl tabular-nums",
-    stockConfirmBtn:
-      "flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
     confirmBtn:
       "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },
@@ -957,24 +936,12 @@ const JOYBEES: MarcaTheme = {
     copyLabel: "Copiar link publico",
     stickyActionColor: null,
   },
-  stockAviso: {
-    panel: "fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#404041]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]",
-    title: "text-sm font-semibold text-[#404041]",
-    line: "text-xs text-[#404041]/70",
-    note: "text-xs text-[#404041]/60 mb-3",
-    confirmBtn:
-      "flex-1 bg-[#404041] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-    cancelBtn:
-      "flex-1 bg-white border border-[#404041]/20 text-[#404041] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-  },
   publico: { confirmingLabel: "Confirmando..." },
   pedidoPublico: {
     pageBg: "min-h-screen bg-[#FFFEF5]",
     spinner: "w-8 h-8 border-2 border-[#1A2656] border-t-transparent rounded-full animate-spin",
     itemImageBg: "w-14 h-14 rounded-lg bg-[#FFFEF5] flex-shrink-0 overflow-hidden",
     totalValue: "text-[#FFE443] font-bold text-xl tabular-nums",
-    stockConfirmBtn:
-      "flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
     confirmBtn:
       "w-full bg-[#1A2656] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },
@@ -1291,24 +1258,12 @@ const TOMMY: MarcaTheme = {
     copyLabel: "Copiar link publico",
     stickyActionColor: "bg-[#AE0029] hover:bg-[#8c0021]",
   },
-  stockAviso: {
-    panel: "fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#152342]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]",
-    title: "text-sm font-semibold text-[#152342]",
-    line: "text-xs text-[#152342]/70",
-    note: "text-xs text-[#152342]/60 mb-3",
-    confirmBtn:
-      "flex-1 bg-[#152342] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-    cancelBtn:
-      "flex-1 bg-white border border-[#152342]/20 text-[#152342] text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
-  },
   publico: { confirmingLabel: "Confirmando..." },
   pedidoPublico: {
     pageBg: "min-h-screen bg-[#F6F7F9]",
     spinner: "w-8 h-8 border-2 border-[#152342] border-t-transparent rounded-full animate-spin",
     itemImageBg: "w-14 h-14 rounded-lg bg-[#F6F7F9] flex-shrink-0 overflow-hidden",
     totalValue: "text-white font-bold text-xl tabular-nums",
-    stockConfirmBtn:
-      "flex-1 bg-[#152342] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50",
     confirmBtn:
       "w-full bg-[#152342] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
   },

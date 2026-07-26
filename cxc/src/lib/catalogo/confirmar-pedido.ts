@@ -1,19 +1,27 @@
 // Núcleo del endpoint público de CONFIRMACIÓN de un pedido del link
 // (POST /api/catalogo/{marca}/pedido-publico/[id]/confirmar).
 //
-// La confirmación del cliente AUTO-CONVIERTE el pedido a PED-### / JBP-###
-// (decisión cerrada): llama la RPC atómica existente de conversión — el pedido
-// entra directo al pipeline del admin. WhatsApp queda como aviso OPCIONAL.
+// La confirmación del cliente AUTO-CONVIERTE el pedido a PED-### / JBP-### /
+// TOM-### (decisión cerrada): llama la RPC atómica existente de conversión — el
+// pedido entra directo al pipeline del admin. WhatsApp queda como aviso OPCIONAL.
+//
+// SIN MODAL DE STOCK (25-jul-2026): antes, si alguna línea tenía menos piezas
+// de las pedidas, esto respondía 409 'stock_corto' y el cliente tenía que
+// reenviar con aceptar_stock=true. Ese paso se ELIMINÓ: el pedido se confirma
+// directo. Lo que NO se pierde es la cantidad real: se toma una FOTO del stock
+// en el momento de confirmar (piezas disponibles por producto) y se guarda con
+// el pedido, para mostrarla al cliente y a la secretaria. Es fiel al momento de
+// la confirmación, no al stock de mañana.
 //
 // La lógica vive aquí con dependencias INYECTADAS (I/O afuera) para poder
-// testearla con vitest sin mockear supabase: idempotencia, aviso de stock (S2)
-// y tolerancia a la migración pendiente (columna confirmado_cliente_at).
+// testearla con vitest sin mockear supabase: idempotencia, foto de stock y
+// tolerancia a las migraciones pendientes (confirmado_cliente_at,
+// stock_confirmacion).
 //
 // Contrato del resultado (el route lo traduce 1:1 a HTTP):
-//   { status: 404 }                         — no existe o está borrado
-//   { status: 409, lineas: [...] }          — stock corto y el cliente aún no aceptó
-//   { status: 200, numero, ya_confirmado }  — confirmado (o ya lo estaba: idempotente)
-//   { status: 500, error }                  — la conversión falló
+//   { status: 404 }                                 — no existe o está borrado
+//   { status: 200, numero, ya_confirmado, stock }   — confirmado (idempotente)
+//   { status: 500, error }                          — la conversión falló
 
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -36,39 +44,59 @@ export interface StockLineaCorta {
   pedido_bultos: number;
   pedido_pzas: number;
   disponible_pzas: number;
+  /** Piezas por bulto usadas al confirmar (Reebok 12/6, Joybees/Tommy 12). */
+  bulto_pzas?: number;
 }
 
 /**
- * Compara lo pedido (bultos × tamaño de bulto = piezas) contra lo disponible.
- * - `disponibles`: piezas por product_id (Reebok: suma de inventory; Joybees:
- *   joybees_products.stock). Producto ausente en el Map = 0 disponibles.
+ * FOTO del stock en el momento de confirmar: para CADA línea (no solo las
+ * cortas) cuánto se pidió y cuántas piezas hay disponibles.
+ * - `disponibles`: piezas por product_id (Reebok: suma de inventory; Joybees y
+ *   Tommy: la columna stock del catálogo). Producto ausente en el Map = 0.
  * - Pre-órdenes (is_preorder) se saltan: por definición no tienen stock aún.
+ * - `bulto_pzas` viaja en la foto para poder formatear "1 bulto · 8 pzas" sin
+ *   recalcular la categoría meses después.
  * Pura, sin I/O.
+ */
+export function computeStockLineas(
+  items: PedidoItemStock[],
+  disponibles: Map<string, number>,
+  getBulto: (category?: string) => number,
+): StockLineaCorta[] {
+  const lineas: StockLineaCorta[] = [];
+  for (const it of items) {
+    if (it.is_preorder) continue;
+    const bultos = Number(it.quantity) || 0;
+    if (bultos <= 0 || !it.product_id) continue;
+    const bulto = getBulto(it.category);
+    lineas.push({
+      product_id: it.product_id,
+      name: it.name || "Producto",
+      sku: it.sku || "",
+      pedido_bultos: bultos,
+      pedido_pzas: bultos * bulto,
+      disponible_pzas: Math.max(0, Number(disponibles.get(it.product_id)) || 0),
+      bulto_pzas: bulto,
+    });
+  }
+  return lineas;
+}
+
+/** Solo las líneas donde hay MENOS piezas de las pedidas. */
+export function soloCortas(lineas: StockLineaCorta[]): StockLineaCorta[] {
+  return lineas.filter((l) => l.disponible_pzas < l.pedido_pzas);
+}
+
+/**
+ * Compatibilidad: las líneas cortas directo desde los items.
+ * (= soloCortas(computeStockLineas(...)))
  */
 export function computeLineasCortas(
   items: PedidoItemStock[],
   disponibles: Map<string, number>,
   getBulto: (category?: string) => number,
 ): StockLineaCorta[] {
-  const cortas: StockLineaCorta[] = [];
-  for (const it of items) {
-    if (it.is_preorder) continue;
-    const bultos = Number(it.quantity) || 0;
-    if (bultos <= 0 || !it.product_id) continue;
-    const pzas = bultos * getBulto(it.category);
-    const disp = Math.max(0, Number(disponibles.get(it.product_id)) || 0);
-    if (disp < pzas) {
-      cortas.push({
-        product_id: it.product_id,
-        name: it.name || "Producto",
-        sku: it.sku || "",
-        pedido_bultos: bultos,
-        pedido_pzas: pzas,
-        disponible_pzas: disp,
-      });
-    }
-  }
-  return cortas;
+  return soloCortas(computeStockLineas(items, disponibles, getBulto));
 }
 
 // ── Rate-limit de confirmaciones por IP (fail-open) ─────────────────────────
@@ -133,57 +161,92 @@ export interface ConfirmarDeps {
   /** Tamaño de bulto por categoría (Reebok 12/6, Joybees 12 fijo). */
   getBulto(category?: string): number;
   /**
-   * Registra confirmado_cliente_at (+ confirmado_ip_hash). TOLERANTE: si la
-   * columna no existe (migración pendiente) debe loguear y NO lanzar — la
-   * confirmación sigue vía RPC igual.
+   * Registra confirmado_cliente_at (+ confirmado_ip_hash) y la FOTO del stock
+   * del momento (stock_confirmacion). TOLERANTE: si alguna columna no existe
+   * (migración pendiente) debe loguear y NO lanzar — la confirmación sigue vía
+   * RPC igual.
    */
-  marcarConfirmado(shortId: string): Promise<void>;
+  marcarConfirmado(shortId: string, stock: StockLineaCorta[]): Promise<void>;
   /** RPC atómica de conversión existente. Idempotente. */
   convertir(pedido: PedidoPublicoRow): Promise<{ numero: string; yaConvertida: boolean }>;
+  /**
+   * Envío del pedido ya convertido al ERP Switch (motor enviarPedidoSwitch).
+   * REGLAS:
+   *   · NUNCA rompe la confirmación: el core lo llama dentro de try/catch. El
+   *     pedido ya está guardado; si Switch está caído queda el "Reintentar"
+   *     del admin (y la alerta a Telegram del propio motor).
+   *   · Idempotente aguas abajo (índice parcial + 'ya_enviado'), por eso se
+   *     llama TAMBIÉN cuando el pedido ya estaba convertido: así un reintento
+   *     del cliente tras un timeout recupera un envío que nunca salió.
+   */
+  enviarSwitch(numero: string, pedido: PedidoPublicoRow): Promise<void>;
 }
 
 export type ConfirmarResult =
   | { status: 404 }
-  | { status: 409; lineas: StockLineaCorta[] }
-  | { status: 200; numero: string; ya_confirmado: boolean }
+  | { status: 200; numero: string; ya_confirmado: boolean; stock: StockLineaCorta[] }
   | { status: 500; error: string };
 
+/**
+ * Confirma el pedido del link. Sin paso intermedio: NO hay 409 de stock corto
+ * ni `aceptar_stock` — el pedido entra directo y la cantidad real disponible
+ * queda registrada con él (ver cabecera).
+ */
 export async function confirmarPedidoPublico(
   deps: ConfirmarDeps,
   shortId: string,
-  aceptarStock: boolean,
 ): Promise<ConfirmarResult> {
   const pedido = await deps.getPedido(shortId);
   if (!pedido || pedido.deleted) return { status: 404 };
 
-  // Idempotente: ya convertido → mismo número, sin tocar nada.
+  // Idempotente: ya convertido → mismo número, sin tocar nada (la foto de
+  // stock ya quedó guardada en la confirmación original: no se re-escribe con
+  // el stock de hoy). El envío a Switch SÍ se reintenta: es idempotente y así
+  // se recupera solo un envío que se perdió por timeout o por Switch caído.
   if (pedido.convertida && pedido.ped_order_number) {
-    return { status: 200, numero: pedido.ped_order_number, ya_confirmado: true };
+    await enviarSinRomper(deps, pedido.ped_order_number, pedido);
+    return { status: 200, numero: pedido.ped_order_number, ya_confirmado: true, stock: [] };
   }
 
-  // Aviso de stock (S2): solo si el cliente no aceptó ya el faltante.
-  if (!aceptarStock) {
-    const items = Array.isArray(pedido.items) ? pedido.items : [];
-    const ids = [...new Set(items.filter((i) => !i.is_preorder && i.product_id).map((i) => i.product_id))];
-    if (ids.length > 0) {
-      const disponibles = await deps.getDisponibles(ids);
-      if (disponibles) {
-        const lineas = computeLineasCortas(items, disponibles, deps.getBulto);
-        if (lineas.length > 0) return { status: 409, lineas };
-      }
-      // disponibles === null → fail-open: seguimos sin aviso.
-    }
+  // FOTO del stock ANTES de convertir. FAIL-OPEN: si no se puede leer, se
+  // confirma igual sin foto (nunca bloquea al cliente).
+  const items = Array.isArray(pedido.items) ? pedido.items : [];
+  let stock: StockLineaCorta[] = [];
+  const ids = [...new Set(items.filter((i) => !i.is_preorder && i.product_id).map((i) => i.product_id))];
+  if (ids.length > 0) {
+    const disponibles = await deps.getDisponibles(ids);
+    if (disponibles) stock = computeStockLineas(items, disponibles, deps.getBulto);
   }
 
-  // Registrar la confirmación del cliente (tolerante a columna ausente).
-  await deps.marcarConfirmado(shortId);
+  // Registrar la confirmación del cliente + la foto (tolerante a columnas
+  // ausentes).
+  await deps.marcarConfirmado(shortId, stock);
 
-  // AUTO-CONVERSIÓN → PED-### / JBP-### (entra directo al pipeline).
+  // AUTO-CONVERSIÓN → PED-### / JBP-### / TOM-### (entra directo al pipeline).
+  let numero: string;
+  let yaConvertida: boolean;
   try {
-    const { numero, yaConvertida } = await deps.convertir(pedido);
-    return { status: 200, numero, ya_confirmado: yaConvertida };
+    ({ numero, yaConvertida } = await deps.convertir(pedido));
   } catch (err) {
     console.error("[confirmar-pedido] conversión falló:", err);
     return { status: 500, error: "No se pudo confirmar el pedido. Intenta de nuevo." };
+  }
+
+  // Y de ahí DERECHO al ERP. Un fallo aquí no le quita el pedido al cliente.
+  await enviarSinRomper(deps, numero, pedido);
+
+  return { status: 200, numero, ya_confirmado: yaConvertida, stock };
+}
+
+/** El envío al ERP jamás puede tumbar la confirmación del cliente. */
+async function enviarSinRomper(
+  deps: ConfirmarDeps,
+  numero: string,
+  pedido: PedidoPublicoRow,
+): Promise<void> {
+  try {
+    await deps.enviarSwitch(numero, pedido);
+  } catch (err) {
+    console.error("[confirmar-pedido] envío a Switch falló (el pedido queda guardado):", err);
   }
 }

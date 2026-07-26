@@ -19,14 +19,17 @@
 // Mensajes de error en español simple y accionable — los leen clientes no técnicos.
 
 import { calculateTommyOrderTotal } from "./tommy-order-total";
+import { NOMBRE_MIN, NOMBRE_MAX, validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 
 export const MAX_ITEMS = 200;
 export const MAX_QUANTITY = 500;
 export const MAX_UNIT_PRICE = 10000;
 export const MAX_STR_LEN = 200;      // sku / name
 export const MAX_IMAGE_URL_LEN = 1000;
-export const NOMBRE_MIN = 2;
-export const NOMBRE_MAX = 120;
+// El nombre del cliente lo valida la regla ÚNICA de las 3 marcas
+// (lib/catalogo/nombre-cliente): mínimo 3 LETRAS. Se re-exporta para no romper
+// a quien importe NOMBRE_MIN/NOMBRE_MAX desde aquí.
+export { NOMBRE_MIN, NOMBRE_MAX };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -56,13 +59,9 @@ export function validatePedidoBody(body: unknown): BodyValidationResult {
   }
   const b = body as Record<string, unknown>;
 
-  const cliente_nombre = typeof b.cliente_nombre === "string" ? b.cliente_nombre.trim() : "";
-  if (cliente_nombre.length < NOMBRE_MIN) {
-    return { ok: false, error: "Escribe tu nombre para enviar el pedido (mínimo 2 letras)." };
-  }
-  if (cliente_nombre.length > NOMBRE_MAX) {
-    return { ok: false, error: "El nombre es demasiado largo (máximo 120 caracteres)." };
-  }
+  const nombre = validarNombreCliente(b.cliente_nombre);
+  if (!nombre.ok) return { ok: false, error: nombre.error };
+  const cliente_nombre = nombre.nombre;
 
   const rawItems = b.items;
   if (!Array.isArray(rawItems) || rawItems.length === 0) {

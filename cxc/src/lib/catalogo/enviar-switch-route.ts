@@ -1,14 +1,22 @@
-// Handler COMPARTIDO de los endpoints enviar-switch de Reebok y Joybees (los
-// route files son wrappers de una línea). Resuelve pedido + cliente/vendedor
-// guardados por el checkout (fallback a los defaults del piloto SOLO en Reebok
-// legacy) y delega el envío al motor enviarPedidoSwitch. El caller cierra la
-// sesión de Switch en su finally.
+// Handler COMPARTIDO de los endpoints enviar-switch de las 3 marcas (los route
+// files son wrappers de una línea). Resuelve pedido + cliente/vendedor y delega
+// el envío al motor enviarPedidoSwitch. El caller cierra la sesión de Switch en
+// su finally.
+//
+// Orden de resolución de cliente/vendedor (el primero que aplique):
+//   1. los guardados en el pedido (checkout del vendedor, y desde 25-jul-2026
+//      también la confirmación pública del link),
+//   2. los defaults del piloto — SOLO Reebok legacy (Contado 1 + Reinaldo 2),
+//   3. los del link público (publico-switch-actor: contado + vendedor DEFAULT
+//      de la empresa). Sin esto, un pedido del link de Joybees/Tommy sin ids
+//      quedaba 422 y NO se podía reintentar desde el admin.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
+import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
 
 // El vendedor también puede consultar/reintentar el envío: crear+enviar desde
 // el checkout ya es suyo — el Reintentar es la misma operación tras un fallo.
@@ -93,15 +101,20 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     return NextResponse.json({ error: "El pedido no tiene productos" }, { status: 400 });
   }
 
-  // Cliente/vendedor: los del checkout (guardados en el pedido) o, en Reebok
-  // legacy, los defaults del piloto.
-  const clienteId = order.cliente_switch_id ?? cfg.fallback?.clienteId ?? null;
-  const vendedorId = order.vendedor_switch_id ?? cfg.fallback?.vendedorId ?? null;
+  // Cliente/vendedor: los del pedido, los defaults del piloto (Reebok legacy) o,
+  // como última red, los del link público (ver cabecera).
+  let clienteId = order.cliente_switch_id ?? cfg.fallback?.clienteId ?? null;
+  let vendedorId = order.vendedor_switch_id ?? cfg.fallback?.vendedorId ?? null;
   if (clienteId == null || vendedorId == null) {
-    return NextResponse.json(
-      { error: "El pedido no tiene cliente/vendedor de Switch asignados — créalo desde el checkout del catálogo" },
-      { status: 422 },
-    );
+    const resuelto = await resolvePublicoSwitchActor(supabaseServer, cfg.empresaKey);
+    if (!resuelto.ok) {
+      return NextResponse.json(
+        { error: `El pedido no tiene cliente/vendedor de Switch asignados — ${resuelto.motivo}` },
+        { status: 422 },
+      );
+    }
+    clienteId = clienteId ?? resuelto.actor.clienteId;
+    vendedorId = vendedorId ?? resuelto.actor.vendedorId;
   }
   // Nombres para preview/Telegram (best-effort).
   let clienteNombre: string | null = order.cliente_switch_id == null ? cfg.fallback?.clienteNombre ?? null : null;

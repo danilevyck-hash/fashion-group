@@ -1,12 +1,16 @@
-// Tests del núcleo de confirmación de pedidos públicos (PARTE A catálogos):
-// idempotencia, aviso de stock (S2), aceptar_stock, tolerancia a la migración
-// pendiente (marcarConfirmado falla pero la conversión sigue) y fail-open del
-// chequeo de stock. La I/O va inyectada (ConfirmarDeps) — sin mocks de supabase.
+// Tests del núcleo de confirmación de pedidos públicos:
+// idempotencia, FOTO del stock al confirmar (25-jul-2026: ya NO hay 409
+// stock_corto ni aceptar_stock — el pedido entra directo y la cantidad real
+// queda registrada), tolerancia a la migración pendiente (marcarConfirmado
+// falla pero la conversión sigue) y fail-open del chequeo de stock.
+// La I/O va inyectada (ConfirmarDeps) — sin mocks de supabase.
 
 import { describe, it, expect, vi } from "vitest";
 import {
   computeLineasCortas,
+  computeStockLineas,
   confirmarPedidoPublico,
+  soloCortas,
   type ConfirmarDeps,
   type PedidoPublicoRow,
 } from "@/lib/catalogo/confirmar-pedido";
@@ -87,7 +91,7 @@ describe("computeLineasCortas", () => {
 
 describe("confirmarPedidoPublico", () => {
   it("404 si el pedido no existe", async () => {
-    const res = await confirmarPedidoPublico(depsBase({ getPedido: async () => null }), "x", false);
+    const res = await confirmarPedidoPublico(depsBase({ getPedido: async () => null }), "x");
     expect(res).toEqual({ status: 404 });
   });
 
@@ -95,7 +99,6 @@ describe("confirmarPedidoPublico", () => {
     const res = await confirmarPedidoPublico(
       depsBase({ getPedido: async () => pedidoBase({ deleted: true }) }),
       "abc12345",
-      false,
     );
     expect(res).toEqual({ status: 404 });
   });
@@ -108,48 +111,51 @@ describe("confirmarPedidoPublico", () => {
         convertir: convertir as unknown as ConfirmarDeps["convertir"],
       }),
       "abc12345",
-      false,
     );
-    expect(res).toEqual({ status: 200, numero: "PED-013", ya_confirmado: true });
+    expect(res).toEqual({ status: 200, numero: "PED-013", ya_confirmado: true, stock: [] });
     expect(convertir).not.toHaveBeenCalled();
   });
 
-  it("409 con el detalle si hay stock corto y el cliente no aceptó", async () => {
-    const convertir = vi.fn();
+  it("SIN modal: con stock corto confirma igual y devuelve la cantidad REAL", async () => {
+    const convertir = vi.fn(async () => ({ numero: "PED-099", yaConvertida: false }));
     const res = await confirmarPedidoPublico(
       depsBase({
-        getDisponibles: async () => new Map([["p1", 12], ["p2", 100]]),
-        convertir: convertir as unknown as ConfirmarDeps["convertir"],
+        getDisponibles: async () => new Map([["p1", 8], ["p2", 100]]),
+        convertir,
       }),
       "abc12345",
-      false,
     );
-    expect(res.status).toBe(409);
-    if (res.status === 409) {
-      expect(res.lineas).toHaveLength(1);
-      expect(res.lineas[0].product_id).toBe("p1");
-    }
-    expect(convertir).not.toHaveBeenCalled(); // NO se confirma
+    expect(res.status).toBe(200);
+    expect(convertir).toHaveBeenCalledOnce(); // el pedido NO se frena
+    if (res.status !== 200) return;
+    const cortas = soloCortas(res.stock);
+    expect(cortas).toHaveLength(1);
+    expect(cortas[0]).toMatchObject({
+      product_id: "p1",
+      pedido_pzas: 24,
+      disponible_pzas: 8,
+      bulto_pzas: 12,
+    });
   });
 
-  it("aceptar_stock=true confirma aunque haya stock corto (segundo POST)", async () => {
-    const getDisponibles = vi.fn(async () => new Map([["p1", 0]]));
-    const res = await confirmarPedidoPublico(
-      depsBase({ getDisponibles }),
+  it("la foto de stock se guarda junto con la confirmación (misma llamada)", async () => {
+    const marcarConfirmado = vi.fn(async () => {});
+    await confirmarPedidoPublico(
+      depsBase({ getDisponibles: async () => new Map([["p1", 8], ["p2", 6]]), marcarConfirmado }),
       "abc12345",
-      true,
     );
-    expect(res).toEqual({ status: 200, numero: "PED-099", ya_confirmado: false });
-    expect(getDisponibles).not.toHaveBeenCalled(); // ni consulta el stock
+    expect(marcarConfirmado).toHaveBeenCalledOnce();
+    const [sid, stock] = marcarConfirmado.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sid).toBe("abc12345");
+    expect(stock).toHaveLength(2); // TODAS las líneas, no solo las cortas
   });
 
-  it("fail-open: si el stock no se puede leer (null) confirma sin aviso", async () => {
+  it("fail-open: si el stock no se puede leer (null) confirma sin foto", async () => {
     const res = await confirmarPedidoPublico(
       depsBase({ getDisponibles: async () => null }),
       "abc12345",
-      false,
     );
-    expect(res).toEqual({ status: 200, numero: "PED-099", ya_confirmado: false });
+    expect(res).toEqual({ status: 200, numero: "PED-099", ya_confirmado: false, stock: [] });
   });
 
   it("tolerancia sin columna: marcarConfirmado no rompe la conversión", async () => {
@@ -158,13 +164,9 @@ describe("confirmarPedidoPublico", () => {
     const marcarConfirmado = vi.fn(async () => {
       console.warn("columna confirmado_cliente_at no existe (migración pendiente)");
     });
-    const res = await confirmarPedidoPublico(
-      depsBase({ marcarConfirmado }),
-      "abc12345",
-      false,
-    );
+    const res = await confirmarPedidoPublico(depsBase({ marcarConfirmado }), "abc12345");
     expect(marcarConfirmado).toHaveBeenCalledOnce();
-    expect(res).toEqual({ status: 200, numero: "PED-099", ya_confirmado: false });
+    expect(res).toMatchObject({ status: 200, numero: "PED-099", ya_confirmado: false });
   });
 
   it("500 amigable si la RPC de conversión falla", async () => {
@@ -175,7 +177,6 @@ describe("confirmarPedidoPublico", () => {
         },
       }),
       "abc12345",
-      false,
     );
     expect(res.status).toBe(500);
   });

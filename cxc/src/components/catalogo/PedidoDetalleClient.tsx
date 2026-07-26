@@ -11,10 +11,14 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import { supabaseThumb } from "@/lib/image-thumb";
+import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
-interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
+interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
+  /** Foto del stock al confirmar el pedido del link (piezas que HABÍA en ese
+   *  momento). undefined = pedido presencial o DDL 20260725130000 pendiente. */
+  disponible_pzas?: number; bulto_pzas?: number; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; created_at: string; updated_at?: string | null; [itemsField: string]: unknown; }
 interface DirClient { nombre: string; empresa: string; }
 interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
@@ -672,6 +676,15 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <td className="py-2">
                     <div className="text-sm">{item.name}</div>
                     <div className="text-xs text-gray-400 font-mono">{item.sku}</div>
+                    {/* Pedidos del link: cantidad REAL que había al confirmar.
+                        Solo se muestra cuando faltaban piezas — que nadie crea
+                        que recibe 12 si hay 8. */}
+                    {typeof item.disponible_pzas === "number" &&
+                      item.disponible_pzas < item.quantity * bs(item) && (
+                        <div className="mt-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
+                          Disponible al confirmar: {formatBultosPiezas(item.disponible_pzas, item.bulto_pzas || bs(item))}
+                        </div>
+                      )}
                   </td>
                   <td className="py-2 text-center">
                     {canEdit ? (

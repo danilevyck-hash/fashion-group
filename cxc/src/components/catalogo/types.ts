@@ -42,6 +42,8 @@ export interface CatalogoCartItem {
   is_preorder?: boolean;
 }
 
+/** Foto del stock de UNA línea en el momento de confirmar el pedido del link
+ *  (espejo de StockLineaCorta en lib/catalogo/confirmar-pedido). */
 export interface StockLinea {
   product_id: string;
   name: string;
@@ -49,4 +51,6 @@ export interface StockLinea {
   pedido_bultos: number;
   pedido_pzas: number;
   disponible_pzas: number;
+  /** Piezas por bulto usadas al confirmar (Reebok 12/6, Joybees/Tommy 12). */
+  bulto_pzas?: number;
 }

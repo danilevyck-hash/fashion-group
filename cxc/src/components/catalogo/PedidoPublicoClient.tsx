@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { buildPedidoWhatsappUrl } from "@/lib/catalogo/whatsapp-msg";
+import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import type { StockLinea } from "./types";
 
 interface OrderItem {
@@ -35,6 +36,10 @@ interface Order {
   ped_order_number?: string | null;
   estado_cliente?: "Confirmado" | "En proceso" | null;
   confirmado_cliente_at?: string | null;
+  /** Foto del stock en el momento de confirmar (null si aún no se confirmó o
+   *  la DDL 20260725130000 no corrió). Es la cantidad REAL del momento, no la
+   *  de hoy: por eso se guarda con el pedido y no se recalcula. */
+  stock_confirmacion?: StockLinea[] | null;
 }
 
 function fmtMoney(n: number) {
@@ -54,7 +59,6 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const [error, setError] = useState<string | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [stockLineas, setStockLineas] = useState<StockLinea[] | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -104,10 +108,12 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
     }
   }
 
-  // Confirmar el pedido: entra directo al proceso (se convierte en pedido
-  // interno numerado). Si hay productos con stock corto, el server responde 409
-  // con el detalle y el cliente puede "Confirmar de todas formas" (aceptar=true).
-  async function handleConfirm(aceptar: boolean) {
+  // Confirmar el pedido: entra DIRECTO al proceso (se convierte en pedido
+  // interno numerado y sale a Switch). Ya no hay paso intermedio de "stock
+  // corto": si algún producto tiene menos piezas, el pedido igual entra y la
+  // respuesta trae la cantidad REAL disponible del momento, que se muestra en
+  // cada línea (misma foto que ve la secretaria en el admin).
+  async function handleConfirm() {
     if (!order || confirming) return;
     setConfirming(true);
     setConfirmError(null);
@@ -115,25 +121,22 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
       const res = await fetch(`${theme.api}/pedido-publico/${order.short_id}/confirmar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aceptar_stock: aceptar }),
+        body: "{}",
       });
       const data = await res.json().catch(() => null);
-      if (res.status === 409 && data?.lineas) {
-        setStockLineas(data.lineas as StockLinea[]);
-        return;
-      }
       if (!res.ok || !data?.numero) {
         setConfirmError(
           (data?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo en unos segundos.",
         );
         return;
       }
-      setStockLineas(null);
+      const stock = Array.isArray(data.stock) ? (data.stock as StockLinea[]) : null;
       setOrder({
         ...order,
         convertida: true,
         ped_order_number: data.numero as string,
         estado_cliente: "Confirmado",
+        stock_confirmacion: stock?.length ? stock : order.stock_confirmacion ?? null,
       });
     } catch {
       setConfirmError("No se pudo confirmar el pedido. Revisa tu conexión e intenta de nuevo.");
@@ -167,6 +170,14 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   }
 
   const confirmado = !!order.convertida && !!order.ped_order_number;
+  // Foto del stock al confirmar, por producto. Solo interesa cuando hay MENOS
+  // piezas de las pedidas: es lo que hay que decirle al cliente de frente.
+  const stockPorProducto = new Map<string, StockLinea>(
+    (order.stock_confirmacion || []).map((l) => [l.product_id, l]),
+  );
+  const lineasCortas = (order.stock_confirmacion || []).filter(
+    (l) => l.disponible_pzas < l.pedido_pzas,
+  );
   const estadoLabel = order.estado_cliente || "Confirmado";
   const totalBultos = order.items.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
   const totalPedido = theme.calcTotal(order.items);
@@ -185,6 +196,8 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   const renderItem = (item: OrderItem, idx: number) => {
     const bs = theme.bulto(item.category || "footwear");
     const lineTotal = item.quantity * bs * item.unit_price;
+    const stock = stockPorProducto.get(item.product_id);
+    const corto = !!stock && stock.disponible_pzas < stock.pedido_pzas;
     return (
       <div key={idx} className="flex items-center gap-3 px-4 py-3">
         <div className={theme.pedidoPublico.itemImageBg}>
@@ -208,6 +221,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[#1A2656] truncate">{item.name}</p>
           <p className="text-xs text-[#1A2656]/40 mt-0.5">{item.sku}</p>
+          {corto && stock && (
+            <p className="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
+              Disponible ahora: {formatBultosPiezas(stock.disponible_pzas, stock.bulto_pzas || bs)}
+            </p>
+          )}
         </div>
         <div className="text-right flex-shrink-0">
           <p className="text-base font-semibold text-[#1A2656] tabular-nums">
@@ -278,46 +296,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
           </span>
         </div>
 
-        {/* Aviso de stock corto */}
-        {!confirmado && stockLineas && stockLineas.length > 0 && (
-          <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <p className="text-sm font-semibold text-amber-800 mb-2">
-              Algunos productos no tienen todas las piezas disponibles
-            </p>
-            <ul className="space-y-1 mb-3">
-              {stockLineas.map((l) => (
-                <li key={l.product_id} className="text-xs text-amber-800/90">
-                  <span className="font-medium">{l.name}</span> — pediste {l.pedido_pzas} pzas, hay {l.disponible_pzas}
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-amber-700/80 mb-3">
-              Puedes confirmarlo igual y te contactamos por la diferencia.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleConfirm(true)}
-                disabled={confirming}
-                className={theme.pedidoPublico.stockConfirmBtn}
-              >
-                {confirming ? "Confirmando..." : "Confirmar de todas formas"}
-              </button>
-              <button
-                onClick={() => setStockLineas(null)}
-                disabled={confirming}
-                className="flex-1 bg-white border border-amber-300 text-amber-800 text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition disabled:opacity-50"
-              >
-                Volver
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Confirmar / Confirmado */}
-        {!confirmado && !stockLineas && (
+        {!confirmado && (
           <div className="mt-6 bg-white rounded-xl p-5 text-center">
             <button
-              onClick={() => handleConfirm(false)}
+              onClick={() => handleConfirm()}
               disabled={confirming}
               className={theme.pedidoPublico.confirmBtn}
             >
@@ -342,6 +325,26 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             <p className="text-xs text-emerald-700/70 mt-1 mb-3">
               Ya lo recibimos. Si quieres, avísanos también por WhatsApp (opcional).
             </p>
+            {lineasCortas.length > 0 && (
+              <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-left">
+                <p className="text-xs font-semibold text-amber-900">
+                  Ojo: hay {lineasCortas.length} producto{lineasCortas.length === 1 ? "" : "s"} con
+                  menos piezas de las que pediste
+                </p>
+                <ul className="mt-1.5 space-y-0.5">
+                  {lineasCortas.map((l) => (
+                    <li key={l.product_id} className="text-xs text-amber-800 tabular-nums">
+                      <span className="font-medium">{l.sku || l.name}</span> — pediste{" "}
+                      {formatBultosPiezas(l.pedido_pzas, l.bulto_pzas || 12)}, hay{" "}
+                      {formatBultosPiezas(l.disponible_pzas, l.bulto_pzas || 12)}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-xs text-amber-700">
+                  Te contactamos por la diferencia.
+                </p>
+              </div>
+            )}
             <a
               href={whatsappUrl}
               target="_blank"

@@ -8,7 +8,8 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
-import type { CatalogoCartItem, CatalogoProducto, StockLinea } from "./types";
+import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
+import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoFilters, { type SaleFilter } from "./CatalogoFilters";
@@ -246,11 +247,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   const [sendingOrder, setSendingOrder] = useState(false);
   const [clientName, setClientName] = useState("");
-  // Aviso de stock (S2): líneas con menos piezas disponibles que las pedidas,
-  // devueltas por el endpoint confirmar (409).
-  const [stockAviso, setStockAviso] = useState<StockLinea[] | null>(null);
-  // short_id del pedido YA creado en el server: si el cliente ve el aviso de
-  // stock y luego confirma de todas formas, se reusa (no se duplica el pedido).
+  // short_id del pedido YA creado en el server: si la confirmación falla y el
+  // cliente reintenta, se reusa (no se duplica el pedido).
   const [pendingShortId, setPendingShortId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -270,21 +268,26 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // representa lo que ve → se creará uno nuevo al confirmar.
   useEffect(() => {
     setPendingShortId(null);
-    setStockAviso(null);
   }, [cart, clientName]);
 
-  // Confirmar pedido (flujo nuevo): 1) crea el pedido en el server (precios
-  // validados server-side), 2) lo CONFIRMA (auto-convierte a número interno) y
-  // 3) lleva al cliente a su página permanente /pedido-<marca>/[short_id], donde
-  // puede avisar por WhatsApp (opcional). Si hay stock corto, el server responde
-  // 409 y se muestra el aviso con "Confirmar de todas formas".
-  async function handleConfirmarPedido(aceptarStock = false) {
+  // Confirmar pedido: 1) crea el pedido en el server (precios validados
+  // server-side), 2) lo CONFIRMA (auto-convierte a número interno y lo manda a
+  // Switch) y 3) lleva al cliente a su página permanente
+  // /pedido-<marca>/[short_id], donde ve la cantidad real disponible y puede
+  // avisar por WhatsApp (opcional).
+  // SIN modal de stock (25-jul-2026): si algún producto tiene menos piezas, el
+  // pedido entra igual y la cantidad REAL se muestra en la página del pedido.
+  async function handleConfirmarPedido() {
     if (cart.length === 0 || sendingOrder) return;
-    const trimmedName = clientName.trim();
-    if (!trimmedName) {
-      setToast("Escribe tu nombre antes de confirmar el pedido");
+    // Nombre OBLIGATORIO — misma regla que el server (lib/catalogo/
+    // nombre-cliente): la barra ya bloquea el botón y escribe el motivo; esto
+    // es el cinturón por si el estado llega sucio desde localStorage.
+    const nombre = validarNombreCliente(clientName);
+    if (!nombre.ok) {
+      setToast(nombre.error);
       return;
     }
+    const trimmedName = nombre.nombre;
     setSendingOrder(true);
     try {
       let shortId = pendingShortId;
@@ -306,13 +309,9 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
       const conf = await fetch(`${theme.api}/pedido-publico/${shortId}/confirmar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aceptar_stock: aceptarStock }),
+        body: "{}",
       });
       const confData = await conf.json().catch(() => null);
-      if (conf.status === 409 && confData?.lineas) {
-        setStockAviso(confData.lineas as StockLinea[]);
-        return;
-      }
       if (!conf.ok || !confData?.numero) {
         setToast((confData?.error as string) || "No se pudo confirmar el pedido. Intenta de nuevo.");
         return;
@@ -488,7 +487,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onQtyChange={handleQtyChange}
           onClearCart={handleClearCart}
           variant="public"
-          onSubmitOrder={() => handleConfirmarPedido(false)}
+          onSubmitOrder={() => handleConfirmarPedido()}
           clientName={clientName}
           onClientNameChange={setClientName}
           saving={sendingOrder}
@@ -496,40 +495,6 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           formatTotal={fmt}
         />
 
-        {stockAviso && stockAviso.length > 0 && (
-          <div
-            className={theme.stockAviso.panel}
-            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-          >
-            <p className={theme.stockAviso.title}>Algunos productos no tienen todas las piezas disponibles</p>
-            <ul className="mt-1.5 mb-2 space-y-0.5 max-h-32 overflow-y-auto">
-              {stockAviso.map((l) => (
-                <li key={l.product_id} className={theme.stockAviso.line}>
-                  <span className="font-medium">{l.name}</span> — pediste {l.pedido_pzas} pzas, hay {l.disponible_pzas}
-                </li>
-              ))}
-            </ul>
-            <p className={theme.stockAviso.note}>
-              Puedes confirmarlo igual y te contactamos por la diferencia.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleConfirmarPedido(true)}
-                disabled={sendingOrder}
-                className={theme.stockAviso.confirmBtn}
-              >
-                {sendingOrder ? "Confirmando..." : "Confirmar de todas formas"}
-              </button>
-              <button
-                onClick={() => setStockAviso(null)}
-                disabled={sendingOrder}
-                className={theme.stockAviso.cancelBtn}
-              >
-                Cambiar mi pedido
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <style jsx global>{`
