@@ -520,17 +520,24 @@ const REEBOK: MarcaTheme = {
 
   logos: {
     navbar: () => <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />,
-    // Logo REAL de la marca. Antes había aquí un <svg> de un triángulo dibujado
-    // a mano (que NO es el logo de Reebok) junto a la palabra en texto; el
-    // wordmark ya viene dentro del PNG, así que el texto sobraba. El <h1> se
-    // conserva por semántica: su texto accesible es el alt de la imagen.
+    // Símbolo REAL de la marca (el "vector") + la palabra en texto. Antes había
+    // aquí un <svg> de un triángulo dibujado a mano que NO es el logo de Reebok.
+    // OJO: reebok-logo.png es SOLO el símbolo — no trae el wordmark, a
+    // diferencia del SVG de Tommy. Verificado abriendo el archivo (2560×726, un
+    // único trazo rojo). Por eso la palabra se escribe aparte, con la misma
+    // tipografía que tenía el header antes de que existiera el PNG: sin ella el
+    // catálogo público quedaba con el símbolo y "Catalogo Panama" debajo, sin
+    // ninguna palabra de la marca (decisión de Daniel, 26-jul-2026).
     header: () => (
-      <div className="flex items-center gap-2">
-        <div>
-          <h1 className="leading-none">
-            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
+      <div className="flex items-center gap-2.5 shrink-0">
+        {/* alt="" a propósito: el nombre accesible lo da el <h1> de al lado. Con
+            alt="Reebok" un lector de pantalla diría la marca dos veces. */}
+        <img src="/reebok/reebok-logo.png" alt="" className="h-5 w-auto shrink-0" />
+        <div className="shrink-0">
+          <h1 className="text-lg font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
+            Reebok
           </h1>
-          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
+          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1">
             Catalogo Panama
           </p>
         </div>
@@ -541,13 +548,18 @@ const REEBOK: MarcaTheme = {
         <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
       </div>
     ),
-    // Logo REAL sobre placa blanca: la banda del header del pedido público es
-    // oscura y el logo es rojo (#E4002B) — la placa garantiza que se lea igual
-    // que en la web de la marca. Antes decía "REEBOK" en texto.
+    // Símbolo + palabra sobre placa blanca: la banda del header del pedido
+    // público es oscura y el símbolo es rojo (#E4002B) — la placa garantiza que
+    // se lea igual que en la web de la marca. La palabra va en navy dentro de la
+    // placa (en blanco sobre blanco desaparecería). Paridad con Tommy, que sí
+    // trae su wordmark dentro del SVG.
     pedidoPublico: () => (
       <div className="shrink-0">
-        <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-1.5">
-          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-5 w-auto shrink-0" />
+        <h1 className="inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5">
+          <img src="/reebok/reebok-logo.png" alt="" className="h-5 w-auto shrink-0" />
+          <span className="text-base font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
+            Reebok
+          </span>
         </h1>
         <p className="text-white/50 text-xs mt-1.5">Panama</p>
       </div>
