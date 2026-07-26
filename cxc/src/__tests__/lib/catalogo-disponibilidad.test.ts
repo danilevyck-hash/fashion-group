@@ -25,6 +25,7 @@ function src(rel: string): string {
 
 const MARCAS = ["reebok", "joybees", "tommy"] as const;
 const PUBLICO = src("src/components/catalogo/CatalogoPublicoPage.tsx");
+const VENDEDOR = src("src/components/catalogo/CatalogoVendedorPage.tsx");
 const AGRUPADA = src("src/components/catalogo/CatalogoGroupedCard.tsx");
 const CONFIRMAR = src("src/app/api/catalogo/[marca]/pedido-publico/[id]/confirmar/route.ts");
 
@@ -94,6 +95,39 @@ describe("el flujo público decide con disponibilidad, no con existencia", () =>
     expect(AGRUPADA).toContain('from "@/lib/catalogos/disponible"');
     expect(AGRUPADA).toContain("disponibleVendible(v.product) === 0");
     expect(AGRUPADA).not.toContain("v.product.stock === 0");
+  });
+
+  it("el catálogo del VENDEDOR decide igual que el público (26-jul-2026)", () => {
+    // Antes esta página armaba `_stock` desde la columna `stock` (espejo exacto
+    // de EXISTENCIA) mientras el público usaba disponibilidad: en producción
+    // hay 17 productos de Tommy, 9 de Joybees y 1 de Reebok donde los dos
+    // números difieren, así que vendedor y cliente podían ver catálogos
+    // distintos. Alinear = misma visibilidad y mismo orden para los dos.
+    expect(VENDEDOR).toContain('from "@/lib/catalogos/disponible"');
+    // Una llamada por rama (Joybees agrupada · Reebok inventory · Tommy plana)
+    // + la 4ª del filtro "2 bultos o más". Igual que el público.
+    expect(VENDEDOR.split("disponibleVendible(").length - 1).toBe(4);
+    // Nada de leer el espejo de existencia a mano — mismas prohibiciones que
+    // en el público.
+    expect(VENDEDOR).not.toContain("p.stock > 0");
+    expect(VENDEDOR).not.toContain("_stock: p.stock");
+    expect(VENDEDOR).not.toContain("_stock: stockMap[p.id]");
+  });
+
+  it("las 3 ramas de datos son EXPRESIÓN POR EXPRESIÓN las mismas en ambas páginas", () => {
+    const RAMAS = [
+      // Joybees (agrupada): regalía sigue entrando aunque no haya piezas.
+      "disponibleVendible(p) > 0 || p.is_regalia",
+      // Reebok: la fila trae la disponibilidad agregada; `inventory` (que es
+      // existencia) queda solo de fallback y para las tallas.
+      "_stock: disponibleVendible(p, stockMap[p.id] ?? 0)",
+      // Tommy: grid plana, todo en la fila del producto.
+      "_stock: disponibleVendible(p)",
+    ];
+    for (const rama of RAMAS) {
+      expect(PUBLICO, `publico · ${rama}`).toContain(rama);
+      expect(VENDEDOR, `vendedor · ${rama}`).toContain(rama);
+    }
   });
 
   it('el "Disponible ahora" del pedido confirmado también es disponibilidad', () => {
