@@ -1,0 +1,142 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// iPhone 390x844 — los 3 casos donde achicar la letra NO alcanzó (26-jul-2026).
+//
+// Continuación de #297/#298/#299. Ahí se bajó el cuerpo de la letra hasta el
+// piso de 12px y aun así quedaban nombres cortados: la única salida era
+// recuperar ANCHO. Medido por CDP (Emulation.setDeviceMetricsOverride 390x844,
+// dsf 3, mobile true) contra los datos reales de producción:
+//
+//   CXC (98 clientes)   7 nombres cortados  →  0
+//   Préstamos (12)     12 nombres cortados  →  0
+//   Vista General       3 subtítulos cortados → 0 (tarjeta 110px → 128px)
+//
+// Tests de FUENTE, mismo patrón que iphone-targets-*.test.ts: lo que se
+// protege es la clase de Tailwind concreta que hizo el ancho, porque el tamaño
+// real ya se midió en el navegador. Si alguien devuelve el chevron, el gap
+// grande o el `truncate`, los nombres vuelven a cortarse en silencio.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import path from "path";
+
+const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
+
+const panelCxc = leer("app/admin/components/PanelCxcMobile.tsx");
+const prestamos = leer("app/prestamos/PrestamosClient.tsx");
+const vistaGeneral = leer("app/vista-general/page.tsx");
+const syncNow = leer("components/shared/SyncNowButton.tsx");
+
+/** Bloque de la cabecera de la card de CXC (nombre + monto + acciones). */
+function cabeceraCxc(): string {
+  const i = panelCxc.indexOf('<div className="flex items-start justify-between');
+  const j = panelCxc.indexOf("<BucketChip", i);
+  expect(i).toBeGreaterThan(-1);
+  expect(j).toBeGreaterThan(i);
+  return panelCxc.slice(i, j);
+}
+
+describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
+  it("el chevron de la card desapareció", () => {
+    // Era un adorno: TODA la fila ya abre/cierra la card. Costaba 22px
+    // (14 del ícono + 8 del gap) del ancho del nombre.
+    const cab = cabeceraCxc();
+    expect(cab).not.toContain("rotate-180");
+    expect(cab).not.toContain('<polyline points="6 9 12 15 18 9"/>');
+  });
+
+  it("la fila sigue siendo el control de expandir (aria-expanded intacto)", () => {
+    // Sin chevron, el único indicador de estado es el panel desplegado + la
+    // semántica. Si esto se pierde, la card deja de ser accesible.
+    expect(panelCxc).toContain("aria-expanded={isExpanded}");
+    expect(panelCxc).toContain('role="button"');
+  });
+
+  it("los gaps de la cabecera están al mínimo (gap-2 fuera, gap-1 dentro)", () => {
+    expect(panelCxc).toContain('<div className="flex items-start justify-between gap-2 px-3 py-3">');
+    expect(panelCxc).toContain('<div className="flex shrink-0 items-center gap-1">');
+  });
+
+  it('el "···" conserva 44x44 y se mete en el padding con -mr-3', () => {
+    // Espejo del -ml-3 de la estrella: gana 12px SIN tocar el área de tap.
+    const cab = cabeceraCxc();
+    expect(cab).toContain('<span className="-mr-3" onClick={e => e.stopPropagation()}>{actionsMenu}</span>');
+    // El botón real vive en OverflowMenu y no se tocó.
+    const overflow = leer("components/ui/OverflowMenu.tsx");
+    expect(overflow).toContain("min-h-[44px] min-w-[44px]");
+  });
+
+  it("la estrella de favorito NO se tocó (sigue 44x44 con -ml-3)", () => {
+    const i = panelCxc.indexOf('aria-label={isFavorite ? "Quitar favorito"');
+    expect(panelCxc.slice(i, i + 400)).toContain("-my-3 -ml-3 flex h-11 w-11");
+  });
+
+  it("el nombre gana con tracking-tight, no bajando de 12px", () => {
+    expect(panelCxc).toContain("text-[12px] font-medium leading-5 tracking-tight");
+    // Piso duro: ningún text-[Npx] por debajo de 12 en el nombre.
+    const px = [...panelCxc.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => parseFloat(m[1]));
+    expect(px.filter((p) => p < 12)).toHaveLength(0);
+  });
+});
+
+describe("Préstamos — los chips bajan a la línea 2 en mobile", () => {
+  it("la columna de quincena solo existe desde sm (en iPhone no ocupa ancho)", () => {
+    expect(prestamos).toContain('<div className="hidden shrink-0 text-center sm:block sm:w-24">');
+    // La versión vieja ocupaba ~86-90px SIEMPRE, incluso en 358px de fila.
+    expect(prestamos).not.toContain('<div className="shrink-0 text-center sm:w-24">');
+  });
+
+  it("en mobile el chip viaja a la línea de la empresa con su TEXTO completo", () => {
+    expect(prestamos).toContain('<div className="flex shrink-0 items-center gap-1.5 sm:hidden">{badges}{chipQuincena}</div>');
+    // Los dos estados se siguen leyendo: el color solo no los distingue.
+    expect(prestamos).toContain("✓ Deducida");
+    expect(prestamos).toContain("⚠ Pendiente");
+  });
+
+  it("los badges de estado se declaran UNA vez y se renderizan en ambos layouts", () => {
+    expect(prestamos).toContain("const badges = [");
+    expect(prestamos).toContain("const chipQuincena =");
+    // Desktop: en la línea 1, junto al nombre (como siempre).
+    expect(prestamos).toContain('<div className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</div>');
+  });
+
+  it("el gap de la fila baja a 2 en mobile y deja sm:gap-4 intacto", () => {
+    expect(prestamos).toContain("flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4");
+  });
+
+  it("el nombre usa tracking-tight (sin bajar el cuerpo de la letra)", () => {
+    expect(prestamos).toContain('<span className="font-medium truncate tracking-tight">{emp.nombre}</span>');
+  });
+
+  it("el saldo y el menú de acciones no se tocaron", () => {
+    expect(prestamos).toContain('<div className="shrink-0 text-right min-w-[72px]">');
+    expect(prestamos).toContain("<OverflowMenu");
+  });
+});
+
+describe("Vista General — el subtítulo del KPI envuelve, no se corta", () => {
+  it("el contenedor del subtítulo ya no lleva truncate", () => {
+    // Con truncate se perdía justo el "(parcial)" de
+    // "▼ 20.3% vs julio 2025 (parcial)" — el aviso de que la comparación
+    // está incompleta. Peor que una tarjeta 18px más alta.
+    expect(vistaGeneral).toContain('<div className="text-xs mt-1 tabular-nums min-h-[2rem] sm:min-h-0">');
+    expect(vistaGeneral).not.toContain('<div className="text-xs mt-1 tabular-nums truncate">');
+  });
+
+  it("el texto del subtítulo de Ventas conserva el (parcial)", () => {
+    expect(vistaGeneral).toContain('{ventas.parcial ? " (parcial)" : ""}');
+  });
+
+  it("min-h reserva 2 líneas solo en mobile (desktop queda como estaba)", () => {
+    const i = vistaGeneral.indexOf('className="text-xs mt-1 tabular-nums min-h-[2rem]');
+    expect(vistaGeneral.slice(i, i + 80)).toContain("sm:min-h-0");
+  });
+});
+
+describe("SyncNowButton — 44px de alto en las 4 pantallas donde aparece", () => {
+  it("el botón llega a 44px", () => {
+    // Medía 147.3x32 en /admin, /ventas, /proveedores y /clientes.
+    expect(syncNow).toContain("inline-flex min-h-[44px] items-center");
+    expect(syncNow).not.toContain('className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5');
+  });
+});
