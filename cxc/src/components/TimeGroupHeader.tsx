@@ -29,7 +29,11 @@ export default function TimeGroupHeader({
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className={`sticky top-14 z-[5] w-full flex items-center gap-3 px-4 py-2 text-left transition-colors bg-gray-50/90 backdrop-blur-sm border-b border-gray-200`}
+        // 358×38 medidos en Guías. Es la cabecera que colapsa el grupo entero
+        // ("Esta semana (15 guías)") y la comparten Guías y Cheques, así que un
+        // solo `min-h-[44px]` cubre los dos. Se saca `py-2`: con el min-h y el
+        // `items-center` el alto lo pone la caja, no el padding.
+        className={`sticky top-14 z-[5] w-full flex items-center gap-3 px-4 min-h-[44px] text-left transition-colors bg-gray-50/90 backdrop-blur-sm border-b border-gray-200`}
       >
         <svg
           className={`w-3 h-3 ${color} transition-transform shrink-0 ${open ? "rotate-90" : ""}`}

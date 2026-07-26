@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
+import IconButton from "@/components/IconButton";
 import { getVisibleGroups, getVisibleModules, getModulesInGroup, type AppModule } from "@/lib/modules";
 import { recordModuleClick, getFrequentModules } from "@/lib/module-frequents";
 import { fmtDate } from "@/lib/format";
@@ -136,22 +137,27 @@ export default function HomePage() {
               {fmtDate(hoyPanama())}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0 pt-1">
-            <button
+          {/* /home NO usa AppHeader: tiene su propio encabezado, así que los 44×44
+              que se arreglaron allá nunca llegaron acá. Estos dos botones medían
+              22×21 y 29×21 en el iPhone — y son los de la primera pantalla que ve
+              todo el mundo al entrar. El -mr-2 compensa el ancho nuevo contra el
+              borde del contenedor. */}
+          <div className="flex items-center shrink-0 -mr-2">
+            <IconButton
               onClick={() => {
                 const next = !darkMode;
                 setDarkMode(next);
                 if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); }
                 else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); }
               }}
-              aria-label={darkMode ? "Modo claro" : "Modo oscuro"}
-              className="text-sm text-gray-400 hover:text-black transition px-1"
+              label={darkMode ? "Modo claro" : "Modo oscuro"}
+              className="text-sm text-gray-400 hover:text-black"
             >
               {darkMode ? "☀" : "◑"}
-            </button>
+            </IconButton>
             <button
               onClick={() => { sessionStorage.clear(); router.push("/"); }}
-              className="text-sm text-gray-400 hover:text-black transition"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-gray-400 hover:text-black transition active:scale-[0.97]"
             >
               Salir
             </button>

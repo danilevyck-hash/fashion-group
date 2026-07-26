@@ -14,20 +14,6 @@ const ROLE_LABELS: Record<string, string> = {
  contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
 
-// La campana vive dentro de NotificationCenter (botón de 24×24: p-1 + ícono de
-// 16). En móvil eso es la mitad del mínimo táctil de la casa, y agrandarlo
-// desde adentro también agrandaría la campana del desktop, que no lo necesita.
-// Por eso el envoltorio móvil estira SOLO su botón a 44×44 y reubica el punto
-// rojo (único <span> hijo directo del botón) para que siga pegado al ícono y no
-// se vaya a la esquina del cuadro nuevo. El desplegable es hermano del botón,
-// así que estos selectores no lo tocan.
-//
-// Lo limpio sería que NotificationCenter aceptara un tamaño; queda pendiente
-// porque ese archivo lo está tocando otro frente.
-const CAMPANA_MOVIL_44 =
-  "[&>div>button]:min-w-[44px] [&>div>button]:min-h-[44px] [&>div>button]:flex [&>div>button]:items-center [&>div>button]:justify-center " +
-  "[&>div>button>span]:top-2 [&>div>button>span]:right-2";
-
 interface AppHeaderProps {
   module: string;
   breadcrumbs?: { label: string; onClick?: () => void }[];
@@ -118,7 +104,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
               Los tres son 44×44 reales (regla de la casa para el tacto en
               iPhone): este header sale en las 22 páginas, así que cada píxel
               que falte acá se multiplica por toda la app. */}
-          <div className={`sm:hidden ${CAMPANA_MOVIL_44}`}><NotificationCenter /></div>
+          <div className="sm:hidden"><NotificationCenter size="tactil" /></div>
           {canSearch && (
             <button onClick={() => setMobileSearchOpen(true)} aria-label="Buscar" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -183,7 +169,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                   <div className="text-sm font-medium text-gray-800 truncate">{userName}</div>
                   <div className="text-xs text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
                 </div>
-                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
+                {/* El drawer es 100% móvil: acá no hay mouse, solo dedo. El -mr-2
+                    recupera el aire que suma el área táctil para que el botón siga
+                    alineado con el borde de la fila. */}
+                <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="min-h-[44px] min-w-[44px] -mr-2 flex items-center justify-center text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
               </div>
             )}
             <nav className="flex-1 overflow-y-auto py-2">
