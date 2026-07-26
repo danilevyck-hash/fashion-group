@@ -35,22 +35,27 @@
 //   node scripts/restore.mjs --date 2026-07-04 --target tabla_staging --tables cheques --yes
 //       Restaura UN dataset en OTRA tabla (staging con el mismo schema).
 //
-// BUCKETS DE STORAGE (réplica en backups/_storage/<bucket>/ en Supabase y en
-// _storage/<bucket>/ en R2, ver api/cron/backup):
+// BUCKETS DE STORAGE — la réplica vive SOLO en R2 (_storage/<bucket>/<path>).
+// La copia intra-Supabase (backups/_storage/) se eliminó el 26-jul-2026: era
+// una copia dentro del MISMO proyecto (no protegía de perderlo), pesaba 103,2 MB
+// del GB del plan y ni siquiera cubría los buckets `marketing` ni
+// `joybees-photos`. Por eso --storage asume --source r2 si no se pasa otro:
 //   node scripts/restore.mjs --storage reclamo-fotos [--prefix carpeta/] [--yes]
 //   node scripts/restore.mjs --source r2 --storage reclamo-fotos [--yes]
 //       Restaura los archivos replicados de ese bucket a su bucket original
 //       (upsert: sobreescribe si existe). Sin --yes solo muestra el plan.
+//       Cubre los 5 buckets: product-images, marketing, joybees-photos,
+//       reclamo-facturas, reclamo-fotos.
 //
 // Passwords: fg_users_auth.ndjson.gz (hashes bcrypt) NO se restaura por defecto;
 // agregar --include-auth para upsertearlo sobre fg_users (columna password).
 //
 // PRUEBA (validada 4-jul-2026): restore real de `transportistas` con datos
-// idénticos → upsert no-op, hash de la tabla intacto antes/después. Ver
-// memoria/PR para el detalle. La prueba equivalente con --source r2 está
-// PENDIENTE: las credenciales R2_* están marcadas Sensitive en Vercel y no se
-// pueden leer ni con `vercel env pull` ni con la API — hay que copiarlas a mano
-// desde el panel de Cloudflare a .env.local.
+// idénticos → upsert no-op, hash de la tabla intacto antes/después.
+// PRUEBA --source r2 (validada 26-jul-2026, ya no está pendiente): escritura
+// REAL de joybees-photos/WFFLT.TNV.jpg desde R2 al bucket original → 2.550 bytes,
+// sha256 83bc1975ce8e idéntico al de R2 y al que había antes. Los 5 buckets
+// listan completos desde R2 (2907+231+28+24+14 = 3.204 archivos, 198 MB).
 //
 // Requiere: .env.local en la raíz del repo (NEXT_PUBLIC_SUPABASE_URL +
 // SUPABASE_SERVICE_ROLE_KEY; para --source r2 además R2_ACCESS_KEY_ID,
@@ -96,9 +101,22 @@ const onlyTables = opt('tables')?.split(',').map(s => s.trim()).filter(Boolean);
 const targetOverride = opt('target');
 const storageBucket = opt('storage');
 const pathPrefix = opt('prefix') || '';
-const source = opt('source') || 'supabase';
+const sourceExplicito = opt('source');
+// --storage lee SIEMPRE de R2: la réplica intra-Supabase (backups/_storage/) se
+// eliminó el 26-jul-2026 (era una copia dentro del mismo proyecto, 103,2 MB del
+// GB del plan, y ni siquiera cubría los buckets marketing y joybees-photos).
+// Sin --source explícito, --storage asume r2 en vez de fallar con "no hay
+// réplica"; con --source supabase explícito se avisa y se corta.
+const source = sourceExplicito || (storageBucket ? 'r2' : 'supabase');
 if (source !== 'supabase' && source !== 'r2') {
   console.error(`--source inválido: "${source}" (valores: supabase, r2)`);
+  process.exit(1);
+}
+if (storageBucket && source === 'supabase') {
+  console.error(
+    'Los archivos de Storage ya no se replican dentro de Supabase (backups/_storage/ se eliminó el 26-jul-2026).\n' +
+    `La copia off-site vive en R2: node scripts/restore.mjs --source r2 --storage ${storageBucket}`
+  );
   process.exit(1);
 }
 const desdeR2 = source === 'r2';
@@ -246,27 +264,21 @@ async function diagnosticarTodas() {
 }
 
 /** Archivos replicados de un bucket de Storage: `dest` es la ruta DENTRO del
- *  bucket original, `src` la ruta en la fuente. */
+ *  bucket original, `src` la key en R2 (única fuente desde el 26-jul-2026). */
 async function listarReplicaStorage(bucket) {
-  if (desdeR2) {
-    const raiz = `_storage/${bucket}/`;
-    const { keys } = await r2List(raiz);
-    return keys.map((k) => ({
-      src: k.key,
-      dest: k.key.slice(raiz.length),
-      size: k.size,
-      mimetype: mimeDe(k.key),
-    }));
-  }
-  const raiz = `_storage/${bucket}`;
-  return (await walkStorage(raiz))
-    .filter((f) => f.path !== '_storage/manifest.json')
-    .map((f) => ({ src: f.path, dest: f.path.slice(raiz.length + 1), size: f.size, mimetype: f.mimetype }));
+  const raiz = `_storage/${bucket}/`;
+  const { keys } = await r2List(raiz);
+  return keys.map((k) => ({
+    src: k.key,
+    dest: k.key.slice(raiz.length),
+    size: k.size,
+    mimetype: mimeDe(k.key),
+  }));
 }
 
-/** Bytes de un archivo de la réplica de Storage. */
+/** Bytes de un archivo de la réplica de Storage (R2). */
 async function replicaDownload(src) {
-  return desdeR2 ? r2Download(src) : storageDownload(src);
+  return r2Download(src);
 }
 
 // ── PKs reales desde el OpenAPI de PostgREST (para on_conflict) ──────────────
@@ -306,17 +318,6 @@ async function upsertBatch(table, pkCols, rows) {
 }
 
 // ── storage: walk recursivo + upload ─────────────────────────────────────────
-async function walkStorage(prefix) {
-  const entries = await storageList(prefix);
-  const out = [];
-  for (const e of entries) {
-    const path = prefix ? `${prefix}/${e.name}` : e.name;
-    if (e.id === null) out.push(...(await walkStorage(path)));
-    else out.push({ path, size: e.metadata?.size || 0, mimetype: e.metadata?.mimetype || 'application/octet-stream' });
-  }
-  return out;
-}
-
 async function storageUpload(bucket, path, buf, contentType) {
   const r = await fetch(`${BASE}/storage/v1/object/${bucket}/${path}`, {
     method: 'POST',
