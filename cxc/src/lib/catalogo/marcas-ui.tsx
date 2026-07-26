@@ -195,6 +195,10 @@ export interface MarcaTheme {
     inventarioPorTalla: boolean;
     /** Chips de categoría en los filtros (Reebok Calzado/Ropa/Accesorios). */
     categoryChips: boolean;
+    /** Chip "2 bultos o más" en los filtros (solo Tommy — ver filtros-extra). */
+    filtroBultos: boolean;
+    /** Select de rango de precio por pieza en los filtros (solo Tommy). */
+    filtroPrecio: boolean;
     /** QUIRK legacy Reebok: rol 'cliente' solo ve su propio pedido. */
     roleClienteGuard: boolean;
     /** El "← Inicio" del navbar solo aparece con rol de sistema (Reebok). */
@@ -498,6 +502,10 @@ const REEBOK: MarcaTheme = {
     agrupacionPorModelo: false,
     inventarioPorTalla: true,
     categoryChips: true,
+    // Precio ~90% redundante con los chips de categoría que ya existen (medido
+    // 25-jul-2026) y el corte de bultos casi no corta: no se agregan.
+    filtroBultos: false,
+    filtroPrecio: false,
     roleClienteGuard: true,
     navInicioRequiereRol: true,
   },
@@ -819,6 +827,10 @@ const JOYBEES: MarcaTheme = {
     agrupacionPorModelo: true,
     inventarioPorTalla: false,
     categoryChips: false,
+    // El corte de bultos dejaría pasar el 92% del catálogo y los precios no
+    // tienen dispersión ($10 y $13 = 3 de cada 4 productos): no se agregan.
+    filtroBultos: false,
+    filtroPrecio: false,
     roleClienteGuard: false,
     navInicioRequiereRol: false,
   },
@@ -1140,6 +1152,8 @@ const TOMMY: MarcaTheme = {
     agrupacionPorModelo: false, // grid PLANA
     inventarioPorTalla: false,
     categoryChips: true,    // categorías parseadas de la descripcion Switch
+    filtroBultos: true,     // "2 bultos o más" (aprobado 25-jul-2026)
+    filtroPrecio: true,     // rango de precio por pieza (4 tramos medidos)
     roleClienteGuard: false,
     navInicioRequiereRol: false,
   },
