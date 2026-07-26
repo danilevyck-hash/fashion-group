@@ -3,17 +3,25 @@
  *
  * Fuente: /apireporte/recibos (API JSON, mismo token que facturas). Un row por
  * recibo (fechaCreacion, cliente, vendedor que registró, total). El endpoint NO
- * da id/secuencial → estrategia delete+insert por (empresa, mes) en cada corrida
- * (re-sincronizar un mes reemplaza limpio TODO el mes).
+ * da id/secuencial → la unidad de reemplazo es el (empresa, mes) completo:
+ * re-sincronizar un mes deja la tabla IDÉNTICA a lo que devuelve Switch para ese
+ * mes, incluidas las BAJAS (recibos anulados o borrados en el ERP).
  *
  * VENTANA RODANTE (jul-2026, audit sync): el cron re-sincroniza SIEMPRE los
  * últimos 3 meses (mesesCronRecibos). A diferencia de facturas/utilidad (upsert
  * incremental), los recibos SÍ cambian dentro de la ventana: Switch permite
- * anular, editar o retro-cargar recibos con fecha pasada, y el delete+insert
- * por mes es la única forma de corregirlos (detectados 4 faltantes + 1 anulado
- * en may-jun 2026 que la ventana de 1 mes nunca corrigió). Duración medida:
- * mediana ~5.1s por empresa-mes → 3 meses × 6 empresas ≈ 90-120s, holgado bajo
- * maxDuration 300.
+ * anular, editar o retro-cargar recibos con fecha pasada, y reemplazar el mes
+ * es la única forma de corregirlos (detectados 4 faltantes + 1 anulado en
+ * may-jun 2026 que la ventana de 1 mes nunca corrigió). Duración medida:
+ * mediana ~5.1s por empresa-mes → 3 meses × 6 empresas ≈ 90-120s.
+ *
+ * ESCRITURA SELECTIVA (26-jul-2026): el reemplazo del mes se calcula, no se
+ * ejecuta a ciegas. Antes era DELETE de todo el mes + INSERT de todo el mes en
+ * cada una de las 4 corridas diarias, lo que reescribía ~37K filas al día para
+ * cambiar unas pocas decenas y dejó la tabla con 18,3% de filas muertas. Ahora
+ * se lee el mes que ya está guardado, se compara contra lo que trajo Switch y
+ * se escriben SOLO las diferencias (altas, bajas y modificaciones). El conjunto
+ * final es el mismo por construcción — ver la demostración en recibos-diff.ts.
  *
  * RECIBOS CON TOTAL $0: son cobros por APLICACIÓN/CRUCE (el recibo aplica saldo
  * a favor / NC contra facturas, sin plata nueva) o recibos ANULADOS. Por
@@ -30,6 +38,7 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
+import { diffRecibos, type ReciboExistente } from "./recibos-diff";
 import { clearStaleRunning, isRunningLockConflict } from "./sync-log";
 import type { Mes } from "./sync-utilidad";
 
@@ -73,9 +82,40 @@ export interface SyncRecibosResult {
   empresaKey: EmpresaKey;
   ok: boolean;
   meses: number;
+  /** Filas que Switch devolvió para la ventana (el tamaño del mes, no lo escrito). */
   recibos: number;
+  /** Filas insertadas de verdad (altas + modificaciones). */
+  insertadas?: number;
+  /** Filas borradas de verdad (bajas + modificaciones). */
+  borradas?: number;
+  /** Filas idénticas que NO se tocaron (lo que antes se reescribía por gusto). */
+  sinCambio?: number;
   error?: string;
 }
+
+/** Columnas de negocio de switch_recibos + id: lo que necesita el diff. */
+const COLUMNAS_DIFF =
+  "id,fecha,fecha_creacion,cliente_switch_id,cliente_codigo,cliente_nombre,vendedor_registro,vendedor_cartera,total,es_retencion";
+
+/**
+ * Tamaño de página de la lectura del mes.
+ *
+ * ⚠️ PostgREST corta TODA respuesta en `db-max-rows` = 1000 filas en este
+ * proyecto, y lo hace en SILENCIO: pedir `.range(0, 49999)` devuelve 1000 sin
+ * error. Medido el 26-jul-2026: american_classic jun-2026 tiene 1.259 recibos y
+ * el select devolvía 1.000. Comparar el mes contra una lectura truncada haría
+ * que las 259 filas invisibles se consideraran ausentes y se RE-INSERTARAN en
+ * cada corrida → recibos duplicados y comisión-cobro inflada. Por eso se pagina
+ * con orden estable y se verifica el total contra un COUNT exacto.
+ */
+const PAGINA_LECTURA = 1000;
+
+/** Cota dura de páginas (1M filas en un mes-empresa es imposible: el mes más
+ *  grande medido tiene 1.259). Está para que el bucle no pueda quedar girando. */
+const MAX_PAGINAS = 1000;
+
+/** Tamaño de lote del DELETE por id (la lista de uuids viaja en el query string). */
+const LOTE_BORRADO = 100;
 
 const num = (v: unknown): number => {
   const n = parseFloat(String(v ?? "").replace(/,/g, ""));
@@ -204,7 +244,7 @@ function esRetencion(cliId: number | null, fecha: string | null, total: number, 
 }
 
 /** Trae todos los recibos de un mes (paginación de 50 server-side). */
-async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: number, impuestoMap: ImpuestoMap, carteraMap: Map<number, string>) {
+export async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: number, impuestoMap: ImpuestoMap, carteraMap: Map<number, string>) {
   const client = createSwitchClient(empresaKey);
   const { inicio } = monthBounds(year, month);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -244,6 +284,75 @@ function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap:
   };
 }
 
+/**
+ * Mapas auxiliares de una corrida: impuestos de facturas (para clasificar
+ * retenciones) y cartera (vendedor dueño de cada cliente). Se arman una vez por
+ * empresa y valen para todos los meses de la ventana.
+ */
+export async function cargarMapasRecibos(empresaKey: EmpresaKey, meses: Mes[]) {
+  // El mapa de impuestos cubre los meses + 35 días antes (una factura puede
+  // preceder a su recibo de retención).
+  const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+  const f0 = sorted[0];
+  const lN = sorted[sorted.length - 1];
+  const winFrom = new Date(Date.UTC(f0.year, f0.month - 1, 1) - RET_WINDOW_MS).toISOString().slice(0, 10);
+  const winTo = monthBounds(lN.year, lN.month).finExcl;
+  const impuestoMap = await loadImpuestoMap(empresaKey, winFrom, winTo);
+  const carteraMap = await buildCarteraMap(empresaKey);
+  return { impuestoMap, carteraMap };
+}
+
+/**
+ * Lee el mes COMPLETO tal como está guardado hoy. El predicado es EXACTAMENTE
+ * el del DELETE que hacía la versión vieja (empresa_key + fecha en
+ * [inicio, finExcl)), que es lo que hace equivalentes al viejo y al nuevo
+ * estado final.
+ *
+ * "Completo" es la palabra clave: una lectura corta se traduce en filas
+ * duplicadas (ver PAGINA_LECTURA). Se pagina con `order("id")` —hace falta un
+ * orden estable, sin él PostgREST puede repetir o saltear filas entre páginas—
+ * y al final se compara contra el COUNT exacto. Si no cuadra se corta con
+ * error: la lectura ocurre ANTES de cualquier escritura del mes, así que el mes
+ * queda intacto.
+ */
+export async function leerMesGuardado(
+  empresaKey: EmpresaKey,
+  inicio: string,
+  finExcl: string,
+): Promise<ReciboExistente[]> {
+  const filas: ReciboExistente[] = [];
+  let esperadas: number | null = null;
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
+    const desde = pagina * PAGINA_LECTURA;
+    const { data, error, count } = await supabaseServer
+      .from("switch_recibos")
+      .select(COLUMNAS_DIFF, pagina === 0 ? { count: "exact" } : {})
+      .eq("empresa_key", empresaKey)
+      .gte("fecha", inicio)
+      .lt("fecha", finExcl)
+      .order("id", { ascending: true })
+      .range(desde, desde + PAGINA_LECTURA - 1);
+    if (error) throw new Error(`select switch_recibos: ${error.message}`);
+    if (pagina === 0) esperadas = count ?? null;
+    const lote = (data ?? []) as unknown as ReciboExistente[];
+    filas.push(...lote);
+    // Se corta por página incompleta o al alcanzar el COUNT. El segundo corte
+    // existe para que un servidor que devolviera páginas llenas para siempre no
+    // deje el bucle girando: se sale y el chequeo de abajo lo denuncia.
+    if (lote.length < PAGINA_LECTURA) break;
+    if (esperadas != null && filas.length >= esperadas) break;
+  }
+  if (esperadas == null) {
+    throw new Error(`switch_recibos sin COUNT (${empresaKey} ${inicio}): no puedo garantizar la lectura completa`);
+  }
+  if (filas.length !== esperadas) {
+    throw new Error(
+      `lectura incompleta de switch_recibos (${empresaKey} ${inicio}): ${filas.length} filas leídas vs ${esperadas} contadas`,
+    );
+  }
+  return filas;
+}
+
 export async function syncEmpresaRecibos(
   empresaKey: EmpresaKey,
   meses: Mes[],
@@ -255,36 +364,53 @@ export async function syncEmpresaRecibos(
   let logId: string | null = null;
   try {
     logId = await createLog(empresaKey, meses, triggeredBy);
-    // Mapa de impuestos para clasificar retenciones: cubre los meses + 35 días antes
-    // (una factura puede preceder a su recibo de retención).
-    const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
-    const f0 = sorted[0];
-    const lN = sorted[sorted.length - 1];
-    const winFrom = new Date(Date.UTC(f0.year, f0.month - 1, 1) - RET_WINDOW_MS).toISOString().slice(0, 10);
-    const winTo = monthBounds(lN.year, lN.month).finExcl;
-    const impuestoMap = await loadImpuestoMap(empresaKey, winFrom, winTo);
-    const carteraMap = await buildCarteraMap(empresaKey);
+    const { impuestoMap, carteraMap } = await cargarMapasRecibos(empresaKey, meses);
 
     let totalRecibos = 0;
+    let totalInsertadas = 0;
+    let totalBorradas = 0;
+    let totalSinCambio = 0;
     for (const { year, month } of meses) {
       const rows = await fetchRecibosMes(empresaKey, year, month, impuestoMap, carteraMap);
       const { inicio, finExcl } = monthBounds(year, month);
-      // delete+insert por mes (el endpoint no da id de recibo → reemplazo limpio)
-      const { error: delErr } = await supabaseServer
-        .from("switch_recibos")
-        .delete()
-        .eq("empresa_key", empresaKey)
-        .gte("fecha", inicio)
-        .lt("fecha", finExcl);
-      if (delErr) throw new Error(`delete switch_recibos: ${delErr.message}`);
-      if (rows.length > 0) {
-        const { error: insErr } = await supabaseServer.from("switch_recibos").insert(rows);
+
+      // Reemplazo del mes calculado, no a ciegas: se escriben solo las
+      // diferencias contra lo guardado. El conjunto final es idéntico al del
+      // DELETE+INSERT completo (demostración en recibos-diff.ts).
+      const guardadas = await leerMesGuardado(empresaKey, inicio, finExcl);
+      const { insertar, borrarIds, sinCambio } = diffRecibos(guardadas, rows);
+
+      // Las BAJAS primero (recibos que Switch anuló/borró y modificaciones), en
+      // lotes: la lista de uuids viaja en el query string.
+      for (let i = 0; i < borrarIds.length; i += LOTE_BORRADO) {
+        const lote = borrarIds.slice(i, i + LOTE_BORRADO);
+        const { error: delErr } = await supabaseServer.from("switch_recibos").delete().in("id", lote);
+        if (delErr) throw new Error(`delete switch_recibos: ${delErr.message}`);
+      }
+      if (insertar.length > 0) {
+        const { error: insErr } = await supabaseServer.from("switch_recibos").insert(insertar);
         if (insErr) throw new Error(`insert switch_recibos: ${insErr.message}`);
       }
+
       totalRecibos += rows.length;
+      totalInsertadas += insertar.length;
+      totalBorradas += borrarIds.length;
+      totalSinCambio += sinCambio;
     }
+    // records_inserted del log sigue siendo el TAMAÑO DE LA VENTANA, no lo
+    // escrito: es lo que muestran /api/sync-status y el panel "Actualizar
+    // ahora" ("N recibos sincronizados"). Cambiarlo por las filas escritas
+    // haría parecer que el sync dejó de traer datos.
     await finishLog(logId, "success", totalRecibos);
-    return { empresaKey, ok: true, meses: meses.length, recibos: totalRecibos };
+    return {
+      empresaKey,
+      ok: true,
+      meses: meses.length,
+      recibos: totalRecibos,
+      insertadas: totalInsertadas,
+      borradas: totalBorradas,
+      sinCambio: totalSinCambio,
+    };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await finishLog(logId, "error", 0, msg);
