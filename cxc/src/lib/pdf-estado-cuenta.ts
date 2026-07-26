@@ -12,9 +12,13 @@ function money(n: number): string {
   return n < 0 ? `-$${abs}` : `$${abs}`;
 }
 
+/** Fecha de hoy en el formato de la casa ("5 abr 2026"), el mismo que usa la
+ *  columna Fecha de la tabla — antes el encabezado y el pie iban en 26/07/2026 y
+ *  la tabla en "10 ene 2026", dos formatos en el MISMO documento del cliente. */
 function hoy(): string {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  const d = new Date(); // fecha LOCAL, no UTC (si no, de madrugada adelanta un día)
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return fmtDate(iso);
 }
 
 function addHeader(doc: jsPDF, nombre: string, codigo: string, empresaNombre: string | null): number {
@@ -82,6 +86,27 @@ function addFooter(doc: jsPDF): void {
   }
 }
 
+/** Alto (mm) reservado abajo para el pie ("Generado … · Confidencial" + N/N). */
+const FOOTER_RESERVA_MM = 16;
+
+/**
+ * Alto de la barra "TOTAL ADEUDADO". Si no cabe entera por encima del pie, el
+ * total se pasa a una página nueva. Sin este guard la barra se dibujaba pegada
+ * al borde inferior TAPANDO el pie (a partir de ~29 documentos por empresa) en
+ * el PDF que se le adjunta al cliente.
+ */
+const TOTAL_BAR_H = 9;
+
+/** Y de arranque de la barra del total, saltando de página si no cabe. */
+export function yParaTotal(doc: jsPDF, y: number): number {
+  const h = doc.internal.pageSize.getHeight();
+  if (y + TOTAL_BAR_H > h - FOOTER_RESERVA_MM) {
+    doc.addPage();
+    return 20;
+  }
+  return y;
+}
+
 export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc: jsPDF; filename: string } {
   const doc = new jsPDF({ unit: "mm", format: "letter" });
   const w = doc.internal.pageSize.getWidth();
@@ -94,6 +119,12 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
   for (const emp of data.empresas) {
     // Encabezado de empresa (solo si hay más de una)
     if (multi) {
+      // Mismo guard que el total: un encabezado de empresa pegado al borde
+      // quedaba encima del pie y su tabla arrancaba en la página siguiente.
+      if (y + 12 > doc.internal.pageSize.getHeight() - FOOTER_RESERVA_MM) {
+        doc.addPage();
+        y = 20;
+      }
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(17, 24, 39);
@@ -135,8 +166,9 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
   }
 
   // Total general (barra oscura estilo de la casa)
+  y = yParaTotal(doc, y);
   doc.setFillColor(17, 24, 39);
-  doc.rect(19, y, w - 38, 9, "F");
+  doc.rect(19, y, w - 38, TOTAL_BAR_H, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(255, 255, 255);

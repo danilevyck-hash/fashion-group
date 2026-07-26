@@ -45,6 +45,11 @@ export const CATALOG_PDF_IMG_PX = 480;
 interface BrandTheme {
   primary: [number, number, number];
   accent: [number, number, number];
+  /** Rojo del badge OFERTA y del precio rebajado. Cada marca usa el SUYO: el
+   *  catálogo de Tommy salía con el rojo Reebok (#E4002B) en las ofertas.
+   *  Joybees se queda en rojo a propósito — su acento es amarillo y "OFERTA" en
+   *  blanco sobre amarillo no se lee. */
+  saleColor: [number, number, number];
   cellBg: [number, number, number];
   bandFill: [number, number, number];
   bandText: [number, number, number];
@@ -66,6 +71,7 @@ const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
   reebok: {
     primary: NAVY,
     accent: RED,
+    saleColor: RED,
     cellBg: [245, 240, 232],
     bandFill: NAVY,
     bandText: WHITE,
@@ -79,6 +85,7 @@ const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
   joybees: {
     primary: JB_DARK,
     accent: JB_YELLOW,
+    saleColor: RED,
     cellBg: [255, 250, 224],
     bandFill: JB_YELLOW,
     bandText: JB_DARK,
@@ -93,6 +100,7 @@ const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
   tommy: {
     primary: TH_NAVY,
     accent: TH_RED,
+    saleColor: TH_RED,
     cellBg: [246, 247, 249],
     bandFill: TH_NAVY,
     bandText: WHITE,
@@ -220,7 +228,7 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
           try { doc.addImage(cached.data, "JPEG", dx, dy, dw, dh); } catch { /* */ }
         }
         if (p.badge === "oferta") {
-          doc.setFillColor(...RED);
+          doc.setFillColor(...theme.saleColor);
           doc.roundedRect(x + 2, y + 2, 14, 4.5, 1, 1, "F");
           doc.setFontSize(6);
           doc.setTextColor(...WHITE);
@@ -251,7 +259,7 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
         ty += 5.5;
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...(p.badge === "oferta" ? RED : theme.primary));
+        doc.setTextColor(...(p.badge === "oferta" ? theme.saleColor : theme.primary));
         doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 1, ty);
       }
       y += CH + RGAP;
