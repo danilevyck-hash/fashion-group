@@ -112,6 +112,11 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
       agrupacionPorModelo: false,
       inventarioPorTalla: false,
       categoryChips: true,
+      // Únicos flags que hoy solo tiene Tommy (25-jul-2026): el chip
+      // "2 bultos o más" y el select de rango de precio por pieza.
+      // Contrato de paridad inversa en catalogo-filtros-tommy.test.ts.
+      filtroBultos: true,
+      filtroPrecio: true,
       roleClienteGuard: false,
       navInicioRequiereRol: false,
     });

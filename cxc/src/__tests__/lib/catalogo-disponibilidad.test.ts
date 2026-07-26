@@ -80,8 +80,11 @@ describe("publicCatalog.cols — las 3 marcas traen disponibilidad", () => {
 describe("el flujo público decide con disponibilidad, no con existencia", () => {
   it("las 3 ramas del catálogo público pasan por la regla única", () => {
     expect(PUBLICO).toContain('from "@/lib/catalogos/disponible"');
-    // Una llamada por rama: Joybees (agrupada), Reebok (inventory), Tommy (plana).
-    expect(PUBLICO.split("disponibleVendible(").length - 1).toBe(3);
+    // Una llamada por rama: Joybees (agrupada), Reebok (inventory), Tommy
+    // (plana) + la 4ª del filtro "2 bultos o más" (25-jul-2026), que también
+    // mide contra disponibilidad y no contra existencia.
+    expect(PUBLICO.split("disponibleVendible(").length - 1).toBe(4);
+    expect(PUBLICO).toContain("cumpleBultosMinimos(disponibleVendible(p)");
     // Nada de leer el espejo de existencia a mano.
     expect(PUBLICO).not.toContain("p.stock > 0");
     expect(PUBLICO).not.toContain("_stock: p.stock");
