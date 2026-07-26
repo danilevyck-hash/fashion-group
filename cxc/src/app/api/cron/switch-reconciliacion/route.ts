@@ -80,13 +80,19 @@ import {
   cronIsStale,
   staleEsPendingRecovery,
   slotCubiertoPorRecuperacion,
+  slotNuncaSembradoVencido,
   reconciliarSlotsSwitchSync,
+  esMarcaDeSlot,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
   SWITCH_SYNC_SLOT_PREFIX,
-  SLOT_RECUPERADO_SUFFIX,
+  SWITCH_SYNC_SLOTS,
+  slotHeartbeatName,
   slotRecuperadoName,
+  slotVistoName,
   catalogoCicloSinceIso,
+  type SlotDesatendido,
 } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -620,13 +626,13 @@ async function checkStaleCrons(): Promise<string[]> {
   const beats = new Map<string, string | null>(
     (data || []).map((h) => [h.cron_name as string, h.last_success_at as string | null]),
   );
-  const esSlot = (n: string) =>
-    n.startsWith(SWITCH_SYNC_SLOT_PREFIX) && !n.endsWith(SLOT_RECUPERADO_SUFFIX);
+  const esSlot = (n: string) => n.startsWith(SWITCH_SYNC_SLOT_PREFIX) && !esMarcaDeSlot(n);
   const stale = (data || [])
-    // Las marcas "#recuperado" NO son crons: las escribe esta misma
-    // reconciliación para certificar que cubrió un slot huérfano. Vigilarlas
-    // como si fueran un cron generaría una alerta eterna por su propia marca.
-    .filter((h) => !String(h.cron_name).endsWith(SLOT_RECUPERADO_SUFFIX))
+    // Las marcas "#recuperado" / "#visto" NO son crons: las escribe esta misma
+    // reconciliación para certificar que cubrió un slot huérfano o para fechar
+    // cuándo lo vio por primera vez. Vigilarlas como si fueran un cron generaría
+    // una alerta eterna por su propia marca.
+    .filter((h) => !esMarcaDeSlot(String(h.cron_name)))
     // Umbral por-cron compartido (cronIsStale): un cron mensual como
     // grupo-resumen-mensual usa 33 días, no las 26h del default.
     .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
@@ -654,6 +660,22 @@ async function checkStaleCrons(): Promise<string[]> {
         ),
     )
     .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
+
+  // Slots que NUNCA registraron un heartbeat propio. Sin esto quedaban
+  // invisibles PARA SIEMPRE en los dos vigías: health-crons los trata como "aún
+  // no sembrados" (regla seed-tolerante, sin vencimiento) y este watchdog solo
+  // recorre las filas que EXISTEN. Caso medido: switch-sync:all-0540 sin fila
+  // propia desde que se introdujeron los slots (#239). La marca #visto fecha
+  // cuándo la reconciliación lo vio por primera vez; pasada la gracia, se
+  // reporta como caído.
+  for (const s of SWITCH_SYNC_SLOTS) {
+    if (beats.get(slotHeartbeatName(s.slot))) continue;
+    if (!slotNuncaSembradoVencido(beats.get(slotVistoName(s.slot)), now)) continue;
+    stale.push(
+      `${slotHeartbeatName(s.slot)} (nunca registró un success propio; visto desde ${beats.get(slotVistoName(s.slot))})`,
+    );
+  }
+
   if (stale.length > 0) {
     await sendTelegramAlert(
       `⏰ Watchdog crons — ${stale.length} sin success reciente:\n` +
@@ -661,6 +683,81 @@ async function checkStaleCrons(): Promise<string[]> {
     );
   }
   return stale;
+}
+
+/** Nombre del cron que alerta switch-sync (dedup contra cron_email_errors). */
+const SWITCH_SYNC_CRON_NAME = "switch-sync";
+
+/**
+ * ¿Esta ocurrencia de slot YA quedó reportada en cron_email_errors? Dedup del
+ * reporte de slots fallados, mirando DOS tipos desde la ocurrencia:
+ *   - "switch-sync"        → el route alcanzó a alertar él mismo (caso normal:
+ *     el 24-jul-2026 dejó su fila a las 06:06 por el fallo de joystep). Solo hay
+ *     que cubrir el caso en que la invocación MUERE sin poder reportar.
+ *   - "switch-sync:<slot>" → lo reportó una pasada ANTERIOR de esta misma
+ *     reconciliación; no repetir en cada pasada mientras el fallo persista.
+ * El filtro es POR SLOT a propósito: con un filtro genérico, el reporte del
+ * slot 1605 taparía al del 1610 dentro de la misma pasada.
+ *
+ * Fail-CERRADO a "no reportado" (=> reportamos) si la consulta falla: mejor un
+ * aviso de más que un fallo intradía en silencio.
+ */
+async function slotFalladoYaReportado(slot: string, desdeIso: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseServer
+      .from("cron_email_errors")
+      .select("id")
+      .in("tipo", [SWITCH_SYNC_CRON_NAME, `${SWITCH_SYNC_CRON_NAME}:${slot}`])
+      .gte("created_at", desdeIso)
+      .limit(1);
+    if (error) return false;
+    return (data ?? []).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reporta las ocurrencias de slot que CORRIERON Y FALLARON (defecto 2). Las que
+ * ni se invocaron NO se reportan aquí: no hay error que clasificar y la
+ * recuperación de esta misma pasada las cubre; si tras recuperar siguen mal,
+ * entran en la alerta 🚨 final como `slotsSinAtender`.
+ *
+ * Delega en alertSwitchCronErrors para heredar la política anti-ruido 401: los
+ * transitorios (401 / red / 5xx) no alertan a la primera y escalan a las 2
+ * corridas consecutivas; los demás —un `statement timeout` de la DB, un run
+ * colgado en 'running'— alertan de inmediato y quedan en cron_email_errors.
+ * Best-effort: no lanza.
+ */
+async function reportarSlotsFallados(desatendidos: SlotDesatendido[]): Promise<void> {
+  const fallados = desatendidos.filter((d) => d.motivo === "corrio-y-fallo");
+  if (fallados.length === 0) return;
+  try {
+    for (const d of fallados) {
+      if (await slotFalladoYaReportado(d.slot, d.ocurrencia)) continue;
+      await alertSwitchCronErrors(
+        `${SWITCH_SYNC_CRON_NAME}:${d.slot}`,
+        d.paresPendientes.map((p) => ({
+          empresaKey: p.empresa,
+          syncType: p.syncType,
+          error:
+            p.ultimoIntento?.error_message ??
+            (p.ultimoIntento
+              ? `la corrida quedó en '${p.ultimoIntento.status}' (invocación muerta a media corrida)`
+              : "la entrada se invocó pero este par no dejó corrida"),
+        })),
+        {
+          nota:
+            `Ocurrencia ${d.ocurrencia} sin refrescar. El par puede tener un success ` +
+            `ANTERIOR del mismo día: eso NO cubre esta corrida intradía.`,
+        },
+      );
+    }
+  } catch (err) {
+    console.error(
+      `[reconciliacion] reportarSlotsFallados threw: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 async function handleCron(req: NextRequest): Promise<NextResponse> {
@@ -680,14 +777,34 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const sinceIso = panamaDayStartIso();
   const expected = expectedPairs();
 
-  // 0. Slots huérfanos de switch-sync: certificar (marca "#recuperado") los que
-  //    perdieron su invocación pero cuyos pares SÍ quedaron al día. Va ANTES del
-  //    watchdog para que este ya no los reporte en esta misma pasada.
-  const slotsCubiertos = await reconciliarSlotsSwitchSync();
+  // 0. Barrido de SLOTS de switch-sync, anclado en la OCURRENCIA de cada slot
+  //    (no en el día). Devuelve:
+  //      - cubiertos:    ocurrencia perdida pero trabajo al día → marca
+  //                      "#recuperado" (ya escrita) para que el watchdog calle.
+  //      - desatendidos: ocurrencia cuyo trabajo NO está hecho → hay que
+  //                      re-ejecutar sus pares AUNQUE tengan un success previo
+  //                      del día (defectos 1 y 2, ver clasificarSlots).
+  //    Va ANTES del watchdog para que este ya no reporte los cubiertos.
+  const slots0 = await reconciliarSlotsSwitchSync();
+  const slotsCubiertos = slots0.cubiertos;
+  const slotsDesatendidos = slots0.desatendidos;
 
   // 0b. Watchdog de heartbeats + registrar el propio.
   const staleCrons = await checkStaleCrons();
   await recordCronHeartbeat(CRON_NAME);
+
+  // 0c. Reporte de las ocurrencias que CORRIERON Y FALLARON (defecto 2). El
+  //     route de switch-sync ya alerta cuando puede, pero si la invocación MUERE
+  //     a media corrida (25-jul-2026: fashion_shoes/estadocuenta con "statement
+  //     timeout" y fashion_wear/active_wear colgados en 'running') nunca llega a
+  //     hacerlo: no queda ni fila en cron_email_errors ni Telegram. Aquí se
+  //     cierra ese hueco, con dos guardas anti-ruido:
+  //       - dedup: si YA hay un registro de switch-sync en cron_email_errors
+  //         posterior a la ocurrencia, el route sí alertó → no duplicar.
+  //       - política 401: se delega en alertSwitchCronErrors, que silencia el
+  //         1er fallo transitorio (401/red/5xx) y escala a las 2 corridas
+  //         consecutivas. Un statement timeout NO es silenciable → alerta ya.
+  await reportarSlotsFallados(slotsDesatendidos);
 
   // 1. Detección inicial (switch-sync por par + colaterales por heartbeat).
   const logBefore = await fetchTodayLog(sinceIso);
@@ -698,7 +815,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // resumen post-recuperación de una caída de Switch que ya sanó SIN esta
   // pasada (ej. el propio slot siguiente del cron recuperó el par) y aún no se
   // reportó (dedup por watermark en cron_email_errors). Best-effort, no lanza.
-  if (missingPairs.length === 0 && missingColaterales.length === 0) {
+  if (missingPairs.length === 0 && missingColaterales.length === 0 && slotsDesatendidos.length === 0) {
     const outage = await enviarResumenCaidaSiAplica();
     return NextResponse.json({
       ok: true,
@@ -710,6 +827,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       outageResumen: outage.resumen,
       staleCrons,
       slotsCubiertos,
+      slotsDesatendidos,
     });
   }
 
@@ -723,9 +841,17 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   //     estadocuenta → costo). Las funciones escriben switch_sync_log (fuente de
   //     verdad del re-chequeo); si lanzan, lo capturamos y seguimos.
   const empresasConPares = new Map<EmpresaKey, Set<DailySyncType>>();
-  for (const p of missingPairs) {
-    if (!empresasConPares.has(p.empresa)) empresasConPares.set(p.empresa, new Set());
-    empresasConPares.get(p.empresa)!.add(p.syncType);
+  const addPar = (empresa: EmpresaKey, syncType: DailySyncType) => {
+    if (!empresasConPares.has(empresa)) empresasConPares.set(empresa, new Set());
+    empresasConPares.get(empresa)!.add(syncType);
+  };
+  for (const p of missingPairs) addPar(p.empresa, p.syncType);
+  // Pares de las ocurrencias de slot desatendidas (defectos 1 y 2). Se suman al
+  // MISMO mapa por empresa: la recuperación sigue siendo serial y reusa un solo
+  // token de Switch por empresa (sesión única). Un par que ya venía de
+  // missingPairs no se duplica — el Set lo absorbe.
+  for (const d of slotsDesatendidos) {
+    for (const par of d.paresPendientes) addPar(par.empresa as EmpresaKey, par.syncType);
   }
   let switchSyncRecoveryRan = false;
   for (const [empresaKey, tipos] of empresasConPares) {
@@ -771,7 +897,14 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // success en switch_sync_log → los slots que perdieron su invocación y esta
   // recuperación compensó quedan certificados YA, sin esperar a la pasada
   // siguiente (la de las 18:00 no tendría otra hasta las 10:00 del día próximo).
-  if (switchSyncRecoveryRan) slotsCubiertos.push(...(await reconciliarSlotsSwitchSync()));
+  // Además re-clasifica los desatendidos: los que la recuperación arregló
+  // desaparecen; los que quedan son fallo real y entran en `hayProblemas`.
+  let slotsSinAtender: SlotDesatendido[] = slotsDesatendidos;
+  if (switchSyncRecoveryRan) {
+    const slots1 = await reconciliarSlotsSwitchSync();
+    slotsCubiertos.push(...slots1.cubiertos);
+    slotsSinAtender = slots1.desatendidos;
+  }
 
   // 3. Re-consultar: fuente de verdad del estado final.
   const logAfter = await fetchTodayLog(sinceIso);
@@ -789,7 +922,11 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   //    success, o trabajo que no entró por tiempo (skipped). Las recuperaciones
   //    se siguen reportando como CONTEXTO dentro de esa alerta de fallo, y en el
   //    JSON de respuesta (reconciled[]) para auditoría.
-  const hayProblemas = stillMissingPairs.length > 0 || failedColaterales.length > 0 || skipped.length > 0;
+  const hayProblemas =
+    stillMissingPairs.length > 0 ||
+    failedColaterales.length > 0 ||
+    skipped.length > 0 ||
+    slotsSinAtender.length > 0;
   let telegram: "alert" | "none" = "none";
 
   // Pasada 100% verde tras recuperar → si lo recuperado fue una CAÍDA de
@@ -807,6 +944,15 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       (p) => `• ${p.empresa}/${p.syncType}: ${shortError(lastErrorFor(p, logAfter))}`,
     );
     const lineasCol = failedColaterales.map((c) => `• ${c.label}: ${shortError(c.detail)}`);
+    // Ocurrencias de slot que siguen sin su trabajo hecho tras recuperar. Se
+    // nombra el slot (no solo el par) para que se vea QUÉ corrida se perdió:
+    // el par puede tener un success previo del día y aun así estar atrasado.
+    const lineasSlots = slotsSinAtender.map(
+      (d) =>
+        `• slot ${d.slot} (${d.ocurrencia.slice(11, 16)} UTC, ${
+          d.motivo === "sin-invocacion" ? "no se invocó" : "corrió y falló"
+        }): ${d.paresPendientes.map((p) => `${p.empresa}/${p.syncType}`).join(", ")}`,
+    );
     const lineasSkip = skipped.length ? [`• sin tiempo (próxima pasada): ${skipped.join(", ")}`] : [];
     const recuperadas =
       recoveredPairs.length || recoveredColaterales.length
@@ -817,7 +963,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
         : "";
     await sendTelegramAlert(
       `🚨 ALERTA sync Switch (${fecha})\n` +
-        `Sin success tras reconciliación:\n${[...lineasPares, ...lineasCol, ...lineasSkip].join("\n")}${recuperadas}`,
+        `Sin success tras reconciliación:\n${[...lineasPares, ...lineasCol, ...lineasSlots, ...lineasSkip].join("\n")}${recuperadas}`,
     );
   }
 
@@ -838,12 +984,20 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
           lastError: lastErrorFor(p, logAfter),
         })),
         ...failedColaterales.map((c) => ({ cron: c.cronName, detail: c.detail })),
+        ...slotsSinAtender.map((d) => ({
+          slot: d.slot,
+          ocurrencia: d.ocurrencia,
+          motivo: d.motivo,
+          pares: d.paresPendientes.map((p) => `${p.empresa}/${p.syncType}`),
+        })),
       ],
       skipped,
       telegram,
       outageResumen,
       staleCrons,
       slotsCubiertos,
+      slotsDesatendidos,
+      slotsSinAtender,
     },
     { status: hayProblemas ? 207 : 200 },
   );
