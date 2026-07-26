@@ -15,7 +15,7 @@
 // verdad que se desincroniza sola.
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import path from "path";
 import fixture from "../fixtures/proyeccion-backtest.json";
 
@@ -25,10 +25,6 @@ const sql = readFileSync(
   "utf8",
 );
 const queries = readFileSync(path.join(RAIZ, "src/lib/ventas/queries.ts"), "utf8");
-const rutaWrapper = readFileSync(
-  path.join(RAIZ, "src/app/api/ventas/proyeccion-cierre/route.ts"),
-  "utf8",
-);
 
 /** Lee `nombre CONSTANT <tipo> := <valor>;` del DECLARE de la función. */
 function constanteSql(nombre: string): number {
@@ -227,20 +223,44 @@ describe("el cierre del año pasado sigue siendo un hecho, no una estimación", 
 });
 
 describe("una sola versión de la proyección para todo el sistema", () => {
-  it("el dashboard y el endpoint suelto llaman a la MISMA función", () => {
-    for (const [nombre, src] of [
-      ["queries.ts", queries],
-      ["route.ts", rutaWrapper],
-    ] as const) {
-      expect(src, nombre).toContain("ventas_proyeccion_cierre_v7");
-      expect(src, nombre).toContain("rpcConFallbackDeVersion");
-      // v5 era la que hacía que el endpoint contestara distinto que el dashboard.
-      expect(src, nombre).not.toContain("ventas_proyeccion_cierre_v5");
-    }
+  it("el dashboard llama a v7 y no quedó rastro de v5", () => {
+    expect(queries).toContain("ventas_proyeccion_cierre_v7");
+    expect(queries).toContain("rpcConFallbackDeVersion");
+    // v5 era la que hacía que el endpoint suelto contestara distinto que el
+    // dashboard. Ese endpoint (/api/ventas/proyeccion-cierre) ya no existe.
+    expect(queries).not.toContain("ventas_proyeccion_cierre_v5");
   });
 
-  it("ambos caen a v6 mientras la migración no haya corrido", () => {
+  it("cae a v6 mientras la migración no haya corrido", () => {
     expect(queries).toContain("ventas_proyeccion_cierre_v6");
-    expect(rutaWrapper).toContain("ventas_proyeccion_cierre_v6");
+  });
+
+  it("queries.ts es el ÚNICO lugar del código que invoca la proyección", () => {
+    // El candado real: dos llamadores = dos números para la misma pregunta.
+    expect(archivosQueInvocanLaProyeccion()).toEqual(["src/lib/ventas/queries.ts"]);
   });
 });
+
+/**
+ * Archivos de src/ (sin tests) que INVOCAN alguna ventas_proyeccion_cierre_vN.
+ * Busca la llamada real `.rpc("…")`, no la mención: fetch-retry.ts y
+ * supabase-retry.ts nombran la RPC en un comentario de ejemplo y no la llaman.
+ */
+function archivosQueInvocanLaProyeccion(): string[] {
+  const encontrados: string[] = [];
+  const recorrer = (dir: string) => {
+    for (const entrada of readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entrada.name);
+      if (entrada.isDirectory()) {
+        if (entrada.name !== "__tests__" && entrada.name !== "node_modules") recorrer(abs);
+        continue;
+      }
+      if (!/\.(ts|tsx)$/.test(entrada.name)) continue;
+      const cuerpo = readFileSync(abs, "utf8");
+      if (!/\.rpc\(\s*["'`]ventas_proyeccion_cierre_v\d/.test(cuerpo)) continue;
+      encontrados.push(path.relative(RAIZ, abs));
+    }
+  };
+  recorrer(path.join(RAIZ, "src"));
+  return encontrados.sort();
+}
