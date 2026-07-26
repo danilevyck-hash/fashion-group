@@ -195,7 +195,20 @@ export function catalogoCicloSinceIso(cronName: string, now: Date = new Date()):
  */
 export const EXTRA_ENTRY_HOURS_UTC: Record<string, number[]> = {
   backup: [10.5, 18.5],
-  "backup-switch": [11.25, 19.25],
+  // backup-switch: 06:45 / 11:15 / 23:30. La 3ª estaba a las 19:15 UTC = 14:15
+  // Panamá, en plena tarde de oficina, y es el ÚNICO grupo de backup que barre
+  // las tablas grandes (SWITCH_DATASETS: switch_articulo_diario 197k filas +
+  // switch_facturas 52k; el grupo core no las incluye). Se movió (26-jul-2026) a
+  // 23:30 UTC (18:30 Panamá): después del cierre, dentro del MISMO día UTC (el
+  // guard no-op de la 2ª oportunidad compara contra el día UTC, así que mover la
+  // entrada al otro lado de la medianoche la convertiría en la corrida primaria
+  // del día siguiente) y con margen antes de la ventana de deploy 23:50-00:20.
+  //
+  // Es HIGIENE, no el arreglo de los picos de /ventas: se probó que este scan
+  // los disparara y 3 ensayos controlados NO lo reprodujeron (una observación
+  // suelta lo había sugerido). Los picos eran el seq scan de las RPC no
+  // sargables — arreglado en 20260726190000.
+  "backup-switch": [11.25, 23.5],
   "backup-storage": [15.5],
   "acs-fidelizacion": [16.5],
 };

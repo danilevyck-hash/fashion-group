@@ -29,6 +29,7 @@ vi.mock("@/lib/telegram", () => ({
 import {
   SWITCH_CRON_ENTRADAS,
   SWITCH_SYNC_SLOTS,
+  EXTRA_ENTRY_HOURS_UTC,
   SEPARACION_MINIMA_MIN,
   RECONCILIACION_PASS_HOURS,
   distanciaCircularMin,
@@ -337,5 +338,57 @@ describe("helpers de horario", () => {
     expect(distanciaCircularMin("2315", "0015")).toBe(60);
     expect(distanciaCircularMin("1500", "1515")).toBe(15);
     expect(distanciaCircularMin("1700", "1700")).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXTRA_ENTRY_HOURS_UTC vive DUPLICADO respecto de vercel.json: son las horas de
+// las entradas "segunda oportunidad" (las que responden no-op si una anterior ya
+// registró success hoy). Hasta el 26-jul-2026 el único candado era una lista
+// escrita a mano en cron-recovery.test.ts, así que mover una entrada en
+// vercel.json y olvidarse de la constante dejaba a los dos watchdogs creyendo
+// que una recuperación viene a una hora que ya no existe —y silenciando un cron
+// realmente caído hasta PENDING_RECOVERY_MAX_HOURS—. Este bloque lo deriva de
+// vercel.json y falla solo.
+describe("EXTRA_ENTRY_HOURS_UTC — espejo derivado de vercel.json", () => {
+  /** Path exacto en vercel.json de cada cron con entradas extra. */
+  const PATH_DE: Record<string, string> = {
+    backup: "/api/cron/backup",
+    "backup-switch": "/api/cron/backup?grupo=switch",
+    "backup-storage": "/api/cron/backup?grupo=storage",
+    "acs-fidelizacion": "/api/cron/acs-fidelizacion",
+  };
+
+  /** Horas UTC fraccionales de un path, ordenadas (06:45 → 6.75). */
+  const horasDe = (p: string) =>
+    VERCEL.crons
+      .filter((c) => c.path === p)
+      .map((c) => {
+        const [min, hora] = c.schedule.split(" ");
+        return Number(hora) + Number(min) / 60;
+      })
+      .sort((a, b) => a - b);
+
+  it("cubre exactamente los crons con entradas extra declarados en la constante", () => {
+    expect(Object.keys(PATH_DE).sort()).toEqual(Object.keys(EXTRA_ENTRY_HOURS_UTC).sort());
+  });
+
+  for (const [cron, p] of Object.entries(PATH_DE)) {
+    it(`${cron}: las extras son las entradas de vercel.json MENOS la primera del día`, () => {
+      const horas = horasDe(p);
+      expect(horas.length, `${p} no está en vercel.json`).toBeGreaterThan(1);
+      // La 1ª entrada del día es la corrida normal; el resto son las que la
+      // constante declara como "recuperación que aún viene hoy".
+      expect(EXTRA_ENTRY_HOURS_UTC[cron]).toEqual(horas.slice(1));
+    });
+  }
+
+  it("backup-switch quedó fuera del horario de oficina de Panamá (13:00-23:00 UTC)", () => {
+    // Es el único grupo de backup que barre switch_articulo_diario (197k filas)
+    // y switch_facturas (52k). Ninguna de sus 3 entradas debe caer en la jornada:
+    // no hay motivo para mover ese volumen mientras la gente trabaja.
+    for (const h of horasDe(PATH_DE["backup-switch"])) {
+      expect(h >= 13 && h < 23, `backup?grupo=switch a las ${h} UTC cae en horario de oficina`).toBe(false);
+    }
   });
 });

@@ -58,11 +58,25 @@ describe("recoveryStillComingToday", () => {
   });
 
   it("los 3 grupos de backup tienen sus propias entradas extra (espejo de vercel.json)", () => {
-    expect(EXTRA_ENTRY_HOURS_UTC["backup-switch"]).toEqual([11.25, 19.25]);
+    // backup-switch: 06:45 / 11:15 / 23:30. La 3ª se movió de 19:15 (14:15
+    // Panamá, plena tarde) a 23:30 el 26-jul-2026: es el único grupo que barre
+    // switch_articulo_diario + switch_facturas y no hay razón para hacerlo en
+    // horario de oficina. Sigue dentro del MISMO día UTC, que es lo que mira el
+    // guard no-op de la 2ª oportunidad.
+    expect(EXTRA_ENTRY_HOURS_UTC["backup-switch"]).toEqual([11.25, 23.5]);
     expect(EXTRA_ENTRY_HOURS_UTC["backup-storage"]).toEqual([15.5]);
     // backup-storage corre 04:00 y 15:30 → a las 05:00 su 2ª entrada aún viene.
     expect(recoveryStillComingToday("backup-storage", 5)).toBe(true);
     expect(recoveryStillComingToday("backup-storage", 16)).toBe(false);
+  });
+
+  it("backup-switch: la 2ª oportunidad de las 23:30 sigue 'por venir' toda la tarde", () => {
+    // Lo que protege el movimiento: entre las 11:15 y las 23:30 el watchdog no
+    // debe declarar caído al backup de switch, porque su recuperación viene.
+    expect(recoveryStillComingToday("backup-switch", 12)).toBe(true);
+    expect(recoveryStillComingToday("backup-switch", 19.25)).toBe(true); // donde estaba antes
+    expect(recoveryStillComingToday("backup-switch", 23.25)).toBe(true); // 23:15 < 23:30
+    expect(recoveryStillComingToday("backup-switch", 23.75)).toBe(false); // 23:45 ya pasó
   });
 
   it("switch-reconciliacion y grupo-resumen-mensual JAMÁS se silencian", () => {
