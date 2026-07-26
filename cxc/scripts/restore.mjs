@@ -15,9 +15,19 @@
 // El destino de la escritura es SIEMPRE Supabase (PostgREST / Storage): la
 // fuente solo cambia de dónde salen los bytes.
 //
+// COMPLETITUD (jul-2026): un backup de un día lo escriben DOS invocaciones del
+// cron sobre la MISMA carpeta `<fecha>/` — core (meta.json, 57 datasets) y
+// ?grupo=switch (meta-switch.json, 8). `--list` VALIDA que estén los dos metas
+// y que cada dataset del meta tenga su .ndjson.gz, y marca OK / INCOMPLETO /
+// INSERVIBLE. Antes listaba las carpetas de fecha a secas: el 25-jul-2026
+// respondía "2026-07-25" (se ve sano) y el restore moría con 404 en meta.json
+// porque ese día solo había corrido el grupo switch. Sin --date se elige la
+// fecha más nueva COMPLETA, no la más nueva a secas; y un día a medias se
+// restaura igual con lo que SÍ tiene, avisando qué falta.
+//
 // USO:
 //   node scripts/restore.mjs --list [--source r2]
-//       Lista los backups disponibles (carpetas de fecha).
+//       Lista los backups disponibles con su estado de completitud.
 //   node scripts/restore.mjs [--source r2] [--date YYYY-MM-DD] [--tables t1,t2]
 //       Sin --yes corre en modo plan: descarga, valida y muestra qué haría.
 //   node scripts/restore.mjs --date 2026-07-04 --tables transportistas --yes
@@ -52,6 +62,14 @@
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { AwsClient } from 'aws4fetch';
+import {
+  GRUPOS_META,
+  agruparKeysPorFecha,
+  diagnosticarFecha,
+  formatearFecha,
+  problemasDe,
+  elegirFechaPorDefecto,
+} from './lib/backup-inventario.mjs';
 
 const env = readFileSync(new URL('../.env.local', import.meta.url), 'utf-8');
 const vars = Object.fromEntries(
@@ -181,17 +199,50 @@ async function backupDownload(relPath) {
   return desdeR2 ? r2Download(`data/${relPath}`) : storageDownload(relPath);
 }
 
-/** Fechas de backup disponibles, ordenadas ascendente. */
-async function listarFechas() {
+/** Inventario de las carpetas de fecha: Map<fecha, Set<nombre de archivo>>.
+ *  Es la base del diagnóstico de completitud — ver scripts/lib/backup-inventario.mjs. */
+async function inventarioFechas() {
   if (desdeR2) {
-    const { prefixes } = await r2List('data/', '/');
-    return prefixes
-      .map((p) => (p.match(/^data\/(\d{4}-\d{2}-\d{2})\/$/) || [])[1])
-      .filter(Boolean)
-      .sort();
+    const { keys } = await r2List('data/');
+    return agruparKeysPorFecha(keys.map((k) => k.key));
   }
   const entries = await storageList('');
-  return entries.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map((e) => e.name).sort();
+  const fechas = entries.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.name)).map((e) => e.name).sort();
+  const out = new Map();
+  for (const f of fechas) {
+    out.set(f, new Set((await storageList(f)).map((e) => e.name)));
+  }
+  return out;
+}
+
+/** Baja y parsea los metas de grupo presentes en una fecha. Un meta que existe
+ *  pero no se puede leer queda en null → el diagnóstico lo cuenta como grupo
+ *  ausente (que es lo que es a efectos de restaurar). */
+async function cargarMetas(fecha, archivos) {
+  const metas = {};
+  for (const [grupo, metaFile] of Object.entries(GRUPOS_META)) {
+    if (!archivos.has(metaFile)) continue;
+    try {
+      metas[grupo] = JSON.parse((await backupDownload(`${fecha}/${metaFile}`)).toString('utf-8'));
+    } catch {
+      metas[grupo] = null;
+    }
+  }
+  return metas;
+}
+
+/** Diagnóstico completo de una fecha (lista + baja sus metas). */
+async function diagnosticar(fecha, archivos) {
+  return diagnosticarFecha(fecha, archivos, await cargarMetas(fecha, archivos));
+}
+
+/** Diagnóstico de TODAS las fechas, de la más nueva a la más vieja. */
+async function diagnosticarTodas() {
+  const inv = await inventarioFechas();
+  const fechas = [...inv.keys()].sort().reverse();
+  const out = [];
+  for (const f of fechas) out.push(await diagnosticar(f, inv.get(f)));
+  return out;
 }
 
 /** Archivos replicados de un bucket de Storage: `dest` es la ruta DENTRO del
@@ -307,42 +358,72 @@ async function restoreStorage() {
   if (storageBucket) return restoreStorage();
 
   if (doList) {
-    const fechas = await listarFechas();
+    // --list NO puede mentir: una carpeta de fecha se lista como disponible
+    // solo si de verdad se puede restaurar. Ver scripts/lib/backup-inventario.mjs.
+    const diags = await diagnosticarTodas();
     console.log(`Backups disponibles (fuente: ${source}):`);
-    for (const f of fechas) console.log(`  ${f}`);
-    if (!fechas.length) console.log('  (ninguno en formato carpeta YYYY-MM-DD)');
+    for (const d of diags) console.log(formatearFecha(d));
+    if (!diags.length) console.log('  (ninguno en formato carpeta YYYY-MM-DD)');
+    const completos = diags.filter(d => d.completo).length;
+    console.log(
+      `\n${completos}/${diags.length} fechas restaurables por completo. ` +
+      `OK = los ${Object.keys(GRUPOS_META).length} grupos (${Object.keys(GRUPOS_META).join(' + ')}) con todos sus archivos · ` +
+      'PARCIAL = falta un grupo entero · DAÑADO = un grupo corrió pero le faltan archivos · INSERVIBLE = sin meta.',
+    );
+    if (diags.length && !completos) {
+      console.log('⚠️  NINGUNA fecha está completa: la réplica NO es hoy una red de seguridad entera.');
+    }
     return;
   }
 
+  const inv = await inventarioFechas();
   if (!date) {
-    const fechas = await listarFechas();
-    date = fechas[fechas.length - 1];
-    if (!date) { console.error('No hay backups. Corré primero /api/cron/backup.'); process.exit(1); }
+    const diags = [];
+    for (const f of [...inv.keys()].sort().reverse()) diags.push(await diagnosticar(f, inv.get(f)));
+    const elegida = elegirFechaPorDefecto(diags);
+    if (!elegida) { console.error('No hay backups restaurables. Corré primero /api/cron/backup y revisá con --list.'); process.exit(1); }
+    date = elegida.fecha;
+    if (!elegida.completa) {
+      console.warn(`⚠️  Ninguna fecha está COMPLETA; se usa la más nueva restaurable (${date}). Revisá --list.`);
+    }
   }
 
   console.log(`\n═ Restore desde backup ${date} (fuente: ${source}) ${dryRun ? '(DRY-RUN — sin escrituras; usá --yes para restaurar)' : '⚠️  ESCRITURA REAL'} ═\n`);
 
-  const meta = JSON.parse((await backupDownload(`${date}/meta.json`)).toString('utf-8'));
-  if (meta.format !== 'v2-ndjson-gz') {
-    console.error(`Backup ${date} en formato "${meta.format || 'v1 (backup.json monolítico)'}" — este script solo restaura v2.`);
+  const archivos = inv.get(date);
+  if (!archivos) {
+    console.error(`No existe la carpeta de backup ${date} en ${source}. Mirá las disponibles con --list.`);
     process.exit(1);
   }
-  if (meta.errores?.length) {
-    console.warn(`⚠️  Ese backup se generó con errores en: ${meta.errores.map(e => e.file).join(', ')}`);
+  const diag = await diagnosticar(date, archivos);
+  if (!diag.restaurable) {
+    console.error(`Backup ${date} sin ningún meta legible (${diag.faltan.map(f => `${f.metaFile}: ${f.motivo}`).join('; ')}) — no hay índice de datasets, nada que restaurar.`);
+    process.exit(1);
+  }
+  for (const f of diag.formatosMalos) {
+    console.error(`Grupo ${f.grupo} de ${date} en formato "${f.format}" — este script solo restaura v2-ndjson-gz.`);
+    process.exit(1);
+  }
+  if (!diag.completo) {
+    console.warn(`⚠️  Backup ${date} ${diag.estado} — ${problemasDe(diag).join('; ')}`);
+    console.warn('   Se restaura solo lo que SÍ está. Para el día entero, elegí otra fecha (--list).\n');
+  }
+  for (const e of diag.conErrores) {
+    console.warn(`⚠️  El grupo ${e.grupo} se generó con errores en: ${e.files.join(', ')}`);
   }
 
-  // Grupo switch (meta-switch.json, generado por /api/cron/backup?grupo=switch):
-  // si existe, sus datasets se suman al índice — restaurables con --tables igual
-  // que los del core. Backups anteriores al split no lo tienen (tolerante).
-  try {
-    const metaSwitch = JSON.parse((await backupDownload(`${date}/meta-switch.json`)).toString('utf-8'));
-    if (metaSwitch.errores?.length) {
-      console.warn(`⚠️  El grupo switch se generó con errores en: ${metaSwitch.errores.map(e => e.file).join(', ')}`);
+  // Índice unificado: los datasets de todos los grupos presentes (core +
+  // switch), restaurables con --tables por igual.
+  const metas = await cargarMetas(date, archivos);
+  let datasets = diag.grupos.flatMap(g => (metas[g].datasets || []).map(d => ({ ...d, grupo: g })));
+  const disponibles = new Set(datasets.flatMap(d => [d.file, d.table]));
+  for (const t of onlyTables || []) {
+    if (!disponibles.has(t)) {
+      const faltanGrupos = diag.faltan.map(f => f.grupo).join(', ');
+      console.error(`"${t}" no está en el backup ${date}${faltanGrupos ? ` (falta el grupo ${faltanGrupos})` : ''}. Mirá --list.`);
+      process.exit(1);
     }
-    meta.datasets = [...meta.datasets, ...(metaSwitch.datasets || [])];
-  } catch { /* sin grupo switch ese día — ok */ }
-
-  let datasets = meta.datasets;
+  }
   if (!includeAuth) datasets = datasets.filter(d => d.file !== 'fg_users_auth');
   if (onlyTables) datasets = datasets.filter(d => onlyTables.includes(d.file) || onlyTables.includes(d.table));
   if (targetOverride && datasets.length !== 1) {

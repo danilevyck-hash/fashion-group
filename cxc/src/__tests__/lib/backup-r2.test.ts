@@ -23,6 +23,10 @@ import {
   RETENCION_R2,
   ventanaVerificacion,
   parseDataDates,
+  parseListKeys,
+  listR2DataKeys,
+  evaluarFechasR2,
+  R2_METAS_POR_GRUPO,
   R2_MANIFEST_KEY,
   R2_STORAGE_MANIFEST_KEY,
   R2_DATA_PREFIX,
@@ -436,10 +440,22 @@ describe("pruneDataManifest", () => {
     ]);
   });
 
-  it("no toca keys que no son data/<fecha>/", () => {
+  it("no toca keys fuera de data/ (la réplica de Storage tiene su propio manifest)", () => {
     const out = pruneDataManifest(manifest, "2030-01-01");
     expect(out["_storage/product-images/foto.jpg"]).toBe("5|e");
     expect(Object.keys(out)).toHaveLength(1);
+  });
+
+  it("quita las keys PLANAS heredadas de data/ (sin carpeta de fecha)", () => {
+    // 57 entradas muertas medidas en el manifest real (25-jul): nunca matchean
+    // una fecha, así que se quedaban para siempre. Ningún escritor las produce.
+    const out = pruneDataManifest(
+      { ...manifest, "data/ventas_raw.ndjson.gz": "9|z", "data/cheques.ndjson.gz": "9|y" },
+      "2026-07-20",
+    );
+    expect(out["data/ventas_raw.ndjson.gz"]).toBeUndefined();
+    expect(out["data/cheques.ndjson.gz"]).toBeUndefined();
+    expect(out["data/2026-07-25/cheques.ndjson.gz"]).toBe("3|c");
   });
 
   it("es pura: no muta el manifest original", () => {
@@ -449,7 +465,7 @@ describe("pruneDataManifest", () => {
   });
 });
 
-describe("r2RetentionPlan (14 diarios + 8 lunes + 24 días 1)", () => {
+describe("r2RetentionPlan (21 diarios + 8 lunes + 24 días 1)", () => {
   /** Fechas consecutivas hacia atrás desde `hasta` (inclusive). */
   const serie = (hasta: string, dias: number) => {
     const out: string[] = [];
@@ -464,15 +480,19 @@ describe("r2RetentionPlan (14 diarios + 8 lunes + 24 días 1)", () => {
     expect(plan.keep).toHaveLength(10);
   });
 
-  it("conserva siempre los últimos 14 días", () => {
+  it("conserva siempre los últimos 21 días (aprobado por Daniel, jul-2026)", () => {
     const plan = r2RetentionPlan(serie("2026-07-25", 200));
     for (const d of serie("2026-07-25", RETENCION_R2.diarios)) expect(plan.keep).toContain(d);
   });
 
+  it("la ventana diaria es de 21, igual que la de Supabase Storage", () => {
+    expect(RETENCION_R2.diarios).toBe(21);
+  });
+
   it("conserva lunes y días 1 más viejos que la ventana diaria", () => {
     const plan = r2RetentionPlan(serie("2026-07-25", 200));
-    expect(new Date("2026-07-06T00:00:00Z").getUTCDay()).toBe(1); // lunes
-    expect(plan.keep).toContain("2026-07-06");
+    expect(new Date("2026-06-29T00:00:00Z").getUTCDay()).toBe(1); // lunes, fuera de los 21 días
+    expect(plan.keep).toContain("2026-06-29");
     expect(plan.keep).toContain("2026-07-01");
     expect(plan.keep).toContain("2026-06-01");
   });
@@ -495,7 +515,7 @@ describe("r2RetentionPlan (14 diarios + 8 lunes + 24 días 1)", () => {
     expect(plan.keep.length).toBeLessThanOrEqual(
       RETENCION_R2.diarios + RETENCION_R2.semanales + RETENCION_R2.mensuales,
     );
-    // ~46 carpetas × ~30 MB ≈ 1.4 GB
+    // ~53 carpetas × ~30 MB ≈ 1.6 GB
     expect(plan.keep.length * 30).toBeLessThan(10 * 1024);
   });
 
@@ -550,6 +570,91 @@ describe("parseDataDates (ListObjectsV2 con delimiter)", () => {
   it("ignora prefijos que no son fechas y no revienta con XML vacío", () => {
     expect(parseDataDates("<ListBucketResult></ListBucketResult>")).toEqual([]);
     expect(parseDataDates("<Prefix>_storage/product-images/</Prefix>")).toEqual([]);
+  });
+});
+
+describe("parseListKeys / listR2DataKeys (inventario paginado de data/)", () => {
+  const xmlDe = (keys: string[], token?: string) =>
+    `<?xml version="1.0"?><ListBucketResult>${keys
+      .map((k) => `<Contents><Key>${k}</Key><Size>10</Size></Contents>`)
+      .join("")}${token ? `<IsTruncated>true</IsTruncated><NextContinuationToken>${token}</NextContinuationToken>` : "<IsTruncated>false</IsTruncated>"}</ListBucketResult>`;
+
+  it("extrae las keys del XML y no revienta con uno vacío", () => {
+    expect(parseListKeys(xmlDe(["data/2026-07-25/meta.json"]))).toEqual(["data/2026-07-25/meta.json"]);
+    expect(parseListKeys("<ListBucketResult></ListBucketResult>")).toEqual([]);
+  });
+
+  it("sigue el continuation-token hasta agotar las páginas", async () => {
+    stubEnv(ENV);
+    const paginas = [
+      xmlDe(["data/2026-07-24/meta.json"], "TOK1"),
+      xmlDe(["data/2026-07-25/meta.json", "data/2026-07-25/meta-switch.json"]),
+    ];
+    let i = 0;
+    const fn = vi.fn(async (_input: Request | string | URL) => new Response(paginas[i++], { status: 200 }));
+    vi.stubGlobal("fetch", fn);
+    const keys = await listR2DataKeys();
+    expect(keys).toEqual([
+      "data/2026-07-24/meta.json",
+      "data/2026-07-25/meta.json",
+      "data/2026-07-25/meta-switch.json",
+    ]);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(calls(fn as FetchMock)[1].url).toContain("continuation-token=TOK1");
+  });
+
+  it("sin env vars o con error de red devuelve [] sin lanzar", async () => {
+    const { fn } = mockFetch(null);
+    expect(await listR2DataKeys()).toEqual([]);
+    expect(fn).not.toHaveBeenCalled();
+    stubEnv(ENV);
+    vi.stubGlobal("fetch", vi.fn(async (_input: Request | string | URL) => { throw new Error("ECONNRESET"); }));
+    expect(await listR2DataKeys()).toEqual([]);
+  });
+});
+
+describe("evaluarFechasR2 (una fecha a medias NO es un backup)", () => {
+  const keysDe = (fecha: string, archivos: string[]) => archivos.map((a) => `data/${fecha}/${a}`);
+
+  it("los dos grupos presentes → completo", () => {
+    const [e] = evaluarFechasR2(
+      keysDe("2026-07-26", ["meta.json", "meta-switch.json", "cheques.ndjson.gz", "switch_recibos.ndjson.gz"]),
+    );
+    expect(e.completo).toBe(true);
+    expect(e.grupos.sort()).toEqual(["core", "switch"]);
+    expect(e.faltan).toEqual([]);
+    expect(e.datasets).toBe(2);
+  });
+
+  it("EL CASO REAL 25-jul: solo meta-switch.json → incompleto, falta core", () => {
+    const [e] = evaluarFechasR2(keysDe("2026-07-25", ["meta-switch.json", "switch_recibos.ndjson.gz"]));
+    expect(e.fecha).toBe("2026-07-25");
+    expect(e.completo).toBe(false);
+    expect(e.faltan).toEqual(["core"]);
+    expect(e.grupos).toEqual(["switch"]);
+  });
+
+  it("solo meta.json (días previos al split core/switch) → falta switch", () => {
+    const [e] = evaluarFechasR2(keysDe("2026-07-10", ["meta.json", "cheques.ndjson.gz"]));
+    expect(e.faltan).toEqual(["switch"]);
+    expect(e.datasets).toBe(1);
+  });
+
+  it("ignora las keys planas heredadas: no inventan una fecha", () => {
+    expect(evaluarFechasR2(["data/cheques.ndjson.gz", "data/ventas_raw.ndjson.gz", "manifest.json"])).toEqual([]);
+  });
+
+  it("devuelve las fechas ordenadas ascendente", () => {
+    const est = evaluarFechasR2([
+      ...keysDe("2026-07-25", ["meta.json"]),
+      ...keysDe("2026-07-23", ["meta.json"]),
+      ...keysDe("2026-07-24", ["meta.json"]),
+    ]);
+    expect(est.map((e) => e.fecha)).toEqual(["2026-07-23", "2026-07-24", "2026-07-25"]);
+  });
+
+  it("los grupos vigilados son core (meta.json) y switch (meta-switch.json)", () => {
+    expect(R2_METAS_POR_GRUPO).toEqual({ core: "meta.json", switch: "meta-switch.json" });
   });
 });
 
