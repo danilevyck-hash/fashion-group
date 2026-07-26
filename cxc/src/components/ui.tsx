@@ -1052,7 +1052,16 @@ export function BottomSheet({
 
   // dvh = dynamic viewport: cuenta la barra de URL de iOS, así el fondo del
   // sheet no queda calculado contra un viewport más grande que el visible.
-  const sheetTop = mode === "half" ? "45dvh" : "5dvh";
+  //
+  // El inset superior se suma para que en modo "full" el borde del sheet (y con
+  // él el agarre y lo primero del contenido) no quede debajo de la Dynamic
+  // Island. Hoy el inset es 0 —`apple-mobile-web-app-status-bar-style: black`—
+  // así que no cambia nada; es el seguro para cuando la PWA pase a status bar
+  // translúcida. Abajo ya está resuelto con safe-area-inset-bottom.
+  const sheetTop =
+    mode === "half"
+      ? "calc(45dvh + env(safe-area-inset-top))"
+      : "calc(5dvh + env(safe-area-inset-top))";
 
   return (
     <div className="fixed inset-0 z-50 sm:hidden">

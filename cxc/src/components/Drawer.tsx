@@ -48,6 +48,11 @@ export default function Drawer({ open, onClose, title, children, footer }: Drawe
         aria-modal="true"
         aria-label={title}
         className={`fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white z-50 shadow-xl transition-transform duration-200 ease-out flex flex-col ${open ? "translate-x-0" : "translate-x-full"}`}
+        // El panel arranca en top:0, así que su cabecera (con el ✕) cae debajo
+        // de la Dynamic Island en cuanto la PWA use status bar translúcida. Hoy
+        // el inset es 0 (`apple-mobile-web-app-status-bar-style: black`) y esto
+        // no cambia nada; el día que cambie, el ✕ sigue siendo alcanzable.
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h2 className="text-base font-medium">{title}</h2>
