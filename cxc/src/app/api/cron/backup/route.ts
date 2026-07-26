@@ -31,20 +31,22 @@
 // hashes van aparte en fg_users_auth.ndjson.gz (mismo bucket privado) para que
 // un restore no deje a todos sin login.
 //
-// Storage: réplica incremental de los buckets con archivos subidos a mano
-// (comprobantes, fotos, adjuntos) a backups/_storage/<bucket>/<path>, guiada
-// por un manifest — solo copia lo nuevo/cambiado desde el último backup.
+// STORAGE — una sola réplica, y va a R2 (?grupo=storage, jul-2026): los ~3.2K
+// archivos subidos a mano (fotos de producto, facturas de reclamos, adjuntos de
+// marketing; 198 MB) se copian a R2 bajo _storage/<bucket>/<path>, guiados por
+// un manifest de firmas. Heartbeat propio: "backup-storage".
 //
-// GRUPO STORAGE (?grupo=storage, jul-2026): réplica OFF-SITE de esos mismos
-// archivos a R2 (_storage/<bucket>/<path>). Hasta ahora los ~3.2K archivos
-// (198 MB: fotos de producto, facturas de reclamos, adjuntos de marketing) solo
-// existían dentro de Supabase — la "réplica" era bucket→bucket del MISMO
-// proyecto, es decir cero red de seguridad si se pierde el proyecto. Va en
-// invocación aparte y no en la corrida core con números medidos (25-jul-2026):
-// la core arrancó 08:33:12 y registró heartbeat 08:37:20 → 248s de los 300s de
-// Hobby, con la réplica a Supabase agotando sus 240s de presupuesto y dejando
-// 2.765 archivos pendientes. No hay hueco: meter R2+Storage ahí recortaría el
-// backup de datos. Heartbeat propio: "backup-storage".
+// La réplica bucket→bucket DENTRO de Supabase (backups/_storage/) se ELIMINÓ el
+// 26-jul-2026, con medición: eran 1.597 archivos / 103,2 MB del MISMO proyecto
+// —o sea cero red de seguridad si se pierde el proyecto— ocupando el 18% del GB
+// del plan (Storage estaba al 56%). Además llegaba tarde y a medias: nunca había
+// copiado `marketing` (55,1 MB) ni `joybees-photos` (15,9 MB), que sí están
+// completos en R2. Antes de borrarla se verificó archivo por archivo que R2
+// tuviera los 3.204 originales de los 5 buckets con el mismo tamaño, y una
+// muestra de 20 descargada de ambos lados coincidió byte a byte (sha256).
+// El camino de vuelta es `scripts/restore.mjs --source r2 --storage <bucket>`
+// (probado el 26-jul: escritura real R2→Supabase de 1 archivo, sha256 idéntico).
+// NO reintroducir la copia intra-Supabase: no protege de nada y se come el plan.
 //
 // Off-site: réplica de los NDJSON.gz + los meta.json a Cloudflare R2
 // (S3-compatible), incremental por manifest de hashes (src/lib/backup/r2.ts),
@@ -203,10 +205,8 @@ const SWITCH_DATASETS: Dataset[] = [
   { table: "multifashion_tickets" },
 ];
 
-// ── Réplica incremental de buckets de Storage ────────────────────────────────
-// Copia archivos nuevos/cambiados de los buckets fuente a backups/_storage/
-// (prefijo estable, fuera del patrón YYYY-MM-DD → la retención no lo toca).
-// Un manifest (path → size|updated_at) evita re-subir lo que no cambió.
+// ── Buckets de Storage que se replican OFF-SITE a R2 ─────────────────────────
+// Los que tienen archivos subidos a mano (comprobantes, fotos, adjuntos).
 // reclamo-zips-privado se excluye: son exports generados, re-derivables.
 const STORAGE_REPLICA_BUCKETS = [
   "reclamo-fotos",
@@ -216,15 +216,9 @@ const STORAGE_REPLICA_BUCKETS = [
   "marketing",
 ];
 const STORAGE_PREFIX = "_storage";
-const MANIFEST_PATH = `${STORAGE_PREFIX}/manifest.json`;
-// Presupuesto de tiempo de la réplica (arranca tras los datasets): si no
-// alcanza, lo que falte queda "pendiente" y se copia en la corrida siguiente
-// (el manifest solo registra lo efectivamente copiado). Deja headroom para
-// meta.json + limpieza dentro de los 800s de Pro (antes 240s de 300).
-const REPLICA_DEADLINE_MS = 700_000;
-// Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): corre tras la
-// réplica de Storage; el set completo pesa ~7 MB gz (~10-25s en subir), así
-// que 740s desde el arranque deja 60s de headroom para meta.json + limpieza.
+// Réplica off-site a Cloudflare R2 (src/lib/backup/r2.ts): el set completo pesa
+// ~7 MB gz (~10-25s en subir), así que 740s desde el arranque deja 60s de
+// headroom para meta.json + limpieza.
 // Lo que no alcance queda pendiente y el manifest lo recupera mañana.
 // (La corrida core midió 248s el 25-jul: estos topes son protección, no el
 // camino normal — subirlos solo agranda el margen antes de dejar pendientes.)
@@ -299,73 +293,14 @@ async function listAllFiles(bucket: string, prefix = ""): Promise<FileEntry[]> {
   return out;
 }
 
-/** Réplica incremental de STORAGE_REPLICA_BUCKETS a backups/_storage/. */
-async function replicateStorage(deadline: number) {
-  let manifest: Record<string, string> = {};
-  const { data: mf } = await supabaseServer.storage.from(BUCKET).download(MANIFEST_PATH);
-  if (mf) {
-    try { manifest = JSON.parse(await mf.text()); } catch { manifest = {}; }
-  }
-
-  let copiados = 0;
-  let bytes = 0;
-  let pendientes = 0;
-  const errores: string[] = [];
-
-  for (const bucket of STORAGE_REPLICA_BUCKETS) {
-    let files: FileEntry[];
-    try {
-      files = await listAllFiles(bucket);
-    } catch (e) {
-      errores.push(e instanceof Error ? e.message : String(e));
-      continue;
-    }
-    for (const f of files) {
-      const key = `${bucket}/${f.path}`;
-      const sig = `${f.size}|${f.updated_at}`;
-      if (manifest[key] === sig) continue; // sin cambios desde el último backup
-      if (Date.now() > deadline) {
-        pendientes++;
-        continue;
-      }
-      try {
-        const { data: blob, error: dlErr } = await supabaseServer.storage.from(bucket).download(f.path);
-        if (dlErr || !blob) throw new Error(dlErr?.message || "download vacío");
-        const buf = Buffer.from(await blob.arrayBuffer());
-        const { error: upErr } = await supabaseServer.storage
-          .from(BUCKET)
-          .upload(`${STORAGE_PREFIX}/${key}`, buf, { contentType: f.mimetype, upsert: true });
-        if (upErr) throw new Error(upErr.message);
-        manifest[key] = sig;
-        copiados++;
-        bytes += buf.length;
-      } catch (e) {
-        errores.push(`${key}: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
-  }
-
-  // Manifest refleja SOLO lo copiado con éxito → lo fallido/pendiente se
-  // reintenta en la corrida siguiente.
-  const { error: mfErr } = await supabaseServer.storage
-    .from(BUCKET)
-    .upload(MANIFEST_PATH, Buffer.from(JSON.stringify(manifest), "utf-8"), {
-      contentType: "application/json",
-      upsert: true,
-    });
-  if (mfErr) errores.push(`manifest: ${mfErr.message}`);
-
-  return { copiados, bytes, pendientes, errores };
-}
-
 // ── Réplica OFF-SITE de los buckets de Storage a R2 (?grupo=storage) ─────────
 /**
  * Lista los mismos buckets que replicateStorage() y los replica a R2 bajo
  * `_storage/<bucket>/<path>`, con descarga PEREZOSA: la firma (`size|updated_at`)
  * se conoce del listado, así que solo se baja de Supabase lo que de verdad hay
- * que subir. Lee de los buckets ORIGEN (no de la réplica backups/_storage/) a
- * propósito: encadenar dos réplicas que van atrasadas dejaría R2 esperando a que
- * la de Supabase se ponga al día.
+ * que subir. Lee siempre de los buckets ORIGEN — nunca de una réplica intermedia
+ * (la que vivía en backups/_storage/ se eliminó): encadenar dos réplicas que van
+ * atrasadas dejaría R2 esperando a que la primera se ponga al día.
  */
 async function replicateStorageOffsite(deadline: number) {
   const files: R2LazyFile[] = [];
@@ -509,15 +444,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Réplica incremental de buckets (con presupuesto de tiempo; lo pendiente
-  // se copia en la próxima corrida). Solo la corrida CORE: la de switch no
-  // toca Storage (sería trabajo duplicado el mismo día).
-  const storage = esGrupoSwitch
-    ? { copiados: 0, bytes: 0, pendientes: 0, errores: [] as string[] }
-    : await replicateStorage(startMs + REPLICA_DEADLINE_MS);
-  for (const err of storage.errores) {
-    errores.push({ file: `storage:${err.slice(0, 120)}`, error: err });
-  }
+  // (Acá vivía la réplica de los buckets a backups/_storage/. Se eliminó el
+  // 26-jul-2026: era una copia dentro del MISMO proyecto de Supabase — no
+  // protegía de nada y ocupaba 103,2 MB del GB del plan. La copia que sirve es
+  // la de R2, que la escribe ?grupo=storage leyendo los buckets originales.)
 
   // Réplica off-site a Cloudflare R2 (best-effort): si faltan las env vars
   // R2_* se omite en silencio; si falla a mitad, el backup a Supabase ya está
@@ -540,7 +470,6 @@ export async function GET(req: NextRequest) {
     grupo: grupoParam ?? "core",
     timestamp: now.toISOString(),
     datasets: results,
-    storage: { copiados: storage.copiados, bytes: storage.bytes, pendientes: storage.pendientes },
     // Nota: refleja la fase de DATOS. La subida del propio meta a R2 va después
     // (no puede contarse a sí misma) y su resultado sale en la respuesta HTTP.
     r2,
@@ -668,7 +597,6 @@ export async function GET(req: NextRequest) {
     datasets: results.length,
     totalRows: results.reduce((s, r) => s + r.rows, 0),
     totalBytes,
-    storage,
     r2: r2Total,
     retencionR2,
     saludR2,

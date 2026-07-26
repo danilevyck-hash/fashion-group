@@ -112,6 +112,7 @@ const EXPECTED_CRONS = [
   "backup",
   "cheques-alert",
   "cleanup-packing-lists",
+  "cleanup-sessions",
   "grupo-resumen-mensual",
   "integrity-check",
   "joybees-catalogo",
