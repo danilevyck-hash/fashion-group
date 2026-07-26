@@ -641,7 +641,7 @@ const REEBOK: MarcaTheme = {
     qtyNum: "text-sm tabular-nums text-[#1A2656] w-6 text-center font-semibold",
     lineTotal: "text-sm tabular-nums text-[#1A2656]/60 w-20 text-right font-medium",
     totalText: "text-sm font-bold text-[#1A2656]",
-    vaciarBtn: "text-xs text-gray-400 hover:text-[#E4002B] transition",
+    vaciarBtn: "min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center text-xs text-gray-400 hover:text-[#E4002B] transition",
     summaryBtn:
       "flex items-center gap-2 px-3 py-3.5 rounded-xl bg-[#F5F0E8] text-[#1A2656] text-sm tabular-nums shrink-0 hover:bg-[#ebe5d9] transition min-h-[56px]",
     summaryMeta: "text-xs text-[#1A2656]/50",
@@ -649,7 +649,7 @@ const REEBOK: MarcaTheme = {
       "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#E4002B] text-white text-xs font-bold flex items-center justify-center",
     nameLabel: "block text-xs font-semibold uppercase tracking-wide text-[#1A2656]/50 mb-1",
     nameInput:
-      "w-full rounded-lg border border-gray-200 bg-[#F5F0E8] px-3 py-2 text-sm text-[#1A2656] placeholder:text-[#1A2656]/30 focus:border-[#1A2656] focus:bg-white focus:outline-none transition",
+      "w-full rounded-lg border border-gray-200 bg-[#F5F0E8] px-3 py-2 min-h-[44px] text-base sm:text-sm text-[#1A2656] placeholder:text-[#1A2656]/30 focus:border-[#1A2656] focus:bg-white focus:outline-none transition",
     actionPublic: "bg-[#1A2656] hover:bg-[#131c40]",
     actionVendor: "bg-[#E4002B] hover:bg-[#c90025]",
     checkIconAlways: false,
@@ -945,7 +945,7 @@ const JOYBEES: MarcaTheme = {
     qtyNum: "text-sm tabular-nums text-[#404041] w-6 text-center font-semibold",
     lineTotal: "text-sm tabular-nums text-[#404041]/60 w-20 text-right font-medium",
     totalText: "text-sm font-bold text-[#404041]",
-    vaciarBtn: "text-xs text-gray-400 hover:text-red-500 transition",
+    vaciarBtn: "min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center text-xs text-gray-400 hover:text-red-500 transition",
     summaryBtn:
       "flex items-center gap-2 px-3 py-3.5 rounded-xl bg-[#FFE443]/20 text-[#404041] text-sm tabular-nums shrink-0 hover:bg-[#FFE443]/30 transition min-h-[56px]",
     summaryMeta: "text-xs text-[#404041]/50",
@@ -953,7 +953,7 @@ const JOYBEES: MarcaTheme = {
       "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#FFE443] text-[#404041] text-xs font-bold flex items-center justify-center",
     nameLabel: "block text-xs font-semibold uppercase tracking-wide text-[#404041]/50 mb-1",
     nameInput:
-      "w-full rounded-lg border border-gray-200 bg-[#FFFEF5] px-3 py-2 text-sm text-[#404041] placeholder:text-[#404041]/30 focus:border-[#404041] focus:bg-white focus:outline-none transition",
+      "w-full rounded-lg border border-gray-200 bg-[#FFFEF5] px-3 py-2 min-h-[44px] text-base sm:text-sm text-[#404041] placeholder:text-[#404041]/30 focus:border-[#404041] focus:bg-white focus:outline-none transition",
     actionPublic: "bg-[#404041] hover:bg-[#2d2d2e]",
     actionVendor: "bg-[#404041] hover:bg-[#2d2d2e]",
     checkIconAlways: true,
@@ -1282,7 +1282,7 @@ const TOMMY: MarcaTheme = {
     qtyNum: "text-sm tabular-nums text-[#152342] w-6 text-center font-semibold",
     lineTotal: "text-sm tabular-nums text-[#152342]/60 w-20 text-right font-medium",
     totalText: "text-sm font-bold text-[#152342]",
-    vaciarBtn: "text-xs text-gray-400 hover:text-[#AE0029] transition",
+    vaciarBtn: "min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center text-xs text-gray-400 hover:text-[#AE0029] transition",
     summaryBtn:
       "flex items-center gap-2 px-3 py-3.5 rounded-xl bg-[#152342]/5 text-[#152342] text-sm tabular-nums shrink-0 hover:bg-[#152342]/10 transition min-h-[56px]",
     summaryMeta: "text-xs text-[#152342]/50",
@@ -1290,7 +1290,7 @@ const TOMMY: MarcaTheme = {
       "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#AE0029] text-white text-xs font-bold flex items-center justify-center",
     nameLabel: "block text-xs font-semibold uppercase tracking-wide text-[#152342]/50 mb-1",
     nameInput:
-      "w-full rounded-lg border border-gray-200 bg-[#F6F7F9] px-3 py-2 text-sm text-[#152342] placeholder:text-[#152342]/30 focus:border-[#152342] focus:bg-white focus:outline-none transition",
+      "w-full rounded-lg border border-gray-200 bg-[#F6F7F9] px-3 py-2 min-h-[44px] text-base sm:text-sm text-[#152342] placeholder:text-[#152342]/30 focus:border-[#152342] focus:bg-white focus:outline-none transition",
     actionPublic: "bg-[#152342] hover:bg-[#0e1830]",
     actionVendor: "bg-[#152342] hover:bg-[#0e1830]",
     checkIconAlways: true,

@@ -124,11 +124,14 @@ export default function CatalogosMarcasPage() {
                     )}
                   </div>
 
-                  {/* Acciones */}
+                  {/* Acciones — iPhone: ambos links medían 39px de alto (px-4
+                      py-2). min-h-[44px] los sube al mínimo táctil de la casa;
+                      el ancho ya pasaba (137px y 111px). Se repite en las 3
+                      marcas porque el bloque se renderiza por cada BRAND. */}
                   <div className="mt-5 flex flex-wrap gap-2.5">
                     <Link
                       href={b.catalogoHref}
-                      className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${hub.primaryBtn}`}
+                      className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-semibold transition active:scale-[0.97] ${hub.primaryBtn}`}
                     >
                       Ver catálogo
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -138,7 +141,7 @@ export default function CatalogosMarcasPage() {
                     {isAdmin && (
                       <Link
                         href={b.adminHref}
-                        className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${hub.outlineBtn}`}
+                        className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${hub.outlineBtn}`}
                       >
                         Administrar
                       </Link>

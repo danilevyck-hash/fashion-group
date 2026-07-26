@@ -249,7 +249,7 @@ export default function CatalogoGroupedCard({
                     <div className={t.qtyWrap}>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty - 1)}
-                        className={`h-9 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                        className={`h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                           qty === 1 ? "px-2 gap-1" : "w-11"
                         }`}
                       >
@@ -274,7 +274,7 @@ export default function CatalogoGroupedCard({
                       </button>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty + 1)}
-                        className={`w-11 h-9 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                        className={`w-11 h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                       >
                         +
                       </button>

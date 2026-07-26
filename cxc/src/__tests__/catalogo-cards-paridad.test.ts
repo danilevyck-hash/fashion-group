@@ -186,8 +186,14 @@ describe("card de producto — paridad en las 3 marcas", () => {
     for (const [nombre, code] of [["plana", PRODUCT_CARD], ["agrupada", GROUPED_CARD]] as const) {
       // h-9 (36) + 1px de borde arriba y abajo del qtyWrap = 38, igual que el
       // botón Agregar: meter un producto al pedido no puede estirar la fila.
-      expect(code, nombre).toContain("h-9 flex items-center justify-center");
-      expect(code, nombre).toContain("w-11 h-9 flex items-center justify-center");
+      //
+      // `shrink-0` (auditoría iPhone, 2ª vuelta): el ALTO sigue siendo h-9, pero
+      // sin esto el flex del qtyWrap achicaba el "+" de los 44px que pide w-11 a
+      // 23px reales en 390×844 — el "−" no se encoge porque su contenido lo
+      // sostiene, así que todo el ajuste se lo comía el "+", que es un solo
+      // carácter. El arreglo es de ANCHO: la fila no crece.
+      expect(code, nombre).toContain("h-9 shrink-0 flex items-center justify-center");
+      expect(code, nombre).toContain("w-11 h-9 shrink-0 flex items-center justify-center");
       expect(code, nombre).not.toContain("h-11 flex items-center");
       expect(code, nombre).not.toContain("w-11 h-11");
     }

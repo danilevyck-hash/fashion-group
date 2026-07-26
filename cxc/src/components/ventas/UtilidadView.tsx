@@ -81,10 +81,13 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
             value={search}
             onChange={(e) => { setSearch(e.target.value); setVisible(PAGE); }}
             placeholder="Buscar cliente o empresa…"
-            className="h-9 pl-8 text-xs"
+            /* h-11 = 44px táctiles; text-base en móvil para que Safari no
+               haga zoom al enfocar (text-xs = 12px). Desde sm, text-xs. */
+            className="h-11 pl-8 text-base sm:text-xs"
           />
         </div>
-        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading}>
+        {/* size="sm" da 32px de alto — min-h-[44px] lo lleva al mínimo. */}
+        <Button variant="outline" size="sm" onClick={onExcel} disabled={!data || loading} className="min-h-[44px]">
           <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
         </Button>
       </div>
@@ -145,7 +148,7 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
 
       {data && !loading && !error && rows.length > visible && (
         <div className="mt-3 text-center">
-          <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + PAGE)}>
+          <Button variant="outline" size="sm" onClick={() => setVisible((v) => v + PAGE)} className="min-h-[44px]">
             Mostrar más ({rows.length - visible} restantes)
           </Button>
         </div>

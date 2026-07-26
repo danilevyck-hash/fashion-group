@@ -15,8 +15,13 @@ import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 import { CajaSubtab } from "./CajaSubtab";
 
+// iPhone: los 4 sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de
+// los 44 de la regla táctil, y son el control que más se toca del módulo. Con
+// min-h-[44px] el alto queda garantizado sin agrandar la letra ni el ancho (el
+// más angosto, "Caja", ya medía 69px de ancho). Los tabs de /ventas ya iban en
+// 44 por su py-3: esto los empareja.
 const SUBTAB_TRIGGER_CLASS =
-  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 interface MultifashionViewProps {
   data: Multifashion;

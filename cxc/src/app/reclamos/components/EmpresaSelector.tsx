@@ -109,7 +109,7 @@ export default function EmpresaSelector({
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
           </div>
-          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
         </div>
 
         {(role === "admin" || role === "secretaria") && (
@@ -122,7 +122,7 @@ export default function EmpresaSelector({
 
         {/* Global search */}
         <div className="mb-4">
-          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, código de ítem o empresa…" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
+          <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo, código de ítem o empresa…" className="w-full border-b border-gray-200 py-2 min-h-[44px] text-base sm:text-sm outline-none focus:border-black transition max-w-md" />
         </div>
 
         {globalSearch.trim() ? (() => {

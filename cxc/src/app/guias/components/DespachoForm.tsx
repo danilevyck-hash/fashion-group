@@ -84,40 +84,42 @@ export default function DespachoForm({
         <h3 className="text-sm font-medium text-gray-900">Despachar</h3>
       </div>
 
-      {/* Toggle tipo despacho */}
+      {/* Toggle tipo despacho — py-2 dejaba las dos mitades en 36 px de alto. */}
       <div className="flex rounded-lg bg-gray-100 p-0.5 mb-6">
         <button type="button" onClick={() => setTipoDespacho("externo")}
-          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "externo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+          className={`flex-1 text-sm px-4 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${tipoDespacho === "externo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
           Transportista externo
         </button>
         <button type="button" onClick={() => setTipoDespacho("directo")}
-          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "directo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+          className={`flex-1 text-sm px-4 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${tipoDespacho === "directo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
           Entrega directa
         </button>
       </div>
 
-      {/* Fields */}
+      {/* Campos del receptor: medían 313×43 y con text-sm (14px) Safari hacía
+          zoom al enfocar. text-base en móvil lo evita; min-h-[44px] cierra el
+          milímetro que faltaba de área táctil. */}
       {tipoDespacho === "externo" ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Placa del vehiculo *</label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">N° guía del transportista *</label>
             <input type="text" value={bNumeroGuiaTransp} onChange={(e) => setBNumeroGuiaTransp(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Nombre del receptor *</label>
             <input type="text" value={bReceptor} onChange={(e) => setBReceptor(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cedula del receptor *</label>
             <input type="text" value={bCedula} onChange={(e) => setBCedula(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
         </div>
       ) : (
@@ -125,22 +127,22 @@ export default function DespachoForm({
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Placa del vehiculo *</label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Chofer *</label>
             <input type="text" value={bChofer} onChange={(e) => setBChofer(e.target.value)} placeholder="Nombre del chofer"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cliente receptor *</label>
             <input type="text" value={bReceptor} onChange={(e) => setBReceptor(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cedula del cliente *</label>
             <input type="text" value={bCedula} onChange={(e) => setBCedula(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
         </div>
       )}

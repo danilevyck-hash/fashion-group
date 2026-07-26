@@ -296,7 +296,8 @@ export default function ProyectosHomeView({
         <button
           type="button"
           onClick={onBack}
-          className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1"
+          /* Volver era texto suelto (~20 px de alto); -my-1 para no separar de la lista. */
+          className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
         >
           ← Marcas
         </button>
@@ -313,11 +314,14 @@ export default function ProyectosHomeView({
             </p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
+        {/* Misma barra que MarcaSelector: eran textos sueltos de 18-21 px de
+            alto. 44 px de área táctil en cada uno; -my-1 evita que la fila
+            empuje el título al crecer. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
           <button
             type="button"
             onClick={onOpenInventario}
-            className="text-gray-600 hover:text-black transition"
+            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
           >
             Mobiliario
           </button>
@@ -325,7 +329,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onOpenReportes}
-            className="text-gray-600 hover:text-black transition"
+            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
           >
             Reportes
           </button>
@@ -333,7 +337,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onOpenImpulsadoras}
-            className="text-gray-600 hover:text-black transition"
+            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
           >
             Impulsadoras
           </button>
@@ -341,7 +345,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onOpenAnulados}
-            className="text-xs text-gray-400 hover:text-gray-700 transition"
+            className="text-xs text-gray-400 hover:text-gray-700 transition min-h-[44px] inline-flex items-center"
           >
             Anulados
           </button>
@@ -350,7 +354,7 @@ export default function ProyectosHomeView({
             type="button"
             onClick={exportarZip}
             disabled={exportando}
-            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] inline-flex items-center"
           >
             {exportando ? "Generando ZIP…" : "Exportar"}
           </button>
@@ -358,7 +362,7 @@ export default function ProyectosHomeView({
             <button
               type="button"
               onClick={onNuevoProyecto}
-              className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
+              className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
             >
               + Nuevo proyecto
             </button>
@@ -368,18 +372,20 @@ export default function ProyectosHomeView({
 
       {/* Filtros: búsqueda (+ dropdown de marca solo fuera del modo bucket) */}
       <div className={`grid grid-cols-1 gap-2 ${enBucket ? "" : "sm:grid-cols-[1fr_200px]"}`}>
+        {/* text-base en mobile: con text-sm (14px) Safari hace zoom al enfocar
+            el campo y descuadra la página. min-h-[44px] para el toque. */}
         <input
           type="search"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar por proyecto, tienda o N° de factura…"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
         />
         {!enBucket && (
           <select
             value={marcaIdFiltro}
             onChange={(e) => setMarcaIdFiltro(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm bg-white focus:border-black focus:outline-none"
           >
             <option value="">Todas las marcas</option>
             {marcas.map((m) => (
@@ -664,14 +670,15 @@ export default function ProyectosHomeView({
               value={anularMotivo}
               onChange={(e) => setAnularMotivo(e.target.value)}
               placeholder="Explica por qué se anula"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4"
+              /* text-base en mobile para que Safari no haga zoom al enfocar. */
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none mb-4"
             />
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={ejecutarAnular}
                 disabled={anulando || anularMotivo.trim().length === 0}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
+                className="flex-1 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
               >
                 {anulando ? "Anulando…" : "Anular proyecto"}
               </button>
@@ -679,7 +686,7 @@ export default function ProyectosHomeView({
                 type="button"
                 onClick={() => setAnularPendiente(null)}
                 disabled={anulando}
-                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
+                className="flex-1 border border-gray-200 text-gray-600 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm hover:bg-gray-50 transition"
               >
                 Cancelar
               </button>

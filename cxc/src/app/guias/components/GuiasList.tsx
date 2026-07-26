@@ -118,17 +118,21 @@ export default function GuiasList({
                 <span className="text-sm text-gray-400">{selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}</span>
                 {selectedIds.size > 0 && (
                   <>
-                    <button onClick={printSelected} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">Imprimir todas</button>
-                    <button onClick={exportSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">&darr; Excel</button>
+                    {/* py-2 daba 36 px de alto: por debajo del mínimo táctil de 44. */}
+                    <button onClick={printSelected} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md active:bg-gray-100 transition-all inline-flex items-center justify-center min-h-[44px]">Imprimir todas</button>
+                    <button onClick={exportSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md active:bg-gray-100 transition-all inline-flex items-center justify-center min-h-[44px]">&darr; Excel</button>
                   </>
                 )}
-                <button onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                {/* Botón de solo texto: los márgenes negativos compensan el padding
+                    que necesita para llegar a 44 px, así no se corre de la fila. */}
+                <button onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center justify-center min-h-[44px] px-2 -mx-2">Cancelar</button>
               </>
             ) : (
               <>
                 {guias.length > 0 && (
                   <>
-                    <button onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
+                    {/* Medía 111.9×39 en iPhone: py-2 no alcanza los 44 px de alto. */}
+                    <button onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 rounded-md transition inline-flex items-center justify-center min-h-[44px]">Seleccionar</button>
                     <button
                       onClick={async () => {
                         const { exportGuiasExcel } = await import("./excel-guias");
@@ -181,9 +185,11 @@ export default function GuiasList({
               <span>
                 {pendingCount} guía{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
               </span>
+              {/* Enlace de texto dentro del banner: sin padding quedaba en 16 px
+                  de alto. Los márgenes negativos evitan que engorde el banner. */}
               <button
                 onClick={() => setShowPending(!showPending)}
-                className="text-xs font-medium text-gray-500 hover:text-black underline transition"
+                className="text-xs font-medium text-gray-500 hover:text-black underline transition inline-flex items-center justify-center min-h-[44px] px-2 -my-2 -mr-2"
               >
                 {showPending ? "Ver todas" : "Ver pendientes"}
               </button>
@@ -205,7 +211,8 @@ export default function GuiasList({
           <>
             <div className="mb-4 flex items-center gap-4 flex-wrap">
               {selectionMode && (
-                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0">
+                // El label es el área de toque real del checkbox (12 px de lado).
+                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0 min-h-[44px] pr-2">
                   <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
                   Todas
                 </label>
@@ -217,7 +224,9 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente, factura o N° de guía…"
                 className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
-              <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
+              {/* Medía 66.9×18: era el peor blanco de la lista. Alto forzado a 44
+                  con padding lateral compensado por -mx-2 para no correr la fila. */}
+              <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap inline-flex items-center justify-center min-h-[44px] px-2 -mx-2 ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
                 {groupedView ? "Lista plana" : "Agrupar por fecha"}
               </button>
             </div>
@@ -374,7 +383,8 @@ export default function GuiasList({
                                     <button
                                       type="button"
                                       onClick={() => window.open(`/guias/${expandedGuia.id}/imprimir`, '_blank')}
-                                      className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-2 py-1.5 rounded hover:bg-gray-100 min-h-[36px]"
+                                      /* Medía 85.5×36 — el min-h-[36px] anterior se quedaba corto. */
+                                      className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3 rounded hover:bg-gray-100 min-h-[44px]"
                                     >
                                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                         <polyline points="6 9 6 2 18 2 18 9" />
@@ -527,9 +537,10 @@ export default function GuiasList({
                                   {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && rejectingId === expandedGuia.id && (
                                     <div className="mt-6 pt-4 border-t border-gray-200">
                                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                        <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-full max-w-[200px]" autoFocus />
-                                        <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
-                                        <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
+                                        {/* text-base en móvil: con text-xs (12px) Safari hace zoom al enfocar. */}
+                                        <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-2 text-base md:text-xs outline-none w-full max-w-[200px] min-h-[44px]" autoFocus />
+                                        <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40 inline-flex items-center justify-center min-h-[44px] px-2 shrink-0">Confirmar</button>
+                                        <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition inline-flex items-center justify-center min-h-[44px] px-2 shrink-0">Cancelar</button>
                                       </div>
                                     </div>
                                   )}

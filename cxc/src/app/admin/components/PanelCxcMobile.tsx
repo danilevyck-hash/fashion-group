@@ -659,7 +659,10 @@ function MobileClientExpanded({
         {codigo && (
           <Link
             href={`/clientes/${encodeURIComponent(codigo)}`}
-            className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
+            // 163×18 medidos: el enlace está DENTRO de la fila expandida, que la
+            // primera vuelta no abrió. `-my-3` devuelve el aire que suma el alto
+            // táctil para que no separe el bloque de botones de arriba.
+            className="inline-flex items-center gap-1 min-h-[44px] -my-3 text-xs font-medium text-blue-600 active:opacity-70"
           >
             Ver facturas pendientes
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

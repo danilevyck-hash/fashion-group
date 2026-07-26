@@ -317,7 +317,7 @@ export default function EmpresaList({
               >
                 {selectionMode ? "Cancelar" : "Seleccionar"}
               </button>
-              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
             </>
           )}
         </div>

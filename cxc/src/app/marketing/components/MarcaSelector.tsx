@@ -127,20 +127,24 @@ export default function MarcaSelector({
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
-          <button type="button" onClick={onOpenInventario} className="text-gray-600 hover:text-black transition">
+        {/* Toda esta barra era texto suelto de 18-21 px de alto (Mobiliario,
+            Reportes, Impulsadoras, Anulados, Exportar): imposible de acertar con
+            el dedo. min-h-[44px] + inline-flex en cada uno; -my-1 compensa el
+            crecimiento para que la fila no se separe del título. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
+          <button type="button" onClick={onOpenInventario} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
             Mobiliario
           </button>
           <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenReportes} className="text-gray-600 hover:text-black transition">
+          <button type="button" onClick={onOpenReportes} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
             Reportes
           </button>
           <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenImpulsadoras} className="text-gray-600 hover:text-black transition">
+          <button type="button" onClick={onOpenImpulsadoras} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
             Impulsadoras
           </button>
           <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenAnulados} className="text-xs text-gray-400 hover:text-gray-700 transition">
+          <button type="button" onClick={onOpenAnulados} className="text-xs text-gray-400 hover:text-gray-700 transition min-h-[44px] inline-flex items-center">
             Anulados
           </button>
           <span className="text-gray-300">·</span>
@@ -148,14 +152,14 @@ export default function MarcaSelector({
             type="button"
             onClick={exportarZip}
             disabled={exportando}
-            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] inline-flex items-center"
           >
             {exportando ? "Generando ZIP…" : "Exportar"}
           </button>
           <button
             type="button"
             onClick={onNuevoProyecto}
-            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
+            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
           >
             + Nuevo proyecto
           </button>

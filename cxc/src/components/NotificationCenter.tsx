@@ -37,10 +37,26 @@ function formatRelativeTime(date: Date): string {
   return `hace ${Math.floor(diffHr / 24)}d`
 }
 
-export default function NotificationCenter() {
+interface NotificationCenterProps {
+  /**
+   * Tamaño del área táctil de la campana.
+   *  - "compacta" (default): el botón chico del header de escritorio, donde se
+   *    apunta con el mouse y 44 px serían un hueco enorme al lado de la lupa.
+   *  - "tactil": 44×44, el mínimo de la casa para el dedo en el iPhone.
+   *
+   * Antes esto se resolvía desde AppHeader estirando el botón con selectores
+   * arbitrarios (`[&>div>button]:min-w-[44px]` y un reposicionamiento del punto
+   * rojo). Funcionaba, pero dejaba el tamaño de este componente escrito en otro
+   * archivo: cualquier cambio acá adentro lo rompía en silencio.
+   */
+  size?: "compacta" | "tactil"
+}
+
+export default function NotificationCenter({ size = "compacta" }: NotificationCenterProps = {}) {
   const { notifications, unreadCount } = useNotifications()
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+  const tactil = size === "tactil"
 
   // Close on click outside
   useEffect(() => {
@@ -74,15 +90,24 @@ export default function NotificationCenter() {
       {/* Bell button */}
       <button
         onClick={handleToggle}
-        className="relative text-gray-400 hover:text-gray-700 transition p-1 rounded-md hover:bg-gray-50"
+        aria-label="Notificaciones"
+        className={`relative text-gray-400 hover:text-gray-700 transition rounded-md hover:bg-gray-50 ${
+          tactil
+            ? "min-w-[44px] min-h-[44px] flex items-center justify-center"
+            : "p-1"
+        }`}
         title="Notificaciones"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
+        {/* El punto rojo se ancla al ÍCONO, no al botón: en modo táctil el botón
+            es 44×44 y las esquinas quedan lejos de la campana dibujada. */}
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+          <span className={`absolute w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white ${
+            tactil ? "top-2 right-2" : "-top-0.5 -right-0.5"
+          }`} />
         )}
       </button>
 

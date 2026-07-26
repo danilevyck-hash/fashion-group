@@ -82,7 +82,9 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
             <button
               key={m}
               onClick={() => handleMode(m)}
-              className={`rounded px-3 py-1.5 text-sm font-medium transition active:scale-[0.97] ${
+              // El segmentado medía 33 px de alto: por debajo del mínimo táctil
+              // de 44. inline-flex + min-h para no perder el centrado del texto.
+              className={`inline-flex min-h-[44px] items-center justify-center rounded px-3 text-sm font-medium transition active:scale-[0.97] ${
                 mode === m ? "bg-black text-white" : "text-gray-600 hover:text-black"
               }`}
             >
@@ -91,8 +93,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           ))}
         </div>
 
+        {/* Los dos selectores (mes 140×36, año 110×36) quedaban cortos de alto.
+            min-h-[44px] pisa el h-9 del SelectTrigger sin tocar el componente
+            compartido. */}
         <Select value={String(mes)} onValueChange={(v) => setMes(parseInt(v, 10))}>
-          <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[140px] min-h-[44px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {MESES.map((m, i) => (
               <SelectItem key={i} value={String(i + 1)} disabled={mesDeshabilitado(i + 1)}>{m}</SelectItem>
@@ -100,7 +105,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           </SelectContent>
         </Select>
         <Select value={String(year)} onValueChange={(v) => handleYear(parseInt(v, 10))}>
-          <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[110px] min-h-[44px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {availableYears.filter((y) => y <= currentYear).map((y) => (
               <SelectItem key={y} value={String(y)}>{y}</SelectItem>

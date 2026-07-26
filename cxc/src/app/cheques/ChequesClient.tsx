@@ -588,10 +588,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           <h1 className="text-xl font-light tracking-tight">Cheques</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
+          {/* min-h-[44px] + inline-flex: medían 35 y 41 px de alto en iPhone,
+              por debajo del mínimo táctil de 44. El ancho ya sobraba. */}
+          <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 min-h-[44px] inline-flex items-center justify-center rounded-md active:bg-gray-100 transition-all">
             ↓ Exportar {exportFilterLabel()}
           </button>
-          <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             Nuevo Cheque
           </button>
         </div>
@@ -660,9 +662,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         onClose={() => { resetForm(); setShowForm(false); }}
         title={editingId ? "Editar Cheque" : "Nuevo Cheque"}
         footer={
+          /* Guardar medía 41 de alto y Cancelar 59×21 (texto suelto, el peor
+             target del panel). Ambos a 44 de alto; Cancelar además con
+             min-w-[44px] y -mx-2 para no desplazar el pie del panel. */
           <div className="flex items-center gap-4">
-            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexión" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar Cheque"}</button>
-            <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexión" : undefined} className="bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] min-w-[44px] px-2 -mx-2 inline-flex items-center justify-center">Cancelar</button>
           </div>
         }
       >
@@ -680,7 +685,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
+                {/* text-base en mobile (text-sm = 14px hace que Safari haga zoom
+                    al enfocar el campo). Regla para TODOS los inputs del panel. */}
+                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
                 {showSuggestions && fCliente.length >= 2 && (() => {
                   const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
                   return matches.length > 0 ? (
@@ -703,23 +710,23 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 placeholder="Seleccionar..."
                 ariaLabel="Empresa"
                 onBlur={() => handleChequeBlur("empresa")}
-                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`}
+                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`}
               />
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
-              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("numero", fNumero) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
-              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("monto", fMonto) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
-              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1 relative">
@@ -734,7 +741,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                   onBlur={() => handleChequeBlur("vendedor")}
                   actionLabel="+ Agregar vendedor"
                   onAction={() => setShowAddVendedor(true)}
-                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`}
+                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`}
                 />
               ) : (
                 <div className="flex items-center gap-2">
@@ -743,7 +750,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     value={newVendedorName}
                     onChange={(e) => setNewVendedorName(e.target.value)}
                     placeholder="Nombre del vendedor"
-                    className="border-b border-gray-200 py-3 text-sm outline-none bg-transparent focus:border-black transition flex-1"
+                    className="border-b border-gray-200 py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition flex-1"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && newVendedorName.trim()) {
@@ -794,7 +801,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Notas</label>
-              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-3 text-sm outline-none bg-transparent focus:border-black transition resize-none" />
+              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition resize-none" />
             </div>
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
@@ -803,9 +810,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
 
       {/* View toggle */}
       <div className="flex items-center gap-4 mb-6">
-        <div className="flex gap-1 bg-gray-100 rounded-full p-0.5 w-fit">
-        <button onClick={() => setViewMode("lista")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Lista</button>
-        <button onClick={() => setViewMode("calendario")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Calendario</button>
+        {/* Medían 30 px de alto y quedaban a 4 px uno del otro: con el dedo se
+            tocaba el equivocado. gap-2 = 8 px de separación y 44 de alto. */}
+        <div className="flex gap-2 bg-gray-100 rounded-full p-0.5 w-fit">
+        <button onClick={() => setViewMode("lista")} className={`min-h-[44px] px-4 text-xs rounded-full transition inline-flex items-center justify-center ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Lista</button>
+        <button onClick={() => setViewMode("calendario")} className={`min-h-[44px] px-4 text-xs rounded-full transition inline-flex items-center justify-center ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Calendario</button>
         </div>
       </div>
 
@@ -820,9 +829,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           ] as [Filter, string, number, string, boolean][])
             .filter(([, , count, , alwaysShow]) => alwaysShow || count > 0)
             .map(([key, label, count, tooltip]) => (
+              // Eran texto suelto de 21 px de alto: los dos filtros principales
+              // (Pendientes / Depositados) fallaban el toque en iPhone.
               <button key={key} onClick={() => setFilter(key)}
                 title={tooltip}
-                className={`text-sm transition flex-shrink-0 whitespace-nowrap ${filter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
+                className={`text-sm transition flex-shrink-0 whitespace-nowrap min-h-[44px] inline-flex items-center ${filter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
                 {label} <span className="text-xs text-gray-300 ml-1">{count}</span>
               </button>
             ))}
@@ -833,7 +844,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar cheque o cliente…"
-            className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-full sm:max-w-xs"
+            // text-base en mobile: con text-sm (14px) Safari hace zoom al
+            // enfocar. Alto 35 → 44 para el toque.
+            className="text-base sm:text-sm border border-gray-200 rounded-full px-4 min-h-[44px] outline-none focus:border-black transition w-full sm:max-w-xs"
           />
         </div>
       </div>}
@@ -852,11 +865,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               onChange={(e) => setMotivoRebote(e.target.value)}
               rows={3}
               placeholder="Fondos insuficientes, firma incorrecta, etc."
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-black transition resize-none mt-1 min-h-[48px]"
+              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-base sm:text-sm outline-none focus:border-black transition resize-none mt-1 min-h-[48px]"
             />
             <div className="flex items-center gap-3 mt-4">
-              <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
-              <button onClick={cerrarRebote} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+              {/* Mismo defecto que el pie del panel de Nuevo Cheque: Cancelar
+                  era texto suelto de 21 px de alto. */}
+              <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
+              <button onClick={cerrarRebote} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] min-w-[44px] px-2 -mx-2 inline-flex items-center justify-center">Cancelar</button>
             </div>
           </div>
         </div>
@@ -906,7 +921,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 <button onClick={goPrev} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
                 <h2 className="text-sm font-medium first-letter:uppercase w-40 text-center">{monthLabel}</h2>
                 <button onClick={goNext} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">›</button>
-                <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2">Hoy</button>
+                {/* Medía 24.5×18 — el target más chico del calendario. -my-1 para
+                    que crecer no empuje la fila del mes. */}
+                <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2 min-h-[44px] min-w-[44px] -my-1 inline-flex items-center justify-center">Hoy</button>
               </div>
               <span className="text-xs text-gray-400">{monthCheques.length} cheques · ${fmt(totalMonth)}</span>
             </div>
@@ -1055,7 +1072,8 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     <button
                       key={key}
                       onClick={() => { setFilter(key); setSearch(""); }}
-                      className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition"
+                      /* Chips del vacío: medían 32 de alto → 44. */
+                      className="text-xs px-3 min-h-[44px] inline-flex items-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition"
                     >
                       {label} <span className="text-gray-300 ml-0.5">{count}</span>
                     </button>

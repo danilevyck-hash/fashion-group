@@ -130,7 +130,12 @@ export default function OverflowMenu({
                   setOpen(false);
                   item.onClick();
                 }}
-                className={`w-full text-left px-3 py-2 text-sm transition ${
+                // El botón "···" ya era 44×44, pero las OPCIONES del desplegable
+                // medían 37 px de alto y nadie las había medido: el menú solo
+                // existe después de tocar, así que una auditoría de pantallas
+                // quietas no las ve. Es el mismo desplegable en Préstamos, Caja,
+                // Guías y Cheques — un solo arreglo cubre los cuatro.
+                className={`w-full text-left px-3 py-2 min-h-[44px] flex items-center text-sm transition ${
                   item.disabled
                     ? "text-gray-300 cursor-not-allowed"
                     : item.destructive

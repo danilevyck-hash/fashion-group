@@ -10,6 +10,20 @@ import IconButton from "@/components/IconButton";
 
 afterEach(cleanup);
 
+/**
+ * Devuelve el `<button …>` que envuelve a `etiqueta`.
+ *
+ * No se puede usar /<button[^>]*>/: los handlers llevan `=>` y el `[^>]*` corta
+ * ahí, dejando afuera el className que es justo lo que se quiere verificar.
+ * Se recorta desde el último "<button" ANTES del texto.
+ */
+function botonDe(src: string, etiqueta: string): string {
+  const fin = src.indexOf(etiqueta);
+  if (fin < 0) return "";
+  const ini = src.lastIndexOf("<button", fin);
+  return ini < 0 ? "" : src.slice(ini, fin);
+}
+
 /** ¿El botón declara el mínimo táctil por clase? */
 function tiene44(el: HTMLElement) {
   const cls = el.className;
@@ -63,8 +77,77 @@ describe("AppHeader — botones móviles", () => {
       expect(src).toContain(`aria-label="${etiqueta}"`);
     }
 
-    // Y la campana (que vive en NotificationCenter) se estira desde acá.
-    expect(src).toContain("[&>div>button]:min-w-[44px]");
-    expect(src).toContain("[&>div>button]:min-h-[44px]");
+    // La campana ya NO se estira desde acá con selectores arbitrarios: el
+    // tamaño se le pide a NotificationCenter, que es quien dibuja el botón.
+    expect(src).not.toContain("[&>div>button]:min-w-[44px]");
+    expect(src).toContain('<NotificationCenter size="tactil" />');
+  });
+
+  it("el botón Salir del drawer es táctil (el drawer es 100% móvil)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const src = readFileSync(resolve(process.cwd(), "src/components/AppHeader.tsx"), "utf8");
+    expect(botonDe(src, "Salir")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
+  });
+});
+
+describe("NotificationCenter — la campana decide su propio tamaño", () => {
+  // La deuda que cerró esta segunda vuelta: el tamaño vivía en AppHeader como
+  // `[&>div>button]:min-w-[44px]` + un reposicionamiento del punto rojo. Andaba,
+  // pero cualquier cambio acá adentro lo rompía en silencio desde otro archivo.
+  const leer = async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    return readFileSync(resolve(process.cwd(), "src/components/NotificationCenter.tsx"), "utf8");
+  };
+
+  it("acepta un tamaño y el táctil pide 44×44", async () => {
+    const src = await leer();
+    expect(src).toMatch(/size\?:\s*"compacta"\s*\|\s*"tactil"/);
+    expect(src).toContain("min-w-[44px] min-h-[44px]");
+  });
+
+  it("el default sigue siendo la campana chica del escritorio", async () => {
+    const src = await leer();
+    expect(src).toMatch(/size = "compacta"/);
+  });
+
+  it("el punto rojo se reancla en modo táctil y no se va a la esquina", async () => {
+    const src = await leer();
+    // En 44×44 las esquinas quedan lejos del ícono de 16px.
+    expect(src).toMatch(/tactil \? "top-2 right-2" : "-top-0\.5 -right-0\.5"/);
+  });
+
+  it("la campana tiene nombre accesible, no solo title", async () => {
+    const src = await leer();
+    expect(src).toContain('aria-label="Notificaciones"');
+  });
+});
+
+describe("/home — el encabezado propio, que no pasa por AppHeader", () => {
+  // /home NO usa AppHeader: tiene su propio encabezado, así que los 44×44 de la
+  // primera vuelta nunca llegaron acá. Medido en 390×844: "Modo oscuro" 22×21 y
+  // "Salir" 29×21 — los dos targets más chicos de toda la app, en la primera
+  // pantalla que ve todo el mundo al entrar.
+  const leer = async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    return readFileSync(resolve(process.cwd(), "src/app/home/page.tsx"), "utf8");
+  };
+
+  it("el botón de modo oscuro usa IconButton (44×44 garantizados)", async () => {
+    const src = await leer();
+    expect(src).toContain('import IconButton from "@/components/IconButton"');
+    expect(src).toMatch(/<IconButton[\s\S]*?label=\{darkMode \? "Modo claro" : "Modo oscuro"\}/);
+  });
+
+  it("el botón Salir del home pide 44×44", async () => {
+    const src = await leer();
+    expect(botonDe(src, "Salir")).toMatch(/min-h-\[44px\][\s\S]*min-w-\[44px\]|min-w-\[44px\][\s\S]*min-h-\[44px\]/);
+  });
+
+  it("ninguno de los dos vuelve al px-1 suelto de antes", async () => {
+    const src = await leer();
+    expect(src).not.toContain('className="text-sm text-gray-400 hover:text-black transition px-1"');
   });
 });

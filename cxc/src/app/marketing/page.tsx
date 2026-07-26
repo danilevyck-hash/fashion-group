@@ -152,7 +152,9 @@ function MarketingPage() {
             <button
               type="button"
               onClick={() => router.push("/marketing")}
-              className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1"
+              /* Volver era texto suelto (~20 px de alto): 44 de área táctil,
+                 con -my-1 para no separar el contenido de abajo. */
+              className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
             >
               ← Proyectos
             </button>

@@ -5,6 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import VendedorSwitchSection from "./VendedorSwitchSection";
+import IconButton from "@/components/IconButton";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
@@ -320,7 +321,10 @@ export default function UsuariosPage() {
                     onChange={e => setUName(e.target.value)}
                     placeholder="Nombre del usuario"
                     autoFocus
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
+                    /* text-base en móvil: con letra < 16px Safari hace zoom al
+                       enfocar y el modal se sale de pantalla. Desde sm vuelve
+                       al text-sm de siempre (desktop igual que antes). */
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
                   />
                 </div>
 
@@ -334,29 +338,38 @@ export default function UsuariosPage() {
                       value={uPassword}
                       onChange={e => setUPassword(e.target.value)}
                       placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 8 caracteres"}
-                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-10 text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
+                      /* text-base en móvil (anti-zoom de Safari) y pr-12 para
+                         dejarle 44px al botón del ojo, que antes cabía en 40. */
+                      className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 pr-12 text-base sm:text-sm font-mono placeholder:text-gray-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowModalPw(s => !s)}
+                    {/* iPhone: el ojo medía 28×28 (p-1.5 + ícono de 16) y es de
+                        SOLO ícono → IconButton, que garantiza 44×44 y exige
+                        aria-label. Va pegado al borde derecho (right-0) porque
+                        ahora ocupa los 44px que le reserva el pr-12 del input.
+                        El title dinámico se conserva: es el copy de siempre. */}
+                    <IconButton
+                      label={showModalPw ? "Ocultar contraseña" : "Ver contraseña"}
                       title={showModalPw ? "Ocultar" : "Ver"}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1.5 rounded transition"
+                      onClick={() => setShowModalPw(s => !s)}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                     >
                       {showModalPw ? (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
                       ) : (
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                       )}
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
+                  {/* <select> NATIVO: con letra < 16px Safari también hace zoom
+                      al desplegarlo. text-base en móvil, text-sm desde sm. */}
                   <select
                     value={uRole}
                     onChange={e => setURole(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm focus:outline-none focus:border-teal-700 transition"
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm focus:outline-none focus:border-teal-700 transition"
                   >
                     <option value="admin">Admin — acceso total</option>
                     <option value="secretaria">Secretaria — operaciones diarias</option>
@@ -379,14 +392,20 @@ export default function UsuariosPage() {
                     value={uCompany}
                     onChange={e => setUCompany(e.target.value)}
                     placeholder="vistana, fashion_wear, etc."
-                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
+                    /* text-base en móvil — anti-zoom de Safari, igual que los
+                       demás campos del modal. */
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
                   />
                   <p className="text-xs text-gray-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
                 </div>
 
                 {/* Override de módulos per-usuario */}
                 <div className="pt-1">
-                  <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  {/* El cuadradito nativo mide 16×16 y no se puede agrandar sin
+                      que se vea mal. El área táctil de 44 la pone la <label>
+                      que lo envuelve: toda la fila (incluido el texto) activa
+                      el checkbox porque el input está adentro. */}
+                  <label className="flex min-h-[44px] items-center justify-between gap-3 cursor-pointer">
                     <span className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
                     <input
                       type="checkbox"
@@ -412,9 +431,12 @@ export default function UsuariosPage() {
                       {MODULES.map(mod => {
                         const checked = uModules.includes(mod.key);
                         return (
+                          /* Misma receta: la fila-<label> da los 44px de alto
+                             (px-3 py-2 daba 36) y el cuadradito nativo se
+                             queda en 16 — es la casilla, no el target. */
                           <label
                             key={mod.key}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-teal-50 border-teal-200" : "border-gray-200 hover:bg-gray-50"}`}
+                            className={`flex min-h-[44px] items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${checked ? "bg-teal-50 border-teal-200" : "border-gray-200 hover:bg-gray-50"}`}
                           >
                             <input
                               type="checkbox"
@@ -434,17 +456,20 @@ export default function UsuariosPage() {
                 {editUserId && <VendedorSwitchSection userId={editUserId} showToast={showToast} />}
               </div>
 
+              {/* iPhone: Cancelar medía 91×37 y Guardar 94×37 — los dos por
+                  debajo de los 44 de alto. min-h + inline-flex centrado; el
+                  padding horizontal y el copy no cambian. */}
               <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
                 <button
                   onClick={() => setShowUserModal(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition"
+                  className="inline-flex min-h-[44px] items-center justify-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={saveUser}
                   disabled={savingUser}
-                  className="px-5 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition disabled:opacity-50"
+                  className="inline-flex min-h-[44px] items-center justify-center px-5 py-2 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition disabled:opacity-50"
                 >
                   {savingUser ? "Guardando..." : "Guardar"}
                 </button>

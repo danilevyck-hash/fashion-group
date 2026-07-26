@@ -95,7 +95,9 @@ export function ProyectoForm({
               setTiendaCodigo("");
             }}
             placeholder="Busca el cliente en el directorio…"
-            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
+            /* text-base en mobile: con text-sm (14px) Safari hace zoom al
+               enfocar. min-h-[44px] porque el campo medía 39 de alto. */
+            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
           />
           <p className="text-xs text-gray-400 mt-1">
             Elige del directorio para vincular; si no está, se guarda como texto
@@ -116,7 +118,7 @@ export function ProyectoForm({
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Opcional — ej: Remodelación tienda Abril 2026"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
           />
         </div>
 
@@ -133,7 +135,7 @@ export function ProyectoForm({
             onChange={(e) => setNotas(e.target.value)}
             placeholder="Opcional — contexto, referencias, período"
             rows={3}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none resize-y"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none resize-y"
           />
         </div>
       </div>
@@ -144,7 +146,7 @@ export function ProyectoForm({
             type="button"
             onClick={onCancel}
             disabled={enviando}
-            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] inline-flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -152,7 +154,7 @@ export function ProyectoForm({
         <button
           type="submit"
           disabled={!puedeGuardar}
-          className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition disabled:opacity-50"
+          className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-50"
         >
           {enviando ? "Creando…" : "Crear proyecto"}
         </button>

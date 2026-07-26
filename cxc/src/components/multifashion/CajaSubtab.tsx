@@ -69,7 +69,10 @@ export function CajaSubtab() {
             value={fecha}
             max={hoy}
             onChange={(e) => { if (e.target.value) setFecha(e.target.value); }}
-            className="border border-gray-200 rounded-md px-3 min-h-[44px] text-sm tabular-nums outline-none focus:border-black transition bg-white"
+            /* text-base en móvil: Safari hace zoom automático al enfocar
+               cualquier input con letra < 16px (text-sm = 14px) y la página
+               queda descuadrada. Desde sm vuelve al text-sm de siempre. */
+            className="border border-gray-200 rounded-md px-3 min-h-[44px] text-base sm:text-sm tabular-nums outline-none focus:border-black transition bg-white"
           />
         </div>
         {data && (
@@ -79,7 +82,9 @@ export function CajaSubtab() {
             <button
               onClick={() => mutate()}
               disabled={isValidating}
-              className="rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-300 transition active:scale-[0.97] disabled:opacity-40"
+              /* Medía ~28px de alto: por debajo de los 44 de la regla táctil.
+                 min-h + inline-flex centra el texto sin cambiar el copy. */
+              className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-gray-200 px-2.5 text-xs font-medium text-gray-600 hover:border-gray-300 transition active:scale-[0.97] disabled:opacity-40"
             >
               {isValidating ? "Actualizando…" : "Actualizar"}
             </button>

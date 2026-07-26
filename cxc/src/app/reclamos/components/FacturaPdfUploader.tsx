@@ -122,7 +122,8 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           <button
             type="button"
             onClick={() => setPdfLightbox(pdfUrl)}
-            className="text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition shrink-0"
+            /* py-1 sobre text-xs dejaba el botón en ~24 px de alto. */
+            className="text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-3 active:scale-[0.97] transition shrink-0 inline-flex items-center justify-center min-h-[44px]"
           >
             Ver factura
           </button>
@@ -161,7 +162,9 @@ export default function FacturaPdfUploader({ pdfUrl, onUploaded, onExtracted }: 
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={subiendo}
-          className="text-xs font-medium border border-gray-200 rounded px-2 py-1 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50"
+          /* Medía 102.4×28: en iPhone el único modo de elegir el PDF es este
+             botón (no hay drag-and-drop), así que tiene que ser tocable. */
+          className="text-xs font-medium border border-gray-200 rounded px-3 text-gray-600 hover:text-black active:scale-[0.97] transition shrink-0 disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]"
         >
           {pdfUrl ? "Reemplazar" : "Elegir archivo"}
         </button>

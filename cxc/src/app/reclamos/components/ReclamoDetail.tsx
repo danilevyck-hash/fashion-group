@@ -241,12 +241,14 @@ export default function ReclamoDetail({
         ]}
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
-      <div className="mb-4">
-        <button onClick={onBackToEmpresa ?? onBack} className="text-sm text-gray-400 hover:text-black transition">← {current.empresa}</button>
+      {/* Los dos "volver" eran líneas de texto de 18 px de alto. -my-2 y -ml-2
+          absorben el padding para que la fila siga donde estaba. */}
+      <div className="-mt-2 mb-2 flex items-center flex-wrap">
+        <button onClick={onBackToEmpresa ?? onBack} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -ml-2">← {current.empresa}</button>
         {onBackToReclamos && (
           <>
-            <span className="text-gray-300 mx-2">·</span>
-            <button onClick={onBackToReclamos} className="text-sm text-gray-400 hover:text-black transition">Todos los reclamos</button>
+            <span className="text-gray-300">·</span>
+            <button onClick={onBackToReclamos} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2">Todos los reclamos</button>
           </>
         )}
       </div>
@@ -261,23 +263,26 @@ export default function ReclamoDetail({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mt-3 max-w-2xl">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Empresa *</span>
-                <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
+                {/* Cabecera en edición: py-1.5 sobre text-sm dejaba los campos en
+                    ~34 px y con 14px Safari hacía zoom al enfocar. En sm+ vuelve
+                    al tamaño denso original. */}
+                <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none bg-transparent min-h-[44px] sm:min-h-0">
                   {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">N° Factura *</span>
-                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
               </label>
               {!esActiveShoes(editEmpresa) && (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-gray-500">N° Pedido *</span>
-                  <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+                  <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
                 </label>
               )}
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Fecha *</span>
-                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-500">Notas</span>
@@ -290,7 +295,8 @@ export default function ReclamoDetail({
                     e.target.style.height = `${e.target.scrollHeight}px`;
                   }}
                   rows={3}
-                  className="rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition resize-y overflow-auto"
+                  /* text-base en móvil: con 14px Safari hace zoom al enfocar. */
+                  className="rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition resize-y overflow-auto"
                   style={{ minHeight: "4.5rem", maxHeight: "12rem" }}
                 />
               </label>
@@ -334,7 +340,8 @@ export default function ReclamoDetail({
                 <button
                   type="button"
                   onClick={() => setFacturaLightbox(current.factura_pdf_url ?? null)}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2.5 py-1.5 active:scale-[0.97] transition"
+                  /* py-1.5 sobre text-xs dejaba el botón en 28 px de alto. */
+                  className="mt-2 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-3 min-h-[44px] active:scale-[0.97] transition"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                   Ver factura
@@ -357,27 +364,32 @@ export default function ReclamoDetail({
       {/* Action bar — en edición se vuelve Guardar / Cancelar (edición in-place) */}
       {editMode ? (
         <div className="flex items-center gap-4 mb-6 flex-wrap">
-          <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
+          {/* "Guardar" quedaba en 40 px y "Cancelar" en 18. */}
+          <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[44px]">
             {editSaving ? "Guardando…" : "Guardar"}
           </button>
-          <button onClick={() => setEditMode(false)} disabled={editSaving} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50">Cancelar</button>
+          <button onClick={() => setEditMode(false)} disabled={editSaving} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] px-2">Cancelar</button>
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
-          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
+          {/* Las 3 píldoras quedaban en ~38 px de alto en iPhone (py-2.5 sobre
+              text-xs). min-h-[44px] solo en móvil: en escritorio la barra sigue
+              compacta con su py-1.5. */}
+          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center justify-center gap-1 min-h-[44px] sm:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
             Editar
           </button>
-          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
+          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] sm:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
             {excelBusy ? "Generando Excel…" : "Descargar Excel"}
           </button>
-          <button onClick={downloadPdf} disabled={pdfBusy} title="Descargar el PDF de este reclamo (datos, ítems, recuperación y evidencia fotográfica)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
+          <button onClick={downloadPdf} disabled={pdfBusy} title="Descargar el PDF de este reclamo (datos, ítems, recuperación y evidencia fotográfica)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] sm:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
             {pdfBusy ? "Generando PDF…" : "Descargar PDF"}
           </button>
           {role === "admin" && (
-            <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center gap-1">
+            // Acción destructiva de solo texto: era una línea de 16 px de alto.
+            <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center justify-center gap-1 min-h-[44px] px-2 -mr-2">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
               Eliminar
             </button>
@@ -391,11 +403,12 @@ export default function ReclamoDetail({
         <div className="mb-6">
           {comprobanteCard}
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <button onClick={() => onChangeEstado("En proceso")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></svg>
               Pasar a En proceso
             </button>
-            <button onClick={() => onChangeEstado("Pagado")} className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all flex items-center gap-2" title="Salto directo: reclamo pagado de inmediato">
+            {/* Botones de cambio de estado: py-2.5 sobre text-sm daba 40 px. */}
+            <button onClick={() => onChangeEstado("Pagado")} className="border border-gray-300 text-gray-700 px-5 rounded-md text-sm font-medium hover:bg-gray-50 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]" title="Salto directo: reclamo pagado de inmediato">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               Marcar como Pagado
             </button>
@@ -407,11 +420,12 @@ export default function ReclamoDetail({
         <div className="mb-6">
           {comprobanteCard}
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center justify-center gap-2 min-h-[44px]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               Marcar como Pagado
             </button>
-            <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Creado">← Volver a Creado</button>
+            {/* Rollback de estado: era una línea de texto de 16 px de alto. */}
+            <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Corrección: regresar a Creado">← Volver a Creado</button>
           </div>
         </div>
       )}
@@ -423,7 +437,8 @@ export default function ReclamoDetail({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               Ciclo completado — Pagado
             </span>
-            <button onClick={() => onChangeEstado("En proceso")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a En proceso">← Volver a En proceso</button>
+            {/* Rollback de estado: era una línea de texto de 16 px de alto. */}
+            <button onClick={() => onChangeEstado("En proceso")} className="text-xs text-gray-400 hover:text-gray-700 transition inline-flex items-center justify-center min-h-[44px] px-2" title="Corrección: regresar a En proceso">← Volver a En proceso</button>
           </div>
         </div>
       )}
@@ -492,9 +507,10 @@ export default function ReclamoDetail({
                     {s.nota_credito && <span className="text-gray-500"> · NC {s.nota_credito}</span>}
                     <span className="text-gray-400"> · {fmtDate(s.fecha)}</span>
                   </div>
+                  {/* Quitar una NC: era una línea de texto de 16 px de alto. */}
                   <button
                     onClick={() => onRemoveSettlement(s.id)}
-                    className="text-xs text-gray-400 hover:text-red-600 transition shrink-0 ml-3"
+                    className="text-xs text-gray-400 hover:text-red-600 transition shrink-0 ml-1 inline-flex items-center justify-center min-h-[44px] px-2 -my-2"
                   >
                     Quitar
                   </button>
@@ -507,34 +523,37 @@ export default function ReclamoDetail({
 
           {/* Agregar NC (settlement fraccionado) */}
           {ncOpen ? (
+            /* Alta de nota de crédito: los 3 campos venían con text-sm (zoom de
+               Safari al enfocar) y ~36 px de alto; los 2 botones, 36. */
             <div className="rounded-md border border-gray-200 p-3">
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-xs text-gray-500">Monto recuperado *</span>
                   <input type="number" inputMode="decimal" min="0" step="0.01" value={ncMonto}
                     onChange={(e) => setNcMonto(e.target.value)} placeholder="0.00"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm tabular-nums outline-none focus:border-black transition" />
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm tabular-nums outline-none focus:border-black transition min-h-[44px]" />
                 </label>
                 <label className="block">
                   <span className="text-xs text-gray-500">Fecha *</span>
                   <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
                 <label className="col-span-2 block">
                   <span className="text-xs text-gray-500">N° nota de crédito (opcional)</span>
                   <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
                 </label>
               </div>
               <div className="mt-3 flex gap-2">
                 <button onClick={() => { setNcOpen(false); setNcMonto(""); setNcNum(""); }}
-                  className="flex-1 rounded-md border border-gray-200 py-2 text-sm hover:bg-gray-50 transition">Cancelar</button>
+                  className="flex-1 rounded-md border border-gray-200 text-sm hover:bg-gray-50 transition inline-flex items-center justify-center min-h-[44px]">Cancelar</button>
                 <button onClick={submitNc}
-                  className="flex-1 rounded-md bg-black py-2 text-sm text-white active:scale-[0.97] transition">Guardar NC</button>
+                  className="flex-1 rounded-md bg-black text-sm text-white active:scale-[0.97] transition inline-flex items-center justify-center min-h-[44px]">Guardar NC</button>
               </div>
             </div>
           ) : (
-            <button onClick={() => setNcOpen(true)} className="text-xs font-medium text-blue-600 hover:underline">
+            /* Enlace de solo texto: era una línea de 16 px de alto. */
+            <button onClick={() => setNcOpen(true)} className="text-xs font-medium text-blue-600 hover:underline inline-flex items-center min-h-[44px] px-2 -mx-2 -mb-2">
               + Agregar nota de crédito
             </button>
           )}
@@ -581,8 +600,9 @@ export default function ReclamoDetail({
                             <div className="flex items-center gap-1">
                               <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
                                 onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
-                              <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black py-2 px-3">OK</button>
-                              <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black py-2 px-3">x</button>
+                              {/* "OK" / "x" quedaban en 36 px de alto con py-2. */}
+                              <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">OK</button>
+                              <button aria-label="Cancelar el motivo nuevo" onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black inline-flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">x</button>
                             </div>
                           ) : (
                             <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
@@ -593,13 +613,15 @@ export default function ReclamoDetail({
                           )}
                         </td>
                         <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                        <td className="py-2 text-center">{editItems.length > 1 && <button onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
+                        {/* Solo ícono ("×"): sin área mínima quedaba en ~10×20 px. */}
+                        <td className="py-2 text-center">{editItems.length > 1 && <button aria-label="Quitar ítem" title="Quitar ítem" onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </ScrollableTable>
-              <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
+              {/* Botón de solo texto: medía 21 px de alto. */}
+              <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar fila</button>
             </>
           ) : (
             <ScrollableTable minWidth={700}>
@@ -653,7 +675,10 @@ export default function ReclamoDetail({
               return (
                 <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(src)}>
                   <img src={src} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200" />
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                  {/* El círculo se ve de 28 px a propósito (más grande taparía la
+                      miniatura), pero el área de toque real llega a 44 con el
+                      pseudo-elemento transparente ::after. */}
+                  <button aria-label="Eliminar foto" title="Eliminar foto" onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center after:absolute after:-inset-2 after:rounded-full after:content-['']">×</button>
                 </div>
               );
             })}
@@ -686,8 +711,9 @@ export default function ReclamoDetail({
       <div className="mb-8">
         <div className="text-sm font-semibold text-gray-700 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
-          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none" />
-          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Agregar</button>
+          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
+          {/* py-1.5 dejaba "Agregar" en 32 px de alto. */}
+          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] shrink-0">Agregar</button>
         </div>
         {seg.map((s) => (
           <div key={s.id} className="border-b border-gray-50 py-2">

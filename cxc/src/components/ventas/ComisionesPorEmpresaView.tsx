@@ -124,7 +124,9 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Select value={empresa} onValueChange={handleEmpresa}>
-          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+          {/* min-h-[44px] pisa el h-9 (36 px) del SelectTrigger compartido:
+              mismo criterio que los selectores de mes/año del shell. */}
+          <SelectTrigger className="w-[200px] min-h-[44px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {EMPRESAS.map((k) => (
               <SelectItem key={k} value={k}>{EMPRESA_KEY_TO_NAME[k] ?? k}</SelectItem>
@@ -136,14 +138,15 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
           <button
             onClick={handleExport}
             disabled={vendedores.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+            /* 39 px de alto medidos en la vista consolidada; mismo botón acá. */
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
           </button>
           {canConfig && (
             <button
               onClick={() => setConfigOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
             >
               <Settings className="h-3.5 w-3.5" /> Configurar
             </button>
@@ -161,7 +164,7 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
             <p className="text-rose-600">{error}</p>
             <button
               onClick={() => void load()}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
             >
               Reintentar
             </button>

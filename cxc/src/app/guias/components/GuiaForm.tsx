@@ -198,15 +198,18 @@ export default function GuiaForm({
     const hasTouchedError = touchedKey !== undefined && touchedValue !== undefined && touched[touchedKey] && !touchedValue.trim();
     const mobileSize = base.includes("text-sm") ? base.replace("text-sm", "text-base md:text-sm") : base;
     const mobilePadding = mobileSize.includes("py-2") ? mobileSize.replace("py-2", "py-3 md:py-2") : mobileSize.includes("py-1") ? mobileSize.replace("py-1", "py-2 md:py-1") : mobileSize;
-    return `${mobilePadding} ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
+    // Los campos de la tabla (py-1) quedaban en ~41 px aun con el padding móvil.
+    // El min-h solo aplica en móvil: en escritorio la tabla debe seguir densa.
+    return `${mobilePadding} min-h-[44px] md:min-h-0 ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
   }
 
   const saveStatus = saving ? "saving" : dirty ? "dirty" : lastSaved ? "saved" : null;
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
+    // La variante "small" de la barra sticky quedaba en 32 px de alto.
     const cls = size === "small"
-      ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40"
-      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40";
+      ? "bg-black text-white px-4 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]"
+      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 inline-flex items-center justify-center min-h-[44px]";
     return (
       <button type="button" onClick={() => handleSave()} disabled={saving || !items.some(i => i.cliente)} className={cls}>
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
@@ -230,7 +233,9 @@ export default function GuiaForm({
       {/* Sticky top bar */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">← Guías</button>
+          {/* Volver: era una línea de texto de 18 px de alto. -mx-2 para que el
+              "←" siga alineado con el borde izquierdo de la barra. */}
+          <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">← Guías</button>
           <span className="text-sm text-gray-300 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
           <StatusBadge />
         </div>
@@ -258,18 +263,18 @@ export default function GuiaForm({
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
               Modo de entrega <span className="text-red-500">*</span>
             </label>
-            {/* Segmented control modo_entrega */}
+            {/* Segmented control modo_entrega — py-2 dejaba 36 px de alto. */}
             <div className="flex rounded-lg bg-gray-100 p-0.5 mb-3">
               <button
                 type="button"
                 onClick={() => { setModoEntrega("transportista"); handleBlur("transportista"); }}
-                className={`flex-1 text-sm py-2 px-3 rounded-md transition font-medium ${modoEntrega === "transportista" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${modoEntrega === "transportista" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
                 Transportista
               </button>
               <button
                 type="button"
                 onClick={() => { setModoEntrega("entrega_directa"); setTransportistaId(null); }}
-                className={`flex-1 text-sm py-2 px-3 rounded-md transition font-medium ${modoEntrega === "entrega_directa" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${modoEntrega === "entrega_directa" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
                 Entrega directa
               </button>
             </div>
@@ -312,7 +317,8 @@ export default function GuiaForm({
               <input type="text" placeholder="Nombre de quien entrega" value={entregadoPorOtro}
                 onChange={e => setEntregadoPorOtro(e.target.value)}
                 onBlur={() => { if (entregadoPorOtro.trim()) addEntregador(entregadoPorOtro); }}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
+                /* text-base en móvil: con 14px Safari hace zoom al enfocar. */
+                className="w-full border-b border-gray-200 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black transition mt-3 min-h-[44px] md:min-h-0" />
             )}
           </div>
 
@@ -328,7 +334,8 @@ export default function GuiaForm({
                 value={numeroGuiaTransp}
                 onChange={e => setNumeroGuiaTransp(e.target.value)}
                 placeholder="Lo puedes poner ahora o al despachar"
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                /* text-base en móvil: con 14px Safari hace zoom al enfocar. */
+                className="w-full border-b border-gray-200 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black transition min-h-[44px] md:min-h-0" />
             </div>
           )}
         </div>
@@ -407,7 +414,8 @@ export default function GuiaForm({
                   {touched[`item-${idx}-bultos`] && !item.bultos && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 text-center">
-                  {items.length > 1 && <button onClick={() => handleRemoveRow(idx)} className="text-gray-400 hover:text-red-500 transition text-sm">×</button>}
+                  {/* Solo ícono ("×"): sin área mínima quedaba en ~10×20 px. */}
+                  {items.length > 1 && <button type="button" aria-label="Quitar fila" title="Quitar fila" onClick={() => handleRemoveRow(idx)} className="text-gray-400 hover:text-red-500 transition text-sm inline-flex items-center justify-center min-w-[44px] min-h-[44px]">×</button>}
                 </td>
               </tr>
             ))}
@@ -415,8 +423,10 @@ export default function GuiaForm({
         </table>
         </ScrollableTable>
 
-        <div className="mt-3">
-          <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
+        <div className="mt-1">
+          {/* Botón de solo texto: medía 21 px de alto. -mx-2 lo deja alineado
+              con el borde izquierdo de la tabla pese al padding nuevo. */}
+          <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar fila</button>
         </div>
       </div>
 
@@ -424,7 +434,8 @@ export default function GuiaForm({
       <div className="mb-6">
         <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones (opcional)</label>
         <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} rows={2}
-          className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+          /* text-base en móvil: con 14px Safari hace zoom al enfocar. */
+          className="w-full border-b border-gray-200 py-2 text-base md:text-sm outline-none focus:border-black transition resize-none" />
       </div>
 
       {/* Footer */}
@@ -445,7 +456,8 @@ export default function GuiaForm({
       {undoRow && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg border border-gray-700 flex items-center gap-3 z-50 text-sm">
           <span>Fila eliminada</span>
-          <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline">Deshacer</button>
+          {/* El toast dura 3s: el "Deshacer" tiene que ser fácil de acertar. */}
+          <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline inline-flex items-center min-h-[44px] px-2 -my-2">Deshacer</button>
         </div>
       )}
     </div>

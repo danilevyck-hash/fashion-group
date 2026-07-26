@@ -255,7 +255,7 @@ export default function CatalogoProductCard({
               <div className={t.qtyWrap}>
                 <button
                   onClick={() => setQty(qty - 1)}
-                  className={`h-9 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
+                  className={`h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-lg font-medium rounded-lg transition ${
                     qty === 1 ? "px-2 gap-1" : "w-11"
                   }`}
                 >
@@ -275,9 +275,14 @@ export default function CatalogoProductCard({
                   <span className={t.qtyNum}>{qty}</span>
                   <span className={t.qtyUnit}>{qty === 1 ? "bulto" : "bultos"}</span>
                 </button>
+                {/* `shrink-0`: sin esto el flex del qtyWrap achicaba el "+" de los
+                    44 px que pide `w-11` a 23 px reales en el iPhone — el "−" no
+                    se encoge porque su contenido lo sostiene, y el "+" (un solo
+                    carácter) se comía todo el ajuste. La altura h-9 se respeta a
+                    propósito: subirla cambiaría el alto fijo de la card. */}
                 <button
                   onClick={() => setQty(qty + 1)}
-                  className={`w-11 h-9 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
+                  className={`w-11 h-9 shrink-0 flex items-center justify-center ${t.qtyBtn} text-xl font-medium rounded-lg transition`}
                 >
                   +
                 </button>
