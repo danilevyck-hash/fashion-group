@@ -2,9 +2,12 @@
 
 // Filtros del catálogo (búsqueda + chips + orden), parametrizados por
 // MARCA_THEME: opciones de género/categoría y clases vienen del tema; los
-// chips de Oferta/Nuevo/Próximamente son feature (saleFilter, hoy solo Reebok).
+// chips de Oferta/Nuevo/Próximamente son feature (saleFilter, hoy solo Reebok),
+// y el chip "2 bultos o más" + el select de precio son feature (filtroBultos /
+// filtroPrecio, hoy solo Tommy — ver lib/catalogo/filtros-extra).
 
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS, type PrecioRango } from "@/lib/catalogo/filtros-extra";
 
 export type SaleFilter = "" | "oferta" | "nuevo" | "proximamente";
 
@@ -18,6 +21,10 @@ interface CatalogoFiltersProps {
   onCategoryChange: (v: string) => void;
   saleFilter?: SaleFilter;
   onSaleFilterChange?: (v: SaleFilter) => void;
+  bultosFilter?: boolean;
+  onBultosFilterChange?: (v: boolean) => void;
+  precioRango?: PrecioRango;
+  onPrecioRangoChange?: (v: PrecioRango) => void;
   sortBy: string;
   onSortByChange: (v: string) => void;
   filteredCount: number;
@@ -30,6 +37,8 @@ export default function CatalogoFilters({
   gender, onGenderChange,
   category, onCategoryChange,
   saleFilter = "", onSaleFilterChange,
+  bultosFilter = false, onBultosFilterChange,
+  precioRango = "", onPrecioRangoChange,
   sortBy, onSortByChange,
   filteredCount, onClearAll,
 }: CatalogoFiltersProps) {
@@ -37,8 +46,15 @@ export default function CatalogoFilters({
   const f = theme.filtros;
   const conCategorias = theme.features.categoryChips;
   const conSale = theme.features.saleFilter && !!onSaleFilterChange;
+  const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
+  const conPrecio = theme.features.filtroPrecio && !!onPrecioRangoChange;
 
-  const hasActiveFilters = !!(searchInput || gender || category || (conSale && saleFilter));
+  const hasActiveFilters = !!(
+    searchInput || gender || category ||
+    (conSale && saleFilter) ||
+    (conBultos && bultosFilter) ||
+    (conPrecio && precioRango)
+  );
 
   return (
     <div className="space-y-3 mb-6">
@@ -141,10 +157,37 @@ export default function CatalogoFilters({
             </div>
           </>
         )}
+
+        {conBultos && (
+          <>
+            <div className={f.divider} />
+
+            {/* Chip "2 bultos o más" (feature filtroBultos). Dice la REGLA y no
+                un juicio de valor sobre el inventario: la card no muestra
+                Disponibilidad ni Existencia, así que el cliente no tendría cómo
+                saber por qué desaparecieron productos. "Bulto" ya es vocabulario
+                de la card. Umbral: 2 bultos COMPLETOS (Tommy = 24 pzas). */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => onBultosFilterChange!(!bultosFilter)}
+                aria-pressed={bultosFilter}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+                  bultosFilter ? f.chipActive : f.chipInactive
+                }`}
+              >
+                {BULTOS_CHIP_LABEL}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Sort + count + clear */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Sort + count + clear.
+          `flex-wrap` en las dos filas: con DOS selects (Tommy: precio + orden)
+          la fila mide 404px y no entra en un iPhone de 390 — sin esto la
+          PÁGINA entera se iba en scroll horizontal (medido en Chrome a 390px).
+          En Reebok y Joybees no cambia nada: con un solo select nunca envuelve. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {hasActiveFilters && (
             <button onClick={onClearAll} className={f.clearAll}>
@@ -153,7 +196,21 @@ export default function CatalogoFilters({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 ml-auto">
+          {/* Rango de precio POR PIEZA (feature filtroPrecio). Va en un select
+              y no en chips: 4 opciones no caben en la fila de chips en móvil. */}
+          {conPrecio && (
+            <select
+              value={precioRango}
+              onChange={e => onPrecioRangoChange!(e.target.value as PrecioRango)}
+              aria-label="Filtrar por precio"
+              className={f.sortSelect}
+            >
+              {PRECIO_RANGO_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          )}
           <select
             value={sortBy}
             onChange={e => onSortByChange(e.target.value)}

@@ -10,6 +10,10 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { disponibleVendible } from "@/lib/catalogos/disponible";
+import {
+  cumpleBultosMinimos, precioEnRango, esPrecioRango, type PrecioRango,
+} from "@/lib/catalogo/filtros-extra";
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
@@ -45,6 +49,16 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
   const [saleFilter, setSaleFilter] = useState<SaleFilter>("");
+  // Filtros extra (hoy solo Tommy). El valor del query es dato no confiable:
+  // el rango se valida contra las opciones reales antes de entrar al estado.
+  const [bultosFilter, setBultosFilter] = useState(
+    theme.features.filtroBultos ? searchParams.get("bultos") === "1" : false,
+  );
+  const [precioRango, setPrecioRango] = useState<PrecioRango>(
+    theme.features.filtroPrecio && esPrecioRango(searchParams.get("precio"))
+      ? (searchParams.get("precio") as PrecioRango)
+      : "",
+  );
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -125,10 +139,13 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (gender) params.set("gender", gender);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
+    if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
+    if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
-  }, [gender, category, search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gender, category, search, bultosFilter, precioRango]);
 
   // loadProducts también lo reusa el botón "Actualizar ahora" (CatalogoSyncNow)
   // para refrescar la vista tras un sync manual exitoso.
@@ -194,6 +211,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
+    // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
+    // vendible), nunca la existencia — ojo que en esta página `_stock` es
+    // existencia (espejo de `stock`), por eso acá se llama a
+    // disponibleVendible y no se reusa `_stock`: si no, el vendedor vería 369
+    // productos donde el link público muestra 367. El tamaño de bulto sale del
+    // tema — el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
+    .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category)))
+    .filter(p => precioEnRango(p.price, precioRango))
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
@@ -282,6 +307,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (category) params.set("category", category);
     if (search) params.set("search", search);
     if (theme.features.saleFilter && saleFilter) params.set("filter", saleFilter);
+    // Los filtros extra viajan en el link: si el vendedor comparte "2 bultos o
+    // más", el cliente abre el catálogo ya filtrado igual que él.
+    if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
+    if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
     const qs = params.toString();
     const url = `${theme.publicoShareUrl}${qs ? `?${qs}` : ""}`;
     navigator.clipboard.writeText(url).then(() => {
@@ -365,7 +394,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setSaleFilter(""); setSortBy("relevancia");
+    setSaleFilter(""); setBultosFilter(false); setPrecioRango("");
+    setSortBy("relevancia");
   }
 
   function handleClearCart() {
@@ -551,6 +581,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onCategoryChange={setCategory}
           saleFilter={saleFilter}
           onSaleFilterChange={theme.features.saleFilter ? setSaleFilter : undefined}
+          bultosFilter={bultosFilter}
+          onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
+          precioRango={precioRango}
+          onPrecioRangoChange={theme.features.filtroPrecio ? setPrecioRango : undefined}
           sortBy={sortBy}
           onSortByChange={setSortBy}
           filteredCount={filteredCount}
