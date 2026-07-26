@@ -11,7 +11,9 @@ import {
   type ReportCell,
   type ReportColumn,
 } from "@/lib/excel-export";
-import XLSX from "xlsx-js-style";
+// Solo el TIPO: el valor XLSX vive dentro de @/lib/excel-export. Un import de
+// valor acá volvería a anclar la librería al grafo de quien importe este módulo.
+import type XLSX from "xlsx-js-style";
 
 export interface ProveedorExportRow {
   nombre: string;
