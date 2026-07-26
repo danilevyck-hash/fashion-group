@@ -680,7 +680,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
                 {showSuggestions && fCliente.length >= 2 && (() => {
                   const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
                   return matches.length > 0 ? (
@@ -703,23 +703,23 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 placeholder="Seleccionar..."
                 ariaLabel="Empresa"
                 onBlur={() => handleChequeBlur("empresa")}
-                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}
+                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`}
               />
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
-              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("numero", fNumero) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
-              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("monto", fMonto) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
-              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1 relative">
@@ -734,7 +734,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                   onBlur={() => handleChequeBlur("vendedor")}
                   actionLabel="+ Agregar vendedor"
                   onAction={() => setShowAddVendedor(true)}
-                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}
+                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-3 text-sm outline-none bg-transparent focus:border-black transition`}
                 />
               ) : (
                 <div className="flex items-center gap-2">
@@ -743,7 +743,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     value={newVendedorName}
                     onChange={(e) => setNewVendedorName(e.target.value)}
                     placeholder="Nombre del vendedor"
-                    className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition flex-1"
+                    className="border-b border-gray-200 py-3 text-sm outline-none bg-transparent focus:border-black transition flex-1"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && newVendedorName.trim()) {
@@ -794,7 +794,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Notas</label>
-              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition resize-none" />
+              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-3 text-sm outline-none bg-transparent focus:border-black transition resize-none" />
             </div>
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
