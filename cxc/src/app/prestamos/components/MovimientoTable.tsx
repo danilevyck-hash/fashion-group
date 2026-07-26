@@ -67,7 +67,7 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEd
           <button
             key={t.key}
             onClick={() => setFiltro(t.key)}
-            className={`flex items-center gap-1.5 py-1.5 px-3 text-sm rounded-md transition whitespace-nowrap ${filtro === t.key ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
+            className={`flex min-h-[44px] items-center gap-1.5 px-3 text-sm rounded-md transition whitespace-nowrap ${filtro === t.key ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
           >
             {t.label}
             {t.count > 0 && (
@@ -119,15 +119,15 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEd
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
                       {m.estado === "pendiente_aprobacion" && isAdmin && (
-                        <button onClick={() => onApprove(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition">Aprobar</button>
+                        <button onClick={() => onApprove(m.id)} className="inline-flex min-h-[44px] items-center justify-center text-xs bg-green-600 text-white px-3 rounded-md hover:bg-green-700 transition">Aprobar</button>
                       )}
                       {canEdit && (m.estado !== "aprobado" || (Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000)) && (
-                        <button onClick={() => onEdit(m)} className="p-1.5 hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">
+                        <button onClick={() => onEdit(m)} className="inline-flex h-11 w-11 items-center justify-center hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>
                       )}
                       {canDelete && (
-                        <button onClick={() => onDelete(m.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
+                        <button onClick={() => onDelete(m.id)} className="inline-flex h-11 w-11 items-center justify-center hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                       )}

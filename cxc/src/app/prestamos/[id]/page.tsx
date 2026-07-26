@@ -141,11 +141,11 @@ export default function PrestamoDetallePage() {
             onClick={actions.pagoQuincenal}
             disabled={saldo <= 0}
             title={saldo <= 0 ? "Préstamo saldado — no hay saldo por deducir" : undefined}
-            className="bg-emerald-600 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex min-h-[44px] items-center justify-center bg-emerald-600 text-white px-5 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}
           </button>
-          <button onClick={movForm.openMovModal} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">
+          <button onClick={movForm.openMovModal} className="inline-flex min-h-[44px] items-center justify-center bg-black text-white px-5 rounded-md text-sm hover:bg-gray-800 transition">
             + Nuevo Movimiento
           </button>
         </div>
