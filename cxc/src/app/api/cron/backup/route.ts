@@ -83,6 +83,7 @@ import { gzipSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
+import { sendTelegramAlert, shortError } from "@/lib/telegram";
 import {
   replicateBackupToR2,
   replicateStorageToR2,
@@ -482,20 +483,60 @@ export async function GET(req: NextRequest) {
     errores,
   };
   const metaBuf = Buffer.from(JSON.stringify(meta, null, 2), "utf-8");
-  const { error: metaErr } = await supabaseServer.storage
-    .from(BUCKET)
-    .upload(`${today}/${metaFile}`, metaBuf, {
-      contentType: "application/json",
-      upsert: true,
-    });
-  if (metaErr) errores.push({ file: metaFile, error: metaErr.message });
+
+  // ── NO PISAR UN ÍNDICE BUENO CON UNO VACÍO (27-jul-2026) ──────────────────
+  // El meta es el índice: sin él, restore.mjs no sabe QUÉ tablas restaurar ni
+  // cuántas filas esperar, aunque los .ndjson.gz estén ahí sanos.
+  //
+  // Pasó de verdad. La corrida `?grupo=switch` de las 23:30 UTC del 26-jul cayó
+  // justo dentro de la caída de Supabase (22:41→23:57): los 8 datasets fallaron
+  // con el HTML del 521 de Cloudflare, y el meta se subió igual —con
+  // `datasets: []`— PISANDO el bueno que la corrida de la 01:28 había dejado
+  // junto a los 8 archivos correctos. Resultado medido en R2: los datos del día
+  // estaban completos (59 objetos) pero el índice decía cero, y
+  // `restore.mjs --list` mostraba la fecha como "OK / switch 0".
+  // Es la peor forma de fallar: una copia buena que se ve inservible.
+  //
+  // Regla: si la corrida no salvó NI UN dataset y hubo errores, el meta viejo
+  // se queda. Un índice de ayer con datos de ayer sirve; uno vacío no sirve
+  // nunca. Una corrida parcial (algunos datasets sí) SÍ escribe: refleja lo que
+  // realmente quedó y sus `errores` lo dicen.
+  //
+  // Ojo con la aritmética del calendario: `?grupo=switch` corre 06:45 / 11:15 /
+  // 23:30 UTC. La de las 23:30 es la ÚLTIMA del día UTC — no tiene segunda
+  // oportunidad detrás. Sin este guard, cualquier caída de Supabase entre las
+  // 23:30 y la medianoche deja el día sin índice recuperable.
+  const corridaEsteril = results.length === 0 && errores.length > 0;
+  if (corridaEsteril) {
+    console.error(
+      `[backup${esGrupoSwitch ? "-switch" : ""}] 0 datasets y ${errores.length} errores: NO piso ${metaFile}`,
+    );
+    await sendTelegramAlert(
+      `⚠️ Backup ${grupoParam ?? "core"} del ${today}: no se pudo copiar ninguna tabla ` +
+        `(${errores.length} errores). Se conserva el índice anterior — el backup de ese día ` +
+        `NO se actualizó.\nPrimer error: ${shortError(errores[0]?.error)}`,
+    );
+  } else {
+    const { error: metaErr } = await supabaseServer.storage
+      .from(BUCKET)
+      .upload(`${today}/${metaFile}`, metaBuf, {
+        contentType: "application/json",
+        upsert: true,
+      });
+    if (metaErr) errores.push({ file: metaFile, error: metaErr.message });
+  }
 
   // El meta TAMBIÉN va a R2 (bloqueante duro que faltaba: sin él restore.mjs no
   // puede correr desde R2 — es su índice de datasets y de filas esperadas).
   // Bytes idénticos a los de Supabase para que ambas copias coincidan.
-  const r2Meta = await replicateBackupToR2([{ key: r2DataKey(today, metaFile), body: metaBuf }], startMs + R2_DEADLINE_MS, {
-    pruneBefore: manifestCutoff,
-  });
+  // Mismo guard que arriba, y por la MISMA razón: R2 es la única copia fuera de
+  // Supabase, así que es donde más caro sale dejar un índice vacío. Fue R2
+  // justamente lo que quedó roto el 26-jul (data/2026-07-26/meta-switch.json).
+  const r2Meta = corridaEsteril
+    ? { subidos: 0, bytes: 0, omitidos: 0, verificados: 0, reparados: 0, pendientes: 0, errores: [] as string[] }
+    : await replicateBackupToR2([{ key: r2DataKey(today, metaFile), body: metaBuf }], startMs + R2_DEADLINE_MS, {
+        pruneBefore: manifestCutoff,
+      });
   const r2Total: R2ReplicaResult = {
     ...r2,
     subidos: r2.subidos + r2Meta.subidos,
