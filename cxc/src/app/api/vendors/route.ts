@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import {
+  CAMPOS_OBLIGATORIOS,
+  respuestaErrorEscritura,
+  textoObligatorio,
+  validarObligatorios,
+} from "@/lib/campos-obligatorios";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +28,27 @@ export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
-  const { company_key, client_name, vendor_name } = body;
+
+  // Las TRES columnas son NOT NULL sin default. Y acá el riesgo era doble: dos
+  // de ellas (`company_key`, `client_name`) son además la llave del
+  // `onConflict`, así que un valor vacío no solo rompía el upsert — habría
+  // podido pisar la fila equivocada.
+  const falta = validarObligatorios(body, CAMPOS_OBLIGATORIOS.vendor_assignments);
+  if (falta) return falta;
 
   const { error } = await supabaseServer
     .from("vendor_assignments")
     .upsert(
-      { company_key, client_name, vendor_name, updated_at: new Date().toISOString() },
+      {
+        company_key: textoObligatorio(body.company_key),
+        client_name: textoObligatorio(body.client_name),
+        vendor_name: textoObligatorio(body.vendor_name),
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "company_key,client_name" }
     );
 
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  if (error) return respuestaErrorEscritura(error, { tabla: "vendor_assignments", accion: "CXC › asignar vendedor" });
   return NextResponse.json({ ok: true });
 }
 

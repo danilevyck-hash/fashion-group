@@ -27,6 +27,38 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+/**
+ * `pl_items.estilo` y `pl_items.producto` son NOT NULL sin default, y a
+ * diferencia de sus columnas vecinas (`total_pcs`, `is_os`) la RPC NO las
+ * envuelve en COALESCE. Un item al que le falte cualquiera de las dos hace
+ * 23502 y —como la RPC es una sola transacción— **tumba el packing list
+ * entero**, con un 500 que no dice cuál fila estaba mal.
+ *
+ * LAS DOS COLUMNAS NO SE TRATAN IGUAL, y la diferencia sale del parser:
+ *
+ * - `producto` es la DESCRIPCIÓN, y el parser produce `""` a propósito cuando
+ *   ninguna palabra clave calza (`parse-packing-list.ts`: `currentProducto =
+ *   producto ? normalizeProductName(producto) : ""`). O sea, vacío es un
+ *   resultado NORMAL y esperado → se normaliza a `""`, igual que sus vecinas.
+ *   Rechazar el PL por esto sería inventar un error que el parser ya decidió
+ *   que no lo es.
+ *
+ * - `estilo` es el SKU, o sea la IDENTIDAD de la fila: sin él el item no se
+ *   puede agrupar, ni validar contra los bultos, ni buscar después. El parser
+ *   NUNCA lo produce vacío (solo abre un item cuando matcheó un código de
+ *   estilo). Un item sin estilo significa que el payload llegó corrupto →
+ *   **es un error legítimo y se reporta**, nombrando la fila.
+ *
+ * Y se rechaza el PL COMPLETO, no se saltea la fila: saltearla guardaría un
+ * packing list con menos items y totales que ya no cuadran con el PDF — el
+ * mismo silencio que causó el bug de cheques, pero en los números. En modo
+ * lote cada PL se evalúa por separado, así que uno malo no tumba a los otros.
+ */
+function itemSinEstilo(plItems: PLIndexRow[]): number | null {
+  const i = plItems.findIndex((it) => typeof it?.estilo !== "string" || it.estilo.trim() === "");
+  return i === -1 ? null : i + 1;
+}
+
 // Save a single PL atómicamente via RPC save_packing_list.
 // La RPC envuelve los 4 pasos (DELETE items, DELETE header, INSERT header,
 // INSERT items) en una transacción plpgsql — si cualquier paso falla todo
@@ -50,7 +82,11 @@ async function saveSinglePL(
   };
   const pl_items_payload = plItems.map((item) => ({
     estilo: item.estilo,
-    producto: item.producto,
+    // Normalizado acá para que el arreglo funcione CON o SIN la migración
+    // `20260727190000` (que le agrega el COALESCE a la RPC). `?? ""` no pisa
+    // un producto real: solo convierte "no vino" en el vacío que la columna sí
+    // acepta.
+    producto: typeof item.producto === "string" ? item.producto : "",
     total_pcs: item.totalPcs,
     bultos: item.distribution,
     bulto_muestra: item.bultoMuestra,
@@ -83,6 +119,13 @@ export async function POST(req: NextRequest) {
       const plItems = pl.items || pl.indexRows || [];
       if (!pl.numeroPL || !plItems.length) {
         results.push({ numeroPL: pl.numeroPL || "?", error: "Datos incompletos" });
+        continue;
+      }
+      // Un item sin estilo tumbaba TODO el lote con un 500 mudo. Ahora solo
+      // este PL queda sin guardar, con el número de fila para poder mirarla.
+      const filaMala = itemSinEstilo(plItems);
+      if (filaMala !== null) {
+        results.push({ numeroPL: pl.numeroPL, error: `La fila ${filaMala} no tiene estilo (SKU). Revisa el PDF y vuelve a subirlo.` });
         continue;
       }
       const result = await saveSinglePL(
@@ -134,6 +177,13 @@ export async function POST(req: NextRequest) {
   }
   if (!plItems || !Array.isArray(plItems) || plItems.length === 0) {
     return NextResponse.json({ error: "El packing list debe tener al menos un item" }, { status: 400 });
+  }
+  const filaMala = itemSinEstilo(plItems);
+  if (filaMala !== null) {
+    return NextResponse.json(
+      { error: `La fila ${filaMala} no tiene estilo (SKU). Revisa el PDF y vuelve a subirlo.` },
+      { status: 400 },
+    );
   }
 
   const result = await saveSinglePL(numeroPL, empresa, fechaEntrega, totalBultos, totalPiezas, plItems);

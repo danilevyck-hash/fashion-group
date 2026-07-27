@@ -36,10 +36,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No hay filas para importar" }, { status: 400 });
     }
 
-    // Validate rows
-    for (const row of rows) {
+    // Validate rows.
+    // `joybees_products` exige sku, name, category y gender. `category` y
+    // `gender` tienen fallback más abajo; `name` NO tenía ninguno, y como el
+    // upsert va en bloque una sola fila sin nombre reventaba el import ENTERO
+    // con un 23502 (y devolvía el mensaje crudo de Postgres al navegador).
+    for (const [i, row] of rows.entries()) {
       if (!row.sku || typeof row.sku !== "string") {
-        return NextResponse.json({ error: "Fila invalida: SKU requerido" }, { status: 400 });
+        return NextResponse.json({ error: `Fila ${i + 1}: falta el SKU.` }, { status: 400 });
+      }
+      if (typeof row.name !== "string" || !row.name.trim()) {
+        return NextResponse.json(
+          { error: `Fila ${i + 1} (${row.sku}): falta el nombre del producto.` },
+          { status: 400 },
+        );
       }
     }
 

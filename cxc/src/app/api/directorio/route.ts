@@ -3,6 +3,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { csvWithBom, buildCsv, CSV_MIME } from "@/lib/csv-export";
+import {
+  CAMPOS_OBLIGATORIOS,
+  respuestaErrorEscritura,
+  textoObligatorio,
+  validarObligatorios,
+} from "@/lib/campos-obligatorios";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 
@@ -91,14 +97,19 @@ export async function POST(req: NextRequest) {
   const auth = requireRole(req, DIRECTORIO_ROLES);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
-  const { nombre, empresa, telefono, celular, correo, contacto, notas } = body;
 
+  // `directorio_clientes.nombre` es NOT NULL sin default (el resto de las
+  // columnas de texto sí tienen default `''`, por eso solo se exige esta).
+  const falta = validarObligatorios(body, CAMPOS_OBLIGATORIOS.directorio_clientes);
+  if (falta) return falta;
+
+  const { empresa, telefono, celular, correo, contacto, notas } = body;
   const { data, error } = await supabaseServer
     .from("directorio_clientes")
-    .insert({ nombre, empresa, telefono, celular, correo, contacto, notas })
+    .insert({ nombre: textoObligatorio(body.nombre), empresa, telefono, celular, correo, contacto, notas })
     .select()
     .single();
 
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › crear cliente" });
   return NextResponse.json(data);
 }
