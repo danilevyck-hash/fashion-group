@@ -15,6 +15,7 @@ import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio"
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
 import { avisoPedidoDelLink } from "@/lib/catalogo/telegram-pedido";
+import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -91,7 +92,7 @@ async function enviarPedidoDelLinkASwitch(
     .eq("order_number", numero)
     .maybeSingle();
   if (orderErr || !order?.id) {
-    await sendTelegramAlert(
+    await enviarSistema(
       `🚨 ${cfg.label} ${numero}: no se pudo ubicar el pedido para mandarlo a Switch (${shortError(orderErr?.message || "sin fila")}). Enviarlo a mano desde el admin.`,
     );
     return;
@@ -100,7 +101,7 @@ async function enviarPedidoDelLinkASwitch(
 
   const resuelto = await resolvePublicoSwitchActor(mainDb, cfg.empresaKey);
   if (!resuelto.ok) {
-    await sendTelegramAlert(
+    await enviarSistema(
       `⚠️ ${cfg.label} ${numero} (pedido del link) NO salió a Switch: ${resuelto.motivo}. El pedido está guardado — usar "Reintentar" en el admin cuando esté el dato.`,
     );
     return;
@@ -127,7 +128,7 @@ async function enviarPedidoDelLinkASwitch(
     .eq("order_id", orderId);
   const items = (itemRows || []) as unknown as EnvioItem[];
   if (!items.length) {
-    await sendTelegramAlert(`🚨 ${cfg.label} ${numero}: sin productos al mandarlo a Switch. Revisar en el admin.`);
+    await enviarSistema(`🚨 ${cfg.label} ${numero}: sin productos al mandarlo a Switch. Revisar en el admin.`);
     return;
   }
 
@@ -162,7 +163,7 @@ async function enviarPedidoDelLinkASwitch(
     carrera: "ya había un envío en curso",
   };
   if (result.kind in pendiente) {
-    await sendTelegramAlert(
+    await enviarSistema(
       `⚠️ ${cfg.label} ${numero} (pedido del link de ${pedido.cliente_nombre || "sin nombre"}) NO salió a Switch: ${pendiente[result.kind]}. Usar "Reintentar" en el admin.`,
     );
   }
@@ -326,7 +327,7 @@ async function handleConfirmar(
         // DEFAULT, ver publico-switch-actor) — es lo que lo diferencia del
         // pedido que mete un vendedor, que sí lleva cliente y vendedor reales.
         if (!ya) {
-          await sendTelegramAlert(
+          await enviarNegocio(
             avisoPedidoDelLink({
               label: cfg.label,
               cliente: pedido.cliente_nombre,
@@ -359,7 +360,7 @@ async function handleConfirmar(
             `${l.sku || l.name}: pidió ${formatBultosPiezas(l.pedido_pzas, l.bulto_pzas || 12)}, hay ${formatBultosPiezas(l.disponible_pzas, l.bulto_pzas || 12)}`,
         )
         .join(" · ");
-      await sendTelegramAlert(
+      await enviarNegocio(
         `⚠️ ${cfg.label} ${result.numero}: ${cortas.length} producto(s) con menos piezas de las pedidas — ${detalle}`,
       );
     }

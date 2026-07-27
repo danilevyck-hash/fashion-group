@@ -23,6 +23,7 @@ import { limpiarVariantesRetiradas } from "@/lib/catalogos/variantes-limpieza";
 import { lineaHousekeeping } from "@/lib/catalogos/variantes-housekeeping";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const linea = lineaHousekeeping(limpieza);
     const mensaje = linea ? `${resumen.mensaje}\n\n${linea}` : resumen.mensaje;
 
-    const sent = await sendTelegramAlert(mensaje);
+    const sent = await enviarNegocio(mensaje);
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

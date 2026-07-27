@@ -3,6 +3,7 @@ import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { runChequesAlert } from "@/lib/cheques-alert";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 const CRON_NAME = "cheques-alert";
 
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
 
   // Test mode: dispara un mensaje Telegram de prueba.
   if (req.nextUrl.searchParams.get("test") === "true") {
-    const sent = await sendTelegramAlert(
+    const sent = await enviarNegocio(
       `🧪 Cheques por vencer (PRUEBA)\n1 cheque — ${money(1000)}\n• PRUEBA TEST (Vistana) ${money(1000)} — MAÑANA`,
     );
     return NextResponse.json({ message: "Telegram de prueba", sent });

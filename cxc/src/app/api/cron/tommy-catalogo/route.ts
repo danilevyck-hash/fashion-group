@@ -29,6 +29,7 @@ import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { buildNuevosSinFotoMsg } from "@/lib/catalogos/fotos-faltantes";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // techo del plan (Pro + Fluid)
@@ -90,7 +91,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     // (anti-ruido; los viejos sin foto los cubre el resumen semanal). Mensaje
     // compartido por las 3 marcas: lib/catalogos/fotos-faltantes.ts.
     const msgSinFoto = buildNuevosSinFotoMsg("Tommy", result.nuevosSinFotoTotal);
-    if (msgSinFoto) await sendTelegramAlert(msgSinFoto);
+    if (msgSinFoto) await enviarNegocio(msgSinFoto);
     if (!result.hadError) await recordCronHeartbeat(CRON_NAME);
   }
 

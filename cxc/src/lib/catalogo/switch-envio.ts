@@ -17,7 +17,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { shortError } from "@/lib/telegram";
+import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
   createSwitchClient,
   SwitchApiError,
@@ -239,7 +240,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
         .from(p.enviosTable)
         .update({ estado: "error", error_detalle: e.message, updated_at: new Date().toISOString() })
         .eq("id", envio.id);
-      await sendTelegramAlert(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
+      await enviarSistema(`🚨 Envío a Switch FALLÓ — ${p.marcaLabel} ${p.orderNumber}: ${shortError(e.message)} (se puede reintentar desde la confirmación)`);
       const detalle = hayPrecioEditado
         ? `Switch rechazó el cambio de precio: ${e.message}`
         : `Switch rechazó el pedido: ${e.message}`;
@@ -252,7 +253,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       .from(p.enviosTable)
       .update({ estado: "enviado", error_detalle: `AMBIGUO (sin respuesta de Switch): ${msg}`, updated_at: new Date().toISOString() })
       .eq("id", envio.id);
-    await sendTelegramAlert(`🚨 Envío a Switch AMBIGUO — ${p.marcaLabel} ${p.orderNumber}: Switch no respondió (${shortError(msg)}). REVISAR EL PANEL antes de reintentar.`);
+    await enviarSistema(`🚨 Envío a Switch AMBIGUO — ${p.marcaLabel} ${p.orderNumber}: Switch no respondió (${shortError(msg)}). REVISAR EL PANEL antes de reintentar.`);
     return { kind: "ambiguo", error: "Switch no respondió — el pedido pudo o no haberse creado. Revisa el panel de Switch antes de reintentar." };
   }
 
@@ -280,7 +281,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       .eq("id", envio.id);
   }
 
-  await sendTelegramAlert(
+  await enviarNegocio(
     `📦 Pedido ${p.marcaLabel} ${p.orderNumber} enviado a Switch → ${numeroInterno}${verificado ? " ✓ verificado" : " ⚠️ sin verificar"} · ${p.clienteNombre || `cliente ${p.clienteId}`} / ${p.vendedorNombre || `vendedor ${p.vendedorId}`}`,
   );
 

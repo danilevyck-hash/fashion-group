@@ -62,9 +62,29 @@ describe("isSwitchTransitorio (anti-ruido red, 17-jul-2026)", () => {
   it("LICENCIA y errores de negocio siguen siendo inmediatos", () => {
     expect(isSwitchTransitorio("Error de red en /x: LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
     expect(isSwitchTransitorio("Auth fallo: HTTP 400 — LICENCIA NO SE ENCUENTRA ACTIVA")).toBe(false);
-    expect(isSwitchTransitorio("Auth respondió 200 pero sin token: <!DOCTYPE html>")).toBe(false);
     expect(isSwitchTransitorio("Run previo atascado en 'running' (probable timeout); cerrado por el siguiente run.")).toBe(false);
     expect(isSwitchTransitorio(null)).toBe(false);
+  });
+
+  /**
+   * CAMBIO DELIBERADO (27-jul-2026, auditoría de alertas).
+   *
+   * Este caso afirmaba lo CONTRARIO: que la página de excepción de Switch
+   * alertara de inmediato. Era el bug. `outage-resumen.ts` ya clasificaba el
+   * mismo mensaje como "Switch estuvo caído… sin impacto" mientras alert-policy
+   * lo trataba como emergencia y le mandaba 200 caracteres de HTML crudo al
+   * celular de Daniel. Medido en producción: 5 ocurrencias en 30 días, las 5
+   * recuperadas solas en ≤12h, 0 sostenidas.
+   *
+   * Ahora es un transitorio como cualquier otro: se calla en la 1ª corrida y
+   * escala por streak si de verdad no se recupera. Ver alertas-canal.test.ts.
+   */
+  it("la página de excepción de Switch es un transitorio (se recupera sola)", () => {
+    expect(isSwitchTransitorio("Auth respondió 200 pero sin token: <!DOCTYPE html>")).toBe(true);
+    // …pero una LICENCIA vencida envuelta en HTML NO se silencia.
+    expect(
+      isSwitchTransitorio("LICENCIA NO SE ENCUENTRA ACTIVA <!DOCTYPE html>"),
+    ).toBe(false);
   });
 
   it("isSwitchSilenciable = 401 o transitorio", () => {

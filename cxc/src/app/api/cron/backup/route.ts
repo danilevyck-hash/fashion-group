@@ -81,9 +81,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { gzipSync } from "zlib";
 import { supabaseServer } from "@/lib/supabase-server";
-import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
+import {
+  recordCronHeartbeat,
+  logCronError,
+  cronSuccessHoyUtc,
+  recoveryStillComingToday,
+} from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { shortError } from "@/lib/telegram";
+import { enviarSistema } from "@/lib/alertas/canal";
+
+/**
+ * ¿El fallo de ESTA corrida de backup puede esperar a la próxima entrada del
+ * día en vez de avisarle a Daniel ahora mismo?
+ *
+ * EL PROBLEMA (medido, 30 días a jul-2026): cada grupo de backup tiene 2-3
+ * entradas en vercel.json (core 06:00/10:30/18:30, switch 06:45/11:15/23:30,
+ * storage 04:00/15:30). Las 2ª y 3ª son "segunda oportunidad" — existen
+ * precisamente para arreglar lo que falló en la 1ª. Pero el guard `cronSuccessHoyUtc`
+ * solo evita REPETIR EL TRABAJO; no puede retirar un mensaje ya enviado. Así que
+ * un fallo a las 06:00 le sonaba el celular aunque a las 10:30 se arreglara
+ * solo, y encima sin ningún mensaje de "ya está resuelto". 3 de las 5 alertas de
+ * backup del mes fueron exactamente eso.
+ *
+ * Eso viola la regla del canal de sistema: si se arregla solo en horas, no es un
+ * incidente — es el sistema funcionando.
+ *
+ * LO QUE NO CAMBIA (y es lo que hace seguro el cambio):
+ *   - La ÚLTIMA entrada del día SIEMPRE alerta. Si el backup de las 23:30 del
+ *     grupo switch falla, ya no hay red detrás → suena.
+ *   - El fallo se sigue PERSISTIENDO en cron_email_errors (telegram:false), así
+ *     que el rastro para auditar no se pierde.
+ *   - El heartbeat sigue sin registrarse → si TODAS las entradas del día fallan,
+ *     health-crons y el watchdog lo ven stale y alertan igual.
+ *   - `backup_r2_incompleto` (la carpeta de AYER) NO usa esto: mira un día ya
+ *     cerrado, no le queda ninguna oportunidad por delante.
+ */
+function alertaDeBackupEsperaSegundaOportunidad(cronName: string, horaUtc: number): boolean {
+  return recoveryStillComingToday(cronName, horaUtc);
+}
 import {
   replicateBackupToR2,
   replicateStorageToR2,
@@ -365,6 +401,10 @@ export async function GET(req: NextRequest) {
   if (grupoParam !== null && grupoParam !== "switch" && grupoParam !== "storage") {
     return NextResponse.json({ error: "grupo inválido (solo: switch, storage)" }, { status: 400 });
   }
+  // Ver `alertaDeBackupEsperaSegundaOportunidad` (abajo): decide si un fallo de
+  // ESTA corrida amerita despertar a Daniel o si conviene esperar a la próxima
+  // entrada del mismo grupo, que hoy todavía va a correr.
+  const horaUtcAhora = new Date().getUTCHours() + new Date().getUTCMinutes() / 60;
   const esGrupoSwitch = grupoParam === "switch";
   const esGrupoStorage = grupoParam === "storage";
   const cronName = esGrupoSwitch ? "backup-switch" : esGrupoStorage ? "backup-storage" : CRON_NAME;
@@ -412,7 +452,20 @@ export async function GET(req: NextRequest) {
     if (storageR2.errores.length > 0) {
       const detalle = storageR2.errores.join("; ");
       console.error("[backup-storage] réplica R2 con errores:", detalle);
-      await logCronError("backup_storage_r2", detalle);
+      const puedeEsperar = alertaDeBackupEsperaSegundaOportunidad(cronName, horaUtcAhora);
+      await logCronError(
+        "backup_storage_r2",
+        puedeEsperar ? `(sin avisar: queda otra corrida hoy) ${detalle}` : detalle,
+        null,
+        { telegram: false },
+      );
+      if (!puedeEsperar) {
+        await enviarSistema(
+          "No se pudo copiar la carpeta de fotos y archivos a la nube de respaldo, y hoy ya no " +
+            "queda otro intento.\nQué significa: las fotos de catálogos y los comprobantes de " +
+            "hoy están solo en un lugar.\nQué hacer: avisame para revisarlo.",
+        );
+      }
     }
     // Éxito aunque queden pendientes: el manifest los recupera en la corrida
     // siguiente (mismo contrato que la réplica interna). Solo un fallo de
@@ -511,10 +564,14 @@ export async function GET(req: NextRequest) {
     console.error(
       `[backup${esGrupoSwitch ? "-switch" : ""}] 0 datasets y ${errores.length} errores: NO piso ${metaFile}`,
     );
-    await sendTelegramAlert(
-      `⚠️ Backup ${grupoParam ?? "core"} del ${today}: no se pudo copiar ninguna tabla ` +
-        `(${errores.length} errores). Se conserva el índice anterior — el backup de ese día ` +
-        `NO se actualizó.\nPrimer error: ${shortError(errores[0]?.error)}`,
+    // Corrida estéril: SIEMPRE avisa, incluso si queda otra entrada hoy. No es
+    // "un backup que falló" sino el índice del día en riesgo — el caso que el
+    // 26-jul dejó `restore.mjs --list` mostrando "switch 0" con los datos sanos.
+    await enviarSistema(
+      `No se pudo guardar la copia de seguridad de hoy (${today}). Se conservó la copia ` +
+        `anterior, así que no se perdió nada.\nQué significa: si hoy hubiera que recuperar ` +
+        `datos, se recuperarían los de la última copia buena, no los de hoy.\n` +
+        `Qué hacer: avisame para revisarlo.\nDetalle: ${shortError(errores[0]?.error)}`,
     );
   } else {
     const { error: metaErr } = await supabaseServer.storage
@@ -548,20 +605,49 @@ export async function GET(req: NextRequest) {
     errores: [...r2.errores, ...r2Meta.errores],
   };
 
-  // Errores de R2 (best-effort): el backup a Supabase ya está a salvo → alerta
-  // Telegram SIN marcar el backup como fallido (nada de R2 entra a `errores`,
-  // que dispararía el 500). El manifest hace catch-up en la corrida siguiente.
+  // Errores de R2 (best-effort): el backup a Supabase ya está a salvo → nada de
+  // R2 entra a `errores` (que dispararía el 500). El manifest hace catch-up en
+  // la corrida siguiente — que es justo por qué esto puede esperar.
   if (r2Total.enabled && r2Total.errores.length > 0) {
     const detalleR2 = r2Total.errores.join("; ");
     console.error(`[${cronName}] réplica R2 con errores:`, detalleR2);
-    await logCronError(`${cronName.replace(/-/g, "_")}_r2`, detalleR2);
+    const puedeEsperar = alertaDeBackupEsperaSegundaOportunidad(cronName, horaUtcAhora);
+    await logCronError(
+      `${cronName.replace(/-/g, "_")}_r2`,
+      puedeEsperar ? `(sin avisar: queda otra corrida hoy) ${detalleR2}` : detalleR2,
+      null,
+      { telegram: false },
+    );
+    if (!puedeEsperar) {
+      await enviarSistema(
+        `La copia de seguridad de hoy se guardó, pero no se pudo mandar completa a la nube ` +
+          `de respaldo, y hoy ya no queda otro intento.\nQué significa: la copia existe, pero ` +
+          `por ahora en un solo lugar.\nQué hacer: avisame para revisarlo.\n` +
+          `Detalle: ${shortError(detalleR2)}`,
+      );
+    }
   }
 
   if (errores.length > 0) {
     const detalle = errores.map((e) => `${e.file}: ${e.error}`).join("; ");
     console.error(`[${cronName}] datasets con error:`, detalle);
-    // Backup incompleto → alerta Telegram y 500 (sin heartbeat → health-crons lo marca stale).
-    await logCronError(`${cronName.replace(/-/g, "_")}_incompleto`, detalle);
+    // Backup incompleto → 500 (sin heartbeat → health-crons lo marca stale). El
+    // aviso a Daniel espera si hoy queda otra entrada del grupo que lo repare.
+    const puedeEsperar = alertaDeBackupEsperaSegundaOportunidad(cronName, horaUtcAhora);
+    await logCronError(
+      `${cronName.replace(/-/g, "_")}_incompleto`,
+      puedeEsperar ? `(sin avisar: queda otra corrida hoy) ${detalle}` : detalle,
+      null,
+      { telegram: false },
+    );
+    if (!puedeEsperar) {
+      await enviarSistema(
+        `La copia de seguridad de hoy quedó incompleta (${errores.length} tabla(s) sin copiar) ` +
+          `y hoy ya no queda otro intento.\nQué significa: si hubiera que recuperar datos de ` +
+          `hoy, faltarían esas tablas.\nQué hacer: avisame para revisarlo.\n` +
+          `Detalle: ${shortError(errores[0]?.error)}`,
+      );
+    }
     return NextResponse.json(
       { ok: false, grupo: grupoParam ?? "core", date: today, datasets: results.length, errores },
       { status: 500 },
@@ -632,7 +718,14 @@ export async function GET(req: NextRequest) {
         : null;
     if (detalle) {
       console.error(`[${cronName}] réplica R2 incompleta:`, detalle);
-      await logCronError("backup_r2_incompleto", detalle);
+      // SIN espera de 2ª oportunidad, a propósito: esto mira AYER, un día ya
+      // cerrado. No le queda ninguna corrida por delante que lo pueda reparar.
+      await logCronError("backup_r2_incompleto", detalle, null, { telegram: false });
+      await enviarSistema(
+        `La copia de seguridad del ${ayer} quedó incompleta: ese día no se podría recuperar ` +
+          `entero si hiciera falta.\nQué significa: la red de seguridad de ese día tiene un ` +
+          `hueco (las copias de los otros días están bien).\nQué hacer: avisame para revisarlo.`,
+      );
     }
   }
 

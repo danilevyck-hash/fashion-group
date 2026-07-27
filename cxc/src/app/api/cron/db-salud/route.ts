@@ -25,7 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendTelegramAlert } from "@/lib/telegram";
+import { enviarSistema } from "@/lib/alertas/canal";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
     // endpoint dejó de responder. Se alerta con dedup propio para no repetir
     // el mismo mensaje en cada muestra de una caída larga.
     if (await debeAlertar(TIPO_SIN_LECTURA)) {
-      await sendTelegramAlert(mensajeSinLectura(detalle));
+      await enviarSistema(mensajeSinLectura(detalle));
       await logCronError(TIPO_SIN_LECTURA, detalle, null, { telegram: false });
     }
     return NextResponse.json({ error: detalle, alertado: true }, { status: 500 });
@@ -155,7 +155,7 @@ export async function GET(req: NextRequest) {
   let enviado = false;
   if (evaluacion.nivel !== "ok") {
     if (await debeAlertar(TIPO_ALERTA)) {
-      enviado = await sendTelegramAlert(mensajeRecursos(muestra, evaluacion));
+      enviado = await enviarSistema(mensajeRecursos(muestra, evaluacion));
       await logCronError(
         TIPO_ALERTA,
         `${evaluacion.nivel}: ${evaluacion.hallazgos.map((h) => h.texto).join(" | ")}`,

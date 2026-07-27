@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
+import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // techo del plan (Pro + Fluid)
@@ -34,7 +35,32 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
 
   // Solo registramos heartbeat si TODAS las empresas corrieron OK (igual criterio
   // que la reconciliación usa para los demás colaterales).
-  if (errors.length === 0) await recordCronHeartbeat(CRON_NAME);
+  //
+  // ── HUECO CERRADO (27-jul-2026) ──────────────────────────────────────────────
+  // Este era el ÚNICO sync de Switch que fallaba en SILENCIO ABSOLUTO: sin
+  // `alertSwitchCronErrors` y sin `logCronError`, lo único que quedaba era la
+  // AUSENCIA de heartbeat. Eso alcanza para que el watchdog lo note a las 26h,
+  // pero no deja ni una fila en cron_email_errors — o sea que un fallo de Cuentas
+  // por Pagar era invisible para cualquier auditoría posterior. De hecho, de los
+  // 58 errores de sync de los últimos 30 días, los de `proveedores` estaban entre
+  // los 38 que no dejaron NINGÚN rastro.
+  //
+  // Pasa por la MISMA política anti-ruido que los demás (no es una alerta nueva
+  // ruidosa): `sync-proveedores` sí escribe switch_sync_log con
+  // sync_type='proveedores', así que el streak funciona y un corte de red
+  // transitorio se calla en la 1ª corrida igual que en el resto.
+  if (errors.length === 0) {
+    await recordCronHeartbeat(CRON_NAME);
+  } else {
+    await alertSwitchCronErrors(
+      CRON_NAME,
+      errors.map((e) => ({
+        empresaKey: e.empresaKey,
+        syncType: "proveedores",
+        error: e.error ?? "error desconocido",
+      })),
+    );
+  }
 
   return NextResponse.json(
     { ok: errors.length === 0, results },

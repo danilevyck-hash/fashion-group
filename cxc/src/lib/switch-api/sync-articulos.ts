@@ -13,6 +13,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { esCostoSospechoso } from "./costo-guard";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 export interface ArticulosSyncResult {
   empresaKey: string;
@@ -48,7 +49,7 @@ async function alertarCostosSospechosos(empresaKey: string, filas: CostoSospecho
     })
     .join("\n");
   const extra = filas.length > 5 ? `\n…y ${filas.length - 5} más.` : "";
-  await sendTelegramAlert(
+  await enviarNegocio(
     `⚠️ Costo sospechoso en artículos — ${empresaKey}\n${detalle}${extra}\n` +
       `Se guardaron con costo $0 para no dañar el margen. ` +
       `Corrige el costo del artículo en Switch y relanza switch-articulos de ese día.`,

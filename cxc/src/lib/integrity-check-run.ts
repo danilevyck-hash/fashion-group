@@ -9,6 +9,7 @@
 
 import { runAllChecks, persistCheckResults, summarize, type CheckResult } from "@/lib/integrity-checks";
 import { sendTelegramAlert } from "@/lib/telegram";
+import { enviarSistema } from "@/lib/alertas/canal";
 
 const DASHBOARD_URL = "https://fashiongr.com/admin/data-health";
 
@@ -63,7 +64,7 @@ export async function runIntegrityCheck(): Promise<IntegrityRunResult> {
   const criticals = results.filter((r) => r.severity === "critical");
   let alertSent = false;
   if (criticals.length > 0) {
-    alertSent = await sendTelegramAlert(buildCriticalAlert(criticals));
+    alertSent = await enviarSistema(buildCriticalAlert(criticals));
   }
 
   return {
