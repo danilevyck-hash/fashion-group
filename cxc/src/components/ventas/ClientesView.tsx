@@ -16,6 +16,7 @@ import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { SortSheet } from "./SortSheet";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
 
@@ -254,13 +255,23 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   }, [orphans, empresa]);
 
   const filtered = useMemo(() => {
-    // Masters: universo sin huérfanos. La búsqueda sólo aplica a masters
-    // — la fila "Otros" permanece visible independiente del search text.
+    // Masters: universo sin huérfanos.
     const masters = universe.filter(c => !c.isOrphan);
     let r = masters.slice();
     if (search) {
-      const q = search.toLowerCase();
-      r = r.filter(c => c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+      // 🩸 BUSCAR ALCANZA TAMBIÉN A LOS HUÉRFANOS (27-jul-2026). Antes la
+      // búsqueda corría sólo sobre `masters`: un cliente sin match en
+      // clientes_master quedaba colapsado dentro de "Otros clientes (N)" y era
+      // IMPOSIBLE de encontrar escribiendo su nombre. Medido contra producción:
+      // 7 clientes con compras en los últimos 12 meses estaban en ese pozo
+      // (CEPREDENAC, NIPMAR, KAREN DUTY FREE, FERIA INT DE DAVID, ISABEL
+      // MARTINEZ, ALMACEN JORDANIA, MAZAR CITY SHOES) — justo los que le
+      // aparecieron a Daniel al buscar "mult". Escribir un nombre tiene que
+      // encontrar al cliente exista o no en el maestro.
+      //
+      // Y se compara normalizando espacios/acentos/mayúsculas, igual que el
+      // módulo Clientes: "multifashion" y "Multi Fashion" son la misma búsqueda.
+      r = [...masters, ...orphans].filter(c => coincideBusqueda(search, [c.nombre, c.id]));
     }
     r.sort((a, b) => {
       const sign = sortDir === "asc" ? 1 : -1;
@@ -277,9 +288,12 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
     // independiente del criterio. Razón: es una agregación de huérfanos
     // que no compite con clientes individuales — colocarla al fondo evita
     // que se mezcle entre clientes reales y confunda la lectura.
-    if (otrosRow) r.push(otrosRow);
+    // Con búsqueda activa la fila agregada NO va: sus integrantes ya se están
+    // buscando uno por uno, y dejarla puesta mostraba "Otros clientes (7)" como
+    // si fuera un resultado de la búsqueda cuando ninguno de los 7 coincidía.
+    if (otrosRow && !search) r.push(otrosRow);
     return r;
-  }, [universe, search, sortBy, sortDir, otrosRow]);
+  }, [universe, orphans, search, sortBy, sortDir, otrosRow]);
 
   const onSort = (col: SortKey) => {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");

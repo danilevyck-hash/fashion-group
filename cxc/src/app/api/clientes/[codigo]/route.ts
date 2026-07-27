@@ -12,6 +12,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+// La definición de "compras del año" vive en UN solo lugar y la comparten la
+// ficha y el listado — si divergieran, la misma pantalla diría dos números
+// distintos para el mismo cliente.
+import { ymdPanama, montoFirmado, ventanaAnioPanama, aCentavos } from "@/lib/clientes-ytd";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +50,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   }
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
+  // El año se corta en hora PANAMÁ. Antes era `new Date().getFullYear()`, que en
+  // el servidor (UTC) ya salta al año siguiente a las 19:00 del 31-dic de
+  // Panamá y vaciaba el YTD 5 horas antes de tiempo.
+  const { desde: anioDesde, hasta: anioHasta } = ventanaAnioPanama();
+  const yearStart = anioDesde.slice(0, 10);
 
   // Puente por ID: pares (empresa_key, cliente_switch_id) del cliente. El id es
   // por-empresa → matcheamos el par exacto, no solo el cliente_switch_id.
@@ -73,7 +81,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
           .from("switch_facturas")
           .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total")
           .in("cliente_switch_id", cids)
-          .gte("fecha", yearStart)
+          .gte("fecha", anioDesde)
+          .lt("fecha", anioHasta)
       : Promise.resolve({ data: [] as unknown[] }),
     cids.length > 0
       ? supabaseServer
@@ -93,23 +102,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .select("empresa_key, total")
       .eq("cliente_codigo", codigo)
       .eq("es_retencion", false)
-      .gte("fecha", yearStart),
+      .gte("fecha", anioDesde)
+      .lt("fecha", anioHasta),
   ]);
 
-  // Ventas YTD (base CON ITBMS = total, igual que antes → solo cambia por frescura),
-  // neto firmado por tipo, re-filtrada a hora-Panamá del año en curso.
-  const POS = new Set(["Factura", "Tiquete", "Transacción", "Nota de Débito"]);
-  const panamaYmd = (iso: string) => new Date(Date.parse(iso) - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  // Ventas YTD (base CON ITBMS = total), neto firmado por tipo. Las tres piezas
+  // del cálculo — ventana del año, día-Panamá y signo por comprobante — salen de
+  // `lib/clientes-ytd`, el MISMO módulo que usa el listado.
   const ventasMap = new Map<string, number>();
   for (const r of (ventasRes.data ?? []) as {
     empresa_key: string; cliente_switch_id: number; fecha: string;
     tipo_comprobante: string; total: number | string;
   }[]) {
     if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
-    if (!r.fecha || panamaYmd(r.fecha) < yearStart) continue;
-    const base = Number(r.total ?? 0);
-    const signed = POS.has(r.tipo_comprobante) ? base : (r.tipo_comprobante === "Nota de Crédito" ? -base : 0);
-    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + signed);
+    if (!r.fecha || ymdPanama(r.fecha) < yearStart) continue;
+    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + montoFirmado(r.tipo_comprobante, r.total));
   }
 
   // Última factura: la lista viene ordenada desc → la primera fila (pairSet match)
@@ -118,7 +125,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   let ultimaGlobal: string | null = null;
   for (const r of (ultimaRes.data ?? []) as { empresa_key: string; cliente_switch_id: number; fecha: string }[]) {
     if (!r.fecha || !pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
-    const ymd = panamaYmd(r.fecha);
+    const ymd = ymdPanama(r.fecha);
     if (!ultimaFacturaMap.has(r.empresa_key)) ultimaFacturaMap.set(r.empresa_key, ymd);
     if (!ultimaGlobal || ymd > ultimaGlobal) ultimaGlobal = ymd;
   }
@@ -135,9 +142,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
-    ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
-    cobrado_ytd: Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
-    cxc: Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
+    ventas_ytd: aCentavos(ventasMap.get(e) ?? 0),
+    cobrado_ytd: aCentavos(cobradoMap.get(e) ?? 0),
+    cxc: aCentavos(cxcMap.get(e) ?? 0),
     ultima_factura: ultimaFacturaMap.get(e) ?? null,
   }));
 
@@ -151,9 +158,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     cliente,
     empresas,
     total_grupo: {
-      ventas_ytd:  Math.round(totalGrupo.ventas_ytd * 100) / 100,
-      cobrado_ytd: Math.round(totalGrupo.cobrado_ytd * 100) / 100,
-      cxc:         Math.round(totalGrupo.cxc * 100) / 100,
+      ventas_ytd:  aCentavos(totalGrupo.ventas_ytd),
+      cobrado_ytd: aCentavos(totalGrupo.cobrado_ytd),
+      cxc:         aCentavos(totalGrupo.cxc),
       ultima_factura: ultimaGlobal,
     },
   });

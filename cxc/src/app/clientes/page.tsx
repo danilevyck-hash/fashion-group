@@ -51,7 +51,7 @@ export default async function ClientesPage() {
   const [listRes, provinciasRes] = await Promise.all([
     supabaseServer
       .from("clientes_master")
-      .select("id, codigo, nombre, telefono, celular, email, provincia", { count: "exact" })
+      .select("id, codigo, nombre, razon_social, telefono, celular, email, provincia", { count: "exact" })
       .eq("deleted", false)
       .order("nombre", { ascending: true })
       .range(0, PAGE_SIZE - 1),
