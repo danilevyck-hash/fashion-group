@@ -103,7 +103,9 @@ export default function SearchableSelect({
                 setQuery("");
                 setOpen(false);
               }}
-              className={`block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition ${
+              // 44 px de alto: son opciones que se tocan con el dedo (Cheques y
+              // Caja se usan desde el iPhone). Antes medían 36.
+              className={`flex w-full items-center text-left px-3 min-h-[44px] text-sm hover:bg-gray-50 transition ${
                 o.value === value ? "bg-gray-50 font-medium" : ""
               }`}
             >
@@ -118,7 +120,7 @@ export default function SearchableSelect({
                 setQuery("");
                 onAction?.();
               }}
-              className="block w-full text-left px-3 py-2 text-sm font-medium text-black border-t border-gray-100 hover:bg-gray-50 transition"
+              className="flex w-full items-center text-left px-3 min-h-[44px] text-sm font-medium text-black border-t border-gray-100 hover:bg-gray-50 transition"
             >
               {actionLabel}
             </button>

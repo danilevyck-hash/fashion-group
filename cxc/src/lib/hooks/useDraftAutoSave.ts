@@ -35,6 +35,22 @@ function timeAgo(savedAt: number): string {
   return `hace ${days} día${days === 1 ? "" : "s"}`;
 }
 
+/**
+ * Borra el borrador desde AFUERA del componente que lo escribe.
+ *
+ * Hace falta cuando el formulario vive en un modal que se desmonta al guardar:
+ * quien sabe que el guardado salió bien es el padre, pero para entonces el hook
+ * (y su `clearDraft`) ya no existen, y el borrador quedaría en el navegador
+ * ofreciendo restaurar algo que YA se guardó.
+ */
+export function borrarBorrador(key: string): void {
+  try {
+    localStorage.removeItem(buildKey(key));
+  } catch {
+    /* sin storage: no hay borrador que borrar */
+  }
+}
+
 export interface DraftAutoSaveResult<T> {
   draft: (T & { savedAt: number }) | null;
   hasDraft: boolean;

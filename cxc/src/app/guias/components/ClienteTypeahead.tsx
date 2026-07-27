@@ -6,13 +6,13 @@
 // y el texto se conserva tal cual — no se rompe nada con guías legacy.
 //
 // GUÍAS YA NO LO USA (jul-2026): ahí el cliente pasó a ser un selector CERRADO
-// con opción "Otro" explícita — ver ClientePicker.tsx. Este componente queda
+// con opción "Otro" explícita — ver src/components/ClientePicker.tsx. Este queda
 // para Marketing (ProyectoForm y EditarProyectoModal), donde escribir libre es
 // el comportamiento deseado. La búsqueda es la misma en los dos
 // (`useBusquedaClientes`).
 
 import { useEffect, useRef, useState } from "react";
-import { useBusquedaClientes, type ClienteHit } from "./useBusquedaClientes";
+import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 interface ClienteTypeaheadProps {
   value: string;

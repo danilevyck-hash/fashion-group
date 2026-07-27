@@ -31,7 +31,9 @@ const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 const guias = (f: string) => read("app", "guias", "components", f);
 
 const form = guias("GuiaForm.tsx");
-const picker = guias("ClientePicker.tsx");
+// Compartido desde jul-2026: Cheques usa el MISMO selector, así que vive en
+// src/components/ y ya no bajo app/guias/.
+const picker = read("components", "ClientePicker.tsx");
 const typeahead = guias("ClienteTypeahead.tsx");
 const addNew = guias("AddNewInline.tsx");
 const sidebar = read("components", "Sidebar.tsx");

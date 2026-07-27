@@ -1,6 +1,12 @@
 "use client";
 
-// Selector CERRADO de cliente para la guía.
+// Selector CERRADO de cliente. COMPARTIDO: lo usan Guías y Cheques.
+//
+// Vivía en `app/guias/components/`. Se movió a `src/components/` en jul-2026,
+// cuando Cheques pidió "que el cliente sea como en Guías": el componente ya era
+// agnóstico (su API es value/codigo/onChange/topClientes, sin nada de guías), y
+// tenerlo bajo una ruta de módulo obligaba a importarlo cruzado — que es lo que
+// ya venía haciendo Marketing con su hermano `ClienteTypeahead`.
 //
 // La diferencia con el typeahead libre de antes (ClienteTypeahead, que sigue
 // vivo para Marketing) es una sola, y es la que pidió Daniel:
@@ -22,7 +28,7 @@
 // escribe y se toca el resultado. No hay que scrollear 200 nombres.
 
 import { useEffect, useRef, useState } from "react";
-import { useBusquedaClientes, type ClienteHit } from "./useBusquedaClientes";
+import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 interface ClientePickerProps {
   /** Nombre ya guardado en la fila. */
@@ -33,6 +39,17 @@ interface ClientePickerProps {
   onChange: (nombre: string, codigo: string) => void;
   /** Clientes más usados, para mostrar sin teclear nada. */
   topClientes?: ClienteHit[];
+  /**
+   * Mostrar el distintivo de cómo quedó el cliente: el código D-XXX en verde
+   * (vinculado) o "Otro" en ámbar (a mano).
+   *
+   * Solo tiene sentido donde el código SE GUARDA. En Guías sí
+   * (`guia_items.cliente_codigo`). En Cheques NO: la tabla `cheques` guarda el
+   * nombre como texto y nada más, así que pintar un "D-126" verde prometería un
+   * vínculo que no existe en la base — y al reabrir el cheque el mismo cliente
+   * aparecería como "Otro". Ahí se apaga y el campo es, simplemente, el nombre.
+   */
+  mostrarVinculo?: boolean;
   hasError?: boolean;
   inputClassName?: string;
   id?: string;
@@ -70,6 +87,7 @@ export default function ClientePicker({
   codigo,
   onChange,
   topClientes,
+  mostrarVinculo = true,
   hasError = false,
   inputClassName = "",
   id,
@@ -79,8 +97,8 @@ export default function ClientePicker({
   const wrapRef = useRef<HTMLDivElement>(null);
   const { hits, cargando } = useBusquedaClientes(query, abierto);
 
-  const vinculado = Boolean(value.trim() && codigo.trim());
-  const aMano = Boolean(value.trim() && !codigo.trim());
+  const vinculado = mostrarVinculo && Boolean(value.trim() && codigo.trim());
+  const aMano = mostrarVinculo && Boolean(value.trim() && !codigo.trim());
   const q = query.trim();
 
   useEffect(() => {
@@ -118,7 +136,11 @@ export default function ClientePicker({
           setAbierto(true);
         }}
         onKeyDown={(e) => {
-          if (e.key === "Escape") {
+          if (e.key === "Escape" && abierto) {
+            // La capa de adentro gana: Escape cierra ESTA lista, no el modal que
+            // la contiene. Sin esto, en Cheques un Escape para salir del
+            // desplegable llegaba también al formulario.
+            e.stopPropagation();
             setAbierto(false);
             setQuery("");
           }
@@ -207,7 +229,11 @@ export default function ClientePicker({
 
       {/* Solo para que el candado de 44px y los lectores de pantalla vean el
           estado sin abrir nada. */}
-      <span className="sr-only">{vinculado ? `Vinculado a ${codigo}` : aMano ? "Cliente escrito a mano" : "Sin cliente"}</span>
+      <span className="sr-only">
+        {!mostrarVinculo
+          ? value.trim() ? `Cliente: ${value}` : "Sin cliente"
+          : vinculado ? `Vinculado a ${codigo}` : aMano ? "Cliente escrito a mano" : "Sin cliente"}
+      </span>
       {hasError ? <span className="sr-only">Campo obligatorio</span> : null}
     </div>
   );
