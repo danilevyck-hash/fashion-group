@@ -52,17 +52,16 @@ export default function GuiaNuevaPage() {
         setNumeroGuiaTransp={s.setNumeroGuiaTransp}
         items={s.items}
         transportistas={s.transportistas}
-        clientes={s.clientes}
         direcciones={s.direcciones}
         validationErrors={s.validationErrors}
         error={s.error}
         saving={s.saving}
-        onAddCliente={s.addCliente}
         onAddDireccion={s.addDireccion}
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}
         onAddRow={s.addRow}
         onRemoveRow={s.removeRow}
+        onRestoreRow={s.restoreRow}
         onSave={s.saveGuia}
         onCancel={() => router.push("/guias")}
       />

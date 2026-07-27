@@ -1,5 +1,13 @@
 export interface GuiaItem {
   id?: string;
+  // Identidad ESTABLE de la fila mientras el formulario está abierto. No existe
+  // en la base: la genera el cliente y la API la ignora (arma sus filas campo
+  // por campo). Sirve para dos cosas que el índice de posición hacía mal:
+  //   1. el `key` de React — con `key={idx}` borrar una fila hace que React
+  //      reuse el DOM de la de abajo y el texto salta de fila;
+  //   2. las marcas de "campo tocado" y los errores de validación, que con
+  //      `item-<idx>-campo` se quedaban pegados a la fila equivocada al borrar.
+  uid?: string;
   orden: number;
   cliente: string;
   // Código del cliente en el directorio (clientes_master), formato D-XXX.
