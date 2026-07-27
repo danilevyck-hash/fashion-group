@@ -9,15 +9,22 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { telHref, mailtoHref } from "@/lib/contact-links";
+import { fmt } from "@/lib/format";
 
 export interface Cliente {
   id: string;
   codigo: string;
   nombre: string;
+  razon_social?: string | null;
   telefono: string | null;
   celular: string | null;
   email: string | null;
   provincia: string | null;
+}
+
+interface YtdResp {
+  anio: number;
+  ytd: Record<string, number>;
 }
 
 interface Props {
@@ -107,6 +114,32 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
   const total = data?.total ?? 0;
   const loading = isLoading && !data;
 
+  // Compras del año — se piden APARTE, con los códigos de la página que ya se
+  // está mostrando. Va en su propia llamada a propósito: leer las facturas del
+  // año de 50 clientes cuesta ~1.000 filas, y si viajara junto con la lista, la
+  // tabla entera esperaría por la columna. Así la tabla sale igual de rápido
+  // que antes y el monto aparece un instante después.
+  const codigosPagina = useMemo(
+    () => clientes.map(c => c.codigo).filter(Boolean).join(","),
+    [clientes],
+  );
+  const { data: ytdData } = useSWR<YtdResp>(
+    codigosPagina ? (["clientes-ytd", codigosPagina] as const) : null,
+    async ([, codigos]: readonly [string, string]): Promise<YtdResp> => {
+      const res = await fetch(`/api/clientes/ytd?codigos=${encodeURIComponent(codigos)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Error al cargar compras del año");
+      return (await res.json()) as YtdResp;
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false, keepPreviousData: false },
+  );
+  const anioYtd = ytdData?.anio ?? new Date().getFullYear();
+  // Sin respuesta todavía → `undefined` (se muestra "…"). Con respuesta y sin
+  // entrada para el cliente → 0, que es la verdad: no compró nada este año.
+  const comprasDe = useCallback(
+    (codigo: string): number | undefined => (ytdData ? (ytdData.ytd[codigo] ?? 0) : undefined),
+    [ytdData],
+  );
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
 
   // Pull-to-refresh (mobile): revalida la clave actual (página + filtros vigentes).
@@ -137,7 +170,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="search"
-            placeholder="Buscar por nombre o código (D-XXX)…"
+            placeholder="Buscar por nombre, razón social o código…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="flex-1 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition"
@@ -175,6 +208,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                     <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                       <th className="py-2 px-3">Código</th>
                       <th className="py-2 px-3">Nombre</th>
+                      <th className="py-2 px-3 text-right whitespace-nowrap">Compras {anioYtd}</th>
                       <th className="py-2 px-3">Teléfono</th>
                       <th className="py-2 px-3">Email</th>
                       <th className="py-2 px-3">Provincia</th>
@@ -188,6 +222,16 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                           <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="hover:underline">
                             {c.nombre}
                           </Link>
+                        </td>
+                        {/* Compras del año. "…" mientras carga; $0.00 en gris
+                            cuando de verdad no compró — un cliente en cero es
+                            un dato, no un hueco. */}
+                        <td className="py-2 px-3 text-right tabular-nums whitespace-nowrap">
+                          {(() => {
+                            const v = comprasDe(c.codigo);
+                            if (v === undefined) return <span className="text-gray-300">…</span>;
+                            return <span className={v > 0 ? "text-gray-900" : "text-gray-400"}>${fmt(v)}</span>;
+                          })()}
                         </td>
                         <td className="py-2 px-3 text-gray-600">{(() => {
                           const tel = c.telefono || c.celular;
@@ -238,7 +282,20 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                       ) : (
                         <span>{tel || "Sin teléfono"}</span>
                       )}
-                      {c.provincia && <span className="text-gray-400">· {c.provincia}</span>}
+                      {c.provincia && <span className="truncate text-gray-400">· {c.provincia}</span>}
+                      {/* En el celular no hay lugar para una columna más sin
+                          que la lista se vaya de lado, así que las compras del
+                          año van acá, empujadas a la derecha de esta misma
+                          línea. `shrink-0` + `truncate` en la provincia: si el
+                          nombre de la provincia es largo, se recorta ella, no
+                          el monto. */}
+                      <span className="ml-auto shrink-0 tabular-nums">
+                        {(() => {
+                          const v = comprasDe(c.codigo);
+                          if (v === undefined) return <span className="text-gray-300">…</span>;
+                          return <span className={v > 0 ? "font-medium text-gray-900" : "text-gray-400"}>${fmt(v)}</span>;
+                        })()}
+                      </span>
                     </div>
                   </li>
                 );
