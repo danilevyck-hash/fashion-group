@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { etiquetaMes } from "@/lib/marketing/meses";
-import type { ImpulsadoraConEstado, MkMarca } from "@/lib/marketing/types";
+import type { ImpulsadoraConEstado, MkMarca, PagoMesEstado } from "@/lib/marketing/types";
 import NuevaImpulsadoraModal from "./NuevaImpulsadoraModal";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 
@@ -20,15 +20,34 @@ function iniciales(nombre: string): string {
   return (partes[0][0] + partes[1][0]).toUpperCase();
 }
 
-// Chip de estado de un mes: pagado ✓ (verde) / pendiente ⏳ (ámbar).
-function ChipMes({ label, pagado }: { label: string; pagado: boolean }) {
+// Chip de estado de un mes. Con quincenas un mes puede quedar A MEDIAS, así que
+// hay tres estados y el parcial dice qué días faltan — ni "pagado" ni
+// "pendiente" a secas serían verdad.
+//   ✓ Julio 2026              → mes cubierto completo (verde)
+//   ◐ Julio 2026 · falta 16–31 → pagado a medias (ámbar oscuro)
+//   ⏳ Julio 2026              → sin ningún pago (ámbar)
+function ChipMes({ label, estado, faltan }: { label: string } & Pick<PagoMesEstado, "estado" | "faltan">) {
+  const estilo =
+    estado === "pagado"
+      ? "bg-emerald-50 text-emerald-700"
+      : estado === "parcial"
+        ? "bg-amber-100 text-amber-900"
+        : "bg-amber-50 text-amber-700";
+  const icono = estado === "pagado" ? "✓" : estado === "parcial" ? "◐" : "⏳";
   return (
+    // El chip PUEDE bajar de línea, pero nunca por la mitad de un dato: cada
+    // parte va en su propio span nowrap. A 390px partía "Julio / 2026" en dos
+    // columnas y no se leía; y forzar nowrap al chip entero lo hacía chocar
+    // contra el botón "Registrar pago".
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-        pagado ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-      }`}
+      className={`inline-flex flex-wrap items-center gap-x-1 rounded-full px-2 py-0.5 text-xs font-medium ${estilo}`}
     >
-      {pagado ? "✓" : "⏳"} {label}
+      <span className="whitespace-nowrap">
+        {icono} {label}
+      </span>
+      {estado === "parcial" && faltan && (
+        <span className="font-normal whitespace-nowrap">· falta {faltan}</span>
+      )}
     </span>
   );
 }
@@ -130,9 +149,24 @@ export default function ImpulsadorasView({ marcas }: Props) {
                     : "Sin marcas"}
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <ChipMes label={etiquetaMes(imp.mesAnterior.mes)} pagado={imp.mesAnterior.pagado} />
-                  <ChipMes label={etiquetaMes(imp.mesActual.mes)} pagado={imp.mesActual.pagado} />
+                  <ChipMes
+                    label={etiquetaMes(imp.mesAnterior.mes)}
+                    estado={imp.mesAnterior.estado}
+                    faltan={imp.mesAnterior.faltan}
+                  />
+                  <ChipMes
+                    label={etiquetaMes(imp.mesActual.mes)}
+                    estado={imp.mesActual.estado}
+                    faltan={imp.mesActual.faltan}
+                  />
                 </div>
+                {/* Sin truncate: a 390px cortaba el año ("1–15 jul 202…").
+                    Es una línea secundaria, que envuelva no molesta. */}
+                {imp.ultimosPeriodos.length > 0 && (
+                  <div className="text-[12px] text-gray-500 mt-1.5 leading-tight">
+                    Pagado: {imp.ultimosPeriodos.join(" · ")}
+                  </div>
+                )}
               </div>
 
               <div className="shrink-0 text-right flex flex-col items-end gap-2">
@@ -142,11 +176,15 @@ export default function ImpulsadorasView({ marcas }: Props) {
                   </div>
                   <div className="text-xs text-gray-400">/ mes</div>
                 </div>
-                {!imp.mesActual.pagado && (
+                {/* Con quincenas el mes anterior puede haber quedado a medias:
+                    si falta algo en cualquiera de los dos meses, el botón está.
+                    Antes solo miraba el mes actual y dejaba sin forma de cargar
+                    la quincena que faltaba del mes pasado. */}
+                {(!imp.mesActual.pagado || !imp.mesAnterior.pagado) && (
                   <button
                     type="button"
                     onClick={() => setPagando(imp)}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-black hover:text-black transition"
+                    className="min-h-[44px] rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-black hover:text-black transition"
                   >
                     Registrar pago
                   </button>
@@ -171,7 +209,10 @@ export default function ImpulsadorasView({ marcas }: Props) {
       {pagando && (
         <RegistrarPagoModal
           impulsadora={pagando}
-          mesInicial={pagando.mesActual.mes}
+          // Arranca en el mes más viejo que todavía debe algo.
+          mesInicial={
+            pagando.mesAnterior.pagado ? pagando.mesActual.mes : pagando.mesAnterior.mes
+          }
           onClose={() => setPagando(null)}
           onSaved={() => {
             setPagando(null);

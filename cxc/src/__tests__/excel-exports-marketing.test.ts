@@ -88,6 +88,7 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
       gastos: [
         {
           fecha: "2026-04-01",
+          periodo: "1–15 abr 2026",
           concepto: "Letrero",
           proveedor: "Prov SA",
           marca: "Tommy Hilfiger",
@@ -138,10 +139,12 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     const wb = roundTrip(buildResumenGastosWorkbook(clientes));
     const ws = wb.Sheets["Cliente Uno"];
     // Layout: r0 GASTOS, r1 "Ver todas las facturas", r2 headers, r3.. gastos.
+    // Col B = "Período" (período trabajado); corre Total a F→G y el link a G→H.
     expect(cell(ws, "A3").v).toBe("Fecha");
-    expect(cell(ws, "G4").l?.Target).toBe("https://example.com/f1.pdf");
-    expect(cell(ws, "F4").t).toBe("n");
-    expect(cell(ws, "F4").v).toBe(100);
+    expect(cell(ws, "B3").v).toBe("Período");
+    expect(cell(ws, "H4").l?.Target).toBe("https://example.com/f1.pdf");
+    expect(cell(ws, "G4").t).toBe("n");
+    expect(cell(ws, "G4").v).toBe(100);
     // Con código de cliente hay link de galería (1 por cliente), no por foto.
     expect(tieneLink(ws, "https://example.com/foto1.jpg")).toBe(false);
   });
@@ -157,8 +160,23 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     expect(a1.s?.fill?.fgColor?.rgb).toBe(CASA_PALETTE.pri);
     expect(a1.s?.font?.name).toBe("Calibri");
     // Link azul 1155CC conservado en la pestaña del cliente.
-    const g4 = cell(wb.Sheets["Cliente Uno"], "G4");
-    expect(g4.s?.font?.color?.rgb).toBe("1155CC");
+    const h4 = cell(wb.Sheets["Cliente Uno"], "H4");
+    expect(h4.s?.font?.color?.rgb).toBe("1155CC");
+  });
+
+  it("columna Período: el rango trabajado sale en el Excel; sin período, '—'", () => {
+    const wb = roundTrip(buildResumenGastosWorkbook(clientes));
+    const ws = wb.Sheets["Cliente Uno"];
+    expect(cell(ws, "B4").v).toBe("1–15 abr 2026");
+    expect(cell(ws, "B5").v).toBe("—");
+  });
+
+  it("el Subtotal sigue cuadrando con la columna corrida", () => {
+    const wb = roundTrip(buildResumenGastosWorkbook(clientes));
+    const ws = wb.Sheets["Cliente Uno"];
+    // r3/r4 gastos (100 + 50), r5 = Subtotal.
+    expect(cell(ws, "F6").v).toBe("Subtotal");
+    expect(cell(ws, "G6").v).toBe(150);
   });
 });
 

@@ -28,6 +28,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
 import { signGalleryToken, signFacturasToken } from "./gallery-token";
+import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 
 const BUCKET = "marketing";
 const MAX_DIM = 1600; // px — lado mayor de la foto tras redimensionar
@@ -418,8 +419,12 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     const nombres = (marcasByFactura.get(f.id) ?? [])
       .map((mid) => marcaNombreById.get(mid))
       .filter((n): n is string => !!n);
+    // Período trabajado: rango real si el pago lo trae, o el mes completo para
+    // los pagos mensuales viejos (que no tienen periodo_desde/hasta).
+    const per = periodoEfectivo(f);
     return {
       fecha: String(f.impulsadora_mes ?? f.fecha_factura ?? "").slice(0, 10),
+      periodo: per ? etiquetaPeriodoCorta(per) : "",
       concepto: f.concepto || "",
       proveedor: f.proveedor || "",
       marca: nombres.length ? nombres.join(" / ") : "—",
@@ -663,6 +668,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
 
 export interface GastoXlsx {
   fecha: string;
+  /** Período trabajado que cubre el gasto ("1–15 jul 2026"). "" si no aplica. */
+  periodo?: string;
   concepto: string;
   proveedor: string;
   marca: string;
@@ -811,7 +818,14 @@ export function buildResumenGastosWorkbook(
     tabsUsados.add(cand.toLowerCase());
     return cand;
   };
-  const headG = ["Fecha", "Concepto", "Proveedor", "Marca", "N° Factura", "Total", "Factura"];
+  // "Período" = período trabajado que cubre el gasto (quincenas de impulsadora).
+  // Los gastos que no tienen período muestran "—".
+  const headG = ["Fecha", "Período", "Concepto", "Proveedor", "Marca", "N° Factura", "Total", "Factura"];
+  // Índices con nombre: la columna nueva corre Total y Factura a la derecha y
+  // hay ~10 lugares que dependían del número crudo.
+  const C_CONCEPTO = 2;
+  const C_TOTAL = 6;
+  const C_LINK = 7;
   for (const cli of clientes) {
     const codigo = cli.codigo;
     // Galería = 1 link por cliente (requiere código). "Sin cliente" / sin código
@@ -832,10 +846,19 @@ export function buildResumenGastosWorkbook(
     aoa.push(headG);
     const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
     for (const g of cli.gastos) {
-      aoa.push([g.fecha, g.concepto, g.proveedor, g.marca, g.numero, g.total, g.signed ? "Ver factura" : "—"]);
+      aoa.push([
+        g.fecha,
+        g.periodo || "—",
+        g.concepto,
+        g.proveedor,
+        g.marca,
+        g.numero,
+        g.total,
+        g.signed ? "Ver factura" : "—",
+      ]);
     }
     const gastoEnd = gastoStart + cli.gastos.length - 1;
-    aoa.push(["", "", "", "", "Subtotal", sumGastos(cli.gastos), ""]);
+    aoa.push(["", "", "", "", "", "Subtotal", sumGastos(cli.gastos), ""]);
     const subtotalRow = aoa.length - 1;
     aoa.push([""]);
     const fotosTitle = aoa.length;
@@ -857,17 +880,17 @@ export function buildResumenGastosWorkbook(
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+    ws["!cols"] = [{ wch: 12 }, { wch: 18 }, { wch: 42 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
 
-    // Links de gasto (col 6) + SUM del subtotal (col 5).
+    // Links de gasto + SUM del subtotal.
     cli.gastos.forEach((g, i) => {
       if (g.signed) {
-        setCell(ws, gastoStart + i, 6, { t: "s", v: "Ver factura", l: { Target: g.signed, Tooltip: "Abrir PDF de la factura" } });
+        setCell(ws, gastoStart + i, C_LINK, { t: "s", v: "Ver factura", l: { Target: g.signed, Tooltip: "Abrir PDF de la factura" } });
       }
     });
     if (cli.gastos.length > 0) {
-      const L = XLSX.utils.encode_col(5);
-      setCell(ws, subtotalRow, 5, { t: "n", f: `SUM(${L}${gastoStart + 1}:${L}${gastoEnd + 1})` });
+      const L = XLSX.utils.encode_col(C_TOTAL);
+      setCell(ws, subtotalRow, C_TOTAL, { t: "n", f: `SUM(${L}${gastoStart + 1}:${L}${gastoEnd + 1})` });
     }
 
     // Estilos comunes: títulos de sección en banda MID, headers banda PRI.
@@ -877,36 +900,36 @@ export function buildResumenGastosWorkbook(
       styleCell(ws, headerRow, c, {
         font: headFont,
         fill: headFill,
-        alignment: { horizontal: c === 5 ? "right" : "left", vertical: "center" },
+        alignment: { horizontal: c === C_TOTAL ? "right" : "left", vertical: "center" },
         border: B,
       });
     }
     for (let i = 0; i < cli.gastos.length; i++) {
       const r = gastoStart + i;
       for (let c = 0; c < headG.length; c++) {
-        const esLink = c === 6 && !!cli.gastos[i].signed;
+        const esLink = c === C_LINK && !!cli.gastos[i].signed;
         styleCell(ws, r, c, {
           font: esLink ? linkFontX : fontBase,
-          alignment: { horizontal: c === 5 ? "right" : "left", wrapText: c === 1 },
+          alignment: { horizontal: c === C_TOTAL ? "right" : "left", wrapText: c === C_CONCEPTO },
           border: B,
         });
       }
-      fmtCell(ws, r, 5, MONEY_FMT);
+      fmtCell(ws, r, C_TOTAL, MONEY_FMT);
     }
     // Fila Subtotal en banda PRI (totales estilo de la casa).
-    styleCell(ws, subtotalRow, 4, {
+    styleCell(ws, subtotalRow, C_TOTAL - 1, {
       font: headFont,
       fill: headFill,
       alignment: { horizontal: "right", vertical: "center" },
       border: B,
     });
-    styleCell(ws, subtotalRow, 5, {
+    styleCell(ws, subtotalRow, C_TOTAL, {
       font: headFont,
       fill: headFill,
       alignment: { horizontal: "right", vertical: "center" },
       border: B,
     });
-    fmtCell(ws, subtotalRow, 5, MONEY_FMT);
+    fmtCell(ws, subtotalRow, C_TOTAL, MONEY_FMT);
 
     // Link "Ver todas las facturas (N)" → PDF combinado del cliente.
     if (verFacturas) {

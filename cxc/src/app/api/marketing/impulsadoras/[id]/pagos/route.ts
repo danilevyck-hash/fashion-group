@@ -9,9 +9,12 @@ export const dynamic = "force-dynamic";
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// POST /api/marketing/impulsadoras/[id]/pagos — registra el pago mensual.
+// POST /api/marketing/impulsadoras/[id]/pagos — registra un pago por PERÍODO
+// TRABAJADO (desde/hasta: quincena, mes completo o un solo día).
 // Crea 1 factura por marca (estado Pagado) con el comprobante adjunto.
 // Comprobante OBLIGATORIO: sin él responde 400 y no guarda nada.
+// Dos pagos en el mismo mes se permiten; lo que se rechaza es que el período
+// se solape con otro pago ya registrado (ver registrarPagoImpulsadora).
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -23,7 +26,7 @@ export async function POST(
   }
   try {
     const body = (await req.json()) as Partial<RegistrarPagoImpulsadoraInput>;
-    if (!body?.mes || body.monto === undefined) {
+    if (!body?.desde || !body?.hasta || body.monto === undefined) {
       return NextResponse.json(
         { error: "Faltan campos obligatorios" },
         { status: 400 },
@@ -36,7 +39,8 @@ export async function POST(
       );
     }
     const res = await registrarPagoImpulsadora(params.id, {
-      mes: body.mes,
+      desde: body.desde,
+      hasta: body.hasta,
       monto: Number(body.monto),
       comprobante: body.comprobante,
     });
@@ -44,7 +48,13 @@ export async function POST(
       auth.role,
       "impulsadora_pago",
       "marketing",
-      { id: params.id, mes: body.mes, monto: body.monto, facturas: res.facturasCreadas },
+      {
+        id: params.id,
+        desde: body.desde,
+        hasta: body.hasta,
+        monto: body.monto,
+        facturas: res.facturasCreadas,
+      },
       auth.userName,
     ).catch(() => {});
     return NextResponse.json(res);
