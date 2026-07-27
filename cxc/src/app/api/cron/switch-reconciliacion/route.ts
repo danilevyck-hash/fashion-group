@@ -76,20 +76,11 @@ import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import {
   recordCronHeartbeat,
-  cronIsStale,
-  staleEsPendingRecovery,
-  slotCubiertoPorRecuperacion,
-  slotNuncaSembradoVencido,
+  cronsStaleParaAlerta,
   reconciliarSlotsSwitchSync,
-  esMarcaDeSlot,
-  esSlotRetirado,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
-  SWITCH_SYNC_SLOT_PREFIX,
-  SWITCH_SYNC_SLOTS,
-  slotHeartbeatName,
-  slotRecuperadoName,
-  slotVistoName,
   catalogoCicloSinceIso,
+  type HeartbeatRow,
   type SlotDesatendido,
 } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
@@ -594,14 +585,24 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
  * Watchdog de heartbeats: revisa cron_heartbeats y alerta por Telegram si algún
  * cron lleva más de su umbral stale sin un success. No lanza.
  *
+ * TODA la decisión ("¿a quién se vigila?" y "¿quién está caído?") vive en
+ * `cronsStaleParaAlerta` (cron-telemetry.ts), pura y testeable en las dos
+ * direcciones. Acá solo queda el I/O: leer las filas y mandar el Telegram.
+ *
  * Anti alerta-fantasma: un cron stale cuya recuperación AÚN viene hoy (pasada
  * de reconciliación posterior, o la 2ª entrada del día de backup/
  * acs-fidelizacion) NO alerta — la lógica (staleEsPendingRecovery, con tope
- * duro de 30h) vive en cron-telemetry.ts, compartida con health-crons. Estricto
- * con la pasada en curso: esta pasada NO cuenta como "por venir" — si su
- * recuperación falla, el alert de failedColaterales/skipped lo reporta con
- * mensaje preciso (caso real 4-jul-2026: sync-clientes-master stale silenciado
- * para siempre por contarse la pasada a sí misma).
+ * duro de 30h) es compartida con health-crons. Estricto con la pasada en curso:
+ * esta pasada NO cuenta como "por venir" — si su recuperación falla, el alert de
+ * failedColaterales/skipped lo reporta con mensaje preciso (caso real
+ * 4-jul-2026: sync-clientes-master stale silenciado para siempre por contarse la
+ * pasada a sí misma).
+ *
+ * Crons RETIRADOS: este watchdog recorre TODAS las filas de cron_heartbeats, así
+ * que la fila huérfana de un cron que ya no existe le alertaba todos los días
+ * para siempre (27-jul-2026: `multifashion-sync`, retirado en el #316, con su
+ * fila viva desde el 26-jul 05:00). `esHeartbeatNoVigilable` los descarta contra
+ * el registro de crons conocidos — ver esCronRetirado en cron-telemetry.ts.
  */
 async function checkStaleCrons(): Promise<string[]> {
   const { data, error } = await supabaseServer
@@ -611,66 +612,7 @@ async function checkStaleCrons(): Promise<string[]> {
     console.error(`[watchdog] no pude leer cron_heartbeats: ${error.message}`);
     return [];
   }
-  const now = Date.now();
-  const beats = new Map<string, string | null>(
-    (data || []).map((h) => [h.cron_name as string, h.last_success_at as string | null]),
-  );
-  const esSlot = (n: string) => n.startsWith(SWITCH_SYNC_SLOT_PREFIX) && !esMarcaDeSlot(n);
-  const stale = (data || [])
-    // Las marcas "#recuperado" / "#visto" NO son crons: las escribe esta misma
-    // reconciliación para certificar que cubrió un slot huérfano o para fechar
-    // cuándo lo vio por primera vez. Vigilarlas como si fueran un cron generaría
-    // una alerta eterna por su propia marca.
-    .filter((h) => !esMarcaDeSlot(String(h.cron_name)))
-    // Slots RETIRADOS del calendario (su entrada se movió o se quitó de
-    // vercel.json): la fila vieja queda en cron_heartbeats envejeciendo para
-    // siempre. health-crons no los ve (vigila la lista derivada), pero este
-    // watchdog recorre TODAS las filas → sin el filtro, cada cambio de horario
-    // deja una alerta diaria eterna por un cron que ya no existe (26-jul-2026:
-    // facturas-2315 → facturas-2300, sync-recibos 20:10/22:20 → 15:15/19:15/23:15).
-    .filter((h) => !esSlotRetirado(String(h.cron_name)))
-    // Umbral por-cron compartido (cronIsStale): un cron mensual como
-    // grupo-resumen-mensual usa 33 días, no las 26h del default.
-    .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
-    // Slot de switch-sync cubierto por una recuperación (su ocurrencia se perdió
-    // pero sus pares quedaron al día) → no alertar. El tope duro de 50h sobre su
-    // heartbeat propio impide que una entrada muerta quede tapada para siempre.
-    .filter(
-      (h) =>
-        !esSlot(h.cron_name) ||
-        !slotCubiertoPorRecuperacion(
-          h.last_success_at,
-          beats.get(slotRecuperadoName(h.cron_name.slice(SWITCH_SYNC_SLOT_PREFIX.length))),
-          now,
-        ),
-    )
-    // Silenciar los que aún se van a auto-recuperar hoy (anti alerta-fantasma).
-    // Los slots se evalúan con el nombre base "switch-sync" (los recupera la
-    // reconciliación por par), igual que en health-crons.
-    .filter(
-      (h) =>
-        !staleEsPendingRecovery(
-          esSlot(h.cron_name) ? "switch-sync" : h.cron_name,
-          h.last_success_at,
-          now,
-        ),
-    )
-    .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
-
-  // Slots que NUNCA registraron un heartbeat propio. Sin esto quedaban
-  // invisibles PARA SIEMPRE en los dos vigías: health-crons los trata como "aún
-  // no sembrados" (regla seed-tolerante, sin vencimiento) y este watchdog solo
-  // recorre las filas que EXISTEN. Caso medido: switch-sync:all-0540 sin fila
-  // propia desde que se introdujeron los slots (#239). La marca #visto fecha
-  // cuándo la reconciliación lo vio por primera vez; pasada la gracia, se
-  // reporta como caído.
-  for (const s of SWITCH_SYNC_SLOTS) {
-    if (beats.get(slotHeartbeatName(s.slot))) continue;
-    if (!slotNuncaSembradoVencido(beats.get(slotVistoName(s.slot)), now)) continue;
-    stale.push(
-      `${slotHeartbeatName(s.slot)} (nunca registró un success propio; visto desde ${beats.get(slotVistoName(s.slot))})`,
-    );
-  }
+  const stale = cronsStaleParaAlerta((data ?? []) as HeartbeatRow[], Date.now());
 
   if (stale.length > 0) {
     await sendTelegramAlert(

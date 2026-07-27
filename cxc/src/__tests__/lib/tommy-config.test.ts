@@ -22,6 +22,7 @@ import {
   SWITCH_CRON_ENTRADAS,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
   SEED_TOLERANT_CRONS,
+  CRONS_FAIL_CLOSED,
 } from "@/lib/cron-telemetry";
 
 describe("MARCAS_CONFIG.tommy — modelo Joybees, tablas tommy_*", () => {
@@ -203,14 +204,11 @@ describe("registro del cron tommy-catalogo en todos los sitios", () => {
   it("recuperación colateral desde las 13 UTC + vigilancia estricta en health", () => {
     expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["tommy-catalogo"]).toBe(13);
     // Promovido en el PR "encender Tommy": ya NO es seed-tolerante (la DDL corrió
-    // y el heartbeat lleva días sembrado) → vigilancia fail-closed 26h en
-    // health-crons EXPECTED_CRONS, como reebok/joybees-catalogo.
+    // y el heartbeat lleva días sembrado) → vigilancia fail-closed 26h. La lista
+    // era EXPECTED_CRONS dentro de health-crons y se mudó a CRONS_FAIL_CLOSED
+    // (cron-telemetry.ts) el 27-jul-2026, compartida por los DOS vigías.
     expect(SEED_TOLERANT_CRONS).not.toContain("tommy-catalogo");
-    const healthRoute = readFileSync(
-      path.join(process.cwd(), "src/app/api/health-crons/route.ts"),
-      "utf8",
-    );
-    expect(healthRoute).toMatch(/"tommy-catalogo"/);
+    expect(CRONS_FAIL_CLOSED).toContain("tommy-catalogo");
   });
 
   it("sync manual: modulo catalogo-tommy con empresa fija y rol vendedor", () => {
