@@ -11,6 +11,22 @@
 //     Ahora en móvil cada envío es una TARJETA con los campos apilados a lo
 //     ancho, y la tabla densa queda solo en escritorio (patrón dual que el
 //     módulo ya usaba en GuiasList).
+//
+// Ajuste de iPad (jul-2026) — "sobre guia, tambien haslo modo ipad". El corte
+// tarjeta/tabla estaba en `md:` (768 px), que es EXACTAMENTE el ancho de un iPad
+// vertical: el iPad caía del lado de la tabla. Medido en producción, con la barra
+// lateral (`md:` en adelante) comiéndose 224 px del ancho:
+//
+//   768×1024  →  tabla, quedaban 496 px útiles para 720 de tabla → 224 px de
+//                arrastre horizontal DENTRO de la tabla (el cuerpo de la página
+//                nunca scrolleó de lado: lo contiene el ScrollableTable)
+//   834×1194  →  tabla, 158 px de arrastre
+//   1024+     →  tabla sin arrastre, pero con los campos en 34 px de alto
+//
+// Decisión: **el corte pasa a `lg:` (1024 px)**. En vertical el iPad no tiene
+// ancho para 7 columnas —496-562 px útiles dan ~90 px por campo— así que va a
+// tarjetas, igual que el iPhone; en horizontal sí sobra (752-1094 px) y se queda
+// la tabla. Lo táctil se resuelve aparte, por tipo de puntero — ver CTRL_BASE.
 //  2. **Cliente cerrado contra el directorio, con "Otro" explícito** (ver
 //     ClientePicker.tsx). Escribir a mano dejó de ser un accidente.
 //  3. **Empresa cerrada: las 8 del grupo, en un `<select>` nativo.** El
@@ -75,10 +91,23 @@ interface GuiaFormProps {
 // Un solo lugar para el aspecto de labels y campos. En móvil el campo mide 44 px
 // y usa text-base (con 14px Safari hace zoom al enfocar); en escritorio vuelve a
 // la densidad de siempre.
+//
+// El alto TÁCTIL no se suelta por ANCHO, sino por TIPO DE PUNTERO. Un iPad en
+// horizontal mide 1024-1366 px —más que muchas laptops— pero se sigue usando con
+// el dedo, y soltar los 44 px en `md:` dejaba los campos en 34 px justo ahí
+// (medido: 22 controles por debajo de 44 en los 6 tamaños de iPad).
+// `(pointer: fine)` = hay mouse o trackpad → densidad de escritorio; en un iPad
+// (pointer: coarse) los 44 px se conservan en las dos orientaciones. El 1440 con
+// mouse que Daniel ya aprobó no cambia ni un píxel.
+//
+// Ojo: las clases van ESCRITAS COMPLETAS y nunca interpoladas — Tailwind escanea
+// el texto del archivo, así que un `${VARIANTE}py-1.5` no generaría nada.
 
 const CTRL_BASE =
   "w-full border-b bg-transparent outline-none transition focus:border-black " +
-  "text-base md:text-sm py-2.5 md:py-1.5 min-h-[44px] md:min-h-0";
+  "text-base md:text-sm " +
+  "py-2.5 min-h-[44px] " +
+  "md:[@media(pointer:fine)]:py-1.5 md:[@media(pointer:fine)]:min-h-0";
 
 function ctrl(error: boolean, extra = ""): string {
   return `${CTRL_BASE} ${error ? "border-red-400" : "border-gray-200"} ${extra}`;
@@ -545,8 +574,8 @@ export default function GuiaForm({
           <p className="text-red-500 text-xs mb-3">Agrega al menos un envío con todos los campos completos.</p>
         )}
 
-        {/* ── Móvil (<md): una tarjeta por envío, campos a lo ancho ───────── */}
-        <div className="md:hidden space-y-4">
+        {/* ── Móvil y iPad vertical (<lg): una tarjeta por envío ─────────── */}
+        <div data-layout="tarjetas" className="lg:hidden space-y-4">
           {items.map((item, idx) => (
             <div key={item.uid ?? idx} className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
@@ -564,8 +593,8 @@ export default function GuiaForm({
           ))}
         </div>
 
-        {/* ── Escritorio (md+): la tabla densa de siempre ─────────────────── */}
-        <div className="hidden md:block">
+        {/* ── iPad horizontal y escritorio (lg+): la tabla de siempre ─────── */}
+        <div data-layout="tabla" className="hidden lg:block">
           <ScrollableTable minWidth={720}>
             <table className="w-full text-sm [&_th]:px-3.5 [&_td]:px-3.5 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
               <thead className="sticky top-0 bg-white z-10">

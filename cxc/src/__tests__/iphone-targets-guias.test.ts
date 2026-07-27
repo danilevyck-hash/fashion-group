@@ -34,11 +34,12 @@ const form = guias("GuiaForm.tsx");
 const picker = guias("ClientePicker.tsx");
 const typeahead = guias("ClienteTypeahead.tsx");
 const addNew = guias("AddNewInline.tsx");
+const sidebar = read("components", "Sidebar.tsx");
 
 describe("El cuerpo de la página no puede scrollear de lado en 390px", () => {
-  it("la tabla de envíos existe SOLO desde md — en el iPhone es una tarjeta", () => {
-    expect(form).toMatch(/\{\/\* ── Escritorio \(md\+\)[^\n]*\n\s*<div className="hidden md:block">/);
-    expect(form).toMatch(/\{\/\* ── Móvil \(<md\)[^\n]*\n\s*<div className="md:hidden/);
+  it("la tabla de envíos existe SOLO desde lg — en el iPhone es una tarjeta", () => {
+    expect(form).toMatch(/<div data-layout="tabla" className="hidden lg:block">/);
+    expect(form).toMatch(/<div data-layout="tarjetas" className="lg:hidden/);
   });
 
   it("ya no hay una tabla de 800px de ancho mínimo", () => {
@@ -49,7 +50,7 @@ describe("El cuerpo de la página no puede scrollear de lado en 390px", () => {
   });
 
   it("el ScrollableTable que queda vive dentro del bloque de escritorio", () => {
-    const i = form.indexOf('<div className="hidden md:block">');
+    const i = form.indexOf('<div data-layout="tabla" className="hidden lg:block">');
     const j = form.indexOf("</ScrollableTable>");
     expect(i).toBeGreaterThan(0);
     expect(j).toBeGreaterThan(i);
@@ -70,10 +71,27 @@ describe("Los campos del formulario miden 44 en móvil y siguen densos en escrit
   it("CTRL_BASE pide 44 en móvil, lo suelta en escritorio y evita el zoom de Safari", () => {
     const base = form.match(/const CTRL_BASE =\s*([\s\S]*?);/)?.[1] ?? "";
     expect(base).toContain("min-h-[44px]");
-    expect(base).toContain("md:min-h-0");
+    expect(base).toContain("md:[@media(pointer:fine)]:min-h-0");
     // text-base = 16px: por debajo, Safari hace zoom al enfocar.
     expect(base).toContain("text-base");
     expect(base).toContain("md:text-sm");
+  });
+
+  it("el alto denso NO se suelta por ancho a secas: eso dejaba el iPad en 34px", () => {
+    const base = form.match(/const CTRL_BASE =\s*([\s\S]*?);/)?.[1] ?? "";
+    // `md:min-h-0` / `md:py-1.5` sin guardia de puntero es exactamente lo que
+    // hacía que un iPad —768 a 1366 px, todo con el dedo— cayera en densidad de
+    // escritorio. La guardia (pointer:fine) = hay mouse.
+    expect(base).not.toMatch(/(^|\s)md:min-h-0(\s|"|$)/);
+    expect(base).not.toMatch(/(^|\s)md:py-1\.5(\s|"|$)/);
+    expect(base).toContain("md:[@media(pointer:fine)]:py-1.5");
+  });
+
+  it("las clases van escritas completas: Tailwind no ve una interpolación", () => {
+    // Un `${VARIANTE}py-1.5` compila en TS pero Tailwind escanea TEXTO: la clase
+    // no se generaría nunca y el campo quedaría en 44 también con mouse.
+    const base = form.match(/const CTRL_BASE =\s*([\s\S]*?);/)?.[1] ?? "";
+    expect(base).not.toContain("${");
   });
 
   it("todos los campos de una fila pasan por ctrl()", () => {
@@ -91,6 +109,71 @@ describe("Los campos del formulario miden 44 en móvil y siguen densos en escrit
     expect(bloque).toContain("min-w-[44px]");
     expect(bloque).toContain("min-h-[44px]");
     expect(bloque).toMatch(/aria-label=\{`Quitar envío/);
+  });
+});
+
+/**
+ * iPad (jul-2026). El corte tarjeta/tabla vivía en `md:` = 768 px, que es
+ * EXACTAMENTE el ancho de un iPad vertical: el iPad caía del lado de la tabla, y
+ * encima la barra lateral (fija desde `md:`) le comía 224 px.
+ *
+ * Medido en producción con emulación CDP, ANTES del arreglo:
+ *   768×1024 → tabla · 224 px de arrastre horizontal dentro de la tabla · 16-22
+ *              controles del formulario por debajo de 44 px
+ *   834×1194 → tabla · 158 px de arrastre · 16-22 controles chicos
+ *   1024/1194/1366 → tabla sin arrastre, pero 17-22 controles chicos
+ * DESPUÉS: los 6 tamaños dan **0** controles del formulario por debajo de 44 y
+ * **0** px de arrastre, con el cuerpo de la página sin scroll lateral en ninguno.
+ * iPhone 390 y escritorio 1440 quedaron idénticos al píxel (0,00 % de diferencia).
+ *
+ * Acá se congela la ARITMÉTICA que produce ese resultado: jsdom no hace layout,
+ * pero los cuatro números que deciden todo sí se pueden leer del fuente.
+ */
+describe("iPad · el corte tarjeta/tabla y el ancho que queda", () => {
+  const LG = 1024; // breakpoint `lg` de Tailwind — corte tarjetas/tabla
+  const BARRA_LATERAL = 224; // Sidebar `w-56`, fija desde `md:`
+  const PADDING = 48; // contenedor del form: `px-6` (24 por lado) desde `sm:`
+  const MIN_TABLA = 720; // ScrollableTable minWidth
+
+  const IPADS = [
+    { nombre: "iPad mini/10.2 vertical", w: 768, esperado: "tarjetas" },
+    { nombre: "iPad mini/10.2 horizontal", w: 1024, esperado: "tabla" },
+    { nombre: "iPad Air/Pro 11 vertical", w: 834, esperado: "tarjetas" },
+    { nombre: "iPad Air/Pro 11 horizontal", w: 1194, esperado: "tabla" },
+    { nombre: "iPad Pro 12.9 vertical", w: 1024, esperado: "tabla" },
+    { nombre: "iPad Pro 12.9 horizontal", w: 1366, esperado: "tabla" },
+  ] as const;
+
+  it("los cuatro números salen del fuente, no de la memoria de nadie", () => {
+    expect(form).toMatch(/<ScrollableTable minWidth=\{720\}/); // MIN_TABLA
+    expect(form).toContain('className="max-w-6xl mx-auto px-4 sm:px-6 py-6"'); // PADDING
+    expect(sidebar).toMatch(/const width = collapsed \? "w-16" : "w-56"/); // BARRA_LATERAL
+    expect(sidebar).toContain("hidden md:flex fixed left-0"); // la barra existe desde md
+  });
+
+  for (const d of IPADS) {
+    it(`${d.nombre} (${d.w}px) → ${d.esperado}`, () => {
+      const layout = d.w >= LG ? "tabla" : "tarjetas";
+      expect(layout).toBe(d.esperado);
+      if (layout === "tabla") {
+        // Con tabla, lo que queda tiene que dar para los 720 px: si no, vuelve
+        // el arrastre horizontal que el #326 sacó del iPhone.
+        expect(d.w - BARRA_LATERAL - PADDING).toBeGreaterThanOrEqual(MIN_TABLA);
+      }
+    });
+  }
+
+  it("en 768 y 834 la tabla NO cabría — por eso van a tarjetas", () => {
+    for (const w of [768, 834]) {
+      expect(w - BARRA_LATERAL - PADDING).toBeLessThan(MIN_TABLA);
+    }
+  });
+
+  it("mover el corte de vuelta a `md:` volvería a romper el iPad vertical", () => {
+    // 768 >= 768 → tabla en un ancho donde solo quedan 496 px útiles.
+    expect(768 - BARRA_LATERAL - PADDING).toBe(496);
+    expect(form).not.toContain('className="hidden md:block"');
+    expect(form).not.toContain('className="md:hidden space-y-4"');
   });
 });
 
