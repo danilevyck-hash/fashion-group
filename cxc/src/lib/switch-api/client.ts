@@ -621,11 +621,14 @@ export interface SwitchProveedorElement {
   saldo: number | string;
   tipoComprobante: string;  // "Factura" | "Pago a proveedores" | ...
   abrev: string;            // "FA" | "PP" | ...
-  fechaCreacion: string;    // DD-MM-YYYY
-  dias: number;
-  saldoConsecutivo: number | string;
-  credito: number | string; // cargos (facturas)
-  debito: number | string;  // pagos
+  // YYYY-MM-DD. Decía "DD-MM-YYYY" (copiado del estado de cuenta de CXC, que sí
+  // usa ese formato) y el parser del sync le creyó: 821/821 renglones reales
+  // vienen en YYYY-MM-DD. Ver src/lib/proveedores-derivados.ts.
+  fechaCreacion: string;
+  dias: number;             // días transcurridos, en VALOR ABSOLUTO (un doc futuro también da positivo)
+  saldoConsecutivo: number | string; // acumulado corrido, NO el monto del documento
+  credito: number | string; // cargos: es el SALDO abierto del documento, no su total
+  debito: number | string;  // pagos y notas de crédito: saldo abierto, no el total
   [key: string]: unknown;
 }
 /** Respuesta de /apiproveedor/info. */

@@ -10,6 +10,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { condenseAging } from "@/lib/proveedores-aging";
+import { derivarProveedor, type ElementoLedger } from "@/lib/proveedores-derivados";
 
 export interface ProveedorRow {
   empresa_key: string;
@@ -46,14 +47,29 @@ export function normProvName(s: string | null | undefined): string {
 }
 
 const COLS =
-  "empresa_key,proveedor_switch_id,codigo,nombre,identificacion,dv,direccion,contacto,telefono,celular,email,tipo_proveedor,saldo_total,aging,comprado_ytd,pagado_ytd,num_facturas,num_pagos,ultimo_pago_monto,ultimo_pago_fecha,ultimo_pago_dias,synced_at";
+  "empresa_key,proveedor_switch_id,codigo,nombre,identificacion,dv,direccion,contacto,telefono,celular,email,tipo_proveedor,saldo_total,aging,comprado_ytd,pagado_ytd,num_facturas,num_pagos,ultimo_pago_monto,ultimo_pago_fecha,ultimo_pago_dias,synced_at,elements";
 
+/**
+ * Los tres campos derivados (Comprado YTD, Pagado YTD, Último pago) se
+ * RECALCULAN acá desde `elements`, la misma columna que el sync ya guarda.
+ *
+ * Por qué no basta con leer las columnas guardadas:
+ *  1. Las 66 filas de hoy vienen del sync viejo, con las tres en cero — leer la
+ *     columna dejaría el módulo vacío hasta la próxima corrida del cron
+ *     (`sync-proveedores` es 1×/día, 09:30 UTC).
+ *  2. "hace N días" se congelaba en el instante del sync. Calculado al leer,
+ *     siempre es el número de hoy.
+ * Es la MISMA función que usa el sync, así que no hay dos verdades posibles.
+ */
 export async function fetchAllProveedorRows(): Promise<ProveedorRow[]> {
   const { data, error } = await supabaseServer
     .from("switch_proveedor_estadocuenta")
     .select(COLS);
   if (error) throw new Error(`switch_proveedor_estadocuenta: ${error.message}`);
-  return (data ?? []) as ProveedorRow[];
+  return (data ?? []).map((r) => {
+    const { elements, ...row } = r as ProveedorRow & { elements?: ElementoLedger[] };
+    return { ...row, ...derivarProveedor(elements) } as ProveedorRow;
+  });
 }
 
 export interface ProveedorListItem {
