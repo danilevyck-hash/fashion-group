@@ -181,7 +181,13 @@ describe("lockKeyDe / config por módulo", () => {
     expect(isSyncNowModulo("estadocuenta")).toBe(true);
     expect(isSyncNowModulo("costo")).toBe(false);
     expect(moduloConfig("estadocuenta").empresas).toContain("joystep");
-    expect(moduloConfig("recibos").empresas).not.toContain("joystep");
+    // joystep SÍ está en recibos desde el 27-jul-2026. Esta línea afirmaba lo
+    // contrario y con eso dejaba fijado el agujero: joystep tenía CXC pero
+    // ningún cobro, así que sus clientes nunca mostraban "último pago" y su
+    // comisión salía $0. Ver empresa-capabilities.test.ts.
+    expect(moduloConfig("recibos").empresas).toContain("joystep");
+    // Boston sigue fuera de recibos, y eso sí es a propósito (su CXC va por Brand It).
+    expect(moduloConfig("recibos").empresas).not.toContain("confecciones_boston");
     expect(moduloConfig("facturas").empresas).toContain("confecciones_boston");
   });
 

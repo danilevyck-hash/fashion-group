@@ -16,8 +16,15 @@
  * supabase/migrations/*_cron_heartbeats.sql) — aplicar manualmente.
  */
 
+import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { supabaseServer } from "@/lib/supabase-server";
-import { empresasConCxc } from "@/lib/switch-api/empresas";
+import {
+  empresasConCxc,
+  empresasConCxp,
+  empresasConFacturas,
+  empresasConRecibos,
+  empresasConUtilidad,
+} from "@/lib/switch-api/empresas";
 import { RUNNING_STALE_MIN } from "@/lib/switch-api/sync-log";
 import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
@@ -300,21 +307,20 @@ export const SEED_TOLERANT_CRONS = [
 // 409 para no matarle la sesión. Al agregar/mover una entrada en vercel.json
 // que toque Switch, actualizar AQUÍ también.
 
-const CRON_EMPRESAS_B2B5 = [
-  "vistana",
-  "fashion_wear",
-  "fashion_shoes",
-  "active_shoes",
-  "active_wear",
-] as const;
-const CRON_EMPRESAS_RECIBOS = [...CRON_EMPRESAS_B2B5, "american_classic"] as const;
-const CRON_EMPRESAS_CXP = [...CRON_EMPRESAS_B2B5, "joystep", "american_classic"] as const;
-const CRON_EMPRESAS_TODAS = [
-  ...CRON_EMPRESAS_B2B5,
-  "joystep",
-  "confecciones_boston",
-  "american_classic",
-] as const;
+// DERIVADAS de EMPRESA_SYNC_CAPABILITIES, no escritas a mano. Eran tres arrays
+// literales y el 27-jul-2026 se comprobó lo que eso cuesta: `joystep` faltaba en
+// el universo de recibos y de utilidad acá Y en los syncs, así que el candado de
+// espaciado de sesión única (cron-calendario.test.ts) medía un calendario que no
+// era el real. Al encender una empresa en un sync, este cronograma tiene que
+// enterarse solo — si no, el test que protege la sesión única mira para otro lado.
+/** Empresas del cron sync-utilidad (07:00). */
+const CRON_EMPRESAS_UTILIDAD = empresasConUtilidad();
+/** Empresas del cron sync-recibos (07:50 / 15:15 / 19:15 / 23:15). */
+const CRON_EMPRESAS_RECIBOS = empresasConRecibos();
+/** Empresas del cron sync-proveedores (09:30). */
+const CRON_EMPRESAS_CXP = empresasConCxp();
+/** Las 8 del grupo: switch-articulos y la reconciliación pueden tocar cualquiera. */
+const CRON_EMPRESAS_TODAS = ALL_EMPRESA_KEYS;
 /**
  * Empresas del sync de VENTAS intradía (tipo=facturas) — las 8 con facturas, o
  * sea `empresasConFacturas()`: american_classic (ACS/Multifashion, retail) + las
@@ -335,9 +341,7 @@ const CRON_EMPRESAS_TODAS = [
  */
 const CRON_EMPRESAS_VENTAS = [
   "american_classic",
-  ...CRON_EMPRESAS_B2B5,
-  "joystep",
-  "confecciones_boston",
+  ...empresasConFacturas().filter((k) => k !== "american_classic"),
 ] as const;
 
 export interface SwitchCronEntrada {
@@ -359,7 +363,7 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
   { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
-  { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_B2B5 },
+  { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_UTILIDAD },
   { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-articulos", hhmmUtc: "0840", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },

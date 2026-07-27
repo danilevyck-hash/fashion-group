@@ -39,19 +39,22 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
+import { empresasConRecibos } from "./empresas";
 import { diffRecibos, type ReciboExistente } from "./recibos-diff";
 import { clearStaleRunning, isRunningLockConflict } from "./sync-log";
 import type { Mes } from "./sync-utilidad";
 
-/** Recibos se sincronizan para las 5 B2B + Multifashion (american_classic). */
-export const RECIBOS_EMPRESA_KEYS: EmpresaKey[] = [
-  "vistana",
-  "fashion_wear",
-  "fashion_shoes",
-  "active_shoes",
-  "active_wear",
-  "american_classic",
-];
+/**
+ * Empresas con sync de recibos: las 6 B2B + Multifashion (american_classic).
+ *
+ * DERIVADA de EMPRESA_SYNC_CAPABILITIES (`recibos: true`), no escrita a mano.
+ * Cuando era un array literal decía 6 empresas y omitía `joystep`, mientras
+ * `B2B_EMPRESA_KEYS` sí lo incluía — dos listas que se contradecían en silencio
+ * desde el commit que creó este archivo, sin un comentario que lo explicara.
+ * Costó $15.262,00 de cobros invisibles solo en julio 2026. Para agregar o
+ * sacar una empresa se toca EMPRESA_SYNC_CAPABILITIES, en un solo lugar.
+ */
+export const RECIBOS_EMPRESA_KEYS: EmpresaKey[] = empresasConRecibos();
 
 /** Meses de la ventana rodante del cron de recibos (mes en curso + 2 anteriores). */
 const RECIBOS_VENTANA_MESES = 3;
