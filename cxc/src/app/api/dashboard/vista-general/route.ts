@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { variacionPct } from "@/lib/variacion";
 import {
   prorratearGrupo,
   estadoSemaforo,
@@ -202,7 +203,7 @@ export async function GET(req: NextRequest) {
     ventas = {
       total: ventasTotal,
       prevYear,
-      yoyPct: prevYear !== null && prevYear > 0 ? (ventasTotal - prevYear) / prevYear : null,
+      yoyPct: variacionPct(ventasTotal, prevYear),
       parcial: parcialSel,
       empresasCount: byEmpresa.length,
       byEmpresa,

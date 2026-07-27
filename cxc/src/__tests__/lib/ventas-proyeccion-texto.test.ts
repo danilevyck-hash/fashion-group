@@ -5,6 +5,7 @@
 // fracción", nada de "algoritmo estacional".
 
 import { describe, it, expect } from "vitest";
+import { SIN_COMPARATIVO } from "@/lib/variacion";
 import { readFileSync } from "fs";
 import path from "path";
 import {
@@ -119,10 +120,19 @@ describe("buildSlotsProyeccion", () => {
     expect(s[0].prev).toBeNull();
   });
 
-  it("sin año previo no inventa un Δ", () => {
+  it("sin año previo no inventa un Δ: dice n/a", () => {
     const s = buildSlotsProyeccion({ ...estacional, ventas_prev_ytd_sp: 0 }, 2025);
-    expect(s[0].delta).toBe("—");
+    // "n/a" y no "—": hay valor actual (el YTD), lo que falta es contra qué
+    // compararlo. Es la misma palabra que usa el heatmap de /ventas — una sola
+    // forma en toda la app (ver src/lib/variacion.ts).
+    expect(s[0].delta).toBe(SIN_COMPARATIVO);
     expect(s[0].prev).toBeNull();
+  });
+
+  it("una base de centavos tampoco produce un Δ", () => {
+    // El caso del +363024750%: base ridícula, no cero.
+    const s = buildSlotsProyeccion({ ...estacional, ventas_prev_ytd_sp: 0.01 }, 2025);
+    expect(s[0].delta).toBe(SIN_COMPARATIVO);
   });
 });
 

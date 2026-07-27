@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaFormat } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import { variacionPct } from "@/lib/variacion";
 
 type ViewMode = "ventas" | "utilidad" | "margen";
 
@@ -70,8 +71,7 @@ function cellDelta(cur: Vals, prev: Vals | null, mode: ViewMode): DeltaFormat {
   }
   const cv = mode === "utilidad" ? cur.utilidad : cur.ventas;
   const pv = mode === "utilidad" ? prev.utilidad : prev.ventas;
-  if (pv <= 0) return formatDeltaRatio(null);
-  return formatDeltaRatio((cv - pv) / pv, "pct");
+  return formatDeltaRatio(variacionPct(cv, pv), "pct");
 }
 
 const toneClass: Record<string, string> = {

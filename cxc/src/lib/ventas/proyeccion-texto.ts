@@ -12,6 +12,7 @@
 // cosa que hay que poder testear sin montar un DOM.
 
 import { formatCompactCurrency } from "./format";
+import { variacionPct, SIN_COMPARATIVO } from "../variacion";
 import type { SlotDetalle } from "./celda";
 
 /** Lo mínimo de ProyeccionEmpresa que hace falta para explicar el número. */
@@ -86,7 +87,7 @@ export function buildSlotsProyeccion(
 ): SlotDetalle[] {
   const ytd = p.ventas_ytd;
   const ytdP = p.ventas_prev_ytd_sp;
-  const ratio = ytdP > 0 ? (ytd - ytdP) / ytdP : null;
+  const ratio = variacionPct(ytd, ytdP);
   const dia = diaCorto(opts.fechaCorte);
 
   const cierra: SlotDetalle = {
@@ -103,7 +104,7 @@ export function buildSlotsProyeccion(
     label: dia ? `Vas al ${dia}` : "Vas",
     valor: formatCompactCurrency(ytd),
     prev: opts.compacto || ytdP <= 0 ? null : formatCompactCurrency(ytdP),
-    delta: ratio == null ? "—" : `${ratio >= 0 ? "+" : "−"}${Math.abs(ratio * 100).toFixed(0)}%`,
+    delta: ratio == null ? SIN_COMPARATIVO : `${ratio >= 0 ? "+" : "−"}${Math.abs(ratio * 100).toFixed(0)}%`,
     tone: ratio == null ? "neutral" : ratio >= 0 ? "emerald" : "orange",
     destacado: false,
   };

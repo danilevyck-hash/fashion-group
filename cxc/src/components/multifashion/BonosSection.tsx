@@ -21,6 +21,7 @@ import { Info } from "lucide-react";
 import type { BonosMultifashion } from "@/components/ventas/types";
 import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
+import { variacionPct, fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 
 const MES_FULL = [
@@ -103,10 +104,12 @@ export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
 function GerenteBanner({ resp }: { resp: BonosMultifashion }) {
   const g = resp.gerente;
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
-  const delta = formatDeltaRatio(g.delta_pct);
-  const deltaExacto = g.delta_pct != null
-    ? `${g.delta_pct >= 0 ? "+" : ""}${(g.delta_pct * 100).toFixed(1)}%`
-    : null;
+  // La RPC corta en `ventas_prev > 0`; acá se re-valida contra la base REAL
+  // que el payload ya trae. Ojo: esto arregla lo que se MUESTRA, no el monto
+  // del bono — ese lo decide la RPC y cambiarlo sería mover plata.
+  const deltaPct = variacionPct(g.ventas_mes, g.ventas_mes_prev);
+  const delta = formatDeltaRatio(deltaPct);
+  const deltaExacto = deltaPct == null ? null : fmtVariacionPct(deltaPct, true, 1);
   const tooltipRegla = deltaExacto
     ? `${REGLA_BONO} · Crecimiento exacto este mes: ${deltaExacto} → bono $${g.bono}.`
     : REGLA_BONO;

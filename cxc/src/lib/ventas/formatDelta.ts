@@ -12,18 +12,23 @@
 // La zona neutral devuelve null en arrow para evitar el em dash confuso
 // que se mezcla con signo menos en montos negativos.
 
+import { variacionPct, SIN_COMPARATIVO } from "../variacion";
+
 export type DeltaTone = "emerald" | "orange" | "stone";
 
 export interface DeltaFormat {
   arrow: "▲" | "▼" | null;
-  /** "+12%" / "-5%" / "+2.1 pts" / "≈0 pts" / "—" cuando no hay comparativo */
+  /** "+12%" / "-5%" / "+2.1 pts" / "≈0 pts" / "n/a" cuando no hay comparativo */
   displayValue: string;
   tone: DeltaTone;
 }
 
+// "n/a", no "—": el usuario tiene que entender que NO HAY con qué comparar,
+// no que la variación fue cero. Es la misma palabra que ya usaba el heatmap de
+// /ventas (`deltaCelda`), así que ahora las dos pantallas dicen lo mismo.
 const NO_COMPARATIVE: DeltaFormat = {
   arrow: null,
-  displayValue: "—",
+  displayValue: SIN_COMPARATIVO,
   tone: "stone",
 };
 
@@ -31,17 +36,17 @@ export type DeltaMode = "pct" | "pts";
 
 /**
  * Calcula y formatea delta a partir de current/previous values.
- * Si previous es null/undefined/0/negativo → returns "sin comparativo" form.
+ * Si la base previa no llega al mínimo comparable ($100) → "sin comparativo".
  * El modo 'pts' acá no aplica — para puntos porcentuales usar formatDeltaPts
  * con los márgenes ya calculados, o formatDeltaRatio con mode='pts'.
+ *
+ * La división NO se escribe acá: la regla está en variacion.ts.
  */
 export function formatDelta(
   current: number | null | undefined,
   previous: number | null | undefined
 ): DeltaFormat {
-  if (previous == null || previous <= 0) return NO_COMPARATIVE;
-  const delta = ((current ?? 0) - previous) / previous;
-  return formatDeltaRatio(delta);
+  return formatDeltaRatio(variacionPct(current ?? 0, previous));
 }
 
 /**

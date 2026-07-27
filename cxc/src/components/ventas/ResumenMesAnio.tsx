@@ -6,6 +6,7 @@ import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { MONTHS } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import { variacionPct } from "@/lib/variacion";
 
 type ViewMode = "ventas" | "utilidad" | "margen";
 
@@ -82,13 +83,20 @@ function renderMetric(v: number | null, mode: ViewMode): string {
 }
 
 // Δ relativo (ratio) del valor actual vs el del año anterior, en los 3 modos.
-// En Margen es el cambio relativo % entre los dos márgenes — NO puntos. null
-// cuando no hay base previa comparable (sin dato previo o previo ≤ 0).
+// En Margen es el cambio relativo % entre los dos márgenes — NO puntos.
+//
+// Ojo con el modo margen: ahí la "base" es un RATIO (0,30 = 30%), no dólares,
+// así que NO le corresponde la regla de base mínima de `variacionPct` —
+// aplicársela borraría la columna entera. El piso en dólares ya lo puso
+// `metricValue`, que devuelve null bajo MARGEN_VENTAS_MIN de ventas.
 function relDelta(cur: Vals | null, prev: Vals | null, mode: ViewMode): number | null {
   const c = metricValue(cur, mode);
   const p = metricValue(prev, mode);
-  if (c == null || p == null || p <= 0) return null;
-  return (c - p) / p;
+  if (mode === "margen") {
+    if (c == null || p == null || p <= 0) return null;
+    return (c - p) / p;
+  }
+  return variacionPct(c, p);
 }
 
 // tone → clase (mismo tratamiento que la tabla principal de Ventas).
@@ -123,8 +131,12 @@ function samePeriodTotalDelta(s: CurrentYtdSamePeriod, mode: ViewMode): number |
     : mode === "utilidad"
       ? [s.utilidad, s.utilidadPrev]
       : [s.ventas, s.ventasPrev];
-  if (c == null || p == null || p <= 0) return null;
-  return (c - p) / p;
+  // Mismo criterio que relDelta: en margen la base es un ratio, no dólares.
+  if (mode === "margen") {
+    if (c == null || p == null || p <= 0) return null;
+    return (c - p) / p;
+  }
+  return variacionPct(c, p);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

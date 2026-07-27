@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Search, ChevronRight } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
+import { variacionPct } from "@/lib/variacion";
 import {
   PRODUCTOS_EMPRESAS,
   PRODUCTOS_EMPRESA_KEYS,
@@ -280,12 +281,15 @@ function SortableTh({
   );
 }
 
-// Δ vs año anterior. Productos sin venta el año previo = "Nuevo" (no +∞%).
+// Δ vs año anterior. Producto sin base comparable el año previo = "Nuevo".
+// Antes bastaba con `prev > 0` y un producto que el año pasado vendió $2 salía
+// con +50000%; ahora la regla es la única de la app (`variacionPct`).
 function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
-  if (prev === undefined || prev <= 0) {
+  const ratio = variacionPct(curr, prev);
+  if (ratio == null) {
     return <td className="hidden px-3 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell">Nuevo</td>;
   }
-  const pct = ((curr - prev) / prev) * 100;
+  const pct = ratio * 100;
   const up = pct >= 0;
   return (
     <td className={`hidden px-3 py-2.5 text-right font-mono tabular-nums sm:table-cell ${up ? "text-emerald-700" : "text-rose-600"}`}>

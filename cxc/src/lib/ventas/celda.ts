@@ -7,6 +7,7 @@
 
 import { fmtMoney, fmtMoneyCompact } from "./format";
 import { formatDeltaRatio } from "./formatDelta";
+import { baseComparable, variacionPct, BASE_MIN_COMPARATIVO, SIN_COMPARATIVO, SIN_DATO } from "../variacion";
 
 export type ViewMode = "ventas" | "utilidad" | "margen";
 
@@ -19,8 +20,9 @@ export interface CeldaBase {
 }
 
 // Por debajo de $100 de ventas el ratio utilidad/ventas no es informativo
-// (mismo guard que Detalle Mensual).
-export const MARGEN_VENTAS_MIN = 100;
+// (mismo guard que Detalle Mensual). Es el mismo número que
+// BASE_MIN_COMPARATIVO —la regla del Δ%— y se ata acá para que no diverjan.
+export const MARGEN_VENTAS_MIN = BASE_MIN_COMPARATIVO;
 
 export function marginRatio(ventas: number, utilidad: number): number | null {
   if (ventas < MARGEN_VENTAS_MIN) return null;
@@ -57,15 +59,16 @@ export function cellDelta(c: CeldaBase, mode: ViewMode): number | null {
     if (prevMargen == null) return null;
     return cur - prevMargen;
   }
-  const prev = cellPrevValue(c, mode);
-  if (prev <= 0) return null;
-  return (cur - prev) / prev;
+  // La regla del Δ% vive en variacion.ts — acá NO se escribe la división.
+  // Con `prev <= 0` el mes de $0,01 de Multifashion (mayo 2024) pasaba y la
+  // celda de mayo 2025 pintaba "+363024750%".
+  return variacionPct(cur, cellPrevValue(c, mode));
 }
 
-/** Hay valor actual pero no hay base comparativa → "n/a". */
+/** Hay valor actual pero la base del año previo no sirve para comparar → "n/a". */
 export function isNaComparison(c: Pick<CeldaBase, "ventasPrev" | "utilidadPrev">, mode: ViewMode): boolean {
   if (mode === "margen") return marginRatio(c.ventasPrev, c.utilidadPrev) == null;
-  return cellPrevValue(c, mode) <= 0;
+  return !baseComparable(cellPrevValue(c, mode));
 }
 
 export function deltaModeFor(mode: ViewMode): "pct" | "pts" {
@@ -102,7 +105,7 @@ export interface DeltaCelda {
  * @param na    true cuando hay valor actual pero NO hay base del año previo.
  */
 export function deltaCelda(delta: number | null, mode: ViewMode, na = false): DeltaCelda | null {
-  if (delta == null) return na ? { texto: "n/a", tone: "neutral" } : null;
+  if (delta == null) return na ? { texto: SIN_COMPARATIVO, tone: "neutral" } : null;
   const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
   return {
     texto: `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
@@ -158,7 +161,7 @@ export function buildSlotsMetrica(
       prev: conPrev && prev > 0 ? renderCellValue(prev, mode) : null,
       delta:
         delta == null
-          ? (na && cur != null ? "n/a" : "—")
+          ? (na && cur != null ? SIN_COMPARATIVO : SIN_DATO)
           : `${fmt.arrow ? `${fmt.arrow} ` : ""}${fmt.displayValue}`,
       tone: delta == null ? "neutral" : fmt.tone === "emerald" ? "emerald" : fmt.tone === "orange" ? "orange" : "neutral",
       destacado: mode === highlight,
