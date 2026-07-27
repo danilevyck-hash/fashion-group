@@ -1,9 +1,19 @@
 // Admin de un pedido del link (cfg.publicosTable): soft-delete + edición de
-// items. Solo admin. El total se recalcula con la fórmula de la marca.
+// items. CATALOGO_ADMIN_ROLES (admin + secretaria). El total se recalcula con
+// la fórmula de la marca.
+//
+// Antes del 27-jul-2026 esto era solo-admin y quedaba INCONSISTENTE con el
+// resto del tab Pedidos, donde la secretaria ya borraba lo mismo: el borrado
+// MASIVO (`orders/bulk-delete`, fuente="publicos") la acepta, y "Editar del
+// link" convierte el pedido a <marca>_orders —cuyo PUT/DELETE también la
+// acepta— así que la capacidad ya existía por el camino largo. Con el botón
+// "Administrar" visible para secretaria, el borrado individual habría sido el
+// único de la pantalla que le respondía 403.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +35,7 @@ export async function DELETE(
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin"]);
+  const auth = requireRole(req, catalogoAdminRoles());
   if (auth instanceof NextResponse) return auth;
 
   const short_id = params.short_id;
@@ -56,7 +66,7 @@ export async function PUT(
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin"]);
+  const auth = requireRole(req, catalogoAdminRoles());
   if (auth instanceof NextResponse) return auth;
 
   const short_id = params.short_id;

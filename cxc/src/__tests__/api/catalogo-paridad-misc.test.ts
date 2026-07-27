@@ -145,16 +145,29 @@ describe("POST /upload — validación de imágenes", () => {
     expect((await jUpload(makeReq("/x", { method: "POST", rawBody: fileForm(), headers: MULTIPART_HEADERS }))).status).toBe(401);
   });
 
-  it("DIVERGENCIA actual de roles: secretaria puede en reebok; en joybees 403 (solo admin)", async () => {
-    const rRes = await rUpload(
-      makeReq("/x", { method: "POST", rawBody: fileForm({ sku: "SKU1" }), headers: MULTIPART_HEADERS, role: "secretaria" }),
-    );
-    expect(rRes.status).toBe(200);
+  // 27-jul-2026: la DIVERGENCIA se cerró. Joybees y Tommy tenían
+  // upload.roles=["admin"] contra ["admin","secretaria"] de Reebok, o sea que
+  // la secretaria no podía subir una foto en 2 de las 3 marcas — justo lo que
+  // Daniel pidió habilitar ("catálogos como a daniel, con administrar
+  // también"). Las 3 marcas usan ahora CATALOGO_ADMIN_ROLES.
+  it("paridad de roles: secretaria puede subir foto en AMBAS marcas", async () => {
+    for (const upload of [rUpload, jUpload]) {
+      const res = await upload(
+        makeReq("/x", { method: "POST", rawBody: fileForm({ sku: "SKU1" }), headers: MULTIPART_HEADERS, role: "secretaria" }),
+      );
+      expect(res.status).toBe(200);
+    }
+  });
 
-    const jRes = await jUpload(
-      makeReq("/x", { method: "POST", rawBody: fileForm({ sku: "SKU1" }), headers: MULTIPART_HEADERS, role: "secretaria" }),
-    );
-    expect(jRes.status).toBe(403);
+  it("los roles que NO administran siguen sin poder subir (403) — ambas marcas", async () => {
+    for (const upload of [rUpload, jUpload]) {
+      for (const role of ["vendedor", "bodega", "contabilidad", "gerente_acs"]) {
+        const res = await upload(
+          makeReq("/x", { method: "POST", rawBody: fileForm({ sku: "SKU1" }), headers: MULTIPART_HEADERS, role }),
+        );
+        expect(res.status, `${role} no debe poder subir fotos`).toBe(403);
+      }
+    }
   });
 
   it("400 sin archivo — ambas marcas", async () => {

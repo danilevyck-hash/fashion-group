@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { CATALOGO_ADMIN_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 
 // Catálogos en UNA pantalla: una tarjeta por marca con sus dos acciones adentro
 // (Ver catálogo · Administrar) + contadores en vivo (productos, sin foto). Elimina
@@ -25,7 +26,7 @@ interface Brand {
   tagline: string;
   productsUrl: string;   // endpoint para contar (active=true)
   catalogoHref: string;  // "Ver catálogo"
-  adminHref: string;     // "Administrar" (solo admin)
+  adminHref: string;     // "Administrar" (CATALOGO_ADMIN_ROLES)
 }
 
 const BRANDS: Brand[] = [
@@ -58,7 +59,7 @@ const BRANDS: Brand[] = [
 export default function CatalogosMarcasPage() {
   const { authChecked, role } = useAuth({
     moduleKey: "catalogos",
-    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
+    allowedRoles: catalogoRoles(),
   });
 
   const [counters, setCounters] = useState<Record<string, BrandCounters | null>>({});
@@ -82,7 +83,11 @@ export default function CatalogosMarcasPage() {
 
   if (!authChecked) return null;
 
-  const isAdmin = role === "admin";
+  // Quién ve "Administrar": admin y secretaria (CATALOGO_ADMIN_ROLES). Vendedor
+  // y bodega solo ven "Ver catálogo". El gate de verdad está en el server
+  // (requireAdmin/requireRole en /api/catalogo/**) — esto solo evita mostrar un
+  // botón que terminaría en 403.
+  const puedeAdministrar = (CATALOGO_ADMIN_ROLES as readonly string[]).includes(role);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,7 +143,7 @@ export default function CatalogosMarcasPage() {
                         <path d="M5 12h14M12 5l7 7-7 7" />
                       </svg>
                     </Link>
-                    {isAdmin && (
+                    {puedeAdministrar && (
                       <Link
                         href={b.adminHref}
                         className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition active:scale-[0.97] ${hub.outlineBtn}`}

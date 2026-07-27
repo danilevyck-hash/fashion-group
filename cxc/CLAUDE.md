@@ -16,13 +16,25 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Rol | DB value | Acceso |
 |-----|----------|--------|
 | Admin | `admin` | Todo |
-| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, marketing, comisiones, packing-lists, catálogos, KPIs dashboard |
-| Bodega | `bodega` | guias (despacho), packing-lists, catálogos, búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo). Nota: directorio aparece solo en la búsqueda global, NO como módulo navegable |
+| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, marketing, comisiones, packing-lists, **catálogos incluido ADMINISTRAR** (ver nota), KPIs dashboard |
+| Bodega | `bodega` | guias (despacho), packing-lists, catálogos (**solo ver**), búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo). Nota: directorio aparece solo en la búsqueda global, NO como módulo navegable |
 | Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
-| Vendedor | `vendedor` | catálogos (reebok), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
+| Vendedor | `vendedor` | catálogos (**solo ver** + armar pedidos), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
 | Gerente ACS | `gerente_acs` | SOLO Multifashion (/multifashion + /api/multifashion/*). Auto-redirect a Multifashion desde home (único módulo). Módulos vía `role_permissions` |
 
 > Roles reales del sistema = los 6 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+
+> **Catálogos tiene DOS niveles de rol, y viven en `src/lib/catalogo/roles.ts` (fuente única, 27-jul-2026):**
+> - `CATALOGO_ROLES` = admin, secretaria, vendedor, bodega → **ver** el catálogo interno y el hub `/catalogos/marcas`.
+> - `CATALOGO_ADMIN_ROLES` = admin, **secretaria** → **administrar** `/catalogos/admin/[marca]` en las 3 marcas: fotos (subida individual, ZIP del banco B2B, selector de variantes), etiqueta `badge`, ocultar del catálogo (`oculto_manual`), "Actualizar ahora", Excel sin foto y el tab Pedidos (borrar individual/masivo, exportar, editar, enviar a Switch).
+>
+> La secretaria se sumó por pedido de Daniel ("catálogos como a daniel, con administrar también"). **No hizo falta migración:** `role_permissions.secretaria` ya traía `catalogos` — el módulo nunca fue el problema. Lo que faltaba estaba repartido en dos capas y estaba INCONSISTENTE consigo mismo:
+> - **UI:** el hub escondía el botón "Administrar" con `role === "admin"`, y `AdminCatalogoClient` pedía `allowedRoles: ["admin"]`. (Ojo: ese `allowedRoles` era decorativo — `hasModuleAccess` cae de vuelta a `fg_modules`, así que cualquiera con el módulo `catalogos` ya entraba por URL. El botón era el único freno real.)
+> - **API:** `requireAdmin` (= admin+secretaria) ya protegía casi todo el admin (`products`, `products/variantes*`), pero quedaban dos huecos solo-admin: `upload` en **Joybees y Tommy** (Reebok sí la dejaba → la secretaria no podía subir foto en 2 de las 3 marcas) y `pedidos-publicos/[short_id]` DELETE/PUT (mientras `orders/bulk-delete` con `fuente="publicos"` sí la aceptaba: se podía borrar el MISMO pedido en masa pero no de a uno).
+>
+> **Lo que NO cambió y no debe cambiar:** los **precios** los manda Switch — la allow-list editable a mano es `image_url`/`badge` (+`name` solo en Tommy, que marca `nombre_manual=true`). Y `createRoles` sigue incluyendo `vendedor` (y el `cliente` legacy en Reebok) para armar pedidos.
+>
+> Candado: `src/__tests__/lib/catalogo-roles.test.ts` congela **las dos listas**, prueba `requireRole`/`requireAdmin` con cookies firmadas rol por rol, verifica `upload.roles` en las 3 marcas y trae un **snapshot literal de los módulos de `bodega`, `contabilidad`, `vendedor` y `gerente_acs`**: si alguno gana un módulo sin querer, el build se pone rojo. Verificado por mutación (agregar `bodega` a `CATALOGO_ADMIN_ROLES` rompe 10 tests).
 
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
