@@ -18,9 +18,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { createSwitchClient, type SwitchProveedorElement } from "./client";
+import { createSwitchClient } from "./client";
 import { clearStaleRunning } from "./sync-log";
 import { empresasConCxp } from "./empresas";
+import { anioPanama, derivarProveedor } from "@/lib/proveedores-derivados";
+import { hoyPanama } from "@/lib/fecha-panama";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 const PROVEEDORES_PAGE = 50;
@@ -71,54 +73,12 @@ const clean = (s: unknown): string | null => {
   return v === "" ? null : v;
 };
 
-/** DD-MM-YYYY -> { year, iso:'YYYY-MM-DD', ms } o null si inválida. */
-function parseFecha(s: unknown): { year: number; iso: string; ms: number } | null {
-  if (typeof s !== "string") return null;
-  const m = s.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m;
-  const iso = `${yyyy}-${mm}-${dd}`;
-  const ms = Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd));
-  if (Number.isNaN(ms)) return null;
-  return { year: Number(yyyy), iso, ms };
-}
-
-/** Agrega los elements del ledger a los campos derivados de la fila. */
-function aggregateElements(elements: SwitchProveedorElement[], anioActual: number) {
-  let comprado_ytd = 0;
-  let pagado_ytd = 0;
-  let num_facturas = 0;
-  let num_pagos = 0;
-  let ultimo: { monto: number; iso: string; dias: number; ms: number } | null = null;
-
-  for (const e of elements) {
-    const credito = num(e.credito); // cargos (facturas de compra)
-    const debito = num(e.debito);   // pagos a proveedor
-    const f = parseFecha(e.fechaCreacion);
-    if (credito > 0) {
-      num_facturas++;
-      if (f && f.year === anioActual) comprado_ytd += credito;
-    }
-    if (debito > 0) {
-      num_pagos++;
-      if (f && f.year === anioActual) pagado_ytd += debito;
-      // último pago = fila de pago (debito>0) con fecha más reciente
-      if (f && (!ultimo || f.ms > ultimo.ms)) {
-        ultimo = { monto: debito, iso: f.iso, dias: Number(e.dias) || 0, ms: f.ms };
-      }
-    }
-  }
-
-  return {
-    comprado_ytd: Math.round(comprado_ytd * 100) / 100,
-    pagado_ytd: Math.round(pagado_ytd * 100) / 100,
-    num_facturas,
-    num_pagos,
-    ultimo_pago_monto: ultimo ? ultimo.monto : null,
-    ultimo_pago_fecha: ultimo ? ultimo.iso : null,
-    ultimo_pago_dias: ultimo ? ultimo.dias : null,
-  };
-}
+// Los campos derivados (Comprado/Pagado YTD, Último pago) se calculan en
+// src/lib/proveedores-derivados.ts — módulo puro COMPARTIDO con la lectura del
+// módulo Proveedores. Acá vivían un `parseFecha()` que exigía DD-MM-YYYY (Switch
+// manda YYYY-MM-DD → devolvía null 821 de 821 veces y las tres columnas salían
+// en cero) y un agregador que contaba las notas de crédito como pagos. El
+// encabezado de ese archivo tiene el diagnóstico completo.
 
 /**
  * READ-ONLY: trae proveedores + estado de cuenta de UNA empresa y devuelve las
@@ -129,7 +89,11 @@ export async function buildProveedorRows(
   empresaKey: EmpresaKey,
 ): Promise<{ rows: ProveedorCxpRow[]; fallidos: number; listedIds: number[]; listaCompleta: boolean }> {
   const client = createSwitchClient(empresaKey);
-  const anioActual = new Date().getUTCFullYear();
+  // Año en hora PANAMÁ (UTC−5 fijo). Con getUTCFullYear(), entre las 19:00 y las
+  // 23:59 del 31-dic de Panamá el corte ya saltaba al año siguiente y el YTD se
+  // vaciaba 5 horas antes de tiempo.
+  const hoy = hoyPanama();
+  const anioActual = anioPanama();
 
   // 1) Listar todos los proveedores (paginación segura: cortar por accumulated>=total).
   const proveedores: { id: number; nombre?: string }[] = [];
@@ -165,7 +129,7 @@ export async function buildProveedorRows(
     }
 
     const prov = info.proveedor ?? {};
-    const agg = aggregateElements(ec.elements, anioActual);
+    const agg = derivarProveedor(ec.elements, { hoy, anio: anioActual });
 
     rows.push({
       empresa_key: empresaKey,
