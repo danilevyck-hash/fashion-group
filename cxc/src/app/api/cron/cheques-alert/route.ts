@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { runChequesAlert } from "@/lib/cheques-alert";
@@ -29,7 +28,7 @@ export async function GET(req: NextRequest) {
   // Test mode: dispara un mensaje Telegram de prueba.
   if (req.nextUrl.searchParams.get("test") === "true") {
     const sent = await enviarNegocio(
-      `🧪 Cheques por vencer (PRUEBA)\n1 cheque — ${money(1000)}\n• PRUEBA TEST (Vistana) ${money(1000)} — MAÑANA`,
+      `🧪 Cheques por vencer (PRUEBA)\n1 cheque — ${money(1000)}\n• PRUEBA TEST (Vistana) ${money(1000)} — el lunes 3 ago`,
     );
     return NextResponse.json({ message: "Telegram de prueba", sent });
   }
@@ -44,9 +43,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: r.detail }, { status: 500 });
   }
 
+  // El heartbeat se registra SIEMPRE que la corrida salió bien, incluso el fin
+  // de semana o sin cheques: es lo que ve el watchdog (si no, alertaría todos
+  // los sábados) y ADEMÁS es el candado anti-duplicado que lee `yaAvisoHoy`.
   await recordCronHeartbeat(CRON_NAME);
   if (r.count === 0) {
-    return NextResponse.json({ message: "No hay cheques por vencer", count: 0 });
+    return NextResponse.json({ message: r.detail, count: 0 });
   }
   return NextResponse.json({
     message: r.sent ? "Alerta enviada" : "Alerta no enviada (Telegram falló)",

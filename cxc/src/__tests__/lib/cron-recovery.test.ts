@@ -33,8 +33,9 @@ describe("recoveryStillComingToday", () => {
     expect(recoveryStillComingToday("sync-clientes-master", 19)).toBe(false); // ya no viene nada hoy
   });
 
-  it("colateral con hora mínima (cheques-alert=14): solo cuentan pasadas elegibles", () => {
-    // A las 12: la pasada de las 14 y la de las 18 son elegibles (>=14) → viene.
+  it("colateral con hora mínima (cheques-alert=15): solo cuentan pasadas elegibles", () => {
+    // Su cron corre 14:15 UTC → solo la pasada de las 18 es elegible (>=15).
+    // A las 12 esa pasada todavía viene.
     expect(recoveryStillComingToday("cheques-alert", 12)).toBe(true);
     // A las 17: queda la de las 18 → viene. A las 18 en punto: estricto → no.
     expect(recoveryStillComingToday("cheques-alert", 17)).toBe(true);
