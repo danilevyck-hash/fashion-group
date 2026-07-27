@@ -28,6 +28,7 @@ import type {
 } from "@/components/ventas/types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
+import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection } from "./BonosSection";
 
@@ -275,8 +276,11 @@ function rowHighlight(v: VendedoraDetalle, badge?: BonoBadge): boolean {
   return !!badge?.winner || (v.manager && !!badge && badge.gerenteBono > 0);
 }
 
+// El payload no trae las ventas del período previo, así que la base se despeja
+// del propio ratio (prev = ventas / (1 + pct)) y se le aplica la MISMA regla.
+// Una vendedora que el año pasado vendió $8 en el mes no genera un +40000%.
 function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge }) {
-  const dv = formatDeltaRatio(v.delta_ventas_pct);
+  const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   return (
     <tr className={rowHighlight(v, badge) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{rank}</td>
@@ -298,7 +302,7 @@ function VendedoraRow({ v, rank, badge }: { v: VendedoraDetalle; rank: number; b
 }
 
 function VendedoraCard({ v, rank, badge }: { v: VendedoraDetalle; rank: number; badge?: BonoBadge }) {
-  const dv = formatDeltaRatio(v.delta_ventas_pct);
+  const dv = formatDeltaRatio(variacionPctDesdeRatio(v.ventas, v.delta_ventas_pct));
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",

@@ -26,6 +26,7 @@ import type {
   Multifashion, RetailMonthly, MultifashionSerieAnio, MultifashionSerieMes,
 } from "@/components/ventas/types";
 import type { CumPoint } from "./CumulativeChartCard";
+import { variacionPct, baseDesdeRatio, fmtVariacionPct } from "@/lib/variacion";
 
 // recharts cargado aparte (ssr:false) → fuera del bundle inicial de /multifashion.
 const VentasDiariasChart = dynamic(
@@ -160,10 +161,11 @@ function formatFechaShort(iso: string): string {
 
 // Delta % entre ventas corrientes y comparativo. Devuelve null si !tiene_data
 // o si el divisor es muy chico (evita spikes engañosos a +99999%).
+// El umbral ya NO vive acá: es la regla única de `variacionPct` (variacion.ts),
+// que nació justamente de este guard — era el ÚNICO del front que lo tenía.
 function calcDeltaPct(cur: number, comp: ComparativoBlock): number | null {
   if (!comp.tiene_data) return null;
-  if (comp.ventas < 100) return null;
-  return (cur - comp.ventas) / comp.ventas;
+  return variacionPct(cur, comp.ventas);
 }
 
 // Un delta de < 1% absoluto es ruido — lo tratamos como "≈0%" sin signo ni
@@ -321,7 +323,7 @@ export function MultifashionResumenView({
   const mayActualYear = overview.wholesale.ytdVentas;
   const proyRetail = overview.proyeccionCierre.proyeccion ?? 0;
   const cierrePrevRetail = overview.proyeccionCierre.cierre_prev;
-  const deltaCierreRetail = cierrePrevRetail > 0 ? (proyRetail - cierrePrevRetail) / cierrePrevRetail : null;
+  const deltaCierreRetail = variacionPct(proyRetail, cierrePrevRetail);
   // Nota YTD del año: monto, cantidad de facturas y cliente representativo salen
   // del bloque wholesale del overview (mismo bucket que la fila de Ventas).
   const notaMayoreoAnio = buildNotaMayoreo({
@@ -524,8 +526,12 @@ function ComparativoInteranualCard({
   const prevYear = year - 1;
   const filas = meses
     .map((m, i) => {
-      const pct = m.vs2025;
-      const vPrev = pct != null ? m.ventas / (1 + pct) : null;
+      // La base del año anterior se despeja del ratio ANTES de aplicarle la
+      // regla: mayo 2024 vale $0,01 y ese centavo se sigue mostrando en la
+      // columna del año previo — puesto al lado de "n/a" explica por qué no
+      // hay porcentaje. Lo que se calla es el "+363024750%", no el dato.
+      const vPrev = baseDesdeRatio(m.ventas, m.vs2025);
+      const pct = variacionPct(m.ventas, vPrev);
       return {
         label: MESES_SHORT[i],
         parcial: !!m.es_periodo_parcial,
@@ -541,15 +547,17 @@ function ComparativoInteranualCard({
   if (filas.length === 0) return null;
 
   // YTD a mismo corte: solo meses con comparación del año anterior disponible.
+  // El criterio NO cambió (sigue siendo "hay base"): los montos del YTD tienen
+  // que quedar exactamente iguales — acá solo se arregla el %.
   const comp = filas.filter((f) => f.vPrev != null);
   const tot = comp.reduce((s, f) => s + f.v, 0);
   const totPrev = comp.reduce((s, f) => s + (f.vPrev ?? 0), 0);
-  const totPct = totPrev > 0 ? (tot - totPrev) / totPrev : null;
+  const totPct = variacionPct(tot, totPrev);
 
   const GRID = "grid grid-cols-[2.8rem_minmax(0,1fr)_minmax(0,1fr)_6rem] items-center gap-2 px-4";
   const deltaTone = (n: number | null) =>
     n == null ? "text-gray-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
-  const fmtPct = (p: number | null) => (p == null ? "—" : `${p >= 0 ? "+" : ""}${(p * 100).toFixed(1)}%`);
+  const fmtPct = (p: number | null) => fmtVariacionPct(p, true, 1);
   const fmtAbs = (n: number | null) => (n == null ? "" : `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`);
 
   return (

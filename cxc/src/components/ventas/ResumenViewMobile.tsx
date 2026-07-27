@@ -29,6 +29,7 @@ import {
   deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda,
 } from "@/lib/ventas/celda";
 import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
+import { variacionPct } from "@/lib/variacion";
 
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 
@@ -152,8 +153,8 @@ export function ResumenViewMobile({
 function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: VentasResumen; prevYear: number; isClosedYear: boolean; selectedYear: number }) {
   const k = data.kpis;
   const periodo = isClosedYear ? String(selectedYear) : "YTD";
-  const ventasDelta   = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
-  const utilidadDelta = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
+  const ventasDelta   = variacionPct(k.ventasNetasYTD, k.ventas2025YTD);
+  const utilidadDelta = variacionPct(k.utilidadYTD, k.utilidad2025YTD);
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
   const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs '${String(prevYear).slice(-2)}`;
 
@@ -616,7 +617,7 @@ function MobileTotalCell({
     display = (cur * 100).toFixed(1) + "%";
   } else {
     cur = ventas;
-    delta = prev > 0 ? (ventas - prev) / prev : null;
+    delta = variacionPct(ventas, prev);
     display = formatCompactCurrency(cur);
   }
   const dc = deltaCelda(delta, mode, delta == null);
@@ -752,11 +753,11 @@ function MobileTotalGrupoYtdCell({
     display = (v * 100).toFixed(1) + "%";
   } else if (mode === "utilidad") {
     v = curUtil;
-    d = prevUtil > 0 ? (curUtil - prevUtil) / prevUtil : null;
+    d = variacionPct(curUtil, prevUtil);
     display = formatCompactCurrency(v);
   } else {
     v = cur;
-    d = prev > 0 ? (cur - prev) / prev : null;
+    d = variacionPct(cur, prev);
     display = formatCompactCurrency(v);
   }
   const dc = deltaCelda(d, mode, d == null);

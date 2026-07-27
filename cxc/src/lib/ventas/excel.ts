@@ -8,6 +8,7 @@
 import type { WorkSheet } from "xlsx-js-style";
 import type { VentasResumen } from "@/components/ventas/types";
 import { MONTHS } from "./format";
+import { variacionPct } from "../variacion";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -55,7 +56,10 @@ export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet>
     : "";
 
   // Filas de empresa — meses + Total + Margen% + prev YTD + Δ
-  const rows: (string | number)[][] = [];
+  // `null` = celda VACÍA en el Excel (lo soporta ReportCell). Es lo que se usa
+  // cuando no hay base comparable para el Δ%: una celda en blanco dice "no hay
+  // comparación", un 0.0% diría "no creció", que es otra cosa.
+  const rows: (string | number | null)[][] = [];
   for (const e of data.empresas) {
     const monthValues = monthsWithData.map(i => Number(e.ventas2026[i] ?? 0));
     const total = monthValues.reduce((s, v) => s + v, 0);
@@ -64,7 +68,9 @@ export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet>
     // el cutoff aplicado y null para meses posteriores al en curso. Summing
     // con null→0 da el YTD ajustado.
     const prevYtd = e.ventas2025.reduce<number>((s, v) => s + (v ?? 0), 0);
-    const delta = prevYtd > 0 ? (total - prevYtd) / prevYtd : 0;
+    // null (no 0): sin base comparable la celda del Excel queda VACÍA. Un
+    // "0.0%" ahí se lee como "no creció", que es una afirmación falsa.
+    const delta = variacionPct(total, prevYtd);
     rows.push([e.empresa.nombre, ...monthValues, total, e.margenPct, prevYtd, delta]);
   }
 
@@ -80,7 +86,7 @@ export async function buildResumenSheet(data: VentasResumen): Promise<WorkSheet>
   const grandMargen = grandTotal > 0 ? grandUtilidad / grandTotal : 0;
   const grandPrevYtd = data.empresas.reduce<number>((s, e) =>
     s + e.ventas2025.reduce<number>((ss, v) => ss + (v ?? 0), 0), 0);
-  const grandDelta = grandPrevYtd > 0 ? (grandTotal - grandPrevYtd) / grandPrevYtd : 0;
+  const grandDelta = variacionPct(grandTotal, grandPrevYtd);
 
   return buildReportSheet({
     title: `FASHION GROUP — Ventas ${data.year}`,

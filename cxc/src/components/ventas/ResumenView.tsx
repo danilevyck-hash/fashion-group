@@ -25,6 +25,7 @@ import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyec
 import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
+import { variacionPct } from "@/lib/variacion";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
 import { EmpresaMesAnioPanel, useResumenMesAnio, type CurrentYtdSamePeriod } from "./ResumenMesAnio";
@@ -209,8 +210,8 @@ export function ResumenView({
   //   ventasDelta   = ratio decimal (0.05 = +5%)
   //   utilidadDelta = ratio decimal
   //   margenDeltaPts = puntos porcentuales (margenYTD y margen2025YTD son ratios 0..1)
-  const ventasDelta    = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD)  / k.ventas2025YTD   : null;
-  const utilidadDelta  = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
+  const ventasDelta    = variacionPct(k.ventasNetasYTD, k.ventas2025YTD);
+  const utilidadDelta  = variacionPct(k.utilidadYTD, k.utilidad2025YTD);
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
   const margenSign     = margenDeltaPts >= 0 ? "▲ +" : "▼ ";
 
@@ -553,7 +554,7 @@ function MesVsMesCard({
   const idx = mesActual - 1;
   const curr = empresas.reduce((s, e) => s + (e.ventas2026?.[idx] ?? 0), 0);
   const prev = empresas.reduce((s, e) => s + (e.ventas2025?.[idx] ?? 0), 0);
-  const delta = prev > 0 ? (curr - prev) / prev : null;
+  const delta = variacionPct(curr, prev);
   const up = (delta ?? 0) >= 0;
   const mes = MONTHS[idx] ?? "";
   return (
@@ -793,11 +794,11 @@ function EmpresaTotalCell({
     displayValue = (cur * 100).toFixed(1) + "%";
   } else if (mode === "utilidad") {
     cur = utilidadTotal;
-    delta = utilidadPrevTotal > 0 ? (utilidadTotal - utilidadPrevTotal) / utilidadPrevTotal : null;
+    delta = variacionPct(utilidadTotal, utilidadPrevTotal);
     displayValue = fmtMoney(cur);
   } else {
     cur = ventasTotal;
-    delta = ventasPrevTotal > 0 ? (ventasTotal - ventasPrevTotal) / ventasPrevTotal : null;
+    delta = variacionPct(ventasTotal, ventasPrevTotal);
     displayValue = fmtMoney(cur);
   }
   const dc = deltaCelda(delta, mode, delta == null);

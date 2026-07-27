@@ -45,6 +45,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
+import { variacionPct } from "@/lib/variacion";
 
 export { hoyPanama };
 
@@ -198,7 +199,7 @@ export async function calcularResumenDiario(
 //   Mes    $32,517     ▲ +36.2%
 //   …
 //
-//   Sin dato del año pasado en una métrica (prev ≤ 0): esa fila muestra
+//   Sin base comparable del año pasado (menos de $100): esa fila muestra
 //   "s/d año pasado" en vez de la flecha y NO aparece en el bloque de abajo.
 //   Si ninguna métrica tiene comparable, el bloque "Año pasado" se omite entero.
 
@@ -206,9 +207,13 @@ export function fmtMonto(n: number): string {
   return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
+// La regla de cuándo HAY comparativo es la única de la app (`variacionPct`);
+// acá solo se elige el texto. Un porcentaje absurdo en un mensaje de Telegram
+// es igual de malo que en pantalla, y encima no se puede ignorar.
 export function fmtPct(cur: number, prev: number, decimales: number): string {
-  if (prev <= 0) return "s/d año pasado";
-  const pct = ((cur - prev) / prev) * 100;
+  const ratio = variacionPct(cur, prev);
+  if (ratio == null) return "s/d año pasado";
+  const pct = ratio * 100;
   const val = pct.toFixed(decimales);
   return `${pct >= 0 ? "+" : ""}${val}%`;
 }
@@ -221,8 +226,9 @@ export function fmtPct(cur: number, prev: number, decimales: number): string {
  *  Sin base comparable (prev ≤ 0) no hay variación que mostrar: "s/d año
  *  pasado" — un +∞% no diría nada útil. */
 export function fmtVariacion(cur: number, prev: number, decimales: number): string {
-  if (prev <= 0) return "s/d año pasado";
-  const txt = (((cur - prev) / prev) * 100).toFixed(decimales);
+  const ratio = variacionPct(cur, prev);
+  if (ratio == null) return "s/d año pasado";
+  const txt = (ratio * 100).toFixed(decimales);
   const redondeado = Number(txt);
   if (redondeado === 0) return `= ${(0).toFixed(decimales)}%`; // cubre "-0" y "0.0"
   return `${redondeado > 0 ? `▲ +${txt}` : `▼ ${txt}`}%`;
