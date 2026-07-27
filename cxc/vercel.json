@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/cheques-alert",
-      "schedule": "0 13 * * *"
+      "schedule": "15 14 * * *"
     },
     {
       "path": "/api/cron/backup",

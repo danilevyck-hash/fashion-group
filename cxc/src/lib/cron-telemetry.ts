@@ -100,7 +100,12 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "cleanup-packing-lists": 0,
   "acs-resumen-diario": 0,
   "integrity-check": 13, // su cron corre 12:00 UTC
-  "cheques-alert": 14, // su cron corre 13:00 UTC
+  // Su cron corre 14:15 UTC (9:15 a.m. Panamá) → hora mínima 15, o sea que solo
+  // la pasada de las 18:00 lo recupera. Con 14 la pasada de las 14:00 se
+  // ADELANTABA a su propio run por 15 min y mandaba el aviso a las 9:00 en
+  // punto; el candado anti-duplicado lo hacía inofensivo, pero recuperar algo
+  // que todavía no falló no es recuperar.
+  "cheques-alert": 15,
   // grupo-resumen-mensual: su run normal es el día 3 a las 13:00 UTC y su
   // recuperación solo aplica los días 3-4 (recoverOnlyIf en la reconciliación).
   // Sigue en NUNCA_SILENCIAR: los watchdogs jamás lo silencian por "recuperación
