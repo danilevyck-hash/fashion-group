@@ -27,10 +27,6 @@ export interface ProveedorRow {
   tipo_proveedor: string | null;
   saldo_total: number;
   aging: { title: string; saldo: number }[];
-  comprado_ytd: number;
-  pagado_ytd: number;
-  num_facturas: number;
-  num_pagos: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null;
   ultimo_pago_dias: number | null;
@@ -46,20 +42,20 @@ export function normProvName(s: string | null | undefined): string {
   return (s ?? "").trim().toUpperCase().replace(/[.,]/g, "").replace(/\s+/g, " ").trim();
 }
 
+// Las columnas comprado_ytd / pagado_ytd / num_facturas / num_pagos siguen
+// EXISTIENDO en la tabla pero ya no se leen ni se escriben (ver la migración
+// 20260727200000): eran el ledger podado. No volver a agregarlas a este select.
 const COLS =
-  "empresa_key,proveedor_switch_id,codigo,nombre,identificacion,dv,direccion,contacto,telefono,celular,email,tipo_proveedor,saldo_total,aging,comprado_ytd,pagado_ytd,num_facturas,num_pagos,ultimo_pago_monto,ultimo_pago_fecha,ultimo_pago_dias,synced_at,elements";
+  "empresa_key,proveedor_switch_id,codigo,nombre,identificacion,dv,direccion,contacto,telefono,celular,email,tipo_proveedor,saldo_total,aging,ultimo_pago_monto,ultimo_pago_fecha,ultimo_pago_dias,synced_at,elements";
 
 /**
- * Los tres campos derivados (Comprado YTD, Pagado YTD, Último pago) se
- * RECALCULAN acá desde `elements`, la misma columna que el sync ya guarda.
+ * "Último pago" se RECALCULA acá desde `elements`, la misma columna que el sync
+ * ya guarda.
  *
- * Por qué no basta con leer las columnas guardadas:
- *  1. Las 66 filas de hoy vienen del sync viejo, con las tres en cero — leer la
- *     columna dejaría el módulo vacío hasta la próxima corrida del cron
- *     (`sync-proveedores` es 1×/día, 09:30 UTC).
- *  2. "hace N días" se congelaba en el instante del sync. Calculado al leer,
- *     siempre es el número de hoy.
- * Es la MISMA función que usa el sync, así que no hay dos verdades posibles.
+ * Por qué no basta con leer la columna guardada: "hace N días" se congelaba en
+ * el instante del sync, que corre 1×/día (09:30 UTC). Calculado al leer, siempre
+ * es el número de hoy. Es la MISMA función que usa el sync, así que no hay dos
+ * verdades posibles.
  */
 export async function fetchAllProveedorRows(): Promise<ProveedorRow[]> {
   const { data, error } = await supabaseServer
@@ -76,7 +72,6 @@ export interface ProveedorListItem {
   key: string;            // nombre normalizado (clave de la ficha)
   nombre: string;         // display (el más largo entre las variantes)
   saldo_total: number;    // suma (o de la empresa filtrada)
-  comprado_ytd: number;
   empresas_count: number;
   ultimo_pago_dias: number | null; // el más reciente entre empresas
   // Aging condensado al vocabulario CXC (suma de los buckets reales de Switch).
@@ -107,7 +102,6 @@ export function buildList(
       key,
       nombre,
       saldo_total: round2(rs.reduce((s, r) => s + Number(r.saldo_total), 0)),
-      comprado_ytd: round2(rs.reduce((s, r) => s + Number(r.comprado_ytd), 0)),
       empresas_count: new Set(rs.map((r) => r.empresa_key)).size,
       ultimo_pago_dias: dias.length ? Math.min(...dias) : null,
       aging_current: aging.current,
@@ -126,8 +120,6 @@ export function buildList(
 
 export interface ProveedorEmpresaTotals {
   empresa: string;
-  comprado_ytd: number;
-  pagado_ytd: number;
   por_pagar: number;       // saldo_total (negativo = saldo a favor)
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null;
@@ -147,8 +139,6 @@ export interface ProveedorFicha {
   tipo_proveedor: string | null;
   empresas: ProveedorEmpresaTotals[];
   total_grupo: {
-    comprado_ytd: number;
-    pagado_ytd: number;
     por_pagar: number;
     aging: { title: string; saldo: number }[];
   };
@@ -169,8 +159,6 @@ export function buildFicha(rows: ProveedorRow[], key: string): ProveedorFicha | 
   const empresas: ProveedorEmpresaTotals[] = rs
     .map((r) => ({
       empresa: r.empresa_key,
-      comprado_ytd: round2(Number(r.comprado_ytd)),
-      pagado_ytd: round2(Number(r.pagado_ytd)),
       por_pagar: round2(Number(r.saldo_total)),
       ultimo_pago_monto: r.ultimo_pago_monto != null ? round2(Number(r.ultimo_pago_monto)) : null,
       ultimo_pago_fecha: r.ultimo_pago_fecha,
@@ -200,8 +188,6 @@ export function buildFicha(rows: ProveedorRow[], key: string): ProveedorFicha | 
     tipo_proveedor: base.tipo_proveedor,
     empresas,
     total_grupo: {
-      comprado_ytd: round2(empresas.reduce((s, e) => s + e.comprado_ytd, 0)),
-      pagado_ytd: round2(empresas.reduce((s, e) => s + e.pagado_ytd, 0)),
       por_pagar: round2(empresas.reduce((s, e) => s + e.por_pagar, 0)),
       aging,
     },

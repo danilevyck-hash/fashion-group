@@ -21,7 +21,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient } from "./client";
 import { clearStaleRunning } from "./sync-log";
 import { empresasConCxp } from "./empresas";
-import { anioPanama, derivarProveedor } from "@/lib/proveedores-derivados";
+import { derivarProveedor } from "@/lib/proveedores-derivados";
 import { hoyPanama } from "@/lib/fecha-panama";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
@@ -44,10 +44,6 @@ export interface ProveedorCxpRow {
   tipo_proveedor: string | null;
   saldo_total: number;
   aging: unknown[];
-  comprado_ytd: number;
-  pagado_ytd: number;
-  num_facturas: number;
-  num_pagos: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null; // YYYY-MM-DD
   ultimo_pago_dias: number | null;
@@ -73,12 +69,16 @@ const clean = (s: unknown): string | null => {
   return v === "" ? null : v;
 };
 
-// Los campos derivados (Comprado/Pagado YTD, Último pago) se calculan en
+// El campo derivado que queda (Último pago) se calcula en
 // src/lib/proveedores-derivados.ts — módulo puro COMPARTIDO con la lectura del
 // módulo Proveedores. Acá vivían un `parseFecha()` que exigía DD-MM-YYYY (Switch
 // manda YYYY-MM-DD → devolvía null 821 de 821 veces y las tres columnas salían
 // en cero) y un agregador que contaba las notas de crédito como pagos. El
 // encabezado de ese archivo tiene el diagnóstico completo.
+//
+// ⛔ "Comprado YTD" / "Pagado YTD" se ELIMINARON el 27-jul-2026: el ledger de
+// /apiproveedor/info solo trae lo que todavía se debe, así que los dos totales
+// eran un subconjunto arbitrario del año. No se reconstruyen desde acá.
 
 /**
  * READ-ONLY: trae proveedores + estado de cuenta de UNA empresa y devuelve las
@@ -89,11 +89,7 @@ export async function buildProveedorRows(
   empresaKey: EmpresaKey,
 ): Promise<{ rows: ProveedorCxpRow[]; fallidos: number; listedIds: number[]; listaCompleta: boolean }> {
   const client = createSwitchClient(empresaKey);
-  // Año en hora PANAMÁ (UTC−5 fijo). Con getUTCFullYear(), entre las 19:00 y las
-  // 23:59 del 31-dic de Panamá el corte ya saltaba al año siguiente y el YTD se
-  // vaciaba 5 horas antes de tiempo.
   const hoy = hoyPanama();
-  const anioActual = anioPanama();
 
   // 1) Listar todos los proveedores (paginación segura: cortar por accumulated>=total).
   const proveedores: { id: number; nombre?: string }[] = [];
@@ -129,7 +125,7 @@ export async function buildProveedorRows(
     }
 
     const prov = info.proveedor ?? {};
-    const agg = derivarProveedor(ec.elements, { hoy, anio: anioActual });
+    const agg = derivarProveedor(ec.elements, { hoy });
 
     rows.push({
       empresa_key: empresaKey,

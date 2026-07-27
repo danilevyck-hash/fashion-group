@@ -17,7 +17,6 @@ import type XLSX from "xlsx-js-style";
 
 export interface ProveedorExportRow {
   nombre: string;
-  comprado_ytd: number;
   aging_current: number;
   aging_watch: number;
   aging_overdue: number;
@@ -28,7 +27,6 @@ export interface ProveedorExportRow {
 
 const COLUMNS: ReportColumn[] = [
   { header: "Proveedor", wch: 34 },
-  { header: "Comprado YTD", wch: 14, align: "right", fmt: MONEY_FMT },
   { header: "0-90d", wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "91-120d", wch: 12, align: "right", fmt: MONEY_FMT },
   { header: "121d+", wch: 12, align: "right", fmt: MONEY_FMT },
@@ -41,7 +39,6 @@ const COLUMNS: ReportColumn[] = [
 export function buildProveedoresSheet(rows: ProveedorExportRow[], subtitle?: string): XLSX.WorkSheet {
   const data: ReportCell[][] = rows.map((p) => [
     { v: p.nombre, bold: p.saldo_total > 0 },
-    p.comprado_ytd,
     p.aging_current,
     { v: p.aging_watch, ...(p.aging_watch > 0 ? { fg: "B45309" } : {}) },
     { v: p.aging_overdue, ...(p.aging_overdue > 0 ? { fg: "B91C1C" } : {}) },
@@ -52,13 +49,12 @@ export function buildProveedoresSheet(rows: ProveedorExportRow[], subtitle?: str
 
   const tot = rows.reduce(
     (acc, p) => ({
-      comprado: acc.comprado + p.comprado_ytd,
       current: acc.current + p.aging_current,
       watch: acc.watch + p.aging_watch,
       overdue: acc.overdue + p.aging_overdue,
       saldo: acc.saldo + p.saldo_total,
     }),
-    { comprado: 0, current: 0, watch: 0, overdue: 0, saldo: 0 }
+    { current: 0, watch: 0, overdue: 0, saldo: 0 }
   );
 
   return buildReportSheet({
@@ -66,7 +62,7 @@ export function buildProveedoresSheet(rows: ProveedorExportRow[], subtitle?: str
     subtitle: subtitle || "Todo el grupo",
     columns: COLUMNS,
     rows: data,
-    totals: [`${rows.length} proveedores`, tot.comprado, tot.current, tot.watch, tot.overdue, tot.saldo, null, null],
+    totals: [`${rows.length} proveedores`, tot.current, tot.watch, tot.overdue, tot.saldo, null, null],
   });
 }
 

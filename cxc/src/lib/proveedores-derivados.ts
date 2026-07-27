@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Campos derivados del ledger de CxP (Comprado YTD, Pagado YTD, Último pago).
+// Campo derivado del ledger de CxP: ÚLTIMO PAGO. Nada más.
 //
 // Módulo PURO: no toca base ni red. Lo usan DOS lugares, y por eso vive aparte:
 //   - src/lib/switch-api/sync-proveedores.ts → escribe las columnas al sincronizar
@@ -7,6 +7,53 @@
 //     mismo `elements` que ya está guardado en la fila
 // Recalcular al leer no es redundancia: arregla las filas viejas sin esperar al
 // cron (que corre 1×/día) y mantiene "hace N días" fresco entre corridas.
+//
+// ⛔ ACÁ VIVÍAN "Comprado YTD" y "Pagado YTD". SE ELIMINARON el 27-jul-2026 y no
+// se vuelven a agregar sobre esta fuente. La regla que fijó Daniel es "solo
+// quiero info que se pueda sacar al centavo desde Switch; lo que no, se elimina",
+// y estos dos números NO se pueden:
+//
+//   `/apiproveedor/info` → `estadodecuenta.elements[]` es un ESTADO DE CUENTA,
+//   no un libro de documentos: solo trae lo que TODAVÍA se debe (verificado: 0 de
+//   821 renglones con saldo cero). Una factura de compra del año pagada al 100%
+//   se cae del ledger **y se lleva su pago con ella**. Los dos totales quedaban
+//   cortos, y cortos de forma impredecible — dependía de a qué proveedor se le
+//   estuviera pagando al día. No es un número aproximado: es un subconjunto
+//   arbitrario, sin factor de corrección ni cota de error posible.
+//
+//   "Pagado YTD" además NO TIENE ARREGLO: en las 74 páginas de la API de Switch
+//   no existe NI UN endpoint de pagos a proveedores (ni reporte, ni lista, ni
+//   detalle). La única fuente de pagos es este mismo ledger podado.
+//
+//   "Comprado" TAMPOCO tiene reemplazo. Se evaluó `/apiingresomercancia/lista`
+//   como fuente de una columna distinta y bien rotulada ("Mercancía recibida") y
+//   se DESCARTÓ tras medirla contra producción el 27-jul-2026. Las tres razones,
+//   cualquiera de ellas suficiente:
+//
+//     1. NO se pueden excluir los anulados, ni siquiera detectarlos. El filtro
+//        `estatus` está documentado pero la API lo IGNORA: medido en
+//        american_classic, `estatus=Activo`, `estatus=Inactivo` y sin filtro
+//        devuelven las MISMAS 610 filas y la MISMA suma ($1.099.278,65). Y no hay
+//        campo de estado en ninguna parte — ni en la lista ni en
+//        `/apiingresomercancia/info` (se revisaron las 10 llaves del detalle en
+//        12 documentos: id, secuencial, fecha, subTotal, impuesto, total,
+//        proveedor, proveedorId, sucursal, sucursalId).
+//     2. Los datos traen basura que no se puede filtrar. En active_shoes el
+//        ingreso 11 (19-000000011) viene con `subTotal: 4460999999999.55` y
+//        `total: 1000000000` — cuatro billones y mil millones exactos, contra un
+//        saldo de CxP de $233.870,60 en TODA la empresa. Ese solo documento hace
+//        que "Mercancía recibida" de LATIN FITNESS GROUP diga MIL MILLONES.
+//        Además 6 de 104 filas no cumplen `subTotal + impuesto = total`.
+//     3. Es BRUTO: en toda la API no existe endpoint de devoluciones ni de notas
+//        de crédito de compra, así que una devolución no se resta nunca.
+//
+//   Bajo la regla de Daniel eso es un borrado, no un rótulo nuevo: el número
+//   sería exacto respecto de lo que Switch lista, pero lo que Switch lista no es
+//   certificable. La evidencia se reproduce con los scripts
+//   `scripts/_probe-ingresomercancia*.ts` (solo lectura).
+//
+// `Último pago` SÍ es exacto y se queda: solo necesita el pago más reciente, que
+// por definición sigue vivo en el ledger abierto.
 //
 // 🩸 EL BUG QUE ARREGLA (27-jul-2026). `parseFecha()` exigía **DD-MM-YYYY**:
 //     const m = s.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
@@ -41,20 +88,12 @@ export interface ElementoLedger {
 }
 
 export interface DerivadosProveedor {
-  comprado_ytd: number;
-  pagado_ytd: number;
-  num_facturas: number;
-  num_pagos: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null; // YYYY-MM-DD
   ultimo_pago_dias: number | null;
 }
 
 export const DERIVADOS_VACIOS: DerivadosProveedor = {
-  comprado_ytd: 0,
-  pagado_ytd: 0,
-  num_facturas: 0,
-  num_pagos: 0,
   ultimo_pago_monto: null,
   ultimo_pago_fecha: null,
   ultimo_pago_dias: null,
@@ -113,16 +152,6 @@ function diaValido(anio: number, mes: number, dia: number): boolean {
   return d.getUTCFullYear() === anio && d.getUTCMonth() === mes - 1 && d.getUTCDate() === dia;
 }
 
-/** Año en curso en hora PANAMÁ. El corte del YTD es el 1-ene 00:00 de Panamá. */
-export function anioPanama(ahora: Date = new Date()): number {
-  return Number(hoyPanama(ahora).slice(0, 4));
-}
-
-/** ¿La fecha (YYYY-MM-DD de Panamá) cae en el año `anio`? Rango [1-ene, 1-ene+1). */
-export function esDelAnio(fechaPanama: string, anio: number): boolean {
-  return fechaPanama >= `${anio}-01-01` && fechaPanama < `${anio + 1}-01-01`;
-}
-
 /**
  * ¿Este renglón es un PAGO de verdad?
  *
@@ -159,53 +188,31 @@ export function montoDocumento(el: ElementoLedger): number {
 }
 
 /**
- * Calcula los campos derivados de una fila de CxP a partir de su ledger.
+ * Último pago a este proveedor, a partir de su ledger de CxP.
  *
- * ⚠️ LÍMITE DEL DATO, no del cálculo: `/apiproveedor/info` devuelve solo el
- * ledger ABIERTO (verificado: 0 de 821 renglones tienen saldo cero). Una factura
- * del año ya pagada por completo desaparece de ahí, así que "Comprado YTD" y
- * "Pagado YTD" cubren lo del año que TODAVÍA figura en la cuenta y se quedan
- * cortos. `Último pago` no tiene ese problema. Queda anotado para que nadie lea
- * estas dos columnas como el total comprado/pagado del año.
+ * Este cálculo NO sufre la poda del estado de cuenta: el pago más reciente sigue
+ * abierto por definición, así que el dato es exacto. (Lo que sí sufría la poda
+ * —"Comprado YTD" y "Pagado YTD"— ya no se calcula acá; ver el encabezado.)
  */
 export function derivarProveedor(
   elements: ElementoLedger[] | null | undefined,
-  opts: { hoy?: string; anio?: number } = {},
+  opts: { hoy?: string } = {},
 ): DerivadosProveedor {
   const hoy = opts.hoy ?? hoyPanama();
-  const anio = opts.anio ?? Number(hoy.slice(0, 4));
 
-  let comprado_ytd = 0;
-  let pagado_ytd = 0;
-  let num_facturas = 0;
-  let num_pagos = 0;
   let ultimo: { monto: number; fecha: string } | null = null;
 
   for (const el of elements ?? []) {
+    if (montoSwitch(el.debito) <= 0 || !esPagoAProveedor(el)) continue;
     const fecha = fechaPanamaDelLedger(el.fechaCreacion);
-    const enElAnio = fecha != null && esDelAnio(fecha, anio);
-
-    if (montoSwitch(el.credito) > 0) {
-      num_facturas++;
-      if (enElAnio) comprado_ytd += montoDocumento(el);
-    }
-
-    if (montoSwitch(el.debito) > 0 && esPagoAProveedor(el)) {
-      num_pagos++;
-      if (enElAnio) pagado_ytd += montoDocumento(el);
-      // Último pago: el de fecha más reciente. Sin fecha legible no compite —
-      // preferimos vacío antes que inventar una.
-      if (fecha != null && (ultimo === null || fecha > ultimo.fecha)) {
-        ultimo = { monto: montoDocumento(el), fecha };
-      }
+    // Último pago: el de fecha más reciente. Sin fecha legible no compite —
+    // preferimos vacío antes que inventar una.
+    if (fecha != null && (ultimo === null || fecha > ultimo.fecha)) {
+      ultimo = { monto: montoDocumento(el), fecha };
     }
   }
 
   return {
-    comprado_ytd: r2(comprado_ytd),
-    pagado_ytd: r2(pagado_ytd),
-    num_facturas,
-    num_pagos,
     ultimo_pago_monto: ultimo ? r2(ultimo.monto) : null,
     ultimo_pago_fecha: ultimo ? ultimo.fecha : null,
     ultimo_pago_dias: ultimo ? diasDesde(ultimo.fecha, hoy) : null,

@@ -20,8 +20,6 @@ const EMPRESAS_CXP = empresasConCxp() as readonly string[];
 
 interface EmpresaTotals {
   empresa: string;
-  comprado_ytd: number;
-  pagado_ytd: number;
   por_pagar: number;
   ultimo_pago_monto: number | null;
   ultimo_pago_fecha: string | null;
@@ -48,7 +46,7 @@ interface Ficha {
   email: string | null;
   tipo_proveedor: string | null;
   empresas: EmpresaTotals[];
-  total_grupo: { comprado_ytd: number; pagado_ytd: number; por_pagar: number; aging: { title: string; saldo: number }[] };
+  total_grupo: { por_pagar: number; aging: { title: string; saldo: number }[] };
   synced_at: string | null;
   reclamos: Reclamo[];
 }
@@ -131,10 +129,6 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                       : `$${fmt(data.total_grupo.por_pagar)}`}
                   </div>
                 </div>
-                <div className="text-right text-xs text-gray-500 tabular-nums">
-                  <div>Comprado YTD ${fmt(data.total_grupo.comprado_ytd)}</div>
-                  <div>Pagado YTD ${fmt(data.total_grupo.pagado_ytd)}</div>
-                </div>
               </div>
 
               {/* Aging bucketizado (viene de Switch). Buckets vacíos en gris. */}
@@ -187,13 +181,11 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
 
             {/* Historial por empresa */}
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
-              <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Por empresa · YTD {new Date().getFullYear()}</h2>
+              <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Por empresa</h2>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                     <th className="py-2 font-normal">Empresa</th>
-                    <th className="py-2 font-normal text-right">Comprado YTD</th>
-                    <th className="py-2 font-normal text-right">Pagado YTD</th>
                     <th className="py-2 font-normal text-right">Por pagar</th>
                     <th className="py-2 font-normal text-right">Último pago</th>
                   </tr>
@@ -202,8 +194,6 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                   {data.empresas.map((e) => (
                     <tr key={e.empresa} className="border-b border-gray-100">
                       <td className="py-2 text-gray-700">{getCompanyDisplay(e.empresa)}</td>
-                      <td className="py-2 text-right tabular-nums text-gray-600">${fmt(e.comprado_ytd)}</td>
-                      <td className={`py-2 text-right tabular-nums ${e.pagado_ytd > 0 ? "text-emerald-700" : "text-gray-400"}`}>${fmt(e.pagado_ytd)}</td>
                       <PorPagarCell value={e.por_pagar} />
                       <td className="py-2 text-right tabular-nums text-gray-600">
                         {e.ultimo_pago_monto != null
@@ -214,8 +204,6 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                   ))}
                   <tr className="font-medium">
                     <td className="py-2.5">Total grupo</td>
-                    <td className="py-2.5 text-right tabular-nums">${fmt(data.total_grupo.comprado_ytd)}</td>
-                    <td className="py-2.5 text-right tabular-nums">${fmt(data.total_grupo.pagado_ytd)}</td>
                     <PorPagarCell value={data.total_grupo.por_pagar} className="py-2.5" />
                     <td className="py-2.5" />
                   </tr>
