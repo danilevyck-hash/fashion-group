@@ -1,0 +1,53 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Proveedores / CxP — borrar las columnas del ledger PODADO (27-jul-2026)
+--
+-- DDL — correr a mano en el SQL Editor de Supabase.
+-- (Sin signos de dolar en comentarios — gotcha del parser del SQL Editor.)
+--
+-- POR QUE SE BORRAN
+--
+-- La regla que fijo Daniel: "solo quiero info que se pueda sacar al centavo
+-- desde Switch; lo que no, se elimina". Estas cuatro columnas no se pueden.
+--
+-- Salian de /apiproveedor/info -> estadodecuenta.elements[], que es un ESTADO DE
+-- CUENTA, no un libro de documentos: solo trae lo que TODAVIA se debe (medido:
+-- 0 de 821 renglones con saldo cero). Cuando una factura de compra del anio se
+-- paga al 100 por ciento se cae del ledger Y SE LLEVA SU PAGO CON ELLA. Los dos
+-- totales quedaban cortos de forma impredecible — dependia de a que proveedor se
+-- le estuviera pagando al dia. No es un numero aproximado: es un subconjunto
+-- arbitrario, sin factor de correccion ni cota de error posible.
+--
+--   comprado_ytd  -> SIN REEMPLAZO. Se evaluo /apiingresomercancia/lista como
+--                    fuente de una columna distinta y bien rotulada ("Mercancia
+--                    recibida") y se descarto tras medirla: (a) el filtro
+--                    `estatus` esta documentado pero la API lo IGNORA (Activo,
+--                    Inactivo y sin filtro devuelven las mismas 610 filas y la
+--                    misma suma en american_classic) y no hay campo de estado ni
+--                    en la lista ni en el detalle, o sea que un ingreso anulado
+--                    no se puede excluir NI DETECTAR; (b) los datos traen basura
+--                    no filtrable: en active_shoes el ingreso 19-000000011 viene
+--                    con subTotal 4460999999999.55 y total 1000000000, contra un
+--                    saldo de CxP de 233,870.60 en toda la empresa, y 6 de 104
+--                    filas no cumplen subTotal + impuesto = total; (c) es bruto,
+--                    porque no existe endpoint de devoluciones de compra.
+--   pagado_ytd    -> SIN REEMPLAZO POSIBLE. En las 74 paginas de la API de
+--                    Switch no existe NI UN endpoint de pagos a proveedores
+--                    (ni reporte, ni lista, ni detalle). Se borra y punto.
+--   num_facturas  -> conteo del MISMO ledger podado. Nunca se mostro en
+--   num_pagos        pantalla, pero corria la misma suerte que los totales.
+--
+-- Lo que NO se toca y sigue siendo exacto: saldo_total, aging (lo calcula
+-- Switch), ultimo_pago_monto / _fecha / _dias (el pago mas reciente sigue vivo
+-- en el ledger abierto por definicion) y el directorio fiscal.
+--
+-- SEGURIDAD DEL DROP: el codigo ya dejo de leerlas y de escribirlas antes de
+-- esta migracion (COLS en src/lib/proveedores.ts y ProveedorCxpRow en
+-- src/lib/switch-api/sync-proveedores.ts). Correr esto con el codigo viejo
+-- desplegado romperia el select. Orden correcto: primero el deploy, despues
+-- este DDL.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+alter table switch_proveedor_estadocuenta drop column if exists comprado_ytd;
+alter table switch_proveedor_estadocuenta drop column if exists pagado_ytd;
+alter table switch_proveedor_estadocuenta drop column if exists num_facturas;
+alter table switch_proveedor_estadocuenta drop column if exists num_pagos;

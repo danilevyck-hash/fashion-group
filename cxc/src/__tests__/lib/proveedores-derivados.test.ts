@@ -1,8 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Candado de los campos derivados de CxP (Comprado YTD, Pagado YTD, Último pago).
+// Candado del campo derivado de CxP que QUEDA: Último pago.
 //
-// El bug que cerró este archivo: `parseFecha()` del sync exigía DD-MM-YYYY y
-// Switch manda YYYY-MM-DD → 66 de 66 filas con las tres columnas en cero.
+// El bug que abrió este archivo: `parseFecha()` del sync exigía DD-MM-YYYY y
+// Switch manda YYYY-MM-DD → 66 de 66 filas con las columnas en cero.
+// Lo que lo cerró: "Comprado YTD" y "Pagado YTD" se ELIMINARON (27-jul-2026)
+// porque el ledger de /apiproveedor/info solo trae lo que todavía se debe.
+// Acá abajo hay un candado explícito para que nadie los vuelva a agregar.
 // Los tests usan fechas FIJAS: nada acá depende de cuándo se corran.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -15,11 +18,9 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 import {
   derivarProveedor,
   fechaPanamaDelLedger,
-  anioPanama,
   esPagoAProveedor,
   montoDocumento,
   diasDesde,
-  esDelAnio,
   type ElementoLedger,
 } from "@/lib/proveedores-derivados";
 import { buildFicha, buildList, type ProveedorRow } from "@/lib/proveedores";
@@ -62,7 +63,7 @@ const notaCredito = (fecha: string, monto: number): ElementoLedger => ({
 });
 
 const HOY = "2026-07-27";
-const OPTS = { hoy: HOY, anio: 2026 };
+const OPTS = { hoy: HOY };
 
 describe("fechaPanamaDelLedger — el formato que Switch manda de verdad", () => {
   it("acepta YYYY-MM-DD (821/821 renglones reales vienen así)", () => {
@@ -101,77 +102,67 @@ describe("fechaPanamaDelLedger — el formato que Switch manda de verdad", () =>
   });
 });
 
-describe("el borde del año se corta en hora Panamá", () => {
-  it("una compra del 31-dic 23:00 de Panamá NO cuenta para el año siguiente", () => {
-    const d = derivarProveedor([factura("2025-12-31T23:00:00-05:00", 1000)], OPTS);
-    expect(d.comprado_ytd).toBe(0);
-    // ...y sí cuenta para 2025.
-    expect(derivarProveedor([factura("2025-12-31T23:00:00-05:00", 1000)], { hoy: "2025-12-31", anio: 2025 }).comprado_ytd).toBe(1000);
-  });
-
-  it("una compra del 1-ene 00:30 de Panamá SÍ cuenta para el año nuevo", () => {
-    const d = derivarProveedor([factura("2026-01-01T00:30:00-05:00", 1000)], OPTS);
-    expect(d.comprado_ytd).toBe(1000);
-  });
-
-  it("un pago del 31-dic 23:00 de Panamá no entra al Pagado YTD del año nuevo", () => {
-    const d = derivarProveedor([pago("2025-12-31T23:00:00-05:00", 500), pago("2026-01-01T00:30:00-05:00", 300)], OPTS);
-    expect(d.pagado_ytd).toBe(300);
-    // el último pago sigue siendo el más reciente, sea de qué año sea
-    expect(d.ultimo_pago_fecha).toBe("2026-01-01");
-  });
-
-  it("el 1-ene 00:00 de Panamá es el primer instante que cuenta", () => {
-    expect(esDelAnio("2026-01-01", 2026)).toBe(true);
-    expect(esDelAnio("2025-12-31", 2026)).toBe(false);
-    expect(esDelAnio("2026-12-31", 2026)).toBe(true);
-    expect(esDelAnio("2027-01-01", 2026)).toBe(false);
-  });
-
-  it("anioPanama no salta de año en las últimas 5 horas del 31-dic de Panamá", () => {
-    // 1-ene 02:00 UTC = 31-dic 21:00 en Panamá: todavía es 2025.
-    expect(anioPanama(new Date("2026-01-01T02:00:00Z"))).toBe(2025);
-    // 1-ene 05:00 UTC = 1-ene 00:00 en Panamá.
-    expect(anioPanama(new Date("2026-01-01T05:00:00Z"))).toBe(2026);
-    expect(anioPanama(new Date("2026-07-27T12:00:00Z"))).toBe(2026);
-  });
-});
-
-describe("el cálculo NO da cero cuando hay compras (la regresión del bug)", () => {
-  it("con el formato real de Switch, comprado y pagado salen con número", () => {
+describe("⛔ Comprado YTD / Pagado YTD ELIMINADOS — no se vuelven a agregar", () => {
+  // La regla de Daniel: "solo quiero info que se pueda sacar al centavo desde
+  // Switch; lo que no, se elimina". El ledger de /apiproveedor/info solo trae lo
+  // que TODAVÍA se debe: una factura del año pagada al 100% se cae de ahí y se
+  // lleva su pago con ella. Los dos totales eran un subconjunto arbitrario.
+  it("derivarProveedor NO devuelve comprado_ytd ni pagado_ytd", () => {
     const d = derivarProveedor(
       [factura("2026-05-11", 41428), factura("2026-06-11", 39628.03), pago("2026-07-13", 25000)],
       OPTS,
     );
-    expect(d.comprado_ytd).toBe(81056.03);
-    expect(d.pagado_ytd).toBe(25000);
-    expect(d.num_facturas).toBe(2);
-    expect(d.num_pagos).toBe(1);
+    expect(Object.keys(d).sort()).toEqual(["ultimo_pago_dias", "ultimo_pago_fecha", "ultimo_pago_monto"]);
+    for (const muerto of ["comprado_ytd", "pagado_ytd", "num_facturas", "num_pagos"]) {
+      expect(d).not.toHaveProperty(muerto);
+    }
+  });
+
+  it("el módulo ya no exporta el corte de año que solo servía para el YTD", async () => {
+    const mod = await import("@/lib/proveedores-derivados");
+    expect(mod).not.toHaveProperty("anioPanama");
+    expect(mod).not.toHaveProperty("esDelAnio");
+  });
+
+  it("la ficha y la lista tampoco los exponen", () => {
+    const f = buildFicha(
+      [fila("fashion_wear", "X SA", [factura("2026-02-01", 100000), pago("2026-07-16", 45394.77)], 54605.23)],
+      "X SA",
+    )!;
+    expect(f.total_grupo).not.toHaveProperty("comprado_ytd");
+    expect(f.total_grupo).not.toHaveProperty("pagado_ytd");
+    expect(f.empresas[0]).not.toHaveProperty("comprado_ytd");
+    expect(f.empresas[0]).not.toHaveProperty("pagado_ytd");
+  });
+});
+
+describe("el parseo de fechas y montos sigue vivo (la regresión del bug)", () => {
+  it("con el formato real de Switch, el último pago sale con número", () => {
+    const d = derivarProveedor(
+      [factura("2026-05-11", 41428), factura("2026-06-11", 39628.03), pago("2026-07-13", 25000)],
+      OPTS,
+    );
     expect(d.ultimo_pago_fecha).toBe("2026-07-13");
+    expect(d.ultimo_pago_monto).toBe(25000);
   });
 
   it("montos con coma de miles (formato US de Switch) no se pierden", () => {
-    const d = derivarProveedor([factura("2026-03-02", 0, { credito: "1,234.5600", total: "1,234.5600" })], OPTS);
-    expect(d.comprado_ytd).toBe(1234.56);
-  });
-
-  it("documentos de años anteriores no entran al YTD pero sí se cuentan", () => {
-    const d = derivarProveedor([factura("2025-12-03", 2926.36), factura("2026-01-15", 100)], OPTS);
-    expect(d.comprado_ytd).toBe(100);
-    expect(d.num_facturas).toBe(2);
+    const d = derivarProveedor([pago("2026-03-02", 0, { debito: "1,234.5600", total: "1,234.5600" })], OPTS);
+    expect(d.ultimo_pago_monto).toBe(1234.56);
   });
 
   it("una fecha ilegible no rompe el resto: se ignora ese renglón, no la fila", () => {
-    const d = derivarProveedor([factura("basura", 999), factura("2026-04-01", 50)], OPTS);
-    expect(d.comprado_ytd).toBe(50);
-    expect(d.num_facturas).toBe(2);
+    const d = derivarProveedor([pago("basura", 999), pago("2026-04-01", 50)], OPTS);
+    expect(d.ultimo_pago_fecha).toBe("2026-04-01");
+    expect(d.ultimo_pago_monto).toBe(50);
   });
 
   it("sin elements devuelve todo vacío, sin explotar", () => {
     for (const v of [[], null, undefined]) {
       const d = derivarProveedor(v as ElementoLedger[] | null | undefined, OPTS);
-      expect(d.comprado_ytd).toBe(0);
       expect(d.ultimo_pago_fecha).toBeNull();
+      expect(d.ultimo_pago_monto).toBeNull();
+      expect(d.ultimo_pago_dias).toBeNull();
     }
   });
 });
@@ -181,7 +172,6 @@ describe("el monto es el del DOCUMENTO, no el saldo que le queda", () => {
     // Caso real (LATIN FITNESS / active_wear): factura de $125.374,80 con $374,80 abiertos.
     const el = factura("2026-05-11", 0, { credito: "374.8000", saldo: "374.8000", total: "125374.8000" });
     expect(montoDocumento(el)).toBe(125374.8);
-    expect(derivarProveedor([el], OPTS).comprado_ytd).toBe(125374.8);
   });
 
   it("si Switch no manda total, cae al crédito/débito sin quedarse en cero", () => {
@@ -196,7 +186,6 @@ describe("Último pago — solo pagos de verdad, nunca una fecha inventada", () 
     expect(d.ultimo_pago_fecha).toBeNull();
     expect(d.ultimo_pago_monto).toBeNull();
     expect(d.ultimo_pago_dias).toBeNull();
-    expect(d.num_pagos).toBe(0);
   });
 
   it("un proveedor con SOLO notas de crédito tampoco tiene último pago", () => {
@@ -204,8 +193,6 @@ describe("Último pago — solo pagos de verdad, nunca una fecha inventada", () 
     // 21-jul-2026. El agregador viejo lo habría mostrado como "último pago".
     const d = derivarProveedor([factura("2026-07-01", 1889.92), notaCredito("2026-07-21", 1889.92)], OPTS);
     expect(d.ultimo_pago_fecha).toBeNull();
-    expect(d.pagado_ytd).toBe(0);
-    expect(d.num_pagos).toBe(0);
   });
 
   it("con pagos y notas mezclados, gana el último PAGO, no la última nota", () => {
@@ -217,8 +204,6 @@ describe("Último pago — solo pagos de verdad, nunca una fecha inventada", () 
     );
     expect(d.ultimo_pago_fecha).toBe("2026-07-16");
     expect(d.ultimo_pago_monto).toBe(45394.77);
-    expect(d.pagado_ytd).toBe(46394.77); // la NC no suma
-    expect(d.num_pagos).toBe(2);
   });
 
   it("esPagoAProveedor distingue por abreviatura y por descripción", () => {
@@ -281,20 +266,16 @@ describe("un proveedor con pagos en más de una empresa", () => {
   it("la ficha suma las dos empresas y cada una conserva SU último pago", () => {
     const f = buildFicha(rows, "AMERICAN FASHION WEAR SA")!;
     expect(f.empresas).toHaveLength(2);
-    expect(f.total_grupo.comprado_ytd).toBe(150000);
-    expect(f.total_grupo.pagado_ytd).toBe(70394.77);
     const fw = f.empresas.find((e) => e.empresa === "fashion_wear")!;
     const fs = f.empresas.find((e) => e.empresa === "fashion_shoes")!;
     expect(fw.ultimo_pago_fecha).toBe("2026-07-16");
     expect(fs.ultimo_pago_fecha).toBe("2026-06-29");
-    expect(fw.pagado_ytd).toBe(45394.77);
   });
 
   it("la lista muestra el pago MÁS RECIENTE entre las empresas", () => {
     const { proveedores } = buildList(rows, {});
     const afw = proveedores.find((p) => p.key === "AMERICAN FASHION WEAR SA")!;
     expect(afw.empresas_count).toBe(2);
-    expect(afw.comprado_ytd).toBe(150000);
     expect(afw.ultimo_pago_dias).toBe(11); // 16-jul, no 29-jun
   });
 

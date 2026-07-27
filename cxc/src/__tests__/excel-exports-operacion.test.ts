@@ -67,8 +67,8 @@ describe("excel-guias — buildGuiasSheet", () => {
 
 describe("excel-proveedores — buildProveedoresSheet", () => {
   const rows: ProveedorExportRow[] = [
-    { nombre: "Proveedor Uno", comprado_ytd: 1000.5, aging_current: 200, aging_watch: 50, aging_overdue: 0, saldo_total: 250, ultimo_pago_dias: 12, empresas_count: 2 },
-    { nombre: "Proveedor Dos", comprado_ytd: 500, aging_current: 0, aging_watch: 0, aging_overdue: 75.25, saldo_total: 75.25, ultimo_pago_dias: null, empresas_count: 1 },
+    { nombre: "Proveedor Uno", aging_current: 200, aging_watch: 50, aging_overdue: 0, saldo_total: 250, ultimo_pago_dias: 12, empresas_count: 2 },
+    { nombre: "Proveedor Dos", aging_current: 0, aging_watch: 0, aging_overdue: 75.25, saldo_total: 75.25, ultimo_pago_dias: null, empresas_count: 1 },
   ];
 
   it("round-trip: hoja, título, headers y moneda como número", () => {
@@ -77,20 +77,26 @@ describe("excel-proveedores — buildProveedoresSheet", () => {
     expect(ws.A1.v).toBe("FASHION GROUP — Proveedores (Cuentas por Pagar)");
     expect(ws.A2.v).toBe("Todo el grupo — 2 proveedores");
     expect(ws.A4.v).toBe("Proveedor");
-    expect(ws.B4.v).toBe("Comprado YTD");
-    expect(ws.F4.v).toBe("Por pagar");
+    // "Comprado YTD" ERA la columna B y se ELIMINÓ (27-jul-2026): el ledger de
+    // Switch solo trae lo que todavía se debe. Ahora B es el primer tramo de aging.
+    expect(ws.B4.v).toBe("0-90d");
+    expect(ws.E4.v).toBe("Por pagar");
     // Moneda: número real con numFmt, no string
     expect(ws.B5.t).toBe("n");
-    expect(ws.B5.v).toBe(1000.5);
+    expect(ws.B5.v).toBe(200);
     expect(ws.B5.z).toBe("$#,##0.00");
     // Último pago: string; null → "—"
-    expect(ws.G5.v).toBe("hace 12d");
-    expect(ws.G6.v).toBe("—");
+    expect(ws.F5.v).toBe("hace 12d");
+    expect(ws.F6.v).toBe("—");
     // Totales en fila 8 (headers 4 + 2 datos + espaciador)
     expect(ws.A8.v).toBe("2 proveedores");
     expect(ws.B8.t).toBe("n");
-    expect(ws.B8.v).toBeCloseTo(1500.5, 2);
-    expect(ws.F8.v).toBeCloseTo(325.25, 2);
+    expect(ws.B8.v).toBeCloseTo(200, 2);
+    expect(ws.E8.v).toBeCloseTo(325.25, 2);
+    // Candado: ni un encabezado con "YTD" en toda la fila 4.
+    for (const col of ["A", "B", "C", "D", "E", "F", "G"]) {
+      expect(String(ws[`${col}4`]?.v ?? "")).not.toMatch(/YTD/i);
+    }
   });
 
   it("subtitle default = Todo el grupo", () => {

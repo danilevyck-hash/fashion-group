@@ -36,7 +36,6 @@ interface ListItem {
   key: string;
   nombre: string;
   saldo_total: number;
-  comprado_ytd: number;
   empresas_count: number;
   ultimo_pago_dias: number | null;
   aging_current: number;
@@ -128,7 +127,7 @@ function ProveedoresList() {
   // tienen saldo (incluido "a favor" negativo) siempre se muestran.
   const conSaldo = items.filter((it) => Math.abs(it.saldo_total) >= 0.005);
   const sinSaldo = items.filter((it) => Math.abs(it.saldo_total) < 0.005);
-  const colsCount = empresa ? 7 : 8;
+  const colsCount = empresa ? 6 : 7;
 
   const renderRow = (it: ListItem) => (
     <tr
@@ -137,7 +136,6 @@ function ProveedoresList() {
       className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
     >
       <td className="py-2 px-3 font-medium">{it.nombre}</td>
-      <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(it.comprado_ytd)}</td>
       <AgingCell value={it.aging_current} aging="current" />
       <AgingCell value={it.aging_watch} aging="watch" />
       <AgingCell value={it.aging_overdue} aging="overdue" />
@@ -165,8 +163,10 @@ function ProveedoresList() {
         </span>
       </div>
       <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
-        Comprado YTD ${fmt(it.comprado_ytd)}{!empresa && it.empresas_count > 1 ? ` · ${it.empresas_count} empresas` : ""}
-        {it.ultimo_pago_dias != null ? ` · pago hace ${it.ultimo_pago_dias}d` : ""}
+        {[
+          !empresa && it.empresas_count > 1 ? `${it.empresas_count} empresas` : "",
+          it.ultimo_pago_dias != null ? `pago hace ${it.ultimo_pago_dias}d` : "",
+        ].filter(Boolean).join(" · ")}
       </div>
       {(it.aging_watch !== 0 || it.aging_overdue !== 0) && (
         <div className="mt-0.5 flex gap-3 text-xs tabular-nums">
@@ -255,7 +255,6 @@ function ProveedoresList() {
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                         <th className="py-2 px-3">Proveedor</th>
-                        <th className="py-2 px-3 text-right">Comprado YTD</th>
                         <th className="py-2 px-3 text-right">{AGING.current.colLabel}</th>
                         <th className="py-2 px-3 text-right">{AGING.watch.colLabel}</th>
                         <th className="py-2 px-3 text-right">{AGING.overdue.colLabel}</th>
