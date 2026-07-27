@@ -23,6 +23,7 @@ const STATIC_ASSET_RE =
 const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
   "/api/health-crons", // meta-watchdog externo; protegido por HEALTHCHECK_TOKEN propio (no cookie)
+  "/api/diag/",     // diagnósticos internos; protegidos por CRON_SECRET propio (fail-closed, no cookie)
   "/api/catalogo/reebok/products", // public catalog reads
   "/api/catalogo/reebok/inventory", // public catalog stock
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
