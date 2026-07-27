@@ -230,7 +230,20 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 - **📊 NEGOCIO** — ventas del día, pedidos, guías, cheques por vencer, fotos faltantes, costo sospechoso. Textual: *"NO, ES SUPER IMPORTANTE ESAS. NECESITO SABER QUE PASA EN LA EMPRESA Y ESO AYUDA BASTANTE"*. **NINGUNA regla anti-ruido aplica acá** — ni frecuencia, ni agrupación, ni "esto funciona bien, no avisar". `enviarNegocio` no acepta perilla de silenciar: que no exista es la garantía. Los textos NO se tocaron.
 - **🔧 SISTEMA** — prefijo `🔧 SISTEMA · ` al principio (se lee en la notificación del iPhone sin abrirla). Regla de tres: **(1)** es real, **(2)** no se arregla solo —si la reconciliación, una 2ª oportunidad o el propio cron lo recupera en horas, NO se avisa—, **(3)** alguien tiene que hacer algo. Y el texto dice **qué pasó / qué significa para el negocio / qué hacer**. Sin nombres de tabla, códigos HTTP ni HTML del proveedor.
 
-> **Separar en dos chats de Telegram no requiere código:** si existe la env var `TELEGRAM_CHAT_ID_SISTEMA`, el canal de sistema se va solo a ese chat; sin ella, ambos caen donde caen hoy. Requiere que Daniel cree el grupo y agregue el bot — decisión suya, pendiente.
+> **Los dos chats YA ESTÁN SEPARADOS (27-jul-2026) — y el canal de sistema tiene BOT PROPIO.** Daniel creó `@fashiongr_sistema_bot` ("FashionGR Sistema") y lo usa en un chat **privado** con él. El diseño del #321 no alcanzaba: asumía el MISMO bot en otro grupo, o sea una sola env var de chat. **Un `chat_id` no significa nada sin su bot** — cada bot ve su propio universo de chats, y en un chat privado el número es el id del usuario (el mismo para todos los bots) pero Telegram solo deja escribir al bot al que el usuario le habló primero: el bot viejo mandando a ese número recibe **403**. Por eso el destino ahora es el PAR `(token, chat)` — tipo `DestinoTelegram` en `src/lib/telegram.ts` — y no dos variables sueltas.
+>
+> | Env vars en Vercel | A dónde va el canal de sistema |
+> |---|---|
+> | `TELEGRAM_BOT_TOKEN_SISTEMA` + `TELEGRAM_CHAT_ID_SISTEMA` | bot propio, chat propio ← **es el caso de hoy** |
+> | solo `TELEGRAM_CHAT_ID_SISTEMA` | el bot de siempre en otro grupo (el diseño del #321; sigue valiendo) |
+> | solo `TELEGRAM_BOT_TOKEN_SISTEMA` | se **ignora** — un bot sin chat no tiene a dónde escribir |
+> | ninguna | el canal de siempre. Cero configuración |
+>
+> **FAIL-SAFE en dos capas, porque un aviso que no llega es peor que uno que llega al chat viejo:** (1) el resolvedor nunca inventa un destino a medias — nada de mandar el chat viejo con el bot nuevo, que sería 403 seguro; (2) si el envío al canal aparte **falla** (token mal copiado, bot bloqueado, chat equivocado), `sendTelegramAlert` lo **reintenta una vez en el canal de siempre**. El prefijo `🔧 SISTEMA · ` viaja intacto, así que se reconoce igual si cae ahí. El reintento solo ocurre cuando el destino elegido es distinto del de siempre → sin duplicados ni bucles.
+>
+> **`enviarNegocio` sigue sin perilla:** recibe `(texto, parseMode)` y nada más — ni destino, ni `process.env`, ni return temprano. El test lo verifica por aridad **y** leyendo el cuerpo de la función.
+>
+> Para ver a qué bot/chat va cada canal **sin mandar nada**: `npx tsx scripts/_probe-canales-telegram.ts` (con `--enviar` manda exactamente 1 mensaje a cada uno).
 
 **La medición que justificó todo** (30 días a 26-jul-2026, `scripts/_diag-alertas-30d.mjs` / `_diag-synclog-30d.mjs` / `_diag-huecos.mjs`, solo lectura): `switch_sync_log` tuvo **1.987 corridas, 58 errores, y los 58 se recuperaron solos en ≤24h** (88% en ≤12h). **Cero fallos sostenidos.** O sea: todas las alertas de sync del mes fueron por algo que el sistema ya estaba arreglando.
 
@@ -245,7 +258,7 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 - **`db-salud` invisible para health-crons** — lo cerró el #320 (quedó en `SEED_TOLERANT_CRONS`).
 - ⚠️ **PENDIENTE — el rastro se pierde cuando la base es lo que falla.** `logCronError` escribe en `cron_email_errors` ANTES de mandar el Telegram: el aviso sale igual (el insert está en try/catch), pero **la fila no queda**. Medido: **38 de 58 errores** de los últimos 30 días no dejaron rastro, incluido el `statement timeout` de `fashion_shoes/estadocuenta` del 25-jul 16:20 que dejó los saldos de CXC viejos ~5h. No se puede auditar desde la base si Daniel recibió o no ese mensaje. `db-salud` (27-jul) cubre la DETECCIÓN de la caída por un camino que no toca Postgres; **falta un rastro de alertas que sobreviva a la base caída**.
 
-**Redacción** — `describirCronParaDaniel(tipo)` (cron-telemetry) traduce el `tipo` interno a una frase de negocio, y `consecuenciaDeSyncType(syncType)` (alert-policy) dice qué se ve viejo en la app. Un tipo no listado cae en un texto genérico honesto en vez de vomitar el identificador. Candado: `src/__tests__/lib/alertas-canal.test.ts` — 21 casos en las DOS direcciones (el ruido se calla **y** LICENCIA / statement timeout / errores de negocio siguen sonando), más un test de que los dos canales no se mezclan.
+**Redacción** — `describirCronParaDaniel(tipo)` (cron-telemetry) traduce el `tipo` interno a una frase de negocio, y `consecuenciaDeSyncType(syncType)` (alert-policy) dice qué se ve viejo en la app. Un tipo no listado cae en un texto genérico honesto en vez de vomitar el identificador. Candado: `src/__tests__/lib/alertas-canal.test.ts` — 28 casos en las DOS direcciones (el ruido se calla **y** LICENCIA / statement timeout / errores de negocio siguen sonando), más el ruteo bot-por-bot, los 5 casos del fail-safe y el candado de que negocio no gane una perilla de silenciar.
 
 **Para revisar redacción sin spamear el chat real:** `npx tsx scripts/_dryrun-alertas.ts` (no manda nada).
 

@@ -168,19 +168,33 @@ describe("Los dos canales — negocio intacto, sistema marcado", () => {
   const OLD = process.env;
   beforeEach(() => {
     vi.resetModules();
-    process.env = { ...OLD, TELEGRAM_BOT_TOKEN: "t", TELEGRAM_CHAT_ID: "chat-unico" };
+    process.env = { ...OLD, TELEGRAM_BOT_TOKEN: "tok-viejo", TELEGRAM_CHAT_ID: "chat-unico" };
+    delete process.env.TELEGRAM_BOT_TOKEN_SISTEMA;
+    delete process.env.TELEGRAM_CHAT_ID_SISTEMA;
   });
   afterEach(() => {
     process.env = OLD;
     vi.unstubAllGlobals();
   });
 
-  async function capturar(fn: (m: typeof import("@/lib/alertas/canal")) => Promise<unknown>) {
-    const enviados: Array<{ chat_id: string; text: string }> = [];
+  /** Lo que Telegram recibiría: a qué bot (token de la URL) y a qué chat. */
+  type Envio = { token: string; chat_id: string; text: string };
+
+  async function capturar(
+    fn: (m: typeof import("@/lib/alertas/canal")) => Promise<unknown>,
+    /** tokens cuyo POST responde 403, para simular un bot mal configurado */
+    tokensQueFallan: string[] = [],
+  ) {
+    const enviados: Envio[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: string, init: { body: string }) => {
-        enviados.push(JSON.parse(init.body));
+      vi.fn(async (url: string, init: { body: string }) => {
+        const token = /\/bot([^/]+)\/sendMessage/.exec(url)?.[1] ?? "";
+        const body = JSON.parse(init.body) as { chat_id: string; text: string };
+        enviados.push({ token, ...body });
+        if (tokensQueFallan.includes(token)) {
+          return { ok: false, status: 403, text: async () => "Forbidden" } as Response;
+        }
         return { ok: true, text: async () => "" } as Response;
       }),
     );
@@ -201,21 +215,130 @@ describe("Los dos canales — negocio intacto, sistema marcado", () => {
     expect(msg.text.startsWith(PREFIJO_SISTEMA)).toBe(true);
   });
 
-  it("sin chat aparte configurado, los dos caen en el chat de siempre (cero setup)", async () => {
+  it("sin canal aparte configurado, los dos caen donde caen hoy (cero setup)", async () => {
     const enviados = await capturar(async (m) => {
       await m.enviarNegocio("hola");
       await m.enviarSistema("falla");
     });
     expect(enviados.map((e) => e.chat_id)).toEqual(["chat-unico", "chat-unico"]);
+    expect(enviados.map((e) => e.token)).toEqual(["tok-viejo", "tok-viejo"]);
   });
 
-  it("con TELEGRAM_CHAT_ID_SISTEMA, el sistema se va solo al otro grupo y el negocio NO se mueve", async () => {
-    process.env.TELEGRAM_CHAT_ID_SISTEMA = "chat-sistema";
+  it("BOT + CHAT de sistema: el sistema se va con SU bot a SU chat; el negocio no se mueve", async () => {
+    process.env.TELEGRAM_BOT_TOKEN_SISTEMA = "tok-sistema";
+    process.env.TELEGRAM_CHAT_ID_SISTEMA = "1367251585";
     const enviados = await capturar(async (m) => {
       await m.enviarNegocio("hola");
       await m.enviarSistema("falla");
     });
-    expect(enviados[0].chat_id).toBe("chat-unico");
-    expect(enviados[1].chat_id).toBe("chat-sistema");
+    expect(enviados).toHaveLength(2);
+    expect(enviados[0]).toMatchObject({ token: "tok-viejo", chat_id: "chat-unico" });
+    expect(enviados[1]).toMatchObject({ token: "tok-sistema", chat_id: "1367251585" });
+  });
+
+  it("sólo CHAT de sistema (el diseño viejo, mismo bot en otro grupo) sigue funcionando", async () => {
+    process.env.TELEGRAM_CHAT_ID_SISTEMA = "grupo-sistema";
+    const enviados = await capturar((m) => m.enviarSistema("falla"));
+    expect(enviados[0]).toMatchObject({ token: "tok-viejo", chat_id: "grupo-sistema" });
+  });
+});
+
+describe("FAIL-SAFE — una configuración a medias NUNCA silencia una alerta", () => {
+  const OLD = process.env;
+  beforeEach(() => {
+    vi.resetModules();
+    process.env = { ...OLD, TELEGRAM_BOT_TOKEN: "tok-viejo", TELEGRAM_CHAT_ID: "chat-unico" };
+    delete process.env.TELEGRAM_BOT_TOKEN_SISTEMA;
+    delete process.env.TELEGRAM_CHAT_ID_SISTEMA;
+  });
+  afterEach(() => {
+    process.env = OLD;
+    vi.unstubAllGlobals();
+  });
+
+  type Envio = { token: string; chat_id: string; text: string };
+
+  async function enviarSistemaCon(tokensQueFallan: string[] = []) {
+    const enviados: Envio[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: { body: string }) => {
+        const token = /\/bot([^/]+)\/sendMessage/.exec(url)?.[1] ?? "";
+        enviados.push({ token, ...JSON.parse(init.body) });
+        if (tokensQueFallan.includes(token)) {
+          return { ok: false, status: 403, text: async () => "Forbidden" } as Response;
+        }
+        return { ok: true, text: async () => "" } as Response;
+      }),
+    );
+    const mod = await import("@/lib/alertas/canal");
+    const ok = await mod.enviarSistema("La base no responde.");
+    return { enviados, ok };
+  }
+
+  it("olvidar las DOS variables no pierde nada: la alerta va al canal de siempre", async () => {
+    const { enviados, ok } = await enviarSistemaCon();
+    expect(ok).toBe(true);
+    expect(enviados).toHaveLength(1);
+    expect(enviados[0]).toMatchObject({ token: "tok-viejo", chat_id: "chat-unico" });
+  });
+
+  it("token de sistema SIN chat es incoherente → canal de siempre, no se inventa destino", async () => {
+    process.env.TELEGRAM_BOT_TOKEN_SISTEMA = "tok-sistema";
+    const { enviados, ok } = await enviarSistemaCon();
+    expect(ok).toBe(true);
+    expect(enviados).toHaveLength(1);
+    // Lo peor sería mandar el chat viejo con el bot nuevo: 403 seguro.
+    expect(enviados[0]).toMatchObject({ token: "tok-viejo", chat_id: "chat-unico" });
+  });
+
+  it("si el bot de sistema rechaza el mensaje (403), se reintenta en el canal de siempre", async () => {
+    process.env.TELEGRAM_BOT_TOKEN_SISTEMA = "tok-sistema";
+    process.env.TELEGRAM_CHAT_ID_SISTEMA = "1367251585";
+    const { enviados, ok } = await enviarSistemaCon(["tok-sistema"]);
+    expect(ok).toBe(true);
+    expect(enviados).toHaveLength(2);
+    expect(enviados[0]).toMatchObject({ token: "tok-sistema", chat_id: "1367251585" });
+    expect(enviados[1]).toMatchObject({ token: "tok-viejo", chat_id: "chat-unico" });
+    // El prefijo viaja intacto: si cae en el chat de negocio se reconoce igual.
+    expect(enviados[1].text.startsWith(PREFIJO_SISTEMA)).toBe(true);
+  });
+
+  it("el reintento NO duplica el mensaje cuando el canal aparte SÍ acepta", async () => {
+    process.env.TELEGRAM_BOT_TOKEN_SISTEMA = "tok-sistema";
+    process.env.TELEGRAM_CHAT_ID_SISTEMA = "1367251585";
+    const { enviados } = await enviarSistemaCon();
+    expect(enviados).toHaveLength(1);
+  });
+
+  it("si el canal de siempre es el único destino y falla, no hay reintento infinito", async () => {
+    const { enviados, ok } = await enviarSistemaCon(["tok-viejo"]);
+    expect(ok).toBe(false);
+    expect(enviados).toHaveLength(1);
+  });
+});
+
+describe("NEGOCIO no tiene perilla de silenciar — la garantía del diseño", () => {
+  it("enviarNegocio recibe SOLO (texto, parseMode): no hay dónde meter un destino ni un filtro", async () => {
+    const { enviarNegocio, enviarSistema } = await import("@/lib/alertas/canal");
+    expect(enviarNegocio.length).toBe(2);
+    expect(enviarSistema.length).toBe(2);
+  });
+
+  it("el archivo no expone ninguna forma de redirigir ni callar el canal de negocio", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const src = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/alertas/canal.ts"),
+      "utf8",
+    );
+    const desde = src.indexOf("export async function enviarNegocio");
+    expect(desde).toBeGreaterThan(-1);
+    // Hasta la llave de cierre de la función (primera "}" a nivel de columna 0).
+    const soloNegocio = src.slice(desde, src.indexOf("\n}", desde) + 2);
+    // Ni destino aparte, ni env vars, ni return temprano: pasa el texto y ya.
+    expect(soloNegocio).not.toContain("process.env");
+    expect(soloNegocio).not.toContain("destinoSistema");
+    expect(soloNegocio).toContain("return sendTelegramAlert(texto, parseMode)");
   });
 });

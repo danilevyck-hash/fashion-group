@@ -16,6 +16,62 @@
 const TELEGRAM_API = "https://api.telegram.org";
 
 /**
+ * A dónde va un mensaje. **El token viaja junto al chat, no por separado.**
+ *
+ * En Telegram un chat_id no significa nada sin el bot: cada bot ve su propio
+ * universo de chats. Un chat privado además EXIGE que el usuario le haya
+ * escrito primero a ESE bot — el bot A no puede escribirle a alguien en el
+ * chat privado que abrió con el bot B, ni con el mismo número de chat. Por eso
+ * el destino es un par indivisible y no dos variables sueltas.
+ */
+export type DestinoTelegram = { token: string; chatId: string };
+
+/** El canal de siempre: el bot y el chat que ya existen y ya funcionan. */
+export function destinoPorDefecto(): DestinoTelegram | null {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+  if (!token || !chatId) return null;
+  return { token, chatId };
+}
+
+function mismoDestino(a: DestinoTelegram, b: DestinoTelegram): boolean {
+  return a.token === b.token && a.chatId === b.chatId;
+}
+
+async function postTelegram(
+  destino: DestinoTelegram,
+  text: string,
+  parseMode?: "HTML" | "MarkdownV2",
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${TELEGRAM_API}/bot${destino.token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: destino.chatId,
+        text,
+        disable_web_page_preview: true,
+        ...(parseMode ? { parse_mode: parseMode } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        `[telegram] sendMessage HTTP ${res.status}: ${body.slice(0, 200)}`,
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(
+      `[telegram] fallo al enviar alerta: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
+  }
+}
+
+/**
  * ¿El texto es una página de error del PROVEEDOR (HTML o XML) en vez de datos?
  *
  * Casos reales medidos en cron_email_errors (30 días a jul-2026):
@@ -59,46 +115,37 @@ export function shortError(msg: string | null | undefined, max = 200): string {
  * parse_mode) — ese es el modo seguro para alertas con contenido arbitrario.
  * Pásalo solo cuando el texto ya viene formateado y escapado (ej. "HTML" con
  * un bloque `<pre>` para texto monoespaciado que alinee).
+ *
+ * @param destino opcional. Sin él va al canal de siempre.
+ *
+ * FAIL-SAFE: si el envío a un destino DISTINTO del de siempre falla (token mal
+ * copiado, bot bloqueado, chat equivocado, 403 porque nadie le escribió al bot
+ * todavía), el mensaje se reintenta UNA vez en el canal de siempre. Un aviso
+ * que no llega es peor que un aviso que llega al chat viejo: una configuración
+ * a medias nunca debe dejar a Daniel sin enterarse de que algo está roto.
  */
 export async function sendTelegramAlert(
   text: string,
   parseMode?: "HTML" | "MarkdownV2",
-  chatIdOverride?: string,
+  destino?: DestinoTelegram,
 ): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = chatIdOverride || process.env.TELEGRAM_CHAT_ID;
+  const porDefecto = destinoPorDefecto();
+  const elegido = destino ?? porDefecto;
 
-  if (!token || !chatId) {
+  if (!elegido) {
     console.warn(
       "[telegram] TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados; omito alerta",
     );
     return false;
   }
 
-  try {
-    const res = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        disable_web_page_preview: true,
-        ...(parseMode ? { parse_mode: parseMode } : {}),
-      }),
-    });
+  if (await postTelegram(elegido, text, parseMode)) return true;
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error(
-        `[telegram] sendMessage HTTP ${res.status}: ${body.slice(0, 200)}`,
-      );
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error(
-      `[telegram] fallo al enviar alerta: ${err instanceof Error ? err.message : String(err)}`,
+  if (porDefecto && !mismoDestino(elegido, porDefecto)) {
+    console.warn(
+      "[telegram] el canal aparte no aceptó el mensaje; lo reintento en el canal de siempre para no perder el aviso",
     );
-    return false;
+    return postTelegram(porDefecto, text, parseMode);
   }
+  return false;
 }

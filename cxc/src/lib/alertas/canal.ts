@@ -31,20 +31,42 @@
  * Y el texto dice qué pasó / qué significa para el negocio / qué hacer.
  *
  * ── CÓMO SE DISTINGUEN EN EL CELULAR ──────────────────────────────────────────
- * Hoy los dos canales caen en el MISMO chat. La separación es visual y va al
- * frente del mensaje, que es lo único que se ve en la notificación del iPhone
- * antes de abrirla: todo lo de sistema abre con "🔧 SISTEMA · ". Lo de negocio
- * conserva su emoji de siempre (🛒 pedido, 📦 guía, 📊 resumen) y NO lleva
- * prefijo — así el cambio no toca ni un texto que hoy le sirve.
+ * La separación visual va al frente del mensaje, que es lo único que se ve en
+ * la notificación del iPhone antes de abrirla: todo lo de sistema abre con
+ * "🔧 SISTEMA · ". Lo de negocio conserva su emoji de siempre (🛒 pedido,
+ * 📦 guía, 📊 resumen) y NO lleva prefijo — así el cambio no toca ni un texto
+ * que hoy le sirve. El prefijo se queda aunque los chats estén separados: es lo
+ * que hace reconocible el mensaje si alguna vez cae en el chat de negocio (ver
+ * el fail-safe más abajo).
  *
- * Y queda listo para separarlos DE VERDAD sin tocar código: si algún día existe
- * la env var TELEGRAM_CHAT_ID_SISTEMA, el canal de sistema se va solo a ese
- * chat. Mientras no exista, ambos caen donde caen hoy. Eso requiere que Daniel
- * cree un segundo grupo de Telegram y agregue el bot — decisión suya, no del
- * código; el código ya está preparado para las dos formas.
+ * ── SEPARARLOS DE VERDAD: BOT PROPIO, NO SOLO CHAT PROPIO ─────────────────────
+ * El diseño original asumía el MISMO bot en otro grupo (una env var
+ * TELEGRAM_CHAT_ID_SISTEMA y listo). No alcanzó: Daniel creó un bot APARTE
+ * (@fashiongr_sistema_bot) y lo usa en un chat PRIVADO con él.
+ *
+ * Un chat_id no significa nada sin su bot. En un chat privado el número de chat
+ * es el id del usuario —el mismo para todos los bots— pero Telegram sólo deja
+ * escribir al bot al que el usuario le habló primero: el bot viejo mandando a
+ * ese mismo número recibe 403. Por eso el destino es el PAR (token, chat).
+ *
+ * Cómo se resuelve el destino del canal de sistema:
+ *   - TOKEN + CHAT de sistema → bot nuevo, chat nuevo. Es el caso de hoy.
+ *   - Sólo CHAT              → mismo bot de siempre, otro chat. Sigue sirviendo
+ *                              para un grupo del bot viejo.
+ *   - Sólo TOKEN             → incoherente (un bot sin chat no puede mandar a
+ *                              ningún lado): se ignora y va al canal de siempre.
+ *   - Ninguna                → todo cae donde cae hoy. Cero configuración.
+ *
+ * Y si el envío al canal aparte FALLA, `sendTelegramAlert` lo reintenta solo en
+ * el canal de siempre. Un olvido de configuración nunca deja a Daniel sin
+ * enterarse de que algo está roto.
  */
 
-import { sendTelegramAlert } from "@/lib/telegram";
+import {
+  sendTelegramAlert,
+  destinoPorDefecto,
+  type DestinoTelegram,
+} from "@/lib/telegram";
 
 /** Marca de agua del canal de sistema. Va al PRINCIPIO para que se lea en la
  *  notificación del celular sin abrirla. */
@@ -65,8 +87,38 @@ export async function enviarNegocio(
 }
 
 /**
- * ALERTA DE SISTEMA. Antepone la marca de agua y, si está configurado el chat
- * aparte, la manda allá.
+ * A dónde va el canal de sistema, según lo que esté configurado en Vercel.
+ * Devuelve `undefined` cuando no hay canal aparte → cae en el de siempre.
+ *
+ * Exportada para que un script de diagnóstico pueda decir a qué chat va a
+ * escribir ANTES de escribir. Se lee de `process.env` en cada llamada a
+ * propósito: los tests cambian las variables entre casos.
+ */
+export function destinoSistema(): DestinoTelegram | undefined {
+  const token = process.env.TELEGRAM_BOT_TOKEN_SISTEMA?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID_SISTEMA?.trim();
+
+  if (token && chatId) return { token, chatId };
+
+  // Sólo el chat: el diseño original (mismo bot, otro grupo). Sigue valiendo.
+  if (chatId) {
+    const base = destinoPorDefecto();
+    return base ? { token: base.token, chatId } : undefined;
+  }
+
+  // Sólo el token: un bot sin chat no tiene a dónde escribir. No se inventa un
+  // destino — se avisa y se cae al canal de siempre.
+  if (token) {
+    console.warn(
+      "[alertas] TELEGRAM_BOT_TOKEN_SISTEMA está puesto pero falta TELEGRAM_CHAT_ID_SISTEMA; las alertas de sistema van al canal de siempre",
+    );
+  }
+  return undefined;
+}
+
+/**
+ * ALERTA DE SISTEMA. Antepone la marca de agua y, si está configurado el canal
+ * aparte, la manda allá (con su propio bot si lo tiene).
  *
  * Con parseMode "HTML" el prefijo va fuera de cualquier etiqueta (es texto
  * plano seguro: no lleva < > &), así que no rompe el marcado del caller.
@@ -75,6 +127,9 @@ export async function enviarSistema(
   texto: string,
   parseMode?: "HTML" | "MarkdownV2",
 ): Promise<boolean> {
-  const chatSistema = process.env.TELEGRAM_CHAT_ID_SISTEMA || undefined;
-  return sendTelegramAlert(`${PREFIJO_SISTEMA}${texto}`, parseMode, chatSistema);
+  return sendTelegramAlert(
+    `${PREFIJO_SISTEMA}${texto}`,
+    parseMode,
+    destinoSistema(),
+  );
 }
