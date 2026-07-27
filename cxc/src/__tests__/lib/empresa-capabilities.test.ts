@@ -37,12 +37,17 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 import {
   EMPRESA_SYNC_CAPABILITIES,
   empresasConCxc,
+  empresasConFacturas,
   empresasConRecibos,
   empresasConUtilidad,
 } from "@/lib/switch-api/empresas";
 import { ALL_EMPRESA_KEYS, B2B_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
 import { RECIBOS_EMPRESA_KEYS } from "@/lib/switch-api/sync-recibos";
 import { B2B_COMISION_KEYS } from "@/lib/switch-api/sync-utilidad";
+import {
+  SYNC_NOW_FACTURAS_OPCIONES,
+  SYNC_NOW_RECIBOS_OPCIONES,
+} from "@/components/shared/syncNowOpciones";
 
 const orden = (xs: readonly string[]) => [...xs].sort();
 
@@ -62,6 +67,16 @@ describe("EMPRESA_SYNC_CAPABILITIES es la fuente única", () => {
   it("B2B_EMPRESA_KEYS no puede contradecir a las empresas con cxc:true", () => {
     // No se puede derivar en código (import circular): se cierra acá.
     expect(orden(B2B_EMPRESA_KEYS)).toEqual(orden(empresasConCxc()));
+  });
+
+  it("el menú de 'Actualizar ahora' ofrece exactamente las empresas que el server acepta", () => {
+    // Era la CUARTA copia de estas listas y la única sin test: `RECIBOS_KEYS`
+    // en syncNowOpciones.ts también omitía joystep, así que el menú ni siquiera
+    // ofrecía la empresa. El comentario del archivo se consolaba con que "un
+    // desfase solo produciría un 400 visible" — falso: no hay 400 que ver
+    // cuando la opción no aparece en el menú.
+    expect(orden(SYNC_NOW_RECIBOS_OPCIONES.map((o) => o.empresa!))).toEqual(orden(RECIBOS_EMPRESA_KEYS));
+    expect(orden(SYNC_NOW_FACTURAS_OPCIONES.map((o) => o.empresa!))).toEqual(orden(empresasConFacturas()));
   });
 });
 
