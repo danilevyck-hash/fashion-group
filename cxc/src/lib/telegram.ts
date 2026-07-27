@@ -122,7 +122,9 @@ export function shortError(msg: string | null | undefined, max = 200): string {
  * copiado, bot bloqueado, chat equivocado, 403 porque nadie le escribió al bot
  * todavía), el mensaje se reintenta UNA vez en el canal de siempre. Un aviso
  * que no llega es peor que un aviso que llega al chat viejo: una configuración
- * a medias nunca debe dejar a Daniel sin enterarse de que algo está roto.
+ * a medias nunca debe hacer desaparecer un mensaje, ni de negocio ni de
+ * sistema. El reintento solo corre cuando el destino difiere del de siempre —
+ * si el de siempre ES el destino y falla, no hay a quién reintentarle.
  */
 export async function sendTelegramAlert(
   text: string,

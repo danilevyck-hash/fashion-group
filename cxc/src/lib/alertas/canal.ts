@@ -40,80 +40,98 @@
  * el fail-safe más abajo).
  *
  * ── SEPARARLOS DE VERDAD: BOT PROPIO, NO SOLO CHAT PROPIO ─────────────────────
- * El diseño original asumía el MISMO bot en otro grupo (una env var
- * TELEGRAM_CHAT_ID_SISTEMA y listo). No alcanzó: Daniel creó un bot APARTE
- * (@fashiongr_sistema_bot) y lo usa en un chat PRIVADO con él.
+ * El diseño original asumía el MISMO bot en otro chat: una env var con el
+ * chat_id y listo. **No alcanza**, y contra producción se ve por qué:
+ * `TELEGRAM_CHAT_ID` ya vale `1367251585`, que es el MISMO número del chat
+ * nuevo. En un chat privado el chat_id es el id del USUARIO, idéntico para
+ * todos los bots — apuntar el otro canal a ese número habría sido un no-op
+ * perfecto. Y al revés tampoco funciona: Telegram sólo deja escribir al bot al
+ * que el usuario le habló primero, así que el bot A mandando al privado que
+ * abrió el bot B recibe 403.
  *
- * Un chat_id no significa nada sin su bot. En un chat privado el número de chat
- * es el id del usuario —el mismo para todos los bots— pero Telegram sólo deja
- * escribir al bot al que el usuario le habló primero: el bot viejo mandando a
- * ese mismo número recibe 403. Por eso el destino es el PAR (token, chat).
+ * Por eso el destino es el PAR (token, chat) — `DestinoTelegram` — y el
+ * override es SIMÉTRICO: cualquiera de los dos canales puede tener bot y chat
+ * propios, y el que no tenga usa el de siempre. Ninguno es el caso especial.
  *
- * Cómo se resuelve el destino del canal de sistema:
- *   - TOKEN + CHAT de sistema → bot nuevo, chat nuevo. Es el caso de hoy.
- *   - Sólo CHAT              → mismo bot de siempre, otro chat. Sigue sirviendo
- *                              para un grupo del bot viejo.
- *   - Sólo TOKEN             → incoherente (un bot sin chat no puede mandar a
- *                              ningún lado): se ignora y va al canal de siempre.
- *   - Ninguna                → todo cae donde cae hoy. Cero configuración.
+ *   TELEGRAM_BOT_TOKEN_NEGOCIO  + TELEGRAM_CHAT_ID_NEGOCIO
+ *   TELEGRAM_BOT_TOKEN_SISTEMA  + TELEGRAM_CHAT_ID_SISTEMA
  *
- * Y si el envío al canal aparte FALLA, `sendTelegramAlert` lo reintenta solo en
- * el canal de siempre. Un olvido de configuración nunca deja a Daniel sin
- * enterarse de que algo está roto.
+ * Por canal:
+ *   - TOKEN + CHAT → bot propio, chat propio.
+ *   - Sólo CHAT    → el bot de siempre en otro chat (sirve para un grupo suyo).
+ *   - Sólo TOKEN   → incoherente (un bot sin chat no tiene a dónde escribir):
+ *                    se ignora con warning y cae en el de siempre.
+ *   - Ninguna      → el canal de siempre. Cero configuración.
+ *
+ * **Cómo quedó el 27-jul-2026:** el bot NUEVO (@fashiongr_sistema_bot, chat
+ * privado 1367251585) lleva el **NEGOCIO**, y las alertas de SISTEMA se quedan
+ * en el bot de siempre (@fashiongr_alertas_bot) sin tocar nada. Sí: el nombre
+ * del bot dice "sistema" y lleva negocio. Es a propósito, lo decidió Daniel, y
+ * el nombre se cambia desde Telegram cuando quiera. **No invertir el ruteo para
+ * que haga juego con el nombre.**
+ *
+ * ── EL FAIL-SAFE ──────────────────────────────────────────────────────────────
+ * Si el envío al canal aparte FALLA, `sendTelegramAlert` lo reintenta solo en el
+ * canal de siempre. Con el negocio en el bot nuevo esto pesa MÁS que antes: un
+ * olvido de configuración ya no silenciaría avisos técnicos sino justo lo que
+ * Daniel dijo que más le importa. Que el override sea de DESTINO, nunca de si
+ * se manda.
  */
 
-import {
-  sendTelegramAlert,
-  destinoPorDefecto,
-  type DestinoTelegram,
-} from "@/lib/telegram";
+import { sendTelegramAlert, destinoPorDefecto, type DestinoTelegram } from "@/lib/telegram";
 
 /** Marca de agua del canal de sistema. Va al PRINCIPIO para que se lea en la
  *  notificación del celular sin abrirla. */
 export const PREFIJO_SISTEMA = "🔧 SISTEMA · ";
 
 /**
- * INFO DEL NEGOCIO. Pasa el texto TAL CUAL, sin prefijo y sin filtro alguno.
+ * A dónde va un canal, según lo que esté configurado en Vercel. `undefined` =
+ * no hay canal aparte → cae en el de siempre.
  *
- * Deliberadamente no acepta ninguna opción de silenciar, agrupar ni limitar:
- * que no exista la perilla es la garantía de que un cambio futuro no se lleve
- * por delante un aviso que Daniel considera esencial.
+ * Se lee de `process.env` en cada llamada a propósito: los tests cambian las
+ * variables entre casos y Vercel las inyecta por deploy.
  */
-export async function enviarNegocio(
-  texto: string,
-  parseMode?: "HTML" | "MarkdownV2",
-): Promise<boolean> {
-  return sendTelegramAlert(texto, parseMode);
-}
-
-/**
- * A dónde va el canal de sistema, según lo que esté configurado en Vercel.
- * Devuelve `undefined` cuando no hay canal aparte → cae en el de siempre.
- *
- * Exportada para que un script de diagnóstico pueda decir a qué chat va a
- * escribir ANTES de escribir. Se lee de `process.env` en cada llamada a
- * propósito: los tests cambian las variables entre casos.
- */
-export function destinoSistema(): DestinoTelegram | undefined {
-  const token = process.env.TELEGRAM_BOT_TOKEN_SISTEMA?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID_SISTEMA?.trim();
+function destinoDeCanal(canal: "NEGOCIO" | "SISTEMA"): DestinoTelegram | undefined {
+  const token = process.env[`TELEGRAM_BOT_TOKEN_${canal}`]?.trim();
+  const chatId = process.env[`TELEGRAM_CHAT_ID_${canal}`]?.trim();
 
   if (token && chatId) return { token, chatId };
 
-  // Sólo el chat: el diseño original (mismo bot, otro grupo). Sigue valiendo.
+  // Sólo el chat: el bot de siempre en otro chat. Sigue valiendo para un grupo.
   if (chatId) {
     const base = destinoPorDefecto();
     return base ? { token: base.token, chatId } : undefined;
   }
 
   // Sólo el token: un bot sin chat no tiene a dónde escribir. No se inventa un
-  // destino — se avisa y se cae al canal de siempre.
+  // destino a medias (mandar el chat de siempre con el bot nuevo sería 403
+  // seguro) — se avisa y se cae al canal de siempre.
   if (token) {
     console.warn(
-      "[alertas] TELEGRAM_BOT_TOKEN_SISTEMA está puesto pero falta TELEGRAM_CHAT_ID_SISTEMA; las alertas de sistema van al canal de siempre",
+      `[alertas] TELEGRAM_BOT_TOKEN_${canal} está puesto pero falta TELEGRAM_CHAT_ID_${canal}; ese canal va al de siempre`,
     );
   }
   return undefined;
+}
+
+/** Exportadas para que un diagnóstico pueda decir a qué bot y a qué chat va
+ *  cada canal ANTES de escribir. */
+export const destinoNegocio = (): DestinoTelegram | undefined => destinoDeCanal("NEGOCIO");
+export const destinoSistema = (): DestinoTelegram | undefined => destinoDeCanal("SISTEMA");
+
+/**
+ * INFO DEL NEGOCIO. Pasa el texto TAL CUAL, sin prefijo y sin filtro alguno.
+ *
+ * Deliberadamente no acepta ninguna opción de silenciar, agrupar ni limitar:
+ * que no exista la perilla es la garantía de que un cambio futuro no se lleve
+ * por delante un aviso que Daniel considera esencial. Lo único que se resuelve
+ * acá es A DÓNDE va — nunca SI va: sin condiciones, sin returns tempranos.
+ */
+export async function enviarNegocio(
+  texto: string,
+  parseMode?: "HTML" | "MarkdownV2",
+): Promise<boolean> {
+  return sendTelegramAlert(texto, parseMode, destinoNegocio());
 }
 
 /**
@@ -127,9 +145,5 @@ export async function enviarSistema(
   texto: string,
   parseMode?: "HTML" | "MarkdownV2",
 ): Promise<boolean> {
-  return sendTelegramAlert(
-    `${PREFIJO_SISTEMA}${texto}`,
-    parseMode,
-    destinoSistema(),
-  );
+  return sendTelegramAlert(`${PREFIJO_SISTEMA}${texto}`, parseMode, destinoSistema());
 }
