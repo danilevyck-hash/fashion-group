@@ -13,7 +13,14 @@
  *   - Token expira ~60min aunque expires_in diga otra cosa
  *
  * Cache de token: en memoria del proceso, por empresaKey. No persiste en DB.
- * Re-auth automático en 401 con code 0005 (TOKEN EXPIRADO) o 0011 (TOKEN INVALIDO).
+ *
+ * Ante un 401 de token hay DOS caminos, y la diferencia importa (ver §4 del PDF
+ * y el comentario largo en `extractNewToken`):
+ *   · code 0005 con `new_token` → se RENUEVA en el lugar, sin `/autenticacion`.
+ *     Un login nuevo tumbaría la sesión única del usuario (code 0006) — que es
+ *     el mismo usuario `daniel` del panel web.
+ *   · cualquier otro caso (0005 sin new_token, 0006, 0008, 0011, 401 pelado)
+ *     → re-auth como siempre. Es el fallback y NUNCA se puede quitar.
  */
 
 import {
@@ -253,6 +260,65 @@ function extractMessage(parsed: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * Extrae el `new_token` que Switch REGALA dentro del cuerpo de un 401 `0005`.
+ *
+ * PDF §4, pág. 6 (literal): *"Si al realizar una petición con un token caducado
+ * **antes de haber transcurrido 15 minutos** desde su caducidad se generará un
+ * nuevo token"*, con la forma
+ * `{ error: { code: 0005, http_code: 401, message: "TOKEN EXPIRADO",
+ *            new_token, expires_in, expires_at } }`
+ * y *"Siempre que se genere un nuevo token el code será 0005 y existirá un
+ * elemento new_token"*.
+ *
+ * POR QUÉ IMPORTA: el mismo §4 dice *"Solo habrá un token válido a la vez por
+ * usuario"*. Un `POST /autenticacion` nuevo TUMBA la sesión que estuviera viva
+ * (code 0006) — incluida la del panel web de Daniel, que usa el MISMO usuario
+ * (`SWITCH_*_API_USER=daniel` en 7 de 8 empresas). Usar el `new_token` es una
+ * RENOVACIÓN: no consume el cupo de sesión única, así que no tumba a nadie.
+ *
+ * Ojo: los 15 minutos son un techo del lado de Switch. Pasada esa ventana el
+ * 0005 llega SIN `new_token` y no queda más que re-autenticar → por eso el
+ * llamador SIEMPRE tiene que tener el fallback a `authenticate()`.
+ */
+function extractNewToken(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== "object") return null;
+  const p = parsed as Record<string, unknown>;
+  const fromError =
+    p.error && typeof p.error === "object"
+      ? (p.error as Record<string, unknown>).new_token
+      : undefined;
+  // El PDF lo documenta SOLO dentro de `error`; leemos también el top-level por
+  // si alguna ruta lo devuelve plano (barato, y no puede dar falso positivo:
+  // solo aceptamos strings no vacías).
+  const raw = fromError ?? p.new_token;
+  if (typeof raw !== "string") return null;
+  const token = raw.trim();
+  return token.length > 0 ? token : null;
+}
+
+/**
+ * TTL para un token renovado, a partir del `expires_in` (MINUTOS) que Switch
+ * manda junto al `new_token`. Se CAPA a TOKEN_TTL_MS: el resultado nunca puede
+ * ser más largo que el TTL de hoy, solo más corto. Así, si `expires_in` viniera
+ * en otra unidad o con un valor absurdo, el peor caso es re-autenticar de más
+ * (comportamiento actual), nunca confiar en un token ya muerto.
+ */
+function ttlFromExpiresIn(parsed: unknown): number {
+  if (!parsed || typeof parsed !== "object") return TOKEN_TTL_MS;
+  const p = parsed as Record<string, unknown>;
+  const src =
+    p.error && typeof p.error === "object"
+      ? (p.error as Record<string, unknown>).expires_in
+      : undefined;
+  const raw = src ?? p.expires_in;
+  const mins = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(mins) || mins <= 0) return TOKEN_TTL_MS;
+  // 5 min de margen, igual que el TTL base (55 sobre ~60).
+  const ms = (mins - 5) * 60 * 1000;
+  return Math.min(TOKEN_TTL_MS, Math.max(60_000, ms));
+}
+
 function isTokenInvalidResponse(httpCode: number, parsed: unknown): boolean {
   if (httpCode !== 401 && httpCode !== 403) {
     // Switch a veces devuelve 200 con code de error en el body.
@@ -363,6 +429,36 @@ async function authedCallOnce<T>(
       attempt === 0 &&
       isTokenInvalidResponse(result.httpCode, result.parsed)
     ) {
+      // 0005 y 0006 NO son lo mismo y no se tratan igual:
+      //
+      //  · 0005 TOKEN EXPIRADO  → "tu token venció, tomá este otro". Switch
+      //    adjunta `new_token`. Re-autenticar acá sería justamente lo que
+      //    DISPARA el 0006 en la sesión de al lado. Renovamos en el lugar.
+      //  · 0006 TOKEN INVALIDO  → "alguien más entró y te sacó". No trae
+      //    `new_token` (el PDF lo ata a 0005) y no habría token que renovar:
+      //    re-loguear ES la respuesta correcta, y es lo que hace la
+      //    recuperación de sesión única de hoy. Ni siquiera miramos el body
+      //    por un new_token: un token entregado en un "te sacaron" es
+      //    sospechoso y no vale arriesgar el fallback que ya funciona.
+      //  · 0008 / 0011 / 401 sin code → token ausente o basura: tampoco hay
+      //    nada que renovar, salvo que Switch mande un new_token igual.
+      const code = extractCode(result.parsed);
+      const nuevo = code === "0006" ? null : extractNewToken(result.parsed);
+
+      if (nuevo) {
+        // FAIL-SAFE: si algo de esto fallara, el catch de authedCall limpia el
+        // cache y el reintento externo re-autentica como siempre.
+        tokenCache.set(empresaKey, {
+          token: nuevo,
+          expiresAt: Date.now() + ttlFromExpiresIn(result.parsed),
+        });
+        token = nuevo;
+        console.info(
+          `[switch ${empresaKey}] token renovado con new_token (code ${code ?? "?"}) — sin /autenticacion, sin tumbar la sesión`,
+        );
+        continue;
+      }
+
       tokenCache.delete(empresaKey);
       token = await authenticate(empresaKey, cfg);
       continue;
