@@ -17,17 +17,23 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
 import { createSwitchClient } from "./client";
+import { empresasConUtilidad } from "./empresas";
 import { clearStaleRunning } from "./sync-log";
 import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
 
-/** Empresas B2B con comisión sobre venta (excluye Multifashion/Boston/Joystep). */
-export const B2B_COMISION_KEYS: EmpresaKey[] = [
-  "vistana",
-  "fashion_wear",
-  "fashion_shoes",
-  "active_shoes",
-  "active_wear",
-];
+/**
+ * Empresas B2B con comisión sobre venta: las 6 B2B (excluye Multifashion, que es
+ * retail sin comisión sobre venta, y Boston, que liquida fuera del sistema).
+ *
+ * DERIVADA de EMPRESA_SYNC_CAPABILITIES (`utilidad: true`), no escrita a mano.
+ * El array literal anterior decía "excluye Multifashion/Boston/Joystep" y listaba
+ * 5 empresas: joystep quedó fuera desde el origen del módulo aunque sí estuviera
+ * en B2B_EMPRESA_KEYS (o sea, con pestaña de comisiones visible). Efecto medido
+ * el 27-jul-2026: `switch_factura_utilidad` con CERO filas de joystep en toda su
+ * historia y comisión de julio en $0,00 con 0 vendedores, mientras el sistema
+ * mostraba ese $0 como si fuera un dato real.
+ */
+export const B2B_COMISION_KEYS: EmpresaKey[] = empresasConUtilidad();
 
 export interface Mes {
   year: number;
@@ -78,18 +84,48 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
 const PAGINA_LECTURA_FACTURAS = 1000;
 const MAX_PAGINAS_FACTURAS = 1000;
 
+/** Borde del rango de meses anclado a medianoche PANAMÁ (offset -05:00 explícito).
+ *  Un `date` pelado corre el rango 5h y pierde los documentos nocturnos. */
+function rangoPanama(meses: Mes[]): { desde: string; hastaExcl: string } | null {
+  if (meses.length === 0) return null;
+  const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+  const f = sorted[0];
+  const l = sorted[sorted.length - 1];
+  const finY = l.month === 12 ? l.year + 1 : l.year;
+  const finM = l.month === 12 ? 1 : l.month + 1;
+  return {
+    desde: `${f.year}-${String(f.month).padStart(2, "0")}-01T00:00:00-05:00`,
+    hastaExcl: `${finY}-${String(finM).padStart(2, "0")}-01T00:00:00-05:00`,
+  };
+}
+
+/** Cuántas facturas tiene switch_facturas para (empresa, rango de meses).
+ *  Solo lo usa el guard del "cero silencioso" — ver syncEmpresaUtilidad. */
+async function contarFacturasEnRango(empresaKey: EmpresaKey, meses: Mes[]): Promise<number> {
+  const r = rangoPanama(meses);
+  if (!r) return 0;
+  const { count, error } = await supabaseServer
+    .from("switch_facturas")
+    .select("*", { count: "exact", head: true })
+    .eq("empresa_key", empresaKey)
+    .gte("fecha", r.desde)
+    .lt("fecha", r.hastaExcl);
+  if (error) {
+    // No se puede desmentir el cero → se deja pasar (el guard no debe inventar
+    // un fallo por un problema de lectura suyo), pero queda el rastro.
+    console.error(`[sync-utilidad ${empresaKey}] contarFacturasEnRango: ${error.message}`);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 /** (secuencial|fechaPanama) → switch_factura_id de los meses a sincronizar.
  *  Ambigüedad (mismo secuencial+fecha con ids distintos) → se descarta (null). */
 async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<Map<string, number>> {
   const map = new Map<string, number>();
-  if (meses.length === 0) return map;
-  const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
-  const f = sorted[0];
-  const l = sorted[sorted.length - 1];
-  const desde = `${f.year}-${String(f.month).padStart(2, "0")}-01T00:00:00-05:00`;
-  const finY = l.month === 12 ? l.year + 1 : l.year;
-  const finM = l.month === 12 ? 1 : l.month + 1;
-  const hastaExcl = `${finY}-${String(finM).padStart(2, "0")}-01T00:00:00-05:00`;
+  const rango = rangoPanama(meses);
+  if (!rango) return map;
+  const { desde, hastaExcl } = rango;
   // Rango timestamptz con offset Panamá explícito (gotcha: date pelado pierde
   // los docs nocturnos — ver loadImpuestoMap en sync-recibos).
   //
@@ -375,6 +411,22 @@ export async function syncEmpresaUtilidad(
     const byKey = new Map<string, ReturnType<typeof toCacheRow>>();
     for (const cr of cacheRows) byKey.set(`${cr.secuencial}|${cr.fecha}`, cr);
     const uniqueRows = [...byKey.values()];
+
+    // GUARD "cero silencioso": no se puede registrar success habiendo escrito 0
+    // filas cuando SÍ había documentos que escribir. Un sync que corre, no
+    // escribe nada y se anota success es peor que uno que falla: nadie se entera.
+    // Es exactamente lo que hacía invisible el agujero de joystep — la tabla
+    // vacía convivía con un panel que mostraba $0,00 de comisión como si fuera
+    // un dato real. Cero filas es LEGÍTIMO cuando la empresa no facturó en el
+    // rango; deja de serlo cuando switch_facturas sí tiene documentos ahí.
+    if (uniqueRows.length === 0) {
+      const facturasEnRango = await contarFacturasEnRango(empresaKey, meses);
+      if (facturasEnRango > 0) {
+        throw new Error(
+          `el reporte de utilidad devolvió 0 documentos pero switch_facturas tiene ${facturasEnRango} en el rango — no se registra success con la tabla vacía`,
+        );
+      }
+    }
 
     await upsertCacheRows(uniqueRows);
     // Siembra tasas globales (0.5%) para nombres del maestro + atribuidos por cartera.
