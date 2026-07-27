@@ -39,6 +39,7 @@ import type {
   RegistrarPagoImpulsadoraInput,
   ImpulsadoraConEstado,
   ImpulsadoraMarcaResuelta,
+  ResultadoEliminarImpulsadora,
 } from "./types";
 
 function round2(n: number): number {
@@ -156,12 +157,19 @@ async function cargarPeriodosPagados(
   return out;
 }
 
-/** Catálogo completo con split resuelto + estado de pago del mes anterior y actual. */
+/**
+ * Catálogo VISIBLE con split resuelto + estado de pago del mes anterior y actual.
+ *
+ * Filtra `activa = false`: esa es la marca de "eliminada" para las impulsadoras
+ * que no se pueden borrar de verdad (ver eliminarImpulsadora). Antes la columna
+ * `activa` no la ponía nadie en false —se escribía `true` al crear y solo se
+ * usaba para ordenar—, así que el filtro no esconde nada que hoy se vea.
+ */
 export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
   const { data, error } = await supabaseServer
     .from("mk_impulsadoras")
     .select("*")
-    .order("activa", { ascending: false })
+    .eq("activa", true)
     .order("nombre", { ascending: true });
   if (error) throw new Error(`listImpulsadoras: ${error.message}`);
 
@@ -199,6 +207,9 @@ export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
       // Los 3 más recientes, para que la tarjeta muestre QUÉ se pagó y no solo
       // el estado del mes ("1–15 jul 2026 · 16–31 jul 2026 · jun 2026").
       ultimosPeriodos: periodos.slice(-3).reverse().map(etiquetaPeriodoCorta),
+      // Ya está calculado y deduplicado acá: el aviso previo a eliminar no
+      // necesita una consulta aparte para decir "tiene N pagos registrados".
+      pagosRegistrados: periodos.length,
     };
   });
 }
@@ -229,6 +240,89 @@ function validarSplit(
   if (Math.abs(suma - 100) > 0.01) {
     throw new Error(`Los porcentajes deben sumar 100% (actual: ${round2(suma)}%)`);
   }
+}
+
+/**
+ * Cuántas FILAS de mk_facturas apuntan a esta impulsadora — anuladas incluidas.
+ * Es lo que decide borrar contra ocultar, y por eso cuenta filas y no pagos:
+ * la FK `mk_facturas.impulsadora_id → mk_impulsadoras(id)` no distingue una
+ * factura anulada de una vigente, así que un DELETE reventaría igual. Contar
+ * pagos "de verdad" acá dejaría pasar un borrado que la base va a rechazar.
+ */
+async function contarFacturasImpulsadora(id: string): Promise<number> {
+  const { count, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("id", { count: "exact", head: true })
+    .eq("impulsadora_id", id);
+  if (error) throw new Error(`contarFacturasImpulsadora: ${error.message}`);
+  // FAIL-CERRADO: sin un número confiable NO se borra. Un count nulo tratado
+  // como 0 sería "borrá igual" sobre plata ya registrada.
+  if (typeof count !== "number") {
+    throw new Error("No se pudo verificar si tiene pagos registrados");
+  }
+  return count;
+}
+
+/**
+ * Pagos que una persona contaría: períodos distintos, sin anulados. Un pago
+ * repartido en 3 marcas son 3 filas de mk_facturas pero UN pago, y decirle a
+ * Daniel "tiene 3 pagos" cuando hizo uno solo sería mentirle.
+ */
+async function contarPagosImpulsadora(id: string): Promise<number> {
+  const periodos = await cargarPeriodosPagados([id]);
+  return (periodos.get(id) ?? []).length;
+}
+
+/**
+ * Elimina una impulsadora. DOS desenlaces, y los dos son legítimos:
+ *
+ *   - SIN gastos registrados → DELETE real. La fila se va y `mk_impulsadora_marcas`
+ *     se va con ella por el ON DELETE CASCADE del split. No hay historial que
+ *     perder: es el caso de la impulsadora que se cargó por error.
+ *   - CON gastos registrados → `activa = false` (queda oculta). Borrarla de
+ *     verdad se llevaría el historial de gastos y descuadraría los reportes por
+ *     marca y los totales del año; la FK de `mk_facturas.impulsadora_id` lo
+ *     rechazaría igual, así que el UPDATE no es un rodeo, es la única salida
+ *     correcta.
+ *
+ * Se usa `activa` y NO una columna `deleted` nueva a propósito: la columna ya
+ * existe desde la migración original, ya significa exactamente esto, y sumarle
+ * un segundo flag para lo mismo dejaría dos fuentes de verdad (y otra DDL
+ * pendiente de correr a mano).
+ */
+export async function eliminarImpulsadora(
+  id: string,
+): Promise<ResultadoEliminarImpulsadora> {
+  if (!id) throw new Error("id requerido");
+
+  const { data, error } = await supabaseServer
+    .from("mk_impulsadoras")
+    .select("id, nombre")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`eliminarImpulsadora[leer]: ${error.message}`);
+  if (!data) throw new Error("La impulsadora no existe");
+  const nombre = String((data as { nombre: string }).nombre);
+
+  if ((await contarFacturasImpulsadora(id)) > 0) {
+    const { error: errOcultar } = await supabaseServer
+      .from("mk_impulsadoras")
+      .update({ activa: false })
+      .eq("id", id);
+    if (errOcultar) {
+      throw new Error(`eliminarImpulsadora[ocultar]: ${errOcultar.message}`);
+    }
+    return { accion: "ocultada", nombre, pagos: await contarPagosImpulsadora(id) };
+  }
+
+  const { error: errBorrar } = await supabaseServer
+    .from("mk_impulsadoras")
+    .delete()
+    .eq("id", id);
+  if (errBorrar) {
+    throw new Error(`eliminarImpulsadora[borrar]: ${errBorrar.message}`);
+  }
+  return { accion: "eliminada", nombre };
 }
 
 /** Crea una impulsadora con su split de marcas. */

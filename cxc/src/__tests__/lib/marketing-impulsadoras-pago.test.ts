@@ -294,9 +294,10 @@ describe("listImpulsadoras — chips con meses a medias", () => {
       supabaseServer: {
         from: (tabla: string) => {
           if (tabla === "mk_impulsadoras") {
+            // listImpulsadoras filtra las ocultas: select().eq("activa",true).order()
             return {
               select: () => ({
-                order: () => ({
+                eq: () => ({
                   order: () => ({
                     then: (res: (v: unknown) => unknown) =>
                       res({

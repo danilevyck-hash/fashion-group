@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { ConfirmDeleteModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { etiquetaMes } from "@/lib/marketing/meses";
-import type { ImpulsadoraConEstado, MkMarca, PagoMesEstado } from "@/lib/marketing/types";
+import type {
+  ImpulsadoraConEstado,
+  MkMarca,
+  PagoMesEstado,
+  ResultadoEliminarImpulsadora,
+} from "@/lib/marketing/types";
 import NuevaImpulsadoraModal from "./NuevaImpulsadoraModal";
 import RegistrarPagoModal from "./RegistrarPagoModal";
 
@@ -52,12 +58,39 @@ function ChipMes({ label, estado, faltan }: { label: string } & Pick<PagoMesEsta
   );
 }
 
+// Texto del modal de eliminar. Tiene que decir la VERDAD de lo que va a pasar:
+// con pagos registrados la impulsadora no se borra, se oculta, y el historial
+// de gastos queda. Prometer un borrado que no ocurre sería peor que no tener
+// el botón.
+function textoEliminar(imp: ImpulsadoraConEstado): {
+  descripcion: string;
+  confirmLabel: string;
+} {
+  const n = imp.pagosRegistrados;
+  if (n === 0) {
+    return {
+      descripcion:
+        "No tiene pagos registrados, así que se borra y no queda nada guardado.",
+      confirmLabel: "Eliminar",
+    };
+  }
+  return {
+    descripcion:
+      `Tiene ${n} pago${n === 1 ? "" : "s"} registrado${n === 1 ? "" : "s"}. ` +
+      "No se puede borrar: se va a ocultar de la lista y el historial de esos " +
+      "gastos se conserva.",
+    confirmLabel: "Ocultar",
+  };
+}
+
 export default function ImpulsadorasView({ marcas }: Props) {
   const { toast } = useToast();
   const [items, setItems] = useState<ImpulsadoraConEstado[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [showNueva, setShowNueva] = useState(false);
   const [pagando, setPagando] = useState<ImpulsadoraConEstado | null>(null);
+  const [eliminando, setEliminando] = useState<ImpulsadoraConEstado | null>(null);
+  const [borrando, setBorrando] = useState(false);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -77,6 +110,46 @@ export default function ImpulsadorasView({ marcas }: Props) {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // El desenlace lo decide el SERVIDOR (borrar vs ocultar). Acá solo se cuenta
+  // lo que respondió, así que el mensaje nunca puede contradecir a la base.
+  const confirmarEliminar = useCallback(async () => {
+    if (!eliminando) return;
+    setBorrando(true);
+    try {
+      const res = await fetch(`/api/marketing/impulsadoras/${eliminando.id}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json().catch(() => ({}))) as
+        | ResultadoEliminarImpulsadora
+        | { error?: string };
+      if (!res.ok) {
+        throw new Error(
+          ("error" in data && data.error) || "No se pudo eliminar.",
+        );
+      }
+      if ("accion" in data && data.accion === "ocultada") {
+        const conservado =
+          data.pagos === 1
+            ? "Se conservó su pago."
+            : data.pagos > 1
+              ? `Se conservaron sus ${data.pagos} pagos.`
+              : "Se conservaron sus gastos registrados.";
+        toast(`${data.nombre} ya no aparece en la lista. ${conservado}`, "success");
+      } else {
+        toast(`${eliminando.nombre} fue eliminada.`, "success");
+      }
+      setEliminando(null);
+      await cargar();
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "No se pudo eliminar.",
+        "error",
+      );
+    } finally {
+      setBorrando(false);
+    }
+  }, [eliminando, toast, cargar]);
 
   const pendientes = (items ?? []).filter((i) => i.activa && !i.mesActual.pagado).length;
 
@@ -189,6 +262,17 @@ export default function ImpulsadorasView({ marcas }: Props) {
                     Registrar pago
                   </button>
                 )}
+                {/* Visible, no escondido en un menú "···": Daniel entró a
+                    buscarlo y no lo encontró. Target táctil de 44px de alto y
+                    de ancho para el pulgar en iPhone. */}
+                <button
+                  type="button"
+                  onClick={() => setEliminando(imp)}
+                  aria-label={`Eliminar a ${imp.nombre}`}
+                  className="min-h-[44px] min-w-[44px] rounded-md px-3 py-1.5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 active:scale-[0.97] transition"
+                >
+                  Eliminar
+                </button>
               </div>
             </div>
           ))}
@@ -205,6 +289,23 @@ export default function ImpulsadorasView({ marcas }: Props) {
           }}
         />
       )}
+
+      <ConfirmDeleteModal
+        open={eliminando !== null}
+        title={eliminando ? `¿Eliminar a ${eliminando.nombre}?` : ""}
+        description={eliminando ? textoEliminar(eliminando).descripcion : ""}
+        confirmLabel={eliminando ? textoEliminar(eliminando).confirmLabel : "Eliminar"}
+        loadingLabel={
+          eliminando && eliminando.pagosRegistrados > 0
+            ? "Ocultando..."
+            : "Eliminando..."
+        }
+        loading={borrando}
+        onConfirm={confirmarEliminar}
+        onCancel={() => {
+          if (!borrando) setEliminando(null);
+        }}
+      />
 
       {pagando && (
         <RegistrarPagoModal
