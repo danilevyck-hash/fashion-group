@@ -104,7 +104,7 @@ export function OtrosClientesDialog({
                 {showEmpresaColumn && (
                   <SortHeader col="empresa" align="left" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
                 )}
-                <SortHeader col="ytd"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras YTD</SortHeader>
+                <SortHeader col="ytd"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras del año</SortHeader>
                 <SortHeader col="delta"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
                 <SortHeader col="ultima" align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
               </tr>

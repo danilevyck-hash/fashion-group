@@ -14,6 +14,9 @@ import {
   ventanaAnioPanama,
   montoFirmado,
   aCentavos,
+  aEnteroEscalado,
+  escaladoACentavos,
+  sumarCentavos,
   TIPOS_QUE_SUMAN,
 } from "@/lib/clientes-ytd";
 
@@ -85,16 +88,65 @@ describe("signo por tipo de comprobante", () => {
     expect(montoFirmado("Factura", null)).toBe(0);
   });
 
-  it("reproduce el número de D-108 medido en producción", () => {
+  it("reproduce el número de D-108 medido en producción (sin ITBMS)", () => {
     // Muestra reducida con la misma forma que la real: facturas menos NCs.
     const docs = [
-      { tipo: "Factura", monto: 200_000 },
+      { tipo: "Factura", monto: 186_215.7 },
       { tipo: "Nota de Débito", monto: 12_000 },
       { tipo: "Nota de Crédito", monto: 1_297.5 },
       { tipo: "Cotización", monto: 999_999 }, // no cuenta
     ];
     const suma = docs.reduce((s, d) => s + montoFirmado(d.tipo, d.monto), 0);
-    expect(aCentavos(suma)).toBe(210_702.5);
+    expect(aCentavos(suma)).toBe(196_918.2);
+  });
+});
+
+describe("sumar plata no puede depender del ORDEN de las filas", () => {
+  // 🩸 Medido contra producción: City Mall Paso Canoa daba 1.073.515,50 en el
+  // listado y 1.073.515,49 en la ficha. Misma definición, mismos documentos —
+  // la única diferencia era el orden en que llegaban (el listado los lee
+  // paginados por id). Sumar decimales no es asociativo y el error se coló al
+  // centavo. Ahora se acumula en enteros.
+
+  /** Montos con decimales "feos" a propósito, del orden de magnitud real. */
+  const montos = [
+    12_345.67, 8_901.23, 4_567.89, 1_234.56, 99_999.99, 7_777.77,
+    3_333.33, 66_666.66, 22_222.22, 555.55, 88_888.88, 4_444.44,
+  ];
+
+  const acumularEscalado = (xs: number[]) =>
+    escaladoACentavos(xs.reduce((s, x) => s + aEnteroEscalado(x), 0));
+
+  it("da el mismo centavo en cualquier orden", () => {
+    const alDerecho = acumularEscalado(montos);
+    const alReves = acumularEscalado([...montos].reverse());
+    const mezclado = acumularEscalado([...montos].sort((a, b) => a - b));
+    expect(alReves).toBe(alDerecho);
+    expect(mezclado).toBe(alDerecho);
+  });
+
+  it("sumar por grupos da lo mismo que sumar todo junto", () => {
+    // Es el caso real: la ficha suma por empresa y el listado sumaba todo junto.
+    const mitad = Math.floor(montos.length / 2);
+    const porGrupos = sumarCentavos([
+      acumularEscalado(montos.slice(0, mitad)),
+      acumularEscalado(montos.slice(mitad)),
+    ]);
+    expect(porGrupos).toBe(acumularEscalado(montos));
+  });
+
+  it("respeta las 4 decimales de numeric(14,4) sin perder precisión", () => {
+    // Cuatro documentos de 0,0001 tienen que sumar 0,0004 → 0,00 en centavos,
+    // no cuatro redondeos a cero por separado que igual dan cero, pero tampoco
+    // un centavo inventado.
+    expect(acumularEscalado([0.0001, 0.0001, 0.0001, 0.0001])).toBe(0);
+    // 0,005 × 2 = 0,01 exacto.
+    expect(acumularEscalado([0.005, 0.005])).toBe(0.01);
+  });
+
+  it("sumarCentavos no arrastra colas binarias", () => {
+    expect(sumarCentavos([0.1, 0.2])).toBe(0.3);
+    expect(sumarCentavos([44_307.63, 124_472.26, 29_252.2])).toBe(198_032.09);
   });
 });
 
@@ -103,6 +155,88 @@ describe("redondeo a centavos", () => {
     // 44307.630000000005 fue un valor REAL de la suma de vistana para D-108.
     expect(aCentavos(44_307.630000000005)).toBe(44_307.63);
     expect(aCentavos(0.1 + 0.2)).toBe(0.3);
+  });
+});
+
+describe("SIN ITBMS — la base es subtotal_descuento, no total", () => {
+  // Decisión de Daniel (27-jul-2026): "Sin ITBMS" para ventas. El impuesto se
+  // cobra para el fisco y nunca fue ingreso de la empresa. Medido en D-108:
+  // 210.702,50 con ITBMS → 196.918,20 sin (−13.784,30).
+  const raiz = path.join(__dirname, "..", "..");
+  const consulta = fs.readFileSync(path.join(raiz, "lib/clientes-ytd-consulta.ts"), "utf8");
+  const ficha = fs.readFileSync(path.join(raiz, "app/api/clientes/[codigo]/route.ts"), "utf8");
+  const migracion = fs.readFileSync(
+    path.join(raiz, "..", "supabase/migrations/20260727230000_clientes_del_grupo_visibles_y_ficha_sin_itbms.sql"),
+    "utf8");
+
+  it("el listado lee subtotal_descuento", () => {
+    expect(consulta).toContain("tipo_comprobante, subtotal_descuento");
+    expect(consulta).not.toContain("tipo_comprobante, total");
+  });
+
+  it("la ficha (refetch) lee subtotal_descuento", () => {
+    expect(ficha).toContain("tipo_comprobante, subtotal_descuento");
+    expect(ficha).not.toContain("tipo_comprobante, total");
+  });
+
+  it("la RPC de la ficha también, vía migración", () => {
+    expect(migracion).toContain("sf.subtotal_descuento");
+    expect(migracion).toContain("CREATE OR REPLACE FUNCTION cliente_ficha_ventas");
+  });
+
+  it("CXC y cobros NO se tocan: siguen con ITBMS", () => {
+    // switch_estadocuenta_aging.total y switch_recibos.total son "lo que hay
+    // que cobrar" / "lo que entró" — llevan ITBMS a propósito.
+    expect(ficha).toContain('.from("switch_estadocuenta_aging")');
+    expect(ficha).toContain('.from("switch_recibos")');
+    expect(migracion).not.toContain("switch_estadocuenta");
+    expect(migracion).not.toContain("switch_recibos");
+  });
+});
+
+describe("las empresas del grupo vuelven al ranking SIN mover los totales", () => {
+  const raiz = path.join(__dirname, "..", "..");
+  const migracion = fs.readFileSync(
+    path.join(raiz, "..", "supabase/migrations/20260727230000_clientes_del_grupo_visibles_y_ficha_sin_itbms.sql"),
+    "utf8");
+
+  it("saca a las empresas del grupo de la lista de exclusión del ranking", () => {
+    const filtro = migracion.slice(migracion.indexOf("filtered AS ("), migracion.indexOf("keyed AS ("));
+    expect(filtro).not.toContain("MULTI FASHION HOLDING");
+    expect(filtro).not.toContain("CONFECCIONES BOSTON");
+  });
+
+  it("deja excluidos los genéricos de mostrador, que no son un cliente", () => {
+    const filtro = migracion.slice(migracion.indexOf("filtered AS ("), migracion.indexOf("keyed AS ("));
+    for (const generico of ["CONTADO", "VENTAS", "VENTAS LOCALES", "(Sin nombre)"]) {
+      expect(filtro).toContain(generico);
+    }
+  });
+
+  it("marca es_del_grupo sin filtrar ni restar nada", () => {
+    expect(migracion).toContain("AS es_del_grupo");
+    expect(migracion).toContain("BOOL_OR(es_del_grupo)");
+    // La marca NO puede aparecer en ningún WHERE: sería una exclusión disfrazada.
+    for (const linea of migracion.split("\n")) {
+      if (/\bWHERE\b/.test(linea)) expect(linea).not.toContain("es_del_grupo");
+    }
+  });
+
+  it("NO toca ninguna fuente de totales de venta", () => {
+    // Los totales ya incluían a Multi Fashion Holding (medido: 4.656.824,38 en
+    // ventas_dashboard_summary = suma cruda CON él). Si esta migración tocara
+    // esas fuentes, los totales se moverían y Daniel vería otro número.
+    // Se mira el SQL EJECUTABLE, no los comentarios (el encabezado cita esas
+    // fuentes justamente para dejar la medición asentada).
+    const sql = migracion.split("\n").filter(l => !l.trim().startsWith("--")).join("\n");
+    for (const fuenteDeTotales of [
+      "ventas_dashboard_summary",
+      "ventas_rollup_mensual_mv",
+      "ventas_topclientes_summary",
+      "ventas_clientes_detalle_summary",
+    ]) {
+      expect(sql).not.toContain(fuenteDeTotales);
+    }
   });
 });
 

@@ -177,14 +177,21 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   // ya filtra al año específico. Forzamos is12mView=false.
   const is12mView = !isClosedYear && vista === "12m";
 
-  // Etiquetas de chip "Vista": para año cerrado siempre "Año {year}";
-  // para año en curso, mantiene el toggle 12m / YTD según sort.
+  // Etiquetas del chip "Vista".
+  //
+  // 🩸 Decían "Últimos 12 meses" mientras la columna de plata decía "Compras
+  // YTD" — dos períodos distintos en la misma pantalla, y Daniel lo leyó como
+  // una contradicción. No lo era, pero el texto mentía por omisión: el chip
+  // elige QUÉ CLIENTES se listan (los que compraron en los últimos 12 meses, o
+  // sólo los que compraron este año) y la columna SIEMPRE muestra las compras
+  // del AÑO EN CURSO. Ahora el chip dice "Clientes: …" y la columna dice
+  // "Compras {año}", así que cada texto nombra lo que de verdad hace.
   const vistaChipLabel = isClosedYear
     ? `Año ${selectedYear}`
-    : (is12mView ? "Vista 12m" : `YTD ${selectedYear}`);
+    : (is12mView ? "Clientes 12m" : `Clientes ${selectedYear}`);
   const vistaChipLong = isClosedYear
     ? `Año ${selectedYear}`
-    : (is12mView ? "Últimos 12 meses" : `YTD ${selectedYear}`);
+    : (is12mView ? "Clientes: últimos 12 meses" : `Clientes: con compras en ${selectedYear}`);
   // El período NO se repite en el contador de clientes (limpieza jul-2026): el
   // chip "Vista: …" de al lado ya lo dice y además es clicable para cambiarlo.
   const vistaChipTitle = isClosedYear
@@ -444,7 +451,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 <SortHeader col="rank"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>#</SortHeader>
                 <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
-                <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras YTD</SortHeader>
+                <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras {selectedYear}</SortHeader>
                 <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
                 <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
               </tr>
@@ -575,6 +582,30 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   );
 }
 
+/**
+ * Etiqueta "Del grupo": el cliente es una empresa nuestra comprándole a otra
+ * empresa nuestra (Multi Fashion Holding, Confecciones Boston).
+ *
+ * 🩸 Antes estos clientes NO aparecían: la vista los tiraba con una lista negra.
+ * Daniel: *"es un cliente al final del dia. tiene que aparecer"*, *"al final es
+ * venta real"*. Y es cierto — Fashion Wear le factura y le tiene que cobrar.
+ *
+ * ⚠️ La etiqueta NO significa que se reste ni que quede fuera de los totales.
+ * **Suma como cualquier otro cliente** (y de hecho SIEMPRE sumó: la exclusión
+ * vivía sólo en este ranking, nunca en los totales de venta — medido). Está
+ * para responder de un vistazo "¿esto lo vendí en la calle o es de casa?".
+ */
+function DelGrupoBadge() {
+  return (
+    <span
+      className="ml-1.5 inline-flex shrink-0 items-center rounded-full border border-violet-200 bg-violet-50 px-1.5 py-px align-middle text-[10px] font-medium leading-4 text-violet-700"
+      title="Empresa del grupo. Es una venta real y cuenta en los totales igual que cualquier cliente; la marca es sólo para reconocerla."
+    >
+      Del grupo
+    </span>
+  );
+}
+
 function ClienteRow({
   c,
   displayRank,
@@ -621,6 +652,7 @@ function ClienteRow({
               className="block max-w-full text-left font-medium leading-tight hover:text-teal-700"
             >
               {c.nombre}
+              {c.esDelGrupo && <DelGrupoBadge />}
             </Link>
           </HoverCardTrigger>
           <HoverCardContent
@@ -755,6 +787,7 @@ function ClienteCard({
             className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
           >
             {c.nombre}
+            {c.esDelGrupo && <DelGrupoBadge />}
           </Link>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">

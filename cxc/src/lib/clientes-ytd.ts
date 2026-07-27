@@ -7,10 +7,10 @@
 // definición vive acá y la usan los dos: `api/clientes/[codigo]` (ficha) y
 // `api/clientes/ytd` (listado). No hay dos fórmulas que puedan divergir.
 //
-// DEFINICIÓN (la que ya usaba la ficha, no se cambió):
+// DEFINICIÓN — ÚNICA para todo el sistema:
 //   · Ventas NETAS de notas de crédito: Factura/Tiquete/Transacción/Nota de
 //     Débito suman, Nota de Crédito resta, cualquier otro tipo vale 0.
-//   · Base = `total`, o sea CON ITBMS.
+//   · Base = `subtotal_descuento`, o sea **SIN ITBMS**.
 //   · Año calendario en curso, en hora de PANAMÁ (UTC−5 fijo, sin horario de
 //     verano).
 //   · Sólo las 6 empresas B2B (`B2B_EMPRESA_KEYS`).
@@ -18,14 +18,20 @@
 //     es por-empresa, así que matchear sólo por cliente_switch_id mezclaría
 //     clientes distintos de empresas distintas.
 //
-// ⚠️ OJO — NO es el mismo número que la columna "Compras YTD" de Ventas →
-// Clientes. Esa otra pantalla suma `subtotal_descuento` (SIN ITBMS). Medido el
-// 27-jul-2026 sobre fashion_wear 2026, coincide al centavo con lo que muestra:
-// City Mall Paso Canoa 479.870,40 sin ITBMS contra 513.457,72 con ITBMS. Son
-// dos definiciones legítimas conviviendo en el sistema; unificarlas es una
-// decisión de negocio de Daniel, no un detalle técnico, y hasta que la tome
-// este módulo replica la de la FICHA porque es la que Daniel pidió ver en el
-// listado ("que el número sea el mismo que muestra la ficha").
+// 🩸 POR QUÉ SIN ITBMS (27-jul-2026). Antes acá se sumaba `total`, que lleva el
+// ITBMS adentro, mientras Ventas → Clientes sumaba `subtotal_descuento`. El
+// mismo cliente, el mismo año, dos pantallas y dos números: City Mall Paso
+// Canoa en fashion_wear 2026 daba 479.870,40 en Ventas y 513.457,72 en la
+// ficha. Daniel lo zanjó: **"Sin ITBMS"** — ese impuesto se cobra para el fisco,
+// nunca fue plata de la empresa, y contarlo como "lo que me compró el cliente"
+// infla la cifra. Ahora las tres pantallas (ficha, listado y Ventas) usan la
+// misma base. Efecto medido en D-108: 210.702,50 → 196.918,20 (−13.784,30).
+//
+// ⚠️ La ficha del cliente tiene DOS caminos y los dos tienen que decir lo
+// mismo: el render inicial va por la RPC `cliente_ficha_ventas` (SQL) y el
+// refetch tras editar va por `api/clientes/[codigo]`. La migración
+// 20260727230000 pasa la RPC a `subtotal_descuento`; hasta que se corra, el
+// render inicial sigue mostrando la cifra vieja CON ITBMS.
 //
 // 🩸 El corte de año iba en UTC y eso es un bug conocido de esta casa: era
 // `new Date().getFullYear()`, que en un servidor UTC ya dice el año siguiente
@@ -75,3 +81,36 @@ export function montoFirmado(tipoComprobante: string | null | undefined, base: n
 
 /** Redondeo a centavos, para que no se filtren colas binarias a la pantalla. */
 export const aCentavos = (n: number): number => Math.round(n * 100) / 100;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUMAR PLATA SIN QUE EL ORDEN CAMBIE EL RESULTADO
+//
+// 🩸 Sumar `number` no es asociativo: (a+b)+c puede no dar lo mismo que a+(b+c)
+// en el último bit. Con cientos de documentos eso se cuela al centavo — medido:
+// City Mall Paso Canoa daba 1.073.515,50 en el listado y 1.073.515,49 en la
+// ficha, y la ÚNICA diferencia entre los dos era el orden en que llegaban las
+// filas (el listado las lee paginadas por id; la ficha, como vengan). Un centavo
+// de diferencia en un número que Daniel lee como plata alcanza para desconfiar
+// de la columna entera.
+//
+// La cura es no acumular en decimales: cada documento se lleva a ENTEROS en la
+// escala de la columna (`numeric(14,4)` → diezmilésimas) y se suman enteros, que
+// sí son exactos y no dependen del orden. Recién al final se baja a centavos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Escala de `switch_facturas.subtotal_descuento`: numeric(14,4). */
+const ESCALA = 10_000;
+
+/** Lleva un monto a enteros en la escala de la columna, para acumular exacto. */
+export const aEnteroEscalado = (n: number): number => Math.round(n * ESCALA);
+
+/** Baja un acumulado escalado a centavos. */
+export const escaladoACentavos = (escalado: number): number =>
+  Math.round(escalado / (ESCALA / 100)) / 100;
+
+/** Suma montos que YA están en centavos, sin volver a pasar por decimales. */
+export function sumarCentavos(montos: Iterable<number>): number {
+  let centavos = 0;
+  for (const m of montos) centavos += Math.round(m * 100);
+  return centavos / 100;
+}

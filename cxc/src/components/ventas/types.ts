@@ -174,6 +174,9 @@ export type Cliente = {
   /** true cuando el row no tiene match en clientes_master (cliente_id NULL).
    *  Estos rows se agrupan en la fila "Otros clientes" en la UI. */
   isOrphan: boolean;
+  /** Empresa del grupo comprándole a otra empresa del grupo. Suma en los
+   *  totales como cualquier cliente; la marca es informativa. */
+  esDelGrupo?: boolean;
   /** true sólo en la fila sintética "Otros clientes" que agrupa huérfanos.
    *  Cliente individual nunca tiene este flag. */
   isOtrosAggregate?: boolean;
