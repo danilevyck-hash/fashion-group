@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { getCompany } from "@/lib/companies";
+import { construirFilaCheque } from "@/lib/cheques-fila";
 
 const CHEQUES_ROLES = ["admin", "secretaria"];
 
@@ -47,9 +48,13 @@ export async function POST(req: NextRequest) {
   if (typeof empresa !== "string" || !getCompany(empresa)) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
   if (typeof numero_cheque !== "string" || !numero_cheque.trim()) return NextResponse.json({ error: "numero_cheque requerido" }, { status: 400 });
 
+  // La fila se arma en `@/lib/cheques-fila`, no acá: `cheques.banco` es NOT NULL
+  // sin default y el formulario no lo captura — dejarlo fuera del INSERT es lo
+  // que rompió el guardado durante 3 meses y medio (23502). Ver el encabezado
+  // de ese archivo.
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente: cliente.trim(), empresa, numero_cheque: numero_cheque.trim(), monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
+    .insert(construirFilaCheque({ cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor }))
     .select()
     .single();
 
