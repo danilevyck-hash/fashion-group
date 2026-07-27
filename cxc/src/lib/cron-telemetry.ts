@@ -19,7 +19,8 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { empresasConCxc } from "@/lib/switch-api/empresas";
 import { RUNNING_STALE_MIN } from "@/lib/switch-api/sync-log";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { shortError } from "@/lib/telegram";
+import { enviarSistema } from "@/lib/alertas/canal";
 
 // ─── Umbrales de "staleness" del watchdog (fuente ÚNICA para AMBOS watchdogs) ──
 // Hay dos vigías de crons: health-crons (monitor externo, responde 200/503) y el
@@ -1368,6 +1369,96 @@ export async function reconciliarSlotsSwitchSync(
  * persistir sin mandar Telegram cuando el caller ya envió una alerta propia
  * más específica (evita el doble aviso).
  */
+/**
+ * Traduce el `tipo` interno de un cron a una frase que Daniel pueda leer en el
+ * celular: QUÉ pasó, QUÉ significa para el negocio y QUÉ hacer.
+ *
+ * Regla de redacción (auditoría de alertas, 27-jul-2026): nada de nombres de
+ * tabla, nombres de cron, códigos HTTP ni jerga. Daniel es dueño de negocio, no
+ * programador: su trabajo frente a una alerta es entender si tiene que hacer
+ * algo y, si no puede resolverlo él, avisar. "Avisame" = avisarle a quien
+ * programa; es la acción correcta para casi todo lo que hay acá.
+ *
+ * Los tipos NO listados caen en un texto genérico honesto en vez de vomitar el
+ * identificador: preferimos "una tarea automática falló" a "refresh_clientes_vw".
+ */
+export function describirCronParaDaniel(tipo: string): string {
+  const t = tipo.toLowerCase();
+  const avisame = "Qué hacer: avisame para revisarlo.";
+
+  if (t.startsWith("switch-sync") || t.startsWith("sync-recibos") || t.startsWith("sync_recibos")) {
+    return (
+      "No se pudieron traer los datos de Switch (ventas, saldos o pagos) y el problema no se " +
+      `resolvió solo.\nQué significa: los números de la app pueden estar viejos.\n${avisame}`
+    );
+  }
+  if (t.startsWith("switch-articulos")) {
+    return (
+      "No se pudieron traer las ventas por artículo de Switch y el problema no se resolvió solo.\n" +
+      `Qué significa: los reportes de costo y utilidad pueden estar viejos.\n${avisame}`
+    );
+  }
+  if (t.startsWith("sync-utilidad") || t.startsWith("sync_utilidad")) {
+    return (
+      "No se pudo actualizar la utilidad desde Switch y el problema no se resolvió solo.\n" +
+      `Qué significa: el margen que ves en los reportes puede estar viejo.\n${avisame}`
+    );
+  }
+  if (t.startsWith("sync-proveedores") || t.startsWith("sync_proveedores")) {
+    return (
+      "No se pudieron traer los saldos de proveedores de Switch y el problema no se resolvió solo.\n" +
+      `Qué significa: lo que debemos a proveedores puede estar viejo.\n${avisame}`
+    );
+  }
+  if (t.includes("catalogo")) {
+    return (
+      "No se pudo actualizar un catálogo desde Switch y el problema no se resolvió solo.\n" +
+      "Qué significa: el catálogo que ven los clientes sigue con los precios y el inventario " +
+      `anteriores (no se dañó).\n${avisame}`
+    );
+  }
+  if (t.includes("clientes")) {
+    return (
+      "No se pudo actualizar la lista de clientes y el problema no se resolvió solo.\n" +
+      `Qué significa: clientes nuevos o cambios de datos pueden no aparecer todavía.\n${avisame}`
+    );
+  }
+  if (t.startsWith("backup")) {
+    return (
+      "Falló la copia de seguridad y el problema no se resolvió solo.\n" +
+      `Qué significa: hoy la red de seguridad de los datos quedó incompleta.\n${avisame}`
+    );
+  }
+  if (t.startsWith("cheques")) {
+    return (
+      "No se pudo revisar los cheques por vencer.\n" +
+      `Qué significa: hoy puede no haberte llegado el aviso de cheques.\n${avisame}`
+    );
+  }
+  if (t.startsWith("integrity") || t.includes("integridad")) {
+    return (
+      "La revisión automática de los datos no se pudo completar.\n" +
+      `Qué significa: hoy nadie verificó que las cuentas cuadren.\n${avisame}`
+    );
+  }
+  if (t.includes("resumen")) {
+    return (
+      "No se pudo armar uno de los resúmenes que te llegan por aquí.\n" +
+      `Qué significa: puede faltarte un resumen del día o del mes.\n${avisame}`
+    );
+  }
+  if (t.startsWith("cleanup") || t.startsWith("sesiones")) {
+    return (
+      "Una tarea de limpieza automática falló.\n" +
+      `Qué significa: nada urgente, pero conviene revisarlo.\n${avisame}`
+    );
+  }
+  return (
+    "Una tarea automática del sistema falló y no se resolvió sola.\n" +
+    `Qué significa: puede haber datos sin actualizar en la app.\n${avisame}`
+  );
+}
+
 export async function logCronError(
   tipo: string,
   message: string,
@@ -1392,7 +1483,11 @@ export async function logCronError(
 
   // 2. Alerta Telegram con el error truncado (best-effort; sendTelegramAlert no
   // lanza). Se omite si el caller ya mandó su propia alerta específica.
+  // El `tipo` es un identificador interno (`backup_switch_r2`, `refresh_clientes_vw`,
+  // `switch-sync:estadocuenta-1605`…) y no le dice nada a Daniel. Se traduce a una
+  // frase de negocio; si no hay traducción conocida, al menos va con la marca del
+  // canal de sistema y sin HTML del proveedor (shortError lo limpia).
   if (opts?.telegram !== false) {
-    await sendTelegramAlert(`🚨 Cron error — ${tipo}\n${shortError(message)}`);
+    await enviarSistema(`${describirCronParaDaniel(tipo)}\nDetalle: ${shortError(message)}`);
   }
 }

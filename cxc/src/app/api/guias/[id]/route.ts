@@ -5,6 +5,7 @@ import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { sendTelegramAlert } from "@/lib/telegram";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
@@ -49,7 +50,7 @@ async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   lineas.push("", `Total: ${total} bultos`);
 
   const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  await sendTelegramAlert(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
+  await enviarNegocio(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
 }
 
 // ── GET ──

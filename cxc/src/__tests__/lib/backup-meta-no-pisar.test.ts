@@ -69,7 +69,24 @@ describe("cableado del guard en el route", () => {
 
   it("avisa por Telegram en vez de fallar en silencio", () => {
     const desdeGuard = fuente.slice(fuente.indexOf("if (corridaEsteril)"));
-    expect(desdeGuard.slice(0, 900)).toContain("sendTelegramAlert");
+    // `enviarSistema` es el canal de alertas de sistema (27-jul-2026): mismo
+    // envío a Telegram que antes, con la marca "🔧 SISTEMA ·" delante.
+    expect(desdeGuard.slice(0, 900)).toContain("enviarSistema");
+  });
+
+  /**
+   * La corrida ESTÉRIL es la excepción a la regla de "esperar la 2ª oportunidad"
+   * que se agregó al resto de los avisos del backup. No está en juego "el backup
+   * de hoy falló" sino el ÍNDICE del día: sin este aviso, una copia buena puede
+   * quedar viéndose inservible (26-jul: `restore.mjs --list` decía "switch 0"
+   * con los 59 objetos sanos en R2). Por eso suena siempre.
+   */
+  it("la corrida estéril NO espera a la segunda oportunidad del día", () => {
+    const desdeGuard = fuente.slice(
+      fuente.indexOf("if (corridaEsteril)"),
+      fuente.indexOf("if (corridaEsteril)") + 900,
+    );
+    expect(desdeGuard).not.toContain("alertaDeBackupEsperaSegundaOportunidad");
   });
 });
 

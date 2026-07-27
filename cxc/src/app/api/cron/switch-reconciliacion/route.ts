@@ -73,7 +73,7 @@ import {
 } from "@/lib/grupo-resumen-mensual";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
-import { sendTelegramAlert } from "@/lib/telegram";
+import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
   recordCronHeartbeat,
   cronsStaleParaAlerta,
@@ -407,7 +407,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
       if (resumen.total === 0) {
         return { ok: false, detail: `sin data para ${fmtMesLabel(anio, mes)} — ¿ventas_rollup_mensual_mv sin refrescar?` };
       }
-      const sent = await sendTelegramAlert(`(recuperado) ${buildMensajeMensual(resumen)}`);
+      const sent = await enviarNegocio(`(recuperado) ${buildMensajeMensual(resumen)}`);
       return { ok: sent, detail: sent ? `resumen ${fmtMesLabel(anio, mes)} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },
@@ -429,7 +429,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
       // El prefijo va DENTRO del <pre> (buildMensajeHtml lo antepone al título)
       // y el envío en "HTML", igual que el run normal: concatenar por fuera
       // dejaría las etiquetas <pre> visibles como texto.
-      const sent = await sendTelegramAlert(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
+      const sent = await enviarNegocio(buildMensajeHtml(resumen, "(recuperado) "), "HTML");
       return { ok: sent, detail: sent ? `resumen ${ayer} reenviado` : "Telegram no aceptó el mensaje" };
     },
   },
@@ -447,7 +447,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     recoverOnlyIf: () => new Date(`${hoyPanama()}T00:00:00Z`).getUTCDay() === 1, // lunes
     recover: async () => {
       const r = await calcularFotosResumen();
-      const sent = await sendTelegramAlert(`(recuperado) ${r.mensaje}`);
+      const sent = await enviarNegocio(`(recuperado) ${r.mensaje}`);
       return {
         ok: sent,
         detail: sent
@@ -615,9 +615,16 @@ async function checkStaleCrons(): Promise<string[]> {
   const stale = cronsStaleParaAlerta((data ?? []) as HeartbeatRow[], Date.now());
 
   if (stale.length > 0) {
-    await sendTelegramAlert(
-      `⏰ Watchdog crons — ${stale.length} sin success reciente:\n` +
-        stale.map((s) => `• ${s}`).join("\n"),
+    // `stale` son nombres internos de cron. No se los mostramos a Daniel como
+    // lista de identificadores: se le dice qué significa y qué hacer, y el
+    // detalle técnico va al final, en una sola línea, para que sirva de pista
+    // cuando me reenvíe el mensaje.
+    await enviarSistema(
+      `${stale.length === 1 ? "Una tarea automática lleva" : `${stale.length} tareas automáticas llevan`} ` +
+        `más de un día sin completarse.\n` +
+        `Qué significa: puede haber datos sin actualizar en la app.\n` +
+        `Qué hacer: avisame para revisarlo.\n` +
+        `Detalle: ${stale.join(", ")}`,
     );
   }
   return stale;
@@ -899,9 +906,15 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
             ...recoveredColaterales.map((c) => c.label),
           ].join(", ")}`
         : "";
-    await sendTelegramAlert(
-      `🚨 ALERTA sync Switch (${fecha})\n` +
-        `Sin success tras reconciliación:\n${[...lineasPares, ...lineasCol, ...lineasSlots, ...lineasSkip].join("\n")}${recuperadas}`,
+    // Este mensaje sale DESPUÉS de que la reconciliación ya intentó reparar y
+    // no pudo: acá el "se arregla solo" ya se agotó. Por eso sí suena.
+    await enviarSistema(
+      `Hay datos de Switch que no se pudieron actualizar hoy (${fecha}), ni siquiera ` +
+        `reintentando.\n` +
+        `Qué significa: las ventas, los saldos o los pagos que ves en la app pueden estar ` +
+        `viejos en algunas empresas.\n` +
+        `Qué hacer: avisame para revisarlo.\n` +
+        `Detalle:\n${[...lineasPares, ...lineasCol, ...lineasSlots, ...lineasSkip].join("\n")}${recuperadas}`,
     );
   }
 

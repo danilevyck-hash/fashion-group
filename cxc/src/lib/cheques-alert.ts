@@ -8,6 +8,7 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { getCompanyDisplay } from "@/lib/companies";
 import { sendTelegramAlert } from "@/lib/telegram";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 const WA_NUMBERS = ["+50766745522", "+50766494096"];
 
@@ -64,6 +65,6 @@ export async function runChequesAlert(): Promise<ChequesAlertResult> {
     `${lineas}\n` +
     `WhatsApp seguimiento: ${WA_NUMBERS.join(", ")}`;
 
-  const sent = await sendTelegramAlert(mensaje);
+  const sent = await enviarNegocio(mensaje);
   return { ok: true, detail: `${cheques.length} por vencer`, count: cheques.length, sent };
 }

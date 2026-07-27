@@ -34,7 +34,7 @@
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { sendTelegramAlert } from "@/lib/telegram";
+
 import { logCronError } from "@/lib/cron-telemetry";
 import { isSwitchTransitorio } from "@/lib/switch-api/alert-policy";
 import { mapEmpresaName, ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -54,11 +54,21 @@ export const OUTAGE_LOOKBACK_HOURS = 24;
  *     respondió 200 pero sin token: <!DOCTYPE html>…", client.ts) o a media
  *     llamada ("update products sku=100202441: <!DOCTYPE html>…", caso real
  *     reebok-catalogo 24-jul). El "<!DOCTYPE html" embebido en el error es la
- *     firma del mantenimiento. OJO: este patrón NO es silenciable en
- *     alert-policy (su alerta inmediata existente queda intacta); aquí solo se
- *     usa para el resumen posterior.
- *   - Red/timeout/5xx (isSwitchTransitorio): "Error de red en …: fetch failed
- *     (ECONNREFUSED / UND_ERR_CONNECT_TIMEOUT)", "Timeout >30000ms…", HTTP 5xx.
+ *     firma del mantenimiento.
+ *   - Red/timeout/5xx: "Error de red en …: fetch failed (ECONNREFUSED /
+ *     UND_ERR_CONNECT_TIMEOUT)", "Timeout >30000ms…", HTTP 5xx.
+ *
+ * ── 27-jul-2026: UN SOLO predicado, no dos ────────────────────────────────────
+ * Esta función tenía su propia copia del patrón HTML porque `isSwitchTransitorio`
+ * no lo cubría, y el comentario de acá lo decía sin rodeos: "OJO: este patrón NO
+ * es silenciable en alert-policy". Esa divergencia era el bug — el mismo evento
+ * era "caída informativa, sin impacto" para este archivo y "🚨 emergencia con
+ * HTML crudo al celular" para el otro. Ahora `isSwitchTransitorio` es el único
+ * dueño del patrón y acá solo se delega.
+ *
+ * Efecto lateral BUSCADO: `isSwitchTransitorio` descarta LICENCIA, así que una
+ * licencia vencida envuelta en la página HTML ya no se confunde con una caída
+ * de Switch. Es lo correcto — la licencia no se arregla sola.
  *
  * Un 401/token a secas NO cuenta: eso es la colisión de sesión única (dos
  * logins simultáneos), rutina esperada — no una caída de Switch, y meterlo
@@ -66,8 +76,6 @@ export const OUTAGE_LOOKBACK_HOURS = 24;
  * en 'running'" (limpieza del lock, pasa también con deploys/timeouts propios).
  */
 export function isSwitchCaida(message: string | null | undefined): boolean {
-  if (!message) return false;
-  if (/<!DOCTYPE html|Auth respondió 200 pero sin token/i.test(message)) return true;
   return isSwitchTransitorio(message);
 }
 
@@ -379,13 +387,22 @@ export async function enviarResumenCaidaSiAplica(): Promise<ResumenCaidaResultad
     if (r.estado !== "recuperada") return { resumen: r.estado };
 
     const mensaje = buildMensajeCaida(r.ventana);
-    const sent = await sendTelegramAlert(mensaje);
-    if (!sent) {
-      // Sin marca de dedup: la próxima pasada verde vuelve a intentar.
-      return { resumen: "error", mensaje };
-    }
-    // Marca de dedup (telegram:false — el mensaje ya salió arriba). El texto
-    // incluye la ventana → auditable desde la propia tabla.
+    // ── YA NO SE MANDA A TELEGRAM (27-jul-2026) ───────────────────────────────
+    // Este mensaje termina, textualmente, en "todo re-sincronizado, sin
+    // impacto". O sea: se declara a sí mismo un no-evento. Falla las tres
+    // condiciones del canal de sistema — nada está roto (ya se recuperó), se
+    // arregló solo (por eso lo estamos contando en pasado) y no hay ninguna
+    // acción para nadie.
+    //
+    // Que Switch se caiga un rato y el sistema lo repare sin ayuda ES EL
+    // SISTEMA FUNCIONANDO BIEN. Avisarlo entrena a Daniel a ignorar el canal
+    // que algún día va a traer algo urgente.
+    //
+    // NO se pierde nada: la fila sigue quedando en cron_email_errors con la
+    // ventana exacta, que es de donde salió toda la evidencia de esta auditoría.
+    // Si una caída NO se recupera, el camino que suena es otro y sigue intacto
+    // (`🔧 SISTEMA · Hay datos de Switch que no se pudieron actualizar…` en
+    // switch-reconciliacion, y el streak de alert-policy).
     await logCronError(OUTAGE_RESUMEN_TIPO, mensaje, null, { telegram: false });
     return { resumen: "enviado", mensaje };
   } catch (err) {

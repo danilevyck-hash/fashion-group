@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { calcularResumenDiario, buildMensajeHtml, hoyPanama, ventasAcsSyncFresco } from "@/lib/acs-resumen-diario";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -49,7 +50,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // HTML (no texto plano): el mensaje es una tabla dentro de un <pre> y sin
     // monoespaciado las columnas no cuadran en el móvil.
     const mensaje = buildMensajeHtml(resumen);
-    const sent = await sendTelegramAlert(mensaje, "HTML");
+    const sent = await enviarNegocio(mensaje, "HTML");
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

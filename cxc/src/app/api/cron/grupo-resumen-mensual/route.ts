@@ -19,6 +19,7 @@ import {
 import { hoyPanama } from "@/lib/fecha-panama";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { enviarNegocio } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       throw new Error(`sin data para ${fmtMesLabel(anio, mes)} — ¿ventas_rollup_mensual_mv sin refrescar?`);
     }
     const mensaje = buildMensajeMensual(resumen);
-    const sent = await sendTelegramAlert(mensaje);
+    const sent = await enviarNegocio(mensaje);
     if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
 
     await recordCronHeartbeat(CRON_NAME);

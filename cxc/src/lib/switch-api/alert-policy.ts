@@ -26,8 +26,35 @@
  */
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { shortError } from "@/lib/telegram";
+import { enviarSistema } from "@/lib/alertas/canal";
 import { logCronError } from "@/lib/cron-telemetry";
+import { mapEmpresaName } from "@/lib/empresa-mapping";
+
+/** Qué le pasa AL NEGOCIO si este sync se queda atrás. Traduce el `sync_type`
+ *  interno a la consecuencia que Daniel puede ver en la app. */
+export function consecuenciaDeSyncType(syncType: string): string {
+  switch (syncType) {
+    case "facturas":
+      return "las ventas que ves en la app pueden estar viejas.";
+    case "estadocuenta":
+      return "los saldos de Cuentas por Cobrar pueden estar viejos.";
+    case "recibos":
+      return "los pagos de clientes pueden no estar reflejados todavía.";
+    case "costo":
+    case "utilidad":
+    case "articulos":
+      return "los costos y la utilidad que ves en los reportes pueden estar viejos.";
+    case "proveedores":
+      return "lo que debemos a proveedores puede estar viejo.";
+    case "catalogo_reebok":
+    case "catalogo_joybees":
+    case "catalogo_tommy":
+      return "el catálogo que ven los clientes sigue con los precios e inventario anteriores.";
+    default:
+      return "puede haber datos sin actualizar en la app.";
+  }
+}
 
 /**
  * ¿El mensaje corresponde a un 401/token de Switch (transitorio de sesión
@@ -51,12 +78,36 @@ export function isSwitch401(message: string | null | undefined): boolean {
  *   - "Error de red en …: fetch failed (UND_ERR_CONNECT_TIMEOUT)"
  *   - "Timeout >30000ms en /apifactura"
  *   - "… → HTTP 502: Bad Gateway"
- * LICENCIA se excluye explícito: esa alerta SIEMPRE sale de inmediato.
+ *
+ * ── Ampliado 27-jul-2026: la página de excepción de Switch ────────────────────
+ * Faltaba la forma MÁS RUIDOSA de que Switch se caiga: responder HTTP 200 con su
+ * página de excepción HTML en vez del token (client.ts:295 →
+ * "Auth respondió 200 pero sin token: <!DOCTYPE html><title>Exception - SWITCH
+ * SOFT</title>…"), o soltarla a media llamada ("update products sku=…:
+ * <!DOCTYPE html>…", reebok-catalogo 24-jul).
+ *
+ * Es exactamente lo mismo que un 502 —Switch no está sirviendo— pero como el
+ * código HTTP es 200 no matcheaba ningún patrón y alertaba de INMEDIATO, con
+ * 200 caracteres de HTML crudo al celular de Daniel.
+ *
+ * Y el sistema YA SABÍA que eso es una caída: `esErrorDeCaidaSwitch` en
+ * outage-resumen.ts lo clasificaba como "Switch estuvo caído… sin impacto"
+ * desde jul-2026. O sea que un archivo lo llamaba caída informativa y el otro
+ * emergencia. Ahora el predicado vive UNA sola vez —acá— y outage-resumen lo
+ * reusa; el test `alertas-canal.test.ts` falla si vuelven a divergir.
+ *
+ * Evidencia de que es transitorio (switch_sync_log, 30 días a 26-jul-2026):
+ * 5 ocurrencias, 5 recuperadas por sí solas en ≤12h, 0 sostenidas.
+ *
+ * LICENCIA se excluye explícito: esa alerta SIEMPRE sale de inmediato (aunque
+ * venga envuelta en la página HTML).
  */
 export function isSwitchTransitorio(message: string | null | undefined): boolean {
   if (!message) return false;
   if (/LICENCIA/i.test(message)) return false;
-  return /Error de red en |Timeout >\d+ms|HTTP 5\d\d/i.test(message);
+  if (/Error de red en |Timeout >\d+ms|HTTP 5\d\d/i.test(message)) return true;
+  // Switch sirviendo su página de excepción en vez de datos = Switch caído.
+  return /<!DOCTYPE\s+html|Auth respondió \d+ pero sin token/i.test(message);
 }
 
 /** Silenciable = transitorio esperado (sesión única 401 o red/5xx) que la
@@ -187,11 +238,14 @@ export async function alertSwitchCronErrors(
     const esc = await evaluateSwitchEscalation(e.empresaKey, e.syncType);
     if (esc.escalate) {
       const desde = esc.streak >= 2 && esc.sinceIso
-        ? `${esc.streak} corridas consecutivas fallando (401/red), falla desde ${fmtPanama(esc.sinceIso)} (Panamá)`
-        : "no pude medir el historial en switch_sync_log (corrida sin registrar o consulta fallida) — alerto por seguridad";
-      await sendTelegramAlert(
-        `🚨 Switch fallo REPETIDO — ${cronName} · ${e.empresaKey}/${e.syncType}\n` +
-          `${desde}.\nÚltimo error: ${shortError(e.error)}${nota}`,
+        ? `Viene fallando desde ${fmtPanama(esc.sinceIso)} (${esc.streak} intentos seguidos)`
+        : "No pude medir desde cuándo, así que aviso por las dudas";
+      await enviarSistema(
+        `Switch lleva rato sin responder para ${mapEmpresaName(e.empresaKey)} y ya no parece ` +
+          `un corte pasajero.\n${desde}.\n` +
+          `Qué significa: ${consecuenciaDeSyncType(e.syncType)}\n` +
+          `Qué hacer: avisame para revisarlo.\n` +
+          `Detalle: ${shortError(e.error)}${nota}`,
       );
       await logCronError(
         cronName,
