@@ -243,6 +243,8 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > | solo `TELEGRAM_BOT_TOKEN_<canal>` | se **ignora** con warning — un bot sin chat no tiene a dónde escribir |
 > | ninguna | el canal de siempre ← **sistema está así hoy** |
 >
+> Concretamente, en Vercel hay **dos** variables nuevas: `TELEGRAM_BOT_TOKEN_NEGOCIO` (token de `@fashiongr_sistema_bot`) y `TELEGRAM_CHAT_ID_NEGOCIO` = `1367251585`. `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` no se tocan: son el canal de sistema **y** la red de rescate. Las `_SISTEMA` existen y funcionan, pero hoy van vacías.
+>
 > **FAIL-SAFE en dos capas.** Pesa más que antes: con el negocio en el bot nuevo, un olvido de configuración ya no silenciaría avisos técnicos sino justo lo que Daniel dijo que más le importa. (1) El resolvedor nunca arma un destino a medias — nada de mandar el chat de siempre con el bot nuevo, que sería 403 seguro. (2) Si el envío al canal aparte **falla** (token mal copiado, bot bloqueado, chat equivocado), `sendTelegramAlert` lo **reintenta una vez en el canal de siempre**; el prefijo `🔧 SISTEMA · ` viaja intacto para que se reconozca si cae ahí. El reintento solo ocurre cuando el destino elegido difiere del de siempre → sin duplicados ni bucles. Probado contra la API real de Telegram: con un token de override inválido el POST sale a `/bot<token-nuevo>/sendMessage`, Telegram responde **401**, y el mensaje **llega igual** al chat de siempre.
 >
 > **`enviarNegocio` sigue sin perilla:** el override es de **destino**, nunca de **si se manda**. Su cuerpo es una sola sentencia sin `if`, sin `return false/true` y sin `process.env`; el test lo verifica por aridad **y** leyendo el cuerpo de la función.
