@@ -325,7 +325,24 @@ export interface ImpulsadoraConEstado extends MkImpulsadora {
   mesActual: PagoMesEstado;
   /** Períodos pagados más recientes, ya formateados ("1–15 jul 2026"). */
   ultimosPeriodos: string[];
+  /**
+   * Cuántos PAGOS tiene registrados (períodos distintos, sin contar anulados).
+   * Un pago repartido en 3 marcas son 3 filas en mk_facturas pero UN pago: acá
+   * va el número que entiende una persona, porque es el que se le muestra
+   * antes de eliminarla ("tiene 3 pagos registrados").
+   */
+  pagosRegistrados: number;
 }
+
+/**
+ * Qué pasó al eliminar una impulsadora. Son dos desenlaces distintos y el de
+ * arriba NO es un caso raro del otro: sin pagos la fila se borra de verdad;
+ * con pagos se oculta, porque borrarla se llevaría por delante el historial de
+ * gastos (y la FK de mk_facturas la protege igual).
+ */
+export type ResultadoEliminarImpulsadora =
+  | { accion: "eliminada"; nombre: string }
+  | { accion: "ocultada"; nombre: string; pagos: number };
 
 // ----------------------------------------------------------------------------
 // Inventario de muebles + entregas por proyecto
