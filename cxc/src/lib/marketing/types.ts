@@ -114,6 +114,13 @@ export interface MkFactura {
   // Ambos NULL para facturas normales de proyecto.
   impulsadora_id?: string | null;
   impulsadora_mes?: string | null;
+  // Período trabajado que cubre el gasto (quincenas). Opcional: los pagos
+  // mensuales viejos NO lo tienen y se leen como el mes completo de
+  // impulsadora_mes (ver lib/marketing/periodo.ts → periodoEfectivo).
+  // Opcional también en el tipo porque la migración 20260727140000 puede no
+  // estar corrida todavía.
+  periodo_desde?: string | null;
+  periodo_hasta?: string | null;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
@@ -286,7 +293,10 @@ export interface ComprobanteInput {
 }
 
 export interface RegistrarPagoImpulsadoraInput {
-  mes: string; // "YYYY-MM-01" (día 1 del mes cubierto)
+  // Período trabajado que cubre el pago. Puede ser una quincena, un mes
+  // completo o un solo día (desde = hasta).
+  desde: string; // "YYYY-MM-DD" inclusive
+  hasta: string; // "YYYY-MM-DD" inclusive
   monto: number; // total del pago (editable; default = monto_mensual)
   comprobante: ComprobanteInput;
 }
@@ -297,10 +307,15 @@ export interface ImpulsadoraMarcaResuelta {
   porcentaje: number;
 }
 
-// Estado de pago de un mes concreto para una impulsadora.
+// Estado de pago de un mes concreto para una impulsadora. Con quincenas un mes
+// puede quedar A MEDIAS, así que no alcanza un booleano: `estado` distingue
+// pagado / parcial / pendiente y `faltan` dice qué días quedaron sin pagar
+// ("16–31"). `pagado` se conserva = (estado === "pagado").
 export interface PagoMesEstado {
   mes: string; // "YYYY-MM-01"
   pagado: boolean;
+  estado: "pagado" | "parcial" | "pendiente";
+  faltan: string;
 }
 
 // Fila del catálogo de impulsadoras que consume la UI (lista + chips).
@@ -308,6 +323,8 @@ export interface ImpulsadoraConEstado extends MkImpulsadora {
   marcas: ImpulsadoraMarcaResuelta[];
   mesAnterior: PagoMesEstado;
   mesActual: PagoMesEstado;
+  /** Períodos pagados más recientes, ya formateados ("1–15 jul 2026"). */
+  ultimosPeriodos: string[];
 }
 
 // ----------------------------------------------------------------------------

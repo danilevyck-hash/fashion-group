@@ -2,14 +2,37 @@
 // Marketing — Impulsadoras (lectura + escritura contra Supabase)
 // ============================================================================
 // Catálogo de impulsadoras con sueldo mensual fijo repartido a marca(s). El
-// pago mensual cae en mk_facturas como gastos SUELTOS (proyecto_id NULL,
+// pago cae en mk_facturas como gastos SUELTOS (proyecto_id NULL,
 // impulsadora_id set), UNA fila por marca según el split, con comprobante
 // obligatorio en mk_adjuntos. Sin comprobante NO se guarda.
+//
+// PERÍODO TRABAJADO (jul-2026): el pago dejó de ser "un mes" y pasó a ser un
+// RANGO desde/hasta, para poder pagar por quincena. Consecuencias:
+//   - Anti-duplicado: ya NO bloquea por mes (eso impedía la 2ª quincena).
+//     Ahora rechaza el pago cuyo rango SE SOLAPA con un pago vigente de la
+//     misma impulsadora — que es exactamente el error que el bloqueo por mes
+//     buscaba evitar (pagar dos veces los mismos días). Quincenas contiguas
+//     (1–15 y 16–31) no comparten ningún día, así que pasan.
+//   - impulsadora_mes se SIGUE guardando (= mes de `desde`). Los reportes por
+//     año (reportes.ts) y el orden del ZIP leen esa columna y no cambian.
+//   - Los pagos viejos (solo impulsadora_mes, sin rango) se leen como el mes
+//     completo. No se migran ni se tocan.
 // ============================================================================
 import { supabaseServer } from "@/lib/supabase-server";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { tituloCase, normalizarTexto } from "./normalizar";
 import { getMarcas } from "./queries";
-import { etiquetaMes, mesActualISO, mesAnteriorISO } from "./meses";
+import { mesActualISO, mesAnteriorISO } from "./meses";
+import {
+  coberturaDelMes,
+  etiquetaPeriodo,
+  etiquetaPeriodoCorta,
+  mesDeFecha,
+  periodoEfectivo,
+  seSolapan,
+  validarPeriodo,
+  type Periodo,
+} from "./periodo";
 import type {
   MkImpulsadora,
   CreateImpulsadoraInput,
@@ -20,15 +43,6 @@ import type {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-// Normaliza cualquier fecha "YYYY-MM-.." al día 1 de ese mes.
-function normalizarMes(mes: string): string {
-  const s = normalizarTexto(mes).slice(0, 7);
-  if (!/^\d{4}-\d{2}$/.test(s)) {
-    throw new Error("mes inválido (esperado YYYY-MM)");
-  }
-  return `${s}-01`;
 }
 
 // ----------------------------------------------------------------------------
@@ -64,26 +78,81 @@ async function cargarSplits(
   return out;
 }
 
-// Meses pagados por impulsadora (set de "YYYY-MM-01"), leyendo mk_facturas
-// vigentes con impulsadora_id + impulsadora_mes.
-async function cargarMesesPagados(
-  impulsadoraIds: ReadonlyArray<string>,
-): Promise<Map<string, Set<string>>> {
-  const out = new Map<string, Set<string>>();
-  if (impulsadoraIds.length === 0) return out;
-  const { data, error } = await supabaseServer
+// ¿Existen ya periodo_desde/periodo_hasta en mk_facturas? Se memoiza el "sí"
+// (la migración no se desaplica); el "no" se reintenta en cada llamada para que
+// el día que Daniel corra el DDL empiece a guardar el rango sin redeploy.
+let periodoDisponible: boolean | null = null;
+async function hayColumnasPeriodo(): Promise<boolean> {
+  if (periodoDisponible) return true;
+  const { error } = await supabaseServer
     .from("mk_facturas")
-    .select("impulsadora_id, impulsadora_mes")
-    .in("impulsadora_id", impulsadoraIds)
-    .is("anulado_en", null)
-    .not("impulsadora_mes", "is", null);
-  if (error) throw new Error(`cargarMesesPagados: ${error.message}`);
-  for (const r of (data ?? []) as Array<{ impulsadora_id: string; impulsadora_mes: string }>) {
-    const key = String(r.impulsadora_id);
-    const set = out.get(key) ?? new Set<string>();
-    set.add(String(r.impulsadora_mes).slice(0, 10));
-    out.set(key, set);
+    .select("periodo_desde")
+    .limit(1);
+  const ok = !error;
+  if (ok) periodoDisponible = true;
+  return ok;
+}
+
+interface FilaPagoRaw {
+  impulsadora_id: string;
+  impulsadora_mes: string | null;
+  periodo_desde?: string | null;
+  periodo_hasta?: string | null;
+}
+
+// TOLERANCIA A DDL PENDIENTE: periodo_desde/periodo_hasta (migración
+// 20260727140000) pueden no existir todavía. Si PostgREST se queja de esas
+// columnas, se relee solo con impulsadora_mes y todo el módulo sigue vivo
+// tratando cada pago como un mes completo (que es lo que eran antes).
+async function leerPagosRaw(
+  impulsadoraIds: ReadonlyArray<string>,
+): Promise<FilaPagoRaw[]> {
+  const consultar = (cols: string) =>
+    supabaseServer
+      .from("mk_facturas")
+      .select(cols)
+      .in("impulsadora_id", impulsadoraIds)
+      .is("anulado_en", null);
+
+  const conPeriodo = await consultar(
+    "impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta",
+  );
+  if (!conPeriodo.error) return (conPeriodo.data ?? []) as unknown as FilaPagoRaw[];
+  if (!/periodo_desde|periodo_hasta/.test(conPeriodo.error.message)) {
+    throw new Error(`leerPagosRaw: ${conPeriodo.error.message}`);
   }
+
+  const sinPeriodo = await consultar("impulsadora_id, impulsadora_mes");
+  if (sinPeriodo.error) throw new Error(`leerPagosRaw: ${sinPeriodo.error.message}`);
+  return (sinPeriodo.data ?? []) as unknown as FilaPagoRaw[];
+}
+
+/**
+ * Períodos ya pagados por impulsadora. Un pago genera N facturas (una por
+ * marca) con el MISMO período: se deduplican, si no un pago repartido en 3
+ * marcas contaría 3 veces en "últimos pagos".
+ */
+async function cargarPeriodosPagados(
+  impulsadoraIds: ReadonlyArray<string>,
+): Promise<Map<string, Periodo[]>> {
+  const out = new Map<string, Periodo[]>();
+  if (impulsadoraIds.length === 0) return out;
+
+  const vistos = new Map<string, Set<string>>();
+  for (const r of await leerPagosRaw(impulsadoraIds)) {
+    const p = periodoEfectivo(r);
+    if (!p) continue;
+    const key = String(r.impulsadora_id);
+    const clave = `${p.desde}|${p.hasta}`;
+    const set = vistos.get(key) ?? new Set<string>();
+    if (set.has(clave)) continue;
+    set.add(clave);
+    vistos.set(key, set);
+    const arr = out.get(key) ?? [];
+    arr.push(p);
+    out.set(key, arr);
+  }
+  for (const arr of out.values()) arr.sort((a, b) => (a.desde < b.desde ? -1 : 1));
   return out;
 }
 
@@ -101,7 +170,7 @@ export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
 
   const [splits, pagados, marcas] = await Promise.all([
     cargarSplits(ids),
-    cargarMesesPagados(ids),
+    cargarPeriodosPagados(ids),
     getMarcas(),
   ]);
   const marcaById = new Map(marcas.map((m) => [m.id, m]));
@@ -118,13 +187,18 @@ export async function listImpulsadoras(): Promise<ImpulsadoraConEstado[]> {
       .filter((x): x is ImpulsadoraMarcaResuelta => x !== null)
       .sort((a, b) => b.porcentaje - a.porcentaje);
 
-    const set = pagados.get(String(imp.id)) ?? new Set<string>();
+    const periodos = pagados.get(String(imp.id)) ?? [];
+    const cobAnt = coberturaDelMes(mesAnt, periodos);
+    const cobAct = coberturaDelMes(mesAct, periodos);
     return {
       ...imp,
       monto_mensual: Number(imp.monto_mensual),
       marcas: marcasResueltas,
-      mesAnterior: { mes: mesAnt, pagado: set.has(mesAnt) },
-      mesActual: { mes: mesAct, pagado: set.has(mesAct) },
+      mesAnterior: { ...cobAnt, pagado: cobAnt.estado === "pagado" },
+      mesActual: { ...cobAct, pagado: cobAct.estado === "pagado" },
+      // Los 3 más recientes, para que la tarjeta muestre QUÉ se pagó y no solo
+      // el estado del mes ("1–15 jul 2026 · 16–31 jul 2026 · jun 2026").
+      ultimosPeriodos: periodos.slice(-3).reverse().map(etiquetaPeriodoCorta),
     };
   });
 }
@@ -216,11 +290,15 @@ function repartirMonto(
 }
 
 /**
- * Registra el pago mensual de una impulsadora. Crea UNA factura por marca
- * (proyecto_id NULL, impulsadora_id set, estado Pagado) con su porción del
- * monto, su marca al 100% en mk_factura_marcas, y el comprobante adjunto.
+ * Registra un pago de impulsadora por PERÍODO TRABAJADO (quincena, mes o un
+ * solo día). Crea UNA factura por marca (proyecto_id NULL, impulsadora_id set,
+ * estado Pagado) con su porción del monto, su marca al 100% en
+ * mk_factura_marcas, y el comprobante adjunto.
  * El comprobante es OBLIGATORIO: sin `path` lanza error (validación server-side).
- * Idempotencia por mes: si ya hay pago vigente de ese mes, rechaza.
+ *
+ * Anti-duplicado: rechaza si el período SE SOLAPA con un pago vigente de la
+ * misma impulsadora (pagar dos veces los mismos días). Dos quincenas del mismo
+ * mes conviven sin problema porque no comparten ningún día.
  */
 export async function registrarPagoImpulsadora(
   impulsadoraId: string,
@@ -238,7 +316,15 @@ export async function registrarPagoImpulsadora(
     throw new Error("Tipo de comprobante inválido");
   }
 
-  const mesISO = normalizarMes(input.mes);
+  const desde = normalizarTexto(input.desde ?? "").slice(0, 10);
+  const hasta = normalizarTexto(input.hasta ?? "").slice(0, 10);
+  const errPeriodo = validarPeriodo(desde, hasta);
+  if (errPeriodo) throw new Error(errPeriodo);
+  const periodo: Periodo = { desde, hasta };
+  // impulsadora_mes sigue siendo el mes del INICIO del período: los reportes
+  // por año y el orden del ZIP siguen leyendo esta columna sin cambios.
+  const mesISO = mesDeFecha(desde);
+
   const monto = round2(Number(input.monto ?? 0));
   if (!Number.isFinite(monto) || monto <= 0) {
     throw new Error("Monto inválido");
@@ -260,23 +346,35 @@ export async function registrarPagoImpulsadora(
     throw new Error("La impulsadora no tiene marcas asignadas");
   }
 
-  // Idempotencia: no permitir doble pago del mismo mes.
-  const { data: yaData, error: yaErr } = await supabaseServer
-    .from("mk_facturas")
-    .select("id")
-    .eq("impulsadora_id", impulsadoraId)
-    .eq("impulsadora_mes", mesISO)
-    .is("anulado_en", null)
-    .limit(1);
-  if (yaErr) throw new Error(`registrarPago[dup]: ${yaErr.message}`);
-  if ((yaData ?? []).length > 0) {
-    throw new Error(`Ya se registró el pago de ${etiquetaMes(mesISO)}`);
+  // Anti-duplicado por SOLAPAMIENTO de días (antes era "un pago por mes", que
+  // bloqueaba la 2ª quincena). Se compara contra el período efectivo de cada
+  // pago vigente, así los pagos mensuales viejos también protegen.
+  const yaPagados = (await cargarPeriodosPagados([impulsadoraId])).get(impulsadoraId) ?? [];
+  const choque = yaPagados.find((p) => seSolapan(p, periodo));
+  if (choque) {
+    throw new Error(
+      `Ya hay un pago registrado que cubre esos días (${etiquetaPeriodo(choque)}). Elegí otras fechas.`,
+    );
   }
 
-  const concepto = `Impulsadora ${nombreImpulsadora} — ${etiquetaMes(mesISO)}`;
-  const numeroFactura = `IMP-${mesISO.slice(0, 7)}`;
-  const fechaFactura = new Date().toISOString().slice(0, 10);
+  // Mes completo → "Impulsadora Ana — Julio 2026" (texto idéntico al de los
+  // pagos mensuales de antes). Quincena → "… — 1–15 de julio 2026".
+  const concepto = `Impulsadora ${nombreImpulsadora} — ${etiquetaPeriodo(periodo)}`;
+  // El número lleva el día de inicio: con dos quincenas en un mes, "IMP-2026-07"
+  // se repetiría en las dos.
+  const numeroFactura = `IMP-${desde}`;
+  // hoyPanama(), NO toISOString(): después de las 19:00 de Panamá el ISO en UTC
+  // ya es el día siguiente y el gasto quedaría fechado mañana.
+  const fechaFactura = hoyPanama();
   const porciones = repartirMonto(monto, split);
+
+  // Pre-migración 20260727140000 el rango no se puede guardar: el pago igual se
+  // registra (con impulsadora_mes, como siempre) en vez de reventar. El
+  // concepto ya lleva el período escrito, así que el dato no se pierde.
+  const guardarPeriodo = await hayColumnasPeriodo();
+  const colsPeriodo = guardarPeriodo
+    ? { periodo_desde: desde, periodo_hasta: hasta }
+    : {};
 
   const creadas: string[] = [];
   try {
@@ -287,6 +385,7 @@ export async function registrarPagoImpulsadora(
           proyecto_id: null,
           impulsadora_id: impulsadoraId,
           impulsadora_mes: mesISO,
+          ...colsPeriodo,
           numero_factura: numeroFactura,
           fecha_factura: fechaFactura,
           proveedor: tituloCase(nombreImpulsadora),

@@ -6,13 +6,21 @@ import { useToast } from "@/components/ToastSystem";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { pedirUploadUrl, subirArchivoAStorage } from "./uploadHelpers";
-import { etiquetaMes } from "@/lib/marketing/meses";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  etiquetaPeriodo,
+  mesCompleto,
+  primeraQuincena,
+  segundaQuincena,
+  validarPeriodo,
+} from "@/lib/marketing/periodo";
 import type { ImpulsadoraConEstado } from "@/lib/marketing/types";
 
 interface Props {
   impulsadora: ImpulsadoraConEstado;
-  // Mes inicial "YYYY-MM-01" (default = mes con pago pendiente).
+  // Mes inicial "YYYY-MM-01" (default = mes con pago pendiente). El formulario
+  // arranca con ese mes COMPLETO cargado: pagar el mes entero es 0 clics y
+  // pagar una quincena es 1 (los atajos de abajo).
   mesInicial: string;
   onClose: () => void;
   onSaved: () => void;
@@ -30,16 +38,24 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, onSaved }: Props) {
   const { toast } = useToast();
   useBodyScrollLock(true);
-  // input type="month" usa "YYYY-MM"
-  const [mes, setMes] = useState(mesInicial.slice(0, 7));
+  // Período trabajado: dos fechas "YYYY-MM-DD". Arranca en el mes completo.
+  const inicial = mesCompleto(mesInicial);
+  const [desde, setDesde] = useState(inicial.desde);
+  const [hasta, setHasta] = useState(inicial.hasta);
   const [monto, setMonto] = useState(String(impulsadora.monto_mensual));
   const [comprobante, setComprobante] = useState<ComprobanteSubido | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const mesISO = `${mes}-01`;
   const montoNum = Number(monto) || 0;
+  const errorPeriodo = validarPeriodo(desde, hasta);
+  // Los atajos operan sobre el mes de "desde" (o el mes inicial si está vacío).
+  const mesBase = /^\d{4}-\d{2}/.test(desde) ? desde : mesInicial;
+  const aplicar = (p: { desde: string; hasta: string }) => {
+    setDesde(p.desde);
+    setHasta(p.hasta);
+  };
 
   // Distribución por marca según el split (cuadrando centavos en la última).
   const distribucion = useMemo(() => {
@@ -55,7 +71,9 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
     });
   }, [impulsadora.marcas, montoNum]);
 
-  const concepto = `Impulsadora ${impulsadora.nombre} — ${etiquetaMes(mesISO)}`;
+  const concepto = errorPeriodo
+    ? `Impulsadora ${impulsadora.nombre}`
+    : `Impulsadora ${impulsadora.nombre} — ${etiquetaPeriodo({ desde, hasta })}`;
 
   const onFile = async (file: File | null) => {
     if (!file) return;
@@ -82,7 +100,8 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
     }
   };
 
-  const puedeGuardar = montoNum > 0 && !!comprobante && !subiendo && !guardando;
+  const puedeGuardar =
+    montoNum > 0 && !!comprobante && !errorPeriodo && !subiendo && !guardando;
 
   const guardar = async () => {
     if (!puedeGuardar || !comprobante) return;
@@ -92,7 +111,8 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mes: mesISO,
+          desde,
+          hasta,
           monto: montoNum,
           comprobante: {
             path: comprobante.path,
@@ -122,10 +142,11 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
   // El comprobante ya subido no es un input, así que se bloquea aparte: con un
   // comprobante cargado tampoco cierra por accidente.
   // El hook va ANTES del return condicional (reglas de hooks).
+  const periodoTocado = desde !== inicial.desde || hasta !== inicial.hasta;
   const { panelRef, backdrop } = useFormModalDismiss(
     mounted,
     onClose,
-    !guardando && !subiendo && !comprobante,
+    !guardando && !subiendo && !comprobante && !periodoTocado,
   );
 
   if (!mounted) return null;
@@ -140,7 +161,7 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">
-            Registrar pago — {etiquetaMes(mesISO)}
+            Registrar pago — {impulsadora.nombre}
           </h2>
           <button
             type="button"
@@ -153,30 +174,84 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
         </div>
 
         <div className="p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
-              <input
-                type="month"
-                value={mes}
-                onChange={(e) => setMes(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+          <div>
+            <div className="text-sm font-medium text-gray-700 mb-2">Período trabajado</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label
+                  htmlFor="periodo-desde"
+                  className="block text-xs text-gray-500 mb-1"
+                >
+                  Desde
+                </label>
                 <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 pl-7 pr-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
+                  id="periodo-desde"
+                  type="date"
+                  value={desde}
+                  onChange={(e) => setDesde(e.target.value)}
+                  className="w-full min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none"
                 />
               </div>
+              <div>
+                <label
+                  htmlFor="periodo-hasta"
+                  className="block text-xs text-gray-500 mb-1"
+                >
+                  Hasta
+                </label>
+                <input
+                  id="periodo-hasta"
+                  type="date"
+                  value={hasta}
+                  onChange={(e) => setHasta(e.target.value)}
+                  className="w-full min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                { label: "1ª quincena", p: primeraQuincena(mesBase) },
+                { label: "2ª quincena", p: segundaQuincena(mesBase) },
+                { label: "Mes completo", p: mesCompleto(mesBase) },
+              ].map((a) => (
+                <button
+                  key={a.label}
+                  type="button"
+                  onClick={() => aplicar(a.p)}
+                  className={`min-h-[44px] rounded-md border px-3 text-sm transition ${
+                    desde === a.p.desde && hasta === a.p.hasta
+                      ? "border-black bg-black text-white"
+                      : "border-gray-300 text-gray-700 hover:border-black hover:text-black"
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+            {errorPeriodo && (
+              <p className="mt-2 text-sm text-red-600">{errorPeriodo}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="pago-monto"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Monto
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+              <input
+                id="pago-monto"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={monto}
+                onChange={(e) => setMonto(e.target.value)}
+                className="w-full min-h-[44px] rounded-md border border-gray-300 pl-7 pr-3 py-2 text-base sm:text-sm tabular-nums focus:border-black focus:outline-none"
+              />
             </div>
           </div>
 
