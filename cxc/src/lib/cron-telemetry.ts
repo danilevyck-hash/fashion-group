@@ -285,6 +285,10 @@ export const SEED_TOLERANT_CRONS = [
   // una semana en sembrar la fila). Umbral propio semanal de 8 días en
   // CRON_STALE_HOURS_POR_CRON. Promover a EXPECTED_CRONS con semanas de siembra.
   "catalogos-fotos-resumen",
+  // Vigía de recursos de la base (11 entradas, 01:45→22:45 UTC). Desplegado el
+  // 27-jul-2026: seed-tolerante hasta que lleve días sembrado. Promover a
+  // CRONS_FAIL_CLOSED después (corre 11×/día: nunca debería estar stale).
+  "db-salud",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -539,6 +543,128 @@ export function esSlotRetirado(cronName: string): boolean {
   if (!cronName.startsWith(SWITCH_SYNC_SLOT_PREFIX)) return false;
   if (esMarcaDeSlot(cronName)) return false;
   return !SWITCH_SYNC_SLOT_HEARTBEATS.includes(cronName);
+}
+
+// ─── Registro de crons vigilados (fuente ÚNICA para AMBOS vigías) ────────────
+// GENERALIZACIÓN de esSlotRetirado (26-jul-2026 → 27-jul-2026). Aquel filtro
+// resolvía el caso de un SLOT de switch-sync retirado, porque los slots se
+// derivan de una lista (SWITCH_SYNC_SLOTS) y "no está en la lista" era
+// computable. Un cron de nombre PLANO no tenía lista equivalente: el watchdog
+// Telegram recorre TODAS las filas de cron_heartbeats y no tenía forma de saber
+// si `multifashion-sync` seguía existiendo.
+//
+// INCIDENTE 27-jul-2026: el PR #316 retiró `multifashion-sync` (entrada de
+// vercel.json, route, colateral de la reconciliación y sus filas en las listas
+// de vigilancia) pero su fila quedó en cron_heartbeats con
+// last_success_at = 2026-07-26T05:00:34. A las 26h pasó a stale y el watchdog
+// empezó a mandar "⏰ Watchdog crons — 1 sin success reciente: multifashion-sync"
+// TODOS LOS DÍAS, para siempre, por un cron que ya no existe.
+//
+// La solución es un REGISTRO explícito de los nombres de heartbeat que el
+// sistema conoce hoy. Un nombre fuera del registro no se vigila.
+
+/**
+ * Crons con vigilancia fail-CLOSED: si su fila NO existe en cron_heartbeats se
+ * reportan como caídos (nunca registraron un success). Vivía como
+ * `EXPECTED_CRONS` dentro de health-crons; se mudó acá para que los DOS vigías
+ * lean la MISMA lista — health-crons la recorre para decidir el 503 y el
+ * watchdog Telegram la usa (vía `esCronRetirado`) para decidir a quién ignorar.
+ * Con la lista duplicada podían divergir, y de hecho divergían: `db-salud`
+ * (desplegado el 27-jul-2026) estaba vigilado por el watchdog Telegram —que
+ * recorre todas las filas— y era INVISIBLE para health-crons.
+ */
+export const CRONS_FAIL_CLOSED = [
+  "acs-fidelizacion",
+  "acs-resumen-diario",
+  "backup",
+  "cheques-alert",
+  "cleanup-packing-lists",
+  "cleanup-sessions",
+  "grupo-resumen-mensual",
+  "integrity-check",
+  "joybees-catalogo",
+  // "multifashion-sync" — RETIRADO 26-jul-2026 (tabla multifashion_tickets
+  // congelada, ver CLAUDE.md). Sin cron no hay heartbeat: dejarlo acá haría que
+  // health-crons devolviera 503 todos los días por un cron que ya no existe.
+  "reebok-catalogo",
+  "refresh-clientes-views",
+  "switch-articulos",
+  "switch-reconciliacion",
+  "switch-sync",
+  "sync-clientes-master",
+  "sync-proveedores",
+  "sync-recibos",
+  "sync-utilidad",
+  "tommy-catalogo",
+] as const;
+
+/**
+ * Heartbeats que NO son crons de vercel.json: los escribe una acción MANUAL del
+ * usuario. `sync-now-refresh-vistas` lo registra el botón "Actualizar ahora" de
+ * Ventas (ver src/lib/refresh-vistas.ts) y solo sirve de cooldown de 10 min.
+ *
+ * Nadie los programa → que lleven 26h sin escribirse es lo NORMAL. El
+ * encabezado de refresh-vistas.ts ya decía "IGNORADA por health-crons/watchdog",
+ * y era verdad a medias: health-crons recorre listas (nunca la vio), pero el
+ * watchdog Telegram recorre TODAS las filas y sí habría alertado por ella el día
+ * después de que alguien usara el botón. Bug latente, nunca disparado porque la
+ * fila no existe todavía en producción.
+ */
+export const HEARTBEATS_NO_CRON = ["sync-now-refresh-vistas"] as const;
+
+/** Todo nombre de heartbeat de cron que el sistema conoce hoy (fail-closed +
+ *  seed-tolerantes). NO incluye slots ni marcas: esos se derivan del calendario
+ *  y tienen su propio camino en `esCronRetirado`. */
+export const CRONS_CONOCIDOS: ReadonlySet<string> = new Set<string>([
+  ...CRONS_FAIL_CLOSED,
+  ...SEED_TOLERANT_CRONS,
+]);
+
+/**
+ * ¿`cronName` es un cron RETIRADO — una fila de cron_heartbeats que ya no
+ * corresponde a ningún cron vivo? Generaliza `esSlotRetirado` a los heartbeats
+ * de nombre plano.
+ *
+ * FAIL-OPEN CONTROLADO, y la tensión se resuelve FUERA del runtime:
+ *
+ * La regla ingenua sería "si no está en vercel.json, no alerto" — y sería
+ * PEOR que el bug: quien borrara una entrada de vercel.json por accidente
+ * apagaría la alerta del cron junto con el cron, en silencio. Por eso el
+ * criterio NO mira vercel.json en tiempo de ejecución: mira este registro, que
+ * es una constante de CÓDIGO. Borrar una entrada de vercel.json no encoge el
+ * registro → el cron sigue vigilado → su heartbeat envejece → los DOS vigías
+ * alertan, exactamente como hoy. El fail-closed queda intacto.
+ *
+ * Retirar un cron a propósito son DOS ediciones deliberadas (vercel.json + este
+ * registro), y `src/__tests__/lib/cron-registro.test.ts` exige la biyección
+ * entre ambos: si alguien toca uno solo, el build se pone ROJO. O sea que el
+ * accidente se atrapa en CI, no en silencio en producción.
+ *
+ * Las marcas (#recuperado / #visto) NO son crons retirados: son datos que
+ * escribe la reconciliación y se filtran aparte con `esMarcaDeSlot`.
+ */
+export function esCronRetirado(cronName: string): boolean {
+  if (esMarcaDeSlot(cronName)) return false;
+  if (cronName.startsWith(SWITCH_SYNC_SLOT_PREFIX)) return esSlotRetirado(cronName);
+  if ((HEARTBEATS_NO_CRON as readonly string[]).includes(cronName)) return false;
+  return !CRONS_CONOCIDOS.has(cronName);
+}
+
+/**
+ * ¿Esta fila de cron_heartbeats NO se vigila? Tres razones, todas computables
+ * en código — es el filtro ÚNICO que aplica el watchdog Telegram antes de mirar
+ * la antigüedad:
+ *   (a) es una MARCA de la reconciliación (#recuperado / #visto), no un cron;
+ *   (b) es un heartbeat de acción MANUAL (HEARTBEATS_NO_CRON), que nadie
+ *       programa y por tanto siempre acaba "stale";
+ *   (c) es un cron RETIRADO (ver esCronRetirado).
+ */
+export function esHeartbeatNoVigilable(cronName: string): boolean {
+  return (
+    esMarcaDeSlot(cronName) ||
+    (HEARTBEATS_NO_CRON as readonly string[]).includes(cronName) ||
+    esCronRetirado(cronName)
+  );
 }
 
 /**
@@ -1026,6 +1152,73 @@ export function staleEsPendingRecovery(
   const d = new Date(now);
   const nowHourUtc = d.getUTCHours() + d.getUTCMinutes() / 60;
   return recoveryStillComingToday(cronName, nowHourUtc);
+}
+
+/** Fila mínima de cron_heartbeats que necesita el watchdog. */
+export interface HeartbeatRow {
+  cron_name: string;
+  last_success_at: string | null;
+}
+
+/**
+ * Lista de crons a reportar como caídos, a partir de las filas de
+ * cron_heartbeats. PURA (sin I/O) para poder testear las DOS direcciones: que un
+ * cron retirado NO aparezca y que un cron VIVO sí aparezca.
+ *
+ * La usa el watchdog Telegram de switch-reconciliacion. health-crons recorre
+ * `CRONS_FAIL_CLOSED` + slots + seed-tolerantes (necesita distinguir fresh /
+ * pendingRecovery / slotsCubiertos para su JSON), pero comparte con esta función
+ * el MISMO registro y los MISMOS helpers — que es lo que impide que vuelvan a
+ * divergir.
+ *
+ * Orden de los filtros (cada uno documentado en su helper):
+ *   1. `esHeartbeatNoVigilable` — marcas, heartbeats manuales y crons RETIRADOS.
+ *   2. `cronIsStale` — umbral propio por cron (mensual = 33 días, no 26h).
+ *   3. slot cubierto por una recuperación certificada (#recuperado).
+ *   4. recuperación que aún viene hoy (anti alerta-fantasma).
+ * Y al final se agregan los slots que NUNCA registraron un heartbeat propio y a
+ * los que ya se les venció la gracia de siembra — no tienen fila que recorrer.
+ */
+export function cronsStaleParaAlerta(rows: HeartbeatRow[], now: number = Date.now()): string[] {
+  const beats = new Map<string, string | null>(rows.map((h) => [h.cron_name, h.last_success_at]));
+  const esSlot = (n: string) => n.startsWith(SWITCH_SYNC_SLOT_PREFIX) && !esMarcaDeSlot(n);
+
+  const stale = rows
+    .filter((h) => !esHeartbeatNoVigilable(h.cron_name))
+    .filter((h) => cronIsStale(h.cron_name, h.last_success_at, now))
+    .filter(
+      (h) =>
+        !esSlot(h.cron_name) ||
+        !slotCubiertoPorRecuperacion(
+          h.last_success_at,
+          beats.get(slotRecuperadoName(h.cron_name.slice(SWITCH_SYNC_SLOT_PREFIX.length))),
+          now,
+        ),
+    )
+    .filter(
+      (h) =>
+        !staleEsPendingRecovery(
+          esSlot(h.cron_name) ? "switch-sync" : h.cron_name,
+          h.last_success_at,
+          now,
+        ),
+    )
+    .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
+
+  // Slots que NUNCA registraron un heartbeat propio. Sin esto quedaban
+  // invisibles PARA SIEMPRE en los dos vigías: health-crons los trata como "aún
+  // no sembrados" y este watchdog solo recorre las filas que EXISTEN. Caso
+  // medido: switch-sync:all-0540 sin fila propia desde que se introdujeron los
+  // slots (#239). La marca #visto fecha cuándo la reconciliación lo vio por
+  // primera vez; pasada la gracia, se reporta como caído.
+  for (const s of SWITCH_SYNC_SLOTS) {
+    if (beats.get(slotHeartbeatName(s.slot))) continue;
+    if (!slotNuncaSembradoVencido(beats.get(slotVistoName(s.slot)), now)) continue;
+    stale.push(
+      `${slotHeartbeatName(s.slot)} (nunca registró un success propio; visto desde ${beats.get(slotVistoName(s.slot))})`,
+    );
+  }
+  return stale;
 }
 
 /**

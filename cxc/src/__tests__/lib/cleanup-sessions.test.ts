@@ -5,9 +5,14 @@
 // servidor. Este cron es el único vencimiento que existe, así que sus tres
 // cortes (14d inactividad / 90d vida máxima / 90d retención de revocadas) y su
 // horario tienen que quedar clavados.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import fs from "fs";
 import path from "path";
+
+// cron-telemetry importa supabase-server/telegram al cargarse (I/O de
+// heartbeats). Acá solo se leen constantes, así que se doblan.
+vi.mock("@/lib/supabase-server", () => ({ supabaseServer: { from: vi.fn() } }));
+vi.mock("@/lib/telegram", () => ({ sendTelegramAlert: vi.fn(), shortError: (s: string) => s }));
 
 import {
   DIAS_INACTIVIDAD,
@@ -17,6 +22,7 @@ import {
   clasificarSesion,
   type FilaSesion,
 } from "@/lib/session-retention";
+import { CRONS_FAIL_CLOSED } from "@/lib/cron-telemetry";
 
 const RUTA_CRON = "/api/cron/cleanup-sessions";
 const SCHEDULE_CRON = "30 2 * * *";
@@ -163,16 +169,17 @@ describe("vercel.json — la entrada del cron", () => {
     fs.readFileSync(path.resolve(__dirname, "../../../vercel.json"), "utf8"),
   ) as { crons: { path: string; schedule: string }[] };
 
-  it("está en EXPECTED_CRONS de health-crons (si no, el watchdog no lo vigila)", () => {
-    // Un cron que registra heartbeat pero no está en esa constante es invisible
+  it("está en el registro fail-closed (si no, el watchdog no lo vigila)", () => {
+    // Un cron que registra heartbeat pero no está en el registro es invisible
     // para /api/health-crons y para el watchdog de Telegram: podría dejar de
     // correr durante meses sin que nadie se entere, que es exactamente el
     // agujero que este cron vino a cerrar.
-    const health = fs.readFileSync(
-      path.join(__dirname, "..", "..", "app", "api", "health-crons", "route.ts"),
-      "utf-8",
-    );
-    expect(health).toContain('"cleanup-sessions"');
+    //
+    // La lista era EXPECTED_CRONS dentro de health-crons y se mudó a
+    // CRONS_FAIL_CLOSED (cron-telemetry.ts) el 27-jul-2026, para que los DOS
+    // vigías lean la misma. Se comprueba contra la CONSTANTE, no contra el texto
+    // del archivo: así el candado no depende de dónde viva la lista.
+    expect(CRONS_FAIL_CLOSED).toContain("cleanup-sessions");
   });
 
   it("existe UNA sola entrada para /api/cron/cleanup-sessions", () => {

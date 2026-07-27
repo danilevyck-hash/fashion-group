@@ -44,6 +44,7 @@ import {
   CRON_STALE_HOURS_DEFAULT,
   cronStaleThresholdHours,
   staleEsPendingRecovery,
+  CRONS_FAIL_CLOSED,
   SEED_TOLERANT_CRONS,
   SWITCH_SYNC_SLOTS,
   slotHeartbeatName,
@@ -106,30 +107,13 @@ async function leerHeartbeatsUnaVez(): Promise<Beat[]> {
 
 // Crons que registran heartbeat (deben existir en cron_heartbeats). Un cron de
 // esta lista SIN fila = nunca registró success → se reporta como stale (null).
-const EXPECTED_CRONS = [
-  "acs-fidelizacion",
-  "acs-resumen-diario",
-  "backup",
-  "cheques-alert",
-  "cleanup-packing-lists",
-  "cleanup-sessions",
-  "grupo-resumen-mensual",
-  "integrity-check",
-  "joybees-catalogo",
-  // "multifashion-sync" — RETIRADO 26-jul-2026 (tabla multifashion_tickets
-  // congelada, ver CLAUDE.md). Sin cron no hay heartbeat: dejarlo acá haría que
-  // health-crons devolviera 503 todos los días por un cron que ya no existe.
-  "reebok-catalogo",
-  "refresh-clientes-views",
-  "switch-articulos",
-  "switch-reconciliacion",
-  "switch-sync",
-  "sync-clientes-master",
-  "sync-proveedores",
-  "sync-recibos",
-  "sync-utilidad",
-  "tommy-catalogo",
-] as const;
+//
+// La lista VIVE en cron-telemetry.ts (CRONS_FAIL_CLOSED), no acá: es el mismo
+// registro que usa el watchdog Telegram de switch-reconciliacion para decidir
+// qué filas de cron_heartbeats son de crons vivos y cuáles de crons retirados.
+// Cuando cada vigía tenía su copia, divergían — `db-salud` estaba vigilado por
+// el watchdog Telegram (que recorre todas las filas) y era invisible acá.
+const EXPECTED_CRONS = CRONS_FAIL_CLOSED;
 
 /** Compara tokens en tiempo constante (evita fuga por timing). */
 function tokenOk(provided: string, expected: string): boolean {
