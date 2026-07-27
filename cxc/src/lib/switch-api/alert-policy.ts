@@ -30,6 +30,7 @@ import { shortError } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
 import { logCronError } from "@/lib/cron-telemetry";
 import { mapEmpresaName } from "@/lib/empresa-mapping";
+import { esRunAtascado } from "./sync-log";
 
 /** Qué le pasa AL NEGOCIO si este sync se queda atrás. Traduce el `sync_type`
  *  interno a la consecuencia que Daniel puede ver en la app. */
@@ -137,11 +138,27 @@ export interface EscalationSwitch {
  * mismo par sigue siendo el mismo Switch caído, no corta el streak). `rows`
  * viene ordenado descendente por started_at y sin 'running'. Pura para poder
  * testearla sin DB.
+ *
+ * ── Las filas cerradas por ATASCO no cuentan, ni a favor ni en contra ────────
+ * 🩸 27-jul-2026. Una fila que el candado cerró por atasco (`esRunAtascado`)
+ * lleva `status='error'`, pero no es un error de Switch: es un proceso que
+ * Vercel mató al agotar su `maxDuration` y que nunca llegó a escribir su
+ * desenlace. No dice NADA sobre el proveedor. Contarla como fallo real era
+ * mentir en las DOS direcciones:
+ *   - hacia arriba: sumaba al streak y podía disparar una alerta escalada
+ *     ("falla desde las HH:MM") por un timeout NUESTRO;
+ *   - hacia abajo, y peor: como el texto del atasco NO es silenciable, la fila
+ *     CORTABA el streak. Un 401 real de Switch con una corrida atascada en el
+ *     medio se leía como "primer fallo" y se callaba, corrida tras corrida.
+ * Se SALTEA (`continue`), no se corta: un streak legítimo que la atraviesa
+ * queda intacto. Hay 17 filas así en producción, así que el predicado también
+ * reconoce las redacciones históricas.
  */
 export function computeStreakSilenciable(rows: SyncLogStreakRow[]): { streak: number; sinceIso: string | null } {
   let streak = 0;
   let sinceIso: string | null = null;
   for (const row of rows) {
+    if (esRunAtascado(row.error_message)) continue; // ni fallo ni éxito: no es evidencia
     if (row.status !== "error" || !isSwitchSilenciable(row.error_message)) break;
     streak++;
     sinceIso = row.started_at;

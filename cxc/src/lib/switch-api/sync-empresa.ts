@@ -24,6 +24,7 @@ import type {
 } from "./types";
 import { parseAmount, parseSwitchFecha, parseFechaDMY } from "./parse";
 import { supabaseServer } from "../supabase-server";
+import { clearStaleRunning } from "./sync-log";
 
 import type { SwitchTotalVentasDia } from "./types";
 
@@ -92,31 +93,20 @@ async function finalizeSyncLog(
 
 /**
  * Marca como 'error' los logs de esta empresa+tipo que quedaron atascados en
- * 'running' (un run previo que murió por timeout antes de llamar finalizeSyncLog).
- * >30min sin terminar = no es un run vivo. 🔴-3: con el fan-out por empresa los
- * timeouts ya no deberían pasar, pero esto auto-sana los logs huérfanos que dejó
- * el cron monolítico viejo y cualquier muerte futura.
+ * 'running' (un run previo que murió antes de llamar finalizeSyncLog).
+ *
+ * DELEGA en `clearStaleRunning` (sync-log.ts) — hasta el 27-jul-2026 esto era
+ * una SEGUNDA implementación, con su propio `30 * 60 * 1000` escrito a mano y su
+ * propia copia del mensaje. Dos copias del mismo candado es una que se puede
+ * corregir sola: el día que el techo de la función cambie, la que no se toque
+ * empieza a liberar candados de corridas vivas (o a no liberarlos nunca). Ahora
+ * el corte y el texto salen de un solo lugar.
  */
 export async function markStaleRunningLogs(
   empresaKey: EmpresaKey,
   syncType: "facturas" | "estadocuenta" | "costo",
 ): Promise<void> {
-  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  const { error } = await supabaseServer
-    .from("switch_sync_log")
-    .update({
-      status: "error",
-      finished_at: new Date().toISOString(),
-      error_message:
-        "Run previo atascado en 'running' (probable timeout); cerrado por el siguiente run.",
-    })
-    .eq("empresa_key", empresaKey)
-    .eq("sync_type", syncType)
-    .eq("status", "running")
-    .lt("started_at", cutoff);
-  if (error) {
-    console.error(`[sync ${empresaKey} ${syncType}] no pude limpiar logs stale: ${error.message}`);
-  }
+  await clearStaleRunning(empresaKey, syncType);
 }
 
 async function createSyncLog(

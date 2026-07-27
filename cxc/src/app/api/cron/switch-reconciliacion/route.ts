@@ -84,6 +84,7 @@ import {
   type SlotDesatendido,
 } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
+import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -721,6 +722,25 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const fecha = panamaToday();
   const sinceIso = panamaDayStartIso();
   const expected = expectedPairs();
+
+  // 0−. BARRIDO DEL CANDADO: cerrar las filas 'running' vencidas de CUALQUIER
+  //     (empresa, sync_type). Va PRIMERO, antes de que nada más mire el log.
+  //
+  //     🩸 27-jul-2026. Hasta hoy una fila 'running' huérfana solo la cerraba la
+  //     corrida SIGUIENTE DEL MISMO PAR. Para los pares que corren pocas veces al
+  //     día eso es una eternidad: `catalogo_tommy` corre 12:40 y 17:40 UTC, así
+  //     que la fila que quedó abierta a las 18:52 iba a mantener el candado
+  //     puesto hasta las 12:40 del día siguiente (17 h 48 min), bloqueando
+  //     "Actualizar ahora" mientras tanto. Ahora cualquier pasada de este cron
+  //     (10/14/18 UTC) lo suelta, sea del par que sea.
+  //
+  //     NO afloja la sesión única: el corte es RUNNING_STALE_MIN (30 min), más
+  //     del doble del `maxDuration` de 800 s, o sea que la fila es de un proceso
+  //     que demostrablemente ya no existe. Paso NO FATAL — nunca lanza.
+  const candadosSoltados = await barrerRunningAtascados();
+  if (candadosSoltados) {
+    console.warn(`[cron/switch-reconciliacion] candados atascados liberados: ${candadosSoltados}`);
+  }
 
   // 0. Barrido de SLOTS de switch-sync, anclado en la OCURRENCIA de cada slot
   //    (no en el día). Devuelve:

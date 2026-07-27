@@ -59,7 +59,18 @@ import {
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+
+// 🩸 800, NO 300 (27-jul-2026). Esta ruta corre EXACTAMENTE los mismos syncs que
+// los crons, que declaran 800 s. Con 300 s, "Actualizar ahora" sobre Tommy era
+// una muerte GARANTIZADA, no una carrera: el sync de `catalogo_tommy` mide
+// 427-485 s (p50 485 s sobre 30 días de switch_sync_log) contra un presupuesto de
+// 300 s. Vercel mataba el proceso a los 5 min, la fila 'running' del log quedaba
+// abierta —un proceso muerto no ejecuta `finally`— y el candado del índice único
+// quedaba puesto. Medido el 27-jul: las 3 corridas colgadas de ese día eran
+// `triggered_by='manual'`; las del cron (800 s) salieron todas success.
+// `sync-lock-atascado.test.ts` compara este número contra el de los crons y se
+// pone rojo si vuelven a divergir.
+export const maxDuration = 800; // techo del plan (Pro + Fluid), igual que los crons
 
 function panamaDate(offsetDays = 0): string {
   const now = new Date();

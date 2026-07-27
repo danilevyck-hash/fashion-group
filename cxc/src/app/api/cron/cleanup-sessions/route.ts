@@ -71,6 +71,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 import { verifySession } from "@/lib/session-cookie";
 import { cortesDeLimpieza } from "@/lib/session-retention";
+import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -146,6 +147,24 @@ export async function GET(req: NextRequest) {
     else revocadasPorAntiguedad = data?.length ?? 0;
   }
 
+  // ── Paso 3b: soltar los candados de sync atascados. NO FATAL.
+  //    Va ANTES de la poda a propósito: `podar_switch_sync_log` nunca borra
+  //    filas en status='running' (son las que sostienen el lock), así que una
+  //    fila atascada sobrevivía a la poda para siempre. Cerrarla acá la vuelve
+  //    podable en la corrida siguiente.
+  //
+  //    Este es el segundo hogar del barrido (el otro es switch-reconciliacion,
+  //    10/14/18 UTC). Con los dos, el peor caso para que un candado se suelte
+  //    solo baja de "la próxima corrida del mismo par" —hasta 17 h para
+  //    catalogo_tommy— a unas pocas horas, sin importar de qué par sea.
+  let candadosSoltados: number | null = null;
+  {
+    candadosSoltados = await barrerRunningAtascados();
+    if (candadosSoltados) {
+      console.warn(`[cron/cleanup-sessions] candados de sync atascados liberados: ${candadosSoltados}`);
+    }
+  }
+
   // ── Paso 4: poda de switch_sync_log. NO FATAL a propósito (ver cabecera):
   //    no entra en `errores` ni afecta el heartbeat.
   let syncLogPodadas: number | null = null;
@@ -179,6 +198,7 @@ export async function GET(req: NextRequest) {
         revocadasPorAntiguedad,
         borradas,
         syncLogPodadas,
+        candadosSoltados,
         durationMs,
       },
       { status: 500 },
@@ -186,7 +206,7 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(
-    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas} syncLogPodadas:${syncLogPodadas ?? "n/a"}`,
+    `[cron/cleanup-sessions] ok in ${durationMs}ms — inactividad:${revocadasPorInactividad} antiguedad:${revocadasPorAntiguedad} borradas:${borradas} syncLogPodadas:${syncLogPodadas ?? "n/a"} candadosSoltados:${candadosSoltados ?? "n/a"}`,
   );
   await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({
@@ -195,6 +215,7 @@ export async function GET(req: NextRequest) {
     revocadasPorAntiguedad,
     borradas,
     syncLogPodadas,
+    candadosSoltados,
     cortes,
     durationMs,
   });
