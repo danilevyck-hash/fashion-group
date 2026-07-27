@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/api-auth";
 import { requireRole } from "@/lib/requireRole";
+import { catalogoRoles } from "@/lib/catalogo/roles";
 import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
@@ -27,9 +28,10 @@ export const dynamic = "force-dynamic";
 // catálogo debe reflejar al instante el sync y el toggle "Ocultar del catálogo".
 export const fetchCache = "force-no-store";
 
-// Roles del módulo Catálogos (admin/secretaria gestionan; vendedor/bodega
-// consultan el catálogo interno). El catálogo PÚBLICO usa /[marca]/public.
-const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
+// Roles del módulo Catálogos (admin/secretaria gestionan vía requireAdmin;
+// vendedor/bodega solo consultan el catálogo interno). Fuente única en
+// lib/catalogo/roles. El catálogo PÚBLICO usa /[marca]/public.
+const CATALOGO_ROLES = catalogoRoles();
 
 // Allow-list de columnas editables a mano. TODO lo demás (active, existencia,
 // disponibilidad, stock, price…) lo maneja el cron de catálogo y se RECHAZA

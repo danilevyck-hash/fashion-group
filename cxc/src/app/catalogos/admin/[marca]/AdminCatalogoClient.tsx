@@ -18,6 +18,7 @@ import PedidosTab, { type UnifiedPedido } from "./PedidosTab";
 import { FaltanFotoTarjetasTab, CatalogoCompletoTab } from "./ProductosTarjetas";
 import { FaltanFotoBatchTab, ProductosBatchListTab, ImportarTab } from "./ProductosBatch";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
 
@@ -45,7 +46,8 @@ export default function AdminCatalogoClient({ marca }: { marca: MarcaUiKey }) {
 
 function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
-  const { authChecked } = useAuth({ moduleKey: "catalogos", allowedRoles: ["admin"] });
+  // Administrar catálogos = admin + secretaria (fuente única en lib/catalogo/roles).
+  const { authChecked } = useAuth({ moduleKey: "catalogos", allowedRoles: catalogoAdminRoles() });
 
   const [tab, setTab] = useUrlState<Tab>("tab", "faltan-foto");
   const [toast, setToast] = useState<string | null>(null);

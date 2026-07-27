@@ -39,6 +39,7 @@ import {
 import { checkPedidoRateLimit as tommyCheckPedidoRateLimit } from "@/lib/tommy-pedido-rate-limit";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { STORAGE_PREFIX } from "@/lib/catalogos/variantes-paths";
+import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 
 export type MarcaKey = "reebok" | "joybees" | "tommy";
 
@@ -171,9 +172,12 @@ export interface MarcaConfig {
   listaFiltraDeleted: boolean;
   /** QUIRK 2: Reebok aún acepta el rol legacy 'cliente' al crear pedidos. */
   createRoles: string[];
-  /** QUIRK 3: upload con roles y Storage distintos por marca (Reebok:
-   *  admin+secretaria → Storage del proyecto Reebok, path products/;
-   *  Joybees: solo admin → Storage del proyecto principal, path joybees/). */
+  /** QUIRK 3 (resuelto en roles el 27-jul-2026): el Storage sigue siendo
+   *  distinto por marca (Reebok → proyecto Reebok, path products/; Joybees y
+   *  Tommy → proyecto principal, paths joybees/ y tommy/), pero los ROLES ya
+   *  no: las 3 marcas usan CATALOGO_ADMIN_ROLES (admin + secretaria). Antes
+   *  Joybees y Tommy eran solo-admin, y eso dejaba a la secretaria sin poder
+   *  subir fotos en 2 de las 3 marcas. */
   upload: { roles: string[]; storage: "marca" | "main"; pathPrefix: string };
 
   // ── Presentación / mensajes ──
@@ -277,7 +281,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "REEBOK — Pedidos",
     listaFiltraDeleted: false, // quirk heredado, unificar con OK de Daniel
     createRoles: ["admin", "secretaria", "vendedor", "cliente"], // quirk heredado ('cliente' legacy)
-    upload: { roles: ["admin", "secretaria"], storage: "marca", pathPrefix: STORAGE_PREFIX.reebok }, // quirk heredado
+    upload: { roles: catalogoAdminRoles(), storage: "marca", pathPrefix: STORAGE_PREFIX.reebok },
     telegramEmoji: "🛒",
     switchDirectorioLabel: "Active Shoes",
     sendOrder: {
@@ -360,7 +364,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "JOYBEES — Pedidos",
     listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
-    upload: { roles: ["admin"], storage: "main", pathPrefix: STORAGE_PREFIX.joybees }, // quirk heredado
+    upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.joybees },
     telegramEmoji: "🐝",
     switchDirectorioLabel: "Joystep",
     sendOrder: {
@@ -445,7 +449,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     exportTitulo: "TOMMY HILFIGER — Pedidos",
     listaFiltraDeleted: true,
     createRoles: ["admin", "secretaria", "vendedor"],
-    upload: { roles: ["admin"], storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
+    upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.tommy },
     telegramEmoji: "🔵",
     switchDirectorioLabel: "Fashion Shoes",
     sendOrder: {
