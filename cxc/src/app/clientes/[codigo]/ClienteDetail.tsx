@@ -275,6 +275,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             <thead>
               <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                 <th className="py-2 font-normal">Empresa</th>
+                {/* Ventas SIN ITBMS, cobros y saldo CON ITBMS. No es un
+                    descuido: son dos preguntas distintas y cada una se responde
+                    con la cifra que le toca. Ver la nota al pie de la tabla. */}
                 <th className="py-2 font-normal text-right">Ventas YTD</th>
                 <th className="py-2 font-normal text-right">Cobrado YTD</th>
                 <th className="py-2 font-normal text-right">CXC actual</th>
@@ -329,6 +332,16 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               </tr>
             </tbody>
           </table>
+          {/* Por qué "Ventas" y "CXC" no cuadran entre sí — la pregunta que se
+              hace cualquiera al ver las dos cifras juntas. Daniel lo dijo así:
+              *"cxc si se muestra con itbms, porq es lo que tengo q cobrar"*.
+              Dicho una sola vez, al pie, en vez de repetirlo por columna. */}
+          <p className="mt-3 text-xs leading-relaxed text-gray-400">
+            <span className="font-medium text-gray-500">Ventas</span> va sin ITBMS — el impuesto se cobra
+            para el fisco, no es venta de la empresa. <span className="font-medium text-gray-500">Cobrado</span> y{" "}
+            <span className="font-medium text-gray-500">CXC</span> van con ITBMS, porque es la plata que
+            entra y la que falta cobrar. Por eso las cifras no cuadran entre sí.
+          </p>
         </section>
 
         {/* Últimas guías del cliente (vínculo por cliente_codigo). Tappable al detalle. */}

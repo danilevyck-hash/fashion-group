@@ -15,7 +15,7 @@ export type SortSheetDir = "asc" | "desc";
 
 const OPTIONS: { key: SortSheetKey; label: string }[] = [
   { key: "ultima",  label: "Última compra" },
-  { key: "ytd",     label: "Compras YTD" },
+  { key: "ytd",     label: "Compras del año" },
   { key: "delta",   label: "Δ vs año anterior" },
   { key: "nombre",  label: "Cliente (nombre)" },
   { key: "empresa", label: "Empresa" },

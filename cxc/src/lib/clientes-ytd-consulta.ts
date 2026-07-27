@@ -12,7 +12,7 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { ventanaAnioPanama, montoFirmado, aCentavos } from "@/lib/clientes-ytd";
 
 interface Par { codigo: string; empresa_key: string; cliente_switch_id: number | null }
-interface FilaFactura { empresa_key: string; cliente_switch_id: number; fecha: string; tipo_comprobante: string; total: number | string }
+interface FilaFactura { empresa_key: string; cliente_switch_id: number; fecha: string; tipo_comprobante: string; subtotal_descuento: number | string }
 
 /**
  * Compras del año de VARIOS clientes, en 2 consultas (no una por cliente).
@@ -66,7 +66,7 @@ export async function comprasDelAnioPorCodigo(
     (pedirCount, from, to) =>
       supabaseServer
         .from("switch_facturas")
-        .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total", pedirCount ? { count: "exact" } : {})
+        .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, subtotal_descuento", pedirCount ? { count: "exact" } : {})
         .in("cliente_switch_id", [...ids])
         .in("empresa_key", [...B2B_EMPRESA_KEYS])
         .gte("fecha", desde)
@@ -80,7 +80,7 @@ export async function comprasDelAnioPorCodigo(
     // otra empresa pertenece a otro cliente sumaría acá.
     const codigo = codigoDePar.get(`${f.empresa_key}|${f.cliente_switch_id}`);
     if (!codigo) continue;
-    resultado.set(codigo, (resultado.get(codigo) ?? 0) + montoFirmado(f.tipo_comprobante, f.total));
+    resultado.set(codigo, (resultado.get(codigo) ?? 0) + montoFirmado(f.tipo_comprobante, f.subtotal_descuento));
   }
 
   for (const [codigo, monto] of resultado) resultado.set(codigo, aCentavos(monto));

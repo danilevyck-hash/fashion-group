@@ -284,6 +284,8 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
 }
 
 interface ClientesEmpresaRow {
+  /** Sólo existe tras la migración 20260727230000. Ver el mapeo más abajo. */
+  es_del_grupo?: boolean | null;
   cliente_id: string | null;
   cliente_nombre: string | null;
   cliente_codigo: string | null;
@@ -404,6 +406,13 @@ export async function fetchClientes({
       // Huérfano = no match en clientes_master (cliente_id NULL en la view).
       // En la UI estos rows se colapsan en la fila sintética "Otros clientes".
       isOrphan: r.cliente_id == null,
+      // Empresa del propio grupo comprándole a otra empresa del grupo. Es una
+      // venta REAL y suma en los totales como cualquier otra — la marca es sólo
+      // para que se vea de un vistazo cuáles son de casa. Llega `undefined`
+      // mientras la migración 20260727230000 no esté corrida, y también en el
+      // modo "año cerrado" (RPC clientes_anio, que no tiene la columna): en
+      // ambos casos simplemente no se muestra la etiqueta.
+      esDelGrupo: r.es_del_grupo === true,
     };
   });
 

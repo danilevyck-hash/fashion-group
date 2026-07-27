@@ -79,7 +79,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     cids.length > 0
       ? supabaseServer
           .from("switch_facturas")
-          .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total")
+          .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, subtotal_descuento")
           .in("cliente_switch_id", cids)
           .gte("fecha", anioDesde)
           .lt("fecha", anioHasta)
@@ -106,17 +106,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .lt("fecha", anioHasta),
   ]);
 
-  // Ventas YTD (base CON ITBMS = total), neto firmado por tipo. Las tres piezas
+  // Ventas YTD (base SIN ITBMS = subtotal_descuento), neto firmado por tipo. Las tres piezas
   // del cálculo — ventana del año, día-Panamá y signo por comprobante — salen de
   // `lib/clientes-ytd`, el MISMO módulo que usa el listado.
   const ventasMap = new Map<string, number>();
   for (const r of (ventasRes.data ?? []) as {
     empresa_key: string; cliente_switch_id: number; fecha: string;
-    tipo_comprobante: string; total: number | string;
+    tipo_comprobante: string; subtotal_descuento: number | string;
   }[]) {
     if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
     if (!r.fecha || ymdPanama(r.fecha) < yearStart) continue;
-    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + montoFirmado(r.tipo_comprobante, r.total));
+    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + montoFirmado(r.tipo_comprobante, r.subtotal_descuento));
   }
 
   // Última factura: la lista viene ordenada desc → la primera fila (pairSet match)
