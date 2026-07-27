@@ -40,23 +40,20 @@ export default async function ChequesPage() {
     redirect("/");
   }
 
-  // 2. Queries paralelas — replica exacto de /api/cheques + extracción de nombres
-  const [chequesRes, dirRes] = await Promise.all([
-    supabaseServer
-      .from("cheques")
-      .select("*")
-      .eq("deleted", false)
-      .order("fecha_deposito", { ascending: true }),
-    supabaseServer
-      .from("directorio_clientes")
-      .select("nombre")
-      .eq("deleted", false),
-  ]);
+  // 2. Query — replica exacta de /api/cheques.
+  //
+  // Ya NO se lee `directorio_clientes`. Ese select alimentaba el autocompletar
+  // viejo del formulario, que era el módulo Directorio legacy: 33 nombres, sin
+  // código. El selector nuevo es el MISMO de Guías y busca contra
+  // `clientes_master` (149 clientes vivos) por `/api/clientes`, o sea el
+  // directorio de verdad, así que la consulta quedó sin lectores.
+  const chequesRes = await supabaseServer
+    .from("cheques")
+    .select("*")
+    .eq("deleted", false)
+    .order("fecha_deposito", { ascending: true });
 
   const cheques = (chequesRes.data || []) as Cheque[];
-  const dirClientes = (dirRes.data || [])
-    .map((r) => r.nombre)
-    .filter(Boolean) as string[];
 
-  return <ChequesClient initialData={{ cheques, dirClientes }} />;
+  return <ChequesClient initialData={{ cheques }} />;
 }

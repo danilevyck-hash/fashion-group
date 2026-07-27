@@ -20,6 +20,20 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+/**
+ * La fecha de depósito es OBLIGATORIA en la pantalla pero el servidor no la
+ * miraba: un POST sin ella (o con basura) entraba igual y dejaba el cheque sin
+ * vencimiento — invisible para el calendario, para los avisos de "vence hoy" y
+ * para el cron que alerta los vencimientos. Se exige el mismo formato que
+ * produce el `<input type="date">`.
+ */
+function fechaValida(v: unknown): v is string {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  // Descarta fechas con forma correcta pero inexistentes (2026-02-31).
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
+
 export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !CHEQUES_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
@@ -27,6 +41,7 @@ export async function POST(req: NextRequest) {
   const { cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
 
   if (typeof cliente !== "string" || !cliente.trim()) return NextResponse.json({ error: "cliente requerido" }, { status: 400 });
+  if (!fechaValida(fecha_deposito)) return NextResponse.json({ error: "fecha de depósito requerida" }, { status: 400 });
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
   if (typeof vendedor !== "string" || !vendedor.trim()) return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
   if (typeof empresa !== "string" || !getCompany(empresa)) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });

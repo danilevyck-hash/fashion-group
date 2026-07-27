@@ -28,7 +28,7 @@
 // tarjetas, igual que el iPhone; en horizontal sí sobra (752-1094 px) y se queda
 // la tabla. Lo táctil se resuelve aparte, por tipo de puntero — ver CTRL_BASE.
 //  2. **Cliente cerrado contra el directorio, con "Otro" explícito** (ver
-//     ClientePicker.tsx). Escribir a mano dejó de ser un accidente.
+//     src/components/ClientePicker.tsx). Escribir a mano dejó de ser un accidente.
 //  3. **Empresa cerrada: las 8 del grupo, en un `<select>` nativo.** El
 //     combobox escribible se fue. En iOS un `<select>` abre la rueda del
 //     sistema: 44 px garantizados por el sistema operativo y cero componente
@@ -52,7 +52,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
-import ClientePicker from "./ClientePicker";
+import ClientePicker from "@/components/ClientePicker";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, opcionesEmpresa } from "./guia-form-logic";
 

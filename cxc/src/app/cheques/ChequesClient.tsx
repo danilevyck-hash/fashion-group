@@ -7,17 +7,16 @@ import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, ConfirmDeleteModal, Modal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
-import Drawer from "@/components/Drawer";
+import ChequeFormModal, { chequeFormVacio, type ChequeFormValues } from "./components/ChequeFormModal";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmt, fmtDate } from "@/lib/format";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 
-import { ALL_COMPANIES, getCompanyDisplay } from "@/lib/companies";
+import { getCompanyDisplay } from "@/lib/companies";
 import { getVencenSemanaRange } from "@/lib/cheques-dates";
-import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { borrarBorrador } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import { useOnline } from "@/lib/OnlineContext";
@@ -26,7 +25,6 @@ import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
 export interface ChequesInitialData {
   cheques: Cheque[];
-  dirClientes: string[];
 }
 
 export interface Cheque {
@@ -139,59 +137,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
   const [motivoRebote, setMotivoRebote] = useState("");
 
-  // Directorio autocomplete
-  const [dirClientes, setDirClientes] = useState<string[]>(initialData.dirClientes);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  // Form fields
-  const [fCliente, setFCliente] = useState("");
-  const [fEmpresa, setFEmpresa] = useState("");
-  const [fNumero, setFNumero] = useState("");
-  const [fMonto, setFMonto] = useState("");
-  const [fFecha, setFFecha] = useState(todayStr());
-  const [fNotas, setFNotas] = useState("");
-  const [fVendedor, setFVendedor] = useState("");
-  const [vendedores, setVendedores] = useState<string[]>(() => {
-    if (typeof window === "undefined") return ["Rey", "Edwin"];
-    try {
-      const stored = localStorage.getItem("fg_cheque_vendedores");
-      if (stored) {
-        const parsed = JSON.parse(stored) as string[];
-        // Ensure defaults are always present
-        const merged = [...new Set(["Rey", "Edwin", ...parsed])];
-        return merged;
-      }
-    } catch {}
-    return ["Rey", "Edwin"];
-  });
-  const [showAddVendedor, setShowAddVendedor] = useState(false);
-  const [newVendedorName, setNewVendedorName] = useState("");
+  // Valores con los que se abre el formulario. El estado de los campos vive
+  // DENTRO de ChequeFormModal: acá solo se dice con qué arranca.
+  const [formInitial, setFormInitial] = useState<ChequeFormValues>(chequeFormVacio);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [touchedCheque, setTouchedCheque] = useState<Record<string, boolean>>({});
-  function handleChequeBlur(field: string) { setTouchedCheque((prev) => ({ ...prev, [field]: true })); }
-  function chequeFieldError(field: string, value: string) { return touchedCheque[field] && !value.trim(); }
-
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
-
-  // Draft auto-save for new cheque form
-  const chequeDraftData = useMemo(() => ({
-    cliente: fCliente, empresa: fEmpresa, numero: fNumero, monto: fMonto, fecha: fFecha,
-  }), [fCliente, fEmpresa, fNumero, fMonto, fFecha]);
-  const isChequeDraftEmpty = useCallback((d: typeof chequeDraftData) => {
-    return !d.cliente && !d.empresa && !d.numero && !d.monto;
-  }, []);
-  const { draft: chequeDraft, hasDraft: hasChequeDraft, clearDraft: clearChequeDraft, draftTimeAgo: chequeDraftTimeAgo } = useDraftAutoSave("cheque", chequeDraftData, isChequeDraftEmpty);
-  function restoreChequeDraft() {
-    if (!chequeDraft) return;
-    setFCliente(chequeDraft.cliente || "");
-    setFEmpresa(chequeDraft.empresa || "");
-    setFNumero(chequeDraft.numero || "");
-    setFMonto(chequeDraft.monto || "");
-    setFFecha(chequeDraft.fecha || todayStr());
-    clearChequeDraft();
-  }
 
   const { show: showContextMenu } = useContextMenu();
 
@@ -274,7 +226,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       return;
     }
     loadCheques();
-    fetch("/api/directorio").then(r => r.ok ? r.json() : []).then(d => setDirClientes((d || []).map((c: { nombre: string }) => c.nombre))).catch(() => {});
   }, [authChecked, loadCheques, initialData.cheques]);
 
   // ESC cierra el modal de "ver todos" los cheques del día
@@ -345,24 +296,45 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFVendedor(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({}); setShowAddVendedor(false); setNewVendedorName("");
+    setFormInitial(chequeFormVacio()); setEditingId(null); setEditingEstado(null); setError(null);
   }
 
   function startEdit(c: Cheque) {
-    setFCliente(c.cliente); setFEmpresa(c.empresa); setFNumero(c.numero_cheque);
-    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFVendedor(c.vendedor || ""); setEditingId(c.id); setEditingEstado(c.estado); setShowForm(true);
+    // El cheque guardado manda: su cliente y su vendedor se muestran tal cual
+    // están, aunque el vendedor ya no figure en la lista de hoy.
+    setFormInitial({
+      cliente: c.cliente,
+      empresa: c.empresa,
+      numero_cheque: c.numero_cheque,
+      monto: String(c.monto),
+      fecha_deposito: c.fecha_deposito,
+      notas: c.notas || "",
+      vendedor: c.vendedor || "",
+    });
+    setEditingId(c.id); setEditingEstado(c.estado); setError(null); setShowForm(true);
   }
 
-  async function saveCheque() {
-    if (!fCliente || !fEmpresa || !fNumero || !fMonto || !fFecha || !fVendedor) { setError("Completa todos los campos obligatorios."); return; }
-    if (parseFloat(fMonto) <= 0) { setError("El monto debe ser mayor a 0."); return; }
+  function cerrarForm() { resetForm(); setShowForm(false); }
+
+  async function saveCheque(v: ChequeFormValues) {
+    if (!v.cliente.trim() || !v.empresa || !v.numero_cheque.trim() || !v.monto || !v.fecha_deposito || !v.vendedor.trim()) {
+      setError("Completa todos los campos obligatorios."); return;
+    }
+    if (parseFloat(v.monto) <= 0) { setError("El monto debe ser mayor a 0."); return; }
     setSaving(true); setError(null);
-    const body = { cliente: fCliente, empresa: fEmpresa, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, vendedor: fVendedor };
+    const body = { cliente: v.cliente.trim(), empresa: v.empresa, numero_cheque: v.numero_cheque.trim(), monto: parseFloat(v.monto), fecha_deposito: v.fecha_deposito, notas: v.notas, vendedor: v.vendedor.trim() };
     try {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) { clearChequeDraft(); resetForm(); setShowForm(false); loadCheques(); showToast(editingId ? "Listo, cheque actualizado" : "Listo, cheque guardado"); }
+      if (res.ok) {
+        // El borrador se borra desde acá: el modal (que es quien lo escribe) se
+        // desmonta al cerrar, y si no, ofrecería restaurar lo que ya se guardó.
+        borrarBorrador("cheque");
+        const editaba = editingId;
+        cerrarForm(); loadCheques();
+        showToast(editaba ? "Listo, cheque actualizado" : "Listo, cheque guardado");
+      }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
@@ -656,157 +628,17 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
 
       {chequeSuggestion && <SuggestionCard suggestion={chequeSuggestion} onDismiss={dismissCheque} />}
 
-      {/* Form (Drawer) */}
-      <Drawer
+      {/* Formulario — VENTANA CENTRADA (antes era un panel lateral). */}
+      <ChequeFormModal
         open={showForm}
-        onClose={() => { resetForm(); setShowForm(false); }}
-        title={editingId ? "Editar Cheque" : "Nuevo Cheque"}
-        footer={
-          /* Guardar medía 41 de alto y Cancelar 59×21 (texto suelto, el peor
-             target del panel). Ambos a 44 de alto; Cancelar además con
-             min-w-[44px] y -mx-2 para no desplazar el pie del panel. */
-          <div className="flex items-center gap-4">
-            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexión" : undefined} className="bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar Cheque"}</button>
-            <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] min-w-[44px] px-2 -mx-2 inline-flex items-center justify-center">Cancelar</button>
-          </div>
-        }
-      >
-        <div className="overflow-visible">
-          {hasChequeDraft && !editingId && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between gap-4">
-              <p className="text-sm text-amber-800">Tienes un borrador guardado de {chequeDraftTimeAgo}. ¿Restaurar?</p>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <button onClick={restoreChequeDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
-                <button onClick={clearChequeDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
-              </div>
-            </div>
-          )}
-          <div className="grid grid-cols-1 gap-y-4 overflow-visible">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
-              <div className="relative">
-                {/* text-base en mobile (text-sm = 14px hace que Safari haga zoom
-                    al enfocar el campo). Regla para TODOS los inputs del panel. */}
-                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
-                {showSuggestions && fCliente.length >= 2 && (() => {
-                  const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
-                  return matches.length > 0 ? (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg z-50 mt-1">
-                      {matches.map(n => (
-                        <button key={n} onMouseDown={() => { setFCliente(n); setShowSuggestions(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">{n}</button>
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-              {chequeFieldError("cliente", fCliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
-              <SearchableSelect
-                value={fEmpresa}
-                onChange={setFEmpresa}
-                options={ALL_COMPANIES.map((c) => ({ value: c.key, label: c.name }))}
-                placeholder="Seleccionar..."
-                ariaLabel="Empresa"
-                onBlur={() => handleChequeBlur("empresa")}
-                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`}
-              />
-              {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
-              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
-              {chequeFieldError("numero", fNumero) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
-              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
-              {chequeFieldError("monto", fMonto) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
-              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`} />
-              {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1 relative">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Vendedor <span className="text-red-500">*</span></label>
-              {!showAddVendedor ? (
-                <SearchableSelect
-                  value={fVendedor}
-                  onChange={setFVendedor}
-                  options={vendedores.map((v) => ({ value: v, label: v }))}
-                  placeholder="Seleccionar vendedor"
-                  ariaLabel="Vendedor"
-                  onBlur={() => handleChequeBlur("vendedor")}
-                  actionLabel="+ Agregar vendedor"
-                  onAction={() => setShowAddVendedor(true)}
-                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition`}
-                />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newVendedorName}
-                    onChange={(e) => setNewVendedorName(e.target.value)}
-                    placeholder="Nombre del vendedor"
-                    className="border-b border-gray-200 py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition flex-1"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && newVendedorName.trim()) {
-                        const name = newVendedorName.trim();
-                        if (!vendedores.includes(name)) {
-                          const updated = [...vendedores, name];
-                          setVendedores(updated);
-                          try { localStorage.setItem("fg_cheque_vendedores", JSON.stringify(updated)); } catch {}
-                        }
-                        setFVendedor(name);
-                        setNewVendedorName("");
-                        setShowAddVendedor(false);
-                      } else if (e.key === "Escape") {
-                        setNewVendedorName("");
-                        setShowAddVendedor(false);
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const name = newVendedorName.trim();
-                      if (name) {
-                        if (!vendedores.includes(name)) {
-                          const updated = [...vendedores, name];
-                          setVendedores(updated);
-                          try { localStorage.setItem("fg_cheque_vendedores", JSON.stringify(updated)); } catch {}
-                        }
-                        setFVendedor(name);
-                      }
-                      setNewVendedorName("");
-                      setShowAddVendedor(false);
-                    }}
-                    className="text-xs text-black font-medium hover:text-gray-600 transition min-h-[44px] px-2"
-                  >
-                    Agregar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setNewVendedorName(""); setShowAddVendedor(false); }}
-                    className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-1"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-              {chequeFieldError("vendedor", fVendedor) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Notas</label>
-              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-3 text-base sm:text-sm outline-none bg-transparent focus:border-black transition resize-none" />
-            </div>
-          </div>
-          {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-        </div>
-      </Drawer>
+        editingId={editingId}
+        initial={formInitial}
+        onClose={cerrarForm}
+        onSave={saveCheque}
+        saving={saving}
+        isOnline={isOnline}
+        error={error}
+      />
 
       {/* View toggle */}
       <div className="flex items-center gap-4 mb-6">
