@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { catalogoTag, CATALOGO_PUBLICO_TTL_SEGUNDOS } from "@/lib/catalogo/cache";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -49,48 +50,62 @@ async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
   if (!supabase) throw new ErrorCatalogo("Not configured");
 
   if (cfg.publicCatalog.conInventario) {
-    // Columnas explícitas (no select("*")): catálogo público — blinda contra
-    // fugas de columnas futuras agregadas a products.
-    const { data: products, error: pErr } = await supabase
-      .from(cfg.productsTable)
-      .select(cfg.publicCatalog.cols)
-      .eq("active", true)
-      .order("created_at", { ascending: false });
+    // ⚠️ PAGINADO (26-jul-2026): las dos lecturas se cortaban en 1.000 filas sin
+    // error. `inventory` es una fila POR PRODUCTO Y TALLA, así que es la primera
+    // en pasarse — y truncarla es el peor síntoma de todos: el producto sí
+    // aparece en la tienda pero sin ninguna talla, o sea **Agotado** a la vista
+    // del cliente. Encima el resultado se guarda en `unstable_cache`, así que la
+    // versión truncada quedaba servida hasta la próxima invalidación.
+    // El orden de NEGOCIO se conserva intacto y se le agrega `id` como
+    // desempate: paginar exige un orden único (con filas empatadas, PostgREST
+    // puede repetir o saltear entre páginas), pero cambiar la columna de orden
+    // cambiaría el orden en que el cliente ve los productos. Compuesto = las dos
+    // cosas.
+    const products = await leerTodoPaginado<unknown>(
+      `${cfg.productsTable} (catálogo público ${cfg.marca})`,
+      (pedirCount, desde, hasta) =>
+        supabase
+          .from(cfg.productsTable)
+          .select(cfg.publicCatalog.cols, pedirCount ? { count: "exact" } : {})
+          .eq("active", true)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(desde, hasta),
+    );
 
-    if (pErr) {
-      console.error(pErr);
-      throw new ErrorCatalogo("Error al cargar productos");
-    }
+    const inventory = await leerTodoPaginado<unknown>(
+      `inventory (catálogo público ${cfg.marca})`,
+      (pedirCount, desde, hasta) =>
+        supabase
+          .from("inventory")
+          .select("product_id,size,quantity", pedirCount ? { count: "exact" } : {})
+          .order("size")
+          .order("id", { ascending: true })
+          .range(desde, hasta),
+    );
 
-    const { data: inventory, error: iErr } = await supabase
-      .from("inventory")
-      .select("product_id,size,quantity")
-      .order("size");
-
-    if (iErr) {
-      console.error(iErr);
-      throw new ErrorCatalogo("Error al cargar inventario");
-    }
-
-    return { products: products || [], inventory: inventory || [] };
+    return { products, inventory };
   }
 
   // Columnas explícitas (no select("*")): endpoint público — blinda contra
   // fugas si se agregan columnas internas (ej. costo). Son exactamente los
   // campos que consume la página pública (incl. stock e is_regalia).
-  const { data: products, error } = await supabase
-    .from(cfg.productsTable)
-    .select(cfg.publicCatalog.cols)
-    .eq("active", true)
-    .order("category")
-    .order("name");
+  // Paginado con el mismo criterio: orden de negocio (category, name) + `id`
+  // como desempate único para que la paginación no pierda ni repita filas.
+  const products = await leerTodoPaginado<unknown>(
+    `${cfg.productsTable} (catálogo público ${cfg.marca})`,
+    (pedirCount, desde, hasta) =>
+      supabase
+        .from(cfg.productsTable)
+        .select(cfg.publicCatalog.cols, pedirCount ? { count: "exact" } : {})
+        .eq("active", true)
+        .order("category")
+        .order("name")
+        .order("id", { ascending: true })
+        .range(desde, hasta),
+  );
 
-  if (error) {
-    console.error(error);
-    throw new ErrorCatalogo("Error al cargar productos");
-  }
-
-  return { products: products || [] };
+  return { products };
 }
 
 /** La misma lectura, cacheada bajo la tag de la marca. `marca` viaja como

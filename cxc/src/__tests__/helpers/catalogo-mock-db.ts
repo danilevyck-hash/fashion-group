@@ -44,7 +44,15 @@ const CHAIN_METHODS = [
 ] as const;
 
 export function makeChain(result: QueryResult = { data: null, error: null }): Chain {
-  const normalized = { data: null, error: null, count: null, ...result };
+  // `count` por defecto = el largo de `data`, como haría PostgREST ante un
+  // `select(..., { count: "exact" })` que devuelve todas las filas en una
+  // página. Sin esto el doble mentía: devolvía filas con count null, que es la
+  // firma de una lectura NO verificable — y los lectores paginados (que exigen
+  // COUNT para poder garantizar que no los truncaron) fallaban en el arnés
+  // aunque en producción reciban el count perfectamente. Un test puede seguir
+  // fijando `count` a mano para simular justamente ese truncado.
+  const countPorDefecto = Array.isArray(result.data) ? result.data.length : null;
+  const normalized = { data: null, error: null, count: countPorDefecto, ...result };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = { _calls: {} as Record<string, unknown[][]>, _result: normalized };
   for (const m of CHAIN_METHODS) {

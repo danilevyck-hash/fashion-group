@@ -34,6 +34,7 @@
  * Tolerante a fallos: una empresa falla → las demás siguen.
  */
 
+import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
@@ -203,22 +204,57 @@ type ImpuestoMap = Map<number, { fecha: string; imp: number }[]>;
  *  último día del rango emitida en la noche quedaba fuera y su retención no se
  *  clasificaba. El rango se ancla a medianoche Panamá (offset -05:00 explícito)
  *  y la fecha del doc se normaliza a día Panamá (fechaPanamaDe), que es el
- *  mismo calendario que la fecha de los recibos del API. */
-async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toExcl: string): Promise<ImpuestoMap> {
+ *  mismo calendario que la fecha de los recibos del API.
+ *
+ *  ⚠️ PAGINADO (26-jul-2026): esta lectura tenía el MISMO defecto que
+ *  leerMesGuardado — `.range(0, 99999)` contra un `db-max-rows` de 1000 devuelve
+ *  1.000 filas SIN error. Medido: american_classic tiene 3.904 facturas en la
+ *  ventana y el select traía 1.000; las 2.904 invisibles no podían clasificar
+ *  ninguna retención, así que un recibo de retención de ITBMS quedaba marcado
+ *  como COBRO REAL y contaminaba el "último pago" del CXC y la comisión sobre
+ *  cobro. Hoy no muerde (esa empresa es retail: 0 retenciones en la ventana, 6
+ *  en toda su historia; las 5 B2B tienen 47-208 facturas, muy por debajo del
+ *  tope) pero muerde el día que una empresa B2B pase de 1.000 facturas en 4
+ *  meses. Mismo patrón que leerMesGuardado: orden estable + COUNT exacto.
+ *
+ *  FALLA CERRADA a propósito: antes un error del select se tragaba y devolvía
+ *  un mapa VACÍO → todos los recibos salían es_retencion=false y el sync los
+ *  escribía como cobros reales. Ahora lanza: la empresa queda ok:false con el
+ *  error en switch_sync_log y el mes NO se toca (la lectura ocurre antes de
+ *  cualquier escritura). Un sync que no corre se ve y se repara; un sync que
+ *  marca mal las retenciones, no. */
+export async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toExcl: string): Promise<ImpuestoMap> {
   const map: ImpuestoMap = new Map();
-  const { data, error } = await supabaseServer
-    .from("switch_facturas")
-    .select("cliente_switch_id,fecha,impuesto")
-    .eq("empresa_key", empresaKey)
-    .eq("tipo_comprobante", "Factura")
-    .gte("fecha", `${from}T00:00:00-05:00`)
-    .lt("fecha", `${toExcl}T00:00:00-05:00`)
-    .range(0, 99999);
-  if (error) {
-    console.error(`[sync-recibos ${empresaKey}] loadImpuestoMap: ${error.message}`);
-    return map;
+  type FilaFactura = { cliente_switch_id: number | null; fecha: string; impuesto: unknown };
+  const filas: FilaFactura[] = [];
+  let esperadas: number | null = null;
+  for (let pagina = 0; pagina < MAX_PAGINAS; pagina += 1) {
+    const desde = pagina * PAGINA_LECTURA;
+    const { data, error, count } = await supabaseServer
+      .from("switch_facturas")
+      .select("cliente_switch_id,fecha,impuesto", pagina === 0 ? { count: "exact" } : {})
+      .eq("empresa_key", empresaKey)
+      .eq("tipo_comprobante", "Factura")
+      .gte("fecha", `${from}T00:00:00-05:00`)
+      .lt("fecha", `${toExcl}T00:00:00-05:00`)
+      .order("id", { ascending: true })
+      .range(desde, desde + PAGINA_LECTURA - 1);
+    if (error) throw new Error(`select switch_facturas (impuestos ${empresaKey}): ${error.message}`);
+    if (pagina === 0) esperadas = count ?? null;
+    const lote = (data ?? []) as unknown as FilaFactura[];
+    filas.push(...lote);
+    if (lote.length < PAGINA_LECTURA) break;
+    if (esperadas != null && filas.length >= esperadas) break;
   }
-  for (const f of (data ?? []) as { cliente_switch_id: number | null; fecha: string; impuesto: unknown }[]) {
+  if (esperadas == null) {
+    throw new Error(`switch_facturas sin COUNT (${empresaKey} ${from}): no puedo garantizar la lectura completa`);
+  }
+  if (filas.length !== esperadas) {
+    throw new Error(
+      `lectura incompleta de switch_facturas (${empresaKey} ${from}): ${filas.length} filas leídas vs ${esperadas} contadas`,
+    );
+  }
+  for (const f of filas) {
     const k = f.cliente_switch_id;
     if (k == null) continue;
     if (!map.has(k)) map.set(k, []);
@@ -228,6 +264,41 @@ async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, toExcl: str
 }
 
 const RET_WINDOW_MS = 35 * 864e5;
+
+/**
+ * El cliente de MOSTRADOR nunca retiene ITBMS — y sin este corte la heurística
+ * se vuelve ruido puro sobre él.
+ *
+ * Quién retiene ITBMS es una figura fiscal: un negocio registrado como agente de
+ * retención le retiene el impuesto a su proveedor y se lo paga a la DGI. Quien
+ * paga en efectivo en el mostrador no es eso. Por eso `es_retencion` sobre el
+ * mostrador no puede ser otra cosa que un falso positivo.
+ *
+ * Y es un falso positivo casi garantizado, porque el mostrador es un
+ * PSEUDO-CLIENTE que acumula toda la venta al detalle bajo un solo id: en
+ * american_classic son 25.800 de las ~26.500 facturas de la empresa, 3.455 solo
+ * en la ventana del mapa. Contra ese volumen, "el recibo coincide con impuesto/2
+ * de ALGUNA factura del cliente dentro de ±35 días" deja de ser evidencia y pasa
+ * a ser el problema del cumpleaños: medido el 26-jul-2026, un recibo de $2.00
+ * cuadra con 6 facturas distintas y uno de $0.01 con 4. Un cliente B2B real
+ * tiene 3-50 facturas en la misma ventana y ahí la coincidencia sí significa
+ * algo.
+ *
+ * IDENTIDAD: `cliente_codigo = 'TCKCTA'`, el código con el que Switch marca a su
+ * pseudo-cliente de contado. NO se compara por nombre: el nombre cambia por
+ * empresa ("CONTADO", "Contado", "VENTAS LOCA", "VENTAS LOCAL" — ver
+ * sync-clientes-master.ts, que lo normaliza justamente por eso) y un día alguien
+ * escribe "Contado " con espacio o existe un cliente real que se llame parecido.
+ * El código es el mismo dato que ya usan las RPC de comisión para excluir al
+ * mostrador de la base de cobro (`AND COALESCE(r.cliente_codigo,'') <> 'TCKCTA'`
+ * en comision_b2b_v4/v5, comision_cobro_v3 y comision_detalle) y el que resuelve
+ * el checkout público (CODIGO_CLIENTE_CONTADO). Reusarlo mantiene una sola
+ * definición de "esto no es un cliente de verdad" en todo el sistema.
+ */
+function esClienteMostrador(clienteCodigo: string | null): boolean {
+  return (clienteCodigo ?? "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO;
+}
+
 /** Retención = total ≈ impuesto/2 de una factura del mismo cliente, dentro de ±35d.
  *  Ventana SIMÉTRICA (|rf - ff|): Switch estampa la retención el mismo día o hasta
  *  un día ANTES que su factura, así que exigir factura ≤ recibo perdía esos casos
@@ -268,18 +339,21 @@ function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap:
   const cliId = typeof r.clienteId === "number" ? r.clienteId : null;
   const total = num(r.total);
   const vendedorRegistro = (r.vendedor as string) ?? null;
+  const clienteCodigo = (r.clienteCodigo as string) ?? null;
   return {
     empresa_key: empresaKey,
     fecha,
     fecha_creacion: fc ? fc.replace(" ", "T") : null,
     cliente_switch_id: cliId,
-    cliente_codigo: (r.clienteCodigo as string) ?? null,
+    cliente_codigo: clienteCodigo,
     cliente_nombre: (r.clienteNombre as string) ?? null,
     vendedor_registro: vendedorRegistro,
     // atribución por cartera (dueño del cliente); fallback al vendedor del recibo
     vendedor_cartera: (cliId != null ? carteraMap.get(cliId) : undefined) ?? vendedorRegistro,
     total,
-    es_retencion: esRetencion(cliId, fecha, total, impuestoMap),
+    // El mostrador no retiene ITBMS: sobre él la heurística sólo puede producir
+    // falsos positivos (ver esClienteMostrador).
+    es_retencion: !esClienteMostrador(clienteCodigo) && esRetencion(cliId, fecha, total, impuestoMap),
     synced_at: new Date().toISOString(),
   };
 }

@@ -7,6 +7,7 @@
 //   - Null in a monthly array means "no data yet" (future month).
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 import {
@@ -339,22 +340,36 @@ export async function fetchClientes({
     error = res.error ? { message: res.error.message } : null;
   } else {
     // Año en curso: vista 12m rolling existente (materialized views).
+    //
+    // ⚠️ PAGINADO (26-jul-2026): el `.limit(5000)` de antes NO protegía de nada
+    // — el tope real es el `db-max-rows` = 1000 de PostgREST, que corta en
+    // silencio. `clientes_empresa_12m_vw` tiene 1.563 filas, así que la lista se
+    // venía cortando y la fila sintética "Otros clientes (N)" —que SUMA plata—
+    // se calculaba sobre una lectura corta. El orden de negocio (última compra
+    // desc) se CONSERVA y se le agregan desempates únicos: paginar exige un
+    // orden total, y muchas filas comparten `ultima_compra`.
     viewLabel = isTodas ? "clientes_agregado_12m_vw" : `clientes_empresa_12m_vw(${empresaKey})`;
-    const query = isTodas
-      ? supabaseServer
-          .from("clientes_agregado_12m_vw")
-          .select("*")
-          .order("ultima_compra", { ascending: false, nullsFirst: false })
-          .limit(5000)
-      : supabaseServer
-          .from("clientes_empresa_12m_vw")
-          .select("*")
-          .eq("empresa", empresaKey)
-          .order("ultima_compra", { ascending: false, nullsFirst: false })
-          .limit(5000);
-    const res = await query;
-    data = (res.data as ClientesEmpresaRow[] | null) ?? null;
-    error = res.error ? { message: res.error.message } : null;
+    const vista = isTodas ? "clientes_agregado_12m_vw" : "clientes_empresa_12m_vw";
+    try {
+      const filas = await leerTodoPaginado<ClientesEmpresaRow>(
+        viewLabel,
+        (pedirCount, desde, hasta) => {
+          const q = supabaseServer
+            .from(vista)
+            .select("*", pedirCount ? { count: "exact" } : {});
+          return (isTodas ? q : q.eq("empresa", empresaKey))
+            .order("ultima_compra", { ascending: false, nullsFirst: false })
+            .order("cliente_nombre", { ascending: true })
+            .order("cliente_id", { ascending: true })
+            .range(desde, hasta);
+        },
+      );
+      data = filas;
+      error = null;
+    } catch (e) {
+      data = null;
+      error = { message: e instanceof Error ? e.message : String(e) };
+    }
   }
 
   if (error) {

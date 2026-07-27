@@ -72,6 +72,12 @@ async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, stri
 // timing) queda con switch_id null — por eso la LLAVE del upsert es
 // (empresa_key, secuencial, fecha), no el switch_id.
 
+/** Tamaño de página / cota de páginas de la lectura de switch_facturas.
+ *  PostgREST corta en `db-max-rows` = 1000 en este proyecto: pedir más en una
+ *  sola llamada devuelve 1000 filas SIN error. Ver buildSwitchIdMap. */
+const PAGINA_LECTURA_FACTURAS = 1000;
+const MAX_PAGINAS_FACTURAS = 1000;
+
 /** (secuencial|fechaPanama) → switch_factura_id de los meses a sincronizar.
  *  Ambigüedad (mismo secuencial+fecha con ids distintos) → se descarta (null). */
 async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<Map<string, number>> {
@@ -86,21 +92,52 @@ async function buildSwitchIdMap(empresaKey: EmpresaKey, meses: Mes[]): Promise<M
   const hastaExcl = `${finY}-${String(finM).padStart(2, "0")}-01T00:00:00-05:00`;
   // Rango timestamptz con offset Panamá explícito (gotcha: date pelado pierde
   // los docs nocturnos — ver loadImpuestoMap en sync-recibos).
-  const { data, error } = await supabaseServer
-    .from("switch_facturas")
-    .select("secuencial,fecha,switch_factura_id")
-    .eq("empresa_key", empresaKey)
-    .gte("fecha", desde)
-    .lt("fecha", hastaExcl)
-    .range(0, 99999);
-  if (error) {
-    // Best-effort: sin mapa, los docs quedan con switch_id null (la llave del
-    // upsert no depende de él).
-    console.error(`[sync-utilidad ${empresaKey}] buildSwitchIdMap: ${error.message}`);
-    return map;
+  //
+  // ⚠️ PAGINADO (26-jul-2026): antes era un solo `.range(0, 99999)`, el mismo
+  // anti-patrón que se arregló en sync-recibos. PostgREST corta en `db-max-rows`
+  // = 1000 y NO avisa, así que un rango grande devolvía 1.000 filas y las demás
+  // facturas quedaban sin resolver su switch_factura_id. HOY no muerde —
+  // utilidad corre solo para las 5 B2B (B2B_COMISION_KEYS) y ahí el máximo
+  // medido es 162 facturas en la ventana del cron y 710 en un backfill de un año
+  // entero (fashion_wear)— pero el modo backfill pide el año completo de una y
+  // el margen se acorta solo con el tiempo. Ordena por `id` (orden estable: sin
+  // él PostgREST puede repetir o saltear filas entre páginas) y verifica contra
+  // un COUNT exacto.
+  //
+  // Se mantiene el contrato BEST-EFFORT del original: un problema de lectura se
+  // reporta y el mapa se devuelve como esté. Acá un switch_id faltante es un
+  // caso ya contemplado (la llave del upsert es (empresa_key, secuencial, fecha),
+  // no el switch_id), así que abortar la corrida entera sería peor que seguir.
+  // Lo que ya no puede pasar es que se trunque en silencio.
+  const filas: { secuencial: string | null; fecha: string; switch_factura_id: number }[] = [];
+  let esperadas: number | null = null;
+  for (let pagina = 0; pagina < MAX_PAGINAS_FACTURAS; pagina += 1) {
+    const desdeFila = pagina * PAGINA_LECTURA_FACTURAS;
+    const { data, error, count } = await supabaseServer
+      .from("switch_facturas")
+      .select("secuencial,fecha,switch_factura_id", pagina === 0 ? { count: "exact" } : {})
+      .eq("empresa_key", empresaKey)
+      .gte("fecha", desde)
+      .lt("fecha", hastaExcl)
+      .order("id", { ascending: true })
+      .range(desdeFila, desdeFila + PAGINA_LECTURA_FACTURAS - 1);
+    if (error) {
+      console.error(`[sync-utilidad ${empresaKey}] buildSwitchIdMap: ${error.message}`);
+      break;
+    }
+    if (pagina === 0) esperadas = count ?? null;
+    const lote = (data ?? []) as typeof filas;
+    filas.push(...lote);
+    if (lote.length < PAGINA_LECTURA_FACTURAS) break;
+    if (esperadas != null && filas.length >= esperadas) break;
+  }
+  if (esperadas != null && filas.length !== esperadas) {
+    console.error(
+      `[sync-utilidad ${empresaKey}] buildSwitchIdMap: lectura incompleta de switch_facturas (${filas.length} leídas vs ${esperadas} contadas) — habrá docs con switch_id null`,
+    );
   }
   const ambiguos = new Set<string>();
-  for (const r of (data ?? []) as { secuencial: string | null; fecha: string; switch_factura_id: number }[]) {
+  for (const r of filas) {
     if (!r.secuencial || typeof r.switch_factura_id !== "number") continue;
     const key = `${r.secuencial}|${fechaPanamaDe(r.fecha)}`;
     const prev = map.get(key);
