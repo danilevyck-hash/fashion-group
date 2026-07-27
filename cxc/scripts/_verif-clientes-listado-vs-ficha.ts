@@ -26,6 +26,9 @@ type Deps = {
   coincideBusqueda: typeof import("../src/lib/buscar-normalizado").coincideBusqueda;
   comprasDelAnioPorCodigo: typeof import("../src/lib/clientes-ytd-consulta").comprasDelAnioPorCodigo;
   ymdPanama: typeof import("../src/lib/clientes-ytd").ymdPanama;
+  aEnteroEscalado: typeof import("../src/lib/clientes-ytd").aEnteroEscalado;
+  escaladoACentavos: typeof import("../src/lib/clientes-ytd").escaladoACentavos;
+  sumarCentavos: typeof import("../src/lib/clientes-ytd").sumarCentavos;
   montoFirmado: typeof import("../src/lib/clientes-ytd").montoFirmado;
   ventanaAnioPanama: typeof import("../src/lib/clientes-ytd").ventanaAnioPanama;
   aCentavos: typeof import("../src/lib/clientes-ytd").aCentavos;
@@ -47,6 +50,9 @@ async function cargarDeps(): Promise<Deps> {
     coincideBusqueda: bus.coincideBusqueda,
     comprasDelAnioPorCodigo: cons.comprasDelAnioPorCodigo,
     ymdPanama: ytd.ymdPanama,
+    aEnteroEscalado: ytd.aEnteroEscalado,
+    escaladoACentavos: ytd.escaladoACentavos,
+    sumarCentavos: ytd.sumarCentavos,
     montoFirmado: ytd.montoFirmado,
     ventanaAnioPanama: ytd.ventanaAnioPanama,
     aCentavos: ytd.aCentavos,
@@ -86,16 +92,16 @@ async function ytdDeLaFicha(codigo: string): Promise<number> {
   const pairSet = new Set((pares ?? []).map(p => `${p.empresa_key}|${p.cliente_switch_id}`));
   const { data: fact } = await D.supabaseServer
     .from("switch_facturas")
-    .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total")
+    .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, subtotal_descuento")
     .in("cliente_switch_id", cids).gte("fecha", desde).lt("fecha", hasta);
   const porEmpresa = new Map<string, number>();
   for (const r of (fact ?? []) as any[]) {
     if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
     if (!r.fecha || D.ymdPanama(r.fecha) < yearStart) continue;
-    porEmpresa.set(r.empresa_key, (porEmpresa.get(r.empresa_key) ?? 0) + D.montoFirmado(r.tipo_comprobante, r.total));
+    porEmpresa.set(r.empresa_key, (porEmpresa.get(r.empresa_key) ?? 0) + D.aEnteroEscalado(D.montoFirmado(r.tipo_comprobante, r.subtotal_descuento)));
   }
   // La ficha suma SOLO las 6 empresas B2B (así arma total_grupo).
-  return D.aCentavos(D.B2B_EMPRESA_KEYS.reduce((s, e) => s + D.aCentavos(porEmpresa.get(e) ?? 0), 0));
+  return D.sumarCentavos(D.B2B_EMPRESA_KEYS.map(e => D.escaladoACentavos(porEmpresa.get(e) ?? 0)));
 }
 
 async function main() {
@@ -162,7 +168,7 @@ async function main() {
   }
 
   console.log(`\n   ${todoOk ? "✅" : "❌"} listado y ficha coinciden al centavo`);
-  console.log(`   D-108 esperado por Daniel: 210,702.50 → ${f(mapa.get("D-108") ?? 0)} ${Math.abs((mapa.get("D-108") ?? 0) - 210702.5) < 0.005 ? "✅" : "❌"}`);
+  console.log(`   D-108 esperado (sin ITBMS): 196,918.20 → ${f(mapa.get("D-108") ?? 0)} ${Math.abs((mapa.get("D-108") ?? 0) - 196918.2) < 0.005 ? "✅" : "❌"}`);
   console.log(`   clientes de la página con compras: ${mapa.size}/${pagina.length} (el resto muestra $0.00)`);
 
   console.log(`\n4) RENDIMIENTO — lista ${msListado} ms · columna ${msYtd} ms (llamada APARTE, no bloquea la tabla)`);

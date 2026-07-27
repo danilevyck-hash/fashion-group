@@ -14,6 +14,9 @@ import {
   ventanaAnioPanama,
   montoFirmado,
   aCentavos,
+  aEnteroEscalado,
+  escaladoACentavos,
+  sumarCentavos,
   TIPOS_QUE_SUMAN,
 } from "@/lib/clientes-ytd";
 
@@ -95,6 +98,55 @@ describe("signo por tipo de comprobante", () => {
     ];
     const suma = docs.reduce((s, d) => s + montoFirmado(d.tipo, d.monto), 0);
     expect(aCentavos(suma)).toBe(196_918.2);
+  });
+});
+
+describe("sumar plata no puede depender del ORDEN de las filas", () => {
+  // 🩸 Medido contra producción: City Mall Paso Canoa daba 1.073.515,50 en el
+  // listado y 1.073.515,49 en la ficha. Misma definición, mismos documentos —
+  // la única diferencia era el orden en que llegaban (el listado los lee
+  // paginados por id). Sumar decimales no es asociativo y el error se coló al
+  // centavo. Ahora se acumula en enteros.
+
+  /** Montos con decimales "feos" a propósito, del orden de magnitud real. */
+  const montos = [
+    12_345.67, 8_901.23, 4_567.89, 1_234.56, 99_999.99, 7_777.77,
+    3_333.33, 66_666.66, 22_222.22, 555.55, 88_888.88, 4_444.44,
+  ];
+
+  const acumularEscalado = (xs: number[]) =>
+    escaladoACentavos(xs.reduce((s, x) => s + aEnteroEscalado(x), 0));
+
+  it("da el mismo centavo en cualquier orden", () => {
+    const alDerecho = acumularEscalado(montos);
+    const alReves = acumularEscalado([...montos].reverse());
+    const mezclado = acumularEscalado([...montos].sort((a, b) => a - b));
+    expect(alReves).toBe(alDerecho);
+    expect(mezclado).toBe(alDerecho);
+  });
+
+  it("sumar por grupos da lo mismo que sumar todo junto", () => {
+    // Es el caso real: la ficha suma por empresa y el listado sumaba todo junto.
+    const mitad = Math.floor(montos.length / 2);
+    const porGrupos = sumarCentavos([
+      acumularEscalado(montos.slice(0, mitad)),
+      acumularEscalado(montos.slice(mitad)),
+    ]);
+    expect(porGrupos).toBe(acumularEscalado(montos));
+  });
+
+  it("respeta las 4 decimales de numeric(14,4) sin perder precisión", () => {
+    // Cuatro documentos de 0,0001 tienen que sumar 0,0004 → 0,00 en centavos,
+    // no cuatro redondeos a cero por separado que igual dan cero, pero tampoco
+    // un centavo inventado.
+    expect(acumularEscalado([0.0001, 0.0001, 0.0001, 0.0001])).toBe(0);
+    // 0,005 × 2 = 0,01 exacto.
+    expect(acumularEscalado([0.005, 0.005])).toBe(0.01);
+  });
+
+  it("sumarCentavos no arrastra colas binarias", () => {
+    expect(sumarCentavos([0.1, 0.2])).toBe(0.3);
+    expect(sumarCentavos([44_307.63, 124_472.26, 29_252.2])).toBe(198_032.09);
   });
 });
 

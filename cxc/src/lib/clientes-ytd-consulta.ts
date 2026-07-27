@@ -9,7 +9,7 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
-import { ventanaAnioPanama, montoFirmado, aCentavos } from "@/lib/clientes-ytd";
+import { ventanaAnioPanama, montoFirmado, aEnteroEscalado, escaladoACentavos, sumarCentavos } from "@/lib/clientes-ytd";
 
 interface Par { codigo: string; empresa_key: string; cliente_switch_id: number | null }
 interface FilaFactura { empresa_key: string; cliente_switch_id: number; fecha: string; tipo_comprobante: string; subtotal_descuento: number | string }
@@ -75,14 +75,34 @@ export async function comprasDelAnioPorCodigo(
         .range(from, to),
   );
 
+  // ⚠️ SE ACUMULA POR (CÓDIGO, EMPRESA) Y EN ENTEROS. Las dos cosas importan
+  // para que este número sea IDÉNTICO al de la ficha:
+  //   · por empresa, porque la ficha muestra una fila por empresa, redondea cada
+  //     una a centavos y su total del grupo es la suma de esas filas redondeadas;
+  //   · en enteros, porque sumar decimales depende del ORDEN en que lleguen las
+  //     filas — y acá llegan paginadas por id, en la ficha no. Ver la nota de
+  //     `clientes-ytd.ts`: así se separaron por un centavo City Mall Paso Canoa.
+  const porCodigoEmpresa = new Map<string, number>();
   for (const f of facturas) {
     // El id de cliente es POR EMPRESA: sin exigir el par exacto, un id que en
     // otra empresa pertenece a otro cliente sumaría acá.
     const codigo = codigoDePar.get(`${f.empresa_key}|${f.cliente_switch_id}`);
     if (!codigo) continue;
-    resultado.set(codigo, (resultado.get(codigo) ?? 0) + montoFirmado(f.tipo_comprobante, f.subtotal_descuento));
+    const llave = `${codigo}|${f.empresa_key}`;
+    porCodigoEmpresa.set(
+      llave,
+      (porCodigoEmpresa.get(llave) ?? 0) + aEnteroEscalado(montoFirmado(f.tipo_comprobante, f.subtotal_descuento)),
+    );
   }
 
-  for (const [codigo, monto] of resultado) resultado.set(codigo, aCentavos(monto));
+  // Centavos por empresa (como los muestra la ficha) y recién ahí el total.
+  const centavosPorCodigo = new Map<string, number[]>();
+  for (const [llave, escalado] of porCodigoEmpresa) {
+    const codigo = llave.slice(0, llave.lastIndexOf("|"));
+    const lista = centavosPorCodigo.get(codigo) ?? [];
+    lista.push(escaladoACentavos(escalado));
+    centavosPorCodigo.set(codigo, lista);
+  }
+  for (const [codigo, montos] of centavosPorCodigo) resultado.set(codigo, sumarCentavos(montos));
   return resultado;
 }

@@ -15,7 +15,7 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 // La definición de "compras del año" vive en UN solo lugar y la comparten la
 // ficha y el listado — si divergieran, la misma pantalla diría dos números
 // distintos para el mismo cliente.
-import { ymdPanama, montoFirmado, ventanaAnioPanama, aCentavos } from "@/lib/clientes-ytd";
+import { ymdPanama, montoFirmado, ventanaAnioPanama, aCentavos, aEnteroEscalado, escaladoACentavos, sumarCentavos } from "@/lib/clientes-ytd";
 
 export const dynamic = "force-dynamic";
 
@@ -116,7 +116,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   }[]) {
     if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
     if (!r.fecha || ymdPanama(r.fecha) < yearStart) continue;
-    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + montoFirmado(r.tipo_comprobante, r.subtotal_descuento));
+    // En ENTEROS: sumar decimales depende del orden de las filas y separaba
+    // este total del que muestra el listado por un centavo (ver clientes-ytd.ts).
+    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + aEnteroEscalado(montoFirmado(r.tipo_comprobante, r.subtotal_descuento)));
   }
 
   // Última factura: la lista viene ordenada desc → la primera fila (pairSet match)
@@ -142,14 +144,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
-    ventas_ytd: aCentavos(ventasMap.get(e) ?? 0),
+    ventas_ytd: escaladoACentavos(ventasMap.get(e) ?? 0),
     cobrado_ytd: aCentavos(cobradoMap.get(e) ?? 0),
     cxc: aCentavos(cxcMap.get(e) ?? 0),
     ultima_factura: ultimaFacturaMap.get(e) ?? null,
   }));
 
   const totalGrupo = {
-    ventas_ytd:  empresas.reduce((s, e) => s + e.ventas_ytd, 0),
+    ventas_ytd:  sumarCentavos(empresas.map(e => e.ventas_ytd)),
     cobrado_ytd: empresas.reduce((s, e) => s + e.cobrado_ytd, 0),
     cxc:         empresas.reduce((s, e) => s + e.cxc, 0),
   };
@@ -158,7 +160,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     cliente,
     empresas,
     total_grupo: {
-      ventas_ytd:  aCentavos(totalGrupo.ventas_ytd),
+      ventas_ytd:  totalGrupo.ventas_ytd,
       cobrado_ytd: aCentavos(totalGrupo.cobrado_ytd),
       cxc:         aCentavos(totalGrupo.cxc),
       ultima_factura: ultimaGlobal,

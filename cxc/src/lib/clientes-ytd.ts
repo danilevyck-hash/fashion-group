@@ -81,3 +81,36 @@ export function montoFirmado(tipoComprobante: string | null | undefined, base: n
 
 /** Redondeo a centavos, para que no se filtren colas binarias a la pantalla. */
 export const aCentavos = (n: number): number => Math.round(n * 100) / 100;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUMAR PLATA SIN QUE EL ORDEN CAMBIE EL RESULTADO
+//
+// 🩸 Sumar `number` no es asociativo: (a+b)+c puede no dar lo mismo que a+(b+c)
+// en el último bit. Con cientos de documentos eso se cuela al centavo — medido:
+// City Mall Paso Canoa daba 1.073.515,50 en el listado y 1.073.515,49 en la
+// ficha, y la ÚNICA diferencia entre los dos era el orden en que llegaban las
+// filas (el listado las lee paginadas por id; la ficha, como vengan). Un centavo
+// de diferencia en un número que Daniel lee como plata alcanza para desconfiar
+// de la columna entera.
+//
+// La cura es no acumular en decimales: cada documento se lleva a ENTEROS en la
+// escala de la columna (`numeric(14,4)` → diezmilésimas) y se suman enteros, que
+// sí son exactos y no dependen del orden. Recién al final se baja a centavos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Escala de `switch_facturas.subtotal_descuento`: numeric(14,4). */
+const ESCALA = 10_000;
+
+/** Lleva un monto a enteros en la escala de la columna, para acumular exacto. */
+export const aEnteroEscalado = (n: number): number => Math.round(n * ESCALA);
+
+/** Baja un acumulado escalado a centavos. */
+export const escaladoACentavos = (escalado: number): number =>
+  Math.round(escalado / (ESCALA / 100)) / 100;
+
+/** Suma montos que YA están en centavos, sin volver a pasar por decimales. */
+export function sumarCentavos(montos: Iterable<number>): number {
+  let centavos = 0;
+  for (const m of montos) centavos += Math.round(m * 100);
+  return centavos / 100;
+}
