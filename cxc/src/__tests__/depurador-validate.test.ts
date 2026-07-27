@@ -275,3 +275,65 @@ describe("Depurador — regla de talla del EAN (caso Kids, aditivo)", () => {
     expect(style("Men-T-Shirts S/S", ["S", "M", "L"]).talla).toBe("M");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ARTÍCULOS SIN CANTIDAD — fuera del Excel, PERO los servicios se quedan.
+   La trampa: los servicios (tipo 02) se emiten a propósito con Stock Ideal 0.
+   Filtrar "todo lo que diga 0" los borraría. El criterio es la CANTIDAD del
+   proveedor, no la celda.
+   ══════════════════════════════════════════════════════════════════════════════ */
+describe("Depurador — artículos sin cantidad (y servicios que sobreviven)", () => {
+  const art = (ref: string, desc: string, cant: number) => [ref, "1", desc, "M", cant, 10, 20, "CK Menswear", "x"];
+
+  it("artículo real con CANTIDAD 0 no sale, y se cuenta como omitido", () => {
+    const r = processRows([H, art("R1", "Men-Polos S/S", 10), art("R2", "Men-T-Shirts S/S", 0)] as SheetRow[], cfg);
+    expect(r.rows.map((x) => x.cols["Código *"])).toEqual(["R1"]);
+    expect(r.omitidosSinCantidad).toBe(1);
+    expect(r.sinColumnaCantidad).toBe(false);
+  });
+
+  it("SERVICIO con CANTIDAD 0 SÍ sale, con Stock Ideal 0 y tipo 02", () => {
+    const r = processRows([H, art("R1", "Men-Polos S/S", 10), art("S1", "AJUSTE DE PRECIO", 0)] as SheetRow[], cfg);
+    const codigos = r.rows.map((x) => x.cols["Código *"]);
+    expect(codigos).toContain("S1");
+    expect(codigos).toContain("R1");
+    expect(r.omitidosSinCantidad).toBe(0); // el servicio NO se cuenta como omitido
+    const s = r.rows.find((x) => x.cols["Código *"] === "S1")!.cols;
+    expect(s["Código Tipo de Artículo *"]).toBe("02");
+    expect(s["Stock Ideal"]).toBe(0);
+  });
+
+  it("un archivo SOLO de servicios en 0 sigue produciendo plantilla", () => {
+    const r = processRows([H, art("S1", "AJUSTE DE PRECIO", 0)] as SheetRow[], cfg);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].cols["Stock Ideal"]).toBe(0);
+  });
+
+  it("varias líneas del mismo estilo: cuenta la SUMA, no cada línea", () => {
+    // R1 tiene una talla en 0 y otra en 7 → suma 7 → SÍ sale.
+    const r = processRows([H,
+      ["R1", "1", "Men-Polos S/S", "M", 0, 10, 20, "CK Menswear", "x"],
+      ["R1", "2", "Men-Polos S/S", "L", 7, 10, 20, "CK Menswear", "x"],
+    ] as SheetRow[], cfg);
+    expect(r.rows).toHaveLength(1);
+    expect(r.rows[0].cols["Stock Ideal"]).toBe(7);
+    expect(r.omitidosSinCantidad).toBe(0);
+  });
+
+  it("SIN columna CANTIDAD no se filtra nada (si no, se vaciaría la plantilla)", () => {
+    // Sin CANTIDAD todas las filas darían 0: filtrar dejaría el Excel sin nada.
+    const Hsin = ["REFERENCIA", "EAN", "P_CATEGORY", "TALLA", "COSTO", "PRECIO2", "MARCA", "PROVEEDOR"];
+    const r = processRows([Hsin,
+      ["R1", "1", "Men-Polos S/S", "M", 10, 20, "CK Menswear", "x"],
+      ["R2", "2", "Men-T-Shirts S/S", "L", 10, 20, "CK Menswear", "x"],
+    ] as SheetRow[], cfg);
+    expect(r.rows).toHaveLength(2);
+    expect(r.sinColumnaCantidad).toBe(true);
+    expect(r.omitidosSinCantidad).toBe(0);
+  });
+
+  it("si TODO queda afuera, corta con un mensaje en vez de entregar un Excel vacío", () => {
+    expect(() => processRows([H, art("R1", "Men-Polos S/S", 0), art("R2", "Men-T-Shirts S/S", 0)] as SheetRow[], cfg))
+      .toThrow(/saldría vacía/);
+  });
+});

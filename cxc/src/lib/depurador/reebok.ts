@@ -242,6 +242,8 @@ export interface CatalogoRow {
   ageGroup: string; colorName: string; gender: string;
   wholesale: number | null; costo: number | null; precioA: number | null; precioB: number | null;
   piezas: number;
+  /** Cuántas filas del archivo (tallas/SKUs) se agruparon en este artículo. */
+  skus: number;
 }
 
 export interface CatalogoConfig {
@@ -271,7 +273,7 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
     out.push({
       po: first.po, newArticle: first.newArticle, name: first.name, department: first.department,
       category: first.category, ageGroup: first.ageGroup, colorName: first.colorName, gender: first.gender,
-      wholesale: w, costo, precioA, precioB, piezas,
+      wholesale: w, costo, precioA, precioB, piezas, skus: group.length,
     });
   }
   out.sort(cmpPoNameGender);
@@ -318,6 +320,11 @@ export interface SwitchRow {
   talla: string;
   fallback: boolean;   // true si no se halló la talla exacta (9/7) → revisar (ámbar)
   po: string; name: string; gender: string;
+  /** Piezas del mes del artículo (= "Stock Ideal"). Espejo tipado de cols para
+   *  poder filtrar sin leer dentro del Record. */
+  piezas: number;
+  /** Cuántas filas del archivo (tallas/SKUs) se agruparon en este artículo. */
+  skus: number;
 }
 
 /** Filas Switch, una por artículo, ordenadas por PO/Name/Género. */
@@ -368,10 +375,37 @@ export function buildSwitchRows(items: ReebokItem[], cfg: SwitchBuildConfig): Sw
       talla: sample.talla,
       fallback: sample.fallback,
       po: first.po, name: first.name, gender: first.gender,
+      piezas: qty, skus: group.length,
     });
   }
   out.sort(cmpPoNameGender);
   return out;
+}
+
+/* ============ FILTRO · ARTÍCULOS SIN PIEZAS DEL MES ============ */
+// Daniel: "no deberia de aparecerme en el excel los que tengan stock 0".
+//
+// OJO CON QUÉ SIGNIFICA EL 0. En Reebok la columna "STOCK" de la vista previa ES
+// "Stock Ideal", que ES la suma de las piezas del mes elegido. O sea: "stock 0" y
+// "el proveedor no pidió nada de este artículo en JULIO" son el MISMO número. Por eso
+// acá filtrar por la celda en 0 sí equivale a filtrar por "sin piezas del mes".
+//
+// NO vale generalizar esto a los otros generadores: en el Depurador CK/TH un
+// "Stock Ideal" 0 también lo llevan los SERVICIOS (tipo de artículo 02), que deben
+// seguir saliendo. Ese caso se maneja aparte en logic.ts.
+//
+// Y hay un 0 que NO es del proveedor: si no se detectó la columna del mes, parseReebok
+// pone piezas=0 en TODAS las filas y el filtro vaciaría el archivo. Por eso esta función
+// NO decide sola: el llamador solo la aplica cuando hay columna de mes de verdad.
+
+/** true si el artículo no tiene ninguna pieza del mes (suma de todas sus tallas = 0). */
+export const sinPiezasDelMes = (r: { piezas: number }): boolean => r.piezas === 0;
+
+/** Deja solo los artículos con piezas del mes y dice cuántos quedaron afuera.
+ *  Una talla suelta en 0 NO saca al artículo: lo que cuenta es la SUMA del artículo. */
+export function filtrarConPiezas<T extends { piezas: number }>(rows: T[]): { rows: T[]; omitidos: number } {
+  const conPiezas = rows.filter((r) => !sinPiezasDelMes(r));
+  return { rows: conPiezas, omitidos: rows.length - conPiezas.length };
 }
 
 /** AOA de la plantilla Switch. Constructor propio SIN Title Case (a diferencia de

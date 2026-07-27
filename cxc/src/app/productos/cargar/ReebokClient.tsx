@@ -10,6 +10,7 @@ import {
   buildCatalogoAoa,
   buildSwitchRows,
   buildSwitchAoa,
+  filtrarConPiezas,
   TEXT_COLS,
   REEBOK_MARCA_A,
   REEBOK_MARCA_B,
@@ -56,7 +57,8 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Config de salida
   const [months, setMonths] = useState<MonthOption[]>([]);
   const [monthColIdx, setMonthColIdx] = useState<number>(-1);
-  const [salida, setSalida] = useState<Salida>("catalogo");
+  // Plantilla Switch por defecto: es la que Daniel usa casi siempre (pedido suyo).
+  const [salida, setSalida] = useState<Salida>("switch");
   const [precioAB, setPrecioAB] = useState<PrecioAB>("A");
   const [tasa] = useState("7");
 
@@ -198,17 +200,45 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
     return [...set].sort((a, b) => a.localeCompare(b, "es"));
   }, [items]);
 
-  const catalogo: CatalogoRow[] = useMemo(
+  // Los artículos sin piezas del mes NO van al Excel (pedido de Daniel). El filtro se
+  // aplica SOLO si hay columna de mes de verdad: sin ella parseReebok deja todo en 0 y
+  // filtrar entregaría un archivo vacío (el aviso ámbar de abajo cubre ese caso).
+  const filtrarSinPiezas = monthColIdx !== -1;
+
+  const catalogoTodo: CatalogoRow[] = useMemo(
     () => (items ? buildCatalogo(items, { formulaA, formulaB, excByName }) : []),
     [items, formulaA, formulaB, excByName],
   );
-  const totalPiezas = useMemo(() => catalogo.reduce((s, r) => s + r.piezas, 0), [catalogo]);
+  const { rows: catalogo, omitidos: catalogoOmitidos } = useMemo(
+    () => (filtrarSinPiezas ? filtrarConPiezas(catalogoTodo) : { rows: catalogoTodo, omitidos: 0 }),
+    [catalogoTodo, filtrarSinPiezas],
+  );
   // Filas Switch (una por artículo) para preview y descarga.
-  const switchRows: SwitchRow[] = useMemo(
+  const switchRowsTodo: SwitchRow[] = useMemo(
     () => (items ? buildSwitchRows(items, { formula: precioAB === "A" ? formulaA : formulaB, temporada, tasa, excByName }) : []),
     [items, precioAB, formulaA, formulaB, temporada, tasa, excByName],
   );
+  const { rows: switchRows, omitidos: switchOmitidos } = useMemo(
+    () => (filtrarSinPiezas ? filtrarConPiezas(switchRowsTodo) : { rows: switchRowsTodo, omitidos: 0 }),
+    [switchRowsTodo, filtrarSinPiezas],
+  );
   const revisar = useMemo(() => switchRows.filter((r) => r.fallback).length, [switchRows]);
+
+  // Contadores de la barra: SIEMPRE los de la salida elegida, para que lo que se lee en
+  // pantalla sea exactamente lo que trae el Excel que se descarga (antes mostraba los
+  // del pedido incluso en modo Switch, que agrupa distinto: 526 en pantalla vs 383 reales).
+  const vista = useMemo(() => {
+    const filas: { piezas: number; skus: number }[] = salida === "catalogo" ? catalogo : switchRows;
+    return {
+      articulos: filas.length,
+      skus: filas.reduce((s, r) => s + r.skus, 0),
+      piezas: filas.reduce((s, r) => s + r.piezas, 0),
+      omitidos: salida === "catalogo" ? catalogoOmitidos : switchOmitidos,
+    };
+  }, [salida, catalogo, switchRows, catalogoOmitidos, switchOmitidos]);
+
+  // Se filtró y no quedó nada: entregar un Excel vacío en silencio sería lo peor.
+  const quedoVacio = filtrarSinPiezas && vista.articulos === 0;
 
   // ── Excepciones por Name: fila derivada, edición y guardado ──────────────────
   const nameRowFor = (name: string) => {
@@ -306,7 +336,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
 
   // Salida A — Catálogo de clientes (pedido).
   const downloadCatalogo = async () => {
-    if (!items || downloading) return;
+    if (!items || downloading || quedoVacio) return;
     setDownloading("catalogo");
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -325,7 +355,7 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
 
   // Salida B — Plantilla Switch (una fila por artículo).
   const downloadSwitch = async () => {
-    if (!items || downloading) return;
+    if (!items || downloading || quedoVacio) return;
     setDownloading("switch");
     try {
       const XLSX = (await import("xlsx-js-style")).default;
@@ -540,7 +570,15 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
 
           {monthColIdx === -1 && (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-              No detecté una columna de mes. Elige cuál tiene las piezas por artículo o las piezas saldrán en 0.
+              No detecté una columna de mes. Elige arriba cuál tiene las piezas por artículo.
+              Mientras tanto todo sale con 0 piezas y <b>se incluyen todos los artículos</b>,
+              porque no hay forma de saber cuáles pidió el proveedor.
+            </div>
+          )}
+          {quedoVacio && (
+            <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">
+              Ningún artículo tiene piezas en {monthLabel || "el mes elegido"}, así que el archivo saldría vacío
+              y no se puede descargar. Revisa arriba si la columna de piezas es la correcta.
             </div>
           )}
           {salida === "switch" && revisar > 0 && (
@@ -551,15 +589,15 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
 
           {/* Stats + acción */}
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-[13px] text-stone-600">
-            <span><b className="font-semibold text-stone-900">{catalogo.length}</b> artículos</span>
+            <span><b className="font-semibold text-stone-900">{vista.articulos}</b> artículos</span>
             <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{items.length}</b> tallas/SKUs</span>
+            <span><b className="font-semibold text-stone-900">{vista.skus.toLocaleString()}</b> tallas/SKUs</span>
             <span className="text-stone-300">·</span>
-            <span><b className="font-semibold text-stone-900">{totalPiezas.toLocaleString()}</b> piezas{monthLabel ? ` (${monthLabel})` : ""}</span>
+            <span><b className="font-semibold text-stone-900">{vista.piezas.toLocaleString()}</b> piezas{monthLabel ? ` (${monthLabel})` : ""}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               <button
                 onClick={handleDownload}
-                disabled={!!downloading}
+                disabled={!!downloading || quedoVacio}
                 className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
               >
                 {downloading ? "Generando…" : salida === "catalogo" ? "Descargar pedido" : "Descargar plantilla Switch"}
@@ -572,6 +610,14 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
               </button>
             </div>
           </div>
+
+          {/* Aviso discreto: no se perdió nada, simplemente no se pidieron esas piezas */}
+          {vista.omitidos > 0 && (
+            <div className="mb-3 px-1 text-[12px] text-stone-500">
+              {vista.omitidos.toLocaleString()} artículo{vista.omitidos === 1 ? "" : "s"} sin piezas
+              en {monthLabel || "el mes elegido"} no se {vista.omitidos === 1 ? "incluyó" : "incluyeron"}.
+            </div>
+          )}
 
           {/* Preview según la salida elegida */}
           {salida === "catalogo" ? (
