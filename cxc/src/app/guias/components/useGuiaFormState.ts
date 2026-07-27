@@ -12,14 +12,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
-import {
-  DEFAULT_CLIENTES,
-  DEFAULT_DIRECCIONES,
-  DEFAULT_EMPRESAS,
-  loadList,
-  saveList,
-  emptyItem,
-} from "./constants";
+import { DEFAULT_DIRECCIONES, loadList, saveList, emptyItem } from "./constants";
+import { nuevoUid, quitarFila, restaurarFila, validarGuia } from "./guia-form-logic";
 
 interface Options {
   editingId?: string | null; // null = creación
@@ -34,9 +28,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   // Catálogo canónico de transportistas (vive en DB, no localStorage).
   const [transportistas, setTransportistas] = useState<Transportista[]>([]);
-  const [clientes, setClientes] = useState<string[]>(DEFAULT_CLIENTES);
   const [direcciones, setDirecciones] = useState<string[]>(DEFAULT_DIRECCIONES);
-  const [empresas, setEmpresas] = useState<string[]>(DEFAULT_EMPRESAS);
 
   // Form state
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
@@ -74,9 +66,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   // Cargar listas dinámicas + catálogo de transportistas
   useEffect(() => {
-    setClientes(loadList("fg_clientes", DEFAULT_CLIENTES));
     setDirecciones(loadList("fg_direcciones", DEFAULT_DIRECCIONES));
-    setEmpresas(loadList("fg_empresas", DEFAULT_EMPRESAS));
     fetch("/api/transportistas", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Transportista[]) => setTransportistas(data || []))
@@ -109,7 +99,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         const guiaItems = (g.guia_items || []) as GuiaItem[];
         setItems(
           guiaItems.length > 0
-            ? guiaItems.map((item, i) => ({ ...item, orden: i + 1 }))
+            // `uid` no viene de la base: se genera acá para que las filas de una
+            // guía existente también tengan identidad estable al editarlas.
+            ? guiaItems.map((item, i) => ({ ...item, uid: item.uid ?? nuevoUid(), orden: i + 1 }))
             : [emptyItem(1)],
         );
         setLoaded(true);
@@ -154,37 +146,31 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setTransportistaId(guiaDraft.transportistaId || "");
     setEntregadoPor(guiaDraft.entregadoPor || "");
     setObservaciones(guiaDraft.observaciones || "");
-    if (guiaDraft.items?.length) setItems(guiaDraft.items);
+    // Un borrador guardado antes de jul-2026 no trae `uid`.
+    if (guiaDraft.items?.length) {
+      setItems(guiaDraft.items.map((item) => ({ ...item, uid: item.uid ?? nuevoUid() })));
+    }
     clearGuiaDraft();
   }
 
   // Adders de listas dinámicas (transportistas ya no se agregan desde el form
   // — son catálogo controlado por admin)
-  function addCliente(name: string) {
-    const updated = [...clientes, name];
-    setClientes(updated);
-    saveList("fg_clientes", DEFAULT_CLIENTES, updated);
-  }
   function addDireccion(name: string) {
     const updated = [...direcciones, name];
     setDirecciones(updated);
     saveList("fg_direcciones", DEFAULT_DIRECCIONES, updated);
   }
-  function addEmpresa(name: string) {
-    const updated = [...empresas, name];
-    setEmpresas(updated);
-    saveList("fg_empresas", DEFAULT_EMPRESAS, updated);
-  }
 
-  // Items
+  // Items. La fila nueva arranca SIEMPRE vacía: no se copia nada de la anterior.
   function addRow() {
-    console.log("[guia] agregar-linea antes", { items: items.length });
-    setItems([...items, emptyItem(items.length + 1)]);
-    console.log("[guia] agregar-linea despues", { items: items.length + 1 });
+    setItems((prev) => [...prev, emptyItem(prev.length + 1)]);
   }
   function removeRow(idx: number) {
-    if (items.length <= 1) return;
-    setItems(items.filter((_, i) => i !== idx).map((item, i) => ({ ...item, orden: i + 1 })));
+    setItems((prev) => quitarFila(prev, idx));
+  }
+  /** Deshacer un borrado: la fila vuelve ENTERA (con cliente_codigo) y a su lugar. */
+  function restoreRow(idx: number, fila: GuiaItem) {
+    setItems((prev) => restaurarFila(prev, idx, fila));
   }
   function updateItem(idx: number, field: keyof GuiaItem, value: string | number) {
     setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
@@ -198,34 +184,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   }
 
   function validate(): boolean {
-    const errors = new Set<string>();
-    if (!fecha) errors.add("fecha");
-    if (modoEntrega === "transportista" && !transportistaId) errors.add("transportista");
-    if (!entregadoPor) errors.add("entregadoPor");
-    const validItems = items.filter(
-      (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
-    );
-    if (validItems.length === 0) errors.add("items-empty");
-    items.forEach((item, idx) => {
-      const hasData = item.cliente || item.direccion || item.facturas || item.bultos > 0;
-      if (!hasData) return;
-      if (!item.cliente) errors.add(`item-${idx}-cliente`);
-      if (!item.direccion) errors.add(`item-${idx}-direccion`);
-      if (!item.empresa) errors.add(`item-${idx}-empresa`);
-      if (!item.facturas) {
-        errors.add(`item-${idx}-facturas`);
-      } else {
-        if (item.facturas.includes(",") && !item.facturas.match(/^[^,]+(, [^,]+)*$/)) {
-          errors.add(`item-${idx}-facturas-separator`);
-        } else if (item.facturas.includes(";")) {
-          errors.add(`item-${idx}-facturas-separator`);
-        }
-        const parts = item.facturas.split(",").map((s) => s.trim()).filter(Boolean);
-        if (parts.some((p) => p.replace(/\D/g, "").length < 4))
-          errors.add(`item-${idx}-facturas-format`);
-      }
-      if (!item.bultos || item.bultos <= 0) errors.add(`item-${idx}-bultos`);
-    });
+    const errors = validarGuia({ fecha, modoEntrega, transportistaId, entregadoPor, items });
     setValidationErrors(errors);
     if (errors.size > 0) {
       setError("Completa todos los campos obligatorios antes de guardar.");
@@ -236,7 +195,6 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   async function saveGuia(opts?: { silent?: boolean }) {
     const silent = opts?.silent === true;
-    console.log(`[guia] saveGuia start (silent=${silent}, editing=${editingId ?? "new"})`);
     if (!validate()) return;
     try {
       localStorage.setItem("fg_last_modo_entrega", modoEntrega);
@@ -289,8 +247,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     toast,
     showToast,
     // listas
-    transportistas, clientes, direcciones, empresas,
-    addCliente, addDireccion, addEmpresa,
+    transportistas, direcciones,
+    addDireccion,
     // form
     formNumero,
     fecha, setFecha,
@@ -301,7 +259,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     numeroGuiaTransp, setNumeroGuiaTransp,
     items,
     saving,
-    updateItem, updateItemFields, addRow, removeRow,
+    updateItem, updateItemFields, addRow, removeRow, restoreRow,
     saveGuia,
     // draft: banner de restaurar en /guias/nueva + limpieza al guardar
     hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,

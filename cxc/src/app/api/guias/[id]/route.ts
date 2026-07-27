@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { enviarNegocio } from "@/lib/alertas/canal";
+import { validarEmpresasItems } from "@/lib/guias/validar-items";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
@@ -100,6 +101,25 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (modo_entrega === "transportista" && !transportista_id) {
       return NextResponse.json({ error: "Selecciona un transportista" }, { status: 400 });
     }
+  }
+
+  // Empresa cerrada a las 8 del grupo — MÁS lo que esta guía ya tenía guardado.
+  // Las guías históricas traen texto sucio ("VISTANA / FASHION WEAR") y se
+  // editan con el mismo formulario: si la lista fuera solo las 8, abrir una
+  // vieja y guardarla daría 400. Se validan las escrituras nuevas sin trabar el
+  // pasado; limpiar un valor sucio es un camino de ida (ya no vuelve a la lista).
+  // Va ANTES de cualquier UPDATE: un body inválido no debe dejar la cabecera
+  // escrita a medias.
+  if (items !== undefined && Array.isArray(items)) {
+    const { data: guardados } = await supabaseServer
+      .from("guia_items")
+      .select("empresa")
+      .eq("guia_id", id);
+    const heredadas = (guardados ?? [])
+      .map((r: { empresa: string | null }) => r.empresa ?? "")
+      .filter(Boolean);
+    const errEmpresa = validarEmpresasItems(items, heredadas);
+    if (errEmpresa) return NextResponse.json({ error: errEmpresa }, { status: 400 });
   }
 
   if (estado && (estado === "Completada" || estado === "Despachada")) {

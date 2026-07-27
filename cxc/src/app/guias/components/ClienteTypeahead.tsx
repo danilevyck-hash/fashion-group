@@ -4,13 +4,15 @@
 // Al seleccionar un cliente del dropdown, guarda su código D-XXX (onSelect).
 // Si el usuario escribe libre sin elegir, queda "sin vincular" (codigo = "")
 // y el texto se conserva tal cual — no se rompe nada con guías legacy.
+//
+// GUÍAS YA NO LO USA (jul-2026): ahí el cliente pasó a ser un selector CERRADO
+// con opción "Otro" explícita — ver ClientePicker.tsx. Este componente queda
+// para Marketing (ProyectoForm y EditarProyectoModal), donde escribir libre es
+// el comportamiento deseado. La búsqueda es la misma en los dos
+// (`useBusquedaClientes`).
 
 import { useEffect, useRef, useState } from "react";
-
-interface ClienteHit {
-  codigo: string;
-  nombre: string;
-}
+import { useBusquedaClientes, type ClienteHit } from "./useBusquedaClientes";
 
 interface ClienteTypeaheadProps {
   value: string;
@@ -39,40 +41,9 @@ export default function ClienteTypeahead({
   topClientes,
 }: ClienteTypeaheadProps) {
   const [open, setOpen] = useState(false);
-  const [hits, setHits] = useState<ClienteHit[]>([]);
-  const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
-
-  // Debounced search contra /api/clientes cuando el usuario teclea.
-  useEffect(() => {
-    const q = query.trim();
-    if (!open || q.length < 2) {
-      setHits([]);
-      return;
-    }
-    let cancel = false;
-    setLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/clientes?q=${encodeURIComponent(q)}&limit=8`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { clientes?: ClienteHit[] };
-        if (!cancel) setHits(Array.isArray(data.clientes) ? data.clientes : []);
-      } catch {
-        if (!cancel) setHits([]);
-      } finally {
-        if (!cancel) setLoading(false);
-      }
-    }, 250);
-    return () => {
-      cancel = true;
-      clearTimeout(t);
-    };
-  }, [query, open]);
+  const { hits, cargando: loading } = useBusquedaClientes(query, open);
 
   // Cerrar al hacer click afuera.
   useEffect(() => {
@@ -139,7 +110,7 @@ export default function ClienteTypeahead({
                   onSelect(h.nombre, h.codigo);
                   setOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+                className="w-full text-left px-3 min-h-[44px] hover:bg-gray-50 flex items-center justify-between gap-2"
               >
                 <span className="truncate">{h.nombre}</span>
                 <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>
@@ -168,7 +139,7 @@ export default function ClienteTypeahead({
                   onSelect(h.nombre, h.codigo);
                   setOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+                className="w-full text-left px-3 min-h-[44px] hover:bg-gray-50 flex items-center justify-between gap-2"
               >
                 <span className="truncate">{h.nombre}</span>
                 <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>

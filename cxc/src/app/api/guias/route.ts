@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { transportistaLabel } from "@/lib/transportistaLabel";
+import { validarEmpresasItems } from "@/lib/guias/validar-items";
 
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
 const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
@@ -61,6 +62,10 @@ export async function POST(req: NextRequest) {
   if (totalBultos === 0) {
     return NextResponse.json({ error: "La guía debe tener al menos un item con bultos > 0" }, { status: 400 });
   }
+
+  // Guía NUEVA: empresa cerrada a las 8 del grupo, sin excepción histórica.
+  const errEmpresa = validarEmpresasItems(items);
+  if (errEmpresa) return NextResponse.json({ error: errEmpresa }, { status: 400 });
 
   // Auto-increment numero with retry for race conditions (UNIQUE constraint)
   let guia: Record<string, unknown> | null = null;
