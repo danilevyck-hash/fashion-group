@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   ceilPar, fobReebok, detectMonthCol, findHeaderRow, parseReebok,
   buildCatalogo, buildCatalogoAoa, buildSwitchRows, buildSwitchAoa,
+  filtrarConPiezas, sinPiezasDelMes,
   OUT_COLS_DEFAULT, REEBOK_FORMULA_A_DEFAULT, REEBOK_FORMULA_B_DEFAULT,
-  type SheetRow,
 } from "../lib/depurador/reebok";
+import type { SheetRow } from "../lib/depurador/logic";
 import { marcaKey, type MarcaRubroFormula } from "../lib/depurador/logic";
 
 // Headers reales del Book4 (fila 2; la fila 1 es basura).
@@ -218,5 +221,162 @@ describe("Reebok — excepciones por Name (jerarquía precio fijo > fórmula Nam
     const cat = buildCatalogo(items, { formulaA: REEBOK_FORMULA_A_DEFAULT, formulaB: REEBOK_FORMULA_B_DEFAULT, excByName: exc });
     expect(cat[0].precioA).toBe(52); // fórmula A
     expect(cat[0].precioB).toBe(48); // fórmula B
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ARTÍCULOS SIN PIEZAS DEL MES — no van al Excel (pedido de Daniel)
+   "en depurador de reebok, no deberia de aparecerme en el excel los que tengan stock 0"
+   La columna STOCK de la vista previa ES "Stock Ideal" = suma de piezas del mes.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+// Artículo Male footwear con TODAS sus tallas en 0 → el proveedor no pidió nada.
+const CERO = [
+  row({ art: "200000001", sku: "Z-8", talla: 8, gender: "Male", piezas: 0 }),
+  row({ art: "200000001", sku: "Z-9", talla: 9, gender: "Male", piezas: 0 }),
+];
+// Artículo MIXTO: algunas tallas en 0 y otras con piezas → SÍ debe salir (suma 4).
+const MIXTO = [
+  row({ art: "300000003", sku: "M-8", talla: 8, gender: "Male", piezas: 0 }),
+  row({ art: "300000003", sku: "M-9", talla: 9, gender: "Male", piezas: 4 }),
+  row({ art: "300000003", sku: "M-10", talla: 10, gender: "Male", piezas: 0 }),
+];
+
+describe("Reebok — artículo con 0 piezas del mes no va al Excel", () => {
+  const parse = () => parseReebok([JUNK, H, ...FEMALE, ...CERO] as SheetRow[], MONTH);
+
+  it("Plantilla Switch: el artículo en 0 se cuenta como omitido y no queda en las filas", () => {
+    const { items } = parse();
+    const todas = SW(items);
+    expect(todas.map((r) => r.cols["Código *"])).toContain("200000001"); // hoy sale
+    const { rows, omitidos } = filtrarConPiezas(todas);
+    expect(omitidos).toBe(1);
+    expect(rows.map((r) => r.cols["Código *"])).not.toContain("200000001");
+    expect(rows.map((r) => r.cols["Código *"])).toContain("100000015");
+  });
+
+  it("Pedido para cliente: mismo filtro, mismo criterio", () => {
+    const { items } = parse();
+    const todas = buildCatalogo(items, CFG);
+    const { rows, omitidos } = filtrarConPiezas(todas);
+    expect(omitidos).toBe(1);
+    expect(rows.map((r) => r.newArticle)).not.toContain("200000001");
+    expect(rows.map((r) => r.newArticle)).toContain("100000015");
+  });
+
+  it("una TALLA en 0 no saca al artículo: lo que cuenta es la SUMA", () => {
+    const { items } = parseReebok([JUNK, H, ...MIXTO] as SheetRow[], MONTH);
+    const { rows, omitidos } = filtrarConPiezas(SW(items));
+    expect(omitidos).toBe(0);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].cols["Stock Ideal"]).toBe(4);   // 0 + 4 + 0
+    expect(rows[0].piezas).toBe(4);                 // espejo tipado de Stock Ideal
+    expect(rows[0].skus).toBe(3);                   // las 3 tallas siguen contadas
+  });
+
+  it("sinPiezasDelMes distingue el artículo vacío del que tiene una talla en 0", () => {
+    expect(sinPiezasDelMes({ piezas: 0 })).toBe(true);
+    expect(sinPiezasDelMes({ piezas: 4 })).toBe(false);
+  });
+});
+
+describe("Reebok — el mismo New Article en dos PO distintas", () => {
+  // Es lo que hace que el pedido (agrupa PO+Article) traiga más filas que Switch
+  // (agrupa solo Article): en el archivo real de JULIO son 526 contra 383.
+  const DOS_PO = [
+    row({ po: "VIC", art: "400000004", sku: "P1-9", talla: 9, gender: "Male", piezas: 2 }),
+    row({ po: "ALB", art: "400000004", sku: "P2-9", talla: 9, gender: "Male", piezas: 3 }),
+  ];
+
+  it("Switch lo junta en UNA fila con la suma de las dos PO", () => {
+    const { items } = parseReebok([JUNK, H, ...DOS_PO] as SheetRow[], MONTH);
+    const rows = SW(items);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].cols["Stock Ideal"]).toBe(5); // 2 + 3
+    expect(rows[0].skus).toBe(2);
+  });
+
+  it("el pedido lo deja en DOS filas, una por PO", () => {
+    const { items } = parseReebok([JUNK, H, ...DOS_PO] as SheetRow[], MONTH);
+    const cat = buildCatalogo(items, CFG);
+    expect(cat).toHaveLength(2);
+    expect(cat.map((r) => r.piezas).sort()).toEqual([2, 3]);
+  });
+
+  it("una PO en 0 y la otra con piezas: el artículo SIGUE saliendo en Switch", () => {
+    const MIXTO_PO = [
+      row({ po: "VIC", art: "500000005", sku: "Q1-9", talla: 9, gender: "Male", piezas: 0 }),
+      row({ po: "ALB", art: "500000005", sku: "Q2-9", talla: 9, gender: "Male", piezas: 6 }),
+    ];
+    const { items } = parseReebok([JUNK, H, ...MIXTO_PO] as SheetRow[], MONTH);
+    const sw = filtrarConPiezas(SW(items));
+    expect(sw.omitidos).toBe(0);
+    expect(sw.rows[0].cols["Stock Ideal"]).toBe(6);
+    // …pero en el PEDIDO la PO vacía sí se va, porque ahí la fila ES la PO.
+    const cat = filtrarConPiezas(buildCatalogo(items, CFG));
+    expect(cat.omitidos).toBe(1);
+    expect(cat.rows).toHaveLength(1);
+    expect(cat.rows[0].po).toBe("ALB");
+  });
+});
+
+describe("Reebok — sin columna de mes NO se entrega un Excel vacío", () => {
+  it("monthColIdx = -1 deja TODO en 0: filtrar acá vaciaría el archivo", () => {
+    const { items } = parseReebok([JUNK, H, ...FEMALE, ...CERO] as SheetRow[], -1);
+    expect(items.every((i) => i.piezas === 0)).toBe(true);
+    // Si alguien aplicara el filtro igual, no quedaría NADA: por eso el cliente
+    // solo filtra cuando monthColIdx !== -1 (y avisa en ámbar).
+    expect(filtrarConPiezas(SW(items)).rows).toHaveLength(0);
+    // Sin filtrar, los 2 artículos siguen ahí.
+    expect(SW(items)).toHaveLength(2);
+  });
+
+  it("el cliente ata el filtro a que exista columna de mes, y bloquea el archivo vacío", () => {
+    const src = readFileSync(join(__dirname, "../app/productos/cargar/ReebokClient.tsx"), "utf8");
+    expect(src).toMatch(/const filtrarSinPiezas = monthColIdx !== -1;/);
+    // Sin resultados tras filtrar → no se puede descargar.
+    expect(src).toMatch(/const quedoVacio = filtrarSinPiezas && vista\.articulos === 0;/);
+    expect(src).toMatch(/disabled=\{!!downloading \|\| quedoVacio\}/);
+    expect(src).toMatch(/if \(!items \|\| downloading \|\| quedoVacio\) return;/);
+  });
+});
+
+describe("Reebok — la vista previa y el Excel traen las MISMAS filas", () => {
+  it("el AOA tiene exactamente 1 fila por artículo (+ encabezado)", () => {
+    const { items } = parseReebok([JUNK, H, ...FEMALE, ...CERO, ...MIXTO] as SheetRow[], MONTH);
+    const sw = filtrarConPiezas(SW(items)).rows;
+    expect(buildSwitchAoa(sw)).toHaveLength(sw.length + 1);
+    const cat = filtrarConPiezas(buildCatalogo(items, CFG)).rows;
+    expect(buildCatalogoAoa(cat, "JULIO")).toHaveLength(cat.length + 1);
+  });
+
+  it("CANDADO: el cliente nunca pasa las filas SIN filtrar ni a la preview ni al Excel", () => {
+    const src = readFileSync(join(__dirname, "../app/productos/cargar/ReebokClient.tsx"), "utf8");
+    // Los arrays crudos existen, pero solo para alimentar el filtro.
+    for (const crudo of ["catalogoTodo", "switchRowsTodo"]) {
+      const usos = src.match(new RegExp(crudo, "g")) ?? [];
+      expect(usos.length).toBeGreaterThan(0);
+      expect(src).not.toMatch(new RegExp(`buildCatalogoAoa\\(${crudo}`));
+      expect(src).not.toMatch(new RegExp(`buildSwitchAoa\\(${crudo}`));
+      expect(src).not.toMatch(new RegExp(`${crudo}\\.map\\(`));   // preview
+      expect(src).not.toMatch(new RegExp(`${crudo}\\.length`));   // contadores
+    }
+    // Los que SÍ se usan son los filtrados.
+    expect(src).toMatch(/buildCatalogoAoa\(catalogo, monthLabel\)/);
+    expect(src).toMatch(/buildSwitchAoa\(switchRows\)/);
+  });
+
+  it("CANDADO: los contadores de la barra salen de la salida elegida, no del catálogo", () => {
+    const src = readFileSync(join(__dirname, "../app/productos/cargar/ReebokClient.tsx"), "utf8");
+    expect(src).toMatch(/salida === "catalogo" \? catalogo : switchRows/);
+    expect(src).toMatch(/\{vista\.articulos\}<\/b> artículos/);
+  });
+});
+
+describe("Reebok — Plantilla Switch es la opción por defecto", () => {
+  it("el estado inicial de la salida es switch", () => {
+    const src = readFileSync(join(__dirname, "../app/productos/cargar/ReebokClient.tsx"), "utf8");
+    expect(src).toMatch(/useState<Salida>\("switch"\)/);
+    expect(src).not.toMatch(/useState<Salida>\("catalogo"\)/);
   });
 });

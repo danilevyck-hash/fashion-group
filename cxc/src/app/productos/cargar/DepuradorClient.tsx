@@ -86,6 +86,8 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
   const [dragging, setDragging] = useState(false);
   const [processed, setProcessed] = useState<ProcessedRow[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  // Artículos que el proveedor no pidió (cantidad 0) y por eso no van al Excel.
+  const [omitidosSinCantidad, setOmitidosSinCantidad] = useState(0);
   const [error, setError] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [downloading, setDownloading] = useState(false);
@@ -145,9 +147,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         }));
         const best = pickBestSheet(sheets);
         if (!best) throw new Error("No encontré ninguna hoja con datos de productos.");
-        const { rows, warnings: w } = processRows(best, cfg);
+        const { rows, warnings: w, omitidosSinCantidad } = processRows(best, cfg);
         setProcessed(rows);
         setWarnings(w);
+        setOmitidosSinCantidad(omitidosSinCantidad);
         setOrphanSeen(false); // re-evaluar alarma de descripción nueva con el archivo nuevo
         setPriceEdits({}); // el CIF pudo cambiar → recalcular precios desde cero
         setSelected(new Set());
@@ -161,6 +164,7 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
       } catch (err) {
         setProcessed(null);
         setWarnings([]);
+        setOmitidosSinCantidad(0);
         setError(err instanceof Error ? err.message : "Error inesperado al leer el archivo.");
       }
     },
@@ -700,6 +704,15 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
             <span className="text-stone-300">·</span>
             <span>factor {factor}</span>
           </div>
+
+          {/* Aviso discreto: no se perdió nada, el proveedor no pidió esos artículos */}
+          {omitidosSinCantidad > 0 && (
+            <div className="mb-4 px-1 text-[12px] text-stone-500">
+              {omitidosSinCantidad.toLocaleString()} artículo{omitidosSinCantidad === 1 ? "" : "s"} sin
+              cantidad en el archivo no se {omitidosSinCantidad === 1 ? "incluyó" : "incluyeron"}.
+              Los servicios (ajustes, retenciones) sí se incluyen aunque vayan en 0.
+            </div>
+          )}
 
           {/* Cálculo de precio (Tarea 2 / A2) */}
           <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">

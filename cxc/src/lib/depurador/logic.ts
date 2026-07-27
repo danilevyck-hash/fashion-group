@@ -55,6 +55,12 @@ export interface ProcessedRow {
 export interface ProcessResult {
   rows: ProcessedRow[];
   warnings: string[];
+  /** Artículos que quedaron fuera por no traer cantidad en el archivo (ver la nota
+   *  de "artículos sin cantidad" en processRows). Los SERVICIOS nunca se cuentan acá. */
+  omitidosSinCantidad: number;
+  /** true si el archivo NO trae columna de CANTIDAD: no se filtró nada, porque sin
+   *  esa columna TODO daría 0 y el Excel saldría vacío. */
+  sinColumnaCantidad: boolean;
 }
 
 /* ============ CONFIG / CONSTANTES ============ */
@@ -382,6 +388,17 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
   // Temporada en formato AAAA-MM (ej. 2026-06) (CAMBIO 3).
   const temporada = `${anio}-${String(mesIdx + 1).padStart(2, "0")}`;
 
+  // ── Artículos sin cantidad ────────────────────────────────────────────────────
+  // Daniel no quiere en el Excel los artículos que el proveedor no pidió. Acá el
+  // criterio NO puede ser "la celda Stock Ideal dice 0": los SERVICIOS (tipo 02,
+  // AJUSTE DE PRECIO y compañía) se emiten a propósito con Stock Ideal 0 y tienen que
+  // seguir saliendo. El criterio correcto es "el proveedor no le asignó cantidad a este
+  // artículo", y eso solo se puede saber si el archivo TRAE la columna CANTIDAD — que
+  // no es obligatoria acá: sin ella num(row[-1]) da 0 en todas las filas y el filtro
+  // vaciaría la plantilla entera. Sin columna, no se filtra nada.
+  const hayColumnaCantidad = col.cant !== -1;
+  let omitidosSinCantidad = 0;
+
   const out: ProcessedRow[] = [];
   for (const [ref, items] of groups) {
     const first = items[0];
@@ -420,6 +437,14 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       tipoArt = "02";
       stockOut = 0;
       fob = 0; cif = 0;
+    }
+
+    // Fuera del Excel: artículo real (no servicio) al que el proveedor no le asignó
+    // cantidad. `servicio` es justo lo que distingue "cantidad 0 de verdad" de
+    // "Stock Ideal 0 por diseño".
+    if (hayColumnaCantidad && !servicio && qtyTotal === 0) {
+      omitidosSinCantidad++;
+      continue;
     }
 
     // Código de barra obligatorio: si no hay, usar el código del producto (Tarea 3.8).
@@ -465,7 +490,12 @@ export function processRows(rows: SheetRow[], config: DepuradorConfig): ProcessR
       destino: first.destino,
     });
   }
-  return { rows: out, warnings };
+  // Nunca entregar una plantilla vacía en silencio.
+  if (out.length === 0 && omitidosSinCantidad > 0) {
+    throw new Error(`Ninguno de los ${omitidosSinCantidad} artículos del archivo trae cantidad, ` +
+      "así que la plantilla saldría vacía. Revisa que la columna CANTIDAD tenga números.");
+  }
+  return { rows: out, warnings, omitidosSinCantidad, sinColumnaCantidad: !hayColumnaCantidad };
 }
 
 /** Reescribe el EAN de una fila a la talla elegida en el dropdown (inmutable). */
