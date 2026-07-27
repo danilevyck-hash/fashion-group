@@ -25,6 +25,15 @@ import type {
 import { parseAmount, parseSwitchFecha, parseFechaDMY } from "./parse";
 import { supabaseServer } from "../supabase-server";
 import { clearStaleRunning } from "./sync-log";
+import {
+  umbralCostoDiario,
+  esCostoDiarioImposible,
+  fechasPorAvisar,
+  COSTO_DIARIO_DIAS_HISTORIA,
+  COSTO_DIARIO_DIAS_ENTRE_AVISOS,
+} from "./costo-guard";
+import { enviarSistema } from "@/lib/alertas/canal";
+import { mapEmpresaName } from "@/lib/empresa-mapping";
 
 import type { SwitchTotalVentasDia } from "./types";
 
@@ -913,6 +922,122 @@ export interface CostoDiarioResult {
   logId: string | null;
 }
 
+interface CostoDiarioRechazado {
+  fecha: string;
+  costo: number;
+  venta: number;
+}
+
+/** Marca del descarte en switch_sync_log.skip_details. Es también la llave del
+ *  anti-loop: de acá salen las fechas que ya se avisaron. */
+const CAMPO_COSTO_IMPOSIBLE = "costo_imposible";
+
+/**
+ * Historia de costo diario de la empresa para calibrar el umbral, EXCLUYENDO
+ * los días que trae el reporte de esta corrida (un día malo no se valida contra
+ * sí mismo). Fail-open: si no se puede leer, devuelve vacío → umbralCostoDiario
+ * cae al piso absoluto, que es el comportamiento más permisivo posible.
+ *
+ * Sin paginar a propósito: 1 fila por día × 365 días = ≤366 filas por empresa,
+ * muy por debajo del `db-max-rows` = 1000 de PostgREST (medido hoy: 92 filas
+ * por empresa en toda la vida de la tabla).
+ */
+async function leerHistoricoCostoDiario(
+  empresaKey: EmpresaKey,
+  excluir: ReadonlySet<string>,
+): Promise<number[]> {
+  const desde = new Date(Date.now() - COSTO_DIARIO_DIAS_HISTORIA * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const { data, error } = await supabaseServer
+    .from("switch_costo_diario")
+    .select("fecha,costo_total")
+    .eq("empresa_key", empresaKey)
+    .gte("fecha", desde);
+  if (error || !data) {
+    console.warn(
+      `[sync ${empresaKey} costo] no pude leer el histórico para calibrar el guard (${error?.message ?? "vacío"}); uso el piso absoluto`,
+    );
+    return [];
+  }
+  return (data as Array<{ fecha: string; costo_total: number | string }>)
+    .filter((r) => !excluir.has(r.fecha))
+    .map((r) => Number(r.costo_total));
+}
+
+/** Fechas que YA se avisaron en la ventana reciente, leídas de las corridas
+ *  anteriores de este mismo par (empresa, costo). Fail-open: si no se puede
+ *  leer, se avisa (perder un aviso es peor que repetirlo). */
+async function fechasYaAvisadas(empresaKey: EmpresaKey, logIdActual: string | null): Promise<string[]> {
+  const desde = new Date(
+    Date.now() - COSTO_DIARIO_DIAS_ENTRE_AVISOS * 86_400_000,
+  ).toISOString();
+  const { data, error } = await supabaseServer
+    .from("switch_sync_log")
+    .select("id,skip_details")
+    .eq("empresa_key", empresaKey)
+    .eq("sync_type", "costo")
+    .gte("started_at", desde);
+  if (error || !data) return [];
+  const fechas: string[] = [];
+  for (const fila of data as Array<{ id: string; skip_details: unknown }>) {
+    if (logIdActual && fila.id === logIdActual) continue; // la corrida en curso no cuenta
+    if (!Array.isArray(fila.skip_details)) continue;
+    for (const d of fila.skip_details as SkipDetail[]) {
+      if (d?.campo === CAMPO_COSTO_IMPOSIBLE && typeof d.secuencial === "string") {
+        fechas.push(d.secuencial);
+      }
+    }
+  }
+  return fechas;
+}
+
+function fmtMontoCosto(n: number): string {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Aviso al canal 🔧 SISTEMA. Cumple la regla de tres: es real (el número está
+ * medido), NO se arregla solo (el dato está mal EN Switch: va a volver a llegar
+ * mañana igual) y alguien tiene que hacer algo (corregirlo en Switch).
+ *
+ * ⚠️ Anti-loop: el reporte trae el mes en curso entero todos los días, así que
+ * un día mal cargado reaparece en CADA corrida. Solo se avisa por las fechas
+ * que no se avisaron en los últimos días; si el dato sigue mal, el recordatorio
+ * vuelve una vez por semana, no una vez por día.
+ */
+async function avisarCostoDiarioImposible(
+  empresaKey: EmpresaKey,
+  rechazadas: readonly CostoDiarioRechazado[],
+  umbral: number,
+  logIdActual: string | null,
+): Promise<void> {
+  const nuevas = new Set(
+    fechasPorAvisar(
+      rechazadas.map((r) => r.fecha),
+      await fechasYaAvisadas(empresaKey, logIdActual),
+    ),
+  );
+  if (nuevas.size === 0) return; // ya se avisó por estos días: no se repite
+
+  const detalle = rechazadas
+    .filter((r) => nuevas.has(r.fecha))
+    .slice(0, 5)
+    .map((r) => `• ${r.fecha}: costo ${fmtMontoCosto(r.costo)} contra una venta de ${fmtMontoCosto(r.venta)}`)
+    .join("\n");
+  const extra = nuevas.size > 5 ? `\n…y ${nuevas.size - 5} día(s) más.` : "";
+
+  await enviarSistema(
+    `Switch mandó un costo imposible — ${mapEmpresaName(empresaKey)}\n${detalle}${extra}\n\n` +
+      `Qué pasó: el reporte de costo de Switch devolvió una cifra que ninguna operación real alcanza ` +
+      `(el tope para esta empresa es ${fmtMontoCosto(umbral)} en un día).\n` +
+      `Qué significa: ese día NO se guardó, así que la utilidad y el margen quedaron limpios. ` +
+      `El resto del mes se sincronizó normal.\n` +
+      `Qué hacer: revisar en Switch el costo de ese día — hay un artículo mal cargado. ` +
+      `Mientras siga mal, este aviso se repite una vez por semana, no todos los días.`,
+  );
+}
+
 /**
  * Sincroniza el costo/venta/utilidad diario del MES EN CURSO desde el reporte
  * "Total de ventas" (tipo=03) → switch_costo_diario. Único endpoint con costo
@@ -974,6 +1099,10 @@ export async function syncCostoDiario(
       updated_at: string;
     }> = [];
 
+    // 1ª pasada — parsear. El guard necesita saber QUÉ días trae el reporte
+    // antes de calcular el umbral (esos días se excluyen de la historia: el
+    // umbral se mide contra el pasado, no contra el dato que se está validando).
+    const parsed: Array<{ fecha: string; venta: number; costo: number; utilidad: number }> = [];
     for (const v of Object.values(totales) as SwitchTotalVentasDia[]) {
       const fecha = parseFechaDMY(v.fecha);
       if (!fecha) {
@@ -982,12 +1111,39 @@ export async function syncCostoDiario(
         skipDetails.push({ facturaId: null, secuencial: null, campo: "costo_fecha_invalida", valorCrudo: v.fecha });
         continue;
       }
+      parsed.push({
+        fecha,
+        venta: parseAmount(v.total) ?? 0,
+        costo: parseAmount(v.costo) ?? 0,
+        utilidad: parseAmount(v.utilidad) ?? 0,
+      });
+    }
+
+    const umbral = umbralCostoDiario(
+      await leerHistoricoCostoDiario(empresaKey, new Set(parsed.map((p) => p.fecha))),
+    );
+
+    // 2ª pasada — guard. Un día imposible NO se escribe (así el último valor
+    // bueno de ese día sobrevive) y NO frena a los demás días del mes.
+    const rechazadas: CostoDiarioRechazado[] = [];
+    for (const p of parsed) {
+      if (esCostoDiarioImposible(p.costo, umbral)) {
+        skipped++;
+        skipDetails.push({
+          facturaId: null,
+          secuencial: p.fecha,
+          campo: CAMPO_COSTO_IMPOSIBLE,
+          valorCrudo: { costo: p.costo, venta: p.venta, umbral },
+        });
+        rechazadas.push({ fecha: p.fecha, costo: p.costo, venta: p.venta });
+        continue;
+      }
       rows.push({
         empresa_key: empresaKey,
-        fecha,
-        venta_total: parseAmount(v.total) ?? 0,
-        costo_total: parseAmount(v.costo) ?? 0,
-        utilidad_total: parseAmount(v.utilidad) ?? 0,
+        fecha: p.fecha,
+        venta_total: p.venta,
+        costo_total: p.costo,
+        utilidad_total: p.utilidad,
         synced_at: nowIso,
         updated_at: nowIso,
       });
@@ -998,6 +1154,20 @@ export async function syncCostoDiario(
         .from("switch_costo_diario")
         .upsert(rows, { onConflict: "empresa_key,fecha", ignoreDuplicates: false });
       if (error) throw new Error(`UPSERT costo_diario falló: ${error.message}`);
+    }
+
+    // El aviso va DESPUÉS del upsert (los días buenos ya están guardados) y
+    // nunca puede tumbar la corrida: si Telegram falla, el sync sigue success.
+    if (rechazadas.length > 0) {
+      console.error(
+        `[sync ${empresaKey} costo] ${rechazadas.length} día(s) con costo IMPOSIBLE (umbral ${umbral}) — no se guardaron`,
+        rechazadas,
+      );
+      try {
+        await avisarCostoDiarioImposible(empresaKey, rechazadas, umbral, logId);
+      } catch (e) {
+        console.error(`[sync ${empresaKey} costo] no pude avisar el costo imposible: ${String(e)}`);
+      }
     }
 
     if (logId) {
