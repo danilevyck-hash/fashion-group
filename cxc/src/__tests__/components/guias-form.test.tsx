@@ -326,16 +326,20 @@ describe("Deshacer un borrado devuelve la fila ENTERA", () => {
   });
 });
 
-// ── 6. Sin scroll de lado en el iPhone ───────────────────────────────────────
+// ── 6. Sin scroll de lado en el iPhone ni en el iPad vertical ────────────────
 
-describe("En el iPhone no hay tabla", () => {
-  it("la tabla existe solo desde md (en 390px está oculta)", () => {
+describe("En el iPhone y en el iPad vertical no hay tabla", () => {
+  it("la tabla existe solo desde lg (en 390, 768 y 834 px está oculta)", () => {
     const { container } = render(<Harness itemsIniciales={[filaBase()]} />);
     const tabla = container.querySelector("table");
     expect(tabla).not.toBeNull();
     const contenedor = tabla!.closest("div.hidden");
     expect(contenedor?.className).toContain("hidden");
-    expect(contenedor?.className).toContain("md:block");
+    // `lg` (1024) y no `md` (768): un iPad vertical mide 768 u 834 px y caía del
+    // lado de la tabla, con solo 496-562 px útiles para 720 de tabla.
+    expect(contenedor?.className).toContain("lg:block");
+    expect(contenedor?.className).not.toContain("md:block");
+    expect(contenedor?.getAttribute("data-layout")).toBe("tabla");
   });
 
   it("los campos de la tarjeta móvil son los MISMOS que los de la tabla", () => {
@@ -347,9 +351,9 @@ describe("En el iPhone no hay tabla", () => {
     }
   });
 
-  it("la tarjeta móvil rotula cada campo (sin encabezado de tabla no hay contexto)", () => {
+  it("la tarjeta rotula cada campo (sin encabezado de tabla no hay contexto)", () => {
     const { container } = render(<Harness itemsIniciales={[filaBase()]} />);
-    const movil = container.querySelector("div.md\\:hidden.space-y-4")!;
+    const movil = container.querySelector('div[data-layout="tarjetas"]')!;
     for (const label of ["Cliente", "Dirección", "Empresa", "Factura(s)", "Bultos"]) {
       expect(within(movil as HTMLElement).getAllByText(label, { exact: false }).length, label).toBeGreaterThan(0);
     }
