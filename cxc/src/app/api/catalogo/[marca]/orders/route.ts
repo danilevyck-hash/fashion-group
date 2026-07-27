@@ -110,6 +110,18 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
 
   const typedItems = items as IncomingItem[];
+  // `<marca>_order_items.product_id` es NOT NULL sin default y las RPC lo
+  // insertan SIN COALESCE, a diferencia de `quantity`/`unit_price`. Un item sin
+  // product_id abortaba la transacción entera (pedido + items) con un 23502 que
+  // la ruta contestaba como "Error interno". El carrito siempre lo manda; esto
+  // es la red del lado del servidor.
+  const sinProducto = typedItems.findIndex((i) => typeof i.product_id !== "string" || !i.product_id.trim());
+  if (sinProducto !== -1) {
+    return NextResponse.json(
+      { error: `El producto ${sinProducto + 1} del pedido no se pudo identificar. Vuelve a agregarlo al carrito.` },
+      { status: 400 },
+    );
+  }
   // Precio por unidad debe ser positivo: un negativo metería un total artificial.
   if (typedItems.some((i) => !(Number(i.unit_price) > 0))) {
     return NextResponse.json({ error: "El precio de cada producto debe ser mayor a cero" }, { status: 400 });

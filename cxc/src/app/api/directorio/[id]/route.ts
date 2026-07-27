@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { CAMPOS_OBLIGATORIOS, respuestaErrorEscritura, validarObligatorios } from "@/lib/campos-obligatorios";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -11,9 +12,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
+  // En un UPDATE, `nombre: undefined` es inofensivo (PostgREST no toca la
+  // columna). Lo que sí rompe es mandarla vacía o en null: `nombre` es NOT NULL
+  // y dejaría al cliente sin nombre, o daría 23502. Solo se valida si viene.
+  if ("nombre" in body) {
+    const falta = validarObligatorios(body, CAMPOS_OBLIGATORIOS.directorio_clientes);
+    if (falta) return falta;
+  }
   const { nombre, empresa, telefono, celular, correo, contacto, notas } = body;
   const { data, error } = await supabaseServer.from("directorio_clientes").update({ nombre, empresa, telefono, celular, correo, contacto, notas }).eq("id", params.id).select().single();
-  if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › editar cliente" });
 
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "directorio_update", "directorio", { clienteId: params.id, nombre }, session?.userName);

@@ -4,6 +4,11 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 import { validarEmpresasItems } from "@/lib/guias/validar-items";
+import {
+  CAMPOS_OBLIGATORIOS,
+  respuestaErrorEscritura,
+  validarObligatorios,
+} from "@/lib/campos-obligatorios";
 
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
 const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
@@ -45,6 +50,13 @@ export async function POST(req: NextRequest) {
   if (!s || !GUIAS_WRITE_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por, numero_guia_transp } = body;
+
+  // `guia_transporte.fecha` es NOT NULL sin default y era el ÚNICO obligatorio
+  // que llegaba crudo del body: el formulario la valida en el navegador
+  // (guia-form-logic.ts) y el servidor no tenía red. Un body sin `fecha` daba
+  // 23502 y la ruta devolvía el mensaje de Postgres tal cual.
+  const faltaObligatorio = validarObligatorios(body, CAMPOS_OBLIGATORIOS.guia_transporte);
+  if (faltaObligatorio) return faltaObligatorio;
 
   // Validate modo_entrega + transportista_id (Sprint 2 schema)
   if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
@@ -115,7 +127,10 @@ export async function POST(req: NextRequest) {
     break;
   }
 
-  if (guiaErr || !guia) return NextResponse.json({ error: guiaErr?.message || "Error al crear guía" }, { status: 500 });
+  // El mensaje crudo de Postgres NO va al navegador (filtraba nombres de tabla
+  // y columna); el detalle queda en el log y, si es un desacuerdo de schema,
+  // sale por el canal de sistema.
+  if (guiaErr || !guia) return respuestaErrorEscritura(guiaErr, { tabla: "guia_transporte", accion: "Guías › crear guía" });
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>, i: number) => ({
@@ -131,7 +146,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const { error: itemsErr } = await supabaseServer.from("guia_items").insert(rows);
-    if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+    if (itemsErr) return respuestaErrorEscritura(itemsErr, { tabla: "guia_items", accion: "Guías › crear guía" });
   }
 
   const session = getSession(req);
