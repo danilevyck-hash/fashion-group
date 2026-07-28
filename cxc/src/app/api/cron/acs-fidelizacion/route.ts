@@ -20,7 +20,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { runAcsFidelizacionSync } from "@/lib/switch-api/sync-acs-fidelizacion";
-import { recordCronHeartbeat, logCronError, cronSuccessHoyUtc } from "@/lib/cron-telemetry";
+import {
+  recordCronHeartbeat,
+  logCronError,
+  cronSuccessHoyUtc,
+  recoveryStillComingToday,
+} from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // techo del plan (Pro + Fluid)
@@ -55,7 +60,21 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, ...r });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    await logCronError(CRON_NAME, msg);
+    // El mismo defecto que se arregló en alert-policy el 28-jul-2026, acá en
+    // chiquito: este cron YA tiene su segunda oportunidad (11:30 y 16:30 UTC,
+    // con el guard no-op de arriba) y el manejador de error la ignoraba —
+    // avisaba a las 11:30 aunque a las 16:30 la corrida siguiente arreglara
+    // todo. Toca Switch MULTI con sesión única, así que el 401 transitorio es su
+    // modo de fallo típico. Ahora usa el mecanismo que ya existe para esto
+    // (`recoveryStillComingToday`, el mismo del backup): si todavía queda una
+    // entrada por delante hoy, se persiste el fallo sin despertar a nadie; si
+    // esta era la ÚLTIMA del día, suena, porque ya no hay red detrás.
+    const ahora = new Date();
+    const quedaOtraHoy = recoveryStillComingToday(
+      CRON_NAME,
+      ahora.getUTCHours() + ahora.getUTCMinutes() / 60,
+    );
+    await logCronError(CRON_NAME, msg, null, { telegram: !quedaOtraHoy });
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

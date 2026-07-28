@@ -16,7 +16,7 @@ vi.mock("@/lib/telegram", () => ({
   shortError: (s: string) => s,
 }));
 
-import { isSwitch401, isSwitchTransitorio, isSwitchSilenciable, computeStreakSilenciable } from "@/lib/switch-api/alert-policy";
+import { isSwitch401, isSwitchTransitorio, isSwitchSilenciable, computeStreakFallos } from "@/lib/switch-api/alert-policy";
 
 describe("isSwitch401", () => {
   it("detecta token muerto a media paginación (caso real recibos)", () => {
@@ -94,7 +94,7 @@ describe("isSwitchTransitorio (anti-ruido red, 17-jul-2026)", () => {
   });
 });
 
-describe("computeStreakSilenciable", () => {
+describe("computeStreakFallos", () => {
   const err401 = (started_at: string) => ({
     status: "error",
     started_at,
@@ -107,12 +107,12 @@ describe("computeStreakSilenciable", () => {
   });
 
   it("1 solo 401 (corrida actual) → streak 1, no escala", () => {
-    const r = computeStreakSilenciable([err401("2026-07-10T05:30:00Z"), success("2026-07-09T05:30:00Z")]);
+    const r = computeStreakFallos([err401("2026-07-10T05:30:00Z"), success("2026-07-09T05:30:00Z")]);
     expect(r.streak).toBe(1);
   });
 
   it("2 corridas consecutivas 401 → streak 2 con sinceIso de la primera", () => {
-    const r = computeStreakSilenciable([
+    const r = computeStreakFallos([
       err401("2026-07-10T05:30:00Z"),
       err401("2026-07-09T05:30:00Z"),
       success("2026-07-08T05:30:00Z"),
@@ -122,7 +122,7 @@ describe("computeStreakSilenciable", () => {
   });
 
   it("un success intermedio corta el streak", () => {
-    const r = computeStreakSilenciable([
+    const r = computeStreakFallos([
       err401("2026-07-10T05:30:00Z"),
       success("2026-07-09T05:30:00Z"),
       err401("2026-07-08T05:30:00Z"),
@@ -131,7 +131,7 @@ describe("computeStreakSilenciable", () => {
   });
 
   it("un error de RED intermedio NO corta el streak (mismo Switch caído)", () => {
-    const r = computeStreakSilenciable([
+    const r = computeStreakFallos([
       err401("2026-07-10T05:30:00Z"),
       { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "Error de red en /autenticacion: fetch failed (ECONNREFUSED)" },
       err401("2026-07-08T05:30:00Z"),
@@ -140,16 +140,36 @@ describe("computeStreakSilenciable", () => {
     expect(r.sinceIso).toBe("2026-07-08T05:30:00Z");
   });
 
-  it("un error NO silenciable (LICENCIA) sí corta el streak", () => {
-    const r = computeStreakSilenciable([
+  /**
+   * CAMBIO DELIBERADO (28-jul-2026, "no avisar al primer fallo").
+   *
+   * Este caso afirmaba lo CONTRARIO: que un error NO silenciable en el medio
+   * cortara la racha y la dejara en 1. Era el bug que dejaba a los errores no
+   * silenciables sin racha ninguna —sonaban al primer fallo— y que además leía
+   * un par alternando 401 → timeout de base → 401 como tres "primeros fallos"
+   * seguidos. Para la pregunta que importa —"¿esto se recupera solo?"— el motivo
+   * de cada fallo da igual: lo que cuenta es que en el medio NO hubo un success.
+   */
+  it("un error de OTRA clase (LICENCIA) ya NO corta la racha: sigue sin haber success", () => {
+    const r = computeStreakFallos([
       err401("2026-07-10T05:30:00Z"),
       { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "Auth fallo: HTTP 400 — LICENCIA NO SE ENCUENTRA ACTIVA" },
       err401("2026-07-08T05:30:00Z"),
     ]);
-    expect(r.streak).toBe(1);
+    expect(r.streak).toBe(3);
+    expect(r.sinceIso).toBe("2026-07-08T05:30:00Z");
+  });
+
+  it("un error de base (statement timeout) cuenta como fallo de la racha", () => {
+    const r = computeStreakFallos([
+      { status: "error", started_at: "2026-07-10T05:30:00Z", error_message: "UPSERT falló: canceling statement due to statement timeout" },
+      { status: "error", started_at: "2026-07-09T05:30:00Z", error_message: "No pude crear switch_sync_log: vacío" },
+      success("2026-07-08T05:30:00Z"),
+    ]);
+    expect(r.streak).toBe(2);
   });
 
   it("sin historial → streak 0", () => {
-    expect(computeStreakSilenciable([]).streak).toBe(0);
+    expect(computeStreakFallos([]).streak).toBe(0);
   });
 });
