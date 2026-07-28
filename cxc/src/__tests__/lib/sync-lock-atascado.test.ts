@@ -129,7 +129,7 @@ import {
   barrerRunningAtascados,
   createSwitchSyncLog,
 } from "../../lib/switch-api/sync-log";
-import { computeStreakSilenciable } from "../../lib/switch-api/alert-policy";
+import { computeStreakFallos } from "../../lib/switch-api/alert-policy";
 
 const haceMin = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
@@ -283,7 +283,7 @@ describe('"error" significa error — un atasco no es un fallo de Switch', () =>
   });
 
   it("un fallo REAL sigue contando como error y escala igual que antes", () => {
-    const { streak } = computeStreakSilenciable([
+    const { streak } = computeStreakFallos([
       { status: "error", started_at: "2026-07-27T18:00:00Z", error_message: "Auth fallo: HTTP 401 — TOKEN INVALIDO" },
       { status: "error", started_at: "2026-07-27T14:00:00Z", error_message: "Error de red en /apifactura: fetch failed" },
       { status: "success", started_at: "2026-07-27T10:00:00Z", error_message: null },
@@ -292,7 +292,7 @@ describe('"error" significa error — un atasco no es un fallo de Switch', () =>
   });
 
   it("una fila de ATASCO no suma al streak (no es evidencia de que Switch falle)", () => {
-    const { streak } = computeStreakSilenciable([
+    const { streak } = computeStreakFallos([
       { status: "error", started_at: "2026-07-27T18:00:00Z", error_message: MSG_RUN_ATASCADO },
       { status: "success", started_at: "2026-07-27T12:00:00Z", error_message: null },
     ]);
@@ -302,7 +302,7 @@ describe('"error" significa error — un atasco no es un fallo de Switch', () =>
   it("y tampoco CORTA un streak legítimo que la atraviesa (el lado que más dolía)", () => {
     // Antes: el texto del atasco no es silenciable → el `break` mataba el conteo
     // y una caída real de Switch se leía como "primer fallo" corrida tras corrida.
-    const { streak, sinceIso } = computeStreakSilenciable([
+    const { streak, sinceIso } = computeStreakFallos([
       { status: "error", started_at: "2026-07-27T18:00:00Z", error_message: "Auth fallo: HTTP 401 — TOKEN INVALIDO" },
       { status: "error", started_at: "2026-07-27T17:00:00Z", error_message: MSG_RUN_ATASCADO },
       { status: "error", started_at: "2026-07-27T15:00:00Z", error_message: "HTTP 502: Bad Gateway" },
@@ -313,7 +313,7 @@ describe('"error" significa error — un atasco no es un fallo de Switch', () =>
   });
 
   it("un success sigue cortando el streak (no se rompió lo que funcionaba)", () => {
-    const { streak } = computeStreakSilenciable([
+    const { streak } = computeStreakFallos([
       { status: "error", started_at: "2026-07-27T18:00:00Z", error_message: "HTTP 502: Bad Gateway" },
       { status: "success", started_at: "2026-07-27T17:00:00Z", error_message: null },
       { status: "error", started_at: "2026-07-27T15:00:00Z", error_message: "HTTP 502: Bad Gateway" },
