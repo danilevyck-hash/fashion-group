@@ -521,6 +521,13 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 - Risk filter subtitles
 - Stale data banner
 
+> **La píldora de tramo FILTRA y ORDENA en una sola acción (27-jul-2026).** Pedido de Daniel, textual: *"los card de cxc por buckets al tocarlo debe de acomodar las cxc en orden de la deuda del bucket no?"*. Tenía razón: tocar "121d+" dejaba los 64 clientes del tramo pero **ordenados por saldo TOTAL**, así que el que más debía EN ESE TRAMO podía no quedar arriba — que es justo lo que se fue a buscar. Medido en producción: por total mandaba CITY MALL PASO CANOA ($587.299,70), y por tramo mandan INTERNACIONAL BELEN ($143.713,36), LA FRONTERA DUTY FREE ($127.052,15) y JERUSALEM DUTY FREE ($122.920,80). Reordenar era un **segundo** control aparte (clic en el título de la columna): dos controles para una sola intención.
+> - **Fuente única: `src/lib/cxc-orden.ts`** (módulo PURO — filtro por tramo + comparador), usada por el escritorio (`KpiCards` + `ClientTable` vía `admin/page.tsx`) **y** por el móvil (`PanelCxcMobile`). Antes el comparador estaba escrito dos veces, con dos criterios distintos. Los tramos siguen siendo 0-90 / 91-120 / 121+ y **no se toca ningún número**: esto solo filtra y ordena.
+> - **El orden se DERIVA del tramo; el clic en el título es un override ANCLADO a ese tramo** (`ordenEfectivo`). Por eso los dos controles no pueden contradecirse: son un solo estado, y la flecha del encabezado siempre describe el orden real. Al cambiar de píldora el override caduca solo, sin efectos ni sincronización manual — y un deep link `?risk=overdue` o un back/forward llegan ya ordenados por su tramo. El orden por título **se queda**: sirve para ordenar sin filtrar.
+> - **Tocar la píldora encendida la apaga** (vuelve a "Total pendiente", que ordena por total). Antes en escritorio no había salida del filtro sin recargar.
+> - **Se ven tocables** (Daniel: "no parecen tocables"): la activa lleva borde de color + fondo tenue + label en negrita, las inactivas borde gris-300 con hover de fondo/borde/sombra, y todas `min-h-[44px]` + `active:scale-[0.97]`. **Sin flechitas** — la única flecha de la pantalla es la del selector de mes; agregar más prometería opciones que no existen.
+> - Candado: `src/__tests__/lib/cxc-orden.test.ts` (21 casos, verificado por mutación: que la píldora no reordene rompe 4, que no se pueda apagar rompe 2, que el override no caduque rompe 1). Verificación en navegador con datos de producción: `node scripts/_verif-pildoras.mjs` (solo lectura; **gotchas**: sembrar `sessionStorage.cxc_role` o `useAuth` redirige todo al login, y `delete Navigator.prototype.serviceWorker` antes de navegar).
+
 ### Cheques (April 10-11)
 - Guided rebotado → re-depositar flow
 
