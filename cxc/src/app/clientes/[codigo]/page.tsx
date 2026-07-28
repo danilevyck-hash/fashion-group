@@ -65,9 +65,17 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .from("switch_estadocuenta_aging")
       .select("company_key, total, d91_120, d121_180, d181_270, d271_365, mas_365")
       .eq("codigo", codigo),
+    // `.in(empresa)` NO es decorativo: sin él esta query trae los recibos de
+    // CUALQUIER empresa que comparta el código de cliente. Hoy la suma se salva
+    // aguas abajo porque el `.map(B2B_EMPRESA_KEYS)` de más abajo descarta las
+    // claves que no son del grupo — o sea que la separación depende de una
+    // proyección a 60 líneas de distancia, no de la consulta. Se hace explícito
+    // acá para que traer una empresa nueva a switch_recibos (confecciones_boston
+    // es la candidata) no pueda contaminar el "Cobrado YTD" ni el total del grupo.
     supabaseServer
       .from("switch_recibos")
       .select("empresa_key, total")
+      .in("empresa_key", B2B_EMPRESA_KEYS)
       .eq("cliente_codigo", codigo)
       .eq("es_retencion", false)
       .gte("fecha", yearStart),
