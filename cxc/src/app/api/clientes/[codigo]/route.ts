@@ -97,9 +97,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .select("company_key, total")
       .eq("codigo", codigo),
     // Cobrado YTD = pagos del año (switch_recibos) EXCLUYENDO retenciones.
+    // El `.in(empresa)` acota a las empresas con CXC en ESTE sistema: sin él la
+    // query trae los recibos de cualquier empresa que comparta el código de
+    // cliente, y la separación quedaría a cargo del `.map(B2B_EMPRESA_KEYS)` de
+    // más abajo en vez de la consulta. Ver el gemelo en clientes/[codigo]/page.tsx.
     supabaseServer
       .from("switch_recibos")
       .select("empresa_key, total")
+      .in("empresa_key", B2B_EMPRESA_KEYS)
       .eq("cliente_codigo", codigo)
       .eq("es_retencion", false)
       .gte("fecha", anioDesde)
