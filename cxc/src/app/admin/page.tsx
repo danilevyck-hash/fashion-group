@@ -30,12 +30,18 @@ import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartS
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
+import {
+  ordenEfectivo,
+  ordenAlTocarTitulo,
+  siguienteRiskFilter,
+  pasaFiltroRiesgo,
+  compararClientes,
+  type RiskFilter,
+  type SortKey,
+  type OrdenOverride,
+} from "@/lib/cxc-orden";
 
 // ── Helpers ──────────────────────────────────────────────
-
-type RiskFilter = "all" | "current" | "watch" | "overdue";
-type SortKey = "name" | "current" | "watch" | "overdue" | "total";
-type SortDir = "asc" | "desc";
 
 function buildEmailSubject(client: ConsolidatedClient) {
   return `Estado de Cuenta - ${client.nombre_normalized} - Fashion Group`;
@@ -119,6 +125,11 @@ function AdminDashboardInner() {
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
   // riskFilter vive en la URL (?risk=) → compartible y sobrevive refresh.
   const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
+  // Tocar una píldora de tramo FILTRA y ORDENA por ese tramo en una sola acción,
+  // y tocar la que ya está activa la apaga. Toda la regla vive en lib/cxc-orden.
+  const handleRiskFilterChange = useCallback((tocada: RiskFilter) => {
+    setRiskFilter(siguienteRiskFilter(riskFilter, tocada));
+  }, [riskFilter, setRiskFilter]);
 
   // Per-user empresa restriction (e.g. Edwin only sees Vistana International)
   const [empresaRestriction, setEmpresaRestriction] = useState<string | null>(null);
@@ -140,8 +151,12 @@ function AdminDashboardInner() {
     setUrlEmpresa(next);   // fuente compartible
     setLastEmpresa(next);  // memoria fallback para próxima visita sin URL
   }, [setUrlEmpresa, setLastEmpresa]);
-  const [sortKey, setSortKey] = useState<SortKey>("total");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // El orden se DERIVA del tramo activo. El clic en el título de una columna es
+  // un override anclado a ese tramo: sirve para ordenar sin filtrar, y al cambiar
+  // de píldora deja de aplicar solo. Así encabezado y píldora nunca se contradicen.
+  const [ordenOverride, setOrdenOverride] = useState<OrdenOverride | null>(null);
+  const orden = ordenEfectivo(riskFilter, ordenOverride);
+  const { key: sortKey, dir: sortDir } = orden;
   const [toast, setToast] = useState<string | null>(null);
   const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
   const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
@@ -246,9 +261,7 @@ function AdminDashboardInner() {
         });
     }
 
-    if (riskFilter === "current") result = result.filter((c) => c.total > 0 && c.overdue === 0 && c.watch === 0);
-    else if (riskFilter === "watch") result = result.filter((c) => c.watch > 0);
-    else if (riskFilter === "overdue") result = result.filter((c) => c.overdue > 0);
+    if (riskFilter !== "all") result = result.filter((c) => pasaFiltroRiesgo(c, riskFilter));
 
     if (search) {
       const q = normalizeName(search);
@@ -262,30 +275,10 @@ function AdminDashboardInner() {
       );
     }
 
-    result.sort((a, b) => {
-      // Favorites always first
-      const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
-      const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
-      if (aFav !== bFav) return aFav - bFav;
-
-      // Negative totals (credit) always last
-      const aNeg = a.total < 0 ? 1 : 0;
-      const bNeg = b.total < 0 ? 1 : 0;
-      if (aNeg !== bNeg) return aNeg - bNeg;
-
-      if (sortKey === "name") {
-        const cmp = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
-        return sortDir === "asc" ? cmp : -cmp;
-      }
-      let va: number, vb: number;
-      if (sortKey === "current") { va = a.current; vb = b.current; }
-      else if (sortKey === "watch") { va = a.watch; vb = b.watch; }
-      else if (sortKey === "overdue") { va = a.overdue; vb = b.overdue; }
-      else { va = a.total; vb = b.total; }
-      if (va !== vb) return sortDir === "asc" ? va - vb : vb - va;
-      // Stable tiebreaker: sort by name when numeric values are equal
-      return a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
-    });
+    result.sort((a, b) => compararClientes(a, b, {
+      orden: { key: sortKey, dir: sortDir },
+      esFavorito: (nombre) => favorites.has(nombre),
+    }));
 
     return result;
   }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, favorites]);
@@ -349,12 +342,7 @@ function AdminDashboardInner() {
   // ── Sorting ──────────────────────────────────────────
 
   function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir(sortDir === "desc" ? "asc" : "desc");
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
+    setOrdenOverride({ risk: riskFilter, ...ordenAlTocarTitulo(orden, key) });
   }
 
   const sortArrow = (key: SortKey) => {
@@ -502,7 +490,7 @@ function AdminDashboardInner() {
         search={search}
         setSearch={setSearch}
         riskFilter={riskFilter}
-        setRiskFilter={setRiskFilter}
+        setRiskFilter={handleRiskFilterChange}
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
         favorites={favorites}
@@ -635,7 +623,7 @@ function AdminDashboardInner() {
       </div>
 
       {/* Clickable KPI chips = risk filter */}
-      <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
+      <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={handleRiskFilterChange} />
 
       <ClientTable
         filtered={filtered}
@@ -644,7 +632,7 @@ function AdminDashboardInner() {
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
         riskFilter={riskFilter}
-        setRiskFilter={setRiskFilter}
+        setRiskFilter={handleRiskFilterChange}
         search={search}
         setSearch={setSearch}
         sortKey={sortKey}

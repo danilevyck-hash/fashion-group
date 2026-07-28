@@ -9,11 +9,8 @@ import { AccordionContent, useContextMenu, BottomSheet } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
-import { AGING, type AgingKey } from "@/lib/cxc-aging";
-
-type RiskFilter = "all" | AgingKey;
-type SortKey = "name" | "current" | "watch" | "overdue" | "total";
-type SortDir = "asc" | "desc";
+import { AGING } from "@/lib/cxc-aging";
+import { etiquetaOrden, type RiskFilter, type SortKey, type SortDir } from "@/lib/cxc-orden";
 
 interface Props {
   filtered: ConsolidatedClient[];
@@ -53,6 +50,8 @@ export default function ClientTable({
   setRiskFilter,
   search,
   setSearch,
+  sortKey,
+  sortDir,
   toggleSort,
   sortArrow,
   userRole,
@@ -294,10 +293,12 @@ export default function ClientTable({
         </div>
       )}
 
-      {/* Result count */}
+      {/* Result count + orden activo — el texto describe el orden REAL de la
+          tabla (píldora o clic en el título de una columna: son el mismo estado). */}
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs text-gray-400">
           {(search || riskFilter !== "all" || companyFilter !== "all") ? `${filtered.length} de ${roleClients.length} clientes` : `${filtered.length} clientes`}
+          {" · ordenados por "}{etiquetaOrden(sortKey)}{sortDir === "asc" ? " (de menor a mayor)" : ""}
         </div>
       </div>
 
@@ -309,16 +310,16 @@ export default function ClientTable({
           <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Por vencer (0-90d) · clic para ordenar" onClick={() => toggleSort("current")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Por vencer (0-90d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("current")}>
             0-90d{sortArrow("current")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido reciente (91-120d) · clic para ordenar" onClick={() => toggleSort("watch")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido reciente (91-120d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("watch")}>
             91-120d{sortArrow("watch")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="Vencido crítico (+120d) · clic para ordenar por monto vencido" onClick={() => toggleSort("overdue")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="Vencido crítico (+120d) · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("overdue")}>
             121d+{sortArrow("overdue")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar" onClick={() => toggleSort("total")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar la lista sin filtrarla" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}
           </div>
         </div>

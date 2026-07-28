@@ -24,8 +24,12 @@ import {
 } from "@/lib/empresa-mapping";
 import { formatCompactCurrency } from "@/lib/ventas/format";
 import { fmt } from "@/lib/format";
-
-type RiskFilter = "all" | "current" | "watch" | "overdue";
+import {
+  ordenParaRiskFilter,
+  ordenarClientes,
+  etiquetaOrden,
+  type RiskFilter,
+} from "@/lib/cxc-orden";
 
 // "Último pago $X · hace N días" por empresa, o "Sin pagos registrados".
 function ultimoPagoLabel(fecha: string | null, monto: number | null): string {
@@ -103,20 +107,15 @@ export default function PanelCxcMobile({
     return { total, current, watch, overdue, cCount, wCount, oCount };
   }, [roleClients]);
 
-  // Ordenamiento mobile: favorites primero, luego negativos al final, luego
-  // por total desc. Independiente del sortKey/sortDir del desktop para que
-  // el helper "ordenados por total" sea siempre cierto en mobile.
-  const sortedMobile = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
-      const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
-      if (aFav !== bFav) return aFav - bFav;
-      const aNeg = a.total < 0 ? 1 : 0;
-      const bNeg = b.total < 0 ? 1 : 0;
-      if (aNeg !== bNeg) return aNeg - bNeg;
-      return b.total - a.total;
-    });
-  }, [filtered, favorites]);
+  // Ordenamiento mobile: favoritos primero, negativos al final, y después por el
+  // tramo del chip encendido (de mayor a menor); sin chip, por total. Misma regla
+  // y mismo comparador que el escritorio (lib/cxc-orden) — en móvil no hay títulos
+  // de columna que tocar, así que el chip es el único que manda el orden.
+  const orden = useMemo(() => ordenParaRiskFilter(riskFilter), [riskFilter]);
+  const sortedMobile = useMemo(
+    () => ordenarClientes(filtered, { orden, esFavorito: (n) => favorites.has(n) }),
+    [filtered, favorites, orden]
+  );
 
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
@@ -159,7 +158,7 @@ export default function PanelCxcMobile({
         />
 
         <p className="text-xs text-gray-500">
-          {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por total
+          {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por {etiquetaOrden(orden.key)}
         </p>
 
         {sortedMobile.length === 0 ? (
@@ -363,16 +362,17 @@ function MobileAgingChips({
       {items.map(({ key, value, count }) => {
         const theme = AGING_THEME[key];
         const isActive = active === key;
-        const onClick = () => onChange(isActive ? "all" : key);
+        // Una sola acción: filtra a los clientes de ese tramo Y los ordena por lo
+        // que deben ahí. El apagar/prender lo resuelve el padre (cxc-orden).
         return (
           <button
             key={key}
             type="button"
-            onClick={onClick}
+            onClick={() => onChange(key)}
             aria-pressed={isActive}
             className={[
-              "rounded-xl border-2 px-2.5 py-2.5 text-left transition min-h-[44px]",
-              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-gray-200 bg-white",
+              "rounded-xl border-2 px-2.5 py-2.5 text-left transition min-h-[44px] active:scale-[0.97]",
+              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-gray-300 bg-white",
             ].join(" ")}
           >
             <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`}>
