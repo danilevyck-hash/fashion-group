@@ -55,7 +55,17 @@ export const ROLES_SYNC_PROVEEDORES = ["admin", "secretaria", "contabilidad"];
  *  botón. */
 export const ROLES_SYNC_FICHA_CLIENTE = ["admin", "secretaria", "vendedor"];
 
-/** Estado de cuenta (CXC): las 6 B2B (espejo de SWITCH_ESTADOCUENTA_EMPRESA_KEYS). */
+/** Estado de cuenta (CXC): las 6 empresas del GRUPO (espejo de
+ *  CXC_GRUPO_EMPRESA_KEYS; lo fija `empresa-capabilities.test.ts`).
+ *
+ *  ⚠️ `confecciones_boston` también sincroniza estado de cuenta desde el
+ *  27-jul-2026, y aun así NO va acá — a propósito, por dos razones:
+ *   1. Su cartera no es la del grupo: este botón vive en el CXC consolidado.
+ *   2. Cuesta ~20 min. El sync recorre cliente por cliente y Boston tiene 1.951
+ *      (contra 127 de las 6 juntas), a ~604 ms cada uno: medido, 1.951 × 604 ms
+ *      ≈ 20 min contra los 800 s de techo de la función. Un botón "Actualizar
+ *      ahora" que se muere a la mitad es peor que no tenerlo. Boston se refresca
+ *      por su cron, en tandas. */
 const ESTADOCUENTA_KEYS = [
   "vistana",
   "fashion_wear",

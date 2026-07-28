@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,14 @@ export async function GET(req: NextRequest) {
   const vencidoPct = totalCxc > 0 ? (vencido / totalCxc) * 100 : 0;
 
   // Frescura CXC = última sincronización del API (switch_estadocuenta), no el CSV legacy.
-  const { data: uploads } = await supabaseServer.from("switch_estadocuenta").select("empresa_key, synced_at").order("synced_at", { ascending: false });
+  // `.in(empresa)` acota al GRUPO: la tabla también guarda a confecciones_boston,
+  // que lleva cartera aparte. Sin el filtro, `lastUploadEmpresa` de este resumen
+  // podría decir "Confecciones Boston" — una empresa que este resumen no cuenta.
+  const { data: uploads } = await supabaseServer
+    .from("switch_estadocuenta")
+    .select("empresa_key, synced_at")
+    .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
+    .order("synced_at", { ascending: false });
 
   // CAMBIO 4: Count unique companies with data
   const empresasSet = new Set((rows || []).map((r: { company_key: string }) => r.company_key));

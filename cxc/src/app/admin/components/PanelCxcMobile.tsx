@@ -19,7 +19,7 @@ import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import OverflowMenu, { type OverflowMenuItem } from "@/components/ui/OverflowMenu";
 import {
-  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
 import { formatCompactCurrency } from "@/lib/ventas/format";
@@ -239,7 +239,7 @@ function MobileHeader({
         </h1>
         <SyncStatus
           tabla="estadocuenta"
-          empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
+          empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
           className="mt-0.5"
         />

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { requireRole } from "@/lib/requireRole";
 import { getEndOfWeek } from "@/lib/cheques-dates";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -64,6 +65,10 @@ export async function GET(req: NextRequest) {
         supabaseServer
           .from("switch_estadocuenta")
           .select("empresa_key, synced_at", pedirCount ? { count: "exact" } : {})
+          // Solo el GRUPO: confecciones_boston también vive en esta tabla desde
+          // el 27-jul-2026 y lleva cartera aparte. Sin el filtro, un atraso suyo
+          // encendería el badge de CXC del grupo.
+          .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
           .order("id", { ascending: true })
           .range(desde, hasta),
     ),

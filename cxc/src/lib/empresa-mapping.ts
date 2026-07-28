@@ -127,10 +127,18 @@ export const SWITCH_FACTURAS_EMPRESA_KEYS = [
 ] as const;
 
 /**
- * Empresas que el cron switch-sync?tipo=estadocuenta pobla en
- * switch_estadocuenta. Hoy = las 6 B2B (Boston/Multifashion no aplican).
+ * CARTERA DEL GRUPO — las 6 B2B. Lo que se suma, se cobra y se le manda por
+ * correo al cliente como "su estado de cuenta con Fashion Group".
+ *
+ * ⚠️ Ya NO es "las empresas que el cron de estadocuenta pobla": desde el
+ * 27-jul-2026 ese cron también trae `confecciones_boston`, cuyos saldos viven en
+ * `switch_estadocuenta` pero NO son cartera del grupo (`cxc:false`) y se ven
+ * SOLO en su pestaña. Se renombró de `CXC_GRUPO_EMPRESA_KEYS` justo
+ * por eso: el nombre viejo describía al sync y se usaba para acotar al grupo, y
+ * esa clase de nombre a medias fue lo que dejó pasar el agujero de joystep.
+ * Para la lista del SYNC: `empresasConEstadoCuenta()` en switch-api/empresas.ts.
  */
-export const SWITCH_ESTADOCUENTA_EMPRESA_KEYS = B2B_EMPRESA_KEYS;
+export const CXC_GRUPO_EMPRESA_KEYS = B2B_EMPRESA_KEYS;
 
 export function mapEmpresaName(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest) {
         supabaseServer
           .from("switch_estadocuenta")
           .select("empresa_key, synced_at", pedirCount ? { count: "exact" } : {})
+          // Solo el GRUPO (ver cxc-summary): Boston lleva cartera aparte.
+          .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
           .order("id", { ascending: true })
           .range(desde, hasta),
     );
