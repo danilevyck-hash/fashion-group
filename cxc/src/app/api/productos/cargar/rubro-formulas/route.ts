@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer, HAS_SERVICE_ROLE } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
+import { validarDivisor } from "@/lib/depurador/divisor";
 
 export const dynamic = "force-dynamic";
 
@@ -50,15 +51,17 @@ export async function PUT(req: NextRequest) {
 
   const marca = String(body.marca ?? "").trim();
   const rubro = String(body.rubro ?? "").trim();
-  const divisor = Number(body.divisor);
+  const divisorOk = validarDivisor(body.divisor);
   const extra = Math.round(Number(body.extra));
   const redondeo = String(body.redondeo ?? "int");
 
   if (!marca) return NextResponse.json({ error: "La marca es obligatoria." }, { status: 400 });
   if (!rubro) return NextResponse.json({ error: "El rubro es obligatorio." }, { status: 400 });
-  if (!Number.isFinite(divisor) || divisor < 0) {
-    return NextResponse.json({ error: "Divisor inválido." }, { status: 400 });
+  // Rango del divisor: 0 (sin fórmula) o entre 0.10 y 1.00. Ver src/lib/depurador/divisor.ts.
+  if (!divisorOk.ok) {
+    return NextResponse.json({ error: divisorOk.error }, { status: 400 });
   }
+  const divisor = divisorOk.divisor;
   if (!Number.isFinite(extra) || extra < 0 || extra > 5) {
     return NextResponse.json({ error: "Extra debe ser un entero entre 0 y 5." }, { status: 400 });
   }
