@@ -36,7 +36,9 @@ vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
 import {
   EMPRESA_SYNC_CAPABILITIES,
+  empresasCarteraAparte,
   empresasConCxc,
+  empresasConEstadoCuenta,
   empresasConFacturas,
   empresasConRecibos,
   empresasConUtilidad,
@@ -90,6 +92,22 @@ describe("invariantes de negocio entre capabilities", () => {
     expect(sinRecibos).toEqual([]);
   });
 
+  it("toda empresa con cartera del grupo (cxc:true) trae su estado de cuenta", () => {
+    // No se puede ser cartera del grupo sin traer los saldos: el CXC quedaría
+    // mostrando una empresa en cero. La implicación va en UN solo sentido —
+    // Boston es estadoCuenta:true + cxc:false a propósito.
+    const sinSaldos = empresasConCxc().filter((k) => !EMPRESA_SYNC_CAPABILITIES[k].estadoCuenta);
+    expect(sinSaldos).toEqual([]);
+  });
+
+  it("toda empresa que trae saldos también trae recibos", () => {
+    // Una cartera abierta sin cobros es una pantalla que nunca puede decir
+    // cuándo pagó el cliente — el agujero exacto de joystep, ahora también
+    // exigido para las que llevan cartera aparte.
+    const sinRecibos = empresasConEstadoCuenta().filter((k) => !EMPRESA_SYNC_CAPABILITIES[k].recibos);
+    expect(sinRecibos).toEqual([]);
+  });
+
   it("toda empresa con utilidad también sincroniza facturas y recibos", () => {
     // La comisión se calcula sobre los tres insumos a la vez (utilidad, facturas
     // y recibos): encender uno solo produce números a medias, que es peor que
@@ -109,15 +127,30 @@ describe("qué está encendido y qué está apagado, por nombre", () => {
     expect(EMPRESA_SYNC_CAPABILITIES.joystep.utilidad).toBe(true);
   });
 
-  it("confecciones_boston queda EXCLUIDO de recibos y utilidad, a propósito", () => {
-    // Su CXC entera se lleva fuera de este sistema (cxc:false, va por Brand It).
-    // Traer sus 125 recibos/mes acá poblaría un 'último pago' que no le
-    // corresponde a ninguna cartera nuestra. Es coherencia, no olvido.
+  it("confecciones_boston: TRAE su cartera pero NO es cartera del grupo", () => {
+    // Cambió el 27-jul-2026 (aprobado por Daniel). Antes era `recibos:false` +
+    // `estadoCuenta:false` porque su cuenta corriente se lleva en Brand It.
+    // Sigue llevándose allá — lo que cambió es que Daniel quiere PODER VERLA,
+    // en una pestaña propia, sin que se mezcle con la del grupo.
+    //
+    // Las dos banderas de abajo son la separación entera:
+    //   estadoCuenta/recibos: true  → traemos sus saldos y sus cobros
+    //   cxc: false                  → NO suman a ningún total del grupo
+    expect(EMPRESA_SYNC_CAPABILITIES.confecciones_boston.estadoCuenta).toBe(true);
+    expect(EMPRESA_SYNC_CAPABILITIES.confecciones_boston.recibos).toBe(true);
     expect(EMPRESA_SYNC_CAPABILITIES.confecciones_boston.cxc).toBe(false);
-    expect(EMPRESA_SYNC_CAPABILITIES.confecciones_boston.recibos).toBe(false);
+    expect(RECIBOS_EMPRESA_KEYS).toContain("confecciones_boston" as EmpresaKey);
+
+    // Y esto NO cambió: nunca tuvo comisiones en este sistema. Encenderlas
+    // crearía de la nada una liquidación de vendedores que Fashion Group no
+    // paga. Es la línea que hay que justificar si alguien la toca.
     expect(EMPRESA_SYNC_CAPABILITIES.confecciones_boston.utilidad).toBe(false);
-    expect(RECIBOS_EMPRESA_KEYS).not.toContain("confecciones_boston" as EmpresaKey);
     expect(B2B_COMISION_KEYS).not.toContain("confecciones_boston" as EmpresaKey);
+    expect(empresasConCxc()).not.toContain("confecciones_boston" as EmpresaKey);
+  });
+
+  it("Boston es la ÚNICA empresa con cartera aparte", () => {
+    expect(empresasCarteraAparte()).toEqual(["confecciones_boston"]);
   });
 
   it("american_classic sincroniza recibos pero NO utilidad (retail)", () => {
@@ -125,8 +158,14 @@ describe("qué está encendido y qué está apagado, por nombre", () => {
     expect(B2B_COMISION_KEYS).not.toContain("american_classic" as EmpresaKey);
   });
 
-  it("recibos = 7 empresas, utilidad = 6 (las B2B)", () => {
-    expect(RECIBOS_EMPRESA_KEYS).toHaveLength(7);
+  it("recibos = 8, estado de cuenta = 7, cartera del grupo = 6, utilidad = 6", () => {
+    // Los cuatro números en una sola línea, para que cambiar cualquiera obligue
+    // a mirar acá y decir por qué. recibos 8 = las 6 B2B + american_classic
+    // (mostrador) + confecciones_boston. estadoCuenta 7 = las 6 + Boston (MF es
+    // retail de contado, no lleva cuenta corriente).
+    expect(RECIBOS_EMPRESA_KEYS).toHaveLength(8);
+    expect(empresasConEstadoCuenta()).toHaveLength(7);
+    expect(empresasConCxc()).toHaveLength(6);
     expect(B2B_COMISION_KEYS).toHaveLength(6);
   });
 });

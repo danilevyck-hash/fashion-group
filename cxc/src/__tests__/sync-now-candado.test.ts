@@ -186,9 +186,15 @@ describe("lockKeyDe / config por módulo", () => {
     // ningún cobro, así que sus clientes nunca mostraban "último pago" y su
     // comisión salía $0. Ver empresa-capabilities.test.ts.
     expect(moduloConfig("recibos").empresas).toContain("joystep");
-    // Boston sigue fuera de recibos, y eso sí es a propósito (su CXC va por Brand It).
-    expect(moduloConfig("recibos").empresas).not.toContain("confecciones_boston");
+    // Boston ENTRÓ a recibos el 27-jul-2026: trae sus cobros para su pestaña
+    // aparte del CXC. Lo que no cambió es que su plata no es del grupo.
+    expect(moduloConfig("recibos").empresas).toContain("confecciones_boston");
     expect(moduloConfig("facturas").empresas).toContain("confecciones_boston");
+    // Pero "Actualizar ahora" de estado de cuenta sigue siendo SOLO el grupo:
+    // Boston cuesta ~20 min (1.951 clientes × 604 ms medidos) contra los 800 s
+    // de techo de la función. Un botón que se muere a la mitad es peor que no
+    // tenerlo — se refresca por su cron, en tandas.
+    expect(moduloConfig("estadocuenta").empresas).not.toContain("confecciones_boston");
   });
 
   it("refresh-vistas: DB-only — sin empresa, sin Switch, sin lock; cooldown por heartbeats", () => {

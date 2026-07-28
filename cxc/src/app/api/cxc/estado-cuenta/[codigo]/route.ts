@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
-import { SWITCH_ESTADOCUENTA_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fetchEstadoCuentaData } from "@/lib/cxc/estado-cuenta-data";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +42,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .eq("id", auth.userId)
       .maybeSingle();
     const asociada = u?.associated_company ?? null;
-    empresas = asociada ? [asociada] : [...SWITCH_ESTADOCUENTA_EMPRESA_KEYS];
+    empresas = asociada ? [asociada] : [...CXC_GRUPO_EMPRESA_KEYS];
   } else if (isTodas) {
-    empresas = [...SWITCH_ESTADOCUENTA_EMPRESA_KEYS];
+    empresas = [...CXC_GRUPO_EMPRESA_KEYS];
   } else {
-    if (!(SWITCH_ESTADOCUENTA_EMPRESA_KEYS as readonly string[]).includes(empresaParam)) {
+    if (!(CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresaParam)) {
       return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
     }
     empresas = [empresaParam];

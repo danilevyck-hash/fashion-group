@@ -23,7 +23,7 @@ import useAdminData from "./hooks/useAdminData";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import {
-  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -528,7 +528,7 @@ function AdminDashboardInner() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SyncStatus
           tabla="estadocuenta"
-          empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
+          empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
         />
         <SyncNowButton

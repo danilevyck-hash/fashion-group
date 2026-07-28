@@ -34,7 +34,7 @@ import path from "node:path";
 vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
 
 import { B2B_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
-import { EMPRESA_SYNC_CAPABILITIES, empresasConCxc } from "@/lib/switch-api/empresas";
+import { EMPRESA_SYNC_CAPABILITIES, empresasCarteraAparte, empresasConCxc } from "@/lib/switch-api/empresas";
 
 const RAIZ = path.resolve(__dirname, "../../..");
 const leer = (rel: string) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -99,6 +99,98 @@ describe("las consultas de recibos POR CLIENTE filtran empresa en la query", () 
     // empresa con filas en switch_recibos aparece ahí.
     expect(src).toContain("empresasConCxc");
     expect(src).toContain('.in("empresa_key", EMPRESAS_CXC)');
+  });
+});
+
+describe("los endpoints que leen la TABLA BASE acotan al grupo", () => {
+  // Defensa en profundidad. La vista ya deja a Boston afuera, pero estas rutas
+  // leen `switch_estadocuenta` DIRECTO (no la vista) para calcular frescura, y
+  // la vista no las protege. Si alguien mañana escribe una consulta nueva contra
+  // la tabla base, este barrido no la va a cubrir — pero al menos las conocidas
+  // no se pueden destapar sin poner el build rojo.
+  const RUTAS = [
+    ["src/app/api/cxc-summary/route.ts", "lastUpload / lastUploadEmpresa del resumen"],
+    ["src/app/api/notification-badges/route.ts", "badge cxcStale"],
+    ["src/app/api/upload/route.ts", "frescura por empresa (UploadFreshness)"],
+  ] as const;
+
+  for (const [rel, que] of RUTAS) {
+    it(`${rel} — ${que}`, () => {
+      const src = leer(rel);
+      expect(src).toContain('.from("switch_estadocuenta")');
+      expect(
+        src.includes('.in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)'),
+        `${rel}: lee switch_estadocuenta sin acotar al grupo. Boston vive en esa ` +
+          `tabla desde el 27-jul-2026 y su cartera va aparte.`,
+      ).toBe(true);
+    });
+  }
+
+  it("el estado de cuenta por cliente valida la empresa contra el grupo", () => {
+    // Esta ruta alimenta el drawer Y el correo que se le manda al cliente. Un
+    // cliente del grupo NUNCA puede recibir un PDF con saldo de Boston adentro.
+    const src = leer("src/app/api/cxc/estado-cuenta/[codigo]/route.ts");
+    expect(src).toContain("CXC_GRUPO_EMPRESA_KEYS");
+    expect(src).toMatch(/CXC_GRUPO_EMPRESA_KEYS as readonly string\[\]\)\.includes\(empresaParam\)/);
+  });
+
+  it("el correo de estado de cuenta también", () => {
+    const src = leer("src/app/api/cxc/enviar-email/route.ts");
+    expect(src).toContain("CXC_GRUPO_EMPRESA_KEYS");
+  });
+});
+
+describe("la vista de aging del GRUPO deja a Boston afuera", () => {
+  // El blindaje de los saldos NO se hace pantalla por pantalla: unas 20 rutas
+  // leen `switch_estadocuenta_aging` (o su MV) — CXC consolidado, búsqueda
+  // global, Vista General, ficha de cliente, cxc-summary, cxc-rows, correos de
+  // estado de cuenta, /api/clients. Se cierra UNA vez, en la vista, y todo lo
+  // que la lea queda separado sin enterarse. Estos tests son lo que impide que
+  // la exclusión se caiga de la migración sin que nadie lo note.
+  const SQL = leer("supabase/migrations/20260728120000_aging_grupo_y_boston_aparte.sql");
+
+  /** Extrae las keys del `NOT IN (...)` de la vista del grupo. */
+  function excluidasEnSql(): string[] {
+    const m = SQL.match(/empresa_key\s+NOT\s+IN\s*\(([^)]*)\)/i);
+    if (!m) return [];
+    return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort();
+  }
+
+  it("la lista excluida del SQL es EXACTAMENTE empresasCarteraAparte()", () => {
+    // Una vista no puede importar TypeScript, así que las keys se repiten en el
+    // SQL. Dos listas paralelas que se contradicen en silencio es exactamente lo
+    // que costó $15.262 con joystep, así que acá se comparan. Agregar una
+    // empresa de un lado y no del otro pone el build ROJO.
+    expect(excluidasEnSql()).toEqual([...empresasCarteraAparte()].sort());
+  });
+
+  it("la vista del grupo excluye confecciones_boston", () => {
+    expect(SQL).toMatch(/CREATE OR REPLACE VIEW switch_estadocuenta_aging AS/);
+    expect(excluidasEnSql()).toContain("confecciones_boston");
+  });
+
+  it("existe una vista propia para Boston, y solo trae a Boston", () => {
+    expect(SQL).toMatch(/CREATE OR REPLACE VIEW switch_estadocuenta_aging_boston AS/);
+    const boston = SQL.slice(SQL.indexOf("switch_estadocuenta_aging_boston AS"));
+    expect(boston).toMatch(/empresa_key\s*=\s*'confecciones_boston'/);
+  });
+
+  it("la vista de Boston NO usa clientes_master para el nombre", () => {
+    // Los clientes de Boston no están en clientes_master (se puebla desde las
+    // empresas del grupo). Con el JOIN, el COALESCE caería al cliente_codigo,
+    // que para Boston es el id numérico de Switch — ilegible en pantalla.
+    const boston = SQL.slice(SQL.indexOf("switch_estadocuenta_aging_boston AS"));
+    expect(boston).not.toMatch(/clientes_master/);
+    expect(boston).toMatch(/cliente_nombre/);
+  });
+
+  it("las dos vistas usan el MISMO signo defensivo", () => {
+    // El API manda `saldo` como magnitud SIEMPRE POSITIVA: las notas de crédito
+    // y los recibos hay que RESTARLOS por tipo_comprobante. Sumarlos crudos
+    // infla la cartera al doble del crédito — el error que se cometió en el
+    // dry-run del 27-jul-2026 (dio $399.817,62 contra los $224.749,88 reales).
+    const credito = /'Nota de Crédito',\s*'Recibo',\s*'Recibo Saldo Anterior'/g;
+    expect([...SQL.matchAll(credito)]).toHaveLength(2);
   });
 });
 

@@ -72,7 +72,7 @@ import {
   fmtMesLabel,
 } from "@/lib/grupo-resumen-mensual";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
-import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
+import { empresasConFacturas, empresasConEstadoCuenta } from "@/lib/switch-api/empresas";
 import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
   recordCronHeartbeat,
@@ -162,7 +162,10 @@ function expectedPairs(): Pair[] {
     pairs.push({ empresa: e, syncType: "facturas" });
     pairs.push({ empresa: e, syncType: "costo" });
   }
-  for (const e of empresasConCxc()) {
+  // Las que TRAEN saldos, no las que son cartera del grupo: confecciones_boston
+  // sincroniza estadocuenta (para su pestaña aparte) con `cxc:false`, y si no
+  // estuviera acá su sync no tendría quién lo recupere cuando falle.
+  for (const e of empresasConEstadoCuenta()) {
     pairs.push({ empresa: e, syncType: "estadocuenta" });
   }
   return pairs;

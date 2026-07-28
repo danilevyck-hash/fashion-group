@@ -45,7 +45,7 @@ import {
 } from "@/lib/switch-api/sync-empresa";
 import {
   empresasConFacturas,
-  empresasConCxc,
+  empresasConEstadoCuenta,
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -105,12 +105,13 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // procesan SERIALMENTE en el for de abajo — requisito de la sesión única por
   // empresa de Switch (logins concurrentes a la misma empresa → code 0006).
   //
-  // Universo: estadocuenta solo aplica a B2B (empresasConCxc); facturas y `all`
-  // aplican a todas las que tienen facturas (en `all`, estadocuenta se salta
-  // adentro del loop para las retail que no tienen CXC).
+  // Universo: estadocuenta aplica a las empresas con `estadoCuenta: true` (las 6
+  // B2B + confecciones_boston, que trae saldos para su pestaña aparte); facturas
+  // y `all` aplican a todas las que tienen facturas (en `all`, estadocuenta se
+  // salta adentro del loop para las que no traen saldos, como american_classic).
   const empresaParam = sp.get("empresa");
   const empresasParam = sp.get("empresas");
-  const universe: EmpresaKey[] = tipo === "estadocuenta" ? empresasConCxc() : empresasConFacturas();
+  const universe: EmpresaKey[] = tipo === "estadocuenta" ? empresasConEstadoCuenta() : empresasConFacturas();
   let empresas: EmpresaKey[];
   if (empresasParam !== null) {
     const raw = empresasParam.split(",").map(s => s.trim()).filter(Boolean);
@@ -169,9 +170,11 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const errors: Array<{ empresaKey: string; tipo: string; error: string }> = [];
   const msg = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-  // estadocuenta solo corre para B2B (empresasConCxc); en tipo=all las retail
-  // (american_classic, confecciones_boston) hacen solo facturas+costo.
-  const cxcSet = new Set<EmpresaKey>(empresasConCxc());
+  // estadocuenta corre para las empresas con `estadoCuenta: true`. OJO: NO es lo
+  // mismo que "cartera del grupo" — confecciones_boston trae saldos (para su
+  // pestaña aparte) pero tiene `cxc:false` y no suma a ningún total del grupo.
+  // En tipo=all, american_classic hace solo facturas+costo.
+  const cxcSet = new Set<EmpresaKey>(empresasConEstadoCuenta());
 
   const runFacturas = async (empresaKey: EmpresaKey) => {
     try { results.push(await syncEmpresaFacturas(empresaKey, { desde, hasta, triggeredBy })); }

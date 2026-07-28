@@ -12,7 +12,7 @@ import {
   VENTAS_ID_TO_EMPRESA_KEY,
   ALL_EMPRESA_KEYS,
   B2B_EMPRESA_KEYS,
-  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  CXC_GRUPO_EMPRESA_KEYS,
   mapEmpresaName,
   mapEmpresaKeyToVentasId,
 } from "@/lib/empresa-mapping";
@@ -43,7 +43,7 @@ describe("dominio de empresas (🟢-18 / 🟢-19)", () => {
   });
 
   it("estadocuenta (CXC) cubre exactamente las 6 B2B", () => {
-    expect([...SWITCH_ESTADOCUENTA_EMPRESA_KEYS]).toEqual([...B2B_EMPRESA_KEYS]);
+    expect([...CXC_GRUPO_EMPRESA_KEYS]).toEqual([...B2B_EMPRESA_KEYS]);
   });
 
   it("cada empresa_key canónica tiene nombre display", () => {

@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole, type SessionPayload } from "@/lib/requireRole";
-import { SWITCH_ESTADOCUENTA_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fetchEstadoCuentaData, type EstadoCuentaResult } from "@/lib/cxc/estado-cuenta-data";
 import {
   buildResumenHtml,
@@ -83,10 +83,10 @@ function resolveEmpresas(auth: SessionPayload, user: CurrentUser | null, empresa
   const isTodas = !empresaParam || empresaParam === "todas" || empresaParam === "all";
   if (auth.role === "vendedor") {
     const asociada = user?.associatedCompany ?? null;
-    return asociada ? [asociada] : [...SWITCH_ESTADOCUENTA_EMPRESA_KEYS];
+    return asociada ? [asociada] : [...CXC_GRUPO_EMPRESA_KEYS];
   }
-  if (isTodas) return [...SWITCH_ESTADOCUENTA_EMPRESA_KEYS];
-  if (!(SWITCH_ESTADOCUENTA_EMPRESA_KEYS as readonly string[]).includes(empresaParam)) return null;
+  if (isTodas) return [...CXC_GRUPO_EMPRESA_KEYS];
+  if (!(CXC_GRUPO_EMPRESA_KEYS as readonly string[]).includes(empresaParam)) return null;
   return [empresaParam];
 }
 

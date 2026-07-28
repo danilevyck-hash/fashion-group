@@ -29,7 +29,7 @@
  */
 
 import {
-  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  CXC_GRUPO_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
 } from "@/lib/empresa-mapping";
 import { RECIBOS_EMPRESA_KEYS } from "./sync-recibos";
@@ -95,7 +95,7 @@ interface ModuloConfig {
 export function moduloConfig(modulo: SyncNowModulo): ModuloConfig {
   switch (modulo) {
     case "estadocuenta":
-      return { empresas: SWITCH_ESTADOCUENTA_EMPRESA_KEYS, syncType: "estadocuenta", tocaSwitch: true };
+      return { empresas: CXC_GRUPO_EMPRESA_KEYS, syncType: "estadocuenta", tocaSwitch: true };
     case "facturas":
       return { empresas: empresasConFacturas(), syncType: "facturas", tocaSwitch: true };
     case "recibos":

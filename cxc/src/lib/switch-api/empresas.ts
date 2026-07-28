@@ -46,8 +46,22 @@ export const SWITCH_EMPRESA_ENV_MAP: Record<EmpresaKey, string> = {
 export interface EmpresaSyncCapability {
   /** Sincroniza facturas a switch_facturas. */
   facturas: boolean;
-  /** Sincroniza estado de cuenta (CXC) a switch_estadocuenta. */
+  /** La cartera de esta empresa es CARTERA DEL GRUPO: entra al CXC consolidado,
+   *  al aging del grupo, a los totales y a las comisiones. Es la lista que
+   *  `B2B_EMPRESA_KEYS` tiene que espejar.
+   *
+   *  ⚠️ NO confundir con `estadoCuenta`. Desde el 27-jul-2026 son dos cosas
+   *  distintas: `estadoCuenta` dice si TRAEMOS sus saldos a la base;
+   *  `cxc` dice si esos saldos SE SUMAN a los del grupo. Boston tiene
+   *  `estadoCuenta: true` y `cxc: false` — vemos su cartera, en su propia
+   *  pestaña, y no se mezcla con nada. Ver `empresasCarteraAparte()`. */
   cxc: boolean;
+  /** Sincroniza el estado de cuenta (saldos por documento) a switch_estadocuenta.
+   *  INVARIANTE: `cxc: true` obliga a `estadoCuenta: true` — no se puede ser
+   *  cartera del grupo sin traer los saldos. Al revés SÍ se puede y es el caso
+   *  de Boston: traemos sus saldos para mostrarlos aparte, sin que cuenten como
+   *  cartera del grupo. Lo hace cumplir un test. */
+  estadoCuenta: boolean;
   /** Sincroniza CxP (proveedores + estado de cuenta) a switch_proveedor_estadocuenta.
    *  SEPARADO de cxc: Multifashion paga proveedores en Switch (cxp:true) pero es
    *  retail sin CXC central (cxc:false); Boston no tiene ninguno de los dos. */
@@ -81,24 +95,39 @@ export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability
   // switch_proveedor_estadocuenta como las B2B.
   // MF: recibos:true (sus cobros de mostrador sí se registran, 26.463 filas) pero
   // utilidad:false — es retail, no tiene vendedores con comisión sobre venta.
-  american_classic: { facturas: true, cxc: false, cxp: true, recibos: true, utilidad: false },
-  vistana: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
-  fashion_wear: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
-  fashion_shoes: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
-  active_shoes: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
-  active_wear: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
+  american_classic: { facturas: true, cxc: false, estadoCuenta: false, cxp: true, recibos: true, utilidad: false },
+  vistana: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
+  fashion_wear: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
+  fashion_shoes: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
+  active_shoes: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
+  active_wear: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
   // joystep ENCENDIDO en recibos y utilidad el 27-jul-2026 (aprobado por Daniel:
   // "fue un olvido"). Es B2B con CXC (cxc:true, $60.606,37 de cartera abierta) y
   // con pestaña de comisiones, así que estar fuera de estos dos syncs nunca tuvo
   // una razón — no había ni un comentario que la explicara. Ver el encabezado.
-  joystep: { facturas: true, cxc: true, cxp: true, recibos: true, utilidad: true },
-  // Boston: solo ventas. CXC por otro lado (Brand It) y su CxP NO se quiere (cxp:false).
-  // recibos:false y utilidad:false NO son un olvido, son la misma decisión: su
-  // cuenta por cobrar entera vive fuera de este sistema, así que traer sus cobros
-  // acá poblaría un "último pago" que no le corresponde a ninguna cartera nuestra
-  // y una base de comisión de vendedores que este sistema no liquida. Tiene 125
-  // recibos / $35.338,99 en julio 2026 que quedan fuera A PROPÓSITO.
-  confecciones_boston: { facturas: true, cxc: false, cxp: false, recibos: false, utilidad: false },
+  joystep: { facturas: true, cxc: true, estadoCuenta: true, cxp: true, recibos: true, utilidad: true },
+  // ─── Boston: CARTERA APARTE (aprobado por Daniel, 27-jul-2026) ──────────────
+  // `estadoCuenta: true` + `recibos: true` → traemos sus saldos y sus cobros.
+  // `cxc: false` → esa plata NO es cartera del grupo: no se suma a ningún total,
+  // no entra al aging consolidado ni a las comisiones. Se ve SOLO en su pestaña.
+  //
+  // Antes era `estadoCuenta/recibos: false` porque su cuenta corriente se lleva
+  // en Brand It. Sigue siendo así — Brand It manda —, pero Daniel quiere PODER
+  // VERLA sin que se mezcle. La regla que puso, textual: *"si un cliente esta en
+  // el grupo de 6 empresas y mismo cliente en conf boston, quiero q no se toque"*.
+  // No es hipotético: hay 10 clientes en los dos lados (CITY MALL DAVID, LA
+  // FRONTERA DUTY FREE, EL MACHETAZO-CALIDONIA, GOLDEN MALL...) y el CXC agrupa
+  // por NOMBRE, así que se sumarían solos si Boston entrara al grupo.
+  //
+  // Medido el 27-jul-2026 (dry-run contra Switch, 1.951 clientes):
+  //   cartera abierta $399.817,62 · 381 clientes · 949 documentos
+  //   (0-90d $169.241,75 · 91-120d $13.032,31 · +121d $217.543,56 = 54%)
+  //   cobros 7.316 recibos desde oct-2022; julio 2026: 126 / $35.392,49
+  //
+  // `cxp: false` y `utilidad: false` NO cambian: su CxP no se quiere, y no tiene
+  // comisiones en este sistema (nunca las tuvo; encenderlas crearía de la nada
+  // una liquidación de vendedores que Fashion Group no paga).
+  confecciones_boston: { facturas: true, cxc: false, estadoCuenta: true, cxp: false, recibos: true, utilidad: false },
 };
 
 const ALL_KEYS = Object.keys(EMPRESA_SYNC_CAPABILITIES) as EmpresaKey[];
@@ -108,9 +137,39 @@ export function empresasConFacturas(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].facturas);
 }
 
-/** Empresas cuyo estado de cuenta va a switch_estadocuenta (excluye Boston y MF). */
+/**
+ * CARTERA DEL GRUPO: las 6 B2B. Es "qué suma en el CXC consolidado", NO "de
+ * quién traemos saldos" — para eso está `empresasConEstadoCuenta()`.
+ *
+ * Todo total, aging, alerta o comisión del grupo se acota con ESTA lista.
+ * `B2B_EMPRESA_KEYS` tiene que ser exactamente igual (lo fija un test).
+ */
 export function empresasConCxc(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].cxc);
+}
+
+/**
+ * Empresas cuyos saldos se sincronizan a switch_estadocuenta: las 6 B2B +
+ * confecciones_boston. Es la lista del SYNC, no la del grupo.
+ */
+export function empresasConEstadoCuenta(): EmpresaKey[] {
+  return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].estadoCuenta);
+}
+
+/**
+ * Empresas de las que traemos cartera pero que NO son cartera del grupo:
+ * hoy, solo `confecciones_boston`. Su plata se muestra en su propia pestaña y
+ * no se suma con nada.
+ *
+ * Es la lista que la vista `switch_estadocuenta_aging` EXCLUYE. La vista no
+ * puede importar TypeScript, así que repite estas keys en su SQL y
+ * `boston-no-se-mezcla.test.ts` compara las dos: si alguien agrega una empresa
+ * acá y no toca la migración, el build se pone rojo (y al revés).
+ */
+export function empresasCarteraAparte(): EmpresaKey[] {
+  return ALL_KEYS.filter(
+    (k) => EMPRESA_SYNC_CAPABILITIES[k].estadoCuenta && !EMPRESA_SYNC_CAPABILITIES[k].cxc,
+  );
 }
 
 /** Empresas cuyo CxP (proveedores) va a switch_proveedor_estadocuenta: las 6 B2B
