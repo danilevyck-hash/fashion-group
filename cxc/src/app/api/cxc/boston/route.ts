@@ -67,9 +67,22 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Chip "también en el grupo". Es SOLO una marca visual: dice que ese nombre
+  // existe en las dos carteras, para que quien cobre sepa que hay otra relación
+  // abierta. NO se suma nada — los dos saldos siguen viviendo cada uno en su
+  // pestaña. Medido el 27-jul-2026: 10 clientes están en los dos lados (CITY
+  // MALL DAVID, LA FRONTERA DUTY FREE, EL MACHETAZO-CALIDONIA, GOLDEN MALL...).
+  const enGrupo = new Set<string>();
+  const { data: g, error: gErr } = await supabaseServer
+    .from("switch_estadocuenta_aging")
+    .select("nombre_normalized");
+  if (gErr) console.error(`[cxc/boston] cruce con el grupo: ${gErr.message}`);
+  for (const r of g ?? []) if (r.nombre_normalized) enGrupo.add(String(r.nombre_normalized));
+
   const clientes = filas.map((r) => {
     const pago = pagos.get(String(r.cliente_switch_id));
     return {
+      tambien_en_grupo: enGrupo.has(String(r.nombre_normalized)),
       codigo: r.codigo as string,
       nombre: (r.nombre as string) || (r.codigo as string),
       nombre_normalized: r.nombre_normalized as string,

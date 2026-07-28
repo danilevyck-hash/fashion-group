@@ -13,6 +13,7 @@ import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
+import BostonTab from "@/components/cxc/BostonTab";
 import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
@@ -122,6 +123,10 @@ function AdminDashboardInner() {
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
+  // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
+  // dos vistas disjuntas (switch_estadocuenta_aging / _boston), así que no hay
+  // ninguna pantalla donde los saldos del grupo y los de Boston puedan sumarse.
+  const [tab, setTab] = useState<"grupo" | "boston">("grupo");
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
   // riskFilter vive en la URL (?risk=) → compartible y sobrevive refresh.
   const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
@@ -483,6 +488,35 @@ function AdminDashboardInner() {
     <div>
       <AppHeader module="Cuentas por Cobrar" />
 
+      {/* Encabezado compacto: las pestañas viven en la misma línea que Exportar
+          para no gastar alto vertical (pedido de Daniel). Sin título grande. */}
+      <div className="max-w-6xl mx-auto px-4 pt-2">
+        <div className="flex items-center gap-1 border-b border-gray-200">
+          {([["grupo", "Grupo · 6 empresas"], ["boston", "Confecciones Boston"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              aria-current={tab === k ? "page" : undefined}
+              className={`min-h-[44px] px-3 text-sm whitespace-nowrap border-b-2 -mb-px transition
+                          ${tab === k ? "border-gray-900 text-gray-900 font-medium" : "border-transparent text-gray-400 hover:text-gray-600"}`}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="ml-auto hidden md:block text-xs text-gray-400 pr-1">
+            {tab === "boston" ? "Confecciones Boston · se lleva aparte" : "6 empresas"}
+          </span>
+        </div>
+      </div>
+
+      {tab === "boston" ? (
+        <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
+          <BostonTab />
+        </div>
+      ) : (
+      <>
+
       <PanelCxcMobile
         filtered={filtered}
         roleClients={kpiClients}
@@ -652,6 +686,8 @@ function AdminDashboardInner() {
         hideSearchAndRiskFilters
       />
       </div>
+      </>
+      )}
 
       <EstadoCuentaDrawer
         client={estadoClient}
