@@ -23,17 +23,29 @@
  *   4. el `saldoConsecutivo` del último documento de cada cliente
  * Medido: las cuatro dan $229.435,64, con 0 discrepancias en 1.009 documentos.
  *
- * ⚠️ QUEDA ABIERTO: el panel de Switch (Reportes → Estado de cuenta → "Saldos",
- * sucursal Todas) dice **$224.749,88** — $4.685,76 menos (2,04%). No es signo
- * (las 4 medidas coinciden) ni sucursal (Daniel verificó que "Todas" da igual
- * que PRINCIPAL) ni los 21 clientes que el API rechaza (devuelven "NO SE
- * ENCUENTRA INFORMACIÓN", o sea sin cartera). El patrón por tramo tampoco es el
- * del paso del tiempo: 181-270 da +4.707,90 y 271-365 da −3.662,86, o sea
- * documentos en tramos DISTINTOS, no corridos hacia arriba. Sospecha principal:
- * la pestaña "Saldos" no es la misma magnitud que el estado de cuenta por
- * cliente (ya pasó con Fashion Shoes, donde las dos pestañas del panel diferían
- * entre sí y era una diferencia de definición). SIN RESOLVER — no escribir
- * saldos hasta cerrarlo.
+ * ── EL SEGUNDO ERROR, Y COMO SE CERRO ───────────────────────────────────────
+ * Con los signos ya arreglados daba $229.435,64 contra los $224.749,88 del panel
+ * — $4.685,76 de más. Tampoco era el panel: era el UNIVERSO DE CLIENTES.
+ *
+ * Este script analiza lo que baja `_dump-boston-ec.ts`, y ese dump armaba la
+ * lista de clientes desde `switch_facturas` (1.951 clientes de Boston CON
+ * FACTURA). Pero el maestro de Switch tiene **4.911 clientes**, y 30 de ellos
+ * tienen SOLO saldo a favor —anticipos, sin ninguna factura— por -$4.685,76.
+ * Nunca entraban a la lista. 229.435,64 - 4.685,76 = 224.749,88, exacto.
+ *
+ * Cotejado despues por CODIGO (no por nombre: los nombres del PDF se parten en
+ * varias lineas) contra el reporte "Estado de cuenta - Antiguedad": **362
+ * clientes en comun, los 8 tramos de cada uno, CERO diferencias**. La anomalia
+ * de "tramos en direcciones opuestas" que se habia visto era el hueco de esos 30
+ * clientes, no otra base de antiguedad: el campo `dias` del API coincide con el
+ * de Switch al centavo.
+ *
+ * ✅ LA CARTERA DE BOSTON ES $224.749,88. El panel tenia razon las dos veces.
+ *
+ * 🩸 LECCION: el universo de clientes NO se deriva de las facturas. El sync real
+ * (`syncEmpresaEstadoCuenta`) recorre `/apicliente/lista`, que es el maestro
+ * completo, y por eso NO tiene este defecto — el atajo estaba solo en la
+ * medicion. Para volver a medir, usar `_boston-clientes-map.ts`.
  */
 import fs from "node:fs";
 const num=(v:unknown)=>{const n=parseFloat(String(v??"").replace(/,/g,""));return Number.isFinite(n)?n:0;};

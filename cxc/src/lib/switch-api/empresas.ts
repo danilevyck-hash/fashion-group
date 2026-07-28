@@ -119,10 +119,18 @@ export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability
   // FRONTERA DUTY FREE, EL MACHETAZO-CALIDONIA, GOLDEN MALL...) y el CXC agrupa
   // por NOMBRE, así que se sumarían solos si Boston entrara al grupo.
   //
-  // Medido el 27-jul-2026 (dry-run contra Switch, 1.951 clientes):
-  //   cartera abierta $399.817,62 · 381 clientes · 949 documentos
-  //   (0-90d $169.241,75 · 91-120d $13.032,31 · +121d $217.543,56 = 54%)
+  // Medido el 27-jul-2026 y CUADRADO al centavo contra el reporte "Estado de
+  // cuenta - Antiguedad" de Switch (392 clientes, los 8 tramos, cliente por
+  // cliente, 0 diferencias):
+  //   cartera abierta $224.749,88 · 392 clientes con saldo
+  //   0-90d $97.354,17 · 91-120d $8.843,93 · +121d $118.551,78 (53%)
   //   cobros 7.316 recibos desde oct-2022; julio 2026: 126 / $35.392,49
+  //
+  // ⚠️ Boston tiene 4.911 clientes en el maestro de Switch (contra 127 con saldo
+  // en las 6 B2B juntas). El sync recorre cliente por cliente a ~604 ms → ~49 min,
+  // muy por encima del techo de la función: va por TANDAS. No estimar este costo
+  // a partir de los clientes con factura (1.951): 30 clientes tienen SOLO saldo a
+  // favor, sin ninguna factura, y valen -$4.685,76.
   //
   // `cxp: false` y `utilidad: false` NO cambian: su CxP no se quiere, y no tiene
   // comisiones en este sistema (nunca las tuvo; encenderlas crearía de la nada

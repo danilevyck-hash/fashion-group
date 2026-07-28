@@ -179,8 +179,10 @@ NOTIFY pgrst, 'reload schema';
 --   SELECT COUNT(*) FROM switch_estadocuenta_aging
 --   WHERE company_key = 'confecciones_boston';
 --
---   -- 3. Boston en la suya (0 hasta que corra la carga inicial;
---   --    esperado después: 381 clientes / 399817.62):
+--   -- 3. Boston en la suya (0 hasta que corra la carga inicial). Esperado
+--   --    después: 392 clientes / 224749.88 — cuadrado al centavo contra el
+--   --    reporte "Estado de cuenta - Antiguedad" de Switch del 27-jul-2026,
+--   --    cliente por cliente y tramo por tramo, 0 diferencias en 362 comunes:
 --   SELECT COUNT(*) AS clientes, ROUND(SUM(total)::numeric, 2) AS total
 --   FROM switch_estadocuenta_aging_boston;
 --
