@@ -1,0 +1,98 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
+
+// Cartera de Confecciones Boston — la pestaña APARTE del CXC.
+//
+// Lee `switch_estadocuenta_aging_boston`, que por definición trae SOLO a Boston
+// (ver la migración 20260728120000). Es su gemela de `switch_estadocuenta_aging`,
+// con la misma forma de fila, y las dos son disjuntas por construcción: ninguna
+// pantalla puede sumar las dos sin escribir la suma a mano.
+//
+// Por qué una ruta separada y no un parámetro `?empresa=` en la del grupo: un
+// parámetro es una puerta. Mientras sean dos rutas contra dos vistas disjuntas,
+// mezclar la plata de Boston con la del grupo no es algo que se pueda hacer por
+// descuido — hay que proponérselo. Es la regla de Daniel: *"si un cliente esta en
+// el grupo de 6 empresas y mismo cliente en conf boston, quiero q no se toque"*.
+//
+// Medido el 27-jul-2026 y cuadrado al centavo contra el reporte de Switch:
+// 392 clientes · $224.749,88 (0-90 $97.354,17 · 91-120 $8.843,93 · 121+ $118.551,78).
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+// Boston es la cartera del negocio de la familia, no la del grupo: la ven los
+// mismos roles que el CXC, menos `vendedor` — los vendedores del grupo no
+// cobran esta cartera ni comisionan sobre ella.
+const ROLES_BOSTON = ["admin", "secretaria"];
+
+const COLS = "codigo,cliente_switch_id,nombre,nombre_normalized,d0_90,d91_120,d121_plus,total";
+const PAGE = 1000;
+
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ROLES_BOSTON);
+  if (auth instanceof NextResponse) return auth;
+
+  // Paginado: PostgREST corta en 1000 filas EN SILENCIO. Hoy Boston tiene 392
+  // clientes con saldo, pero el tope no se pide por el tamaño de hoy.
+  const filas: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseServer
+      .from("switch_estadocuenta_aging_boston")
+      .select(COLS)
+      .order("codigo", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error(`[cxc/boston] ${error.message}`);
+      return NextResponse.json({ error: "Error al leer la cartera de Boston" }, { status: 500 });
+    }
+    if (!data || data.length === 0) break;
+    filas.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  // Último pago por cliente. Se acota a Boston explícitamente: la vista
+  // `switch_ultimo_pago_cliente_v2` no filtra empresa (devuelve toda empresa con
+  // filas en switch_recibos), así que sin el `.eq` traería también al grupo.
+  const pagos = new Map<string, { fecha: string; monto: number }>();
+  const { data: up, error: upErr } = await supabaseServer
+    .from("switch_ultimo_pago_cliente_v2")
+    .select("cliente_switch_id,ultimo_pago_fecha,ultimo_pago_monto")
+    .eq("empresa_key", "confecciones_boston");
+  if (upErr) console.error(`[cxc/boston] último pago: ${upErr.message}`);
+  for (const p of up ?? []) {
+    if (p.cliente_switch_id == null) continue;
+    pagos.set(String(p.cliente_switch_id), {
+      fecha: p.ultimo_pago_fecha as string,
+      monto: Number(p.ultimo_pago_monto) || 0,
+    });
+  }
+
+  const clientes = filas.map((r) => {
+    const pago = pagos.get(String(r.cliente_switch_id));
+    return {
+      codigo: r.codigo as string,
+      nombre: (r.nombre as string) || (r.codigo as string),
+      nombre_normalized: r.nombre_normalized as string,
+      d0_90: Number(r.d0_90) || 0,
+      d91_120: Number(r.d91_120) || 0,
+      d121_plus: Number(r.d121_plus) || 0,
+      total: Number(r.total) || 0,
+      ultimo_pago_fecha: pago?.fecha ?? null,
+      ultimo_pago_monto: pago?.monto ?? null,
+    };
+  });
+
+  const suma = (k: "d0_90" | "d91_120" | "d121_plus" | "total") =>
+    Math.round(clientes.reduce((s, c) => s + c[k], 0) * 100) / 100;
+
+  return NextResponse.json({
+    clientes,
+    totales: {
+      total: suma("total"),
+      d0_90: suma("d0_90"),
+      d91_120: suma("d91_120"),
+      d121_plus: suma("d121_plus"),
+      clientes: clientes.length,
+    },
+  });
+}
