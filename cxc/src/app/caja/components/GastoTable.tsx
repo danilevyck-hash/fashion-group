@@ -80,7 +80,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className="snap-start shrink-0 inline-flex items-center gap-2 whitespace-nowrap px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
+      className="shrink-0 inline-flex min-h-[44px] items-center gap-2 whitespace-nowrap px-3 rounded-full text-[12px] font-medium transition-all"
       style={{
         background: active ? "var(--caja-stone-950)" : "#fff",
         color: active ? "#fff" : "var(--caja-fg-default)",
@@ -198,7 +198,7 @@ export default function GastoTable({
         {onNuevoGasto ? (
           <button
             onClick={onNuevoGasto}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
             style={{ background: "var(--caja-accent)", color: "#fff" }}
           >
             <PlusIcon /> Nuevo gasto
@@ -206,7 +206,7 @@ export default function GastoTable({
         ) : nuevoHref ? (
           <Link
             href={nuevoHref}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
             style={{ background: "var(--caja-accent)", color: "#fff" }}
           >
             <PlusIcon /> Nuevo gasto
@@ -214,9 +214,14 @@ export default function GastoTable({
         ) : null}
       </div>
 
-      {/* Category chips */}
+      {/* Category chips — ENVUELTOS, no carrusel.
+          🩸 Con 5 categorías la tira medía 327 px de más a 390 px y 139 a 834:
+          para llegar a "Materiales $10.27" había que arrastrar. `flex-wrap`
+          los acomoda solos y en escritorio siguen entrando en una fila, así
+          que ahí no cambia nada. (Mismo cambio que #371 en los filtros del
+          catálogo: correr el breakpoint no arreglaba nada, envolver sí.) */}
       {gastos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 mb-3.5 -mx-5 px-5 sm:mx-0 sm:px-0">
+        <div className="flex flex-wrap gap-2 pb-2 mb-3.5">
           <Chip
             label="Todas"
             amount={grandTotal}
@@ -235,8 +240,13 @@ export default function GastoTable({
         </div>
       )}
 
-      {/* Mobile card layout */}
-      <div className="md:hidden space-y-3">
+      {/* ── Tarjetas (celular y iPad) ──────────────────────────────────────
+          A 834 px la tabla pedía 702 px contra 538 útiles (la barra lateral se
+          lleva 224 px desde los 768, justo donde se encendía con `md`) y las
+          columnas que se iban fuera de la pantalla eran CATEGORÍA y TOTAL.
+          El corte pasa a `lg` (1024), donde quedan 728 px útiles y la tabla
+          entra con 26 px de aire — medido, no supuesto. */}
+      <div className="lg:hidden space-y-3">
         {sortedGastos.length === 0 ? (
           <EmptyState
             title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"}
@@ -247,6 +257,7 @@ export default function GastoTable({
             {sortedGastos.map((g) => (
               <div
                 key={g.id}
+                data-gasto-fila={g.id}
                 className={`rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
                 style={{
                   background: "var(--caja-bg-surface)",
@@ -257,10 +268,11 @@ export default function GastoTable({
                   <p
                     className="text-sm font-medium truncate flex-1"
                     style={{ color: "var(--caja-fg-strong)" }}
+                    data-gasto-campo="descripcion"
                   >
                     {g.descripcion || g.nombre || "—"}
                   </p>
-                  <p className="caja-money caja-money-strong text-sm whitespace-nowrap">
+                  <p className="caja-money caja-money-strong text-sm whitespace-nowrap" data-gasto-campo="total">
                     ${fmt(g.total)}
                   </p>
                   {isOpen && (
@@ -269,7 +281,7 @@ export default function GastoTable({
                     </div>
                   )}
                 </div>
-                <div className="mb-1">
+                <div className="mb-1" data-gasto-campo="categoria">
                   <CategoryDot categoria={g.categoria || "Varios"} />
                 </div>
                 <p
@@ -296,7 +308,7 @@ export default function GastoTable({
 
       {/* Desktop table */}
       <div
-        className="hidden md:block overflow-hidden"
+        className="hidden lg:block overflow-hidden"
         style={{
           background: "var(--caja-bg-surface)",
           border: "1px solid var(--caja-border-subtle)",
@@ -437,6 +449,7 @@ export default function GastoTable({
                     ) : (
                       <tr
                         key={g.id}
+                        data-gasto-fila={g.id}
                         className={`transition-colors ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
                         style={{
                           borderBottom: idx < sortedGastos.length - 1 ? "1px solid var(--caja-stone-100)" : 0,
@@ -454,6 +467,7 @@ export default function GastoTable({
                         <td
                           className="py-3 px-4"
                           style={{ color: "var(--caja-fg-strong)" }}
+                          data-gasto-campo="descripcion"
                         >
                           {g.descripcion || g.nombre}
                         </td>
@@ -468,7 +482,7 @@ export default function GastoTable({
                             </div>
                           )}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4" data-gasto-campo="categoria">
                           {isOpen && onQuickCategoria && quickCatId === g.id ? (
                             <select
                               autoFocus
@@ -509,7 +523,7 @@ export default function GastoTable({
                             </td>
                           </>
                         )}
-                        <td className="py-3 px-4 text-right caja-money caja-money-strong">
+                        <td className="py-3 px-4 text-right caja-money caja-money-strong" data-gasto-campo="total">
                           ${fmt(g.total)}
                         </td>
                         {isOpen && (
@@ -553,8 +567,11 @@ export default function GastoTable({
       {/* Fiscal toggle */}
       {gastos.length > 0 && (
         <div className="mt-4 flex items-center justify-end">
+          {/* El <input type=checkbox> nativo mide 13×13 y no se puede agrandar
+              sin que se vea deforme; lo que se toca de verdad es la etiqueta,
+              así que la etiqueta es la que llega a 44 px de alto. */}
           <label
-            className="flex items-center gap-2 text-xs cursor-pointer select-none"
+            className="flex min-h-[44px] items-center gap-2 text-xs cursor-pointer select-none"
             style={{ color: "var(--caja-fg-muted)" }}
           >
             <input

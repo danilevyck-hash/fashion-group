@@ -196,7 +196,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
         <button
           onClick={() => save({ andNew: true })}
           disabled={!canSave}
-          className="text-sm font-medium px-3 h-9 rounded-md transition-colors disabled:opacity-40"
+          className="inline-flex items-center justify-center text-sm font-medium px-3 min-h-[44px] rounded-md transition-colors disabled:opacity-40"
           style={{ background: "#fff", color: "var(--caja-fg-default)", border: "1px solid var(--caja-border-default)" }}
         >
           Guardar y nuevo
@@ -204,7 +204,7 @@ export default function NuevoGastoDrawer({ open, onClose, periodo, totalGastado,
         <button
           onClick={() => save({ andNew: false })}
           disabled={!canSave}
-          className="text-sm font-medium px-3 h-9 rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
+          className="inline-flex items-center justify-center text-sm font-medium px-3 min-h-[44px] rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
           style={{ background: "var(--caja-accent)", color: "#fff" }}
         >
           {addingGasto ? "Guardando..." : "Guardar gasto"}

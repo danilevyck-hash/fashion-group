@@ -125,7 +125,10 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     // los iconos de editar/eliminar medían 26×26 con p-1.5
     expect(tabla).not.toContain('className="p-1.5 hover:bg-blue-50');
     expect(tabla).not.toContain('className="p-1.5 hover:bg-red-50');
-    expect((tabla.match(/inline-flex h-11 w-11 items-center justify-center/g) ?? []).length).toBe(2);
+    // 4 y no 2: el mismo par (editar/eliminar) aparece en la TARJETA y en la
+    // TABLA desde que la ficha pasó a tarjetas por debajo de 1024 px. Lo que
+    // congela el candado es que ninguno vuelva a medir menos de 44.
+    expect((tabla.match(/inline-flex h-11 w-11 items-center justify-center/g) ?? []).length).toBe(4);
   });
 
   it("DangerZone · el toggle (medía 18) y los 3 botones rojos llegan a 44", () => {

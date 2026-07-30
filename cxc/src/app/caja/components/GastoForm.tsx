@@ -8,7 +8,7 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 // SearchableSelect (responsable/categoría).
 const cajaInputStyle: CSSProperties = {
   width: "100%",
-  height: 36,
+  height: 44,
   padding: "0 10px",
   fontFamily: "var(--caja-font-sans)",
   fontSize: 13,
@@ -149,7 +149,7 @@ function TextInput({
       placeholder={placeholder}
       style={{
         width: "100%",
-        height: 36,
+        height: 44,
         padding: "0 10px",
         fontFamily: type === "date" ? "var(--caja-font-mono)" : "var(--caja-font-sans)",
         fontSize: 13,
@@ -184,7 +184,7 @@ function SelectInput({
         onBlur={() => setFocus(false)}
         style={{
           width: "100%",
-          height: 36,
+          height: 44,
           padding: "0 32px 0 10px",
           fontFamily: "var(--caja-font-sans)",
           fontSize: 13,
@@ -471,7 +471,7 @@ export default function GastoForm({
                 setShowManageCat(!showManageCat);
               }}
               type="button"
-              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors"
+              className="inline-flex min-h-[44px] items-center gap-1.5 text-xs px-2 rounded transition-colors"
               style={{
                 color: "var(--caja-fg-muted)",
                 border: "1px solid var(--caja-border-subtle)",
@@ -524,7 +524,7 @@ export default function GastoForm({
                         }
                         setCategorias(categorias.filter((x) => x !== c));
                       }}
-                      className="text-sm ml-3 transition-colors"
+                      className="inline-flex h-11 w-11 items-center justify-center text-sm ml-3 -my-2 transition-colors"
                       style={{ color: "var(--caja-fg-subtle)" }}
                       onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-danger)")}
                       onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-subtle)")}
@@ -539,7 +539,7 @@ export default function GastoForm({
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
                     placeholder="Nueva categoría"
-                    className="flex-1 py-1 text-sm outline-none bg-transparent"
+                    className="flex-1 min-h-[44px] text-sm outline-none bg-transparent"
                     style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                   />
                   <button
@@ -565,7 +565,7 @@ export default function GastoForm({
                       setCategorias([...categorias, normalized]);
                       setNewCatName("");
                     }}
-                    className="text-sm transition-colors"
+                    className="inline-flex h-11 w-11 items-center justify-center text-sm -my-1 transition-colors"
                     style={{ color: "var(--caja-fg-muted)" }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-accent)")}
                     onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}

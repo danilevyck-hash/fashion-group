@@ -119,7 +119,7 @@ export default function PeriodoList({
         {!hasOpenPeriod && (
           <button
             onClick={onCreatePeriodo}
-            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
             style={{ background: "var(--caja-accent)", color: "#fff" }}
           >
             <PlusIcon /> Nuevo período
@@ -150,8 +150,19 @@ export default function PeriodoList({
         />
       ) : (
         <>
-          {/* Mobile card layout */}
-          <div className="md:hidden space-y-3">
+          {/* ── Tarjetas (celular, iPad y ventanas angostas) ──────────────────
+              🩸 Esta pantalla se rompía SOLO en el iPad: a 390 px ya usaba
+              tarjetas y a 1440 la tabla entraba, pero a 834 px se encendía la
+              tabla de escritorio JUSTO cuando aparece la barra lateral (`md`
+              arranca en 768 y la barra se lleva 224 px). Quedaban 384 px de
+              arrastre y afuera FONDO, GASTADO y SALDO.
+              El corte es `xl` (1280) y NO `lg`, y está medido: el ancho natural
+              de las 8 columnas suma 491 px de puro texto, que con el relleno
+              mínimo (px-3) dan ~744 px, y un iPad horizontal de 1024 deja 728 px
+              útiles. Correr el corte a `lg` habría dejado el problema vivo a
+              1024 — 16 px de arrastre. A 1280 quedan 984 px útiles: entra con
+              240 px de aire. */}
+          <div className="xl:hidden space-y-3">
             {periodos.map((p) => {
               const saldo = p.fondo_inicial - p.total_gastado;
               const items: OverflowMenuItem[] = [
@@ -166,6 +177,7 @@ export default function PeriodoList({
               return (
                 <div
                   key={p.id}
+                  data-periodo-fila={p.id}
                   onClick={() => onLoadDetail(p.id)}
                   className="rounded-lg p-4 active:scale-[0.99] transition cursor-pointer"
                   style={{
@@ -197,13 +209,15 @@ export default function PeriodoList({
                   <div className="flex items-center justify-between text-xs">
                     <span style={{ color: "var(--caja-fg-muted)" }}>
                       Fondo{" "}
-                      <span className="caja-money caja-money-strong">${fmt(p.fondo_inicial)}</span>
+                      <span className="caja-money caja-money-strong" data-periodo-campo="fondo">${fmt(p.fondo_inicial)}</span>
                     </span>
                     <span style={{ color: "var(--caja-fg-muted)" }}>
                       Gastado{" "}
-                      <span className="caja-money">${fmt(p.total_gastado)}</span>
+                      <span className="caja-money" data-periodo-campo="gastado">${fmt(p.total_gastado)}</span>
                     </span>
-                    <SaldoValue saldo={saldo} fondo={p.fondo_inicial} />
+                    <span data-periodo-campo="saldo">
+                      <SaldoValue saldo={saldo} fondo={p.fondo_inicial} />
+                    </span>
                   </div>
                 </div>
               );
@@ -212,7 +226,7 @@ export default function PeriodoList({
 
           {/* Desktop table — scroll horizontal para que SALDO/Acciones no se corten */}
           <div
-            className="hidden md:block overflow-x-auto"
+            className="hidden xl:block overflow-x-auto"
             style={{
               background: "var(--caja-bg-surface)",
               border: "1px solid var(--caja-border-subtle)",
@@ -248,6 +262,7 @@ export default function PeriodoList({
               return (
                 <div
                   key={p.id}
+                  data-periodo-fila={p.id}
                   role="button"
                   tabIndex={0}
                   onClick={() => onLoadDetail(p.id)}
@@ -298,13 +313,13 @@ export default function PeriodoList({
                   <div className="px-4">
                     <StatusPill estado={p.estado} />
                   </div>
-                  <div className="caja-money caja-money-strong px-4 text-right">
+                  <div className="caja-money caja-money-strong px-4 text-right" data-periodo-campo="fondo">
                     ${fmt(p.fondo_inicial)}
                   </div>
-                  <div className="caja-money px-4 text-right">
+                  <div className="caja-money px-4 text-right" data-periodo-campo="gastado">
                     ${fmt(p.total_gastado)}
                   </div>
-                  <div className="px-4 text-right">
+                  <div className="px-4 text-right" data-periodo-campo="saldo">
                     <SaldoValue saldo={saldo} fondo={p.fondo_inicial} />
                   </div>
                   <div className="px-4 flex items-center justify-end gap-1.5">
