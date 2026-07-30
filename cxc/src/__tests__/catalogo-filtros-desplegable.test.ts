@@ -1,26 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// En CELULAR los filtros del catálogo son DESPLEGABLES, no una fila que se
-// arrastra de costado (30-jul-2026).
+// En CELULAR y en iPAD los filtros del catálogo son DESPLEGABLES, no una fila
+// que se arrastra de costado (30-jul-2026).
 //
 // Daniel, textual: *"en todo lo del iphone donde haya data como los filtros en
 // los catalogos y hay que hacer scroll, mejor arreglarlo de otra manera, un
-// drop down"*.
+// drop down"*. Y al ver que a 834 px seguía igual: *"si, hazlo en ipad tambien"*.
 //
-// 🩸 LO MEDIDO ANTES, navegador real, build y datos de producción, 390 px
-// (iPhone), en las DOS vistas que comparten este componente — la interna del
-// vendedor (`/catalogo/<marca>`) y la pública del cliente
-// (`/catalogo-publico/<marca>`):
+// 🩸 LO MEDIDO, navegador real, build y datos de producción, en las DOS vistas
+// que comparten este componente — la interna del vendedor (`/catalogo/<marca>`)
+// y la pública del cliente (`/catalogo-publico/<marca>`). Px de arrastre
+// horizontal de la fila de filtros, interno / público:
 //
-//   marca      interno            público            controles fuera de la vista
-//   Tommy      779 px de arrastre  813 px             10 de 15
-//   Reebok     642 px              674 px              7 de 12
-//   Joybees    138 px              158 px              2 de 7
+//   marca    390 (iPhone)  834 (iPad V)  1024 (iPad H)  1180 (iPad Pro)  1440
+//   Tommy     779 / 813     559 / 369      369 / 179      213 /  23      0 / 0
+//   Reebok    642 / 674     422 / 230      232 /  40       76 /   0      0 / 0
+//   Joybees   138 / 158       0 /   0        0 /   0        0 /   0      0 / 0
 //
-// Después del arreglo: **0 px en las 3 marcas y en las 2 vistas**.
+// El corte pasó de `md` (768) a `lg` (1024): **390 y 834 quedan en 0**.
+//
+// ⚠️ **1024 y 1180 NO son 0 y este arreglo no los toca** — ahí ya mandan las
+// píldoras. Está medido a propósito (era el borde donde esto se podía romper) y
+// reportado a Daniel con el número; correr el corte otra vez sería una decisión
+// suya, no un ajuste técnico.
 //
 // Este archivo congela la CAUSA (jsdom no calcula layout, así que no puede
 // medir un arrastre); la medición real vive en
-// `scripts/_medir-filtros-catalogo.mjs`.
+// `scripts/_medir-filtros-catalogo.mjs` (5 anchos).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from "vitest";
@@ -65,25 +70,25 @@ function filaPildoras(container: HTMLElement): HTMLElement {
   return el;
 }
 
-/** La fila de desplegables (celular): la que se esconde de `md` para arriba. */
+/** La fila de desplegables (celular e iPad): la que se esconde de `lg` p'arriba. */
 function filaMovil(container: HTMLElement): HTMLElement {
-  const el = container.querySelector<HTMLElement>(".md\\:hidden");
-  if (!el) throw new Error("no encontré la fila de celular");
+  const el = container.querySelector<HTMLElement>(".lg\\:hidden");
+  if (!el) throw new Error("no encontré la fila de celular/iPad");
   return el;
 }
 
-// ── La causa del arrastre: la fila de píldoras ya no se dibuja en celular ─────
-describe("la fila que se arrastraba sale de la pantalla del celular", () => {
-  it("la fila de píldoras es `hidden md:flex` — solo iPad y escritorio", () => {
+// ── La causa del arrastre: la fila de píldoras ya no se dibuja bajo `lg` ──────
+describe("la fila que se arrastraba sale de la pantalla del celular y del iPad", () => {
+  it("la fila de píldoras es `hidden lg:flex` — solo escritorio", () => {
     for (const marca of MARCAS) {
       const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
       expect(filaPildoras(container).className, marca).toContain("hidden");
-      expect(filaPildoras(container).className, marca).toContain("md:flex");
+      expect(filaPildoras(container).className, marca).toContain("lg:flex");
       unmount();
     }
   });
 
-  it("la fila de celular ENVUELVE y no se arrastra: `flex-wrap`, sin overflow", () => {
+  it("la fila de celular/iPad ENVUELVE y no se arrastra: `flex-wrap`, sin overflow", () => {
     for (const marca of MARCAS) {
       const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
       const fila = filaMovil(container);
@@ -95,13 +100,15 @@ describe("la fila que se arrastraba sale de la pantalla del celular", () => {
     }
   });
 
-  it("el corte es `md` (768): iPad de 834 y escritorio NO cambian", () => {
-    // Con `sm` (640) un iPad en vertical seguiría igual, pero un celular
-    // apaisado perdería el arreglo; con `lg` (1024) el iPad cambiaría de
-    // aspecto, y el alcance aprobado fue SOLO el celular.
-    expect(FUENTE).toContain("hidden md:flex items-center gap-2 overflow-x-auto");
-    expect(FUENTE).toContain("flex md:hidden flex-wrap");
-    expect(FUENTE).not.toMatch(/\b(sm|lg|xl):hidden\b/);
+  it("el corte es `lg` (1024): el iPad queda del lado de los desplegables", () => {
+    // El primer arreglo cortó en `md` (768) y dejó el iPad con la fila vieja:
+    // medido, a 834 px seguía arrastrándose 559 px en Tommy y 422 en Reebok.
+    // Daniel: *"si, hazlo en ipad tambien"*. Con `lg`, 1023 es el último ancho
+    // con desplegables y 1024 el primero con píldoras — y a 1024/1180/1440 las
+    // píldoras entran solas (medido: 0 px en las 3 marcas y las 2 vistas).
+    expect(FUENTE).toContain("hidden lg:flex items-center gap-2 overflow-x-auto");
+    expect(FUENTE).toContain("flex lg:hidden flex-wrap");
+    expect(FUENTE).not.toMatch(/\b(sm|md|xl):hidden\b/);
   });
 });
 

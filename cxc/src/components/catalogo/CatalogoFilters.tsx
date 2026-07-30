@@ -6,18 +6,20 @@
 // y el chip "2 bultos o más" + el select de precio son feature (filtroBultos /
 // filtroPrecio, hoy solo Tommy — ver lib/catalogo/filtros-extra).
 //
-// ── 📱 EN CELULAR LOS FILTROS SON DESPLEGABLES, NO UNA FILA QUE SE ARRASTRA ──
+// ── 📱 EN CELULAR Y iPAD LOS FILTROS SON DESPLEGABLES, NO UNA FILA QUE SE ARRASTRA ──
 //
 // Daniel, textual (30-jul-2026): *"en todo lo del iphone donde haya data como
 // los filtros en los catalogos y hay que hacer scroll, mejor arreglarlo de otra
-// manera, un drop down"*.
+// manera, un drop down"*. Y después, viendo que a 834 px seguía arrastrándose:
+// *"si, hazlo en ipad tambien"*.
 //
 // La fila de píldoras es un `overflow-x-auto`. Medido en el navegador con build
-// y datos de producción, a 390 px (iPhone), catálogo interno / público:
+// y datos de producción, catálogo interno / público:
 //
-//   Tommy ..... 779 / 813 px de arrastre — 10 de 15 controles fuera de la vista
-//   Reebok .... 642 / 674 px de arrastre —  7 de 12 fuera
-//   Joybees ... 138 / 158 px de arrastre —  2 de  7 fuera
+//   a 390 px (iPhone)          a 834 px (iPad vertical)
+//   Tommy ..... 779 / 813 px    Tommy ..... 559 / 369 px
+//   Reebok .... 642 / 674 px    Reebok .... 422 / 230 px
+//   Joybees ... 138 / 158 px    Joybees ....... 0 /   0 px
 //
 // O sea: en Tommy, DIEZ opciones de filtro solo existían para quien adivinara
 // que la fila se arrastra de costado. Este repo ya había pagado ese peaje una
@@ -25,17 +27,17 @@
 // justamente porque *"un filtro que no se ve no existe"*. Moverlo de lugar
 // arreglaba UN chip; esto arregla la fila entera.
 //
-// La forma: **hasta `md` (768 px), un desplegable por grupo** — Género,
+// La forma: **hasta `lg` (1024 px), un desplegable por grupo** — Género,
 // Categoría, Estado — en una fila que ENVUELVE (`flex-wrap`), así que el
 // arrastre horizontal es 0 px por construcción, no por que los chips hayan
 // entrado justo. Cada disparador dice de qué filtro es Y qué está elegido
 // ("Género: Women"), que es lo que la fila de píldoras no podía mostrar sin
 // que uno la recorriera entera.
 //
-// **De `md` para arriba NO cambia NADA**: iPad (834) y escritorio (1440) siguen
-// con la misma fila de píldoras, mismo marcado, mismas clases.
-// ⚠️ A 834 px la fila TODAVÍA se arrastra (Tommy 559 px, Reebok 422 px). Es a
-// propósito: el alcance aprobado fue el celular. Queda anotado como pendiente.
+// **De `lg` para arriba NO cambia NADA**: el escritorio sigue con la misma fila
+// de píldoras, mismo marcado, mismas clases. El borde de arriba se midió a
+// propósito (1024 y 1180 px, iPad Pro horizontal): ahí las píldoras vuelven y
+// entran solas, 0 px de arrastre en las 3 marcas.
 //
 // El panel es `<DesplegableFlotante>` (portal a <body> + `position: fixed`), que
 // es EL desplegable de la casa — un panel `absolute` acá lo recortaría el primer
@@ -206,11 +208,12 @@ export default function CatalogoFilters({
         )}
       </div>
 
-      {/* ── CELULAR (hasta md): un desplegable por grupo, fila que ENVUELVE ──
+      {/* ── CELULAR Y iPAD (hasta lg): un desplegable por grupo, fila que ENVUELVE ──
           Es la misma información que la fila de píldoras de al lado, pero sin
           arrastre horizontal: `flex-wrap` la baja de renglón en vez de esconder
-          lo que no entra. Medido a 390 px: 813 px de arrastre → 0. */}
-      <div className="flex md:hidden flex-wrap items-center gap-2">
+          lo que no entra. Medido: 813 px de arrastre a 390 → 0, y 559 px a
+          834 (iPad vertical) → 0. */}
+      <div className="flex lg:hidden flex-wrap items-center gap-2">
         {conBultos && (
           <button
             onClick={() => onBultosFilterChange!(!bultosFilter)}
@@ -255,10 +258,12 @@ export default function CatalogoFilters({
         )}
       </div>
 
-      {/* ── iPAD Y ESCRITORIO (md+): la fila de píldoras de siempre ──
-          No se le tocó ni una clase salvo el `hidden md:flex` que la esconde en
-          celular. En 834 y 1440 el marcado y el aspecto son idénticos a antes. */}
-      <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+      {/* ── ESCRITORIO (lg+): la fila de píldoras de siempre ──
+          No se le tocó ni una clase salvo el `hidden lg:flex` que la esconde en
+          celular y iPad. De 1024 px para arriba el marcado y el aspecto son
+          idénticos a antes, y las píldoras entran sin arrastre en las 3 marcas
+          (medido a 1024, 1180 y 1440). */}
+      <div className="hidden lg:flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
         {conBultos && (
           <>
             {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila

@@ -37,9 +37,16 @@ const ETAPA = process.env.ETAPA ?? "antes";
 const SOLO = process.env.SOLO ?? "";
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 
+// 1024 y 1180 están acá por el BORDE DE ARRIBA (30-jul-2026): al correr el
+// corte de `md` a `lg`, 1023 es el último ancho con desplegables y 1024 el
+// primero donde vuelven las píldoras. Medir solo 834 y 1440 habría dejado sin
+// mirar justo el ancho donde el arreglo se puede romper. 1180 = iPad Pro 11"
+// horizontal, el aparato real más ancho que cae del lado de las píldoras.
 const TAMANOS = [
   { nombre: "390", width: 390, height: 844, movil: true },
   { nombre: "834", width: 834, height: 1194, movil: true },
+  { nombre: "1024", width: 1024, height: 768, movil: true },
+  { nombre: "1180", width: 1180, height: 820, movil: true },
   { nombre: "1440", width: 1440, height: 900, movil: false },
 ];
 
