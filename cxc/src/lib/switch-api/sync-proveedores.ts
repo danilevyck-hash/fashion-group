@@ -19,6 +19,8 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient } from "./client";
+import { particionarFilas } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { clearStaleRunning } from "./sync-log";
 import { empresasConCxp } from "./empresas";
 import { derivarProveedor } from "@/lib/proveedores-derivados";
@@ -188,11 +190,22 @@ async function finishLog(
   status: "success" | "error",
   n: number,
   err?: string,
+  // Los descartes del guard de montos. De acá sale el anti-loop del aviso: sin
+  // persistirlos, el recordatorio volvería a sonar en cada corrida.
+  skipDetails?: unknown[],
 ): Promise<void> {
   if (!logId) return;
   await supabaseServer
     .from("switch_sync_log")
-    .update({ status, finished_at: new Date().toISOString(), records_updated: n, error_message: err ?? null })
+    .update({
+      status,
+      finished_at: new Date().toISOString(),
+      records_updated: n,
+      error_message: err ?? null,
+      ...(skipDetails && skipDetails.length > 0
+        ? { records_skipped: skipDetails.length, skip_details: skipDetails }
+        : {}),
+    })
     .eq("id", logId);
 }
 
@@ -203,7 +216,27 @@ export async function syncEmpresaProveedores(
 ): Promise<ProveedorSyncResult> {
   const logId = await createLog(empresaKey, triggeredBy);
   try {
-    const { rows, fallidos, listedIds, listaCompleta } = await buildProveedorRows(empresaKey);
+    const { rows: crudas, fallidos, listedIds, listaCompleta } = await buildProveedorRows(empresaKey);
+
+    // Guard de montos imposibles. ⚠️ Esta familia tiene el piso MÁS ALTO ($20M)
+    // y no es por capricho: el récord real y LEGÍTIMO de la tabla es
+    // $2.074.195,21 (fashion_wear · American Fashion Wear, SA) y hay 3 filas
+    // sobre el millón, todas de proveedores intercompañía. No es un documento:
+    // es el saldo ACUMULADO de una cuenta corriente de importación. Un piso de
+    // $1M copiado del guard de costo habría rechazado datos buenos el día 1.
+    const umbralProveedor = await calibrarUmbral("proveedor", empresaKey);
+    const { buenas: rows, rechazadas } = particionarFilas(
+      "proveedor",
+      crudas,
+      umbralProveedor,
+      (f) => f.nombre,
+    );
+    if (rechazadas.length > 0) {
+      console.error(
+        `[sync ${empresaKey} proveedores] ${rechazadas.length} proveedor(es) con monto IMPOSIBLE (umbral ${umbralProveedor}) — no se guardaron`,
+        rechazadas.map((r) => r.clave),
+      );
+    }
 
     const now = new Date().toISOString();
     let upserted = 0;
@@ -240,7 +273,30 @@ export async function syncEmpresaProveedores(
       }
     }
 
-    await finishLog(logId, "success", upserted);
+    await finishLog(
+      logId,
+      "success",
+      upserted,
+      undefined,
+      rechazadas.length > 0 ? detallesDeRechazo("proveedor", rechazadas, umbralProveedor) : undefined,
+    );
+
+    // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+    if (rechazadas.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "proveedor",
+          empresaKey,
+          syncType: "proveedores",
+          rechazadas,
+          umbral: umbralProveedor,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync ${empresaKey} proveedores] no pude avisar el monto imposible: ${String(e)}`);
+      }
+    }
+
     return { empresaKey, ok: true, proveedores: upserted, fallidos, purgados };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

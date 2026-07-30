@@ -39,6 +39,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSwitchClient, type SwitchArticulo } from "./client";
 import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
+import { columnasImposibles, campoSkip, fmtMonto } from "./monto-guard";
+import { calibrarUmbral, avisarMontosImposibles } from "./monto-guard-io";
 import { logCronError } from "@/lib/cron-telemetry";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
@@ -183,6 +185,9 @@ export async function syncCatalogo(
     // DDL 20260723150000) puede lanzar si ya hay una corrida en curso → la
     // empresa falla limpio (out.error) sin tumbar el resto.
     let logId: string | null = null;
+    /** Descartes del guard de precios — se persisten en el log de esta empresa
+     *  aunque después falle algo: de ahí sale el anti-loop del aviso. */
+    let skipDetailsPrecio: unknown[] | undefined;
     try {
       if (!dryRun) {
         logId = await createSwitchSyncLog({
@@ -192,6 +197,27 @@ export async function syncCatalogo(
         });
       }
       const client = createSwitchClient(emp.empresaKey);
+
+      // Guard de montos imposibles sobre el PRECIO. Es la única familia que un
+      // tercero VE: el precio se publica en el catálogo público. El umbral se
+      // calibra contra la tabla de ESTA marca (products / joybees_products /
+      // tommy_products), no contra un número fijo.
+      const umbralPrecio = await calibrarUmbral("producto", undefined, productsTable);
+      const preciosRechazados: Array<{ clave: string; fila: unknown; columnas: Array<{ columna: string; valor: number }> }> = [];
+      /** ¿El precio de Switch es usable? Si no, se REGISTRA y se devuelve null:
+       *  el producto existente conserva el precio bueno que ya tenía (stock,
+       *  nombre y visibilidad se actualizan igual) y el producto nuevo no se
+       *  crea — publicarle al cliente final un precio imposible es peor que no
+       *  tenerlo en el catálogo. Una fila mala no frena a las demás. */
+      const precioUsable = (precio: number, sku: string): number | null => {
+        const malas = columnasImposibles("producto", { price: precio }, umbralPrecio);
+        if (malas.length === 0) return precio;
+        preciosRechazados.push({ clave: sku, fila: { sku, price: precio }, columnas: malas });
+        console.error(
+          `[${config.syncLogType} ${emp.empresaKey}] PRECIO IMPOSIBLE sku=${sku}: ${fmtMonto(precio)} (tope ${fmtMonto(umbralPrecio)})`,
+        );
+        return null;
+      };
 
       // (1) /lista bulk → universo + disponible.
       const artsAll = await fetchAllArticulos(emp.empresaKey);
@@ -252,6 +278,8 @@ export async function syncCatalogo(
         const p = bySku.get(codigo);
         const precio = num(art.precio);
 
+        const precioOk = precioUsable(precio, codigo);
+
         if (p) {
           // Regla única de visibilidad (lib/catalogos/visibilidad.ts):
           // oculto_manual=true (toggle admin) gana SIEMPRE → el toggle sobrevive
@@ -263,7 +291,7 @@ export async function syncCatalogo(
             ocultoManual: p.oculto_manual,
           });
           const nameFinal = p.name && p.name.trim() ? p.name : (art.descripcion ?? p.name);
-          if (p.price == null || Math.abs(Number(p.price) - precio) > 0.004) {
+          if (precioOk != null && (p.price == null || Math.abs(Number(p.price) - precio) > 0.004)) {
             out.preciosCambiados.push({ sku: codigo, antes: p.price, despues: precio });
           }
           if (!dryRun) {
@@ -272,7 +300,9 @@ export async function syncCatalogo(
             // invisible → contadores mentirosos + heartbeat verde. Throw → aborta
             // la empresa, setea out.error, dispara alerta Telegram (sin falso éxito).
             const { error: upErr } = await db.from(productsTable).update({
-              price: precio,
+              // Precio imposible → NO se escribe la columna: el producto
+              // conserva el último precio bueno y el resto se actualiza igual.
+              ...(precioOk != null ? { price: precioOk } : {}),
               name: nameFinal,
               active: shouldShow,
               ...config.stockFields(existencia, disponibilidad),
@@ -297,6 +327,10 @@ export async function syncCatalogo(
           else if (p.active === true && !shouldShow) out.ocultados++;
           else out.actualizados++;
         } else if (existencia >= 1) {
+          // Producto NUEVO con precio imposible: no se crea. No hay precio
+          // anterior que conservar y publicarlo sería mostrarle la cifra al
+          // cliente final. Vuelve a intentarse en la corrida siguiente.
+          if (precioOk == null) continue;
           // Auto-agregar nuevo con EXISTENCIA >= 1.
           out.agregados++;
           out.nuevosSinFoto.push(codigo); // nuevo ⇒ image_url null ⇒ sin foto
@@ -304,7 +338,7 @@ export async function syncCatalogo(
             const { data: np, error: insErr } = await db.from(productsTable).insert({
               sku: art.codigo,
               name: art.descripcion ?? art.codigo,
-              price: precio,
+              price: precioOk,
               category: emp.defaultCategory,
               active: true,
               image_url: null,
@@ -344,6 +378,7 @@ export async function syncCatalogo(
         const p = bySku.get(codigo);
         if (!p) continue;
         const precio = num(a.precio);
+        if (precioUsable(precio, codigo) == null) continue; // conserva el precio bueno
         if (p.price != null && Math.abs(Number(p.price) - precio) <= 0.004) continue;
         if (!dryRun) {
           const { error: prErr } = await db
@@ -399,16 +434,38 @@ export async function syncCatalogo(
           { telegram: false },
         );
       }
+      // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+      if (preciosRechazados.length > 0 && !dryRun) {
+        skipDetailsPrecio = preciosRechazados.map((r) => ({
+          facturaId: null,
+          secuencial: r.clave,
+          campo: campoSkip("producto"),
+          valorCrudo: { umbral: umbralPrecio, columnas: r.columnas },
+        }));
+        try {
+          await avisarMontosImposibles({
+            familia: "producto",
+            empresaKey: emp.empresaKey,
+            syncType: config.syncLogType,
+            rechazadas: preciosRechazados,
+            umbral: umbralPrecio,
+            logId,
+          });
+        } catch (e) {
+          console.error(`[${config.syncLogType} ${emp.empresaKey}] no pude avisar el precio imposible: ${String(e)}`);
+        }
+      }
     } catch (err) {
       out.error = err instanceof Error ? err.message : String(err);
     }
     if (out.error) {
-      await finishSwitchSyncLog(logId, "error", { errorMessage: out.error });
+      await finishSwitchSyncLog(logId, "error", { errorMessage: out.error, skipDetails: skipDetailsPrecio });
     } else {
       await finishSwitchSyncLog(logId, "success", {
         inserted: out.agregados,
         updated: out.actualizados + out.reactivados,
         skipped: out.ocultados,
+        skipDetails: skipDetailsPrecio,
       });
     }
     empresasOut.push(out);

@@ -20,6 +20,8 @@ import { createSwitchClient } from "./client";
 import { empresasConUtilidad } from "./empresas";
 import { clearStaleRunning } from "./sync-log";
 import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
+import { particionarFilas } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 
 /**
  * Empresas B2B con comisión sobre venta: las 6 B2B (excluye Multifashion, que es
@@ -358,6 +360,9 @@ async function finishLog(
   status: "success" | "error",
   records: number,
   errorMessage?: string,
+  // Los descartes del guard de montos. Es también de donde sale el anti-loop del
+  // aviso: sin persistirlos, el recordatorio volvería a sonar cada corrida.
+  skipDetails?: unknown[],
 ): Promise<void> {
   if (!logId) return;
   await supabaseServer
@@ -367,6 +372,9 @@ async function finishLog(
       finished_at: new Date().toISOString(),
       records_inserted: records,
       error_message: errorMessage ?? null,
+      ...(skipDetails && skipDetails.length > 0
+        ? { records_skipped: skipDetails.length, skip_details: skipDetails }
+        : {}),
     })
     .eq("id", logId);
 }
@@ -410,7 +418,27 @@ export async function syncEmpresaUtilidad(
     // affect row a second time"). Última gana (mismo criterio que el upsert).
     const byKey = new Map<string, ReturnType<typeof toCacheRow>>();
     for (const cr of cacheRows) byKey.set(`${cr.secuencial}|${cr.fecha}`, cr);
-    const uniqueRows = [...byKey.values()];
+
+    // Guard de montos imposibles. Esta tabla decide QUÉ FACTURAS COMISIONAN: un
+    // costo o una utilidad corruptos son plata mal pagada. Se rechaza el
+    // documento entero (el upsert conserva el último valor bueno) y los demás
+    // del mes se guardan igual — una fila mala no tumba el sync.
+    const umbralUtilidad = await calibrarUmbral("utilidad", empresaKey);
+    const { buenas: uniqueRows, rechazadas } = particionarFilas(
+      "utilidad",
+      [...byKey.values()],
+      umbralUtilidad,
+      (f) => `${f.secuencial} · ${f.fecha}`,
+    );
+    const skipDetails = rechazadas.length > 0
+      ? detallesDeRechazo("utilidad", rechazadas, umbralUtilidad)
+      : [];
+    if (rechazadas.length > 0) {
+      console.error(
+        `[sync-utilidad ${empresaKey}] ${rechazadas.length} doc(s) con monto IMPOSIBLE (umbral ${umbralUtilidad}) — no se guardaron`,
+        rechazadas.map((r) => r.clave),
+      );
+    }
 
     // GUARD "cero silencioso": no se puede registrar success habiendo escrito 0
     // filas cuando SÍ había documentos que escribir. Un sync que corre, no
@@ -422,8 +450,12 @@ export async function syncEmpresaUtilidad(
     if (uniqueRows.length === 0) {
       const facturasEnRango = await contarFacturasEnRango(empresaKey, meses);
       if (facturasEnRango > 0) {
+        // Si lo que vació el lote fue el guard de montos, decirlo: "0 documentos"
+        // y "todos los documentos venían corruptos" son diagnósticos distintos.
         throw new Error(
-          `el reporte de utilidad devolvió 0 documentos pero switch_facturas tiene ${facturasEnRango} en el rango — no se registra success con la tabla vacía`,
+          rechazadas.length > 0
+            ? `el reporte de utilidad trajo ${rechazadas.length} documento(s) y TODOS traían montos imposibles (umbral ${umbralUtilidad}) — no se registra success con la tabla vacía`
+            : `el reporte de utilidad devolvió 0 documentos pero switch_facturas tiene ${facturasEnRango} en el rango — no se registra success con la tabla vacía`,
         );
       }
     }
@@ -432,7 +464,23 @@ export async function syncEmpresaUtilidad(
     // Siembra tasas globales (0.5%) para nombres del maestro + atribuidos por cartera.
     const vendedoresNuevos = await seedTasasGlobal(vendedores);
 
-    await finishLog(logId, "success", uniqueRows.length);
+    await finishLog(logId, "success", uniqueRows.length, undefined, skipDetails);
+
+    // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+    if (rechazadas.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "utilidad",
+          empresaKey,
+          syncType: "utilidad",
+          rechazadas,
+          umbral: umbralUtilidad,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync-utilidad ${empresaKey}] no pude avisar el monto imposible: ${String(e)}`);
+      }
+    }
     return {
       empresaKey,
       ok: true,

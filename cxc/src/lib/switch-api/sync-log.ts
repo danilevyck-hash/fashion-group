@@ -239,7 +239,14 @@ export async function createSwitchSyncLog(opts: {
 export async function finishSwitchSyncLog(
   logId: string | null,
   status: "success" | "error",
-  fields?: { inserted?: number; updated?: number; skipped?: number; errorMessage?: string },
+  fields?: {
+    inserted?: number;
+    updated?: number;
+    skipped?: number;
+    errorMessage?: string;
+    /** Descartes del guard de montos. De acá sale el anti-loop de su aviso. */
+    skipDetails?: unknown[];
+  },
 ): Promise<void> {
   if (!logId) return;
   try {
@@ -252,6 +259,9 @@ export async function finishSwitchSyncLog(
         records_updated: fields?.updated ?? 0,
         records_skipped: fields?.skipped ?? 0,
         error_message: fields?.errorMessage ? fields.errorMessage.slice(0, 2000) : null,
+        ...(fields?.skipDetails && fields.skipDetails.length > 0
+          ? { skip_details: fields.skipDetails }
+          : {}),
       })
       .eq("id", logId);
     if (error) console.error(`[sync-log] no pude finalizar switch_sync_log ${logId}: ${error.message}`);

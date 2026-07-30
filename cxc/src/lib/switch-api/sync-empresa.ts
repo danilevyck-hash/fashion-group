@@ -25,15 +25,8 @@ import type {
 import { parseAmount, parseSwitchFecha, parseFechaDMY } from "./parse";
 import { supabaseServer } from "../supabase-server";
 import { clearStaleRunning } from "./sync-log";
-import {
-  umbralCostoDiario,
-  esCostoDiarioImposible,
-  fechasPorAvisar,
-  COSTO_DIARIO_DIAS_HISTORIA,
-  COSTO_DIARIO_DIAS_ENTRE_AVISOS,
-} from "./costo-guard";
-import { enviarSistema } from "@/lib/alertas/canal";
-import { mapEmpresaName } from "@/lib/empresa-mapping";
+import { particionarFilas, campoSkip } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 
 import type { SwitchTotalVentasDia } from "./types";
 
@@ -375,6 +368,13 @@ export async function syncEmpresaFacturas(
     const client = createSwitchClient(empresaKey);
     const buffer: FacturaRow[] = [];
 
+    // Guard de montos imposibles. `switch_facturas` es la peor tabla donde puede
+    // entrar una cifra corrupta: es la base de las ventas, del margen, de las
+    // comisiones y de la proyección, y contamina 6 vistas materializadas. El
+    // umbral se calibra UNA vez por corrida contra el histórico de esta empresa.
+    const umbralFactura = await calibrarUmbral("factura", empresaKey);
+    const rechazadasFactura: Array<ReturnType<typeof particionarFilas<FacturaRow>>["rechazadas"][number]> = [];
+
     const flush = async (): Promise<void> => {
       while (buffer.length >= UPSERT_BATCH) {
         const batch = buffer.splice(0, UPSERT_BATCH);
@@ -424,7 +424,27 @@ export async function syncEmpresaFacturas(
               );
             }
           }
-          buffer.push(res.row);
+          // Guard de montos imposibles: se mira la fila ENTERA (subtotal,
+          // descuento, impuesto, total, saldo). Una factura imposible NO se
+          // escribe —el upsert conserva así el último valor bueno— y NO frena a
+          // las demás del lote.
+          const { buenas, rechazadas } = particionarFilas(
+            "factura",
+            [res.row],
+            umbralFactura,
+            (f) => `${f.tipo_comprobante} ${f.secuencial}`,
+          );
+          if (rechazadas.length > 0) {
+            counters.skipped++;
+            rechazadasFactura.push(...rechazadas);
+            skipDetails.push(...detallesDeRechazo("factura", rechazadas, umbralFactura));
+            console.error(
+              `[sync ${empresaKey} ${label}] MONTO IMPOSIBLE sec=${res.row.secuencial} (umbral ${umbralFactura})`,
+              rechazadas[0].columnas,
+            );
+            continue;
+          }
+          buffer.push(...buenas);
         }
         traidos += items.length;
         await flush();
@@ -482,6 +502,23 @@ export async function syncEmpresaFacturas(
       const r = await persistFacturasBatch(empresaKey, buffer);
       counters.inserted += r.inserted;
       counters.updated += r.updated;
+    }
+
+    // El aviso va DESPUÉS de escribir (las facturas buenas ya están guardadas) y
+    // nunca puede tumbar la corrida: si Telegram falla, el sync sigue success.
+    if (rechazadasFactura.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "factura",
+          empresaKey,
+          syncType: "facturas",
+          rechazadas: rechazadasFactura,
+          umbral: umbralFactura,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync ${empresaKey} facturas] no pude avisar el monto imposible: ${String(e)}`);
+      }
     }
 
     const durationMs = Date.now() - startedAt;
@@ -733,6 +770,11 @@ export async function syncEmpresaEstadoCuenta(
   try {
     const client = createSwitchClient(empresaKey);
 
+    // Guard de montos imposibles: un umbral por corrida, calibrado contra el
+    // histórico de cartera de ESTA empresa.
+    const umbralCxc = await calibrarUmbral("cxc", empresaKey);
+    const rechazadasCxc: Array<ReturnType<typeof particionarFilas<EstadoCuentaRow>>["rechazadas"][number]> = [];
+
     // 1) Traer todos los clientes de la empresa.
     //
     // OJO con la paginación: /apicliente/lista NO respeta porPagina (Switch cap
@@ -829,6 +871,26 @@ export async function syncEmpresaEstadoCuenta(
           skipDetails.push(res.skip);
           continue;
         }
+        // Guard de montos imposibles. Un saldo corrupto acá infla la cartera y
+        // dispara alertas de cobranza falsas. Se rechaza el documento entero
+        // (upsert: el último valor bueno sobrevive); los demás documentos del
+        // mismo cliente se guardan igual.
+        const p = particionarFilas(
+          "cxc",
+          [res.row],
+          umbralCxc,
+          (f) => `${f.secuencial ?? f.ccte_id} · ${f.cliente_nombre ?? ""}`.trim(),
+        );
+        if (p.rechazadas.length > 0) {
+          skipped++;
+          rechazadasCxc.push(...p.rechazadas);
+          skipDetails.push(...detallesDeRechazo("cxc", p.rechazadas, umbralCxc));
+          console.error(
+            `[sync ${empresaKey} cxc] MONTO IMPOSIBLE ccte=${res.row.ccte_id} (umbral ${umbralCxc})`,
+            p.rechazadas[0].columnas,
+          );
+          continue;
+        }
         buffer.push(res.row);
       }
       while (buffer.length >= UPSERT_BATCH) {
@@ -849,6 +911,22 @@ export async function syncEmpresaEstadoCuenta(
       buffer = [];
     }
 
+    // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+    if (rechazadasCxc.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "cxc",
+          empresaKey,
+          syncType: "estadocuenta",
+          rechazadas: rechazadasCxc,
+          umbral: umbralCxc,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync ${empresaKey} cxc] no pude avisar el monto imposible: ${String(e)}`);
+      }
+    }
+
     // 3) Reconciliar: documentos no vistos en este run (pagados/cerrados) que
     //    aún tengan saldo > 0 → poner saldo 0. synced_at < runStamp = no tocado.
     //
@@ -857,12 +935,26 @@ export async function syncEmpresaEstadoCuenta(
     //    sin que eso signifique "cerrado". Zerearlos corrompería su CXC a $0 por
     //    una falla transitoria de red. Un cliente procesado OK con 0 elements SÍ
     //    se reconcilia (sus docs realmente se cerraron).
+    //
+    //    ⚠️ Y EXCLUIR TAMBIÉN los documentos que el guard de montos rechazó. Sin
+    //    esto el guard se volvería DESTRUCTIVO: como no se reescriben, su
+    //    synced_at queda viejo y el reconcile los leería como "cerrados" y les
+    //    pondría saldo 0 — que es exactamente el valor bueno que el guard existe
+    //    para conservar. Switch sigue mandando el documento; lo que está mal es
+    //    su monto, no que el documento haya dejado de existir.
     let reconcileQuery = supabaseServer
       .from("switch_estadocuenta")
       .update({ saldo: 0, updated_at: new Date().toISOString() })
       .eq("empresa_key", empresaKey)
       .lt("synced_at", runStamp)
       .gt("saldo", 0);
+    if (rechazadasCxc.length > 0) {
+      const cctesRechazados = [...new Set(rechazadasCxc.map((r) => r.fila.ccte_id))];
+      reconcileQuery = reconcileQuery.not("ccte_id", "in", `(${cctesRechazados.join(",")})`);
+      console.error(
+        `[sync ${empresaKey} cxc] reconcile excluye ${cctesRechazados.length} documento(s) con monto imposible (su saldo bueno se conserva)`,
+      );
+    }
     if (failedClienteIds.length > 0) {
       const uniqFailed = [...new Set(failedClienteIds)];
       reconcileQuery = reconcileQuery.not(
@@ -920,122 +1012,6 @@ export interface CostoDiarioResult {
   dias: number;
   durationMs: number;
   logId: string | null;
-}
-
-interface CostoDiarioRechazado {
-  fecha: string;
-  costo: number;
-  venta: number;
-}
-
-/** Marca del descarte en switch_sync_log.skip_details. Es también la llave del
- *  anti-loop: de acá salen las fechas que ya se avisaron. */
-const CAMPO_COSTO_IMPOSIBLE = "costo_imposible";
-
-/**
- * Historia de costo diario de la empresa para calibrar el umbral, EXCLUYENDO
- * los días que trae el reporte de esta corrida (un día malo no se valida contra
- * sí mismo). Fail-open: si no se puede leer, devuelve vacío → umbralCostoDiario
- * cae al piso absoluto, que es el comportamiento más permisivo posible.
- *
- * Sin paginar a propósito: 1 fila por día × 365 días = ≤366 filas por empresa,
- * muy por debajo del `db-max-rows` = 1000 de PostgREST (medido hoy: 92 filas
- * por empresa en toda la vida de la tabla).
- */
-async function leerHistoricoCostoDiario(
-  empresaKey: EmpresaKey,
-  excluir: ReadonlySet<string>,
-): Promise<number[]> {
-  const desde = new Date(Date.now() - COSTO_DIARIO_DIAS_HISTORIA * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
-  const { data, error } = await supabaseServer
-    .from("switch_costo_diario")
-    .select("fecha,costo_total")
-    .eq("empresa_key", empresaKey)
-    .gte("fecha", desde);
-  if (error || !data) {
-    console.warn(
-      `[sync ${empresaKey} costo] no pude leer el histórico para calibrar el guard (${error?.message ?? "vacío"}); uso el piso absoluto`,
-    );
-    return [];
-  }
-  return (data as Array<{ fecha: string; costo_total: number | string }>)
-    .filter((r) => !excluir.has(r.fecha))
-    .map((r) => Number(r.costo_total));
-}
-
-/** Fechas que YA se avisaron en la ventana reciente, leídas de las corridas
- *  anteriores de este mismo par (empresa, costo). Fail-open: si no se puede
- *  leer, se avisa (perder un aviso es peor que repetirlo). */
-async function fechasYaAvisadas(empresaKey: EmpresaKey, logIdActual: string | null): Promise<string[]> {
-  const desde = new Date(
-    Date.now() - COSTO_DIARIO_DIAS_ENTRE_AVISOS * 86_400_000,
-  ).toISOString();
-  const { data, error } = await supabaseServer
-    .from("switch_sync_log")
-    .select("id,skip_details")
-    .eq("empresa_key", empresaKey)
-    .eq("sync_type", "costo")
-    .gte("started_at", desde);
-  if (error || !data) return [];
-  const fechas: string[] = [];
-  for (const fila of data as Array<{ id: string; skip_details: unknown }>) {
-    if (logIdActual && fila.id === logIdActual) continue; // la corrida en curso no cuenta
-    if (!Array.isArray(fila.skip_details)) continue;
-    for (const d of fila.skip_details as SkipDetail[]) {
-      if (d?.campo === CAMPO_COSTO_IMPOSIBLE && typeof d.secuencial === "string") {
-        fechas.push(d.secuencial);
-      }
-    }
-  }
-  return fechas;
-}
-
-function fmtMontoCosto(n: number): string {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/**
- * Aviso al canal 🔧 SISTEMA. Cumple la regla de tres: es real (el número está
- * medido), NO se arregla solo (el dato está mal EN Switch: va a volver a llegar
- * mañana igual) y alguien tiene que hacer algo (corregirlo en Switch).
- *
- * ⚠️ Anti-loop: el reporte trae el mes en curso entero todos los días, así que
- * un día mal cargado reaparece en CADA corrida. Solo se avisa por las fechas
- * que no se avisaron en los últimos días; si el dato sigue mal, el recordatorio
- * vuelve una vez por semana, no una vez por día.
- */
-async function avisarCostoDiarioImposible(
-  empresaKey: EmpresaKey,
-  rechazadas: readonly CostoDiarioRechazado[],
-  umbral: number,
-  logIdActual: string | null,
-): Promise<void> {
-  const nuevas = new Set(
-    fechasPorAvisar(
-      rechazadas.map((r) => r.fecha),
-      await fechasYaAvisadas(empresaKey, logIdActual),
-    ),
-  );
-  if (nuevas.size === 0) return; // ya se avisó por estos días: no se repite
-
-  const detalle = rechazadas
-    .filter((r) => nuevas.has(r.fecha))
-    .slice(0, 5)
-    .map((r) => `• ${r.fecha}: costo ${fmtMontoCosto(r.costo)} contra una venta de ${fmtMontoCosto(r.venta)}`)
-    .join("\n");
-  const extra = nuevas.size > 5 ? `\n…y ${nuevas.size - 5} día(s) más.` : "";
-
-  await enviarSistema(
-    `Switch mandó un costo imposible — ${mapEmpresaName(empresaKey)}\n${detalle}${extra}\n\n` +
-      `Qué pasó: el reporte de costo de Switch devolvió una cifra que ninguna operación real alcanza ` +
-      `(el tope para esta empresa es ${fmtMontoCosto(umbral)} en un día).\n` +
-      `Qué significa: ese día NO se guardó, así que la utilidad y el margen quedaron limpios. ` +
-      `El resto del mes se sincronizó normal.\n` +
-      `Qué hacer: revisar en Switch el costo de ese día — hay un artículo mal cargado. ` +
-      `Mientras siga mal, este aviso se repite una vez por semana, no todos los días.`,
-  );
 }
 
 /**
@@ -1119,34 +1095,34 @@ export async function syncCostoDiario(
       });
     }
 
-    const umbral = umbralCostoDiario(
-      await leerHistoricoCostoDiario(empresaKey, new Set(parsed.map((p) => p.fecha))),
-    );
+    const umbral = await calibrarUmbral("costo_diario", empresaKey);
 
     // 2ª pasada — guard. Un día imposible NO se escribe (así el último valor
     // bueno de ese día sobrevive) y NO frena a los demás días del mes.
-    const rechazadas: CostoDiarioRechazado[] = [];
-    for (const p of parsed) {
-      if (esCostoDiarioImposible(p.costo, umbral)) {
-        skipped++;
-        skipDetails.push({
-          facturaId: null,
-          secuencial: p.fecha,
-          campo: CAMPO_COSTO_IMPOSIBLE,
-          valorCrudo: { costo: p.costo, venta: p.venta, umbral },
-        });
-        rechazadas.push({ fecha: p.fecha, costo: p.costo, venta: p.venta });
-        continue;
-      }
-      rows.push({
-        empresa_key: empresaKey,
-        fecha: p.fecha,
-        venta_total: p.venta,
-        costo_total: p.costo,
-        utilidad_total: p.utilidad,
-        synced_at: nowIso,
-        updated_at: nowIso,
-      });
+    //
+    // ⚠️ Se miran las TRES columnas de plata (venta, costo, utilidad), no solo
+    // el costo: el guard viejo validaba el costo y dejaba pasar la venta del
+    // mismo día sin mirar, y con la venta corrupta el margen queda igual de
+    // reventado. La simetría vive en GUARDS.costo_diario.columnas.
+    const candidatas = parsed.map((p) => ({
+      empresa_key: empresaKey,
+      fecha: p.fecha,
+      venta_total: p.venta,
+      costo_total: p.costo,
+      utilidad_total: p.utilidad,
+      synced_at: nowIso,
+      updated_at: nowIso,
+    }));
+    const { buenas, rechazadas } = particionarFilas(
+      "costo_diario",
+      candidatas,
+      umbral,
+      (f) => f.fecha,
+    );
+    rows.push(...buenas);
+    if (rechazadas.length > 0) {
+      skipped += rechazadas.length;
+      skipDetails.push(...detallesDeRechazo("costo_diario", rechazadas, umbral));
     }
 
     if (rows.length > 0) {
@@ -1160,13 +1136,20 @@ export async function syncCostoDiario(
     // nunca puede tumbar la corrida: si Telegram falla, el sync sigue success.
     if (rechazadas.length > 0) {
       console.error(
-        `[sync ${empresaKey} costo] ${rechazadas.length} día(s) con costo IMPOSIBLE (umbral ${umbral}) — no se guardaron`,
+        `[sync ${empresaKey} costo] ${rechazadas.length} día(s) con monto IMPOSIBLE (umbral ${umbral}) — no se guardaron`,
         rechazadas,
       );
       try {
-        await avisarCostoDiarioImposible(empresaKey, rechazadas, umbral, logId);
+        await avisarMontosImposibles({
+          familia: "costo_diario",
+          empresaKey,
+          syncType: "costo",
+          rechazadas,
+          umbral,
+          logId,
+        });
       } catch (e) {
-        console.error(`[sync ${empresaKey} costo] no pude avisar el costo imposible: ${String(e)}`);
+        console.error(`[sync ${empresaKey} costo] no pude avisar el monto imposible: ${String(e)}`);
       }
     }
 
