@@ -84,9 +84,18 @@ function mkRow(marca: string, empresa: string | null, saved?: MarcaFormula): Mar
 }
 
 // ── Estilos ──────────────────────────────────────────────────────────────────
-const selCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+//
+// 🩸 `min-h-[44px]` y no `h-7`: esta pestaña era la PEOR del sistema en área
+// táctil — 37 controles bajo 44px a 390 y 36 a 834 (censo 30-jul-2026), casi
+// todos estos dos campos repetidos por marca y por descripción. 28px de alto es
+// menos de dos tercios del mínimo de Apple y son campos que se editan a dedo.
+//
+// Solo cambia el ALTO. El ancho de cada columna lo fija la grilla
+// (`grid-cols-[…_64px_50px_90px_96px]`, todas ya ≥44px), así que subir la
+// altura no mueve una sola columna ni agrega un píxel de arrastre horizontal.
+const selCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-1.5 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 // [appearance:textfield] + sin spin-buttons → el divisor de 2 decimales se ve completo (no lo tapan las flechitas).
-const numCls = "h-7 rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+const numCls = "min-h-[44px] rounded-md border border-stone-300 bg-stone-50 px-2 text-right font-mono text-[13px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
 
 export default function FormulasConfig({ scope = "depurador" }: { scope?: FormulasScope }) {
   // Si el scope cambia, el padre debe remontar con key={scope} (el estado inicial
@@ -250,7 +259,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           <button
             type="button"
             onClick={reintentarDescs}
-            className="rounded-md border border-red-300 bg-white px-2.5 py-1 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-red-300 bg-white px-2.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-100 active:scale-[0.97]"
           >
             Reintentar
           </button>
@@ -262,10 +271,10 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
       <div className="mb-5 flex items-center justify-between gap-3">
         <input
           value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar marca o descripción…"
-          className="w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+          className="min-h-[44px] w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
         />
         <button type="button" onClick={addMarca}
-          className="whitespace-nowrap rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]">
+          className="inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97]">
           + Agregar marca
         </button>
       </div>
@@ -277,7 +286,7 @@ export default function FormulasConfig({ scope = "depurador" }: { scope?: Formul
           {nuevas.map((row) => (
             <div key={row.id} className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
               <input value={row.marca} onChange={(e) => patchMarca(row.id, { marca: e.target.value })} placeholder="Nombre de la marca"
-                className="w-40 rounded-md border border-stone-300 bg-white px-2 py-1 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20" />
+                className="min-h-[44px] w-40 rounded-md border border-stone-300 bg-white px-2 text-[13px] focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20" />
               <select value={row.empresa ?? ""} onChange={(e) => patchMarca(row.id, { empresa: e.target.value || null })} className={selCls}>
                 {cfg.grupos.filter((g) => g.label).map((g) => <option key={g.label} value={g.label}>{g.label}</option>)}
                 <option value="">Otras</option>
@@ -444,7 +453,7 @@ function SaveBtn({ label, dirty, onClick, disabled, flashed, compact }: { label:
   return (
     <span className="whitespace-nowrap">
       <button type="button" onClick={(e) => { e.stopPropagation(); onClick(); }} disabled={disabled}
-        className={`rounded-md ${compact ? "px-1.5" : "px-2.5"} py-1 text-[12px] font-semibold transition disabled:opacity-50 ${dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
+        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md ${compact ? "px-1.5" : "px-2.5"} text-[12px] font-semibold transition disabled:opacity-50 ${dirty ? "bg-amber-500 text-white hover:bg-amber-600" : "text-teal-700 hover:bg-teal-50"}`}>
         {label}
       </button>
       {flashed && <span className="ml-1 text-[11px] font-semibold text-emerald-600">✓</span>}
@@ -463,7 +472,7 @@ function FormulasAyuda({ scope }: { scope: FormulasScope }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-stone-100 active:scale-[0.99]"
+        className="flex min-h-[44px] w-full items-center gap-2 px-3 text-left transition hover:bg-stone-100 active:scale-[0.99]"
         aria-expanded={open}
       >
         <span aria-hidden className="shrink-0 text-stone-400">ⓘ</span>

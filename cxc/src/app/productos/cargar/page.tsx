@@ -1,8 +1,9 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import DepuradorDispatcher from "./DepuradorDispatcher";
 import FacturasTiendaClient from "./FacturasTiendaClient";
 import HistorialView from "./HistorialView";
@@ -13,6 +14,87 @@ import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
 
 type Tab = "depurador" | "facturas" | "curvas" | "formulas" | "reglas" | "historial";
 type FormulasScope = "depurador" | "tienda";
+
+/** Las 6 pestañas, en UN solo lugar: las dibujan tanto el desplegable (angosto)
+ *  como la fila de píldoras (≥lg), y no pueden desincronizarse. Las etiquetas
+ *  son EXACTAMENTE las que ya estaban en pantalla. */
+const PESTANAS: { id: Tab; label: string }[] = [
+  { id: "depurador", label: "Depurador" },
+  { id: "facturas", label: "Facturas Tienda" },
+  { id: "curvas", label: "Tallas" },
+  { id: "formulas", label: "Fórmulas por marca" },
+  { id: "reglas", label: "Reglas" },
+  { id: "historial", label: "Historial" },
+];
+
+/**
+ * Las pestañas en celular e iPad vertical: un botón que dice en cuál estás y
+ * despliega las 6.
+ *
+ * El panel es `<DesplegableFlotante>` (portal a <body> + `position: fixed`),
+ * que es EL desplegable de la casa: un panel `absolute` acá lo recortaría el
+ * primer ancestro con overflow, y hay un candado (`__tests__/desplegables-flotan`)
+ * que pone el build rojo si alguien escribe uno nuevo a mano.
+ *
+ * Cuando está cerrado NO existe en el DOM, así que duplicar el control
+ * (desplegable en angosto + píldoras en ancho) no duplica opciones para nadie
+ * — ni para un lector de pantalla ni para la medición.
+ */
+function SelectorPestanas({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const anclaRef = useRef<HTMLButtonElement>(null);
+  const actual = PESTANAS.find(p => p.id === tab) ?? PESTANAS[0];
+
+  return (
+    <div className="lg:hidden">
+      <button
+        ref={anclaRef}
+        type="button"
+        onClick={() => setAbierto(a => !a)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        aria-label="Sección del Depurador"
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white px-4 min-h-[44px] text-sm font-medium text-stone-700 transition hover:bg-stone-50"
+      >
+        <span className="truncate">{actual.label}</span>
+        <svg className="h-4 w-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <DesplegableFlotante
+        abierto={abierto}
+        anclaRef={anclaRef}
+        onCerrar={() => setAbierto(false)}
+        marca="depurador-pestanas"
+        role="listbox"
+        aria-label="Sección del Depurador"
+        anchoMinimo={220}
+        className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
+      >
+        {PESTANAS.map(p => (
+          <button
+            key={p.id}
+            type="button"
+            role="option"
+            aria-selected={p.id === tab}
+            onClick={() => { onChange(p.id); setAbierto(false); }}
+            className={`w-full min-h-[44px] px-4 flex items-center justify-between gap-2 text-left text-sm transition hover:bg-black/5 ${
+              p.id === tab ? "font-semibold text-teal-700" : "text-stone-700"
+            }`}
+          >
+            <span>{p.label}</span>
+            {p.id === tab && (
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </button>
+        ))}
+      </DesplegableFlotante>
+    </div>
+  );
+}
 
 export default function CargarProductosPage() {
   return (
@@ -55,17 +137,24 @@ function CargarInner() {
       <AppHeader module="Depurador" />
 
       <div className="mx-auto max-w-5xl px-4 pt-4">
-        {/* iPhone: 6 pestañas suman ~543px contra 390px de pantalla. Sin
-            `overflow-x-auto` el ancho sobrante empujaba la PÁGINA entera
-            (scrollWidth 547 vs clientWidth 390) y "Reglas"/"Historial" solo se
-            alcanzaban arrastrando todo el layout. Ahora scrollea la barra sola. */}
-        <div className="flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabBtn active={tab === "depurador"} onClick={() => setTab("depurador")}>Depurador</TabBtn>
-          <TabBtn active={tab === "facturas"} onClick={() => setTab("facturas")}>Facturas Tienda</TabBtn>
-          <TabBtn active={tab === "curvas"} onClick={() => setTab("curvas")}>Tallas</TabBtn>
-          <TabBtn active={tab === "formulas"} onClick={() => setTab("formulas")}>Fórmulas por marca</TabBtn>
-          <TabBtn active={tab === "reglas"} onClick={() => setTab("reglas")}>Reglas</TabBtn>
-          <TabBtn active={tab === "historial"} onClick={() => setTab("historial")}>Historial</TabBtn>
+        {/* ── 🩸 LAS 6 PESTAÑAS, MEDIDAS (30-jul-2026, build de producción) ──
+            Antes esto era UNA fila con `overflow-x-auto`. Arrastraba 295px a
+            390 y 75px a 834: de las 6 pestañas se veían ~3, y **Fórmulas por
+            marca, Reglas e Historial solo existían si uno adivinaba que la fila
+            se arrastra de costado**. Es EL MISMO caso que los filtros del
+            catálogo Tommy (10 de 15 opciones invisibles), y se resuelve igual:
+            hasta `lg`, un DESPLEGABLE; de `lg` para arriba, la fila intacta.
+
+            El corte es `lg` (1024) y está MEDIDO, no elegido: a 1024 la fila ya
+            daba 0px de arrastre antes de tocar nada. */}
+        <SelectorPestanas tab={tab} onChange={setTab} />
+
+        {/* ≥lg: la misma fila de siempre. No se le tocó una sola clase salvo el
+            `hidden lg:flex` que la esconde en angosto. */}
+        <div className="hidden lg:flex w-full flex-nowrap overflow-x-auto rounded-lg border border-stone-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {PESTANAS.map(p => (
+            <TabBtn key={p.id} active={tab === p.id} onClick={() => setTab(p.id)}>{p.label}</TabBtn>
+          ))}
         </div>
       </div>
 

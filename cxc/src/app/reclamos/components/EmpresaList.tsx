@@ -249,13 +249,13 @@ export default function EmpresaList({
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       <div className="mb-4">
-        <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">← Reclamos</button>
+        <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-gray-400 hover:text-black transition">← Reclamos</button>
       </div>
 
       <div className="flex items-end justify-between mb-4 sm:mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
-          {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="text-blue-600 hover:underline">{c.correo}</a> : c.correo}</p>}
+          {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="relative text-blue-600 hover:underline after:absolute after:-inset-y-[14px] after:inset-x-0 after:content-['']">{c.correo}</a> : c.correo}</p>}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {hasSelection ? (
@@ -313,7 +313,7 @@ export default function EmpresaList({
               )}
               <button
                 onClick={() => { setSelectionMode(!selectionMode); setSelectedIds([]); }}
-                className={`text-sm border px-4 py-2 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
+                className={`inline-flex min-h-[44px] items-center justify-center text-sm border px-4 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
               >
                 {selectionMode ? "Cancelar" : "Seleccionar"}
               </button>
@@ -324,13 +324,13 @@ export default function EmpresaList({
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <button onClick={() => setFilterEstado("all")} className={`text-xs px-3 py-1 rounded-full transition ${filterEstado === "all" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+        <button onClick={() => setFilterEstado("all")} className={`inline-flex min-h-[44px] items-center justify-center text-xs px-3 rounded-full transition ${filterEstado === "all" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
           Todos <span className="ml-1 opacity-60">{allEmpresaRecs.length}</span>
         </button>
         {ESTADOS.map((e) => {
           const count = allEmpresaRecs.filter((r) => r.estado === e).length;
           return (
-            <button key={e} onClick={() => setFilterEstado(e)} className={`text-xs px-3 py-1 rounded-full transition ${filterEstado === e ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+            <button key={e} onClick={() => setFilterEstado(e)} className={`inline-flex min-h-[44px] items-center justify-center text-xs px-3 rounded-full transition ${filterEstado === e ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
               {estadoLabel(e)} <span className="ml-1 opacity-60">{count}</span>
             </button>
           );
@@ -338,12 +338,17 @@ export default function EmpresaList({
       </div>
 
       <div className="mb-6">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o ítem…" className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por N° reclamo, factura o ítem…" className="min-h-[44px] border-b border-gray-200 text-base sm:text-sm outline-none w-full max-w-xs" />
       </div>
 
       {/* Mobile card list — visible on small screens only */}
       {sortedRecs.length > 0 && (
-        <div className="sm:hidden space-y-2 mb-4">
+        /* 🩸 El corte era `sm` (640) y a 834 la tabla arrastraba 107px, dejando
+           fuera la columna ACCIONES. Lo que decide es el ancho ÚTIL: la barra
+           lateral se lleva ~224px, así que un iPad de 834 deja ~562 — más
+           angosto que un iPhone acostado. Las tarjetas ya existían y estaban
+           probadas; solo se amplió su tramo hasta `lg` (medido: 0px a 1024). */
+        <div className="lg:hidden space-y-2 mb-4" data-vista="tarjetas">
           {sortedRecs.map((r) => {
             const days = daysSince(r.fecha_reclamo);
             const total = reclamoTaxes(r.empresa, calcSub(r.reclamo_items ?? [])).total;
@@ -381,12 +386,12 @@ export default function EmpresaList({
                 </div>
                 {!selectionMode && (
                   <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconMail}</button>
-                    <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
-                    <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
-                    <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="p-2 text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
+                    <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconMail}</button>
+                    <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
+                    <button onClick={() => downloadSinglePdf(r)} disabled={pdfDownloadingId !== null} title="Descargar PDF" aria-label="Descargar PDF" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100 disabled:opacity-40">{pdfDownloadingId === r.id ? IconSpinner : IconPdf}</button>
+                    <button onClick={() => onEditReclamo(r.id)} title="Editar" aria-label="Editar" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-black rounded-md transition active:bg-gray-100">{IconPencil}</button>
                     {isAdmin && (
-                      <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="p-2 text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
+                      <button onClick={() => onDeleteReclamo(r.id)} title="Eliminar" aria-label="Eliminar" className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-red-600 rounded-md transition active:bg-red-50">{IconTrash}</button>
                     )}
                   </div>
                 )}
@@ -421,7 +426,7 @@ export default function EmpresaList({
         }
         return <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" />;
       })() : (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 hidden sm:block">
+        <div className="overflow-x-auto -mx-4 lg:mx-0 hidden lg:block" data-vista="tabla">
           <div className="min-w-[600px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
@@ -468,6 +473,14 @@ export default function EmpresaList({
                   <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                   {!selectionMode && (
                     <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      {/* ⚠️ Estos 5 íconos quedan en 26px A PROPÓSITO, y solo
+                          viven de `lg` para arriba. Agrandarlos a 44 —o darles
+                          el área de toque con un ::after de 9px— ensancha la
+                          columna y **devuelve 8px de arrastre a 1024 y 1440**
+                          (medido). El escritorio no puede empeorar, así que
+                          manda esa restricción. Quien toca con el dedo entra
+                          por debajo de `lg`, donde la misma fila es una TARJETA
+                          con sus targets de 44px. */}
                       <div className="flex items-center justify-end gap-0.5">
                         <button onClick={() => setMailRec(r)} title="Enviar al proveedor" aria-label="Enviar al proveedor" className="p-1.5 text-gray-400 hover:text-black rounded transition">{IconMail}</button>
                         <button onClick={() => downloadSingleExcel(r)} disabled={downloadingId !== null} title="Descargar Excel" aria-label="Descargar Excel" className="p-1.5 text-gray-400 hover:text-black rounded transition disabled:opacity-40">{downloadingId === r.id ? IconSpinner : IconDownload}</button>
