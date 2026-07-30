@@ -170,7 +170,10 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
 
   it("Tommy muestra el chip de bultos y el select de precio", () => {
     render(createElement(CatalogoFilters, props("tommy")));
-    expect(screen.getByRole("button", { name: BULTOS_CHIP_LABEL })).toBeTruthy();
+    // DOS chips: uno en la fila de píldoras (iPad/escritorio) y otro en la fila
+    // de desplegables (celular) — ver `catalogo-filtros-movil.test.ts`. Solo uno
+    // se ve a la vez; jsdom no aplica CSS, así que acá aparecen los dos.
+    expect(screen.getAllByRole("button", { name: BULTOS_CHIP_LABEL })).toHaveLength(2);
     expect(screen.getByLabelText("Filtrar por precio")).toBeTruthy();
     for (const o of PRECIO_RANGO_OPTIONS) {
       expect(screen.getByRole("option", { name: o.label })).toBeTruthy();

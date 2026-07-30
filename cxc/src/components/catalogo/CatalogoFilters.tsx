@@ -5,11 +5,137 @@
 // chips de Oferta/Nuevo/Próximamente son feature (saleFilter, hoy solo Reebok),
 // y el chip "2 bultos o más" + el select de precio son feature (filtroBultos /
 // filtroPrecio, hoy solo Tommy — ver lib/catalogo/filtros-extra).
+//
+// ── 📱 EN CELULAR LOS FILTROS SON DESPLEGABLES, NO UNA FILA QUE SE ARRASTRA ──
+//
+// Daniel, textual (30-jul-2026): *"en todo lo del iphone donde haya data como
+// los filtros en los catalogos y hay que hacer scroll, mejor arreglarlo de otra
+// manera, un drop down"*.
+//
+// La fila de píldoras es un `overflow-x-auto`. Medido en el navegador con build
+// y datos de producción, a 390 px (iPhone), catálogo interno / público:
+//
+//   Tommy ..... 779 / 813 px de arrastre — 10 de 15 controles fuera de la vista
+//   Reebok .... 642 / 674 px de arrastre —  7 de 12 fuera
+//   Joybees ... 138 / 158 px de arrastre —  2 de  7 fuera
+//
+// O sea: en Tommy, DIEZ opciones de filtro solo existían para quien adivinara
+// que la fila se arrastra de costado. Este repo ya había pagado ese peaje una
+// vez — el chip "2 bultos o más" se movió al principio de la fila el 26-jul
+// justamente porque *"un filtro que no se ve no existe"*. Moverlo de lugar
+// arreglaba UN chip; esto arregla la fila entera.
+//
+// La forma: **hasta `md` (768 px), un desplegable por grupo** — Género,
+// Categoría, Estado — en una fila que ENVUELVE (`flex-wrap`), así que el
+// arrastre horizontal es 0 px por construcción, no por que los chips hayan
+// entrado justo. Cada disparador dice de qué filtro es Y qué está elegido
+// ("Género: Women"), que es lo que la fila de píldoras no podía mostrar sin
+// que uno la recorriera entera.
+//
+// **De `md` para arriba NO cambia NADA**: iPad (834) y escritorio (1440) siguen
+// con la misma fila de píldoras, mismo marcado, mismas clases.
+// ⚠️ A 834 px la fila TODAVÍA se arrastra (Tommy 559 px, Reebok 422 px). Es a
+// propósito: el alcance aprobado fue el celular. Queda anotado como pendiente.
+//
+// El panel es `<DesplegableFlotante>` (portal a <body> + `position: fixed`), que
+// es EL desplegable de la casa — un panel `absolute` acá lo recortaría el primer
+// ancestro con overflow, y hay un candado (`__tests__/desplegables-flotan`) que
+// pone el build rojo si alguien escribe uno nuevo.
 
+import { useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS, type PrecioRango } from "@/lib/catalogo/filtros-extra";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 
 export type SaleFilter = "" | "oferta" | "nuevo" | "proximamente";
+
+/** Chips de Oferta/Nuevo/Próximamente, como lista para el desplegable móvil. */
+const SALE_OPTIONS: { value: SaleFilter; label: string }[] = [
+  { value: "", label: "Todos" },
+  { value: "oferta", label: "Oferta" },
+  { value: "nuevo", label: "Nuevo" },
+  { value: "proximamente", label: "Próximamente" },
+];
+
+interface FiltroDesplegableProps {
+  /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
+  etiqueta: string;
+  valor: string;
+  opciones: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  /** Clases del tema de la marca para el estado encendido/apagado. */
+  chipActive: string;
+  chipInactive: string;
+}
+
+/**
+ * Un grupo de filtros del catálogo, en celular: botón + lista flotante.
+ *
+ * El botón muestra "<Etiqueta>: <elegido>" y se pinta como chip encendido
+ * cuando hay algo elegido, así que el estado se lee sin abrirlo. La lista vive
+ * en `<DesplegableFlotante>`: **cuando está cerrada no existe en el DOM**, que
+ * es lo que hace que duplicar el control (píldoras en escritorio + desplegable
+ * en celular) no duplique opciones ni etiquetas para nadie.
+ */
+function FiltroDesplegable({
+  etiqueta, valor, opciones, onChange, chipActive, chipInactive,
+}: FiltroDesplegableProps) {
+  const [abierto, setAbierto] = useState(false);
+  const anclaRef = useRef<HTMLButtonElement>(null);
+  const elegida = opciones.find(o => o.value === valor);
+  const activo = !!valor;
+
+  return (
+    <>
+      <button
+        ref={anclaRef}
+        type="button"
+        onClick={() => setAbierto(a => !a)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+          activo ? chipActive : chipInactive
+        }`}
+      >
+        <span>{etiqueta}: {elegida?.label ?? opciones[0]?.label ?? "Todos"}</span>
+        <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <DesplegableFlotante
+        abierto={abierto}
+        anclaRef={anclaRef}
+        onCerrar={() => setAbierto(false)}
+        marca={`catalogo-filtro-${etiqueta.toLowerCase()}`}
+        role="listbox"
+        aria-label={etiqueta}
+        anchoMinimo={200}
+        className="bg-white rounded-xl border border-black/10 shadow-lg py-1"
+      >
+        {opciones.map(o => (
+          <button
+            key={o.value || "todos"}
+            type="button"
+            role="option"
+            aria-selected={o.value === valor}
+            onClick={() => { onChange(o.value); setAbierto(false); }}
+            className={`w-full min-h-[44px] px-4 flex items-center justify-between gap-2 text-left text-sm transition hover:bg-black/5 ${
+              o.value === valor ? "font-semibold" : "text-gray-700"
+            }`}
+          >
+            <span>{o.label}</span>
+            {o.value === valor && (
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </button>
+        ))}
+      </DesplegableFlotante>
+    </>
+  );
+}
 
 interface CatalogoFiltersProps {
   marca: MarcaUiKey;
@@ -80,8 +206,59 @@ export default function CatalogoFilters({
         )}
       </div>
 
-      {/* Chip filters row */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+      {/* ── CELULAR (hasta md): un desplegable por grupo, fila que ENVUELVE ──
+          Es la misma información que la fila de píldoras de al lado, pero sin
+          arrastre horizontal: `flex-wrap` la baja de renglón en vez de esconder
+          lo que no entra. Medido a 390 px: 813 px de arrastre → 0. */}
+      <div className="flex md:hidden flex-wrap items-center gap-2">
+        {conBultos && (
+          <button
+            onClick={() => onBultosFilterChange!(!bultosFilter)}
+            aria-pressed={bultosFilter}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
+              bultosFilter ? f.chipActive : f.chipInactive
+            }`}
+          >
+            {BULTOS_CHIP_LABEL}
+          </button>
+        )}
+
+        <FiltroDesplegable
+          etiqueta="Género"
+          valor={gender}
+          opciones={f.genderOptions}
+          onChange={onGenderChange}
+          chipActive={f.chipActive}
+          chipInactive={f.chipInactive}
+        />
+
+        {conCategorias && (
+          <FiltroDesplegable
+            etiqueta="Categoría"
+            valor={category}
+            opciones={f.categoryOptions}
+            onChange={onCategoryChange}
+            chipActive={f.chipActive}
+            chipInactive={f.chipInactive}
+          />
+        )}
+
+        {conSale && (
+          <FiltroDesplegable
+            etiqueta="Estado"
+            valor={saleFilter}
+            opciones={SALE_OPTIONS}
+            onChange={v => onSaleFilterChange!(v as SaleFilter)}
+            chipActive={f.chipActive}
+            chipInactive={f.chipInactive}
+          />
+        )}
+      </div>
+
+      {/* ── iPAD Y ESCRITORIO (md+): la fila de píldoras de siempre ──
+          No se le tocó ni una clase salvo el `hidden md:flex` que la esconde en
+          celular. En 834 y 1440 el marcado y el aspecto son idénticos a antes. */}
+      <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
         {conBultos && (
           <>
             {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila
