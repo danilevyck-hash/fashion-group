@@ -4,6 +4,18 @@
 // productos editable, tabla de reparto por tienda con expand para editar la
 // entrega. Ruta de página: /marketing/mobiliario. La API interna sigue en
 // /api/marketing/inventario/* (plomería, datos intactos).
+//
+// 🩸 RECORTE (jul-2026). Las dos tablas vivían dentro de un contenedor con
+// `overflow-hidden` y SIN scroller propio adentro. Medido: ancho ÚTIL 358px
+// @390 y 562px @834 (la barra lateral se come 224px desde md), contra 695px
+// que pide la tabla de Productos y 605px la de Resumen por tienda. Recorte:
+// 338px y 248px @390; 134px y 44px @834. Se perdían ENTREGADO, DISPONIBLE,
+// VALOR y ACCIONES del inventario, y "$ Tommy Hilfiger" y "TOTAL $" del
+// resumen — sin scroll y sin aviso.
+//   * < lg → TARJETAS con los mismos datos y las mismas etiquetas.
+//   * ≥ lg → las mismas tablas (útil 752px a 1024 y 1104px a 1440: entran), con
+//     un scroller propio adentro para que crecer nunca vuelva a ser recortar
+//     (el resumen gana una columna por cada marca nueva).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -367,7 +379,7 @@ export default function MobiliarioPage() {
             <button
               type="button"
               onClick={() => router.push("/marketing")}
-              className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 mb-2"
+              className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -mt-2"
             >
               ← Proyectos
             </button>
@@ -379,7 +391,7 @@ export default function MobiliarioPage() {
             type="button"
             onClick={() => descargarExcel()}
             disabled={downloading === "global"}
-            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-60"
+            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] text-sm hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-60"
           >
             {downloading === "global" ? "Generando…" : "Descargar Excel"}
           </button>
@@ -404,12 +416,115 @@ export default function MobiliarioPage() {
             <button
               type="button"
               onClick={abrirNuevoProducto}
-              className="text-xs text-gray-500 hover:text-black underline"
+              className="text-xs text-gray-500 hover:text-black underline min-h-[44px] px-1"
             >
               + Agregar producto
             </button>
           </div>
-          <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
+          {/* TARJETAS — hasta lg. Mismos datos y mismas etiquetas que la tabla. */}
+          <div className="lg:hidden space-y-2">
+            {loading ? (
+              <div className="rounded-[10px] border border-gray-200 bg-white px-3 py-6 text-center text-gray-400 text-sm">
+                Cargando…
+              </div>
+            ) : productos.length === 0 ? (
+              <div className="rounded-[10px] border border-gray-200 bg-white px-3 py-6 text-center text-gray-400 text-sm">
+                No hay productos. Agrega el primero.
+              </div>
+            ) : (
+              <>
+                {productos.map((p) => {
+                  const entregado = entregadoPorProducto.get(p.id) ?? 0;
+                  const comprado = entregado + Number(p.stock_total);
+                  const valor = Number(p.precio) * Number(p.stock_total);
+                  return (
+                    <div
+                      key={p.id}
+                      data-fg-tarjeta
+                      data-fg-fila={p.id}
+                      className="rounded-[10px] border border-gray-200 bg-white p-3"
+                    >
+                      <div
+                        data-fg-campo="producto"
+                        className="text-sm font-medium text-gray-900 break-words"
+                      >
+                        {p.nombre}
+                      </div>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                        <Dato campo="precio" label="Precio" valor={formatearMonto(p.precio)} />
+                        <Dato campo="comprado" label="Comprado" valor={String(comprado)} />
+                        <Dato campo="entregado" label="Entregado" valor={String(entregado)} />
+                        <Dato campo="disponible" label="Disponible" valor={String(p.stock_total)} />
+                        <Dato campo="valor" label="Valor" valor={formatearMonto(valor)} />
+                      </dl>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => abrirEditarProducto(p)}
+                          className="flex-1 min-h-[44px] px-3 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
+                        >
+                          Editar
+                        </button>
+                        {role === "admin" && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteProd(p)}
+                            className="flex-1 min-h-[44px] px-3 rounded-md border border-red-200 bg-white text-sm font-medium text-red-600 hover:bg-red-50 active:scale-[0.97]"
+                          >
+                            Borrar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div
+                  data-fg-tarjeta
+                  data-fg-fila="TOTAL"
+                  className="rounded-[10px] border border-gray-300 bg-gray-50 p-3"
+                >
+                  <div className="text-sm font-semibold text-gray-900">TOTAL</div>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                    <Dato
+                      campo="comprado"
+                      label="Comprado"
+                      valor={String(
+                        productos.reduce(
+                          (s, p) =>
+                            s + (entregadoPorProducto.get(p.id) ?? 0) + p.stock_total,
+                          0,
+                        ),
+                      )}
+                    />
+                    <Dato
+                      campo="entregado"
+                      label="Entregado"
+                      valor={String(
+                        productos.reduce(
+                          (s, p) => s + (entregadoPorProducto.get(p.id) ?? 0),
+                          0,
+                        ),
+                      )}
+                    />
+                    <Dato
+                      campo="disponible"
+                      label="Disponible"
+                      valor={String(productos.reduce((s, p) => s + p.stock_total, 0))}
+                    />
+                    <Dato
+                      campo="valor"
+                      label="Valor"
+                      valor={formatearMonto(metricas.valor)}
+                    />
+                  </dl>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* TABLA — desde lg. El div interno es el scroller. */}
+          <div className="hidden lg:block rounded-[10px] border border-gray-200 overflow-hidden bg-white">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
@@ -442,21 +557,27 @@ export default function MobiliarioPage() {
                       const comprado = entregado + Number(p.stock_total);
                       const valor = Number(p.precio) * Number(p.stock_total);
                       return (
-                        <tr key={p.id} className="border-t border-gray-100">
-                          <td className="px-3 py-2 text-gray-900">{p.nombre}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
+                        <tr
+                          key={p.id}
+                          data-fg-fila={p.id}
+                          className="border-t border-gray-100"
+                        >
+                          <td data-fg-campo="producto" className="px-3 py-2 text-gray-900">
+                            {p.nombre}
+                          </td>
+                          <td data-fg-campo="precio" className="px-3 py-2 text-right tabular-nums">
                             {formatearMonto(p.precio)}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                          <td data-fg-campo="comprado" className="px-3 py-2 text-right tabular-nums text-gray-600">
                             {comprado}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                          <td data-fg-campo="entregado" className="px-3 py-2 text-right tabular-nums text-gray-600">
                             {entregado}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums font-medium">
+                          <td data-fg-campo="disponible" className="px-3 py-2 text-right tabular-nums font-medium">
                             {p.stock_total}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
+                          <td data-fg-campo="valor" className="px-3 py-2 text-right tabular-nums">
                             {formatearMonto(valor)}
                           </td>
                           <td className="px-3 py-2 text-right space-x-2">
@@ -480,26 +601,29 @@ export default function MobiliarioPage() {
                         </tr>
                       );
                     })}
-                    <tr className="border-t border-gray-200 bg-gray-50/50 font-semibold text-gray-900">
+                    <tr
+                      data-fg-fila="TOTAL"
+                      className="border-t border-gray-200 bg-gray-50/50 font-semibold text-gray-900"
+                    >
                       <td className="px-3 py-2">TOTAL</td>
                       <td />
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td data-fg-campo="comprado" className="px-3 py-2 text-right tabular-nums">
                         {productos.reduce(
                           (s, p) =>
                             s + (entregadoPorProducto.get(p.id) ?? 0) + p.stock_total,
                           0,
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td data-fg-campo="entregado" className="px-3 py-2 text-right tabular-nums">
                         {productos.reduce(
                           (s, p) => s + (entregadoPorProducto.get(p.id) ?? 0),
                           0,
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td data-fg-campo="disponible" className="px-3 py-2 text-right tabular-nums">
                         {productos.reduce((s, p) => s + p.stock_total, 0)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
+                      <td data-fg-campo="valor" className="px-3 py-2 text-right tabular-nums">
                         {formatearMonto(metricas.valor)}
                       </td>
                       <td />
@@ -508,6 +632,7 @@ export default function MobiliarioPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
 
@@ -525,12 +650,120 @@ export default function MobiliarioPage() {
               type="button"
               onClick={() => descargarExcel()}
               disabled={downloading === "global"}
-              className="text-xs text-gray-500 hover:text-black underline disabled:opacity-60"
+              className="text-xs text-gray-500 hover:text-black underline disabled:opacity-60 min-h-[44px] px-1"
             >
               {downloading === "global" ? "Generando…" : "Descargar Excel"}
             </button>
           </div>
-          <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
+          {/* TARJETAS — hasta lg. Una por tienda, con las mismas etiquetas de
+              columna ("Total Paneles", "$ <marca>", "Total $"). */}
+          <div className="lg:hidden space-y-2">
+            {loading ? (
+              <div className="rounded-[10px] border border-gray-200 bg-white px-3 py-6 text-center text-gray-400 text-sm">
+                Cargando…
+              </div>
+            ) : resumenFilas.length === 0 ? (
+              <div className="rounded-[10px] border border-gray-200 bg-white px-3 py-6 text-center text-gray-400 text-sm">
+                Aún no hay entregas registradas.
+              </div>
+            ) : (
+              <>
+                {resumenFilas.map((f) => (
+                  <div
+                    key={f.tienda}
+                    data-fg-tarjeta
+                    data-fg-fila={f.tienda}
+                    className="rounded-[10px] border border-gray-200 bg-white p-3"
+                  >
+                    <div
+                      data-fg-campo="cliente"
+                      className="text-sm font-medium text-gray-900 break-words"
+                    >
+                      {f.tienda}
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <Dato
+                        campo="paneles"
+                        label="Total Paneles"
+                        valor={f.totalPaneles > 0 ? String(f.totalPaneles) : "—"}
+                        atenuado={f.totalPaneles <= 0}
+                      />
+                      {resumenMarcas.map((m) => {
+                        const monto = f.montoPorMarca[m.id] ?? 0;
+                        return (
+                          <Dato
+                            key={m.id}
+                            campo={`marca:${m.id}`}
+                            label={`$ ${m.nombre}`}
+                            valor={monto > 0 ? formatearMonto(monto) : "—"}
+                            atenuado={monto <= 0}
+                          />
+                        );
+                      })}
+                      <Dato
+                        campo="total"
+                        label="Total $"
+                        valor={
+                          f.totalMonto > 0 ? formatearMonto(f.totalMonto) : "—"
+                        }
+                        atenuado={f.totalMonto <= 0}
+                        destacado
+                      />
+                    </dl>
+                  </div>
+                ))}
+                <div
+                  data-fg-tarjeta
+                  data-fg-fila="Total"
+                  className="rounded-[10px] border border-gray-300 bg-gray-900 text-white p-3"
+                >
+                  <div className="text-xs font-bold uppercase tracking-wide">
+                    Total
+                  </div>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                    <Dato
+                      campo="paneles"
+                      label="Total Paneles"
+                      valor={
+                        totalResumen.totalPaneles
+                          ? String(totalResumen.totalPaneles)
+                          : "—"
+                      }
+                      oscuro
+                    />
+                    {resumenMarcas.map((m) => {
+                      const monto = totalResumen.montoPorMarca[m.id] ?? 0;
+                      return (
+                        <Dato
+                          key={m.id}
+                          campo={`marca:${m.id}`}
+                          label={`$ ${m.nombre}`}
+                          valor={monto > 0 ? formatearMonto(monto) : "—"}
+                          oscuro
+                        />
+                      );
+                    })}
+                    <Dato
+                      campo="total"
+                      label="Total $"
+                      valor={
+                        totalResumen.totalMonto > 0
+                          ? formatearMonto(totalResumen.totalMonto)
+                          : "—"
+                      }
+                      oscuro
+                    />
+                  </dl>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* TABLA — desde lg. El div interno es el scroller: el resumen gana
+              una columna por cada marca nueva, así que crecer no puede volver
+              a significar recortar. */}
+          <div className="hidden lg:block rounded-[10px] border border-gray-200 overflow-hidden bg-white">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead className="bg-gray-50">
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
@@ -575,10 +808,13 @@ export default function MobiliarioPage() {
                     {resumenFilas.map((f) => (
                       <tr
                         key={f.tienda}
+                        data-fg-fila={f.tienda}
                         className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                       >
-                        <td className="px-3 py-2 text-gray-900">{f.tienda}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
+                        <td data-fg-campo="cliente" className="px-3 py-2 text-gray-900">
+                          {f.tienda}
+                        </td>
+                        <td data-fg-campo="paneles" className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
                           {f.totalPaneles > 0 ? (
                             f.totalPaneles
                           ) : (
@@ -590,6 +826,7 @@ export default function MobiliarioPage() {
                           return (
                             <td
                               key={m.id}
+                              data-fg-campo={`marca:${m.id}`}
                               className="px-3 py-2 text-right font-mono tabular-nums"
                             >
                               {monto > 0 ? (
@@ -600,7 +837,7 @@ export default function MobiliarioPage() {
                             </td>
                           );
                         })}
-                        <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
+                        <td data-fg-campo="total" className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
                           {f.totalMonto > 0 ? (
                             formatearMonto(f.totalMonto)
                           ) : (
@@ -610,11 +847,14 @@ export default function MobiliarioPage() {
                       </tr>
                     ))}
                     {/* Fila TOTAL — fondo oscuro para contraste con el módulo. */}
-                    <tr className="border-t border-gray-300 bg-gray-900 text-white">
+                    <tr
+                      data-fg-fila="Total"
+                      className="border-t border-gray-300 bg-gray-900 text-white"
+                    >
                       <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wide">
                         Total
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                      <td data-fg-campo="paneles" className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
                         {totalResumen.totalPaneles || (
                           <span className="opacity-50">—</span>
                         )}
@@ -624,13 +864,14 @@ export default function MobiliarioPage() {
                         return (
                           <td
                             key={m.id}
+                            data-fg-campo={`marca:${m.id}`}
                             className="px-3 py-2.5 text-right font-mono tabular-nums font-bold"
                           >
                             {monto > 0 ? formatearMonto(monto) : "—"}
                           </td>
                         );
                       })}
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                      <td data-fg-campo="total" className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
                         {totalResumen.totalMonto > 0
                           ? formatearMonto(totalResumen.totalMonto)
                           : "—"}
@@ -640,6 +881,7 @@ export default function MobiliarioPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </section>
       </main>
@@ -782,6 +1024,51 @@ export default function MobiliarioPage() {
         );
       })()}
 
+    </div>
+  );
+}
+
+// Un dato de tarjeta: la MISMA etiqueta que el encabezado de columna de la
+// tabla, y el mismo valor ya formateado. `data-fg-campo` es lo que permite
+// comparar fila por fila entre anchos sin depender de clases de breakpoint.
+function Dato({
+  campo,
+  label,
+  valor,
+  atenuado,
+  destacado,
+  oscuro,
+}: {
+  campo: string;
+  label: string;
+  valor: string;
+  atenuado?: boolean;
+  destacado?: boolean;
+  oscuro?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 min-w-0">
+      <dt
+        className={`text-xs uppercase tracking-wide truncate ${
+          oscuro ? "text-white/60" : "text-gray-500"
+        }`}
+      >
+        {label}
+      </dt>
+      <dd
+        data-fg-campo={campo}
+        className={`text-xs font-mono tabular-nums shrink-0 ${
+          oscuro
+            ? "font-bold"
+            : atenuado
+              ? "text-gray-300"
+              : destacado
+                ? "font-semibold text-gray-900"
+                : "text-gray-700"
+        }`}
+      >
+        {valor}
+      </dd>
     </div>
   );
 }

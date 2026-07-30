@@ -5,6 +5,24 @@
 //   - Restaurar (uno o varios)
 //   - Eliminar permanentemente (uno o varios) con doble confirmación.
 // Reemplazó a la antigua "Papelera" + sección "Limpieza anual DGI".
+//
+// 🩸 RECORTE (jul-2026). La tabla vivía dentro de un contenedor con
+// `overflow-hidden` y SIN scroller propio adentro: a 390px se recortaban 581px
+// y a 834px 558px. Lo recortado eran los botones "Restaurar" y "Eliminar" —
+// una ACCIÓN que la propia página promete ("Puedes restaurarlos o
+// eliminarlos") y que en celular y iPad no se podía ejecutar de ninguna forma,
+// ni arrastrando. Medido: ancho ÚTIL 358px @390 y 562px @834 (la barra lateral
+// se come 224px desde md), contra 938-1119px que pedía la tabla.
+//   * < lg  → TARJETAS. Con 358px útiles la tabla es IMPOSIBLE: la casilla
+//     (44px) + "Restaurar" (86px) + "Eliminar" (75px) ya son 205px y no dejan
+//     lugar al nombre del registro.
+//   * ≥ lg  → la misma tabla de siempre, ahora ENTRANDO: `max-w-0` + un ancho
+//     porcentual en Registro y Motivo (el `truncate` no truncaba nada sin cota)
+//     y padding px-3 en vez de los 18px de antes (36px por columna).
+//     Antes pedía 1119px contra 1104px útiles: el escritorio TAMBIÉN recortaba
+//     16px.
+//   * El contenedor lleva un scroller propio: si algún día el contenido crece,
+//     se arrastra en vez de desaparecer.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
@@ -31,6 +49,88 @@ interface AnuladosListaProps {
 
 function keyDe(item: { tipo: AnuladoItem["tipo"]; id: string }): string {
   return `${item.tipo}::${item.id}`;
+}
+
+// Casilla de selección con área táctil de 44px. La casilla dibujada sigue
+// siendo chica; lo que crece es la zona que responde al dedo (antes 14×14px).
+function CasillaSeleccion({
+  checked,
+  onChange,
+  label,
+  texto,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  /** Texto visible al lado de la casilla (solo en la barra de tarjetas). */
+  texto?: string;
+}) {
+  return (
+    <label
+      className={`inline-flex min-h-[44px] items-center cursor-pointer -my-2 ${
+        texto ? "gap-1 pr-2" : "min-w-[44px] justify-center -mx-2"
+      }`}
+    >
+      <span className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onChange}
+          className="accent-black w-[18px] h-[18px]"
+          title={label}
+          aria-label={label}
+        />
+      </span>
+      {texto ? <span className="text-sm text-gray-600">{texto}</span> : null}
+    </label>
+  );
+}
+
+// Restaurar / Eliminar. Mismas acciones y mismos textos en tarjeta y tabla.
+function AccionesAnulado({
+  esAdmin,
+  restaurando,
+  eliminando,
+  onRestaurar,
+  onEliminar,
+  ancho,
+}: {
+  esAdmin: boolean;
+  restaurando: boolean;
+  eliminando: boolean;
+  onRestaurar: () => void;
+  onEliminar: () => void;
+  /** "completo" estira los botones (tarjeta); "compacto" los deja al tamaño del texto (tabla). */
+  ancho: "completo" | "compacto";
+}) {
+  const base =
+    ancho === "completo"
+      ? "flex-1 min-h-[44px] px-3 rounded-md text-sm font-medium"
+      : "min-h-[36px] px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap";
+  return (
+    <>
+      <button
+        type="button"
+        data-fg-accion="restaurar"
+        onClick={onRestaurar}
+        disabled={restaurando}
+        className={`${base} border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50`}
+      >
+        {restaurando ? "Restaurando..." : "Restaurar"}
+      </button>
+      {esAdmin && (
+        <button
+          type="button"
+          data-fg-accion="eliminar"
+          onClick={onEliminar}
+          disabled={eliminando}
+          className={`${base} border border-red-200 bg-white text-red-600 hover:bg-red-50 active:scale-[0.97] disabled:opacity-50`}
+        >
+          Eliminar
+        </button>
+      )}
+    </>
+  );
 }
 
 export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
@@ -286,7 +386,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`px-3 py-1.5 rounded-md text-sm border transition-all active:scale-[0.97] ${
+            className={`px-3 min-h-[44px] rounded-md text-sm border transition-all active:scale-[0.97] ${
               filtro === f
                 ? "bg-black text-white border-black"
                 : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
@@ -317,7 +417,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
             <button
               type="button"
               onClick={clearSeleccion}
-              className="ml-3 text-xs text-gray-500 hover:text-gray-800 underline"
+              className="ml-3 min-h-[44px] px-1 text-xs text-gray-500 hover:text-gray-800 underline"
             >
               Limpiar
             </button>
@@ -327,7 +427,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
               type="button"
               onClick={() => setConfirmBulkRestaurar(true)}
               disabled={bulkRestaurando}
-              className="px-3 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-white hover:bg-gray-100 active:scale-[0.97] disabled:opacity-50"
+              className="px-3 min-h-[44px] rounded-md text-sm font-medium border border-gray-300 bg-white hover:bg-gray-100 active:scale-[0.97] disabled:opacity-50"
             >
               Restaurar seleccionados
             </button>
@@ -339,7 +439,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
                   setConfirmBulkEliminar(true);
                 }}
                 disabled={eliminando}
-                className="px-3 py-1.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50"
+                className="px-3 min-h-[44px] rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50"
               >
                 Eliminar seleccionados
               </button>
@@ -361,124 +461,199 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
           </p>
         </div>
       ) : (
-        <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-[18px] py-2.5 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={toggleAllVisible}
-                    className="accent-black w-3.5 h-3.5"
-                    title="Seleccionar todos"
-                    aria-label="Seleccionar todos"
-                  />
-                </th>
-                <th className="text-left font-medium px-[18px] py-2.5">
-                  Registro
-                </th>
-                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
-                  Anulado el
-                </th>
-                <th className="text-left font-medium px-[18px] py-2.5 hidden md:table-cell">
-                  Motivo
-                </th>
-                <th className="text-right font-medium px-[18px] py-2.5 w-[180px]">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {itemsFiltrados.map((item) => {
-                const k = keyDe(item);
-                const checked = seleccion.has(k);
-                return (
-                  <tr
-                    key={k}
-                    className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-[18px] py-3 align-middle">
-                      <input
-                        type="checkbox"
+        <>
+          {/* TARJETAS — hasta lg. Con 358px útiles (iPhone) y 562px (iPad, con
+              la barra lateral puesta) la tabla no entra: acá las dos acciones
+              quedan siempre a la vista y al alcance del dedo. */}
+          <div className="lg:hidden space-y-2">
+            <CasillaSeleccion
+              checked={allVisibleSelected}
+              onChange={toggleAllVisible}
+              label="Seleccionar todos"
+              texto="Seleccionar todos"
+            />
+            {itemsFiltrados.map((item) => {
+              const k = keyDe(item);
+              const checked = seleccion.has(k);
+              return (
+                <div
+                  key={k}
+                  data-fg-tarjeta
+                  data-fg-fila={k}
+                  className="rounded-[10px] border border-[#e5e5e5] bg-white p-3"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="shrink-0 pt-1.5">
+                      <CasillaSeleccion
                         checked={checked}
                         onChange={() => toggleOne(item)}
-                        className="accent-black w-3.5 h-3.5"
-                        aria-label={`Seleccionar ${item.nombre}`}
+                        label={`Seleccionar ${item.nombre}`}
                       />
-                    </td>
-                    {/* Registro: tipo badge + nombre */}
-                    <td className="px-[18px] py-3 align-middle">
-                      <div className="flex items-center gap-2 min-w-0">
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2 min-w-0">
                         <span
                           className={`inline-flex items-center rounded-full border text-xs px-1.5 py-0.5 font-medium uppercase tracking-wide shrink-0 ${TIPO_BADGE[item.tipo]}`}
                         >
                           {TIPO_LABEL[item.tipo]}
                         </span>
-                        <span className="text-gray-900 font-medium truncate">
+                        <span
+                          data-fg-campo="registro"
+                          className="text-sm text-gray-900 font-medium break-words min-w-0"
+                        >
                           {item.nombre}
                         </span>
                       </div>
-                      {/* En mobile, motivo y fecha colapsan aquí debajo */}
-                      <div className="md:hidden text-xs text-gray-500 mt-1 truncate">
-                        Anulado {fmtDate(item.anulado_en.slice(0, 10))}
-                        {item.anulado_motivo
-                          ? ` · ${item.anulado_motivo}`
-                          : ""}
-                      </div>
-                    </td>
-                    {/* Anulado el */}
-                    <td
-                      className="px-[18px] py-3 align-middle text-[12px] text-gray-500 tabular-nums hidden md:table-cell"
-                      title={item.anulado_en}
-                    >
-                      {fmtDate(item.anulado_en.slice(0, 10))}
-                    </td>
-                    {/* Motivo */}
-                    <td className="px-[18px] py-3 align-middle text-[12px] text-gray-600 hidden md:table-cell">
-                      {item.anulado_motivo ? (
-                        <span
-                          className="block max-w-[260px] truncate"
-                          title={item.anulado_motivo}
-                        >
-                          {item.anulado_motivo}
+                      <div className="text-xs text-gray-500 mt-1">
+                        <span title={item.anulado_en}>
+                          Anulado{" "}
+                          <span data-fg-campo="anulado_el">
+                            {fmtDate(item.anulado_en.slice(0, 10))}
+                          </span>
                         </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    {/* Acciones */}
-                    <td className="px-[18px] py-3 align-middle text-right">
-                      <div className="inline-flex gap-1.5">
-                        <button
-                          onClick={() => setConfirmRestaurar(item)}
-                          disabled={restaurando === item.id}
-                          className="px-3 py-1.5 rounded-md text-xs font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
-                        >
-                          {restaurando === item.id
-                            ? "Restaurando..."
-                            : "Restaurar"}
-                        </button>
-                        {esAdmin && (
-                          <button
-                            onClick={() => {
-                              setTextoConfirm("");
-                              setConfirmEliminarItem(item);
-                            }}
-                            disabled={eliminando}
-                            className="px-3 py-1.5 rounded-md text-xs font-medium border border-red-200 bg-white text-red-600 hover:bg-red-50 active:scale-[0.97] disabled:opacity-50"
-                          >
-                            Eliminar
-                          </button>
-                        )}
+                        {item.anulado_motivo ? (
+                          <>
+                            {" · "}
+                            <span
+                              data-fg-campo="motivo"
+                              className="text-gray-600"
+                            >
+                              {item.anulado_motivo}
+                            </span>
+                          </>
+                        ) : null}
                       </div>
-                    </td>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <AccionesAnulado
+                      esAdmin={esAdmin}
+                      restaurando={restaurando === item.id}
+                      eliminando={eliminando}
+                      onRestaurar={() => setConfirmRestaurar(item)}
+                      onEliminar={() => {
+                        setTextoConfirm("");
+                        setConfirmEliminarItem(item);
+                      }}
+                      ancho="completo"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* TABLA — desde lg. El div interno es el scroller: sin él, el
+              `overflow-hidden` del borde redondeado RECORTA sin salida. */}
+          <div className="hidden lg:block rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr className="text-xs uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2.5 w-[44px]">
+                      <CasillaSeleccion
+                        checked={allVisibleSelected}
+                        onChange={toggleAllVisible}
+                        label="Seleccionar todos"
+                      />
+                    </th>
+                    {/* max-w-0 + w-full: esta columna absorbe el sobrante y es
+                        la que puede truncar. Sin cota, `truncate` no truncaba
+                        nada y la tabla crecía hasta 1119px. */}
+                    <th className="text-left font-medium px-3 py-2.5 max-w-0 w-1/2">
+                      Registro
+                    </th>
+                    <th className="text-left font-medium px-3 py-2.5 w-[104px]">
+                      Anulado el
+                    </th>
+                    <th className="text-left font-medium px-3 py-2.5 max-w-0 w-1/3">
+                      Motivo
+                    </th>
+                    <th className="text-right font-medium px-3 py-2.5 whitespace-nowrap">
+                      Acciones
+                    </th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {itemsFiltrados.map((item) => {
+                    const k = keyDe(item);
+                    const checked = seleccion.has(k);
+                    return (
+                      <tr
+                        key={k}
+                        data-fg-fila={k}
+                        className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-3 py-3 align-middle">
+                          <CasillaSeleccion
+                            checked={checked}
+                            onChange={() => toggleOne(item)}
+                            label={`Seleccionar ${item.nombre}`}
+                          />
+                        </td>
+                        {/* Registro: tipo badge + nombre */}
+                        <td className="px-3 py-3 align-middle max-w-0 w-1/2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`inline-flex items-center rounded-full border text-xs px-1.5 py-0.5 font-medium uppercase tracking-wide shrink-0 ${TIPO_BADGE[item.tipo]}`}
+                            >
+                              {TIPO_LABEL[item.tipo]}
+                            </span>
+                            <span
+                              data-fg-campo="registro"
+                              className="text-gray-900 font-medium truncate"
+                              title={item.nombre}
+                            >
+                              {item.nombre}
+                            </span>
+                          </div>
+                        </td>
+                        {/* Anulado el */}
+                        <td
+                          data-fg-campo="anulado_el"
+                          className="px-3 py-3 align-middle text-[12px] text-gray-500 tabular-nums whitespace-nowrap"
+                          title={item.anulado_en}
+                        >
+                          {fmtDate(item.anulado_en.slice(0, 10))}
+                        </td>
+                        {/* Motivo */}
+                        <td className="px-3 py-3 align-middle text-[12px] text-gray-600 max-w-0 w-1/3">
+                          {item.anulado_motivo ? (
+                            <span
+                              data-fg-campo="motivo"
+                              className="block truncate"
+                              title={item.anulado_motivo}
+                            >
+                              {item.anulado_motivo}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        {/* Acciones */}
+                        <td className="px-3 py-3 align-middle text-right">
+                          <div className="inline-flex gap-1.5">
+                            <AccionesAnulado
+                              esAdmin={esAdmin}
+                              restaurando={restaurando === item.id}
+                              eliminando={eliminando}
+                              onRestaurar={() => setConfirmRestaurar(item)}
+                              onEliminar={() => {
+                                setTextoConfirm("");
+                                setConfirmEliminarItem(item);
+                              }}
+                              ancho="compacto"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Modal restaurar (single) */}
