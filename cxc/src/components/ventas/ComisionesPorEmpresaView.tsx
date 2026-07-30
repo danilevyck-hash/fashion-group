@@ -10,12 +10,13 @@
 // vendedor; cobros siguen por cartera). Muestra a todos los vendedores activos
 // aunque base=$0; los sin actividad se colapsan a una línea al pie.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileSpreadsheet, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
+import type { ExcelApi } from "./ComisionesView";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
@@ -50,9 +51,12 @@ interface ComisionResp {
 interface Props {
   year: number;
   mes: number;
+  /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
+   *  sigue siendo la dueña del cálculo y solo registra su función acá. */
+  onExcel?: (api: ExcelApi | null) => void;
 }
 
-export function ComisionesPorEmpresaView({ year, mes }: Props) {
+export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
   // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
   // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
   const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
@@ -120,12 +124,22 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
     });
   };
 
+  // El shell dispara el Excel de la vista activa (ver ComisionesView).
+  const exportRef = useRef(handleExport);
+  exportRef.current = handleExport;
+  useEffect(() => {
+    onExcel?.({ run: () => exportRef.current(), disabled: vendedores.length === 0 });
+    return () => onExcel?.(null);
+  }, [onExcel, vendedores.length]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-2">
+      {/* Esta fila es SOLO del modo "Por empresa" (el Excel subió a la barra del
+          shell). Selector de empresa a la izquierda, Configurar —solo admin— a
+          la derecha. */}
+      <div className="flex items-center gap-2">
         <Select value={empresa} onValueChange={handleEmpresa}>
-          {/* min-h-[44px] pisa el h-9 (36 px) del SelectTrigger compartido:
-              mismo criterio que los selectores de mes/año del shell. */}
+          {/* min-h-[44px] pisa el h-9 (36 px) del SelectTrigger compartido. */}
           <SelectTrigger className="w-[200px] min-h-[44px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {EMPRESAS.map((k) => (
@@ -134,24 +148,14 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
           </SelectContent>
         </Select>
 
-        <div className="ml-auto flex items-center gap-2">
+        {canConfig && (
           <button
-            onClick={handleExport}
-            disabled={vendedores.length === 0}
-            /* 39 px de alto medidos en la vista consolidada; mismo botón acá. */
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => setConfigOpen(true)}
+            className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-md border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+            <Settings className="h-4 w-4 shrink-0" /> Configurar
           </button>
-          {canConfig && (
-            <button
-              onClick={() => setConfigOpen(true)}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
-            >
-              <Settings className="h-3.5 w-3.5" /> Configurar
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {savedMsg && <p className="text-xs text-teal-700">{savedMsg}</p>}

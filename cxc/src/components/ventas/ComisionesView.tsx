@@ -1,18 +1,40 @@
 "use client";
 
-// Shell del tab Comisiones (empresas B2B / mayoreo). Controla el modo de vista
-// (Todas las empresas / Por empresa, con memoria) y el período compartido
+// Shell del módulo Comisiones (empresas B2B / mayoreo). Controla el modo de
+// vista (Todas las empresas / Por empresa, con memoria) y el período compartido
 // (mes/año, con meses futuros no navegables). Delega el render a:
 //  - ComisionesConsolidadoView (matriz vendedor × empresa, default)
 //  - ComisionesPorEmpresaView  (una empresa a la vez)
+//
+// ─── Encabezado: 481px → 2 filas (jul-2026) ──────────────────────────────────
+// Medido con datos de producción en 390×844: del borde de arriba al primer
+// número de comisión había 481px, el 57% del iPhone, y en Safari real (área
+// útil ~664px) entraban 4 vendedores de 6. Eran cuatro bloques apilados —
+// título grande, fila de 5 controles, acordeón "Criterios" y una fila entera
+// solo para el botón Excel.
+//
+// Lo que se hizo, con el lenguaje visual que ya estrenó CXC (/admin): sin
+// título grande (el módulo ya se nombra en el header sticky y en el breadcrumb),
+// pestañas de modo en la primera línea, y las acciones que Daniel usa —
+// período, "Actualizar ahora" y Excel — en la segunda. Mes y año pasaron a ser
+// UN control ("Julio 2026"), no dos cajas. "Criterios" y la fecha de
+// sincronizado NO se borraron: viven en el ⓘ de la primera línea, que cerrado
+// no ocupa alto propio.
+//
+// El botón Excel SUBIÓ acá desde las dos vistas hijas (cada una gastaba una
+// fila de 44px solo para él). La vista hija sigue siendo la dueña del cálculo
+// del Excel: registra su función con `onExcel` y este shell solo la dispara.
+// Ningún número ni ningún cálculo cambió — esto es puramente de layout.
+// ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FileSpreadsheet } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
 import { ComisionesCriterios } from "./ComisionesCriterios";
+import { ComisionesPeriodo } from "./ComisionesPeriodo";
 import dynamic from "next/dynamic";
 
 // Vistas LAZY: solo el modo activo (Todas / Por empresa) descarga su JS, en su
@@ -29,15 +51,16 @@ const ComisionesPorEmpresaView = dynamic(
   { ssr: false, loading: () => <ViewSkeleton /> },
 );
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
 const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
 const MODE_KEY = "fg_comisiones_mode";
 
 type Mode = "todas" | "empresa";
+
+/** Lo que una vista hija expone para que el Excel viva en la barra de arriba. */
+export interface ExcelApi {
+  run: () => void;
+  disabled: boolean;
+}
 
 interface ComisionesViewProps {
   availableYears: number[];
@@ -51,6 +74,17 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const [mode, setMode] = useState<Mode>("todas");
   const [year, setYear] = useState<number>(currentYear);
   const [mes, setMes] = useState<number>(currentMonth);
+  const [syncStale, setSyncStale] = useState(false);
+
+  // Excel: la vista hija registra su función; acá solo se dispara. La función
+  // se guarda en un ref (cambia en cada render de la hija) y en el estado solo
+  // queda si está habilitado, que es lo único que pinta el botón.
+  const excelRef = useRef<(() => void) | null>(null);
+  const [excelDisabled, setExcelDisabled] = useState(true);
+  const registrarExcel = useCallback((api: ExcelApi | null) => {
+    excelRef.current = api ? api.run : null;
+    setExcelDisabled(api ? api.disabled : true);
+  }, []);
 
   // Recuerda el último modo de vista.
   useEffect(() => {
@@ -63,75 +97,76 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
     localStorage.setItem(MODE_KEY, m);
   };
 
-  // Meses futuros no navegables: en el año en curso, solo hasta el mes actual.
-  const mesDeshabilitado = (m: number) => year === currentYear && m > currentMonth;
-
-  const handleYear = (y: number) => {
+  const handlePeriodo = (y: number, m: number) => {
     setYear(y);
-    // Si el mes quedó en el futuro del nuevo año, lo bajamos al mes en curso.
-    if (y === currentYear && mes > currentMonth) setMes(currentMonth);
+    setMes(m);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Barra superior: modo + período + estado de sync */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Toggle de modo */}
-        <div className="inline-flex rounded-md border border-gray-200 p-0.5">
-          {([["todas", "Todas las empresas"], ["empresa", "Por empresa"]] as [Mode, string][]).map(([m, label]) => (
-            <button
-              key={m}
-              onClick={() => handleMode(m)}
-              // El segmentado medía 33 px de alto: por debajo del mínimo táctil
-              // de 44. inline-flex + min-h para no perder el centrado del texto.
-              className={`inline-flex min-h-[44px] items-center justify-center rounded px-3 text-sm font-medium transition active:scale-[0.97] ${
-                mode === m ? "bg-black text-white" : "text-gray-600 hover:text-black"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+    <div className="space-y-2">
+      {/* Fila 1 — modo de vista + ⓘ (criterios y frescura del dato).
+          Mismo patrón que las pestañas de CXC: sin título grande arriba. */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        {([["todas", "Todas las empresas"], ["empresa", "Por empresa"]] as [Mode, string][]).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => handleMode(m)}
+            aria-current={mode === m ? "page" : undefined}
+            className={`-mb-px min-h-[44px] whitespace-nowrap border-b-2 px-2.5 text-sm transition active:scale-[0.97] ${
+              mode === m
+                ? "border-gray-900 font-medium text-gray-900"
+                : "border-transparent text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
 
-        {/* Los dos selectores (mes 140×36, año 110×36) quedaban cortos de alto.
-            min-h-[44px] pisa el h-9 del SelectTrigger sin tocar el componente
-            compartido. */}
-        <Select value={String(mes)} onValueChange={(v) => setMes(parseInt(v, 10))}>
-          <SelectTrigger className="w-[140px] min-h-[44px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MESES.map((m, i) => (
-              <SelectItem key={i} value={String(i + 1)} disabled={mesDeshabilitado(i + 1)}>{m}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={String(year)} onValueChange={(v) => handleYear(parseInt(v, 10))}>
-          <SelectTrigger className="w-[110px] min-h-[44px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {availableYears.filter((y) => y <= currentYear).map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ComisionesCriterios className="ml-auto" aviso={syncStale}>
+          <SyncStatus
+            tabla="facturas"
+            empresasEsperadas={EMPRESAS}
+            empresaLabels={EMPRESA_KEY_TO_NAME}
+            prefix="Sincronizado"
+            onStale={setSyncStale}
+          />
+        </ComisionesCriterios>
+      </div>
 
-        <SyncStatus
-          tabla="facturas"
-          empresasEsperadas={EMPRESAS}
-          empresaLabels={EMPRESA_KEY_TO_NAME}
-          variant="pill"
-          prefix="Sincronizado"
+      {/* Fila 2 — lo que Daniel usa: período, actualizar, Excel.
+          En 390px los tres miden 346px de los 358 disponibles: van con
+          shrink-0 (para que ninguno se comprima y parta su texto en dos
+          líneas) y la fila con flex-wrap, que es el modo de fallar bueno —
+          si algún día no entran, se bajan a otra línea en vez de sacar la
+          página para el costado. */}
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <ComisionesPeriodo
+          mes={mes}
+          year={year}
+          availableYears={availableYears}
+          onChange={handlePeriodo}
         />
+
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
             disparo — sesión única Switch). */}
-        <SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} />
+        <SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} className="shrink-0" />
+
+        <button
+          type="button"
+          onClick={() => excelRef.current?.()}
+          disabled={excelDisabled}
+          className="ml-auto inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md border border-gray-200 px-2.5 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40 sm:gap-1.5 sm:px-3"
+        >
+          <FileSpreadsheet className="h-4 w-4 shrink-0" /> Excel
+        </button>
       </div>
 
-      <ComisionesCriterios />
-
       {mode === "todas" ? (
-        <ComisionesConsolidadoView year={year} mes={mes} />
+        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} />
       ) : (
-        <ComisionesPorEmpresaView year={year} mes={mes} />
+        <ComisionesPorEmpresaView year={year} mes={mes} onExcel={registrarExcel} />
       )}
     </div>
   );

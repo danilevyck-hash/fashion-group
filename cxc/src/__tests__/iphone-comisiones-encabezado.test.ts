@@ -1,0 +1,224 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// iPhone 390×844 — el encabezado de /comisiones (jul-2026).
+//
+// PROBLEMA MEDIDO (navegador real, build de producción, datos de producción):
+// del borde de arriba al primer número de comisión había **480.5px**, el 57%
+// de la pantalla. Con el área útil real de Safari (~664px) se veían 4 de 6
+// vendedores. Eran cuatro bloques apilados: título grande, fila de 5 controles,
+// acordeón "Criterios" y una fila entera solo para el botón Excel.
+//
+// DESPUÉS: **193.5px** y los 6 vendedores en la primera pantalla. Escritorio
+// 378.5 → 223.5px.
+//
+// Este test CONGELA ese logro. No renderiza (vitest no tiene layout): reconstruye
+// el alto a partir de lo que dice la FUENTE — el padding de <main>, la
+// separación entre filas y cuántas filas tiene la barra — más las dos piezas
+// que ya se midieron en el navegador y no dependen de este código (el header
+// sticky de la app y el encabezado de la tabla). Si alguien agrega una fila,
+// engorda el padding o devuelve el título grande, la cuenta pasa de 200px y el
+// build se pone ROJO.
+//
+// Mismo patrón que iphone-targets-*.test.ts: se protege una clase concreta de
+// Tailwind, no un render.
+//
+// Verificación en navegador: `node scripts/_medir-comisiones-encabezado.mjs`
+// (solo lectura; ver los gotchas en su encabezado).
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import path from "path";
+
+const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
+
+const page = leer("app/comisiones/ComisionesPageClient.tsx");
+const shell = leer("components/ventas/ComisionesView.tsx");
+const criterios = leer("components/ventas/ComisionesCriterios.tsx");
+const periodo = leer("components/ventas/ComisionesPeriodo.tsx");
+const consolidado = leer("components/ventas/ComisionesConsolidadoView.tsx");
+const porEmpresa = leer("components/ventas/ComisionesPorEmpresaView.tsx");
+
+/** Techo acordado: el primer número tiene que verse en la primera pantalla. */
+const PRESUPUESTO_PX = 200;
+
+/** Medidos en el navegador — no dependen de este código. */
+const ALTO_APPHEADER_MOVIL = 45; // barra sticky de la app en 390px
+const ALTO_THEAD_TABLA = 34.5; // encabezado de columnas de la tabla
+const BORDE_CARD = 1;
+
+/** Alto táctil mínimo de la casa. */
+const TARGET_MIN = 44;
+
+/** Escala de espaciado de Tailwind: `pt-2` = 8px, `space-y-1.5` = 6px, … */
+const escala = (n: number) => n * 4;
+
+/** Lee el número de una clase de espaciado (pt-2 → 2). */
+function claseEspaciado(src: string, re: RegExp): number {
+  const m = src.match(re);
+  expect(m, `no encontré ${re} — ¿cambió la estructura del encabezado?`).toBeTruthy();
+  return parseFloat(m![1]);
+}
+
+/** El padding de arriba de <main> EN MÓVIL (ignora los `md:` de escritorio). */
+function padTopMovil(): number {
+  const cls = page.match(/<main className="([^"]*)"/);
+  expect(cls, "no encontré el <main> de /comisiones").toBeTruthy();
+  const clases = cls![1].split(/\s+/).filter((c) => !c.includes(":")); // sin breakpoints
+  const pt = clases.find((c) => /^pt-\d/.test(c));
+  const py = clases.find((c) => /^py-\d/.test(c));
+  const usada = pt ?? py;
+  expect(usada, `<main> sin padding de arriba en móvil: ${cls![1]}`).toBeTruthy();
+  return escala(parseFloat(usada!.split("-")[1]));
+}
+
+/** El bloque JSX de la barra de controles (hasta que arranca la vista hija). */
+function barraDeControles(): string {
+  const i = shell.indexOf('<div className="space-y-2">');
+  const j = shell.indexOf('{mode === "todas"', i);
+  expect(i).toBeGreaterThan(-1);
+  expect(j).toBeGreaterThan(i);
+  return shell.slice(i, j);
+}
+
+describe("Comisiones — el encabezado entra en la primera pantalla del iPhone", () => {
+  it("la barra de controles tiene DOS filas, ni una más", () => {
+    // Cada fila es un <div className="flex …"> hijo directo de la barra. Los
+    // botones de adentro usan template literals o `inline-flex`, así que no
+    // cuentan. Una tercera fila rompe el presupuesto de 200px.
+    const filas = [...barraDeControles().matchAll(/<div className="flex /g)];
+    expect(filas).toHaveLength(2);
+  });
+
+  it("las dos filas miden 44px (mínimo táctil) y nada más", () => {
+    const barra = barraDeControles();
+    // Ningún alto fijo mayor que el target mínimo escondido en la barra.
+    expect(barra).not.toMatch(/(?<!min-)h-\[\d+px\]/);
+    expect(barra).not.toMatch(/\bpy-\d/); // el alto lo da min-h-[44px], no padding
+  });
+
+  it("la cuenta del encabezado da menos de 200px en 390px de ancho", () => {
+    const padTop = padTopMovil();
+    const separacion = escala(claseEspaciado(shell, /<div className="space-y-(\d+(?:\.\d+)?)">/));
+    const filas = [...barraDeControles().matchAll(/<div className="flex /g)].length;
+
+    // <main pt> + (filas × 44) + (separación entre filas y antes de la tabla)
+    const alto =
+      ALTO_APPHEADER_MOVIL +
+      padTop +
+      filas * TARGET_MIN +
+      filas * separacion +
+      BORDE_CARD +
+      ALTO_THEAD_TABLA;
+
+    // 45 + 8 + 88 + 16 + 1 + 34.5 = 192.5 (medido en el navegador: 193.5).
+    expect(alto).toBeLessThan(PRESUPUESTO_PX);
+  });
+
+  it("no volvió el título grande (lo dicen el header sticky y el breadcrumb)", () => {
+    expect(page).not.toMatch(/<h1/);
+    expect(page).not.toContain("font-display");
+    expect(page).not.toContain("text-3xl");
+  });
+});
+
+describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
+  it("el interruptor Todas / Por empresa conserva sus dos etiquetas", () => {
+    expect(shell).toContain('"Todas las empresas"');
+    expect(shell).toContain('"Por empresa"');
+  });
+
+  it("mes y año son UN control, no dos cajas sueltas", () => {
+    expect(shell).toContain("<ComisionesPeriodo");
+    // El shell ya no arma selectores de mes/año por su cuenta.
+    expect(shell).not.toContain("@/components/ui/select");
+    expect(shell).not.toContain("SelectTrigger");
+  });
+
+  it("'Actualizar ahora' y Excel viven en la barra, no en una fila propia", () => {
+    const barra = barraDeControles();
+    expect(barra).toContain("<SyncNowButton");
+    expect(barra).toContain("Excel");
+    // Las vistas hijas ya no dibujan su propio botón Excel (era una fila de
+    // 44px + 16px de separación, solo para él).
+    expect(consolidado).not.toContain("FileSpreadsheet");
+    expect(porEmpresa).not.toContain("FileSpreadsheet");
+    // …pero SIGUEN siendo las dueñas del cálculo del Excel.
+    expect(consolidado).toContain("exportComisionesConsolidado");
+    expect(consolidado).toContain("onExcel?.(");
+    expect(porEmpresa).toContain("exportComisionesResumen");
+    expect(porEmpresa).toContain("onExcel?.(");
+  });
+});
+
+describe("Comisiones — Criterios y la fecha de sincronizado NO se borraron", () => {
+  it("el texto de los criterios está intacto (explica un cálculo de plata)", () => {
+    expect(criterios).toContain("facturas con utilidad &gt;20% menos notas de crédito");
+    expect(criterios).toContain("excluyendo retenciones de ITBMS");
+    expect(criterios).toContain("Fuente: reportes de Switch");
+  });
+
+  it("Criterios vive en un ⓘ que cerrado no ocupa alto propio", () => {
+    // El panel es un popover absoluto: no empuja a la tabla hacia abajo.
+    expect(criterios).toContain("absolute right-0 top-full");
+    expect(criterios).not.toContain("w-full items-center gap-2 px-3 py-2 text-left"); // el acordeón viejo
+    expect(barraDeControles()).toContain("<ComisionesCriterios");
+  });
+
+  it("la frescura del dato sigue en pantalla, adentro del mismo ⓘ", () => {
+    expect(shell).toContain("<SyncStatus");
+    expect(shell).toContain('prefix="Sincronizado"');
+    // Y si alguna empresa quedó sin actualizar, el ⓘ lo avisa sin abrirlo.
+    expect(shell).toContain("onStale={setSyncStale}");
+    expect(criterios).toContain("bg-amber-500");
+  });
+});
+
+describe("Comisiones — 44px al tacto y cero scroll lateral en iPhone", () => {
+  const archivos: [string, string][] = [
+    ["shell", shell],
+    ["criterios", criterios],
+    ["período", periodo],
+  ];
+
+  it.each(archivos)("todo lo tocable de %s llega a 44px", (_nombre, src) => {
+    // Cada <button> del encabezado declara min-h-[44px] o h-11 en su className.
+    // (No se puede cortar la etiqueta en el primer ">": las flechas de las
+    // arrow functions tienen uno.)
+    const botones = src
+      .split("<button")
+      .slice(1)
+      .map((c) => {
+        const hasta = c.indexOf("</button");
+        return hasta > -1 ? c.slice(0, hasta) : c;
+      });
+    expect(botones.length).toBeGreaterThan(0);
+    for (const b of botones) {
+      const clases = b.match(/className=(?:"([^"]*)"|\{`([\s\S]*?)`\})/);
+      expect(clases, b.slice(0, 160)).toBeTruthy();
+      const valor = clases![1] ?? clases![2];
+      expect(valor, valor).toMatch(/min-h-\[44px\]|h-11/);
+    }
+  });
+
+  it("el ⓘ llega a 44px de ANCHO aunque solo muestre el ícono", () => {
+    expect(criterios).toContain("min-w-[44px]");
+  });
+
+  it("el control de período mide igual en mayo que en julio", () => {
+    // "May 2026" es 8.6px más ancho que "Jul 2026" (medido con la fuente real).
+    // Con ancho automático eso alcanzaba para que "Actualizar ahora" se
+    // partiera en dos líneas y el encabezado creciera 6px. Ancho fijo en
+    // iPhone + mes abreviado = la fila mide lo mismo los 12 meses del año.
+    expect(periodo).toContain("w-[110px]");
+    expect(periodo).toContain("MESES_CORTOS[mes - 1]");
+  });
+
+  it("los controles no se comprimen; si algún día no entran, bajan de línea", () => {
+    // flex-wrap es el modo de fallar bueno: nunca saca la página para el
+    // costado. shrink-0 evita que un control se achique y parta su texto.
+    const barra = barraDeControles();
+    expect(barra).toContain("flex flex-wrap items-center");
+    expect(barra).toContain('<SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} className="shrink-0" />');
+    expect(periodo).toContain("shrink-0");
+  });
+});
