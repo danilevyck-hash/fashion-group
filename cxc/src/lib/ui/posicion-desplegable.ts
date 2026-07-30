@@ -47,6 +47,35 @@ export interface PosicionDesplegable {
   hacia: "abajo" | "arriba";
 }
 
+/**
+ * Ajustes por control. Los DEFAULTS son exactamente el comportamiento que ya
+ * tenía el selector de cliente de Guías, así que omitirlos no cambia nada.
+ *
+ * Existen porque el barrido del 30-jul-2026 encontró el mismo bug en 5 lugares
+ * más y no todos son un typeahead pegado al borde izquierdo de un campo ancho:
+ * el menú ⋯ de Cheques y la campana de notificaciones se cuelgan del borde
+ * DERECHO de un botón chico, y sus paneles tienen ancho propio (180 y 320 px).
+ * Sin `alinear`/`ancho` habría que copiar la aritmética en cada uno — que es
+ * justo lo que este módulo vino a evitar.
+ */
+export interface OpcionesDesplegable {
+  /** Alto que se querría ocupar. Se acota a `ALTO_MAXIMO` y al lugar real. */
+  altoDeseado?: number;
+  /**
+   * Ancho FIJO en px. Sin esto, el ancho sale del ancla con piso
+   * `anchoMinimo` — que es lo que quiere un typeahead (la lista mide lo que el
+   * campo) y NO lo que quiere un menú colgado de un botón de 44 px.
+   */
+  ancho?: number;
+  /** Piso de ancho cuando se deriva del ancla. Default `ANCHO_MINIMO`. */
+  anchoMinimo?: number;
+  /**
+   * A qué borde del ancla se pega horizontalmente. "derecha" alinea los bordes
+   * derechos (el `right-0` de Tailwind). Default "izquierda".
+   */
+  alinear?: "izquierda" | "derecha";
+}
+
 /** Aire entre el campo y la lista (equivalente al `mt-1` de antes). */
 export const SEPARACION = 4;
 /** Margen mínimo contra los bordes de la pantalla. */
@@ -86,10 +115,26 @@ function acotar(v: number, min: number, max: number): number {
 export function calcularPosicionDesplegable(
   ancla: Ancla,
   viewport: Viewport,
-  altoDeseado = ALTO_MAXIMO,
+  // Se acepta el número suelto de antes para no tocar a los llamadores viejos.
+  opciones: number | OpcionesDesplegable = ALTO_MAXIMO,
 ): PosicionDesplegable {
-  const width = acotar(ancla.width, ANCHO_MINIMO, Math.max(0, viewport.width - MARGEN * 2));
-  const left = acotar(ancla.left, MARGEN, Math.max(MARGEN, viewport.width - width - MARGEN));
+  const o: OpcionesDesplegable =
+    typeof opciones === "number" ? { altoDeseado: opciones } : opciones;
+  const altoDeseado = o.altoDeseado ?? ALTO_MAXIMO;
+
+  const techoAncho = Math.max(0, viewport.width - MARGEN * 2);
+  // Un ancho FIJO igual se acota a la pantalla: un menú de 320 px en un iPhone
+  // de 390 entra, pero uno de 420 no, y salirse por el costado es el mismo
+  // defecto que el recorte — el usuario no lo ve.
+  const width =
+    o.ancho != null
+      ? Math.min(o.ancho, techoAncho)
+      : acotar(ancla.width, o.anchoMinimo ?? ANCHO_MINIMO, techoAncho);
+
+  // El borde por el que se cuelga. Con "derecha" se alinean los bordes derechos
+  // del ancla y del panel; después se acota igual, así que nunca se sale.
+  const preferido = o.alinear === "derecha" ? ancla.left + ancla.width - width : ancla.left;
+  const left = acotar(preferido, MARGEN, Math.max(MARGEN, viewport.width - width - MARGEN));
 
   const espacioAbajo = viewport.height - ancla.bottom - SEPARACION - MARGEN;
   const espacioArriba = ancla.top - SEPARACION - MARGEN;

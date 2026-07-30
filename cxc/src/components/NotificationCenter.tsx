@@ -10,6 +10,7 @@ import {
   type Notification,
   type NotificationType,
 } from "@/lib/notification-store"
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante"
 
 function useNotifications() {
   const notifications = useSyncExternalStore(subscribe, getNotifications, getNotifications)
@@ -80,6 +81,8 @@ export default function NotificationCenter({ size = "compacta" }: NotificationCe
     return () => document.removeEventListener("keydown", handler)
   }, [open])
 
+  const botonRef = useRef<HTMLButtonElement>(null)
+
   const handleToggle = () => {
     if (!open) markAllRead()
     setOpen(prev => !prev)
@@ -89,6 +92,7 @@ export default function NotificationCenter({ size = "compacta" }: NotificationCe
     <div className="relative" ref={panelRef}>
       {/* Bell button */}
       <button
+        ref={botonRef}
         onClick={handleToggle}
         aria-label="Notificaciones"
         className={`relative text-gray-400 hover:text-gray-700 transition rounded-md hover:bg-gray-50 ${
@@ -111,9 +115,22 @@ export default function NotificationCenter({ size = "compacta" }: NotificationCe
         )}
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-gray-200 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+      {/* 🩸 El panel FLOTA (portal a <body> + fixed) desde el 30-jul-2026. Era
+          `absolute right-0 w-80`, o sea 320 px colgados del borde derecho de la
+          campana; medido a 390 px de ancho, arrancaba en **x = -54**: 54 px de
+          notificación quedaban FUERA de la pantalla por la izquierda, en el
+          iPhone, que es donde Daniel las lee. Ahora se acota a la pantalla.
+          Ver `DesplegableFlotante`. */}
+      <DesplegableFlotante
+        abierto={open}
+        anclaRef={botonRef}
+        onCerrar={() => setOpen(false)}
+        marca="notificaciones"
+        ancho={320}
+        alinear="derecha"
+        className="bg-white rounded-lg border border-gray-200 shadow-lg"
+      >
+        <>
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Notificaciones</span>
             {notifications.length > 0 && (
@@ -142,8 +159,8 @@ export default function NotificationCenter({ size = "compacta" }: NotificationCe
               ))
             )}
           </div>
-        </div>
-      )}
+        </>
+      </DesplegableFlotante>
     </div>
   )
 }

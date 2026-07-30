@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, ConfirmDeleteModal, Modal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import ChequeFormModal, { chequeFormVacio, type ChequeFormValues } from "./components/ChequeFormModal";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmt, fmtDate } from "@/lib/format";
@@ -45,15 +46,91 @@ export interface Cheque {
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
+/** Color de la píldora del calendario. A nivel de módulo porque lo usan la
+ *  píldora (componente propio desde el arreglo del globo) y la lista del día. */
+function pillColor(estado: string) {
+  if (estado === "pendiente") return "bg-emerald-100 text-emerald-700";
+  if (estado === "vencido") return "bg-red-100 text-red-700";
+  if (estado === "rebotado") return "bg-red-50 text-red-400";
+  return "bg-gray-100 text-gray-500";
+}
+
 type Filter = "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
 const VALID_FILTERS: Filter[] = ["pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
 
+/**
+ * Píldora de un cheque dentro de una casilla del calendario, con su globo de
+ * detalle.
+ *
+ * 🩸 El globo FLOTA (portal a <body> + fixed) desde el 30-jul-2026. Era
+ * `absolute top-full` dentro de una casilla de `min-h-[80px]`, y en las últimas
+ * semanas del mes eso lo dejaba FUERA DE LA PANTALLA: medido a 1440×900,
+ * **138 px por debajo del borde de abajo** — o sea que "Confirmar depósito" y
+ * "Rebotado" quedaban donde nadie los podía tocar. Ahora, si abajo no alcanza,
+ * se abre hacia arriba. Se extrajo a su propio componente porque cada píldora
+ * necesita SU ancla (un `ref` por celda). Ver `DesplegableFlotante`.
+ */
+function ChequeCalendarioPill({
+  cheque, ve, abierto, onAbrir, onCerrar, onDepositar, onRebotado,
+}: {
+  cheque: Cheque; ve: string; abierto: boolean;
+  onAbrir: () => void; onCerrar: () => void;
+  onDepositar: () => void; onRebotado: () => void;
+}) {
+  const pillRef = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="relative">
+      <button ref={pillRef} onClick={onAbrir}
+        title={`N° ${cheque.numero_cheque} · $${fmt(cheque.monto)} · ${cheque.cliente}`}
+        className={`w-full flex items-center gap-1 text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
+        <span className="truncate">{cheque.cliente.length > 12 ? cheque.cliente.slice(0, 12) + "…" : cheque.cliente} ${fmt(cheque.monto)}</span>
+      </button>
+      <DesplegableFlotante
+        abierto={abierto}
+        anclaRef={pillRef}
+        onCerrar={onCerrar}
+        marca="cheque-calendario"
+        ancho={224}
+        className="bg-white border border-gray-200 rounded-lg shadow-lg p-3"
+      >
+        <div onClick={e => e.stopPropagation()}>
+          <div className="text-xs font-medium mb-1">{cheque.cliente}</div>
+          <div className="text-xs text-gray-500 mb-0.5">N° {cheque.numero_cheque}</div>
+          <div className="text-sm font-semibold mb-2">${fmt(cheque.monto)}</div>
+          <StatusBadge estado={ve} />
+          {(ve === "pendiente" || ve === "vencido") && (
+            <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
+              <button onClick={onDepositar} className="text-xs text-emerald-600 hover:underline">Confirmar depósito</button>
+              <button onClick={onRebotado} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline">Rebotado</button>
+            </div>
+          )}
+        </div>
+      </DesplegableFlotante>
+    </div>
+  );
+}
+
+/**
+ * Menú ⋯ de la fila de un cheque.
+ *
+ * 🩸 FLOTA (portal a <body> + fixed) desde el 30-jul-2026. Era `absolute
+ * top-full` dentro de un `<td>`, y esa tabla vive en un `overflow-x-auto` y
+ * encima tiene `overflow-hidden` propio (por el `rounded-lg`). Medido en el
+ * navegador, abriendo el menú de la primera fila:
+ *
+ *   121 px del menú RECORTADOS por la TABLE, a 834 px y a 1440 px
+ *   +206 px de desplazamiento de las columnas a 834 px
+ *
+ * O sea, de las 2-3 acciones se veía la primera y media. El `alignRight`
+ * calculado a mano ya no hace falta: `DesplegableFlotante` acota el panel a la
+ * pantalla por los dos lados. Ver ese componente.
+ */
 function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar }: {
   cheque: Cheque; ve: string; role: string;
   onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(true);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const isPending = ve === "pendiente" || ve === "vencido";
   const isRebotado = ve === "rebotado";
@@ -62,34 +139,30 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   const canDelete = role === "admin" && !isDep;
   const hasActions = isPending || (isRebotado && onRedepositar) || canDelete;
 
-  // Flip: si el trigger está cerca del borde derecho, abre el dropdown hacia la izquierda
-  useEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const dropdownWidth = 180; // min-w-[160px] + margen
-    const spaceRight = window.innerWidth - rect.right;
-    // Si no hay espacio a la derecha para que el dropdown respete right-0, voltear a left-0
-    setAlignRight(spaceRight >= dropdownWidth - rect.width || rect.left < dropdownWidth);
-  }, [open]);
-
   if (!hasActions) return null;
   return (
     <div className="relative">
       <button ref={triggerRef} onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
-      {open && (<>
-        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-        <div className={`absolute top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px] max-w-[90vw] ${alignRight ? "right-0" : "left-0"}`}>
-          {isPending && (
-            <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Marcar como rebotado (devuelto)</button>
-          )}
-          {isRebotado && onRedepositar && (
-            <button onClick={() => { onRedepositar(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
-          )}
-          {canDelete && (
-            <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition min-h-[44px]">Eliminar Cheque</button>
-          )}
-        </div>
-      </>)}
+      <DesplegableFlotante
+        abierto={open}
+        anclaRef={triggerRef}
+        onCerrar={() => setOpen(false)}
+        role="menu"
+        marca="cheque-fila"
+        ancho={240}
+        alinear="derecha"
+        className="bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+      >
+        {isPending && (
+          <button role="menuitem" onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="flex w-full items-center text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Marcar como rebotado (devuelto)</button>
+        )}
+        {isRebotado && onRedepositar && (
+          <button role="menuitem" onClick={() => { onRedepositar(); setOpen(false); }} className="flex w-full items-center text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
+        )}
+        {canDelete && (
+          <button role="menuitem" onClick={() => { onDelete(); setOpen(false); }} className="flex w-full items-center text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition min-h-[44px]">Eliminar Cheque</button>
+        )}
+      </DesplegableFlotante>
     </div>
   );
 }
@@ -734,13 +807,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         const goPrev = () => setCalMonth(p => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
         const goNext = () => setCalMonth(p => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 });
 
-        const pillColor = (estado: string) => {
-          if (estado === "pendiente") return "bg-emerald-100 text-emerald-700";
-          if (estado === "vencido") return "bg-red-100 text-red-700";
-          if (estado === "rebotado") return "bg-red-50 text-red-400";
-          return "bg-gray-100 text-gray-500";
-        };
-
         const cells = [];
         for (let i = 0; i < startDow; i++) cells.push(null);
         for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -778,28 +844,16 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                         {dayCheques.slice(0, 3).map(c => {
                           const ve = visualEstado(c);
                           return (
-                          <div key={c.id} className="relative">
-                            <button onClick={() => setCalPopover(calPopover === c.id ? null : c.id)}
-                              title={`N° ${c.numero_cheque} · $${fmt(c.monto)} · ${c.cliente}`}
-                              className={`w-full flex items-center gap-1 text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
-                              <span className="truncate">{c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}</span>
-                            </button>
-                            {calPopover === c.id && (
-                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg p-3 w-56" onClick={e => e.stopPropagation()}>
-                                <div className="text-xs font-medium mb-1">{c.cliente}</div>
-                                <div className="text-xs text-gray-500 mb-0.5">N° {c.numero_cheque}</div>
-                                <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
-                                <StatusBadge estado={ve} />
-                                {(ve === "pendiente" || ve === "vencido") && (
-                                  <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-xs text-emerald-600 hover:underline">Confirmar depósito</button>
-                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline">Rebotado</button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <ChequeCalendarioPill
+                            key={c.id}
+                            cheque={c}
+                            ve={ve}
+                            abierto={calPopover === c.id}
+                            onAbrir={() => setCalPopover(calPopover === c.id ? null : c.id)}
+                            onCerrar={() => setCalPopover(null)}
+                            onDepositar={() => { setConfirmDepositId(c.id); setCalPopover(null); }}
+                            onRebotado={() => { setRebotandoId(c.id); setCalPopover(null); }}
+                          />
                           );
                         })}
                         {dayCheques.length > 3 && (
