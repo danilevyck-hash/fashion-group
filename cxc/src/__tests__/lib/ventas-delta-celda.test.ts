@@ -57,20 +57,35 @@ describe("las 8 celdas de las dos tablas pintan el %", () => {
     expect(resumen.match(/dc\.texto/g) ?? []).toHaveLength(4);
   });
 
-  it("celular: mismas 4 celdas", () => {
-    expect(mobile.match(/deltaCelda\(/g) ?? []).toHaveLength(4);
-    expect(mobile.match(/dc\.texto/g) ?? []).toHaveLength(4);
+  // ⚠️ El celular pasó de matriz a TARJETAS el 30-jul-2026 (753 px de scroll
+  // lateral, el peor del sistema). Ya no hay 4 celdas distintas: hay UN renglón
+  // reusado para los 12 períodos, el Total y la Proyección — así que contar usos
+  // de `deltaCelda(` mediría cuántas veces se copió el código, no cuántos
+  // números pintan el %. Lo que hay que sostener es que el % siga saliendo en
+  // TODOS: el período, el resumen cerrado de la tarjeta y el total.
+  it("celular: el % se pinta en el renglón, en el total y en el período en curso", () => {
+    expect(mobile).toContain("renglon.dc.texto");
+    expect(mobile).toContain("tarjeta.resumen.dc.texto");
+    expect(mobile).toContain("tarjeta.enCurso.dc.texto");
+    // El cálculo sigue siendo el compartido, no una matemática nueva.
+    expect(mobile.match(/deltaCelda\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
-  it("el monto y el % van apilados, no en la misma línea", () => {
+  it("el monto y el % van apilados en el escritorio, no en la misma línea", () => {
     // Apilarlos es lo que deja el ancho de la tabla intacto: el % nunca es más
     // ancho que el monto, así que la columna no crece.
     expect(resumen).toContain("flex flex-col items-end leading-tight");
-    expect(mobile).toContain("flex-col items-end justify-center");
+  });
+
+  it("celular: el % tiene ancho fijo para que quede en columna", () => {
+    // En una lista vertical el reparto es al revés que en la matriz: lo que hay
+    // que sostener es que los % se puedan comparar de un barrido de arriba a
+    // abajo, y para eso su caja no puede cambiar de ancho con el texto.
+    expect(mobile).toContain("w-[54px] shrink-0 text-right");
   });
 
   it("celular conserva el área táctil de 44px", () => {
-    expect(mobile.match(/min-h-\[44px\]/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(mobile.match(/min-h-\[44px\]/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
   it("nadie quedó pintando solo la flecha suelta (la regresión del #279)", () => {

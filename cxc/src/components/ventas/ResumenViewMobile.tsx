@@ -5,10 +5,33 @@
 // hidden md:block en ResumenView.tsx.
 //
 // Estructura: pill de frescura → 3 KPI cards (Ventas/Utilidad/Margen YTD) →
-// Toggles segmented → Heatmap con sticky col + mes actual highlighted +
-// total grupo dark row.
-// Sin tooltips (no hay hover en touch): tocar una celda abre el panel de
-// detalle (sheet desde abajo) con Ventas, Utilidad y Margen del período.
+// Toggles segmented → UNA TARJETA POR EMPRESA (+ la del total del grupo).
+// Sin tooltips (no hay hover en touch): tocar un período abre el detalle con
+// Ventas, Utilidad y Margen, en el lugar donde se tocó.
+//
+// 🩸 POR QUÉ TARJETAS Y NO EL HEATMAP. Hasta el 30-jul-2026 esto era la misma
+// matriz del escritorio: empresa + 12 meses + Total + Proyección = 15 columnas
+// metidas en un `overflow-x-auto`. Medido en el navegador a 390 px: la tabla
+// pedía 1.109 px contra 356 visibles, o sea **753 px de scroll a la derecha** —
+// el peor de todo el sistema en el censo de ese día (CXC, ya pasado a tarjetas,
+// medía 0). Daniel, textual: *"todavia hay q hacer mucho scroll a la derecha
+// para ver la info"*. Con 12 meses en una pantalla de 390 px se ven DOS a la
+// vez, así que el heatmap no cumplía ni su propia promesa: comparar empresas
+// dentro del mismo mes exigía arrastrar casi dos pantallas y perder de vista la
+// columna de nombres.
+//
+// El patrón es el de `admin/components/PanelCxcMobile.tsx` (tabla ancha →
+// tarjetas), no uno nuevo. Cada tarjeta cerrada muestra lo que se mira de un
+// golpe (empresa, total del año y el período en curso); abierta, la lista
+// vertical de los 12 meses (o 4 trimestres) + Total + Proyección.
+//
+// NINGÚN NÚMERO CAMBIA y no se perdió ninguno: los 12 períodos, el Total, la
+// Proyección, el detalle por período, el panel mes × año de la empresa y la nota
+// de mayoreo de Multifashion están todos. Es presentación.
+//
+// El ESCRITORIO NO SE TOCÓ: sigue con su matriz en `ResumenView.tsx`, detrás de
+// `hidden md:block`. En una pantalla ancha la matriz sí se ve entera y es mejor
+// que las tarjetas — por eso no se unificaron.
 
 import type {
   VentasResumen,
@@ -16,9 +39,10 @@ import type {
   ProyeccionResp,
   ProyeccionEmpresa,
 } from "./types";
+import { useState } from "react";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_VENTAS_SECUENCIA } from "@/components/shared/syncNowOpciones";
@@ -26,12 +50,12 @@ import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
 import {
   buildSlotsMetrica, cellValue, cellDelta, renderCellValue, celdaKey,
-  deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda,
+  deltaCelda, isNaComparison, type CeldaBase, type DeltaCelda, type SlotDetalle,
 } from "@/lib/ventas/celda";
 import { buildSlotsProyeccion, explicacionProyeccion } from "@/lib/ventas/proyeccion-texto";
 import { variacionPct } from "@/lib/variacion";
 
-import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
+import { FilaDetalleBloque, medirRenglon, TOTAL_GRUPO_ID, type FilaDetalle } from "./FilaDetalle";
 
 /** Color del % bajo el monto en filas claras / en la fila oscura del total. */
 function toneDeltaClaro(tone: DeltaCelda["tone"]): string {
@@ -129,7 +153,7 @@ export function ResumenViewMobile({
       {granularity === "anual" ? (
         <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
       ) : (
-        <MobileHeatmap
+        <MobileTarjetas
           data={data}
           viewMode={viewMode}
           granularity={granularity}
@@ -281,12 +305,53 @@ function SegmentedRow<T extends string>({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Heatmap mobile — sticky col + mes actual highlight + total grupo dark row
+// Tarjetas por empresa — reemplazan la matriz de 15 columnas
 // ─────────────────────────────────────────────────────────────────────────────
 
 type CellData = CeldaBase;
 
-function MobileHeatmap({
+/**
+ * Un renglón de la lista abierta de una tarjeta: un período, el Total del año o
+ * la Proyección.
+ *
+ * Se arma en el padre y no dentro de la tarjeta a propósito: así la tarjeta de
+ * una empresa y la del total del grupo dibujan EXACTAMENTE lo mismo. El heatmap
+ * tenía cinco componentes de celda (`MobileCell`, `MobileTotalCell`,
+ * `MobileProyCell`, `MobileTotalGrupoCell`, `MobileTotalGrupoYtdCell`) con la
+ * misma lógica escrita cinco veces y ya habían divergido: la Proyección del
+ * grupo era un `<td>` mudo mientras la de cada empresa sí abría su explicación.
+ */
+interface Renglon {
+  /** `data-celda` — es también la llave con la que se sabe cuál está abierto. */
+  foco: string;
+  etiqueta: string;
+  valor: string;
+  dc: DeltaCelda | null;
+  /** Período en curso: se tiñe como la columna resaltada del escritorio. */
+  enCurso: boolean;
+  /** Total / Proyección: separados del bloque de períodos y en negrita. */
+  fuerte: boolean;
+  /** Qué mostrar al tocarlo. `null` = no hay nada que abrir. */
+  detalle: { titulo: string; subtitulo: string; slots: SlotDetalle[] } | null;
+}
+
+interface Tarjeta {
+  id: string;
+  nombre: string;
+  /** Nota de mayoreo de Multifashion, o nada. */
+  nota: string | null;
+  /** Lo que se ve con la tarjeta cerrada: el total del año. */
+  resumen: { valor: string; dc: DeltaCelda | null };
+  /** El período en curso, también visible con la tarjeta cerrada. */
+  enCurso: { etiqueta: string; valor: string; dc: DeltaCelda | null } | null;
+  renglones: Renglon[];
+  /** Total del grupo: fondo oscuro, igual que su fila en el escritorio. */
+  oscura: boolean;
+  /** Abre el panel mes × año de la empresa. El total del grupo no tiene. */
+  abrirPanel: (() => void) | null;
+}
+
+function MobileTarjetas({
   data,
   viewMode,
   granularity,
@@ -311,7 +376,7 @@ function MobileHeatmap({
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
 
-  // Índice de columna del mes en curso para highlight.
+  // Índice del período en curso, para resaltarlo.
   // mesActual es 1-indexed (5 = May). En trimestral: ceil(5/3)=2 → Q2 → idx 1.
   const currentColIdx = isClosedYear || data.mesActual === 0
     ? -1
@@ -319,35 +384,160 @@ function MobileHeatmap({
       ? data.mesActual - 1
       : Math.ceil(data.mesActual / 3) - 1;
 
-  // Filas por empresa (con cells re-derivadas por granularidad).
-  const rows = data.empresas.map(e => ({
-    id: e.empresa.id,
-    nombre: e.empresa.nombre,
-    cells: buildCells(e, granularity),
-    ytdTotal: yearlyTotal(e, viewMode),
-    // Las 4 fuentes del YTD, para que el panel de la columna Total muestre
-    // Ventas + Utilidad + Margen igual que en desktop.
-    ytdCell: {
+  const yy = String(selectedYear).slice(-2);
+  const yyPrev = String(selectedYear - 1).slice(-2);
+  const showProy = !isClosedYear && !!data.proyeccion;
+
+  // Una tarjeta abierta a la vez, misma regla que PanelCxcMobile: con 8 empresas
+  // × 12 meses, permitir varias abiertas convierte la pantalla en una lista de
+  // 100 renglones donde no se encuentra nada.
+  const [abierta, setAbierta] = useState<string | null>(null);
+
+  function alternar(id: string) {
+    // Cerrar la tarjeta con un detalle abierto adentro dejaría ese detalle vivo
+    // en el estado del padre y reaparecería al volver a abrirla.
+    if (abierta === id && filaDetalle) onCerrarFila();
+    setAbierta(prev => (prev === id ? null : id));
+  }
+
+  /** Renglón de un período. Sirve igual para una empresa y para el grupo. */
+  function renglonPeriodo(filaId: string, titulo: string, cell: CellData, ci: number): Renglon {
+    const cur = cellValue(cell, viewMode);
+    const foco = celdaKey("m", filaId, String(ci));
+    const base = { foco, etiqueta: cols[ci], enCurso: ci === currentColIdx, fuerte: false };
+    if (cur == null) {
+      return { ...base, valor: "—", dc: null, detalle: null };
+    }
+    return {
+      ...base,
+      valor: renderCellValue(cur, viewMode),
+      dc: deltaCelda(cellDelta(cell, viewMode), viewMode, isNaComparison(cell, viewMode)),
+      detalle: {
+        titulo,
+        subtitulo: `${cols[ci].toUpperCase()} ${yy} vs ${yyPrev}`,
+        // Sin montos del año previo: en 390 px no entran los 3 datos con el
+        // nombre y la ×. El Δ ya dice el cambio.
+        slots: buildSlotsMetrica(cell, viewMode, false),
+      },
+    };
+  }
+
+  /** Renglón del Total del año. En modo margen NO es una suma: es el margen. */
+  function renglonTotal(
+    filaId: string,
+    titulo: string,
+    ytdCell: CellData,
+    cur: number,
+    prev: number,
+    margenPct: number,
+    margenPctPrev: number,
+  ): { renglon: Renglon; dc: DeltaCelda | null } {
+    let display: string;
+    let delta: number | null;
+    if (viewMode === "margen") {
+      display = `${(margenPct * 100).toFixed(1)}%`;
+      delta = margenPctPrev > 0 ? margenPct - margenPctPrev : null;
+    } else {
+      display = formatCompactCurrency(cur);
+      delta = variacionPct(cur, prev);
+    }
+    const dc = deltaCelda(delta, viewMode, delta == null);
+    return {
+      dc,
+      renglon: {
+        foco: celdaKey("m", filaId, "total"),
+        etiqueta: `Total ${selectedYear}`,
+        valor: display,
+        dc,
+        enCurso: false,
+        fuerte: true,
+        detalle: {
+          titulo,
+          subtitulo: `TOTAL ${yy} vs ${yyPrev}`,
+          slots: buildSlotsMetrica(ytdCell, viewMode, false),
+        },
+      },
+    };
+  }
+
+  // Las celdas de cada empresa, UNA vez: las usan la tarjeta de la empresa y
+  // también el agregado del grupo, y `buildCells` construye 12 objetos por
+  // llamada. Recalcularlas dentro del bucle del grupo serían 96 llamadas.
+  const cellsPorEmpresa = data.empresas.map(e => buildCells(e, granularity));
+
+  // ── Una tarjeta por empresa ────────────────────────────────────────────────
+  const tarjetas: Tarjeta[] = data.empresas.map((e, ei) => {
+    const id = e.empresa.id;
+    const nombre = e.empresa.nombre;
+    const cells = cellsPorEmpresa[ei];
+    const yt = yearlyTotal(e, viewMode);
+    // Las 4 fuentes del YTD, para que el detalle del Total muestre Ventas +
+    // Utilidad + Margen igual que en el escritorio.
+    const ytdCell: CellData = {
       ventas: sumSeries(e.ventas2026),
       ventasPrev: sumSeries(e.ventas2025),
       utilidad: sumSeries(e.utilidad2026),
       utilidadPrev: sumSeries(e.utilidad2025),
-    } as CellData,
-    margenPct: e.margenPct,
-    margenPctPrev: e.margenPctPrev,
-  }));
+    };
+    const periodos = cells.map((c, ci) => renglonPeriodo(id, nombre, c, ci));
+    const total = renglonTotal(id, nombre, ytdCell, yt.cur, yt.prev, e.margenPct, e.margenPctPrev);
 
-  // Aggregates por columna (suma de todas las empresas).
+    const renglones = [...periodos, total.renglon];
+    if (showProy) {
+      const p = findProyeccionForEmpresa(data.proyeccion!, id);
+      renglones.push({
+        foco: celdaKey("m", id, "proy"),
+        etiqueta: "Proyección",
+        valor: p ? formatCompactCurrency(p.proyeccion_cierre) : "—",
+        dc: null,
+        enCurso: false,
+        fuerte: true,
+        // La Proyección explica de dónde sale, en castellano llano (antes en el
+        // escritorio era un número sin origen).
+        detalle: p
+          ? {
+              titulo: nombre,
+              subtitulo: explicacionProyeccion(p, selectedYear - 1, {
+                fechaCorte: data.fecha_corte,
+                corto: true,
+              }),
+              slots: buildSlotsProyeccion(p, selectedYear - 1, {
+                fechaCorte: data.fecha_corte,
+                compacto: true,
+              }),
+            }
+          : null,
+      });
+    }
+
+    const enCursoR = currentColIdx >= 0 ? periodos[currentColIdx] : null;
+    return {
+      id,
+      nombre,
+      // La nota es VISIBLE (paridad con escritorio): la fila es american_classic
+      // COMPLETA (tienda + mayoreo) y declara CUÁNTO es mayoreo.
+      nota: id === "multi" ? multiMayoreoNota ?? null : null,
+      resumen: { valor: total.renglon.valor, dc: total.dc },
+      enCurso: enCursoR ? { etiqueta: enCursoR.etiqueta, valor: enCursoR.valor, dc: enCursoR.dc } : null,
+      renglones,
+      oscura: false,
+      abrirPanel: () => onOpenEmpresa(id),
+    };
+  });
+
+  // ── Tarjeta del total del grupo ────────────────────────────────────────────
+  // Los agregados por período son la suma de todas las empresas; el YTD sale de
+  // las series reales (no de sumar columnas), igual que en el escritorio.
   const totalColAggs: CellData[] = cols.map((_, ci) => {
     let v = 0, vp = 0, u = 0, up = 0;
     let hasV = false, hasU = false;
-    rows.forEach(r => {
-      const c = r.cells[ci];
+    for (const cells of cellsPorEmpresa) {
+      const c = cells[ci];
       if (c.ventas != null) { v += c.ventas; hasV = true; }
       vp += c.ventasPrev;
       if (c.utilidad != null) { u += c.utilidad; hasU = true; }
       up += c.utilidadPrev;
-    });
+    }
     return {
       ventas: hasV ? v : null,
       ventasPrev: vp,
@@ -356,7 +546,6 @@ function MobileHeatmap({
     };
   });
 
-  // YTD del grupo (siempre ventas2026/2025 reales, no por columna).
   const groupYtd = data.empresas.reduce<{ v: number; vp: number; u: number; up: number }>(
     (s, e) => ({
       v: s.v + sumSeries(e.ventas2026),
@@ -367,429 +556,284 @@ function MobileHeatmap({
     { v: 0, vp: 0, u: 0, up: 0 }
   );
 
-  const showProy = !isClosedYear && !!data.proyeccion;
-  // Columnas que abarca la fila transformada: empresa + períodos + Total (+
-  // Proyección cuando aplica).
-  const colSpanTabla = 2 + cols.length + (showProy ? 1 : 0);
+  const grupoPeriodos = totalColAggs.map((c, ci) => renglonPeriodo(TOTAL_GRUPO_ID, "Total grupo", c, ci));
+  const grupoYtdCell: CellData = {
+    ventas: groupYtd.v, ventasPrev: groupYtd.vp, utilidad: groupYtd.u, utilidadPrev: groupYtd.up,
+  };
+  const grupoTotal = renglonTotal(
+    TOTAL_GRUPO_ID,
+    "Total grupo",
+    grupoYtdCell,
+    viewMode === "utilidad" ? groupYtd.u : groupYtd.v,
+    viewMode === "utilidad" ? groupYtd.up : groupYtd.vp,
+    data.kpis.margenYTD,
+    data.kpis.margen2025YTD,
+  );
+  const grupoRenglones = [...grupoPeriodos, grupoTotal.renglon];
+  if (showProy) {
+    grupoRenglones.push({
+      foco: celdaKey("m", TOTAL_GRUPO_ID, "proy"),
+      etiqueta: "Proyección",
+      valor: formatCompactCurrency(data.proyeccion!.totales_grupo.proyeccion_cierre),
+      dc: null,
+      enCurso: false,
+      fuerte: true,
+      // Sin detalle, igual que en el escritorio: `buildSlotsProyeccion` describe
+      // la proyección de UNA empresa y los totales del grupo no traen las mismas
+      // partes. Inventarle una explicación sería inventar el dato.
+      detalle: null,
+    });
+  }
+  const grupoEnCurso = currentColIdx >= 0 ? grupoPeriodos[currentColIdx] : null;
+
+  const tarjetaGrupo: Tarjeta = {
+    id: TOTAL_GRUPO_ID,
+    nombre: "Total grupo",
+    nota: null,
+    resumen: { valor: grupoTotal.renglon.valor, dc: grupoTotal.dc },
+    enCurso: grupoEnCurso
+      ? { etiqueta: grupoEnCurso.etiqueta, valor: grupoEnCurso.valor, dc: grupoEnCurso.dc }
+      : null,
+    renglones: grupoRenglones,
+    oscura: true,
+    abrirPanel: null,
+  };
 
   return (
-    <div className="relative overflow-x-auto rounded-xl border border-gray-200 bg-white">
-      <table className="w-full border-collapse text-xs [&_td]:align-middle [&_th]:align-middle">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50">
-            <th
-              scope="col"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-gray-200 bg-gray-50 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500"
-            >
-              Empresa
-            </th>
-            {cols.map((c, ci) => (
-              <th
-                key={c}
-                scope="col"
-                className={cn(
-                  "px-2 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500",
-                  ci === currentColIdx && "bg-[rgba(15,118,110,0.06)] text-teal-800"
-                )}
-              >
-                {c}
-              </th>
-            ))}
-            <th
-              scope="col"
-              className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
-            >
-              Total
-            </th>
-            {showProy && (
-              <th
-                scope="col"
-                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950"
-              >
-                Proyección
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => {
-            const proy = showProy
-              ? findProyeccionForEmpresa(data.proyeccion!, r.id)
-              : null;
-            // La fila abierta se TRANSFORMA en su propio lugar (paridad exacta
-            // con desktop). Solo una a la vez.
-            if (filaDetalle?.filaId === r.id) {
-              return (
-                <FilaDetalleTr
-                  key={r.id}
-                  detalle={filaDetalle}
-                  colSpan={colSpanTabla}
-                  onClose={onCerrarFila}
-                  compacto
-                />
-              );
-            }
-            return (
-              <tr
-                key={r.id}
-                className="border-b border-gray-100 last:border-b-0"
-              >
-                <th
-                  scope="row"
-                  onClick={() => onOpenEmpresa(r.id)}
-                  aria-haspopup="dialog"
-                  className="sticky left-0 z-10 min-w-[120px] max-w-[150px] cursor-pointer border-r border-gray-200 bg-white px-3 py-3 text-left text-xs font-medium text-gray-900 active:bg-gray-50"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{r.nombre}</span>
-                      {r.id === "multi" && multiMayoreoNota && (
-                        /* Nota VISIBLE (paridad con desktop): la fila es american_classic
-                           COMPLETA (tienda + mayoreo). Declara CUÁNTO es mayoreo. */
-                        <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-gray-500">
-                          {multiMayoreoNota}
-                        </span>
-                      )}
-                    </span>
-                    {/* Affordance: abre el panel mes × año de la empresa. */}
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300" aria-hidden />
-                  </div>
-                </th>
-                {r.cells.map((c, ci) => (
-                  <MobileCell
-                    key={ci}
-                    cell={c}
-                    mode={viewMode}
-                    highlighted={ci === currentColIdx}
-                    filaId={r.id}
-                    columna={String(ci)}
-                    titulo={r.nombre}
-                    cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`}
-                    onAbrir={onAbrirFila}
-                  />
-                ))}
-                <MobileTotalCell
-                  ventas={r.ytdTotal.cur}
-                  prev={r.ytdTotal.prev}
-                  mode={viewMode}
-                  margenPct={r.margenPct}
-                  margenPctPrev={r.margenPctPrev}
-                  cell={r.ytdCell}
-                  filaId={r.id}
-                  titulo={r.nombre}
-                  selectedYear={selectedYear}
-                  onAbrir={onAbrirFila}
-                />
-                {showProy && (
-                  <MobileProyCell
-                    proyeccion={proy}
-                    prevYear={selectedYear - 1}
-                    fechaCorte={data.fecha_corte}
-                    filaId={r.id}
-                    titulo={r.nombre}
-                    onAbrir={onAbrirFila}
-                  />
-                )}
-              </tr>
-            );
-          })}
-          {filaDetalle?.filaId === TOTAL_GRUPO_ID ? (
-            <FilaDetalleTr
-              detalle={filaDetalle}
-              colSpan={colSpanTabla}
-              onClose={onCerrarFila}
-              oscura
-              compacto
+    <div className="space-y-2">
+      <ul className="space-y-2">
+        {tarjetas.map(t => (
+          <li key={t.id}>
+            <TarjetaEmpresa
+              tarjeta={t}
+              abierta={abierta === t.id}
+              onAlternar={() => alternar(t.id)}
+              filaDetalle={filaDetalle}
+              onAbrirFila={onAbrirFila}
+              onCerrarFila={onCerrarFila}
             />
-          ) : (
-          <tr className="bg-gray-900 text-white">
-            <th
-              scope="row"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-gray-700 bg-gray-900 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide"
-            >
-              Total grupo
-            </th>
-            {totalColAggs.map((agg, ci) => (
-              <MobileTotalGrupoCell
-                key={ci}
-                cell={agg}
-                mode={viewMode}
-                highlighted={ci === currentColIdx}
-                columna={String(ci)}
-                periodLabel={`${cols[ci]} ${selectedYear}`}
-                cortoLabel={`${cols[ci].toUpperCase()} ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`}
-                onAbrir={onAbrirFila}
-              />
-            ))}
-            <MobileTotalGrupoYtdCell
-              cur={groupYtd.v}
-              prev={groupYtd.vp}
-              curUtil={groupYtd.u}
-              prevUtil={groupYtd.up}
-              mode={viewMode}
-              data={data}
-              selectedYear={selectedYear}
-              onAbrir={onAbrirFila}
-            />
-            {showProy && (
-              <MobileProyGrupoCell proyeccion={data.proyeccion!} />
-            )}
-          </tr>
-          )}
-        </tbody>
-      </table>
+          </li>
+        ))}
+      </ul>
+      {/* El total del grupo va último, igual que su fila en el escritorio. */}
+      <TarjetaEmpresa
+        tarjeta={tarjetaGrupo}
+        abierta={abierta === TOTAL_GRUPO_ID}
+        onAlternar={() => alternar(TOTAL_GRUPO_ID)}
+        filaDetalle={filaDetalle}
+        onAbrirFila={onAbrirFila}
+        onCerrarFila={onCerrarFila}
+      />
     </div>
   );
 }
 
-function MobileCell({
-  cell, mode, highlighted, filaId, columna, titulo, cortoLabel, onAbrir,
+function TarjetaEmpresa({
+  tarjeta,
+  abierta,
+  onAlternar,
+  filaDetalle,
+  onAbrirFila,
+  onCerrarFila,
 }: {
-  cell: CellData;
-  mode: ViewMode;
-  highlighted: boolean;
-  filaId: string;
-  columna: string;
-  titulo: string;
-  cortoLabel: string;
-  onAbrir: AbrirFila;
+  tarjeta: Tarjeta;
+  abierta: boolean;
+  onAlternar: () => void;
+  filaDetalle: FilaDetalle | null;
+  onAbrirFila: AbrirFila;
+  onCerrarFila: () => void;
 }) {
-  const cur = cellValue(cell, mode);
-  const delta = cellDelta(cell, mode);
-  const bgCls = highlighted ? "bg-[rgba(15,118,110,0.06)]" : "";
+  const { oscura } = tarjeta;
+  const tono = (dc: DeltaCelda) => (oscura ? toneDeltaOscuro(dc.tone) : toneDeltaClaro(dc.tone));
 
-  if (cur == null) {
+  return (
+    <article
+      className={cn(
+        "overflow-hidden rounded-xl border",
+        oscura ? "border-gray-800 bg-gray-900 text-white" : "border-gray-200 bg-white",
+      )}
+    >
+      {/* UN solo blanco táctil en el encabezado: abre y cierra. El chevron es
+          parte del botón, no un control aparte — dos targets pegados en 356 px se
+          erran con el pulgar. */}
+      <button
+        type="button"
+        onClick={onAlternar}
+        aria-expanded={abierta}
+        className={cn(
+          "flex w-full items-center gap-2 px-3 py-3 text-left",
+          oscura ? "active:bg-white/5" : "active:bg-gray-50",
+        )}
+      >
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate text-[13px] font-medium leading-tight",
+              oscura ? "font-semibold uppercase tracking-wide text-white" : "text-gray-900",
+            )}
+          >
+            {tarjeta.nombre}
+          </span>
+          {tarjeta.nota && (
+            <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-gray-500">
+              {tarjeta.nota}
+            </span>
+          )}
+          {/* El período en curso, cerrado: es el número que se mira todos los
+              días y en el heatmap era la columna resaltada. Sin esto habría que
+              abrir las 8 tarjetas para ver cómo va el mes. */}
+          {tarjeta.enCurso && (
+            <span className={cn("mt-1 block text-xs leading-tight", oscura ? "text-gray-300" : "text-gray-500")}>
+              <span className="uppercase">{tarjeta.enCurso.etiqueta} en curso</span>{" "}
+              <span className="font-mono tabular-nums">{tarjeta.enCurso.valor}</span>
+              {tarjeta.enCurso.dc && (
+                <span className={cn("ml-1", tono(tarjeta.enCurso.dc))}>{tarjeta.enCurso.dc.texto}</span>
+              )}
+            </span>
+          )}
+        </span>
+        <span className="shrink-0 text-right">
+          <span
+            className={cn(
+              "block font-mono text-[15px] font-semibold tabular-nums",
+              oscura ? "text-white" : "text-gray-950",
+            )}
+          >
+            {tarjeta.resumen.valor}
+          </span>
+          {tarjeta.resumen.dc && (
+            <span className={cn("block text-xs", tono(tarjeta.resumen.dc))}>
+              {tarjeta.resumen.dc.texto}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform",
+            abierta && "rotate-180",
+            oscura ? "text-gray-500" : "text-gray-400",
+          )}
+          aria-hidden
+        />
+      </button>
+
+      {abierta && (
+        <div className={cn("border-t", oscura ? "border-gray-700" : "border-gray-100")}>
+          <ul>
+            {tarjeta.renglones.map(r => (
+              <li key={r.foco}>
+                {filaDetalle?.focoCelda === r.foco ? (
+                  <FilaDetalleBloque detalle={filaDetalle} onClose={onCerrarFila} oscura={oscura} />
+                ) : (
+                  <RenglonPeriodo
+                    renglon={r}
+                    filaId={tarjeta.id}
+                    oscura={oscura}
+                    onAbrirFila={onAbrirFila}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+          {tarjeta.abrirPanel && (
+            <button
+              type="button"
+              onClick={tarjeta.abrirPanel}
+              className="flex min-h-[44px] w-full items-center justify-between gap-2 border-t border-gray-100 px-3 text-left text-xs font-medium text-blue-600 active:bg-gray-50"
+            >
+              Ver mes por mes de otros años
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+            </button>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function RenglonPeriodo({
+  renglon,
+  filaId,
+  oscura,
+  onAbrirFila,
+}: {
+  renglon: Renglon;
+  filaId: string;
+  oscura: boolean;
+  onAbrirFila: AbrirFila;
+}) {
+  const claseBase = cn(
+    // 44 px de alto: es un blanco táctil, no un renglón de tabla.
+    "flex min-h-[44px] w-full items-center gap-2 px-3 py-2",
+    renglon.fuerte && (oscura ? "border-t border-gray-700" : "border-t border-gray-100"),
+    renglon.enCurso && (oscura ? "bg-[rgba(15,118,110,0.22)]" : "bg-[rgba(15,118,110,0.06)]"),
+  );
+
+  const etiqueta = (
+    <span
+      className={cn(
+        "shrink-0 text-xs uppercase tracking-wide",
+        renglon.fuerte ? "font-semibold" : "font-medium",
+        oscura ? "text-gray-300" : renglon.enCurso ? "text-teal-800" : "text-gray-500",
+      )}
+    >
+      {renglon.etiqueta}
+    </span>
+  );
+
+  const cifras = (
+    <span className="ml-auto flex items-baseline gap-2">
+      <span
+        className={cn(
+          "font-mono text-xs tabular-nums",
+          renglon.fuerte && "font-semibold",
+          renglon.valor === "—"
+            ? oscura ? "text-gray-500" : "text-gray-300"
+            : oscura ? "text-white" : "text-gray-950",
+        )}
+      >
+        {renglon.valor}
+      </span>
+      {/* Ancho fijo para que los % queden en columna y se puedan comparar de un
+          barrido vertical, que es lo que el heatmap hacía en horizontal. */}
+      <span
+        className={cn(
+          "w-[54px] shrink-0 text-right text-xs",
+          renglon.dc ? (oscura ? toneDeltaOscuro(renglon.dc.tone) : toneDeltaClaro(renglon.dc.tone)) : "text-transparent",
+        )}
+      >
+        {renglon.dc ? renglon.dc.texto : ""}
+      </span>
+    </span>
+  );
+
+  if (!renglon.detalle) {
     return (
-      <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-300", bgCls)}>
-        —
-      </td>
+      <div className={claseBase}>
+        {etiqueta}
+        {cifras}
+      </div>
     );
   }
 
-  // Monto arriba, % del cambio vs el mismo mes del año anterior abajo (más
-  // chico). Área táctil de 44px de alto para el pulgar.
-  const dc = deltaCelda(delta, mode, isNaComparison(cell, mode));
-  const foco = celdaKey("m", filaId, columna);
+  const detalle = renglon.detalle;
   return (
-    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
-      <button
-        type="button"
-        data-celda={foco}
-        onClick={(e) => onAbrir({
-          filaId,
-          focoCelda: foco,
-          titulo,
-          subtitulo: cortoLabel,
-          // Sin montos del año previo: en 390 px no entran los 3 datos con el
-          // nombre y la ×. El Δ ya dice el cambio.
-          slots: buildSlotsMetrica(cell, mode, false),
-          ...medirFila(e),
-        })}
-        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2 py-2.5 text-right leading-tight active:bg-gray-100"
-      >
-        <span className="text-xs text-gray-600">{renderCellValue(cur, mode)}</span>
-        {dc && <span className={cn("text-[10px]", toneDeltaClaro(dc.tone))}>{dc.texto}</span>}
-      </button>
-    </td>
-  );
-}
-
-function MobileTotalCell({
-  ventas, prev, mode, margenPct, margenPctPrev, cell, filaId, titulo, selectedYear, onAbrir,
-}: {
-  ventas: number;
-  prev: number;
-  mode: ViewMode;
-  margenPct: number;
-  margenPctPrev: number;
-  cell: CellData;
-  filaId: string;
-  titulo: string;
-  selectedYear: number;
-  onAbrir: AbrirFila;
-}) {
-  let cur: number;
-  let delta: number | null;
-  let display: string;
-  if (mode === "margen") {
-    cur = margenPct;
-    delta = margenPctPrev > 0 ? margenPct - margenPctPrev : null;
-    display = (cur * 100).toFixed(1) + "%";
-  } else {
-    cur = ventas;
-    delta = variacionPct(ventas, prev);
-    display = formatCompactCurrency(cur);
-  }
-  const dc = deltaCelda(delta, mode, delta == null);
-  const foco = celdaKey("m", filaId, "total");
-  return (
-    <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums text-gray-950">
-      <button
-        type="button"
-        data-celda={foco}
-        onClick={(e) => onAbrir({
-          filaId,
-          focoCelda: foco,
-          titulo,
-          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`,
-          slots: buildSlotsMetrica(cell, mode, false),
-          ...medirFila(e),
-        })}
-        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2.5 py-2.5 text-right leading-tight active:bg-gray-100"
-      >
-        <span className="text-xs font-semibold">{display}</span>
-        {dc && <span className={cn("text-[10px] font-normal", toneDeltaClaro(dc.tone))}>{dc.texto}</span>}
-      </button>
-    </td>
-  );
-}
-
-/**
- * Proyección de cierre por empresa. Antes era un `<td>` mudo: el número estaba
- * pero no había forma de saber de dónde salía en celular. Ahora abre la fila
- * transformada con la explicación en castellano llano, igual que el escritorio.
- */
-function MobileProyCell({
-  proyeccion, prevYear, fechaCorte, filaId, titulo, onAbrir,
-}: {
-  proyeccion: ProyeccionEmpresa | null;
-  prevYear: number;
-  fechaCorte: string | null;
-  filaId: string;
-  titulo: string;
-  onAbrir: AbrirFila;
-}) {
-  if (!proyeccion) {
-    return (
-      <td className="border-l border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums text-gray-300">
-        —
-      </td>
-    );
-  }
-  const foco = celdaKey("m", filaId, "proy");
-  return (
-    <td className="border-l border-gray-200 p-0 text-right font-mono tabular-nums">
-      <button
-        type="button"
-        data-celda={foco}
-        onClick={(e) => onAbrir({
-          filaId,
-          focoCelda: foco,
-          titulo,
-          subtitulo: explicacionProyeccion(proyeccion, prevYear, { fechaCorte, corto: true }),
-          slots: buildSlotsProyeccion(proyeccion, prevYear, { fechaCorte, compacto: true }),
-          ...medirFila(e),
-        })}
-        className="flex min-h-[44px] w-full items-center justify-end px-2.5 py-3 text-right text-xs font-semibold text-teal-700 active:bg-gray-100"
-      >
-        {formatCompactCurrency(proyeccion.proyeccion_cierre)}
-      </button>
-    </td>
-  );
-}
-
-function MobileTotalGrupoCell({
-  cell, mode, highlighted, columna, periodLabel, cortoLabel, onAbrir,
-}: {
-  cell: CellData;
-  mode: ViewMode;
-  highlighted: boolean;
-  columna: string;
-  periodLabel: string;
-  cortoLabel: string;
-  onAbrir: AbrirFila;
-}) {
-  const cur = cellValue(cell, mode);
-  const delta = cellDelta(cell, mode);
-  const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
-
-  if (cur == null) {
-    return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-gray-500", bgCls)}>—</td>;
-  }
-
-  const dc = deltaCelda(delta, mode, isNaComparison(cell, mode));
-  const foco = celdaKey("m", TOTAL_GRUPO_ID, columna);
-  return (
-    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
-      <button
-        type="button"
-        data-celda={foco}
-        aria-label={`Total grupo ${periodLabel}`}
-        onClick={(e) => onAbrir({
-          filaId: TOTAL_GRUPO_ID,
-          focoCelda: foco,
-          titulo: "Total grupo",
-          subtitulo: cortoLabel,
-          slots: buildSlotsMetrica(cell, mode, false),
-          ...medirFila(e),
-        })}
-        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2 py-2.5 text-right leading-tight active:bg-white/10"
-      >
-        <span className="text-xs font-medium text-white">{renderCellValue(cur, mode)}</span>
-        {dc && <span className={cn("text-[10px] font-normal", toneDeltaOscuro(dc.tone))}>{dc.texto}</span>}
-      </button>
-    </td>
-  );
-}
-
-function MobileTotalGrupoYtdCell({
-  cur, prev, curUtil, prevUtil, mode, data, selectedYear, onAbrir,
-}: {
-  cur: number;
-  prev: number;
-  curUtil: number;
-  prevUtil: number;
-  mode: ViewMode;
-  data: VentasResumen;
-  selectedYear: number;
-  onAbrir: AbrirFila;
-}) {
-  let v: number;
-  let d: number | null;
-  let display: string;
-  if (mode === "margen") {
-    v = data.kpis.margenYTD;
-    d = data.kpis.margen2025YTD > 0 ? v - data.kpis.margen2025YTD : null;
-    display = (v * 100).toFixed(1) + "%";
-  } else if (mode === "utilidad") {
-    v = curUtil;
-    d = variacionPct(curUtil, prevUtil);
-    display = formatCompactCurrency(v);
-  } else {
-    v = cur;
-    d = variacionPct(cur, prev);
-    display = formatCompactCurrency(v);
-  }
-  const dc = deltaCelda(d, mode, d == null);
-  const ytdCell: CellData = { ventas: cur, ventasPrev: prev, utilidad: curUtil, utilidadPrev: prevUtil };
-  const foco = celdaKey("m", TOTAL_GRUPO_ID, "total");
-  return (
-    <td className="border-l border-gray-700 p-0 text-right font-mono tabular-nums text-white">
-      <button
-        type="button"
-        data-celda={foco}
-        onClick={(e) => onAbrir({
-          filaId: TOTAL_GRUPO_ID,
-          focoCelda: foco,
-          titulo: "Total grupo",
-          subtitulo: `TOTAL ${String(selectedYear).slice(-2)} vs ${String(selectedYear - 1).slice(-2)}`,
-          slots: buildSlotsMetrica(ytdCell, mode, false),
-          ...medirFila(e),
-        })}
-        className="flex min-h-[44px] w-full flex-col items-end justify-center gap-0.5 px-2.5 py-2.5 text-right leading-tight active:bg-white/10"
-      >
-        <span className="text-xs font-semibold">{display}</span>
-        {dc && <span className={cn("text-[10px] font-normal", toneDeltaOscuro(dc.tone))}>{dc.texto}</span>}
-      </button>
-    </td>
-  );
-}
-
-function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
-  return (
-    <td className="border-l border-gray-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-200">
-      {formatCompactCurrency(proyeccion.totales_grupo.proyeccion_cierre)}
-    </td>
+    <button
+      type="button"
+      data-celda={renglon.foco}
+      onClick={(e) => onAbrirFila({
+        filaId,
+        focoCelda: renglon.foco,
+        titulo: detalle.titulo,
+        subtitulo: detalle.subtitulo,
+        slots: detalle.slots,
+        ...medirRenglon(e),
+      })}
+      className={cn(claseBase, oscura ? "active:bg-white/10" : "active:bg-gray-100")}
+    >
+      {etiqueta}
+      {cifras}
+    </button>
   );
 }
 
