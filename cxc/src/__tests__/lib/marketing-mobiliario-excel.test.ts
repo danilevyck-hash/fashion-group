@@ -92,21 +92,23 @@ describe("mobiliario en la hoja de detalle", () => {
     ).Sheets["Hanna Calzados"];
     // r0 GASTOS, r1 "Ver todas las facturas", r2 headers, r3 factura, r4 mueble.
     expect(cell(ws, "F5").v).toBe("ME-AD3C1932");
-    expect(cell(ws, "L5").v).toBe("Ver comprobante");
-    expect(cell(ws, "L5").l?.Target).toBe(LINK_COMPROBANTE);
+    // Sin la columna "Total", el link de comprobante vive en K (antes L).
+    expect(cell(ws, "K5").v).toBe("Ver comprobante");
+    expect(cell(ws, "K5").l?.Target).toBe(LINK_COMPROBANTE);
     // La factura de proveedor conserva su propia etiqueta.
-    expect(cell(ws, "L4").v).toBe("Ver factura");
+    expect(cell(ws, "K4").v).toBe("Ver factura");
   });
 
-  it("el mueble no lleva ITBMS: Subtotal === Total en su fila", () => {
+  it("la única columna de dinero es el Subtotal: el mueble entra por su monto", () => {
+    // Ya no hay columna "Total" con ITBMS (*"dame subtotal solamente, no total"*),
+    // así que el mueble aporta su monto y la factura su subtotal, no su total.
     const ws = buildResumenGastosWorkbook(
       cliente([facturaNormal, muebleConComprobante]),
     ).Sheets["Hanna Calzados"];
-    expect(cell(ws, "J5").v).toBe(2695); // Subtotal (sin ITBMS)
-    expect(cell(ws, "K5").v).toBe(2695); // Total
-    // La factura sí tiene diferencia (ITBMS).
-    expect(cell(ws, "J4").v).toBe(66.6);
-    expect(cell(ws, "K4").v).toBe(71.26);
+    expect(cell(ws, "J3").v).toBe("Subtotal (sin ITBMS)");
+    expect(cell(ws, "K3").v).toBe("Comprobante");
+    expect(cell(ws, "J5").v).toBe(2695); // el mueble no lleva ITBMS
+    expect(cell(ws, "J4").v).toBe(66.6); // la factura, SIN su ITBMS (71.26)
   });
 
   it("SIN comprobante: la fila SIGUE con su monto (no desaparece)", () => {
@@ -114,10 +116,10 @@ describe("mobiliario en la hoja de detalle", () => {
       cliente([facturaNormal, muebleSinComprobante]),
     ).Sheets["Hanna Calzados"];
     expect(cell(ws, "F5").v).toBe("—"); // número vacío se muestra como guion
-    expect(cell(ws, "L5").v).toBe("—"); // sin link
-    expect(cell(ws, "K5").v).toBe(2695); // el monto sigue ahí
+    expect(cell(ws, "K5").v).toBe("—"); // sin link
+    expect(cell(ws, "J5").v).toBe(2695); // el monto sigue ahí
     expect(cell(ws, "F6").v).toBe("TOTALES");
-    expect(cell(ws, "K6").v).toBe(2766.26); // 71.26 + 2695
+    expect(cell(ws, "J6").v).toBe(2761.6); // 66.60 + 2695, subtotales
   });
 
   it("un cliente con SOLO mobiliario igual tiene su hoja y su total", () => {
@@ -125,8 +127,8 @@ describe("mobiliario en la hoja de detalle", () => {
     expect(wb.SheetNames).toContain("Hanna Calzados");
     const res = wb.Sheets["Resumen"];
     expect(cell(res, "E2").v).toBe(2695); // Calvin Klein
-    expect(cell(res, "H2").v).toBe(2695); // Subtotal
-    expect(cell(res, "I2").v).toBe(2695); // Total
+    expect(cell(res, "H2").v).toBe(2695); // Subtotal (última columna de dinero)
+    expect(res["I2"]).toBeUndefined(); // ya no hay columna "Total"
   });
 
   it("'Ver todas las facturas (N)' NO cuenta los comprobantes de mobiliario", () => {
@@ -138,17 +140,11 @@ describe("mobiliario en la hoja de detalle", () => {
     expect(cell(ws, "A2").v).toBe("Ver todas las facturas (1)");
   });
 
-  it("la hoja 'Cómo leer esto' explica por qué el mobiliario no tiene factura", () => {
-    const ws = buildResumenGastosWorkbook(cliente([muebleConComprobante])).Sheets[
-      "Cómo leer esto"
-    ];
-    const texto = Object.keys(ws)
-      .filter((k) => !k.startsWith("!"))
-      .map((k) => String(cell(ws, k).v ?? ""))
-      .join(" | ");
-    expect(texto).toContain("Entregas de mobiliario");
-    expect(texto).toContain("no hay un tercero que nos cobre");
-    expect(texto).toContain("comprobante de entrega");
+  it("el Excel no trae hoja de ayuda: son números y nada más", () => {
+    // El documento que Daniel pedía era el COMPROBANTE de mobiliario (que lista
+    // los muebles de la entrega), no una hoja que explique el archivo.
+    const wb = buildResumenGastosWorkbook(cliente([muebleConComprobante]));
+    expect(wb.SheetNames).not.toContain("Cómo leer esto");
   });
 });
 

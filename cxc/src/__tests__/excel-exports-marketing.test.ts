@@ -124,13 +124,9 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
 
   it("conserva estructura de hojas: Resumen + 1 pestaña por cliente", () => {
     const wb = roundTrip(buildResumenGastosWorkbook(clientes));
-    // "Cómo leer esto" se agregó como PRIMERA hoja (documento explicativo).
-    expect(wb.SheetNames).toEqual([
-      "Cómo leer esto",
-      "Resumen",
-      "Cliente Uno",
-      "Sin cliente",
-    ]);
+    // SIN hoja "Cómo leer esto": el Excel son números y nada más. El documento
+    // que Daniel pedía era el comprobante de mobiliario, no una hoja de ayuda.
+    expect(wb.SheetNames).toEqual(["Resumen", "Cliente Uno", "Sin cliente"]);
   });
 
   it("Resumen: mismas columnas, moneda numérica y fila TOTAL", () => {
@@ -138,31 +134,34 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     const ws = wb.Sheets["Resumen"];
     expect(cell(ws, "A1").v).toBe("Cliente");
     expect(cell(ws, "B1").v).toBe("Marcas");
-    // Columnas nuevas: Calvin / Tommy / Otras / Subtotal antes del Total.
+    // Calvin / Tommy / Otras / Subtotal, y ahí se acaba: NO hay columna "Total"
+    // con ITBMS (pedido de Daniel: *"dame subtotal solamente, no total"*).
     expect(cell(ws, "E1").v).toBe("Calvin Klein");
     expect(cell(ws, "F1").v).toBe("Tommy Hilfiger");
     expect(cell(ws, "G1").v).toBe("Otras marcas");
     expect(cell(ws, "H1").v).toBe("Subtotal (sin ITBMS)");
-    expect(cell(ws, "I1").v).toBe("Total");
-    // Total de Cliente Uno = 150, numérico (no string "$150.00").
-    expect(cell(ws, "I2").t).toBe("n");
-    expect(cell(ws, "I2").v).toBe(150);
-    // Fila TOTAL al pie.
+    expect(ws["I1"]).toBeUndefined();
+    // Subtotal de Cliente Uno = 93.46 + 50, numérico (no string "$143.46").
+    expect(cell(ws, "H2").t).toBe("n");
+    expect(cell(ws, "H2").v).toBe(143.46);
+    // Fila TOTAL al pie: suma subtotales, no totales con ITBMS.
     expect(cell(ws, "A4").v).toBe("TOTAL");
-    expect(cell(ws, "I4").v).toBe(150);
+    expect(cell(ws, "H4").v).toBe(143.46);
+    expect(ws["I4"]).toBeUndefined();
   });
 
   it("pestaña de cliente: link al PDF de la factura intacto (.l.Target)", () => {
     const wb = roundTrip(buildResumenGastosWorkbook(clientes));
     const ws = wb.Sheets["Cliente Uno"];
     // Layout: r0 GASTOS, r1 "Ver todas las facturas", r2 headers, r3.. gastos.
-    // Col B = "Período" (período trabajado); corre Total a F→G y el link a G→H.
     expect(cell(ws, "A3").v).toBe("Fecha");
     expect(cell(ws, "B3").v).toBe("Período");
-    // Las 4 columnas nuevas corren Total a K y el link a L.
-    expect(cell(ws, "L4").l?.Target).toBe("https://example.com/f1.pdf");
-    expect(cell(ws, "K4").t).toBe("n");
-    expect(cell(ws, "K4").v).toBe(100);
+    // Sin la columna "Total", el Subtotal queda en J y el link en K.
+    expect(cell(ws, "J3").v).toBe("Subtotal (sin ITBMS)");
+    expect(cell(ws, "K3").v).toBe("Comprobante");
+    expect(cell(ws, "K4").l?.Target).toBe("https://example.com/f1.pdf");
+    expect(cell(ws, "J4").t).toBe("n");
+    expect(cell(ws, "J4").v).toBe(93.46);
     // Con código de cliente hay link de galería (1 por cliente), no por foto.
     expect(tieneLink(ws, "https://example.com/foto1.jpg")).toBe(false);
   });
@@ -178,7 +177,7 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     expect(a1.s?.fill?.fgColor?.rgb).toBe(CASA_PALETTE.pri);
     expect(a1.s?.font?.name).toBe("Calibri");
     // Link azul 1155CC conservado en la pestaña del cliente.
-    const l4 = cell(wb.Sheets["Cliente Uno"], "L4");
+    const l4 = cell(wb.Sheets["Cliente Uno"], "K4");
     expect(l4.s?.font?.color?.rgb).toBe("1155CC");
   });
 
@@ -192,9 +191,9 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
   it("el Subtotal sigue cuadrando con la columna corrida", () => {
     const wb = roundTrip(buildResumenGastosWorkbook(clientes));
     const ws = wb.Sheets["Cliente Uno"];
-    // r3/r4 gastos (100 + 50), r5 = fila de totales.
+    // r3/r4 gastos (93.46 + 50), r5 = fila de totales.
     expect(cell(ws, "F6").v).toBe("TOTALES");
-    expect(cell(ws, "K6").v).toBe(150);
+    expect(cell(ws, "J6").v).toBe(143.46);
   });
 });
 
