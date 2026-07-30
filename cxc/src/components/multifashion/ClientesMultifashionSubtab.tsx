@@ -304,8 +304,12 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, ventanaAcotada =
                   key={opt.value}
                   type="button"
                   onClick={() => setRango(opt.value)}
+                  // 44 px de alto: la regla de la casa. Medían 26 y salió en la
+                  // verificación del 30-jul-2026. El `-my-1.5` le devuelve al
+                  // contenedor el aire que suma el área de tap, así que crecer no
+                  // separa el filtro del título.
                   className={cn(
-                    "rounded px-2.5 py-1 text-xs font-medium transition",
+                    "-my-1.5 inline-flex min-h-[44px] items-center rounded px-2.5 text-xs font-medium transition",
                     rango === opt.value
                       ? "bg-white text-gray-900 shadow-sm"
                       : "text-gray-500 hover:text-gray-800",
@@ -356,8 +360,10 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, ventanaAcotada =
                     key={opt.value}
                     type="button"
                     onClick={() => setSeg(opt.value)}
+                    // 44 px, igual que las píldoras de período de arriba. Medían
+                    // 28 y son el filtro principal de la tabla de identificados.
                     className={cn(
-                      "rounded-full border px-3 py-1 text-xs font-medium transition",
+                      "inline-flex min-h-[44px] items-center rounded-full border px-3 text-xs font-medium transition",
                       seg === opt.value
                         ? "border-teal-700 bg-teal-700 text-white"
                         : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900",
