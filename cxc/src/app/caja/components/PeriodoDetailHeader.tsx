@@ -267,7 +267,7 @@ export default function PeriodoDetailHeader({
             {onPrint && (
               <button
                 onClick={onPrint}
-                className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-colors"
                 style={{
                   background: "#fff",
                   color: "var(--caja-fg-default)",
@@ -282,7 +282,7 @@ export default function PeriodoDetailHeader({
             {isOpen && onClosePeriodo && (
               <button
                 onClick={onClosePeriodo}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97]"
                 style={{ background: "var(--caja-stone-950)", color: "#fff" }}
               >
                 <CheckIcon />

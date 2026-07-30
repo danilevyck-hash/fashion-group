@@ -350,7 +350,7 @@ function NuevoGastoPage() {
               <div className="flex gap-2">
                 <button
                   onClick={backToDetail}
-                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-colors"
+                  className="inline-flex items-center justify-center text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-colors"
                   style={{
                     background: "#fff",
                     color: "var(--caja-fg-default)",
@@ -364,7 +364,7 @@ function NuevoGastoPage() {
                 <button
                   onClick={() => save({ andNew: true })}
                   disabled={!canSave}
-                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-colors disabled:opacity-40"
+                  className="inline-flex items-center justify-center text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-colors disabled:opacity-40"
                   style={{
                     background: "#fff",
                     color: "var(--caja-fg-default)",
@@ -380,7 +380,7 @@ function NuevoGastoPage() {
                 <button
                   onClick={() => save({ andNew: false })}
                   disabled={!canSave}
-                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
+                  className="inline-flex items-center justify-center text-sm font-medium px-3.5 min-h-[44px] rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
                   style={{ background: "var(--caja-accent)", color: "#fff" }}
                 >
                   {addingGasto ? "Guardando..." : "Guardar gasto"}
