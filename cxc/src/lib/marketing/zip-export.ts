@@ -1,9 +1,9 @@
 // ============================================================================
 // Marketing — Export ZIP "todo en uno" (server-side).
 //
-//   resumen_gastos.xlsx                          (hoja "Cómo leer esto" + hoja
-//                                                 Resumen + 1 hoja por cliente,
-//                                                 con hyperlinks a cada PDF/foto)
+//   resumen_gastos.xlsx                          (hoja Resumen + 1 hoja por
+//                                                 cliente, con hyperlinks a
+//                                                 cada PDF/foto)
 //   <Cliente>/
 //       facturas/<fecha · concepto>.pdf          (pdf_factura del gasto)
 //       fotos/<archivo>.jpg                      (foto_proyecto, comprimidas)
@@ -877,112 +877,17 @@ const sumSubtotales = (gastos: ReadonlyArray<GastoXlsx>): number =>
 const splitDeGastos = (gastos: ReadonlyArray<GastoXlsx>): SplitMarcas =>
   sumarSplits(gastos.map((g) => splitMarcas(Number(g.subtotal) || 0, g.partes ?? [])));
 
-// ⚠️ SIN nota al pie sobre el ITBMS en las hojas de datos. Daniel, textual:
-// *"Excel de Marketing → gastos sin ITBMS, SIN nota al pie"* — ya sabe que los
-// gastos van sin impuesto y no quiere que el archivo se lo explique fila por
-// fila. La explicación del criterio vive UNA vez, en la hoja "Cómo leer esto",
-// que es el documento que pidió aparte. No reintroducir el pie de página.
-
-/**
- * Hoja "Cómo leer esto" — la explicación que pidió Daniel: qué agrupa cada
- * categoría de Marketing y cómo está vinculado, en español simple.
- *
- * Es una HOJA y no un archivo aparte del ZIP a propósito (ver el llamador). Se
- * construye con los datos REALES del export (cuántos clientes, cuánto suma cada
- * fuente de gasto) para que no sea un texto genérico que envejece: si mañana
- * hay más gastos de mobiliario, la hoja lo dice sola.
- */
-function buildHojaComoLeer(
-  clientes: ReadonlyArray<ClienteResumenXlsx>,
-): XLSX.WorkSheet {
-  const { hdr, td, band, fillRow } = makeCellStyles(CASA_PALETTE);
-  const todos = clientes.flatMap((c) => c.gastos);
-  const esMueble = (g: GastoXlsx) => g.proveedor === "Mobiliario";
-  const impuls = clientes.filter((c) => c.esImpulsadoras).flatMap((c) => c.gastos);
-  const muebles = todos.filter(esMueble);
-  const facturas = todos.filter((g) => !esMueble(g) && !impuls.includes(g));
-  const mf = clientes.filter((c) => c.esMultifashion);
-  const money = (n: number) =>
-    `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  const sub = (gs: ReadonlyArray<GastoXlsx>) => money(sumSubtotales(gs));
-  /** "3 facturas · $500.00" / "1 factura · $10.00" / "ninguna en este archivo". */
-  const cuenta = (
-    gs: ReadonlyArray<GastoXlsx>,
-    singular: string,
-    plural: string,
-  ): string =>
-    gs.length === 0
-      ? `En este archivo no hay ${plural}.`
-      : `En este archivo: ${gs.length} ${gs.length === 1 ? singular : plural}, ${sub(gs)} sin ITBMS.`;
-
-  // [título de sección | texto]. Título vacío = línea de continuación.
-  const filas: Array<[string, string]> = [
-    ["Qué es este archivo", "El archivo de GASTOS de Marketing: todo lo que Fashion Group gastó en las tiendas (letreros, instalación, muebles, impulsadoras). No es un archivo de ventas ni de cobros."],
-    ["", "Los gastos y proyectos ANULADOS no aparecen: ni acá, ni en el ZIP, ni en los totales."],
-    ["Las 3 cosas que se juntan acá", ""],
-    ["1) Facturas de proveedor", `Lo que factura un tercero (Impresora Comercial, Impreco, A.g. Display…) por un trabajo en una tienda. Va colgada de un PROYECTO, y el proyecto está colgado de un CLIENTE del directorio (el código D-XXX). Cada factura tiene su PDF: se abre con el link de la columna "Comprobante" y también viene dentro del ZIP, en <Cliente>/facturas/.  ${cuenta(facturas, "factura de proveedor", "facturas de proveedor")}`],
-    ["2) Entregas de mobiliario", `Muebles nuestros (paneles, tablas, barras, colgadores) que salen del inventario y se entregan a una tienda. NO son una factura de proveedor: no hay un tercero que nos cobre, así que no existe una factura que abrir. En su lugar el sistema GENERA un comprobante de entrega (N° ME-XXXXXXXX) con el detalle de los muebles, la cantidad, el precio y las firmas — se abre con el mismo link "Ver comprobante" y también está en el ZIP junto a las facturas.  ${cuenta(muebles, "entrega de muebles", "entregas de muebles")}`],
-    ["", "El comprobante sale con el bloque de firmas EN BLANCO porque el sistema todavía no guarda quién entregó ni quién recibió: se imprime y se firma."],
-    ["3) Pagos de impulsadoras", `El pago de una impulsadora por un período trabajado (una quincena o un mes). No pertenece a ninguna tienda, así que va en su propia pestaña "Impulsadoras" y no en la de un cliente. La columna "Período" dice qué días cubre el pago.  ${cuenta(impuls, "pago de impulsadora", "pagos de impulsadora")}`],
-    ["Cómo está armado", ""],
-    ["Hoja Resumen", `Una fila por cliente: cuántos gastos y fotos tiene y cuánto suma. Es la vista de pájaro.  En este archivo hay ${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}.`],
-    ["Una hoja por cliente", "El detalle: cada gasto en su fila, con su link al PDF, y abajo las fotos del proyecto."],
-    ["Carpetas del ZIP", "Cada cliente tiene su carpeta con dos subcarpetas: facturas/ (los PDF y los comprobantes de mobiliario) y fotos/ (las fotos de los proyectos, comprimidas). Los proyectos sin cliente del directorio caen en \"Sin cliente\"."],
-    ["Multifashion va aparte", mf.length > 0
-      ? `Multifashion es una tienda del propio grupo, no una marca con la que compartimos el gasto. Por eso tiene su bloque propio al final de la hoja Resumen, su carpeta "${MULTIFASHION_LABEL}/" en el ZIP y su propio total: no se mezcla con el TOTAL GRUPO. El GRAN TOTAL de abajo suma las dos cosas.  ${cuenta(mf.flatMap((c) => c.gastos), "gasto", "gastos")}`
-      : `Multifashion es una tienda del propio grupo y se lleva aparte (bloque propio, carpeta propia y card propio en la pantalla). En este archivo no hay gastos de Multifashion.`],
-    ["Las columnas de dinero", ""],
-    [COL_CALVIN, "La parte del gasto que le toca a Calvin Klein, SIN ITBMS."],
-    [COL_TOMMY, "La parte del gasto que le toca a Tommy Hilfiger, SIN ITBMS."],
-    [COL_OTRAS, "Todo lo demás: Reebok, French Connection, Joybees, Otros, o un gasto que todavía no tiene marca asignada. SIN ITBMS."],
-    [COL_SUBTOTAL, "El gasto sin ITBMS. Siempre da Calvin + Tommy + Otras marcas — las tres columnas cuadran con esta."],
-    ["Total", "El gasto CON ITBMS: lo que efectivamente se pagó. La diferencia con el Subtotal es el impuesto."],
-    ["", "Criterio de la casa: ventas y gastos SIN ITBMS, saldos CON ITBMS. Marketing son gastos, así que las columnas de marca y el Subtotal van sin impuesto."],
-    ["El mobiliario no lleva ITBMS", "En las filas de \"Mobiliario\" el Subtotal y el Total son el mismo número: son muebles nuestros, no una compra con impuesto."],
-    ["Un gasto de 2 marcas", "Si un gasto está repartido entre dos marcas, cada columna recibe su parte según el % guardado. La fila sigue sumando una sola vez en el Subtotal."],
-    ["Si algo no cuadra", "Los montos de este archivo salen tal cual de la pantalla de Marketing. Si un número no coincide con lo que ves ahí, es que el gasto se editó o se anuló después de generar el archivo: bajalo de nuevo."],
-  ];
-
-  const ws: XLSX.WorkSheet = {};
-  const merges: XLSX.Range[] = [];
-  const heights: number[] = [];
-  const lastCol = 1;
-  let r = 0;
-  band(ws, r, lastCol, merges, "FASHION GROUP — Marketing: cómo leer este archivo", CASA_PALETTE.pri, 14);
-  heights[r] = 30; r++;
-  band(ws, r, lastCol, merges, "Gastos de marketing en tiendas · generado el " + new Date().toISOString().slice(0, 10), CASA_PALETTE.mid, 10);
-  heights[r] = 20; r++;
-  fillRow(ws, r, lastCol, CASA_PALETTE.sep);
-  merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } });
-  heights[r] = 4; r++;
-
-  for (const [titulo, texto] of filas) {
-    if (texto === "") {
-      // Encabezado de sección: banda MID mergeada, como en las otras hojas.
-      band(ws, r, lastCol, merges, titulo, CASA_PALETTE.mid, 11);
-      heights[r] = 22; r++;
-      continue;
-    }
-    ws[addr(r, 0)] = titulo
-      ? hdr(titulo, "left")
-      : td("", false);
-    ws[addr(r, 1)] = td(texto, r % 2 === 0, { sz: 10 });
-    // Alto estimado por largo del texto: sin esto las filas largas se cortan.
-    heights[r] = Math.max(18, Math.ceil(texto.length / 95) * 14);
-    (ws[addr(r, 1)] as { s: { alignment: Record<string, unknown> } }).s.alignment = {
-      horizontal: "left",
-      vertical: "top",
-      wrapText: true,
-    };
-    r++;
-  }
-
-  ws["!ref"] = `A1:${addr(r - 1, lastCol)}`;
-  ws["!merges"] = merges;
-  ws["!cols"] = [{ wch: 30 }, { wch: 110 }];
-  ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
-  return ws;
-}
+// ⚠️ NADA de explicaciones en el Excel: ni nota al pie sobre el ITBMS, ni hoja
+// "Cómo leer esto". Daniel, textual: *"Excel de Marketing → gastos sin ITBMS,
+// SIN nota al pie"*, y sobre la hoja explicativa: *"sobre el excel me referia a
+// — Que el comprobante de mobiliario liste qué muebles incluye la entrega"*. O
+// sea que el documento que pedía era el COMPROBANTE de mobiliario (ver
+// lib/marketing/pdf-entrega-mueble.ts), no una hoja que explique el archivo.
+// El Excel son números y nada más. No reintroducir ninguna de las dos.
+//
+// ⚠️ Y una SOLA columna de dinero por fila: el Subtotal (sin ITBMS). Textual:
+// *"dame subtotal solamente, no total"*. La columna "Total" (con ITBMS) se quitó
+// del Resumen y del detalle, y el GRAN TOTAL suma subtotales. No reponerla.
 
 export function buildResumenGastosWorkbook(
   clientes: ReadonlyArray<ClienteResumenXlsx>,
@@ -1012,14 +917,6 @@ export function buildResumenGastosWorkbook(
     if (cell) cell.z = z;
   };
 
-  // ── Hoja "Cómo leer esto" ──
-  // Va PRIMERA a propósito: es lo que Daniel pidió para entender qué agrupa cada
-  // categoría y cómo está vinculado. Se eligió una HOJA del Excel en vez de un
-  // archivo aparte en el ZIP porque el Excel es lo que él abre (un README.txt
-  // dentro de un ZIP no se abre nunca) y así la explicación viaja pegada a los
-  // números que explica: si manda el Excel por correo, la explicación va con él.
-  XLSX.utils.book_append_sheet(wb, buildHojaComoLeer(clientes), "Cómo leer esto");
-
   // ── Hoja "Resumen" (vista de pájaro) ──
   // Columna "Marcas" = siglas de las marcas que toca cada cliente (facturas +
   // muebles), igual que los chips de la pantalla. Las columnas Calvin Klein /
@@ -1033,10 +930,10 @@ export function buildResumenGastosWorkbook(
     COL_TOMMY,
     COL_OTRAS,
     COL_SUBTOTAL,
-    "Total",
   ];
   const C_RES_CK = 4;
-  const C_RES_TOTAL = 8;
+  /** Última columna de dinero (= Subtotal): todo lo de CK..acá va en $. */
+  const C_RES_SUBTOTAL = 7;
   const filaDeCliente = (c: ClienteResumenXlsx): (string | number)[] => {
     const s = splitDeGastos(c.gastos);
     return [
@@ -1048,7 +945,6 @@ export function buildResumenGastosWorkbook(
       s.th,
       s.otras,
       sumSubtotales(c.gastos),
-      sumGastos(c.gastos),
     ];
   };
 
@@ -1073,7 +969,6 @@ export function buildResumenGastosWorkbook(
       s.th,
       s.otras,
       sumSubtotales(todos),
-      Number(sumGastos(todos).toFixed(2)),
     ];
   };
 
@@ -1082,19 +977,17 @@ export function buildResumenGastosWorkbook(
   const impulsadoras = delGrupo.filter((c) => c.esImpulsadoras);
   const hayImpulsadoras = impulsadoras.length > 0;
   const vacias = (n: number) => Array.from({ length: n }, () => "" as string | number);
-  const filaMonto = (etiqueta: string, sub: number, tot: number): (string | number)[] => [
+  const filaMonto = (etiqueta: string, sub: number): (string | number)[] => [
     etiqueta,
     ...vacias(3),
     ...vacias(3),
     sub,
-    tot,
   ];
   const filasDesglose: (string | number)[][] = hayImpulsadoras
     ? [
         filaMonto(
           "Subtotal impulsadoras",
           sumSubtotales(impulsadoras.flatMap((c) => c.gastos)),
-          Number(impulsadoras.reduce((s, c) => s + sumGastos(c.gastos), 0).toFixed(2)),
         ),
         filaMonto(
           "Otros gastos",
@@ -1102,12 +995,6 @@ export function buildResumenGastosWorkbook(
             (
               sumSubtotales(delGrupo.flatMap((c) => c.gastos)) -
               sumSubtotales(impulsadoras.flatMap((c) => c.gastos))
-            ).toFixed(2),
-          ),
-          Number(
-            (
-              delGrupo.reduce((s, c) => s + sumGastos(c.gastos), 0) -
-              impulsadoras.reduce((s, c) => s + sumGastos(c.gastos), 0)
             ).toFixed(2),
           ),
         ),
@@ -1146,7 +1033,6 @@ export function buildResumenGastosWorkbook(
     { wch: 15 },
     { wch: 14 },
     { wch: 18 },
-    { wch: 15 },
   ];
   wsR["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
   // Índices de las filas especiales, para estilarlas sin adivinar.
@@ -1197,7 +1083,7 @@ export function buildResumenGastosWorkbook(
             : { font: fontBase, alignment: { horizontal: esTextoCol(c) ? "left" : "right" }, border: B },
       );
     }
-    for (let c = C_RES_CK; c <= C_RES_TOTAL; c++) fmtCell(wsR, r, c, MONEY_FMT);
+    for (let c = C_RES_CK; c <= C_RES_SUBTOTAL; c++) fmtCell(wsR, r, c, MONEY_FMT);
   }
   XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
 
@@ -1227,18 +1113,15 @@ export function buildResumenGastosWorkbook(
     COL_TOMMY,
     COL_OTRAS,
     COL_SUBTOTAL,
-    "Total",
     "Comprobante",
   ];
-  // Índices con nombre: las 4 columnas nuevas corren Total y el link a la
-  // derecha, y hay ~10 lugares que dependían del número crudo.
+  // Índices con nombre: hay ~10 lugares que dependían del número crudo.
   const C_CONCEPTO = 2;
   const C_CK = 6;
   const C_SUBTOTAL = 9;
-  const C_TOTAL = 10;
-  const C_LINK = 11;
+  const C_LINK = 10;
   /** Columnas de dinero de la hoja de detalle (todas van con formato moneda). */
-  const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_TOTAL;
+  const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_SUBTOTAL;
   for (const cli of clientes) {
     const codigo = cli.codigo;
     // Galería = 1 link por cliente (requiere código). "Sin cliente" / sin código
@@ -1278,7 +1161,6 @@ export function buildResumenGastosWorkbook(
         s.th,
         s.otras,
         Number(g.subtotal) || 0,
-        g.total,
         g.signed ? g.etiquetaLink || "Ver factura" : "—",
       ]);
     }
@@ -1298,7 +1180,6 @@ export function buildResumenGastosWorkbook(
       totalesCli.th,
       totalesCli.otras,
       sumSubtotales(cli.gastos),
-      sumGastos(cli.gastos),
       "",
     ]);
     const subtotalRow = aoa.length - 1;
@@ -1333,7 +1214,6 @@ export function buildResumenGastosWorkbook(
       { wch: 15 },
       { wch: 14 },
       { wch: 18 },
-      { wch: 14 },
       { wch: 16 },
     ];
 
@@ -1355,7 +1235,7 @@ export function buildResumenGastosWorkbook(
       }
     });
     if (cli.gastos.length > 0) {
-      for (let c = C_CK; c <= C_TOTAL; c++) {
+      for (let c = C_CK; c <= C_SUBTOTAL; c++) {
         const L = XLSX.utils.encode_col(c);
         setCell(ws, subtotalRow, c, {
           t: "n",
@@ -1392,7 +1272,7 @@ export function buildResumenGastosWorkbook(
       }
     }
     // Fila Subtotal en banda PRI (totales estilo de la casa).
-    for (let c = C_CK - 1; c <= C_TOTAL; c++) {
+    for (let c = C_CK - 1; c <= C_SUBTOTAL; c++) {
       styleCell(ws, subtotalRow, c, {
         font: headFont,
         fill: headFill,
