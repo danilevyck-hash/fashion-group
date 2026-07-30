@@ -31,6 +31,12 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 // llegado (los dos tabs se auto-fetchean después de hidratar). Un 0 sin filas es
 // "no medido". Acá se ESPERA a que aparezca contenido de verdad antes de medir.
 const PANTALLAS = [
+  // Resumen NO tiene `data-fila-*`: su forma angosta son tarjetas y la ancha una
+  // matriz, y ninguna de las dos quedó marcada cuando se separaron (#369). Se
+  // espera por lo que SÍ existe en las dos: `tbody tr` en la matriz y
+  // `[data-celda]` en las tarjetas. Sigue siendo un ancla estable del contenido,
+  // no una clase de breakpoint.
+  { id: "ventas-resumen", url: "/ventas?tab=resumen", listo: "table tbody tr, [data-celda]" },
   { id: "ventas-clientes", url: "/ventas?tab=clientes", listo: "table tbody tr, [data-fila-cliente]" },
   { id: "ventas-productos", url: "/ventas?tab=productos", listo: "table tbody tr, [data-fila-producto]" },
   { id: "ventas-utilidad", url: "/ventas?tab=utilidad", listo: "table tbody tr, [data-fila-utilidad]" },
@@ -111,7 +117,10 @@ const SONDA = `(() => {
     tablas: salida,
     crudos: crudos.slice(0, 8),
     // Control de vacío para las TARJETAS: un 0 sin tarjetas no prueba nada.
-    tarjetas: document.querySelectorAll("[data-fila-cliente], [data-fila-utilidad], [data-fila-semaforo], [data-fila-producto]").length,
+    // data-celda es el ancla de Resumen (la lleva IGUAL la celda de la matriz
+    // y el renglón de la tarjeta). Sin contarla, Resumen salía "0 filas" y su
+    // "no arrastra" no probaba nada.
+    tarjetas: document.querySelectorAll("[data-fila-cliente], [data-fila-utilidad], [data-fila-semaforo], [data-fila-producto], [data-celda]").length,
   };
 })()`;
 
