@@ -54,7 +54,7 @@ export interface UtilidadRow {
   pctUtilidad: number | null;
 }
 
-interface WebSession {
+export interface WebSession {
   empresaKey: string;
   baseUrl: string;
   cookies: Map<string, string>;
@@ -301,4 +301,160 @@ export async function fetchUtilidadMes(
   }
   const rows = Array.isArray(json?.data) ? json!.data : [];
   return (rows as Record<string, unknown>[]).map(mapRow);
+}
+
+// ─── Reporte de ANTIGÜEDAD (cartera completa de una empresa) ─────────────────
+//
+// Es el mismo reporte que Daniel baja a mano desde `Reportes → Estado de cuenta
+// → Antigüedad`. Descubierto en vivo el 30-jul-2026 contra el panel de Boston:
+//
+//   1. GET  /estadodecuenta            → HTML con `var token = '…'`.
+//      ⚠️ La ruta es `/estadodecuenta`, NO `/estadocuenta`: esta última no
+//      existe y devuelve la página de excepción de Switch con HTTP 200.
+//   2. POST /estadodecuenta/obtener    → JSON.
+//      Se llama en RONDAS: mientras responde `{response: true}` (y nada más),
+//      el servidor sigue acumulando y hay que volver a pedir con `key += chunk`.
+//      La ronda que responde `response: false` trae el reporte entero.
+//
+// ⚠️ Los filtros geográficos van en CADENA VACÍA, no en la palabra "null".
+// Con `pais: "null"` el endpoint responde 200 con `recordsTotal: 0` — o sea, una
+// cartera vacía perfectamente creíble. Es el modo de fallo más peligroso de este
+// reporte: no da error, da CERO. Por eso `syncCarteraWeb` se niega a escribir
+// (y sobre todo a reconciliar) cuando el reporte viene vacío.
+//
+// ⚠️ `fechaHasta` NO sirve para pedir un corte histórico de la antigüedad: con
+// una fecha anterior a hoy el endpoint devuelve los saldos a esa fecha pero SIN
+// `elements`, o sea sin un solo documento. La antigüedad es siempre "al día de
+// hoy" (verificado con 2026-06-30 y 2026-01-31: 0 documentos en ambas).
+
+/** Máximo de rondas del acumulador. 500 clientes por ronda; Boston tiene ~4.900
+ *  con ficha y 400 con saldo, así que 60 rondas (30.000) es techo de sobra y a
+ *  la vez frena un bucle infinito si el endpoint nunca dijera `response:false`. */
+const ANTIGUEDAD_MAX_RONDAS = 60;
+const ANTIGUEDAD_CHUNK = 500;
+
+export interface CarteraAntiguedad {
+  /** Clientes con su `elements[]` (los documentos abiertos). */
+  clientes: Record<string, unknown>[];
+  /** Totales por tramo que publica el propio Switch — la contraparte con la que
+   *  se cuadra lo que calculamos nosotros documento por documento. */
+  saldosTotales: Array<{ title: string; saldo: string | number }>;
+  saldoTotalGlobal: number;
+  recordsTotal: number;
+  fechaReporte: string | null;
+  /** Cuántas rondas hicieron falta (telemetría, para ver si el reporte crece). */
+  rondas: number;
+}
+
+/** Fecha de hoy en `YYYY-MM-DD`, que es el formato que usa la página
+ *  (`var today = '2026-07-30'`). */
+function hoyISO(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+/** Trae la cartera completa (todos los clientes con saldo y sus documentos). */
+export async function fetchCarteraAntiguedad(
+  session: WebSession,
+  now: Date = new Date(),
+): Promise<CarteraAntiguedad> {
+  const { empresaKey, baseUrl, cookies } = session;
+
+  const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}/estadodecuenta`, cookies, {
+    headers: { Accept: "text/html" },
+  });
+  if (pgRes.status !== 200) {
+    throw new SwitchWebError(empresaKey, "cartera-page", `/estadodecuenta devolvió ${pgRes.status}`);
+  }
+  const token = extractToken(pgHtml);
+  if (!token) {
+    throw new SwitchWebError(empresaKey, "cartera-token", "no se encontró el _token del reporte");
+  }
+
+  const fechaHasta = hoyISO(now);
+  let key = 0;
+  for (let ronda = 1; ronda <= ANTIGUEDAD_MAX_RONDAS; ronda++) {
+    const body = new URLSearchParams({
+      chunk: String(ANTIGUEDAD_CHUNK),
+      key: String(key),
+      sucursalId: "1",
+      saldomayora: "",
+      chkSaldo0: "false",
+      clientesInactivo: "false",
+      clientes: "[]",
+      vendedores: "[]",
+      fechaHasta,
+      // ⚠️ vacías, no "null" — ver el comentario de arriba.
+      pais: "",
+      provincia: "",
+      distrito: "",
+      corregimiento: "",
+      clienteindustria: "null",
+      clientezona: "null",
+      clientecategoria: "null",
+      clientetamano: "null",
+      crmleadreferencia: "null",
+      _token: token,
+    }).toString();
+
+    const { res, text } = await webFetch(`${baseUrl}/estadodecuenta/obtener`, cookies, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "application/json",
+        Origin: baseUrl,
+        Referer: `${baseUrl}/estadodecuenta`,
+      },
+    });
+
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      throw new SwitchWebError(
+        empresaKey,
+        "cartera-fetch",
+        `respuesta no-JSON en la ronda ${ronda} (status ${res.status})`,
+      );
+    }
+
+    // `response: true` = "seguí pidiendo": el servidor está acumulando.
+    if (json.response === true) {
+      key += ANTIGUEDAD_CHUNK;
+      continue;
+    }
+
+    return {
+      clientes: Array.isArray(json.data) ? (json.data as Record<string, unknown>[]) : [],
+      saldosTotales: Array.isArray(json.saldosTotales)
+        ? (json.saldosTotales as Array<{ title: string; saldo: string | number }>)
+        : [],
+      saldoTotalGlobal: Number(json.saldoTotalGlobal ?? 0),
+      recordsTotal: Number(json.recordsTotal ?? 0),
+      fechaReporte: typeof json.fechaReporte === "string" ? json.fechaReporte : null,
+      rondas: ronda,
+    };
+  }
+  throw new SwitchWebError(
+    empresaKey,
+    "cartera-fetch",
+    `el reporte no terminó en ${ANTIGUEDAD_MAX_RONDAS} rondas`,
+  );
+}
+
+/**
+ * Cierra la sesión web. El login usa `changesession=SI`, que EXPULSA a quien
+ * esté trabajando en el panel de esa empresa; dejar la sesión abierta alarga ese
+ * despojo sin necesidad. Best-effort: nunca lanza — el trabajo ya está hecho y
+ * un fallo al cerrar no puede convertir una corrida buena en una fallida.
+ */
+export async function cerrarSesionWeb(session: WebSession): Promise<void> {
+  try {
+    await webFetch(`${session.baseUrl}/users/logout`, session.cookies, {
+      headers: { Accept: "text/html" },
+    });
+  } catch {
+    /* best-effort */
+  }
 }
