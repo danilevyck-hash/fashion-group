@@ -16,7 +16,7 @@
 // Cuando todas las empresas están al día, el warning se omite.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar } from "lucide-react";
 
 export type SyncTable = "facturas" | "estadocuenta";
@@ -38,6 +38,10 @@ interface SyncStatusProps {
   variant?: "block" | "pill";
   prefix?: string;
   className?: string;
+  /** Aviso "alguna empresa sin actualizar" hacia afuera. Lo usa Comisiones, que
+   *  guarda la frescura dentro de un popover ⓘ: sin esto, la advertencia solo
+   *  se vería al abrirlo. Opcional — los demás llamadores no cambian. */
+  onStale?: (stale: boolean) => void;
 }
 
 const TS_FMT = new Intl.DateTimeFormat("es-PA", {
@@ -85,11 +89,20 @@ export default function SyncStatus({
   variant = "block",
   prefix,
   className,
+  onStale,
 }: SyncStatusProps) {
   const [data, setData] = useState<SyncStatusData | null>(null);
   const [error, setError] = useState(false);
 
   const empresasKey = empresasEsperadas.join(",");
+
+  // El callback puede no ser estable en el llamador; se lee por ref para que no
+  // reinicie el fetch/polling de arriba.
+  const onStaleRef = useRef(onStale);
+  onStaleRef.current = onStale;
+  useEffect(() => {
+    onStaleRef.current?.((data?.stale.length ?? 0) > 0);
+  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
