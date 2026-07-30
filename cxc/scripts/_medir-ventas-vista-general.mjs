@@ -31,6 +31,12 @@ const ETAPA = process.env.ETAPA ?? "final";
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 
 const PANTALLAS = [
+  // Resumen NO tiene `data-fila-*`: su forma angosta son tarjetas y la ancha una
+  // matriz, y ninguna de las dos quedó marcada cuando se separaron (#369). Se
+  // espera por lo que SÍ existe en las dos: `tbody tr` en la matriz y
+  // `[data-celda]` en las tarjetas. Sigue siendo un ancla estable del contenido,
+  // no una clase de breakpoint.
+  { id: "ventas-resumen",   titulo: "Ventas > Resumen",   url: "/ventas?tab=resumen",   ancla: "table tbody tr, [data-celda]" },
   { id: "ventas-clientes",  titulo: "Ventas > Clientes",  url: "/ventas?tab=clientes",  ancla: "table tbody tr, [data-fila-cliente]" },
   { id: "ventas-productos", titulo: "Ventas > Productos", url: "/ventas?tab=productos", ancla: "[data-fila-producto]" },
   { id: "ventas-utilidad",  titulo: "Ventas > Utilidad",  url: "/ventas?tab=utilidad",  ancla: "[data-fila-utilidad]" },

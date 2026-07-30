@@ -598,7 +598,20 @@ function Atencion({ data }: { data: VistaGeneral }) {
   return (
     <div>
       <h2 className="text-sm font-semibold text-stone-900 mb-3">Requiere tu atención</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* 🩸 A 1024 px las 3 columnas apretaban la tarjeta a 159 px y el nombre
+          del cliente perdía 125 px con puntos suspensivos — 18 de las 21 filas.
+          Es el ancho PEOR de todos, y no por casualidad: `lg` entra justo a
+          1024, que es donde el útil recién se recupera de la barra lateral (742
+          px para tres columnas). Medido por ancho: 390 → 12 px · 834 → 0 ·
+          **1024 → 125** · 1280 → 50 · 1440 → 50.
+
+          Con un paso intermedio de 2 columnas, 1024 baja de 125 a ~9 px. NO se
+          tocó la tipografía: el #301 ya decidió esto con Daniel —letra más
+          chica antes que cortar el nombre, ni dos líneas ni abreviar, piso de
+          12 px— y esa decisión sigue en pie. Acá cambia el ANCHO de la tarjeta,
+          no la letra. De `xl` para arriba quedan las 3 columnas de siempre: el
+          escritorio no cambia. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {/* CXC +90d */}
         <AlertCard title="Clientes con saldo +90 días" href="/admin" linkLabel="Ir a CXC" count={data.cxc.topClientes.length}>
           {data.cxc.topClientes.length === 0 ? (
@@ -697,7 +710,7 @@ function PageSkeleton() {
         ))}
       </div>
       {/* Atención */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="rounded-[14px] border border-stone-200 bg-white p-4">
             <div className="h-3 w-40 bg-stone-200 rounded" />

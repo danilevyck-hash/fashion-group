@@ -1,8 +1,10 @@
 "use client";
 
-// Layout mobile-first del tab Resumen. Visible <md, gated por md:hidden en
+// Layout mobile-first del tab Resumen. Visible por DEBAJO de 1440 px (el porqué
+// medido está en ResumenView.tsx: la matriz de 15 columnas necesitaba 1.276 px y
+// no entraba ni en un escritorio de 1440). Gated por min-[1440px]:hidden en
 // el contenedor. El layout desktop existente queda intacto detrás de
-// hidden md:block en ResumenView.tsx.
+// hidden min-[1440px]:block en ResumenView.tsx.
 //
 // Estructura: pill de frescura → 3 KPI cards (Ventas/Utilidad/Margen YTD) →
 // Toggles segmented → UNA TARJETA POR EMPRESA (+ la del total del grupo).
@@ -29,9 +31,12 @@
 // Proyección, el detalle por período, el panel mes × año de la empresa y la nota
 // de mayoreo de Multifashion están todos. Es presentación.
 //
-// El ESCRITORIO NO SE TOCÓ: sigue con su matriz en `ResumenView.tsx`, detrás de
-// `hidden md:block`. En una pantalla ancha la matriz sí se ve entera y es mejor
-// que las tarjetas — por eso no se unificaron.
+// La matriz sigue viva en `ResumenView.tsx` para la pantalla ancha, pero su
+// corte YA NO ES `md`: es 1440 px. El 30-jul-2026 se midió lo que hasta entonces
+// se daba por sentado —"en una pantalla ancha la matriz se ve entera"— y era
+// falso: necesitaba 1.276 px de ancho mínimo y arrastraba en TODOS los anchos,
+// 724 px en un iPad de 834 y 118 px hasta en un escritorio de 1440. Ahora la
+// matriz entra de verdad en su tramo, y las tarjetas cubren todo lo de abajo.
 
 import type {
   VentasResumen,
@@ -130,7 +135,7 @@ export function ResumenViewMobile({
   const prevYear = selectedYear - 1;
 
   return (
-    <div className="md:hidden space-y-4">
+    <div className="min-[1440px]:hidden space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <SyncStatus
           tabla="facturas"

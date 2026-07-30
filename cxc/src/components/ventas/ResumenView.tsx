@@ -269,7 +269,25 @@ export function ResumenView({
         multiMayoreoNota={multiMayoreoNota?.texto ?? null}
       />
 
-      <div className="hidden md:block space-y-5">
+      {/* 🩸 EL CORTE NO ES `md` NI `lg` NI `xl`, Y EL MOTIVO ES UN NÚMERO.
+          La matriz son 15 columnas (Empresa + 12 meses + Total + Proyección) y
+          su ancho MÍNIMO REAL —medido con scripts/_ancho-util-ventas.mjs, que la
+          colapsa en una jaula de 1 px para que el navegador parta todo lo que
+          pueda— era 1.276 px. Contra el ancho ÚTIL, que es lo que queda después
+          de los 223 px de la barra lateral y los 56 del main:
+
+            390 -> 356    810 -> 528    834 -> 552    1024 -> 742
+            1194 -> 912   1366 -> 1087  1440 -> 1158
+
+          NO ENTRABA EN NINGUNO. Ni siquiera en el escritorio: a 1440 px se
+          arrastraban 118. O sea que "en una pantalla ancha la matriz se ve
+          entera" nunca fue cierto — se creía, no se había medido.
+
+          Por eso las tarjetas suben hasta 1440 (cubren iPhone y TODOS los iPad,
+          incluido el Pro de 12.9" acostado, que da 1366) y a la matriz se le
+          bajó el piso para que a 1440 entre de verdad. Correr el corte a `xl`
+          no alcanzaba: a 1280 el útil es 1.001 y faltarían 275 px. */}
+      <div className="hidden min-[1440px]:block space-y-5">
       {/* KPI cards YTD del grupo — 3 cols (Ventas Netas / Utilidad / Margen).
           Comparativo same-period vs prev year (ya viene aplicado desde la RPC
           ventas_dashboard_prev_same_period). El toggle de la matriz no afecta
@@ -371,19 +389,19 @@ export function ResumenView({
                 queda sticky en ambos ejes (left+top) sobre el resto. */}
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="sticky left-0 top-0 z-30 min-w-[180px] bg-gray-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <th className="sticky left-0 top-0 z-30 min-w-[120px] bg-gray-100 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Empresa
                 </th>
                 {cols.map(c => (
-                  <th key={c} className="sticky top-0 z-20 bg-gray-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th key={c} className="sticky top-0 z-20 bg-gray-100 px-1.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
                     {c}
                   </th>
                 ))}
-                <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Total</th>
+                <th className="sticky top-0 z-20 bg-gray-100 px-2 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Total</th>
                 {/* Columna "Proyección": sólo años en curso con data de
                     proyección disponible (no aplica a años cerrados). */}
                 {showProyeccionCol && (
-                  <th className="sticky top-0 z-20 bg-gray-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Proyección</th>
+                  <th className="sticky top-0 z-20 bg-gray-100 px-2 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-950">Proyección</th>
                 )}
               </tr>
             </thead>
@@ -418,7 +436,10 @@ export function ResumenView({
                     onClick={() => setPanelEmpresaId(r.empresa.id)}
                     aria-haspopup="dialog"
                     className={cn(
-                    "sticky left-0 z-10 cursor-pointer whitespace-nowrap border-b border-gray-200 px-3.5 py-3.5 text-sm text-gray-950",
+                    // SIN `whitespace-nowrap`: "Confecciones Boston" puede caer en dos
+                    // renglones. Partirlo no es abreviarlo —dice lo mismo— y es lo que más
+                    // le baja el piso a la tabla: esa columna sola medía 189 px.
+                    "sticky left-0 z-10 cursor-pointer border-b border-gray-200 px-2.5 py-3.5 text-sm text-gray-950",
                     isMulti ? "bg-teal-50" : isOpen ? "bg-gray-50" : "bg-white"
                   )}>
                     <div className="flex items-center gap-1.5">
@@ -482,7 +503,7 @@ export function ResumenView({
                 />
               ) : (
               <tr className="bg-gray-950 text-white">
-                <td className="sticky left-0 z-10 bg-gray-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
+                <td className="sticky left-0 z-10 bg-gray-950 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}
@@ -611,7 +632,7 @@ function EmpresaProjectionCell({
 }) {
   if (!proyeccion) {
     return (
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400">
+      <td className="whitespace-nowrap border-b border-gray-200 px-2 py-3.5 text-right font-mono text-xs tabular-nums text-gray-400">
         —
       </td>
     );
@@ -631,7 +652,7 @@ function EmpresaProjectionCell({
           slots: buildSlotsProyeccion(proyeccion, prevYear, { fechaCorte }),
           ...medirFila(e),
         })}
-        className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
         <span className="block text-sm font-medium text-gray-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
         <p className={cn(
@@ -650,7 +671,7 @@ function EmpresaProjectionCell({
 function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
   const delta = totales.delta_vs_anio_anterior_total;
   return (
-    <td className="whitespace-nowrap px-3.5 py-3.5 text-right font-mono text-sm font-semibold tabular-nums">
+    <td className="whitespace-nowrap px-2 py-3.5 text-right font-mono text-sm font-semibold tabular-nums">
       <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
       <p className={cn(
         "mt-0.5 text-xs font-medium",
@@ -697,7 +718,7 @@ function HeatCell({
   const hasPrev = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
   if (cur == null && !hasPrev) {
     return (
-      <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-1.5 py-3.5 text-right font-mono text-xs tabular-nums">
         <span className="text-gray-400">—</span>
       </td>
     );
@@ -723,7 +744,7 @@ function HeatCell({
           slots: buildSlotsMetrica(cell, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-1.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
         {cur == null ? (
           <span className="text-gray-400">—</span>
@@ -817,7 +838,7 @@ function EmpresaTotalCell({
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
+        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-gray-100/70 focus-visible:ring-2 focus-visible:ring-teal-700/30"
       >
         <span className="flex flex-col items-end leading-tight">
           <span className="text-sm font-medium text-gray-950">{displayValue}</span>
@@ -850,7 +871,7 @@ function TotalGroupCell({
   const cur = cellValue(agg, mode);
   if (cur == null) {
     return (
-      <td className="whitespace-nowrap px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap px-1.5 py-3.5 text-right font-mono text-xs tabular-nums">
         <span className="text-gray-500">—</span>
       </td>
     );
@@ -873,7 +894,7 @@ function TotalGroupCell({
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-2.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+        className="block w-full px-1.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
         <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{renderCellValue(cur, mode)}</span>
@@ -920,7 +941,7 @@ function TotalGroupAnnualCell({
           slots: buildSlotsMetrica(agg, mode),
           ...medirFila(e),
         })}
-        className="block w-full px-3.5 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+        className="block w-full px-2 py-3.5 text-right outline-none transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
       >
         <span className="flex flex-col items-end leading-tight">
           <span className="text-white">{displayValue}</span>
