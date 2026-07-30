@@ -50,7 +50,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Ordenar lista">
+    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Ordenar lista">
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
         onClick={onClose}

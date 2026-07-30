@@ -6,7 +6,9 @@ import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 
 /**
  * Mobile bottom-sheet para el detalle de cliente — equivalente del HoverCard
- * desktop. Diseñado para `md:hidden` (≤ 768px). Sin drag-to-dismiss ni half/full
+ * desktop. Diseñado para `lg:hidden` (< 1024px): el corte se movió de `md` a
+ * `lg` junto con el de ClientesView — con `md`, un iPad de 834 px caía del lado
+ * de la tabla de escritorio y este sheet nunca se abría ahí. Sin drag-to-dismiss ni half/full
  * mode: es un sheet info-only que se cierra con backdrop tap o Escape.
  *
  * El cuerpo es el mismo `<ClienteHoverCard>` que se monta en el HoverCard
@@ -58,7 +60,7 @@ export function ClienteSheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
         onClick={onClose}

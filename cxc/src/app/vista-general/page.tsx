@@ -345,7 +345,14 @@ function Equilibrio({ eq }: { eq: VistaGeneral["equilibrio"] }) {
       ) : (
         <p className="text-sm text-stone-500">
           Para calcularlo carga los gastos del mes en{" "}
-          <Link href="/gastos-empresa" className="text-teal-600 hover:text-teal-700 font-medium">Gastos de Empresa</Link>.
+          {/* 44 px de alto sin romper el párrafo: el enlace sigue en línea, sólo
+              se le da blanco tocable arriba y abajo. Medía 129×17. */}
+          <Link
+            href="/gastos-empresa"
+            className="inline-flex min-h-[44px] items-center text-teal-600 hover:text-teal-700 font-medium"
+          >
+            Gastos de Empresa
+          </Link>.
         </p>
       )}
     </div>
@@ -374,19 +381,51 @@ function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
   return (
     <div className="mb-8">
       <h2 className="text-sm font-semibold text-stone-900 mb-3">Semáforo por empresa</h2>
-      <div className="rounded-[14px] border border-stone-200 bg-white overflow-x-auto">
-        <table className="w-full text-sm min-w-[560px]">
+
+      {/* ─── Tarjetas (< md): iPhone ──────────────────────────────────────
+          🩸 POR QUÉ. Medido con scripts/_ancho-util-ventas.mjs: la tabla necesita
+          530 px como MÍNIMO absoluto (con el navegador partiendo cada texto
+          donde puede) contra 356 disponibles en un iPhone de 390. Eran los 204 px
+          de arrastre del censo. No hay relleno que sacar que cierre 174 px, y de
+          las cuatro columnas la que más pesa es la píldora de Estado ("Sin
+          gastos cargados"), que es justo la que no se puede abreviar sin cambiar
+          un texto que ve el usuario. Va a tarjetas.
+
+          De `md` para arriba la tabla se queda como estaba: a 834 px el útil es
+          576 y el mínimo 530 — entra, y de hecho ya medía 0. */}
+      <div className="space-y-2 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-[14px] border border-stone-200 bg-white px-4 py-6 text-center text-stone-400">
+            Sin datos este mes.
+          </div>
+        ) : rows.map((e) => {
+          const abiertaEsta = abierta === e.key;
+          return (
+            <SemaforoTarjeta
+              key={e.key}
+              e={e}
+              pill={SEMAFORO_PILL[e.estado]}
+              abierta={abiertaEsta}
+              onToggle={() => setAbierta(abiertaEsta ? null : e.key)}
+              mes={mes}
+            />
+          );
+        })}
+      </div>
+
+      <div className="hidden rounded-[14px] border border-stone-200 bg-white overflow-x-auto md:block">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-stone-400 border-b border-stone-100">
-              <th className="text-left font-medium px-4 py-2.5">Empresa</th>
-              <th className="text-right font-medium px-4 py-2.5">Ventas</th>
-              <th className="text-right font-medium px-4 py-2.5">Rentabilidad</th>
-              <th className="text-right font-medium px-4 py-2.5">Estado</th>
+              <th className="text-left font-medium px-3 py-2.5">Empresa</th>
+              <th className="text-right font-medium px-3 py-2.5">Ventas</th>
+              <th className="text-right font-medium px-3 py-2.5">Rentabilidad</th>
+              <th className="text-right font-medium px-3 py-2.5">Estado</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-stone-400">Sin datos este mes.</td></tr>
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-stone-400">Sin datos este mes.</td></tr>
             ) : rows.map((e) => {
               const pill = SEMAFORO_PILL[e.estado];
               const abiertaEsta = abierta === e.key;
@@ -408,6 +447,89 @@ function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
   );
 }
 
+/**
+ * Desglose de una empresa. Se dibuja UNA sola vez para las dos formas (la fila
+ * desplegada de la tabla y la tarjeta abierta): tener dos copias del mismo
+ * párrafo es exactamente como divergen los números entre pantallas.
+ */
+function SemaforoDesglose({ e }: { e: SemaforoRow }) {
+  if (e.rentabilidad == null) {
+    return <p className="text-sm text-stone-500">Aún no hay gastos cargados para esta empresa este mes.</p>;
+  }
+  return (
+    <p className="text-sm text-stone-700 tabular-nums">
+      Utilidad bruta <span data-col="utilidad" className="font-medium">{money(e.utilidad)}</span>
+      {" − "}Gastos directos <span data-col="gastos-directos" className="font-medium">{money(e.gastosDirectos)}</span>
+      {" − "}Parte de gastos de Grupo <span data-col="prorrateo" className="font-medium">{money(e.prorrateo)}</span>
+      {" = "}Rentabilidad <span data-col="rentabilidad-detalle" className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
+    </p>
+  );
+}
+
+/** Enlace "Ver gastos de X →". 44 px de alto en las dos formas. */
+function VerGastosLink({ e, mes }: { e: SemaforoRow; mes: string }) {
+  return (
+    <Link
+      href={`/gastos-empresa?mes=${mes}&empresa=${e.key}`}
+      onClick={(ev) => ev.stopPropagation()}
+      className="inline-flex min-h-[44px] items-center text-xs text-teal-600 hover:text-teal-700 font-medium"
+    >
+      Ver gastos de {e.name} →
+    </Link>
+  );
+}
+
+/** Tarjeta (< md) equivalente a SemaforoFila: mismos cuatro datos de la fila
+ *  cerrada y el mismo desglose al abrirla. */
+function SemaforoTarjeta({ e, pill, abierta, onToggle, mes }: {
+  e: SemaforoRow;
+  pill: { label: string; cls: string };
+  abierta: boolean;
+  onToggle: () => void;
+  mes: string;
+}) {
+  return (
+    <div data-fila-semaforo={e.key} className="rounded-[14px] border border-stone-200 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={abierta}
+        className="flex min-h-[44px] w-full items-center gap-2.5 px-4 py-3 text-left active:bg-stone-50"
+      >
+        <span className={`w-2 h-2 rounded-full shrink-0 ${SEMAFORO_DOT[e.estado]}`} />
+        <span data-col="empresa" className="min-w-0 flex-1 font-medium text-stone-800">{e.name}</span>
+        <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 px-4 pb-3 text-sm">
+        <span className="text-xs text-stone-400">Ventas</span>
+        <span data-col="ventas" className="tabular-nums text-stone-700">{moneyK(e.ventas)}</span>
+        <span className="text-xs text-stone-400">Rentabilidad</span>
+        <span data-col="rentabilidad" className="tabular-nums">
+          {e.rentabilidad == null ? (
+            <span className="text-stone-400">—</span>
+          ) : (
+            <>
+              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
+              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
+            </>
+          )}
+        </span>
+        <span data-col="estado" className={`ml-auto inline-block text-xs font-medium rounded-full px-2.5 py-1 ${pill.cls}`}>{pill.label}</span>
+      </div>
+
+      {abierta && (
+        <div className="border-t border-stone-100 bg-stone-50/60 px-4 py-3">
+          <SemaforoDesglose e={e} />
+          <div className="mt-0.5">
+            <VerGastosLink e={e} mes={mes} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SemaforoFila({ e, pill, abierta, onToggle, mes }: {
   e: SemaforoRow;
   pill: { label: string; cls: string };
@@ -417,52 +539,42 @@ function SemaforoFila({ e, pill, abierta, onToggle, mes }: {
 }) {
   return (
     <>
+      {/* `data-fila-semaforo` es el ancla estable que cruza tarjeta y fila en el
+          verificador — no una clase de breakpoint. */}
       <tr
+        data-fila-semaforo={e.key}
         onClick={onToggle}
         className="border-b border-stone-50 last:border-0 hover:bg-stone-50 cursor-pointer transition"
       >
-        <td className="px-4 py-3">
+        <td className="px-3 py-3">
           <span className="inline-flex items-center gap-2.5">
             <span className={`w-2 h-2 rounded-full shrink-0 ${SEMAFORO_DOT[e.estado]}`} />
-            <span className="font-medium text-stone-800">{e.name}</span>
-            <svg className={`w-3.5 h-3.5 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <span data-col="empresa" className="font-medium text-stone-800">{e.name}</span>
+            <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </span>
         </td>
-        <td className="px-4 py-3 text-right tabular-nums text-stone-700">{moneyK(e.ventas)}</td>
-        <td className="px-4 py-3 text-right tabular-nums">
+        <td data-col="ventas" className="px-3 py-3 text-right tabular-nums text-stone-700">{moneyK(e.ventas)}</td>
+        <td data-col="rentabilidad" className="px-3 py-3 text-right tabular-nums">
           {e.rentabilidad == null ? (
             <span className="text-stone-400">—</span>
           ) : (
             <>
               <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
-              <span className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
+              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
             </>
           )}
         </td>
-        <td className="px-4 py-3 text-right">
-          <span className={`inline-block text-xs font-medium rounded-full px-2.5 py-1 whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
+        <td className="px-3 py-3 text-right">
+          <span data-col="estado" className={`inline-block text-xs font-medium rounded-full px-2.5 py-1 whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
         </td>
       </tr>
       {abierta && (
         <tr className="border-b border-stone-50 last:border-0 bg-stone-50/60">
-          <td colSpan={4} className="px-4 py-3">
-            {e.rentabilidad == null ? (
-              <p className="text-sm text-stone-500">Aún no hay gastos cargados para esta empresa este mes.</p>
-            ) : (
-              <p className="text-sm text-stone-700 tabular-nums">
-                Utilidad bruta <span className="font-medium">{money(e.utilidad)}</span>
-                {" − "}Gastos directos <span className="font-medium">{money(e.gastosDirectos)}</span>
-                {" − "}Parte de gastos de Grupo <span className="font-medium">{money(e.prorrateo)}</span>
-                {" = "}Rentabilidad <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
-              </p>
-            )}
-            <Link
-              href={`/gastos-empresa?mes=${mes}&empresa=${e.key}`}
-              onClick={(ev) => ev.stopPropagation()}
-              className="inline-block text-xs text-teal-600 hover:text-teal-700 font-medium mt-1.5"
-            >
-              Ver gastos de {e.name} →
-            </Link>
+          <td colSpan={4} className="px-3 py-3">
+            <SemaforoDesglose e={e} />
+            <div className="mt-0.5">
+              <VerGastosLink e={e} mes={mes} />
+            </div>
           </td>
         </tr>
       )}
