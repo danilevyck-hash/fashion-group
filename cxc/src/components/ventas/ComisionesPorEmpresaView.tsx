@@ -22,6 +22,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesConfigModal } from "./ComisionesConfigModal";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
+import { ComisionesTarjetasPorEmpresa } from "./ComisionesTarjetas";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -160,10 +161,12 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
 
       {savedMsg && <p className="text-xs text-teal-700">{savedMsg}</p>}
 
-      <Card className="overflow-hidden rounded-lg border border-gray-200">
-        {loading ? (
+      {loading ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={5} /></div>
-        ) : error ? (
+        </Card>
+      ) : error ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm">
             <p className="text-rose-600">{error}</p>
             <button
@@ -173,11 +176,30 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
               Reintentar
             </button>
           </div>
-        ) : vendedores.length === 0 ? (
+        </Card>
+      ) : vendedores.length === 0 ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm text-gray-500">
             Sin vendedores para {MESES[mes - 1]} {year}.
           </div>
-        ) : (
+        </Card>
+      ) : (
+        <>
+          {/* Celular: TARJETAS. Esta tabla es la que fallaba PEOR — 636px de
+              contenido dentro de un `Card` con overflow-hidden, así que a 390px
+              quedaban 279px RECORTADOS y "Com. cobro" y "Com. total" no se
+              podían ver ni arrastrando. */}
+          <ComisionesTarjetasPorEmpresa
+            activos={activos}
+            inactivos={inactivos}
+            total={totalGeneral}
+            onDetalle={setDetalleVendedor}
+          />
+
+          {/* iPad y escritorio: la tabla. El `overflow-x-auto` es nuevo — sin
+              él, a 834px se perdían 83px sin aviso ni forma de alcanzarlos. */}
+          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
+            <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -224,8 +246,10 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
               </tr>
             </tfoot>
           </table>
-        )}
-      </Card>
+            </div>
+          </Card>
+        </>
+      )}
 
       {canConfig && (
         <ComisionesConfigModal
