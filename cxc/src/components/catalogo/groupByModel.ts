@@ -46,6 +46,18 @@ const GENDER_FIELD_LABELS: Record<string, string> = {
 /** Known gender suffixes (longest first so JUNIOR matches before J, etc.) */
 const KNOWN_SUFFIXES = ["JUNIOR", "KIDS", "W", "M"];
 
+/**
+ * Orden de los botones de talla DENTRO de la card: talla chica primero, y Mujer
+ * antes que Hombre (el mismo orden que las secciones del grid, `SECTION_ORDER`).
+ *
+ * Sin esto el orden es el que trae el catálogo y CAMBIA de tarjeta en tarjeta:
+ * medido en producción, `UKVCG.MTC` mostraba KIDS · JUNIOR y `UKVCG.OLM` al lado
+ * mostraba JUNIOR · KIDS. Un vendedor que recorre la grilla dando precios no
+ * puede tener que leer la etiqueta de cada botón para saber cuál es cuál.
+ */
+const ORDEN_SUFIJO: Record<string, number> = { KIDS: 0, JUNIOR: 1, W: 2, M: 3 };
+const ordenDe = (suffix: string) => ORDEN_SUFIJO[suffix.toUpperCase()] ?? 9;
+
 export interface ProductVariant {
   product: JoybeesProduct;
   genderLabel: string;
@@ -57,7 +69,15 @@ export interface GroupedProduct {
   baseSku: string;
   /** Shared display name */
   name: string;
-  /** Shared price */
+  /**
+   * Precio de REFERENCIA del grupo = el MENOR de sus variantes.
+   *
+   * ⚠️ Sirve para ORDENAR la grilla ("precio: menor a mayor") y para el
+   * centinela de regalía. **La card NO lo muestra**: muestra el precio de la
+   * talla elegida (`variants[i].product.price`), porque un grupo puede tener
+   * dos precios (`UKTRK.BLK` = KIDS $13 / JUNIOR $15). Mostrar este número
+   * como "el precio del modelo" volvería a esconder uno de los dos.
+   */
   price: number;
   /** Shared image */
   image_url: string | null;
@@ -85,30 +105,38 @@ export function getGenderLabel(suffix: string, genderField: string): string {
 }
 
 /**
- * Groups products by base SKU when they share name & price.
- * Products without a recognized gender suffix stay as single-variant groups.
+ * Agrupa productos por base de SKU + NOMBRE. Cada variante de talla/género del
+ * modelo queda como una entrada de `variants` con SU precio y SU stock.
+ * Un producto sin sufijo reconocido queda como grupo de una sola variante.
  *
- * 🩸 DOS SKU CON EL MISMO BASE PERO DISTINTO PRECIO SON DOS PRODUCTOS (27-jul-2026).
- * Antes, cuando dos artículos compartían el base pero NO el name+price, el
- * segundo hacía `map.set(key, …)` sobre la MISMA llave: destruía al primero y
- * además volvía a hacer `order.push(key)`, así que `order.map(k => map.get(k))`
- * devolvía DOS VECES el mismo grupo. En pantalla: dos tarjetas IDÉNTICAS, las
- * dos con el SKU base (sin sufijo) y las dos con la existencia del sobreviviente
- * — la del otro artículo DESAPARECÍA. Medido en producción (25-jul-2026):
- * `UKTRK.BLK-KIDS` $13/95 uds y `UKTRK.BLK-JUNIOR` $15/120 uds mostraban dos
- * cards "UKTRK.BLK · $13 · 95", o sea 120 unidades invisibles; igual
- * `UKTRK.DRO-KIDS` $13/99 vs `UKTRK.DRO-JUNIOR` $15/100. El precio lo manda
- * Switch y una card tiene UN precio, así que agruparlos es imposible: cada uno
- * necesita su propia tarjeta con SU stock.
+ * 🩸 NINGUNA VARIANTE PUEDE QUEDAR ESCONDIDA — ese es el invariante (27-jul-2026).
+ * El bug original: cuando dos artículos compartían el base pero no el
+ * `name+price`, el segundo hacía `map.set(key, …)` sobre la MISMA llave,
+ * destruía al primero y volvía a hacer `order.push(key)`, así que
+ * `order.map(k => map.get(k))` devolvía DOS VECES el mismo grupo. En pantalla:
+ * dos tarjetas IDÉNTICAS con el stock del sobreviviente y las unidades del otro
+ * INVISIBLES. Medido en producción (25-jul-2026): `UKTRK.BLK-KIDS` $13/95 uds y
+ * `UKTRK.BLK-JUNIOR` $15/120 uds salían como dos cards "UKTRK.BLK · $13 · 95";
+ * igual `UKTRK.DRO`.
  *
- * La AGRUPACIÓN NO CAMBIA para los pares que sí comparten name+price (W/M y
- * KIDS/JUNIOR del mismo precio siguen en una sola card con sus dos botones).
- * Lo único que cambia es el caso que hoy está roto.
+ * **El PRECIO ya no separa grupos (30-jul-2026).** El primer arreglo (#348) los
+ * partió en dos tarjetas porque "una card tiene UN precio". Con el SELECTOR DE
+ * TALLA de la card agrupada eso dejó de ser cierto: cada botón de talla lleva su
+ * propio precio y su propio stock, y el precio de arriba sigue a la talla
+ * elegida. Así `UKTRK.BLK` vuelve a ser UN modelo (como es en la vitrina) sin
+ * volver a esconder nada. Aprobado por Daniel sobre el mockup de la opción A.
+ *
+ * **Lo que SÍ sigue separando: un sufijo REPETIDO.** Dos filas `-KIDS` del mismo
+ * base no pueden compartir card porque el selector mostraría dos botones con la
+ * misma etiqueta y uno de los dos stocks quedaría inalcanzable — exactamente el
+ * daño de #348 por otra puerta. Hoy no ocurre en producción (medido: 11 bases
+ * con 2 variantes, ningún sufijo repetido), y el guard existe para que el día
+ * que Switch mande un duplicado se vea en vez de desaparecer.
  */
 export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
   const map = new Map<string, GroupedProduct>();
   const order: string[] = [];
-  /** Grupos ya abiertos por base — puede haber más de uno si el precio difiere. */
+  /** Grupos ya abiertos por base — puede haber más de uno (nombre o sufijo repetido). */
   const porBase = new Map<string, GroupedProduct[]>();
 
   for (const p of products) {
@@ -117,7 +145,9 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
     if (parsed) {
       const key = parsed.base.toUpperCase();
       const abiertos = porBase.get(key) ?? [];
-      const existing = abiertos.find(g => g.name === p.name && g.price === p.price);
+      const existing = abiertos.find(
+        g => g.name === p.name && !g.variants.some(v => v.suffix === parsed.suffix)
+      );
 
       if (existing) {
         // Add variant to existing group
@@ -126,6 +156,9 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
           genderLabel: getGenderLabel(parsed.suffix, p.gender),
           suffix: parsed.suffix,
         });
+        // El precio del grupo es el MENOR de sus variantes (solo ordena la
+        // grilla — la card muestra el de la talla elegida).
+        if (p.price < existing.price) existing.price = p.price;
         // If group had no image but this variant does, use it
         if (!existing.image_url && p.image_url) {
           existing.image_url = p.image_url;
@@ -150,8 +183,8 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
       };
       abiertos.push(group);
       porBase.set(key, abiertos);
-      // Llave ÚNICA: si ya había un grupo con este base (precio distinto), el
-      // nuevo NO lo puede pisar ni repetirse en `order`.
+      // Llave ÚNICA: si ya había un grupo con este base (otro nombre, o un
+      // sufijo repetido), el nuevo NO lo puede pisar ni repetirse en `order`.
       const llave = abiertos.length === 1 ? key : `${key}#${abiertos.length}`;
       map.set(llave, group);
       order.push(llave);
@@ -186,9 +219,25 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
     if (g.variants.length === 1 && g.variants[0].suffix) {
       g.baseSku = g.variants[0].product.sku;
     }
+    // Orden estable de los botones de talla, igual en todas las tarjetas.
+    if (g.variants.length > 1) {
+      g.variants.sort((a, b) => ordenDe(a.suffix) - ordenDe(b.suffix));
+    }
   }
 
   return order.map(k => map.get(k)!);
+}
+
+/**
+ * ¿Las tallas de este modelo tienen PRECIOS DISTINTOS?
+ *
+ * Cuando es `true` la card escribe el precio dentro de cada botón de talla
+ * (`KIDS · $13` / `JUNIOR · $15`): sin eso, el número grande de arriba cambiaría
+ * al tocar una talla sin decir por qué. Los precios los manda Switch — acá solo
+ * se leen. Caso real: `UKTRK.BLK` y `UKTRK.DRO`.
+ */
+export function tienePreciosDistintos(group: GroupedProduct): boolean {
+  return new Set(group.variants.map(v => v.product.price)).size > 1;
 }
 
 export type DisplaySection = "mujer" | "hombre" | "adultos" | "kids" | "accesorios";

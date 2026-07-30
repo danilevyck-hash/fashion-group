@@ -29,9 +29,20 @@ interface CatalogoStockLineProps {
   disponibilidad: number | null | undefined;
   /** Saldo físico. null/undefined → "—". */
   existencia: number | null | undefined;
+  /**
+   * Talla elegida — SOLO la card agrupada de Joybees con selector de talla
+   * (30-jul-2026). Con talla el bloque deja de ser la columna derecha del precio
+   * y pasa a ocupar el ancho completo DEBAJO de los botones de talla:
+   * "Disponibilidad 168 · Junior". Ahí el número tiene que decir de QUÉ talla es,
+   * y al lado del precio no cabe (medido: "Disponibilidad 168 · Junior" son
+   * ~135px de los 204px de contenido, y el precio ya se lleva 61px + 8 de gap).
+   * Sin talla, el bloque histórico de dos renglones a la derecha — es el caso de
+   * Reebok, Tommy y los modelos de una sola talla: no cambia nada.
+   */
+  talla?: string;
 }
 
-export default function CatalogoStockLine({ marca, disponibilidad, existencia }: CatalogoStockLineProps) {
+export default function CatalogoStockLine({ marca, disponibilidad, existencia, talla }: CatalogoStockLineProps) {
   const s = getMarcaTheme(marca)!.card.stock;
   const agotado = disponibilidad == null || disponibilidad <= 0;
   return (
@@ -41,9 +52,12 @@ export default function CatalogoStockLine({ marca, disponibilidad, existencia }:
        xl:text-right — de xl para arriba va pegado al borde derecho de la card;
        por debajo (card de ~173px) el bloque cae bajo el precio, alineado a la
        izquierda, porque ahí NINGÚN tamaño legible cabe al lado. */
-    <div className="shrink-0 text-[11px] leading-[15px] tabular-nums xl:text-right">
+    <div className={talla
+      ? "text-[11px] leading-[15px] tabular-nums"
+      : "shrink-0 text-[11px] leading-[15px] tabular-nums xl:text-right"}>
       <div className={`font-semibold whitespace-nowrap ${agotado ? s.agotado : s.strong}`}>
         Disponibilidad {disponibilidad ?? "—"}
+        {talla && <span className={`font-normal ${s.soft}`}> · {talla}</span>}
       </div>
       <div className={`whitespace-nowrap ${s.soft}`}>
         Existencia {existencia ?? "—"}

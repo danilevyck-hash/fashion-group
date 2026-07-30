@@ -193,6 +193,9 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
 
   const availableVariants = (group?.variants || []).filter(v => v.product.stock > 0);
   const selected = availableVariants.find(v => v.product.id === selectedId)?.product || null;
+  /** ¿Las versiones que se ofrecen valen distinto? Entonces cada botón dice su precio. */
+  const variantesConPrecioDistinto =
+    new Set(availableVariants.map(v => v.product.price)).size > 1;
 
   // Carrito compartido con la página del catálogo (misma key localStorage)
   function getCart(): CartItem[] {
@@ -258,8 +261,16 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
         <div>
           <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
           {product.sku && <p className="text-sm text-gray-500 mb-4">SKU: {product.sku}</p>}
+          {/* El precio es el de la VARIANTE elegida (mismo criterio que la card
+              del grid): un modelo puede tener dos tallas con precios distintos
+              —`UKTRK.BLK` es KIDS $13 y JUNIOR $15— y el número de arriba tiene
+              que ser el del bulto que se va a agregar, que es el que
+              `handleAdd` manda al carrito. */}
           <p className={theme.producto.price}>
-            {product.price ? fmtPrecio(product.price) : "Consultar precio"}
+            {(() => {
+              const precio = selected?.price ?? product.price;
+              return precio ? fmtPrecio(precio) : "Consultar precio";
+            })()}
           </p>
 
           {availableVariants.length > 0 ? (
@@ -272,11 +283,12 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
                       <button
                         key={v.product.id}
                         onClick={() => setSelectedId(v.product.id)}
-                        className={`px-4 py-2 border rounded text-sm font-medium transition-colors ${
+                        className={`px-4 py-2 border rounded text-sm font-medium transition-colors min-h-[44px] ${
                           selectedId === v.product.id ? theme.producto.sizeActive : theme.producto.sizeInactive
                         }`}
                       >
                         {v.genderLabel}
+                        {variantesConPrecioDistinto && ` · ${fmtPrecio(v.product.price)}`}
                       </button>
                     ))}
                   </div>
