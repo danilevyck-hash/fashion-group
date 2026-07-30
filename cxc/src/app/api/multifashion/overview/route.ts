@@ -43,10 +43,18 @@ export async function GET(req: NextRequest) {
 
   // CANDADO gerente_acs: año en {actual, anterior} y mes = mes en curso. Admin
   // no cambia. Ver src/lib/multifashion/ventana-gerente.ts.
-  // OJO (documentado en el PR): el RPC multifashion_overview_serie_v1 devuelve
-  // la serie del AÑO completo, así que acotar year/mes limita QUÉ años se
-  // pueden pedir, no recorta el payload a un mes. Recortar la serie es una
-  // decisión de producto aparte — vaciaría el gráfico anual del Resumen.
+  //
+  // LA SERIE ANUAL SE DEJA COMPLETA A PROPÓSITO — esto NO es un olvido.
+  // `multifashion_overview_serie_v1(p_year)` devuelve los 12 meses del año, así
+  // que el clamp limita QUÉ años se pueden pedir pero no recorta el payload a un
+  // mes. Y así se queda: la ventana que pidió Daniel es sobre QUÉ PERÍODO se
+  // puede consultar, y el gráfico anual del año en curso es parte de ver el mes
+  // en curso (es el contexto donde se lee — sin él el número del mes no dice si
+  // fue bueno o malo). Recortar la serie vaciaría el gráfico del Resumen: le
+  // sacaría una pantalla que hoy funciona, sin cerrar nada que importe — los dos
+  // años pedibles siguen siendo {actual, anterior} y ningún año viejo entra.
+  // Si alguna vez se decide lo contrario, es una decisión de PRODUCTO de Daniel,
+  // no una fuga que quedó abierta.
   const acotado = clampAnioMes(auth.role, { year: yearPedido, mes: mesPedido }, now);
   const year = acotado.year;
   const mes = acotado.mes as number;
