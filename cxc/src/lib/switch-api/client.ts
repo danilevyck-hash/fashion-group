@@ -394,6 +394,22 @@ async function authenticate(
   throw lastErr;
 }
 
+/**
+ * Logins EN VUELO por empresa. Sin esto, N llamadas concurrentes que encuentran
+ * el token vencido disparan N `/autenticacion` a la vez.
+ *
+ * 🩸 POR QUÉ IMPORTA ACÁ Y NO EN OTRO LADO: Switch admite **UNA SOLA SESIÓN por
+ * empresa** — el segundo login invalida el token del primero (code 0006). O sea
+ * que la estampida no sería "un login de más": sería la tanda entera quedándose
+ * con tokens muertos y cayendo en cascada. Mientras TODO fue serial esto no
+ * podía pasar (una llamada por vez, la primera renueva y las demás usan la
+ * caché). Desde que el sync de catálogo pide `/stock` en paralelo, sí puede.
+ *
+ * El de-dup es por empresa: dos empresas distintas son dos sesiones distintas y
+ * deben poder autenticar a la vez.
+ */
+const loginEnVuelo = new Map<string, Promise<string>>();
+
 async function getToken(
   empresaKey: string,
   cfg: EmpresaConfig,
@@ -402,7 +418,17 @@ async function getToken(
   if (cached && cached.expiresAt > Date.now()) {
     return cached.token;
   }
-  return authenticate(empresaKey, cfg);
+  // Si ya hay un login corriendo para esta empresa, esperar ESE en vez de
+  // abrir otro. `finally` limpia siempre: un login fallido no puede dejar una
+  // promesa rechazada pegada y condenar a la empresa a fallar para siempre.
+  const enVuelo = loginEnVuelo.get(empresaKey);
+  if (enVuelo) return enVuelo;
+
+  const p = authenticate(empresaKey, cfg).finally(() => {
+    loginEnVuelo.delete(empresaKey);
+  });
+  loginEnVuelo.set(empresaKey, p);
+  return p;
 }
 
 // ─── Llamada autenticada con re-auth automático ──────────────────────────────
