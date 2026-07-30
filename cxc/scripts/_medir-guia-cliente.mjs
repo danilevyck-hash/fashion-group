@@ -61,7 +61,7 @@ const MEDIR_FILA = `(() => {
 const BUSCAR_LISTA = `
   const _visible = (el) => el.getBoundingClientRect().height > 0;
   const _input = [...document.querySelectorAll('[id^="cliente-"]')].find((el) => el.getBoundingClientRect().width > 0);
-  let lista = document.querySelector("[data-desplegable-cliente]");
+  let lista = document.querySelector('[data-desplegable="cliente"]');
   if (!lista && _input) {
     lista = [..._input.parentElement.children].find((el) => el !== _input && el.tagName === "DIV" && _visible(el)) ?? null;
   }

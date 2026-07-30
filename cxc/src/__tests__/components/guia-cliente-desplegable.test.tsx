@@ -96,7 +96,10 @@ function EnLaTabla({ inicial = "", codigoInicial = "" }: { inicial?: string; cod
 }
 
 const campo = () => screen.getByRole("combobox") as HTMLInputElement;
-const lista = () => document.querySelector("[data-desplegable-cliente]");
+// Desde el 30-jul-2026 el portal lo dibuja `DesplegableFlotante`, compartido
+// por los seis desplegables del sistema; la marca del control va en
+// `data-desplegable` y hacia dónde se abrió, en `data-hacia`.
+const lista = () => document.querySelector('[data-desplegable="cliente"]');
 
 async function escribir(texto: string) {
   fireEvent.focus(campo());
@@ -166,7 +169,7 @@ describe("Lo que se escribió sigue A LA VISTA mientras se elige", () => {
   it("la lista no arranca encima del campo: se ancla por debajo o por arriba", async () => {
     render(<EnLaTabla />);
     await escribir("CI");
-    expect(["abajo", "arriba"]).toContain(lista()!.getAttribute("data-desplegable-cliente"));
+    expect(["abajo", "arriba"]).toContain(lista()!.getAttribute("data-hacia"));
   });
 });
 

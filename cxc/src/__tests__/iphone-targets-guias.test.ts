@@ -37,6 +37,7 @@ const picker = read("components", "ClientePicker.tsx");
 const typeahead = guias("ClienteTypeahead.tsx");
 const addNew = guias("AddNewInline.tsx");
 const sidebar = read("components", "Sidebar.tsx");
+const flotante = read("components", "ui", "DesplegableFlotante.tsx");
 
 describe("El cuerpo de la página no puede scrollear de lado en 390px", () => {
   it("la tabla de envíos existe SOLO desde lg — en el iPhone es una tarjeta", () => {
@@ -202,24 +203,30 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
    * hueco quedaba un pedazo de la lista encima de DIRECCIÓN/EMPRESA/FACTURA(S).
    * Eso es lo que Daniel fotografió: *"se esconde… es problema mas de ux"*.
    */
+  // 📌 Desde el 30-jul-2026 el MECANISMO de flotar no vive en ClientePicker: se
+  // extrajo a `components/ui/DesplegableFlotante`, que comparten los seis
+  // desplegables del sistema. Por eso el candado se parte en dos: que el
+  // selector lo USE, y que el compartido siga haciendo lo que hay que hacer.
   it("la lista FLOTA en un portal — un `absolute` adentro vuelve a romper la fila", () => {
-    expect(picker).toContain("createPortal");
-    expect(picker).toContain("document.body");
+    expect(picker).toContain("DesplegableFlotante");
+    expect(flotante).toContain("createPortal");
+    expect(flotante).toContain("document.body");
     // Ni un `absolute` en la caja de la lista: el chip del código sí lo usa (y
     // no crece), pero el desplegable no puede.
     expect(picker).not.toMatch(/className="absolute z-30 left-0 right-0/);
-    expect(picker).toMatch(/position: "fixed"/);
+    expect(flotante).toMatch(/position: "fixed"/);
   });
 
   it("la posición sale del módulo puro, no de números sueltos en el componente", () => {
-    expect(picker).toContain("calcularPosicionDesplegable");
+    expect(flotante).toContain("calcularPosicionDesplegable");
     // Reancla al scrollear con `capture`: el scroll del ScrollableTable no
     // burbujea, así que sin capture la lista quedaría flotando en el aire.
-    expect(picker).toMatch(/addEventListener\("scroll", reubicar, true\)/);
+    expect(flotante).toMatch(/addEventListener\("scroll", reubicar, true\)/);
   });
 
   it("el click de afuera mira TAMBIÉN el portal, o el primer toque cerraría", () => {
-    expect(picker).toContain("menuRef.current?.contains");
+    expect(flotante).toContain("panelRef.current?.contains");
+    expect(flotante).toContain("anclaRef.current?.contains");
   });
 
   it("el typeahead libre de Marketing también se arregló (mismo defecto)", () => {

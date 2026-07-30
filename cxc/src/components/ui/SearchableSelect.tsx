@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
+import DesplegableFlotante from "./DesplegableFlotante";
 
 export interface SearchableOption {
   value: string;
@@ -33,6 +34,17 @@ interface Props {
  *
  * Muestra el label de la opción seleccionada cuando no tiene foco; al enfocar
  * abre el dropdown y permite teclear para filtrar. Emite el `value` elegido.
+ *
+ * 🩸 La lista FLOTA (portal a <body> + fixed) desde el 30-jul-2026. Era
+ * `absolute top-full` dentro del formulario, y sus DOS usos viven en un panel
+ * con scroll propio — `flex-1 overflow-y-auto` en el modal de Cheques y en el
+ * cajón de Caja. Medido en el navegador con build de producción:
+ *
+ *   Cheques › Nuevo cheque › Vendedor ...... 34 px recortados @390, 17 @834
+ *   Caja › Nuevo gasto › Responsable ....... 228 px recortados @390
+ *
+ * O sea: en el iPhone, elegir vendedor mostraba una tira de lista y el resto
+ * quedaba debajo del borde del formulario. Ver `DesplegableFlotante`.
  */
 export default function SearchableSelect({
   value,
@@ -50,6 +62,7 @@ export default function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedLabel = options.find((o) => o.value === value)?.label ?? "";
   const q = query.trim().toLowerCase();
@@ -58,6 +71,7 @@ export default function SearchableSelect({
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         type="text"
         role="combobox"
         aria-expanded={open}
@@ -89,8 +103,13 @@ export default function SearchableSelect({
           }
         }}
       />
-      {open && (
-        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-56 overflow-y-auto">
+      <DesplegableFlotante
+        abierto={open}
+        anclaRef={inputRef}
+        marca="select-busqueda"
+        className="bg-white border border-gray-200 rounded-lg shadow-lg"
+      >
+        <>
           {filtered.length === 0 && !actionLabel && (
             <div className="px-3 py-2 text-sm text-gray-400">Sin resultados</div>
           )}
@@ -125,8 +144,8 @@ export default function SearchableSelect({
               {actionLabel}
             </button>
           )}
-        </div>
-      )}
+        </>
+      </DesplegableFlotante>
     </div>
   );
 }

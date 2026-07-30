@@ -48,18 +48,19 @@
 // recorta, pierde siempre. Por eso sale del flujo con `createPortal` y se ubica
 // en coordenadas de viewport con `calcularPosicionDesplegable` (módulo puro).
 //
+// 📌 Desde el 30-jul-2026 ese mecanismo NO vive acá: el barrido encontró el
+// mismo bug en 5 controles más (Cheques ×2, Caja ×2, notificaciones) y se
+// extrajo a `components/ui/DesplegableFlotante`. Este archivo lo USA. Si hay
+// que tocar cómo flota una lista, se toca allá y se arreglan los seis.
+//
 // Consecuencias buscadas: abrir la lista **no cambia el layout de la fila** (ni
 // una columna se mueve un píxel, medido), el campo con lo tecleado **queda
 // siempre a la vista**, y la lista puede ser más ancha que la columna para que
 // los nombres largos del directorio no salgan truncados.
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useRef, useState } from "react";
 import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
-import {
-  calcularPosicionDesplegable,
-  type PosicionDesplegable,
-} from "@/lib/ui/posicion-desplegable";
+import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 
 interface ClientePickerProps {
   /** Nombre ya guardado en la fila. */
@@ -125,60 +126,17 @@ export default function ClientePicker({
 }: ClientePickerProps) {
   const [abierto, setAbierto] = useState(false);
   const [query, setQuery] = useState("");
-  const [pos, setPos] = useState<PosicionDesplegable | null>(null);
   const idLista = `lista-${useId()}`;
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { hits, cargando } = useBusquedaClientes(query, abierto);
 
   const vinculado = mostrarVinculo && Boolean(value.trim() && codigo.trim());
   const aMano = mostrarVinculo && Boolean(value.trim() && !codigo.trim());
   const q = query.trim();
 
-  /** Reancla la lista al campo. En coordenadas de VIEWPORT, para `fixed`. */
-  const reubicar = useCallback(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPos(
-      calcularPosicionDesplegable(
-        { top: r.top, bottom: r.bottom, left: r.left, width: r.width },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
-  }, []);
-
-  // Antes de pintar, para que la lista no aparezca un frame en (0,0).
-  useLayoutEffect(() => {
-    if (abierto) reubicar();
-  }, [abierto, reubicar]);
-
-  // Mientras está abierta la lista SIGUE al campo: `fixed` no se mueve con el
-  // scroll, así que sin esto quedaría flotando en el aire al scrollear la página
-  // (o el propio ScrollableTable, de ahí el `capture`).
-  useEffect(() => {
-    if (!abierto) return;
-    window.addEventListener("scroll", reubicar, true);
-    window.addEventListener("resize", reubicar);
-    return () => {
-      window.removeEventListener("scroll", reubicar, true);
-      window.removeEventListener("resize", reubicar);
-    };
-  }, [abierto, reubicar]);
-
-  useEffect(() => {
-    function fuera(e: MouseEvent) {
-      const t = e.target as Node;
-      // La lista ya NO es hija del wrapper (vive en un portal), así que hay que
-      // preguntar por las dos cajas o el primer toque en una opción cerraría.
-      if (wrapRef.current?.contains(t)) return;
-      if (menuRef.current?.contains(t)) return;
-      setAbierto(false);
-    }
-    document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
-  }, []);
+  // Ubicar la lista, seguirla al scrollear y cerrarla al tocar afuera es todo
+  // de `DesplegableFlotante`. Acá solo queda lo que es de ESTE selector.
 
   function elegir(nombre: string, cod: string) {
     onChange(nombre, cod);
@@ -256,25 +214,16 @@ export default function ClientePicker({
 
       {/* La lista se dibuja en <body>: NINGÚN ancestro con overflow la puede
           recortar, y al estar fuera del flujo no mueve ni una columna. */}
-      {abierto && pos && typeof document !== "undefined" && createPortal(
-        <div
-          ref={menuRef}
-          id={idLista}
-          data-desplegable-cliente={pos.hacia}
-          style={{
-            position: "fixed",
-            top: pos.top,
-            left: pos.left,
-            width: pos.width,
-            maxHeight: pos.maxHeight,
-          }}
-          // z-[60] a propósito: por encima de la barra lateral y del panel de
-          // Cheques (los dos `z-50`) y de la barra sticky (`z-20`), pero por
-          // DEBAJO de los `z-[100]` (toasts, confirmaciones) — un diálogo tiene
-          // que poder taparla. Al estar en <body> el z-index no depende del
-          // orden del DOM, que era lo frágil.
-          className="z-[60] bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto overscroll-contain"
-        >
+      <DesplegableFlotante
+        abierto={abierto}
+        anclaRef={inputRef}
+        extraDentroRef={wrapRef}
+        onCerrar={() => setAbierto(false)}
+        id={idLista}
+        marca="cliente"
+        className="bg-white border border-gray-200 rounded-md shadow-lg"
+      >
+        <>
           {q.length >= 2 && cargando && (
             <div className="px-3 py-2 text-xs text-gray-400">Buscando…</div>
           )}
@@ -322,9 +271,8 @@ export default function ClientePicker({
               </div>
             )}
           </div>
-        </div>,
-        document.body,
-      )}
+        </>
+      </DesplegableFlotante>
 
       {/* Solo para que el candado de 44px y los lectores de pantalla vean el
           estado sin abrir nada. */}
