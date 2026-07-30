@@ -33,15 +33,16 @@ interface Variante {
 export function VariantePicker({
   marca,
   product,
-  tieneVariantes,
+  alternativas,
   onSaved,
   showToast,
   compacto,
 }: {
   marca: MarcaUiKey;
   product: { id: string; sku: string | null; name: string; image_url: string | null };
-  /** Ya sabemos (lista global) si este SKU tiene fotos del banco. */
-  tieneVariantes: boolean;
+  /** Cuántas fotos ALTERNATIVAS (distintas a la puesta) tiene. 0 = no se pinta
+   *  nada. Ya viene calculado de la lista global: acá NO se consulta. */
+  alternativas: number;
   onSaved: () => Promise<void>;
   showToast: (msg: string) => void;
   /** Variante visual para las filas densas. */
@@ -122,7 +123,7 @@ export function VariantePicker({
     : "w-full py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition";
 
   // Sin alternativas no hay nada que elegir → no se pinta ningún control.
-  if (!tieneVariantes) return null;
+  if (alternativas <= 0) return null;
 
   return (
     <div className={compacto ? "" : "w-full"}>
@@ -132,7 +133,7 @@ export function VariantePicker({
         aria-expanded={abierto}
         className={`${btnBase} ${abierto ? "bg-gray-50" : ""}`}
       >
-        {abierto ? "Cerrar fotos" : "Cambiar foto"}
+        {abierto ? "Cerrar fotos" : `Cambiar foto (${alternativas})`}
       </button>
 
       {abierto && (

@@ -55,8 +55,86 @@ async function listarTodo(
   return out;
 }
 
-/** SKUs (normalizados) que tienen al menos una variante guardada. */
-export async function listarSkusConVariantes(cfg: MarcaConfig): Promise<string[]> {
+/**
+ * Vistas guardadas de CADA SKU, en UNA sola llamada a Storage.
+ *
+ * 🩸 POR QUÉ ASÍ Y NO CONTANDO CARPETA POR CARPETA. Para decidir si se pinta el
+ * botón "Cambiar foto" hay que saber QUÉ hay dentro de cada carpeta, no solo si
+ * la carpeta existe. La forma obvia —un `list()` por SKU— serían 383 llamadas
+ * en cada carga de la pantalla de Tommy, y los metadatos de Storage viven en el
+ * mismo Postgres que el negocio: es justo la clase de barrido que ya tumbó la
+ * base dos veces esta semana.
+ *
+ * `list-v2` con `delimiter: ""` devuelve las rutas COMPLETAS de forma recursiva,
+ * así que todo el banco de una marca entra en 1 llamada (Tommy: 383 objetos,
+ * 1 página). Verificado contra producción el 30-jul-2026. Es el MISMO costo que
+ * tenía el listado de carpetas que reemplaza.
+ *
+ * DEGRADACIÓN SEGURA: si `list-v2` no existe o falla, se vuelve al listado de
+ * carpetas de siempre y se marca `exacto: false`. El cliente entonces trata
+ * "hay carpeta" como "hay alternativas" — el comportamiento viejo. Ante la duda
+ * se muestra el botón de más; nunca se esconde una función que sirve.
+ */
+export async function listarVistasPorSku(
+  cfg: MarcaConfig,
+): Promise<{ vistas: Record<string, number[]>; exacto: boolean }> {
+  const db = await storageDbDe(cfg);
+  const marca = cfg.marca as StorageMarcaKey;
+  const root = variantesRoot(marca);
+
+  try {
+    // `list-v2` no está en supabase-js: se llama por REST con las credenciales
+    // del MISMO client de la marca (nada de leer env por acá, que se desviaría
+    // de cómo cada marca resuelve su proyecto).
+    const anon = db as unknown as { supabaseKey: string; storage: { url: string } };
+    const url = `${anon.storage.url}/object/list-v2/${BUCKET}`;
+    const headers = {
+      apikey: anon.supabaseKey,
+      Authorization: `Bearer ${anon.supabaseKey}`,
+      "Content-Type": "application/json",
+    };
+
+    const vistas: Record<string, number[]> = {};
+    let cursor: string | undefined;
+    for (let pagina = 0; pagina < 50; pagina++) {
+      const resp = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ prefix: `${root}/`, limit: PAGE, delimiter: "", ...(cursor ? { cursor } : {}) }),
+      });
+      if (!resp.ok) throw new Error(`list-v2 ${resp.status}`);
+      const json = (await resp.json()) as { objects?: { name: string }[]; hasNext?: boolean };
+      const objetos = json.objects ?? [];
+      for (const o of objetos) {
+        // `{prefijo}/_v/{skuStorage}/{vista}.jpg` — ruta COMPLETA.
+        const m = String(o.name).match(/\/_v\/([^/]+)\/([^/]+)$/);
+        if (!m) continue;
+        const vista = vistaDesdeNombre(m[2]);
+        if (vista == null) continue;
+        (vistas[m[1]] ??= []).push(vista);
+      }
+      if (!json.hasNext || objetos.length === 0) break;
+      cursor = objetos[objetos.length - 1].name;
+    }
+    for (const k of Object.keys(vistas)) vistas[k].sort((a, b) => a - b);
+    return { vistas, exacto: true };
+  } catch {
+    // Degradación segura: solo sabemos qué carpetas existen → el cliente vuelve
+    // al comportamiento de antes (carpeta = hay alternativas).
+    try {
+      const vistas: Record<string, number[]> = {};
+      for (const f of await listarTodo(db, root)) if (f.name) vistas[f.name] = [];
+      return { vistas, exacto: false };
+    } catch {
+      return { vistas: {}, exacto: true }; // sin carpeta raíz: nadie subió el ZIP
+    }
+  }
+}
+
+/** SKUs (normalizados) que tienen al menos una variante guardada. Solo la usa
+ *  el fallback de `listarVistasPorSku`: la pantalla necesita el CONTENIDO de
+ *  cada carpeta, no la lista de carpetas. */
+async function listarSkusConVariantes(cfg: MarcaConfig): Promise<string[]> {
   const db = await storageDbDe(cfg);
   const marca = cfg.marca as StorageMarcaKey;
   try {
