@@ -266,23 +266,23 @@ export default function ReclamoDetail({
                 {/* Cabecera en edición: py-1.5 sobre text-sm dejaba los campos en
                     ~34 px y con 14px Safari hacía zoom al enfocar. En sm+ vuelve
                     al tamaño denso original. */}
-                <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none bg-transparent min-h-[44px] sm:min-h-0">
+                <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none bg-transparent min-h-[44px] xl:min-h-0">
                   {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">N° Factura *</span>
-                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
+                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
               </label>
               {!esActiveShoes(editEmpresa) && (
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-gray-500">N° Pedido *</span>
-                  <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
+                  <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
                 </label>
               )}
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-gray-500">Fecha *</span>
-                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
+                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-2.5 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-xs text-gray-500">Notas</span>
@@ -371,19 +371,24 @@ export default function ReclamoDetail({
           <button onClick={() => setEditMode(false)} disabled={editSaving} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] px-2">Cancelar</button>
         </div>
       ) : (
-        <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
+        /* `flex-wrap` YA baja de renglón, así que el `overflow-x-auto` que
+           estaba acá al lado no aportaba nada y arrastraba 8px en los CUATRO
+           anchos —incluido 1440—: un scroller que nadie necesita, sobre una
+           fila que nunca desborda. Es la misma lección de los filtros del
+           catálogo: gana `flex-wrap`, una sola clase. */
+        <div className="flex items-center gap-2 mb-6 flex-wrap pb-1">
           {/* Las 3 píldoras quedaban en ~38 px de alto en iPhone (py-2.5 sobre
               text-xs). min-h-[44px] solo en móvil: en escritorio la barra sigue
               compacta con su py-1.5. */}
-          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center justify-center gap-1 min-h-[44px] sm:min-h-0">
+          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center justify-center gap-1 min-h-[44px] xl:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
             Editar
           </button>
-          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] sm:min-h-0">
+          <button onClick={downloadExcel} disabled={excelBusy} title="Descargar el Excel de este reclamo (con links a la factura y fotos que abren con un clic)" className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] xl:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
             {excelBusy ? "Generando Excel…" : "Descargar Excel"}
           </button>
-          <button onClick={downloadPdf} disabled={pdfBusy} title="Descargar el PDF de este reclamo (datos, ítems, recuperación y evidencia fotográfica)" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] sm:min-h-0">
+          <button onClick={downloadPdf} disabled={pdfBusy} title="Descargar el PDF de este reclamo (datos, ítems, recuperación y evidencia fotográfica)" className="text-xs border border-gray-200 px-3 py-2.5 xl:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center justify-center gap-1 disabled:opacity-40 min-h-[44px] xl:min-h-0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
             {pdfBusy ? "Generando PDF…" : "Descargar PDF"}
           </button>
@@ -624,40 +629,126 @@ export default function ReclamoDetail({
               <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition inline-flex items-center min-h-[44px] px-2 -mx-2">+ Agregar fila</button>
             </>
           ) : (
-            <ScrollableTable minWidth={700}>
-              <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
-                    <th className="text-left pb-2 font-medium">Código</th>
-                    <th className="text-left pb-2 font-medium">Descripción</th>
-                    <th className="text-left pb-2 font-medium">Talla</th>
-                    <th className="text-left pb-2 font-medium">Género</th>
-                    <th className="text-right pb-2 font-medium">Cant.</th>
-                    <th className="text-right pb-2 font-medium">Precio</th>
-                    <th className="text-right pb-2 font-medium">Subtotal</th>
-                    <th className="text-left pb-2 font-medium">Motivo</th>
-                    <th className="text-left pb-2 font-medium">Factura</th>
-                    <th className="text-left pb-2 font-medium">PO</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, i) => (
-                    <tr key={i} className="border-b border-gray-200">
-                      <td className="py-2">{item.referencia}</td>
-                      <td className="py-2 text-gray-500">{item.descripcion}</td>
-                      <td className="py-2 text-gray-500">{item.talla}</td>
-                      <td className="py-2 text-gray-500 text-xs">{item.genero || "—"}</td>
-                      <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
-                      <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
-                      <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                      <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
-                      <td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td>
-                      <td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ScrollableTable>
+            /* ── 🩸 LOS ÍTEMS DEL RECLAMO, MEDIDOS (30-jul-2026) ──────────────
+               10 columnas dentro de un ScrollableTable de 700px de piso. En
+               iPhone arrastraba 310px y en iPad 138px, y lo que quedaba fuera
+               era **PRECIO y SUBTOTAL** — o sea cuánto se le reclama al
+               proveedor, que es la razón de ser de la pantalla. También MOTIVO,
+               FACTURA y PO.
+
+               El ancho ÚTIL es el que decide: la barra lateral se lleva ~224px,
+               así que un iPad de 834 deja ~562. Por eso el corte es `lg` (1024)
+               —donde la tabla ya entraba sola, medido en 0px— y no `md`.
+
+               Patrón: tarjetas, el mismo de `admin/components/PanelCxcMobile.tsx`
+               y `components/ventas/ResumenViewMobile.tsx`. No se inventa otro.
+               `data-medir` es FIJO (no una clase de breakpoint) para que el
+               arnés compare los MISMOS números en los 4 anchos: buscar por
+               `.lg\:hidden` devuelve vacío en cuanto se mueve el corte y el
+               chequeo pasaría sin comparar nada. */
+            <div data-medir="reclamo-items">
+              {/* Celular e iPad vertical: una tarjeta por ítem. 0px de arrastre
+                  por construcción — no hay contenedor con scroll lateral. */}
+              <ul className="lg:hidden space-y-2" data-vista="tarjetas">
+                {items.map((item, i) => {
+                  const cant = Number(item.cantidad) || 0;
+                  const precio = Number(item.precio_unitario) || 0;
+                  return (
+                    <li key={i} className="rounded-lg border border-gray-200 p-3">
+                      {/* Encabezado: el código manda, el subtotal es lo que se mira. */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{item.referencia}</div>
+                          {item.descripcion && (
+                            <div className="text-xs text-gray-500 truncate">{item.descripcion}</div>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-xs text-gray-400">Subtotal</div>
+                          <div className="font-medium tabular-nums">${fmt(cant * precio)}</div>
+                        </div>
+                      </div>
+
+                      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-gray-400">Cant.</dt>
+                          <dd className="tabular-nums">{cant}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-gray-400">Precio</dt>
+                          <dd className="tabular-nums">${fmt(item.precio_unitario)}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-gray-400">Talla</dt>
+                          <dd className="text-gray-600 truncate">{item.talla || "—"}</dd>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <dt className="text-gray-400">Género</dt>
+                          <dd className="text-gray-600 truncate">{item.genero || "—"}</dd>
+                        </div>
+                        {item.motivo && (
+                          <div className="col-span-2 flex justify-between gap-2">
+                            <dt className="text-gray-400 shrink-0">Motivo</dt>
+                            <dd className="text-gray-600 text-right">{item.motivo}</dd>
+                          </div>
+                        )}
+                        {item.nro_factura && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-gray-400">Factura</dt>
+                            <dd className="text-gray-600 truncate">{item.nro_factura}</dd>
+                          </div>
+                        )}
+                        {item.nro_orden_compra && (
+                          <div className="flex justify-between gap-2">
+                            <dt className="text-gray-400">PO</dt>
+                            <dd className="text-gray-600 truncate">{item.nro_orden_compra}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* ≥lg: la tabla de siempre, intacta. Solo se le agregó el
+                  `hidden lg:block` del contenedor que la esconde en angosto. */}
+              <div className="hidden lg:block" data-vista="tabla">
+                <ScrollableTable minWidth={700}>
+                  <table className="w-full text-sm [&_td]:py-3 [&_th]:pb-3">
+                    <thead className="sticky top-0 bg-white z-10">
+                      <tr className="border-b border-gray-200 text-xs uppercase tracking-wide font-medium text-gray-500">
+                        <th className="text-left pb-2 font-medium">Código</th>
+                        <th className="text-left pb-2 font-medium">Descripción</th>
+                        <th className="text-left pb-2 font-medium">Talla</th>
+                        <th className="text-left pb-2 font-medium">Género</th>
+                        <th className="text-right pb-2 font-medium">Cant.</th>
+                        <th className="text-right pb-2 font-medium">Precio</th>
+                        <th className="text-right pb-2 font-medium">Subtotal</th>
+                        <th className="text-left pb-2 font-medium">Motivo</th>
+                        <th className="text-left pb-2 font-medium">Factura</th>
+                        <th className="text-left pb-2 font-medium">PO</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, i) => (
+                        <tr key={i} className="border-b border-gray-200">
+                          <td className="py-2">{item.referencia}</td>
+                          <td className="py-2 text-gray-500">{item.descripcion}</td>
+                          <td className="py-2 text-gray-500">{item.talla}</td>
+                          <td className="py-2 text-gray-500 text-xs">{item.genero || "—"}</td>
+                          <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
+                          <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
+                          <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
+                          <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
+                          <td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td>
+                          <td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollableTable>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -711,7 +802,7 @@ export default function ReclamoDetail({
       <div className="mb-8">
         <div className="text-sm font-semibold text-gray-700 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
-          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] sm:min-h-0" />
+          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none min-h-[44px] xl:min-h-0" />
           {/* py-1.5 dejaba "Agregar" en 32 px de alto. */}
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 inline-flex items-center justify-center min-h-[44px] shrink-0">Agregar</button>
         </div>

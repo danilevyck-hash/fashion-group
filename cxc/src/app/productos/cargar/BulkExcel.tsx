@@ -188,13 +188,13 @@ export default function BulkExcel({ catalogo, onDone }: { catalogo: CatalogoDesc
         <span className="text-[12px] font-semibold uppercase tracking-wide text-stone-500">Edición en masa</span>
         <button
           type="button" onClick={download} disabled={!!busy || !catalogo}
-          className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97] disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-900 transition hover:border-teal-600 hover:text-teal-800 active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "download" ? "Generando…" : "Descargar Excel"}
         </button>
         <button
           type="button" onClick={() => inputRef.current?.click()} disabled={!!busy || !catalogo}
-          className="rounded-md bg-teal-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md bg-teal-600 px-3 text-sm font-semibold text-white transition hover:bg-teal-700 active:scale-[0.97] disabled:opacity-50"
         >
           {busy === "upload" ? "Subiendo…" : "Subir Excel"}
         </button>

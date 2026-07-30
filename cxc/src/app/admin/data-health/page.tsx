@@ -222,12 +222,47 @@ export default function DataHealthPage() {
               No hay resultados todavía. Corre el primer check con el botón de arriba.
             </div>
           ) : (
-            // Sin este overflow-x-auto la tabla (~690px) queda recortada dentro
-            // del `overflow-hidden` de la card: en iPhone (340px útiles) se
-            // perdían 350px SIN scroll, y lo inalcanzable era justo Severity y
-            // Rows — el dato por el que existe la página. Mismo patrón que la
-            // tabla del historial 30d de más abajo.
-            <div className="overflow-x-auto">
+            // ── 🩸 MEDIDO (30-jul-2026, build de producción) ──────────────
+            // El `overflow-x-auto` salvó el dato de ser RECORTADO por el
+            // `overflow-hidden` de la card, pero dejaba el arrastre: 353px en
+            // iPhone y 133px en iPad, con Severity y Rows —el dato por el que
+            // existe la página— fuera de la pantalla. Ahora, hasta `lg`, son
+            // TARJETAS; de `lg` para arriba la tabla entra sola (medido: 0px a
+            // 1024) y no se le tocó nada.
+            //
+            // `data-medir` es FIJO, no una clase de breakpoint: el arnés compara
+            // los mismos números en los 4 anchos y buscar por `.lg\:hidden`
+            // devolvería vacío al mover el corte, pasando sin comparar nada.
+            <div data-medir="dh-checks">
+              {/* Celular e iPad vertical: una tarjeta por check. */}
+              <ul className="lg:hidden divide-y divide-gray-200" data-vista="tarjetas">
+                {data?.latest.map(r => {
+                  const badge = SEVERITY_BADGE[r.severity];
+                  return (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCheck(r)}
+                        className="w-full min-h-[44px] px-4 py-3 text-left transition hover:bg-gray-50 active:bg-gray-100"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="font-mono text-xs break-all">{r.check_name}</span>
+                          <span className={`shrink-0 inline-block px-2 py-0.5 rounded text-xs font-semibold ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                          <span className="font-mono">{r.table_name}</span>
+                          <span className="tabular-nums font-medium text-gray-700">{r.rows_affected}</span>
+                          <span title={fmtAbsolute(r.checked_at)}>{fmtRelative(r.checked_at)}</span>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="hidden lg:block overflow-x-auto" data-vista="tabla">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="text-xs text-gray-500 uppercase tracking-wide bg-gray-50 border-b border-gray-200">
@@ -266,6 +301,7 @@ export default function DataHealthPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -277,7 +313,43 @@ export default function DataHealthPage() {
               <h2 className="text-sm font-semibold text-gray-700">Historial 30 días</h2>
               <p className="text-xs text-gray-400 mt-0.5">Cada celda = peor severity del día. Gris = sin corrida.</p>
             </div>
-            <div className="px-4 py-4 overflow-x-auto">
+            {/* ── 🩸 EL MAPA DE 31 COLUMNAS, MEDIDO (30-jul-2026) ───────────
+                Era el peor arrastre de la pantalla: 448px en iPhone y 228px en
+                iPad — de los 30 días se veían 7. **Y a 1024 todavía quedaban
+                38px**, así que acá el corte `lg` NO alcanzaba: el corte no tiene
+                por qué ser el mismo en toda la app, se mide pantalla por
+                pantalla.
+
+                Esto no es una tabla de datos, es una CUADRÍCULA de estado, así
+                que en vez de correr el corte se la deja ENVOLVER: los 30 puntos
+                bajan de renglón (`flex-wrap`) y el arrastre es 0 por
+                construcción, en todos los anchos, sin tocar el escritorio.
+
+                ⚠️ Al envolver se pierde el renglón con el número de día — no
+                habría forma de alinearlo. La fecha no se pierde: sigue en el
+                `title` de cada punto, que ya era la fuente de verdad del dato
+                (el `título` del escritorio dice el día, el `title` dice la fecha
+                completa y la severidad). */}
+            <div className="px-4 py-4">
+              {/* Hasta `xl`: un bloque por check con los puntos envueltos. */}
+              <div className="xl:hidden space-y-3" data-vista="tarjetas">
+                {data.latest.map(r => (
+                  <div key={r.check_name}>
+                    <div className="font-mono text-xs text-gray-600 break-all mb-1">{r.check_name}</div>
+                    <div className="flex flex-wrap gap-1">
+                      {days30.map(d => {
+                        const sev = data.history[r.check_name]?.[d];
+                        const dotClass = sev ? SEVERITY_DOT[sev] : SEVERITY_DOT.missing;
+                        const tooltipLabel = sev ? `${d}: ${sev}` : `${d}: sin corrida`;
+                        return <div key={d} className={`w-3 h-3 rounded-sm ${dotClass}`} title={tooltipLabel} />;
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* ≥xl: la cuadrícula de siempre, con su renglón de días. */}
+              <div className="hidden xl:block overflow-x-auto" data-vista="tabla">
               <table className="text-xs">
                 <thead>
                   <tr>
@@ -307,7 +379,12 @@ export default function DataHealthPage() {
                   ))}
                 </tbody>
               </table>
-              <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+              </div>
+              {/* `flex-wrap`: las 4 etiquetas de severidad no entran en 342px y
+                  la card las RECORTA (overflow-hidden, sin scroller adentro).
+                  Antes quedaba tapado por el arrastre del mapa; al sacarlo,
+                  aparecieron sus 28px. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 text-xs text-gray-500">
                 {(["ok", "info", "warning", "critical"] as const).map(s => (
                   <div key={s} className="flex items-center gap-1.5">
                     <div className={`w-3 h-3 rounded-sm ${SEVERITY_DOT[s]}`} />
