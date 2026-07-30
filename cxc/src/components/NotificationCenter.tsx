@@ -38,26 +38,27 @@ function formatRelativeTime(date: Date): string {
   return `hace ${Math.floor(diffHr / 24)}d`
 }
 
-interface NotificationCenterProps {
-  /**
-   * Tamaño del área táctil de la campana.
-   *  - "compacta" (default): el botón chico del header de escritorio, donde se
-   *    apunta con el mouse y 44 px serían un hueco enorme al lado de la lupa.
-   *  - "tactil": 44×44, el mínimo de la casa para el dedo en el iPhone.
-   *
-   * Antes esto se resolvía desde AppHeader estirando el botón con selectores
-   * arbitrarios (`[&>div>button]:min-w-[44px]` y un reposicionamiento del punto
-   * rojo). Funcionaba, pero dejaba el tamaño de este componente escrito en otro
-   * archivo: cualquier cambio acá adentro lo rompía en silencio.
-   */
-  size?: "compacta" | "tactil"
-}
-
-export default function NotificationCenter({ size = "compacta" }: NotificationCenterProps = {}) {
+/**
+ * La campana mide 44×44 SIEMPRE — ya no hay dos tamaños.
+ *
+ * 🩸 Tenía uno "compacto" de 24×24 para el header de escritorio, con el
+ * argumento de que ahí se apunta con el mouse. El argumento se cae con la
+ * medición: ese header aparece desde `sm` (640 px), o sea que **el iPad lo
+ * muestra y la campana se toca con el dedo** — medida a 834 y a 1024 px daba
+ * 24×24. "Escritorio" no es una pantalla grande: es un puntero fino, y a 834
+ * no hay ninguno.
+ *
+ * Y no cuesta nada de layout: la fila del header ya mide `h-11` = 44 px, así
+ * que el botón entra exacto sin mover un píxel de lo que está al lado
+ * (verificado en el navegador a los 4 anchos).
+ *
+ * El punto rojo se ancla al ÍCONO, no al botón: en 44×44 las esquinas quedan
+ * lejos de la campana dibujada de 16 px.
+ */
+export default function NotificationCenter() {
   const { notifications, unreadCount } = useNotifications()
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
-  const tactil = size === "tactil"
 
   // Close on click outside
   useEffect(() => {
@@ -95,23 +96,17 @@ export default function NotificationCenter({ size = "compacta" }: NotificationCe
         ref={botonRef}
         onClick={handleToggle}
         aria-label="Notificaciones"
-        className={`relative text-gray-400 hover:text-gray-700 transition rounded-md hover:bg-gray-50 ${
-          tactil
-            ? "min-w-[44px] min-h-[44px] flex items-center justify-center"
-            : "p-1"
-        }`}
+        className="relative text-gray-400 hover:text-gray-700 transition rounded-md hover:bg-gray-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
         title="Notificaciones"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {/* El punto rojo se ancla al ÍCONO, no al botón: en modo táctil el botón
-            es 44×44 y las esquinas quedan lejos de la campana dibujada. */}
+        {/* El punto rojo se ancla al ÍCONO, no al botón: el botón es 44×44 y
+            las esquinas quedan lejos de la campana dibujada de 16 px. */}
         {unreadCount > 0 && (
-          <span className={`absolute w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white ${
-            tactil ? "top-2 right-2" : "-top-0.5 -right-0.5"
-          }`} />
+          <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
         )}
       </button>
 
