@@ -26,7 +26,6 @@ import { FilaDetalleTr, medirFila, TOTAL_GRUPO_ID, type FilaDetalle } from "./Fi
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { cn } from "@/lib/utils";
 import { variacionPct } from "@/lib/variacion";
-import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
 import { EmpresaMesAnioPanel, useResumenMesAnio, type CurrentYtdSamePeriod } from "./ResumenMesAnio";
 
@@ -251,43 +250,29 @@ export function ResumenView({
         </div>
       )}
 
-      <ResumenViewMobile
-        data={data}
-        selectedYear={selectedYear}
-        isClosedYear={isClosedYear}
-        viewMode={viewMode}
-        setViewMode={onToggleMode}
-        granularity={granularity}
-        setGranularity={setGranularity}
-        anualData={anualData}
-        anualError={anualError}
-        onOpenEmpresa={setPanelEmpresaId}
-        onAbrirFila={setFilaDetalle}
-        filaDetalle={filaDetalle}
-        onCerrarFila={cerrarFila}
-        onReloadData={onReloadData}
-        multiMayoreoNota={multiMayoreoNota?.texto ?? null}
-      />
+      {/* 🩸 ACÁ VIVÍAN LAS TARJETAS DE CELULAR, Y SE FUERON POR PEDIDO DE DANIEL.
+          Textual, 30-jul-2026: *"porq ventas en el celular me cambiastes el
+          formato? no me gusta asi, me gusta ver mi tabla completa, o buscar
+          otra manera de verlo en el ihpone"*.
 
-      {/* 🩸 EL CORTE NO ES `md` NI `lg` NI `xl`, Y EL MOTIVO ES UN NÚMERO.
-          La matriz son 15 columnas (Empresa + 12 meses + Total + Proyección) y
-          su ancho MÍNIMO REAL —medido con scripts/_ancho-util-ventas.mjs, que la
-          colapsa en una jaula de 1 px para que el navegador parta todo lo que
-          pueda— era 1.276 px. Contra el ancho ÚTIL, que es lo que queda después
-          de los 223 px de la barra lateral y los 56 del main:
+          La lectura del problema estaba equivocada. Se había medido el
+          ARRASTRE y se lo trató como el defecto; el defecto real era que al
+          arrastrar **se perdía la columna de nombres** y dejabas de saber qué
+          fila estabas leyendo. Con la primera columna fija, arrastrar deja de
+          ser un problema y pasa a ser navegación normal — y la tabla, que es
+          lo que Daniel quiere ver, se queda.
 
-            390 -> 356    810 -> 528    834 -> 552    1024 -> 742
-            1194 -> 912   1366 -> 1087  1440 -> 1158
+          Así que ahora hay UNA sola forma en todos los anchos: la matriz.
 
-          NO ENTRABA EN NINGUNO. Ni siquiera en el escritorio: a 1440 px se
-          arrastraban 118. O sea que "en una pantalla ancha la matriz se ve
-          entera" nunca fue cierto — se creía, no se había medido.
+          🔑 La columna Empresa va FIJA (`sticky left-0`): al deslizar por los
+          meses nunca se pierde de vista de quién es la fila.
 
-          Por eso las tarjetas suben hasta 1440 (cubren iPhone y TODOS los iPad,
-          incluido el Pro de 12.9" acostado, que da 1366) y a la matriz se le
-          bajó el piso para que a 1440 entre de verdad. Correr el corte a `xl`
-          no alcanzaba: a 1280 el útil es 1.001 y faltarían 275 px. */}
-      <div className="hidden min-[1440px]:block space-y-5">
+          El piso de la matriz sigue bajo a propósito (medido en el #380):
+          menos ancho = menos que deslizar. Su mínimo real es 1.098 px contra
+          los 1.158 útiles de un escritorio de 1440, así que ahí entra entera y
+          no queda nada que arrastrar; en el iPhone se desliza, que es justo lo
+          que Daniel pidió. */}
+      <div className="space-y-5">
       {/* KPI cards YTD del grupo — 3 cols (Ventas Netas / Utilidad / Margen).
           Comparativo same-period vs prev year (ya viene aplicado desde la RPC
           ventas_dashboard_prev_same_period). El toggle de la matriz no afecta
@@ -346,7 +331,10 @@ export function ResumenView({
                 key={m}
                 onClick={() => onToggleMode(m)}
                 className={cn(
-                  "rounded-full px-3.5 py-1.5 font-medium capitalize transition",
+                  // 44 px: estos dos toggles vivían SOLO en el escritorio y median
+                  // 30 de alto. Al dibujar la matriz también en el celular quedaron
+                  // bajo el pulgar, y cambian lo que muestra toda la tabla.
+                  "inline-flex min-h-[44px] items-center rounded-full px-3.5 font-medium capitalize transition",
                   viewMode === m
                     ? "bg-white text-gray-950 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
@@ -364,7 +352,7 @@ export function ResumenView({
                 key={g}
                 onClick={() => setGranularity(g)}
                 className={cn(
-                  "rounded-full px-3.5 py-1.5 font-medium transition",
+                  "inline-flex min-h-[44px] items-center rounded-full px-3.5 font-medium transition",
                   granularity === g
                     ? "bg-white text-gray-950 shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
@@ -389,7 +377,7 @@ export function ResumenView({
                 queda sticky en ambos ejes (left+top) sobre el resto. */}
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="sticky left-0 top-0 z-30 min-w-[120px] bg-gray-100 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                <th className="sticky left-0 top-0 z-30 min-w-[120px] border-r border-gray-200 bg-gray-100 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide text-gray-500">
                   Empresa
                 </th>
                 {cols.map(c => (
@@ -439,7 +427,11 @@ export function ResumenView({
                     // SIN `whitespace-nowrap`: "Confecciones Boston" puede caer en dos
                     // renglones. Partirlo no es abreviarlo —dice lo mismo— y es lo que más
                     // le baja el piso a la tabla: esa columna sola medía 189 px.
-                    "sticky left-0 z-10 cursor-pointer border-b border-gray-200 px-2.5 py-3.5 text-sm text-gray-950",
+                    // `border-r` marca dónde termina lo FIJO y empieza lo que se desliza.
+                    // Sin esa línea la columna se lee como parte del resto y el deslizamiento
+                    // parece un salto. El fondo opaco (bg-white / bg-teal-50 / bg-gray-50) NO
+                    // es decorativo: sin él los meses se ven POR DEBAJO del nombre al deslizar.
+                    "sticky left-0 z-10 cursor-pointer border-b border-r border-gray-200 px-2.5 py-3.5 text-sm text-gray-950",
                     isMulti ? "bg-teal-50" : isOpen ? "bg-gray-50" : "bg-white"
                   )}>
                     <div className="flex items-center gap-1.5">
@@ -503,7 +495,7 @@ export function ResumenView({
                 />
               ) : (
               <tr className="bg-gray-950 text-white">
-                <td className="sticky left-0 z-10 bg-gray-950 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
+                <td className="sticky left-0 z-10 border-r border-gray-800 bg-gray-950 px-2.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}

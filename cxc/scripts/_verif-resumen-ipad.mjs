@@ -1,4 +1,10 @@
-// ¿CAMBIÓ ALGÚN NÚMERO de Ventas › Resumen al llevar las tarjetas hasta 1440 px?
+// ¿CAMBIÓ ALGÚN NÚMERO de Ventas › Resumen entre un ancho y otro?
+//
+// 🩸 Las tarjetas de celular SE FUERON el 30-jul-2026 por pedido de Daniel (*"me
+// gusta ver mi tabla completa"*): ahora la matriz se dibuja en TODOS los anchos,
+// con la columna Empresa fija. Este verificador sigue haciendo falta — compara la
+// MISMA matriz leída angosta contra 1440, que es lo que atrapa una celda que se
+// esconda, se recorte o se formatee distinto según el ancho.
 //
 // Compara la MISMA pantalla en dos anchos, celda por celda: los 12 meses, el
 // Total y la Proyección de cada empresa y del total del grupo.
@@ -114,6 +120,11 @@ function compararCelda(a, b) {
 
   const montoX = x.find((t) => !t.pct);
   const montoY = y.find((t) => !t.pct);
+  // Un mes sin dato se dibuja "—": no tiene números y las dos formas lo muestran
+  // igual. Sin este caso, dos celdas idénticas se reportaban como diferencia.
+  if (!montoX && !montoY) {
+    return { ok: (a ?? "").trim() === (b ?? "").trim(), nota: null };
+  }
   if (!montoX || !montoY) return { ok: false, nota: null };
   if (Math.abs(montoX.valor - montoY.valor) > Math.max(montoX.tol, montoY.tol)) {
     return { ok: false, nota: null };

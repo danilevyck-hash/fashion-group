@@ -311,11 +311,6 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   const histStateFor = (c: Cliente): HistorialState =>
     historialCache[`${c.id}|${c.empresaKey}`] ?? { status: "idle" };
 
-  // En modo "Todas", mostrar la empresa principal en las cards mobile.
-  // En modo empresa específica, la empresa está implícita en el filtro,
-  // así que se omite del subtítulo para reducir ruido visual.
-  const showEmpresaInCard = empresa === "todas";
-
   return (
     <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
       {fetchError && (
@@ -474,13 +469,27 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
 
           El escritorio ancho no cambia: la tabla es `w-full` y el `minWidth`
           sólo actúa cuando el contenedor es más angosto que él. */}
-      <Card className="hidden overflow-hidden p-0 lg:block">
+      {/* 🩸 ACÁ TAMBIÉN HUBO TARJETAS EN CELULAR, y se fueron con las de las
+          otras pestañas. Daniel, 30-jul-2026: *"me gusta ver mi tabla completa"*.
+          Lo que hacía ilegible el arrastre no era el arrastre: era perder de
+          vista de QUIÉN era la fila. Por eso las dos primeras columnas (# y
+          Cliente) van FIJAS. */}
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 680 }}>
             <thead>
               <tr className="bg-gray-100">
+                {/* 🩸 SOLO SE FIJA UNA COLUMNA, Y ES EL NOMBRE. Fijar también "#"
+                    con un desplazamiento escrito a mano se midió y NO funciona:
+                    en `table-layout: auto` el ANCHO DE LA COLUMNA LO DECIDE EL
+                    NAVEGADOR, no el `width` que uno le pone. Medido a 390 px, la
+                    columna "#" quedó en 96 px con `width: 3rem` puesto → el
+                    nombre se despegaba 48 px al deslizar. Con una sola columna
+                    fija no hay ningún número que pueda desincronizarse: el "#"
+                    se desliza por debajo del nombre, que es el dato que hay que
+                    no perder de vista. */}
                 <SortHeader col="rank"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>#</SortHeader>
-                <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
+                <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort} fija>Cliente</SortHeader>
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
                 <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras {selectedYear}</SortHeader>
                 <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
@@ -511,6 +520,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     histState={histStateFor(c)}
                     empresaScope={empresa}
                     onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
+                    onTap={() => setSheetCliente(c)}
                   />
                 );
               })}
@@ -519,10 +529,15 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right">
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
                   </td>
-                  <td className="border-b border-gray-200 px-2.5 py-3 text-sm font-medium text-gray-700" colSpan={2}>
+                  {/* SIN `colSpan={2}`: una celda fija que abarca dos columnas
+                      queda pinchada tapando la de Empresa al deslizar. Se parte
+                      en dos — el nombre fijo, la de Empresa vacía y deslizable —
+                      y la grilla sigue cuadrando en 6 columnas. */}
+                  <td className="sticky left-0 z-10 border-b border-r border-gray-200 bg-amber-50 px-2.5 py-3 text-sm font-medium text-gray-700">
                     {ventasLocalRow.nombre}
                     <span className="ml-2 text-xs font-normal text-gray-500">ventas de contado · fuera del ranking</span>
                   </td>
+                  <td className="border-b border-gray-200 px-2.5 py-3" />
                   <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
                   <td className="border-b border-gray-200 px-2.5 py-3 text-right text-gray-400">—</td>
                   <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
@@ -537,46 +552,6 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           </table>
         </div>
       </Card>
-
-      {/* ─────── Mobile (-md): cards verticales ─────── */}
-      <div className="space-y-2 lg:hidden">
-        {filtered.map(c => {
-          if (c.isOtrosAggregate) {
-            return (
-              <OtrosCard
-                key="__otros_card__"
-                c={c}
-                onTap={() => setOtrosOpen(true)}
-              />
-            );
-          }
-          return (
-            <ClienteCard
-              key={`card-${c.empresaKey}-${c.id}-${c.rank}`}
-              c={c}
-              showEmpresa={showEmpresaInCard}
-              onTap={() => setSheetCliente(c)}
-            />
-          );
-        })}
-        {ventasLocalRow && !search.trim() && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
-              <span className="text-sm font-medium text-gray-700">{ventasLocalRow.nombre}</span>
-            </div>
-            <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
-              <span>ventas de contado · fuera del ranking</span>
-              <span className="font-mono tabular-nums text-gray-700">{fmtMoney(ventasLocalRow.ytd)}</span>
-            </div>
-          </div>
-        )}
-        {filtered.length === 0 && (
-          <div className="rounded-lg border border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-500">
-            No se encontraron clientes con esos filtros.
-          </div>
-        )}
-      </div>
 
       <OtrosClientesDialog
         open={otrosOpen}
@@ -643,6 +618,7 @@ function ClienteRow({
   histState,
   empresaScope,
   onTriggerHistorial,
+  onTap,
 }: {
   c: Cliente;
   /** Rank visual 1..N según el sort actual. Reemplaza c.rank (DB rank
@@ -652,6 +628,10 @@ function ClienteRow({
   histState: HistorialState;
   empresaScope: string;
   onTriggerHistorial: () => void;
+  /** Abre el detalle en celular. En escritorio no pasa nada: `ClienteSheet` es
+   *  `lg:hidden` y ahí el preview lo da el HoverCard al pasar el mouse. La fila
+   *  ya se veía clicable (`cursor-pointer`) y no hacía nada — ahora sí. */
+  onTap: () => void;
 }) {
   const fmt = formatDeltaRatio(c.delta);
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
@@ -671,9 +651,11 @@ function ClienteRow({
     // verificador. Buscar por clase de breakpoint (`.md\\:hidden`) es la trampa
     // que hace pasar un chequeo sin comparar nada: al mover el corte, el
     // selector devuelve vacío y el test "aprueba" el silencio.
-    <tr data-fila-cliente={`${c.empresaKey}|${c.id}`} className="cursor-pointer transition hover:bg-gray-50">
+    <tr data-fila-cliente={`${c.empresaKey}|${c.id}`} onClick={onTap} className="group cursor-pointer transition hover:bg-gray-50">
       <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
-      <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
+      {/* El `bg-white` es obligatorio: sin fondo opaco, las columnas de plata se
+          ven POR DEBAJO del nombre al deslizar. */}
+      <td data-col="celda-nombre" className="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2.5 py-3 text-sm text-gray-950 group-hover:bg-gray-50">
         {/* Escritorio (lg+): HoverCard con popover. Debajo de lg el mismo
             botón dispara onMobileTap → abre ClienteSheet en el padre. */}
         <HoverCard openDelay={250} closeDelay={100}>
@@ -779,7 +761,7 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       aria-label="Abrir detalle de otros clientes"
     >
       <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-400 tabular-nums">—</td>
-      <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
+      <td className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-100 px-2.5 py-3 text-sm text-gray-950">
         <div className="font-medium leading-tight">{c.nombre}</div>
         <div className="font-mono text-xs leading-tight text-gray-500">click para ver detalle</div>
       </td>
@@ -800,107 +782,15 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
   );
 }
 
-/**
- * Card mobile equivalente a ClienteRow. Tap en cualquier parte (menos el
- * botón WhatsApp) abre el ClienteSheet con el detalle. Touch target del
- * WhatsApp ≥ 44px independiente del icono visual.
- */
-function ClienteCard({
-  c,
-  showEmpresa,
-  onTap,
-}: {
-  c: Cliente;
-  showEmpresa: boolean;
-  onTap: () => void;
-}) {
-  const fmt = formatDeltaRatio(c.delta);
-  return (
-    <div
-      data-fila-cliente={`${c.empresaKey}|${c.id}`}
-      role="button"
-      tabIndex={0}
-      onClick={onTap}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
-      className="rounded-lg border border-gray-200 bg-white active:bg-gray-50"
-    >
-      <div className="px-4 py-2.5">
-        {/* El nombre es un enlace ANIDADO adentro de una tarjeta que ya es
-            tocable, y medía 324×19 — el blanco táctil más repetido de la
-            pantalla (112 en la lista). Ahora ocupa 44 px de alto; el `-my-*`
-            se los toma del relleno de la tarjeta, así que la lista no se
-            estira ni se pierde densidad. */}
-        <div className="flex items-baseline justify-between gap-2">
-          <Link
-            href={`/clientes/${encodeURIComponent(c.id)}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
-          >
-            <span data-col="nombre" className="truncate">
-              {c.nombre}
-              {c.esDelGrupo && <DelGrupoBadge />}
-            </span>
-          </Link>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
-          <span data-col="codigo" className="font-mono">{c.id}</span>
-          {showEmpresa && c.empresa && (
-            <>
-              <span aria-hidden className="opacity-50">·</span>
-              <span data-col="empresa" className="truncate">{c.empresa}</span>
-            </>
-          )}
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-3">
-          <div data-col="ytd-compacto" className="font-mono text-base font-medium tabular-nums text-gray-950">
-            {fmtMoneyCompact(c.ytd)}
-          </div>
-          <div data-col="delta" className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
-            {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
-            {fmt.displayValue}
-          </div>
-          <div data-col="ultima" className="ml-auto truncate text-xs text-gray-500">
-            {c.ultima || "—"}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Card mobile equivalente a OtrosRow. Bg gris, sin WhatsApp; tap abre Dialog. */
-function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
-  const fmt = formatDeltaRatio(c.delta);
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onTap}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
-      className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3.5 active:bg-gray-100"
-    >
-      <div className="text-[15px] font-medium leading-tight text-gray-950">{c.nombre}</div>
-      <div className="mt-1 text-xs text-gray-500">Ver detalle de huérfanos sin master</div>
-      <div className="mt-3 flex items-baseline gap-3">
-        <div className="font-mono text-base font-medium tabular-nums text-gray-950">
-          {fmtMoneyCompact(c.ytd)}
-        </div>
-        <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
-          {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
-          {fmt.displayValue}
-        </div>
-        <div className="ml-auto text-xs text-gray-500">{c.ultima || "—"}</div>
-      </div>
-    </div>
-  );
-}
-
 function SortHeader({
-  col, align, children, sortBy, sortDir, onClick,
+  col, align, children, sortBy, sortDir, onClick, fija,
 }: {
   col: SortKey; align: "left" | "right"; children: React.ReactNode;
   sortBy: SortKey; sortDir: SortDir; onClick: (c: SortKey) => void;
+  /** `true` = esta columna NO se desliza; queda pegada al borde izquierdo.
+   *  El `bg-gray-100` va explícito porque una celda fija sin fondo opaco deja
+   *  ver las columnas que le pasan por debajo. */
+  fija?: boolean;
 }) {
   const active = sortBy === col;
   return (
@@ -913,6 +803,7 @@ function SortHeader({
       className={cn(
         "cursor-pointer select-none border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
+        fija && "sticky left-0 z-20 border-r border-gray-200",
         active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
       )}
     >

@@ -29,22 +29,20 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 
 /** Ancho angosto (tarjetas) contra ancho ancho (tabla), pantalla por pantalla. */
 const CASOS = [
+  // 🩸 YA NO HAY DOS FORMAS. Daniel rechazó las tarjetas el 30-jul-2026 (*"me
+  // gusta ver mi tabla completa"*), así que en Ventas hay UNA sola tabla en todos
+  // los anchos, con la primera columna fija. Este verificador sigue haciendo
+  // falta: ahora compara la MISMA tabla leída a 390 px contra 1440, que es lo que
+  // atrapa una celda que se esconda, se recorte o se formatee distinto según el
+  // ancho. Vista General sí conserva sus dos formas (tarjetas < md).
   {
     id: "Ventas › Clientes",
     url: "/ventas?tab=clientes",
     ancla: "data-fila-cliente",
-    // `ytd` (tabla) vs `ytd-compacto` (tarjeta) NO se comparan como texto: la
-    // tarjeta usa formato compacto ($27K) desde MUCHO antes de este cambio.
-    // Se comparan por VALOR con la tolerancia que impone esa precisión.
-    columnas: ["nombre", "codigo", "delta", "ultima"],
-    compacto: { tarjeta: "ytd-compacto", tabla: "ytd" },
-    // Columna que a propósito NO se compara, dicho en voz alta para que la
-    // exclusión no sea la misma trampa con otro disfraz: para un cliente que le
-    // compra a varias empresas la TABLA muestra "6 empresas" (con el desglose en
-    // un tooltip, que en pantalla táctil no existe) y la TARJETA muestra la
-    // empresa principal. Es una divergencia que YA estaba en `origin/main`
-    // —verificable ahí mismo, líneas 685 y 795— y no la tocó este cambio.
-    noComparadas: { empresa: 'la tabla colapsa a "N empresas" y la tarjeta muestra la principal (ya era así en main)' },
+    // `empresa` ya SÍ se compara: antes divergía porque la tarjeta mostraba la
+    // empresa principal y la tabla colapsaba a "N empresas". Sin tarjetas, las
+    // dos lecturas salen de la misma celda.
+    columnas: ["nombre", "codigo", "empresa", "ytd", "delta", "ultima"],
     angosto: 390,
     ancho: 1440,
   },
@@ -68,9 +66,9 @@ const CASOS = [
     id: "Ventas › Productos",
     url: "/ventas?tab=productos",
     ancla: "data-fila-producto",
-    // Códigos/Cant/Δ se ocultan bajo `sm`, igual que ANTES de este cambio: no
-    // se comparan a 390 porque no están en ninguno de los dos lados.
-    columnas: ["descripcion", "venta", "margen"],
+    // Las 6 columnas: Códigos, Cant y Δ dejaron de esconderse en celular — es la
+    // "tabla completa" que se pidió.
+    columnas: ["descripcion", "codigos", "cantidad", "venta", "delta", "margen"],
     angosto: 390,
     ancho: 1440,
   },

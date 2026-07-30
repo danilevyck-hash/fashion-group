@@ -218,11 +218,14 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
-                <th className="px-2 py-2.5 font-normal lg:px-3">Descripción</th>
-                <th className="hidden px-2 py-2.5 text-right font-normal sm:table-cell lg:px-3">Códigos</th>
-                <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
+                {/* Fija: al deslizar por Cant/Venta/Δ/Margen el nombre del
+                    producto no se va de la vista. `bg-white` obligatorio — sin
+                    fondo opaco las columnas se ven POR DEBAJO al deslizar. */}
+                <th className="sticky left-0 z-20 border-r border-gray-200 bg-white px-2 py-2.5 font-normal lg:px-3">Descripción</th>
+                <th className="px-2 py-2.5 text-right font-normal lg:px-3">Códigos</th>
+                <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort}  />
                 <SortableTh label="Venta" active={sort} sortKey="venta" onClick={toggleSort} />
-                <th className="hidden px-2 py-2.5 text-right font-normal sm:table-cell lg:px-3">Δ {selectedYear - 1}</th>
+                <th className="px-2 py-2.5 text-right font-normal lg:px-3">Δ {selectedYear - 1}</th>
                 <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
               </tr>
             </thead>
@@ -296,12 +299,12 @@ function SortableTh({
 function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
   const ratio = variacionPct(curr, prev);
   if (ratio == null) {
-    return <td data-col="delta" className="hidden px-2 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell lg:px-3">Nuevo</td>;
+    return <td data-col="delta" className="px-2 py-2.5 text-right font-mono text-xs text-teal-700 lg:px-3">Nuevo</td>;
   }
   const pct = ratio * 100;
   const up = pct >= 0;
   return (
-    <td data-col="delta" className={`hidden px-2 py-2.5 text-right font-mono tabular-nums sm:table-cell lg:px-3 ${up ? "text-emerald-700" : "text-rose-600"}`}>
+    <td data-col="delta" className={`px-2 py-2.5 text-right font-mono tabular-nums lg:px-3 ${up ? "text-emerald-700" : "text-rose-600"}`}>
       {up ? "+" : ""}{pct.toFixed(0)}%
     </td>
   );
@@ -326,10 +329,10 @@ function ProductoRow({
           haber comparado una sola celda. */}
       <tr
         data-fila-producto={p.descripcion}
-        className={`border-b border-gray-100 ${drillable ? "cursor-pointer hover:bg-gray-50" : ""}`}
+        className={`group border-b border-gray-100 ${drillable ? "cursor-pointer hover:bg-gray-50" : ""}`}
         onClick={drillable ? onToggle : undefined}
       >
-        <td data-col="descripcion" className="px-2 py-2.5 lg:px-3">
+        <td data-col="descripcion" className="sticky left-0 z-10 border-r border-gray-200 bg-white px-2 py-2.5 group-hover:bg-gray-50 lg:px-3">
           <div className="flex items-center gap-1.5">
             {drillable ? (
               <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -339,8 +342,8 @@ function ProductoRow({
             <span className="text-gray-800">{p.descripcion}</span>
           </div>
         </td>
-        <td data-col="codigos" className="hidden px-2 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell lg:px-3">{p.num_codigos}</td>
-        <td data-col="cantidad" className="hidden px-2 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
+        <td data-col="codigos" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-500 lg:px-3">{p.num_codigos}</td>
+        <td data-col="cantidad" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-600 lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
         <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 lg:px-3">{fmtMoney(p.venta)}</td>
         <DeltaCell curr={p.venta} prev={prevVenta} />
         <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtMargen(p.margen)}</td>
@@ -359,7 +362,7 @@ function ProductoRow({
                           <span className="font-mono text-gray-500">{c.codigo}</span>
                           {c.descripcion && <span className="ml-2 text-gray-400">{c.descripcion}</span>}
                         </td>
-                        <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-500">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
                         <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-gray-800">{fmtMoney(c.venta)}</td>
                         <td className="py-1.5 text-right font-mono tabular-nums text-gray-600">{fmtMargen(c.margen)}</td>
                       </tr>

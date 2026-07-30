@@ -1,5 +1,21 @@
 "use client";
 
+// ⛔ ESTE COMPONENTE HOY NO SE DIBUJA EN NINGÚN LADO (30-jul-2026).
+//
+// Daniel rechazó las tarjetas de Ventas en el celular, textual: *"porq ventas en
+// el celular me cambiastes el formato? no me gusta asi, me gusta ver mi tabla
+// completa, o buscar otra manera de verlo en el ihpone"*. `ResumenView.tsx`
+// dejó de renderizarlo y ahora la matriz se dibuja en todos los anchos, con la
+// columna Empresa fija.
+//
+// NO SE BORRÓ A PROPÓSITO, y no es olvido: Daniel acaba de cambiar de opinión
+// una vez, y este archivo lo cubren 5 archivos de test que también validan
+// lógica compartida (delta, proyección, textos pendientes). Volver a encenderlo
+// es una línea en ResumenView; borrarlo y rehacerlo, un día de trabajo.
+//
+// 👉 Cuando Daniel confirme que la tabla con columna fija le sirve, se borra
+//    este archivo junto con sus tests, en un PR aparte.
+
 // Layout mobile-first del tab Resumen. Visible por DEBAJO de 1440 px (el porqué
 // medido está en ResumenView.tsx: la matriz de 15 columnas necesitaba 1.276 px y
 // no entraba ni en un escritorio de 1440). Gated por min-[1440px]:hidden en

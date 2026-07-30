@@ -40,105 +40,87 @@ const sortSheet = read(path.join(ventas, "SortSheet.tsx"));
 const shell = read(path.join(app, "ventas/VentasShell.tsx"));
 const vistaGeneral = read(path.join(app, "vista-general/page.tsx"));
 
-describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio", () => {
-  it("la tabla es lg+, no md+ (con md, un iPad de 834 px cae del lado de la tabla)", () => {
-    expect(clientes).toContain('className="hidden overflow-hidden p-0 lg:block"');
+describe("Ventas › Clientes — la tabla en todos los anchos, con el nombre fijo", () => {
+  // 🩸 Daniel rechazó las tarjetas el 30-jul-2026: *"me gusta ver mi tabla
+  // completa"*. Acá las tarjetas venían de ANTES de todo este trabajo (eran
+  // `md:hidden` desde mucho antes), así que a 390 px esta pestaña no había
+  // cambiado — pero el pedido es del módulo entero y quedó pareja con el resto.
+
+  it("no queda ningún corte por ancho: una sola forma", () => {
+    expect(clientes).toContain('<Card className="overflow-hidden p-0">');
+    expect(clientes).not.toContain("p-0 lg:block");
     expect(clientes).not.toContain("p-0 md:block");
   });
 
-  it("las tarjetas cubren todo lo que está por debajo de lg", () => {
-    expect(clientes).toContain('<div className="space-y-2 lg:hidden">');
+  it("las tarjetas ya no se dibujan", () => {
+    expect(clientes).not.toContain("<ClienteCard");
+    expect(clientes).not.toContain("<OtrosCard");
+    expect(clientes).not.toContain('<div className="space-y-2 lg:hidden">');
   });
 
-  it("el mínimo de la tabla entra en los 742 px útiles de una pantalla de 1024", () => {
-    const m = /minWidth:\s*(\d+)/.exec(clientes);
-    expect(m).not.toBeNull();
-    // 920 era el valor viejo: mínimo real 791 px, o sea que NO entraba ni a 1024.
-    expect(Number(m![1])).toBeLessThanOrEqual(742);
+  it("se fija UNA sola columna, el nombre, y pegada al borde", () => {
+    // 🩸 Fijar también "#" con un desplazamiento escrito a mano se MIDIÓ y no
+    // funciona: en `table-layout: auto` el ancho de la columna lo decide el
+    // navegador. A 390 px, "#" quedó en 96 px con `width: 3rem` puesto → el
+    // nombre se despegaba 48 px al deslizar. Con una sola columna fija no hay
+    // ningún número que pueda desincronizarse.
+    expect(clientes).toContain("fija>Cliente</SortHeader>");
+    expect(clientes).not.toContain("ANCHO_RANK");
+    expect(clientes).toContain("fija && \"sticky left-0 z-20 border-r border-gray-200\"");
   });
 
-  it("los encabezados pueden partirse en dos líneas (es la mitad de lo que bajó el mínimo)", () => {
-    // Con `whitespace-nowrap`, "Compras 2026" y "Última compra" fuerzan su ancho
-    // de una sola línea. Se mira la CLASE del <th>, no el archivo entero: el
-    // comentario de al lado nombra la clase justo para explicar por qué no está.
-    const th = clientes.slice(clientes.indexOf("function SortHeader"));
-    const clase = /"cursor-pointer select-none[^"]*"/.exec(th);
-    expect(clase).not.toBeNull();
-    expect(clase![0]).not.toContain("whitespace-nowrap");
+  it("las celdas fijas tienen FONDO OPACO — sin eso los montos se ven por debajo", () => {
+    // una por cada clase de fila: cliente, "Otros clientes" y el mostrador
+    expect(clientes).toContain('className="sticky left-0 z-10 border-b border-r border-gray-200 bg-white');
+    expect(clientes).toContain('className="sticky left-0 z-10 border-b border-r border-gray-200 bg-gray-100');
+    expect(clientes).toContain('className="sticky left-0 z-10 border-b border-r border-gray-200 bg-amber-50');
   });
 
-  it("los textos de los encabezados NO se abreviaron", () => {
+  it("ninguna celda fija abarca dos columnas (queda pinchada tapando la de al lado)", () => {
+    const fijas = clientes.split("\n").filter((l) => l.includes("sticky") && l.includes("<td"));
+    expect(fijas.length).toBeGreaterThan(0);
+    for (const l of fijas) expect(l).not.toContain("colSpan");
+  });
+
+  it("el detalle de celular sigue existiendo: la fila lo abre", () => {
+    expect(clientes).toContain("onClick={onTap}");
+    expect(clientes).toContain("onTap={() => setSheetCliente(c)}");
+    expect(clientes).toContain("<ClienteSheet");
+  });
+
+  it("los encabezados no se abreviaron", () => {
     expect(clientes).toContain("Compras {selectedYear}");
     expect(clientes).toContain("Última compra");
   });
 
-  it("las píldoras de empresa ENVUELVEN en vez de arrastrarse (eran los 369 px del iPhone)", () => {
+  it("las píldoras de empresa siguen envolviendo (no vuelven a arrastrarse)", () => {
     expect(clientes).toContain("flex flex-wrap gap-1.5");
-    expect(clientes).not.toContain("flex flex-nowrap gap-1.5");
     expect(clientes).not.toContain("scrollSnapType");
-    expect(clientes).not.toContain("scrollSnapAlign");
-  });
-
-  it("las 6 píldoras siguen estando y con su texto entero", () => {
-    for (const label of [
-      "Todas", "Vistana International", "Fashion Wear",
-      "Fashion Shoes", "Active Shoes", "Active Wear",
-    ]) {
-      expect(clientes).toContain(`label: "${label}"`);
-    }
-  });
-
-  it("los sheets acompañan el corte: con md se abrían sólo debajo de 768 y el iPad quedaba sin ellos", () => {
-    expect(clienteSheet).toContain("z-50 lg:hidden");
-    expect(sortSheet).toContain("z-50 lg:hidden");
-    expect(clienteSheet).not.toContain("z-50 md:hidden");
-    expect(sortSheet).not.toContain("z-50 md:hidden");
-  });
-
-  it("el HoverCard sólo aparece donde hay tabla (debajo de lg no hay hover)", () => {
-    expect(clientes).toContain('className="hidden w-[320px] lg:block"');
   });
 });
 
-describe("Ventas › Utilidad — tarjetas debajo de lg", () => {
-  it("la tabla es lg+ y hay una lista de tarjetas debajo", () => {
-    expect(utilidad).toContain("hidden overflow-x-auto rounded-lg border border-gray-200 lg:block");
-    expect(utilidad).toContain('<div className="space-y-2 lg:hidden">');
-    expect(utilidad).toContain("function UtilidadCard");
+describe("Ventas › Utilidad — la tabla vuelve, con Cliente fijo", () => {
+  it("no queda ningún corte por ancho ni rastro de las tarjetas", () => {
+    expect(utilidad).toContain('<div className="overflow-x-auto rounded-lg border border-gray-200">');
+    expect(utilidad).not.toContain("lg:block");
+    expect(utilidad).not.toContain("lg:hidden");
+    expect(utilidad).not.toContain("UtilidadCard");
+    expect(utilidad).not.toContain("ORDEN_TARJETAS");
   });
 
-  it("la tarjeta trae los SEIS campos de la fila — no se perdió ninguna cifra", () => {
-    const card = utilidad.slice(utilidad.indexOf("function UtilidadCard"));
+  it("la columna Cliente no se desliza, y tiene fondo opaco", () => {
+    expect(utilidad).toContain('<th className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-2.5 font-normal">Cliente</th>');
+    expect(utilidad).toContain('className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-2.5 group-hover:bg-gray-50"');
+  });
+
+  it("las 6 columnas siguen ahí — es la tabla completa que Daniel pidió", () => {
     for (const col of ["cliente", "empresa", "ventas", "costo", "utilidad", "margen"]) {
-      expect(card).toContain(`data-col="${col}"`);
+      expect(utilidad).toContain(`data-col="${col}"`);
     }
   });
 
-  it("la tarjeta usa EXACTAMENTE los mismos formateadores que la tabla", () => {
-    const card = utilidad.slice(utilidad.indexOf("function UtilidadCard"));
-    expect(card).toContain("fmtMoneySigned(r.ventas)");
-    expect(card).toContain("fmtMoneySigned(r.costo)");
-    expect(card).toContain("fmtMoneySigned(r.utilidad)");
-    expect(card).toContain("fmtMargen(r.margen)");
-    // Nada de redondeos ni abreviaturas propias de la tarjeta.
-    expect(card).not.toContain("toFixed");
-  });
-
-  it("sin tabla sigue habiendo forma de ordenar en celular", () => {
-    expect(utilidad).toContain("ORDEN_TARJETAS");
-    expect(utilidad).toContain('<div className="mb-4 flex flex-wrap items-center gap-1.5 lg:hidden">');
-  });
-
-  it("las etiquetas del selector de orden son las MISMAS de los encabezados", () => {
-    for (const label of ["Ventas", "Utilidad", "Margen %"]) {
-      expect(utilidad).toContain(`label: "${label}"`);
-    }
-  });
-
-  it("en la tabla de escritorio Empresa y Costo dejaron de esconderse (ya no hace falta)", () => {
-    const tabla = utilidad.slice(utilidad.indexOf("lg:block"), utilidad.indexOf("function SortableTh"));
-    expect(tabla).not.toContain("sm:table-cell");
-    expect(tabla).not.toContain("md:table-cell");
+  it("el encabezado sigue siendo el control de orden, y mide 44 px", () => {
+    expect(utilidad).toContain("inline-flex min-h-[44px] min-w-[44px] items-center justify-end");
   });
 });
 
@@ -153,6 +135,11 @@ describe("Ventas › Productos — la tabla ENTRA, así que se queda tabla", () 
   it("no se pasó a tarjetas: a 390 px el mínimo real es 294 contra 356 disponibles", () => {
     expect(productos).not.toContain("lg:hidden");
     expect(productos).toContain("<tbody>");
+  });
+
+  it("y ahora la columna Descripción tampoco se desliza", () => {
+    expect(productos).toContain("sticky left-0 z-20 border-r border-gray-200 bg-white");
+    expect(productos).toContain("sticky left-0 z-10 border-r border-gray-200 bg-white");
   });
 
   it("las 6 columnas siguen existiendo con sus mismos textos", () => {
@@ -225,11 +212,14 @@ describe("las anclas del verificador son `data-` FIJOS, no clases de breakpoint"
   // 🩸 La trampa: buscar la vista angosta por `.md\:hidden` y, al moverse el
   // corte, no encontrar nada — la comparación recorre 0 filas y el chequeo pasa
   // en verde sin haber comparado un solo número.
-  it("cada fila y cada tarjeta llevan la MISMA clave estable", () => {
-    expect(clientes.match(/data-fila-cliente=/g) ?? []).toHaveLength(2);
-    expect(utilidad.match(/data-fila-utilidad=/g) ?? []).toHaveLength(2);
+  it("cada fila lleva su clave estable", () => {
+    // Clientes y Utilidad volvieron a tener UNA sola forma (la tabla), así que
+    // ahora hay un ancla por fila y no dos. Vista General sigue con tarjetas en
+    // celular —ahí no hubo queja: lo que se arregló fue que la grilla ENTRARA— y
+    // conserva sus dos.
+    expect(clientes.match(/data-fila-cliente=/g) ?? []).toHaveLength(1);
+    expect(utilidad.match(/data-fila-utilidad=/g) ?? []).toHaveLength(1);
     expect(vistaGeneral.match(/data-fila-semaforo=/g) ?? []).toHaveLength(2);
-    // Productos no se partió en dos formas: una sola tabla, un solo ancla.
     expect(productos.match(/data-fila-producto=/g) ?? []).toHaveLength(1);
   });
 

@@ -16,14 +16,6 @@ import {
 type SortKey = "ventas" | "utilidad" | "margen";
 const PAGE = 25;
 
-/** Criterios del selector de orden de las tarjetas. Mismas etiquetas que los
- *  encabezados de la tabla — no se abrevió ni se renombró nada. */
-const ORDEN_TARJETAS: { key: SortKey; label: string }[] = [
-  { key: "ventas", label: "Ventas" },
-  { key: "utilidad", label: "Utilidad" },
-  { key: "margen", label: "Margen %" },
-];
-
 export function UtilidadView({ selectedYear }: { selectedYear: number }) {
   const [data, setData] = useState<UtilidadClienteResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -100,31 +92,6 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         </Button>
       </div>
 
-      {/* Ordenar en tarjetas. En la tabla el orden se cambia desde los
-          encabezados; sin tabla hacía falta un control propio o el celular se
-          quedaba sin poder ordenar. Mismos 3 criterios y mismo toggle
-          asc/desc: tocar el criterio activo lo da vuelta. */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5 lg:hidden">
-        <span className="text-xs text-gray-400">Ordenar por</span>
-        {ORDEN_TARJETAS.map((o) => {
-          const activo = sort.key === o.key;
-          return (
-            <button
-              key={o.key}
-              type="button"
-              onClick={() => toggleSort(o.key)}
-              aria-pressed={activo}
-              className={`inline-flex min-h-[44px] items-center gap-1 rounded-full border px-3.5 text-xs font-medium transition ${
-                activo ? "border-teal-700 bg-teal-700 text-white" : "border-gray-200 bg-white text-gray-700"
-              }`}
-            >
-              {o.label}
-              {activo && <span aria-hidden>{sort.dir === "desc" ? "▼" : "▲"}</span>}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Totales + alcance */}
       {data && !loading && (
         <p className="mb-3 text-sm text-gray-600">
@@ -154,49 +121,22 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         </div>
       )}
 
-      {/* ─── Tarjetas (< lg): iPhone e iPad ───────────────────────────────
-          🩸 POR QUÉ NO LA TABLA. Medido con scripts/_ancho-util-ventas.mjs, que
-          clona la tabla en una jaula de 1 px para que el navegador la colapse a
-          su ancho MÍNIMO real (parte los textos donde puede). Ese mínimo es lo
-          que la tabla necesita sí o sí:
+      {/* ─── La tabla, en TODOS los anchos ─────────────────────────────────
+          🩸 ACÁ HUBO TARJETAS Y DURARON UN DÍA. Daniel, 30-jul-2026: *"me gusta
+          ver mi tabla completa"*. El arrastre no era el defecto; el defecto era
+          que al arrastrar se perdía de vista de QUIÉN era la fila. Por eso la
+          columna Cliente va FIJA y las tarjetas se fueron.
 
-            · iPhone 390 → mínimo 413 px contra 356 disponibles. Y eso con sólo
-              4 columnas visibles: las tres de plata solas ya se comen el ancho y
-              al nombre del cliente no le queda nada.
-            · iPad 834 → mínimo 635 px contra 552. Ojo con el ancho ÚTIL: la
-              barra lateral se lleva 223 px, así que un iPad de 834 deja 552 —
-              MÁS ANGOSTO que un iPhone acostado. Por eso el iPad no se arregla
-              solo por ser más grande.
-
-          Nada de relleno que sacar ni encabezado que partir alcanza contra un
-          faltante de 83 px. Se va a tarjetas, patrón de PanelCxcMobile /
-          ResumenViewMobile.
-
-          NO SE PIERDE NINGÚN DATO: la tarjeta trae los 6 campos de la fila,
-          incluidos Empresa y Costo, que en la tabla angosta estaban ocultos por
-          `sm:`/`md:table-cell`. En celular hoy se ven MÁS números que antes. */}
+          En un iPhone de 390 px esta tabla se desliza —sus 6 columnas piden
+          635 px contra 356 disponibles— y está bien: es lo que se pidió. */}
       {data && !loading && !error && (
-        <div className="space-y-2 lg:hidden">
-          {visibleRows.length === 0 && (
-            <div className="rounded-lg border border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-400">
-              Sin clientes para este filtro.
-            </div>
-          )}
-          {visibleRows.map((r) => (
-            <UtilidadCard key={`card|${r.empresaKey}|${r.clienteSwitchId ?? r.cliente}`} r={r} />
-          ))}
-        </div>
-      )}
-
-      {/* ─── Tabla (lg+): el escritorio no se tocó ─────────────────────────
-          A 1024 px el útil es 745 y el mínimo de la tabla 635: entra entera.
-          De ahí para arriba se queda como estaba. */}
-      {data && !loading && !error && (
-        <div className="hidden overflow-x-auto rounded-lg border border-gray-200 lg:block">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
-                <th className="px-3 py-2.5 font-normal">Cliente</th>
+                {/* Fija. El `bg-white` NO es decorativo: sin fondo opaco las
+                    columnas de plata se ven POR DEBAJO del nombre al deslizar. */}
+                <th className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-2.5 font-normal">Cliente</th>
                 <th className="px-3 py-2.5 font-normal">Empresa</th>
                 <SortableTh label="Ventas" active={sort} sortKey="ventas" onClick={toggleSort} />
                 <th className="px-3 py-2.5 text-right font-normal">Costo</th>
@@ -264,8 +204,8 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
   const utilCls = neg ? "text-rose-600" : "text-gray-900";
   const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-rose-600" : "text-gray-700";
   return (
-    <tr data-fila-utilidad={filaKey(r)} className="border-b border-gray-100 hover:bg-gray-50">
-      <td data-col="cliente" className="px-3 py-2.5">
+    <tr data-fila-utilidad={filaKey(r)} className="group border-b border-gray-100 hover:bg-gray-50">
+      <td data-col="cliente" className="sticky left-0 z-10 border-r border-gray-200 bg-white px-3 py-2.5 group-hover:bg-gray-50">
         <span className="text-gray-800">{r.cliente}</span>
         {neg && (
           <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
@@ -279,52 +219,5 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
       <td data-col="utilidad" className={`px-3 py-2.5 text-right font-mono font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</td>
       <td data-col="margen" className={`px-3 py-2.5 text-right font-mono tabular-nums ${margenCls}`}>{fmtMargen(r.margen)}</td>
     </tr>
-  );
-}
-
-/**
- * Tarjeta (< lg) equivalente a UtilidadRow. Trae los SEIS campos de la fila con
- * el mismo formateo — mismos `fmtMoneySigned` / `fmtMargen`, ningún redondeo ni
- * abreviatura propia — para que el número que se lee en el celular sea, carácter
- * por carácter, el mismo que el del escritorio.
- */
-function UtilidadCard({ r }: { r: UtilidadClienteRow }) {
-  const neg = r.utilidad < 0;
-  const utilCls = neg ? "text-rose-600" : "text-gray-900";
-  const margenCls = r.margen == null ? "text-gray-400" : r.margen < 0 ? "text-rose-600" : "text-gray-700";
-  return (
-    <div data-fila-utilidad={filaKey(r)} className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span data-col="cliente" className="text-[15px] font-medium leading-tight text-gray-900">{r.cliente}</span>
-        {neg && (
-          <span
-            className="rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600"
-            title="Devoluciones netas: las notas de crédito superan las ventas del período"
-          >
-            dev. neta
-          </span>
-        )}
-      </div>
-      <div data-col="empresa" className="mt-0.5 text-xs text-gray-500">{r.empresa}</div>
-
-      <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="text-xs text-gray-400">Ventas</dt>
-          <dd data-col="ventas" className="font-mono tabular-nums text-gray-700">{fmtMoneySigned(r.ventas)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="text-xs text-gray-400">Costo</dt>
-          <dd data-col="costo" className="font-mono tabular-nums text-gray-500">{fmtMoneySigned(r.costo)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="text-xs text-gray-400">Utilidad</dt>
-          <dd data-col="utilidad" className={`font-mono font-medium tabular-nums ${utilCls}`}>{fmtMoneySigned(r.utilidad)}</dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <dt className="text-xs text-gray-400">Margen %</dt>
-          <dd data-col="margen" className={`font-mono tabular-nums ${margenCls}`}>{fmtMargen(r.margen)}</dd>
-        </div>
-      </dl>
-    </div>
   );
 }

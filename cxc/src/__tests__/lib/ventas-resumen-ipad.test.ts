@@ -42,29 +42,75 @@ const read = (f: string) => readFileSync(path.join(ventas, f), "utf8");
 const matriz = read("ResumenView.tsx");
 const tarjetas = read("ResumenViewMobile.tsx");
 
-describe("el corte de Resumen cubre TODOS los iPad, no solo el iPhone", () => {
-  it("la matriz se dibuja desde 1440 px, no desde md", () => {
-    expect(matriz).toContain('className="hidden min-[1440px]:block space-y-5"');
-    // `md:block` era lo que le entregaba la matriz a un iPad de 834.
-    expect(matriz).not.toContain('className="hidden md:block space-y-5"');
+describe("la matriz se dibuja en TODOS los anchos, con la columna Empresa fija", () => {
+  // 🩸 EL 30-jul-2026 DANIEL RECHAZÓ LAS TARJETAS, textual: *"porq ventas en el
+  // celular me cambiastes el formato? no me gusta asi, me gusta ver mi tabla
+  // completa, o buscar otra manera de verlo en el ihpone"*.
+  //
+  // El diagnóstico anterior estaba mal leído: se midió el ARRASTRE y se lo trató
+  // como el defecto. El defecto era otro — al arrastrar se perdía la columna de
+  // nombres y dejabas de saber qué fila estabas leyendo. Con la primera columna
+  // FIJA, arrastrar deja de ser un problema y pasa a ser navegación normal.
+  //
+  // ⚠️ ACÁ SE ESPERA ARRASTRE, y eso NO es una regresión: es lo que se pidió.
+  // Medido a 390 px: 744 px de desliz con la columna Empresa clavada al borde.
+  //
+  // Lo que SÍ se conserva del trabajo anterior: el piso de la matriz, que bajó
+  // de 1.276 a 1.098 px. Menos ancho = menos que deslizar, y a 1440 entra entera.
+
+  it("no queda ningún corte por ancho: una sola forma", () => {
+    expect(matriz).not.toContain("min-[1440px]:block");
+    expect(matriz).not.toContain("hidden md:block space-y-5");
+    expect(matriz).toContain('<div className="space-y-5">');
   });
 
-  it("las tarjetas cubren todo lo que está por debajo de 1440", () => {
-    expect(tarjetas).toContain('<div className="min-[1440px]:hidden space-y-4">');
-    expect(tarjetas).not.toContain('<div className="md:hidden space-y-4">');
+  it("las tarjetas de celular ya no se dibujan", () => {
+    expect(matriz).not.toContain("<ResumenViewMobile");
+    expect(matriz).not.toContain('from "./ResumenViewMobile"');
   });
 
-  it("los dos cortes son el MISMO número — si divergen, un ancho ve las dos formas o ninguna", () => {
-    const dMatriz = /hidden min-\[(\d+)px\]:block/.exec(matriz);
-    const dTarjetas = /min-\[(\d+)px\]:hidden/.exec(tarjetas);
-    expect(dMatriz).not.toBeNull();
-    expect(dTarjetas).not.toBeNull();
-    expect(dMatriz![1]).toBe(dTarjetas![1]);
+  it("la columna Empresa NO se desliza (encabezado y las dos clases de fila)", () => {
+    expect(matriz).toContain("sticky left-0 top-0 z-30");          // encabezado
+    expect(matriz).toContain("sticky left-0 z-10 cursor-pointer"); // empresa
+    expect(matriz).toContain("sticky left-0 z-10 border-r border-gray-800 bg-gray-950"); // Total Grupo
   });
 
-  it("el corte deja del lado de las tarjetas al iPad Pro de 12.9 acostado (1366)", () => {
-    const corte = Number(/hidden min-\[(\d+)px\]:block/.exec(matriz)![1]);
-    expect(corte).toBeGreaterThan(1366);
+  it("la celda fija tiene FONDO OPACO — sin eso los meses se ven por debajo al deslizar", () => {
+    const i = matriz.indexOf('"sticky left-0 z-10 cursor-pointer');
+    const bloque = matriz.slice(i - 400, i + 400);
+    expect(bloque).toMatch(/bg-teal-50|bg-gray-50|bg-white/);
+  });
+
+  it("y un separador que marca dónde termina lo fijo y empieza lo que se desliza", () => {
+    expect(matriz).toContain("sticky left-0 top-0 z-30 min-w-[120px] border-r border-gray-200");
+    expect(matriz).toContain("border-b border-r border-gray-200 px-2.5 py-3.5");
+  });
+
+  it("el encabezado fijo queda POR ENCIMA del resto (si no, se solapan al deslizar)", () => {
+    // esquina Empresa (30) > resto del encabezado (20) > columna fija (10) > datos
+    const esquina = /sticky left-0 top-0 z-(\d+)/.exec(matriz);
+    const encabezado = /sticky top-0 z-(\d+) bg-gray-100/.exec(matriz);
+    const columna = /sticky left-0 z-(\d+) cursor-pointer/.exec(matriz);
+    expect(Number(esquina![1])).toBeGreaterThan(Number(encabezado![1]));
+    expect(Number(encabezado![1])).toBeGreaterThan(Number(columna![1]));
+  });
+
+  it("los toggles de la matriz miden 44 px (vivían solo en escritorio y median 30)", () => {
+    expect(matriz.match(/inline-flex min-h-\[44px\] items-center rounded-full px-3\.5/g) ?? []).toHaveLength(2);
+  });
+
+  it("el verificador de la columna fija existe y NO se conforma con leer el CSS", () => {
+    const script = path.resolve(__dirname, "../../../scripts/_verif-columna-fija.mjs");
+    expect(existsSync(script)).toBe(true);
+    const src = readFileSync(script, "utf8");
+    // lleva el scroll al extremo y comprueba que quedó anclada al borde
+    expect(src).toContain("cont.scrollLeft = cont.scrollWidth");
+    expect(src).toContain("anclada");
+    // fondo opaco y que nada se le monte encima
+    expect(src).toContain("backgroundColor");
+    expect(src).toContain("elementFromPoint");
+    // y que de verdad haya habido algo que deslizar
+    expect(src).toContain("huboDesliz");
   });
 });
 
@@ -104,7 +150,6 @@ describe("las dos formas siguen mostrando los mismos números", () => {
     // El prefijo de vista TIENE que diferir: las dos formas conviven en el DOM
     // y esa llave es la que dice cuál celda está abierta.
     expect(matriz).toContain('celdaKey("d"');
-    expect(tarjetas).toContain('celdaKey("m"');
   });
 
   it("el verificador existe, exige cobertura y declara que cero celdas es FALLA", () => {
@@ -119,12 +164,12 @@ describe("las dos formas siguen mostrando los mismos números", () => {
     expect(src).not.toMatch(/\\:hidden/);
   });
 
-  it("el contenido de las tarjetas no se tocó: solo cambió la clase del contenedor", () => {
-    // Si alguien edita una celda de la tarjeta, este candado no lo ve — lo ve el
-    // verificador del navegador. Acá se fija lo que SÍ es estático: que las
-    // tarjetas siguen dibujando los 12 meses + Total + Proyección.
-    expect(tarjetas).toContain('celdaKey("m", filaId, String(ci))');
-    expect(tarjetas).toContain('celdaKey("m", filaId, "total")');
-    expect(tarjetas).toContain('celdaKey("m", id, "proy")');
+  it("ResumenViewMobile sigue en el repo pero NO se dibuja", () => {
+    // No se borró a propósito: Daniel acaba de cambiar de opinión una vez y el
+    // componente tiene 5 archivos de test que cubren lógica compartida. Queda
+    // como está hasta que confirme que la tabla le gusta; si confirma, se borra
+    // junto con sus tests en un PR aparte.
+    expect(tarjetas.length).toBeGreaterThan(0);
+    expect(matriz).not.toContain("ResumenViewMobile");
   });
 });
