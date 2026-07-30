@@ -16,6 +16,12 @@
 // Estado 5% por cliente: "usado" (alguna factura con global=5) ·
 // "disponible" (registrado sin usarlo) · null (no registrado / huérfano).
 //
+// VENTANA gerente_acs: esta ruta NO acepta NINGÚN parámetro de fecha — es un
+// snapshot de "hoy" (segmentos calculados contra la fecha de Panamá del server).
+// Por eso es la única de /api/multifashion/* sin clamp de ventana, y está en la
+// lista de excepciones del candado src/__tests__/lib/multifashion-ventana-
+// gerente.test.ts. Si algún día acepta `desde`/`hasta`, hay que acotarla.
+//
 // Mostrador (cliente_switch_id=1) y nombres genéricos excluidos de todo.
 // Si la migración 20260704090000 aún no corrió (columna descuento_global_pct
 // ausente), degrada: detalle_activo=false y nadie aparece como "usado".

@@ -120,6 +120,9 @@ const normNombre = (s: string): string =>
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
   mes: number;
+  /** gerente_acs: solo el mes; las ventanas 3m/6m/12m no se ofrecen (y el
+   *  servidor las recorta al mes igual). */
+  ventanaAcotada?: boolean;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -164,12 +167,17 @@ function computeRange(
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultifashionSubtabProps) {
+export function ClientesMultifashionSubtab({ selectedYear, mes, ventanaAcotada = false }: ClientesMultifashionSubtabProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filtro de período PROPIO del tab (persistido en URL ?mfCliRango). Es un
   // filtro del mismo nivel → history "replace" (no cicla en back/forward).
-  const [rango, setRango] = useUrlState<RangoCli>("mfCliRango", "mes");
+  const [rangoRaw, setRango] = useUrlState<RangoCli>("mfCliRango", "mes");
+  // Ventana acotada: "mes" y nada más — ni siquiera vía ?mfCliRango=12m.
+  const rango: RangoCli = ventanaAcotada ? "mes" : rangoRaw;
+  const opcionesRango = ventanaAcotada
+    ? RANGO_OPCIONES.filter(o => o.value === "mes")
+    : RANGO_OPCIONES;
 
   const range = useMemo(() => computeRange(rango, selectedYear, mes), [rango, selectedYear, mes]);
   const periodoStr = useMemo(() => {
@@ -285,7 +293,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
               <p className="mt-0.5 text-xs text-gray-400">Mostrador anónimo va aparte</p>
             </div>
             <div className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5">
-              {RANGO_OPCIONES.map(opt => (
+              {opcionesRango.map(opt => (
                 <button
                   key={opt.value}
                   type="button"

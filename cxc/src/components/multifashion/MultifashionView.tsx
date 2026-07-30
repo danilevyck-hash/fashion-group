@@ -9,6 +9,7 @@ import {
 import {
   TrendingUp, Users, UserCircle, Wallet, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { ventanaGerente } from "@/lib/multifashion/ventana-gerente";
 import type { Multifashion } from "@/components/ventas/types";
 import { VendedorasSubtab } from "./VendedorasSubtab";
 import { MultifashionResumenView } from "./MultifashionResumenView";
@@ -30,9 +31,12 @@ interface MultifashionViewProps {
   /** Sube +1 cada vez que el header corre un "Actualizar ahora" con éxito. Se
    *  pasa tal cual al Resumen para que re-pida el detalle del mes. */
   syncTick?: number;
+  /** gerente_acs: mes en curso + mismo mes del año pasado, nada más. Acá solo
+   *  quita controles que igual no funcionarían — el candado está en la API. */
+  ventanaAcotada?: boolean;
 }
 
-export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }: MultifashionViewProps) {
+export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, ventanaAcotada = false }: MultifashionViewProps) {
   // Sub-tab activo en la URL (?subtab=resumen|vendedoras|clientes). Key distinta
   // a "tab" del shell para no chocar. Persiste en refresh/back-forward. Los tabs
   // viejos "overview" y "mes" (fusionados en "resumen") se normalizan acá para no
@@ -58,6 +62,13 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
   //     Dic (año cerrado) / mes calendario (año en curso).
   const { minMonth, maxMonth, mesDefault } = useMemo(() => {
     const now = new Date();
+    // Ventana acotada: un solo mes navegable — el mes en curso de Panamá (UTC-5
+    // fijo, el mismo que calcula el clamp del servidor). Con min = max = ese
+    // mes, las flechas quedan deshabilitadas y el dropdown no se dibuja.
+    if (ventanaAcotada) {
+      const m = ventanaGerente(now).mes;
+      return { minMonth: m, maxMonth: m, mesDefault: m };
+    }
     const isCurrentYear = selectedYear === now.getFullYear();
     const currentCalMonth = now.getMonth() + 1;
     const withData: number[] = [];
@@ -70,7 +81,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
       : (withData.length > 0 ? withData[withData.length - 1] : 12);
     const def = max;
     return { minMonth: min, maxMonth: max, mesDefault: def };
-  }, [data.retail.meses, selectedYear, isClosedYear]);
+  }, [data.retail.meses, selectedYear, isClosedYear, ventanaAcotada]);
 
   const [mes, setMes] = useUrlState("mfMes", mesDefault);
 
@@ -124,7 +135,19 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
           año lo fija ese selector global; aquí solo el mes. Se muestra en Resumen
           (vista unificada del mes); Vendedoras tiene su propio control y Clientes
           usa pills propias. */}
-      {subtab === "resumen" && (
+      {/* Ventana acotada: no hay nada que elegir — el mes es el mes en curso y
+          el servidor lo impone igual. Se muestra como etiqueta para que quede
+          claro QUÉ período se está viendo, en vez de un control muerto. */}
+      {subtab === "resumen" && ventanaAcotada && (
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
+          <span className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-700">
+            {MES_FULL_OVERVIEW[mes - 1]} {selectedYear}
+          </span>
+        </div>
+      )}
+
+      {subtab === "resumen" && !ventanaAcotada && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
@@ -197,15 +220,15 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }:
           />
         </TabsContent>
         <TabsContent value="vendedoras" className="mt-5">
-          <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} />
+          <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} ventanaAcotada={ventanaAcotada} />
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
-          <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} />
+          <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} ventanaAcotada={ventanaAcotada} />
         </TabsContent>
         <TabsContent value="caja" className="mt-5">
           {/* Cuadre diario: independiente del año/mes global — usa su propio
               selector de día (default hoy). */}
-          <CajaSubtab />
+          <CajaSubtab ventanaAcotada={ventanaAcotada} />
         </TabsContent>
       </Tabs>
     </div>

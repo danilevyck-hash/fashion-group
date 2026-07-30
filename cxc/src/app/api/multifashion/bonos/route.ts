@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { clampAnioMes } from "@/lib/multifashion/ventana-gerente";
 import type { BonosMultifashion } from "@/components/ventas/types";
 
 export const dynamic = "force-dynamic";
@@ -36,9 +37,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
+  // CANDADO gerente_acs: mes en curso + mismo mes del año pasado. Un `mes` nulo
+  // (que el RPC lee como "último mes elegible") también se cierra al mes en
+  // curso. Admin no cambia. Ver src/lib/multifashion/ventana-gerente.ts.
+  const acotado = clampAnioMes(auth.role, { year, mes }, new Date());
+
   const { data, error } = await supabaseServer.rpc("multifashion_bonos_v3", {
-    p_year: year,
-    p_mes: mes,
+    p_year: acotado.year,
+    p_mes: acotado.mes,
   });
 
   if (error) {
