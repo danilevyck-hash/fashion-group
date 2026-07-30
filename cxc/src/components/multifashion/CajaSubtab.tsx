@@ -39,9 +39,17 @@ const num = (v: string | number | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function CajaSubtab() {
+interface CajaSubtabProps {
+  /** gerente_acs: solo días del mes en curso. El servidor lo impone igual. */
+  ventanaAcotada?: boolean;
+}
+
+export function CajaSubtab({ ventanaAcotada = false }: CajaSubtabProps) {
   const hoy = hoyPanama();
   const [fecha, setFecha] = useState(hoy);
+  // Piso del selector de día. Con ventana acotada, el 1 del mes en curso: pedir
+  // un día anterior lo devolvería a hoy desde el servidor (clampFechaDia).
+  const minFecha = ventanaAcotada ? `${hoy.slice(0, 7)}-01` : undefined;
 
   const { data, error, isLoading, mutate, isValidating } = useSWR<CajaResponse>(
     ["multifashion-caja", fecha],
@@ -67,6 +75,7 @@ export function CajaSubtab() {
             id="caja-fecha"
             type="date"
             value={fecha}
+            min={minFecha}
             max={hoy}
             onChange={(e) => { if (e.target.value) setFecha(e.target.value); }}
             /* text-base en móvil: Safari hace zoom automático al enfocar

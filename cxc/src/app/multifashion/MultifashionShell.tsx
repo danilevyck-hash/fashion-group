@@ -21,6 +21,7 @@ import { MultifashionView } from "@/components/multifashion/MultifashionView";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { esRolAcotado } from "@/lib/multifashion/ventana-gerente";
 import type { Multifashion } from "@/components/ventas/types";
 
 // Fetcher puro del overview por año. Misma llamada que tenía el onYearChange
@@ -46,7 +47,17 @@ export function MultifashionShell({
   const currentYear = new Date().getFullYear();
   // Mientras no esté chequeado no renderizamos contenido para no parpadear
   // data a un rol sin acceso (useAuth redirige si no pasa).
-  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
+  const { authChecked, role } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
+
+  // Ventana acotada (gerente_acs): mes en curso + mismo mes del año pasado. Acá
+  // solo se DIBUJA menos — el candado real vive en /api/multifashion/* (ver
+  // src/lib/multifashion/ventana-gerente.ts). Esconder controles no cierra nada:
+  // es exactamente el error que ya se cometió en Catálogos (CLAUDE.md).
+  const ventanaAcotada = esRolAcotado(role);
+  const añosVisibles = ventanaAcotada
+    ? availableYears.filter(y => y === currentYear || y === currentYear - 1)
+    : availableYears;
+  const años = añosVisibles.length > 0 ? añosVisibles : [currentYear];
 
   // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -126,7 +137,7 @@ export function MultifashionShell({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {availableYears.map(y => (
+              {años.map(y => (
                 <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
                   {y}
                 </SelectItem>
@@ -148,6 +159,7 @@ export function MultifashionShell({
           selectedYear={selectedYear}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
+          ventanaAcotada={ventanaAcotada}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

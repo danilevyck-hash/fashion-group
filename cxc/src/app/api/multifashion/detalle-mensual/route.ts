@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { clampAnioMes } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 // Hace 2 llamados al RPC mensual (año actual + año anterior para la comparación
@@ -31,18 +32,25 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const yearParam = sp.get("year");
   const mesParam = sp.get("mes");
-  const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
-  if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+  const yearPedido = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
+  if (!Number.isFinite(yearPedido) || yearPedido < 2000 || yearPedido > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
 
   const now = new Date();
-  const isCurrent = year === now.getFullYear();
+  const isCurrent = yearPedido === now.getFullYear();
   const mesFallback = isCurrent ? now.getMonth() + 1 : 12;
-  const mes = mesParam ? parseInt(mesParam, 10) : mesFallback;
-  if (!Number.isFinite(mes) || mes < 1 || mes > 12) {
+  const mesPedido = mesParam ? parseInt(mesParam, 10) : mesFallback;
+  if (!Number.isFinite(mesPedido) || mesPedido < 1 || mesPedido > 12) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
+
+  // CANDADO gerente_acs: mes en curso + mismo mes del año pasado, impuesto acá
+  // (la UI que esconde el selector es cortesía, no candado). Admin no cambia.
+  // Ver src/lib/multifashion/ventana-gerente.ts.
+  const acotado = clampAnioMes(auth.role, { year: yearPedido, mes: mesPedido }, now);
+  const year = acotado.year;
+  const mes = acotado.mes as number;
 
   // Rango del mes para el desacople retail/mayoreo. El RPC de detalle ya da el
   // retail (totales.ventas, is_wholesale=false). El mayoreo lo sumamos aparte de

@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { clampPeriodoVendedoras } from "@/lib/multifashion/ventana-gerente";
 import type { VendedorasPeriodo } from "@/components/ventas/types";
 
 export const dynamic = "force-dynamic";
@@ -55,19 +56,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "trimestre requerido (1..4) cuando periodo=trimestre" }, { status: 400 });
   }
 
+  const nParam = parseIntParam(sp.get("n"));
+
+  // CANDADO gerente_acs: trimestre, YTD y las ventanas rolling de 3/6/12 meses
+  // se aplastan a periodo='mes' con el mes en curso (y año en {actual,
+  // anterior}). Admin no cambia. Ver src/lib/multifashion/ventana-gerente.ts.
+  const acotado = clampPeriodoVendedoras(
+    auth.role,
+    { year, periodo: periodoRaw, mes, trimestre, n: nParam },
+    new Date(),
+  );
+
   // periodo=ultimos → ventana rolling de N meses (3/6/12) terminando en `mes`,
   // vía multifashion_vendedoras_range (Δ vs misma ventana del año anterior, sin bono).
-  if (periodoRaw === "ultimos") {
-    const n = parseIntParam(sp.get("n"));
+  if (acotado.periodo === "ultimos") {
+    const n = acotado.n;
     if (n !== 3 && n !== 6 && n !== 12) {
       return NextResponse.json({ error: "n requerido (3|6|12) cuando periodo=ultimos" }, { status: 400 });
     }
-    if (mes == null || mes < 1 || mes > 12) {
+    if (acotado.mes == null || acotado.mes < 1 || acotado.mes > 12) {
       return NextResponse.json({ error: "mes (fin de ventana) requerido (1..12)" }, { status: 400 });
     }
     const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_range", {
-      p_year: year,
-      p_fin_mes: mes,
+      p_year: acotado.year,
+      p_fin_mes: acotado.mes,
       p_n_meses: n,
     });
     if (error) {
@@ -78,10 +90,10 @@ export async function GET(req: NextRequest) {
   }
 
   const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_v3", {
-    p_year: year,
-    p_periodo: periodoRaw,
-    p_mes: periodoRaw === "mes" ? mes : null,
-    p_trimestre: periodoRaw === "trimestre" ? trimestre : null,
+    p_year: acotado.year,
+    p_periodo: acotado.periodo,
+    p_mes: acotado.periodo === "mes" ? acotado.mes : null,
+    p_trimestre: acotado.periodo === "trimestre" ? acotado.trimestre : null,
   });
 
   if (error) {

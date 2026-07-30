@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { clampRangoFechas } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "limit inválido (1..500)" }, { status: 400 });
   }
 
+  // CANDADO gerente_acs: el rango se intersecta con el mes en curso (o con el
+  // mismo mes del año pasado, si es con ese con el que más solapa). Admin no
+  // cambia. Ver src/lib/multifashion/ventana-gerente.ts.
+  const rango = clampRangoFechas(auth.role, { inicio: fecha_inicio, fin: fecha_fin }, new Date());
+
   const { data, error } = await supabaseServer.rpc("multifashion_retail_recurrentes_v2", {
-    p_fecha_inicio: fecha_inicio,
-    p_fecha_fin: fecha_fin,
+    p_fecha_inicio: rango.inicio,
+    p_fecha_fin: rango.fin,
     p_limit: limit,
   });
   if (error) {
