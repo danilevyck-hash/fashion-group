@@ -142,11 +142,28 @@ describe("evaluarRecursos", () => {
     expect(evaluarRecursos({ ...base, memoriaDisponiblePct: 8 }).nivel).toBe("critico");
   });
 
-  it("tolera el swap normal de Micro pero avisa si sube", () => {
-    // 13,5% es la línea base en reposo: no puede alertar.
-    expect(evaluarRecursos({ ...base, swapUsadoPct: 13.5 }).nivel).toBe("ok");
-    expect(evaluarRecursos({ ...base, swapUsadoPct: 45 }).nivel).toBe("aviso");
-    expect(evaluarRecursos({ ...base, swapUsadoPct: 80 }).nivel).toBe("critico");
+  it("el swap NO alerta NUNCA, por más alto que esté", () => {
+    // Regla de Daniel (30-jul-2026): "solo arriba del 80% de memoria, no del 42%.
+    // Al 42% no se avisa nada". El 42% era SWAP, y con la base sana: medido ese
+    // día, swap 40,3% con memoria disponible 53,3% y `oom_kill` en 0 — y el 🟡
+    // llegó 3 veces (28, 29 y 30-jul). El swap usado es una marca de marea
+    // PEGAJOSA (13,5% el 27-jul → 40,3% el 30-jul sin un solo incidente), así que
+    // cualquier umbral sobre él termina sonando para siempre. Se mide y se muestra
+    // como contexto, pero no genera hallazgos.
+    for (const pct of [13.5, 40.3, 42, 65, 72, 86, 99]) {
+      expect(
+        evaluarRecursos({ ...base, swapUsadoPct: pct }).nivel,
+        `swap ${pct}% no debe alertar`,
+      ).toBe("ok");
+    }
+  });
+
+  it("la memoria SÍ alerta arriba del 80% usado (el umbral que pidió Daniel)", () => {
+    // "Arriba del 80% de memoria" = menos del 20% disponible. Es lo que queda
+    // vigilando la memoria, y es una condición sostenida, no una marca pegajosa.
+    expect(evaluarRecursos({ ...base, memoriaDisponiblePct: 25 }).nivel).toBe("ok");
+    expect(evaluarRecursos({ ...base, memoriaDisponiblePct: 19 }).nivel).toBe("aviso");
+    expect(evaluarRecursos({ ...base, memoriaDisponiblePct: 5 }).nivel).toBe("critico");
   });
 
   it("grita cuando la carga por núcleo llega al territorio del statement timeout", () => {
@@ -164,7 +181,7 @@ describe("evaluarRecursos", () => {
   it("un crítico manda sobre varios avisos y sale primero en la lista", () => {
     const ev = evaluarRecursos({
       ...base,
-      swapUsadoPct: 45, // aviso
+      conexionesPct: 75, // aviso (el swap ya no alerta)
       memoriaDisponiblePct: 5, // crítico
       dbUsadoPct: 80, // aviso
     });
@@ -185,7 +202,11 @@ describe("evaluarRecursos", () => {
     };
     const ev = evaluarRecursos(ahogo);
     expect(ev.nivel).toBe("critico");
-    expect(ev.hallazgos.map((h) => h.clave).sort()).toEqual(["carga", "memoria", "swap"]);
+    // Sin "swap" desde el 30-jul-2026, y es la prueba de que quitarlo no costó
+    // NADA: el episodio real seguía teniendo la memoria en el piso (4%) y la carga
+    // disparada (6× por núcleo). El swap al 92% era un síntoma acompañante, no la
+    // señal — se detecta igual, y sin los 3 falsos positivos que costaba.
+    expect(ev.hallazgos.map((h) => h.clave).sort()).toEqual(["carga", "memoria"]);
   });
 });
 
@@ -218,6 +239,63 @@ describe("mensajes de Telegram", () => {
     expect(t).toContain("HTTP 521");
     expect(t).toContain("runbook-base-lenta.md");
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 🩸 30-jul-2026: "me preocupa que me manda alerta de espacio, eso que es si
+  // subi supabase". El mensaje decía MEMORIA pero listaba disco y tamaño de la
+  // base en la MISMA lista, y se leyó como que la base se quedaba sin espacio —
+  // con el disco al 92% libre y la base en 270 MB de 8 GB. Estos candados fijan
+  // que memoria y almacenamiento no vuelvan a mezclarse.
+  describe("un aviso de memoria no se puede confundir con falta de espacio", () => {
+    const muestra = leerMuestra(MUESTRA_REAL);
+    const evMemoria = evaluarRecursos({ ...muestra, memoriaDisponiblePct: 8 });
+    const texto = mensajeRecursos({ ...muestra, memoriaDisponiblePct: 8 }, evMemoria);
+
+    it("el hallazgo dice MEMORIA de entrada", () => {
+      expect(evMemoria.hallazgos[0].texto).toContain("MEMORIA");
+    });
+
+    it("aclara que es memoria y NO espacio de almacenamiento", () => {
+      expect(texto).toContain("es MEMORIA (RAM), no espacio de almacenamiento");
+    });
+
+    it("dice que tener disco libre no lo arregla", () => {
+      expect(texto).toMatch(/disco libre no lo arregla/i);
+    });
+
+    it("dice que el plan de Supabase no cambia la RAM (fue la duda exacta)", () => {
+      expect(texto).toMatch(/plan de Supabase no cambia la RAM/i);
+    });
+
+    it("memoria y almacenamiento van en bloques SEPARADOS y rotulados", () => {
+      const iMem = texto.indexOf("MEMORIA (es lo que se aprieta)");
+      const iAlm = texto.indexOf("ALMACENAMIENTO (va aparte");
+      expect(iMem).toBeGreaterThan(-1);
+      expect(iAlm).toBeGreaterThan(-1);
+      // El disco vive DESPUÉS del rótulo de almacenamiento, nunca entre las
+      // cifras de memoria: esa mezcla fue la causa de la confusión.
+      expect(texto.indexOf("Disco libre")).toBeGreaterThan(iAlm);
+      expect(texto.indexOf("Memoria de respaldo usada")).toBeLessThan(iAlm);
+      expect(texto.indexOf("Tamaño de la base")).toBeGreaterThan(iAlm);
+    });
+
+    it("cuando el problema NO es de memoria, no mete la aclaración de RAM", () => {
+      // Un aviso de tamaño de la base sí es de almacenamiento: la aclaración
+      // sobraría y volvería a mezclar los dos temas.
+      const evDisco = evaluarRecursos({ ...muestra, dbUsadoPct: 80 });
+      const t = mensajeRecursos({ ...muestra, dbUsadoPct: 80 }, evDisco);
+      expect(t).not.toContain("es MEMORIA (RAM), no espacio de almacenamiento");
+    });
+  });
+
+  it("la medición real del 30-jul-2026 (base sana) NO manda ningún mensaje", () => {
+    // swap 40,3% · memoria libre 53,3% · disco 92% libre · base 270 MB de 8 GB.
+    // Ese día llegó un 🟡 que no correspondía. Con los umbrales nuevos: silencio.
+    const sana = { ...leerMuestra(MUESTRA_REAL), swapUsadoPct: 40.3, memoriaDisponiblePct: 53.3 };
+    const ev = evaluarRecursos(sana);
+    expect(ev.nivel).toBe("ok");
+    expect(ev.hallazgos).toEqual([]);
+  });
 });
 
 describe("cableado del cron", () => {
@@ -227,11 +305,22 @@ describe("cableado del cron", () => {
   const propias = entradas.filter((c) => c.path === "/api/cron/db-salud");
 
   it("está en vercel.json y toma varias muestras al día", () => {
-    // Una sola muestra diaria no sirve: la caída del 26-jul duró 76 minutos.
-    expect(propias.length).toBeGreaterThanOrEqual(8);
+    // 11 → 5 entradas (30-jul-2026). Las 11 se dimensionaron para cazar una
+    // caída corta (la del 26-jul duró 76 min), no para el umbral de recursos. Dos
+    // cosas cambiaron y ninguna necesita 11 muestras:
+    //   • El swap dejó de alertar y lo que queda vigilando la memoria es un
+    //     umbral SOSTENIDO (>80 % usado). Una condición que se mueve despacio no
+    //     se detecta mejor mirándola 11 veces que 5.
+    //   • La detección de "la base no responde" ya la cubre el vigía EXTERNO, que
+    //     llama a /api/health-crons CADA HORA desde afuera y devuelve 503 cuando
+    //     no puede leer `cron_heartbeats`. Es más denso que cualquier cron nuestro
+    //     y, a diferencia de db-salud, no vive dentro del sistema que vigila.
+    // Menos entradas = menos superficie de fallo, que es el pedido de Daniel.
+    // Una sola muestra diaria seguiría siendo insuficiente: el piso se queda.
+    expect(propias.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("las muestras están repartidas: ningún hueco mayor a 3 horas", () => {
+  it("las muestras están repartidas: ningún hueco mayor a 6 horas", () => {
     const horas = propias
       .map((c) => {
         const [min, hr] = c.schedule.split(" ");
@@ -240,7 +329,7 @@ describe("cableado del cron", () => {
       .sort((a, b) => a - b);
     for (let i = 0; i < horas.length; i++) {
       const sig = i === horas.length - 1 ? horas[0] + 1440 : horas[i + 1];
-      expect(sig - horas[i]).toBeLessThanOrEqual(180);
+      expect(sig - horas[i]).toBeLessThanOrEqual(360);
     }
   });
 

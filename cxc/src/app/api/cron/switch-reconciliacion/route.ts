@@ -73,11 +73,12 @@ import {
   fmtMesLabel,
 } from "@/lib/grupo-resumen-mensual";
 import { calcularFotosResumen } from "@/lib/catalogos/fotos-resumen";
-import { empresasConFacturas, empresasConEstadoCuenta } from "@/lib/switch-api/empresas";
+import { empresasConFacturas, empresasConEstadoCuentaEnCron } from "@/lib/switch-api/empresas";
 import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
   recordCronHeartbeat,
   cronsStaleParaAlerta,
+  logCronError,
   reconciliarSlotsSwitchSync,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
   catalogoCicloSinceIso,
@@ -85,6 +86,13 @@ import {
   type SlotDesatendido,
 } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
+import {
+  medirFrescura,
+  clasificarDatosViejos,
+  mensajeDatosViejos,
+  yaAvisoReciente,
+  TIPO_DATO_VIEJO,
+} from "@/lib/datos-frescos";
 import { barrerRunningAtascados } from "@/lib/switch-api/sync-log";
 import { colateralDayStartIso, hoyPanama } from "@/lib/fecha-panama";
 import { enviarResumenCaidaSiAplica } from "@/lib/switch-api/outage-resumen";
@@ -163,10 +171,16 @@ function expectedPairs(): Pair[] {
     pairs.push({ empresa: e, syncType: "facturas" });
     pairs.push({ empresa: e, syncType: "costo" });
   }
-  // Las que TRAEN saldos, no las que son cartera del grupo: confecciones_boston
-  // sincroniza estadocuenta (para su pestaña aparte) con `cxc:false`, y si no
+  // Las que TRAEN saldos, no las que son cartera del grupo: una empresa puede
+  // sincronizar estadocuenta (para su pestaña aparte) con `cxc:false`, y si no
   // estuviera acá su sync no tendría quién lo recupere cuando falle.
-  for (const e of empresasConEstadoCuenta()) {
+  //
+  // ...EnCron excluye las que NO caben en el techo de la función (hoy:
+  // confecciones_boston). Recuperar un par que muere siempre no es recuperación:
+  // hasta el 30-jul-2026 esta reconciliación reintentaba boston/estadocuenta a
+  // las 10:00, 14:00 y 18:00 y las tres corridas se morían igual, dejando las
+  // filas en 'running' hasta que el run siguiente las cerraba con #atascado.
+  for (const e of empresasConEstadoCuentaEnCron()) {
     pairs.push({ empresa: e, syncType: "estadocuenta" });
   }
   return pairs;
@@ -631,20 +645,58 @@ async function checkStaleCrons(): Promise<string[]> {
   }
   const stale = cronsStaleParaAlerta((data ?? []) as HeartbeatRow[], Date.now());
 
+  // ⛔ NO SE MANDA TELEGRAM POR UN CRON STALE (30-jul-2026, regla de Daniel).
+  //
+  // Este watchdog avisaba "Una tarea automática lleva más de un día sin
+  // completarse. Detalle: switch-sync:all-0630". Medía el MECANISMO, no el
+  // resultado, y se equivocaba en las dos direcciones: mandó ese mismo mensaje el
+  // 27, 28 y 29 de julio mientras las ventas de american_classic de ese run
+  // entraban bien (06:31:23), y al revés, un sync que corre y no trae nada deja el
+  // heartbeat fresco y el dato viejo pasa inadvertido.
+  //
+  // Lo reemplaza `checkDatosViejos()` (regla 1): pregunta si la CARTERA o las
+  // VENTAS llevan más de 24 h sin actualizarse, que es lo que Daniel realmente
+  // mira. Un cron caído cuyo trabajo igual se hizo ya no molesta a nadie: queda
+  // en el cuerpo de /api/health-crons y en el log, para quien lo vaya a buscar.
+  //
+  // El valor se sigue devolviendo (entra en el JSON de la respuesta y en los
+  // logs) — lo único que se quitó es el sendTelegram.
   if (stale.length > 0) {
-    // `stale` son nombres internos de cron. No se los mostramos a Daniel como
-    // lista de identificadores: se le dice qué significa y qué hacer, y el
-    // detalle técnico va al final, en una sola línea, para que sirva de pista
-    // cuando me reenvíe el mensaje.
-    await enviarSistema(
-      `${stale.length === 1 ? "Una tarea automática lleva" : `${stale.length} tareas automáticas llevan`} ` +
-        `más de un día sin completarse.\n` +
-        `Qué significa: puede haber datos sin actualizar en la app.\n` +
-        `Qué hacer: avisame para revisarlo.\n` +
-        `Detalle: ${stale.join(", ")}`,
-    );
+    console.error(`[watchdog] crons stale (informativo, sin alerta): ${stale.join(", ")}`);
   }
   return stale;
+}
+
+/**
+ * REGLA 1 — "Un dato que mirás está viejo". La única alerta de datos.
+ *
+ * Avisa si la cartera o las ventas llevan más de 24 h sin actualizarse, con
+ * dedup de 20 h para no repetirlo en cada pasada. Toda la decisión vive en
+ * `src/lib/datos-frescos.ts` (pura y testeable); acá queda el I/O. No lanza: un
+ * fallo midiendo frescura no puede tumbar la reconciliación.
+ */
+async function checkDatosViejos(): Promise<string[]> {
+  try {
+    const estados = await medirFrescura();
+    const viejos = clasificarDatosViejos(estados);
+    if (viejos.length === 0) return [];
+    const etiquetas = viejos.map((v) => `${v.dato}:${v.empresa}`);
+    if (await yaAvisoReciente()) {
+      console.error(`[datos-viejos] ya avisado hace <20h, no repito: ${etiquetas.join(", ")}`);
+      return etiquetas;
+    }
+    // Se registra en cron_email_errors ANTES de mandar: es la llave del dedup, y
+    // dejarla después haría que un fallo de Telegram provocara un segundo intento
+    // inmediato en la pasada siguiente.
+    await logCronError(TIPO_DATO_VIEJO, etiquetas.join(", "), null, { telegram: false });
+    await enviarSistema(mensajeDatosViejos(viejos));
+    return etiquetas;
+  } catch (err) {
+    console.error(
+      `[datos-viejos] no pude medir la frescura: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return [];
+  }
 }
 
 /** Nombre del cron que alerta switch-sync (dedup contra cron_email_errors). */
@@ -770,8 +822,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const slotsCubiertos = slots0.cubiertos;
   const slotsDesatendidos = slots0.desatendidos;
 
-  // 0b. Watchdog de heartbeats + registrar el propio.
+  // 0b. Watchdog de heartbeats (INFORMATIVO, ya no alerta) + registrar el propio.
   const staleCrons = await checkStaleCrons();
+  // 0b-bis. REGLA 1: la única alerta de datos — cartera/ventas con más de 24 h.
+  const datosViejos = await checkDatosViejos();
   await recordCronHeartbeat(CRON_NAME);
 
   // 0c. Reporte de las ocurrencias que CORRIERON Y FALLARON (defecto 2). El
@@ -807,6 +861,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram: "none",
       outageResumen: outage.resumen,
       staleCrons,
+      datosViejos,
       slotsCubiertos,
       slotsDesatendidos,
     });
@@ -982,6 +1037,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       telegram,
       outageResumen,
       staleCrons,
+      datosViejos,
       slotsCubiertos,
       slotsDesatendidos,
       slotsSinAtender,
