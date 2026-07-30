@@ -99,7 +99,7 @@ export function FaltanFotoBatchTab({
                 <VariantePicker
                   marca={marca}
                   product={p}
-                  tieneVariantes={tieneVariantes(p.sku)}
+                  alternativas={tieneVariantes(p.sku)}
                   onSaved={onComplete}
                   showToast={showToast}
                 />
@@ -455,7 +455,7 @@ function ProductRow({
         <VariantePicker
           marca={marca}
           product={product}
-          tieneVariantes={tieneVariantes(product.sku)}
+          alternativas={tieneVariantes(product.sku)}
           onSaved={onComplete}
           showToast={showToast}
           compacto

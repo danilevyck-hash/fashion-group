@@ -13,6 +13,8 @@ import {
   vistaDesdeNombre,
   vistaActualDeImageUrl,
   pathDeVarianteValido,
+  tieneAlternativas,
+  contarAlternativas,
 } from "@/lib/catalogos/variantes-paths";
 import {
   planHousekeeping,
@@ -145,5 +147,67 @@ describe("mensaje de housekeeping", () => {
   it("menciona los fallos sin romper el resumen", () => {
     expect(lineaHousekeeping({ productos: 2, bytes: 2048, fallos: 1 })).toContain("(1 con error)");
     expect(lineaHousekeeping({ productos: 0, bytes: 0, fallos: 2 })).toContain("2 carpeta(s)");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Candado del botón "Cambiar foto" (30-jul-2026).
+//
+// Daniel, con captura del producto THS10159C000: "no me deberia de salir el
+// boton de Cambiar foto si no hay opciones". El botón se pintaba con solo
+// EXISTIR la carpeta `_v/{sku}/`, y tras la limpieza del banco esa carpeta
+// conserva UN archivo: justamente la foto elegida.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("tieneAlternativas / contarAlternativas", () => {
+  it("🩸 CASO REAL THS10159C000: 1 sola foto y ES la puesta → NO hay botón", () => {
+    const url =
+      "https://x.supabase.co/storage/v1/object/public/product-images/tommy/_v/ths10159c000/1.jpg?v=1784964356592";
+    expect(tieneAlternativas([1], url, "tommy", "THS10159C000")).toBe(false);
+    expect(contarAlternativas([1], url, "tommy", "THS10159C000")).toBe(0);
+  });
+
+  it("hay otras vistas además de la puesta → sí hay botón, y dice cuántas", () => {
+    const url = "product-images/tommy/_v/abc/6.jpg";
+    expect(tieneAlternativas([1, 6, 13], url, "tommy", "ABC")).toBe(true);
+    expect(contarAlternativas([1, 6, 13], url, "tommy", "ABC")).toBe(2);
+  });
+
+  it("sin carpeta (undefined) → no hay botón", () => {
+    expect(tieneAlternativas(undefined, "x.jpg", "tommy", "ABC")).toBe(false);
+    expect(contarAlternativas(undefined, "x.jpg", "tommy", "ABC")).toBe(0);
+  });
+
+  it("carpeta vacía → no hay botón", () => {
+    expect(tieneAlternativas([], null, "tommy", "ABC")).toBe(false);
+  });
+
+  it("la foto puesta NO sale del banco (subida a mano) → todas son alternativas", () => {
+    expect(tieneAlternativas([1, 2], "product-images/tommy/abc.jpg", "tommy", "ABC")).toBe(true);
+    expect(contarAlternativas([1, 2], "product-images/tommy/abc.jpg", "tommy", "ABC")).toBe(2);
+    // Y sin foto puesta, igual.
+    expect(contarAlternativas([1, 2], null, "tommy", "ABC")).toBe(2);
+  });
+
+  it("la puesta apunta a una vista que ya no está guardada → lo que queda ES alternativa", () => {
+    expect(tieneAlternativas([1], "product-images/tommy/_v/abc/6.jpg", "tommy", "ABC")).toBe(true);
+  });
+
+  it("exacto=false (no se pudo leer la carpeta) → se muestra el botón, nunca se esconde de más", () => {
+    expect(tieneAlternativas([], "x", "tommy", "ABC", false)).toBe(true);
+    expect(contarAlternativas([], "x", "tommy", "ABC", false)).toBe(1);
+    // Pero sin carpeta sigue sin haber nada que elegir.
+    expect(tieneAlternativas(undefined, "x", "tommy", "ABC", false)).toBe(false);
+  });
+
+  it("Reebok y Joybees conservan el botón cuando SÍ tienen banco (no se esconde de más)", () => {
+    expect(tieneAlternativas([1, 2], "product-images/products/_v/abc/1.jpg", "reebok", "ABC")).toBe(true);
+    expect(contarAlternativas([1, 2], "product-images/products/_v/abc/1.jpg", "reebok", "ABC")).toBe(1);
+    expect(tieneAlternativas([3, 7], "product-images/joybees/_v/xyz/3.jpg", "joybees", "XYZ")).toBe(true);
+  });
+
+  it("el SKU con guión se normaliza igual que en Storage", () => {
+    const url = "product-images/tommy/_v/t1a832600313/1.jpg";
+    expect(tieneAlternativas([1, 5], url, "tommy", "T1A8-32600-313")).toBe(true);
+    expect(contarAlternativas([1, 5], url, "tommy", "T1A8-32600-313")).toBe(1);
   });
 });

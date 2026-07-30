@@ -20,7 +20,7 @@ import { getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import {
-  listarSkusConVariantes,
+  listarVistasPorSku,
   listarVariantesDeSku,
   urlDeVariante,
   guardarFotoElegida,
@@ -38,7 +38,13 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   const sku = new URL(req.url).searchParams.get("sku")?.trim();
   try {
-    if (!sku) return NextResponse.json({ skus: await listarSkusConVariantes(cfg) });
+    if (!sku) {
+      // `vistas` (qué fotos tiene CADA sku) es lo que permite decidir si se
+      // pinta "Cambiar foto" SIN preguntar carpeta por carpeta. `skus` se
+      // conserva por compatibilidad; sale del mismo mapa, sin otra llamada.
+      const { vistas, exacto } = await listarVistasPorSku(cfg);
+      return NextResponse.json({ skus: Object.keys(vistas), vistas, exacto });
+    }
     return NextResponse.json(await listarVariantesDeSku(cfg, sku));
   } catch (err) {
     console.error(err);

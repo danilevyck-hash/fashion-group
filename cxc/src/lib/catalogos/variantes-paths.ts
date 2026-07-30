@@ -92,3 +92,55 @@ export function vistaActualDeImageUrl(
   if (i < 0) return null;
   return vistaDesdeNombre(sinQuery.slice(i + prefijo.length));
 }
+
+/**
+ * ¿Este producto tiene ALTERNATIVAS de foto, o sea alguna guardada DISTINTA a
+ * la que ya está puesta?
+ *
+ * 🩸 EL BUG QUE ARREGLA (30-jul-2026). Daniel, con captura del producto
+ * `THS10159C000`: "no me deberia de salir el boton de Cambiar foto si no hay
+ * opciones". El botón se pintaba con solo EXISTIR la carpeta `_v/{sku}/`, y tras
+ * la limpieza del banco esa carpeta conserva UN archivo: justamente la foto
+ * elegida. O sea que existía carpeta, se pintaba el botón, y recién al tocarlo
+ * aparecía "Este código no tiene más fotos guardadas" — enterarse después de
+ * tocar es exactamente lo que él no quiere.
+ *
+ * La pregunta correcta no es "¿hay carpeta?" ni "¿hay fotos?", es **"¿hay
+ * alguna foto que NO sea la puesta?"**. Con las vistas de cada SKU y su
+ * `image_url` se responde exacto y sin una sola consulta extra.
+ *
+ * @param vistas  vistas guardadas del SKU (`undefined` = no hay carpeta)
+ * @param exacto  false = no se pudo saber el contenido de la carpeta (Storage
+ *                no soportó el listado recursivo). Se degrada a "sí hay": ante
+ *                la duda es mejor mostrar el botón de más que esconder una
+ *                función que sirve.
+ */
+export function tieneAlternativas(
+  vistas: readonly number[] | undefined,
+  imageUrl: string | null | undefined,
+  marca: StorageMarcaKey,
+  sku: string,
+  exacto: boolean = true,
+): boolean {
+  if (vistas === undefined) return false; // sin carpeta → no hay nada que elegir
+  if (!exacto) return true;
+  if (vistas.length === 0) return false;
+  const actual = vistaActualDeImageUrl(imageUrl, marca, sku);
+  // La foto puesta no sale del banco (subida a mano/legacy) → TODAS son alternativas.
+  if (actual == null) return true;
+  return vistas.some((v) => v !== actual);
+}
+
+/** Cuántas fotos alternativas hay (0 = no se pinta el botón). */
+export function contarAlternativas(
+  vistas: readonly number[] | undefined,
+  imageUrl: string | null | undefined,
+  marca: StorageMarcaKey,
+  sku: string,
+  exacto: boolean = true,
+): number {
+  if (!tieneAlternativas(vistas, imageUrl, marca, sku, exacto)) return 0;
+  if (!exacto || !vistas) return 1; // no sabemos cuántas; alcanza con "hay"
+  const actual = vistaActualDeImageUrl(imageUrl, marca, sku);
+  return actual == null ? vistas.length : vistas.filter((v) => v !== actual).length;
+}

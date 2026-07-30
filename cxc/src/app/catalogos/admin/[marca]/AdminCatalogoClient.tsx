@@ -21,6 +21,16 @@ import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalo
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 import { colaSinFoto } from "@/lib/catalogos/fotos-faltantes";
 import { normalizarSkuStorage } from "@/lib/catalogos/fotos-b2b";
+import { contarAlternativas, type StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
+
+/** Respuesta de GET /products/variantes (sin `sku`): el mapa completo de la marca. */
+interface VariantesResp {
+  skus: string[];
+  /** skuStorage → vistas guardadas. Ausente = ese SKU no tiene carpeta. */
+  vistas: Record<string, number[]>;
+  /** false = no se pudo leer el contenido; el cliente asume que SÍ hay alternativas. */
+  exacto: boolean;
+}
 
 type Tab = "faltan-foto" | "completo" | "pedidos" | "importar";
 
@@ -73,9 +83,9 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   );
   // Qué SKUs tienen fotos del banco B2B guardadas — UNA petición para todo el
   // catálogo (en vez de una por fila) que habilita el botón "Cambiar foto".
-  const { data: variantesData, mutate: mutateVariantes } = useSWR<{ skus: string[] }>(
+  const { data: variantesData, mutate: mutateVariantes } = useSWR<VariantesResp>(
     authChecked ? `${marca}-catalogo-variantes` : null,
-    () => fetchJson<{ skus: string[] }>(`${theme.api}/products/variantes`, { skus: [] }),
+    () => fetchJson<VariantesResp>(`${theme.api}/products/variantes`, { skus: [], vistas: {}, exacto: true }),
     ADMIN_SWR_OPTS,
   );
 
@@ -97,14 +107,28 @@ function AdminCatalogoInner({ marca }: { marca: MarcaUiKey }) {
   const metrics = useMemo(() => theme.admin.metrics(visibles), [theme, visibles]);
   const sinFotoCount = sinFoto.length;
 
-  // Set de SKUs normalizados con variantes (misma normalización que Storage).
-  const skusConVariantes = useMemo(
-    () => new Set(variantesData?.skus ?? []),
-    [variantesData],
-  );
+  // Cuántas fotos ALTERNATIVAS tiene cada SKU — o sea, distintas a la que ya
+  // está puesta. Se calcula UNA vez para toda la lista, con datos que ya
+  // llegaron: cero consultas por fila.
+  //
+  // 🩸 No alcanza con "existe la carpeta _v/{sku}/": tras la limpieza del banco
+  // esa carpeta conserva UN archivo, que es justamente la foto elegida. Ese era
+  // el bug de `THS10159C000` — botón visible que al tocarlo decía que no había
+  // más fotos.
+  const alternativasPorSku = useMemo(() => {
+    const vistas = variantesData?.vistas ?? {};
+    const exacto = variantesData?.exacto !== false;
+    const out = new Map<string, number>();
+    for (const p of products) {
+      if (!p.sku) continue;
+      const key = normalizarSkuStorage(p.sku);
+      out.set(key, contarAlternativas(vistas[key], p.image_url, marca as StorageMarcaKey, p.sku, exacto));
+    }
+    return out;
+  }, [products, variantesData, marca]);
   const tieneVariantes = useCallback(
-    (sku: string | null) => (sku ? skusConVariantes.has(normalizarSkuStorage(sku)) : false),
-    [skusConVariantes],
+    (sku: string | null) => (sku ? alternativasPorSku.get(normalizarSkuStorage(sku)) ?? 0 : 0),
+    [alternativasPorSku],
   );
 
   const reloadProducts = useCallback(async () => { await mutateProducts(); }, [mutateProducts]);

@@ -14,7 +14,9 @@ import type { AdminProducto, MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 
 /** Saber si un SKU tiene fotos del banco B2B guardadas (lo calcula el shell). */
-export type TieneVariantes = (sku: string | null) => boolean;
+/** Cuántas fotos ALTERNATIVAS (distintas a la puesta) tiene el SKU. 0 = no se
+ *  pinta el botón "Cambiar foto". */
+export type TieneVariantes = (sku: string | null) => number;
 
 type CategoriaFilter = "todas" | "footwear" | "apparel" | "accessories";
 type FotoFilter = "todos" | "con" | "sin";
@@ -478,7 +480,7 @@ function ProductPhotoCard({
           <VariantePicker
             marca={marca}
             product={product}
-            tieneVariantes={tieneVariantes(product.sku)}
+            alternativas={tieneVariantes(product.sku)}
             onSaved={onPhotoSaved}
             showToast={showToast}
           />
@@ -647,7 +649,7 @@ function ProductListRow({
         <VariantePicker
           marca={marca}
           product={product}
-          tieneVariantes={tieneVariantes(product.sku)}
+          alternativas={tieneVariantes(product.sku)}
           onSaved={onPhotoSaved}
           showToast={showToast}
           compacto
