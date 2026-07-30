@@ -290,7 +290,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Ya está descontado lo devuelto · Tocá para ver el detalle
+        Ya está descontado lo devuelto · Toca para ver el detalle
       </p>
 
       {detalle && (
