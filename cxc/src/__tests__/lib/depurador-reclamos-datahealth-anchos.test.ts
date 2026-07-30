@@ -204,8 +204,13 @@ describe("Reclamos › Por empresa — la columna ACCIONES entra en iPad", () =>
 });
 
 describe("Guías › Imprimir — el arrastre deja de ser de la PÁGINA", () => {
+  // 🩸 ACTUALIZADO: el marco se MUDÓ a `HojaEscalada` cuando Daniel eligió ver
+  // la hoja entera y achicada en el celular. La garantía de este bloque no se
+  // aflojó — se hizo más fuerte: a 390 la hoja ya no se arrastra (0px, escala
+  // 0.733) y en modo ampliado sigue scrolleando en su marco, no la página. El
+  // detalle vive en `guia-imprimir-escala.test.ts`.
   it("el documento scrollea dentro de su propio marco, y al imprimir no hay scroller", () => {
-    const src = leer(GUIA_DETAIL);
+    const src = leer("src/app/guias/components/HojaEscalada.tsx");
     expect(src).toContain("overflow-x-auto");
     expect(src).toContain("print:overflow-visible");
     expect(src).toContain("print:mx-0");
