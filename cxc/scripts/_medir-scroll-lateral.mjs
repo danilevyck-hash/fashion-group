@@ -83,15 +83,21 @@ const SONDA = `(() => {
     //     ya está resuelto y mide 0, salía con 2 px por un nombre de cliente.
     //   · una tabla → el dato queda fuera de la pantalla y no hay forma de
     //     alcanzarlo. Es PEOR que tener que arrastrar, y hay que reportarlo.
-    // Un <table> adentro lo resuelve sin ambigüedad, pero NO alcanza: la tabla
-    // de Multifashion › Clientes está hecha de divs y perdía 288 px sin un solo
-    // <table>. El segundo criterio es de tamaño, y el umbral está MEDIDO: en el
-    // barrido de las 26 pantallas, TODO recorte de texto quedó en ≤53 px (el
-    // mayor: un nombre de cliente en el directorio) y el único recorte de datos
-    // real fue de 288 px. 100 px deja el doble de aire sobre el ruido observado
-    // y sigue atrapando el caso real por un factor de casi 3.
+    // Lo que separa los dos casos es QUE recorta, y son dos condiciones:
+    //   (a) recorta HIJOS, no texto propio. Un elemento hoja que recorta es un
+    //       texto con puntos suspensivos por definicion. Los nombres de producto
+    //       del catalogo, que son un h3 con truncate, perdian 174 px y se leian
+    //       como datos inalcanzables siendo el mecanismo del ... bien usado. Los
+    //       recortes de texto se cuentan aparte, en textosCortados, y si el texto
+    //       cortado es un MONTO se marca aparte otra vez, en montosCortados.
+    //   (b) y es una tabla, o un recorte grande. Un table adentro lo resuelve sin
+    //       ambiguedad pero NO alcanza: la tabla de Multifashion > Clientes esta
+    //       hecha de divs y perdia 288 px sin un solo table. El umbral esta
+    //       MEDIDO: en el barrido, todo recorte de texto quedo en 53 px o menos y
+    //       el unico recorte de datos real fue de 288 px.
     const RECORTE_SOSPECHOSO_PX = 100;
-    if (!arrastrable && !tablaAdentro && sobra < RECORTE_SOSPECHOSO_PX) continue;
+    const recorteDeDatos = el.children.length > 0 && (tablaAdentro || sobra >= RECORTE_SOSPECHOSO_PX);
+    if (!arrastrable && !recorteDeDatos) continue;
 
     const r = el.getBoundingClientRect();
     desbordes.push({
@@ -143,6 +149,50 @@ const SONDA = `(() => {
     // largo del texto no sirve (Reclamos, con 5 tarjetas y 26 reclamos, tiene
     // menos texto que el mensaje de "no hay nada" de otra pantalla).
     mensajeVacio: /No hay |Sin resultados|No se encontr/i.test(document.body.innerText),
+
+    // ── Texto y NÚMEROS cortados ─────────────────────────────────────────────
+    // Un nombre con puntos suspensivos es diseño. Un MONTO cortado es otra cosa:
+    // "$1,23…" no es un número más chico, es un número que no se puede leer, y
+    // encima parece completo. Por eso se cuentan aparte.
+    ...(() => {
+      const cortes = [];
+      for (const el of document.querySelectorAll("*")) {
+        if (el.children.length > 0) continue;              // solo hojas de texto
+        const sobra = el.scrollWidth - el.clientWidth;
+        if (sobra <= 1) continue;
+        const cs = getComputedStyle(el);
+        if (cs.overflowX !== "hidden" && cs.overflowX !== "clip") continue;
+        if (!visible(el)) continue;
+        const txt = (el.textContent ?? "").trim();
+        if (!txt) continue;
+        cortes.push({ txt: txt.slice(0, 40), px: Math.round(sobra), plata: /[$%]|\\d[\\d,.]{3,}/.test(txt) });
+      }
+      cortes.sort((a, b) => b.px - a.px);
+      return {
+        textosCortados: cortes.length,
+        montosCortados: cortes.filter((c) => c.plata).length,
+        ejemplosCorte: cortes.slice(0, 5),
+      };
+    })(),
+
+    // ── Blancos táctiles por debajo de 44 px ─────────────────────────────────
+    // Regla de la casa (auditoría iPhone #297-304). Se mide en reposo: lo que se
+    // ve al abrir la pantalla, sin desplegar nada.
+    ...(() => {
+      const chicos = [];
+      const sel = "button, a[href], [role=button], [role=menuitem], input:not([type=hidden]), select, textarea";
+      for (const el of document.querySelectorAll(sel)) {
+        if (!visible(el)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.height >= 44 && r.width >= 44) continue;
+        chicos.push({
+          etiqueta: (el.getAttribute("aria-label") || el.textContent || el.tagName).replace(/\\s+/g, " ").trim().slice(0, 28),
+          w: Math.round(r.width), h: Math.round(r.height),
+        });
+      }
+      chicos.sort((a, b) => Math.min(a.w, a.h) - Math.min(b.w, b.h));
+      return { targetsChicos: chicos.length, ejemplosTarget: chicos.slice(0, 5) };
+    })(),
   };
 })()`;
 
@@ -155,81 +205,75 @@ const SONDA = `(() => {
 const P = [];
 const pant = (o) => P.push(o);
 
-pant({ id: "cxc", titulo: "CXC (Panel principal)", url: "/admin", espera: 9000 });
+// Mis 7 módulos del grupo "Ventas y clientes". Comisiones, Cheques, Caja,
+// Préstamos, Guías, Reclamos, Packing, Depurador, Marketing, Gastos y Data
+// Health los mide OTRO agente — no se duplican acá.
+pant({ id: "vista-general", titulo: "Vista General", url: "/vista-general", espera: 10000 });
+
 pant({ id: "ventas-resumen", titulo: "Ventas › Resumen", url: "/ventas?tab=resumen", espera: 11000 });
 pant({ id: "ventas-clientes", titulo: "Ventas › Clientes", url: "/ventas?tab=clientes", espera: 11000 });
 pant({ id: "ventas-productos", titulo: "Ventas › Productos", url: "/ventas?tab=productos", espera: 12000 });
 pant({ id: "ventas-utilidad", titulo: "Ventas › Utilidad", url: "/ventas?tab=utilidad", espera: 12000 });
-pant({ id: "comisiones", titulo: "Comisiones", url: "/comisiones", espera: 12000 });
-pant({ id: "cheques", titulo: "Cheques › Lista", url: "/cheques", espera: 8000 });
-pant({
-  id: "cheques-calendario",
-  titulo: "Cheques › Calendario",
-  url: "/cheques",
-  espera: 8000,
-  async preparar(page) {
-    const b = page.getByRole("button", { name: /^Calendario$/ }).locator("visible=true").first();
-    if (!(await b.count())) return false;
-    await b.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(2500);
-    return true;
-  },
-});
-pant({ id: "caja-lista", titulo: "Caja › Períodos", url: "/caja", espera: 8000 });
-pant({
-  id: "caja-periodo",
-  titulo: "Caja › Período (tabla de gastos)",
-  url: "/caja",
-  espera: 8000,
-  async preparar(page) {
-    const fila = page.locator(".caja-row, div.cursor-pointer").filter({ hasText: "Abierto" })
-      .locator("visible=true").first();
-    if (!(await fila.count())) return false;
-    await fila.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(4000);
-    return /\/caja\/[^/]+$/.test(page.url());
-  },
-});
-pant({ id: "prestamos", titulo: "Préstamos › Lista", url: "/prestamos", espera: 8000 });
-// ⚠️ Por URL DIRECTA, no por clic: en un viewport <640 px `handleRowClick` abre
-// un bottom sheet en vez de navegar, así que la ficha del empleado —donde vive la
-// tabla de movimientos, que es lo que hay que medir— no se alcanza tocando la
-// lista. El id es de un empleado real (LAURA CASIANI); la pantalla es de lectura.
-pant({
-  id: "prestamos-detalle",
-  titulo: "Préstamos › Detalle (movimientos)",
-  url: "/prestamos/cfd135e5-758f-4ddf-9b16-6396785dc3aa",
-  espera: 9000,
-});
-pant({ id: "guias", titulo: "Guías › Lista", url: "/guias", espera: 8000 });
-pant({ id: "reclamos", titulo: "Reclamos", url: "/reclamos", espera: 8000 });
-pant({ id: "proveedores", titulo: "Proveedores (CxP)", url: "/proveedores", espera: 9000 });
+
+// CXC ya fue trabajada: sirve de CALIBRACIÓN (el patrón que hay que imitar).
+pant({ id: "cxc", titulo: "CXC (Panel principal)", url: "/admin", espera: 9000 });
+
+pant({ id: "multifashion-resumen", titulo: "Multifashion › Resumen", url: "/multifashion?subtab=resumen", espera: 11000 });
+pant({ id: "multifashion-vendedoras", titulo: "Multifashion › Vendedoras", url: "/multifashion?subtab=vendedoras", espera: 11000 });
+pant({ id: "multifashion-clientes", titulo: "Multifashion › Clientes", url: "/multifashion?subtab=clientes", espera: 11000 });
+pant({ id: "multifashion-caja", titulo: "Multifashion › Caja", url: "/multifashion?subtab=caja", espera: 11000 });
+
 pant({ id: "clientes", titulo: "Clientes › Directorio", url: "/clientes", espera: 9000 });
 pant({
   id: "clientes-ficha",
-  titulo: "Clientes › Ficha (facturas)",
+  titulo: "Clientes › Ficha de cliente",
   url: "/clientes",
   espera: 9000,
   // En celular la lista es `ul.sm:hidden` y navega por `onClick` de la fila, no
   // con un `<a>`: buscar un enlace no encontraba nada (el `<a>` del nombre vive
-  // en la tabla de escritorio, que acá está oculta).
+  // en la tabla de escritorio, que a 390 px está oculta). En 834/1440 sí hay
+  // tabla, así que se prueban los dos caminos.
   async preparar(page) {
     const fila = page.locator("ul.sm\\:hidden > li").locator("visible=true").first();
-    if (!(await fila.count())) return false;
-    await fila.click({ timeout: 8000 }).catch(() => {});
+    if (await fila.count()) {
+      await fila.click({ timeout: 8000 }).catch(() => {});
+    } else {
+      const l = page.locator('a[href^="/clientes/"]').locator("visible=true").first();
+      if (!(await l.count())) return false;
+      await l.click({ timeout: 8000 }).catch(() => {});
+    }
     await page.waitForTimeout(6000);
     return /\/clientes\/[^/]+$/.test(page.url());
   },
 });
-pant({ id: "packing-lists", titulo: "Packing Lists", url: "/packing-lists", espera: 8000 });
-pant({ id: "multifashion-resumen", titulo: "Multifashion › Resumen", url: "/multifashion?subtab=resumen", espera: 11000 });
-pant({ id: "multifashion-vendedoras", titulo: "Multifashion › Vendedoras", url: "/multifashion?subtab=vendedoras", espera: 11000 });
-pant({ id: "multifashion-clientes", titulo: "Multifashion › Clientes", url: "/multifashion?subtab=clientes", espera: 11000 });
-pant({ id: "depurador", titulo: "Depurador (productos/cargar)", url: "/productos/cargar", espera: 9000 });
-pant({ id: "marketing", titulo: "Marketing", url: "/marketing", espera: 9000 });
-pant({ id: "gastos-empresa", titulo: "Gastos Empresa", url: "/gastos-empresa", espera: 9000 });
-pant({ id: "vista-general", titulo: "Vista General", url: "/vista-general", espera: 10000 });
-pant({ id: "data-health", titulo: "CXC › Data Health", url: "/admin/data-health", espera: 8000 });
+
+pant({ id: "proveedores", titulo: "Proveedores (CxP)", url: "/proveedores", espera: 9000 });
+pant({
+  id: "proveedores-ficha",
+  titulo: "Proveedores › Ficha",
+  url: "/proveedores",
+  espera: 9000,
+  async preparar(page) {
+    const l = page.locator('a[href^="/proveedores/"]').locator("visible=true").first();
+    if (!(await l.count())) return false;
+    await l.click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(6000);
+    return /\/proveedores\/[^/]+$/.test(page.url());
+  },
+});
+
+// ── Catálogos: las 3 marcas, interna y pública ───────────────────────────────
+// ⚠️ Los FILTROS los está arreglando otro agente: el `div.overflow-x-auto` de
+// `CatalogFilters` se anota pero NO cuenta como hallazgo mío (queda marcado en
+// el JSON por su etiqueta). Lo que se mide acá es el resto: grilla, tarjetas,
+// carrito y detalle de producto.
+pant({ id: "catalogos-hub", titulo: "Catálogos › Hub de marcas", url: "/catalogos/marcas", espera: 8000 });
+for (const m of ["reebok", "joybees", "tommy"]) {
+  pant({ id: `catalogo-${m}`, titulo: `Catálogo interno › ${m}`, url: `/catalogo/${m}`, espera: 13000 });
+  pant({ id: `catalogo-pub-${m}`, titulo: `Catálogo público › ${m}`, url: `/catalogo-publico/${m}`, espera: 13000 });
+  // El detalle de producto NO es una pantalla aparte: la grilla usa tarjetas
+  // agrupadas que se despliegan en su lugar, sin navegar. Se mide en la grilla.
+}
 
 // ── Corrida ──────────────────────────────────────────────────────────────────
 
@@ -257,6 +301,15 @@ for (const p of P) {
     sessionStorage.setItem("cxc_role", "admin");
     sessionStorage.setItem("fg_user_id", "10948974-05bb-4e58-b708-a450cfd45d6c");
     sessionStorage.setItem("fg_is_owner", "1");
+    // `hasModuleAccess` cae de vuelta a `fg_modules`: sin esto el catálogo
+    // interno rebota antes de dibujar nada y se mediría una pantalla vacía.
+    sessionStorage.setItem(
+      "fg_modules",
+      JSON.stringify([
+        "catalogos", "ventas", "cxc", "multifashion", "clientes", "proveedores",
+        "vista-general", "admin",
+      ]),
+    );
   });
 
   const page = await ctx.newPage();
@@ -304,10 +357,11 @@ for (const p of P) {
   r.erroresJs = erroresJs.slice(0, 2);
   resultados.push(r);
   console.error(
-    `[${ETAPA}] ${p.id.padEnd(26)} → ${String(r.peorPx ?? "?").padStart(5)} px  ` +
-    `${r.veredicto.padEnd(24)} cortado=${String(r.cortadoPx ?? "?").padStart(4)} ` +
-    `filas=${r.filas ?? "?"} cuerpo=${r.cuerpoPx ?? "?"}` +
-    ((r.peor ?? r.cortado) ? `  ← ${(r.peor ?? r.cortado).etiqueta.slice(0, 52)}` : "") +
+    `[${ETAPA}@${ANCHO}] ${p.id.padEnd(24)} arrastre=${String(r.peorPx ?? "?").padStart(4)} ` +
+    `RECORTADO=${String(r.cortadoPx ?? "?").padStart(4)} montos✂=${String(r.montosCortados ?? "?").padStart(3)} ` +
+    `tap<44=${String(r.targetsChicos ?? "?").padStart(3)} filas=${String(r.filas ?? "?").padStart(4)} ` +
+    `${r.veredicto}` +
+    ((r.peor ?? r.cortado) ? `  ← ${(r.peor ?? r.cortado).etiqueta.slice(0, 44)}` : "") +
     (r.error ? `  ⚠️ ${r.error}` : ""),
   );
   await ctx.close();
