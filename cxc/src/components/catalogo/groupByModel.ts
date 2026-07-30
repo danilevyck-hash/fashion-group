@@ -87,19 +87,39 @@ export function getGenderLabel(suffix: string, genderField: string): string {
 /**
  * Groups products by base SKU when they share name & price.
  * Products without a recognized gender suffix stay as single-variant groups.
+ *
+ * 🩸 DOS SKU CON EL MISMO BASE PERO DISTINTO PRECIO SON DOS PRODUCTOS (27-jul-2026).
+ * Antes, cuando dos artículos compartían el base pero NO el name+price, el
+ * segundo hacía `map.set(key, …)` sobre la MISMA llave: destruía al primero y
+ * además volvía a hacer `order.push(key)`, así que `order.map(k => map.get(k))`
+ * devolvía DOS VECES el mismo grupo. En pantalla: dos tarjetas IDÉNTICAS, las
+ * dos con el SKU base (sin sufijo) y las dos con la existencia del sobreviviente
+ * — la del otro artículo DESAPARECÍA. Medido en producción (25-jul-2026):
+ * `UKTRK.BLK-KIDS` $13/95 uds y `UKTRK.BLK-JUNIOR` $15/120 uds mostraban dos
+ * cards "UKTRK.BLK · $13 · 95", o sea 120 unidades invisibles; igual
+ * `UKTRK.DRO-KIDS` $13/99 vs `UKTRK.DRO-JUNIOR` $15/100. El precio lo manda
+ * Switch y una card tiene UN precio, así que agruparlos es imposible: cada uno
+ * necesita su propia tarjeta con SU stock.
+ *
+ * La AGRUPACIÓN NO CAMBIA para los pares que sí comparten name+price (W/M y
+ * KIDS/JUNIOR del mismo precio siguen en una sola card con sus dos botones).
+ * Lo único que cambia es el caso que hoy está roto.
  */
 export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
   const map = new Map<string, GroupedProduct>();
   const order: string[] = [];
+  /** Grupos ya abiertos por base — puede haber más de uno si el precio difiere. */
+  const porBase = new Map<string, GroupedProduct[]>();
 
   for (const p of products) {
     const parsed = parseSuffix(p.sku);
 
     if (parsed) {
       const key = parsed.base.toUpperCase();
-      const existing = map.get(key);
+      const abiertos = porBase.get(key) ?? [];
+      const existing = abiertos.find(g => g.name === p.name && g.price === p.price);
 
-      if (existing && existing.name === p.name && existing.price === p.price) {
+      if (existing) {
         // Add variant to existing group
         existing.variants.push({
           product: p,
@@ -128,8 +148,13 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
           suffix: parsed.suffix,
         }],
       };
-      map.set(key, group);
-      order.push(key);
+      abiertos.push(group);
+      porBase.set(key, abiertos);
+      // Llave ÚNICA: si ya había un grupo con este base (precio distinto), el
+      // nuevo NO lo puede pisar ni repetirse en `order`.
+      const llave = abiertos.length === 1 ? key : `${key}#${abiertos.length}`;
+      map.set(llave, group);
+      order.push(llave);
     } else {
       // No suffix — standalone card, use product id as unique key
       const soloKey = `__solo__${p.id}`;
@@ -149,6 +174,17 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
         }],
       });
       order.push(soloKey);
+    }
+  }
+
+  // El SKU que se muestra (píldora de la card, PDF del vendedor) y que sirve de
+  // React key: si el grupo terminó con UNA sola variante, el base a secas MIENTE
+  // — esconde justo el sufijo que distingue JUNIOR de KIDS, y con dos grupos del
+  // mismo base daría además dos React keys iguales. Con 2+ variantes el base es
+  // correcto: la card muestra un botón por variante y ahí sí es el modelo.
+  for (const g of map.values()) {
+    if (g.variants.length === 1 && g.variants[0].suffix) {
+      g.baseSku = g.variants[0].product.sku;
     }
   }
 
