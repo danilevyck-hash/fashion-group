@@ -20,6 +20,7 @@ import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
+import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -180,12 +181,17 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
     </>
   );
 
+  const detalleDe = (empresa: string, vendedor: string) =>
+    setDetalle({ empresa, vendedor: vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : vendedor });
+
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-lg border border-gray-200">
-        {loading ? (
+      {loading ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={6} /></div>
-        ) : error ? (
+        </Card>
+      ) : error ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm">
             <p className="text-rose-600">{error}</p>
             <button
@@ -195,12 +201,32 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
               Reintentar
             </button>
           </div>
-        ) : empty ? (
+        </Card>
+      ) : empty ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm text-gray-500">
             Sin comisiones para {MESES[mes - 1]} {year}.
           </div>
-        ) : (
-          <div className="overflow-x-auto">
+        </Card>
+      ) : (
+        <>
+          {/* Celular: TARJETAS. La tabla de 7 columnas medía 984px de contenido
+              en 356px útiles → 628px de arrastre lateral (medido a 390px). */}
+          <ComisionesTarjetasConsolidado
+            activos={activos}
+            sinAsignar={sinAsignar}
+            inactivos={inactivos}
+            mostrarInactivos={showInactivos}
+            onToggleInactivos={() => setShowInactivos((v) => !v)}
+            empresas={EMPRESAS}
+            nombreEmpresa={(k) => EMPRESA_KEY_TO_NAME[k] ?? k}
+            granTotal={grandTotal}
+            onDetalle={detalleDe}
+          />
+
+          {/* iPad y escritorio: la tabla, intacta. */}
+          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -257,9 +283,10 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
                 </tr>
               </tfoot>
             </table>
-          </div>
-        )}
-      </Card>
+            </div>
+          </Card>
+        </>
+      )}
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />

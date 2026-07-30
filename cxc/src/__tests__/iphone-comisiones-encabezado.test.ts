@@ -10,6 +10,17 @@
 // DESPUÉS: **193.5px** y los 6 vendedores en la primera pantalla. Escritorio
 // 378.5 → 223.5px.
 //
+// ── ACTUALIZACIÓN 30-jul-2026 (#365, tarjetas en el celular) ──────────────────
+// La tabla de 7 columnas pasó a TARJETAS bajo `md` (ver ComisionesTarjetas.tsx),
+// así que en el iPhone ya no hay `<thead>` sobre el primer número. Medido de
+// nuevo en el navegador: **113px** en "Todas las empresas" y **165px** en "Por
+// empresa" (esa suma la fila del selector de empresa), con los 5 vendedores +
+// el total del mes en la primera pantalla de Safari. La cuenta de abajo NO se
+// aflojó: sigue incluyendo los 34.5px del encabezado de la tabla, así que el
+// presupuesto de 200px es ahora un techo con MÁS aire, no menos. El límite que
+// congela este test es el de la BARRA DE CONTROLES, que es lo único que este
+// código gobierna en los dos layouts.
+//
 // Este test CONGELA ese logro. No renderiza (vitest no tiene layout): reconstruye
 // el alto a partir de lo que dice la FUENTE — el padding de <main>, la
 // separación entre filas y cuántas filas tiene la barra — más las dos piezas
@@ -37,6 +48,7 @@ const criterios = leer("components/ventas/ComisionesCriterios.tsx");
 const periodo = leer("components/ventas/ComisionesPeriodo.tsx");
 const consolidado = leer("components/ventas/ComisionesConsolidadoView.tsx");
 const porEmpresa = leer("components/ventas/ComisionesPorEmpresaView.tsx");
+const tarjetas = leer("components/ventas/ComisionesTarjetas.tsx");
 
 /** Techo acordado: el primer número tiene que verse en la primera pantalla. */
 const PRESUPUESTO_PX = 200;
@@ -121,6 +133,89 @@ describe("Comisiones — el encabezado entra en la primera pantalla del iPhone",
   });
 });
 
+/**
+ * CANDADO del #365 — en el celular la tabla de Comisiones no se arrastra.
+ *
+ * 🩸 MEDIDO en el navegador el 30-jul-2026 a 390px (build de producción, datos
+ * de producción, `node scripts/_medir-comisiones-tabla.mjs`):
+ *
+ *   Todas las empresas ... 7 columnas, 984px de contenido en 356px útiles →
+ *        **628px de arrastre lateral**. La columna Total —la que se va a mirar—
+ *        quedaba fuera de la pantalla.
+ *   Por empresa .......... 6 columnas, 636px, y NI SIQUIERA arrastraba: el
+ *        `Card` de arriba tiene `overflow-hidden`, así que **279px quedaban
+ *        RECORTADOS** y "Com. cobro" y "Com. total" no se podían ver de ninguna
+ *        manera. Peor que el scroll: invisible y sin aviso.
+ *
+ *   DESPUÉS: **0 px en los dos modos.** iPad y escritorio no cambian (la tabla
+ *   sigue ahí), salvo que "Por empresa" a 834px pasó de 83px RECORTADOS a 84px
+ *   ARRASTRABLES — el `overflow-x-auto` que le faltaba.
+ */
+describe("Comisiones — en el celular la tabla ancha son TARJETAS", () => {
+  it("las dos vistas montan las tarjetas y esconden su tabla bajo md", () => {
+    for (const [nombre, src] of [
+      ["consolidado", consolidado],
+      ["por empresa", porEmpresa],
+    ] as const) {
+      // La tabla vive dentro de un Card que solo aparece en ≥md.
+      expect(src, nombre).toMatch(/className="hidden [^"]*md:block"/);
+      expect(src, nombre).toContain("<ComisionesTarjetas");
+    }
+    // Y las tarjetas son SOLO del celular.
+    expect(tarjetas).toContain("md:hidden");
+  });
+
+  it("ninguna tabla queda dentro de un overflow-hidden sin poder arrastrarse", () => {
+    // Un `Card` con `overflow-hidden` recorta sin dejar arrastrar: lo que
+    // sobresale se vuelve INALCANZABLE. Cada tabla necesita su propio
+    // `overflow-x-auto` en el medio.
+    for (const [nombre, src] of [
+      ["consolidado", consolidado],
+      ["por empresa", porEmpresa],
+    ] as const) {
+      const i = src.indexOf('<div className="overflow-x-auto">');
+      const j = src.indexOf('<table className="w-full text-sm">');
+      expect(i, `${nombre}: la tabla no tiene un overflow-x-auto propio`).toBeGreaterThan(-1);
+      expect(j, `${nombre}: no encontré la tabla`).toBeGreaterThan(i);
+    }
+  });
+
+  it("las tarjetas usan el MISMO formateador que la tabla — ningún número cambia", () => {
+    // fmtMoney, no el compacto: una comisión es plata que se le paga a alguien,
+    // así que van los centavos, igual que en la tabla y en el Excel.
+    expect(tarjetas).toContain('import { fmtMoney } from "@/lib/ventas/format"');
+    expect(tarjetas).not.toContain("formatCompactCurrency");
+  });
+
+  it("el total del mes va ABAJO, donde estaba el tfoot", () => {
+    // Un "hero" arriba empujaría la primera fila y se comería el encabezado de
+    // 193px que costó ganar. Las tarjetas arrancan pegadas a la barra.
+    const iTotal = tarjetas.indexOf("function TarjetaTotal");
+    expect(iTotal).toBeGreaterThan(-1);
+    for (const fn of ["ComisionesTarjetasConsolidado", "ComisionesTarjetasPorEmpresa"]) {
+      const cuerpo = tarjetas.slice(tarjetas.indexOf(`export function ${fn}`));
+      const fin = cuerpo.indexOf("</ListaTarjetas>");
+      const dentro = cuerpo.slice(0, fin);
+      // <TarjetaTotal> es lo ÚLTIMO de la lista.
+      expect(dentro.indexOf("<TarjetaTotal"), fn).toBeGreaterThan(
+        dentro.lastIndexOf("map("),
+      );
+    }
+  });
+
+  it("el mecanismo de las tarjetas vive en UN archivo, no uno por vista", () => {
+    // Las dos vistas lo importan del mismo módulo; ninguna dibuja su propia
+    // <article> de tarjeta.
+    for (const [nombre, src] of [
+      ["consolidado", consolidado],
+      ["por empresa", porEmpresa],
+    ] as const) {
+      expect(src, nombre).toContain('from "./ComisionesTarjetas"');
+      expect(src, nombre).not.toContain("<article");
+    }
+  });
+});
+
 describe("Comisiones — lo que Daniel usa sigue a un toque", () => {
   it("el interruptor Todas / Por empresa conserva sus dos etiquetas", () => {
     expect(shell).toContain('"Todas las empresas"');
@@ -178,6 +273,10 @@ describe("Comisiones — 44px al tacto y cero scroll lateral en iPhone", () => {
     ["shell", shell],
     ["criterios", criterios],
     ["período", periodo],
+    // Las tarjetas del celular son la superficie que se TOCA en el iPhone:
+    // abren el detalle por empresa y despliegan la matriz. Sin esta línea, el
+    // 44px quedaba cubierto solo en el encabezado.
+    ["tarjetas", tarjetas],
   ];
 
   it.each(archivos)("todo lo tocable de %s llega a 44px", (_nombre, src) => {
