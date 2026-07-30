@@ -11,10 +11,11 @@
 // Si un mismo vendedor está escrito distinto entre empresas, aparece partido en dos
 // filas hasta corregir el nombre en Switch — es dato, no estructura.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
-import { Coins, FileSpreadsheet } from "lucide-react";
+import { Coins } from "lucide-react";
+import type { ExcelApi } from "./ComisionesView";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
@@ -48,11 +49,14 @@ interface Row extends ComisionConsolidadoRow {
 interface Props {
   year: number;
   mes: number;
+  /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
+   *  sigue siendo la dueña del cálculo y solo registra su función acá. */
+  onExcel?: (api: ExcelApi | null) => void;
 }
 
 const moneyClass = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-700");
 
-export function ComisionesConsolidadoView({ year, mes }: Props) {
+export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
@@ -142,6 +146,16 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
     });
   };
 
+  // El shell dispara el Excel de la vista activa. La función se guarda en un
+  // ref (cambia en cada render, con los datos frescos) y solo se re-registra
+  // cuando cambia si el botón va habilitado — así el efecto no corre de más.
+  const exportRef = useRef(handleExport);
+  exportRef.current = handleExport;
+  useEffect(() => {
+    onExcel?.({ run: () => exportRef.current(), disabled: empty });
+    return () => onExcel?.(null);
+  }, [onExcel, empty]);
+
   const renderCells = (r: Row, isTotalBold: boolean) => (
     <>
       {EMPRESAS.map((k) => {
@@ -168,17 +182,6 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <button
-          onClick={handleExport}
-          disabled={empty}
-          /* Medía 81×39: faltaban 5 px de alto para el mínimo táctil. */
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
-        </button>
-      </div>
-
       <Card className="overflow-hidden rounded-lg border border-gray-200">
         {loading ? (
           <div className="p-3"><SkeletonTable rows={6} cols={6} /></div>

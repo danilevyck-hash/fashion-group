@@ -11,12 +11,10 @@ export function ComisionesPageClient({ availableYears }: { availableYears: numbe
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Comisiones" />
-      <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
-        <header className="mb-5">
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
-            Comisiones
-          </h1>
-        </header>
+      {/* Sin título grande: "Comisiones" ya lo dicen el header sticky (móvil) y
+          el breadcrumb (escritorio) — repetirlo costaba 44px de la primera
+          pantalla del iPhone. Mismo criterio que el encabezado de CXC. */}
+      <main className="mx-auto w-full max-w-[1280px] px-4 pb-8 pt-2 md:px-7 md:pt-3">
         <ComisionesView availableYears={availableYears} />
       </main>
     </div>

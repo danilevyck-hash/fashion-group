@@ -132,7 +132,7 @@ describe("Excel: Multifashion en bloque aparte", () => {
     const r = filaDe(ws, "TOTAL GRUPO");
     expect(r).toBeGreaterThan(0);
     expect(cellv(ws, `H${r}`)).toBe(100); // Subtotal sin ITBMS, solo el grupo
-    expect(cellv(ws, `I${r}`)).toBe(107);
+    expect(cellv(ws, `I${r}`)).toBeUndefined(); // ya no hay columna "Total"
   });
 
   it("hay un bloque con título propio y su TOTAL MULTIFASHION", () => {
@@ -145,7 +145,7 @@ describe("Excel: Multifashion en bloque aparte", () => {
     expect(titulo).toBeGreaterThan(0);
     expect(total).toBeGreaterThan(titulo);
     expect(cellv(ws, `H${total}`)).toBe(40);
-    expect(cellv(ws, `I${total}`)).toBe(42.8);
+    expect(cellv(ws, `I${total}`)).toBeUndefined();
     // El título del bloque va DESPUÉS del total del grupo (no arriba de todo).
     expect(titulo).toBeGreaterThan(filaDe(ws, "TOTAL GRUPO"));
   });
@@ -154,8 +154,10 @@ describe("Excel: Multifashion en bloque aparte", () => {
     const ws = buildResumenGastosWorkbook(clientes).Sheets["Resumen"];
     const r = filaDe(ws, "GRAN TOTAL (grupo + Multifashion)");
     expect(r).toBeGreaterThan(0);
+    // El GRAN TOTAL suma SUBTOTALES (100 del grupo + 40 de Multifashion), no
+    // totales con ITBMS: la columna "Total" ya no existe.
     expect(cellv(ws, `H${r}`)).toBe(140);
-    expect(cellv(ws, `I${r}`)).toBe(149.8);
+    expect(cellv(ws, `I${r}`)).toBeUndefined();
   });
 
   it("sin clientes Multifashion la hoja NO cambia de forma (dice TOTAL, sin bloque)", () => {
