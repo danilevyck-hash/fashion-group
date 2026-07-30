@@ -26,9 +26,40 @@
 //
 // Buscar tecleando sigue siendo el camino rápido: el foco abre la lista, se
 // escribe y se toca el resultado. No hay que scrollear 200 nombres.
+//
+// ── La lista FLOTA: portal a <body> + position fixed (30-jul-2026) ───────────
+//
+// Daniel, textual: *"no es que se borra, sino que se esconde como en la foto que
+// te mande, es problema mas de ux"*. No perdía lo tecleado: dejaba de verlo.
+//
+// La lista era `absolute` DENTRO de la fila, y la fila vive en un
+// `ScrollableTable` (`overflow-x-auto`). `overflow-x: auto` con `overflow-y:
+// visible` computa `overflow-y: auto`, así que ese contenedor RECORTA y se
+// vuelve scrolleable cuando el contenido lo pasa. Medido en producción a
+// 1440×900: cerrado `scrollHeight` 114 == `clientHeight` 114; abierto 397 vs
+// 114, o sea **283 px scrolleables** y **76 de los 81 px de la lista
+// recortados** (se veía una tirita de 5 px). Al scrollear esos 283 px la fila
+// entera se iba de y=612 a y=329 — por debajo del `thead` sticky — y en el
+// hueco quedaba un pedazo de la lista, exactamente encima de donde estaban
+// DIRECCIÓN / EMPRESA / FACTURA(S). Esa es la foto.
+//
+// **Subir el z-index no arregla nada**: el recorte de un ancestro con overflow
+// no lo gana ningún apilamiento. Mientras la lista sea hija del contenedor que
+// recorta, pierde siempre. Por eso sale del flujo con `createPortal` y se ubica
+// en coordenadas de viewport con `calcularPosicionDesplegable` (módulo puro).
+//
+// Consecuencias buscadas: abrir la lista **no cambia el layout de la fila** (ni
+// una columna se mueve un píxel, medido), el campo con lo tecleado **queda
+// siempre a la vista**, y la lista puede ser más ancha que la columna para que
+// los nombres largos del directorio no salgan truncados.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
+import {
+  calcularPosicionDesplegable,
+  type PosicionDesplegable,
+} from "@/lib/ui/posicion-desplegable";
 
 interface ClientePickerProps {
   /** Nombre ya guardado en la fila. */
@@ -94,16 +125,56 @@ export default function ClientePicker({
 }: ClientePickerProps) {
   const [abierto, setAbierto] = useState(false);
   const [query, setQuery] = useState("");
+  const [pos, setPos] = useState<PosicionDesplegable | null>(null);
+  const idLista = `lista-${useId()}`;
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { hits, cargando } = useBusquedaClientes(query, abierto);
 
   const vinculado = mostrarVinculo && Boolean(value.trim() && codigo.trim());
   const aMano = mostrarVinculo && Boolean(value.trim() && !codigo.trim());
   const q = query.trim();
 
+  /** Reancla la lista al campo. En coordenadas de VIEWPORT, para `fixed`. */
+  const reubicar = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos(
+      calcularPosicionDesplegable(
+        { top: r.top, bottom: r.bottom, left: r.left, width: r.width },
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  }, []);
+
+  // Antes de pintar, para que la lista no aparezca un frame en (0,0).
+  useLayoutEffect(() => {
+    if (abierto) reubicar();
+  }, [abierto, reubicar]);
+
+  // Mientras está abierta la lista SIGUE al campo: `fixed` no se mueve con el
+  // scroll, así que sin esto quedaría flotando en el aire al scrollear la página
+  // (o el propio ScrollableTable, de ahí el `capture`).
+  useEffect(() => {
+    if (!abierto) return;
+    window.addEventListener("scroll", reubicar, true);
+    window.addEventListener("resize", reubicar);
+    return () => {
+      window.removeEventListener("scroll", reubicar, true);
+      window.removeEventListener("resize", reubicar);
+    };
+  }, [abierto, reubicar]);
+
   useEffect(() => {
     function fuera(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setAbierto(false);
+      const t = e.target as Node;
+      // La lista ya NO es hija del wrapper (vive en un portal), así que hay que
+      // preguntar por las dos cajas o el primer toque en una opción cerraría.
+      if (wrapRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setAbierto(false);
     }
     document.addEventListener("mousedown", fuera);
     return () => document.removeEventListener("mousedown", fuera);
@@ -123,16 +194,24 @@ export default function ClientePicker({
   return (
     <div ref={wrapRef} className="relative">
       <input
+        ref={inputRef}
         id={id}
         type="text"
         autoComplete="off"
+        role="combobox"
+        aria-expanded={abierto}
+        aria-controls={idLista}
+        aria-autocomplete="list"
         value={textoVisible}
         onChange={(e) => {
           setQuery(e.target.value);
           setAbierto(true);
         }}
         onFocus={() => {
-          setQuery("");
+          // Arranca con lo que YA dice el campo en vez de vaciarlo: enfocar un
+          // cliente puesto y verlo desaparecer es la mitad del "se esconde" que
+          // reportó Daniel. Y no ensucia nada — la fila solo cambia en `elegir`.
+          setQuery(value);
           setAbierto(true);
         }}
         onKeyDown={(e) => {
@@ -175,8 +254,27 @@ export default function ClientePicker({
         </span>
       )}
 
-      {abierto && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-72 overflow-y-auto">
+      {/* La lista se dibuja en <body>: NINGÚN ancestro con overflow la puede
+          recortar, y al estar fuera del flujo no mueve ni una columna. */}
+      {abierto && pos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          id={idLista}
+          data-desplegable-cliente={pos.hacia}
+          style={{
+            position: "fixed",
+            top: pos.top,
+            left: pos.left,
+            width: pos.width,
+            maxHeight: pos.maxHeight,
+          }}
+          // z-[60] a propósito: por encima de la barra lateral y del panel de
+          // Cheques (los dos `z-50`) y de la barra sticky (`z-20`), pero por
+          // DEBAJO de los `z-[100]` (toasts, confirmaciones) — un diálogo tiene
+          // que poder taparla. Al estar en <body> el z-index no depende del
+          // orden del DOM, que era lo frágil.
+          className="z-[60] bg-white border border-gray-200 rounded-md shadow-lg overflow-y-auto overscroll-contain"
+        >
           {q.length >= 2 && cargando && (
             <div className="px-3 py-2 text-xs text-gray-400">Buscando…</div>
           )}
@@ -224,7 +322,8 @@ export default function ClientePicker({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Solo para que el candado de 44px y los lectores de pantalla vean el

@@ -191,6 +191,37 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
     expect(picker).not.toMatch(/className="w-full text-left px-3 py-2/);
   });
 
+  /**
+   * 30-jul-2026. El desplegable NO puede volver a ser hijo de la fila.
+   *
+   * La fila vive en un `ScrollableTable` = `overflow-x-auto`, y `overflow-x:
+   * auto` con `overflow-y: visible` computa `overflow-y: auto`: recorta y se
+   * vuelve scrolleable. Medido a 1440×900 con la lista `absolute` adentro:
+   * `scrollHeight` 114 → 397 (283 px scrolleables) y 76 de los 81 px de la
+   * lista recortados. Al scrollear, la fila se iba de y=612 a y=329 y en el
+   * hueco quedaba un pedazo de la lista encima de DIRECCIÓN/EMPRESA/FACTURA(S).
+   * Eso es lo que Daniel fotografió: *"se esconde… es problema mas de ux"*.
+   */
+  it("la lista FLOTA en un portal — un `absolute` adentro vuelve a romper la fila", () => {
+    expect(picker).toContain("createPortal");
+    expect(picker).toContain("document.body");
+    // Ni un `absolute` en la caja de la lista: el chip del código sí lo usa (y
+    // no crece), pero el desplegable no puede.
+    expect(picker).not.toMatch(/className="absolute z-30 left-0 right-0/);
+    expect(picker).toMatch(/position: "fixed"/);
+  });
+
+  it("la posición sale del módulo puro, no de números sueltos en el componente", () => {
+    expect(picker).toContain("calcularPosicionDesplegable");
+    // Reancla al scrollear con `capture`: el scroll del ScrollableTable no
+    // burbujea, así que sin capture la lista quedaría flotando en el aire.
+    expect(picker).toMatch(/addEventListener\("scroll", reubicar, true\)/);
+  });
+
+  it("el click de afuera mira TAMBIÉN el portal, o el primer toque cerraría", () => {
+    expect(picker).toContain("menuRef.current?.contains");
+  });
+
   it("el typeahead libre de Marketing también se arregló (mismo defecto)", () => {
     const items = typeahead.match(/className="w-full text-left px-3[^"]*"/g) ?? [];
     expect(items).toHaveLength(2); // resultados de búsqueda + más usados
