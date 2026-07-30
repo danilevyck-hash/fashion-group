@@ -677,6 +677,40 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 ### Upload (April 10-11)
 - 3-step progress indicator
 
+### Tablas anchas en iPhone y iPad (30-jul-2026)
+
+> **Cuatro pantallas del grupo "Ventas y clientes" se adaptaron, y el ancho que fallaba era el que nadie miraba: el iPad.** Medido en el navegador contra el build de producción, ANTES:
+>
+> | Pantalla | 390 | 834 | Qué pasaba |
+> |---|---:|---:|---|
+> | **Multifashion › Clientes** | **288 px RECORTADOS** | **92 px RECORTADOS** | el top-50 perdía columnas **sin forma de alcanzarlas** |
+> | Proveedores | 0 | **249 px** de arrastre | columnas de la cuenta por pagar |
+> | Clientes › Directorio | 0 | **226 px** de arrastre | columnas de contacto |
+> | Multifashion › Vendedoras | 0 | **208 px** de arrastre | columnas de la derecha |
+>
+> **DESPUÉS: 0 en los cuatro anchos medidos (390 · 834 · 1024 · 1440), en las 4 pantallas.**
+>
+> 🔑 **LO QUE DECIDE ES EL ANCHO ÚTIL, NO EL DE LA VENTANA.** La barra lateral se lleva 224 px, así que un iPad de 834 deja **610** y su contenido ~552-562 — **más angosto que un iPhone acostado**. Por eso el corte de layout es `lg` (1024) y no `sm` (640) ni `md` (768): a 640 y a 768 la tabla NO entra, y dibujarla ahí ES el bug.
+>
+> ⚠️ **1024 no es "escritorio": es el MISMO iPad, acostado.** Con el corte en `lg` las tablas reaparecían justo ahí y volvían a arrastrar 18-59 px. Se resolvió haciéndolas ENTRAR en 1024 (relleno `px-1.5 xl:px-3` **solo por debajo de xl**, y el piso de Vendedoras de 760 → 720) en vez de empujar el corte a `xl`, que le habría sacado la tabla a un escritorio de 1024-1279 donde sí cabía. **El escritorio no cambió en nada.**
+>
+> 🩸 **"Recortado" es PEOR que "hay que arrastrar", y Multifashion › Clientes era el caso.** Su grilla de ancho fijo (`2.5rem 1fr 7rem 4rem 5rem 6rem 5.5rem 2.5rem 1.25rem` = 644 px) vive en una `Card` con `overflow-hidden` y **sin scroller propio**: los píxeles que sobran no se alcanzan de ninguna manera, ni sabiendo que están. Encima el `1fr` del NOMBRE era lo único elástico y se lo comía el resto: **la columna "Cliente" se veía vacía** (0 px de ancho). Es la causa que ya apareció tres veces — contenido dentro de un contenedor recortado y sin scroller adentro. Y está hecha de `div`, sin un solo `<table>`, que es por lo que ningún barrido genérico la había cazado.
+> - **Patrón: tarjetas**, el de `admin/components/PanelCxcMobile.tsx` y `components/ventas/ResumenViewMobile.tsx`. No se inventó uno nuevo.
+> - **Los meses van en LISTA VERTICAL, no en el gráfico a lo ancho** del escritorio: con 12 meses en 356 px cada columna del sparkline queda en ~29 px y la etiqueta ("May '25", con `whitespace-nowrap`) se sale de su celda. La barra sigue estando —la comparación no se pierde, cambia de eje— y la escala es la MISMA (`peakMes`, compartida entre mayoreo y retail).
+> - **El WhatsApp pasó de 24×24 a 44 px** de alto (regla de la casa).
+>
+> **Las otras tres NO necesitaron componente nuevo:** ya tenían su layout de tarjetas, funcionando y verificado, escondido detrás de `sm:`/`md:`. Solo se les amplió el tramo hasta `lg`.
+>
+> **NINGÚN número cambió, y está medido:** `node scripts/_verif-tarjetas-vs-tabla.mjs` compara las tarjetas contra la tabla **elemento por elemento** — **215 montos, 0 distintos**, y **0 blancos táctiles bajo 44 px** en las 4 pantallas a 390 y 834.
+> - 🩸 **La trampa que el script evita:** verificar buscando el elemento por su clase de breakpoint (`.md\:hidden`) devuelve **vacío** en cuanto el corte se mueve → el chequeo compara CERO y **pasa en verde sin haber mirado nada**. Por eso cada layout lleva un `data-vista` FIJO ("tarjetas"/"tabla") y el script **falla si encuentra cero**.
+> - **El pareo va por POSICIÓN, no por nombre**: los dos layouts recorren el MISMO arreglo ya ordenado. Parsear nombres daba falsos "sin par" (nombres partidos en dos líneas, el renglón "Ver N sin saldo" que no es una entidad).
+> - **Solo se comparan montos con `$`**: un extractor de "todo lo que parezca número" leía las etiquetas de tramo del CxP ("91-120 días", "121+ días") como cifras y daba 31 falsos positivos.
+> - **La tolerancia sale de la precisión MOSTRADA**, media unidad del último dígito visible y sin casos especiales: `$1,234.56` → 0,005 · `$11,406` → 0,50 · `$27K` → 500. La tarjeta de Vendedoras muestra los montos sin centavos; exigirle 0,005 la marcaba como "cambió" cuando la diferencia era el redondeo que ella misma declara.
+>
+> **Medición cruda sin umbrales: `node scripts/_diag-recorte-exacto.mjs`.** El censo (`_medir-scroll-lateral.mjs`) usa un umbral de 100 px para separar una tabla recortada de un texto con puntos suspensivos — correcto para barrer 26 pantallas, pero **esconde los recortes chicos**: por eso el censo reportó 0 en Multifashion › Clientes a 834 cuando en realidad recortaba 92. Para arreglar una pantalla hace falta el número crudo.
+>
+> Candado: `src/__tests__/lib/tablas-anchas-ipad.test.ts` (18 casos, verificado por mutación: devolver un corte a `sm` rompe 2).
+
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows
 

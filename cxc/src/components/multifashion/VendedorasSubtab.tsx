@@ -222,10 +222,18 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
         <EmptyState />
       ) : (
         <div className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
-          {/* Desktop */}
-          <Card className="hidden p-0 md:block">
+          {/* Escritorio. El corte es `lg` y no `md` porque lo que decide es el
+              ancho ÚTIL, no el de la ventana: la barra lateral se lleva 224 px,
+              así que un iPad de 834 deja 552 y esta tabla pide 760 (su propio
+              `minWidth`) — 208 px de arrastre, medidos en el navegador. Las
+              tarjetas de abajo ya existían; solo se les amplió el tramo. */}
+          <Card data-vista="tabla" className="hidden p-0 lg:block">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ minWidth: 760 }}>
+              {/* 720 y no 760: a 1024 px (el MISMO iPad, acostado) el contenido
+                  dispone de 742, así que el piso viejo forzaba 18 px de arrastre
+                  justo ahí. Bajarlo no aprieta nada en pantallas anchas — la
+                  tabla es `w-full` y ya mide más que su piso. */}
+              <table className="w-full border-collapse" style={{ minWidth: 720 }}>
                 <thead>
                   <tr className="bg-gray-100">
                     <th className="w-10 border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
@@ -246,8 +254,8 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
             </div>
           </Card>
 
-          {/* Mobile */}
-          <div className="space-y-2 md:hidden">
+          {/* Celular e iPad */}
+          <div data-vista="tarjetas" className="space-y-2 lg:hidden">
             {sortedVendedoras.map((v, i) => (
               <VendedoraCard key={v.nombre} v={v} rank={i + 1} badge={bonoBadges.get(v.nombre)} />
             ))}
