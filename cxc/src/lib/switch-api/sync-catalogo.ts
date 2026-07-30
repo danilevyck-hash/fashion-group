@@ -23,13 +23,19 @@
 //   La regla mostrar/ocultar/agregar usa EXISTENCIA, no disponibilidad.
 //
 // RETO: `saldo` (existencia) NO viene en el bulk /lista — solo en /stock (1 call
-// por artículo). ESTRATEGIA (cabe en 300s): /lista da el universo + `disponible`;
-// como existencia >= disponible SIEMPRE, solo se piden /stock del set acotado
-// { productos ACTIVOS } ∪ { artículos con disponible >= 1 }.
+// por artículo), y MEDIDO el 30-jul-2026 no hay forma masiva de pedirlo (ver el
+// comentario de STOCK_CONCURRENCIA). ESTRATEGIA: /lista da el universo +
+// `disponible`; como existencia >= disponible SIEMPRE, solo se piden /stock del
+// set acotado { productos ACTIVOS } ∪ { artículos con disponible >= 1 }, y esas
+// llamadas van de a STOCK_CONCURRENCIA en paralelo.
 //
 // FAIL-SAFE: read-all-then-write. Se juntan TODOS los /stock primero; si CUALQUIER
 // llamada falla (ej. 401 sesión muerta) se ABORTA la empresa SIN escribir nada —
-// un fallo de Switch NUNCA vacía el catálogo. Serial (sesión única). Idempotente.
+// un fallo de Switch NUNCA vacía el catálogo. Idempotente.
+//
+// ⚠️ Las EMPRESAS se siguen recorriendo EN SERIE (sesión única de Switch: dos
+// logins de la misma empresa se matan entre sí). Lo que va en paralelo son las
+// llamadas de UNA empresa, que comparten un solo token.
 //
 // PARAMETRIZACIÓN: cada marca pasa su `CatalogoSyncConfig` (cliente Supabase,
 // tabla, scope de empresas, filtro de artículo, campos de stock e inserción). El
@@ -44,10 +50,44 @@ import { calibrarUmbral, avisarMontosImposibles } from "./monto-guard-io";
 import { logCronError } from "@/lib/cron-telemetry";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
+import { enParalelo } from "./en-paralelo";
 import type { MarcaKey } from "@/lib/catalogo/marcas";
 
 const PER_PAGE = 50;
 const MAX_PAGES = 80;
+
+/**
+ * Cuántas llamadas `/apiarticulos/stock` van a la vez.
+ *
+ * 🩸 POR QUÉ EXISTE ESTE NÚMERO (30-jul-2026). El cron `tommy-catalogo` medía
+ * **395-485 s contra un techo de función de 800 s** — el más largo del sistema.
+ * Medido fase por fase (`scripts/_medir-tommy-catalogo.ts`): de sus 4 fases, el
+ * **72% del tiempo son 478 llamadas `/stock`, una por artículo**, hechas en
+ * serie. Es la misma forma que tenía el sync de Boston (4.912 llamadas, 54 min).
+ *
+ * **No se pudo eliminar las llamadas, así que se acortó el tiempo de pared.**
+ * Medido antes de tocar nada (`scripts/_probe-tommy-alternativas.ts`): el bulk
+ * `/apiarticulos/lista` devuelve 26 campos y **ninguno es el saldo** (trae
+ * `disponible`, que no alcanza: la regla del catálogo es por EXISTENCIA), y
+ * `/apiarticulos/stock` **no admite forma masiva** — sin `articuloId`, vacío, 0
+ * o -1 responde 200 con body vacío, que en Switch es "esa forma no existe". O
+ * sea que la salida de Boston (un reporte del panel web) no está disponible acá.
+ *
+ * **4 es conservador a propósito.** Medido contra Switch con lotes DISJUNTOS
+ * (reusar el mismo lote medía la caché del servidor y daba un 13,6× imposible):
+ * ×3 → 2,8× · ×5 → 4,7× · ×8 → 6,8×, con **0 errores y 0 respuestas vacías** en
+ * los tres. La curva sigue subiendo en 8, y aun así se eligió 4: el cuello de
+ * botella es un ERP ajeno del que no controlamos ni el dimensionamiento ni el
+ * límite de peticiones, y la diferencia entre 4 y 8 son ~30 s sobre un
+ * presupuesto de 800 — no vale comprarlos apretando al proveedor. Con 4 alcanza
+ * de sobra para el margen que hacía falta.
+ *
+ * ⚠️ **Requiere el de-dup de login de `client.ts` (`loginEnVuelo`).** Switch
+ * admite UNA sesión por empresa; sin ese candado, N llamadas concurrentes que
+ * encuentren el token vencido dispararían N `/autenticacion` y se matarían el
+ * token entre sí (code 0006). Subir este número sin ese candado rompe el sync.
+ */
+const STOCK_CONCURRENCIA = 4;
 
 export interface CatalogoEmpresaScope {
   empresaKey: string;
@@ -263,13 +303,25 @@ export async function syncCatalogo(
       );
 
       // (3) Junta TODOS los /stock primero (read-all). Si uno falla → throw → ABORTA empresa sin escribir.
-      const stockByCodigo = new Map<string, { existencia: number; disponibilidad: number; art: SwitchArticulo }>();
-      for (const a of stockSet) {
+      //
+      // EN PARALELO, de a STOCK_CONCURRENCIA. Es la fase que se come el sync:
+      // medido el 30-jul-2026 en Tommy, 478 llamadas serie = **72% del tiempo
+      // total** del cron (que corre en 395-485 s contra un techo de 800).
+      const resultados = await enParalelo(stockSet, STOCK_CONCURRENCIA, async (a) => {
         const sd = await client.getStock(a.id);
         const rows = sd?.stock ?? [];
         const saldo = rows.reduce((s, r) => s + num(r.saldo), 0);
         const disp = rows.reduce((s, r) => s + num(r.disponible), 0);
-        stockByCodigo.set(String(a.codigo), { existencia: Math.trunc(saldo), disponibilidad: Math.trunc(disp), art: a });
+        return { existencia: Math.trunc(saldo), disponibilidad: Math.trunc(disp), art: a };
+      });
+      // El Map se arma DESPUÉS y en el orden original de `stockSet`, no en el
+      // orden en que fueron llegando las respuestas: el loop (4) itera este Map
+      // para escribir, y un orden que cambia entre corridas vuelve el sync
+      // irreproducible al depurar. El resultado no cambia (cada UPDATE va por
+      // id), pero la reproducibilidad sí.
+      const stockByCodigo = new Map<string, { existencia: number; disponibilidad: number; art: SwitchArticulo }>();
+      for (let i = 0; i < stockSet.length; i++) {
+        stockByCodigo.set(String(stockSet[i].codigo), resultados[i]);
       }
       out.stockChecks = stockByCodigo.size;
 
