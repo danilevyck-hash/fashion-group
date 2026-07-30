@@ -296,14 +296,27 @@ export default function EntregasSection({
                       </table>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end items-center gap-3">
+                      {/* Comprobante de entrega: el papel del gasto de
+                          mobiliario. Se genera al abrirlo (no es un adjunto
+                          guardado) — ver lib/marketing/pdf-entrega-mueble.ts. */}
+                      <a
+                        href={`/api/marketing/entregas-pdf/${e.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(ev) => ev.stopPropagation()}
+                        className="text-xs rounded-md bg-black text-white px-3 py-2 active:scale-[0.97] transition min-h-[44px] inline-flex items-center"
+                        title="Abrir el comprobante de entrega en PDF (para imprimir y firmar)"
+                      >
+                        Ver comprobante
+                      </a>
                       <button
                         type="button"
                         onClick={(ev) => {
                           ev.stopPropagation();
                           setEditando(e);
                         }}
-                        className="text-xs text-gray-700 hover:text-black underline"
+                        className="text-xs text-gray-700 hover:text-black underline min-h-[44px] px-1"
                       >
                         Editar entrega
                       </button>

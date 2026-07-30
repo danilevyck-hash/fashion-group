@@ -12,6 +12,8 @@ import { useToast } from "@/components/ToastSystem";
 
 interface Resumen {
   legacy: { count: number; total: number };
+  /** Bucket independiente (fuera del grupo de marcas). */
+  multifashion?: { count: number; total: number };
   porMarca: Record<string, { count: number; total: number }>;
 }
 
@@ -19,6 +21,7 @@ interface Props {
   marcas: MkMarca[];
   onSelectMarca: (marcaId: string) => void;
   onSelectLegacy: () => void;
+  onSelectMultifashion: () => void;
   onNuevoProyecto: () => void;
   onOpenAnulados: () => void;
   onOpenReportes: () => void;
@@ -52,6 +55,7 @@ export default function MarcaSelector({
   marcas,
   onSelectMarca,
   onSelectLegacy,
+  onSelectMultifashion,
   onNuevoProyecto,
   onOpenAnulados,
   onOpenReportes,
@@ -196,6 +200,38 @@ export default function MarcaSelector({
               <div className="text-[12px] text-gray-500">
                 {resumen?.legacy.count ?? 0}{" "}
                 {(resumen?.legacy.count ?? 0) === 1 ? "factura" : "facturas"}
+              </div>
+            </div>
+          </button>
+
+          {/* Multifashion — marca INDEPENDIENTE, fuera del grupo de marcas
+              (pedido de Daniel). Va en su propia fila, arriba del grid de
+              marcas, para que se lea como "otra cosa" y no como una más del
+              grupo. Sus gastos NO se cuentan en la card de arriba ni en las de
+              abajo: ver api/marketing/marca-resumen. */}
+          <button
+            type="button"
+            onClick={onSelectMultifashion}
+            className="w-full text-left rounded-xl border-2 border-indigo-200 bg-white p-4 hover:border-indigo-400 hover:shadow-sm transition flex items-center justify-between gap-4"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-gray-900">Multifashion</span>
+                <span className="rounded bg-indigo-50 text-indigo-700 text-xs px-1.5 py-0.5 font-medium">
+                  Independiente
+                </span>
+              </div>
+              <div className="text-[12px] text-gray-500 mt-0.5">
+                Tienda propia del grupo · aparte de las marcas
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="font-semibold text-gray-900 tabular-nums">
+                {formatearMonto(resumen?.multifashion?.total ?? 0)}
+              </div>
+              <div className="text-[12px] text-gray-500">
+                {resumen?.multifashion?.count ?? 0}{" "}
+                {(resumen?.multifashion?.count ?? 0) === 1 ? "factura" : "facturas"}
               </div>
             </div>
           </button>

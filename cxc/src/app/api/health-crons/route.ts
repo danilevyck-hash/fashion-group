@@ -7,11 +7,29 @@
 // propia reconciliación interna se caiga (si Vercel deja de invocar crons, el
 // watchdog interno tampoco corre → solo un observador EXTERNO lo nota).
 //
-// Respuesta:
-//   - 200 { ok: true, ... }   → todos los crons frescos (success en <26h) o
-//     stale pero con recuperación EN CAMINO hoy (pendingRecovery, ver abajo).
-//   - 503 { ok: false, stale: [...] } → ≥1 cron viejo o sin heartbeat nunca.
-//   El monitor externo alerta cuando el status ≠ 200 (o cuando ok=false).
+// EL CÓDIGO HTTP DICE "¿LA VIGILANCIA FUNCIONA?", NO "¿HAY HALLAZGOS?"
+// (29-jul-2026). Antes bastaba UN cron stale para devolver 503, y eso apagó el
+// vigía: `switch-sync:all-0630` dejó de registrar heartbeat el 27-jul, el
+// endpoint quedó en 503 permanente y cron-job.org deshabilitó el monitor
+// automáticamente tras 26 fallos seguidos. Un cron roto le costó al sistema la
+// vigilancia externa de los otros ~50 — y el watchdog Telegram YA venía
+// reportando ese cron los días 27, 28 y 29. Ahora:
+//   - 200 → la vigilancia funciona. Incluye el caso "hay crons atrasados": los
+//     hallazgos van SIEMPRE en el cuerpo (`stale[]`, `staleCount`) y los reporta
+//     por Telegram el watchdog interno, que para eso está.
+//   - 503 → la vigilancia NO puede responder por sí sola: el watchdog interno
+//     está caído (switch-reconciliacion stale), hay una caída MASIVA
+//     (≥ UMBRAL_CAIDA_MASIVA crons stale = "Vercel dejó de invocar crons"), o no
+//     se pudo leer cron_heartbeats. El veredicto es una función pura,
+//     `veredictoVigiaExterno` en cron-telemetry.ts.
+// `ok` conserva su viejo significado (cero hallazgos); `vigilanciaOk` es el
+// semáforo. Un 503 de este endpoint vuelve a ser raro y significativo, que es la
+// única forma de que un servicio de monitoreo no lo termine apagando.
+//
+// VIGILANCIA MUTUA — el que vigila también es vigilado. Cada llamada autenticada
+// registra el heartbeat `vigia-externo`. Si cron-job.org deja de llamar, esa fila
+// envejece y el watchdog Telegram interno lo reporta a las 26h. No hace falta
+// otro cron (que podría morirse igual de callado): los dos vigías se cubren.
 //
 // Recovery-aware (jul-2026): un cron stale NO cuenta para el 503 si (a) tiene
 // recuperación conocida (colateral de la reconciliación 10/14/18 UTC, o 2ª
@@ -33,8 +51,11 @@
 //
 // Protección: token simple (?token= o header x-healthcheck-token), comparado en
 // tiempo constante contra HEALTHCHECK_TOKEN. NO usa CRON_SECRET a propósito: un
-// monitor de terceros no debe poder disparar crons. Fail-closed: sin la env var
-// configurada responde 503.
+// monitor de terceros no debe poder disparar crons — probarlo con Bearer
+// CRON_SECRET da 401, y es lo esperado. Fail-closed y SIEMPRE 401: sin la env var
+// configurada tampoco entra nadie, pero se responde 401 (no 503), porque un
+// problema de credenciales no es una caída de los crons y confundirlos hace que
+// el monitor externo alarme por lo que no es. Ver el bloque de AUTH en el GET.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -53,6 +74,9 @@ import {
   slotCubiertoPorRecuperacion,
   slotNuncaSembradoVencido,
   SLOT_SEED_GRACE_HOURS,
+  veredictoVigiaExterno,
+  recordCronHeartbeat,
+  VIGIA_EXTERNO_HEARTBEAT,
 } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -124,20 +148,41 @@ function tokenOk(provided: string, expected: string): boolean {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  // AUTH — un problema de credenciales JAMÁS devuelve 503.
+  //
+  // Antes, `HEALTHCHECK_TOKEN` sin configurar respondía 503 "fail-closed". Suena
+  // prudente y es un error de diseño: hace que un olvido de configuración se vea
+  // EXACTAMENTE igual que "los crons se cayeron", así que el monitor externo
+  // dispara la alarma equivocada y, peor, la dispara para siempre (una env var
+  // ausente no se arregla sola) hasta que el servicio de monitoreo apaga el
+  // check. El 503 de este endpoint significa UNA sola cosa: la vigilancia no
+  // funciona. Un problema de token es un 401 — sigue siendo fail-closed (nadie
+  // entra sin credencial válida), pero le dice la verdad al que pregunta.
   const expected = process.env.HEALTHCHECK_TOKEN;
-  if (!expected) {
-    return NextResponse.json(
-      { ok: false, error: "HEALTHCHECK_TOKEN no configurado" },
-      { status: 503 },
-    );
-  }
   const provided =
     req.nextUrl.searchParams.get("token") ??
     req.headers.get("x-healthcheck-token") ??
     "";
-  if (!tokenOk(provided, expected)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!expected || !tokenOk(provided, expected)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unauthorized",
+        // Pista para quien lo pruebe a mano: la credencial de este endpoint NO
+        // es CRON_SECRET (un monitor de terceros no debe poder disparar crons).
+        comoAutenticar: "?token=<HEALTHCHECK_TOKEN> o header x-healthcheck-token",
+      },
+      { status: 401 },
+    );
   }
+
+  // Heartbeat del PROPIO vigía externo: si cron-job.org deja de llamar (se cayó,
+  // o lo deshabilitaron tras N fallos como el 29-jul-2026), esta fila envejece y
+  // el watchdog Telegram INTERNO lo reporta a las 26h como cualquier cron caído.
+  // Vigilancia MUTUA sin agregar un tercer vigilante. Se registra ANTES de medir
+  // y es no-fatal a propósito: lo que se afirma es "el vigía llamó", que ya es
+  // cierto en este punto, y un fallo de escritura no debe cambiar el veredicto.
+  await recordCronHeartbeat(VIGIA_EXTERNO_HEARTBEAT);
 
   // Lectura con timeout interno + 1 reintento. El reintento absorbe el blip
   // transitorio (lo más común); si tras el reintento sigue fallando, respondemos
@@ -151,9 +196,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   } catch (err) {
     const detalle = err instanceof Error ? err.message : String(err);
+    const veredicto = veredictoVigiaExterno({ stale: [], lecturaFallo: true });
     return NextResponse.json(
-      { ok: false, error: "timeout leyendo cron_heartbeats", detalle },
-      { status: 503 },
+      { ok: false, error: veredicto.detalle, motivo: veredicto.motivo, detalle },
+      { status: veredicto.http },
     );
   }
 
@@ -255,10 +301,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // El código HTTP responde "¿la vigilancia funciona?", NO "¿hay hallazgos?".
+  // Los hallazgos van SIEMPRE en el cuerpo (stale[]); el 503 se reserva para lo
+  // que el watchdog Telegram interno no puede reportar por sí mismo. Ver el
+  // bloque "Veredicto del vigía EXTERNO" en cron-telemetry.ts.
+  const veredicto = veredictoVigiaExterno({ stale: stale.map((s) => s.cron) });
   const ok = stale.length === 0;
   return NextResponse.json(
     {
+      // `ok` sigue significando "cero hallazgos" — no cambia de sentido para
+      // quien ya lo leía. El semáforo del monitor es el código HTTP.
       ok,
+      vigilanciaOk: veredicto.http === 200,
+      motivo: veredicto.motivo,
+      detalle: veredicto.detalle,
       checkedAt: new Date(now).toISOString(),
       staleHours: STALE_HOURS,
       slotSeedGraceHours: SLOT_SEED_GRACE_HOURS,
@@ -272,6 +328,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       slotsCubiertosCount: slotsCubiertos.length,
       slotsCubiertos,
     },
-    { status: ok ? 200 : 503 },
+    { status: veredicto.http },
   );
 }

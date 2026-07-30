@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { esMultifashion } from "@/lib/marketing/multifashion";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,6 +12,9 @@ export const fetchCache = "force-no-store";
 //   - legacy: { count, total } sobre facturas grupo_legacy=true (card "Tommy y Calvin").
 //   - porMarca[marca_id]: { count, total } sobre facturas NO-legacy, gasto repartido
 //     por porcentaje entre las marcas de cada factura (1 marca = total completo).
+//   - multifashion: { count, total } — bucket INDEPENDIENTE (ver lib/marketing/
+//     multifashion.ts). Sus facturas NO se cuentan en legacy ni en porMarca: si se
+//     contaran en los dos lados, la suma de las cards daría más que el gasto real.
 // Solo facturas no anuladas.
 
 export async function GET(req: NextRequest) {
@@ -18,21 +22,27 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const [facturasRes, fmRes] = await Promise.all([
+    const [facturasRes, fmRes, proyRes] = await Promise.all([
       supabaseServer
         .from("mk_facturas")
-        .select("id, total, grupo_legacy, impulsadora_id")
+        .select("id, proyecto_id, total, grupo_legacy, impulsadora_id")
         .is("anulado_en", null),
       supabaseServer
         .from("mk_factura_marcas")
         .select("factura_id, marca_id, porcentaje"),
+      supabaseServer
+        .from("mk_proyectos")
+        .select("id, tienda, tienda_codigo")
+        .is("anulado_en", null),
     ]);
 
     if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
     if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
+    if (proyRes.error) throw new Error(`proyectos: ${proyRes.error.message}`);
 
     const facturas = (facturasRes.data ?? []) as Array<{
       id: string;
+      proyecto_id: string | null;
       total: number | null;
       grupo_legacy?: boolean;
       impulsadora_id?: string | null;
@@ -43,17 +53,43 @@ export async function GET(req: NextRequest) {
       porcentaje: number | null;
     }>;
 
+    const proyectosMf = new Set(
+      (
+        (proyRes.data ?? []) as Array<{
+          id: string;
+          tienda: string | null;
+          tienda_codigo: string | null;
+        }>
+      )
+        .filter((p) => esMultifashion(p))
+        .map((p) => String(p.id)),
+    );
+    const facturaEsMf = (proyectoId: string | null): boolean =>
+      !!proyectoId && proyectosMf.has(String(proyectoId));
+
     const facturaById = new Map(
       facturas.map((f) => [
         String(f.id),
-        { total: Number(f.total ?? 0), legacy: !!f.grupo_legacy, impulsadora: !!f.impulsadora_id },
+        {
+          total: Number(f.total ?? 0),
+          legacy: !!f.grupo_legacy,
+          impulsadora: !!f.impulsadora_id,
+          multifashion: facturaEsMf(f.proyecto_id),
+        },
       ]),
     );
 
-    // Legacy: cuenta y suma directa de facturas legacy.
+    // Legacy: cuenta y suma directa de facturas legacy, SIN Multifashion.
     let legacyCount = 0;
     let legacyTotal = 0;
+    let mfCount = 0;
+    let mfTotal = 0;
     for (const f of facturas) {
+      if (facturaEsMf(f.proyecto_id)) {
+        mfCount += 1;
+        mfTotal += Number(f.total ?? 0);
+        continue;
+      }
       if (f.grupo_legacy) {
         legacyCount += 1;
         legacyTotal += Number(f.total ?? 0);
@@ -86,6 +122,7 @@ export async function GET(req: NextRequest) {
     };
     for (const [fid, rows] of rowsByFactura) {
       const info = facturaById.get(fid)!;
+      if (info.multifashion) continue; // Multifashion tiene su propia card
       if (info.legacy) continue; // legacy va al bucket "Tommy y Calvin", no a las marcas
       const sumPct = rows.reduce((s, x) => s + x.pct, 0) || 1;
       for (const r of rows) {
@@ -104,6 +141,7 @@ export async function GET(req: NextRequest) {
 
     const res = NextResponse.json({
       legacy: { count: legacyCount, total: Number(legacyTotal.toFixed(2)) },
+      multifashion: { count: mfCount, total: Number(mfTotal.toFixed(2)) },
       porMarca,
       impulsadoraPorMarca,
     });

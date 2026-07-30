@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
+import { esMultifashion } from "@/lib/marketing/multifashion";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -84,8 +85,10 @@ export async function GET(req: NextRequest) {
       (() => {
         let q = supabaseServer
           .from("mk_proyectos")
+          // tienda_codigo entra para poder reconocer los proyectos de
+          // Multifashion (bucket independiente) — ver lib/marketing/multifashion.
           .select(
-            "id, nombre, tienda, estado, created_at, anulado_en, fecha_enviado, fecha_cobrado",
+            "id, nombre, tienda, tienda_codigo, estado, created_at, anulado_en, fecha_enviado, fecha_cobrado",
           )
           .is("anulado_en", null);
         if (filtroEstado === "activos" || filtroEstado === "joybees") {
@@ -143,12 +146,16 @@ export async function GET(req: NextRequest) {
       id: string;
       nombre: string | null;
       tienda: string;
+      tienda_codigo: string | null;
       estado: string;
       created_at: string;
       anulado_en: string | null;
       fecha_enviado: string | null;
       fecha_cobrado: string | null;
     }>;
+    const proyectosMf = new Set(
+      proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
+    );
 
     if (proyectos.length === 0) {
       return jsonNoStore([]);
@@ -326,6 +333,10 @@ export async function GET(req: NextRequest) {
     // Proyectos sin facturas de ese bucket quedan fuera (un proyecto vacío no
     // pertenece a ninguna marca todavía).
     const passBucket = (pid: string): boolean => {
+      // Multifashion es un bucket INDEPENDIENTE: entra solo con
+      // grupo=multifashion y queda fuera de legacy y de las marcas.
+      if (grupo === "multifashion") return proyectosMf.has(pid);
+      if (proyectosMf.has(pid) && (grupo === "legacy" || grupo === "marca")) return false;
       if (grupo === "legacy") return hasLegacyByProy.has(pid);
       if (grupo === "marca") {
         if (!marcaIdFiltro) return true;

@@ -165,6 +165,51 @@ export function empresasConEstadoCuenta(): EmpresaKey[] {
 }
 
 /**
+ * Empresas cuyo estado de cuenta NO se sincroniza por CRON, aunque su capability
+ * `estadoCuenta` siga en true.
+ *
+ * 🔴 `confecciones_boston` — NO CABE en una función serverless (30-jul-2026).
+ * `syncEmpresaEstadoCuenta` hace **una llamada HTTP por cliente** y boston tiene
+ * **4.912 clientes** (las demás empresas: 136-139). Su ÚNICO run exitoso de la
+ * historia tardó **3.240 s (54 min)** y fue un `triggered_by='backfill'` local;
+ * el techo de la función es **800 s** (`FUNCTION_MAX_DURATION_S`). O sea que cada
+ * corrida programada **muere siempre**, y un proceso matado no ejecuta `finally`:
+ * no deja heartbeat NI alerta. Eso mataba el slot `switch-sync:all-0630`
+ * (arrastrando a american_classic, que en el MISMO run sincronizaba bien) y
+ * quemaba ~13 min de función 4 veces al día para nada.
+ *
+ * **Por qué una lista aparte y NO `estadoCuenta: false`:** la capability dice
+ * "traemos sus saldos", y eso sigue siendo verdad — la pestaña de Boston lee las
+ * 1.067 filas ya cargadas, y el sync manual y el arreglo definitivo la necesitan.
+ * Apagar la bandera desharía lo que aprobó el #347. Esta lista dice algo más
+ * chico y más honesto: *por cron, todavía no*.
+ *
+ * **Qué falta para vaciar esta lista** (tarea aparte, toca la ruta del DINERO y
+ * necesita aprobación): su universo real son **459 clientes con saldo abierto**
+ * (+326 con factura desde el 1-may), no 4.912 → consultar solo esos entra cómodo
+ * en el techo. ⚠️ El reconcile de `syncEmpresaEstadoCuenta` pone `saldo = 0` a
+ * TODA la empresa por `synced_at < runStamp`, así que restringir el bucle exige
+ * excluir del reconcile a los clientes no consultados (mismo mecanismo que
+ * `failedClienteIds`) — hacerlo mal pone en cero saldos buenos. Por eso NO se
+ * hizo acá. Partirlo en tandas es peor: cada tanda zerearía lo que cargó la
+ * anterior.
+ */
+export const EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON: readonly EmpresaKey[] = [
+  "confecciones_boston",
+];
+
+/**
+ * Empresas cuyo estado de cuenta sí se sincroniza por CRON. Es la lista que
+ * tienen que usar el cron `switch-sync` (tipo=all) y la reconciliación: pedir
+ * trabajo que provablemente no puede terminar no es vigilancia, es ruido.
+ */
+export function empresasConEstadoCuentaEnCron(): EmpresaKey[] {
+  return empresasConEstadoCuenta().filter(
+    (k) => !EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON.includes(k),
+  );
+}
+
+/**
  * Empresas de las que traemos cartera pero que NO son cartera del grupo:
  * hoy, solo `confecciones_boston`. Su plata se muestra en su propia pestaña y
  * no se suma con nada.
