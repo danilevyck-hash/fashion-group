@@ -40,9 +40,19 @@ const claseMonto = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-900");
 
 // ── Piezas compartidas ───────────────────────────────────────────────────────
 
-/** Contenedor de la lista de tarjetas. Solo celular. */
+/**
+ * Contenedor de la lista de tarjetas. Celular **y iPad vertical** (<lg).
+ *
+ * 🩸 EL CORTE ES `lg` (1024px) Y NO `md`, Y ES ARITMÉTICA, NO GUSTO. Medido a
+ * 834px (iPad vertical): dentro de la tarjeta hay **552px** útiles — el
+ * viewport miente porque la barra lateral se lleva ~225px. Los DATOS de las 7
+ * columnas de "Todas las empresas", puro texto, sin un solo píxel de relleno y
+ * sin encabezados, miden **554px**. O sea que la tabla no entra a 834px por
+ * 2px ANTES de dibujar una sola línea: no hay abreviatura ni relleno que la
+ * haga entrar. A 1024px sí entra (742 útiles), y ahí se muestra la tabla.
+ */
 function ListaTarjetas({ children }: { children: ReactNode }) {
-  return <ul className="space-y-2 md:hidden">{children}</ul>;
+  return <ul className="space-y-2 lg:hidden">{children}</ul>;
 }
 
 /**
@@ -54,7 +64,15 @@ function ListaTarjetas({ children }: { children: ReactNode }) {
 function TarjetaTotal({ total }: { total: number }) {
   return (
     <li>
-      <div className="flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3">
+      {/* data-comision-total: gancho de MEDICIÓN. Antes el verificador buscaba
+          la tarjeta por su clase de breakpoint (`.md\:hidden`) y al mover el
+          corte de md a lg se quedó leyendo null — o sea que el chequeo de "el
+          total no cambió" pasó a no chequear nada. El gancho no depende de
+          cómo esté maquetado. */}
+      <div
+        data-comision-total
+        className="flex items-center justify-between gap-2 rounded-xl bg-gray-900 px-3 py-3"
+      >
         <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Total</span>
         <span className="font-mono text-base font-semibold tabular-nums text-white">
           {fmtMoney(total)}

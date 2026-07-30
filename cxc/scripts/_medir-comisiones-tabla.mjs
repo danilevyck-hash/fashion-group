@@ -33,9 +33,16 @@ const SALIDA = process.env.SALIDA ?? "/Users/daniellevy/.claude/jobs/5b66fe8c/tm
 const ETAPA = process.env.ETAPA ?? "antes";
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 
+// El iPad tiene DOS orientaciones y hay dos generaciones vivas, así que no
+// alcanza con "834 y 1440": 1024 es el iPad 10.9" horizontal y 1180 el iPad
+// Pro 11" horizontal, y los dos caen justo en el hueco donde la tabla ya no
+// entra pero el escritorio sí. Daniel: "todo tiene q estar hecho para ipad
+// iphone y desktop".
 const TAMANOS = [
   { nombre: "390", width: 390, height: 844, movil: true },
   { nombre: "834", width: 834, height: 1194, movil: true },
+  { nombre: "1024", width: 1024, height: 768, movil: true },
+  { nombre: "1180", width: 1180, height: 820, movil: true },
   { nombre: "1440", width: 1440, height: 900, movil: false },
 ];
 
@@ -84,6 +91,38 @@ const MEDIR = `(() => {
     recorte = Math.max(recorte, fuera);
   }
 
+  // ¿Cuánto ancho hay DE VERDAD para la tabla? En >=md hay barra lateral, así
+  // que el viewport miente: lo que manda es el clientWidth del contenedor.
+  const cajaTabla = tabla.parentElement;
+  const anchoDisponible = cajaTabla ? cajaTabla.clientWidth : null;
+
+  // Qué le cuesta cada columna, y si el costo lo pone el ENCABEZADO o el DATO.
+  // Sirve para decidir con número entre "abreviar encabezados" y "tarjetas".
+  const anchoTexto = (el) => {
+    if (!el) return 0;
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    return Math.round(r.getBoundingClientRect().width);
+  };
+  const ths = [...(tabla.querySelectorAll("thead th") || [])];
+  const cuerpo = [...tabla.querySelectorAll("tbody tr")];
+  const columnas = ths.map((th, i) => {
+    let maxDato = 0;
+    for (const tr of cuerpo) {
+      const td = tr.children[i];
+      if (!td || tr.children.length !== ths.length) continue;
+      maxDato = Math.max(maxDato, anchoTexto(td));
+    }
+    return {
+      titulo: th.textContent.trim(),
+      ancho: Math.round(th.getBoundingClientRect().width),
+      textoEncabezado: anchoTexto(th),
+      textoDatoMax: maxDato,
+      // Lo que se ahorraría si el encabezado dejara de ser el que manda.
+      sobranteDeEncabezado: Math.max(0, anchoTexto(th) - maxDato),
+    };
+  });
+
   return {
     arrastrePagina,
     arrastreInterno,
@@ -92,8 +131,12 @@ const MEDIR = `(() => {
     tabla: {
       anchoVisual: Math.round(rTabla.width),
       anchoContenido: tabla.scrollWidth,
-      columnas: (tabla.querySelector("thead tr") || { children: [] }).children.length,
-      filas: tabla.querySelectorAll("tbody tr").length,
+      anchoDisponible,
+      faltante: anchoDisponible == null ? null : Math.max(0, tabla.scrollWidth - anchoDisponible),
+      columnas: ths.length,
+      filas: cuerpo.length,
+      detalleColumnas: columnas,
+      ahorroSiSeAbrevianEncabezados: columnas.reduce((a, c) => a + c.sobranteDeEncabezado, 0),
     },
     tarjetas: document.querySelectorAll("main [data-comision-card]").length,
     anchoViewport: window.innerWidth,

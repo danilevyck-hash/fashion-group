@@ -162,20 +162,20 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
       {EMPRESAS.map((k) => {
         const val = r.porEmpresa[k];
         if (val === undefined) {
-          return <td key={k} className="px-3 py-2.5 text-right tabular-nums text-gray-300">—</td>;
+          return <td key={k} className="px-2 py-2.5 text-right tabular-nums text-gray-300 xl:px-3">—</td>;
         }
         return (
           <td
             key={k}
             onClick={(e) => { e.stopPropagation(); setDetalle({ empresa: k, vendedor: r.vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : r.vendedor }); }}
-            className={`cursor-pointer px-3 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline ${moneyClass(val)}`}
+            className={`cursor-pointer px-2 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline xl:px-3 ${moneyClass(val)}`}
             title={`Ver detalle · ${EMPRESA_KEY_TO_NAME[k] ?? k}`}
           >
             {fmtMoney(val)}
           </td>
         );
       })}
-      <td className={`bg-gray-50 px-4 py-2.5 text-right font-semibold tabular-nums ${r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
+      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
         {fmtMoney(r.total)}
       </td>
     </>
@@ -225,34 +225,34 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
           />
 
           {/* iPad y escritorio: la tabla, intacta. */}
-          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
+          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 lg:block">
             <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-2 font-medium">Vendedor</th>
+                  <th className="px-3 py-2 font-medium xl:px-4">Vendedor</th>
                   {EMPRESAS.map((k) => (
-                    <th key={k} className="whitespace-nowrap px-3 py-2 text-right font-medium">{EMPRESA_KEY_TO_NAME[k] ?? k}</th>
+                    <th key={k} className="px-2 py-2 text-right font-medium xl:whitespace-nowrap xl:px-3">{EMPRESA_KEY_TO_NAME[k] ?? k}</th>
                   ))}
-                  <th className="bg-gray-100 px-4 py-2 text-right font-semibold text-gray-700">Total</th>
+                  <th className="bg-gray-100 px-3 py-2 text-right font-semibold text-gray-700 xl:px-4">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {activos.map((r) => (
                   <tr key={r.vendedor} className="border-b border-gray-100 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 font-medium text-gray-900">{r.vendedor}</td>
+                    <td className="px-3 py-2.5 font-medium text-gray-900 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
                     {renderCells(r, false)}
                   </tr>
                 ))}
                 {sinAsignar && (
                   <tr className="border-b border-gray-100 bg-gray-50/50 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 italic text-gray-500">Sin asignar</td>
+                    <td className="px-3 py-2.5 italic text-gray-500 xl:whitespace-nowrap xl:px-4">Sin asignar</td>
                     {renderCells(sinAsignar, false)}
                   </tr>
                 )}
                 {inactivos.length > 0 && (
                   <tr className="border-b border-gray-100 last:border-0">
-                    <td colSpan={EMPRESAS.length + 2} className="px-4 py-1.5">
+                    <td colSpan={EMPRESAS.length + 2} className="px-3 py-1.5 xl:px-4">
                       <button
                         onClick={() => setShowInactivos((v) => !v)}
                         /* Era texto suelto de 18 px de alto dentro de la fila.
@@ -267,19 +267,19 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
                 )}
                 {showInactivos && inactivos.map((r) => (
                   <tr key={r.vendedor} className="border-b border-gray-100 text-gray-400 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5">{r.vendedor}</td>
+                    <td className="px-3 py-2.5 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
                     {renderCells(r, false)}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
-                  <td className="px-4 py-2.5">Total</td>
+                  <td className="px-3 py-2.5 xl:px-4">Total</td>
                   {EMPRESAS.map((k) => {
                     const t = colTotal(k);
-                    return <td key={k} className={`px-3 py-2.5 text-right tabular-nums ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;
+                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;
                   })}
-                  <td className={`bg-gray-100 px-4 py-2.5 text-right font-semibold tabular-nums ${grandTotal < 0 ? "text-rose-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
+                  <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-rose-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
                 </tr>
               </tfoot>
             </table>

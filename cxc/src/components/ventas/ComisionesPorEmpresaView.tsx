@@ -198,17 +198,17 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
 
           {/* iPad y escritorio: la tabla. El `overflow-x-auto` es nuevo — sin
               él, a 834px se perdían 83px sin aviso ni forma de alcanzarlos. */}
-          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
+          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 lg:block">
             <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-4 py-2 font-medium">Vendedor</th>
-                <th className="px-4 py-2 text-right font-medium">Ventas</th>
-                <th className="px-4 py-2 text-right font-medium">Com. venta</th>
-                <th className="px-4 py-2 text-right font-medium">Cobros</th>
-                <th className="px-4 py-2 text-right font-medium">Com. cobro</th>
-                <th className="px-4 py-2 text-right font-medium">Com. total</th>
+                <th className="px-3 py-2 font-medium xl:px-4">Vendedor</th>
+                <th className="px-3 py-2 text-right font-medium xl:px-4">Ventas</th>
+                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. venta</th>
+                <th className="px-3 py-2 text-right font-medium xl:px-4">Cobros</th>
+                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. cobro</th>
+                <th className="px-3 py-2 text-right font-medium xl:px-4">Com. total</th>
               </tr>
             </thead>
             <tbody>
@@ -219,17 +219,17 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
                   className="cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50"
                   title="Ver reporte detallado"
                 >
-                  <td className="px-4 py-2.5 font-medium text-gray-900 underline-offset-2 hover:underline">{v.vendedor}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtMoney(v.comision)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base_cobro)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtMoney(v.comision_cobro)}</td>
-                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">{fmtMoney(v.comision_total)}</td>
+                  <td className="px-3 py-2.5 font-medium text-gray-900 underline-offset-2 hover:underline xl:px-4">{v.vendedor}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-600 xl:px-4">{fmtMoney(v.comision)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-700 xl:px-4">{fmtMoney(v.base_cobro)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-gray-600 xl:px-4">{fmtMoney(v.comision_cobro)}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-gray-900 xl:px-4">{fmtMoney(v.comision_total)}</td>
                 </tr>
               ))}
               {inactivos.length > 0 && (
                 <tr className="border-b border-gray-100 last:border-0">
-                  <td colSpan={6} className="px-4 py-2 text-center text-xs italic text-gray-400">
+                  <td colSpan={6} className="px-3 py-2 text-center text-xs italic text-gray-400 xl:px-4">
                     {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
                   </td>
                 </tr>
@@ -237,12 +237,12 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
-                <td className="px-4 py-2.5">Total</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalBase)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalComision)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalCobroBase)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalComisionCobro)}</td>
-                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalGeneral)}</td>
+                <td className="px-3 py-2.5 xl:px-4">Total</td>
+                <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalBase)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalComision)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalCobroBase)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalComisionCobro)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums xl:px-4">{fmtMoney(totalGeneral)}</td>
               </tr>
             </tfoot>
           </table>
