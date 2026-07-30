@@ -45,6 +45,7 @@ import {
   CRONS_FAIL_CLOSED,
   SEED_TOLERANT_CRONS,
   HEARTBEATS_NO_CRON,
+  HEARTBEATS_EXTERNOS,
   esCronRetirado,
   esHeartbeatNoVigilable,
   cronsStaleParaAlerta,
@@ -160,6 +161,15 @@ describe("B. un cron VIVO sigue alertando", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("C. el registro y vercel.json son biyectivos", () => {
+  // Los vigías EXTERNOS (HEARTBEATS_EXTERNOS) quedan fuera de la biyección a
+  // propósito: los dispara cron-job.org desde afuera, así que no tienen ni pueden
+  // tener entrada en vercel.json. Sí están en el registro porque SÍ se vigilan —
+  // es lo contrario de HEARTBEATS_NO_CRON. La lista es cerrada y corta, y
+  // vigia-externo.test.ts fija que se sigan vigilando.
+  const REGISTRO_PROGRAMADO = [...CRONS_CONOCIDOS].filter(
+    (c) => !(HEARTBEATS_EXTERNOS as readonly string[]).includes(c),
+  );
+
   it("cada cron de vercel.json está en el registro (si no, nadie lo vigila)", () => {
     const huerfanos = CRONS_EN_VERCEL.filter((c) => !CRONS_CONOCIDOS.has(c));
     expect(
@@ -170,13 +180,22 @@ describe("C. el registro y vercel.json son biyectivos", () => {
   });
 
   it("cada cron del registro sigue teniendo entrada en vercel.json", () => {
-    const fantasmas = [...CRONS_CONOCIDOS].filter((c) => !CRONS_EN_VERCEL.includes(c)).sort();
+    const fantasmas = REGISTRO_PROGRAMADO.filter((c) => !CRONS_EN_VERCEL.includes(c)).sort();
     expect(
       fantasmas,
       `el registro vigila crons que ya no están en vercel.json: ${fantasmas.join(", ")}\n` +
         `Si el retiro es a propósito, sacalos del registro (y borrá su fila de cron_heartbeats).\n` +
         `Si NO lo es, alguien borró una entrada de vercel.json por accidente — restaurala.`,
     ).toEqual([]);
+  });
+
+  it("un vigía externo NO se cuela como cron programado", () => {
+    // Si alguno apareciera en vercel.json sería un cron de verdad y tendría que
+    // salir de HEARTBEATS_EXTERNOS (o la biyección dejaría de proteger nada).
+    for (const n of HEARTBEATS_EXTERNOS) {
+      expect(CRONS_EN_VERCEL, `${n} está en vercel.json: no es un vigía externo`).not.toContain(n);
+      expect(CRONS_CONOCIDOS.has(n), `${n} tiene que seguir vigilado`).toBe(true);
+    }
   });
 
   it("multifashion-sync no está en ninguno de los dos lados", () => {

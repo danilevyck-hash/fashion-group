@@ -622,12 +622,41 @@ export const CRONS_FAIL_CLOSED = [
  */
 export const HEARTBEATS_NO_CRON = ["sync-now-refresh-vistas"] as const;
 
+/** Heartbeat que escribe el VIGÍA EXTERNO cada vez que llama a
+ *  /api/health-crons con su token. No es un cron de vercel.json: lo dispara
+ *  cron-job.org desde afuera. */
+export const VIGIA_EXTERNO_HEARTBEAT = "vigia-externo";
+
+/**
+ * Heartbeats de vigías EXTERNOS: nadie los programa en vercel.json, pero SÍ se
+ * vigilan — que es exactamente lo contrario de `HEARTBEATS_NO_CRON`.
+ *
+ * 🩸 INCIDENTE 29-jul-2026 — el vigía se murió en silencio. cron-job.org
+ * deshabilitó automáticamente el monitor de /api/health-crons tras **26 fallos
+ * consecutivos**, y NADIE se enteró: el que vigilaba a los crons no tenía quien
+ * lo vigilara. Durante esos días, si un sync se caía, no había aviso externo.
+ *
+ * El arreglo NO es otro cron (que también podría morirse en silencio): es
+ * VIGILANCIA MUTUA sobre el mecanismo que ya existe.
+ *   • Si los crons de Vercel se caen → el vigía externo ve 503 → cron-job.org
+ *     le manda el correo a Daniel.
+ *   • Si el vigía externo se cae (o lo deshabilitan) → deja de escribir este
+ *     heartbeat → a las 26h el watchdog Telegram INTERNO lo reporta como
+ *     cualquier otro cron caído.
+ *
+ * Ninguno de los dos puede morir callado, y no hizo falta agregar un tercer
+ * vigilante. Se vigila con el umbral normal de 26h: cron-job.org lo llama cada
+ * hora, así que 26h sin una sola llamada es inequívoco.
+ */
+export const HEARTBEATS_EXTERNOS = [VIGIA_EXTERNO_HEARTBEAT] as const;
+
 /** Todo nombre de heartbeat de cron que el sistema conoce hoy (fail-closed +
- *  seed-tolerantes). NO incluye slots ni marcas: esos se derivan del calendario
- *  y tienen su propio camino en `esCronRetirado`. */
+ *  seed-tolerantes + vigías externos). NO incluye slots ni marcas: esos se
+ *  derivan del calendario y tienen su propio camino en `esCronRetirado`. */
 export const CRONS_CONOCIDOS: ReadonlySet<string> = new Set<string>([
   ...CRONS_FAIL_CLOSED,
   ...SEED_TOLERANT_CRONS,
+  ...HEARTBEATS_EXTERNOS,
 ]);
 
 /**
@@ -1229,6 +1258,112 @@ export function cronsStaleParaAlerta(rows: HeartbeatRow[], now: number = Date.no
     );
   }
   return stale;
+}
+
+// ─── Veredicto del vigía EXTERNO: estar vivo ≠ no tener hallazgos ─────────────
+//
+// 🩸 INCIDENTE 29-jul-2026. `/api/health-crons` devolvía 503 en cuanto UN cron
+// quedaba stale. El 27-jul, `switch-sync:all-0630` dejó de registrar heartbeat
+// (confecciones_boston/estadocuenta no cabe en el techo de la función y mata el
+// proceso, ver CLAUDE.md) → el endpoint pasó a devolver 503 en TODAS las
+// llamadas, y cron-job.org, que deshabilita un monitor tras demasiados fallos
+// seguidos, lo apagó a los **26 fallos**. Resultado: por UN cron roto —que el
+// watchdog Telegram YA venía reportando los días 27, 28 y 29— el sistema perdió
+// la vigilancia externa de los otros ~50.
+//
+// El 503 no estaba equivocado; estaba MAL DIRIGIDO. Un semáforo que se queda en
+// rojo para siempre no es un semáforo: es un semáforo que alguien va a apagar.
+//
+// LA REGLA: el código HTTP responde "¿el aparato de vigilancia funciona?", NO
+// "¿hay algún hallazgo?". Los hallazgos viajan SIEMPRE en el cuerpo (`stale[]`,
+// `staleCount`) — no se esconden — pero solo levantan el 503 cuando el vigía
+// INTERNO no puede reportarlos él mismo. Repartición de trabajo:
+//
+//   • Un puñado de crons stale → 200 con los hallazgos en el cuerpo. El watchdog
+//     Telegram de switch-reconciliacion recorre cron_heartbeats 3×/día y ya avisa
+//     por Telegram. Que sonaran los dos era redundancia que terminó costando la
+//     vigilancia entera.
+//   • El watchdog INTERNO caído (switch-reconciliacion stale) → 503. Es el caso
+//     que justifica que exista un observador de afuera: si el que avisa por
+//     Telegram no corre, nadie más puede contarlo.
+//   • CAÍDA MASIVA (≥ UMBRAL_CAIDA_MASIVA crons stale) → 503. La firma de
+//     "Vercel dejó de invocar crons", el escenario del encabezado del route.
+//   • No se pudo LEER cron_heartbeats → 503, fail-closed. Un vigía que no puede
+//     medir tiene que gritar, nunca callar.
+
+/**
+ * Cuántos crons stale a la vez dejan de ser "un cron roto" y pasan a ser "el
+ * programador de crons se cayó". Con ~50 nombres vigilados, 5 simultáneos no
+ * ocurre por casualidad; y un cron roto de arrastre (como all-0630) deja 4 de
+ * margen antes de enmascarar una caída general.
+ */
+export const UMBRAL_CAIDA_MASIVA = 5;
+
+/** Cron que hospeda el watchdog Telegram interno. Si ÉL está stale, nadie
+ *  adentro puede reportar nada → el vigía externo es la única voz que queda. */
+export const CRON_WATCHDOG_INTERNO = "switch-reconciliacion";
+
+export interface VeredictoVigia {
+  /** Código HTTP a devolver: 200 = el aparato de vigilancia funciona. */
+  http: 200 | 503;
+  /** Por qué. `sano` y `solo-hallazgos` son 200; el resto, 503. */
+  motivo: "sano" | "solo-hallazgos" | "watchdog-interno-caido" | "caida-masiva" | "lectura-fallo";
+  /** Frase para el cuerpo del JSON, en español, sin jerga. */
+  detalle: string;
+}
+
+/**
+ * Decide el código HTTP del vigía externo. PURA (sin I/O) para poder testear las
+ * dos direcciones: que un hallazgo suelto NO tumbe el semáforo y que una caída
+ * de verdad SÍ lo tumbe.
+ *
+ * `stale` son los hallazgos ya calculados por el route (crons y slots caídos,
+ * después de descontar recuperaciones en camino y slots cubiertos).
+ */
+export function veredictoVigiaExterno(args: {
+  stale: readonly string[];
+  lecturaFallo?: boolean;
+}): VeredictoVigia {
+  if (args.lecturaFallo) {
+    return {
+      http: 503,
+      motivo: "lectura-fallo",
+      detalle: "No se pudo leer el registro de tareas automáticas. Puede estar caída la base.",
+    };
+  }
+  const staleCount = args.stale.length;
+  // El nombre del watchdog interno puede venir como "switch-reconciliacion" o
+  // como "switch-reconciliacion (último: ...)" según cómo arme el route la
+  // etiqueta; se compara por prefijo de palabra para no depender del formato.
+  const watchdogCaido = args.stale.some(
+    (s) => s === CRON_WATCHDOG_INTERNO || s.startsWith(`${CRON_WATCHDOG_INTERNO} `),
+  );
+  if (watchdogCaido) {
+    return {
+      http: 503,
+      motivo: "watchdog-interno-caido",
+      detalle:
+        "El vigilante interno (el que avisa por Telegram) no está corriendo. " +
+        "Nadie más puede reportar tareas caídas: revisar ya.",
+    };
+  }
+  if (staleCount >= UMBRAL_CAIDA_MASIVA) {
+    return {
+      http: 503,
+      motivo: "caida-masiva",
+      detalle: `${staleCount} tareas automáticas caídas a la vez. Parece que dejaron de ejecutarse todas: revisar ya.`,
+    };
+  }
+  if (staleCount > 0) {
+    return {
+      http: 200,
+      motivo: "solo-hallazgos",
+      detalle:
+        `${staleCount} tarea(s) automática(s) atrasada(s), ya reportada(s) por Telegram. ` +
+        "La vigilancia funciona; no hace falta despertar a nadie por esto.",
+    };
+  }
+  return { http: 200, motivo: "sano", detalle: "Todas las tareas automáticas al día." };
 }
 
 /**

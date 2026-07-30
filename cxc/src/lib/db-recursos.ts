@@ -219,10 +219,29 @@ export const UMBRALES: Umbrales = {
   // killer (la métrica node_vmstat_oom_kill lo confirmaría después del hecho).
   memoriaDisponiblePctAviso: 20,
   memoriaDisponiblePctCritico: 10,
-  // Swap: usar algo de swap es NORMAL en Micro (13,5 % en reposo). Lo que no es
-  // normal es que suba: pasar de 40 % significa que la RAM real no alcanza.
-  swapUsadoPctAviso: 40,
-  swapUsadoPctCritico: 70,
+  // Swap 40→70 aviso y 70→85 crítico (30-jul-2026). El 40 generaba RUIDO PURO:
+  // Daniel recibió "🟡 Memoria de emergencia en uso: 42%" con la base
+  // perfectamente sana, y encima lo leyó como falta de ESPACIO (acababa de pagar
+  // Supabase Pro). Medido ese día contra el endpoint de métricas: swap usado
+  // 40,3 % — o sea parado justo encima del umbral — con memoria disponible 53,3 %
+  // y `node_vmstat_oom_kill` en 0 (la base nunca fue matada por memoria).
+  //
+  // ⚠️ POR QUÉ EL NÚMERO SOLO NO SIRVE DE MUCHO: el swap usado es una marca de
+  // marea ALTA y PEGAJOSA. Cuando el kernel manda páginas al swap no las trae de
+  // vuelta hasta que alguien las pide, así que el porcentaje sube y casi nunca
+  // baja: 13,5 % el 27-jul → 40,3 % el 30-jul, sin ningún incidente en el medio.
+  // Un umbral bajo sobre una métrica monótona = una alerta que, una vez que
+  // suena, suena para siempre. La señal que de verdad importa es la memoria
+  // DISPONIBLE (que tiene su propio umbral, 20 %) y `oom_kill`.
+  //
+  // El 70 deja el doble de aire sobre la deriva observada y sigue atrapando el
+  // episodio REAL: durante la caída del 26-jul el swap llegó a 86 % → cae en
+  // crítico (>85). Si con el tiempo la deriva normal también cruza el 70, el
+  // arreglo NO es volver a subir el número: es dejar de alertar por swap usado y
+  // mirar la ACTIVIDAD de swap (node_vmstat_pswpin/pswpout entre dos muestras),
+  // que sí distingue "hay páginas viejas guardadas" de "está paginando ahora".
+  swapUsadoPctAviso: 70,
+  swapUsadoPctCritico: 85,
   // Disco: Postgres necesita aire para WAL, vacuum e índices temporales.
   discoDisponiblePctAviso: 25,
   discoDisponiblePctCritico: 12,
@@ -289,7 +308,7 @@ export function evaluarRecursos(
       u.memoriaDisponiblePctAviso,
       u.memoriaDisponiblePctCritico,
       "menor",
-      (v) => `Memoria libre: ${un(v)}% (la base se queda sin RAM)`,
+      (v) => `MEMORIA apretada: solo queda ${un(v)}% de memoria libre`,
     ),
     revisar(
       "swap",
@@ -297,7 +316,11 @@ export function evaluarRecursos(
       u.swapUsadoPctAviso,
       u.swapUsadoPctCritico,
       "mayor",
-      (v) => `Memoria de emergencia en uso: ${un(v)}% (la RAM real no alcanza)`,
+      // Dice "MEMORIA" y no deja lugar a leerlo como espacio de almacenamiento:
+      // el 30-jul-2026 el texto viejo ("Memoria de emergencia en uso: 42%") se
+      // entendió como que la base se quedaba sin espacio, con el disco al 92 %
+      // libre y la base en 270 MB de 8 GB.
+      (v) => `MEMORIA apretada: la base ya usa ${un(v)}% de la memoria de respaldo`,
     ),
     revisar(
       "disco",
@@ -354,9 +377,21 @@ export function evaluarRecursos(
 const mb = (b: number | null) => (b === null ? "—" : `${Math.round(b / 1048576)} MB`);
 const unoDec = (n: number | null) => (n === null ? "—" : n.toFixed(0));
 
+/** Claves de hallazgo que hablan de MEMORIA (RAM), no de almacenamiento. */
+const CLAVES_MEMORIA = ["memoria", "swap"];
+
 /**
  * Mensaje de Telegram en español simple. Texto plano (sin parse_mode): es el
  * modo seguro de `sendTelegramAlert` para contenido con números y símbolos.
+ *
+ * 🩸 POR QUÉ EL ESTADO VA EN GRUPOS SEPARADOS (30-jul-2026). El mensaje viejo
+ * listaba de corrido "Memoria de emergencia usada 42% · Disco libre 92% · Tamaño
+ * de la base 270 MB de 8 GB". Daniel lo leyó como un aviso de que se estaba
+ * quedando sin ESPACIO —justo después de pagar Supabase Pro— cuando lo que se
+ * apretaba era la RAM (906 MB, que el plan no cambió) y el almacenamiento estaba
+ * perfecto. Mezclar memoria y disco en una sola lista es lo que produjo la
+ * confusión: ahora van en bloques con título, y cuando el hallazgo es de memoria
+ * el mensaje dice explícitamente que el disco no tiene nada que ver.
  */
 export function mensajeRecursos(m: MuestraRecursos, ev: Evaluacion): string {
   const titulo =
@@ -368,14 +403,29 @@ export function mensajeRecursos(m: MuestraRecursos, ev: Evaluacion): string {
   for (const h of ev.hallazgos) {
     lineas.push(`${h.nivel === "critico" ? "🔴" : "🟡"} ${h.texto}`);
   }
+
+  // Aclaración anti-confusión, SOLO cuando el problema es de memoria.
+  if (ev.hallazgos.some((h) => CLAVES_MEMORIA.includes(h.clave))) {
+    lineas.push("");
+    lineas.push(
+      "Qué significa: es MEMORIA (RAM), no espacio de almacenamiento. " +
+        "Tener disco libre no lo arregla, y el plan de Supabase no cambia la RAM: " +
+        "se baja consultando menos de golpe o subiendo el tamaño del servidor.",
+    );
+  }
+
   lineas.push("");
-  lineas.push("Estado completo:");
+  lineas.push("MEMORIA (es lo que se aprieta):");
   lineas.push(
     `· Memoria libre ${unoDec(m.memoriaDisponiblePct)}% (${mb(m.memoriaDisponibleBytes)} de ${mb(m.memoriaTotalBytes)})`,
   );
-  lineas.push(`· Memoria de emergencia usada ${unoDec(m.swapUsadoPct)}%`);
+  lineas.push(`· Memoria de respaldo usada ${unoDec(m.swapUsadoPct)}%`);
+  lineas.push("");
+  lineas.push("ALMACENAMIENTO (va aparte, no tiene que ver con la memoria):");
   lineas.push(`· Disco libre ${unoDec(m.discoDisponiblePct)}%`);
   lineas.push(`· Tamaño de la base ${mb(m.dbBytes)} de 8 GB`);
+  lineas.push("");
+  lineas.push("SERVIDOR:");
   lineas.push(
     `· Trabajo acumulado ${m.cargaPorNucleo === null ? "—" : m.cargaPorNucleo.toFixed(2)}x`,
   );
