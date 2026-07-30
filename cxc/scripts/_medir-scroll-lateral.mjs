@@ -208,72 +208,29 @@ const pant = (o) => P.push(o);
 // Mis 7 módulos del grupo "Ventas y clientes". Comisiones, Cheques, Caja,
 // Préstamos, Guías, Reclamos, Packing, Depurador, Marketing, Gastos y Data
 // Health los mide OTRO agente — no se duplican acá.
-pant({ id: "vista-general", titulo: "Vista General", url: "/vista-general", espera: 10000 });
+// Mi lote del 30-jul-2026: las 4 pantallas que yo mismo medi rotas en el censo.
+// Multifashion > Clientes es el ROJO (recortado, no se alcanza ni arrastrando);
+// las otras 3 estan sanas en celular y rotas SOLO en iPad, que es el ancho que
+// nadie miraba.
+pant({ id: "multifashion-clientes", titulo: "Multifashion > Clientes", url: "/multifashion?subtab=clientes", espera: 12000 });
+pant({ id: "multifashion-vendedoras", titulo: "Multifashion > Vendedoras", url: "/multifashion?subtab=vendedoras", espera: 12000 });
+pant({ id: "proveedores", titulo: "Proveedores (CxP)", url: "/proveedores", espera: 10000 });
+pant({ id: "clientes", titulo: "Clientes > Directorio", url: "/clientes", espera: 10000 });
 
-pant({ id: "ventas-resumen", titulo: "Ventas › Resumen", url: "/ventas?tab=resumen", espera: 11000 });
-pant({ id: "ventas-clientes", titulo: "Ventas › Clientes", url: "/ventas?tab=clientes", espera: 11000 });
-pant({ id: "ventas-productos", titulo: "Ventas › Productos", url: "/ventas?tab=productos", espera: 12000 });
-pant({ id: "ventas-utilidad", titulo: "Ventas › Utilidad", url: "/ventas?tab=utilidad", espera: 12000 });
-
-// CXC ya fue trabajada: sirve de CALIBRACIÓN (el patrón que hay que imitar).
-pant({ id: "cxc", titulo: "CXC (Panel principal)", url: "/admin", espera: 9000 });
-
-pant({ id: "multifashion-resumen", titulo: "Multifashion › Resumen", url: "/multifashion?subtab=resumen", espera: 11000 });
-pant({ id: "multifashion-vendedoras", titulo: "Multifashion › Vendedoras", url: "/multifashion?subtab=vendedoras", espera: 11000 });
-pant({ id: "multifashion-clientes", titulo: "Multifashion › Clientes", url: "/multifashion?subtab=clientes", espera: 11000 });
-pant({ id: "multifashion-caja", titulo: "Multifashion › Caja", url: "/multifashion?subtab=caja", espera: 11000 });
-
-pant({ id: "clientes", titulo: "Clientes › Directorio", url: "/clientes", espera: 9000 });
-pant({
-  id: "clientes-ficha",
-  titulo: "Clientes › Ficha de cliente",
-  url: "/clientes",
-  espera: 9000,
-  // En celular la lista es `ul.sm:hidden` y navega por `onClick` de la fila, no
-  // con un `<a>`: buscar un enlace no encontraba nada (el `<a>` del nombre vive
-  // en la tabla de escritorio, que a 390 px está oculta). En 834/1440 sí hay
-  // tabla, así que se prueban los dos caminos.
-  async preparar(page) {
-    const fila = page.locator("ul.sm\\:hidden > li").locator("visible=true").first();
-    if (await fila.count()) {
-      await fila.click({ timeout: 8000 }).catch(() => {});
-    } else {
-      const l = page.locator('a[href^="/clientes/"]').locator("visible=true").first();
-      if (!(await l.count())) return false;
-      await l.click({ timeout: 8000 }).catch(() => {});
-    }
-    await page.waitForTimeout(6000);
-    return /\/clientes\/[^/]+$/.test(page.url());
-  },
-});
-
-pant({ id: "proveedores", titulo: "Proveedores (CxP)", url: "/proveedores", espera: 9000 });
-pant({
-  id: "proveedores-ficha",
-  titulo: "Proveedores › Ficha",
-  url: "/proveedores",
-  espera: 9000,
-  async preparar(page) {
-    const l = page.locator('a[href^="/proveedores/"]').locator("visible=true").first();
+// Controles: no pueden empeorar.
+pant({ id: "cxc", titulo: "CXC (calibracion, ya resuelta)", url: "/admin", espera: 9000 });
+pant({ id: "multifashion-resumen", titulo: "Multifashion > Resumen", url: "/multifashion?subtab=resumen", espera: 11000 });
+pant({ id: "clientes-ficha", titulo: "Clientes > Ficha", url: "/clientes", espera: 9000, async preparar(page) {
+  const fila = page.locator("ul.sm\\:hidden > li").locator("visible=true").first();
+  if (await fila.count()) { await fila.click({ timeout: 8000 }).catch(() => {}); }
+  else {
+    const l = page.locator('a[href^="/clientes/"]').locator("visible=true").first();
     if (!(await l.count())) return false;
     await l.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(6000);
-    return /\/proveedores\/[^/]+$/.test(page.url());
-  },
-});
-
-// ── Catálogos: las 3 marcas, interna y pública ───────────────────────────────
-// ⚠️ Los FILTROS los está arreglando otro agente: el `div.overflow-x-auto` de
-// `CatalogFilters` se anota pero NO cuenta como hallazgo mío (queda marcado en
-// el JSON por su etiqueta). Lo que se mide acá es el resto: grilla, tarjetas,
-// carrito y detalle de producto.
-pant({ id: "catalogos-hub", titulo: "Catálogos › Hub de marcas", url: "/catalogos/marcas", espera: 8000 });
-for (const m of ["reebok", "joybees", "tommy"]) {
-  pant({ id: `catalogo-${m}`, titulo: `Catálogo interno › ${m}`, url: `/catalogo/${m}`, espera: 13000 });
-  pant({ id: `catalogo-pub-${m}`, titulo: `Catálogo público › ${m}`, url: `/catalogo-publico/${m}`, espera: 13000 });
-  // El detalle de producto NO es una pantalla aparte: la grilla usa tarjetas
-  // agrupadas que se despliegan en su lugar, sin navegar. Se mide en la grilla.
-}
+  }
+  await page.waitForTimeout(6000);
+  return /\/clientes\/[^/]+$/.test(page.url());
+} });
 
 // ── Corrida ──────────────────────────────────────────────────────────────────
 

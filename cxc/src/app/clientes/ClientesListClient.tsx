@@ -200,25 +200,29 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
           />
         ) : (
           <>
-            {/* Desktop: tabla */}
-            <div className="hidden sm:block">
+            {/* Escritorio: tabla. El corte es `lg` y no `sm` porque lo que
+                decide es el ancho ÚTIL, no el de la ventana: la barra lateral se
+                lleva 224 px, así que un iPad de 834 deja 562 y esta tabla pide
+                788 — 226 px de arrastre, medidos en el navegador. Las tarjetas
+                de abajo ya existían; solo se les amplió el tramo. */}
+            <div data-vista="tabla" className="hidden lg:block">
               <ScrollableTable>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                      <th className="py-2 px-3">Código</th>
-                      <th className="py-2 px-3">Nombre</th>
-                      <th className="py-2 px-3 text-right whitespace-nowrap">Compras {anioYtd}</th>
-                      <th className="py-2 px-3">Teléfono</th>
-                      <th className="py-2 px-3">Email</th>
-                      <th className="py-2 px-3">Provincia</th>
+                      <th className="py-2 px-1.5 xl:px-3">Código</th>
+                      <th className="py-2 px-1.5 xl:px-3">Nombre</th>
+                      <th className="py-2 px-1.5 xl:px-3 text-right whitespace-nowrap">Compras {anioYtd}</th>
+                      <th className="py-2 px-1.5 xl:px-3">Teléfono</th>
+                      <th className="py-2 px-1.5 xl:px-3">Email</th>
+                      <th className="py-2 px-1.5 xl:px-3">Provincia</th>
                     </tr>
                   </thead>
                   <tbody>
                     {clientes.map((c) => (
                       <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                        <td className="py-2 px-3 tabular-nums text-gray-500">{c.codigo}</td>
-                        <td className="py-2 px-3 font-medium">
+                        <td className="py-2 px-1.5 xl:px-3 tabular-nums text-gray-500">{c.codigo}</td>
+                        <td className="py-2 px-1.5 xl:px-3 font-medium">
                           <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="hover:underline">
                             {c.nombre}
                           </Link>
@@ -226,23 +230,23 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                         {/* Compras del año. "…" mientras carga; $0.00 en gris
                             cuando de verdad no compró — un cliente en cero es
                             un dato, no un hueco. */}
-                        <td className="py-2 px-3 text-right tabular-nums whitespace-nowrap">
+                        <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums whitespace-nowrap">
                           {(() => {
                             const v = comprasDe(c.codigo);
                             if (v === undefined) return <span className="text-gray-300">…</span>;
                             return <span className={v > 0 ? "text-gray-900" : "text-gray-400"}>${fmt(v)}</span>;
                           })()}
                         </td>
-                        <td className="py-2 px-3 text-gray-600">{(() => {
+                        <td className="py-2 px-1.5 xl:px-3 text-gray-600">{(() => {
                           const tel = c.telefono || c.celular;
                           const href = telHref(tel);
                           return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{tel}</a> : (tel || "—");
                         })()}</td>
-                        <td className="py-2 px-3 text-gray-600 max-w-[14rem] truncate">{(() => {
+                        <td className="py-2 px-1.5 xl:px-3 text-gray-600 max-w-[14rem] truncate">{(() => {
                           const href = mailtoHref(c.email);
                           return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{c.email}</a> : (c.email || "—");
                         })()}</td>
-                        <td className="py-2 px-3 text-gray-600">{c.provincia || "—"}</td>
+                        <td className="py-2 px-1.5 xl:px-3 text-gray-600">{c.provincia || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -250,8 +254,8 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
               </ScrollableTable>
             </div>
 
-            {/* Mobile: card-list (toda la card navega a la ficha) */}
-            <ul className="sm:hidden border-t border-gray-100">
+            {/* Celular e iPad: card-list (toda la card navega a la ficha) */}
+            <ul data-vista="tarjetas" className="border-t border-gray-100 lg:hidden">
               {clientes.map((c) => {
                 const tel = c.telefono || c.celular;
                 const tHref = telHref(tel);
