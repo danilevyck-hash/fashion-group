@@ -21,7 +21,12 @@ interface EntregaRow {
   notas: string | null;
   created_at: string;
   total_por_marca: Record<string, number> | null;
+  /** Correlativo del comprobante. Ausente hasta que corra la migración. */
+  numero?: number | null;
 }
+
+const COLS_BASE = "id, proyecto_id, total, notas, created_at, total_por_marca";
+const COLS_CON_NUMERO = `${COLS_BASE}, numero`;
 
 /** Unidades de un item: `reparto` es un array de tuplas por marca. */
 function unidadesDeItem(reparto: unknown): number {
@@ -44,10 +49,28 @@ export async function cargarComprobantes(
   const out = new Map<string, EntregaMueblePdfData>();
   if (entregaIds.length === 0) return out;
 
-  const { data: entRows, error: entErr } = await supabaseServer
-    .from("mk_entregas_muebles")
-    .select("id, proyecto_id, total, notas, created_at, total_por_marca")
-    .in("id", entregaIds as string[]);
+  // `numero` la agrega la migración 20260730120000. Mientras Daniel no la haya
+  // corrido a mano, pedirla hace fallar el select entero: se reintenta sin ella
+  // y el comprobante cae al número viejo derivado del uuid. El módulo NUNCA se
+  // rompe por una migración pendiente.
+  let entRows: unknown[] | null = null;
+  let entErr: { message: string } | null = null;
+  {
+    const conNumero = await supabaseServer
+      .from("mk_entregas_muebles")
+      .select(COLS_CON_NUMERO)
+      .in("id", entregaIds as string[]);
+    if (conNumero.error) {
+      const sinNumero = await supabaseServer
+        .from("mk_entregas_muebles")
+        .select(COLS_BASE)
+        .in("id", entregaIds as string[]);
+      entRows = sinNumero.data;
+      entErr = sinNumero.error;
+    } else {
+      entRows = conNumero.data;
+    }
+  }
   if (entErr) throw new Error(`cargarComprobantes[entregas]: ${entErr.message}`);
   const entregas = (entRows ?? []) as EntregaRow[];
   if (entregas.length === 0) return out;
@@ -159,6 +182,7 @@ export async function cargarComprobantes(
       (codigo ? nombreCliente.get(codigo) : null) || proy?.tienda || "Sin cliente";
     out.set(String(e.id), {
       entregaId: String(e.id),
+      numero: e.numero ?? null,
       fecha: String(e.created_at ?? ""),
       cliente,
       clienteCodigo: codigo,

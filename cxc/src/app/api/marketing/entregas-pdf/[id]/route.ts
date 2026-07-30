@@ -50,7 +50,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="comprobante-${numeroComprobante(id)}.pdf"`,
+        "Content-Disposition": `inline; filename="comprobante-${numeroComprobante(datos)}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

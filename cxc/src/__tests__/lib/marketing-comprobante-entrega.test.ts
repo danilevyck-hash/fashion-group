@@ -8,9 +8,15 @@
 //      PDF ya generado: si el logo no entra, el test se pone rojo.
 //   2. Que el detalle de los muebles y los montos LLEGUEN al papel — un
 //      comprobante que sale en blanco es peor que no tenerlo.
-//   3. Que el número de comprobante sea estable y derivado del id.
+//   3. Que el número sea SECUENCIAL (ME-0001) y ESTABLE: la misma entrega
+//      abierta dos veces tiene que decir lo mismo, y dos entregas nunca pueden
+//      compartir número.
+//   4. Que lo que Daniel mandó sacar NO vuelva: tienda, firmas, resumen de
+//      unidades, nota del ITBMS y pie de página.
 // ============================================================================
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import {
   buildComprobanteEntregaPdf,
   nombreArchivoComprobante,
@@ -22,6 +28,7 @@ const ENTREGA_ID = "a1e6b971-2f4c-4a9e-9b71-0c1d2e3f4a5b";
 
 const datos: EntregaMueblePdfData = {
   entregaId: ENTREGA_ID,
+  numero: 7,
   fecha: "2026-06-22T16:15:32.586175+00:00",
   cliente: "Jerusalem De Panama",
   clienteCodigo: "D-80",
@@ -49,23 +56,77 @@ function contiene(buf: Buffer, texto: string): boolean {
 }
 
 describe("numeroComprobante", () => {
-  it("es estable y se deriva del id (no de un contador)", () => {
-    expect(numeroComprobante(ENTREGA_ID)).toBe("ME-A1E6B971");
-    expect(numeroComprobante(ENTREGA_ID)).toBe(numeroComprobante(ENTREGA_ID));
+  it("es secuencial y con 4 dígitos, no un hash del uuid", () => {
+    expect(numeroComprobante({ numero: 1, entregaId: ENTREGA_ID })).toBe("ME-0001");
+    expect(numeroComprobante({ numero: 21, entregaId: ENTREGA_ID })).toBe("ME-0021");
+    expect(numeroComprobante({ numero: 1234, entregaId: ENTREGA_ID })).toBe("ME-1234");
   });
 
-  it("ids distintos dan números distintos", () => {
-    expect(numeroComprobante("e8cc66dd-0000-0000-0000-000000000000")).toBe("ME-E8CC66DD");
+  it("ES ESTABLE: la misma entrega da siempre el mismo número", () => {
+    const d = { numero: 7, entregaId: ENTREGA_ID };
+    expect(numeroComprobante(d)).toBe(numeroComprobante(d));
+    // Y no depende del uuid: el número guardado manda.
+    expect(numeroComprobante({ numero: 7, entregaId: "otro-uuid-cualquiera" })).toBe(
+      numeroComprobante(d),
+    );
   });
 
-  it("no revienta con un id vacío", () => {
-    expect(numeroComprobante("")).toBe("ME-00000000");
+  it("SIN REPETIDOS NI HUECOS: 1..9999 dan 9999 números distintos y ordenados", () => {
+    const vistos = new Set<string>();
+    let previo = "";
+    for (let n = 1; n <= 9999; n++) {
+      const s = numeroComprobante({ numero: n, entregaId: ENTREGA_ID });
+      expect(s).toMatch(/^ME-\d{4}$/);
+      expect(vistos.has(s)).toBe(false); // ningún repetido
+      vistos.add(s);
+      // Con padding fijo el orden alfabético es el orden numérico: sin huecos.
+      expect(s > previo).toBe(true);
+      previo = s;
+    }
+    expect(vistos.size).toBe(9999);
+  });
+
+  it("pasado 9999 sigue creciendo en vez de truncarse", () => {
+    expect(numeroComprobante({ numero: 10000, entregaId: ENTREGA_ID })).toBe("ME-10000");
+  });
+
+  it("sin número guardado cae al respaldo del uuid, no a un número repetido", () => {
+    // Mientras la migración no corra, dos entregas distintas siguen dando
+    // números distintos (lo peor sería que todas dijeran ME-0000).
+    expect(numeroComprobante({ numero: null, entregaId: ENTREGA_ID })).toBe("ME-A1E6B971");
+    expect(
+      numeroComprobante({ numero: null, entregaId: "e8cc66dd-0000-0000-0000-000000000000" }),
+    ).toBe("ME-E8CC66DD");
+    expect(numeroComprobante({ entregaId: "" })).toBe("ME-00000000");
   });
 
   it("el nombre de archivo lleva la fecha y el número", () => {
-    expect(nombreArchivoComprobante({ entregaId: ENTREGA_ID, fecha: "2026-06-22" })).toBe(
-      "2026-06-22 · Entrega de mobiliario ME-A1E6B971",
-    );
+    expect(
+      nombreArchivoComprobante({ entregaId: ENTREGA_ID, numero: 7, fecha: "2026-06-22" }),
+    ).toBe("2026-06-22 · Entrega de mobiliario ME-0007");
+  });
+});
+
+describe("la migración que numera las entregas", () => {
+  const sql = fs.readFileSync(
+    path.join(
+      process.cwd(),
+      "supabase/migrations/20260730120000_mk_entregas_muebles_numero.sql",
+    ),
+    "utf8",
+  );
+
+  it("numera lo existente EN ORDEN DE FECHA de entrega", () => {
+    expect(sql).toMatch(/row_number\(\)\s*OVER\s*\(\s*ORDER BY created_at/i);
+  });
+
+  it("deja el número a cargo de una sequence (nada de max+1 en el código)", () => {
+    expect(sql).toMatch(/CREATE SEQUENCE IF NOT EXISTS mk_entregas_muebles_numero_seq/i);
+    expect(sql).toMatch(/SET DEFAULT nextval\('mk_entregas_muebles_numero_seq'\)/i);
+  });
+
+  it("tiene el candado de que nadie repita número", () => {
+    expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS mk_entregas_muebles_numero_key/i);
   });
 });
 
@@ -74,6 +135,7 @@ describe("buildComprobanteEntregaPdf", () => {
     const buf = buildComprobanteEntregaPdf(datos);
     expect(buf.length).toBeGreaterThan(5000);
     expect(crudo(buf).startsWith("%PDF-")).toBe(true);
+    expect((crudo(buf).match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(1);
   });
 
   it("EL LOGO SALE — hay al menos un XObject de imagen en el PDF", () => {
@@ -81,9 +143,9 @@ describe("buildComprobanteEntregaPdf", () => {
     expect(imagenes(buildComprobanteEntregaPdf(datos))).toBeGreaterThanOrEqual(1);
   });
 
-  it("trae el número, el cliente, el código y el proyecto", () => {
+  it("trae el número secuencial, el cliente, el código y el proyecto", () => {
     const buf = buildComprobanteEntregaPdf(datos);
-    expect(contiene(buf, "ME-A1E6B971")).toBe(true);
+    expect(contiene(buf, "ME-0007")).toBe(true);
     expect(contiene(buf, "Jerusalem De Panama")).toBe(true);
     expect(contiene(buf, "D-80")).toBe(true);
     expect(contiene(buf, "Remodelacion")).toBe(true);
@@ -95,15 +157,18 @@ describe("buildComprobanteEntregaPdf", () => {
     expect(contiene(buf, "Barra plana")).toBe(true);
     expect(contiene(buf, "Paneles")).toBe(true);
     expect(contiene(buf, "14,630.00")).toBe(true);
-    // Unidades: 114 + 38 = 152.
-    expect(contiene(buf, "152 unidades")).toBe(true);
   });
 
-  it("trae el bloque de firmas EN BLANCO (el sistema no guarda el receptor)", () => {
+  it("NO trae nada de lo que Daniel mandó sacar", () => {
+    // *"tiene q ser asi de simple"*. Si alguno de estos vuelve, este test avisa.
     const buf = buildComprobanteEntregaPdf(datos);
-    expect(contiene(buf, "Entregado por")).toBe(true);
-    expect(contiene(buf, "Recibido por")).toBe(true);
-    expect(contiene(buf, "CEDULA") || contiene(buf, "C")).toBe(true);
+    expect(contiene(buf, "Jerusalem Pasocanoa")).toBe(false); // la TIENDA
+    expect(contiene(buf, "Recibido por")).toBe(false); // firmas
+    expect(contiene(buf, "Entregado por")).toBe(false);
+    expect(contiene(buf, "Conformidad")).toBe(false);
+    expect(contiene(buf, "unidades en")).toBe(false); // "152 unidades en 2 art."
+    expect(contiene(buf, "ITBMS")).toBe(false); // la nota del impuesto
+    expect(contiene(buf, "fashiongr.com")).toBe(false); // el pie de página
   });
 
   it("una entrega SIN detalle de artículos no sale vacía: muestra el total", () => {
@@ -113,9 +178,10 @@ describe("buildComprobanteEntregaPdf", () => {
     expect(contiene(buf, "14,630.00")).toBe(true);
   });
 
-  it("un proyecto sin código de directorio lo dice, no deja el campo en blanco", () => {
+  it("un proyecto sin código de directorio igual muestra el cliente", () => {
     const buf = buildComprobanteEntregaPdf({ ...datos, clienteCodigo: null });
-    expect(contiene(buf, "Sin vincular al directorio")).toBe(true);
+    expect(contiene(buf, "Jerusalem De Panama")).toBe(true);
+    expect(contiene(buf, "D-80")).toBe(false);
   });
 
   it("sin marca asignada lo dice explícito", () => {
@@ -133,20 +199,18 @@ describe("buildComprobanteEntregaPdf", () => {
     });
     expect(contiene(buf, "Tommy Hilfiger")).toBe(true);
     expect(contiene(buf, "Calvin Klein")).toBe(true);
+    expect(contiene(buf, "3,080.00")).toBe(true);
   });
 
   it("las notas de la entrega salen cuando existen", () => {
-    const buf = buildComprobanteEntregaPdf({ ...datos, notas: "Entrega parcial de la bodega" });
+    const buf = buildComprobanteEntregaPdf({
+      ...datos,
+      notas: "Entrega parcial de la bodega",
+    });
     expect(contiene(buf, "Entrega parcial")).toBe(true);
   });
 
-  it("la fecha de generación va en dd/mm/yyyy, no en formato de EE.UU.", () => {
-    // toLocaleDateString("es-PA") en Node sin ICU devolvía mm/dd/yyyy.
-    const buf = buildComprobanteEntregaPdf(datos);
-    const hoy = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    expect(contiene(buf, `${p(hoy.getDate())}/${p(hoy.getMonth() + 1)}/${hoy.getFullYear()}`)).toBe(
-      true,
-    );
+  it("sin notas no dibuja el bloque de notas", () => {
+    expect(contiene(buildComprobanteEntregaPdf(datos), "NOTAS")).toBe(false);
   });
 });

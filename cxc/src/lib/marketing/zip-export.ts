@@ -728,7 +728,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       concepto: e.notas?.trim() || "Entrega de muebles",
       proveedor: "Mobiliario",
       marca: marcaMueble(e.total_por_marca),
-      numero: datos ? numeroComprobante(e.id) : "",
+      numero: datos ? numeroComprobante(datos) : "",
       subtotal: total,
       partes: partesDeMueble(e.total_por_marca),
       total,
