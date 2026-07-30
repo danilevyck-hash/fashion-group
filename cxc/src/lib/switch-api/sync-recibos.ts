@@ -38,6 +38,8 @@ import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import { fechaPanamaDe } from "@/lib/fecha-panama";
 import { supabaseServer } from "../supabase-server";
+import { particionarFilas } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchClient } from "./client";
 import { empresasConRecibos } from "./empresas";
 import { diffRecibos, type ReciboExistente } from "./recibos-diff";
@@ -170,11 +172,27 @@ async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: stri
   return (data as { id: string }).id;
 }
 
-async function finishLog(logId: string | null, status: "success" | "error", n: number, err?: string): Promise<void> {
+async function finishLog(
+  logId: string | null,
+  status: "success" | "error",
+  n: number,
+  err?: string,
+  // Los descartes del guard de montos. De acá sale el anti-loop del aviso: sin
+  // persistirlos, el recordatorio volvería a sonar en cada corrida.
+  skipDetails?: unknown[],
+): Promise<void> {
   if (!logId) return;
   await supabaseServer
     .from("switch_sync_log")
-    .update({ status, finished_at: new Date().toISOString(), records_inserted: n, error_message: err ?? null })
+    .update({
+      status,
+      finished_at: new Date().toISOString(),
+      records_inserted: n,
+      error_message: err ?? null,
+      ...(skipDetails && skipDetails.length > 0
+        ? { records_skipped: skipDetails.length, skip_details: skipDetails }
+        : {}),
+    })
     .eq("id", logId);
 }
 
@@ -443,19 +461,66 @@ export async function syncEmpresaRecibos(
     logId = await createLog(empresaKey, meses, triggeredBy);
     const { impuestoMap, carteraMap } = await cargarMapasRecibos(empresaKey, meses);
 
+    // Guard de montos imposibles: el total de un recibo es la base de la
+    // comisión sobre cobro. Un umbral por corrida, calibrado contra el
+    // histórico de cobros de ESTA empresa.
+    const umbralRecibo = await calibrarUmbral("recibo", empresaKey);
+    const rechazadasRecibo: Array<
+      ReturnType<typeof particionarFilas<ReturnType<typeof mapRow>>>["rechazadas"][number]
+    > = [];
+
     let totalRecibos = 0;
     let totalInsertadas = 0;
     let totalBorradas = 0;
     let totalSinCambio = 0;
     for (const { year, month } of meses) {
-      const rows = await fetchRecibosMes(empresaKey, year, month, impuestoMap, carteraMap);
+      const crudas = await fetchRecibosMes(empresaKey, year, month, impuestoMap, carteraMap);
       const { inicio, finExcl } = monthBounds(year, month);
+
+      // Un recibo con monto imposible no entra. Los demás del mes sí — una fila
+      // mala no tumba el sync.
+      const { buenas: rows, rechazadas } = particionarFilas(
+        "recibo",
+        crudas,
+        umbralRecibo,
+        (f) => `${f.fecha ?? "sin fecha"} · ${f.cliente_nombre ?? "sin cliente"}`,
+      );
+      if (rechazadas.length > 0) {
+        rechazadasRecibo.push(...rechazadas);
+        console.error(
+          `[sync-recibos ${empresaKey}] ${rechazadas.length} recibo(s) con monto IMPOSIBLE (umbral ${umbralRecibo}) — no se guardaron`,
+          rechazadas.map((r) => r.clave),
+        );
+      }
 
       // Reemplazo del mes calculado, no a ciegas: se escriben solo las
       // diferencias contra lo guardado. El conjunto final es idéntico al del
       // DELETE+INSERT completo (demostración en recibos-diff.ts).
       const guardadas = await leerMesGuardado(empresaKey, inicio, finExcl);
-      const { insertar, borrarIds, sinCambio } = diffRecibos(guardadas, rows);
+      const { insertar, borrarIds: borrarCrudos, sinCambio } = diffRecibos(guardadas, rows);
+
+      // ⚠️ SIN ESTO EL GUARD SERÍA DESTRUCTIVO. `total` entra en la identidad
+      // del diff, así que el recibo cuya cifra vino corrupta no se parea con su
+      // fila guardada y esa fila —la que tiene el ÚLTIMO VALOR BUENO— caería en
+      // `borrarIds`. Rechazar el dato malo terminaría BORRANDO el bueno, que es
+      // justo lo contrario de lo que el guard existe para hacer. Se protege la
+      // fila guardada del recibo rechazado (misma fecha y mismo cliente).
+      const clavesRechazadas = new Set(
+        rechazadas.map((r) => `${r.fila.fecha}|${r.fila.cliente_switch_id}|${r.fila.cliente_nombre}`),
+      );
+      const protegidos = new Set(
+        guardadas
+          .filter((g) => clavesRechazadas.has(`${g.fecha}|${g.cliente_switch_id}|${g.cliente_nombre}`))
+          .map((g) => g.id),
+      );
+      const borrarIds = protegidos.size > 0
+        ? borrarCrudos.filter((id) => !protegidos.has(id))
+        : borrarCrudos;
+      if (protegidos.size > 0) {
+        console.error(
+          `[sync-recibos ${empresaKey}] ${protegidos.size} recibo(s) guardado(s) protegidos del borrado (su versión nueva vino con monto imposible)`,
+        );
+      }
 
       // Las BAJAS primero (recibos que Switch anuló/borró y modificaciones), en
       // lotes: la lista de uuids viaja en el query string.
@@ -478,7 +543,32 @@ export async function syncEmpresaRecibos(
     // escrito: es lo que muestran /api/sync-status y el panel "Actualizar
     // ahora" ("N recibos sincronizados"). Cambiarlo por las filas escritas
     // haría parecer que el sync dejó de traer datos.
-    await finishLog(logId, "success", totalRecibos);
+    await finishLog(
+      logId,
+      "success",
+      totalRecibos,
+      undefined,
+      rechazadasRecibo.length > 0
+        ? detallesDeRechazo("recibo", rechazadasRecibo, umbralRecibo)
+        : undefined,
+    );
+
+    // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+    if (rechazadasRecibo.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "recibo",
+          empresaKey,
+          syncType: "recibos",
+          rechazadas: rechazadasRecibo,
+          umbral: umbralRecibo,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[sync-recibos ${empresaKey}] no pude avisar el monto imposible: ${String(e)}`);
+      }
+    }
+
     return {
       empresaKey,
       ok: true,

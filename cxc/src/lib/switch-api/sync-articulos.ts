@@ -12,6 +12,8 @@ import { createSwitchClient } from "./client";
 import { supabaseServer } from "@/lib/supabase-server";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { esCostoSospechoso } from "./costo-guard";
+import { particionarFilas } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 import { enviarNegocio } from "@/lib/alertas/canal";
 
@@ -22,6 +24,8 @@ export interface ArticulosSyncResult {
   dias: number;
   filas: number;
   costosSospechosos: number;
+  /** Filas descartadas por el guard de montos imposibles (venta o costo). */
+  montosImposibles: number;
 }
 
 const SUCURSAL_ID = 1; // PRINCIPAL (única en todas las empresas)
@@ -88,8 +92,12 @@ export async function syncArticulosDiario(
   });
 
   try {
-    const result = await syncArticulosDiarioInner(empresaKey, desde, hasta);
-    await finishSwitchSyncLog(logId, "success", { updated: result.filas });
+    const result = await syncArticulosDiarioInner(empresaKey, desde, hasta, logId);
+    await finishSwitchSyncLog(logId, "success", {
+      updated: result.filas,
+      skipped: result.montosImposibles,
+      skipDetails: result.skipDetails,
+    });
     return result;
   } catch (err) {
     await finishSwitchSyncLog(logId, "error", {
@@ -103,12 +111,26 @@ async function syncArticulosDiarioInner(
   empresaKey: string,
   desde: string,
   hasta: string,
-): Promise<ArticulosSyncResult> {
+  logId: string | null,
+): Promise<ArticulosSyncResult & { skipDetails?: unknown[] }> {
   const client = createSwitchClient(empresaKey);
   const now = new Date().toISOString();
   let dias = 0;
   let filas = 0;
   const sospechosos: CostoSospechoso[] = [];
+
+  // ⚠️ ARREGLO DE LA ASIMETRÍA. `esCostoSospechoso` mira el COSTO y deja pasar
+  // la VENTA de la misma fila sin mirarla: con la venta corrupta el margen
+  // queda igual de reventado y el guard no se entera. El guard compartido mira
+  // la fila entera (venta_total Y costo_total) con el umbral relativo de la
+  // tabla. Los dos guards conviven y hacen cosas distintas:
+  //   • `esCostoSospechoso` = costo mal cargado en Switch → se guarda costo $0
+  //     y avisa por 📊 NEGOCIO (texto de Daniel, no se toca).
+  //   • el guard de montos = cifra IMPOSIBLE de la fuente → la fila NO se
+  //     escribe (el upsert conserva el último valor bueno) y avisa por
+  //     🔧 SISTEMA. Las demás filas del día se guardan igual.
+  const umbralArticulo = await calibrarUmbral("articulo_diario", empresaKey);
+  const rechazadasArticulo: Array<ReturnType<typeof particionarFilas<Record<string, unknown>>>["rechazadas"][number]> = [];
 
   for (const fecha of dateRange(desde, hasta)) {
     dias++;
@@ -154,11 +176,26 @@ async function syncArticulosDiarioInner(
     }
     if (byKey.size === 0) continue;
 
+    const { buenas, rechazadas } = particionarFilas(
+      "articulo_diario",
+      [...byKey.values()],
+      umbralArticulo,
+      (f) => `${f.fecha} · ${f.codigo ?? f.articulo_id} [${f.tipo}]`,
+    );
+    if (rechazadas.length > 0) {
+      rechazadasArticulo.push(...rechazadas);
+      console.error(
+        `[sync-articulos] ${empresaKey} ${fecha}: ${rechazadas.length} fila(s) con monto IMPOSIBLE (umbral ${umbralArticulo}) — no se guardaron`,
+        rechazadas.map((r) => r.clave),
+      );
+    }
+    if (buenas.length === 0) continue;
+
     const { error } = await supabaseServer
       .from("switch_articulo_diario")
-      .upsert([...byKey.values()], { onConflict: "empresa_key,fecha,articulo_id,tipo" });
+      .upsert(buenas, { onConflict: "empresa_key,fecha,articulo_id,tipo" });
     if (error) throw new Error(`upsert ${empresaKey} ${fecha}: ${error.message}`);
-    filas += byKey.size;
+    filas += buenas.length;
   }
 
   if (sospechosos.length > 0) {
@@ -166,5 +203,32 @@ async function syncArticulosDiarioInner(
     await alertarCostosSospechosos(empresaKey, sospechosos);
   }
 
-  return { empresaKey, desde, hasta, dias, filas, costosSospechosos: sospechosos.length };
+  // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+  let skipDetails: unknown[] | undefined;
+  if (rechazadasArticulo.length > 0) {
+    skipDetails = detallesDeRechazo("articulo_diario", rechazadasArticulo, umbralArticulo);
+    try {
+      await avisarMontosImposibles({
+        familia: "articulo_diario",
+        empresaKey,
+        syncType: "articulos",
+        rechazadas: rechazadasArticulo,
+        umbral: umbralArticulo,
+        logId,
+      });
+    } catch (e) {
+      console.error(`[sync-articulos] ${empresaKey}: no pude avisar el monto imposible: ${String(e)}`);
+    }
+  }
+
+  return {
+    empresaKey,
+    desde,
+    hasta,
+    dias,
+    filas,
+    costosSospechosos: sospechosos.length,
+    montosImposibles: rechazadasArticulo.length,
+    skipDetails,
+  };
 }
