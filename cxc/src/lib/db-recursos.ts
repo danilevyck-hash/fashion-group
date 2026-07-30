@@ -219,6 +219,10 @@ export const UMBRALES: Umbrales = {
   // killer (la métrica node_vmstat_oom_kill lo confirmaría después del hecho).
   memoriaDisponiblePctAviso: 20,
   memoriaDisponiblePctCritico: 10,
+  // ⛔ Los umbrales de swap quedan declarados pero YA NO SE APLICAN: el swap no
+  // genera hallazgos (ver el comentario en evaluarRecursos). Se conservan para no
+  // romper la forma de `Umbrales` ni los tests de coherencia aviso<crítico.
+  //
   // Swap 40→70 aviso y 70→85 crítico (30-jul-2026). El 40 generaba RUIDO PURO:
   // Daniel recibió "🟡 Memoria de emergencia en uso: 42%" con la base
   // perfectamente sana, y encima lo leyó como falta de ESPACIO (acababa de pagar
@@ -310,18 +314,25 @@ export function evaluarRecursos(
       "menor",
       (v) => `MEMORIA apretada: solo queda ${un(v)}% de memoria libre`,
     ),
-    revisar(
-      "swap",
-      m.swapUsadoPct,
-      u.swapUsadoPctAviso,
-      u.swapUsadoPctCritico,
-      "mayor",
-      // Dice "MEMORIA" y no deja lugar a leerlo como espacio de almacenamiento:
-      // el 30-jul-2026 el texto viejo ("Memoria de emergencia en uso: 42%") se
-      // entendió como que la base se quedaba sin espacio, con el disco al 92 %
-      // libre y la base en 270 MB de 8 GB.
-      (v) => `MEMORIA apretada: la base ya usa ${un(v)}% de la memoria de respaldo`,
-    ),
+    // ⛔ SWAP: NO ALERTA. Decisión de Daniel (30-jul-2026): "solo arriba del 80%
+    // de memoria, no del 42%. Al 42% no se avisa nada". Sigue MEDIDO y visible en
+    // el bloque de estado del mensaje (es contexto útil cuando algo pasa), pero
+    // ya no genera hallazgos.
+    //
+    // Por qué es la métrica correcta para callar, y no solo una orden que se
+    // acata: el swap usado es una marca de marea ALTA y PEGAJOSA — el kernel no
+    // trae de vuelta las páginas hasta que alguien las pide, así que el
+    // porcentaje sube y casi nunca baja (13,5 % el 27-jul → 40,3 % el 30-jul, sin
+    // ningún incidente en el medio). Alertar sobre una métrica monótona es
+    // garantizar una alerta que, una vez que suena, suena para siempre: eso fue
+    // exactamente lo que pasó (🟡 al 41-42 % los días 28, 29 y 30 con la base
+    // sana, memoria disponible 53,3 % y `node_vmstat_oom_kill` en 0).
+    //
+    // Lo que SÍ queda vigilando la memoria es `memoriaDisponiblePct` (aviso <20 %
+    // = más del 80 % usado, que es el umbral que pidió Daniel; crítico <10 %).
+    // El episodio REAL del 26-jul entra por ahí: durante la caída la memoria
+    // estaba en el piso y la carga disparada (ver el test "la caída del 26-jul se
+    // habría detectado antes de los 521"), no hacía falta el swap para verlo.
     revisar(
       "disco",
       m.discoDisponiblePct,

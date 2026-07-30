@@ -46,6 +46,7 @@ import {
 import {
   empresasConFacturas,
   empresasConEstadoCuenta,
+  empresasConEstadoCuentaEnCron,
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -174,7 +175,13 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // mismo que "cartera del grupo" — confecciones_boston trae saldos (para su
   // pestaña aparte) pero tiene `cxc:false` y no suma a ningún total del grupo.
   // En tipo=all, american_classic hace solo facturas+costo.
-  const cxcSet = new Set<EmpresaKey>(empresasConEstadoCuenta());
+  //
+  // ...EnCron excluye a las empresas cuyo estado de cuenta no cabe en el techo de
+  // la función (hoy: confecciones_boston, 4.912 clientes ≈ 54 min vs 800 s). Sin
+  // esto el run de las 06:30 moría SIEMPRE y se llevaba puesto el heartbeat de
+  // american_classic, que en el mismo run sincronizaba bien. Ver
+  // EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON en switch-api/empresas.ts.
+  const cxcSet = new Set<EmpresaKey>(empresasConEstadoCuentaEnCron());
 
   const runFacturas = async (empresaKey: EmpresaKey) => {
     try { results.push(await syncEmpresaFacturas(empresaKey, { desde, hasta, triggeredBy })); }
