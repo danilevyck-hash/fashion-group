@@ -42,11 +42,17 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 // primero donde vuelven las píldoras. Medir solo 834 y 1440 habría dejado sin
 // mirar justo el ancho donde el arreglo se puede romper. 1180 = iPad Pro 11"
 // horizontal, el aparato real más ancho que cae del lado de las píldoras.
+// 1280 y 1366 entraron el 30-jul-2026 porque son LAS LAPTOPS EN JUEGO: al
+// discutir si el corte se corría a `xl` (1280), la pregunta era qué le pasa a
+// un MacBook Air de 1280 lógico y a un portátil de 1366. Sin esos dos números
+// la decisión se toma a ojo.
 const TAMANOS = [
   { nombre: "390", width: 390, height: 844, movil: true },
   { nombre: "834", width: 834, height: 1194, movil: true },
   { nombre: "1024", width: 1024, height: 768, movil: true },
   { nombre: "1180", width: 1180, height: 820, movil: true },
+  { nombre: "1280", width: 1280, height: 800, movil: false },
+  { nombre: "1366", width: 1366, height: 768, movil: false },
   { nombre: "1440", width: 1440, height: 900, movil: false },
 ];
 

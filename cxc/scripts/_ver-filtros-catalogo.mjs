@@ -15,11 +15,15 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 const MARCAS = ["reebok", "joybees", "tommy"];
 // 1024 es el BORDE: el primer ancho donde vuelven las píldoras al cortar en
 // `lg`. Se captura para poder mirar con los ojos lo que dice el número.
+// 1280 y 1366 son LAS LAPTOPS: hay que poder mirar con los ojos que no
+// cambiaron de aspecto, no solo que el número dé 0.
 const TAMANOS = [
   { nombre: "390-iphone", width: 390, height: 844, abrir: true },
   { nombre: "834-ipad", width: 834, height: 1194, abrir: true },
   { nombre: "1024-ipad-horizontal", width: 1024, height: 768, abrir: false },
   { nombre: "1180-ipad-pro", width: 1180, height: 820, abrir: false },
+  { nombre: "1280-laptop", width: 1280, height: 800, abrir: false },
+  { nombre: "1366-laptop", width: 1366, height: 768, abrir: false },
   { nombre: "1440-escritorio", width: 1440, height: 900, abrir: false },
 ];
 
