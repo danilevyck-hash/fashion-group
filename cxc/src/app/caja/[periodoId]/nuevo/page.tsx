@@ -239,7 +239,7 @@ function NuevoGastoPage() {
         <div className="max-w-3xl mx-auto px-5 sm:px-9 pt-6 pb-28">
           <button
             onClick={backToDetail}
-            className="inline-flex items-center gap-1 text-xs mb-5 transition-colors"
+            className="inline-flex min-h-[44px] items-center gap-1 text-xs mb-2 -mt-2 transition-colors"
             style={{ color: "var(--caja-fg-muted)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-fg-strong)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}

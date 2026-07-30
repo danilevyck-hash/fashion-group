@@ -326,7 +326,7 @@ export default function PeriodoList({
                     <button
                       onClick={(e) => { stop(e); onPrintPeriodo(p.id); }}
                       title="Imprimir"
-                      className="caja-row-action text-xs px-2 h-7 rounded-md"
+                      className="caja-row-action inline-flex min-h-[44px] items-center text-xs px-2 rounded-md"
                       style={{
                         color: "var(--caja-fg-muted)",
                         border: "1px solid transparent",
@@ -339,7 +339,7 @@ export default function PeriodoList({
                       <button
                         onClick={(e) => { stop(e); onClosePeriodo(p.id); }}
                         title="Cerrar período"
-                        className="caja-row-action text-xs px-2 h-7 rounded-md"
+                        className="caja-row-action inline-flex min-h-[44px] items-center text-xs px-2 rounded-md"
                         style={{
                           color: "var(--caja-fg-muted)",
                           border: "1px solid transparent",
