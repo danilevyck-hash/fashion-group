@@ -94,6 +94,33 @@ const EXCEPCIONES: Record<string, string> = {
     "menú de Actualizar ahora — sin medir, /ventas caído el día del barrido",
   "app/admin/components/PanelCxcMobile.tsx":
     "menú Acciones de CXC móvil — sin medir, /admin caído el día del barrido",
+
+  // ⚠️ DEUDA, y de otra clase que las de arriba: a estos dos el barrido NUNCA
+  // LOS VIO. Nacieron en el #355 (encabezado de Comisiones 481px → 193px), que
+  // entró a main DESPUÉS de que esta rama saliera — así que no es una decisión
+  // que se tomó, es una que no se llegó a tomar, y main quedó ROJO al mergear.
+  //
+  // Revisados en el fuente: **ninguno de los dos tiene hoy un ancestro que
+  // recorte** (fila 1 `flex items-center gap-1 border-b`, fila 2
+  // `flex flex-wrap items-center`, y `<main>` sin overflow), y los dos anclan
+  // hacia adentro de la pantalla — `right-0` el ⓘ, que vive pegado al borde
+  // derecho con `ml-auto`, y `left-0` el de período, que es el control más a la
+  // izquierda con un panel de 276px sobre 358px útiles en un iPhone. O sea que
+  // muy probablemente estén sanos. **Pero probable no es medido**, y Comisiones
+  // es una pantalla de plata. Cuando la base respire:
+  //   1. `node scripts/_medir-desplegables.mjs` con SOLO=comisiones
+  //   2. si sale ROTO → <DesplegableFlotante> y borrar la excepción.
+  //
+  // 🩸 OJO al portar el ⓘ: su panel se esconde con `hidden` y NO se desmonta, a
+  // propósito. Adentro vive el <SyncStatus> que consulta la frescura al cargar
+  // la página para poder encender el punto ámbar. `DesplegableFlotante` hace
+  // `return null` cuando está cerrado, así que un port directo desmonta el
+  // SyncStatus y **el aviso solo aparecería después de abrir el ⓘ — o sea,
+  // nunca**. Hay que sacar el SyncStatus del panel antes de portarlo.
+  "components/ventas/ComisionesCriterios.tsx":
+    "ⓘ Criterios de Comisiones — nació en el #355, el barrido no lo vio; sin medir",
+  "components/ventas/ComisionesPeriodo.tsx":
+    "selector de período de Comisiones — nació en el #355, el barrido no lo vio; sin medir",
 };
 
 interface Sospechoso {
@@ -156,6 +183,8 @@ describe("Las excepciones siguen siendo las que se decidieron", () => {
       "app/guias/components/ClienteTypeahead.tsx",
       "components/shared/SyncNowButton.tsx",
       "components/ui.tsx",
+      "components/ventas/ComisionesCriterios.tsx",
+      "components/ventas/ComisionesPeriodo.tsx",
       "lib/catalogo/marcas-ui.tsx",
     ]);
     for (const motivo of Object.values(EXCEPCIONES)) {
