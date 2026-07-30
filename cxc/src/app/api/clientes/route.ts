@@ -35,6 +35,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { idsFueraDelDirectorio, sinClientesFueraDelDirectorio } from "@/lib/clientes/directorio-exclusiones";
 
 export const dynamic = "force-dynamic";
 
@@ -88,9 +89,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  // Fuera del Directorio los clientes EXCLUSIVOS de las empresas listadas en
+  // `EMPRESAS_FUERA_DEL_DIRECTORIO` (hoy: Boston). El criterio y su porqué viven
+  // en UN solo lugar — `lib/clientes/directorio-exclusiones` — no acá.
+  // Va antes de la búsqueda y del conteo, así que `total` ya sale sin ellos.
+  const visibles = sinClientesFueraDelDirectorio(filas, await idsFueraDelDirectorio());
+
   const filtrados = q
-    ? filas.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
-    : filas;
+    ? visibles.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
+    : visibles;
 
   // Orden de presentación: por nombre, con collation española (ñ y acentos en
   // su lugar). Es el mismo criterio que mostraba la pantalla antes.
