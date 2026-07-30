@@ -179,6 +179,95 @@ export function planLimpiezaFotos(
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BORRAR LAS ALTERNATIVAS DEL BANCO — decisión de Daniel, 30-jul-2026.
+//
+// Textual, reafirmado tras advertirle dos veces que pierde la posibilidad de
+// cambiar la foto: "sobre las fotos de tommy que hay varias opciones y una
+// seleccionada para mostrar al catalogo, ya escogi la que utilizare, asi que ya
+// no necesito tenerla como opcion. solo ayudame a borrar las fotos esas".
+//
+// 🩸 EL PELIGRO, MEDIDO ANTES DE ESCRIBIR UNA LÍNEA: "borrar las variantes de un
+// SKU" es una frase que suena inofensiva y NO lo es. En Tommy, **383 de las 468
+// fotos elegidas VIVEN dentro de `_v/`** — el selector guarda en `image_url` la
+// ruta de la variante elegida, no una copia aparte. Barrer la carpeta entera
+// habría borrado la foto que el catálogo muestra en 383 de 490 productos.
+// Por eso la unidad NO es la carpeta: es el OBJETO, y la foto elegida se salva
+// una por una comparando la ruta exacta.
+//
+// SEGURA POR CONSTRUCCIÓN — solo se borra la alternativa de un SKU que ya tiene
+// una foto elegida VIVA. "Viva" = `image_url` apunta a un objeto que EXISTE de
+// verdad en Storage; que la columna traiga una ruta no prueba que el archivo
+// esté ahí. De ahí sale la garantía que importa: después de esto, **ningún
+// producto puede quedar sin foto**, porque a cada SKU que pierde alternativas le
+// queda su elegida, y a los que no tienen elegida NO se les toca nada.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PlanBorradoAlternativas {
+  /** Alternativas del banco a borrar (nunca la elegida). */
+  aBorrar: FotoClasificada[];
+  bytesLiberados: number;
+  /** SKUs cuyas variantes se conservan porque NO tienen foto elegida viva. */
+  skusProtegidos: string[];
+  abortado: string | null;
+}
+
+/**
+ * Alternativas del banco de variantes que se pueden borrar.
+ *
+ * @param objetos   todo lo que hay bajo `{prefijo}/`
+ * @param productos TODAS las filas de la marca
+ * @param prefijo   raíz de la marca en el bucket
+ */
+export function planBorradoAlternativas(
+  objetos: readonly ObjetoStorage[],
+  productos: readonly ProductoConFoto[],
+  prefijo: string,
+): PlanBorradoAlternativas {
+  const vacio: PlanBorradoAlternativas = {
+    aBorrar: [], bytesLiberados: 0, skusProtegidos: [], abortado: null,
+  };
+  if (objetos.length === 0) return vacio;
+  // Mismo guard anti-catástrofe que planLimpiezaFotos: sin filas no se borra nada.
+  if (productos.length === 0) return { ...vacio, abortado: "sin productos que comparar" };
+
+  const existentes = new Set(objetos.map((o) => o.path));
+  /** skuStorage → ruta de su foto elegida, SOLO si el archivo existe. */
+  const elegidaViva = new Map<string, string>();
+  const porStorage = new Map<string, ProductoConFoto>();
+  for (const p of productos) {
+    const key = normalizarSkuStorage(p.sku ?? "");
+    if (!key) continue;
+    porStorage.set(key, p);
+    const elegida = pathDeImageUrl(p.image_url);
+    if (elegida && existentes.has(elegida)) elegidaViva.set(key, elegida);
+  }
+
+  const aBorrar: FotoClasificada[] = [];
+  const protegidos = new Set<string>();
+  for (const o of objetos) {
+    const varKey = skuStorageDeVariante(o.path, prefijo);
+    if (!varKey) continue;                       // no es del banco → no es asunto de esta función
+    const elegida = elegidaViva.get(varKey);
+    if (!elegida) {
+      // Sin foto elegida viva (o SKU que ya no existe): se queda TODO. Borrarlas
+      // dejaría al producto sin ninguna imagen y sin manera de recuperarla.
+      const p = porStorage.get(varKey);
+      protegidos.add(p?.sku ?? varKey);
+      continue;
+    }
+    if (o.path === elegida) continue;            // ES la elegida — jamás se borra
+    aBorrar.push({ ...o, clase: "banco-vivo", sku: porStorage.get(varKey)?.sku ?? null });
+  }
+
+  return {
+    aBorrar,
+    bytesLiberados: aBorrar.reduce((s, f) => s + (f.bytes || 0), 0),
+    skusProtegidos: [...protegidos].sort(),
+    abortado: null,
+  };
+}
+
 /** Conteo y bytes por clase — para el informe. */
 export function resumenPorClase(fotos: readonly FotoClasificada[]): Record<ClaseFoto, { n: number; bytes: number }> {
   const out: Record<ClaseFoto, { n: number; bytes: number }> = {

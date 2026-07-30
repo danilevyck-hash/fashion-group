@@ -8,8 +8,16 @@
 // modal, sin botón Guardar — optimista + toast corto, y si el server falla se
 // revierte y se avisa.
 //
-// Si el SKU no tiene variantes guardadas el botón sale deshabilitado con el
-// tooltip "Sube el ZIP del B2B para ver más fotos".
+// Si el SKU no tiene alternativas guardadas, NO se pinta nada.
+//
+// 🩸 Antes salía un botón "Cambiar foto" deshabilitado (opacidad 40%) con el
+// tooltip "Sube el ZIP del B2B para ver más fotos". Eso dejó de tener sentido el
+// 30-jul-2026, cuando Daniel mandó borrar las alternativas del banco: el ZIP ya
+// se subió, él ya eligió su foto, y el consejo del tooltip es imposible de
+// seguir. Un control muerto que no se puede activar y que aconseja algo que ya
+// se hizo es peor que no mostrar nada — ocupa lugar, se ve como un error y
+// promete una acción que no existe. Cuando SÍ hay alternativas el botón aparece
+// igual que siempre.
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -113,18 +121,8 @@ export function VariantePicker({
     ? "px-3 py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition whitespace-nowrap"
     : "w-full py-2 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50 active:scale-[0.97] transition";
 
-  if (!tieneVariantes) {
-    return (
-      <button
-        type="button"
-        disabled
-        title="Sube el ZIP del B2B para ver más fotos"
-        className={`${btnBase} opacity-40 cursor-not-allowed`}
-      >
-        Cambiar foto
-      </button>
-    );
-  }
+  // Sin alternativas no hay nada que elegir → no se pinta ningún control.
+  if (!tieneVariantes) return null;
 
   return (
     <div className={compacto ? "" : "w-full"}>
@@ -141,10 +139,14 @@ export function VariantePicker({
         <div className="mt-2">
           {cargando && <p className="text-[11px] text-gray-400">Cargando fotos…</p>}
           {error && <p className="text-[11px] text-[#E4002B]">{error}</p>}
-          {variantes && variantes.length === 0 && !cargando && (
+          {/* "Más fotos" = fotos DISTINTAS a la puesta. Tras la limpieza del
+              30-jul-2026 a muchos SKU les queda una sola guardada, que es
+              justamente la que ya se está usando: ofrecerla como si fuera una
+              opción sería mentir. */}
+          {variantes && !cargando && variantes.every((v) => v.vista === vistaActual) && (
             <p className="text-[11px] text-gray-400">Este código no tiene más fotos guardadas.</p>
           )}
-          {variantes && variantes.length > 0 && (
+          {variantes && variantes.some((v) => v.vista !== vistaActual) && (
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5">
               {variantes.map((v) => {
                 const activa = v.vista === vistaActual;

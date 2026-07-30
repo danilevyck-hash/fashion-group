@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import {
   planLimpiezaFotos,
+  planBorradoAlternativas,
   resumenPorClase,
   pathDeImageUrl,
   candidatosSkuStorageDeRaiz,
@@ -167,6 +168,101 @@ describe("guard anti-catástrofe", () => {
       expect(f.path.startsWith("tommy/_v/")).toBe(false);
     }
     expect(plan.aBorrar.map((f) => f.path)).toEqual(["tommy/1785356800000-DEF.jpg"]);
+  });
+});
+
+describe("planBorradoAlternativas — Daniel ya eligió su foto (30-jul-2026)", () => {
+  it("🩸 LA ELEGIDA VIVE DENTRO DE _v/ Y NO SE BORRA (383 de 468 fotos de Tommy son así)", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/_v/abc/1.jpg"), obj("tommy/_v/abc/6.jpg"), obj("tommy/_v/abc/13.jpg")],
+      [{ sku: "ABC", image_url: "product-images/tommy/_v/abc/6.jpg?v=9" }],
+      P,
+    );
+    expect(plan.aBorrar.map((f) => f.path)).toEqual(["tommy/_v/abc/1.jpg", "tommy/_v/abc/13.jpg"]);
+    expect(plan.aBorrar.map((f) => f.path)).not.toContain("tommy/_v/abc/6.jpg");
+  });
+
+  it("un SKU SIN foto elegida conserva TODAS sus variantes (si no, queda sin ninguna imagen)", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/_v/sinfoto/1.jpg"), obj("tommy/_v/sinfoto/2.jpg")],
+      [{ sku: "SINFOTO", image_url: null }],
+      P,
+    );
+    expect(plan.aBorrar).toEqual([]);
+    expect(plan.skusProtegidos).toContain("SINFOTO");
+  });
+
+  it("la elegida tiene que EXISTIR en Storage: si image_url apunta a la nada, no se borra nada", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/_v/abc/1.jpg"), obj("tommy/_v/abc/6.jpg")],
+      [{ sku: "ABC", image_url: "product-images/tommy/borrada-hace-tiempo.jpg" }],
+      P,
+    );
+    expect(plan.aBorrar).toEqual([]);
+    expect(plan.skusProtegidos).toContain("ABC");
+  });
+
+  it("la elegida puede vivir en la RAÍZ: entonces sí se borra el banco entero de ese SKU", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/1785357259071-ABC.jpg"), obj("tommy/_v/abc/1.jpg"), obj("tommy/_v/abc/6.jpg")],
+      [{ sku: "ABC", image_url: "product-images/tommy/1785357259071-ABC.jpg" }],
+      P,
+    );
+    expect(plan.aBorrar.map((f) => f.path)).toEqual(["tommy/_v/abc/1.jpg", "tommy/_v/abc/6.jpg"]);
+  });
+
+  it("NO toca nada fuera de _v/ (de la raíz se encarga planLimpiezaFotos)", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/abc.jpg"), obj("tommy/1785356800000-ABC.jpg"), obj("tommy/_v/abc/1.jpg")],
+      [{ sku: "ABC", image_url: "product-images/tommy/abc.jpg" }],
+      P,
+    );
+    expect(plan.aBorrar.every((f) => f.path.startsWith("tommy/_v/"))).toBe(true);
+  });
+
+  it("variantes de un SKU que ya no existe en la tabla: se conservan (huérfanas)", () => {
+    const plan = planBorradoAlternativas(
+      [obj("tommy/_v/muerto/1.jpg"), obj("tommy/_v/muerto/2.jpg")],
+      [{ sku: "ABC", image_url: "tommy/abc.jpg" }],
+      P,
+    );
+    expect(plan.aBorrar).toEqual([]);
+  });
+
+  it("guard anti-catástrofe: sin productos no se borra NADA", () => {
+    const plan = planBorradoAlternativas([obj("tommy/_v/abc/1.jpg")], [], P);
+    expect(plan.abortado).toBe("sin productos que comparar");
+    expect(plan.aBorrar).toEqual([]);
+  });
+
+  it("INVARIANTE: después de borrar, todo producto que tenía foto la SIGUE teniendo", () => {
+    const productos = [
+      { sku: "A", image_url: "product-images/tommy/_v/a/1.jpg" },   // elegida en _v
+      { sku: "B", image_url: "product-images/tommy/b.jpg" },         // elegida en raíz
+      { sku: "C", image_url: null },                                  // sin foto
+      { sku: "D", image_url: "product-images/tommy/no-existe.jpg" }, // elegida rota
+    ];
+    const objetos = [
+      obj("tommy/_v/a/1.jpg"), obj("tommy/_v/a/2.jpg"), obj("tommy/_v/a/6.jpg"),
+      obj("tommy/b.jpg"), obj("tommy/_v/b/1.jpg"), obj("tommy/_v/b/2.jpg"),
+      obj("tommy/_v/c/1.jpg"), obj("tommy/_v/c/2.jpg"),
+      obj("tommy/_v/d/1.jpg"),
+    ];
+    const plan = planBorradoAlternativas(objetos, productos, P);
+    const borradas = new Set(plan.aBorrar.map((f) => f.path));
+    const quedan = objetos.map((o) => o.path).filter((p) => !borradas.has(p));
+    for (const p of productos) {
+      const elegida = pathDeImageUrl(p.image_url);
+      // Quien tenía una foto que existía, la conserva.
+      if (elegida && objetos.some((o) => o.path === elegida)) {
+        expect(quedan, `${p.sku} perdió su foto`).toContain(elegida);
+      }
+    }
+    // Y a los que no tienen elegida viva no se les tocó una sola variante.
+    expect(quedan).toContain("tommy/_v/c/1.jpg");
+    expect(quedan).toContain("tommy/_v/c/2.jpg");
+    expect(quedan).toContain("tommy/_v/d/1.jpg");
+    expect(borradas).toEqual(new Set(["tommy/_v/a/2.jpg", "tommy/_v/a/6.jpg", "tommy/_v/b/1.jpg", "tommy/_v/b/2.jpg"]));
   });
 });
 
