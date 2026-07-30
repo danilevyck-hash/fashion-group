@@ -34,10 +34,25 @@
 // ("Género: Women"), que es lo que la fila de píldoras no podía mostrar sin
 // que uno la recorriera entera.
 //
-// **De `lg` para arriba NO cambia NADA**: el escritorio sigue con la misma fila
-// de píldoras, mismo marcado, mismas clases. El borde de arriba se midió a
-// propósito (1024 y 1180 px, iPad Pro horizontal): ahí las píldoras vuelven y
-// entran solas, 0 px de arrastre en las 3 marcas.
+// ── 🖥️ Y DE `lg` PARA ARRIBA LA FILA DE PÍLDORAS TAMBIÉN ENVUELVE ────────────
+//
+// Daniel, tercer pedido: *"y si, hazlo en ipad horizontal tambien"*. A 1024 px
+// (iPad horizontal) volvían las píldoras y volvía el arrastre.
+//
+// **Había dos salidas y las dos se midieron. La obvia PIERDE:**
+//
+//   1. Correr el corte a `xl` (1280). **Ni siquiera llega a 0** — medido, a
+//      1280 px Tommy interno arrastra 113 px y a 1366 arrastra 27: ahí las
+//      píldoras vuelven y vuelve el problema. Encima metería el desplegable en
+//      laptops de 1280 lógicos, que Daniel no pidió cambiar.
+//   2. Dejar el corte donde está y hacer que las píldoras ENTREN: `flex-wrap`.
+//      Da 0 px **en TODOS los anchos**, incluidos los dos de laptop que la
+//      salida 1 no arreglaba.
+//
+// Gana la 2 por número, no por gusto. **A 1440 no cambia nada y eso está
+// medido, no supuesto**: ahí las píldoras ya entraban en una sola línea en las
+// 3 marcas y las 2 vistas (0 px de arrastre, alto de la zona 163 px antes y
+// después), y `flex-wrap` no mueve lo que ya cabe.
 //
 // El panel es `<DesplegableFlotante>` (portal a <body> + `position: fixed`), que
 // es EL desplegable de la casa — un panel `absolute` acá lo recortaría el primer
@@ -258,12 +273,15 @@ export default function CatalogoFilters({
         )}
       </div>
 
-      {/* ── ESCRITORIO (lg+): la fila de píldoras de siempre ──
-          No se le tocó ni una clase salvo el `hidden lg:flex` que la esconde en
-          celular y iPad. De 1024 px para arriba el marcado y el aspecto son
-          idénticos a antes, y las píldoras entran sin arrastre en las 3 marcas
-          (medido a 1024, 1180 y 1440). */}
-      <div className="hidden lg:flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
+      {/* ── iPAD HORIZONTAL Y ESCRITORIO (lg+): la fila de píldoras, que ENVUELVE ──
+          `flex-wrap` sin tope: lo que no entra baja de renglón en vez de
+          esconderse a la derecha. **A 1440 no cambia NADA** — ahí las píldoras
+          ya entraban en una línea (0 px de arrastre, medido en las 3 marcas y
+          las 2 vistas), y `flex-wrap` no mueve nada que ya quepa.
+          El corte NO se movió a `xl` a propósito: ver el porqué arriba.
+          `overflow-x-auto` se queda como última red por si un grupo suelto
+          fuera más ancho que la pantalla entera. */}
+      <div className="hidden lg:flex flex-wrap items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
         {conBultos && (
           <>
             {/* Chip "2 bultos o más" (feature filtroBultos) — PRIMERO de la fila

@@ -9,23 +9,27 @@
 // 🩸 LO MEDIDO, navegador real, build y datos de producción, en las DOS vistas
 // que comparten este componente — la interna del vendedor (`/catalogo/<marca>`)
 // y la pública del cliente (`/catalogo-publico/<marca>`). Px de arrastre
-// horizontal de la fila de filtros, interno / público:
+// horizontal de la fila de filtros, interno / público, ANTES de cada arreglo:
 //
-//   marca    390 (iPhone)  834 (iPad V)  1024 (iPad H)  1180 (iPad Pro)  1440
-//   Tommy     779 / 813     559 / 369      369 / 179      213 /  23      0 / 0
-//   Reebok    642 / 674     422 / 230      232 /  40       76 /   0      0 / 0
-//   Joybees   138 / 158       0 /   0        0 /   0        0 /   0      0 / 0
+//   marca    390 (iPhone) 834 (iPad V) 1024 (iPad H) 1180 (Pro) 1280 (lap) 1366  1440
+//   Tommy     779 / 813    559 / 369     369 / 179    213 / 23   113 / 0   27/0  0/0
+//   Reebok    642 / 674    422 / 230     232 /  40     76 /  0     0 / 0    0/0  0/0
+//   Joybees   138 / 158      0 /   0       0 /   0      0 /  0     0 / 0    0/0  0/0
 //
-// El corte pasó de `md` (768) a `lg` (1024): **390 y 834 quedan en 0**.
+// **DESPUÉS: 0 px en los 7 anchos, las 3 marcas y las 2 vistas.**
 //
-// ⚠️ **1024 y 1180 NO son 0 y este arreglo no los toca** — ahí ya mandan las
-// píldoras. Está medido a propósito (era el borde donde esto se podía romper) y
-// reportado a Daniel con el número; correr el corte otra vez sería una decisión
-// suya, no un ajuste técnico.
+// Dos cambios, en dos PRs, con el mismo objetivo:
+//   1. El corte pasó de `md` (768) a `lg` (1024) → 390 y 834 en 0.
+//   2. La fila de píldoras ganó `flex-wrap` → 1024, 1180, 1280 y 1366 en 0,
+//      sin tocar 1440 (ahí ya entraban en una línea).
+//
+// ⚠️ **Lo que NO se hizo, y por qué:** correr el corte a `xl` (1280) parecía la
+// salida natural para el iPad horizontal y **no llegaba a 0** — a 1280 px las
+// píldoras vuelven y Tommy interno arrastra 113 px. Se midió antes de elegir.
 //
 // Este archivo congela la CAUSA (jsdom no calcula layout, así que no puede
 // medir un arrastre); la medición real vive en
-// `scripts/_medir-filtros-catalogo.mjs` (5 anchos).
+// `scripts/_medir-filtros-catalogo.mjs` (7 anchos).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi } from "vitest";
@@ -100,15 +104,27 @@ describe("la fila que se arrastraba sale de la pantalla del celular y del iPad",
     }
   });
 
-  it("el corte es `lg` (1024): el iPad queda del lado de los desplegables", () => {
+  it("el corte es `lg` (1024): el iPad vertical queda del lado de los desplegables", () => {
     // El primer arreglo cortó en `md` (768) y dejó el iPad con la fila vieja:
     // medido, a 834 px seguía arrastrándose 559 px en Tommy y 422 en Reebok.
     // Daniel: *"si, hazlo en ipad tambien"*. Con `lg`, 1023 es el último ancho
-    // con desplegables y 1024 el primero con píldoras — y a 1024/1180/1440 las
-    // píldoras entran solas (medido: 0 px en las 3 marcas y las 2 vistas).
-    expect(FUENTE).toContain("hidden lg:flex items-center gap-2 overflow-x-auto");
+    // con desplegables y 1024 el primero con píldoras.
     expect(FUENTE).toContain("flex lg:hidden flex-wrap");
     expect(FUENTE).not.toMatch(/\b(sm|md|xl):hidden\b/);
+  });
+
+  it("y de `lg` para arriba las PÍLDORAS también envuelven — nada se arrastra", () => {
+    // Tercer pedido de Daniel: *"y si, hazlo en ipad horizontal tambien"*.
+    // La salida obvia —correr el corte a `xl` (1280)— se midió y PIERDE: a
+    // 1280 px Tommy interno arrastra 113 px y a 1366 arrastra 27, o sea que
+    // ahí las píldoras vuelven y vuelve el problema; encima metería el
+    // desplegable en laptops que nadie pidió cambiar. `flex-wrap` sin tope da
+    // 0 px en TODOS los anchos, incluidos esos dos.
+    expect(filaPildoras(render(createElement(CatalogoFilters, props("tommy"))).container).className)
+      .toContain("flex-wrap");
+    expect(FUENTE).toContain("hidden lg:flex flex-wrap items-center gap-2 overflow-x-auto");
+    // Sin tope: un `xl:flex-nowrap` devolvería el arrastre a 1280 y 1366.
+    expect(FUENTE).not.toContain("flex-nowrap");
   });
 });
 
