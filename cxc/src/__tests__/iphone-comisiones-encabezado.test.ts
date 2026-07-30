@@ -147,22 +147,67 @@ describe("Comisiones — el encabezado entra en la primera pantalla del iPhone",
  *        RECORTADOS** y "Com. cobro" y "Com. total" no se podían ver de ninguna
  *        manera. Peor que el scroll: invisible y sin aviso.
  *
- *   DESPUÉS: **0 px en los dos modos.** iPad y escritorio no cambian (la tabla
- *   sigue ahí), salvo que "Por empresa" a 834px pasó de 83px RECORTADOS a 84px
- *   ARRASTRABLES — el `overflow-x-auto` que le faltaba.
+ *   DESPUÉS: **0 px en los dos modos.**
+ *
+ * ── SEGUNDA VUELTA (#367, 30-jul-2026): los CINCO anchos en 0 ────────────────
+ * Daniel fijó la regla general: *"todo tiene q estar hecho para ipad iphone y
+ * desktop"*. El #365 dejó el iPhone en 0 pero el iPad seguía arrastrando, así
+ * que se midieron los dos iPad en sus dos orientaciones. Ancho ÚTIL real
+ * (dentro de la tarjeta, ya descontada la barra lateral):
+ *
+ *   viewport   útil   "Todas" antes   "Por empresa" antes   ahora
+ *   390 px     356    628 arrastre    279 RECORTADOS        0 · 0
+ *   834 px     552    432 arrastre     84 arrastre          0 · 0
+ *   1024 px    742    242 arrastre      0                   0 · 0
+ *   1180 px    898     86 arrastre      0                   0 · 0
+ *   1440 px   1158      0               0                   0 · 0
+ *
+ * **A 834px la tabla es IMPOSIBLE, y eso decidió el corte.** Los datos de las 7
+ * columnas —puro texto, sin un píxel de relleno y sin encabezados— miden 554px
+ * contra 552 disponibles: no entra ni en el mejor caso concebible. Por eso las
+ * tarjetas suben de `md` (768) a **`lg` (1024)**.
+ * De 1024 para arriba la tabla SÍ entra, y ahí se la hizo entrar en vez de
+ * mandar 7 tarjetas a una pantalla ancha: los encabezados de empresa dejan de
+ * forzar su ancho bajo `xl` y el relleno pasa de px-3/px-4 a px-2/px-3.
+ * min-content 984 → **650**, con **92px de holgura a 1024** (alcanza para que
+ * las 5 comisiones pasen a 6 cifras y siga entrando). **≥xl no se tocó:**
+ * min-content 985 y holgura 173px a 1440, igual que antes.
  */
-describe("Comisiones — en el celular la tabla ancha son TARJETAS", () => {
-  it("las dos vistas montan las tarjetas y esconden su tabla bajo md", () => {
+describe("Comisiones — la tabla ancha son TARJETAS bajo lg", () => {
+  it("las dos vistas montan las tarjetas y esconden su tabla bajo lg", () => {
     for (const [nombre, src] of [
       ["consolidado", consolidado],
       ["por empresa", porEmpresa],
     ] as const) {
-      // La tabla vive dentro de un Card que solo aparece en ≥md.
-      expect(src, nombre).toMatch(/className="hidden [^"]*md:block"/);
+      // La tabla vive dentro de un Card que solo aparece en ≥lg.
+      expect(src, nombre).toMatch(/className="hidden [^"]*lg:block"/);
       expect(src, nombre).toContain("<ComisionesTarjetas");
     }
-    // Y las tarjetas son SOLO del celular.
-    expect(tarjetas).toContain("md:hidden");
+    // Y las tarjetas son del celular Y del iPad vertical.
+    expect(tarjetas).toContain("lg:hidden");
+    // `md` dejaría la tabla imposible de 834px en pantalla: 554px de datos
+    // pelados contra 552px útiles. Medido, no estimado.
+    expect(tarjetas).not.toContain("md:hidden");
+  });
+
+  it("el escritorio (≥xl) conserva el ancho de siempre; lo que se aprieta es el iPad", () => {
+    // El ajuste que hace entrar la tabla a 1024/1180 va SOLO bajo `xl` (1280).
+    // A 1440 el min-content sigue siendo 985px, idéntico al de antes del PR.
+    // Encabezados de empresa: nowrap sólo en xl.
+    expect(consolidado).toContain('className="px-2 py-2 text-right font-medium xl:whitespace-nowrap xl:px-3"');
+    // Nombre del vendedor: en xl vuelve a una sola línea.
+    expect(consolidado).toMatch(/xl:whitespace-nowrap xl:px-4/);
+    // Y no puede quedar ningún `whitespace-nowrap` incondicional en la tabla:
+    // sería el que vuelve a empujar el min-content a 984.
+    const cuerpoTabla = consolidado.slice(consolidado.indexOf("<thead>"));
+    expect(cuerpoTabla).not.toMatch(/className="[^"]*\bwhitespace-nowrap\b(?![^"]*xl:)/);
+    // Las dos tablas recuperan su relleno de escritorio en xl.
+    for (const [nombre, src] of [
+      ["consolidado", consolidado],
+      ["por empresa", porEmpresa],
+    ] as const) {
+      expect(src, nombre).toContain("xl:px-4");
+    }
   });
 
   it("ninguna tabla queda dentro de un overflow-hidden sin poder arrastrarse", () => {

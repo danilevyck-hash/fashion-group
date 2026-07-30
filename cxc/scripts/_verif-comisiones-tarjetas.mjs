@@ -15,7 +15,7 @@
 import { chromium } from "playwright";
 import { readFileSync } from "fs";
 
-const BASE = process.env.BASE ?? "http://localhost:3164";
+const BASE = process.env.BASE ?? "http://localhost:3169";
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 
 const norm = (s) => s.replace(/\s+/g, " ").trim();
@@ -28,8 +28,9 @@ const LEER_TARJETAS = `(() => {
     if (spans.length < 2) continue;
     out.push([spans[0].textContent.trim(), spans[1].textContent.trim()]);
   }
-  const total = [...document.querySelectorAll("main .md\\\\:hidden li div")]
-    .find((d) => d.textContent.includes("Total"));
+  // Por data-attribute, NO por la clase de breakpoint: la clase cambia cuando
+  // se mueve el corte y el verificador se queda leyendo null en silencio.
+  const total = document.querySelector("main [data-comision-total]");
   return {
     filas: out,
     total: total ? total.textContent.replace("Total", "").trim() : null,
@@ -84,11 +85,19 @@ async function leer(navegador, { width, height, movil }, modo, script) {
 const navegador = await chromium.launch();
 let fallas = 0;
 
+// Las tarjetas ahora cubren iPhone (390) **y iPad vertical** (834): los dos
+// anchos se comparan contra la MISMA tabla de escritorio.
+const ANCHOS_TARJETA = [
+  { nombre: "iPhone 390", width: 390, height: 844 },
+  { nombre: "iPad 834", width: 834, height: 1194 },
+];
+
 for (const modo of ["todas", "empresa"]) {
-  const movil = await leer(navegador, { width: 390, height: 844, movil: true }, modo, LEER_TARJETAS);
+ for (const t of ANCHOS_TARJETA) {
+  const movil = await leer(navegador, { width: t.width, height: t.height, movil: true }, modo, LEER_TARJETAS);
   const escritorio = await leer(navegador, { width: 1440, height: 900, movil: false }, modo, LEER_TABLA);
 
-  console.log(`\n── modo "${modo}" ──`);
+  console.log(`\n── modo "${modo}" · ${t.nombre} ──`);
   console.log(`  tarjetas: ${movil.filas.length} (con ${movil.detalles} líneas de detalle)   tabla: ${escritorio.filas.length}`);
 
   if (movil.filas.length !== escritorio.filas.length) {
@@ -106,6 +115,7 @@ for (const modo of ["todas", "empresa"]) {
   const totalOk = norm(movil.total ?? "") === norm(escritorio.total ?? "");
   console.log(`  ${totalOk ? "✓" : "❌"} TOTAL ${escritorio.total}  |  tarjeta ${movil.total}`);
   if (!totalOk) fallas++;
+ }
 }
 
 await navegador.close();
