@@ -208,15 +208,21 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
 
       {/* Tabla nivel 1 */}
       {data && !loading && !error && (
+        /* 🩸 SIN `min-w-[560px]`. Ese mínimo inventado era TODO el arrastre:
+           medido en el navegador (scripts/_ancho-util-ventas.mjs), la tabla
+           necesita 318 px en un iPhone de 390 (donde sólo se ven Descripción,
+           Venta y Margen) contra 356 disponibles — ENTRA de sobra. Los 204 px
+           que se arrastraban eran los 560 forzados, no los datos. Acá la tabla
+           no pasa a tarjetas porque no hace falta: entra. */
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full min-w-[560px] border-collapse text-sm">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-[0.04em] text-gray-400">
-                <th className="px-3 py-2.5 font-normal">Descripción</th>
-                <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Códigos</th>
+                <th className="px-2 py-2.5 font-normal lg:px-3">Descripción</th>
+                <th className="hidden px-2 py-2.5 text-right font-normal sm:table-cell lg:px-3">Códigos</th>
                 <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
                 <SortableTh label="Venta" active={sort} sortKey="venta" onClick={toggleSort} />
-                <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Δ {selectedYear - 1}</th>
+                <th className="hidden px-2 py-2.5 text-right font-normal sm:table-cell lg:px-3">Δ {selectedYear - 1}</th>
                 <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
               </tr>
             </thead>
@@ -269,10 +275,13 @@ function SortableTh({
 }) {
   const isActive = active.key === sortKey;
   return (
-    <th className={`px-3 py-2.5 text-right font-normal ${className}`}>
+    <th className={`px-2 py-0 text-right font-normal lg:px-3 ${className}`}>
+      {/* El botón mide 44 px de alto (regla táctil de la casa): antes eran 18 y
+          en iPhone ordenar era una lotería. El `py` se movió del th al button
+          para que el alto lo dé el blanco tocable y no se sumen los dos. */}
       <button
         onClick={() => onClick(sortKey)}
-        className={`inline-flex items-center gap-0.5 hover:text-gray-700 ${isActive ? "text-gray-900" : ""}`}
+        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-end gap-0.5 hover:text-gray-700 ${isActive ? "text-gray-900" : ""}`}
       >
         {label}
         <span className="w-2 text-xs">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
@@ -287,12 +296,12 @@ function SortableTh({
 function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
   const ratio = variacionPct(curr, prev);
   if (ratio == null) {
-    return <td className="hidden px-3 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell">Nuevo</td>;
+    return <td data-col="delta" className="hidden px-2 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell lg:px-3">Nuevo</td>;
   }
   const pct = ratio * 100;
   const up = pct >= 0;
   return (
-    <td className={`hidden px-3 py-2.5 text-right font-mono tabular-nums sm:table-cell ${up ? "text-emerald-700" : "text-rose-600"}`}>
+    <td data-col="delta" className={`hidden px-2 py-2.5 text-right font-mono tabular-nums sm:table-cell lg:px-3 ${up ? "text-emerald-700" : "text-rose-600"}`}>
       {up ? "+" : ""}{pct.toFixed(0)}%
     </td>
   );
@@ -311,11 +320,16 @@ function ProductoRow({
 }) {
   return (
     <>
+      {/* `data-fila-producto` es el ancla ESTABLE para el verificador. Buscar
+          por clase de breakpoint (`.sm\\:table-cell`) es una trampa: si el corte
+          se mueve, el selector no encuentra nada y la comparación "pasa" sin
+          haber comparado una sola celda. */}
       <tr
+        data-fila-producto={p.descripcion}
         className={`border-b border-gray-100 ${drillable ? "cursor-pointer hover:bg-gray-50" : ""}`}
         onClick={drillable ? onToggle : undefined}
       >
-        <td className="px-3 py-2.5">
+        <td data-col="descripcion" className="px-2 py-2.5 lg:px-3">
           <div className="flex items-center gap-1.5">
             {drillable ? (
               <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -325,15 +339,15 @@ function ProductoRow({
             <span className="text-gray-800">{p.descripcion}</span>
           </div>
         </td>
-        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell">{p.num_codigos}</td>
-        <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
-        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-900">{fmtMoney(p.venta)}</td>
+        <td data-col="codigos" className="hidden px-2 py-2.5 text-right font-mono tabular-nums text-gray-500 sm:table-cell lg:px-3">{p.num_codigos}</td>
+        <td data-col="cantidad" className="hidden px-2 py-2.5 text-right font-mono tabular-nums text-gray-600 sm:table-cell lg:px-3">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
+        <td data-col="venta" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-900 lg:px-3">{fmtMoney(p.venta)}</td>
         <DeltaCell curr={p.venta} prev={prevVenta} />
-        <td className="px-3 py-2.5 text-right font-mono tabular-nums text-gray-700">{fmtMargen(p.margen)}</td>
+        <td data-col="margen" className="px-2 py-2.5 text-right font-mono tabular-nums text-gray-700 lg:px-3">{fmtMargen(p.margen)}</td>
       </tr>
       {isOpen && (
         <tr className="bg-gray-50/60">
-          <td colSpan={6} className="px-3 py-0">
+          <td colSpan={6} className="px-2 py-0 lg:px-3">
             <div className="py-2 pl-5">
               {codigosLoading && <div className="py-2 text-xs text-gray-400">Cargando códigos…</div>}
               {!codigosLoading && codigos && codigos.length > 0 && (
