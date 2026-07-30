@@ -30,6 +30,7 @@ const PUBLIC_PREFIXES = [
   "/catalogo-publico/",             // public catalog page (no auth)
   "/marketing/galeria/",            // galería pública de fotos por cliente (token HMAC)
   "/api/marketing/facturas-pdf/",   // PDF combinado de facturas por cliente (token HMAC)
+  "/api/marketing/entregas-pdf/",   // comprobante de entrega de mobiliario (token HMAC o sesión)
   "/reclamos/galeria/",             // galería pública de fotos por reclamo (token HMAC)
   "/pedido-reebok/",                // public order view page (no auth)
   "/api/catalogo/reebok/pedido-publico", // public order API (no auth)

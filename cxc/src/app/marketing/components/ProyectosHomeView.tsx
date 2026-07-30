@@ -63,7 +63,7 @@ interface Props {
   refreshKey: number;
   // Modo bucket (rediseño por marca): al entrar desde una card. El filtro de
   // marca queda FIJO por el bucket y se oculta el dropdown.
-  grupo?: "legacy" | "marca";
+  grupo?: "legacy" | "marca" | "multifashion";
   marcaIdFijo?: string;
   bucketLabel?: string;
   bucketEsLegacy?: boolean;
@@ -182,8 +182,8 @@ export default function ProyectosHomeView({
       const qs = new URLSearchParams();
       qs.set("filtro_estado", filtroEstado);
       // Bucket fijo (rediseño): legacy o marca. Sin bucket, cae al dropdown legacy-compat.
-      if (grupo === "legacy") {
-        qs.set("grupo", "legacy");
+      if (grupo === "legacy" || grupo === "multifashion") {
+        qs.set("grupo", grupo);
       } else if (marcaIdFijo) {
         qs.set("grupo", "marca");
         qs.set("marca_id", marcaIdFijo);
