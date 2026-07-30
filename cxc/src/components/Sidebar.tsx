@@ -107,7 +107,7 @@ function CollapsedFlyout({
                 onClose();
               }}
               title={m.label}
-              className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors ${
+              className={`w-full flex min-h-[44px] items-center gap-2.5 px-3 text-[13px] transition-colors ${
                 active
                   ? "bg-blue-50 text-blue-700 font-medium"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -210,9 +210,11 @@ export default function Sidebar() {
           collapsed ? "px-1.5" : "px-5"
         }`}
       >
+        {/* El logo es un ENLACE a /home, así que va a 44 de alto. Sale gratis:
+            la fila del encabezado ya mide 57 px. */}
         <Link
           href="/home"
-          className="flex items-center gap-2 hover:opacity-70 transition min-w-0"
+          className="flex min-h-[44px] items-center gap-2 hover:opacity-70 transition min-w-0"
           title={collapsed ? "Fashion Group" : undefined}
         >
           <FGLogo variant="icon" theme="light" size={22} />
@@ -226,7 +228,14 @@ export default function Sidebar() {
           onClick={toggleCollapsed}
           aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
           title={collapsed ? "Expandir" : "Colapsar"}
-          className="flex-shrink-0 text-gray-400 hover:text-gray-700 p-1 rounded transition"
+          /* ⚠️ 44×44 SOLO expandida, y está medido: colapsada la barra mide
+             64 px y con `px-1.5` quedan 52 útiles — el logo (22) más un botón
+             de 44 dan 66 y no entran. Dos targets de 44 no caben en un rail de
+             64 px, así que ahí se conserva el tamaño chico a propósito. El
+             ALTO sí llega a 44 en los dos estados (la fila mide 57). */
+          className={`flex-shrink-0 inline-flex min-h-[44px] items-center justify-center text-gray-400 hover:text-gray-700 rounded transition ${
+            collapsed ? "w-8" : "w-11"
+          }`}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points={collapsed ? "9 18 15 12 9 6" : "15 18 9 12 15 6"} />
@@ -238,7 +247,7 @@ export default function Sidebar() {
         <Link
           href="/home"
           title={collapsed ? "Inicio" : undefined}
-          className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} py-2.5 text-sm transition-all border-l-2 ${
+          className={`w-full flex min-h-[44px] items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} text-sm transition-all border-l-2 ${
             homeActive
               ? "bg-gray-50 text-black font-medium border-l-blue-500"
               : "text-gray-600 hover:bg-gray-50 border-l-transparent"
@@ -266,7 +275,7 @@ export default function Sidebar() {
                   }}
                   title={g.label}
                   aria-expanded={isFlyoutOpen}
-                  className={`w-full flex items-center justify-center px-0 py-2.5 text-sm transition-all border-l-2 ${
+                  className={`w-full flex min-h-[44px] items-center justify-center px-0 text-sm transition-all border-l-2 ${
                     groupActive || isFlyoutOpen
                       ? "bg-gray-50 text-black font-medium border-l-blue-500"
                       : "text-gray-600 hover:bg-gray-50 border-l-transparent"
@@ -298,7 +307,7 @@ export default function Sidebar() {
               <button
                 onClick={() => toggleGroup(g.key)}
                 aria-expanded={isOpen}
-                className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-all border-l-2 border-l-transparent ${
+                className={`w-full flex min-h-[44px] items-center gap-3 px-5 text-sm transition-all border-l-2 border-l-transparent ${
                   groupActive ? "text-black font-medium" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
@@ -336,7 +345,7 @@ export default function Sidebar() {
                         onClick={() => recordModuleClick(m.key, userName)}
                         title={m.label}
                         tabIndex={isOpen ? 0 : -1}
-                        className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-1.5 text-[13px] transition-colors border-l-2 ${
+                        className={`w-full flex min-h-[44px] items-center gap-2.5 pl-12 pr-5 text-[13px] transition-colors border-l-2 ${
                           mActive
                             ? "bg-blue-50 text-blue-700 font-medium border-l-blue-500"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-transparent"
@@ -375,7 +384,7 @@ export default function Sidebar() {
               <button
                 onClick={handleLogout}
                 title="Cerrar sesión"
-                className="text-gray-300 hover:text-red-500 transition p-1 flex-shrink-0"
+                className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center text-gray-300 hover:text-red-500 transition -my-2 -mr-3"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />

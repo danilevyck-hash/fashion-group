@@ -214,7 +214,7 @@ export default function PeriodoDetailHeader({
       <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-7 pb-5">
         <button
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-xs mb-4 transition-colors"
+          className="inline-flex min-h-[44px] items-center gap-1 text-xs mb-1 -mt-2 transition-colors"
           style={{ color: "var(--caja-fg-muted)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-fg-strong)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}

@@ -1151,7 +1151,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                         Re-depositar
                       </button>
                     )}
-                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
+                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm text-gray-500 hover:text-black transition disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu
                       cheque={c}
                       ve={ve}
