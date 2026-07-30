@@ -298,6 +298,12 @@ export const SEED_TOLERANT_CRONS = [
   // una semana en sembrar la fila). Umbral propio semanal de 8 días en
   // CRON_STALE_HOURS_POR_CRON. Promover a EXPECTED_CRONS con semanas de siembra.
   "catalogos-fotos-resumen",
+  // Cartera de Confecciones Boston desde el REPORTE WEB del panel (08:10 UTC =
+  // 03:10 a.m. Panamá). Sustituye, solo para esa empresa, el estadocuenta
+  // cliente-por-cliente que no cabía en la función (ver
+  // EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON). Seed-tolerante hasta que lleve días
+  // sembrado; después se puede promover a CRONS_FAIL_CLOSED.
+  "boston-cartera",
   // Vigía de recursos de la base (11 entradas, 01:45→22:45 UTC). Desplegado el
   // 27-jul-2026: seed-tolerante hasta que lleve días sembrado. Promover a
   // CRONS_FAIL_CLOSED después (corre 11×/día: nunca debería estar stale).
@@ -370,6 +376,12 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync all", hhmmUtc: "0630", empresas: ["american_classic", "confecciones_boston"] },
   { cron: "sync-utilidad", hhmmUtc: "0700", empresas: CRON_EMPRESAS_UTILIDAD },
   { cron: "sync-recibos", hhmmUtc: "0750", empresas: CRON_EMPRESAS_RECIBOS },
+  // Cartera de Boston por el reporte WEB del panel. Entra al cronograma como
+  // cualquier otra entrada que toca Switch: abre una sesión de esa empresa (y
+  // encima con changesession=SI, que expulsa a quien esté en el panel), así que
+  // le corresponde la misma separación mínima que a las demás. Queda a 20 min de
+  // sync-recibos (07:50) y a 30 de switch-articulos (08:40).
+  { cron: "boston-cartera", hhmmUtc: "0810", empresas: ["confecciones_boston"] },
   { cron: "switch-articulos", hhmmUtc: "0840", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.

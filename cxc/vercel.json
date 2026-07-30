@@ -85,6 +85,10 @@
       "schedule": "0 13 * * *"
     },
     {
+      "path": "/api/cron/boston-cartera",
+      "schedule": "10 8 * * *"
+    },
+    {
       "path": "/api/cron/switch-articulos",
       "schedule": "40 8 * * *"
     },
