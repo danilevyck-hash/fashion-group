@@ -1,0 +1,652 @@
+{
+ "clientes": [
+  {
+   "clienteId": 1,
+   "codigo": "TCKCTA",
+   "nombre": "VENTAS",
+   "saldoTotal": 25.15,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 0
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 25.15
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 0
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 0
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "TCKCTA",
+     "clienteNombre": "VENTAS",
+     "secuencial": "155-000000058",
+     "numeroFiscal": null,
+     "numeroOrden": "4154200155",
+     "tipoComprobante": "Transacción",
+     "abrev": "CNF",
+     "total": "25.1500",
+     "saldo": "25.1500",
+     "debito": "25.1500",
+     "credito": 0,
+     "plazoCredito": "0.0000",
+     "dias": 71,
+     "fechaCreacion": "2026-05-20"
+    }
+   ]
+  },
+  {
+   "clienteId": 3,
+   "codigo": "1",
+   "nombre": "ACCIONA CONSTRUCCION S. A.",
+   "saldoTotal": 2790.03,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 438.7
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 2351.33
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 0
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 0
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "1",
+     "clienteNombre": "ACCIONA CONSTRUCCION S. A.",
+     "secuencial": "11-000006970",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026050400000069700010117961372941",
+     "numeroOrden": "403900011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "2351.3300",
+     "saldo": "2351.3300",
+     "debito": "2351.3300",
+     "credito": 0,
+     "plazoCredito": "0.0000",
+     "dias": 87,
+     "fechaCreacion": "2026-05-04"
+    },
+    {
+     "clienteCodigo": "1",
+     "clienteNombre": "ACCIONA CONSTRUCCION S. A.",
+     "secuencial": "11-000007387",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026070800000073870010118072613198",
+     "numeroOrden": "444550011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "438.7000",
+     "saldo": "438.7000",
+     "debito": "438.7000",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 22,
+     "fechaCreacion": "2026-07-08"
+    }
+   ]
+  },
+  {
+   "clienteId": 6,
+   "codigo": "4",
+   "nombre": "ADM M&S INC",
+   "saldoTotal": 49.76,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 0
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 0
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 49.760000000000005
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 0
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "4",
+     "clienteNombre": "ADM M&S INC",
+     "secuencial": "11-000005462",
+     "numeroFiscal": "FE012000000655-544-133465-1300012025080100000054620010111152945159",
+     "numeroOrden": "290640011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "178.1600",
+     "saldo": "14.4500",
+     "debito": "14.4500",
+     "credito": 0,
+     "plazoCredito": "0.0000",
+     "dias": 363,
+     "fechaCreacion": "2025-08-01"
+    },
+    {
+     "clienteCodigo": "4",
+     "clienteNombre": "ADM M&S INC",
+     "secuencial": "11-000005609",
+     "numeroFiscal": "FE012000000655-544-133465-1300012025082600000056090010115778371620",
+     "numeroOrden": "307340011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "35.3100",
+     "saldo": "35.3100",
+     "debito": "35.3100",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 338,
+     "fechaCreacion": "2025-08-26"
+    }
+   ]
+  },
+  {
+   "clienteId": 26,
+   "codigo": "24",
+   "nombre": "ARTES VISUALES, S.A.",
+   "saldoTotal": 2899.7,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 0
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 0
+    },
+    {
+     "title": "91-120",
+     "saldo": 1448.78
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 1450.92
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 0
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "24",
+     "clienteNombre": "ARTES VISUALES, S.A.",
+     "secuencial": "11-000005611",
+     "numeroFiscal": "FE012000000655-544-133465-1300012025082600000056110010119361171054",
+     "numeroOrden": "307370011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "1874.6400",
+     "saldo": "1450.9200",
+     "debito": "1450.9200",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 338,
+     "fechaCreacion": "2025-08-26"
+    },
+    {
+     "clienteCodigo": "24",
+     "clienteNombre": "ARTES VISUALES, S.A.",
+     "secuencial": "11-000006855",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026041300000068550010119881651040",
+     "numeroOrden": "394620011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "1448.7800",
+     "saldo": "1448.7800",
+     "debito": "1448.7800",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 108,
+     "fechaCreacion": "2026-04-13"
+    }
+   ]
+  },
+  {
+   "clienteId": 37,
+   "codigo": "35",
+   "nombre": "BASH CORPORATION",
+   "saldoTotal": 1223.81,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 1223.81
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 0
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 0
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 0
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "35",
+     "clienteNombre": "BASH CORPORATION",
+     "secuencial": "11-000007425",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026071500000074250010116494225612",
+     "numeroOrden": "449360011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "648.4200",
+     "saldo": "648.4200",
+     "debito": "648.4200",
+     "credito": 0,
+     "plazoCredito": "0.0000",
+     "dias": 15,
+     "fechaCreacion": "2026-07-15"
+    },
+    {
+     "clienteCodigo": "35",
+     "clienteNombre": "BASH CORPORATION",
+     "secuencial": "11-000007433",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026071700000074330010115202897397",
+     "numeroOrden": "450730011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "822.5600",
+     "saldo": "822.5600",
+     "debito": "822.5600",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 13,
+     "fechaCreacion": "2026-07-17"
+    },
+    {
+     "clienteCodigo": "35",
+     "clienteNombre": "BASH CORPORATION",
+     "secuencial": "12-000007382",
+     "numeroFiscal": null,
+     "numeroOrden": "459020012",
+     "tipoComprobante": "Recibo",
+     "abrev": "RE",
+     "total": 247.17,
+     "saldo": -247.17,
+     "debito": 0,
+     "credito": 247.17,
+     "plazoCredito": "0.0000",
+     "dias": 13,
+     "fechaCreacion": "2026-07-17"
+    }
+   ]
+  },
+  {
+   "clienteId": 1660,
+   "codigo": "111660",
+   "nombre": "JIDSA PMA, S.A.",
+   "saldoTotal": 2085.25,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 93.15
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": -93.15
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 326.55
+    },
+    {
+     "title": "271-365",
+     "saldo": 0
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 1758.7
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "12-000002212",
+     "numeroFiscal": null,
+     "numeroOrden": "113150012",
+     "tipoComprobante": "Recibo",
+     "abrev": "RE",
+     "total": 380.36,
+     "saldo": -0.8,
+     "debito": 0,
+     "credito": 0.8,
+     "plazoCredito": "0.0000",
+     "dias": 918,
+     "fechaCreacion": "2024-01-24"
+    },
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "11-000004126",
+     "numeroFiscal": "FE012000000655-544-133465-1300012024121800000041260010113640210714",
+     "numeroOrden": "189340011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "1819.0000",
+     "saldo": "1759.5000",
+     "debito": "1759.5000",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 589,
+     "fechaCreacion": "2024-12-18"
+    },
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "11-000006123",
+     "numeroFiscal": "FE012000000655-544-133465-1300012025112000000061230010116751497404",
+     "numeroOrden": "341940011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "321.0000",
+     "saldo": "310.5000",
+     "debito": "310.5000",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 252,
+     "fechaCreacion": "2025-11-20"
+    },
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "14-000000053",
+     "numeroFiscal": "FE072000000655-544-133465-1300012026013000000000530010119343249218",
+     "numeroOrden": "363570014",
+     "tipoComprobante": "Nota de Débito",
+     "abrev": "ND",
+     "total": "16.0500",
+     "saldo": "16.0500",
+     "debito": "16.0500",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 181,
+     "fechaCreacion": "2026-01-30"
+    },
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "12-000006958",
+     "numeroFiscal": null,
+     "numeroOrden": "419390012",
+     "tipoComprobante": "Recibo",
+     "abrev": "RE",
+     "total": 93.15,
+     "saldo": -93.15,
+     "debito": 0,
+     "credito": 93.15,
+     "plazoCredito": "0.0000",
+     "dias": 64,
+     "fechaCreacion": "2026-05-27"
+    },
+    {
+     "clienteCodigo": "111660",
+     "clienteNombre": "JIDSA PMA, S.A.",
+     "secuencial": "11-000007401",
+     "numeroFiscal": "FE012000000655-544-133465-1300012026070900000074010010115346081104",
+     "numeroOrden": "446510011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "96.3000",
+     "saldo": "93.1500",
+     "debito": "93.1500",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 21,
+     "fechaCreacion": "2026-07-09"
+    }
+   ]
+  },
+  {
+   "clienteId": 5,
+   "codigo": "3",
+   "nombre": "ADAN Y MAYA, S.A.",
+   "saldoTotal": 3913.53,
+   "saldos": [
+    {
+     "title": "0-30",
+     "saldo": 0
+    },
+    {
+     "title": "31-60",
+     "saldo": 0
+    },
+    {
+     "title": "61-90",
+     "saldo": 0
+    },
+    {
+     "title": "91-120",
+     "saldo": 0
+    },
+    {
+     "title": "121-180",
+     "saldo": 0
+    },
+    {
+     "title": "181-270",
+     "saldo": 0
+    },
+    {
+     "title": "271-365",
+     "saldo": 0
+    },
+    {
+     "title": "Mas de 365",
+     "saldo": 3913.53
+    }
+   ],
+   "elements": [
+    {
+     "clienteCodigo": "3",
+     "clienteNombre": "ADAN Y MAYA, S.A.",
+     "secuencial": "139-000000038",
+     "numeroFiscal": null,
+     "numeroOrden": "243900139",
+     "tipoComprobante": "Saldo Anterior",
+     "abrev": "SAC",
+     "total": "2694.1200",
+     "saldo": "1194.1200",
+     "debito": "1194.1200",
+     "credito": 0,
+     "plazoCredito": "0.0000",
+     "dias": 1429,
+     "fechaCreacion": "2022-08-31"
+    },
+    {
+     "clienteCodigo": "3",
+     "clienteNombre": "ADAN Y MAYA, S.A.",
+     "secuencial": "11-000000680",
+     "numeroFiscal": "TFHKC50002518-00001393",
+     "numeroOrden": "26750011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "1431.1300",
+     "saldo": "1431.1300",
+     "debito": "1431.1300",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 1191,
+     "fechaCreacion": "2023-04-26"
+    },
+    {
+     "clienteCodigo": "3",
+     "clienteNombre": "ADAN Y MAYA, S.A.",
+     "secuencial": "11-000001589",
+     "numeroFiscal": "TFHKC50002518-00002303",
+     "numeroOrden": "62750011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "1031.4800",
+     "saldo": "1031.4800",
+     "debito": "1031.4800",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 1037,
+     "fechaCreacion": "2023-09-27"
+    },
+    {
+     "clienteCodigo": "3",
+     "clienteNombre": "ADAN Y MAYA, S.A.",
+     "secuencial": "11-000001686",
+     "numeroFiscal": "TFHKC50002518-00002399",
+     "numeroOrden": "65700011",
+     "tipoComprobante": "Factura",
+     "abrev": "FA",
+     "total": "256.8000",
+     "saldo": "256.8000",
+     "debito": "256.8000",
+     "credito": 0,
+     "plazoCredito": "30.0000",
+     "dias": 1028,
+     "fechaCreacion": "2023-10-06"
+    }
+   ]
+  }
+ ],
+ "saldosTotales": [
+  {
+   "title": "0-30",
+   "saldo": 1755.66
+  },
+  {
+   "title": "31-60",
+   "saldo": 0.0
+  },
+  {
+   "title": "61-90",
+   "saldo": 2283.33
+  },
+  {
+   "title": "91-120",
+   "saldo": 1448.78
+  },
+  {
+   "title": "121-180",
+   "saldo": 0.0
+  },
+  {
+   "title": "181-270",
+   "saldo": 326.55
+  },
+  {
+   "title": "271-365",
+   "saldo": 1500.68
+  },
+  {
+   "title": "Mas de 365",
+   "saldo": 5672.23
+  }
+ ]
+}

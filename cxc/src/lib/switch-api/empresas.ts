@@ -184,15 +184,28 @@ export function empresasConEstadoCuenta(): EmpresaKey[] {
  * Apagar la bandera desharía lo que aprobó el #347. Esta lista dice algo más
  * chico y más honesto: *por cron, todavía no*.
  *
- * **Qué falta para vaciar esta lista** (tarea aparte, toca la ruta del DINERO y
- * necesita aprobación): su universo real son **459 clientes con saldo abierto**
- * (+326 con factura desde el 1-may), no 4.912 → consultar solo esos entra cómodo
- * en el techo. ⚠️ El reconcile de `syncEmpresaEstadoCuenta` pone `saldo = 0` a
- * TODA la empresa por `synced_at < runStamp`, así que restringir el bucle exige
- * excluir del reconcile a los clientes no consultados (mismo mecanismo que
- * `failedClienteIds`) — hacerlo mal pone en cero saldos buenos. Por eso NO se
- * hizo acá. Partirlo en tandas es peor: cada tanda zerearía lo que cargó la
- * anterior.
+ * ✅ **RESUELTO por otro camino el 30-jul-2026: `/api/cron/boston-cartera`.**
+ * Su cartera ya NO está congelada — se trae del **reporte WEB del panel**
+ * (`Reportes → Estado de cuenta → Antigüedad`), que devuelve TODOS los
+ * documentos abiertos en 2 llamadas (~3 s medidos) en vez de 4.912. Escribe la
+ * misma tabla con la misma forma de fila, así que la pestaña y
+ * `switch_estadocuenta_aging_boston` no cambian. Ver
+ * `src/lib/switch-api/sync-estadocuenta-web.ts`.
+ *
+ * **Boston SIGUE en esta lista, y es correcto:** la lista dice "el estadocuenta
+ * POR API no corre por cron para esta empresa", y eso no cambió — ese camino
+ * sigue sin caber en la función. Sacarla de acá volvería a meter a Boston en el
+ * bloque `all-0630` y en los pares de la reconciliación, que es exactamente lo
+ * que mataba 4 corridas por día. El sync manual y el backfill la siguen
+ * aceptando.
+ *
+ * **El problema del reconcile que hacía imposible partirlo en tandas** —el
+ * `saldo = 0` a TODA la empresa por `synced_at < runStamp`, que hacía que cada
+ * tanda borrara lo que cargó la anterior— **desaparece por construcción** con el
+ * reporte web: el universo llega COMPLETO en una sola respuesta, así que "no
+ * vino en el reporte" sí significa "ya no debe". Las guardas que sostienen esa
+ * premisa (reporte vacío ⇒ no se escribe ni se reconcilia; cuadre contra los
+ * totales que publica Switch antes de escribir) están en ese archivo.
  */
 export const EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON: readonly EmpresaKey[] = [
   "confecciones_boston",
