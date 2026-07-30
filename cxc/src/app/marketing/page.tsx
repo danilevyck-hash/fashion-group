@@ -15,6 +15,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
+import {
+  MULTIFASHION_BUCKET,
+  MULTIFASHION_LABEL,
+} from "@/lib/marketing/multifashion";
 import ProyectosHomeView from "./components/ProyectosHomeView";
 import MarcaSelector from "./components/MarcaSelector";
 import ProyectoOverlay from "./components/ProyectoOverlay";
@@ -125,9 +129,11 @@ function MarketingPage() {
   const bucketLabel =
     marcaParam === "legacy"
       ? "Gastos Tommy y Calvin"
-      : marcaParam
-        ? marcas.find((m) => m.id === marcaParam)?.nombre ?? "Marca"
-        : null;
+      : marcaParam === MULTIFASHION_BUCKET
+        ? MULTIFASHION_LABEL
+        : marcaParam
+          ? marcas.find((m) => m.id === marcaParam)?.nombre ?? "Marca"
+          : null;
 
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "anulados") {
@@ -169,8 +175,18 @@ function MarketingPage() {
         ) : marcaParam ? (
           <ProyectosHomeView
             marcas={marcas}
-            grupo={marcaParam === "legacy" ? "legacy" : "marca"}
-            marcaIdFijo={marcaParam === "legacy" ? undefined : marcaParam}
+            grupo={
+              marcaParam === "legacy"
+                ? "legacy"
+                : marcaParam === MULTIFASHION_BUCKET
+                  ? "multifashion"
+                  : "marca"
+            }
+            marcaIdFijo={
+              marcaParam === "legacy" || marcaParam === MULTIFASHION_BUCKET
+                ? undefined
+                : marcaParam
+            }
             bucketLabel={bucketLabel ?? ""}
             bucketEsLegacy={marcaParam === "legacy"}
             onBack={() => navegar({ marca: null, proyecto: null })}
@@ -187,6 +203,7 @@ function MarketingPage() {
             marcas={marcas}
             onSelectMarca={(id) => navegar({ marca: id })}
             onSelectLegacy={() => navegar({ marca: "legacy" })}
+            onSelectMultifashion={() => navegar({ marca: MULTIFASHION_BUCKET })}
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}

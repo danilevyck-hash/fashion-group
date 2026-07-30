@@ -275,6 +275,9 @@ export default function FacturasSection({
   const handleAbrirEdicion = useCallback(
     async (factura: FacturaConAdjuntos) => {
       setEditando(factura);
+      // Se limpia ANTES de pedir: si quedaran las marcas de la factura anterior,
+      // el form se dibujaría por un instante con las marcas equivocadas.
+      setEditandoMarcas(null);
       // Pre-cargar marcas actuales de esa factura
       try {
         const res = await fetch(`/api/marketing/facturas/${factura.id}/marcas`, {
@@ -617,31 +620,6 @@ export default function FacturasSection({
         </div>
       )}
 
-      {editando && editandoMarcas !== null && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Editar factura {editando.numero_factura}
-            </h3>
-            <button
-              type="button"
-              onClick={() => { setEditando(null); setEditandoMarcas(null); }}
-              className="text-xs text-gray-500 hover:text-black"
-            >
-              Cancelar
-            </button>
-          </div>
-          <FacturaForm
-            proyecto={proyecto}
-            marcasCatalogo={marcasCatalogo}
-            initial={editando}
-            initialMarcas={editandoMarcas}
-            onSubmit={handleEditar}
-            onCancel={() => { setEditando(null); setEditandoMarcas(null); }}
-          />
-        </div>
-      )}
-
       {loading ? (
         <div className="space-y-2">
           {[1, 2].map((i) => (
@@ -669,11 +647,59 @@ export default function FacturasSection({
               f.marcas && f.marcas.length > 0
                 ? f.marcas
                 : proyecto.marcas ?? [];
+
+            // 🩸 El formulario de edición se dibuja EN EL LUGAR de la factura, no
+            // arriba de la lista. Antes vivía antes del listado y "Editar" parecía
+            // no hacer nada: la ficha del proyecto es un modal con scroll propio
+            // (`max-h-[95vh] overflow-y-auto` en ProyectoOverlay), así que al
+            // tocar Editar en una factura del medio o del final, el form se abría
+            // fuera de la pantalla y no había ninguna señal de que algo pasó.
+            // Acá el formulario aparece exactamente donde el usuario hizo clic.
+            //
+            // El `key` obliga a REMONTARLO al pasar de una factura a otra: los
+            // campos del form son useState inicializados desde `initial`, que solo
+            // corren al montar — sin key, abrir la factura B con la A abierta
+            // mostraba los datos de A y se podía guardar el número equivocado.
+            if (editando?.id === f.id && editandoMarcas !== null) {
+              return (
+                <div
+                  key={f.id}
+                  className="rounded-lg border-2 border-black bg-white p-4"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      Editar factura {editando.numero_factura}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => { setEditando(null); setEditandoMarcas(null); }}
+                      className="text-xs text-gray-500 hover:text-black min-h-[44px] px-2"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                  <FacturaForm
+                    key={editando.id}
+                    proyecto={proyecto}
+                    marcasCatalogo={marcasCatalogo}
+                    initial={editando}
+                    initialMarcas={editandoMarcas}
+                    onSubmit={handleEditar}
+                    onCancel={() => { setEditando(null); setEditandoMarcas(null); }}
+                  />
+                </div>
+              );
+            }
+
             return (
               <div key={f.id} className="relative group">
                 <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
+                {/* En pantalla táctil no existe el hover: si quedaran en
+                    opacity-0, Editar/Anular/Eliminar serían INVISIBLES en el
+                    iPhone. Se muestran siempre en móvil y se conserva el
+                    revelado por hover en escritorio. */}
                 {!f.anulado_en && !readonly && (
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                  <div className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition flex gap-1">
                     <button
                       type="button"
                       onClick={(e) => {

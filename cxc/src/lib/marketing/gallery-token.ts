@@ -21,8 +21,10 @@ function requireSecret(): string {
   return s;
 }
 
-// scope = "galeria" (fotos) | "facturas" (PDF combinado). Namespaces separados
-// para que un token de una vista no sirva para la otra.
+// scope = "galeria" (fotos) | "facturas" (PDF combinado) | "entrega"
+// (comprobante de entrega de mobiliario; acá el "codigo" es el id de la
+// entrega, no el del cliente). Namespaces separados para que un token de una
+// vista no sirva para la otra.
 function firmar(scope: string, codigo: string, secret: string): string {
   return crypto
     .createHmac("sha256", secret)
@@ -64,4 +66,20 @@ export function verifyFacturasToken(
   token: string | undefined | null,
 ): boolean {
   return verificar("facturas", clienteCodigo, token);
+}
+
+/**
+ * Comprobante de entrega de mobiliario. El sujeto del token es el ID DE LA
+ * ENTREGA (no el cliente): un comprobante es un documento puntual, y tener el
+ * link de uno no debe abrir los de las demás entregas del mismo cliente.
+ */
+export function signEntregaToken(entregaId: string): string {
+  return firmar("entrega", entregaId, requireSecret());
+}
+
+export function verifyEntregaToken(
+  entregaId: string,
+  token: string | undefined | null,
+): boolean {
+  return verificar("entrega", entregaId, token);
 }

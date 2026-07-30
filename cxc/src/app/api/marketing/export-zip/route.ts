@@ -18,13 +18,17 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as {
       busqueda?: string;
       marca_id?: string | null;
-      grupo?: "legacy" | "marca";
+      grupo?: "legacy" | "marca" | "multifashion";
     };
+    // Lista blanca explícita: un `grupo` desconocido cae a undefined (export
+    // global) en vez de colarse hasta el filtro.
+    const GRUPOS = ["legacy", "marca", "multifashion"] as const;
+    const grupo = GRUPOS.find((g) => g === body.grupo);
 
     const result = await buildMarketingZip({
       busqueda: body.busqueda,
       marcaId: body.marca_id ?? null,
-      grupo: body.grupo === "legacy" || body.grupo === "marca" ? body.grupo : undefined,
+      grupo,
     });
 
     const fecha = new Date().toISOString().slice(0, 10);
