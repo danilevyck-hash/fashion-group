@@ -711,6 +711,30 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > Candado: `src/__tests__/lib/tablas-anchas-ipad.test.ts` (18 casos, verificado por mutación: devolver un corte a `sm` rompe 2).
 
+### Multifashion › Resumen — los números pegados de "Mes a mes" (30-jul-2026)
+
+> Daniel, mirando el iPhone: *"mira en multifashion, en resumen, lo pegado que estan los numeros, arreglalo"*. Medido en el navegador a 390 px con las cifras reales (5 dígitos con centavos, el peor caso es la fila YTD): el aire entre el monto del año actual y el del anterior era **−4,8 px**. **No estaban apretados: se SUPERPONÍAN** (`$302,556.86$271,191.20`).
+>
+> **DESPUÉS: +16 px, con desborde 0. iPad y escritorio quedaron IDÉNTICOS** (93,2 px a 834 · 188,2 a 1024 · 396,2 a 1440, los mismos antes y después), y el arrastre horizontal sigue en **0 en los cuatro anchos**.
+>
+> 🩸 **La causa NO era el relleno ni el interletrado — que es lo que uno toca si arregla a ojo.** Con las 4 columnas en una sola línea, a cada monto le tocaba una pista de **79,6 px** cuando el texto pide **92,4**: cada uno desbordaba **12,8 px** y eso se comía los 8 px del `gap` (8 − 12,8 = −4,8). Las dos columnas estaban **compitiendo** por un ancho que no alcanzaba. Por eso el diagnóstico mide **pista contra texto** y no solo el hueco: distingue "falta aire" de "no entra", que se arreglan distinto.
+>
+> **La cuenta que cierra el caso, a 390 px:** quedan 326 px útiles dentro de la tarjeta, y Mes (44,8) + dos montos (92,4 × 2) + Δ (96) + 3 separaciones = **350,4**. **Faltan 24,4 px.** Las 4 columnas en una línea no entran, y las dos salidas baratas están prohibidas: **la letra no baja de 12 px** (#301, y esta pantalla es de plata) y **los montos van completos con centavos** (nada de `$33.2K`).
+>
+> **Solución: en celular la fila usa DOS líneas.** Arriba Mes + los dos montos; abajo el Δ (porcentaje y absoluto, uno al lado del otro), alineado a la derecha.
+> - **Los montos van en columnas `auto`, no en fracciones.** En un grid, una pista `auto` vale lo mismo para TODAS las filas (el ancho del contenido más largo, el YTD), así que los montos siguen **alineados de arriba abajo** —que es lo que permite comparar de un barrido— y el aire entre ellos es **exactamente el `gap-x-4` = 16 px**, ni más ni menos. Con `1fr 1fr` el aire habría salido de 48 px y variable; con `auto` es el que se elige.
+> - **La columna Mes se queda con el sobrante** (`minmax(2.8rem,1fr)`), que es donde no molesta.
+> - **El corte es `md` y no `sm`:** a 640 px la tabla quedaría con **8 px de aire total**, otra vez al borde de tocarse.
+> - **Desde `md` no cambia NADA**: vuelve el reparto de 4 columnas en una línea. El encabezado "Δ" se esconde solo en celular (un encabezado suelto en la segunda línea sobra; el valor ya se explica con su signo, % y $).
+>
+> **Ningún número cambió, y está medido:** `node scripts/_verif-mes-a-mes.mjs` compara las 8 filas celda por celda entre 390 y 1440 — **32 celdas, 0 distintas**. La comparación va contra `data-col`, **no** contra la clase del breakpoint: buscar por `.md\:block` devuelve vacío en cuanto el corte se mueve, el chequeo compara CERO y **pasa en verde sin haber mirado nada**; el script falla si encuentra cero.
+>
+> **Diagnóstico reproducible: `ETAPA=antes node scripts/_medir-aire-mes-a-mes.mjs`** (390/834/1024/1440, solo lectura). Mide sobre la fila del **peor caso** —la de más dígitos, no la primera—: un mes de 4 cifras no prueba nada sobre uno de 5 con centavos. Deja capturas de la tabla en cada ancho.
+>
+> **De paso, blancos táctiles de Multifashion › Clientes:** las píldoras de período (Mes / 3 meses / 6 meses / 12 meses) medían **26 px** y los chips de segmento (Todos / Frecuentes / Dormidos / 5% disponible) **28**. Los dos grupos pasaron a **44** con `-my-1.5` para que crecer no separe el filtro del título. Verificado: **0 blancos bajo 44 px** en Resumen y Clientes, a 390 y 834.
+>
+> Candado: `src/__tests__/lib/multifashion-numeros-aire.test.ts` (12 casos; verificado por mutación: volver a `minmax(0,1fr)` en celular rompe 1). Incluye los candados de las reglas que no se pueden romper para ganar espacio — que la letra siga en `text-sm` y que la tabla no use `fmtMoneyCompact`.
+
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows
 

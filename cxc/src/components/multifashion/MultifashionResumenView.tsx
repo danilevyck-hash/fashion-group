@@ -554,14 +554,47 @@ function ComparativoInteranualCard({
   const totPrev = comp.reduce((s, f) => s + (f.vPrev ?? 0), 0);
   const totPct = variacionPct(tot, totPrev);
 
-  const GRID = "grid grid-cols-[2.8rem_minmax(0,1fr)_minmax(0,1fr)_6rem] items-center gap-2 px-4";
+  // 🩸 POR QUÉ SON DOS REPARTOS Y NO UNO (30-jul-2026). Daniel, sobre el iPhone:
+  // *"lo pegado que estan los numeros"*. Medido en el navegador a 390 px, el aire
+  // entre la cifra del año actual y la del anterior era de **−4,8 px**: no es que
+  // estuvieran apretadas, es que se SUPERPONÍAN. La causa no era el relleno ni el
+  // interletrado: con 4 columnas en una sola línea, a cada monto le tocaba una
+  // pista de 79,6 px cuando el texto pide 92,4 — cada uno desbordaba 12,8 px y
+  // eso se comía los 8 px del `gap` (8 − 12,8 = −4,8). Las dos columnas estaban
+  // COMPITIENDO por un ancho que no alcanzaba.
+  //
+  // La cuenta a 390 px: quedan 326 px útiles adentro de la tarjeta. Mes (44,8) +
+  // dos montos (92,4 × 2) + Δ (96) + 3 separaciones = 350,4. **Faltan 24,4 px**,
+  // así que las 4 columnas en una línea NO entran — y bajar la letra (piso de 12
+  // px, decidido en el #301) o abreviar los montos está prohibido: esta pantalla
+  // es de plata.
+  //
+  // Solución: en celular la fila usa DOS líneas. Arriba Mes + los dos montos;
+  // abajo el Δ, alineado a la derecha. Los montos van en columnas `auto`, que en
+  // un grid valen lo mismo para TODAS las filas (el ancho del contenido más
+  // largo, el YTD), así que siguen alineados de arriba abajo y el aire entre
+  // ellos es EXACTAMENTE el `gap-x-4` = 16 px. La columna Mes se queda con el
+  // sobrante.
+  //
+  // Desde `md` no cambia NADA: vuelve el reparto de 4 columnas en una línea, que
+  // ahí tiene aire de sobra (93 px a 834, 396 px a 1440). El corte es `md` y no
+  // `sm` porque a 640 px la tabla quedaría con 8 px de aire total — otra vez al
+  // borde de tocarse.
+  const GRID = [
+    "grid items-center px-4",
+    "grid-cols-[minmax(2.8rem,1fr)_auto_auto] gap-x-4 gap-y-1",
+    "md:grid-cols-[2.8rem_minmax(0,1fr)_minmax(0,1fr)_6rem] md:gap-x-2 md:gap-y-0",
+  ].join(" ");
+  // El Δ: segunda línea en celular (ocupando el ancho de los dos montos), su
+  // propia columna desde `md`.
+  const CELDA_DELTA = "col-start-2 col-span-2 md:col-start-4 md:col-span-1";
   const deltaTone = (n: number | null) =>
     n == null ? "text-gray-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
   const fmtPct = (p: number | null) => fmtVariacionPct(p, true, 1);
   const fmtAbs = (n: number | null) => (n == null ? "" : `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`);
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card data-tabla="mes-a-mes" className="overflow-hidden p-0">
       <div className="border-b border-gray-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">Mes a mes vs {prevYear}</h4>
         <p className="mt-0.5 text-xs text-gray-400">
@@ -572,33 +605,39 @@ function ComparativoInteranualCard({
         <span>Mes</span>
         <span className="text-right">{year}</span>
         <span className="text-right">{prevYear}</span>
-        <span className="text-right">Δ</span>
+        {/* En celular el Δ vive en la segunda línea de cada fila, así que un
+            encabezado suelto ahí sobra: el valor ya se explica solo (lleva signo,
+            % y $). Desde `md` recupera su columna. */}
+        <span className={cn("hidden text-right md:block", CELDA_DELTA)}>Δ</span>
       </div>
       {filas.map((f) => (
-        <div key={f.label} className={cn(GRID, "border-t border-gray-100 py-2 text-sm")}>
-          <span className="capitalize text-gray-700">
+        <div key={f.label} data-fila="mes" className={cn(GRID, "border-t border-gray-100 py-2 text-sm")}>
+          <span data-col="mes" className="capitalize text-gray-700">
             {f.label}
             {f.parcial ? <span className="ml-1 text-xs text-gray-400">d{diaActual}</span> : null}
           </span>
-          <span className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
-          <span className="text-right font-mono tabular-nums text-gray-500">
+          <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(f.v)}</span>
+          <span data-col="previo" className="text-right font-mono tabular-nums text-gray-500">
             {f.vPrev != null ? fmtMoney(f.vPrev) : "—"}
           </span>
-          <span className="text-right font-mono tabular-nums leading-tight">
+          {/* En celular los dos datos del Δ van uno al lado del otro en la
+              segunda línea (hay ancho de sobra); desde `md` se apilan como
+              siempre dentro de su columna de 6rem. */}
+          <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right font-mono tabular-nums leading-tight md:block md:gap-0")}>
             <span className={cn("font-medium", deltaTone(f.pct))}>{fmtPct(f.pct)}</span>
             {f.abs != null && (
-              <span className={cn("block text-xs", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
+              <span className={cn("text-xs md:block", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
             )}
           </span>
         </div>
       ))}
-      <div className={cn(GRID, "border-t border-gray-300 bg-gray-50 py-2 text-sm font-semibold")}>
-        <span className="text-gray-700">YTD</span>
-        <span className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(tot)}</span>
-        <span className="text-right font-mono tabular-nums text-gray-600">{fmtMoney(totPrev)}</span>
-        <span className="text-right font-mono tabular-nums leading-tight">
+      <div data-fila="mes" className={cn(GRID, "border-t border-gray-300 bg-gray-50 py-2 text-sm font-semibold")}>
+        <span data-col="mes" className="text-gray-700">YTD</span>
+        <span data-col="actual" className="text-right font-mono tabular-nums text-gray-950">{fmtMoney(tot)}</span>
+        <span data-col="previo" className="text-right font-mono tabular-nums text-gray-600">{fmtMoney(totPrev)}</span>
+        <span data-col="delta" className={cn(CELDA_DELTA, "flex items-baseline justify-end gap-2 text-right font-mono tabular-nums leading-tight md:block md:gap-0")}>
           <span className={cn("font-medium", deltaTone(totPct))}>{fmtPct(totPct)}</span>
-          <span className={cn("block text-xs", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
+          <span className={cn("text-xs md:block", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
         </span>
       </div>
     </Card>
