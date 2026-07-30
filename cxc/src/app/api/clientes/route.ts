@@ -35,7 +35,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
-import { idsFueraDelDirectorio, sinClientesFueraDelDirectorio } from "@/lib/clientes/directorio-exclusiones";
+import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
 
 export const dynamic = "force-dynamic";
 
@@ -89,11 +89,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Fuera del Directorio los clientes EXCLUSIVOS de las empresas listadas en
-  // `EMPRESAS_FUERA_DEL_DIRECTORIO` (hoy: Boston). El criterio y su porqué viven
-  // en UN solo lugar — `lib/clientes/directorio-exclusiones` — no acá.
-  // Va antes de la búsqueda y del conteo, así que `total` ya sale sin ellos.
-  const visibles = sinClientesFueraDelDirectorio(filas, await idsFueraDelDirectorio());
+  // Solo los clientes del GRUPO (las 6 que conviven). Los de Boston viven en su
+  // pestaña de CXC y los de Multifashion en su módulo. La regla y su porqué
+  // viven en UN solo lugar — `lib/clientes/mundos` — no acá.
+  // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
+  const visibles = soloClientesDelGrupo(filas, await mundosDeClientes());
 
   const filtrados = q
     ? visibles.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))

@@ -11,7 +11,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import ClientesListClient, { type Cliente } from "./ClientesListClient";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { idsFueraDelDirectorio, sinClientesFueraDelDirectorio } from "@/lib/clientes/directorio-exclusiones";
+import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 const PAGE_SIZE = 50;
@@ -53,11 +53,11 @@ export default async function ClientesPage() {
   //
   // 🩸 La lista se lee ENTERA y se recorta acá, en vez de pedirle a la base la
   // primera página con `count: exact`. Es por las exclusiones del Directorio:
-  // los clientes exclusivos de Boston se quitan DESPUÉS de leer, así que un
-  // `count` de la base contaría 794 que no se van a mostrar y la paginación
+  // los que no son del grupo se quitan DESPUÉS de leer, así que un
+  // `count` de la base contaría miles que no se van a mostrar y la paginación
   // prometería páginas vacías. Mismo criterio que `/api/clientes`, que ya leía
   // así — el primer render y el refetch tienen que dar el MISMO total.
-  const [todosRes, provinciasRes, excluidos] = await Promise.all([
+  const [todosRes, provinciasRes, mundos] = await Promise.all([
     leerTodoPaginado<Cliente>(
       "clientes_master (primer render del Directorio)",
       (pedirCount, from, to) =>
@@ -76,10 +76,10 @@ export default async function ClientesPage() {
       .select("provincia")
       .eq("deleted", false)
       .not("provincia", "is", null),
-    idsFueraDelDirectorio(),
+    mundosDeClientes(),
   ]);
 
-  const visibles = sinClientesFueraDelDirectorio(todosRes, excluidos);
+  const visibles = soloClientesDelGrupo(todosRes, mundos);
   visibles.sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
   const clientes = visibles.slice(0, PAGE_SIZE);
   const total = visibles.length;
