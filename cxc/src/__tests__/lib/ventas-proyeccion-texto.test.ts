@@ -153,6 +153,9 @@ describe("el desglose viejo con jerga no volvió a la UI", () => {
   });
 
   it("en celular la proyección ya se puede tocar (antes era un td mudo)", () => {
-    expect(mobile).toContain('celdaKey("m", filaId, "proy")');
+    // Desde el paso a tarjetas la Proyección es un renglón más de la lista, con
+    // su propia llave de foco — pero sigue siendo tocable y sigue explicándose.
+    expect(mobile).toContain('celdaKey("m", id, "proy")');
+    expect(mobile).toMatch(/etiqueta: "Proyección"/);
   });
 });
