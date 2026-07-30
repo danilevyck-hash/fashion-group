@@ -1,0 +1,288 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// En CELULAR los filtros del catálogo son DESPLEGABLES, no una fila que se
+// arrastra de costado (30-jul-2026).
+//
+// Daniel, textual: *"en todo lo del iphone donde haya data como los filtros en
+// los catalogos y hay que hacer scroll, mejor arreglarlo de otra manera, un
+// drop down"*.
+//
+// 🩸 LO MEDIDO ANTES, navegador real, build y datos de producción, 390 px
+// (iPhone), en las DOS vistas que comparten este componente — la interna del
+// vendedor (`/catalogo/<marca>`) y la pública del cliente
+// (`/catalogo-publico/<marca>`):
+//
+//   marca      interno            público            controles fuera de la vista
+//   Tommy      779 px de arrastre  813 px             10 de 15
+//   Reebok     642 px              674 px              7 de 12
+//   Joybees    138 px              158 px              2 de 7
+//
+// Después del arreglo: **0 px en las 3 marcas y en las 2 vistas**.
+//
+// Este archivo congela la CAUSA (jsdom no calcula layout, así que no puede
+// medir un arrastre); la medición real vive en
+// `scripts/_medir-filtros-catalogo.mjs`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { describe, it, expect, vi } from "vitest";
+import { createElement } from "react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { readFileSync } from "fs";
+import path from "path";
+
+vi.mock("@/lib/tommy-supabase-server", () => ({ tommyServer: {} }));
+vi.mock("@/lib/supabase-server", () => ({ supabaseServer: {} }));
+
+import { MARCA_THEME, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { BULTOS_CHIP_LABEL, type PrecioRango } from "@/lib/catalogo/filtros-extra";
+import CatalogoFilters from "@/components/catalogo/CatalogoFilters";
+
+const FUENTE = readFileSync(
+  path.join(process.cwd(), "src/components/catalogo/CatalogoFilters.tsx"),
+  "utf8",
+);
+
+const MARCAS: MarcaUiKey[] = ["reebok", "joybees", "tommy"];
+
+function props(marca: MarcaUiKey, extra: Record<string, unknown> = {}) {
+  return {
+    marca,
+    searchInput: "", onSearchChange: () => {},
+    gender: "", onGenderChange: () => {},
+    category: "", onCategoryChange: () => {},
+    saleFilter: "" as const, onSaleFilterChange: () => {},
+    bultosFilter: false, onBultosFilterChange: () => {},
+    precioRango: "" as PrecioRango, onPrecioRangoChange: () => {},
+    sortBy: "relevancia", onSortByChange: () => {},
+    filteredCount: 0, onClearAll: () => {},
+    ...extra,
+  };
+}
+
+/** La fila de píldoras de siempre (iPad/escritorio): la del `overflow-x-auto`. */
+function filaPildoras(container: HTMLElement): HTMLElement {
+  const el = container.querySelector<HTMLElement>(".overflow-x-auto");
+  if (!el) throw new Error("no encontré la fila de píldoras");
+  return el;
+}
+
+/** La fila de desplegables (celular): la que se esconde de `md` para arriba. */
+function filaMovil(container: HTMLElement): HTMLElement {
+  const el = container.querySelector<HTMLElement>(".md\\:hidden");
+  if (!el) throw new Error("no encontré la fila de celular");
+  return el;
+}
+
+// ── La causa del arrastre: la fila de píldoras ya no se dibuja en celular ─────
+describe("la fila que se arrastraba sale de la pantalla del celular", () => {
+  it("la fila de píldoras es `hidden md:flex` — solo iPad y escritorio", () => {
+    for (const marca of MARCAS) {
+      const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
+      expect(filaPildoras(container).className, marca).toContain("hidden");
+      expect(filaPildoras(container).className, marca).toContain("md:flex");
+      unmount();
+    }
+  });
+
+  it("la fila de celular ENVUELVE y no se arrastra: `flex-wrap`, sin overflow", () => {
+    for (const marca of MARCAS) {
+      const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
+      const fila = filaMovil(container);
+      // `flex-wrap` es lo que garantiza 0 px de arrastre por CONSTRUCCIÓN: lo
+      // que no entra baja de renglón en vez de esconderse a la derecha.
+      expect(fila.className, marca).toContain("flex-wrap");
+      expect(fila.className, marca).not.toContain("overflow-x-auto");
+      unmount();
+    }
+  });
+
+  it("el corte es `md` (768): iPad de 834 y escritorio NO cambian", () => {
+    // Con `sm` (640) un iPad en vertical seguiría igual, pero un celular
+    // apaisado perdería el arreglo; con `lg` (1024) el iPad cambiaría de
+    // aspecto, y el alcance aprobado fue SOLO el celular.
+    expect(FUENTE).toContain("hidden md:flex items-center gap-2 overflow-x-auto");
+    expect(FUENTE).toContain("flex md:hidden flex-wrap");
+    expect(FUENTE).not.toMatch(/\b(sm|lg|xl):hidden\b/);
+  });
+});
+
+// ── Qué grupos aparecen en cada marca ────────────────────────────────────────
+describe("cada marca lleva sus grupos, ni uno más", () => {
+  const ESPERADO: Record<MarcaUiKey, string[]> = {
+    // Reebok: género + categoría + los chips de Oferta/Nuevo/Próximamente.
+    reebok: ["Género", "Categoría", "Estado"],
+    // Joybees no tiene categorías (`categoryOptions` vacío) ni saleFilter.
+    joybees: ["Género"],
+    // Tommy no tiene saleFilter; su chip de bultos es un interruptor, no lista.
+    tommy: ["Género", "Categoría"],
+  };
+
+  for (const marca of MARCAS) {
+    it(`${marca}: ${ESPERADO[marca].join(" · ")}`, () => {
+      const { container } = render(createElement(CatalogoFilters, props(marca)));
+      const disparadores = within(filaMovil(container))
+        .getAllByRole("button")
+        .filter(b => b.getAttribute("aria-haspopup") === "listbox")
+        .map(b => (b.textContent || "").split(":")[0].trim());
+      expect(disparadores).toEqual(ESPERADO[marca]);
+    });
+  }
+
+  it("en Tommy el chip de bultos sigue PRIMERO también en celular", () => {
+    // Misma razón que en la fila de píldoras (26-jul-2026): corta 123 de 490
+    // productos y un filtro que no se ve no existe.
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    const botones = within(filaMovil(container)).getAllByRole("button");
+    expect((botones[0].textContent || "").trim()).toBe(BULTOS_CHIP_LABEL);
+  });
+
+  it("Reebok y Joybees NO muestran el chip de bultos en celular", () => {
+    for (const marca of ["reebok", "joybees"] as const) {
+      const { container, unmount } = render(createElement(CatalogoFilters, props(marca)));
+      expect(
+        within(filaMovil(container)).queryByRole("button", { name: BULTOS_CHIP_LABEL }),
+        marca,
+      ).toBeNull();
+      unmount();
+    }
+  });
+});
+
+// ── El desplegable: qué dice, qué muestra y qué devuelve ─────────────────────
+describe("el desplegable de un grupo", () => {
+  function disparador(container: HTMLElement, etiqueta: string): HTMLElement {
+    const b = within(filaMovil(container))
+      .getAllByRole("button")
+      .find(x => (x.textContent || "").startsWith(`${etiqueta}:`));
+    if (!b) throw new Error(`no encontré el disparador de ${etiqueta}`);
+    return b;
+  }
+
+  it("cerrado NO existe en el DOM (por eso duplicar el control no duplica nada)", () => {
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    expect(container.ownerDocument.querySelector("[data-desplegable]")).toBeNull();
+    // Y el único "Women" de la pantalla es el chip de la fila de píldoras.
+    expect(screen.getAllByRole("button", { name: "Women" })).toHaveLength(1);
+  });
+
+  it("el botón dice el grupo Y lo elegido, para leer el estado sin abrirlo", () => {
+    const { container } = render(
+      createElement(CatalogoFilters, props("tommy", { gender: "women" })),
+    );
+    expect(disparador(container, "Género").textContent).toContain("Género: Women");
+  });
+
+  it("sin nada elegido dice la primera opción del tema ('Todos')", () => {
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    expect(disparador(container, "Género").textContent).toContain("Género: Todos");
+    expect(MARCA_THEME.tommy.filtros.genderOptions[0].value).toBe("");
+  });
+
+  it("abierto muestra TODAS las opciones del tema, la elegida marcada", () => {
+    const { container } = render(
+      createElement(CatalogoFilters, props("tommy", { gender: "men" })),
+    );
+    fireEvent.click(disparador(container, "Género"));
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-género"]',
+    );
+    expect(panel).toBeTruthy();
+    const opciones = within(panel!).getAllByRole("option");
+    expect(opciones.map(o => (o.textContent || "").trim())).toEqual(
+      MARCA_THEME.tommy.filtros.genderOptions.map(o => o.label),
+    );
+    expect(opciones.find(o => o.getAttribute("aria-selected") === "true")?.textContent)
+      .toContain("Men");
+  });
+
+  it("elegir una opción avisa el valor y cierra la lista", () => {
+    const vistos: string[] = [];
+    const { container } = render(
+      createElement(CatalogoFilters, props("tommy", { onGenderChange: (v: string) => vistos.push(v) })),
+    );
+    fireEvent.click(disparador(container, "Género"));
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-género"]',
+    )!;
+    fireEvent.click(within(panel).getByRole("option", { name: "Boys" }));
+    expect(vistos).toEqual(["boys"]);
+    expect(
+      container.ownerDocument.querySelector('[data-desplegable="catalogo-filtro-género"]'),
+    ).toBeNull();
+  });
+
+  it("'Todos' devuelve la cadena vacía: apaga el filtro, no lo pone en 'todos'", () => {
+    const vistos: string[] = [];
+    const { container } = render(
+      createElement(CatalogoFilters, props("tommy", {
+        gender: "women",
+        onGenderChange: (v: string) => vistos.push(v),
+      })),
+    );
+    fireEvent.click(disparador(container, "Género"));
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-género"]',
+    )!;
+    fireEvent.click(within(panel).getByRole("option", { name: "Todos" }));
+    expect(vistos).toEqual([""]);
+  });
+
+  it("Reebok mapea el grupo 'Estado' a los chips de Oferta/Nuevo/Próximamente", () => {
+    const vistos: string[] = [];
+    const { container } = render(
+      createElement(CatalogoFilters, props("reebok", {
+        onSaleFilterChange: (v: string) => vistos.push(v),
+      })),
+    );
+    fireEvent.click(disparador(container, "Estado"));
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-estado"]',
+    )!;
+    expect(within(panel).getAllByRole("option").map(o => (o.textContent || "").trim()))
+      .toEqual(["Todos", "Oferta", "Nuevo", "Próximamente"]);
+    fireEvent.click(within(panel).getByRole("option", { name: "Próximamente" }));
+    expect(vistos).toEqual(["proximamente"]);
+  });
+});
+
+// ── Alto táctil ──────────────────────────────────────────────────────────────
+describe("todo lo que se toca mide 44 px de alto", () => {
+  it("los disparadores y las opciones llevan min-h-[44px]", () => {
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    for (const b of within(filaMovil(container)).getAllByRole("button")) {
+      expect(b.className, b.textContent ?? "").toContain("min-h-[44px]");
+    }
+    fireEvent.click(
+      within(filaMovil(container))
+        .getAllByRole("button")
+        .find(x => (x.textContent || "").startsWith("Género:"))!,
+    );
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-género"]',
+    )!;
+    for (const o of within(panel).getAllByRole("option")) {
+      expect(o.className).toContain("min-h-[44px]");
+    }
+  });
+});
+
+// ── El panel usa EL desplegable de la casa ───────────────────────────────────
+describe("el panel flota de verdad", () => {
+  it("usa <DesplegableFlotante>, no un `absolute` que un ancestro recorta", () => {
+    expect(FUENTE).toContain('from "@/components/ui/DesplegableFlotante"');
+    expect(FUENTE).not.toMatch(/absolute[^"]*top-full/);
+  });
+
+  it("se dibuja en <body>, fuera del contenedor de los filtros", () => {
+    const { container } = render(createElement(CatalogoFilters, props("tommy")));
+    fireEvent.click(
+      within(filaMovil(container))
+        .getAllByRole("button")
+        .find(x => (x.textContent || "").startsWith("Género:"))!,
+    );
+    const panel = container.ownerDocument.querySelector<HTMLElement>(
+      '[data-desplegable="catalogo-filtro-género"]',
+    )!;
+    expect(panel.parentElement).toBe(container.ownerDocument.body);
+    expect(container.contains(panel)).toBe(false);
+  });
+});
