@@ -46,6 +46,7 @@ import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
+import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { clearStaleRunning, isRunningLockConflict } from "@/lib/switch-api/sync-log";
 import {
   isSyncNowModulo,
@@ -232,8 +233,20 @@ async function ejecutar(
       if (r.hadError || !emp || emp.error) {
         return { error: emp?.error ?? "sync de catálogo falló" };
       }
+      // 🩸 ACÁ ESTABA EL HUECO (28-jul-2026). Este botón mete productos igual
+      // que el cron, y era el ÚNICO camino que no avisaba: los 60 productos de
+      // Reebok entraron por acá (`by=manual`, 17:23 UTC) y el mensaje nunca
+      // salió — ni pudo salir después, porque para la corrida siguiente del
+      // cron las filas ya existían y dejaban de ser "nuevas". Best-effort: si
+      // el aviso falla, el sync ya terminó bien y se reporta bien.
+      const aviso = await avisarNuevosSinFoto(
+        modulo === "catalogo-reebok" ? "reebok" : modulo === "catalogo-joybees" ? "joybees" : "tommy",
+      );
+      const sufijoAviso = aviso.codigos.length > 0
+        ? ` · avisé de ${aviso.codigos.length} sin foto`
+        : "";
       return {
-        resumen: `Catálogo al día: ${emp.actualizados} actualizados · ${emp.agregados} nuevos · ${emp.ocultados} ocultados`,
+        resumen: `Catálogo al día: ${emp.actualizados} actualizados · ${emp.agregados} nuevos · ${emp.ocultados} ocultados${sufijoAviso}`,
       };
     }
   }

@@ -188,7 +188,11 @@ describe("buildReebokSinFotoWorkbook — export 'sin foto' del admin", () => {
   const ws = wb.Sheets["Sin foto"];
 
   it("hoja 'Sin foto' con estructura completa: título navy + headers navy", () => {
-    expect(wb.SheetNames).toEqual(["Sin foto"]);
+    // Desde el 30-jul-2026 el archivo lleva DOS hojas: primero la réplica de la
+    // plantilla del banco B2B (códigos en la columna B, ordenados A-Z) y después
+    // este reporte de detalle, que NO se quitó. La forma de la hoja de la
+    // plantilla la fija dash-busqueda-excel.test.ts.
+    expect(wb.SheetNames).toEqual(["DASHBOARD DE BUSQUEDA", "Sin foto"]);
     expect(ws[A(0, 0)].v).toBe("REEBOK — Productos sin foto");
     expect(ws[A(0, 0)].s.fill.fgColor.rgb).toBe(NAVY);
     const headers = ["Código", "Descripción", "Categoría", "Disponible", "Existencia"];

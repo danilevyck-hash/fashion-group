@@ -61,6 +61,7 @@ import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
+import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
 import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
@@ -484,6 +485,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
     successSinceIso: cicloCatalogo("joybees-catalogo"), // ciclo 17:55h (11:00/17:05)
     recover: async () => {
       const r = await syncCatalogoJoybees();
+      // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
+      // la corrida que meta los productos, así que no puede quedarse muda
+      // (best-effort, delta de estado — ver lib/catalogos/fotos-nuevos.ts).
+      await avisarNuevosSinFoto("joybees");
       const bad = r.empresas.filter((e) => e.error);
       return {
         ok: !r.hadError,
@@ -506,6 +511,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
     successSinceIso: cicloCatalogo("reebok-catalogo"), // ciclo 19:10h (12:10/17:00)
     recover: async () => {
       const r = await syncCatalogoReebok();
+      // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
+      // la corrida que meta los productos, así que no puede quedarse muda
+      // (best-effort, delta de estado — ver lib/catalogos/fotos-nuevos.ts).
+      await avisarNuevosSinFoto("reebok");
       const bad = r.empresas.filter((e) => e.error);
       return {
         ok: !r.hadError,
@@ -532,6 +541,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
       if (r.ddlPendiente) {
         return { ok: true, detail: "DDL 20260724150000 pendiente — sync omitido (sin tocar Switch)" };
       }
+      // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
+      // la corrida que meta los productos, así que no puede quedarse muda
+      // (best-effort, delta de estado — ver lib/catalogos/fotos-nuevos.ts).
+      await avisarNuevosSinFoto("tommy");
       const bad = r.empresas.filter((e) => e.error);
       return {
         ok: !r.hadError,

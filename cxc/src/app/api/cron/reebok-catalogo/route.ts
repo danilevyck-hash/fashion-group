@@ -15,10 +15,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { logCronError, recordCronHeartbeat } from "@/lib/cron-telemetry";
-import { sendTelegramAlert } from "@/lib/telegram";
-import { buildNuevosSinFotoMsg } from "@/lib/catalogos/fotos-faltantes";
+import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
-import { enviarNegocio } from "@/lib/alertas/canal";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800; // techo del plan (Pro + Fluid)
@@ -63,11 +61,12 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
         { nota: "El catálogo NO se modificó (fail-safe)." },
       );
     }
-    // Alerta de productos NUEVOS sin foto — UNA por corrida, nada si 0
-    // (anti-ruido; los viejos sin foto los cubre el resumen semanal). Mensaje
-    // compartido por las 3 marcas: lib/catalogos/fotos-faltantes.ts.
-    const msgSinFoto = buildNuevosSinFotoMsg("Reebok", result.nuevosSinFotoTotal);
-    if (msgSinFoto) await enviarNegocio(msgSinFoto);
+    // Aviso de productos NUEVOS sin foto — nada si no entró ninguno (anti-ruido;
+    // los viejos sin foto los cubre el resumen semanal). Es un delta de ESTADO
+    // contra una marca de agua, NO el resultado de esta corrida: por eso el
+    // mismo aviso lo dispara "Actualizar ahora" y la reconciliación. Ver el
+    // encabezado de lib/catalogos/fotos-nuevos.ts.
+    await avisarNuevosSinFoto("reebok");
     // Heartbeat de éxito SOLO si no hubo error (las empresas fallidas ya
     // alertaron arriba). Antes se registraba siempre → falso éxito ante un 207.
     if (!result.hadError) await recordCronHeartbeat(CRON_NAME);

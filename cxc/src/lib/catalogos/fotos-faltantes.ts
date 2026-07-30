@@ -49,6 +49,28 @@ export function colaSinFoto<T extends ProductoFotoInfo>(products: T[]): T[] {
     .sort((a, b) => disponibleDe(b) - disponibleDe(a));
 }
 
+/**
+ * Orden A-Z de una lista de códigos, sin duplicados y sin vacíos.
+ *
+ * Deliberadamente NO usa `localeCompare` con opciones: el resultado tiene que
+ * ser el mismo en el navegador de Daniel, en Node y en el test, y las tablas de
+ * ICU no lo garantizan. Con códigos A-Z0-9 la comparación cruda en MAYÚSCULAS
+ * ES el orden alfabético. Lo usan el Excel de la plantilla B2B
+ * (dash-busqueda-excel) y el aviso de productos nuevos sin foto.
+ */
+export function ordenarCodigosAZ(codigos: readonly (string | null | undefined)[]): string[] {
+  const limpios = codigos.map((c) => String(c ?? "").trim()).filter(Boolean);
+  return Array.from(new Set(limpios)).sort((a, b) => {
+    const A = a.toUpperCase();
+    const B = b.toUpperCase();
+    if (A < B) return -1;
+    if (A > B) return 1;
+    // Desempate estable por el código crudo (dos códigos que solo difieren en
+    // mayúsculas/minúsculas no pueden quedar en orden aleatorio).
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+}
+
 /** "A, B, C" o —si son más de `limit`— "A, …, O y N más". */
 export function formatCodigos(codigos: string[], limit: number = LIMITE_CODIGOS): string {
   if (codigos.length <= limit) return codigos.join(", ");
@@ -66,6 +88,60 @@ export function buildNuevosSinFotoMsg(marcaLabel: string, codigos: string[]): st
   const n = codigos.length;
   const sustantivo = n === 1 ? "producto nuevo" : "productos nuevos";
   return `📷 ${marcaLabel}: ${n} ${sustantivo} sin foto: ${formatCodigos(codigos)}`;
+}
+
+// ── Aviso de productos NUEVOS sin foto (delta contra una marca de agua) ──────
+
+export interface FilaSinFoto extends ProductoFotoInfo {
+  sku: string | null;
+  /** Momento en que la FILA nació en nuestra tabla (ISO). */
+  created_at: string | null;
+}
+
+export interface PlanAvisoNuevos {
+  /** Códigos a anunciar, ordenados A-Z. Vacío = no mandar nada. */
+  codigos: string[];
+  /** Marca de agua a guardar DESPUÉS de anunciar (ISO). */
+  watermark: string;
+  /** true = primera vez: no se anuncia nada, solo se planta la marca de agua. */
+  sembrar: boolean;
+}
+
+/**
+ * Decide qué productos sin foto son NUEVOS desde la última vez que se avisó.
+ *
+ * Es un delta de ESTADO, no un evento de una corrida: por eso da igual quién
+ * metió el producto (el cron, "Actualizar ahora", la reconciliación o un
+ * backfill) — todos los caminos quedan cubiertos por igual. Y por eso mismo no
+ * puede repetir: lo que ya se anunció queda debajo de la marca de agua.
+ *
+ * `watermarkIso = null` significa "nunca se avisó de esta marca": se SIEMBRA en
+ * silencio. Anunciar de golpe todo el atraso histórico sería ruido, y de eso ya
+ * se encarga el resumen semanal de los lunes.
+ *
+ * La marca de agua nueva es `max(ahora, el created_at más nuevo que vimos)`. El
+ * `max` no es adorno: una fila insertada MIENTRAS corría la consulta tiene
+ * `created_at > ahora`, entra en este aviso, y sin el `max` volvería a entrar en
+ * el siguiente — el mismo producto anunciado dos veces.
+ */
+export function planAvisoNuevos(
+  filas: readonly FilaSinFoto[],
+  watermarkIso: string | null,
+  ahoraIso: string,
+): PlanAvisoNuevos {
+  const candidatas = filas.filter(
+    (f) => f.active !== false && f.oculto_manual !== true && !tieneFotoProducto(f) && !!f.sku,
+  );
+  const maxCreated = candidatas.reduce<string>(
+    (max, f) => (f.created_at && f.created_at > max ? f.created_at : max),
+    "",
+  );
+  const watermark = maxCreated > ahoraIso ? maxCreated : ahoraIso;
+
+  if (!watermarkIso) return { codigos: [], watermark, sembrar: true };
+
+  const nuevas = candidatas.filter((f) => !!f.created_at && f.created_at > watermarkIso);
+  return { codigos: ordenarCodigosAZ(nuevas.map((f) => f.sku)), watermark, sembrar: false };
 }
 
 export interface ResumenFotosMarca {

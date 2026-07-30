@@ -1035,9 +1035,10 @@ const JOYBEES: MarcaTheme = {
       ];
     },
     excelSinFoto: async (sin) => {
-      // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
+      // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, JOYBEES_PALETTE } =
         await import("@/lib/excel-export");
+      const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
       const ws = buildReportSheet({
         title: "JOYBEES — Productos sin foto",
         subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
@@ -1051,7 +1052,11 @@ const JOYBEES: MarcaTheme = {
         rows: sin.map((p) => [p.sku || "", p.name || "", tipoJoybees(p.name) ?? "", JOYBEES_GENERO_LABEL[p.gender || ""] ?? (p.gender || ""), p.stock ?? ""]),
         palette: JOYBEES_PALETTE,
       });
-      const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
+      // La hoja de la plantilla del banco B2B va PRIMERA (ver dash-busqueda-excel).
+      const wb = workbookFromSheets([
+        ...buildDashBusquedaSheets(sin.map((p) => p.sku)),
+        { name: "Sin foto", ws },
+      ]);
       downloadWorkbook(wb, exportFilename("joybees-sin-foto"));
     },
     fotoTabBadge: "inline",
@@ -1375,9 +1380,10 @@ const TOMMY: MarcaTheme = {
       ];
     },
     excelSinFoto: async (sin) => {
-      // Import dinámico: xlsx-js-style no entra al bundle inicial de la página.
+      // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
       const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, TOMMY_PALETTE } =
         await import("@/lib/excel-export");
+      const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
       const ws = buildReportSheet({
         title: "TOMMY HILFIGER — Productos sin foto",
         subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
@@ -1397,7 +1403,11 @@ const TOMMY: MarcaTheme = {
         ]),
         palette: TOMMY_PALETTE,
       });
-      const wb = workbookFromSheets([{ name: "Sin foto", ws }]);
+      // La hoja de la plantilla del banco B2B va PRIMERA (ver dash-busqueda-excel).
+      const wb = workbookFromSheets([
+        ...buildDashBusquedaSheets(sin.map((p) => p.sku)),
+        { name: "Sin foto", ws },
+      ]);
       downloadWorkbook(wb, exportFilename("tommy-sin-foto"));
     },
     fotoTabBadge: "inline",
