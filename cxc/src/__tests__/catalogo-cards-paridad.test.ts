@@ -164,10 +164,25 @@ describe("card de producto — paridad en las 3 marcas", () => {
   it("la card agrupada no muestra chips de categoría ni de género", () => {
     expect(GROUPED_CARD).not.toContain("groupedCategoryLabels");
     expect(GROUPED_CARD).not.toContain("Disponible en:");
-    // El label de género sigue vivo SOLO en los botones por variante.
+    // El label de género/talla vive en el SELECTOR DE TALLA y en el botón
+    // Agregar — nunca como chip decorativo arriba del precio, que es lo que se
+    // quitó el 25-jul-2026 (la sección del grid ya dice el género).
+    //
+    // ⚠️ DIVERGENCIA DELIBERADA DE JOYBEES (30-jul-2026): hasta este cambio el
+    // label solo podía aparecer DESPUÉS de "Action buttons". Ahora el selector de
+    // talla —que va ANTES, entre el stock y el botón— también lo usa, y tiene que
+    // usarlo: es el texto del botón que el vendedor toca para elegir Junior o
+    // Kids. Se acota en vez de borrarse: el label sigue prohibido en el bloque de
+    // arriba de la card (nombre · código · precio · bulto), que es donde estaba
+    // el chip. El selector es de esta card y solo lo renderiza Joybees
+    // (`features.agrupacionPorModelo`) — ver el candado
+    // `joybees-selector-talla.test.ts`.
     const botones = GROUPED_CARD.slice(GROUPED_CARD.indexOf("Action buttons"));
     expect(botones).toContain("genderLabel");
-    expect(GROUPED_CARD.slice(0, GROUPED_CARD.indexOf("Action buttons")).includes("genderLabel")).toBe(false);
+    const selector = GROUPED_CARD.indexOf("Selector de talla");
+    expect(selector, "el selector de talla existe y está antes del botón").toBeGreaterThan(0);
+    const arriba = GROUPED_CARD.slice(0, selector);
+    expect(arriba.includes("genderLabel"), "ningún chip de género arriba del precio").toBe(false);
   });
 
   it("el botón Agregar: 44px táctil en móvil/tablet, 38px desde xl", () => {

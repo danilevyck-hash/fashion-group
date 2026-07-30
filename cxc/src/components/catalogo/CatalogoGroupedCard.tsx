@@ -7,24 +7,38 @@
 import { useState, useEffect, useRef } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
-import { type JoybeesProduct, type GroupedProduct } from "./groupByModel";
+import { type JoybeesProduct, type GroupedProduct, tienePreciosDistintos } from "./groupByModel";
 import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 
-/** Suma un campo de stock del grupo; null si NINGUNA variante lo trae (pre-sync
- *  → la línea muestra "—" en vez de un 0 que se leería como agotado). */
-function sumaStock(group: GroupedProduct, campo: "existencia" | "disponibilidad"): number | null {
-  let total = 0;
-  let hay = false;
-  for (const v of group.variants) {
-    const n = v.product[campo];
-    if (n != null) { total += n; hay = true; }
-  }
-  return hay ? total : null;
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// SELECTOR DE TALLA — solo esta card (30-jul-2026)
+//
+// 🩸 Un modelo con dos tallas mostraba la SUMA de los dos stocks y ni uno de los
+// dos números reales aparecía en ninguna parte. Medido en producción:
+// `UKVCG.MTC` decía "Disponibilidad 335", que eran 168 Junior + 167 Kids. Un
+// vendedor que vendía 200 Junior contra ese 335 quedaba corto por 32 bultos.
+//
+// Lo aprobado por Daniel (opción A del mockup): DOS BOTONES DE TALLA dentro de la
+// tarjeta, cada uno con SU stock a la vista sin tocar nada — *"tiene q ser medio
+// obvio para el cliente y vendedor al ver el catálogo que hay dos tallas
+// disponibles"* — el activo con fondo oscuro, la línea de disponibilidad
+// siguiendo a la talla elegida, y **la suma nunca más en pantalla** (por eso la
+// función que sumaba se BORRÓ, no se dejó sin llamar).
+//
+// **SOLO Joybees**, textual: *"opcion a sin rehacer el diseño en las 3 marcas
+// para que sigan iguales, solo ahi en joybees"*. Esta card es la única con
+// `features.agrupacionPorModelo`, así que Reebok y Tommy —que usan
+// CatalogoProductCard— no cambian ni un pixel. El esqueleto canónico
+// (foto · nombre · código · precio · bulto · stock · Agregar) se respeta: el
+// selector se INTERCALA entre el stock y el botón, no reordena nada.
+//
+// Un modelo de UNA sola talla se ve EXACTAMENTE como antes: sin selector, con su
+// stock a la derecha del precio. Es el 90% del catálogo.
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface CatalogoGroupedCardProps {
   marca: MarcaUiKey;
@@ -45,8 +59,6 @@ export default function CatalogoGroupedCard({
   const theme = getMarcaTheme(marca)!;
   const t = theme.card;
   const BULTO_SIZE = theme.bulto();
-  const groupDisponibilidad = sumaStock(group, "disponibilidad");
-  const groupExistencia = sumaStock(group, "existencia");
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
   // Thumbnail (render transform); si falla, cae a la URL original una vez.
   const [useThumb, setUseThumb] = useState(true);
@@ -79,6 +91,24 @@ export default function CatalogoGroupedCard({
 
   const isRegalia = group.is_regalia || group.price === 0;
   const isSingleVariant = group.variants.length === 1;
+
+  // ── Talla elegida ──
+  // El orden de las variantes es el que trae el catálogo (no se reordena: es el
+  // mismo en que hoy salen los botones "Agregar Junior" / "Agregar Kids").
+  // `Math.min` acota el índice si el grupo se queda con menos variantes tras un
+  // refresco de datos: sin eso, `sel` quedaría undefined y la card no renderiza.
+  const [tallaIdx, setTallaIdx] = useState(0);
+  const idx = Math.min(tallaIdx, group.variants.length - 1);
+  const sel = group.variants[idx];
+  const preciosDistintos = tienePreciosDistintos(group);
+
+  /* Colores del selector: SALEN DEL TEMA, no hardcodeados. El activo reusa el
+     mismo fondo oscuro del botón Agregar (t.addBtn) — es lo que Daniel aprobó
+     como "seleccionado" — y el inactivo el color de texto del stock sobre
+     blanco, con borde gris neutro. Así una marca futura con agrupación por
+     modelo hereda sus colores sin tocar este archivo. */
+  const tallaOn = `border-transparent ${t.addBtn}`;
+  const tallaOff = `border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50 ${t.stock.strong}`;
 
   // Escape cierra igual que el clic fuera (que ya existe en los dos overlays):
   // en la cantidad equivale a Cancelar — nunca guarda lo tecleado.
@@ -203,7 +233,11 @@ export default function CatalogoGroupedCard({
           <div className="mt-1.5 flex flex-col gap-y-1 xl:flex-row xl:items-start xl:justify-between xl:gap-x-2 xl:gap-y-0">
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
-                <span className={t.priceNormal}>{fmtPrecio(group.price)}</span>
+                {/* El precio es el de la TALLA ELEGIDA, nunca un precio de
+                    grupo: `UKTRK.BLK` es KIDS $13 y JUNIOR $15, y el número
+                    grande tiene que ser el del bulto que se va a pedir. Con una
+                    sola talla es el mismo de siempre. */}
+                <span className={t.priceNormal}>{fmtPrecio(sel.product.price)}</span>
               </div>
               {/* Solo "Bulto de N" — el precio del bulto y el indicador "● N" se
                   quitaron en las 3 marcas (Daniel, 25-jul-2026). Espejo exacto de
@@ -214,22 +248,81 @@ export default function CatalogoGroupedCard({
             </div>
 
             {/* Stock interno (Switch) — componente COMPARTIDO con la card plana.
-                El grupo agrega sus variantes (una card = un modelo). Solo
-                catálogo interno (showStock); NUNCA en el público. */}
-            {showStock && (
+                Solo catálogo interno (showStock); NUNCA en el público.
+                Con VARIAS tallas el bloque baja al pie del selector, porque ahí
+                tiene que decir de qué talla es el número (ver más abajo): al
+                lado del precio "Disponibilidad 168 · Junior" no cabe. */}
+            {showStock && isSingleVariant && (
               <CatalogoStockLine
                 marca={marca}
-                disponibilidad={groupDisponibilidad}
-                existencia={groupExistencia}
+                disponibilidad={sel.product.disponibilidad}
+                existencia={sel.product.existencia}
               />
             )}
           </div>
 
+          {/* ── Selector de talla (solo modelos con 2+ tallas) ──
+              Cada botón trae SU stock: el vendedor ve los dos números sin tocar
+              nada. 44px de alto (mínimo táctil de iOS/Android) y `flex-1` +
+              `min-w-0` + `truncate`: los botones se reparten el ancho de la card
+              y NUNCA la desbordan, ni en 390px de iPhone. En el catálogo público
+              no se muestra stock interno — ahí el botón es solo la talla. */}
+          {!isSingleVariant && (
+            <div className="mt-1.5 flex gap-1.5" role="group" aria-label="Talla">
+              {group.variants.map((v, i) => {
+                const activa = i === idx;
+                const enPedido = cartMap.get(v.product.id) || 0;
+                const sinStock = disponibleVendible(v.product) === 0;
+                return (
+                  <button
+                    key={v.product.id}
+                    type="button"
+                    onClick={() => setTallaIdx(i)}
+                    aria-pressed={activa}
+                    className={`relative flex-1 min-w-0 min-h-[44px] px-1 py-1 rounded-lg border transition flex flex-col items-center justify-center ${activa ? tallaOn : tallaOff}`}
+                  >
+                    <span className="max-w-full truncate text-[10px] leading-[13px] font-bold uppercase tracking-wide">
+                      {v.genderLabel}{preciosDistintos ? ` · ${fmtPrecio(v.product.price)}` : ""}
+                    </span>
+                    {showStock && (
+                      <span className={`max-w-full truncate text-[10px] leading-[13px] tabular-nums ${activa ? "opacity-80" : "opacity-60"}`}>
+                        {sinStock ? "Agotado" : (v.product.disponibilidad ?? "—")}
+                      </span>
+                    )}
+                    {/* Insignia: bultos de ESTA talla ya en el pedido. Sin ella,
+                        el control de cantidad de la talla no elegida quedaría
+                        escondido y se perdería de vista lo ya pedido. */}
+                    {enPedido > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1 rounded-full bg-emerald-600 text-white text-[9px] font-bold leading-[17px] tabular-nums">
+                        {enPedido}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Disponibilidad de la TALLA ELEGIDA — nunca la suma de las dos.
+              Mismo componente compartido de arriba, con el nombre de la talla
+              pegado al número para que se lea "Disponibilidad 168 · Junior". */}
+          {showStock && !isSingleVariant && (
+            <div className="mt-1.5">
+              <CatalogoStockLine
+                marca={marca}
+                disponibilidad={sel.product.disponibilidad}
+                existencia={sel.product.existencia}
+                talla={sel.genderLabel}
+              />
+            </div>
+          )}
+
           {/* Action buttons — Regalia usa Agregar como cualquier producto normal.
               38px de alto y márgenes apretados (Daniel, 25-jul-2026); el control
               de cantidad mide lo MISMO (h-9 + 1px de borde arriba y abajo = 38). */}
-          <div className={`mt-1.5 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
-              {group.variants.map(v => {
+          <div className="mt-1.5">
+              {(() => {
+                const v = sel;
                 const qty = cartMap.get(v.product.id) || 0;
                 const inOrder = qty > 0;
                 // "Agotado" se decide por DISPONIBILIDAD (vendible), no por
@@ -243,9 +336,6 @@ export default function CatalogoGroupedCard({
 
                 return inOrder ? (
                   <div key={v.product.id}>
-                    {!isSingleVariant && (
-                      <div className={`${t.bultoMeta} font-medium mb-0.5`}>{v.genderLabel}</div>
-                    )}
                     <div className={t.qtyWrap}>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty - 1)}
@@ -294,7 +384,7 @@ export default function CatalogoGroupedCard({
                     {buttonLabel}
                   </button>
                 );
-              })}
+              })()}
             </div>
         </div>
       </div>
