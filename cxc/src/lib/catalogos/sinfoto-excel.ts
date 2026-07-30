@@ -1,6 +1,13 @@
 // Workbook del export "Excel sin foto" del admin del catálogo Reebok.
-// Estructura estándar del helper (I11) con el navy de marca Reebok
-// (REEBOK_PALETTE). Función pura para poder testearla sin browser.
+//
+// DOS hojas, y el orden importa:
+//   1. "DASHBOARD DE BUSQUEDA" — réplica de la plantilla del banco de fotos B2B
+//      (códigos en la columna B, ordenados A-Z). Va PRIMERA porque es la que
+//      Daniel usa: se abre el archivo y ya está listo para el portal.
+//   2. "Sin foto" — el reporte con descripción/categoría/stock de siempre. NO
+//      se quitó: sirve para trabajar la cola de fotos.
+//
+// Función pura para poder testearla sin browser.
 
 import type XLSX from "xlsx-js-style";
 import {
@@ -9,6 +16,7 @@ import {
   REEBOK_PALETTE,
   fmtFechaExcel,
 } from "@/lib/excel-export";
+import { buildDashBusquedaSheets } from "@/lib/catalogos/dash-busqueda-excel";
 
 export interface SinFotoRow {
   sku: string;
@@ -33,5 +41,8 @@ export function buildReebokSinFotoWorkbook(rows: SinFotoRow[]): XLSX.WorkBook {
     rows: rows.map((r) => [r.sku, r.nombre, r.categoria, r.disponible, r.existencia]),
     palette: REEBOK_PALETTE,
   });
-  return workbookFromSheets([{ name: "Sin foto", ws }]);
+  return workbookFromSheets([
+    ...buildDashBusquedaSheets(rows.map((r) => r.sku)),
+    { name: "Sin foto", ws },
+  ]);
 }

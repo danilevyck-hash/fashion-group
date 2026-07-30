@@ -619,8 +619,22 @@ export const CRONS_FAIL_CLOSED = [
  * watchdog Telegram recorre TODAS las filas y sí habría alertado por ella el día
  * después de que alguien usara el botón. Bug latente, nunca disparado porque la
  * fila no existe todavía en producción.
+ *
+ * `catalogos-fotos-nuevos:<marca>` son MARCAS DE AGUA, no crons: guardan hasta
+ * qué momento ya se avisó de productos nuevos sin foto (ver
+ * src/lib/catalogos/fotos-nuevos.ts). Las escribe cualquier camino que
+ * sincronice el catálogo, incluido "Actualizar ahora" — nadie las programa.
+ * Se repiten acá como literales a propósito: importar fotos-nuevos.ts desde
+ * este módulo arrastraría MARCAS_CONFIG (y con él los clients de Storage) a
+ * TODA la telemetría de crons. La coherencia con `watermarkNuevosSinFoto()` la
+ * sostiene `catalogos-aviso-nuevos-sin-foto.test.ts`.
  */
-export const HEARTBEATS_NO_CRON = ["sync-now-refresh-vistas"] as const;
+export const HEARTBEATS_NO_CRON = [
+  "sync-now-refresh-vistas",
+  "catalogos-fotos-nuevos:reebok",
+  "catalogos-fotos-nuevos:joybees",
+  "catalogos-fotos-nuevos:tommy",
+] as const;
 
 /** Todo nombre de heartbeat de cron que el sistema conoce hoy (fail-closed +
  *  seed-tolerantes). NO incluye slots ni marcas: esos se derivan del calendario
