@@ -15,7 +15,15 @@ import { esCostoSospechoso } from "./costo-guard";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
-import { enviarNegocio } from "@/lib/alertas/canal";
+import { enviarSistema } from "@/lib/alertas/canal";
+import {
+  claveDeCosto,
+  clavesPorAvisar,
+  clavesYaAvisadas,
+  detallesDeCostoSospechoso,
+  MAX_EN_MENSAJE,
+  type CostoSospechoso,
+} from "./costo-sospechoso-aviso";
 
 export interface ArticulosSyncResult {
   empresaKey: string;
@@ -30,30 +38,38 @@ export interface ArticulosSyncResult {
 
 const SUCURSAL_ID = 1; // PRINCIPAL (única en todas las empresas)
 
-interface CostoSospechoso {
-  fecha: string;
-  codigo: string | null;
-  descripcion: string | null;
-  tipo: string;
-  cantidad: number;
-  costo: number;
-}
-
 function fmtMonto(n: number): string {
   return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
-async function alertarCostosSospechosos(empresaKey: string, filas: CostoSospechoso[]): Promise<void> {
-  const detalle = filas
-    .slice(0, 5)
+async function alertarCostosSospechosos(
+  empresaKey: string,
+  filas: CostoSospechoso[],
+  logId: string | null,
+): Promise<void> {
+  // Anti-loop de 7 días por fila: mientras el artículo siga mal en Switch, esto
+  // avisa UNA vez por semana, no en cada corrida. Sin esto, mudarlo a 🔧 SISTEMA
+  // lo volvería la alerta que suena todos los días.
+  const nuevas = new Set(
+    clavesPorAvisar(
+      filas.map(claveDeCosto),
+      await clavesYaAvisadas(empresaKey, "articulos", logId),
+    ),
+  );
+  if (nuevas.size === 0) return;
+
+  const aMostrar = filas.filter((f) => nuevas.has(claveDeCosto(f))).slice(0, MAX_EN_MENSAJE);
+  const detalle = aMostrar
     .map((f) => {
       const unit = f.cantidad > 0 ? ` (≈ ${fmtMonto(f.costo / f.cantidad)}/und)` : "";
       const desc = (f.descripcion ?? "").slice(0, 40);
       return `• ${f.fecha} · ${f.codigo ?? "?"} ${desc} [${f.tipo}]: costo ${fmtMonto(f.costo)} × ${f.cantidad} und${unit}`;
     })
     .join("\n");
-  const extra = filas.length > 5 ? `\n…y ${filas.length - 5} más.` : "";
-  await enviarNegocio(
+  const extra = nuevas.size > MAX_EN_MENSAJE ? `\n…y ${nuevas.size - MAX_EN_MENSAJE} más.` : "";
+  // ⚠️ El TEXTO no cambia: lo único que se movió es el canal. El prefijo
+  // `🔧 SISTEMA · ` lo pone el canal solo.
+  await enviarSistema(
     `⚠️ Costo sospechoso en artículos — ${empresaKey}\n${detalle}${extra}\n` +
       `Se guardaron con costo $0 para no dañar el margen. ` +
       `Corrige el costo del artículo en Switch y relanza switch-articulos de ese día.`,
@@ -198,13 +214,21 @@ async function syncArticulosDiarioInner(
     filas += buenas.length;
   }
 
+  // Se declara acá arriba porque lo llenan DOS guards distintos: el de costos
+  // sospechosos (abajo) y el de montos imposibles (más abajo).
+  let skipDetails: unknown[] | undefined;
+
   if (sospechosos.length > 0) {
     console.error(`[sync-articulos] ${empresaKey}: ${sospechosos.length} fila(s) con costo sospechoso`, sospechosos);
-    await alertarCostosSospechosos(empresaKey, sospechosos);
+    // Las filas quedan registradas en `skip_details` para que el anti-loop de 7
+    // días tenga memoria en la próxima corrida. Van marcadas con
+    // `campo = 'costo_sospechoso'`, así que NO se mezclan con los descartes del
+    // guard de montos, que usan su propia familia.
+    skipDetails = [...(skipDetails ?? []), ...detallesDeCostoSospechoso(sospechosos)];
+    await alertarCostosSospechosos(empresaKey, sospechosos, logId);
   }
 
   // Aviso DESPUÉS de escribir; nunca tumba la corrida.
-  let skipDetails: unknown[] | undefined;
   if (rechazadasArticulo.length > 0) {
     skipDetails = detallesDeRechazo("articulo_diario", rechazadasArticulo, umbralArticulo);
     try {
