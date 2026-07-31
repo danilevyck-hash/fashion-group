@@ -93,6 +93,10 @@ describe("esMultifashion — quién queda fuera del grupo de marcas", () => {
   });
 });
 
+// ⚠️ Estos fixtures NO reparten por marca, así que `otras` = subtotal > 0 y la
+// columna "Otras marcas" se dibuja sola: por eso el Subtotal está en la H y no
+// en la G. Es justo el comportamiento nuevo — la columna aparece cuando hay
+// algo que mostrar, para que el archivo no deje de cuadrar.
 describe("Excel: Multifashion en bloque aparte", () => {
   const gasto = (
     subtotal: number,
@@ -131,7 +135,7 @@ describe("Excel: Multifashion en bloque aparte", () => {
     const ws = buildResumenGastosWorkbook(clientes).Sheets["Resumen"];
     const r = filaDe(ws, "TOTAL GRUPO");
     expect(r).toBeGreaterThan(0);
-    expect(cellv(ws, `G${r}`)).toBe(100); // Subtotal sin ITBMS, solo el grupo
+    expect(cellv(ws, `H${r}`)).toBe(100); // Subtotal sin ITBMS, solo el grupo
     expect(cellv(ws, `I${r}`)).toBeUndefined(); // ya no hay columna "Total"
   });
 
@@ -144,7 +148,7 @@ describe("Excel: Multifashion en bloque aparte", () => {
     const total = filaDe(ws, `TOTAL ${MULTIFASHION_LABEL.toUpperCase()}`);
     expect(titulo).toBeGreaterThan(0);
     expect(total).toBeGreaterThan(titulo);
-    expect(cellv(ws, `G${total}`)).toBe(40);
+    expect(cellv(ws, `H${total}`)).toBe(40);
     expect(cellv(ws, `I${total}`)).toBeUndefined();
     // El título del bloque va DESPUÉS del total del grupo (no arriba de todo).
     expect(titulo).toBeGreaterThan(filaDe(ws, "TOTAL GRUPO"));
@@ -156,7 +160,7 @@ describe("Excel: Multifashion en bloque aparte", () => {
     expect(r).toBeGreaterThan(0);
     // El GRAN TOTAL suma SUBTOTALES (100 del grupo + 40 de Multifashion), no
     // totales con ITBMS: la columna "Total" ya no existe.
-    expect(cellv(ws, `G${r}`)).toBe(140);
+    expect(cellv(ws, `H${r}`)).toBe(140);
     expect(cellv(ws, `I${r}`)).toBeUndefined();
   });
 

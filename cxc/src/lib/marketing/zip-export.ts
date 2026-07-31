@@ -34,6 +34,7 @@ import { signGalleryToken, signFacturasToken } from "./gallery-token";
 import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 import {
   COL_CALVIN,
+  COL_OTRAS,
   COL_SUBTOTAL,
   COL_TOMMY,
   splitMarcas,
@@ -893,6 +894,26 @@ export function buildResumenGastosWorkbook(
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
 
+  // ── 🩸 "Otras marcas" APARECE SOLA CUANDO HAY ALGO QUE MOSTRAR ───────────
+  //
+  // `otras` es un RESIDUO (`subtotal − ck − th`): existe para que
+  // `ck + th + otras` cuadre con el subtotal SIEMPRE, incluso si mañana entra
+  // un gasto de una marca que no es Calvin ni Tommy. Hoy da 0 en todas las
+  // filas —medido sobre el Excel real de Daniel— y por eso él pidió quitarla:
+  // *"claramente no hay otras marcas"*.
+  //
+  // Pero quitarla PARA SIEMPRE haría que ese gasto futuro desapareciera en
+  // silencio y el archivo dejara de cuadrar, que es el descuadre que un Excel
+  // de gastos no puede tener. Así que la columna se dibuja solo si alguna fila
+  // la necesita. Hoy: no aparece. El día que aparezca, cuadra.
+  //
+  // ⚠️ LA DECISIÓN ES GLOBAL, NO POR HOJA. Se mira TODO el export una sola vez:
+  // si se decidiera por cliente, el Resumen podría traerla y la hoja de un
+  // cliente no, y las dos vistas del mismo dato dirían cosas distintas.
+  const mostrarOtras = clientes.some((c) =>
+    c.gastos.some((g) => splitMarcas(Number(g.subtotal) || 0, g.partes ?? []).otras > 0),
+  );
+
   // ── Estilos de la casa (links azules conservados) ──
   const { B } = makeCellStyles(CASA_PALETTE);
   const fontBase = { name: "Calibri", sz: 10, color: { rgb: "333333" } };
@@ -927,11 +948,12 @@ export function buildResumenGastosWorkbook(
     "# Fotos",
     COL_CALVIN,
     COL_TOMMY,
+    ...(mostrarOtras ? [COL_OTRAS] : []),
     COL_SUBTOTAL,
   ];
   const C_RES_CK = 4;
   /** Última columna de dinero (= Subtotal): todo lo de CK..acá va en $. */
-  const C_RES_SUBTOTAL = 6;
+  const C_RES_SUBTOTAL = mostrarOtras ? 7 : 6;
   const filaDeCliente = (c: ClienteResumenXlsx): (string | number)[] => {
     const s = splitDeGastos(c.gastos);
     return [
@@ -941,6 +963,7 @@ export function buildResumenGastosWorkbook(
       c.fotos.length,
       s.ck,
       s.th,
+      ...(mostrarOtras ? [s.otras] : []),
       sumSubtotales(c.gastos),
     ];
   };
@@ -964,6 +987,7 @@ export function buildResumenGastosWorkbook(
       lista.reduce((n, c) => n + c.fotos.length, 0),
       s.ck,
       s.th,
+      ...(mostrarOtras ? [s.otras] : []),
       sumSubtotales(todos),
     ];
   };
@@ -976,7 +1000,7 @@ export function buildResumenGastosWorkbook(
   const filaMonto = (etiqueta: string, sub: number): (string | number)[] => [
     etiqueta,
     ...vacias(3),
-    ...vacias(2),
+    ...vacias(mostrarOtras ? 3 : 2),
     sub,
   ];
   const filasDesglose: (string | number)[][] = hayImpulsadoras
@@ -1111,14 +1135,15 @@ export function buildResumenGastosWorkbook(
     "N° Factura",
     COL_CALVIN,
     COL_TOMMY,
+    ...(mostrarOtras ? [COL_OTRAS] : []),
     COL_SUBTOTAL,
     "Comprobante",
   ];
   // Índices con nombre: hay ~10 lugares que dependían del número crudo.
   const C_CONCEPTO = 2;
   const C_CK = 6;
-  const C_SUBTOTAL = 8;
-  const C_LINK = 9;
+  const C_SUBTOTAL = mostrarOtras ? 9 : 8;
+  const C_LINK = mostrarOtras ? 10 : 9;
   /** Columnas de dinero de la hoja de detalle (todas van con formato moneda). */
   const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_SUBTOTAL;
   for (const cli of clientes) {
@@ -1158,6 +1183,7 @@ export function buildResumenGastosWorkbook(
         g.numero || "—",
         s.ck,
         s.th,
+        ...(mostrarOtras ? [s.otras] : []),
         Number(g.subtotal) || 0,
         g.signed ? g.etiquetaLink || "Ver factura" : "—",
       ]);
@@ -1176,6 +1202,7 @@ export function buildResumenGastosWorkbook(
       "TOTALES",
       totalesCli.ck,
       totalesCli.th,
+      ...(mostrarOtras ? [totalesCli.otras] : []),
       sumSubtotales(cli.gastos),
       "",
     ]);
