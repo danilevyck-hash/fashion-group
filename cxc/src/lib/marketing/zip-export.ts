@@ -26,7 +26,7 @@
 import JSZip from "jszip";
 import sharp from "sharp";
 import XLSX from "xlsx-js-style";
-import { addr, CASA_PALETTE, makeCellStyles, MONEY_FMT } from "@/lib/excel-export";
+import { addr, CASA_PALETTE, makeCellStyles, MONEY_FMT, MONEY_FMT_GUION } from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
@@ -34,7 +34,6 @@ import { signGalleryToken, signFacturasToken } from "./gallery-token";
 import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 import {
   COL_CALVIN,
-  COL_OTRAS,
   COL_SUBTOTAL,
   COL_TOMMY,
   splitMarcas,
@@ -928,12 +927,11 @@ export function buildResumenGastosWorkbook(
     "# Fotos",
     COL_CALVIN,
     COL_TOMMY,
-    COL_OTRAS,
     COL_SUBTOTAL,
   ];
   const C_RES_CK = 4;
   /** Última columna de dinero (= Subtotal): todo lo de CK..acá va en $. */
-  const C_RES_SUBTOTAL = 7;
+  const C_RES_SUBTOTAL = 6;
   const filaDeCliente = (c: ClienteResumenXlsx): (string | number)[] => {
     const s = splitDeGastos(c.gastos);
     return [
@@ -943,7 +941,6 @@ export function buildResumenGastosWorkbook(
       c.fotos.length,
       s.ck,
       s.th,
-      s.otras,
       sumSubtotales(c.gastos),
     ];
   };
@@ -967,7 +964,6 @@ export function buildResumenGastosWorkbook(
       lista.reduce((n, c) => n + c.fotos.length, 0),
       s.ck,
       s.th,
-      s.otras,
       sumSubtotales(todos),
     ];
   };
@@ -980,7 +976,7 @@ export function buildResumenGastosWorkbook(
   const filaMonto = (etiqueta: string, sub: number): (string | number)[] => [
     etiqueta,
     ...vacias(3),
-    ...vacias(3),
+    ...vacias(2),
     sub,
   ];
   const filasDesglose: (string | number)[][] = hayImpulsadoras
@@ -1083,7 +1079,11 @@ export function buildResumenGastosWorkbook(
             : { font: fontBase, alignment: { horizontal: esTextoCol(c) ? "left" : "right" }, border: B },
       );
     }
-    for (let c = C_RES_CK; c <= C_RES_SUBTOTAL; c++) fmtCell(wsR, r, c, MONEY_FMT);
+    // Las columnas de MARCA muestran `–` cuando esa marca no gastó; el
+    // Subtotal sigue con el formato de siempre. Es formato, no texto: la
+    // celda sigue siendo 0 y las filas de TOTAL suman igual.
+    for (let c = C_RES_CK; c <= C_RES_SUBTOTAL; c++)
+      fmtCell(wsR, r, c, c < C_RES_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
   }
   XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
 
@@ -1111,15 +1111,14 @@ export function buildResumenGastosWorkbook(
     "N° Factura",
     COL_CALVIN,
     COL_TOMMY,
-    COL_OTRAS,
     COL_SUBTOTAL,
     "Comprobante",
   ];
   // Índices con nombre: hay ~10 lugares que dependían del número crudo.
   const C_CONCEPTO = 2;
   const C_CK = 6;
-  const C_SUBTOTAL = 9;
-  const C_LINK = 10;
+  const C_SUBTOTAL = 8;
+  const C_LINK = 9;
   /** Columnas de dinero de la hoja de detalle (todas van con formato moneda). */
   const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_SUBTOTAL;
   for (const cli of clientes) {
@@ -1159,7 +1158,6 @@ export function buildResumenGastosWorkbook(
         g.numero || "—",
         s.ck,
         s.th,
-        s.otras,
         Number(g.subtotal) || 0,
         g.signed ? g.etiquetaLink || "Ver factura" : "—",
       ]);
@@ -1178,7 +1176,6 @@ export function buildResumenGastosWorkbook(
       "TOTALES",
       totalesCli.ck,
       totalesCli.th,
-      totalesCli.otras,
       sumSubtotales(cli.gastos),
       "",
     ]);
@@ -1268,7 +1265,7 @@ export function buildResumenGastosWorkbook(
           alignment: { horizontal: esColMoneda(c) ? "right" : "left", wrapText: c === C_CONCEPTO },
           border: B,
         });
-        if (esColMoneda(c)) fmtCell(ws, r, c, MONEY_FMT);
+        if (esColMoneda(c)) fmtCell(ws, r, c, c < C_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
       }
     }
     // Fila Subtotal en banda PRI (totales estilo de la casa).
@@ -1279,7 +1276,7 @@ export function buildResumenGastosWorkbook(
         alignment: { horizontal: "right", vertical: "center" },
         border: B,
       });
-      if (esColMoneda(c)) fmtCell(ws, subtotalRow, c, MONEY_FMT);
+      if (esColMoneda(c)) fmtCell(ws, subtotalRow, c, c < C_SUBTOTAL ? MONEY_FMT_GUION : MONEY_FMT);
     }
 
     // Link "Ver todas las facturas (N)" → PDF combinado del cliente.

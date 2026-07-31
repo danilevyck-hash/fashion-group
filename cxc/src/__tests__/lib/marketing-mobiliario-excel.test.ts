@@ -93,10 +93,10 @@ describe("mobiliario en la hoja de detalle", () => {
     // r0 GASTOS, r1 "Ver todas las facturas", r2 headers, r3 factura, r4 mueble.
     expect(cell(ws, "F5").v).toBe("ME-AD3C1932");
     // Sin la columna "Total", el link de comprobante vive en K (antes L).
-    expect(cell(ws, "K5").v).toBe("Ver comprobante");
-    expect(cell(ws, "K5").l?.Target).toBe(LINK_COMPROBANTE);
+    expect(cell(ws, "J5").v).toBe("Ver comprobante");
+    expect(cell(ws, "J5").l?.Target).toBe(LINK_COMPROBANTE);
     // La factura de proveedor conserva su propia etiqueta.
-    expect(cell(ws, "K4").v).toBe("Ver factura");
+    expect(cell(ws, "J4").v).toBe("Ver factura");
   });
 
   it("la única columna de dinero es el Subtotal: el mueble entra por su monto", () => {
@@ -105,10 +105,10 @@ describe("mobiliario en la hoja de detalle", () => {
     const ws = buildResumenGastosWorkbook(
       cliente([facturaNormal, muebleConComprobante]),
     ).Sheets["Hanna Calzados"];
-    expect(cell(ws, "J3").v).toBe("Subtotal (sin ITBMS)");
-    expect(cell(ws, "K3").v).toBe("Comprobante");
-    expect(cell(ws, "J5").v).toBe(2695); // el mueble no lleva ITBMS
-    expect(cell(ws, "J4").v).toBe(66.6); // la factura, SIN su ITBMS (71.26)
+    expect(cell(ws, "I3").v).toBe("Subtotal (sin ITBMS)");
+    expect(cell(ws, "J3").v).toBe("Comprobante");
+    expect(cell(ws, "I5").v).toBe(2695); // el mueble no lleva ITBMS
+    expect(cell(ws, "I4").v).toBe(66.6); // la factura, SIN su ITBMS (71.26)
   });
 
   it("SIN comprobante: la fila SIGUE con su monto (no desaparece)", () => {
@@ -116,10 +116,10 @@ describe("mobiliario en la hoja de detalle", () => {
       cliente([facturaNormal, muebleSinComprobante]),
     ).Sheets["Hanna Calzados"];
     expect(cell(ws, "F5").v).toBe("—"); // número vacío se muestra como guion
-    expect(cell(ws, "K5").v).toBe("—"); // sin link
-    expect(cell(ws, "J5").v).toBe(2695); // el monto sigue ahí
+    expect(cell(ws, "J5").v).toBe("—"); // sin link
+    expect(cell(ws, "I5").v).toBe(2695); // el monto sigue ahí
     expect(cell(ws, "F6").v).toBe("TOTALES");
-    expect(cell(ws, "J6").v).toBe(2761.6); // 66.60 + 2695, subtotales
+    expect(cell(ws, "I6").v).toBe(2761.6); // 66.60 + 2695, subtotales
   });
 
   it("un cliente con SOLO mobiliario igual tiene su hoja y su total", () => {
@@ -127,7 +127,7 @@ describe("mobiliario en la hoja de detalle", () => {
     expect(wb.SheetNames).toContain("Hanna Calzados");
     const res = wb.Sheets["Resumen"];
     expect(cell(res, "E2").v).toBe(2695); // Calvin Klein
-    expect(cell(res, "H2").v).toBe(2695); // Subtotal (última columna de dinero)
+    expect(cell(res, "G2").v).toBe(2695); // Subtotal (última columna de dinero)
     expect(res["I2"]).toBeUndefined(); // ya no hay columna "Total"
   });
 
