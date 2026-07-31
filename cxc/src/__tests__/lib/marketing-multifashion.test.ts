@@ -93,6 +93,10 @@ describe("esMultifashion — quién queda fuera del grupo de marcas", () => {
   });
 });
 
+// ⚠️ Estos fixtures NO reparten por marca, así que `otras` = subtotal > 0 y la
+// columna "Otras marcas" se dibuja sola: por eso el Subtotal está en la H y no
+// en la G. Es justo el comportamiento nuevo — la columna aparece cuando hay
+// algo que mostrar, para que el archivo no deje de cuadrar.
 describe("Excel: Multifashion en bloque aparte", () => {
   const gasto = (
     subtotal: number,

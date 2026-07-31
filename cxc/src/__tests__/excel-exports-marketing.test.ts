@@ -138,16 +138,17 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     // con ITBMS (pedido de Daniel: *"dame subtotal solamente, no total"*).
     expect(cell(ws, "E1").v).toBe("Calvin Klein");
     expect(cell(ws, "F1").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "G1").v).toBe("Otras marcas");
-    expect(cell(ws, "H1").v).toBe("Subtotal (sin ITBMS)");
-    expect(ws["I1"]).toBeUndefined();
+    expect(cell(ws, "G1").v).toBe("Subtotal (sin ITBMS)");
+    // "Otras marcas" se quitó: daba $0.00 en todas las filas.
+    expect(ws["H1"]).toBeUndefined();
+    
     // Subtotal de Cliente Uno = 93.46 + 50, numérico (no string "$143.46").
-    expect(cell(ws, "H2").t).toBe("n");
-    expect(cell(ws, "H2").v).toBe(143.46);
+    expect(cell(ws, "G2").t).toBe("n");
+    expect(cell(ws, "G2").v).toBe(143.46);
     // Fila TOTAL al pie: suma subtotales, no totales con ITBMS.
     expect(cell(ws, "A4").v).toBe("TOTAL");
-    expect(cell(ws, "H4").v).toBe(143.46);
-    expect(ws["I4"]).toBeUndefined();
+    expect(cell(ws, "G4").v).toBe(143.46);
+    expect(ws["H4"]).toBeUndefined();
   });
 
   it("pestaña de cliente: link al PDF de la factura intacto (.l.Target)", () => {
@@ -157,11 +158,11 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     expect(cell(ws, "A3").v).toBe("Fecha");
     expect(cell(ws, "B3").v).toBe("Período");
     // Sin la columna "Total", el Subtotal queda en J y el link en K.
-    expect(cell(ws, "J3").v).toBe("Subtotal (sin ITBMS)");
-    expect(cell(ws, "K3").v).toBe("Comprobante");
-    expect(cell(ws, "K4").l?.Target).toBe("https://example.com/f1.pdf");
-    expect(cell(ws, "J4").t).toBe("n");
-    expect(cell(ws, "J4").v).toBe(93.46);
+    expect(cell(ws, "I3").v).toBe("Subtotal (sin ITBMS)");
+    expect(cell(ws, "J3").v).toBe("Comprobante");
+    expect(cell(ws, "J4").l?.Target).toBe("https://example.com/f1.pdf");
+    expect(cell(ws, "I4").t).toBe("n");
+    expect(cell(ws, "I4").v).toBe(93.46);
     // Con código de cliente hay link de galería (1 por cliente), no por foto.
     expect(tieneLink(ws, "https://example.com/foto1.jpg")).toBe(false);
   });
@@ -177,7 +178,7 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     expect(a1.s?.fill?.fgColor?.rgb).toBe(CASA_PALETTE.pri);
     expect(a1.s?.font?.name).toBe("Calibri");
     // Link azul 1155CC conservado en la pestaña del cliente.
-    const l4 = cell(wb.Sheets["Cliente Uno"], "K4");
+    const l4 = cell(wb.Sheets["Cliente Uno"], "J4");
     expect(l4.s?.font?.color?.rgb).toBe("1155CC");
   });
 
@@ -193,7 +194,7 @@ describe("buildResumenGastosWorkbook (zip-export)", () => {
     const ws = wb.Sheets["Cliente Uno"];
     // r3/r4 gastos (93.46 + 50), r5 = fila de totales.
     expect(cell(ws, "F6").v).toBe("TOTALES");
-    expect(cell(ws, "J6").v).toBe(143.46);
+    expect(cell(ws, "I6").v).toBe(143.46);
   });
 });
 

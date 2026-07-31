@@ -94,6 +94,17 @@ export function paletaDeMarca(marca: string): ExcelPalette {
 
 /** Moneda como número real: se ve "$1,234.56" y Excel puede sumar. */
 export const MONEY_FMT = "$#,##0.00";
+
+/**
+ * Moneda que muestra `–` en el cero, en vez de `$0.00`.
+ *
+ * 🩸 ES UN FORMATO, NO UN TEXTO. Los formatos de Excel tienen secciones
+ * `positivo;negativo;cero`, así que la celda sigue siendo un NÚMERO (0) y solo
+ * cambia cómo se ve. Escribir el guion como string rompería las filas de TOTAL
+ * y el «suma de la selección» que muestra Excel abajo — que es justo la regla
+ * de la casa: *"Moneda: `$#,##0.00` en Excel, números reales, no texto"*.
+ */
+export const MONEY_FMT_GUION = '$#,##0.00;-$#,##0.00;"–"';
 export const PCT_FMT = "0.0%";
 
 export function addr(r: number, c: number): string {
