@@ -308,6 +308,10 @@ export const SEED_TOLERANT_CRONS = [
   // 27-jul-2026: seed-tolerante hasta que lleve días sembrado. Promover a
   // CRONS_FAIL_CLOSED después (corre 11×/día: nunca debería estar stale).
   "db-salud",
+  // Aviso de guías sin despachar (14:30 UTC = 9:30 a.m. Panamá). Desplegado el
+  // 3-ago-2026: seed-tolerante hasta que siembre su fila. Promover a
+  // CRONS_FAIL_CLOSED cuando lleve días corriendo.
+  "guias-pendientes",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
