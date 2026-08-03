@@ -132,7 +132,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (totalBultos === 0) return NextResponse.json({ error: "No se puede despachar una guía con 0 bultos" }, { status: 400 });
     if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
     if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
-    if (!placa) return NextResponse.json({ error: "Placa del vehículo requerida" }, { status: 400 });
+    // Placa: obligatoria SOLO en transportista externo. En entrega directa la
+    // exigencia trababa el cierre (78% de esas guías quedaban en "pendiente"
+    // para siempre, medido el 3-ago-2026) y con ellas se perdía el aviso de
+    // Telegram, que solo sale al pasar a "Completada". Decisión de Daniel.
+    if (tipo_despacho !== "directo" && !placa) {
+      return NextResponse.json({ error: "Placa del vehículo requerida" }, { status: 400 });
+    }
     if (tipo_despacho === "externo" && !numero_guia_transp) return NextResponse.json({ error: "Falta el N° de guía del transportista" }, { status: 400 });
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
@@ -265,15 +271,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   // Block double-dispatch: if guia is already Completada, reject state changes
   if (body.estado) {
-    const { data: current } = await supabaseServer.from("guia_transporte").select("estado, placa").eq("id", params.id).single();
+    const { data: current } = await supabaseServer.from("guia_transporte").select("estado, placa, tipo_despacho").eq("id", params.id).single();
     if (current?.estado === "Completada" && body.estado === "Completada") {
       return NextResponse.json({ error: "Esta guía ya fue despachada" }, { status: 400 });
     }
     if (current?.estado === "Completada" && body.estado !== "Completada") {
       return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
     }
-    // Placa obligatoria siempre para despachar (en el body o ya guardada).
-    if (body.estado === "Completada" && !(body.placa || current?.placa)) {
+    // Placa obligatoria SOLO en transportista externo (mismo criterio que el
+    // PUT). El tipo puede venir en este mismo body o estar ya guardado.
+    const tipoEfectivo = body.tipo_despacho ?? current?.tipo_despacho;
+    if (body.estado === "Completada" && tipoEfectivo !== "directo" && !(body.placa || current?.placa)) {
       return NextResponse.json({ error: "Placa del vehículo requerida" }, { status: 400 });
     }
   }
