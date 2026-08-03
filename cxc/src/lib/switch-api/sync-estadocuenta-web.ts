@@ -64,6 +64,8 @@ import {
   type ResumenCartera,
 } from "./estadocuenta-web";
 import type { SkipDetail } from "./sync-empresa";
+import { particionarFilas } from "./monto-guard";
+import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
 
 /** La única empresa que hoy usa este camino. */
@@ -71,6 +73,16 @@ export const EMPRESA_CARTERA_WEB: EmpresaKey = "confecciones_boston";
 
 /** Filas por UPSERT. Mismo tamaño que el sync del API. */
 const UPSERT_BATCH = 100;
+
+/**
+ * Capacidad de `switch_estadocuenta.plazo_credito`, que es `numeric(8,2)`:
+ * 8 dígitos con 2 decimales → 6 enteros → |x| < 10^6.
+ *
+ * NO es un umbral de plata (eso lo decide `monto-guard`, y solo él): es el
+ * borde físico de la columna, derivado de su precisión en vez de escrito a
+ * mano — por eso se calcula y no se teclea la constante.
+ */
+const PLAZO_CREDITO_LIMITE = 10 ** 6;
 
 /** Tolerancia del cuadre contra `saldosTotales`. Un centavo: los montos son
  *  `numeric(12,4)` y los dos lados suman los mismos números, así que cualquier
@@ -139,14 +151,23 @@ async function upsertFilas(
  * Devuelve cuántas filas se cerraron — el número que hay que mirar para saber si
  * un día este reconcile se volvió loco.
  */
-async function reconciliar(empresaKey: string, runStamp: string): Promise<number> {
-  const { data, error } = await supabaseServer
+async function reconciliar(
+  empresaKey: string,
+  runStamp: string,
+  protegidos: readonly number[] = [],
+): Promise<number> {
+  let q = supabaseServer
     .from("switch_estadocuenta")
     .update({ saldo: 0, updated_at: new Date().toISOString() })
     .eq("empresa_key", empresaKey)
     .lt("synced_at", runStamp)
-    .neq("saldo", 0)
-    .select("ccte_id");
+    .neq("saldo", 0);
+  // 🩸 Una fila rechazada por el guard NO se reescribe, así que su `synced_at`
+  // queda viejo y este reconcile la leería como "documento cerrado" → le pondría
+  // saldo 0, que es EXACTAMENTE el último valor bueno que el guard existe para
+  // conservar. Se excluyen sus ccte_id (mismo remedio que el sync del API).
+  if (protegidos.length > 0) q = q.not("ccte_id", "in", `(${protegidos.join(",")})`);
+  const { data, error } = await q.select("ccte_id");
   if (error) throw new Error(`reconcile falló: ${error.message}`);
   return (data ?? []).length;
 }
@@ -233,10 +254,53 @@ export async function syncCarteraWeb(opts: {
       );
     }
 
+    // ─── 4b. Guard de montos imposibles ─────────────────────────────────────
+    //
+    // 🩸 Este camino (el ÚNICO por el que pasa confecciones_boston) no tenía el
+    // guard que el sync del API sí aplica desde el #345, y una sola cifra
+    // corrupta de Switch reventaba el UPSERT ENTERO con `numeric field overflow`
+    // — `total`/`saldo` son numeric(12,4), o sea que topan en $99.999.999,9999.
+    // Boston quedó 3 días sin actualizar la cartera por eso (1, 2 y 3-ago-2026).
+    // El cuadre de arriba se hace ANTES a propósito: sigue comparando contra lo
+    // que publica Switch usando TODAS las filas, así que el guard no puede
+    // enmascarar un error de lectura nuestro.
+    const umbralCxc = await calibrarUmbral("cxc", empresaKey);
+    const part = particionarFilas(
+      "cxc",
+      filas,
+      umbralCxc,
+      (f) => `${f.secuencial ?? f.ccte_id} · ${f.cliente_nombre ?? ""}`.trim(),
+    );
+    // `plazo_credito` es numeric(8,2) → topa en 999.999,99, MUY por debajo de
+    // las columnas de plata, y el guard de montos no lo mira (no es plata). Un
+    // valor corrupto ahí desbordaría igual y tumbaría el lote entero. Es un
+    // plazo, no un saldo: se anula la celda y se anota, en vez de descartar el
+    // documento — perder el plazo no cuesta nada, perder la deuda sí.
+    const filasBuenas = part.buenas.map((f) => {
+      const p = f.plazo_credito;
+      if (p === null || Math.abs(p) < PLAZO_CREDITO_LIMITE) return f;
+      skips.push({
+        facturaId: f.cliente_switch_id,
+        secuencial: f.secuencial,
+        campo: "plazo_credito_fuera_de_rango",
+        valorCrudo: String(p),
+      });
+      return { ...f, plazo_credito: null };
+    });
+    const protegidos = part.rechazadas.map((r) => r.fila.ccte_id);
+    if (part.rechazadas.length > 0) {
+      skips.push(...detallesDeRechazo("cxc", part.rechazadas, umbralCxc));
+      console.error(
+        `[cartera-web ${empresaKey}] MONTO IMPOSIBLE en ${part.rechazadas.length} documento(s) ` +
+          `(umbral ${umbralCxc}) — se conserva el último valor bueno`,
+        part.rechazadas[0].columnas,
+      );
+    }
+
     const conCifras = {
       ...base,
       logId,
-      documentos: filas.length,
+      documentos: filasBuenas.length,
       clientes: resumen.clientes,
       resumen,
       publicadoPorSwitch: publicado,
@@ -249,17 +313,33 @@ export async function syncCarteraWeb(opts: {
     }
 
     // ─── 5. Escribir y reconciliar, en la misma corrida ──────────────────────
-    await upsertFilas(filas, runStamp);
-    const cerrados = await reconciliar(empresaKey, runStamp);
+    await upsertFilas(filasBuenas, runStamp);
+    const cerrados = await reconciliar(empresaKey, runStamp, protegidos);
 
     console.error(
-      `[cartera-web ${empresaKey}] ${filas.length} documentos de ${resumen.clientes} clientes ` +
+      `[cartera-web ${empresaKey}] ${filasBuenas.length} documentos de ${resumen.clientes} clientes ` +
         `= ${resumen.total} (0-90 ${resumen.d0_90} · 91-120 ${resumen.d91_120} · 121+ ${resumen.d121_plus}); ` +
         `${cerrados} documentos cerrados; ${skips.length} omitidos; ${reporte.rondas} rondas`,
     );
 
+    // Aviso DESPUÉS de escribir; nunca tumba la corrida.
+    if (part.rechazadas.length > 0) {
+      try {
+        await avisarMontosImposibles({
+          familia: "cxc",
+          empresaKey,
+          syncType: "estadocuenta",
+          rechazadas: part.rechazadas,
+          umbral: umbralCxc,
+          logId,
+        });
+      } catch (e) {
+        console.error(`[cartera-web ${empresaKey}] aviso de monto imposible falló: ${String(e)}`);
+      }
+    }
+
     await finishSwitchSyncLog(logId, "success", {
-      inserted: filas.length,
+      inserted: filasBuenas.length,
       updated: cerrados,
       skipped: skips.length,
     });

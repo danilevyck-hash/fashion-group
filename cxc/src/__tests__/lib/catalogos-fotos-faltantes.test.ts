@@ -60,13 +60,39 @@ describe("buildNuevosSinFotoMsg", () => {
 // ── buildResumenSemanalMsg (resumen semanal) ─────────────────────────────────
 
 describe("buildResumenSemanalMsg", () => {
-  it("todo en 0 → mensaje corto de catálogos al día", () => {
+  // Daniel, 3-ago-2026: *"solo dime si me faltan fotos, no si no me faltan
+  // fotos"*. Antes esto devolvía "📷 Los 3 catálogos tienen todas sus fotos ✅"
+  // y llegaba cada lunes sin nada que hacer con él.
+  it("todo en 0 → NO hay mensaje (null), no un aviso de 'todo bien'", () => {
     const msg = buildResumenSemanalMsg([
       { label: "Reebok", codigos: [] },
       { label: "Joybees", codigos: [] },
       { label: "Tommy", codigos: [] },
     ]);
-    expect(msg).toBe("📷 Los 3 catálogos tienen todas sus fotos ✅");
+    expect(msg).toBeNull();
+  });
+
+  it("una sola marca, sin faltantes → tampoco avisa", () => {
+    expect(buildResumenSemanalMsg([{ label: "Reebok", codigos: [] }])).toBeNull();
+  });
+
+  it("sin faltantes pero con una marca PENDIENTE sí avisa (no es 'todo bien')", () => {
+    const msg = buildResumenSemanalMsg([
+      { label: "Reebok", codigos: [] },
+      { label: "Tommy", codigos: [], pendiente: true },
+    ]);
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("pendiente de activación");
+  });
+
+  it("basta UNA foto faltante para que avise", () => {
+    const msg = buildResumenSemanalMsg([
+      { label: "Reebok", codigos: ["ABC-1"] },
+      { label: "Joybees", codigos: [] },
+      { label: "Tommy", codigos: [] },
+    ]);
+    expect(msg).not.toBeNull();
+    expect(msg).toContain("ABC-1");
   });
 
   it("con faltantes: línea resumen + detalle solo de marcas con códigos", () => {

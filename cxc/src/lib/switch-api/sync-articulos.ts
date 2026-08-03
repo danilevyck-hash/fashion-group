@@ -15,7 +15,6 @@ import { esCostoSospechoso } from "./costo-guard";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
-import { enviarNegocio } from "@/lib/alertas/canal";
 
 export interface ArticulosSyncResult {
   empresaKey: string;
@@ -39,26 +38,15 @@ interface CostoSospechoso {
   costo: number;
 }
 
-function fmtMonto(n: number): string {
-  return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-}
-
-async function alertarCostosSospechosos(empresaKey: string, filas: CostoSospechoso[]): Promise<void> {
-  const detalle = filas
-    .slice(0, 5)
-    .map((f) => {
-      const unit = f.cantidad > 0 ? ` (≈ ${fmtMonto(f.costo / f.cantidad)}/und)` : "";
-      const desc = (f.descripcion ?? "").slice(0, 40);
-      return `• ${f.fecha} · ${f.codigo ?? "?"} ${desc} [${f.tipo}]: costo ${fmtMonto(f.costo)} × ${f.cantidad} und${unit}`;
-    })
-    .join("\n");
-  const extra = filas.length > 5 ? `\n…y ${filas.length - 5} más.` : "";
-  await enviarNegocio(
-    `⚠️ Costo sospechoso en artículos — ${empresaKey}\n${detalle}${extra}\n` +
-      `Se guardaron con costo $0 para no dañar el margen. ` +
-      `Corrige el costo del artículo en Switch y relanza switch-articulos de ese día.`,
-  );
-}
+// ⚠️ NO SE AVISA POR TELEGRAM. Daniel lo pidió explícito el 3-ago-2026: *"no
+// quiero mensaje de costos"*. Le llegaba repetido por confecciones_boston (el
+// artículo "0806 AGUA MINERAL 600ML" con costo mal cargado en Switch) y no es
+// accionable en el momento en que suena.
+//
+// **La PROTECCIÓN sigue intacta**: `esCostoSospechoso` se sigue evaluando, la
+// fila se sigue guardando con costo $0 para no dañar el margen, el conteo
+// sigue viajando en `costosSospechosos` del resultado y el detalle sigue
+// quedando en el log de la corrida. Lo único que se quitó es el mensaje.
 
 function num(x: unknown): number {
   const n = parseFloat(String(x).replace(/,/g, ""));
@@ -199,8 +187,9 @@ async function syncArticulosDiarioInner(
   }
 
   if (sospechosos.length > 0) {
+    // Rastro en el log de la corrida — el aviso a Telegram se quitó a pedido de
+    // Daniel (ver la nota arriba de `num`); la fila ya se guardó con costo $0.
     console.error(`[sync-articulos] ${empresaKey}: ${sospechosos.length} fila(s) con costo sospechoso`, sospechosos);
-    await alertarCostosSospechosos(empresaKey, sospechosos);
   }
 
   // Aviso DESPUÉS de escribir; nunca tumba la corrida.

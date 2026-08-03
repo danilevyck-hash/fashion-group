@@ -95,6 +95,10 @@ describe("ningún sync protegido puede quedarse sin el guard", () => {
    */
   const SYNCS_PROTEGIDOS = [
     "src/lib/switch-api/sync-empresa.ts", // switch_facturas + switch_estadocuenta + switch_costo_diario
+    // 🩸 Faltaba, y costó 3 días de cartera de Boston congelada (1-3 ago 2026):
+    // es el ÚNICO camino de confecciones_boston y una cifra imposible de Switch
+    // reventaba el UPSERT entero con `numeric field overflow`.
+    "src/lib/switch-api/sync-estadocuenta-web.ts", // switch_estadocuenta (reporte web)
     "src/lib/switch-api/sync-utilidad.ts", // switch_factura_utilidad
     "src/lib/switch-api/sync-recibos.ts", // switch_recibos
     "src/lib/switch-api/sync-proveedores.ts", // switch_proveedor_estadocuenta

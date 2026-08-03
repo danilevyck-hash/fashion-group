@@ -54,11 +54,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       console.error("housekeeping variantes:", err);
       limpieza = { productos: 0, bytes: 0, fallos: 1 };
     }
+    // ⚠️ SIN FOTOS FALTANTES NO SE MANDA NADA (Daniel, 3-ago-2026: *"solo dime
+    // si me faltan fotos, no si no me faltan fotos"*). El housekeeping SÍ corre
+    // igual —borra variantes retiradas, es trabajo real— pero su línea es un
+    // apéndice del resumen: sin resumen no viaja sola, que sería un mensaje
+    // nuevo que nadie pidió. El cron termina en éxito y registra su heartbeat:
+    // "no había nada que avisar" es una corrida exitosa, no un no-op ni un error.
     const linea = lineaHousekeeping(limpieza);
-    const mensaje = linea ? `${resumen.mensaje}\n\n${linea}` : resumen.mensaje;
+    const mensaje = resumen.mensaje
+      ? linea
+        ? `${resumen.mensaje}\n\n${linea}`
+        : resumen.mensaje
+      : null;
 
-    const sent = await enviarNegocio(mensaje);
-    if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
+    if (mensaje) {
+      const sent = await enviarNegocio(mensaje);
+      if (!sent) throw new Error("Telegram no aceptó el mensaje (ver logs)");
+    }
 
     await recordCronHeartbeat(CRON_NAME);
     return NextResponse.json({

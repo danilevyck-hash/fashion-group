@@ -466,6 +466,10 @@ const COLATERAL_CRONS: ColateralCron[] = [
     recoverOnlyIf: () => new Date(`${hoyPanama()}T00:00:00Z`).getUTCDay() === 1, // lunes
     recover: async () => {
       const r = await calcularFotosResumen();
+      // Sin fotos faltantes no se manda nada (ver buildResumenSemanalMsg). La
+      // recuperación se da por CUMPLIDA: el resumen se calculó y no había nada
+      // que avisar — devolver ok:false lo haría reintentar en cada pasada.
+      if (!r.mensaje) return { ok: true, detail: "sin fotos faltantes — nada que avisar" };
       const sent = await enviarNegocio(`(recuperado) ${r.mensaje}`);
       return {
         ok: sent,
