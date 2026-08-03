@@ -24,6 +24,12 @@ const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
   "/api/health-crons", // meta-watchdog externo; protegido por HEALTHCHECK_TOKEN propio (no cookie)
   "/api/diag/",     // diagnósticos internos; protegidos por CRON_SECRET propio (fail-closed, no cookie)
+  // Marcaciones del reloj: las manda un agente desde la oficina, que no tiene
+  // ni puede tener una cookie de sesión. Lleva su propia llave
+  // (ASISTENCIA_INGEST_SECRET, fail-closed y comparada en tiempo constante) —
+  // deliberadamente distinta de CRON_SECRET, porque vive en una PC de la
+  // oficina y si se filtrara solo debe permitir escribir marcaciones.
+  "/api/asistencia/ingest",
   "/api/catalogo/reebok/products", // public catalog reads
   "/api/catalogo/reebok/inventory", // public catalog stock
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
