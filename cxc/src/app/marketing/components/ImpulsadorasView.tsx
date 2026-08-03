@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import HistorialImpulsadoraModal from "./HistorialImpulsadoraModal";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
@@ -90,6 +91,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
   const [showNueva, setShowNueva] = useState(false);
   const [pagando, setPagando] = useState<ImpulsadoraConEstado | null>(null);
   const [eliminando, setEliminando] = useState<ImpulsadoraConEstado | null>(null);
+  const [viendo, setViendo] = useState<ImpulsadoraConEstado | null>(null);
   const [borrando, setBorrando] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -265,6 +267,15 @@ export default function ImpulsadorasView({ marcas }: Props) {
                 {/* Visible, no escondido en un menú "···": Daniel entró a
                     buscarlo y no lo encontró. Target táctil de 44px de alto y
                     de ancho para el pulgar en iPhone. */}
+                {/* Daniel: "quiero ver y editar el historial". Antes no había
+                    forma de llegar a los pagos guardados desde la tarjeta. */}
+                <button
+                  type="button"
+                  onClick={() => setViendo(imp)}
+                  className="min-h-[44px] rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:border-black hover:text-black active:scale-[0.97] transition"
+                >
+                  Ver historial
+                </button>
                 <button
                   type="button"
                   onClick={() => setEliminando(imp)}
@@ -319,6 +330,16 @@ export default function ImpulsadorasView({ marcas }: Props) {
             setPagando(null);
             cargar();
           }}
+        />
+      )}
+
+      {viendo && (
+        <HistorialImpulsadoraModal
+          impulsadora={viendo}
+          onClose={() => setViendo(null)}
+          // Anular un pago o cambiar el monto mueve los chips y el "Pagado:"
+          // de la tarjeta, así que la lista se recarga sin cerrar el modal.
+          onChanged={() => cargar()}
         />
       )}
     </div>

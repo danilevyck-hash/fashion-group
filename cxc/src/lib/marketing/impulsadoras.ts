@@ -534,3 +534,274 @@ export async function registrarPagoImpulsadora(
 
   return { facturasCreadas: creadas.length };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//   HISTORIAL · ANULAR · EDITAR FICHA  (3-ago-2026)
+//
+// 🩸 POR QUÉ. Daniel: *"en impulsadoras, no puedo ver el historial ni nada, solo
+// me deja ingresar gastos… quiero ver y editar el historial"*. El módulo era de
+// SOLO ESCRITURA: se podía crear y pagar, pero no revisar ni corregir. La
+// tarjeta enseñaba los últimos 3 períodos como texto y nada más, aunque en la
+// base ya había pagos guardados desde abril-2024. Tampoco se podía editar la
+// ficha: subirle el sueldo a alguien exigía borrarla y crearla de nuevo.
+//
+// ⚠️ NO SE BORRA UN PAGO, SE ANULA. Los pagos alimentan el reporte por marca,
+// la card de marca y el Excel de gastos — los tres filtran por `anulado_en`
+// (verificado uno por uno). Anular los saca de TODOS esos números y deja
+// rastro; borrar perdería la evidencia de que el gasto existió.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una marca dentro de un pago, con la porción que le tocó. */
+export interface PagoMarca {
+  marcaId: string;
+  marca: string;
+  monto: number;
+}
+
+/** Un pago = las N facturas (una por marca) que comparten `numero_factura`. */
+export interface PagoHistorial {
+  /** Llave del pago: el `numero_factura` que comparten sus filas. */
+  ref: string;
+  periodoDesde: string | null;
+  periodoHasta: string | null;
+  /** Día 1 del mes imputado. Es lo único que existe en los pagos viejos. */
+  mes: string | null;
+  concepto: string;
+  fechaRegistro: string | null;
+  total: number;
+  marcas: PagoMarca[];
+  anulado: boolean;
+  anuladoMotivo: string | null;
+  anuladoEn: string | null;
+  /** Path en Storage del comprobante (se firma al servir). */
+  comprobantePath: string | null;
+  /** Cuántas filas de mk_facturas componen el pago (una por marca). */
+  filas: number;
+}
+
+interface FilaHistorial {
+  id: string;
+  numero_factura: string | null;
+  impulsadora_mes: string | null;
+  periodo_desde?: string | null;
+  periodo_hasta?: string | null;
+  concepto: string | null;
+  fecha_factura: string | null;
+  created_at: string | null;
+  total: number | string | null;
+  anulado_en: string | null;
+  anulado_motivo: string | null;
+}
+
+/**
+ * TODO el historial de pagos de una impulsadora, del más nuevo al más viejo,
+ * incluidos los ANULADOS (se marcan; esconderlos sería esconder justamente lo
+ * que alguien vino a auditar).
+ */
+export async function historialPagosImpulsadora(
+  impulsadoraId: string,
+): Promise<PagoHistorial[]> {
+  if (!impulsadoraId) throw new Error("impulsadoraId requerido");
+
+  const conPeriodo = await hayColumnasPeriodo();
+  const cols =
+    "id, numero_factura, impulsadora_mes, concepto, fecha_factura, created_at, total, anulado_en, anulado_motivo" +
+    (conPeriodo ? ", periodo_desde, periodo_hasta" : "");
+
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select(cols)
+    .eq("impulsadora_id", impulsadoraId)
+    .order("impulsadora_mes", { ascending: false });
+  if (error) throw new Error(`historialPagos: ${error.message}`);
+
+  const filas = (data ?? []) as unknown as FilaHistorial[];
+  if (filas.length === 0) return [];
+
+  // Marcas y comprobantes de todas las filas, en 2 consultas (no una por fila).
+  const ids = filas.map((f) => String(f.id));
+  const [marcasRes, adjRes, catalogo] = await Promise.all([
+    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id").in("factura_id", ids),
+    supabaseServer.from("mk_adjuntos").select("factura_id, url").in("factura_id", ids),
+    getMarcas(),
+  ]);
+  if (marcasRes.error) throw new Error(`historialPagos[marcas]: ${marcasRes.error.message}`);
+  if (adjRes.error) throw new Error(`historialPagos[adjuntos]: ${adjRes.error.message}`);
+
+  const nombreMarca = new Map(
+    (catalogo ?? []).map((m: { id: string; nombre: string }) => [String(m.id), m.nombre]),
+  );
+  const marcaDeFactura = new Map<string, string>();
+  for (const r of (marcasRes.data ?? []) as Array<{ factura_id: string; marca_id: string }>) {
+    marcaDeFactura.set(String(r.factura_id), String(r.marca_id));
+  }
+  const adjuntoDeFactura = new Map<string, string>();
+  for (const r of (adjRes.data ?? []) as Array<{ factura_id: string; url: string | null }>) {
+    if (r.url && !adjuntoDeFactura.has(String(r.factura_id))) {
+      adjuntoDeFactura.set(String(r.factura_id), r.url);
+    }
+  }
+
+  // Agrupar por `numero_factura`. Si faltara (dato viejo), la fila es su propio
+  // pago: mejor mostrarla suelta que perderla al agrupar por una llave vacía.
+  const porRef = new Map<string, PagoHistorial>();
+  for (const f of filas) {
+    const ref = (f.numero_factura ?? "").trim() || `fila:${f.id}`;
+    const monto = Number(f.total ?? 0);
+    const marcaId = marcaDeFactura.get(String(f.id)) ?? "";
+    let pago = porRef.get(ref);
+    if (!pago) {
+      pago = {
+        ref,
+        periodoDesde: f.periodo_desde ?? null,
+        periodoHasta: f.periodo_hasta ?? null,
+        mes: f.impulsadora_mes ?? null,
+        concepto: f.concepto ?? "",
+        fechaRegistro: f.fecha_factura ?? (f.created_at ? f.created_at.slice(0, 10) : null),
+        total: 0,
+        marcas: [],
+        // Un pago cuenta como anulado solo si TODAS sus filas lo están: si
+        // quedara una viva, el gasto sigue impactando los reportes y decir
+        // "anulado" sería mentira.
+        anulado: true,
+        anuladoMotivo: f.anulado_motivo ?? null,
+        anuladoEn: f.anulado_en ?? null,
+        comprobantePath: adjuntoDeFactura.get(String(f.id)) ?? null,
+        filas: 0,
+      };
+      porRef.set(ref, pago);
+    }
+    pago.total = round2(pago.total + monto);
+    pago.filas += 1;
+    if (!f.anulado_en) pago.anulado = false;
+    if (f.anulado_en && !pago.anuladoEn) {
+      pago.anuladoEn = f.anulado_en;
+      pago.anuladoMotivo = f.anulado_motivo ?? null;
+    }
+    if (!pago.comprobantePath) {
+      pago.comprobantePath = adjuntoDeFactura.get(String(f.id)) ?? null;
+    }
+    if (marcaId) {
+      pago.marcas.push({
+        marcaId,
+        marca: nombreMarca.get(marcaId) ?? "—",
+        monto: round2(monto),
+      });
+    }
+  }
+
+  return Array.from(porRef.values()).sort((a, b) => {
+    const ka = a.periodoDesde ?? a.mes ?? "";
+    const kb = b.periodoDesde ?? b.mes ?? "";
+    return kb.localeCompare(ka);
+  });
+}
+
+/**
+ * Anula un pago entero (todas sus filas). Idempotente: volver a anular no
+ * cambia nada y no es un error.
+ *
+ * Los tres consumidores —reporte por marca, card de marca y Excel— filtran por
+ * `anulado_en`, así que esto lo saca de TODOS los totales sin borrar evidencia.
+ */
+export async function anularPagoImpulsadora(
+  impulsadoraId: string,
+  ref: string,
+  motivo: string,
+): Promise<{ filasAnuladas: number }> {
+  if (!impulsadoraId) throw new Error("impulsadoraId requerido");
+  const referencia = (ref ?? "").trim();
+  if (!referencia) throw new Error("Falta indicar cuál pago anular");
+  const razon = normalizarTexto(motivo ?? "").trim();
+  if (!razon) throw new Error("Escribe por qué se anula el pago");
+
+  // `impulsadora_id` va en el WHERE además de la ref: sin él, una referencia de
+  // otra impulsadora anularía pagos ajenos.
+  let q = supabaseServer
+    .from("mk_facturas")
+    .update({ anulado_en: new Date().toISOString(), anulado_motivo: razon })
+    .eq("impulsadora_id", impulsadoraId)
+    .is("anulado_en", null);
+  q = referencia.startsWith("fila:")
+    ? q.eq("id", referencia.slice(5))
+    : q.eq("numero_factura", referencia);
+
+  const { data, error } = await q.select("id");
+  if (error) throw new Error(`anularPago: ${error.message}`);
+  return { filasAnuladas: (data ?? []).length };
+}
+
+export interface ActualizarImpulsadoraInput {
+  nombre?: string;
+  montoMensual?: number;
+  marcas?: Array<{ marcaId: string; porcentaje: number }>;
+}
+
+/**
+ * Edita la ficha: nombre, monto mensual y/o reparto de marcas.
+ *
+ * ⚠️ NO toca los pagos ya registrados, y es a propósito: un pago es lo que se
+ * pagó ese mes con el reparto vigente entonces. Recalcularlo hacia atrás
+ * reescribiría gastos ya cerrados y movería los reportes de meses pasados.
+ * Subir el sueldo aplica del PRÓXIMO pago en adelante.
+ */
+export async function actualizarImpulsadora(
+  impulsadoraId: string,
+  input: ActualizarImpulsadoraInput,
+): Promise<MkImpulsadora> {
+  if (!impulsadoraId) throw new Error("impulsadoraId requerido");
+
+  const patch: Record<string, unknown> = {};
+  if (input.nombre !== undefined) {
+    const nombre = tituloCase(input.nombre ?? "");
+    if (!nombre) throw new Error("El nombre es obligatorio");
+    patch.nombre = nombre;
+  }
+  if (input.montoMensual !== undefined) {
+    const monto = round2(Number(input.montoMensual));
+    if (!Number.isFinite(monto) || monto < 0) throw new Error("Monto mensual inválido");
+    patch.monto_mensual = monto;
+  }
+  if (input.marcas !== undefined) validarSplit(input.marcas);
+
+  if (Object.keys(patch).length === 0 && input.marcas === undefined) {
+    throw new Error("No hay nada que cambiar");
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabaseServer
+      .from("mk_impulsadoras")
+      .update(patch)
+      .eq("id", impulsadoraId);
+    if (error) throw new Error(`actualizarImpulsadora: ${error.message}`);
+  }
+
+  if (input.marcas !== undefined) {
+    // Se reemplaza el split entero. El borrado va PRIMERO y el insert después:
+    // si el insert falla, el error sube y la ficha queda sin split — mejor un
+    // error visible que un reparto a medias que dispersaría plata en silencio.
+    const { error: errDel } = await supabaseServer
+      .from("mk_impulsadora_marcas")
+      .delete()
+      .eq("impulsadora_id", impulsadoraId);
+    if (errDel) throw new Error(`actualizarImpulsadora[marcas]: ${errDel.message}`);
+    const filas = input.marcas.map((m) => ({
+      impulsadora_id: impulsadoraId,
+      marca_id: m.marcaId,
+      porcentaje: round2(Number(m.porcentaje)),
+    }));
+    const { error: errIns } = await supabaseServer
+      .from("mk_impulsadora_marcas")
+      .insert(filas);
+    if (errIns) throw new Error(`actualizarImpulsadora[marcas]: ${errIns.message}`);
+  }
+
+  const { data, error } = await supabaseServer
+    .from("mk_impulsadoras")
+    .select("*")
+    .eq("id", impulsadoraId)
+    .single();
+  if (error || !data) throw new Error(`actualizarImpulsadora: ${error?.message ?? "sin datos"}`);
+  const imp = data as MkImpulsadora;
+  return { ...imp, monto_mensual: Number(imp.monto_mensual) };
+}
