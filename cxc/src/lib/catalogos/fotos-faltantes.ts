@@ -159,11 +159,17 @@ export interface ResumenFotosMarca {
  * - Si no: línea resumen por marca + detalle de códigos (límite 15 + resto)
  *   solo de las marcas con faltantes.
  */
-export function buildResumenSemanalMsg(marcas: ResumenFotosMarca[]): string {
+export function buildResumenSemanalMsg(marcas: ResumenFotosMarca[]): string | null {
+  // 🩸 SIN HALLAZGOS NO SE MANDA NADA — devuelve `null`, no un mensaje de "todo
+  // bien". Daniel, 3-ago-2026: *"solo dime si me faltan fotos, no si no me
+  // faltan fotos"*. Antes esta rama devolvía "📷 Los 3 catálogos tienen todas
+  // sus fotos ✅" y llegaba cada lunes sin nada que hacer con él.
+  //
+  // Devolver `null` (en vez de dejar que el llamador decida) es lo que hace
+  // IMPOSIBLE volver a mandarlo desde cualquiera de los dos consumidores: el
+  // cron semanal y el colateral de switch-reconciliacion.
   const todasAlDia = marcas.every((m) => !m.pendiente && m.codigos.length === 0);
-  if (todasAlDia) {
-    return `📷 Los ${marcas.length} catálogos tienen todas sus fotos ✅`;
-  }
+  if (todasAlDia) return null;
 
   const partes = marcas.map((m, i) => {
     if (m.pendiente) return `${m.label}: pendiente de activación`;

@@ -1,14 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// El aviso de COSTO SOSPECHOSO va a 🔧 SISTEMA, no a 📊 NEGOCIO.
+// El aviso de COSTO SOSPECHOSO **NO SE MANDA** — por ningún canal.
 //
-// Daniel, mostrando el mensaje que le llegó al chat de negocio: *"me llego esto
-// a fashion gr negocio, deberia de llegar solo a alertas"*.
+// Daniel, 3-ago-2026: *"no quiero mensaje de costos"*. Le seguía llegando por
+// confecciones_boston (el artículo "0806 AGUA MINERAL 600ML", con el costo mal
+// cargado EN Switch), y no es accionable en el momento en que suena.
 //
-// 🩸 Y NO PUEDE IR SIN FRENO. Mientras vivía en NEGOCIO no tenía anti-loop
-// ninguno: mientras el artículo siguiera mal en Switch, avisaba en CADA corrida.
-// En SISTEMA eso lo volvería la alerta-que-suena-para-siempre, que es justo lo
-// que Daniel quiso cortar al fijar la lista cerrada. Por eso se le agregó el
-// mismo freno del guard de montos: 7 días por fila.
+// 🩸 HISTORIA, porque explica por qué este archivo se llama "canal": el #390 lo
+// mudó de 📊 NEGOCIO a 🔧 SISTEMA y le puso un anti-loop de 7 días (sin freno
+// habría sido la alerta-que-suena-para-siempre). Cambiar de canal no alcanzó:
+// Daniel no lo quiere en ninguno. Ahora el archivo prueba lo contrario de lo que
+// probaba — que no sale por NINGÚN canal.
+//
+// ⚠️ LO QUE SIGUE VIVO Y NO SE PUEDE PERDER: la protección. Se sigue detectando
+// el costo sospechoso, la fila se sigue guardando con costo $0 para no dañar el
+// margen, y el rastro sigue quedando en `skip_details` (lo único que se conserva
+// del #390) para poder auditar después sin escribirle a nadie.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from "vitest";
@@ -27,41 +33,56 @@ const sync = readFileSync(
   "utf8",
 );
 
-describe("🔴 el canal, en las dos direcciones", () => {
-  it("manda por SISTEMA", () => {
-    expect(sync).toContain('import { enviarSistema } from "@/lib/alertas/canal"');
-    const fn = sync.slice(sync.indexOf("async function alertarCostosSospechosos"));
-    expect(fn.slice(0, fn.indexOf("\n}\n"))).toContain("await enviarSistema(");
+/** El archivo sin comentarios: los comentarios SÍ nombran los canales y el
+ *  mensaje viejo, y eso es correcto — documentan por qué ya no se manda. Lo que
+ *  no puede volver es el CÓDIGO que envía. */
+const codigo = sync
+  .split("\n")
+  .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+  .join("\n");
+
+describe("🔴 no se manda por NINGÚN canal", () => {
+  it("no envía por SISTEMA", () => {
+    expect(codigo).not.toContain("enviarSistema");
   });
 
-  it("y NO por negocio — ni el import quedó", () => {
-    expect(sync).not.toContain("enviarNegocio");
-  });
-});
-
-describe("el texto no se tocó: solo cambió el canal", () => {
-  it("mantiene las tres frases que ve Daniel", () => {
-    expect(sync).toContain("⚠️ Costo sospechoso en artículos");
-    expect(sync).toContain("Se guardaron con costo $0 para no dañar el margen.");
-    expect(sync).toContain(
-      "Corrige el costo del artículo en Switch y relanza switch-articulos de ese día.",
-    );
+  it("no envía por NEGOCIO", () => {
+    expect(codigo).not.toContain("enviarNegocio");
   });
 
-  it("no escribe el prefijo a mano — lo pone el canal", () => {
-    // Se mira el CUERPO de la función, no el archivo: los comentarios sí
-    // nombran el canal y eso es correcto.
-    const fn = sync.slice(sync.indexOf("async function alertarCostosSospechosos"));
-    const cuerpo = fn
-      .slice(0, fn.indexOf("\n}\n"))
-      .split("\n")
-      .filter((l) => !l.trim().startsWith("//"))
-      .join("\n");
-    expect(cuerpo).not.toContain("🔧 SISTEMA · ");
+  it("no quedó la función que armaba el aviso", () => {
+    expect(codigo).not.toContain("alertarCostosSospechosos");
+  });
+
+  it("no quedó el texto del mensaje en el código", () => {
+    expect(codigo).not.toContain("⚠️ Costo sospechoso en artículos");
+    expect(codigo).not.toContain("Se guardaron con costo $0 para no dañar el margen.");
   });
 });
 
-describe("🔴 el anti-loop, para que no suene todos los días", () => {
+describe("🔴 pero la PROTECCIÓN sigue viva — esto es lo que no se puede perder", () => {
+  it("se sigue detectando el costo sospechoso", () => {
+    expect(codigo).toContain("esCostoSospechoso(");
+  });
+
+  it("la fila se sigue guardando con costo $0, no con el costo corrupto", () => {
+    expect(codigo).toContain("costo_total: sospechoso ? 0 : costoTotal");
+  });
+
+  it("el conteo sigue viajando en el resultado del sync", () => {
+    expect(codigo).toContain("costosSospechosos");
+  });
+
+  it("el rastro sigue quedando en skip_details (lo que se conservó del #390)", () => {
+    expect(codigo).toContain("detallesDeCostoSospechoso(sospechosos)");
+  });
+});
+
+// El módulo `costo-sospechoso-aviso.ts` sigue existiendo entero. De él, la parte
+// que USA producción es `detallesDeCostoSospechoso` (el rastro en base); las
+// piezas del anti-loop quedan disponibles por si algún día se quiere volver a
+// avisar, y se siguen cubriendo acá para que no se pudran en silencio.
+describe("el anti-loop queda disponible, aunque hoy nada lo use para avisar", () => {
   it("son 7 días, igual que el guard de montos", () => {
     expect(COSTO_DIAS_ENTRE_AVISOS).toBe(7);
   });
@@ -79,9 +100,8 @@ describe("🔴 el anti-loop, para que no suene todos los días", () => {
     expect(clavesPorAvisar(["a", "b"], [])).toEqual(["a", "b"]);
   });
 
-  it("si TODAS ya se avisaron, no se manda nada", () => {
+  it("si TODAS ya se avisaron, la lista queda vacía", () => {
     expect(clavesPorAvisar(["a"], ["a"])).toEqual([]);
-    expect(sync).toContain("if (nuevas.size === 0) return;");
   });
 
   it("las filas quedan registradas para que la próxima corrida recuerde", () => {

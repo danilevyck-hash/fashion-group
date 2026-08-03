@@ -25,7 +25,9 @@ const MARCAS_RESUMEN: MarcaKey[] = ["reebok", "joybees", "tommy"];
 
 export interface FotosResumenResult {
   marcas: ResumenFotosMarca[];
-  mensaje: string;
+  /** `null` = no hay nada que avisar. Ver `buildResumenSemanalMsg`: no existe
+   *  un mensaje de "todos los catálogos están al día". */
+  mensaje: string | null;
   totalSinFoto: number;
 }
 
