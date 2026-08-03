@@ -31,6 +31,21 @@ const MESES = [
 const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
 const DEFAULT_VENDEDOR = "DEFAULT"; // centinela "cliente sin dueño"
 
+// Vendedores que NO se muestran en Comisiones. Daniel, 3-ago-2026: *"quita el
+// vendedor aguas, no lo quiero ver"*.
+//
+// ⚠️ Se excluye de la TABLA **y de los totales**. AGUAS es un vendedor real en
+// Switch (4 facturas de julio en Vistana por $1.148 → $34,66 de comisión), así
+// que esconder solo la fila dejaría un total que no cuadra con lo que se ve —
+// y un total que no cuadra es lo que hace que nadie vuelva a confiar en la
+// pantalla. Es una lista para que agregar otro sea una línea, no un rediseño.
+const VENDEDORES_OCULTOS = new Set(["AGUAS"]);
+
+const estaOculto = (v: string) => VENDEDORES_OCULTOS.has(v.trim().toUpperCase());
+
+/** Los montos vienen de dos fuentes; sin esto la resta arrastra centavos. */
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 interface ApiVendedor {
   vendedor: string;
   base: number;
@@ -45,6 +60,8 @@ interface ApiResp {
 interface Row extends ComisionConsolidadoRow {
   sumBase: number;
   sumBaseCobro: number;
+  /** Descuentos fijos activos del mes, ya sumados. Se restan del total. */
+  sumDescuento: number;
 }
 
 interface Props {
@@ -79,7 +96,31 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
             const body = await res.json().catch(() => ({}));
             throw new Error(`${EMPRESA_KEY_TO_NAME[empresa] ?? empresa}: ${body.error ?? `HTTP ${res.status}`}`);
           }
-          return (await res.json()) as ApiResp;
+          const comisiones = (await res.json()) as ApiResp;
+
+          // Descuentos fijos ACTIVOS del mes, de todos los vendedores de la
+          // empresa. 🩸 La tabla mostraba el subtotal ANTES de descuentos
+          // mientras el detalle sí restaba: Fashion Shoes de Reinaldo decía
+          // $2.859,65 cuando lo que se paga son $1.286,57. Daniel: *"me sale en
+          // el web el total, y no me resta el descuento"*.
+          //
+          // Si esta llamada falla NO se tumba la pantalla: se sigue con
+          // descuentos en 0 y la tabla queda como estaba antes. Un total de
+          // comisiones visible vale más que una pantalla en blanco.
+          let porVendedor: Record<string, number> = {};
+          try {
+            const rd = await fetch(
+              `/api/ventas/comisiones/descuentos?empresa=${empresa}&year=${year}&mes=${mes}`,
+              { cache: "no-store" },
+            );
+            if (rd.ok) {
+              const body = (await rd.json()) as { porVendedor?: Record<string, number> };
+              porVendedor = body.porVendedor ?? {};
+            }
+          } catch {
+            /* se queda en 0 */
+          }
+          return { ...comisiones, porVendedor };
         }),
       );
 
@@ -87,11 +128,12 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
       const byName = new Map<string, Row>();
       let def: Row | null = null;
       const blank = (vendedor: string): Row => ({
-        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0,
+        vendedor, porEmpresa: {}, total: 0, sumBase: 0, sumBaseCobro: 0, sumDescuento: 0,
       });
 
       for (const r of resp) {
         for (const v of r.vendedores) {
+          if (estaOculto(v.vendedor)) continue; // fuera de la tabla Y de los totales
           const target = v.vendedor === DEFAULT_VENDEDOR
             ? (def ??= blank("Sin asignar"))
             : (byName.get(v.vendedor) ?? blank(v.vendedor));
@@ -101,6 +143,18 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
           target.total += v.comision_total ?? 0;
           target.sumBase += v.base ?? 0;
           target.sumBaseCobro += v.base_cobro ?? 0;
+        }
+        // El descuento es por (empresa, vendedor), así que se resta de LA CELDA
+        // de esa empresa —que es la que Daniel estaba mirando: la columna
+        // Fashion Shoes decía $2.859,65 cuando lo que se paga son $1.286,57— y
+        // por arrastre del total de la fila.
+        for (const [nombre, monto] of Object.entries(r.porVendedor ?? {})) {
+          if (!monto || estaOculto(nombre) || nombre === DEFAULT_VENDEDOR) continue;
+          const target = byName.get(nombre);
+          if (!target) continue; // descuento de alguien sin comisión este mes
+          target.porEmpresa[r.empresa_key] = round2((target.porEmpresa[r.empresa_key] ?? 0) - monto);
+          target.total = round2(target.total - monto);
+          target.sumDescuento = round2(target.sumDescuento + monto);
         }
       }
 
@@ -290,7 +344,9 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Ya está descontado lo devuelto · Toca para ver el detalle
+        {/* Antes decía solo "lo devuelto" y por eso el número parecía mal: los
+            descuentos fijos NO estaban restados y el detalle sí los restaba. */}
+        Ya están descontados lo devuelto y los descuentos · Toca para ver el detalle
       </p>
 
       {detalle && (
