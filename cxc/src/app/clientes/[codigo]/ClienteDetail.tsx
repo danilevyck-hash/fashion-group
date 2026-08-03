@@ -14,6 +14,7 @@ import {
   opcionesFichaCliente,
   ROLES_SYNC_FICHA_CLIENTE,
 } from "@/components/shared/syncNowOpciones";
+import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 
 interface Cliente {
   id: string;
@@ -126,6 +127,11 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
       } else {
         setCliente(json.cliente);
         setEditing(false);
+        // El selector de clientes (Guías, Cheques, Marketing) guarda el
+        // directorio en memoria para buscar sin ir a la red. La app navega sin
+        // recargar, así que ese caché sobreviviría a esta edición y seguiría
+        // mostrando el nombre viejo. Se invalida acá.
+        invalidarDirectorioClientes();
         setToast("Datos actualizados");
       }
     } catch (err) {
