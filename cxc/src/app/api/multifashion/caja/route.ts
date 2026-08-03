@@ -46,7 +46,7 @@ interface CacheRow {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "gerente_acs"]);
+  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
   if (auth instanceof NextResponse) return auth;
 
   const hoy = hoyPanama();

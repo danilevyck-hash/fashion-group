@@ -23,7 +23,7 @@ function parseIntParam(v: string | null): number | null {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "gerente_acs"]);
+  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;

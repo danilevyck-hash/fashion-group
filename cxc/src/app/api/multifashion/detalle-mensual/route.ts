@@ -26,7 +26,7 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   // Multifashion es módulo admin-only por ahora (los demás roles se definen
   // después). overview queda compartido con Ventas, pero los sub-tabs son admin.
-  const auth = requireRole(req, ["admin", "gerente_acs"]);
+  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;

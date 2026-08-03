@@ -56,7 +56,7 @@ async function fetchAll<T>(build: (from: number) => PromiseLike<{ data: T[] | nu
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "gerente_acs"]);
+  const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
   if (auth instanceof NextResponse) return auth;
 
   try {

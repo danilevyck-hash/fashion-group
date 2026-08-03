@@ -391,6 +391,36 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
     expect((await bonosGet(req("/api/multifashion/bonos", "bodega"))).status).toBe(403);
     expect((await cajaGet(req("/api/multifashion/caja", "vendedor"))).status).toBe(403);
   });
+
+  // 🩸 3-ago-2026. A Andrea (rol `secretaria`) se le dio el módulo Multifashion
+  // por `fg_users.modulos_override`, así que le aparecía en el menú y podía
+  // abrir la pantalla — pero las rutas solo admitían admin y gerente_acs, y le
+  // salía "Sin permiso" en el ranking y en los bonos. Los permisos se otorgan
+  // POR USUARIO y se verifican POR ROL: ese es el desajuste. Daniel: *"si
+  // debería de poder verlo"*.
+  it("secretaria ENTRA en las 7 rutas (no 403)", async () => {
+    const casos: Array<[string, (r: NextRequest) => Promise<Response>]> = [
+      ["/api/multifashion/overview?year=2026", overviewGet],
+      ["/api/multifashion/detalle-mensual?year=2026&mes=7", detalleGet],
+      ["/api/multifashion/bonos?year=2026&mes=7", bonosGet],
+      ["/api/multifashion/vendedoras?year=2026&mes=7", vendedorasGet],
+      ["/api/multifashion/clientes-wholesale?desde=2026-07-01&hasta=2026-07-31", wholesaleGet],
+      ["/api/multifashion/retail-recurrentes?desde=2026-07-01&hasta=2026-07-31", retailGet],
+      ["/api/multifashion/caja?fecha=2026-07-15", cajaGet],
+    ];
+    for (const [url, handler] of casos) {
+      const res = await handler(req(url, "secretaria"));
+      expect(res.status, `403 en ${url}`).not.toBe(403);
+      expect(res.status, `401 en ${url}`).not.toBe(401);
+    }
+  });
+
+  it("⚠️ pero a la secretaria NO se le acota la ventana — eso es solo de gerente_acs", () => {
+    // Si algún día alguien la sumara a `esRolAcotado`, vería solo el mes en
+    // curso sin que nadie lo haya pedido. La ventana la definió Daniel para
+    // Jennifer, no para el personal interno.
+    expect(esRolAcotado("secretaria")).toBe(false);
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
