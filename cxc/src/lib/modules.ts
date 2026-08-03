@@ -11,6 +11,7 @@
 // tiene que bastar (auditoría de textos, PR #278). No reintroducir `subtitle`.
 
 import {
+  Clock,
   CircleDollarSign,
   Truck,
   Wallet,
@@ -79,6 +80,7 @@ export const ALL_MODULES: AppModule[] = [
   // Operación
   { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
   { key: "packing-lists",  label: "Packing Lists",     href: "/packing-lists",    icon: ClipboardList, roles: ["admin", "secretaria", "bodega"],             group: "operacion" },
+  { key: "asistencia",     label: "Asistencia",        href: "/asistencia",       icon: Clock,         roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "comisiones",     label: "Comisiones",        href: "/comisiones",       icon: Coins,         roles: ["admin", "secretaria"],                       group: "operacion" },
