@@ -5,6 +5,9 @@
  *
  * GET  ?empresa=&year=&mes=&vendedor=  → descuentos con su `activo` EFECTIVO
  *      del mes (excepción si existe; si no, activo por defecto).
+ *      SIN `vendedor` → los de TODOS los vendedores de la empresa, agrupados
+ *      por nombre. Lo usa la tabla consolidada, que necesita el neto de todos
+ *      a la vez y no puede hacer una llamada por vendedor.
  * POST { descuento_id, year, mes, activo } → upsert de la excepción del mes.
  */
 import { NextRequest, NextResponse } from "next/server";
@@ -40,17 +43,16 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
-  if (!vendedor) {
-    return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
-  }
-
-  const { data: fijos, error: e1 } = await supabaseServer
+  // `vendedor` es OPCIONAL: sin él se devuelven los de toda la empresa. Antes
+  // era obligatorio y por eso la tabla consolidada no podía mostrar el neto —
+  // habría necesitado una llamada por cada vendedor de cada empresa.
+  let q = supabaseServer
     .from("comision_descuentos_fijos")
-    .select("id, concepto, monto")
+    .select("id, concepto, monto, vendedor_nombre")
     .eq("empresa_key", empresa)
-    .eq("vendedor_nombre", vendedor)
-    .eq("activo", true)
-    .order("concepto", { ascending: true });
+    .eq("activo", true);
+  if (vendedor) q = q.eq("vendedor_nombre", vendedor);
+  const { data: fijos, error: e1 } = await q.order("concepto", { ascending: true });
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
 
   const ids = (fijos ?? []).map((f) => String(f.id));
@@ -69,10 +71,26 @@ export async function GET(req: NextRequest) {
     const id = String(f.id);
     // Efectivo: excepción del mes si existe; si no, activo por defecto.
     const activo = excById.has(id) ? excById.get(id)! : true;
-    return { id, concepto: String(f.concepto), monto: Number(f.monto), activo };
+    return {
+      id,
+      concepto: String(f.concepto),
+      monto: Number(f.monto),
+      activo,
+      vendedor: String((f as { vendedor_nombre?: string }).vendedor_nombre ?? ""),
+    };
   });
 
-  return NextResponse.json({ descuentos });
+  // Con vendedor: forma de siempre (la usa el modal de detalle).
+  if (vendedor) return NextResponse.json({ descuentos });
+
+  // Sin vendedor: además, el total ACTIVO por vendedor ya sumado, que es lo
+  // único que la tabla consolidada necesita para mostrar el neto.
+  const porVendedor: Record<string, number> = {};
+  for (const d of descuentos) {
+    if (!d.activo || !d.vendedor) continue;
+    porVendedor[d.vendedor] = Math.round(((porVendedor[d.vendedor] ?? 0) + d.monto) * 100) / 100;
+  }
+  return NextResponse.json({ descuentos, porVendedor });
 }
 
 export async function POST(req: NextRequest) {
