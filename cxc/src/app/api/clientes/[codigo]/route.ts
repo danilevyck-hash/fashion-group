@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
+import { invalidarDirectorioServidor } from "@/lib/clientes/directorio-cache";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 // La definición de "compras del año" vive en UN solo lugar y la comparten la
 // ficha y el listado — si divergieran, la misma pantalla diría dos números
@@ -219,5 +220,10 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ codigo: s
   }
   if (!data) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
+  // El listado del directorio se sirve de un caché en memoria (60 s). Sin esto
+  // una edición tardaría hasta un minuto en verse. ⚠️ Solo limpia ESTA
+  // instancia: en serverless otra puede seguir sirviendo lo viejo hasta que
+  // venza el TTL — por eso el TTL es corto y no se depende solo de acá.
+  invalidarDirectorioServidor();
   return NextResponse.json({ ok: true, cliente: data });
 }

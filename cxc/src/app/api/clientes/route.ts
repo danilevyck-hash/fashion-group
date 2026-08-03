@@ -15,15 +15,21 @@
 // nombre de fantasía — "Millenium / David" factura como "Grupo Irmode De
 // Panama, S.A", así que quien buscara "irmode" no encontraba nada.
 //
-// POR QUÉ EL FILTRO ES EN MEMORIA Y NO EN SQL. `clientes_master` tiene **149
-// filas vivas** (medido el 27-jul-2026 contra producción; el número de ~1.700
-// que se manejaba es el de `switch_clientes`, que son pares cliente-empresa de
-// las 8 empresas, no clientes). Traer 149 filas y filtrarlas acá cuesta lo mismo
-// que una consulta filtrada y evita meter una función SQL + su migración en el
-// camino crítico de una pantalla que hoy funciona. La lectura va por
-// `leerTodoPaginado`, que pagina y VERIFICA contra el COUNT: si la tabla
-// creciera, esto no se rompe en silencio. ⚠️ Si algún día `clientes_master`
-// pasa de ~1.000 filas, este filtro se muda a una RPC en SQL.
+// POR QUÉ EL FILTRO ES EN MEMORIA Y NO EN SQL. La regla de mundos (qué cliente
+// es del grupo y cuál de Boston/Multifashion) se calcula en TypeScript, así que
+// no se puede empujar a la base sin una migración.
+//
+// 🩸 ACÁ DECÍA QUE `clientes_master` TENÍA "149 filas vivas" Y ERA FALSO
+// (3-ago-2026). 149 es lo que queda DESPUÉS de filtrar por mundos, no el tamaño
+// de la tabla. Medido contra producción: **5.062 filas vivas** en
+// `clientes_master` y **6.667** en `switch_clientes` → cada llamada leía
+// **11.729 filas en 13 viajes** a Supabase para devolver ~149. Con el número
+// equivocado la lectura completa parecía barata y por eso nadie la tocó.
+//
+// La lectura ahora pasa por `lib/clientes/directorio-cache`, que la guarda en
+// memoria 60 s: el resultado solo cambia cuando corre un sync o alguien edita
+// una ficha, nunca entre dos tecleos. Sigue usando `leerTodoPaginado` (pagina y
+// VERIFICA contra el COUNT), así que si la tabla crece no se rompe en silencio.
 //
 // Query params: q · provincia · page (1-indexed) · limit (default 50, max 200)
 // Devuelve: { clientes, total, page, limit }
@@ -31,26 +37,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
-import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
-import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
+import { leerDirectorioGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
-
-interface FilaCliente {
-  id: string;
-  codigo: string | null;
-  nombre: string | null;
-  razon_social: string | null;
-  telefono: string | null;
-  celular: string | null;
-  email: string | null;
-  provincia: string | null;
-}
 
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED_ROLES);
@@ -63,41 +56,30 @@ export async function GET(req: NextRequest) {
   const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10) || 50;
   const limit = Math.min(200, Math.max(1, limitRaw));
 
-  let filas: FilaCliente[];
+  // Lectura + filtro de mundos, cacheados 60 s por instancia. La provincia SÍ
+  // se filtra en la base (igual exacto), por eso es parte de la clave.
+  //
+  // Solo los clientes del GRUPO (las 6 que conviven). Los de Boston viven en su
+  // pestaña de CXC y los de Multifashion en su módulo. La regla y su porqué
+  // viven en UN solo lugar — `lib/clientes/mundos` — no acá.
+  // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
+  let visibles: FilaCliente[];
   try {
-    filas = await leerTodoPaginado<FilaCliente>(
-      "clientes_master (listado)",
-      (pedirCount, from, to) => {
-        let sel = supabaseServer
-          .from("clientes_master")
-          .select(
-            "id, codigo, nombre, razon_social, telefono, celular, email, provincia",
-            pedirCount ? { count: "exact" } : {},
-          )
-          .eq("deleted", false);
-        // La provincia SÍ se filtra en la base: es un igual exacto, no hace
-        // falta normalizar nada y achica lo que viaja.
-        if (provincia) sel = sel.eq("provincia", provincia);
-        // Orden de PAGINACIÓN (estable y único), no el de presentación: el
-        // orden que ve el usuario se aplica abajo, en español.
-        return sel.order("id", { ascending: true }).range(from, to);
-      },
-    );
+    visibles = await leerDirectorioGrupo(provincia);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[api/clientes] list error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  // Solo los clientes del GRUPO (las 6 que conviven). Los de Boston viven en su
-  // pestaña de CXC y los de Multifashion en su módulo. La regla y su porqué
-  // viven en UN solo lugar — `lib/clientes/mundos` — no acá.
-  // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
-  const visibles = soloClientesDelGrupo(filas, await mundosDeClientes());
-
+  // ⚠️ `.slice()` OBLIGATORIO cuando no hay búsqueda: sin él, `filtrados` sería
+  // el MISMO array que guarda el caché y el `sort` de abajo lo ordenaría en el
+  // lugar, mutando estado compartido entre llamadas. Antes del caché cada
+  // llamada traía un array recién creado y mutarlo no tenía consecuencia; ahora
+  // sí. (`filter` ya devuelve uno nuevo, por eso solo la otra rama lo necesita.)
   const filtrados = q
     ? visibles.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
-    : visibles;
+    : visibles.slice();
 
   // Orden de presentación: por nombre, con collation española (ñ y acentos en
   // su lugar). Es el mismo criterio que mostraba la pantalla antes.
