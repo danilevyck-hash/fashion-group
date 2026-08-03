@@ -20,6 +20,7 @@ import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
+import { ComisionesTarjetasConsolidado } from "./ComisionesTarjetas";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -161,31 +162,36 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
       {EMPRESAS.map((k) => {
         const val = r.porEmpresa[k];
         if (val === undefined) {
-          return <td key={k} className="px-3 py-2.5 text-right tabular-nums text-gray-300">—</td>;
+          return <td key={k} className="px-2 py-2.5 text-right tabular-nums text-gray-300 xl:px-3">—</td>;
         }
         return (
           <td
             key={k}
             onClick={(e) => { e.stopPropagation(); setDetalle({ empresa: k, vendedor: r.vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : r.vendedor }); }}
-            className={`cursor-pointer px-3 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline ${moneyClass(val)}`}
+            className={`cursor-pointer px-2 py-2.5 text-right tabular-nums transition hover:bg-gray-100 hover:underline xl:px-3 ${moneyClass(val)}`}
             title={`Ver detalle · ${EMPRESA_KEY_TO_NAME[k] ?? k}`}
           >
             {fmtMoney(val)}
           </td>
         );
       })}
-      <td className={`bg-gray-50 px-4 py-2.5 text-right font-semibold tabular-nums ${r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
+      <td className={`bg-gray-50 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${r.total < 0 ? "text-rose-600" : "text-gray-900"} ${isTotalBold ? "" : ""}`}>
         {fmtMoney(r.total)}
       </td>
     </>
   );
 
+  const detalleDe = (empresa: string, vendedor: string) =>
+    setDetalle({ empresa, vendedor: vendedor === "Sin asignar" ? DEFAULT_VENDEDOR : vendedor });
+
   return (
     <div className="space-y-4">
-      <Card className="overflow-hidden rounded-lg border border-gray-200">
-        {loading ? (
+      {loading ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-3"><SkeletonTable rows={6} cols={6} /></div>
-        ) : error ? (
+        </Card>
+      ) : error ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm">
             <p className="text-rose-600">{error}</p>
             <button
@@ -195,38 +201,58 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
               Reintentar
             </button>
           </div>
-        ) : empty ? (
+        </Card>
+      ) : empty ? (
+        <Card className="overflow-hidden rounded-lg border border-gray-200">
           <div className="p-8 text-center text-sm text-gray-500">
             Sin comisiones para {MESES[mes - 1]} {year}.
           </div>
-        ) : (
-          <div className="overflow-x-auto">
+        </Card>
+      ) : (
+        <>
+          {/* Celular: TARJETAS. La tabla de 7 columnas medía 984px de contenido
+              en 356px útiles → 628px de arrastre lateral (medido a 390px). */}
+          <ComisionesTarjetasConsolidado
+            activos={activos}
+            sinAsignar={sinAsignar}
+            inactivos={inactivos}
+            mostrarInactivos={showInactivos}
+            onToggleInactivos={() => setShowInactivos((v) => !v)}
+            empresas={EMPRESAS}
+            nombreEmpresa={(k) => EMPRESA_KEY_TO_NAME[k] ?? k}
+            granTotal={grandTotal}
+            onDetalle={detalleDe}
+          />
+
+          {/* iPad y escritorio: la tabla, intacta. */}
+          <Card className="hidden overflow-hidden rounded-lg border border-gray-200 lg:block">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-4 py-2 font-medium">Vendedor</th>
+                  <th className="px-3 py-2 font-medium xl:px-4">Vendedor</th>
                   {EMPRESAS.map((k) => (
-                    <th key={k} className="whitespace-nowrap px-3 py-2 text-right font-medium">{EMPRESA_KEY_TO_NAME[k] ?? k}</th>
+                    <th key={k} className="px-2 py-2 text-right font-medium xl:whitespace-nowrap xl:px-3">{EMPRESA_KEY_TO_NAME[k] ?? k}</th>
                   ))}
-                  <th className="bg-gray-100 px-4 py-2 text-right font-semibold text-gray-700">Total</th>
+                  <th className="bg-gray-100 px-3 py-2 text-right font-semibold text-gray-700 xl:px-4">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {activos.map((r) => (
                   <tr key={r.vendedor} className="border-b border-gray-100 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 font-medium text-gray-900">{r.vendedor}</td>
+                    <td className="px-3 py-2.5 font-medium text-gray-900 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
                     {renderCells(r, false)}
                   </tr>
                 ))}
                 {sinAsignar && (
                   <tr className="border-b border-gray-100 bg-gray-50/50 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5 italic text-gray-500">Sin asignar</td>
+                    <td className="px-3 py-2.5 italic text-gray-500 xl:whitespace-nowrap xl:px-4">Sin asignar</td>
                     {renderCells(sinAsignar, false)}
                   </tr>
                 )}
                 {inactivos.length > 0 && (
                   <tr className="border-b border-gray-100 last:border-0">
-                    <td colSpan={EMPRESAS.length + 2} className="px-4 py-1.5">
+                    <td colSpan={EMPRESAS.length + 2} className="px-3 py-1.5 xl:px-4">
                       <button
                         onClick={() => setShowInactivos((v) => !v)}
                         /* Era texto suelto de 18 px de alto dentro de la fila.
@@ -241,29 +267,30 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
                 )}
                 {showInactivos && inactivos.map((r) => (
                   <tr key={r.vendedor} className="border-b border-gray-100 text-gray-400 last:border-0 transition hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-2.5">{r.vendedor}</td>
+                    <td className="px-3 py-2.5 xl:whitespace-nowrap xl:px-4">{r.vendedor}</td>
                     {renderCells(r, false)}
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
-                  <td className="px-4 py-2.5">Total</td>
+                  <td className="px-3 py-2.5 xl:px-4">Total</td>
                   {EMPRESAS.map((k) => {
                     const t = colTotal(k);
-                    return <td key={k} className={`px-3 py-2.5 text-right tabular-nums ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;
+                    return <td key={k} className={`px-2 py-2.5 text-right tabular-nums xl:px-3 ${t < 0 ? "text-rose-600" : ""}`}>{fmtMoney(t)}</td>;
                   })}
-                  <td className={`bg-gray-100 px-4 py-2.5 text-right font-semibold tabular-nums ${grandTotal < 0 ? "text-rose-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
+                  <td className={`bg-gray-100 px-3 py-2.5 text-right font-semibold tabular-nums xl:px-4 ${grandTotal < 0 ? "text-rose-600" : "text-gray-900"}`}>{fmtMoney(grandTotal)}</td>
                 </tr>
               </tfoot>
             </table>
-          </div>
-        )}
-      </Card>
+            </div>
+          </Card>
+        </>
+      )}
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Cada celda ya viene neteada · Toca una celda para ver su detalle
+        Ya está descontado lo devuelto · Toca para ver el detalle
       </p>
 
       {detalle && (

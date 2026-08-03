@@ -80,11 +80,21 @@ function ChequeCalendarioPill({
   const pillRef = useRef<HTMLButtonElement>(null);
   return (
     <div className="relative">
+      {/* 🩸 El nombre y el MONTO iban en la misma línea con `truncate`, y en una
+          casilla de calendario (7 columnas: ~80 px en un iPad de 834) el monto
+          quedaba fuera del recorte: "Jerusalem De… $29,476.28" perdía 121 px a
+          834 y 113 a 1440 — el número no se podía leer y encima parecía
+          completo. Ahora el monto tiene su propio renglón y siempre entra; lo
+          único que se acorta es el nombre, que es el mecanismo del "…" bien
+          usado (y el globo de detalle lo muestra entero). */}
       <button ref={pillRef} onClick={onAbrir}
         title={`N° ${cheque.numero_cheque} · $${fmt(cheque.monto)} · ${cheque.cliente}`}
-        className={`w-full flex items-center gap-1 text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
-        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
-        <span className="truncate">{cheque.cliente.length > 12 ? cheque.cliente.slice(0, 12) + "…" : cheque.cliente} ${fmt(cheque.monto)}</span>
+        className={`w-full text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
+        <span className="flex items-center gap-1 min-w-0">
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
+          <span className="truncate">{cheque.cliente}</span>
+        </span>
+        <span className="block tabular-nums font-medium">${fmt(cheque.monto)}</span>
       </button>
       <DesplegableFlotante
         abierto={abierto}
@@ -101,8 +111,8 @@ function ChequeCalendarioPill({
           <StatusBadge estado={ve} />
           {(ve === "pendiente" || ve === "vencido") && (
             <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-              <button onClick={onDepositar} className="text-xs text-emerald-600 hover:underline">Confirmar depósito</button>
-              <button onClick={onRebotado} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline">Rebotado</button>
+              <button onClick={onDepositar} className="text-xs text-emerald-600 hover:underline min-h-[44px] inline-flex items-center">Confirmar depósito</button>
+              <button onClick={onRebotado} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline min-h-[44px] inline-flex items-center">Rebotado</button>
             </div>
           )}
         </div>
@@ -142,7 +152,8 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   if (!hasActions) return null;
   return (
     <div className="relative">
-      <button ref={triggerRef} onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
+      {/* Tenía min-h pero no ANCHO: medía 12×44 y el dedo no le acierta. */}
+      <button ref={triggerRef} onClick={() => setOpen(!open)} aria-label="Más acciones" className="inline-flex h-11 w-11 items-center justify-center text-sm text-gray-400 hover:text-black transition">&#x22EF;</button>
       <DesplegableFlotante
         abierto={open}
         anclaRef={triggerRef}
@@ -889,10 +900,13 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                             <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5 ml-1">N° {c.numero_cheque} · {getCompanyDisplay(c.empresa)}</div>
+                          {/* Medían 119×26 y 59×26 — los 2 targets bajo 44 px
+                              del calendario en celular. `-my-1.5` para que
+                              crecer no estire la fila del día. */}
                           {(ve === "pendiente" || ve === "vencido") && (
-                            <div className="flex gap-3 mt-1 ml-1">
-                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Confirmar depósito</button>
-                              <button onClick={() => setRebotandoId(c.id)} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
+                            <div className="flex gap-3 mt-1 ml-1 -my-1.5">
+                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline min-h-[44px] inline-flex items-center">Confirmar depósito</button>
+                              <button onClick={() => setRebotandoId(c.id)} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline min-h-[44px] inline-flex items-center">Rebotado</button>
                             </div>
                           )}
                         </div>
@@ -988,8 +1002,16 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <button onClick={() => setSelectedVencidos(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
           </div>
         )}
-        {/* Mobile card list with swipe-to-deposit */}
-        <div className="sm:hidden space-y-1.5">
+        {/* ── Tarjetas (celular, iPad y ventanas angostas) ────────────────────
+            🩸 Rota SOLO en el iPad: a 390 px ya eran tarjetas y a 1440 la tabla
+            entra, pero el corte estaba en `sm` (640) mientras la barra lateral
+            aparece en `md` (768) y se lleva 224 px. A 834 px quedaban 562 útiles
+            contra 768 de tabla = 206 px de arrastre, y lo que se iba fuera de la
+            pantalla eran ESTADO y el menú de acciones.
+            El corte es `xl` (1280), medido: a 1024 la columna "N° Cheque"
+            reaparece (`lg:table-cell`) y la tabla pide ~848 px contra 752 útiles
+            — con `lg` el problema seguía vivo. A 1280 quedan 1008 px. */}
+        <div className="xl:hidden space-y-1.5">
           {filtered.map((c) => {
             const ve = visualEstado(c);
             const isPending = ve === "pendiente" || ve === "vencido";
@@ -1001,19 +1023,31 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               onAction: () => setConfirmDepositId(c.id),
             } : undefined;
             const card = (
-              <div className={`px-4 py-3 ${ve === "depositado" ? "opacity-60" : ""}`} onClick={() => startEdit(c)}>
+              <div data-cheque-fila={c.id} className={`px-4 py-3 ${ve === "depositado" ? "opacity-60" : ""}`} onClick={() => startEdit(c)}>
                 {/* Row 1: Cliente + Monto */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-medium truncate">{c.cliente}</span>
+                    <span className="text-sm font-medium truncate" data-cheque-campo="cliente">{c.cliente}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-sm font-semibold tabular-nums">${fmt(c.monto)}</span>
+                    <span className="text-sm font-semibold tabular-nums" data-cheque-campo="monto">${fmt(c.monto)}</span>
+                    {/* El menú ⋯ es lo que se perdía a 834 px junto con ESTADO.
+                        Mismo componente flotante de la tabla — no se rehace. */}
+                    <span className="-my-2" onClick={(e) => e.stopPropagation()}>
+                      <ChequeMoreMenu
+                        cheque={c}
+                        ve={ve}
+                        role={role}
+                        onRebotado={() => setRebotandoId(c.id)}
+                        onDelete={() => setConfirmDeleteId(c.id)}
+                        onRedepositar={isRebotado ? () => redepositar(c.id) : undefined}
+                      />
+                    </span>
                   </div>
                 </div>
                 {/* Row 2: fecha, status */}
                 <div className="flex items-center gap-2 mt-1.5">
-                  <StatusBadge estado={ve} />
+                  <span data-cheque-campo="estado"><StatusBadge estado={ve} /></span>
                   <div className="ml-auto text-right">
                     <div className="text-xs text-gray-400">{fmtDate(c.fecha_deposito)}</div>
                     {ve === "depositado" && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
@@ -1060,7 +1094,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         </div>
 
         {/* Desktop table */}
-        <div className="hidden sm:block overflow-x-auto">
+        <div className="hidden xl:block overflow-x-auto">
           <div className="min-w-[700px]">
         {(() => {
           const _gm = filter === "depositado" ? "depositado" as const : "pendiente" as const;
@@ -1074,7 +1108,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
-                <tr key={c.id} onClick={() => setDetailCheque(c)} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer ${urgencyBorder(c, ve)} ${isDep ? "text-gray-400" : isRebotado ? "bg-red-50/20" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
+                <tr key={c.id} data-cheque-fila={c.id} onClick={() => setDetailCheque(c)} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer ${urgencyBorder(c, ve)} ${isDep ? "text-gray-400" : isRebotado ? "bg-red-50/20" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
                   <td className="py-3 pl-2 pr-0 w-8" onClick={(e) => e.stopPropagation()}>
                     {ve === "pendiente" && (
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
@@ -1083,9 +1117,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     )}
                   </td>
-                  <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{getCompanyDisplay(c.empresa)}</div></td>
+                  <td className="py-3 px-4"><div className="font-medium" data-cheque-campo="cliente">{c.cliente}</div><div className="text-xs text-gray-400">{getCompanyDisplay(c.empresa)}</div></td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
-                  <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums font-medium" data-cheque-campo="monto">${fmt(c.monto)}</td>
                   <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     {c.fecha_depositado ? (
@@ -1095,7 +1129,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     )}
                   </td>
                   {filter !== "depositado" && (
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4" data-cheque-campo="estado">
                       <StatusBadge estado={ve} />
                     </td>
                   )}
@@ -1117,7 +1151,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                         Re-depositar
                       </button>
                     )}
-                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
+                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-sm text-gray-500 hover:text-black transition disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu
                       cheque={c}
                       ve={ve}

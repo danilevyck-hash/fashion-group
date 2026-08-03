@@ -125,7 +125,10 @@ describe("Préstamos · el barrido del resto del módulo", () => {
     // los iconos de editar/eliminar medían 26×26 con p-1.5
     expect(tabla).not.toContain('className="p-1.5 hover:bg-blue-50');
     expect(tabla).not.toContain('className="p-1.5 hover:bg-red-50');
-    expect((tabla.match(/inline-flex h-11 w-11 items-center justify-center/g) ?? []).length).toBe(2);
+    // 4 y no 2: el mismo par (editar/eliminar) aparece en la TARJETA y en la
+    // TABLA desde que la ficha pasó a tarjetas por debajo de 1024 px. Lo que
+    // congela el candado es que ninguno vuelva a medir menos de 44.
+    expect((tabla.match(/inline-flex h-11 w-11 items-center justify-center/g) ?? []).length).toBe(4);
   });
 
   it("DangerZone · el toggle (medía 18) y los 3 botones rojos llegan a 44", () => {
@@ -160,13 +163,60 @@ describe("Préstamos · el barrido del resto del módulo", () => {
 });
 
 describe("Préstamos · lo que NO se puede romper", () => {
-  it("la fila sigue con los chips en la línea 2 en mobile (PR #301)", () => {
-    // el chip de quincena y los badges bajan junto a la empresa en <sm
-    expect(lista).toMatch(/<div className="flex shrink-0 items-center gap-1\.5 sm:hidden">\{badges\}\{chipQuincena\}<\/div>/);
+  /**
+   * EL LAYOUT DEL PR #301 SIGUE INTACTO. Lo único que cambió es el ANCHO en el
+   * que arranca la vista de escritorio: `sm` (640) → `lg` (1024).
+   *
+   * 🩸 POR QUÉ CAMBIÓ EL NÚMERO. El corte estaba DESALINEADO con la barra
+   * lateral: las columnas de progreso (w-36) y chip-quincena (w-24) se
+   * encendían en `sm` = 640 px, pero la barra lateral entra en `md` = 768 y se
+   * lleva **224 px** (`md:ml-56` en `SidebarAwareMain`). Entre 768 y 1023 pasan
+   * las dos cosas a la vez —240 px de columnas nuevas Y 224 px menos de
+   * ancho— y el nombre, que es lo único elástico de la fila, paga la cuenta.
+   *
+   * MEDIDO en el navegador contra el build de producción, con los 12 nombres
+   * REALES de la base (`scripts/_medir-prestamos-nombre.mjs`):
+   *
+   *              390     834     1024    1440
+   *   antes       0      11/12     0       0     ← "MARIA BETHANCOURTH" perdía
+   *   después     0        0       0       0        79 px: pedía 184 y le
+   *                                                 caían 105
+   *
+   * El nombre más largo de la base pide 184 px y a 834 ahora le caben 382.
+   * A 1024 y 1440 nada cambió: ahí el corte ya estaba encendido y el nombre
+   * entraba con 300 px y 652 px de espacio. **El escritorio no se tocó.**
+   *
+   * EL `truncate` SE QUEDA, y no es contradictorio: es el mecanismo correcto
+   * para un nombre que no entra. Lo que estaba mal era que NO entrara.
+   */
+  it("la fila sigue con los chips en la línea 2 en mobile y iPad (PR #301)", () => {
+    // el chip de quincena y los badges bajan junto a la empresa en <lg
+    expect(lista).toMatch(/<div className="flex shrink-0 items-center gap-1\.5 lg:hidden">\{badges\}\{chipQuincena\}<\/div>/);
     // y en desktop siguen en su columna propia de w-24
-    expect(lista).toMatch(/<div className="hidden shrink-0 text-center sm:block sm:w-24">/);
+    expect(lista).toMatch(/<div className="hidden shrink-0 text-center lg:block lg:w-24">/);
     // el nombre conserva flex-1 + truncate en su propia línea
-    expect(lista).toMatch(/<span className="font-medium truncate tracking-tight">\{emp\.nombre\}<\/span>/);
+    expect(lista).toMatch(/<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">\{emp\.nombre\}<\/span>/);
+    // los badges de la línea 1 acompañan el mismo corte
+    expect(lista).toMatch(/<div className="hidden shrink-0 items-center gap-2 lg:flex">\{badges\}<\/div>/);
+    // y la columna de progreso también
+    expect(lista).toMatch(/<div className="hidden lg:flex items-center gap-2 w-36 shrink-0">/);
+  });
+
+  it("ninguna columna de la fila vuelve a encenderse en `sm` — es el bug, no un detalle", () => {
+    // Devolver cualquiera de las 4 a `sm` reabre la banda 768-1023 donde la
+    // barra lateral ya se llevó 224 px y las columnas todavía no caben.
+    expect(lista).not.toContain('gap-1.5 sm:hidden">{badges}{chipQuincena}');
+    expect(lista).not.toContain('text-center sm:block sm:w-24');
+    expect(lista).not.toContain('items-center gap-2 sm:flex">{badges}');
+    expect(lista).not.toContain('hidden sm:flex items-center gap-2 w-36 shrink-0');
+  });
+
+  it("el nombre se puede localizar por un `data-` fijo, no por su clase de breakpoint", () => {
+    // 🩸 Un verificador que busque el nombre por `.sm\\:hidden` devuelve VACÍO
+    // en cuanto el corte se mueve, y comparar dos listas vacías PASA. El
+    // `data-empleado-campo` no depende de ningún breakpoint.
+    expect(lista).toContain("data-empleado-fila={emp.id}");
+    expect(lista).toContain('data-empleado-campo="nombre"');
   });
 
   it("ninguna letra del módulo baja de 12px", () => {

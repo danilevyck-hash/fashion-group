@@ -2,8 +2,52 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { transportistaLabel } from "@/lib/transportistaLabel";
+import { EMPRESAS_DEL_GRUPO } from "@/lib/clientes/mundos";
 
 export const dynamic = "force-dynamic";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL BUSCADOR (⌘K) DEVUELVE SOLO CLIENTES DE LAS 6 DEL GRUPO.
+//
+// 🩸 LA REGLA, cerrada con Daniel (30-jul-2026): los clientes de Boston viven
+// SOLO en la pestaña CXC › Boston y los de Multifashion SOLO en su módulo. Las
+// 6 del grupo conviven en todos lados. Sobre perder la búsqueda por nombre del
+// saldo de un cliente de Boston, textual: *"no aparezca nunca"*.
+//
+// ⚠️ **ACÁ NO ENTRAN POR `clientes_master`**, que es lo que filtró el PR del
+// Directorio. En el buscador los clientes llegan por otras dos puertas, cada
+// una con su propia columna de empresa:
+//
+//   sección     tabla                          columna         filas de fuera
+//   ─────────────────────────────────────────────────────────────────────────
+//   ventas      switch_facturas                empresa_key     37.205 de 52.480
+//   cxc         switch_estadocuenta_aging      company_key     0 de 221 (hoy)
+//   cheques     cheques                        empresa         0 de 19 (hoy)
+//
+// Los ceros NO son motivo para no filtrar: el cron de estado de cuenta ya trae
+// `confecciones_boston` a `switch_estadocuenta` desde el 27-jul, y el día que
+// eso llegue al agregado el buscador se llenaría de Boston sin que nadie lo
+// tocara. El filtro es por INCLUSIÓN (`.in(...)` con las 6), así que una empresa
+// nueva tampoco contamina hasta que alguien la agregue a `EMPRESAS_DEL_GRUPO`.
+//
+// La lista de las 6 NO se escribe acá: sale de `@/lib/clientes/mundos`, que es
+// la única fuente de verdad. Este repo ya se quemó con listas repartidas que se
+// contradecían en silencio.
+//
+// CONSECUENCIA MEDIDA Y QUERIDA: 13 nombres compran en los dos mundos (CITY
+// MALL DAVID, LA FRONTERA DUTY FREE…). Para ellos el buscador ahora muestra
+// **sus ventas del grupo**, no la suma con Boston/Multifashion. Es lo mismo que
+// hace Ventas › Clientes. Los totales del MÓDULO Ventas y de Vista General no
+// se tocan: la plata de los tres mundos sigue sumando ahí.
+//
+// Lo que NO se filtra, y por qué:
+//   · `directorio_clientes` (33 contactos cargados a mano) no tiene columna de
+//     empresa — no hay con qué clasificarlo. Misma regla que en `mundos.ts`: si
+//     no se puede determinar el mundo, el cliente SE QUEDA. Ojo que esta tabla
+//     NO es el Directorio del módulo /clientes, que lee `clientes_master`.
+//   · guías, reclamos, préstamos y caja no buscan por nombre de cliente
+//     (transportista, nro de reclamo/factura, empleado y proveedor).
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
@@ -19,6 +63,7 @@ export async function GET(req: NextRequest) {
     supabaseServer
       .from("switch_estadocuenta_aging")
       .select("id, nombre_normalized, total, company_key")
+      .in("company_key", EMPRESAS_DEL_GRUPO)
       .ilike("nombre_normalized", pattern)
       .order("total", { ascending: false })
       .limit(20),
@@ -56,6 +101,7 @@ export async function GET(req: NextRequest) {
     supabaseServer
       .from("cheques")
       .select("id, cliente, monto, fecha_deposito, estado")
+      .in("empresa", EMPRESAS_DEL_GRUPO)
       .ilike("cliente", pattern)
       .order("fecha_deposito", { ascending: false })
       .limit(5),
@@ -66,6 +112,7 @@ export async function GET(req: NextRequest) {
     supabaseServer
       .from("switch_facturas")
       .select("cliente:cliente_nombre, empresa:empresa_key, subtotal:subtotal_descuento, fecha")
+      .in("empresa_key", EMPRESAS_DEL_GRUPO)
       .ilike("cliente_nombre", pattern)
       .order("fecha", { ascending: false })
       .limit(50),

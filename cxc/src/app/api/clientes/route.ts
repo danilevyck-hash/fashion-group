@@ -35,6 +35,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
 
 export const dynamic = "force-dynamic";
 
@@ -88,9 +89,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
+  // Solo los clientes del GRUPO (las 6 que conviven). Los de Boston viven en su
+  // pestaña de CXC y los de Multifashion en su módulo. La regla y su porqué
+  // viven en UN solo lugar — `lib/clientes/mundos` — no acá.
+  // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
+  const visibles = soloClientesDelGrupo(filas, await mundosDeClientes());
+
   const filtrados = q
-    ? filas.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
-    : filas;
+    ? visibles.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
+    : visibles;
 
   // Orden de presentación: por nombre, con collation española (ñ y acentos en
   // su lugar). Es el mismo criterio que mostraba la pantalla antes.

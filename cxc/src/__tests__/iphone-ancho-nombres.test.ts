@@ -79,15 +79,44 @@ describe("CXC mobile — el ancho sale de la derecha, no de la letra", () => {
   });
 });
 
-describe("Préstamos — los chips bajan a la línea 2 en mobile", () => {
-  it("la columna de quincena solo existe desde sm (en iPhone no ocupa ancho)", () => {
-    expect(prestamos).toContain('<div className="hidden shrink-0 text-center sm:block sm:w-24">');
+/**
+ * 30-jul-2026 — EL LAYOUT DE ESTE BLOQUE NO CAMBIÓ; CAMBIÓ EL ANCHO EN QUE
+ * ARRANCA. Los chips siguen bajando a la línea 2 y la columna de quincena
+ * sigue sin ocupar ancho cuando la fila es angosta: lo único que se movió es
+ * el corte, de `sm` (640) a `lg` (1024).
+ *
+ * 🩸 EL CORTE ESTABA DESALINEADO CON LA BARRA LATERAL. Las columnas de
+ * progreso (w-36) y quincena (w-24) se encendían en 640 px, pero la barra
+ * lateral entra en 768 (`md:ml-56`) y se lleva **224 px**. Entre 768 y 1023
+ * pasan las dos cosas a la vez —240 px de columnas nuevas Y 224 px menos de
+ * ancho— y el nombre, único elástico de la fila, se queda con las sobras.
+ *
+ * MEDIDO en el navegador con los 12 nombres REALES de la base
+ * (`scripts/_medir-prestamos-nombre.mjs`), nombres cortados:
+ *
+ *              390     834     1024    1440
+ *   antes       0      11/12     0       0
+ *   después     0        0       0       0
+ *
+ * El peor era "MARIA BETHANCOURTH": pedía 184 px y a 834 le caían **105**
+ * (−79). Ahora le caben 382. A 1024 y 1440 no cambió nada — ahí el corte ya
+ * estaba encendido y el nombre entraba con 300 y 652 px de aire. **El
+ * escritorio no se tocó.**
+ *
+ * El `truncate` se QUEDA: es el mecanismo correcto para un nombre que no
+ * entra. Lo que estaba mal era que no entrara.
+ */
+describe("Préstamos — los chips bajan a la línea 2 en mobile y iPad", () => {
+  it("la columna de quincena solo existe desde lg (en iPhone y iPad no ocupa ancho)", () => {
+    expect(prestamos).toContain('<div className="hidden shrink-0 text-center lg:block lg:w-24">');
     // La versión vieja ocupaba ~86-90px SIEMPRE, incluso en 358px de fila.
     expect(prestamos).not.toContain('<div className="shrink-0 text-center sm:w-24">');
+    // Y la de `sm` la encendía a 640, con la barra lateral ya comiendo 224px.
+    expect(prestamos).not.toContain('text-center sm:block sm:w-24');
   });
 
-  it("en mobile el chip viaja a la línea de la empresa con su TEXTO completo", () => {
-    expect(prestamos).toContain('<div className="flex shrink-0 items-center gap-1.5 sm:hidden">{badges}{chipQuincena}</div>');
+  it("en mobile y iPad el chip viaja a la línea de la empresa con su TEXTO completo", () => {
+    expect(prestamos).toContain('<div className="flex shrink-0 items-center gap-1.5 lg:hidden">{badges}{chipQuincena}</div>');
     // Los dos estados se siguen leyendo: el color solo no los distingue.
     expect(prestamos).toContain("✓ Deducida");
     expect(prestamos).toContain("⚠ Pendiente");
@@ -97,7 +126,7 @@ describe("Préstamos — los chips bajan a la línea 2 en mobile", () => {
     expect(prestamos).toContain("const badges = [");
     expect(prestamos).toContain("const chipQuincena =");
     // Desktop: en la línea 1, junto al nombre (como siempre).
-    expect(prestamos).toContain('<div className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</div>');
+    expect(prestamos).toContain('<div className="hidden shrink-0 items-center gap-2 lg:flex">{badges}</div>');
   });
 
   it("el gap de la fila baja a 2 en mobile y deja sm:gap-4 intacto", () => {
@@ -105,7 +134,7 @@ describe("Préstamos — los chips bajan a la línea 2 en mobile", () => {
   });
 
   it("el nombre usa tracking-tight (sin bajar el cuerpo de la letra)", () => {
-    expect(prestamos).toContain('<span className="font-medium truncate tracking-tight">{emp.nombre}</span>');
+    expect(prestamos).toContain('<span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">{emp.nombre}</span>');
   });
 
   it("el saldo y el menú de acciones no se tocaron", () => {

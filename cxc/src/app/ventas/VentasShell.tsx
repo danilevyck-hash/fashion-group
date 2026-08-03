@@ -227,28 +227,35 @@ export function VentasShell({
       </header>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+        {/* 🩸 LOS 54 px QUE SOBRABAN EN LAS 4 PESTAÑAS. No era ninguna tabla: era
+            esta tira. Las 4 pestañas pedían 444 px contra 390 de pantalla, así
+            que hasta el Resumen —que ya pasó a tarjetas y su tabla mide 0—
+            seguía arrastrando acá. Sin `overflow-x-auto` y con menos relleno
+            lateral en celular (px-4 → px-2.5, que devuelve 48 px) entran las
+            cuatro sin arrastrar. Ningún texto cambió; desde `sm` vuelve el
+            relleno de siempre. */}
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger
             value="resumen"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <TrendingUp className="h-3.5 w-3.5" /> Resumen
           </TabsTrigger>
           <TabsTrigger
             value="clientes"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Contact className="h-3.5 w-3.5" /> Clientes
           </TabsTrigger>
           <TabsTrigger
             value="productos"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Package className="h-3.5 w-3.5" /> Productos
           </TabsTrigger>
           <TabsTrigger
             value="utilidad"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none"
           >
             <Percent className="h-3.5 w-3.5" /> Utilidad
           </TabsTrigger>

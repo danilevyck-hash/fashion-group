@@ -413,32 +413,72 @@ esc({
   },
 });
 
-// ⚠️ `SyncNowButton` NO se mide: su menú (`esMenu`) exige más de una opción y
-// que NO sea `secuencial`, y NINGÚN llamador del repo cumple las dos — hoy es
-// código muerto que nunca se dibuja. Encima, tocar el botón dispara un sync de
-// verdad contra Switch, así que medirlo tendría efectos.
+// ⚠️ El menú de `SyncNowButton` SÍ se dibuja, en UN solo lugar: /comisiones,
+// que le pasa las 7 empresas de recibos y NO le pasa `secuencial`. Ese es el
+// escenario `sync-now-comisiones` de abajo. Los demás llamadores le pasan una
+// sola opción (botón directo) o `secuencial` (un clic dispara la secuencia
+// entera contra Switch) — a esos NO se les toca el botón al medir.
+
+/**
+ * Comisiones es MÓDULO PROPIO (/comisiones), no una pestaña de /ventas.
+ * Los tres desplegables de esta pantalla (ⓘ Criterios, período y el menú de
+ * "Actualizar ahora") cuelgan de la MISMA barra de dos filas, así que comparten
+ * el camino de entrada.
+ */
+async function irAComisiones(page) {
+  await page.goto(`${BASE}/comisiones`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(3500);
+  return Boolean(await page.getByRole("button", { name: "Por empresa", exact: true }).count());
+}
 
 esc({
   id: "sync-now-comisiones",
-  titulo: "Ventas › Comisiones › Actualizar ahora › menú de 7 empresas",
-  refs: "h1, h2",
-  async ir(page) {
-    await page.goto(`${BASE}/ventas`, { waitUntil: "networkidle" });
-    await page.waitForTimeout(7000);
-    const t = page.getByRole("button", { name: /Comisiones/ }).locator("visible=true").first();
-    if (!(await t.count())) return false;
-    await t.click({ timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(6000);
-    return true;
-  },
+  titulo: "Comisiones › Actualizar ahora › menú de empresas",
+  refs: "thead th, table tbody tr td, article",
+  ir: irAComisiones,
   async abrir(page) {
-    // Con varias opciones y sin `secuencial`, el botón ABRE UN MENÚ; no dispara
-    // ningún sync. Por eso este sí se puede medir sin efectos.
+    // ⚠️ Con varias opciones y SIN `secuencial`, el botón ABRE UN MENÚ; no
+    // dispara ningún sync. (Con `secuencial` sí dispararía — no se mide así.)
+    // Tampoco se toca ningún ITEM del menú: eso sí sincronizaría de verdad.
     const b = page.getByRole("button", { name: /actualizar ahora/i }).locator("visible=true").first();
     if (!(await b.count())) return false;
     await b.scrollIntoViewIfNeeded().catch(() => {});
     await b.click({ timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(700);
+    return true;
+  },
+});
+
+esc({
+  id: "comisiones-criterios",
+  titulo: "Comisiones › ⓘ Criterios (popover con la frescura del dato)",
+  refs: "thead th, table tbody tr td, article",
+  ir: irAComisiones,
+  async abrir(page) {
+    const b = page
+      .getByRole("button", { name: "Cómo se calcula y cuándo se actualizó" })
+      .locator("visible=true")
+      .first();
+    if (!(await b.count())) return false;
+    await b.click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    return true;
+  },
+});
+
+esc({
+  id: "comisiones-periodo",
+  titulo: "Comisiones › selector de período (mes + año en un control)",
+  refs: "thead th, table tbody tr td, article",
+  ir: irAComisiones,
+  async abrir(page) {
+    const b = page
+      .locator('button[aria-haspopup="dialog"][aria-label^="Período"]')
+      .locator("visible=true")
+      .first();
+    if (!(await b.count())) return false;
+    await b.click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(600);
     return true;
   },
 });

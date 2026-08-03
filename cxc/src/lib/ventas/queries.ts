@@ -8,6 +8,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { esEmpresaDelGrupo } from "@/lib/clientes/mundos";
 import { withDbRetry, isTransientDbError } from "@/lib/supabase-retry";
 import { rpcConFallbackDeVersion } from "@/lib/ventas/rpc-version";
 import {
@@ -353,7 +354,17 @@ export async function fetchClientes({
     viewLabel = isTodas ? "clientes_agregado_12m_vw" : `clientes_empresa_12m_vw(${empresaKey})`;
     const vista = isTodas ? "clientes_agregado_12m_vw" : "clientes_empresa_12m_vw";
     try {
-      const filas = await leerTodoPaginado<ClientesEmpresaRow>(
+      // 🩸 Ventas › Clientes lista SOLO los clientes del GRUPO (las 6 que
+      // conviven). Los de Boston viven en CXC › Boston y los de Multifashion en
+      // su módulo — Daniel: "sus ventas suman, pero sus clientes no se ven".
+      //
+      // ⚠️ Esto NO toca un solo total: acá se listan clientes, y la PLATA de los
+      // tres mundos se suma en `ventas_dashboard_summary` y en Vista General,
+      // que no pasan por esta función. Si un total se moviera, el cambio está mal.
+      //
+      // El modo "Todas" (clientes_agregado_12m_vw) ya viene sin Boston ni
+      // Multifashion: medido, 117 filas y 0 de esas dos empresas.
+      const filasCrudas = await leerTodoPaginado<ClientesEmpresaRow>(
         viewLabel,
         (pedirCount, desde, hasta) => {
           const q = supabaseServer
@@ -366,6 +377,9 @@ export async function fetchClientes({
             .range(desde, hasta);
         },
       );
+      const filas = isTodas
+        ? filasCrudas
+        : filasCrudas.filter((r) => esEmpresaDelGrupo((r as { empresa?: string }).empresa));
       data = filas;
       error = null;
     } catch (e) {

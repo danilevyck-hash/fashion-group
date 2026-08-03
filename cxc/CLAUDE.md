@@ -660,8 +660,80 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 ### Ventas (April 10-11)
 - View preference saved to localStorage
 
+> **Ventas › Resumen en CELULAR: tarjetas, no matriz (30-jul-2026).** Daniel, textual: *"todavia hay q hacer mucho scroll a la derecha para ver la info"*. Medido en el navegador a 390 px sobre el build de producción: el heatmap pedía **1.109 px contra 356 visibles = 753 px de arrastre**, el peor de las 26 pantallas censadas (el CXC, ya pasado a tarjetas, mide 0). Con 12 meses en 390 px se ven DOS a la vez, así que el heatmap no cumplía ni su propia promesa —comparar empresas dentro del mismo mes— porque para llegar a la columna había que perder de vista la de nombres.
+> - **Después: 54 px, y NO son de la tabla** — es la tira de pestañas del módulo (Resumen/Clientes/Productos/Utilidad), que ya desbordaba lo mismo en los 4 tabs desde antes. La tabla pasó de 753 a **0**.
+> - **El patrón es el de `admin/components/PanelCxcMobile.tsx`** (tabla ancha → tarjetas), no uno nuevo. Cerrada, la tarjeta muestra empresa + total del año + **el período en curso** (lo que era la columna resaltada del heatmap: sin eso habría que abrir las 8 tarjetas para ver cómo va el mes). Abierta, la lista vertical de los 12 meses (o 4 trimestres) + Total + Proyección, y un enlace al panel mes × año.
+> - **El ESCRITORIO NO SE TOCÓ.** Sigue con su matriz en `ResumenView.tsx` detrás de `hidden md:block`: en una pantalla ancha se ve entera y es mejor que las tarjetas. Por eso NO se unificaron, y por eso los candados de `ventas-fila-detalle.test.ts` ahora verifican cada regla contra la vista que le corresponde — exigirle al celular un `colSpan` o un ancho medido sería exigirle la tabla de vuelta.
+> - **NINGÚN número cambió, y está medido:** `node scripts/_verif-ventas-tarjetas.mjs` abre las 9 tarjetas en 390 px, lee sus 12 meses + Total + Proyección y los compara **celda por celda contra la matriz del escritorio a 1440 px** — 79 celdas, 0 distintas. ⚠️ El texto crudo de las dos vistas NO es comparable tal cual: el escritorio pega el Δ al monto en la misma celda y el celular usa formato compacto en los totales (`$27K`) desde mucho antes de este cambio. La tolerancia sale de la **precisión que se muestra** (`$27K` no distingue nada por debajo de medio millar), no de un porcentaje al ojo — con un 0,5 % fijo, 27K contra 26.574,97 se leía como "cambió el número" siendo solo el redondeo.
+> - **El detalle por período se conserva y sigue abriendo donde se tocó**, ahora como `FilaDetalleBloque` (un `<div>`) en vez de `FilaDetalleTr`. `FilaDetalle.tsx` dibuja el contenido UNA vez (`FilaDetalleContenido`) para las dos formas: cinco copias de la misma celda es lo que ya había divergido en el heatmap —la Proyección del grupo era un `<td>` mudo mientras la de cada empresa sí explicaba de dónde salía—. El bloque de tarjeta **no lleva ancho fijo**: no hay contenedor con scroll lateral que compensar, que es justo lo que se vino a eliminar.
+> - **Cerrar la tarjeta cierra el detalle que tuviera adentro.** Sin eso queda vivo en el state del padre y reaparece al volver a abrirla.
+>
+> **CENSO de scroll lateral a 390 px — `node scripts/_medir-scroll-lateral.mjs`** (26 pantallas, solo lectura). Lo que queda pendiente, de peor a mejor: **Comisiones 628 px** (7 columnas), **Data Health 448**, **Préstamos › Detalle 315** (+218 px cortados), **Depurador 295** (tira de pestañas), **Multifashion › Clientes 288 CORTADOS**, **Ventas › Utilidad 284**, **Ventas › Productos 204**, **Vista General 204**. Sanas en 0: CXC, Cheques (lista y calendario), Caja, Préstamos lista, Guías, Reclamos, Proveedores, Clientes (lista y ficha), Multifashion Resumen/Vendedoras, Marketing, Gastos de Empresa.
+> - **Dos desbordes del censo son CARRUSELES a propósito, no defectos:** Ventas › Clientes 369 px y Caja › Período 327 px, los dos con `scroll-snap`. El script los anota igual —no adivina intención— y guarda el `snap` en el JSON para poder distinguirlos a mano.
+> - 🩸 **"Recortado" y "hay que arrastrar" NO son lo mismo, y el peor de los dos es el que no se ve.** `Multifashion › Clientes` pierde 288 px con `overflow:hidden`: el dato queda fuera de la pantalla y **no hay forma de alcanzarlo ni arrastrando**. El script lo reporta aparte (`CORTADO`). Distinguir esos de un texto con puntos suspensivos —donde que `scrollWidth` pase del `clientWidth` ES el mecanismo, no un defecto— necesitó dos criterios, porque un `<table>` adentro no alcanza: esa tabla está hecha de `div`. El segundo es de tamaño y el umbral está MEDIDO: en las 26 pantallas todo recorte de texto quedó en **≤53 px** y el único recorte de datos real fue de **288**. Contar los recortes de texto era ruido puro — el CXC, que ya está resuelto, salía con 2 px por un nombre de cliente.
+> - ⚠️ **Una tabla vacía mide 0 px y no prueba nada.** El veredicto lo dice (`SIN-DATOS`), y el largo del texto NO sirve para detectarlo: Reclamos, con 26 reclamos y 5 tarjetas, tiene menos texto que el mensaje de "no hay nada" de otra pantalla. La señal confiable es que la pantalla lo DIGA ("No hay…"). Hoy solo Packing Lists está genuinamente vacía.
+> - **Gotchas de medición:** sembrar la cookie de sesión **y** `sessionStorage.cxc_role` (si no, todo redirige al login), y `delete Navigator.prototype.serviceWorker` antes de navegar (bloquear el SW de otra forma mata la hidratación). **Préstamos › Detalle se mide por URL directa**: en un viewport <640 px `handleRowClick` abre un bottom sheet en vez de navegar, así que su tabla de movimientos no se alcanza tocando la lista.
+
 ### Upload (April 10-11)
 - 3-step progress indicator
+
+### Tablas anchas en iPhone y iPad (30-jul-2026)
+
+> **Cuatro pantallas del grupo "Ventas y clientes" se adaptaron, y el ancho que fallaba era el que nadie miraba: el iPad.** Medido en el navegador contra el build de producción, ANTES:
+>
+> | Pantalla | 390 | 834 | Qué pasaba |
+> |---|---:|---:|---|
+> | **Multifashion › Clientes** | **288 px RECORTADOS** | **92 px RECORTADOS** | el top-50 perdía columnas **sin forma de alcanzarlas** |
+> | Proveedores | 0 | **249 px** de arrastre | columnas de la cuenta por pagar |
+> | Clientes › Directorio | 0 | **226 px** de arrastre | columnas de contacto |
+> | Multifashion › Vendedoras | 0 | **208 px** de arrastre | columnas de la derecha |
+>
+> **DESPUÉS: 0 en los cuatro anchos medidos (390 · 834 · 1024 · 1440), en las 4 pantallas.**
+>
+> 🔑 **LO QUE DECIDE ES EL ANCHO ÚTIL, NO EL DE LA VENTANA.** La barra lateral se lleva 224 px, así que un iPad de 834 deja **610** y su contenido ~552-562 — **más angosto que un iPhone acostado**. Por eso el corte de layout es `lg` (1024) y no `sm` (640) ni `md` (768): a 640 y a 768 la tabla NO entra, y dibujarla ahí ES el bug.
+>
+> ⚠️ **1024 no es "escritorio": es el MISMO iPad, acostado.** Con el corte en `lg` las tablas reaparecían justo ahí y volvían a arrastrar 18-59 px. Se resolvió haciéndolas ENTRAR en 1024 (relleno `px-1.5 xl:px-3` **solo por debajo de xl**, y el piso de Vendedoras de 760 → 720) en vez de empujar el corte a `xl`, que le habría sacado la tabla a un escritorio de 1024-1279 donde sí cabía. **El escritorio no cambió en nada.**
+>
+> 🩸 **"Recortado" es PEOR que "hay que arrastrar", y Multifashion › Clientes era el caso.** Su grilla de ancho fijo (`2.5rem 1fr 7rem 4rem 5rem 6rem 5.5rem 2.5rem 1.25rem` = 644 px) vive en una `Card` con `overflow-hidden` y **sin scroller propio**: los píxeles que sobran no se alcanzan de ninguna manera, ni sabiendo que están. Encima el `1fr` del NOMBRE era lo único elástico y se lo comía el resto: **la columna "Cliente" se veía vacía** (0 px de ancho). Es la causa que ya apareció tres veces — contenido dentro de un contenedor recortado y sin scroller adentro. Y está hecha de `div`, sin un solo `<table>`, que es por lo que ningún barrido genérico la había cazado.
+> - **Patrón: tarjetas**, el de `admin/components/PanelCxcMobile.tsx` y `components/ventas/ResumenViewMobile.tsx`. No se inventó uno nuevo.
+> - **Los meses van en LISTA VERTICAL, no en el gráfico a lo ancho** del escritorio: con 12 meses en 356 px cada columna del sparkline queda en ~29 px y la etiqueta ("May '25", con `whitespace-nowrap`) se sale de su celda. La barra sigue estando —la comparación no se pierde, cambia de eje— y la escala es la MISMA (`peakMes`, compartida entre mayoreo y retail).
+> - **El WhatsApp pasó de 24×24 a 44 px** de alto (regla de la casa).
+>
+> **Las otras tres NO necesitaron componente nuevo:** ya tenían su layout de tarjetas, funcionando y verificado, escondido detrás de `sm:`/`md:`. Solo se les amplió el tramo hasta `lg`.
+>
+> **NINGÚN número cambió, y está medido:** `node scripts/_verif-tarjetas-vs-tabla.mjs` compara las tarjetas contra la tabla **elemento por elemento** — **215 montos, 0 distintos**, y **0 blancos táctiles bajo 44 px** en las 4 pantallas a 390 y 834.
+> - 🩸 **La trampa que el script evita:** verificar buscando el elemento por su clase de breakpoint (`.md\:hidden`) devuelve **vacío** en cuanto el corte se mueve → el chequeo compara CERO y **pasa en verde sin haber mirado nada**. Por eso cada layout lleva un `data-vista` FIJO ("tarjetas"/"tabla") y el script **falla si encuentra cero**.
+> - **El pareo va por POSICIÓN, no por nombre**: los dos layouts recorren el MISMO arreglo ya ordenado. Parsear nombres daba falsos "sin par" (nombres partidos en dos líneas, el renglón "Ver N sin saldo" que no es una entidad).
+> - **Solo se comparan montos con `$`**: un extractor de "todo lo que parezca número" leía las etiquetas de tramo del CxP ("91-120 días", "121+ días") como cifras y daba 31 falsos positivos.
+> - **La tolerancia sale de la precisión MOSTRADA**, media unidad del último dígito visible y sin casos especiales: `$1,234.56` → 0,005 · `$11,406` → 0,50 · `$27K` → 500. La tarjeta de Vendedoras muestra los montos sin centavos; exigirle 0,005 la marcaba como "cambió" cuando la diferencia era el redondeo que ella misma declara.
+>
+> **Medición cruda sin umbrales: `node scripts/_diag-recorte-exacto.mjs`.** El censo (`_medir-scroll-lateral.mjs`) usa un umbral de 100 px para separar una tabla recortada de un texto con puntos suspensivos — correcto para barrer 26 pantallas, pero **esconde los recortes chicos**: por eso el censo reportó 0 en Multifashion › Clientes a 834 cuando en realidad recortaba 92. Para arreglar una pantalla hace falta el número crudo.
+>
+> Candado: `src/__tests__/lib/tablas-anchas-ipad.test.ts` (18 casos, verificado por mutación: devolver un corte a `sm` rompe 2).
+
+### Multifashion › Resumen — los números pegados de "Mes a mes" (30-jul-2026)
+
+> Daniel, mirando el iPhone: *"mira en multifashion, en resumen, lo pegado que estan los numeros, arreglalo"*. Medido en el navegador a 390 px con las cifras reales (5 dígitos con centavos, el peor caso es la fila YTD): el aire entre el monto del año actual y el del anterior era **−4,8 px**. **No estaban apretados: se SUPERPONÍAN** (`$302,556.86$271,191.20`).
+>
+> **DESPUÉS: +16 px, con desborde 0. iPad y escritorio quedaron IDÉNTICOS** (93,2 px a 834 · 188,2 a 1024 · 396,2 a 1440, los mismos antes y después), y el arrastre horizontal sigue en **0 en los cuatro anchos**.
+>
+> 🩸 **La causa NO era el relleno ni el interletrado — que es lo que uno toca si arregla a ojo.** Con las 4 columnas en una sola línea, a cada monto le tocaba una pista de **79,6 px** cuando el texto pide **92,4**: cada uno desbordaba **12,8 px** y eso se comía los 8 px del `gap` (8 − 12,8 = −4,8). Las dos columnas estaban **compitiendo** por un ancho que no alcanzaba. Por eso el diagnóstico mide **pista contra texto** y no solo el hueco: distingue "falta aire" de "no entra", que se arreglan distinto.
+>
+> **La cuenta que cierra el caso, a 390 px:** quedan 326 px útiles dentro de la tarjeta, y Mes (44,8) + dos montos (92,4 × 2) + Δ (96) + 3 separaciones = **350,4**. **Faltan 24,4 px.** Las 4 columnas en una línea no entran, y las dos salidas baratas están prohibidas: **la letra no baja de 12 px** (#301, y esta pantalla es de plata) y **los montos van completos con centavos** (nada de `$33.2K`).
+>
+> **Solución: en celular la fila usa DOS líneas.** Arriba Mes + los dos montos; abajo el Δ (porcentaje y absoluto, uno al lado del otro), alineado a la derecha.
+> - **Los montos van en columnas `auto`, no en fracciones.** En un grid, una pista `auto` vale lo mismo para TODAS las filas (el ancho del contenido más largo, el YTD), así que los montos siguen **alineados de arriba abajo** —que es lo que permite comparar de un barrido— y el aire entre ellos es **exactamente el `gap-x-4` = 16 px**, ni más ni menos. Con `1fr 1fr` el aire habría salido de 48 px y variable; con `auto` es el que se elige.
+> - **La columna Mes se queda con el sobrante** (`minmax(2.8rem,1fr)`), que es donde no molesta.
+> - **El corte es `md` y no `sm`:** a 640 px la tabla quedaría con **8 px de aire total**, otra vez al borde de tocarse.
+> - **Desde `md` no cambia NADA**: vuelve el reparto de 4 columnas en una línea. El encabezado "Δ" se esconde solo en celular (un encabezado suelto en la segunda línea sobra; el valor ya se explica con su signo, % y $).
+>
+> **Ningún número cambió, y está medido:** `node scripts/_verif-mes-a-mes.mjs` compara las 8 filas celda por celda entre 390 y 1440 — **32 celdas, 0 distintas**. La comparación va contra `data-col`, **no** contra la clase del breakpoint: buscar por `.md\:block` devuelve vacío en cuanto el corte se mueve, el chequeo compara CERO y **pasa en verde sin haber mirado nada**; el script falla si encuentra cero.
+>
+> **Diagnóstico reproducible: `ETAPA=antes node scripts/_medir-aire-mes-a-mes.mjs`** (390/834/1024/1440, solo lectura). Mide sobre la fila del **peor caso** —la de más dígitos, no la primera—: un mes de 4 cifras no prueba nada sobre uno de 5 con centavos. Deja capturas de la tabla en cada ancho.
+>
+> **De paso, blancos táctiles de Multifashion › Clientes:** las píldoras de período (Mes / 3 meses / 6 meses / 12 meses) medían **26 px** y los chips de segmento (Todos / Frecuentes / Dormidos / 5% disponible) **28**. Los dos grupos pasaron a **44** con `-my-1.5` para que crecer no separe el filtro del título. Verificado: **0 blancos bajo 44 px** en Resumen y Clientes, a 390 y 834.
+>
+> Candado: `src/__tests__/lib/multifashion-numeros-aire.test.ts` (12 casos; verificado por mutación: volver a `minmax(0,1fr)` en celular rompe 1). Incluye los candados de las reglas que no se pueden romper para ganar espacio — que la letra siga en `text-sm` y que la tabla no use `fmtMoneyCompact`.
 
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows

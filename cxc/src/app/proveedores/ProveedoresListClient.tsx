@@ -135,15 +135,15 @@ function ProveedoresList() {
       onClick={() => goFicha(it.key)}
       className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
     >
-      <td className="py-2 px-3 font-medium">{it.nombre}</td>
+      <td className="py-2 px-1.5 xl:px-3 font-medium">{it.nombre}</td>
       <AgingCell value={it.aging_current} aging="current" />
       <AgingCell value={it.aging_watch} aging="watch" />
       <AgingCell value={it.aging_overdue} aging="overdue" />
       <SaldoCell value={it.saldo_total} />
-      <td className="py-2 px-3 text-right tabular-nums text-gray-500">
+      <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-500">
         {it.ultimo_pago_dias != null ? `hace ${it.ultimo_pago_dias}d` : <span className="text-gray-300">—</span>}
       </td>
-      {!empresa && <td className="py-2 px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
+      {!empresa && <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
     </tr>
   );
 
@@ -248,19 +248,24 @@ function ProveedoresList() {
                 </button>
               </div>
 
-              {/* Desktop */}
-              <div className="hidden sm:block">
+              {/* Escritorio. El corte es `lg` y no `sm` porque lo que decide es
+                  el ancho ÚTIL, no el de la ventana: la barra lateral se lleva
+                  224 px, así que un iPad de 834 deja 562 y esta tabla pide 811
+                  — 249 px de arrastre, medidos en el navegador. Las tarjetas de
+                  abajo ya existían y ya estaban bien; solo se les amplió el
+                  tramo. Ver el porqué completo en el encabezado del archivo. */}
+              <div data-vista="tabla" className="hidden lg:block">
                 <ScrollableTable>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                        <th className="py-2 px-3">Proveedor</th>
-                        <th className="py-2 px-3 text-right">{AGING.current.colLabel}</th>
-                        <th className="py-2 px-3 text-right">{AGING.watch.colLabel}</th>
-                        <th className="py-2 px-3 text-right">{AGING.overdue.colLabel}</th>
-                        <th className="py-2 px-3 text-right">Por pagar</th>
-                        <th className="py-2 px-3 text-right">Último pago</th>
-                        {!empresa && <th className="py-2 px-3 text-right">Empresas</th>}
+                        <th className="py-2 px-1.5 xl:px-3">Proveedor</th>
+                        <th className="py-2 px-1.5 xl:px-3 text-right">{AGING.current.colLabel}</th>
+                        <th className="py-2 px-1.5 xl:px-3 text-right">{AGING.watch.colLabel}</th>
+                        <th className="py-2 px-1.5 xl:px-3 text-right">{AGING.overdue.colLabel}</th>
+                        <th className="py-2 px-1.5 xl:px-3 text-right">Por pagar</th>
+                        <th className="py-2 px-1.5 xl:px-3 text-right">Último pago</th>
+                        {!empresa && <th className="py-2 px-1.5 xl:px-3 text-right">Empresas</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -283,8 +288,8 @@ function ProveedoresList() {
                 </ScrollableTable>
               </div>
 
-              {/* Mobile */}
-              <ul className="sm:hidden border-t border-gray-100">
+              {/* Celular e iPad */}
+              <ul data-vista="tarjetas" className="border-t border-gray-100 lg:hidden">
                 {conSaldo.map(renderCard)}
                 {sinSaldo.length > 0 && (
                   <li className="px-1 py-2">
@@ -325,7 +330,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 function AgingCell({ value, aging }: { value: number; aging: AgingKey }) {
   const tone = value === 0 ? "text-gray-300" : value < 0 ? "text-blue-600" : AGING[aging].text;
   return (
-    <td className={`py-2 px-3 text-right tabular-nums ${tone}`}>
+    <td className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${tone}`}>
       {value === 0 ? "—" : value < 0 ? `-$${fmt(Math.abs(value))}` : `$${fmt(value)}`}
     </td>
   );
@@ -334,10 +339,10 @@ function AgingCell({ value, aging }: { value: number; aging: AgingKey }) {
 // Por pagar: positivo = púrpura; cero = gris; negativo = "Saldo a favor" azul.
 function SaldoCell({ value }: { value: number }) {
   if (value < 0) {
-    return <td className="py-2 px-3 text-right tabular-nums text-blue-600">Saldo a favor ${fmt(Math.abs(value))}</td>;
+    return <td className="py-2 px-1.5 xl:px-3 text-right tabular-nums text-blue-600">Saldo a favor ${fmt(Math.abs(value))}</td>;
   }
   return (
-    <td className={`py-2 px-3 text-right tabular-nums ${value > 0 ? "text-purple-700 font-medium" : "text-gray-400"}`}>
+    <td className={`py-2 px-1.5 xl:px-3 text-right tabular-nums ${value > 0 ? "text-purple-700 font-medium" : "text-gray-400"}`}>
       ${fmt(value)}
     </td>
   );

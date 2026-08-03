@@ -15,6 +15,9 @@ import { esCostoSospechoso } from "./costo-guard";
 import { particionarFilas } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { createSwitchSyncLog, finishSwitchSyncLog, type SwitchSyncTriggeredBy } from "./sync-log";
+// Del módulo del #390 se conserva SOLO el rastro en base (`skip_details`); el
+// resto (anti-loop y armado del mensaje) dejó de usarse al quitar el aviso.
+import { detallesDeCostoSospechoso, type CostoSospechoso } from "./costo-sospechoso-aviso";
 
 export interface ArticulosSyncResult {
   empresaKey: string;
@@ -29,24 +32,20 @@ export interface ArticulosSyncResult {
 
 const SUCURSAL_ID = 1; // PRINCIPAL (única en todas las empresas)
 
-interface CostoSospechoso {
-  fecha: string;
-  codigo: string | null;
-  descripcion: string | null;
-  tipo: string;
-  cantidad: number;
-  costo: number;
-}
-
 // ⚠️ NO SE AVISA POR TELEGRAM. Daniel lo pidió explícito el 3-ago-2026: *"no
 // quiero mensaje de costos"*. Le llegaba repetido por confecciones_boston (el
 // artículo "0806 AGUA MINERAL 600ML" con costo mal cargado en Switch) y no es
 // accionable en el momento en que suena.
 //
+// Esto SUCEDE al #390, que lo había mudado de 📊 NEGOCIO a 🔧 SISTEMA con un
+// anti-loop de 7 días. Cambiar de canal no alcanzó: Daniel no quiere el mensaje
+// en ninguno. De aquel PR **se conserva el rastro en `skip_details`** — es la
+// parte que sirve para auditar después sin escribirle a nadie.
+//
 // **La PROTECCIÓN sigue intacta**: `esCostoSospechoso` se sigue evaluando, la
-// fila se sigue guardando con costo $0 para no dañar el margen, el conteo
-// sigue viajando en `costosSospechosos` del resultado y el detalle sigue
-// quedando en el log de la corrida. Lo único que se quitó es el mensaje.
+// fila se sigue guardando con costo $0 para no dañar el margen, el conteo sigue
+// viajando en `costosSospechosos` y el detalle sigue quedando en la base y en el
+// log de la corrida. Lo único que se quitó es el mensaje.
 
 function num(x: unknown): number {
   const n = parseFloat(String(x).replace(/,/g, ""));
@@ -186,14 +185,23 @@ async function syncArticulosDiarioInner(
     filas += buenas.length;
   }
 
+  // Se declara acá arriba porque lo llenan DOS guards distintos: el de costos
+  // sospechosos (abajo) y el de montos imposibles (más abajo).
+  let skipDetails: unknown[] | undefined;
+
   if (sospechosos.length > 0) {
     // Rastro en el log de la corrida — el aviso a Telegram se quitó a pedido de
     // Daniel (ver la nota arriba de `num`); la fila ya se guardó con costo $0.
     console.error(`[sync-articulos] ${empresaKey}: ${sospechosos.length} fila(s) con costo sospechoso`, sospechosos);
+    // El rastro en `skip_details` SE MANTIENE (viene del #390) aunque ya no se
+    // avise: es lo que permite auditar después qué artículos vinieron mal y
+    // desde cuándo, sin mandarle un mensaje a nadie. Van marcadas con
+    // `campo = 'costo_sospechoso'`, así que NO se mezclan con los descartes del
+    // guard de montos, que usan su propia familia.
+    skipDetails = [...(skipDetails ?? []), ...detallesDeCostoSospechoso(sospechosos)];
   }
 
   // Aviso DESPUÉS de escribir; nunca tumba la corrida.
-  let skipDetails: unknown[] | undefined;
   if (rechazadasArticulo.length > 0) {
     skipDetails = detallesDeRechazo("articulo_diario", rechazadasArticulo, umbralArticulo);
     try {

@@ -120,7 +120,7 @@ export default function CatalogoDescripcionesAdmin() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar marca o descripción…"
-              className="w-full max-w-xs rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
+              className="min-h-[44px] w-full max-w-xs rounded-md border border-stone-300 bg-white px-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20"
             />
             <span className="text-[13px] text-stone-500">
               <b className="font-semibold text-stone-900">{activas}</b> activas de{" "}
@@ -165,7 +165,7 @@ export default function CatalogoDescripcionesAdmin() {
                     type="button"
                     onClick={() => toggle(r)}
                     disabled={busyId === r.id}
-                    className={`rounded-md border px-2.5 py-1 text-[12px] font-semibold transition active:scale-[0.97] disabled:opacity-50 ${
+                    className={`inline-flex min-h-[44px] items-center justify-center rounded-md border px-2.5 text-[12px] font-semibold transition active:scale-[0.97] disabled:opacity-50 ${
                       r.activa
                         ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300"
                         : "border-stone-300 bg-white text-stone-500 hover:border-stone-400"

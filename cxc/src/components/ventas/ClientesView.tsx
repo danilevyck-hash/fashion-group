@@ -349,7 +349,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           <button
             type="button"
             onClick={() => setSortOpen(true)}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 active:bg-gray-100 md:hidden"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 active:bg-gray-100 lg:hidden"
             aria-label="Ordenar lista"
           >
             <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
@@ -362,7 +362,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={reloadData} />
 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
-          <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 md:flex">
+          <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 lg:flex">
             <p>
               <span className="font-mono text-gray-950">{filtered.length}</span> clientes activos · ordenados por {SORT_LABELS[sortBy]}
             </p>
@@ -377,7 +377,9 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
               <button
                 type="button"
                 onClick={() => setVista(v => (v === "12m" ? "ytd" : "12m"))}
-                className={cn("rounded-md px-2 py-0.5 text-xs font-medium transition active:scale-[0.97]", vistaChipTone)}
+                /* 44 px: el iPad horizontal (1194) cae del lado de la tabla y
+                   este chip se toca con el dedo. Medía 236×22. */
+                className={cn("inline-flex min-h-[44px] items-center rounded-md px-2.5 text-xs font-medium transition active:scale-[0.97]", vistaChipTone)}
                 title={vistaChipTitle}
               >
                 Vista: {vistaChipLong} ⇄
@@ -389,7 +391,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         {/* Counter mobile — texto en línea 1, chip de vista debajo en
             línea 2 con 6px de separación. Evita que el chip quede pegado
             al texto y dé sensación de amontonamiento. */}
-        <div className="md:hidden">
+        <div className="lg:hidden">
           <div className="text-xs text-gray-500">
             <span className="font-mono text-gray-950">{filtered.length}</span> clientes
           </div>
@@ -401,7 +403,10 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             <button
               type="button"
               onClick={() => setVista(v => (v === "12m" ? "ytd" : "12m"))}
-              className={cn("mt-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium active:scale-[0.97]", vistaChipTone)}
+              /* 44 px: medía 107×26 y era el último blanco táctil chico de la
+                 pantalla en iPhone. Cambia el universo de clientes que se
+                 lista, así que errarle no es gratis. */
+              className={cn("mt-1.5 inline-flex min-h-[44px] items-center gap-1 rounded px-2.5 text-xs font-medium active:scale-[0.97]", vistaChipTone)}
               title={vistaChipTitle}
             >
               {vistaChipLabel} ⇄
@@ -409,8 +414,20 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           )}
         </div>
 
-        <div className="-mx-1 overflow-x-auto px-1" style={{ scrollSnapType: "x proximity" }}>
-          <div className="flex flex-nowrap gap-1.5">
+        {/* 🩸 ACÁ ESTABAN LOS 369 px DEL IPHONE, y no era la tabla: era esta tira
+            de píldoras. En celular la tabla ya estaba resuelta con tarjetas
+            desde antes; lo que quedaba arrastrando eran los seis filtros de
+            empresa metidos en un `overflow-x-auto` con scroll-snap. Medido a
+            390 px: 725 px de píldoras contra 356 visibles.
+
+            Se resuelve con `flex-wrap`, una sola clase — es la misma salida que
+            ganó por medición en los filtros del catálogo (#371), donde correr el
+            breakpoint NI SIQUIERA LLEGABA A CERO. Envolver además ARREGLA el
+            filtro en vez de sólo dejar de arrastrarlo: los seis se ven de una,
+            que es lo que un filtro tiene que hacer. Los textos no se tocaron —
+            "Vistana International" sigue diciendo lo mismo. */}
+        <div className="-mx-1 px-1">
+          <div className="flex flex-wrap gap-1.5">
             {EMPRESA_PILLS.map(p => {
               const active = empresa === p.id;
               return (
@@ -419,7 +436,6 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                   type="button"
                   onClick={() => onEmpresaChange(p.id)}
                   disabled={loading}
-                  style={{ scrollSnapAlign: "start" }}
                   className={cn(
                     // Box-sizing idéntico entre estados: ambos llevan border
                     // para que el activo no crezca 1px respecto al inactivo.
@@ -442,10 +458,25 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         </div>
       </div>
 
-      {/* ─────── Desktop (md+): tabla con headers clickeables ─────── */}
-      <Card className="hidden overflow-hidden p-0 md:block">
+      {/* ─────── Escritorio (lg+): tabla con encabezados clicables ───────
+          🩸 EL CORTE SE MOVIÓ DE `md` (768) A `lg` (1024), y el motivo es un
+          número: el ancho ÚTIL no es el viewport. La barra lateral se lleva
+          223 px y el `main` otros 56, así que **un iPad de 834 px deja 552** —
+          más angosto que un iPhone acostado. Por eso el iPad medía 368 px de
+          arrastre contra los 369 del iPhone: no ganaba NADA por ser más ancho,
+          la firma de que estaba recibiendo la pantalla de escritorio sin
+          adaptar. Con el corte en `md` el iPad caía del lado de la tabla.
+
+          `lg` no alcanzaba solo: el mínimo real de esta tabla era 791 px contra
+          los 745 útiles de una pantalla de 1024, así que además se le bajó el
+          piso — encabezados de dos líneas y menos relleno (ver `SortHeader` y
+          `ClienteRow`). Medido después: 655 px de mínimo, entra con aire.
+
+          El escritorio ancho no cambia: la tabla es `w-full` y el `minWidth`
+          sólo actúa cuando el contenedor es más angosto que él. */}
+      <Card className="hidden overflow-hidden p-0 lg:block">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse" style={{ minWidth: 920 }}>
+          <table className="w-full border-collapse" style={{ minWidth: 680 }}>
             <thead>
               <tr className="bg-gray-100">
                 <SortHeader col="rank"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>#</SortHeader>
@@ -485,16 +516,16 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
               })}
               {ventasLocalRow && !search.trim() && (
                 <tr className="bg-amber-50/40">
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right">
+                  <td className="border-b border-gray-200 px-2.5 py-3 text-right">
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
                   </td>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-sm font-medium text-gray-700" colSpan={2}>
+                  <td className="border-b border-gray-200 px-2.5 py-3 text-sm font-medium text-gray-700" colSpan={2}>
                     {ventasLocalRow.nombre}
                     <span className="ml-2 text-xs font-normal text-gray-500">ventas de contado · fuera del ranking</span>
                   </td>
-                  <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
-                  <td className="border-b border-gray-200 px-3.5 py-3 text-right text-gray-400">—</td>
-                  <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
+                  <td className="border-b border-gray-200 px-2.5 py-3 text-right text-gray-400">—</td>
+                  <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
                 </tr>
               )}
               {filtered.length === 0 && (
@@ -508,7 +539,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
       </Card>
 
       {/* ─────── Mobile (-md): cards verticales ─────── */}
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-2 lg:hidden">
         {filtered.map(c => {
           if (c.isOtrosAggregate) {
             return (
@@ -636,30 +667,42 @@ function ClienteRow({
   };
 
   return (
-    <tr className="cursor-pointer transition hover:bg-gray-50">
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
-        {/* Desktop (md+): HoverCard con popover. Mobile (< md): el mismo
+    // `data-fila-cliente` es el ancla ESTABLE que cruza fila y tarjeta en el
+    // verificador. Buscar por clase de breakpoint (`.md\\:hidden`) es la trampa
+    // que hace pasar un chequeo sin comparar nada: al mover el corte, el
+    // selector devuelve vacío y el test "aprueba" el silencio.
+    <tr data-fila-cliente={`${c.empresaKey}|${c.id}`} className="cursor-pointer transition hover:bg-gray-50">
+      <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{displayRank}</td>
+      <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
+        {/* Escritorio (lg+): HoverCard con popover. Debajo de lg el mismo
             botón dispara onMobileTap → abre ClienteSheet en el padre. */}
         <HoverCard openDelay={250} closeDelay={100}>
           <HoverCardTrigger asChild>
             {/* El nombre es link directo a la ficha (/clientes/[codigo]); el
                 HoverCard sigue mostrando el preview al hover en desktop. */}
+            {/* El CÓDIGO va ADENTRO del enlace a propósito. El nombre solo
+                medía 18 px de alto y el iPad horizontal (1194) cae del lado de
+                la tabla y se toca con el dedo. Envolver las dos líneas da los
+                44 px SIN agrandar la fila ni un píxel: el código ya estaba ahí
+                abajo, sólo dejó de ser texto muerto al lado del enlace. */}
             <Link
               href={`/clientes/${encodeURIComponent(c.id)}`}
               onMouseEnter={handleHoverEnter}
               onFocus={handleHoverEnter}
-              className="block max-w-full text-left font-medium leading-tight hover:text-teal-700"
+              className="flex min-h-[44px] max-w-full flex-col justify-center text-left font-medium leading-tight hover:text-teal-700"
             >
-              {c.nombre}
-              {c.esDelGrupo && <DelGrupoBadge />}
+              <span data-col="nombre">
+                {c.nombre}
+                {c.esDelGrupo && <DelGrupoBadge />}
+              </span>
+              <span data-col="codigo" className="font-mono text-xs font-normal leading-tight text-gray-500">{c.id}</span>
             </Link>
           </HoverCardTrigger>
           <HoverCardContent
             side={hoverSide}
             align="start"
             collisionPadding={12}
-            className="hidden w-[320px] md:block"
+            className="hidden w-[320px] lg:block"
           >
             <ClienteHoverCard
               nombre={c.nombre}
@@ -671,16 +714,17 @@ function ClienteRow({
             />
           </HoverCardContent>
         </HoverCard>
-        <div className="font-mono text-xs leading-tight text-gray-500">{c.id}</div>
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-xs text-gray-700">
+      <td data-col="empresa" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-xs text-gray-700">
         {isMultiEmpresa ? (
           <TooltipProvider delayDuration={120}>
             <Tooltip>
               <TooltipTrigger asChild>
+                {/* 44 px de alto (medía 72×18). Entra en el alto que la fila
+                    ya tenía, así que la tabla no crece. */}
                 <button
                   type="button"
-                  className="cursor-help underline decoration-dotted decoration-gray-300 underline-offset-4 hover:text-gray-950"
+                  className="inline-flex min-h-[44px] cursor-help items-center underline decoration-dotted decoration-gray-300 underline-offset-4 hover:text-gray-950"
                 >
                   {c.empresas_count} empresas
                 </button>
@@ -710,12 +754,12 @@ function ClienteRow({
           c.empresa
         )}
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
-      <td className={cn("whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+      <td data-col="ytd" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">{fmtMoney(c.ytd)}</td>
+      <td data-col="delta" className={cn("whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
         {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
         {fmt.displayValue}
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
+      <td data-col="ultima" className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">{c.ultima || "—"}</td>
     </tr>
   );
 }
@@ -734,22 +778,22 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       role="button"
       aria-label="Abrir detalle de otros clientes"
     >
-      <td className="border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-400 tabular-nums">—</td>
-      <td className="border-b border-gray-200 px-3.5 py-3 text-sm text-gray-950">
+      <td className="border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-400 tabular-nums">—</td>
+      <td className="border-b border-gray-200 px-2.5 py-3 text-sm text-gray-950">
         <div className="font-medium leading-tight">{c.nombre}</div>
         <div className="font-mono text-xs leading-tight text-gray-500">click para ver detalle</div>
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-xs text-gray-700">
+      <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-xs text-gray-700">
         {c.empresa}
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-sm font-medium text-gray-950 tabular-nums">
         {fmtMoney(c.ytd)}
       </td>
-      <td className={cn("whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+      <td className={cn("whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
         {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
         {fmt.displayValue}
       </td>
-      <td className="whitespace-nowrap border-b border-gray-200 px-3.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">
+      <td className="whitespace-nowrap border-b border-gray-200 px-2.5 py-3 text-right font-mono text-xs text-gray-500 tabular-nums">
         {c.ultima || "—"}
       </td>
     </tr>
@@ -773,42 +817,50 @@ function ClienteCard({
   const fmt = formatDeltaRatio(c.delta);
   return (
     <div
+      data-fila-cliente={`${c.empresaKey}|${c.id}`}
       role="button"
       tabIndex={0}
       onClick={onTap}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
       className="rounded-lg border border-gray-200 bg-white active:bg-gray-50"
     >
-      <div className="px-4 py-3.5">
+      <div className="px-4 py-2.5">
+        {/* El nombre es un enlace ANIDADO adentro de una tarjeta que ya es
+            tocable, y medía 324×19 — el blanco táctil más repetido de la
+            pantalla (112 en la lista). Ahora ocupa 44 px de alto; el `-my-*`
+            se los toma del relleno de la tarjeta, así que la lista no se
+            estira ni se pierde densidad. */}
         <div className="flex items-baseline justify-between gap-2">
           <Link
             href={`/clientes/${encodeURIComponent(c.id)}`}
             onClick={(e) => e.stopPropagation()}
-            className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
+            className="flex min-h-[44px] min-w-0 flex-1 items-center truncate text-[15px] font-medium leading-tight text-gray-950 hover:text-teal-700"
           >
-            {c.nombre}
-            {c.esDelGrupo && <DelGrupoBadge />}
+            <span data-col="nombre" className="truncate">
+              {c.nombre}
+              {c.esDelGrupo && <DelGrupoBadge />}
+            </span>
           </Link>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
-          <span className="font-mono">{c.id}</span>
+        <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500">
+          <span data-col="codigo" className="font-mono">{c.id}</span>
           {showEmpresa && c.empresa && (
             <>
               <span aria-hidden className="opacity-50">·</span>
-              <span className="truncate">{c.empresa}</span>
+              <span data-col="empresa" className="truncate">{c.empresa}</span>
             </>
           )}
         </div>
 
         <div className="mt-3 flex items-baseline gap-3">
-          <div className="font-mono text-base font-medium tabular-nums text-gray-950">
+          <div data-col="ytd-compacto" className="font-mono text-base font-medium tabular-nums text-gray-950">
             {fmtMoneyCompact(c.ytd)}
           </div>
-          <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+          <div data-col="delta" className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
             {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
             {fmt.displayValue}
           </div>
-          <div className="ml-auto truncate text-xs text-gray-500">
+          <div data-col="ultima" className="ml-auto truncate text-xs text-gray-500">
             {c.ultima || "—"}
           </div>
         </div>
@@ -852,15 +904,21 @@ function SortHeader({
 }) {
   const active = sortBy === col;
   return (
+    // SIN `whitespace-nowrap`: "Compras 2026" y "Última compra" ahora pueden
+    // partirse en dos líneas cuando el ancho aprieta. Es la mitad de lo que le
+    // bajó el mínimo a la tabla (la otra mitad es el relleno px-3.5 → px-2.5).
+    // Partir un encabezado en dos renglones no es abreviarlo: dice lo mismo.
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
+        "cursor-pointer select-none border-b border-gray-200 bg-gray-100 px-2.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
         active ? "text-gray-950" : "text-gray-500 hover:text-gray-700"
       )}
     >
-      <span className="inline-flex items-center gap-1">
+      {/* 44 px táctiles: el iPad horizontal (1194) también cae del lado de la
+          tabla y ordenar se hace con el dedo. */}
+      <span className="inline-flex min-h-[44px] items-center gap-1">
         {children}
         <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
           {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}

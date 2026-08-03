@@ -38,20 +38,41 @@ function tamanosArbitrarios(src: string): number[] {
 }
 
 describe("Data Health — la tabla de estado se puede leer entera en iPhone", () => {
-  it("la tabla 'Estado actual por check' vive dentro de un overflow-x-auto", () => {
-    // Antes: la card tenía `overflow-hidden` y la tabla (691px) se recortaba a
-    // 340px SIN scroll → 351px inalcanzables, justo Severity y Rows.
+  // 🩸 ACTUALIZADO 30-jul-2026. La garantía se hizo MÁS FUERTE, no se aflojó.
+  //
+  // Este bloque nació cuando la card tenía `overflow-hidden` y la tabla (691px)
+  // se recortaba a 340px SIN scroll: 351px inalcanzables, justo Severity y Rows.
+  // El arreglo de entonces fue un `overflow-x-auto` — el dato dejaba de ser
+  // INALCANZABLE, pero seguía habiendo que arrastrar: 353px medidos a 390 y
+  // 133px a 834.
+  //
+  // Ahora, hasta `lg`, la tabla es TARJETAS y el arrastre es **0**; la tabla
+  // (con su scroller y su `min-w`) sigue igual de `lg` para arriba, que es donde
+  // entra sola. Por eso el test ya no exige el scroller a secas: exige las DOS
+  // vistas. Detalle en `__tests__/lib/depurador-reclamos-datahealth-anchos`.
+  it("en angosto son tarjetas (0px de arrastre), no una tabla que se arrastra", () => {
+    const i = dataHealth.indexOf("Estado actual por check");
+    expect(i).toBeGreaterThan(-1);
+    const j = dataHealth.indexOf("</table>", i);
+    const bloque = dataHealth.slice(i, j);
+    expect(bloque).toContain('data-medir="dh-checks"');
+    expect(bloque).toContain('lg:hidden divide-y');
+    // Y la tarjeta sigue mostrando lo que se perdía: Severity y Rows.
+    expect(bloque).toContain("badge.label");
+    expect(bloque).toContain("r.rows_affected");
+  });
+
+  it("de lg para arriba sigue la tabla, con su scroller y su min-w", () => {
     const i = dataHealth.indexOf("Estado actual por check");
     const j = dataHealth.indexOf("</table>", i);
-    expect(i).toBeGreaterThan(-1);
     const bloque = dataHealth.slice(i, j);
-    expect(bloque).toContain('<div className="overflow-x-auto">');
+    expect(bloque).toContain('<div className="hidden lg:block overflow-x-auto" data-vista="tabla">');
     // min-w evita que la tabla se comprima en vez de scrollear.
     expect(bloque).toMatch(/<table className="w-full min-w-\[\d+px\] text-sm">/);
   });
 
   it("el div que scrollea se cierra (no queda JSX desbalanceado)", () => {
-    const i = dataHealth.indexOf('<div className="overflow-x-auto">');
+    const i = dataHealth.indexOf('<div className="hidden lg:block overflow-x-auto" data-vista="tabla">');
     const j = dataHealth.indexOf("</table>", i);
     expect(dataHealth.slice(j, j + 60)).toContain("</div>");
   });

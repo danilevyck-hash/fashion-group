@@ -451,8 +451,9 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
     return (
       <button
         onClick={() => { setExpanded(true); setTimeout(() => inputRef.current?.focus(), 0); }}
-        className="text-gray-400 hover:text-black transition p-1 rounded-lg hover:bg-gray-100 flex items-center gap-1"
+        className="text-gray-400 hover:text-black transition min-h-[44px] px-2 rounded-lg hover:bg-gray-100 flex items-center gap-1"
         title="Buscar (Cmd+K)"
+        aria-label="Buscar"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />

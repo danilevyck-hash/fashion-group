@@ -586,25 +586,26 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               return (
                 <li
                   key={emp.id}
+                  data-empleado-fila={emp.id}
                   onClick={() => handleRowClick(emp)}
                   className={`flex items-center gap-2 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors ${pendientes > 0 ? "border-l-4 border-l-amber-400" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
                 >
                   {/* 1 · Nombre + empresa (+ chips en mobile) */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium truncate tracking-tight">{emp.nombre}</span>
-                      {badges.length > 0 && <div className="hidden shrink-0 items-center gap-2 sm:flex">{badges}</div>}
+                      <span data-empleado-campo="nombre" className="font-medium truncate tracking-tight">{emp.nombre}</span>
+                      {badges.length > 0 && <div className="hidden shrink-0 items-center gap-2 lg:flex">{badges}</div>}
                     </div>
                     <div className="flex min-w-0 items-center gap-1.5 text-xs text-gray-500">
                       <span className="truncate">{emp.empresa || "Sin empresa"}</span>
                       {(badges.length > 0 || chipQuincena) && (
-                        <div className="flex shrink-0 items-center gap-1.5 sm:hidden">{badges}{chipQuincena}</div>
+                        <div className="flex shrink-0 items-center gap-1.5 lg:hidden">{badges}{chipQuincena}</div>
                       )}
                     </div>
                   </div>
 
                   {/* 2 · Progreso (fino) — desktop */}
-                  <div className="hidden sm:flex items-center gap-2 w-36 shrink-0">
+                  <div className="hidden lg:flex items-center gap-2 w-36 shrink-0">
                     <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div className={`h-full ${progressColor(pct)} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
                     </div>
@@ -612,7 +613,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                   </div>
 
                   {/* 3 · Chip quincena — columna propia solo en desktop */}
-                  <div className="hidden shrink-0 text-center sm:block sm:w-24">
+                  <div className="hidden shrink-0 text-center lg:block lg:w-24">
                     {chipQuincena}
                   </div>
 

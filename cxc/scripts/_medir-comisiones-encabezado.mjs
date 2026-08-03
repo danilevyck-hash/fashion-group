@@ -38,19 +38,29 @@ const MEDIR = `(() => {
   if (!main) return { error: "sin <main>" };
   const mainTop = main.getBoundingClientRect().top + window.scrollY;
 
-  // Primer número de comisión: primera celda de la primera fila del tbody.
-  const fila = document.querySelector("main table tbody tr");
-  const celda = fila ? fila.querySelector("td") : null;
+  // Primer número de comisión. DOS layouts, y el de celular no tiene tabla:
+  // desde el #365 la tabla va oculta bajo md y en su lugar hay TARJETAS
+  // (data-comision-card). La tabla SIGUE en el DOM con display:none, así que
+  // un querySelector a ciegas devolvería una fila de alto 0 en la posición 0
+  // y el encabezado saldría NEGATIVO. Se toma lo que de verdad se ve.
+  const seVe = (el) => el && el.getBoundingClientRect().height > 0;
+  const filas = [
+    ...document.querySelectorAll("main table tbody tr"),
+    ...document.querySelectorAll("main [data-comision-card]"),
+  ].filter(seVe);
+  const fila = filas[0] ?? null;
+  const celda = fila ? (fila.querySelector("td") ?? fila.querySelector("span + span")) : null;
   const filaTop = fila ? fila.getBoundingClientRect().top + window.scrollY : null;
 
-  const filas = [...document.querySelectorAll("main table tbody tr")];
   const contar = (alto) => filas.filter((tr) => {
     const r = tr.getBoundingClientRect();
     return r.bottom + window.scrollY <= alto && r.height > 0;
   }).length;
 
-  // Targets del encabezado (todo lo que está sobre la tabla).
-  const tabla = document.querySelector("main table");
+  // Targets del encabezado (todo lo que está sobre la tabla o las tarjetas).
+  const tabla = seVe(document.querySelector("main table"))
+    ? document.querySelector("main table")
+    : fila;
   const tablaTop = tabla ? tabla.getBoundingClientRect().top + window.scrollY : Infinity;
   const chicos = [];
   for (const el of document.querySelectorAll("main button, main [role='combobox'], main a[href], main input, main select")) {

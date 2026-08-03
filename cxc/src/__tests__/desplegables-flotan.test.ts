@@ -79,48 +79,65 @@ const EXCEPCIONES: Record<string, string> = {
   "lib/catalogo/marcas-ui.tsx":
     "sugerencias del detalle de pedido — sin medir, catálogos con trabajo en curso",
 
-  // ⚠️ DEUDA CONOCIDA, los dos por el MISMO motivo: la base estaba saturada por
-  // las auditorías del día y /admin y /ventas devolvían "Reintentar", así que no
-  // se pudieron medir en el navegador. Se llegó a portarlos y se REVIRTIÓ: la
-  // regla de este barrido es arreglar lo que se MIDIÓ roto, y mandar a CXC un
-  // cambio de UI sin haberlo abierto una sola vez es justo lo que la regla de
-  // calidad del repo prohíbe. Cuando la base respire:
-  //   1. `node scripts/_medir-desplegables.mjs` con SOLO=cxc-,sync-now
-  //   2. si sale ROTO → pasarlo a <DesplegableFlotante> y borrar la excepción.
-  // El de SyncNowButton es el que más pinta tiene: su menú SÍ se dibuja (Ventas
-  // › Comisiones pasa 7 empresas y no es `secuencial`) y cuelga de un botón de
-  // una barra de herramientas.
+  // ✅ MEDIDO en el navegador el 30-jul-2026 (build de producción, datos de
+  // producción, /comisiones con las 7 empresas de recibos en el menú):
+  // **SANO en 390 / 834 / 1440 px** — 0 px recortados, 0 px fuera de pantalla,
+  // 0 px de desplazamiento de columnas, 0 px de arrastre nuevo, y el panel
+  // flotando por encima. Panel de 224 px: a 390 px el botón arranca en x=132 y
+  // el panel termina en 356, o sea 34 px de aire hasta el borde.
+  //
+  // Sobrevive porque su barra de herramientas NO recorta (`flex flex-wrap
+  // items-center`, sin overflow) y el `<main>` tampoco. **Se deja como está: la
+  // regla de este barrido es arreglar lo que se MIDIÓ roto, no lo que se
+  // parece.**
+  // ⚠️ Si algún día ese menú se dibuja DENTRO de una tabla o de un modal con
+  //    scroll, se rompe: ahí sí hay que pasarlo a <DesplegableFlotante>.
+  // ⚠️ Al medirlo: con `secuencial` este botón NO abre menú, EJECUTA el sync.
+  //    /comisiones es el único llamador que abre menú (7 opciones, sin
+  //    `secuencial`), y NUNCA se toca un item — eso sí sincronizaría de verdad.
+  //    Reproducir con: `SOLO=sync-now node scripts/_medir-desplegables.mjs`
   "components/shared/SyncNowButton.tsx":
-    "menú de Actualizar ahora — sin medir, /ventas caído el día del barrido",
+    "menú de Actualizar ahora — medido SANO en los 3 anchos (30-jul-2026); su barra no recorta",
+
+  // ⚠️ DEUDA CONOCIDA: la base estaba saturada por las auditorías del día y
+  // /admin devolvía "Reintentar", así que no se pudo medir en el navegador. Se
+  // llegó a portarlo y se REVIRTIÓ: mandar a CXC un cambio de UI sin haberlo
+  // abierto una sola vez es justo lo que la regla de calidad del repo prohíbe.
+  // Cuando se pueda abrir /admin:
+  //   1. `node scripts/_medir-desplegables.mjs` con SOLO=cxc-
+  //   2. si sale ROTO → pasarlo a <DesplegableFlotante> y borrar la excepción.
   "app/admin/components/PanelCxcMobile.tsx":
     "menú Acciones de CXC móvil — sin medir, /admin caído el día del barrido",
 
-  // ⚠️ DEUDA, y de otra clase que las de arriba: a estos dos el barrido NUNCA
-  // LOS VIO. Nacieron en el #355 (encabezado de Comisiones 481px → 193px), que
-  // entró a main DESPUÉS de que esta rama saliera — así que no es una decisión
-  // que se tomó, es una que no se llegó a tomar, y main quedó ROJO al mergear.
+  // ✅ MEDIDOS en el navegador el 30-jul-2026 (build de producción, datos de
+  // producción, /comisiones). Nacieron en el #355 y el barrido original NUNCA
+  // LOS VIO; el #364 los anotó como deuda "muy probablemente sanos, pero
+  // probable no es medido". Ahora están medidos, en los DOS modos de la
+  // pantalla y en los 3 anchos:
   //
-  // Revisados en el fuente: **ninguno de los dos tiene hoy un ancestro que
-  // recorte** (fila 1 `flex items-center gap-1 border-b`, fila 2
-  // `flex flex-wrap items-center`, y `<main>` sin overflow), y los dos anclan
-  // hacia adentro de la pantalla — `right-0` el ⓘ, que vive pegado al borde
-  // derecho con `ml-auto`, y `left-0` el de período, que es el control más a la
-  // izquierda con un panel de 276px sobre 358px útiles en un iPhone. O sea que
-  // muy probablemente estén sanos. **Pero probable no es medido**, y Comisiones
-  // es una pantalla de plata. Cuando la base respire:
-  //   1. `node scripts/_medir-desplegables.mjs` con SOLO=comisiones
-  //   2. si sale ROTO → <DesplegableFlotante> y borrar la excepción.
+  //   ⓘ Criterios ....... 390: panel 300×219 en x=74 · 834: x=506 · 1440: x=1112
+  //   Período ........... 390: panel 276×258 en x=16 · 834: x=252 · 1440: x=252
   //
-  // 🩸 OJO al portar el ⓘ: su panel se esconde con `hidden` y NO se desmonta, a
-  // propósito. Adentro vive el <SyncStatus> que consulta la frescura al cargar
-  // la página para poder encender el punto ámbar. `DesplegableFlotante` hace
-  // `return null` cuando está cerrado, así que un port directo desmonta el
-  // SyncStatus y **el aviso solo aparecería después de abrir el ⓘ — o sea,
-  // nunca**. Hay que sacar el SyncStatus del panel antes de portarlo.
+  // En los seis casos: **0 px recortados, 0 px fuera de pantalla, 0 px de
+  // desplazamiento de columnas, 0 px de arrastre nuevo, flotando por encima.**
+  // Ninguno de los dos tiene un ancestro que recorte (fila 1 `flex items-center
+  // gap-1 border-b`, fila 2 `flex flex-wrap items-center`, `<main>` sin
+  // overflow) y los dos anclan hacia adentro: `right-0` el ⓘ, que vive pegado
+  // al borde derecho con `ml-auto`, y `left-0` el de período, que es el control
+  // más a la izquierda con un panel de 276 px sobre 358 px útiles en un iPhone.
+  // **NO se portan**: no están rotos.
+  //   Reproducir: `SOLO=comisiones node scripts/_medir-desplegables.mjs`
+  //
+  // 🩸 SI algún día hay que portar el ⓘ: su panel se esconde con `hidden` y NO
+  // se desmonta, a propósito. Adentro vive el <SyncStatus> que consulta la
+  // frescura al cargar la página para poder encender el punto ámbar.
+  // `DesplegableFlotante` hace `return null` cuando está cerrado, así que un
+  // port directo desmonta el SyncStatus y **el aviso solo aparecería después de
+  // abrir el ⓘ — o sea, nunca**. Hay que sacar el SyncStatus del panel primero.
   "components/ventas/ComisionesCriterios.tsx":
-    "ⓘ Criterios de Comisiones — nació en el #355, el barrido no lo vio; sin medir",
+    "ⓘ Criterios de Comisiones — medido SANO en los 3 anchos y los 2 modos (30-jul-2026)",
   "components/ventas/ComisionesPeriodo.tsx":
-    "selector de período de Comisiones — nació en el #355, el barrido no lo vio; sin medir",
+    "selector de período de Comisiones — medido SANO en los 3 anchos y los 2 modos (30-jul-2026)",
 };
 
 interface Sospechoso {

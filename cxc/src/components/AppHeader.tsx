@@ -94,7 +94,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                 <div className="text-sm text-gray-700 font-medium leading-tight">{userName.split(" ")[0]}</div>
                 <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[userRole] || userRole}</div>
               </div>
-              <button onClick={handleLogout} title="Cerrar sesión" className="text-gray-300 hover:text-gray-600 transition p-1">
+              <button onClick={handleLogout} title="Cerrar sesión" aria-label="Cerrar sesión" className="inline-flex h-11 w-11 items-center justify-center text-gray-300 hover:text-gray-600 transition">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
               <div className="w-px h-4 bg-gray-200" />
@@ -103,8 +103,9 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
           {/* Mobile: search + notification + hamburger.
               Los tres son 44×44 reales (regla de la casa para el tacto en
               iPhone): este header sale en las 22 páginas, así que cada píxel
-              que falte acá se multiplica por toda la app. */}
-          <div className="sm:hidden"><NotificationCenter size="tactil" /></div>
+              que falte acá se multiplica por toda la app. La campana decide su
+              propio tamaño y ya no admite uno chico — ver NotificationCenter. */}
+          <div className="sm:hidden"><NotificationCenter /></div>
           {canSearch && (
             <button onClick={() => setMobileSearchOpen(true)} aria-label="Buscar" className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -134,7 +135,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                     {isLast || !seg.onClick ? (
                       <span className="text-gray-600 font-medium cursor-default">{seg.label}</span>
                     ) : (
-                      <button onClick={seg.onClick} className="hover:text-gray-700 hover:underline transition cursor-pointer">{seg.label}</button>
+                      <button onClick={seg.onClick} className="-my-[13px] inline-flex min-h-[44px] min-w-[44px] items-center justify-center hover:text-gray-700 hover:underline transition cursor-pointer">{seg.label}</button>
                     )}
                   </span>
                 );

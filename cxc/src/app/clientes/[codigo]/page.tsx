@@ -6,6 +6,7 @@
 
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
+import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -86,6 +87,11 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .eq("deleted", false),
   ]);
   if (!cliente) notFound();
+
+  // Un cliente que no se lista en el Directorio tampoco se abre por URL directa:
+  // si no, "no está en ningún lado" duraría hasta que alguien pegara un enlace.
+  // Mismo criterio y mismo lugar que la lista — `lib/clientes/mundos`.
+  if (soloClientesDelGrupo([cliente], await mundosDeClientes()).length === 0) notFound();
 
   // ventas YTD (firmada, base con ITBMS, hora-Panamá) + última factura por empresa,
   // ya agregadas server-side. Si el RPC aún no está aplicado (ventana de deploy),
