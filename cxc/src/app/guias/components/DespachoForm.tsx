@@ -52,8 +52,19 @@ export default function DespachoForm({
   }, [isDirty, bSaving]);
 
   function handleConfirmar() {
-    // La placa es obligatoria SIEMPRE, sin importar el tipo de despacho.
-    if (!bPlaca.trim()) return showToast("Ingresa la placa del vehiculo");
+    // 🩸 La placa era obligatoria SIEMPRE, y eso trababa la entrega directa.
+    // Medido el 3-ago-2026 sobre las 172 guías vivas: **entrega directa 78%
+    // sin despachar** (37 de 47) contra 85% despachadas en transportista. La
+    // mercancía salía físicamente y la guía quedaba en "pendiente" para
+    // siempre — por eso Daniel dejó de recibir el aviso de Telegram, que solo
+    // sale al pasar a "Completada". Pedirle placa de vehículo a una entrega
+    // que hace la propia gente de la casa no aporta nada y frena el cierre.
+    // Daniel, textual: *"entrega directa no es necesario placa"*.
+    // En transportista externo SIGUE siendo obligatoria: ahí sí importa saber
+    // en qué vehículo se fue la mercancía de un tercero.
+    if (tipoDespacho === "externo" && !bPlaca.trim()) {
+      return showToast("Ingresa la placa del vehiculo");
+    }
     if (tipoDespacho === "externo") {
       if (!bNumeroGuiaTransp.trim()) return showToast("Falta el N° de guía del transportista");
       if (!bReceptor.trim()) return showToast("Ingresa el nombre del transportista/receptor");
@@ -125,7 +136,11 @@ export default function DespachoForm({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div>
-            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Placa del vehiculo *</label>
+            {/* Opcional en entrega directa: el campo se queda por si la quieren
+                anotar, pero ya no traba el despacho. Ver handleConfirmar. */}
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">
+              Placa del vehiculo <span className="normal-case text-gray-400">(opcional)</span>
+            </label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-base sm:text-sm outline-none focus:border-black transition min-h-[44px]" />
           </div>
