@@ -222,6 +222,11 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "marketing",
     "caja",
     "cheques",
+    // Nuevo el 3-ago-2026: sube el Excel de marcaciones del reloj mientras no
+    // se tiene la contraseña de red. Es quien hace ese trabajo, así que el
+    // módulo es suyo. Se agrega acá A PROPÓSITO — este inventario existe para
+    // que un módulo NO se le abra de rebote, y funcionó: el test se puso rojo.
+    "asistencia",
   ],
   bodega: ["catalogos", "guias", "packing-lists"],
   contabilidad: ["proveedores", "gastos-empresa", "prestamos"],
