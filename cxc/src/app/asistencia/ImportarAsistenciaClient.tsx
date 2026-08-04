@@ -10,6 +10,7 @@
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useToast } from "@/components/ToastSystem";
+import VerMarcaciones from "./VerMarcaciones";
 
 interface Preview {
   encabezados: string[];
@@ -41,6 +42,7 @@ export default function ImportarAsistenciaClient() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   const [guardadas, setGuardadas] = useState<number | null>(null);
+  const [tab, setTab] = useState<"ver" | "cargar">("ver");
 
   async function enviar(soloPreview: boolean) {
     if (!archivo) return toast("Elige el archivo primero", "error");
@@ -74,9 +76,31 @@ export default function ImportarAsistenciaClient() {
   return (
     <>
       <AppHeader module="asistencia" />
-      <div className="mx-auto max-w-3xl px-4 py-6">
-        <h1 className="text-xl font-semibold text-gray-900">Cargar marcaciones</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="mx-auto max-w-5xl px-4 py-6">
+        <h1 className="text-xl font-semibold text-gray-900">Asistencia</h1>
+
+        <div className="mt-4 flex gap-1 border-b border-gray-200">
+          {([["ver", "Marcaciones"], ["cargar", "Cargar Excel"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              className={`min-h-[44px] px-4 text-sm transition ${
+                tab === k
+                  ? "border-b-2 border-black font-medium text-gray-900"
+                  : "text-gray-500 hover:text-gray-900"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "ver" && <div className="mt-5"><VerMarcaciones /></div>}
+
+        {tab === "cargar" && (
+        <div className="mt-5">
+        <p className="text-sm text-gray-500">
           Sube el Excel que exportas desde iVMS-4200. Puedes subir el mismo archivo
           más de una vez sin miedo: las marcaciones repetidas no se duplican.
         </p>
@@ -201,6 +225,8 @@ export default function ImportarAsistenciaClient() {
               </>
             )}
           </div>
+        )}
+        </div>
         )}
       </div>
     </>
