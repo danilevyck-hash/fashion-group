@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx-js-style";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { importarFilas, type FilaExcel } from "@/lib/asistencia/importar-excel";
+import { importarMatriz, type Matriz } from "@/lib/asistencia/importar-excel";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -45,37 +45,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta indicar de qué reloj es" }, { status: 400 });
   }
 
-  let filasCrudas: FilaExcel[];
-  let encabezados: string[];
+  // ⚠️ Se lee como MATRIZ (header:1), no como objetos. El export real de iVMS
+  // trae un título en la fila 1 y los encabezados en la 2, así que dejar que la
+  // librería adivine los nombres de campo da basura. La detección de la fila de
+  // encabezados vive en el módulo puro.
+  let matriz: Matriz;
   try {
     const buf = Buffer.from(await archivo.arrayBuffer());
     const wb = XLSX.read(buf, { type: "buffer", cellDates: true });
     const hoja = wb.Sheets[wb.SheetNames[0]];
     if (!hoja) throw new Error("el archivo no tiene hojas");
-    filasCrudas = XLSX.utils.sheet_to_json<FilaExcel>(hoja, { defval: null });
-    // Los encabezados se leen aparte: `sheet_to_json` los pierde si la primera
-    // fila tiene celdas vacías, y sin ellos no se pueden detectar las columnas.
-    const cab = XLSX.utils.sheet_to_json<string[]>(hoja, { header: 1, range: 0 })[0] ?? [];
-    encabezados = cab.map((c) => String(c ?? "")).filter(Boolean);
+    matriz = XLSX.utils.sheet_to_json<Matriz[number]>(hoja, { header: 1, defval: null, blankrows: false });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "no se pudo leer";
     return NextResponse.json({ error: `No pude leer el archivo: ${msg}` }, { status: 400 });
   }
 
-  if (filasCrudas.length > MAX_FILAS) {
+  if (matriz.length > MAX_FILAS) {
     return NextResponse.json(
-      { error: `El archivo tiene ${filasCrudas.length} filas; el máximo es ${MAX_FILAS}. Súbelo por partes.` },
+      { error: `El archivo tiene ${matriz.length} filas; el máximo es ${MAX_FILAS}. Súbelo por partes.` },
       { status: 400 },
     );
   }
 
-  const { filas, descartadas, columnas } = importarFilas(dispositivo, filasCrudas, encabezados);
+  const { filas, descartadas, columnas, encabezados, filasDeDetalle } = importarMatriz(dispositivo, matriz);
 
   const resumen = {
     dispositivo,
     encabezados,
-    columnasDetectadas: columnas,
-    filasEnArchivo: filasCrudas.length,
+    columnasDetectadas: Object.fromEntries(
+      Object.entries(columnas).map(([k, i]) => [k, i === null ? null : (encabezados[i] ?? null)]),
+    ),
+    filasEnArchivo: matriz.length,
+    // iVMS intercala una fila de resumen entre cada dato; no son descartes.
+    filasDeDetalle,
     listasParaGuardar: filas.length,
     descartadas: descartadas.length,
     // Las primeras, para que se vea el motivo sin abrir el archivo.
