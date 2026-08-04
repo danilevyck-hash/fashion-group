@@ -28,11 +28,27 @@ const visor = leer("src/components/catalogo/VisorFoto.tsx");
 const card = leer("src/components/catalogo/CatalogoProductCard.tsx");
 const grouped = leer("src/components/catalogo/CatalogoGroupedCard.tsx");
 const layout = leer("src/app/layout.tsx");
+const ficha = leer("src/components/catalogo/ProductoDetalleClient.tsx");
 
-describe("🔴 tocar la foto la acerca, no la cierra", () => {
-  it("el contenedor de la foto FRENA la propagación del clic", () => {
-    // Sin esto, el clic sube al fondo y cierra: el bug original.
-    expect(visor).toContain("onClick={(e) => e.stopPropagation()}");
+describe("🔴 tocar la foto la acerca; tocar afuera cierra", () => {
+  // 🩸 SEGUNDO BUG, reportado por Daniel: *"no funciona lo de tocar el fondo
+  // pero si la x"*. El primer intento puso `stopPropagation` en el contenedor
+  // de gestos — que ocupa la pantalla ENTERA porque necesita captar el pellizco
+  // en cualquier lado. Resultado: no quedaba ningún "fondo" que tocar, se
+  // tragaba todos los toques y solo servía la ×. La distinción no puede ser por
+  // elemento; tiene que ser por POSICIÓN.
+  it("decide por la POSICIÓN del toque, no por el elemento", () => {
+    expect(visor).toContain("const tocoLaFoto");
+    expect(visor).toContain("imgRef.current?.getBoundingClientRect()");
+  });
+
+  it("un toque fuera de la foto cierra", () => {
+    expect(visor).toContain("else cerrar();");
+    expect(visor).toContain("if (!tocoLaFoto(e.clientX, e.clientY)) cerrar();");
+  });
+
+  it("ya NO hay un stopPropagation que se trague todo", () => {
+    expect(visor).not.toContain("onClick={(e) => e.stopPropagation()}");
   });
 
   it("un toque limpio alterna el zoom", () => {
@@ -95,6 +111,18 @@ describe("las dos tarjetas usan el MISMO visor", () => {
     ["CatalogoGroupedCard", grouped],
   ])("%s ya no tiene el visor viejo sin zoom", (_, archivo) => {
     expect(archivo).not.toContain("max-w-full max-h-full object-contain rounded-lg");
+  });
+});
+
+describe("⚠️ la FICHA de producto también tiene visor", () => {
+  // Estaba sin visor: tocar la foto ahí no hacía absolutamente nada.
+  it("las dos variantes de ficha (tallas y variantes) lo montan", () => {
+    expect(ficha).toContain('import VisorFoto from "./VisorFoto"');
+    expect(ficha.match(/<VisorFoto/g) ?? []).toHaveLength(2);
+  });
+
+  it("y la foto se ve tocable", () => {
+    expect(ficha.match(/cursor-zoom-in/g) ?? []).toHaveLength(2);
   });
 });
 

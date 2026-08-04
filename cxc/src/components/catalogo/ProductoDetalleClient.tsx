@@ -16,6 +16,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { supabase, type Product, type InventoryItem } from "@/components/reebok/supabase";
 import { groupByModel, type GroupedProduct, type JoybeesProduct } from "./groupByModel";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import VisorFoto from "./VisorFoto";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
@@ -31,6 +32,8 @@ function DetallePorTallas({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
+  // La ficha de producto no tenía visor: tocar la foto no hacía nada.
+  const [verFoto, setVerFoto] = useState(false);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [selectedSize, setSelectedSize] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -97,7 +100,13 @@ function DetallePorTallas({ marca }: { marca: MarcaUiKey }) {
         <div className={theme.producto.imageWrap}>
           {product.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+            <img
+              src={product.image_url}
+              alt={product.name}
+              onClick={() => setVerFoto(true)}
+              className="w-full h-full object-contain cursor-zoom-in"
+              loading="lazy"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-400">
               <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,6 +168,10 @@ function DetallePorTallas({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
       </div>
+
+      {verFoto && product?.image_url && (
+        <VisorFoto src={product.image_url} alt={product.name} onClose={() => setVerFoto(false)} />
+      )}
     </div>
   );
 }
@@ -170,6 +183,7 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
   const BULTO = theme.bulto();
   const { id } = useParams();
   const [product, setProduct] = useState<JoybeesProduct | null>(null);
+  const [verFoto, setVerFoto] = useState(false);
   const [group, setGroup] = useState<GroupedProduct | null>(null);
   const [selectedId, setSelectedId] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -248,7 +262,13 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
         <div className={theme.producto.imageWrap}>
           {product.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+            <img
+              src={product.image_url}
+              alt={product.name}
+              onClick={() => setVerFoto(true)}
+              className="w-full h-full object-contain cursor-zoom-in"
+              loading="lazy"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-400">
               <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,6 +339,10 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
           )}
         </div>
       </div>
+
+      {verFoto && product?.image_url && (
+        <VisorFoto src={product.image_url} alt={product.name} onClose={() => setVerFoto(false)} />
+      )}
     </div>
   );
 }

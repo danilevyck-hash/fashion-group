@@ -46,6 +46,7 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
   const [escala, setEscala] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const contRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Estado del gesto en curso. En refs y no en estado: cambian en cada
   // `touchmove` y meterlos en el render haría perder cuadros.
@@ -59,6 +60,22 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
     posY0: 0,
     movio: false,
   });
+
+  /**
+   * ¿El toque cayó SOBRE la foto?
+   *
+   * 🩸 Hace falta porque el contenedor de gestos ocupa la pantalla entera —lo
+   * necesita para captar el pellizco en cualquier lado— así que "el fondo" no
+   * es un elemento aparte que se pueda tocar. Sin esta prueba, cerrar tocando
+   * afuera NO funcionaba: el contenedor se tragaba todos los toques y solo
+   * servía la ×. Se mide contra el rectángulo REAL de la imagen, que ya incluye
+   * el zoom aplicado, así que estando acercada el área táctil crece con ella.
+   */
+  const tocoLaFoto = useCallback((x: number, y: number): boolean => {
+    const r = imgRef.current?.getBoundingClientRect();
+    if (!r) return false;
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  }, []);
 
   const cerrar = useCallback(() => {
     setEscala(1);
@@ -130,10 +147,12 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
 
   function onTouchEnd(e: React.TouchEvent) {
     const g = gesto.current;
-    // Un toque limpio (sin arrastre ni pellizco) = alternar zoom.
+    // Un toque limpio (sin arrastre ni pellizco): sobre la foto alterna el
+    // zoom, fuera de ella cierra.
     if (!g.movio && e.changedTouches.length === 1 && e.touches.length === 0) {
       const t = e.changedTouches[0];
-      alternarZoom(t.clientX, t.clientY);
+      if (tocoLaFoto(t.clientX, t.clientY)) alternarZoom(t.clientX, t.clientY);
+      else cerrar();
     }
     g.pinchInicio = 0;
     g.arrastrando = false;
@@ -142,15 +161,14 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
-      // Cerrar SOLO al tocar el fondo. El contenedor de la foto frena la
-      // propagación: ese fue el bug original.
-      onClick={cerrar}
     >
       <div
         ref={contRef}
         className="relative flex h-full w-full items-center justify-center overflow-hidden"
         style={{ touchAction: "none" }}
-        onClick={(e) => e.stopPropagation()}
+        // Con ratón: sobre la foto no hace nada (el doble clic acerca); fuera
+        // de ella, cierra. En táctil lo resuelve onTouchEnd.
+        onClick={(e) => { if (!tocoLaFoto(e.clientX, e.clientY)) cerrar(); }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -158,6 +176,7 @@ export default function VisorFoto({ src, alt, onClose }: Props) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          ref={imgRef}
           src={src}
           alt={alt}
           draggable={false}
