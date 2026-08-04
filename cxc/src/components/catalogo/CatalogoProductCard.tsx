@@ -14,6 +14,7 @@ import CatalogoProductName from "./CatalogoProductName";
 import CatalogoStockLine from "./CatalogoStockLine";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import VisorFoto from "./VisorFoto";
 
 const COLOR_DOT_MAP: Record<string, string> = {
   black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
@@ -327,14 +328,7 @@ export default function CatalogoProductCard({
 
       {/* Lightbox */}
       {showLightbox && product.image_url && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-8"
-          onClick={() => setShowLightbox(false)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain rounded-lg" />
-          <button onClick={() => setShowLightbox(false)} className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl">&times;</button>
-        </div>
+        <VisorFoto src={product.image_url} alt={product.name} onClose={() => setShowLightbox(false)} />
       )}
     </>
   );
