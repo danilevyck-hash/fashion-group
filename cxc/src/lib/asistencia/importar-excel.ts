@@ -135,10 +135,32 @@ export function buscarEncabezados(matriz: Matriz): number {
   return 0;
 }
 
-/** Fila de resumen que iVMS intercala: "Hora de entrada: …". No es un dato. */
+/**
+ * Fila de "detalle" que iVMS intercala debajo de cada jornada.
+ *
+ * 🩸 LA LLAMÉ BASURA Y ERA EL DATO MÁS IMPORTANTE (5-ago-2026). Se veía así:
+ *
+ *   [0] "Hora de entrada: 2026-07-13 08:16:24 Hora de entrada: 2026-07-13 13:39:45"
+ *   [1] "Hora de salida:  2026-07-13 13:10:13 Hora de salida:  2026-07-13 16:50:21"
+ *
+ * O sea que trae **LAS CUATRO MARCACIONES DEL DÍA** —entrada, salida a
+ * almuerzo, regreso, salida a casa— mientras las columnas `Entrada`/`Salida` de
+ * la fila de arriba solo muestran la PRIMERA y la ÚLTIMA. Saltearla dejaba el
+ * almuerzo invisible, y sin almuerzo no hay forma de medir el exceso ni las
+ * horas realmente trabajadas.
+ */
 function esFilaDeDetalle(fila: readonly Celda[]): boolean {
   const p = norm(fila[0]);
   return p.startsWith("hora de entrada") || p.startsWith("check-in time") || p.startsWith("duracion");
+}
+
+/** Las horas `HH:MM:SS` que aparezcan en la fila de detalle, en orden. */
+export function marcasDeDetalle(fila: readonly Celda[]): string[] {
+  const texto = `${txt(fila[0]) ?? ""} ${txt(fila[1]) ?? ""}`;
+  const horas = texto.match(/\d{2}:\d{2}:\d{2}/g) ?? [];
+  // Orden cronológico y sin repetidas: iVMS lista primero todas las entradas y
+  // después todas las salidas, así que tal cual vienen NO están en orden.
+  return [...new Set(horas)].sort();
 }
 
 /** "-" y variantes = ese día no marcó. */
@@ -212,6 +234,9 @@ export function importarMatriz(dispositivo: string, matriz: Matriz): ResultadoIm
     const numero = i + 1; // Excel cuenta desde 1
     if (fila.every((c) => c === null || c === undefined || String(c).trim() === "")) continue;
     if (esFilaDeDetalle(fila)) { filasDeDetalle++; continue; }
+    // La fila de detalle vive JUSTO DEBAJO y trae las 4 marcas del día.
+    const detalle = matriz[i + 1] ?? [];
+    const marcasReales = esFilaDeDetalle(detalle) ? marcasDeDetalle(detalle) : [];
 
     if (columnas.fecha === null) {
       descartadas.push({ fila: numero, motivo: "no se encontró la columna de fecha" });
@@ -227,10 +252,22 @@ export function importarMatriz(dispositivo: string, matriz: Matriz): ResultadoIm
     const departamento = columnas.departamento !== null ? txt(fila[columnas.departamento]) : null;
     const estado = columnas.estado !== null ? txt(fila[columnas.estado]) : null;
 
-    // Una jornada da hasta DOS marcaciones. Si el día no tuvo marcaje, ninguna.
-    const puntos: Array<{ hora: Celda; tipo: string }> = [];
-    if (columnas.entrada !== null) puntos.push({ hora: fila[columnas.entrada], tipo: "Entrada" });
-    if (columnas.salida !== null) puntos.push({ hora: fila[columnas.salida], tipo: "Salida" });
+    // Se prefieren SIEMPRE las marcas de la fila de detalle: son todas las del
+    // día (normalmente 4). Las columnas Entrada/Salida solo tienen la primera y
+    // la última, y con eso el almuerzo no se puede medir.
+    const puntos: Array<{ hora: Celda; tipo: string }> =
+      marcasReales.length > 0
+        ? marcasReales.map((h, k) => ({
+            // Se alternan entrada/salida por posición. Con 4 marcas queda
+            // Entrada · Salida almuerzo · Entrada · Salida — que es el orden
+            // que Daniel describió. No se usa `attendanceStatus`: viene vacío.
+            hora: h,
+            tipo: k % 2 === 0 ? "Entrada" : "Salida",
+          }))
+        : [
+            ...(columnas.entrada !== null ? [{ hora: fila[columnas.entrada], tipo: "Entrada" }] : []),
+            ...(columnas.salida !== null ? [{ hora: fila[columnas.salida], tipo: "Salida" }] : []),
+          ];
 
     let algunaValida = false;
     for (const p of puntos) {
