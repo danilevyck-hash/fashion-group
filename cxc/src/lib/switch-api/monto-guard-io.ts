@@ -172,6 +172,26 @@ const MAX_EN_MENSAJE = 5;
  * UN aviso por corrida al canal 🔧 SISTEMA. Nunca puede tumbar el sync: el
  * llamador lo envuelve en try/catch y sigue en `success` aunque Telegram falle.
  */
+/**
+ * Empresas que NO avisan por Telegram cuando el guard rechaza una cifra.
+ *
+ * 🩸 confecciones_boston (5-ago-2026). Daniel: *"en telegram no quiero noti de
+ * boston de ese estilo"*. Su documento `155-000000129` trae
+ * **$266.541.352,00** —contra un tope de $2.000.000— y el dato está mal EN
+ * SWITCH, no acá. Daniel decidió no corregirlo, así que el aviso iba a repetirse
+ * cada semana para siempre sin que nadie hiciera nada: exactamente la
+ * alerta-que-suena-para-siempre que la lista de 3 reglas vino a eliminar.
+ *
+ * ⚠️ LO QUE **NO** CAMBIA: el guard sigue rechazando la fila igual. La cifra
+ * imposible NO entra a la base, el margen y las comisiones siguen protegidos, y
+ * el rechazo sigue quedando en `switch_sync_log.skip_details` para poder
+ * auditarlo. Lo único que se apaga es el mensaje.
+ *
+ * Las demás empresas SÍ avisan: si mañana aparece una cifra imposible en
+ * Vistana o Fashion Wear, eso sí es noticia.
+ */
+const SIN_AVISO_DE_MONTOS = new Set(["confecciones_boston"]);
+
 export async function avisarMontosImposibles<T>(opts: {
   familia: FamiliaMonto;
   empresaKey: string;
@@ -182,6 +202,7 @@ export async function avisarMontosImposibles<T>(opts: {
 }): Promise<void> {
   const { familia, empresaKey, syncType, rechazadas, umbral, logId } = opts;
   if (rechazadas.length === 0) return;
+  if (SIN_AVISO_DE_MONTOS.has(empresaKey)) return;
 
   const nuevas = new Set(
     clavesPorAvisar(

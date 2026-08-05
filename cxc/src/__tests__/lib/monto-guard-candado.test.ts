@@ -138,3 +138,37 @@ describe("ningún sync protegido puede quedarse sin el guard", () => {
     expect(posEnvio).toBeGreaterThan(posAntiLoop);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boston no avisa por Telegram, pero SIGUE protegido.
+//
+// 🩸 Daniel, 5-ago-2026: *"en telegram no quiero noti de boston de ese estilo"*.
+// Su documento 155-000000129 trae $266.541.352,00 contra un tope de $2M, el
+// dato está mal EN SWITCH y él decidió no corregirlo → el aviso se repetiría
+// cada semana para siempre sin que nadie actúe.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 silenciar Boston apaga el MENSAJE, no la protección", () => {
+  const io = readFileSync(join(process.cwd(), "src/lib/switch-api/monto-guard-io.ts"), "utf8");
+  const guard = readFileSync(join(process.cwd(), "src/lib/switch-api/monto-guard.ts"), "utf8");
+
+  it("boston está en la lista de sin-aviso", () => {
+    expect(io).toContain('SIN_AVISO_DE_MONTOS = new Set(["confecciones_boston"])');
+  });
+
+  it("el corte está en el AVISO, no en el guard", () => {
+    // Si el filtro viviera en monto-guard.ts, Boston dejaría de estar PROTEGIDO
+    // y la cifra imposible entraría a la base. En los comentarios sí se nombra
+    // (documentan el incidente que originó el guard), así que se mira el CÓDIGO.
+    const codigo = guard
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+      .join("\n");
+    expect(codigo).not.toContain("confecciones_boston");
+    expect(io).toContain("if (SIN_AVISO_DE_MONTOS.has(empresaKey)) return;");
+  });
+
+  it("las demás empresas SIGUEN avisando", () => {
+    expect(io).not.toMatch(/SIN_AVISO_DE_MONTOS = new Set\(\[[^\]]*"vistana"/);
+    expect(io).not.toMatch(/SIN_AVISO_DE_MONTOS = new Set\(\[[^\]]*"fashion_wear"/);
+  });
+});
