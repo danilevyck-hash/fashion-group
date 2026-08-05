@@ -208,6 +208,16 @@ export function armarReporte(opts: {
 
       const fmt = (min: number) => `${p2(Math.floor(min / 60))}:${p2(min % 60)}`;
       const ent = crudas[0];
+      // 🩸 CON UNA SOLA MARCA NO SE SABE A QUÉ HORA SE FUE. Antes se tomaba esa
+      // misma hora como entrada Y como salida, y salían disparates: en el
+      // export histórico de enero-julio (995 días, TODOS con solo la entrada)
+      // Roxana entrando 07:04 aparecía saliendo 9 horas temprano.
+      //
+      // Esto NO contradice la regla 5. Contar el atraso de una entrada real es
+      // contar lo que la persona marcó; inventarle una salida a partir de esa
+      // MISMA marca es usar un dato dos veces para dos cosas distintas. La
+      // entrada se conoce, la salida no.
+      const soloUna = crudas.length === 1;
       const sal = crudas[crudas.length - 1];
 
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
@@ -223,12 +233,12 @@ export function armarReporte(opts: {
         excesoAlmuerzoMin = Math.max(0, almuerzoTomado - almuerzoProg);
       }
 
-      const salidaTempranaMin = Math.max(0, salidaProg - sal);
+      const salidaTempranaMin = soloUna ? 0 : Math.max(0, salidaProg - sal);
       // Regla 3. Mínimo 15 min y neto del atraso del mismo día.
-      const bruto = Math.max(0, sal - salidaProg);
+      const bruto = soloUna ? 0 : Math.max(0, sal - salidaProg);
       const extraMin = bruto < EXTRA_MINIMO_MIN ? 0 : Math.max(0, bruto - tardeMin);
 
-      const trabajadoMin = Math.max(0, sal - ent - almuerzoTomado);
+      const trabajadoMin = soloUna ? 0 : Math.max(0, sal - ent - almuerzoTomado);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero
       // los números se calculan igual.
       const revisar = crudas.length !== 4;
@@ -237,7 +247,8 @@ export function armarReporte(opts: {
         fecha,
         marcas: crudas.map(fmt),
         entrada: fmt(ent),
-        salida: fmt(sal),
+        // `null` y no la hora de entrada: no sabemos cuándo se fue.
+        salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
         revisar, ausente: false, justificado, feriado,
       });
