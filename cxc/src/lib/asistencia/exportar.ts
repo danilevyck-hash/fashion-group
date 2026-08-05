@@ -1,0 +1,224 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Exportar el reporte de asistencia: Excel (2 hojas) y PDF (el resumen).
+//
+// ── QUÉ VA EN CADA UNO, y por qué ────────────────────────────────────────────
+// El EXCEL trae las dos hojas: Detalle (una línea por persona por día, con las
+// 4 marcas) y Resumen (una línea por persona). Es el archivo de trabajo.
+//
+// El PDF trae SOLO el resumen. Es lo que se firma y se entrega a planilla: si
+// llevara las 340 líneas del detalle nadie lo leería y nadie lo firmaría.
+//
+// ⚠️ TODO EN MINUTOS, nunca en horas decimales. "295 minutos" se le discute a
+// una persona; "4,92 horas" no le dice nada a nadie. Fue decisión de Daniel y
+// se respeta en los dos archivos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import * as XLSX from "xlsx-js-style";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import type { PersonaReporte } from "./reporte";
+
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
+
+/** "2026-07-13" → "lun 13 jul". Se parte el string: `new Date` lo corre un día. */
+function fecha(iso: string): string {
+  const [a, m, d] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  return `${DIAS[dow]} ${d} ${MESES[m - 1]}`;
+}
+function rango(desde: string, hasta: string): string {
+  const f = (iso: string) => { const [a,m,d] = iso.split("-").map(Number); return `${d} ${MESES[m-1]} ${a}`; };
+  return `${f(desde)} — ${f(hasta)}`;
+}
+/** 0 se muestra vacío, no como "0": una columna de ceros esconde lo que importa. */
+const n0 = (v: number) => (v === 0 ? "" : v);
+
+const HEAD = { font: { bold: true, sz: 9, color: { rgb: "6B7280" } }, alignment: { horizontal: "left" } };
+const HEAD_R = { ...HEAD, alignment: { horizontal: "right" } };
+const NUM = { alignment: { horizontal: "right" } };
+const ALERTA = { font: { color: { rgb: "A3352A" }, bold: true }, alignment: { horizontal: "right" } };
+
+export interface DatosExport {
+  personas: readonly PersonaReporte[];
+  desde: string;
+  hasta: string;
+}
+
+// ── EXCEL ────────────────────────────────────────────────────────────────────
+
+export function construirExcel({ personas, desde, hasta }: DatosExport): XLSX.WorkBook {
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1 — Detalle. Solo días CON marcas o con ausencia: los feriados y los
+  // días justificados sin marca llenarían la hoja de renglones vacíos.
+  const detalle: unknown[][] = [[
+    "Persona","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
+    "Tarde (min)","Exceso almuerzo (min)","Salida temprana (min)","Extra (min)",
+    "Trabajado (min)","Revisar","Ausencia",
+  ]];
+  for (const p of personas) {
+    for (const d of p.dias) {
+      if (!d.marcas.length && !d.ausente && !d.justificado) continue;
+      detalle.push([
+        p.nombre ?? p.codigo, p.codigo, fecha(d.fecha),
+        d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
+        d.marcas.length > 3 ? d.marcas[d.marcas.length - 1] : (d.marcas.length === 2 ? d.marcas[1] : ""),
+        n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin), n0(d.extraMin),
+        n0(d.trabajadoMin),
+        d.revisar ? "Revisar" : "",
+        d.ausente ? "Sin justificar" : d.justificado ? `Justificada — ${d.justificado}` : d.feriado ? `Feriado — ${d.feriado}` : "",
+      ]);
+    }
+  }
+  const h1 = XLSX.utils.aoa_to_sheet(detalle);
+  h1["!cols"] = [{wch:24},{wch:8},{wch:12},{wch:9},{wch:13},{wch:9},{wch:9},
+                 {wch:11},{wch:19},{wch:19},{wch:11},{wch:14},{wch:9},{wch:24}];
+  h1["!freeze"] = { xSplit: 0, ySplit: 1 };
+  for (let c = 0; c < detalle[0].length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (h1[ref]) h1[ref].s = c >= 3 && c <= 11 ? HEAD_R : HEAD;
+  }
+  XLSX.utils.book_append_sheet(wb, h1, "Detalle");
+
+  // Hoja 2 — Resumen. Es la que se mira.
+  const resumen: unknown[][] = [[
+    "Persona","Código","Sale","Días trabajados","Ausencias sin justificar",
+    "Ausencias justificadas","Veces tarde","Minutos tarde","…de días a revisar",
+    "Exceso almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
+    "Extras (min)","Días a revisar",
+  ]];
+  for (const p of personas) {
+    const r = p.resumen;
+    resumen.push([
+      p.nombre ?? p.codigo, p.codigo, p.salida,
+      r.diasTrabajados, n0(r.ausenciasSinJustificar), n0(r.ausenciasJustificadas),
+      n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
+      n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
+      n0(r.extraMin), n0(r.diasARevisar),
+    ]);
+  }
+  const t = personas.reduce((a, p) => ({
+    dias: a.dias + p.resumen.diasTrabajados,
+    aus: a.aus + p.resumen.ausenciasSinJustificar,
+    ausJ: a.ausJ + p.resumen.ausenciasJustificadas,
+    veces: a.veces + p.resumen.vecesTarde,
+    tarde: a.tarde + p.resumen.minutosTarde,
+    tardeRev: a.tardeRev + p.resumen.minutosTardeDeDiasARevisar,
+    almz: a.almz + p.resumen.excesoAlmuerzoMin,
+    temp: a.temp + p.resumen.salidaTempranaMin,
+    noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
+    extra: a.extra + p.resumen.extraMin,
+    rev: a.rev + p.resumen.diasARevisar,
+  }), { dias:0,aus:0,ausJ:0,veces:0,tarde:0,tardeRev:0,almz:0,temp:0,noTrab:0,extra:0,rev:0 });
+  resumen.push([]);
+  resumen.push(["TOTAL", "", "", t.dias, t.aus, t.ausJ, t.veces, t.tarde, t.tardeRev,
+                t.almz, t.temp, t.noTrab, t.extra, t.rev]);
+
+  const h2 = XLSX.utils.aoa_to_sheet(resumen);
+  h2["!cols"] = [{wch:24},{wch:8},{wch:7},{wch:16},{wch:23},{wch:22},{wch:12},
+                 {wch:14},{wch:18},{wch:20},{wch:21},{wch:24},{wch:13},{wch:15}];
+  h2["!freeze"] = { xSplit: 0, ySplit: 1 };
+  for (let c = 0; c < resumen[0].length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (h2[ref]) h2[ref].s = c >= 3 ? HEAD_R : HEAD;
+  }
+  // El total en negrita: es la línea que se mira primero.
+  const filaTotal = resumen.length - 1;
+  for (let c = 0; c < resumen[0].length; c++) {
+    const ref = XLSX.utils.encode_cell({ r: filaTotal, c });
+    if (h2[ref]) h2[ref].s = { font: { bold: true }, alignment: { horizontal: c >= 3 ? "right" : "left" } };
+  }
+  // La columna "…de días a revisar" en rojo: es la advertencia.
+  for (let r = 1; r <= personas.length; r++) {
+    const ref = XLSX.utils.encode_cell({ r, c: 8 });
+    if (h2[ref] && h2[ref].v) h2[ref].s = ALERTA;
+  }
+  XLSX.utils.book_append_sheet(wb, h2, "Resumen");
+
+  // Hoja 3 — las reglas. Va DENTRO del archivo a propósito: quien lo reciba por
+  // correo dentro de seis meses tiene que poder saber cómo se calculó.
+  const reglas = [
+    ["Reporte de asistencia", rango(desde, hasta)],
+    [],
+    ["Cómo se calcula"],
+    ["Entrada", "8:00 a.m. con 5 minutos de tolerancia. Pasados los 5, se cuenta desde las 8:00."],
+    ["Almuerzo", "30 minutos por defecto. Se mide entre la 2ª y la 3ª marca del día."],
+    ["Horas extra", "Mínimo 15 minutos, y se le resta el atraso del mismo día."],
+    ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
+    ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
+    [],
+    ["Todo en MINUTOS, no en horas decimales."],
+  ];
+  const h3 = XLSX.utils.aoa_to_sheet(reglas);
+  h3["!cols"] = [{ wch: 18 }, { wch: 86 }];
+  if (h3["A1"]) h3["A1"].s = { font: { bold: true, sz: 12 } };
+  if (h3["A3"]) h3["A3"].s = { font: { bold: true } };
+  XLSX.utils.book_append_sheet(wb, h3, "Cómo se calcula");
+
+  return wb;
+}
+
+// ── PDF ──────────────────────────────────────────────────────────────────────
+
+export function construirPdf({ personas, desde, hasta }: DatosExport): jsPDF {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
+  const w = doc.internal.pageSize.getWidth();
+
+  try {
+    doc.addImage(FG_LOGO_BASE64, "JPEG", 14, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+  } catch { /* sin logo si falla */ }
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(17, 24, 39);
+  doc.text("FASHION GROUP", 14 + FG_LOGO_WIDTH + 3, 17);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(107, 114, 128);
+  doc.text(`Asistencia — ${rango(desde, hasta)}`, w - 14, 17, { align: "right" });
+
+  const t = personas.reduce((a, p) => ({
+    aus: a.aus + p.resumen.ausenciasSinJustificar,
+    tarde: a.tarde + p.resumen.minutosTarde,
+    noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
+    extra: a.extra + p.resumen.extraMin,
+    rev: a.rev + p.resumen.diasARevisar,
+  }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0 });
+
+  autoTable(doc, {
+    startY: 27,
+    head: [["Persona", "Sale", "Días", "Ausen.", "Veces\ntarde", "Min\ntarde",
+            "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar"]],
+    body: personas.map((p) => {
+      const r = p.resumen;
+      return [
+        p.nombre ?? p.codigo, p.salida, r.diasTrabajados,
+        r.ausenciasSinJustificar || "", r.vecesTarde || "", r.minutosTarde || "",
+        r.excesoAlmuerzoMin || "", r.salidaTempranaMin || "",
+        r.tiempoNoTrabajadoMin || "", r.extraMin || "", r.diasARevisar || "",
+      ];
+    }),
+    foot: [["TOTAL", "", "", t.aus || "", "", t.tarde || "", "", "", t.noTrab || "", t.extra || "", t.rev || ""]],
+    theme: "plain",
+    styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [31, 41, 55], lineColor: [229, 231, 235], lineWidth: 0.1 },
+    headStyles: { fontStyle: "bold", fontSize: 6.8, textColor: [107, 114, 128], lineWidth: { bottom: 0.3 }, valign: "bottom" },
+    footStyles: { fontStyle: "bold", fontSize: 7.5, textColor: [17, 24, 39], lineWidth: { top: 0.3 } },
+    columnStyles: {
+      0: { cellWidth: 46 }, 1: { halign: "center", cellWidth: 13 },
+      2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
+      5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
+      8: { halign: "right", fontStyle: "bold" }, 9: { halign: "right" }, 10: { halign: "right" },
+    },
+    margin: { left: 14, right: 14 },
+    didDrawPage: () => {
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFontSize(7); doc.setTextColor(156, 163, 175);
+      doc.text(
+        "Entrada 8:00 (5 min de tolerancia) · almuerzo 30 min · extras desde 15 min, menos el atraso del día · " +
+        "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
+        14, h - 8,
+      );
+      doc.text(`Página ${doc.getNumberOfPages()}`, w - 14, h - 8, { align: "right" });
+    },
+  });
+
+  return doc;
+}
