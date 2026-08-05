@@ -226,3 +226,44 @@ describe("el total de planilla junta las tres pérdidas", () => {
     expect(r[0].resumen.tiempoNoTrabajadoMin).toBe(60);
   });
 });
+
+describe("🔴 con UNA sola marca no se inventa la salida", () => {
+  // 🩸 Lo destapó el export histórico de enero-julio: 995 días, TODOS con solo
+  // la hora de entrada (la columna Salida venía en "-"). El motor tomaba esa
+  // misma marca como entrada Y como salida, así que Roxana entrando 07:04
+  // aparecía saliendo 9 horas temprano.
+  //
+  // NO contradice la regla 5: contar el atraso de una entrada real es contar lo
+  // que la persona marcó. Inventarle una salida a partir de esa MISMA marca es
+  // usar un dato dos veces para dos cosas distintas.
+  const unaSola = correr([marca("2026-07-13", "07:04")]);
+
+  it("la salida queda vacía, no repetida", () => {
+    expect(unaSola[0].dias[0].entrada).toBe("07:04");
+    expect(unaSola[0].dias[0].salida).toBeNull();
+  });
+
+  it("NO se le cuenta salida temprana", () => {
+    expect(unaSola[0].dias[0].salidaTempranaMin).toBe(0);
+  });
+
+  it("ni horas extra ni tiempo trabajado", () => {
+    expect(unaSola[0].dias[0].extraMin).toBe(0);
+    expect(unaSola[0].dias[0].trabajadoMin).toBe(0);
+  });
+
+  it("pero el ATRASO sí cuenta: esa marca es real", () => {
+    const tarde = correr([marca("2026-07-13", "08:20")]);
+    expect(tarde[0].dias[0].tardeMin).toBe(20);
+  });
+
+  it("y el día queda marcado para revisar", () => {
+    expect(unaSola[0].dias[0].revisar).toBe(true);
+  });
+
+  it("con DOS marcas la salida sí se calcula", () => {
+    const dos = correr([marca("2026-07-13", "08:00"), marca("2026-07-13", "16:00")]);
+    expect(dos[0].dias[0].salida).toBe("16:00");
+    expect(dos[0].dias[0].salidaTempranaMin).toBe(60);
+  });
+});
