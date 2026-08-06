@@ -2,16 +2,43 @@
 
 // Sección "Vendedor en Switch" del modal de edición de usuario (Sistema →
 // Usuarios). Mapea al fg_user con su vendedorId de Switch POR EMPRESA de
-// catálogo (Reebok=active_shoes, Joybees=joystep) — el checkout usa este mapeo
-// para setear el vendedor del pedido automáticamente según el login.
+// catálogo — el checkout usa este mapeo para setear el vendedor del pedido
+// automáticamente según quién esté logueado.
 // Autocontenida: carga vendedores en vivo + mapeos, y guarda al cambiar.
+//
+// 🩸 LA LISTA SE DERIVA DE LAS MARCAS, NO SE ESCRIBE A MANO (6-ago-2026).
+// Estaba escrita a mano con DOS entradas —Reebok y Joybees— y cuando se
+// encendió el catálogo de Tommy nadie se acordó de agregar la tercera. El
+// resultado no era un selector incompleto: era que **ningún pedido de Tommy
+// podía salir a Switch**. Daniel lo vio con un pedido de $1.584,00 armado y el
+// botón "Confirmar y enviar a Switch" apagado, diciendo "No tienes vendedor de
+// Switch asignado" — sin forma de asignarlo, porque Tommy no estaba en esta
+// lista.
+//
+// Todo lo demás YA era genérico: la tabla de mapeos y `/api/admin/vendedor-
+// mapping` aceptan cualquier `empresa_key`, y el checkout busca por
+// `cfg.empresaKey`. El único lugar que sabía "solo hay dos marcas" era este
+// arreglo. Derivarlo de `MARCAS_UI` hace que la cuarta marca aparezca sola.
+//
+// ⚠️ Cada empresa de la lista abre una sesión de Switch al abrir el modal
+// (secuencial, sesión única por empresa). No es nuevo —ya pasaba con las dos
+// anteriores— pero ahora son tres: abrir este modal justo en la ventana del
+// cron de esa empresa puede tumbarle el token. Es el riesgo aceptado de
+// siempre, anotado acá para que nadie lo redescubra.
 
 import { useEffect, useState } from "react";
+import { MARCAS_UI, getMarcaTheme } from "@/lib/catalogo/marcas-ui";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
-const EMPRESAS = [
-  { key: "active_shoes", label: "Reebok (Active Shoes)" },
-  { key: "joystep", label: "Joybees (Joystep)" },
-] as const;
+const EMPRESAS = MARCAS_UI.map((marca) => {
+  const theme = getMarcaTheme(marca)!;
+  return {
+    key: theme.empresaKey,
+    // "Tommy Hilfiger (Fashion Shoes)" — la marca es lo que el vendedor
+    // reconoce; la empresa es lo que hay que elegir en Switch.
+    label: `${theme.label} (${EMPRESA_KEY_TO_NAME[theme.empresaKey] ?? theme.empresaKey})`,
+  };
+});
 
 interface Vendedor { id: number; nombre: string }
 interface Mapping { user_id: string; empresa_key: string; vendedor_id: number; vendedor_nombre: string | null }

@@ -1,16 +1,18 @@
-// GET /api/catalogo/mi-vendedor?empresa=active_shoes|joystep — el vendedor de
+// GET /api/catalogo/mi-vendedor?empresa=<empresa de un catálogo> — el vendedor de
 // Switch mapeado al usuario LOGUEADO (fg_user_switch_vendedor). Lo usa el
 // checkout de catálogos para setear el vendedor del pedido automáticamente.
 // Devuelve { vendedor: null } si el usuario no tiene mapeo (el checkout lo
 // muestra y bloquea el envío con mensaje accionable).
 
 import { NextRequest, NextResponse } from "next/server";
+import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
-const EMPRESAS_CATALOGO = new Set(["active_shoes", "joystep"]);
+// Empresas Switch de los catálogos — DERIVADAS de las marcas (fuente única en
+// lib/catalogo/marcas.ts). Ver el porqué en EMPRESAS_CATALOGO.
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);

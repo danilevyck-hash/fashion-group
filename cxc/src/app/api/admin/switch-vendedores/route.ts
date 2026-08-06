@@ -1,9 +1,10 @@
-// GET /api/admin/switch-vendedores?empresa=active_shoes|joystep — vendedores
+// GET /api/admin/switch-vendedores?empresa=<empresa de un catálogo> — vendedores
 // EN VIVO de la instancia Switch de un catálogo (para el mapeo fg_user →
 // vendedor en Sistema → Usuarios). Admin-only, uso esporádico → se cierra la
 // sesión de Switch al terminar (higiene sesión única).
 
 import { NextRequest, NextResponse } from "next/server";
+import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas";
 import { requireRole } from "@/lib/requireRole";
 import { createSwitchClient, logoutAllSwitchSessions } from "@/lib/switch-api/client";
 
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const maxDuration = 60;
 
-// Empresas Switch de los catálogos (Reebok vive en active_shoes, Joybees en joystep).
-const EMPRESAS_CATALOGO = new Set(["active_shoes", "joystep"]);
+// Empresas Switch de los catálogos — DERIVADAS de las marcas (fuente única en
+// lib/catalogo/marcas.ts). Escribirlas a mano fue lo que dejó a Tommy sin
+// vendedor asignable durante semanas.
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const auth = requireRole(req, ["admin"]);
