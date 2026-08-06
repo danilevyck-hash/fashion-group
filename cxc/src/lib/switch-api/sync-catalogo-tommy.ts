@@ -110,12 +110,25 @@ export async function syncCatalogoTommy(
           const d = buildTommyDerivedFields(a.codigo, a.descripcion);
           return { name: d.name, category: d.category, gender: d.gender };
         },
-        // nombre_manual=true → el admin es dueño del nombre; no se pisa.
-        // (undefined pre-migración de la columna cuenta como false.)
-        updateFields: (a, existing) =>
-          existing.nombre_manual === true
-            ? {}
-            : { name: buildTommyDerivedFields(a.codigo, a.descripcion).name },
+        // 🩸 LA CATEGORÍA TAMBIÉN SE REFRESCA, y esto es un ARREGLO (5-ago-2026).
+        // Antes solo se actualizaba el `name` y la categoría quedaba congelada
+        // desde el INSERT. Cuando Switch cambiaba la descripción de un artículo,
+        // el nombre se corregía y la categoría NO: quedaban contradiciéndose.
+        //
+        // Medido: **12 de 490 productos** con el nombre diciendo una cosa y la
+        // categoría otra. Daniel lo vio filtrando "Sandals" en el catálogo y
+        // encontrando cinco pares que se llaman "Women-Flip Flops" (7 casos
+        // sandals→flip_flops, 2 flip_flops→slippers, 3 desde sneakers).
+        //
+        // Para Tommy la categoría NO es manual: se DERIVA de la misma
+        // descripción que el nombre. Si se refresca una y la otra no, el filtro
+        // del catálogo miente. `nombre_manual` protege solo el NOMBRE —que es lo
+        // que el admin edita— no la categoría, que sigue siendo de Switch.
+        updateFields: (a, existing) => {
+          const d = buildTommyDerivedFields(a.codigo, a.descripcion);
+          const cat = { category: d.category, gender: d.gender };
+          return existing.nombre_manual === true ? cat : { ...cat, name: d.name };
+        },
       },
     },
     opts,
