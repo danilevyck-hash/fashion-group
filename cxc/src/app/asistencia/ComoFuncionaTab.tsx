@@ -6,17 +6,27 @@
 // Va DENTRO del módulo a propósito: un reglamento en un papel se pierde; acá
 // está al lado del número que genera la discusión. Sin jerga y sin fórmulas.
 
-const REGLAS: Array<{ t: string; d: string }> = [
+import { useEffect, useState } from "react";
+import { REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
+
+/** Los minutos de la tolerancia salen de la CONFIGURACIÓN, no de un texto fijo.
+ *  🩸 Este cartel decía "8:05" con la tolerancia en 5; la contable la subió a 10
+ *  y un cartel que contradice al cálculo es peor que no tener cartel. */
+const reglasDe = (r: ReglasAsistencia): Array<{ t: string; d: string }> => {
+  const tol = r.toleranciaTardanzaMin;
+  const limite = `8:${String(tol).padStart(2, "0")}`;
+  const unoMas = `8:${String(tol + 1).padStart(2, "0")}`;
+  return [
   {
     t: "Se marca 4 veces al día",
     d: "Al llegar, al salir a almorzar, al volver, y al irse. Si falta alguna, el día queda señalado como “a revisar”.",
   },
   {
-    t: "La entrada es a las 8:00, con 5 minutos de gracia",
-    d: "Marcar hasta las 8:05 no cuenta como tarde. Pasadas las 8:05, se cuentan los minutos desde las 8:00 — o sea que llegar 8:06 son 6 minutos, no 1.",
+    t: `La entrada es a las 8:00, con ${tol} minutos de gracia`,
+    d: `Marcar hasta las ${limite} no cuenta como tarde. Pasadas las ${limite}, se cuentan los minutos desde las 8:00 — o sea que llegar ${unoMas} son ${tol + 1} minutos, no 1.`,
   },
   {
-    t: "El almuerzo es de 30 minutos",
+    t: `El almuerzo es de ${r.almuerzoDefaultMin} minutos`,
     d: "Se mide entre la salida a almorzar y el regreso. Lo que pase de ahí cuenta como tiempo no trabajado. Algunas personas tienen 60 minutos.",
   },
   {
@@ -25,7 +35,7 @@ const REGLAS: Array<{ t: string; d: string }> = [
   },
   {
     t: "Las horas extra se aprueban, no se toman",
-    d: "Quedarse después de tu hora se registra, pero solo cuenta como hora extra si alguien la autoriza. Menos de 15 minutos no cuenta. Y si ese día llegaste tarde, primero se recupera ese tiempo.",
+    d: `Quedarse después de tu hora se registra, pero solo cuenta como hora extra si alguien la autoriza. Menos de ${r.extraMinimoMin} minutos no cuenta. Y si ese día llegaste tarde, primero se recupera ese tiempo.`,
   },
   {
     t: "Faltar sin marcar es ausencia",
@@ -35,9 +45,24 @@ const REGLAS: Array<{ t: string; d: string }> = [
     t: "Marcar mal es responsabilidad de cada uno",
     d: "Si no marcaste al entrar, el sistema cuenta desde tu primera marca. El día queda señalado para corregirlo, pero los minutos cuentan.",
   },
-];
+  ];
+};
 
 export default function ComoFuncionaTab() {
+  // Arranca con los valores por defecto para que el cartel se lea de inmediato,
+  // y se corrige solo cuando llegan los configurados.
+  const [reglas, setReglas] = useState<ReglasAsistencia>(REGLAS_DEFAULT);
+  useEffect(() => {
+    let vivo = true;
+    void fetch("/api/asistencia/configuracion/reglas", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (vivo && d?.reglas) setReglas(d.reglas as ReglasAsistencia); })
+      .catch(() => { /* el cartel sirve igual con los valores por defecto */ });
+    return () => { vivo = false; };
+  }, []);
+
+  const REGLAS = reglasDe(reglas);
+
   return (
     <div className="max-w-2xl space-y-5">
       <div>
@@ -78,6 +103,7 @@ export default function ComoFuncionaTab() {
           <li>· Revisa en <b>Horarios</b> que la hora de salida de esa persona sea la correcta. La que trae el reloj viene equivocada seguido.</li>
           <li>· Mira si sus minutos vienen de <b>días a revisar</b>: ahí el número puede estar inflado porque no marcó.</li>
           <li>· Comprueba que las <b>justificaciones</b> del período ya estén cargadas.</li>
+          <li>· Los números de arriba se cambian en <b>Configuración</b> si la regla cambia.</li>
         </ul>
       </div>
     </div>

@@ -5,14 +5,21 @@
 // que cambiar una política sea cambiar una constante y no perseguir cuentas por
 // media app.
 //
+// ── LOS NÚMEROS YA NO SON CONSTANTES ─────────────────────────────────────────
+// Daniel, 6-ago-2026: *"todos los calculos deben de ser configurables en caso de
+// que algo cambie"*. La tolerancia, el mínimo de horas extra y el almuerzo por
+// defecto entran por parámetro (`reglas`) y salen de `asistencia_reglas`. Lo que
+// queda acá es el VALOR POR DEFECTO —el confirmado por la contable— para que el
+// motor siga siendo puro y testeable sin base.
+//
 // ── LAS REGLAS, acordadas con Daniel el 5-ago-2026 ───────────────────────────
 //
-// 1. ENTRADA 8:00 CON 5 MINUTOS DE TOLERANCIA, y pasados los 5 se cuenta DESDE
-//    LAS 8:00, no desde las 8:05.
-//    🩸 El "desde las 8:00" no es un detalle: si al que llega 8:06 le contaras
-//    1 minuto, le acabás de enseñar que la entrada es 8:05. Con 0 de tolerancia
-//    discutís por segundos de cola en el lector; con 10, la gente aprende y
-//    llega 8:09 — con 30 personas son 5 horas perdidas por día.
+// 1. ENTRADA 8:00 CON TOLERANCIA (hoy 10 MINUTOS), y pasada la tolerancia se
+//    cuenta DESDE LAS 8:00, no desde el fin de la gracia.
+//    🩸 El "desde las 8:00" no es un detalle: si al que llega 8:11 le contaras
+//    1 minuto, le acabás de enseñar que la entrada es 8:10.
+//    🩸 La tolerancia arrancó en 5 y la contable la subió a 10 (6-ago-2026). Se
+//    cambia en UN lugar: el default de `config.ts` o la fila de la base.
 //
 // 2. ALMUERZO 30 MINUTOS por defecto, configurable por persona.
 //    Medido contra los 3 archivos reales: la mayoría toma entre 23 y 30.
@@ -38,14 +45,25 @@
 //    marcados mal — para que nadie descuente sobre un dato sin haberlo mirado.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
+
 /** Panamá es UTC−5 fijo, sin horario de verano. */
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
 
-export const TOLERANCIA_MIN = 5;
-export const ALMUERZO_DEFAULT_MIN = 30;
-export const EXTRA_MINIMO_MIN = 15;
+// Los tres números que el motor usa. Son los VALORES POR DEFECTO: si no se le
+// pasan reglas, se comporta como la configuración confirmada por la contable.
+// Se re-exportan desde acá para que quien ya los importaba no tenga dos fuentes.
+export const TOLERANCIA_MIN = REGLAS_DEFAULT.toleranciaTardanzaMin;
+export const ALMUERZO_DEFAULT_MIN = REGLAS_DEFAULT.almuerzoDefaultMin;
+export const EXTRA_MINIMO_MIN = REGLAS_DEFAULT.extraMinimoMin;
 export const ENTRADA_DEFAULT = "08:00";
 export const SALIDA_DEFAULT = "17:00";
+
+/** Lo único de `asistencia_reglas` que el reporte de minutos usa hoy. */
+export type ReglasReporte = Pick<
+  ReglasAsistencia,
+  "toleranciaTardanzaMin" | "extraMinimoMin" | "almuerzoDefaultMin"
+>;
 
 export interface Marcacion {
   empleado_codigo: string | null;
@@ -163,8 +181,19 @@ export function armarReporte(opts: {
   feriados: ReadonlyMap<string, string>;
   desde: string;
   hasta: string;
+  /** Lo configurado en `asistencia_reglas`. Sin esto, los valores por defecto. */
+  reglas?: Partial<ReglasReporte>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta } = opts;
+
+  // 🔑 Nunca se toma un valor a medias: un `undefined` en `reglas` cae al
+  // default, no a `NaN`. Con `NaN` de tolerancia toda comparación da `false` y
+  // NADIE llegaría tarde nunca — un fallo silencioso que se paga en planilla.
+  const num = (v: number | undefined, def: number) =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : def;
+  const toleranciaMin = num(opts.reglas?.toleranciaTardanzaMin, TOLERANCIA_MIN);
+  const extraMinimoMin = num(opts.reglas?.extraMinimoMin, EXTRA_MINIMO_MIN);
+  const almuerzoDefaultMin = num(opts.reglas?.almuerzoDefaultMin, ALMUERZO_DEFAULT_MIN);
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   const habiles = diasHabiles(desde, hasta);
@@ -189,7 +218,7 @@ export function armarReporte(opts: {
     const h = horarioDe.get(codigo);
     const entradaProg = hhmmAMin(h?.entrada ?? ENTRADA_DEFAULT);
     const salidaProg = hhmmAMin(h?.salida ?? SALIDA_DEFAULT);
-    const almuerzoProg = h?.almuerzo_minutos ?? ALMUERZO_DEFAULT_MIN;
+    const almuerzoProg = h?.almuerzo_minutos ?? almuerzoDefaultMin;
 
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {
@@ -222,7 +251,7 @@ export function armarReporte(opts: {
 
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
       // la hora de entrada, no desde el fin de la tolerancia.
-      const tardeMin = ent > entradaProg + TOLERANCIA_MIN ? ent - entradaProg : 0;
+      const tardeMin = ent > entradaProg + toleranciaMin ? ent - entradaProg : 0;
 
       // Regla 2. Solo se puede medir con 4 marcas (o más): las del medio son
       // el almuerzo. Con 2 marcas no hay almuerzo que medir.
@@ -236,7 +265,7 @@ export function armarReporte(opts: {
       const salidaTempranaMin = soloUna ? 0 : Math.max(0, salidaProg - sal);
       // Regla 3. Mínimo 15 min y neto del atraso del mismo día.
       const bruto = soloUna ? 0 : Math.max(0, sal - salidaProg);
-      const extraMin = bruto < EXTRA_MINIMO_MIN ? 0 : Math.max(0, bruto - tardeMin);
+      const extraMin = bruto < extraMinimoMin ? 0 : Math.max(0, bruto - tardeMin);
 
       const trabajadoMin = soloUna ? 0 : Math.max(0, sal - ent - almuerzoTomado);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero

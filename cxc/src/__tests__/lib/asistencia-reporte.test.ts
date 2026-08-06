@@ -28,21 +28,23 @@ const correr = (marcaciones: Marcacion[], extra: Partial<Parameters<typeof armar
     feriados: new Map(), desde: "2026-07-13", hasta: "2026-07-13", ...extra,
   });
 
-describe("🔴 Regla 1 — tolerancia de 5 min, y luego se cuenta DESDE las 8:00", () => {
-  it("son 5 minutos", () => expect(TOLERANCIA_MIN).toBe(5));
+describe("🔴 Regla 1 — tolerancia CONFIGURABLE (hoy 10 min), y luego se cuenta DESDE las 8:00", () => {
+  // 🩸 Arrancó en 5 y la contable la subió a 10 (6-ago-2026). El número ya no
+  // vive acá: sale de `asistencia_reglas`, con este valor por defecto.
+  it("por defecto son 10 minutos", () => expect(TOLERANCIA_MIN).toBe(10));
 
-  it("8:04 no es tarde", () => {
-    expect(correr([marca("2026-07-13", "08:04"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(0);
+  it("8:09 no es tarde", () => {
+    expect(correr([marca("2026-07-13", "08:09"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(0);
   });
 
-  it("8:05 justo no es tarde (la tolerancia incluye el minuto 5)", () => {
-    expect(correr([marca("2026-07-13", "08:05"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(0);
+  it("8:10 justo no es tarde (la tolerancia incluye el minuto 10)", () => {
+    expect(correr([marca("2026-07-13", "08:10"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(0);
   });
 
-  it("⚠️ 8:06 son SEIS minutos, no uno", () => {
-    // Si contara desde las 8:05 daría 1, y le enseñaría a todos que la entrada
-    // es 8:05. Ese es el punto de la regla.
-    expect(correr([marca("2026-07-13", "08:06"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(6);
+  it("⚠️ 8:11 son ONCE minutos, no uno", () => {
+    // Si contara desde las 8:10 daría 1, y le enseñaría a todos que la entrada
+    // es 8:10. Ese es el punto de la regla.
+    expect(correr([marca("2026-07-13", "08:11"), marca("2026-07-13", "17:00")])[0].dias[0].tardeMin).toBe(11);
   });
 
   it("el caso real de Kevin Lubo: 08:16 → 16 minutos", () => {

@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { useToast } from "@/components/ToastSystem";
 import { construirExcel, construirPdf } from "@/lib/asistencia/exportar";
-import type { PersonaReporte } from "@/lib/asistencia/reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import RangoFechas from "./RangoFechas";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -30,6 +30,9 @@ export default function ReporteTab() {
   const [q, setQ] = useState("");
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
   const [sinHorario, setSinHorario] = useState(0);
+  // Los números con los que el SERVIDOR calculó. La pantalla no los inventa:
+  // si dijera "5 de tolerancia" mientras el motor usa 10, el texto sería falso.
+  const [reglas, setReglas] = useState<Partial<ReglasReporte> | null>(null);
   const [abierta, setAbierta] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +47,7 @@ export default function ReporteTab() {
       if (!res.ok) throw new Error(data.error ?? "No se pudo cargar");
       setPersonas(data.personas ?? []);
       setSinHorario(data.sinHorario ?? 0);
+      setReglas(data.reglas ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
@@ -54,12 +58,12 @@ export default function ReporteTab() {
 
   function bajarExcel() {
     if (!personas?.length) return;
-    XLSX.writeFile(construirExcel({ personas, desde, hasta }), `Asistencia ${desde} a ${hasta}.xlsx`);
+    XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), `Asistencia ${desde} a ${hasta}.xlsx`);
     toast("Excel listo — revisa tu carpeta de descargas", "success");
   }
   function bajarPdf() {
     if (!personas?.length) return;
-    construirPdf({ personas, desde, hasta }).save(`Asistencia ${desde} a ${hasta}.pdf`);
+    construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(`Asistencia ${desde} a ${hasta}.pdf`);
     toast("PDF listo — revisa tu carpeta de descargas", "success");
   }
 
@@ -149,9 +153,11 @@ export default function ReporteTab() {
       )}
 
       <p className="text-xs text-gray-400">
-        Todo en minutos. Entrada 8:00 con 5 de tolerancia · almuerzo según cada persona ·
-        extras desde 15 min, menos el atraso del día. <b>&quot;A revisar&quot;</b> es un día sin las
-        4 marcas: los minutos igual cuentan.
+        Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
+        tolerancia · almuerzo según cada persona · extras desde{" "}
+        {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
+        <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
+        Estos números se cambian en <b>Configuración</b>.
       </p>
     </div>
   );
