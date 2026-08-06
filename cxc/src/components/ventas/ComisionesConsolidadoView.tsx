@@ -70,11 +70,13 @@ interface Props {
   /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
    *  sigue siendo la dueña del cálculo y solo registra su función acá. */
   onExcel?: (api: ExcelApi | null) => void;
+  /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
+  refreshKey?: number;
 }
 
 const moneyClass = (n: number) => (n < 0 ? "text-rose-600" : "text-gray-700");
 
-export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
+export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }: Props) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [sinAsignar, setSinAsignar] = useState<Row | null>(null);
   const [loading, setLoading] = useState(false);
@@ -169,7 +171,7 @@ export function ComisionesConsolidadoView({ year, mes, onExcel }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [year, mes]);
+  }, [year, mes, refreshKey]);
 
   useEffect(() => { void load(); }, [load]);
 

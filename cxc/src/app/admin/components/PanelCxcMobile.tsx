@@ -249,7 +249,7 @@ function MobileHeader({
           className="mt-2"
           opciones={[{ modulo: "estadocuenta", empresa: companyFilter }]}
           disabledReason={companyFilter === "all" ? "Elige una empresa en el filtro para actualizarla" : null}
-          onSuccess={onSyncedNow}
+          onSuccess={() => onSyncedNow?.()}
         />
       </div>
       {canExport && (

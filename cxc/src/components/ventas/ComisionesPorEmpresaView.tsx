@@ -55,9 +55,11 @@ interface Props {
   /** El botón Excel vive en la barra del shell (ver ComisionesView): esta vista
    *  sigue siendo la dueña del cálculo y solo registra su función acá. */
   onExcel?: (api: ExcelApi | null) => void;
+  /** Cambia cuando "Actualizar ahora" termina: fuerza re-pedir los datos. */
+  refreshKey?: number;
 }
 
-export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
+export function ComisionesPorEmpresaView({ year, mes, onExcel, refreshKey = 0 }: Props) {
   // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
   // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
   const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
@@ -96,7 +98,7 @@ export function ComisionesPorEmpresaView({ year, mes, onExcel }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [empresa, year, mes]);
+  }, [empresa, year, mes, refreshKey]);
 
   useEffect(() => {
     void load();

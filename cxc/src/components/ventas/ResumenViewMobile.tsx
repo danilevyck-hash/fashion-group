@@ -146,7 +146,7 @@ export function ResumenViewMobile({
         />
         {/* "Actualizar ahora" (admin/secretaria) — un clic = las 8 empresas en
             secuencia + refresh-vistas como paso final. */}
-        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={onReloadData} />
+        <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
       </div>
       <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
       <MobileToggles
