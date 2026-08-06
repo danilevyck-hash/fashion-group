@@ -75,14 +75,36 @@ describe("los campos del empleado", () => {
     expect(f.tipo).toBe("checkIn");
   });
 
-  it("acepta que falten: la marcación vale igual", () => {
-    const f = normalizarEventos("reloj_fg", [
+  it("🔴 SIN código de empleado NO es una marcación — se descarta con motivo", () => {
+    // 🩸 Antes se aceptaba y "la marcación valía igual". Medido al cargar julio
+    // entero desde el reloj real: de 8.785 eventos, **5.845 (66%)** vienen sin
+    // `employeeNoString` — huellas no reconocidas, puertas abiertas por dentro
+    // y eventos del propio aparato. Guardarlos llenaba la tabla de filas con la
+    // persona en blanco: 5.845 estorbando a 2.826 marcaciones de verdad.
+    const r = normalizarEventos("reloj_fg", [
       ev({ employeeNoString: undefined, name: undefined, attendanceStatus: undefined }),
+    ]);
+    expect(r.filas).toHaveLength(0);
+    expect(r.descartados).toHaveLength(1);
+    expect(r.descartados[0].motivo).toContain("sin código de empleado");
+  });
+
+  it("⚠️ se descarta con MOTIVO, nunca en silencio", () => {
+    // Si un día el reloj dejara de mandar el código de TODO el mundo, el conteo
+    // de descartados lo grita; en silencio la asistencia quedaría vacía y nadie
+    // sabría por qué.
+    const r = normalizarEventos("reloj_fg", [ev({ employeeNoString: "" }), ev({ serialNo: 2, employeeNoString: "7" })]);
+    expect(r.filas).toHaveLength(1);
+    expect(r.descartados).toHaveLength(1);
+  });
+
+  it("el nombre y el tipo SÍ pueden faltar — el código es lo único obligatorio", () => {
+    const f = normalizarEventos("reloj_fg", [
+      ev({ name: undefined, attendanceStatus: undefined }),
     ]).filas[0];
-    expect(f.empleado_codigo).toBeNull();
+    expect(f.empleado_codigo).toBe("7");
     expect(f.empleado_nombre).toBeNull();
     expect(f.tipo).toBeNull();
-    expect(f.evento_id).toBe("1001"); // lo esencial sigue ahí
   });
 
   it("guarda el evento crudo para poder auditarlo después", () => {

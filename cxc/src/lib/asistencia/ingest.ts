@@ -81,13 +81,29 @@ export function normalizarEventos(
       descartados.push({ motivo: "fecha/hora inválida o ausente", evento: ev });
       continue;
     }
+    // 🩸 SIN CÓDIGO DE EMPLEADO NO ES UNA MARCACIÓN DE NADIE (6-ago-2026).
+    //
+    // Medido al cargar julio entero desde el reloj real: de 8.785 eventos,
+    // **5.845 (el 66%) vienen sin `employeeNoString`**. Son huellas que el
+    // lector no reconoció, puertas abiertas desde adentro y eventos del propio
+    // aparato. Guardarlos llenaba la tabla de filas con la persona en blanco
+    // que no le suman a nadie y que en el reporte solo estorban.
+    //
+    // Se DESCARTAN con motivo, no en silencio: si algún día el reloj dejara de
+    // mandar el código de TODO el mundo, el conteo de descartados lo grita en
+    // vez de dejar la asistencia vacía sin explicación.
+    const codigo = txt(ev.employeeNoString);
+    if (!codigo) {
+      descartados.push({ motivo: "sin código de empleado (nadie identificado)", evento: ev });
+      continue;
+    }
     if (vistos.has(eventoId)) continue;
     vistos.add(eventoId);
 
     filas.push({
       dispositivo,
       evento_id: eventoId,
-      empleado_codigo: txt(ev.employeeNoString),
+      empleado_codigo: codigo,
       empleado_nombre: txt(ev.name),
       ocurrio_en: ocurrio,
       tipo: txt(ev.attendanceStatus),
