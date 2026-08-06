@@ -699,6 +699,16 @@ export interface SwitchArticulo {
   costo: string | null;
   disponible: string | null;
   precio: string | null;
+  /**
+   * Piezas por caja del artículo. Llega como STRING ("12.0000").
+   *
+   * ⚠️ EN LA PRÁCTICA VIENE EN CERO. Medido el 6-ago-2026 sobre los 650
+   * artículos de Tommy (marcaId=3) en fashion_shoes: `0.0000` en los 650, o sea
+   * nadie lo llena en Switch. Por eso el bulto de Tommy se marca a mano en el
+   * catálogo (`tommy_products.bulto_pzas`). Si algún día lo llenan, ESTE valor
+   * manda y pisa lo marcado a mano — es la fuente, no una segunda opinión.
+   */
+  cantidadPorCaja: string | null;
   talla: string | null;
   color: string | null;
   marcaId: number | null;

@@ -23,6 +23,12 @@ export interface CatalogoProducto {
   stock?: number;
   popular?: boolean;
   is_regalia?: boolean;
+  /**
+   * Tommy: piezas por bulto de ESTE estilo. Vacío = 12 (el default de la
+   * marca). Sus bultos vienen de 8 o de 12 y no hay fuente de la que sacarlo
+   * —ver `tommy-bulto.ts`—, por eso viaja pegado al producto.
+   */
+  bulto_pzas?: number | null;
   /** Reebok: stock desde Switch (pueden ser null pre-sync). */
   existencia?: number | null;
   disponibilidad?: number | null;
@@ -39,6 +45,13 @@ export interface CatalogoCartItem {
   quantity: number;
   unit_price: number;
   category?: string;
+  /**
+   * Tommy: piezas por bulto del estilo, copiadas del producto al agregarlo.
+   * Viaja EN LA LÍNEA y no se vuelve a leer del producto: el carrito tiene que
+   * seguir cotizando lo mismo aunque el estilo se re-marque mientras el cliente
+   * arma el pedido.
+   */
+  bulto_pzas?: number | null;
   is_preorder?: boolean;
 }
 

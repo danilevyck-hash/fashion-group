@@ -243,7 +243,12 @@ describe("paridad inversa — los filtros nuevos son SOLO de Tommy", () => {
 describe("las dos páginas aplican el filtro igual", () => {
   it("ambas filtran con cumpleBultosMinimos + precioEnRango", () => {
     for (const [nombre, code] of [["publico", PUBLICO], ["vendedor", VENDEDOR]] as const) {
-      expect(code, nombre).toContain("cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category))");
+      // `bulto_pzas` (Tommy) entra en el cálculo desde el 6-ago-2026: sus bultos
+      // vienen de 8 o de 12 según el estilo. El filtro "2 bultos o más" tiene que
+      // contar con el tamaño REAL del estilo, no con el default de la marca.
+      expect(code, nombre).toContain(
+        "cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category, p.bulto_pzas))",
+      );
       expect(code, nombre).toContain("precioEnRango(p.price, precioRango)");
     }
   });

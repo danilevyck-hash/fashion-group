@@ -12,6 +12,7 @@
 // viejo — que es justo lo que rompió en #244 y #253.
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerConColumnaOpcional } from "@/lib/catalogo/cols-opcionales";
 import { unstable_cache } from "next/cache";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { catalogoTag, CATALOGO_PUBLICO_TTL_SEGUNDOS } from "@/lib/catalogo/cache";
@@ -61,17 +62,21 @@ async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
     // puede repetir o saltear entre páginas), pero cambiar la columna de orden
     // cambiaría el orden en que el cliente ve los productos. Compuesto = las dos
     // cosas.
-    const products = await leerTodoPaginado<unknown>(
+    // `bulto_pzas` (Tommy) puede no existir todavía — migración 20260806120000,
+    // que corre Daniel a mano. Sin este respaldo el catálogo PÚBLICO entero no
+    // carga hasta que la corra.
+    const products = await leerConColumnaOpcional(cfg.publicCatalog.cols, "bulto_pzas", (cols) =>
+      leerTodoPaginado<unknown>(
       `${cfg.productsTable} (catálogo público ${cfg.marca})`,
       (pedirCount, desde, hasta) =>
         supabase
           .from(cfg.productsTable)
-          .select(cfg.publicCatalog.cols, pedirCount ? { count: "exact" } : {})
+          .select(cols, pedirCount ? { count: "exact" } : {})
           .eq("active", true)
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
           .range(desde, hasta),
-    );
+    ));
 
     const inventory = await leerTodoPaginado<unknown>(
       `inventory (catálogo público ${cfg.marca})`,
@@ -92,18 +97,19 @@ async function leerCatalogo(cfg: MarcaConfig): Promise<PayloadPublico> {
   // campos que consume la página pública (incl. stock e is_regalia).
   // Paginado con el mismo criterio: orden de negocio (category, name) + `id`
   // como desempate único para que la paginación no pierda ni repita filas.
-  const products = await leerTodoPaginado<unknown>(
+  const products = await leerConColumnaOpcional(cfg.publicCatalog.cols, "bulto_pzas", (cols) =>
+    leerTodoPaginado<unknown>(
     `${cfg.productsTable} (catálogo público ${cfg.marca})`,
     (pedirCount, desde, hasta) =>
       supabase
         .from(cfg.productsTable)
-        .select(cfg.publicCatalog.cols, pedirCount ? { count: "exact" } : {})
+        .select(cols, pedirCount ? { count: "exact" } : {})
         .eq("active", true)
         .order("category")
         .order("name")
         .order("id", { ascending: true })
         .range(desde, hasta),
-  );
+  ));
 
   return { products };
 }

@@ -5,12 +5,14 @@
 // filas con etiqueta (badge), stock Switch y toggle "Ocultar del catálogo".
 
 import { useState, useRef } from "react";
+import BultoSelector from "./BultoSelector";
 import Image from "next/image";
 import BulkPhotoUpload from "./BulkPhotoUpload";
 import ZipB2BUpload from "./ZipB2BUpload";
 import VariantePicker from "./VariantePicker";
 import { validateProductPhoto, uploadProductPhoto, updateProductBadge, toggleProductOculto } from "./photoUpload";
 import type { AdminProducto, MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 
 /** Saber si un SKU tiene fotos del banco B2B guardadas (lo calcula el shell). */
@@ -255,6 +257,16 @@ function Segmented<T extends string>({
       ))}
     </div>
   );
+}
+
+// ¿Esta marca marca las piezas por bulto a mano? Hoy solo Tommy (ver
+// `BultoSelector`). Se pregunta al tema para no cablear el nombre de la marca.
+function bultoEditableDe(marca: MarcaUiKey): boolean {
+  return !!getMarcaTheme(marca)?.admin.bultoEditable;
+}
+// El id con el que esta marca edita: Tommy y Joybees por `sku`, Reebok por `id`.
+function idParaEdicion(marca: MarcaUiKey, p: AdminProducto): string {
+  return getMarcaTheme(marca)?.admin.productEdit.idField === "sku" ? (p.sku ?? "") : p.id;
 }
 
 // ── Acciones de producto (foto + etiqueta), compartidas por tarjeta y fila ─────
@@ -515,6 +527,20 @@ function ProductPhotoCard({
           </select>
         </div>
 
+        {/* Piezas por bulto (solo Tommy — ver BultoSelector). */}
+        {bultoEditableDe(marca) && (
+          <div className="mt-1.5 pt-2 border-t border-[#1A2656]/10">
+            <BultoSelector
+              marca={marca}
+              productId={idParaEdicion(marca, product)}
+              productName={product.name}
+              bultoPzas={product.bulto_pzas}
+              onSaved={onPhotoSaved}
+              showToast={showToast}
+            />
+          </div>
+        )}
+
         {/* Ocultar / mostrar en el catálogo (sobrevive al sync). */}
         <div className="mt-1.5 pt-2 border-t border-[#1A2656]/10">
           <OcultarToggle
@@ -631,6 +657,17 @@ function ProductListRow({
           ) : badgeSaved ? (
             <span className="text-[10px] text-emerald-600 font-medium">✓ Guardado</span>
           ) : null}
+          {bultoEditableDe(marca) && (
+            <BultoSelector
+              marca={marca}
+              productId={idParaEdicion(marca, product)}
+              productName={product.name}
+              bultoPzas={product.bulto_pzas}
+              onSaved={onPhotoSaved}
+              showToast={showToast}
+              compacto
+            />
+          )}
           <OcultarToggle
             oculto={oculto}
             confirmando={confirmandoOculto}

@@ -47,7 +47,7 @@ describe("🔴 el parser siempre estuvo bien — el problema era no aplicarlo", 
 
 describe("🔴 el UPDATE ahora refresca la categoría", () => {
   it("updateFields devuelve category y gender, no solo name", () => {
-    expect(sync).toContain("const cat = { category: d.category, gender: d.gender }");
+    expect(sync).toContain("const cat = { category: d.category, gender: d.gender, ...bultoDeSwitch(a) }");
   });
 
   it("⚠️ nombre_manual protege el NOMBRE, no la categoría", () => {
@@ -58,6 +58,6 @@ describe("🔴 el UPDATE ahora refresca la categoría", () => {
   });
 
   it("el INSERT sigue poniendo las tres", () => {
-    expect(sync).toContain("{ name: d.name, category: d.category, gender: d.gender }");
+    expect(sync).toContain("{ name: d.name, category: d.category, gender: d.gender, ...bultoDeSwitch(a) }");
   });
 });

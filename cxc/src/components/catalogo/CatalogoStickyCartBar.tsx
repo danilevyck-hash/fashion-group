@@ -83,7 +83,7 @@ export default function CatalogoStickyCartBar({
   const renderItem = (item: CatalogoCartItem) => {
     // Fallback "footwear" heredado del StickyCartBar original de Reebok (solo
     // aplica a items viejos sin category en storage; Joybees ignora el arg).
-    const bs = theme.bulto(item.category || "footwear");
+    const bs = theme.bulto(item.category || "footwear", item.bulto_pzas);
     const lineTotal = item.quantity * bs * item.unit_price;
     const asProduct = (i: CatalogoCartItem): CatalogoProducto =>
       ({ id: i.product_id, name: i.name, sku: i.sku, price: i.unit_price, image_url: i.image_url });

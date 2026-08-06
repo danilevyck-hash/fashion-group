@@ -27,9 +27,29 @@
 // ruido ni queman la sesión única de fashion_shoes mientras la DDL no corra.
 
 import { syncCatalogo, type CatalogoSyncResult } from "./sync-catalogo";
+import { normalizarBultoPzas } from "@/lib/tommy-bulto";
 import { tommyServer } from "@/lib/tommy-supabase-server";
 import { buildTommyDerivedFields } from "@/lib/tommy-nombres";
 import type { SwitchArticulo } from "./client";
+
+/**
+ * Piezas por bulto SEGÚN SWITCH (`cantidadPorCaja`).
+ *
+ * 🩸 DEVUELVE UN OBJETO VACÍO CUANDO NO HAY DATO, y eso es lo importante: hoy
+ * `cantidadPorCaja` viene en `0.0000` en los 650 artículos de Tommy (medido
+ * 6-ago-2026), así que la columna NO entra en el payload y el sync sigue
+ * funcionando aunque la migración 20260806120000 todavía no se haya corrido.
+ * Devolver `{ bulto_pzas: null }` habría tumbado el cron del catálogo —que está
+ * bajo vigilancia estricta— y encima habría BORRADO lo marcado a mano en cada
+ * corrida.
+ *
+ * Cuando Switch SÍ trae un número, ese número manda: es la fuente del dato, no
+ * una segunda opinión sobre lo que alguien marcó en el catálogo.
+ */
+function bultoDeSwitch(a: { cantidadPorCaja?: string | null }): { bulto_pzas?: number } {
+  const n = normalizarBultoPzas(a.cantidadPorCaja);
+  return n === null ? {} : { bulto_pzas: n };
+}
 
 const EMPRESAS = [
   { empresaKey: "fashion_shoes", categories: [] as const, defaultCategory: "otros" },
@@ -108,7 +128,7 @@ export async function syncCatalogoTommy(
         extraCols: ["nombre_manual"],
         insertFields: (a) => {
           const d = buildTommyDerivedFields(a.codigo, a.descripcion);
-          return { name: d.name, category: d.category, gender: d.gender };
+          return { name: d.name, category: d.category, gender: d.gender, ...bultoDeSwitch(a) };
         },
         // 🩸 LA CATEGORÍA TAMBIÉN SE REFRESCA, y esto es un ARREGLO (5-ago-2026).
         // Antes solo se actualizaba el `name` y la categoría quedaba congelada
@@ -126,7 +146,7 @@ export async function syncCatalogoTommy(
         // que el admin edita— no la categoría, que sigue siendo de Switch.
         updateFields: (a, existing) => {
           const d = buildTommyDerivedFields(a.codigo, a.descripcion);
-          const cat = { category: d.category, gender: d.gender };
+          const cat = { category: d.category, gender: d.gender, ...bultoDeSwitch(a) };
           return existing.nombre_manual === true ? cat : { ...cat, name: d.name };
         },
       },

@@ -87,7 +87,7 @@ export default function CatalogoProductCard({
   }
 
   const inOrder = qty > 0;
-  const bultoSize = theme.bulto(product.category);
+  const bultoSize = theme.bulto(product.category, product.bulto_pzas);
 
   return (
     <>

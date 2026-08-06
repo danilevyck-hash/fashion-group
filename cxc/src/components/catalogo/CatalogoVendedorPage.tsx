@@ -68,7 +68,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [cart, setCart] = useState<CatalogoCartItem[]>([]);
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cart.reduce((s, i) => s + i.quantity * theme.bulto(i.category) * Number(i.unit_price || 0), 0);
+  const cartTotal = cart.reduce((s, i) => s + i.quantity * theme.bulto(i.category, i.bulto_pzas) * Number(i.unit_price || 0), 0);
 
   // ── On mount: hidratar el carrito (session → localStorage según marca). ──
   useEffect(() => {
@@ -109,6 +109,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       };
       if (!agrupado) {
         nuevo.category = product.category;
+        // Tommy: se CONGELA en la línea. Si el estilo se re-marca de 12 a 8
+        // mientras el cliente arma el pedido, lo que ya agregó sigue cotizando
+        // como cuando lo vio.
+        nuevo.bulto_pzas = product.bulto_pzas ?? null;
         if (theme.features.preorder) nuevo.is_preorder = product.badge === "proximamente";
       }
       return [...prev, nuevo];
@@ -239,7 +243,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
     // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
     // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
-    .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category)))
+    .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category, p.bulto_pzas)))
     .filter(p => precioEnRango(p.price, precioRango))
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
