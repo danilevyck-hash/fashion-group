@@ -8,6 +8,7 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import ReporteTab from "./ReporteTab";
 import CargarTab from "./CargarTab";
+import ConfiguracionTab from "./ConfiguracionTab";
 import HorariosTab from "./HorariosTab";
 import JustificacionesTab from "./JustificacionesTab";
 import FeriadosTab from "./FeriadosTab";
@@ -15,6 +16,9 @@ import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
   ["reporte", "Reporte"],
+  // Configuración va segunda: es lo primero que hay que llenar para que el
+  // reporte y la planilla signifiquen algo.
+  ["configuracion", "Configuración"],
   ["horarios", "Horarios"],
   ["justificaciones", "Justificaciones"],
   ["feriados", "Feriados"],
@@ -49,6 +53,7 @@ export default function AsistenciaClient() {
 
         <div className="mt-5">
           {tab === "reporte" && <ReporteTab key={version} />}
+          {tab === "configuracion" && <ConfiguracionTab />}
           {tab === "horarios" && <HorariosTab />}
           {tab === "justificaciones" && <JustificacionesTab />}
           {tab === "feriados" && <FeriadosTab />}

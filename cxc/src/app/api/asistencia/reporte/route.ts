@@ -15,6 +15,7 @@ import {
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
+import { leerReglas } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -62,6 +63,10 @@ export async function GET(req: NextRequest) {
       },
     );
 
+    // Las reglas configuradas. Sin la migración corrida devuelve los valores por
+    // defecto en vez de tirar: el reporte tiene que salir igual.
+    const { reglas } = await leerReglas();
+
     const [hRes, jRes, fRes] = await Promise.all([
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
       supabaseServer.from("asistencia_justificaciones").select("empleado_codigo, desde, hasta, motivo")
@@ -92,12 +97,17 @@ export async function GET(req: NextRequest) {
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
       desde,
       hasta,
+      reglas,
     });
 
     return NextResponse.json({
       personas,
       desde,
       hasta,
+      // Se devuelven para que la pantalla, el Excel y el PDF digan los MISMOS
+      // números que usó el motor. Un pie de página que dice "5 de tolerancia"
+      // mientras el cálculo usa 10 es peor que no decir nada.
+      reglas,
       // Para que la pantalla pueda avisar si alguien no tiene horario fijado:
       // sin él se asume 17:00 y el número puede estar mal.
       sinHorario: personas.filter((p) => !(hRes.data ?? []).some((h) => h.empleado_codigo === p.codigo)).length,

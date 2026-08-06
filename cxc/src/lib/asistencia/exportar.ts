@@ -17,7 +17,7 @@ import * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import type { PersonaReporte } from "./reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, ALMUERZO_DEFAULT_MIN, type PersonaReporte, type ReglasReporte } from "./reporte";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -44,11 +44,31 @@ export interface DatosExport {
   personas: readonly PersonaReporte[];
   desde: string;
   hasta: string;
+  /**
+   * Los números con los que el servidor CALCULÓ este reporte. Van al archivo
+   * porque los archivos sobreviven a la configuración: si dentro de seis meses
+   * alguien sube la tolerancia, el Excel de hoy tiene que seguir diciendo con
+   * cuánta se hizo. Sin esto, el pie del PDF sería una frase escrita a mano que
+   * envejece mal y contradice al motor.
+   */
+  reglas?: Partial<ReglasReporte>;
+}
+
+/** Los números del reporte, con los valores por defecto si no llegaron. */
+function conDefaults(r: Partial<ReglasReporte> | undefined): ReglasReporte {
+  const n = (v: number | undefined, def: number) =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : def;
+  return {
+    toleranciaTardanzaMin: n(r?.toleranciaTardanzaMin, TOLERANCIA_MIN),
+    extraMinimoMin: n(r?.extraMinimoMin, EXTRA_MINIMO_MIN),
+    almuerzoDefaultMin: n(r?.almuerzoDefaultMin, ALMUERZO_DEFAULT_MIN),
+  };
 }
 
 // ── EXCEL ────────────────────────────────────────────────────────────────────
 
-export function construirExcel({ personas, desde, hasta }: DatosExport): XLSX.WorkBook {
+export function construirExcel({ personas, desde, hasta, reglas }: DatosExport): XLSX.WorkBook {
+  const g = conDefaults(reglas);
   const wb = XLSX.utils.book_new();
 
   // Hoja 1 — Detalle. Solo días CON marcas o con ausencia: los feriados y los
@@ -139,19 +159,19 @@ export function construirExcel({ personas, desde, hasta }: DatosExport): XLSX.Wo
 
   // Hoja 3 — las reglas. Va DENTRO del archivo a propósito: quien lo reciba por
   // correo dentro de seis meses tiene que poder saber cómo se calculó.
-  const reglas = [
+  const filasReglas: unknown[][] = [
     ["Reporte de asistencia", rango(desde, hasta)],
     [],
     ["Cómo se calcula"],
-    ["Entrada", "8:00 a.m. con 5 minutos de tolerancia. Pasados los 5, se cuenta desde las 8:00."],
-    ["Almuerzo", "30 minutos por defecto. Se mide entre la 2ª y la 3ª marca del día."],
-    ["Horas extra", "Mínimo 15 minutos, y se le resta el atraso del mismo día."],
+    ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
+    ["Almuerzo", `${g.almuerzoDefaultMin} minutos por defecto. Se mide entre la 2ª y la 3ª marca del día.`],
+    ["Horas extra", `Mínimo ${g.extraMinimoMin} minutos, y se le resta el atraso del mismo día.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
     ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
     [],
     ["Todo en MINUTOS, no en horas decimales."],
   ];
-  const h3 = XLSX.utils.aoa_to_sheet(reglas);
+  const h3 = XLSX.utils.aoa_to_sheet(filasReglas);
   h3["!cols"] = [{ wch: 18 }, { wch: 86 }];
   if (h3["A1"]) h3["A1"].s = { font: { bold: true, sz: 12 } };
   if (h3["A3"]) h3["A3"].s = { font: { bold: true } };
@@ -162,7 +182,8 @@ export function construirExcel({ personas, desde, hasta }: DatosExport): XLSX.Wo
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
-export function construirPdf({ personas, desde, hasta }: DatosExport): jsPDF {
+export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): jsPDF {
+  const g = conDefaults(reglas);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "letter" });
   const w = doc.internal.pageSize.getWidth();
 
@@ -212,7 +233,8 @@ export function construirPdf({ personas, desde, hasta }: DatosExport): jsPDF {
       const h = doc.internal.pageSize.getHeight();
       doc.setFontSize(7); doc.setTextColor(156, 163, 175);
       doc.text(
-        "Entrada 8:00 (5 min de tolerancia) · almuerzo 30 min · extras desde 15 min, menos el atraso del día · " +
+        `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${g.almuerzoDefaultMin} min · ` +
+        `extras desde ${g.extraMinimoMin} min, menos el atraso del día · ` +
         "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
         14, h - 8,
       );
