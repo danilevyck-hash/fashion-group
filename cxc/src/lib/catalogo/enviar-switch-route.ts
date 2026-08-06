@@ -12,6 +12,7 @@
 //      quedaba 422 y NO se podía reintentar desde el admin.
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "./bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
@@ -139,22 +140,12 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     vendedorNombre = v?.vendedor_nombre ?? null;
   }
 
-  // Categorías para el bulto (Switch trabaja en PIEZAS, el pedido en bultos).
-  //
-  // ⚠️ `bulto_pzas` (Tommy) puede no existir todavía: la migración
-  // 20260806120000 la corre Daniel a mano. Si falta, se relee sin ella y toda
-  // la marca cae en su default — el pedido sale igual que antes en vez de
-  // quedarse trabado. Mismo fallback pre-migración que usa el sync.
-  const idsPedidos = order.items.map((i) => i.product_id);
-  const leerProds = (cols: string) =>
-    db.from(cfg.productsTable).select(cols).in("id", idsPedidos);
-  let { data: prods, error: prodsErr } = await leerProds("id, category, bulto_pzas");
-  if (prodsErr?.message?.includes("bulto_pzas")) {
-    ({ data: prods } = await leerProds("id, category"));
-  }
-  const filas = (prods ?? []) as unknown as Array<{ id: string; category: string; bulto_pzas?: number | null }>;
-  const categoryByProduct = new Map(filas.map((p) => [String(p.id), p.category]));
-  const bultoPzasByProduct = new Map(filas.map((p) => [String(p.id), p.bulto_pzas ?? null]));
+  // Categoría + piezas por bulto (Switch trabaja en PIEZAS, el pedido en bultos).
+  const { categoryByProduct, bultoPzasByProduct } = await leerCategoriaYBulto(
+    db as never,
+    cfg.productsTable,
+    order.items.map((i) => i.product_id),
+  );
 
   const result = await enviarPedidoSwitch({
     empresaKey: cfg.empresaKey,

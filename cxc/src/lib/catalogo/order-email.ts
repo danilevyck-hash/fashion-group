@@ -38,6 +38,8 @@ export interface OrderEmailItem {
   image_url: string;
   is_preorder?: boolean;
   category?: string;
+  /** Tommy: piezas por bulto del estilo. Vacío = el default de la marca. */
+  bulto_pzas?: number | null;
 }
 
 /** Quién va a leer el correo. Decide los textos, no la maqueta. */
@@ -59,7 +61,7 @@ export interface OrderEmailOpts {
   /** La marca maneja pre-orden (solo Reebok). */
   itemsHasPreorder: boolean;
   items: OrderEmailItem[];
-  bultoSize: (category?: string | null) => number;
+  bultoSize: (category?: string | null, bultoPzas?: number | null) => number;
   comment: string | null;
   totalBultos: number;
   totalPiezas: number;
@@ -92,7 +94,7 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   const hasPreorders = itemsHasPreorder && preorderItems.length > 0;
 
   const renderRow = (item: OrderEmailItem) => {
-    const bs = bultoSize(item.category);
+    const bs = bultoSize(item.category, item.bulto_pzas);
     const foto = item.image_url
       ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" width="40" height="40" class="fg-foto" style="display:block;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee">`
       : `<div class="fg-foto" style="display:block;width:40px;height:40px;background:#e5e7eb;border-radius:4px"></div>`;

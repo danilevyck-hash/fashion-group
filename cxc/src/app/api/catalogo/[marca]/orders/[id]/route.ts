@@ -10,6 +10,7 @@
 // reemplazo de items atómico vía RPC. DELETE: soft-delete visual.
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
@@ -83,27 +84,36 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // Reebok: pedidos viejos pueden tener total inflado en la columna (bulto 12 a
   // ciegas) — items enriquecidos con category y total recalculado con bulto
   // correcto por categoría, sin tocar la DB. Joybees: recalcula con bulto 12.
-  let itemsOut: Record<string, unknown>[] = items as unknown as Record<string, unknown>[];
-  let recalcTotal: number;
-  if (cfg.categoryLookup) {
-    const categoryMap = await cfg.categoryLookup(items.map((i) => i.product_id));
-    const enrichedItems = items.map((i) => ({
-      ...i,
-      category: categoryMap.get(i.product_id) || cfg.fallbackCategory,
-    }));
-    itemsOut = enrichedItems as unknown as Record<string, unknown>[];
-    recalcTotal = cfg.calcTotal(
-      enrichedItems.map((i) => ({
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        category: i.category || undefined,
-      })),
-    );
-  } else {
-    recalcTotal = cfg.calcTotal(
-      items.map((i) => ({ quantity: i.quantity, unit_price: i.unit_price })),
-    );
-  }
+  //
+  // 🩸 SE ENRIQUECE SIEMPRE, no solo cuando la marca tiene `categoryLookup`.
+  // Tommy lo tiene en null (su bulto no depende de la categoría) y por eso sus
+  // items llegaban PELADOS a todos lados: el total se recalculaba con 12 fijo y
+  // el PDF también. Fue el bug de TOM-003 — un estilo de 8 facturado como 12.
+  // La CATEGORÍA se sigue resolviendo con `cfg.categoryLookup` — no se toca:
+  // Reebok la lee con su propio cliente de base y cambiarlo le rompió el total
+  // recalculado en las pruebas. Lo único que se agrega son las PIEZAS.
+  const categoryByProduct = cfg.categoryLookup
+    ? await cfg.categoryLookup(items.map((i) => i.product_id))
+    : new Map<string, string>();
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(
+    db as never,
+    cfg.productsTable,
+    items.map((i) => i.product_id),
+  );
+  const enrichedItems = items.map((i) => ({
+    ...i,
+    category: categoryByProduct.get(i.product_id) || cfg.fallbackCategory || undefined,
+    bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+  }));
+  let itemsOut: Record<string, unknown>[] = enrichedItems as unknown as Record<string, unknown>[];
+  const recalcTotal = cfg.calcTotal(
+    enrichedItems.map((i) => ({
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+      category: i.category || undefined,
+      bulto_pzas: i.bulto_pzas,
+    })),
+  );
 
   // Trazabilidad de reemplazo (Duplicar y corregir). Tolerante a la DDL
   // 20260722120000 pendiente (todo null hasta que corra).
@@ -123,7 +133,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   return NextResponse.json({
     ...row,
-    ...(cfg.categoryLookup || stockConfirmacion ? { [cfg.itemsRelation]: itemsOut } : {}),
+    [cfg.itemsRelation]: itemsOut,
     total: recalcTotal,
     stock_confirmacion: stockConfirmacion,
     ...reemplazo,
@@ -171,21 +181,26 @@ export async function PUT(req: NextRequest, { params }: { params: { marca: strin
     };
     const typedItems = items as IncomingItem[];
 
-    let total: number;
-    if (cfg.categoryLookup) {
-      const categoryMap = await cfg.categoryLookup(typedItems.map((i) => i.product_id));
-      total = cfg.calcTotal(
-        typedItems.map((i) => ({
-          quantity: i.quantity || 1,
-          unit_price: Number(i.unit_price) || 0,
-          category: categoryMap.get(i.product_id) || i.category || cfg.fallbackCategory || undefined,
-        })),
-      );
-    } else {
-      total = cfg.calcTotal(
-        typedItems.map((i) => ({ quantity: i.quantity || 1, unit_price: Number(i.unit_price) || 0 })),
-      );
-    }
+    // Mismo criterio que al LEER: categoría y piezas por bulto SIEMPRE, no solo
+    // cuando la marca tiene `categoryLookup`. Editar un pedido de Tommy con la
+    // rama de abajo le habría vuelto a escribir el total con 12 fijo — el bug
+    // de TOM-003 otra vez, esta vez al corregir el pedido.
+    const catEdicion = cfg.categoryLookup
+      ? await cfg.categoryLookup(typedItems.map((i) => i.product_id))
+      : new Map<string, string>();
+    const { bultoPzasByProduct: bultoEdicion } = await leerCategoriaYBulto(
+      db as never,
+      cfg.productsTable,
+      typedItems.map((i) => i.product_id),
+    );
+    const total = cfg.calcTotal(
+      typedItems.map((i) => ({
+        quantity: i.quantity || 1,
+        unit_price: Number(i.unit_price) || 0,
+        category: catEdicion.get(i.product_id) || i.category || cfg.fallbackCategory || undefined,
+        bulto_pzas: bultoEdicion.get(i.product_id) ?? null,
+      })),
+    );
 
     // Reemplazo atómico de items + total vía RPC (delete+insert+update en UNA
     // transacción). Si el insert falla tras el delete, todo hace rollback y el

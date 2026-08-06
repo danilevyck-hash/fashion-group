@@ -159,7 +159,7 @@ export interface MarcaTheme {
    * categoría y Joybees es fijo, así que las dos ignoran el segundo argumento.
    */
   bulto: (category?: string | null, bultoPzas?: number | null) => number;
-  calcTotal: (items: { quantity: number; unit_price: number; category?: string }[]) => number;
+  calcTotal: (items: { quantity: number; unit_price: number; category?: string; bulto_pzas?: number | null }[]) => number;
   /** Orden canónico de items del pedido (Reebok: categoría+SKU) o null = SKU asc. */
   sortOrderItems: (<T extends { sku: string; category?: string }>(items: T[]) => T[]) | null;
   /** Fallback de category para PDFs / items sin category. */

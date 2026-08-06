@@ -4,6 +4,7 @@
 // colores del correo vienen de cfg.sendOrder (branding heredado por marca).
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf } from "@/lib/catalogo/order-pdf";
@@ -21,7 +22,9 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 });
 
-  type EmailItem = { sku: string; name: string; quantity: number; unit_price: number; image_url: string; is_preorder?: boolean; category?: string };
+  type EmailItem = { sku: string; name: string; quantity: number; unit_price: number; image_url: string; is_preorder?: boolean; category?: string;
+    /** Tommy: piezas por bulto del estilo. Vacío = el default de la marca. */
+    bulto_pzas?: number | null };
   let clientName: string;
   let orderNumber: string;
   let items: EmailItem[];
@@ -47,22 +50,28 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     comment = (orderRow.comment as string | null) ?? null;
     createdAt = String(orderRow.created_at ?? createdAt);
     const rawItems = (orderRow[cfg.itemsRelation] || []) as { product_id: string; sku: string; name: string; quantity: number; unit_price: number; image_url?: string; is_preorder?: boolean }[];
-    if (cfg.categoryLookup) {
-      const categoryMap = await cfg.categoryLookup(rawItems.map((i) => i.product_id));
+    // Categoría + piezas por bulto SIEMPRE, no solo si la marca tiene
+    // `categoryLookup`: Tommy lo tiene en null y sus items llegaban pelados al
+    // correo y al PDF, o sea con el bulto por default (bug de TOM-003).
+    {
+      const categoryByProduct = cfg.categoryLookup
+        ? await cfg.categoryLookup(rawItems.map((i) => i.product_id))
+        : new Map<string, string>();
+      const { bultoPzasByProduct } = await leerCategoriaYBulto(
+        db as never,
+        cfg.productsTable,
+        rawItems.map((i) => i.product_id),
+      );
       items = rawItems.map((i) => ({
         sku: i.sku || "", name: i.name || "", quantity: i.quantity, unit_price: i.unit_price,
         image_url: i.image_url || "", is_preorder: i.is_preorder === true,
-        category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined,
-      }));
-    } else {
-      items = rawItems.map((i) => ({
-        sku: i.sku || "", name: i.name || "", quantity: i.quantity, unit_price: i.unit_price,
-        image_url: i.image_url || "",
+        category: categoryByProduct.get(i.product_id) || cfg.fallbackCategory || undefined,
+        bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
       }));
     }
     totalBultos = items.reduce((s, i) => s + i.quantity, 0);
-    totalPiezas = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category), 0);
-    total = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category) * Number(i.unit_price), 0);
+    totalPiezas = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category, i.bulto_pzas), 0);
+    total = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category, i.bulto_pzas) * Number(i.unit_price), 0);
   } else {
     clientName = body.clientName || "Sin nombre";
     orderNumber = "PEDIDO";

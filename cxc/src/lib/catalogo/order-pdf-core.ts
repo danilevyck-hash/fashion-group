@@ -28,6 +28,8 @@ export interface PdfOrderItem {
   image_url: string;
   is_preorder?: boolean;
   category: string;
+  /** Tommy: piezas por bulto del estilo. Vacío = el default de la marca. */
+  bulto_pzas?: number | null;
 }
 
 export interface OrderPdfOpts {
@@ -36,7 +38,7 @@ export interface OrderPdfOpts {
   clientName: string;
   createdAt: string;
   items: PdfOrderItem[];
-  bultoSize: (category: string | null | undefined) => number;
+  bultoSize: (category: string | null | undefined, bultoPzas?: number | null) => number;
   /** image_url → dataURL ya preparado (downscaled). Las ausentes se saltan. */
   images: Record<string, string>;
 }
@@ -70,8 +72,8 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const preorderItems = items.filter((i) => i.is_preorder);
 
   const totalBultos = items.reduce((s, i) => s + i.quantity, 0);
-  const totalPiezas = items.reduce((s, i) => s + i.quantity * bultoSize(i.category), 0);
-  const total = items.reduce((s, i) => s + i.quantity * bultoSize(i.category) * Number(i.unit_price), 0);
+  const totalPiezas = items.reduce((s, i) => s + i.quantity * bultoSize(i.category, i.bulto_pzas), 0);
+  const total = items.reduce((s, i) => s + i.quantity * bultoSize(i.category, i.bulto_pzas) * Number(i.unit_price), 0);
 
   const doc = new jsPDF("portrait");
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
@@ -115,7 +117,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
       startY: startY + 3,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
       body: sectionItems.map((i) => {
-        const bs = bultoSize(i.category);
+        const bs = bultoSize(i.category, i.bulto_pzas);
         return ["", i.name, i.sku, String(i.quantity), String(i.quantity * bs), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * bs * Number(i.unit_price))}`];
       }),
       styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },

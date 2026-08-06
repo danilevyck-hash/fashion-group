@@ -91,19 +91,14 @@ describe("🔴 el camino del DINERO: el pedido a Switch usa el bulto del estilo"
 
   it("switch-envio recibe las piezas por producto y las usa", () => {
     expect(envio).toContain("bultoPzasByProduct");
-    expect(envio).toContain("p.bultoPzasByProduct?.get(item.product_id)");
+    expect(envio).toContain("p.bultoPzasByProduct.get(item.product_id)");
   });
 
-  it("el route arma el mapa desde la tabla de productos", () => {
+  it("el route arma el mapa con el helper compartido", () => {
+    // El detalle del fallback pre-migración vive ahora en `bulto-productos.ts`
+    // y lo cubre `tommy-bulto-pedido-completo.test.ts`.
+    expect(route).toContain("leerCategoriaYBulto");
     expect(route).toContain("bultoPzasByProduct");
-    expect(route).toContain('leerProds("id, category, bulto_pzas")');
-  });
-
-  it("⚠️ si la columna no existe todavía, el pedido SALE IGUAL", () => {
-    // El DDL lo corre Daniel a mano. Trabar los pedidos hasta que lo haga sería
-    // peor que mandarlos con el default de siempre.
-    expect(route).toContain('prodsErr?.message?.includes("bulto_pzas")');
-    expect(route).toContain('leerProds("id, category")');
   });
 });
 

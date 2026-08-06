@@ -3,6 +3,9 @@ import { getBultoSize } from "./tommy-bulto";
 export interface TommyOrderItemForTotal {
   quantity: number;
   unit_price: number;
+  category?: string;
+  /** Piezas por bulto del estilo. Vacío = 12, el default de la marca. */
+  bulto_pzas?: number | null;
 }
 
 /**
@@ -13,7 +16,7 @@ export interface TommyOrderItemForTotal {
 export function calculateTommyOrderTotal(items: TommyOrderItemForTotal[]): number {
   if (!Array.isArray(items)) return 0;
   return items.reduce(
-    (sum, item) => sum + item.quantity * getBultoSize() * item.unit_price,
+    (sum, item) => sum + item.quantity * getBultoSize(item.category, item.bulto_pzas) * item.unit_price,
     0,
   );
 }

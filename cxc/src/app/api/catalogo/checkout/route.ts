@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
@@ -74,14 +75,22 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── Categorías (bulto) + total server-side ──
-  const { data: prods } = await db
-    .from(cfg.productsTable)
-    .select("id, category")
-    .in("id", items.map((i) => i.product_id));
-  const categoryByProduct = new Map((prods || []).map((p) => [String(p.id), p.category as string]));
+  // ── Categoría + piezas por bulto + total server-side ──
+  //
+  // 🩸 El total se calcula ACÁ y se guarda: si el tamaño del bulto está mal, el
+  // pedido queda mal escrito para siempre, no solo mal mostrado. Fue el bug de
+  // TOM-003 (6-ago-2026): $456 = 12 × $38 en un estilo de 8, que debía ser $304.
+  const { categoryByProduct, bultoPzasByProduct } = await leerCategoriaYBulto(
+    db as never,
+    cfg.productsTable,
+    items.map((i) => i.product_id),
+  );
   const total = items.reduce(
-    (s, i) => s + Number(i.quantity) * cfg.bultoSize(categoryByProduct.get(i.product_id)) * Number(i.unit_price),
+    (s, i) =>
+      s +
+      Number(i.quantity) *
+        cfg.bultoSize(categoryByProduct.get(i.product_id), bultoPzasByProduct.get(i.product_id)) *
+        Number(i.unit_price),
     0,
   );
 
@@ -139,6 +148,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     items,
     bultoSize: cfg.bultoSize,
     categoryByProduct,
+    bultoPzasByProduct,
     clienteId,
     clienteNombre,
     vendedorId: mapping.vendedor_id,

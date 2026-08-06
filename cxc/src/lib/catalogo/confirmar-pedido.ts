@@ -35,6 +35,8 @@ export interface PedidoItemStock {
   quantity?: number; // en BULTOS
   category?: string;
   is_preorder?: boolean;
+  /** Tommy: piezas por bulto del estilo. Vacío = el default de la marca. */
+  bulto_pzas?: number | null;
 }
 
 export interface StockLineaCorta {
@@ -44,7 +46,7 @@ export interface StockLineaCorta {
   pedido_bultos: number;
   pedido_pzas: number;
   disponible_pzas: number;
-  /** Piezas por bulto usadas al confirmar (Reebok 12/6, Joybees/Tommy 12). */
+  /** Piezas por bulto usadas al confirmar (Reebok 12/6, Joybees 12, Tommy 8 o 12). */
   bulto_pzas?: number;
 }
 
@@ -61,14 +63,14 @@ export interface StockLineaCorta {
 export function computeStockLineas(
   items: PedidoItemStock[],
   disponibles: Map<string, number>,
-  getBulto: (category?: string) => number,
+  getBulto: (item: PedidoItemStock) => number,
 ): StockLineaCorta[] {
   const lineas: StockLineaCorta[] = [];
   for (const it of items) {
     if (it.is_preorder) continue;
     const bultos = Number(it.quantity) || 0;
     if (bultos <= 0 || !it.product_id) continue;
-    const bulto = getBulto(it.category);
+    const bulto = getBulto(it);
     lineas.push({
       product_id: it.product_id,
       name: it.name || "Producto",
@@ -94,7 +96,7 @@ export function soloCortas(lineas: StockLineaCorta[]): StockLineaCorta[] {
 export function computeLineasCortas(
   items: PedidoItemStock[],
   disponibles: Map<string, number>,
-  getBulto: (category?: string) => number,
+  getBulto: (item: PedidoItemStock) => number,
 ): StockLineaCorta[] {
   return soloCortas(computeStockLineas(items, disponibles, getBulto));
 }
@@ -159,7 +161,12 @@ export interface ConfirmarDeps {
    */
   getDisponibles(productIds: string[]): Promise<Map<string, number> | null>;
   /** Tamaño de bulto por categoría (Reebok 12/6, Joybees 12 fijo). */
-  getBulto(category?: string): number;
+  /**
+   * Piezas por bulto de UNA línea. Recibe el item entero, no solo la categoría:
+   * en Tommy el tamaño lo decide el estilo (8 o 12) y no la categoría — ver
+   * `tommy-bulto.ts`.
+   */
+  getBulto(item: PedidoItemStock): number;
   /**
    * Registra confirmado_cliente_at (+ confirmado_ip_hash) y la FOTO del stock
    * del momento (stock_confirmacion). TOLERANTE: si alguna columna no existe
