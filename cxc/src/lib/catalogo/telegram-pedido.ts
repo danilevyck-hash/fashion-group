@@ -41,6 +41,31 @@ const nombreODefecto = (v: string | null | undefined, fallback: string) => {
   return s.length > 0 ? s : fallback;
 };
 
+/** Lo que Daniel pidió ver de un vistazo: cuánto es y de qué tamaño. */
+export interface ResumenAviso {
+  /** Productos distintos. En el negocio se les dice "referencias". */
+  referencias: number;
+  /** Piezas TOTALES — no bultos. Es lo que se despacha y lo que factura Switch. */
+  piezas: number;
+}
+
+/**
+ * "3 referencias · 36 piezas". Pedido de Daniel (6-ago-2026): *"quiero que me
+ * diga a quien se le vendio, cuantas referencias, piezas totales y monto
+ * total"*. El cliente y el monto ya estaban; faltaban estas dos.
+ *
+ * Se OMITE si no hay resumen, en vez de escribir "0 referencias · 0 piezas":
+ * un cero inventado en un aviso de plata se lee como un pedido vacío. Los
+ * números salen de `resumirPedido` (lineas-pedido.ts), el único lugar del
+ * sistema que multiplica bultos por piezas.
+ */
+function lineaTamano(r?: ResumenAviso): string[] {
+  if (!r || (r.referencias <= 0 && r.piezas <= 0)) return [];
+  const ref = `${r.referencias} referencia${r.referencias === 1 ? "" : "s"}`;
+  const pzs = `${r.piezas} pieza${r.piezas === 1 ? "" : "s"}`;
+  return [`${ref} · ${pzs}`];
+}
+
 export interface AvisoPedidoVendedor {
   /** Emoji de la marca (cfg.telegramEmoji). */
   emoji: string;
@@ -51,6 +76,8 @@ export interface AvisoPedidoVendedor {
   cliente?: string | null;
   total: number;
   numero: string;
+  /** Ausente en pedidos viejos o si no se pudo resolver: la línea se omite. */
+  resumen?: ResumenAviso;
 }
 
 /**
@@ -63,6 +90,7 @@ export function avisoPedidoDeVendedor(a: AvisoPedidoVendedor): string {
   return [
     `${a.emoji} ${a.label} — pedido DEL VENDEDOR`,
     `Vendedor: ${vendedor} · Cliente: ${cliente}`,
+    ...lineaTamano(a.resumen),
     `${money(a.total)} · ${a.numero}`,
   ].join("\n");
 }
@@ -72,6 +100,7 @@ export interface AvisoPedidoLink {
   cliente?: string | null;
   total: number;
   numero: string;
+  resumen?: ResumenAviso;
 }
 
 /**
@@ -84,6 +113,7 @@ export function avisoPedidoDelLink(a: AvisoPedidoLink): string {
   return [
     `✅ ${a.label} — pedido DEL LINK, lo confirmó el cliente`,
     `Cliente: ${cliente}`,
+    ...lineaTamano(a.resumen),
     `${money(a.total)} · ${a.numero}`,
     `Entra a Switch como Contado y sin vendedor — no paga comisión.`,
   ].join("\n");

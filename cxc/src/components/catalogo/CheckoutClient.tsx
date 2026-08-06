@@ -9,6 +9,7 @@
 // quede guardado en DB.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabaseThumb } from "@/lib/image-thumb";
@@ -114,9 +115,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   // ── Derivados ──
   const lineas = useMemo(() => cart.map((i) => {
-    const bulto = cfg.bulto(i.category, i.bulto_pzas);
-    const piezas = i.quantity * bulto;
-    return { ...i, bulto, piezas, subtotal: piezas * i.unit_price };
+    // Línea resuelta: piezas y subtotal ya vienen del único lugar que multiplica.
+    const l = resolverLineas([i], { bultoSize: cfg.bulto })[0];
+    return { ...i, bulto: l.bulto_pzas, piezas: l.piezas, subtotal: l.subtotal };
   }), [cart, cfg]);
   const total = lineas.reduce((s, l) => s + l.subtotal, 0);
   const totalPiezas = lineas.reduce((s, l) => s + l.piezas, 0);

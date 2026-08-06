@@ -29,6 +29,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { precioTexto } from "@/lib/catalogo/precio";
+import { resolverLineas } from "./lineas-pedido";
 
 export interface OrderEmailItem {
   sku: string;
@@ -94,7 +95,8 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
   const hasPreorders = itemsHasPreorder && preorderItems.length > 0;
 
   const renderRow = (item: OrderEmailItem) => {
-    const bs = bultoSize(item.category, item.bulto_pzas);
+    // Línea resuelta: piezas y subtotal ya vienen calculados (lineas-pedido.ts).
+    const l = resolverLineas([item], { bultoSize })[0];
     const foto = item.image_url
       ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" width="40" height="40" class="fg-foto" style="display:block;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee">`
       : `<div class="fg-foto" style="display:block;width:40px;height:40px;background:#e5e7eb;border-radius:4px"></div>`;
@@ -102,9 +104,9 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
       <td style="${CELL};width:44px">${foto}</td>
       <td style="${CELL};overflow-wrap:break-word"><strong>${escapeHtml(item.name)}</strong><br><span style="font-size:11px;color:#888">${escapeHtml(item.sku)}</span></td>
       <td style="${CELL};text-align:center">${item.quantity}</td>
-      <td style="${CELL};text-align:center">${item.quantity * bs}</td>
+      <td style="${CELL};text-align:center">${l.piezas}</td>
       <td style="${CELL};text-align:right;white-space:nowrap">$${fmt(item.unit_price)}</td>
-      <td style="${CELL};text-align:right;white-space:nowrap">$${fmt(item.quantity * bs * Number(item.unit_price))}</td>
+      <td style="${CELL};text-align:right;white-space:nowrap">$${fmt(l.subtotal)}</td>
     </tr>`;
   };
 

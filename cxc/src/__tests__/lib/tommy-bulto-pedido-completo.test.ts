@@ -103,7 +103,9 @@ describe("🔴 el mapa es OBLIGATORIO — que lo cace el compilador, no un usuar
   it("switch-envio lo exige y lo usa", () => {
     const envio = leer("src/lib/catalogo/switch-envio.ts");
     expect(envio).toContain("bultoPzasByProduct: Map<string, number | null>;"); // sin `?`
-    expect(envio).toContain("p.bultoPzasByProduct.get(item.product_id)");
+    // Ya no multiplica: lee las piezas de la línea resuelta.
+    expect(envio).toContain("resolverLineas(p.items");
+    expect(envio).toContain("resuelta?.piezas");
   });
 
   it("los TRES llamadores lo pasan", () => {
@@ -145,12 +147,13 @@ describe("🔴 el número correcto llega al total, al PDF y al correo", () => {
 
   it("el checkout guarda el total con el bulto correcto", () => {
     const co = leer("src/app/api/catalogo/checkout/route.ts");
-    expect(co).toContain("bultoPzasByProduct.get(i.product_id)");
+    expect(co).toContain("resumirDesdeItems(items");
+    expect(co).toContain("bultoPzasByProduct,");
   });
 
   it("el PDF y el correo reciben las piezas del estilo", () => {
-    expect(leer("src/lib/catalogo/order-pdf-core.ts")).toContain("bultoSize(i.category, i.bulto_pzas)");
-    expect(leer("src/lib/catalogo/order-email.ts")).toContain("bultoSize(item.category, item.bulto_pzas)");
+    expect(leer("src/lib/catalogo/order-pdf-core.ts")).toContain("resolverLineas(sectionItems");
+    expect(leer("src/lib/catalogo/order-email.ts")).toContain("resolverLineas([item]");
     expect(leer("src/app/api/catalogo/[marca]/orders/[id]/pdf/route.ts")).toContain("bultoPzasByProduct.get");
     expect(leer("src/app/api/catalogo/[marca]/send-order/route.ts")).toContain("bultoPzasByProduct.get");
   });
@@ -169,6 +172,6 @@ describe("🔴 el número correcto llega al total, al PDF y al correo", () => {
   it("getBulto recibe el ITEM entero, no solo la categoría", () => {
     const cp = leer("src/lib/catalogo/confirmar-pedido.ts");
     expect(cp).toContain("getBulto: (item: PedidoItemStock) => number");
-    expect(cp).toContain("const bulto = getBulto(it);");
+    expect(cp).toContain("bultoSize: () => getBulto(it)");
   });
 });

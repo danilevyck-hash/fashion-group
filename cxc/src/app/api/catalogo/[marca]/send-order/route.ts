@@ -4,6 +4,7 @@
 // colores del correo vienen de cfg.sendOrder (branding heredado por marca).
 
 import { NextRequest, NextResponse } from "next/server";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
@@ -69,9 +70,10 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
       }));
     }
-    totalBultos = items.reduce((s, i) => s + i.quantity, 0);
-    totalPiezas = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category, i.bulto_pzas), 0);
-    total = items.reduce((s, i) => s + i.quantity * cfg.bultoSize(i.category, i.bulto_pzas) * Number(i.unit_price), 0);
+    const resumen = resumirDesdeItems(items, { bultoSize: cfg.bultoSize });
+    totalBultos = resumen.bultos;
+    totalPiezas = resumen.piezas;
+    total = resumen.total;
   } else {
     clientName = body.clientName || "Sin nombre";
     orderNumber = "PEDIDO";

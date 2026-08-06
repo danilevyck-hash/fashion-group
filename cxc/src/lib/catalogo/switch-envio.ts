@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolverLineas } from "./lineas-pedido";
 import { shortError } from "@/lib/telegram";
 import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
@@ -110,6 +111,16 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   const warnings: string[] = [];
   const errores: string[] = [];
 
+  // Una sola resolución para todo el pedido — categoría, piezas por bulto,
+  // piezas y subtotal. Todo lo de abajo LEE de acá.
+  const lineasResueltas = new Map(
+    resolverLineas(p.items, {
+      bultoSize: p.bultoSize,
+      categoryByProduct: p.categoryByProduct,
+      bultoPzasByProduct: p.bultoPzasByProduct,
+    }).map((l) => [l.product_id, l]),
+  );
+
   for (const item of p.items) {
     const sku = (item.sku || "").trim();
     if (!sku) {
@@ -160,11 +171,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       warnings.push(`SKU ${sku}: no se pudo verificar tallas/colores en Switch`);
     }
 
-    const bulto = p.bultoSize(
-      p.categoryByProduct.get(item.product_id),
-      p.bultoPzasByProduct.get(item.product_id),
-    );
-    const piezas = (item.quantity || 0) * bulto;
+    // Las piezas YA vienen calculadas: acá no se multiplica nada (ver
+    // `lineas-pedido.ts` — la multiplicación vive en un solo lugar del sistema).
+    const resuelta = lineasResueltas.get(item.product_id);
+    const piezas = resuelta?.piezas ?? 0;
     lineas.push({
       sku,
       descripcionSwitch: articulo.descripcion || item.name || sku,

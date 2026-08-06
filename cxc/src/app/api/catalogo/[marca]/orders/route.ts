@@ -7,6 +7,8 @@
 // is_preorder; Joybees es bulto 12 fijo sin preventa.
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { sendTelegramAlert } from "@/lib/telegram";
@@ -38,28 +40,27 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   // Reebok: una sola query batch para resolver category de todos los items.
-  let categoryMap = new Map<string, string>();
-  if (cfg.categoryLookup) {
-    const allProductIds = (data || []).flatMap((o) =>
-      ((o as unknown as Record<string, unknown>)[cfg.itemsRelation] as { product_id: string }[] | null || []).map((i) => i.product_id),
-    );
-    categoryMap = await cfg.categoryLookup(allProductIds);
-  }
+  const allProductIds = (data || []).flatMap((o) =>
+    ((o as unknown as Record<string, unknown>)[cfg.itemsRelation] as { product_id: string }[] | null || []).map((i) => i.product_id),
+  );
+  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(allProductIds) : new Map<string, string>();
+  // Las piezas por bulto son del ESTILO (Tommy): sin esto la lista mostraba el
+  // total con el bulto por default, distinto del que abre el detalle.
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, allProductIds);
 
   const orders = (data || []).map((o) => {
     const row = o as unknown as Record<string, unknown>;
     const items = (row[cfg.itemsRelation] || []) as { product_id: string; quantity: number; unit_price: number }[];
-    const itemsForTotal = items.map((i) => ({
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-      ...(cfg.categoryLookup
-        ? { category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined }
-        : {}),
-    }));
+    const resumen = resumirDesdeItems(items, {
+      bultoSize: cfg.bultoSize,
+      categoryByProduct: categoryMap,
+      bultoPzasByProduct,
+      fallbackCategory: cfg.fallbackCategory,
+    });
     return {
       ...row,
       item_count: items.length,
-      total: cfg.calcTotal(itemsForTotal),
+      total: resumen.total,
       [cfg.itemsRelation]: undefined,
     };
   });
@@ -77,22 +78,25 @@ interface IncomingItem {
   is_preorder?: boolean;
 }
 
-/** Total del pedido: con category real vía products (Reebok, respaldo el
- *  category del body y fallback apparel) o bulto fijo (Joybees). */
-async function totalDePedido(cfg: MarcaConfig, items: IncomingItem[]): Promise<number> {
-  if (cfg.categoryLookup) {
-    const categoryMap = await cfg.categoryLookup(items.map((i) => i.product_id));
-    return cfg.calcTotal(
-      items.map((i) => ({
-        quantity: i.quantity,
-        unit_price: Number(i.unit_price) || 0,
-        category: categoryMap.get(i.product_id) || i.category || cfg.fallbackCategory || undefined,
-      })),
-    );
-  }
-  return cfg.calcTotal(
-    items.map((i) => ({ quantity: i.quantity, unit_price: Number(i.unit_price) || 0 })),
-  );
+/**
+ * Resumen del pedido: referencias, bultos, piezas y total. Devuelve TODO y no
+ * solo el total porque el aviso de Telegram necesita las mismas cifras, y
+ * calcularlas dos veces es exactamente cómo se separan.
+ *
+ * La categoría se resuelve con `cfg.categoryLookup` (Reebok usa su propio
+ * cliente de base); las piezas por bulto salen de la tabla de productos.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resumenDePedido(cfg: MarcaConfig, db: any, items: IncomingItem[]) {
+  const ids = items.map((i) => i.product_id);
+  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(ids) : new Map<string, string>();
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, ids);
+  return resumirDesdeItems(items, {
+    bultoSize: cfg.bultoSize,
+    categoryByProduct: categoryMap,
+    bultoPzasByProduct,
+    fallbackCategory: cfg.fallbackCategory,
+  });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { marca: string } }) {
@@ -126,13 +130,15 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   if (typedItems.some((i) => !(Number(i.unit_price) > 0))) {
     return NextResponse.json({ error: "El precio de cada producto debe ser mayor a cero" }, { status: 400 });
   }
-  const total = await totalDePedido(cfg, typedItems);
+  const dbPedido = await cfg.db();
+  const resumenPed = await resumenDePedido(cfg, dbPedido as never, typedItems);
+  const total = resumenPed.total;
 
   // Creación atómica e idempotente vía RPC: numera <prefijo>-### sin race
   // (advisory lock) e inserta pedido + items en una transacción. Si llega un
   // retry con el mismo idempotency_key, devuelve el pedido ya creado en vez de
   // duplicarlo.
-  const db = await cfg.db();
+  const db = dbPedido;
   const { data: result, error } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: client_name,
     p_vendor_name: vendor_name || session.userName || null,
@@ -168,6 +174,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         cliente: client_name,
         total,
         numero: order_number,
+        resumen: { referencias: resumenPed.referencias, piezas: resumenPed.piezas },
       }),
     );
   }
