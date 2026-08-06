@@ -7,6 +7,7 @@
 // catálogo se sincroniza por API desde Switch, cron de la marca).
 
 import { useState, useRef } from "react";
+import { FiltroDesplegable } from "@/components/catalogo/CatalogoFilters";
 import BultoSelector from "./BultoSelector";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
@@ -117,6 +118,13 @@ export function FaltanFotoBatchTab({
 // Subida de foto por fila. Las etiquetas (badge) se muestran tal cual — NO se
 // editan aquí (decisión del dueño).
 
+/** Opciones del filtro de bulto. Los dos tamaños que existen en el negocio. */
+const BULTO_FILTRO_OPCIONES = [
+  { value: "", label: "Todos" },
+  { value: "12", label: "12 piezas" },
+  { value: "8", label: "8 piezas" },
+];
+
 export function ProductosBatchListTab({
   marca,
   products,
@@ -134,6 +142,15 @@ export function ProductosBatchListTab({
   const [search, setSearch] = useState("");
   const [visibilidad, setVisibilidad] = useState<"visibles" | "ocultos">("visibles");
   const [soloSneakers, setSoloSneakers] = useState(false);
+  // Mismos filtros que el catálogo público (pedido de Daniel, 6-ago-2026:
+  // *"tambien debe de haber opcion de filtrar como en el catalogo"*). Las
+  // OPCIONES salen del tema —`theme.filtros`—, no de una lista escrita acá:
+  // dos listas para la misma pregunta terminan diciendo cosas distintas.
+  const [genero, setGenero] = useState("");
+  const [categoria, setCategoria] = useState("");
+  // Piezas por bulto: solo donde se marcan a mano (hoy Tommy). Sirve para
+  // repasar cuáles ya quedaron en 8 y cuáles siguen en el default.
+  const [bulto, setBulto] = useState("");
 
   // Chip "Solo sneakers": data-driven — solo aparece si la marca de verdad
   // tiene esa categoría (hoy Tommy). Sirve para repasar rápido los que peor
@@ -149,6 +166,11 @@ export function ProductosBatchListTab({
     const oculto = p.oculto_manual === true;
     if (visibilidadEfectiva === "visibles" ? oculto : !oculto) return false;
     if (soloSneakers && p.category !== "sneakers") return false;
+    if (!theme.genero.match(p.gender, genero)) return false;
+    if (categoria && p.category !== categoria) return false;
+    // Se compara contra el tamaño EFECTIVO, no contra la columna: un producto
+    // sin marcar es de 12, y filtrar por 12 tiene que traerlo.
+    if (bulto && String(theme.bulto(p.category, p.bulto_pzas)) !== bulto) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -156,6 +178,8 @@ export function ProductosBatchListTab({
       (p.sku || "").toLowerCase().includes(q)
     );
   });
+
+  const hayFiltros = !!(genero || categoria || bulto || soloSneakers || search);
 
   const sorted = [...filtered].sort((a, b) => {
     if ((a.stock ?? 0) > 0 && (b.stock ?? 0) === 0) return -1;
@@ -178,11 +202,51 @@ export function ProductosBatchListTab({
         />
       </div>
 
-      {sneakersCount > 0 && (
-        <div className="mb-4">
+      {/* Filtros — MISMOS controles y MISMAS opciones que el catálogo público.
+          `flex-wrap`: en 390 px una sola fila de píldoras arrastraría la página
+          de costado, y envolver es lo que ya hace el público por lo mismo. */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <FiltroDesplegable
+          etiqueta="Género"
+          valor={genero}
+          opciones={theme.filtros.genderOptions}
+          onChange={setGenero}
+          chipActive={theme.filtros.chipActive}
+          chipInactive={theme.filtros.chipInactive}
+        />
+        {theme.features.categoryChips && theme.filtros.categoryOptions.length > 0 && (
+          <FiltroDesplegable
+            etiqueta="Categoría"
+            valor={categoria}
+            opciones={theme.filtros.categoryOptions}
+            onChange={setCategoria}
+            chipActive={theme.filtros.chipActive}
+            chipInactive={theme.filtros.chipInactive}
+          />
+        )}
+        {theme.admin.bultoEditable && (
+          <FiltroDesplegable
+            etiqueta="Bulto"
+            valor={bulto}
+            opciones={BULTO_FILTRO_OPCIONES}
+            onChange={setBulto}
+            chipActive={theme.filtros.chipActive}
+            chipInactive={theme.filtros.chipInactive}
+          />
+        )}
+        {sneakersCount > 0 && (
           <SneakersChip activo={soloSneakers} count={sneakersCount} onToggle={() => setSoloSneakers((v) => !v)} />
-        </div>
-      )}
+        )}
+        {hayFiltros && (
+          <button
+            type="button"
+            onClick={() => { setGenero(""); setCategoria(""); setBulto(""); setSoloSneakers(false); setSearch(""); }}
+            className="min-h-[44px] px-3 text-xs font-medium text-gray-500 underline-offset-2 hover:underline hover:text-gray-700 transition"
+          >
+            Limpiar filtros
+          </button>
+        )}
+      </div>
 
       {/* Filtro del toggle "Ocultar del catálogo" — solo aparece si hay ocultos. */}
       {ocultosCount > 0 && (
@@ -206,8 +270,16 @@ export function ProductosBatchListTab({
 
       <p className="text-sm text-gray-500 mb-4">
         {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
-        {search && ` (de ${products.length})`}
+        {hayFiltros && ` (de ${products.length})`}
       </p>
+
+      {/* Que los filtros no dejen una pantalla vacía sin explicación: es la
+          diferencia entre "no hay ninguno así" y "algo se rompió". */}
+      {filtered.length === 0 && hayFiltros && (
+        <p className="py-10 text-center text-sm text-gray-500">
+          Ningún producto con esos filtros.
+        </p>
+      )}
 
       <div className="space-y-2">
         {sorted.map((product) => (
