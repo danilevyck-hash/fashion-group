@@ -366,14 +366,21 @@ export function validarPorcentaje(v: unknown, que: string, ejemplo: string): Res
 }
 
 /**
- * Divisor de la rata. La rata es `salario ÷ divisor`, así que un 0 acá no da un
- * error: da `Infinity` y la planilla se paga con ese número. Por eso el piso es
- * 1 y no 0, y por eso este validador nunca recibe un `Number()` ya hecho.
+ * Las horas que se trabajan al mes. La rata es `salario ÷ estas horas`, así que
+ * un 0 acá no da un error: da `Infinity` y la planilla se paga con ese número.
+ * Por eso el piso es 1 y no 0, y por eso este validador nunca recibe un
+ * `Number()` ya hecho.
+ *
+ * ⚠️ En el código se llama `divisor` —y las columnas son `divisor_40` y
+ * `divisor_48`— pero eso NO se le muestra a nadie: la contable revisó el cuadro
+ * de reglas, validó todo y se trabó justo en esa palabra (*"no sé a qué se
+ * refiere eso de divisores"*). El nombre técnico se deja como está para no pedir
+ * otra migración a mano; lo que se ve dice "horas que se trabajan al mes".
  */
 export function validarDivisorRata(v: unknown, que: string, ejemplo: string): Resultado<number> {
   const r = numero(v, {
     min: DIVISOR_RATA_MIN, max: DIVISOR_RATA_MAX, que,
-    ayuda: `Son las horas del mes, por ejemplo ${ejemplo}. No puede ser 0: la rata se divide entre este número.`,
+    ayuda: `Por ejemplo ${ejemplo}. El salario mensual se divide entre estas horas para sacar la rata por hora, así que no puede ser 0.`,
   });
   if (!r.ok) return r;
   return { ok: true, valor: redondear(r.valor, 4) };
@@ -418,8 +425,9 @@ export function validarReglas(body: unknown): Resultado<ReglasAsistencia> {
     ["recargoExtraNocturno", validarRecargo(b.recargoExtraNocturno, "El recargo de hora extra de noche", "1.50")],
     ["horaCorteNocturno", validarHora(b.horaCorteNocturno, "La hora de corte de la noche")],
     ["recargoDomingoFeriado", validarRecargo(b.recargoDomingoFeriado, "El recargo de domingos y feriados", "1.50")],
-    ["divisor40", validarDivisorRata(b.divisor40, "El divisor de 40 horas", "173.33")],
-    ["divisor48", validarDivisorRata(b.divisor48, "El divisor de 48 horas", "208")],
+    // Sin la palabra "divisor": la contable no la usa y es la que lee el error.
+    ["divisor40", validarDivisorRata(b.divisor40, "El total de horas al mes de quien trabaja 40 horas por semana", "173.33")],
+    ["divisor48", validarDivisorRata(b.divisor48, "El total de horas al mes de quien trabaja 48 horas por semana", "208")],
     ["seguroSocialPct", validarPorcentaje(b.seguroSocialPct, "El seguro social", "9.75")],
     ["seguroEducativoPct", validarPorcentaje(b.seguroEducativoPct, "El seguro educativo", "1.25")],
     ["excedenteHorasDia", validarExcedenteHoras(b.excedenteHorasDia)],
