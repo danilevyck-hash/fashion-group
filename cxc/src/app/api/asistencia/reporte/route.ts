@@ -5,6 +5,7 @@
 // acá solo se junta el dato.
 
 import { NextRequest, NextResponse } from "next/server";
+import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
@@ -27,7 +28,7 @@ function limite(dia: string, fin: boolean): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;

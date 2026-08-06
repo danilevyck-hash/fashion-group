@@ -229,7 +229,11 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "asistencia",
   ],
   bodega: ["catalogos", "guias", "packing-lists"],
-  contabilidad: ["proveedores", "gastos-empresa", "prestamos"],
+  // `asistencia` se le abrió el 6-ago-2026 por pedido de Daniel: la planilla
+  // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
+  // extra y las ausencias que necesita para llenarla salen de ese módulo.
+  // Cambio DELIBERADO — este candado hizo lo suyo y frenó el build hasta acá.
+  contabilidad: ["proveedores", "gastos-empresa", "prestamos", "asistencia"],
   vendedor: ["cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };
