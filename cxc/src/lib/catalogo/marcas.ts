@@ -511,6 +511,25 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
 };
 
 /** Marca del segmento dinámico [marca] → config; null si no existe (→ 404). */
+/**
+ * Empresas de Switch donde vive un catálogo, DERIVADAS de las marcas.
+ *
+ * 🩸 Esto era un `new Set(["active_shoes", "joystep"])` escrito a mano en DOS
+ * rutas, más un tercer arreglo en la pantalla de Usuarios (6-ago-2026). Cuando
+ * se encendió el catálogo de Tommy nadie tocó ninguno de los tres, y el efecto
+ * no fue un selector incompleto: **ningún pedido de Tommy podía salir a
+ * Switch**. Daniel lo vio con un pedido de $1.584,00 armado, el botón
+ * "Confirmar y enviar a Switch" apagado y el aviso "No tienes vendedor de
+ * Switch asignado" — sin forma de asignarlo, porque Tommy no estaba en las
+ * listas. Switch sí tenía sus vendedores todo el tiempo (REINALDO ESPINOSA y
+ * DEFAULT, verificado en vivo).
+ *
+ * Derivado, la próxima marca aparece sola en los tres lugares.
+ */
+export const EMPRESAS_CATALOGO: ReadonlySet<string> = new Set(
+  Object.values(MARCAS_CONFIG).map((m) => m.empresaKey),
+);
+
 export function getMarcaConfig(marca: string | undefined | null): MarcaConfig | null {
   if (!marca) return null;
   return MARCAS_CONFIG[marca] ?? null;
