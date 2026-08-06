@@ -94,7 +94,13 @@ interface FiltroDesplegableProps {
  * es lo que hace que duplicar el control (píldoras en escritorio + desplegable
  * en celular) no duplique opciones ni etiquetas para nadie.
  */
-function FiltroDesplegable({
+/**
+ * Desplegable de un filtro. Se EXPORTA para que la pantalla de administrar use
+ * exactamente el mismo control que el catálogo público: son la misma pregunta
+ * ("¿de qué género?", "¿de qué categoría?") y dos implementaciones distintas
+ * terminarían dando dos listas de opciones distintas.
+ */
+export function FiltroDesplegable({
   etiqueta, valor, opciones, onChange, chipActive, chipInactive,
 }: FiltroDesplegableProps) {
   const [abierto, setAbierto] = useState(false);
