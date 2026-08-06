@@ -40,7 +40,7 @@ interface RpcCall { name: string; args: Record<string, unknown> }
 const rpcCalls: RpcCall[] = [];
 const fromCalls: { tabla: string; filtros: Array<[string, unknown]> }[] = [];
 
-function chain(result: { data: unknown; error: unknown }) {
+function chain(result: { data: unknown; error: unknown; count?: number }) {
   const filtros: Array<[string, unknown]> = [];
   const self: Record<string, unknown> = {};
   const paso = (k: string) => (a?: unknown, b?: unknown) => { filtros.push([k, b ?? a]); return self; };
@@ -73,7 +73,11 @@ vi.mock("@/lib/supabase-server", () => ({
       const c = chain(
         tabla === "multifashion_caja_diaria"
           ? { data: null, error: ERROR_TABLA_AUSENTE }
-          : { data: [], error: null },
+          // `count` va SIEMPRE, como haría PostgREST: los lectores paginados
+          // (leerTodoPaginado) revientan a propósito ante una lectura sin COUNT
+          // exacto, y un doble que devuelve `count: undefined` los haría fallar
+          // en el arnés por una razón que en producción no existe.
+          : { data: [], error: null, count: 0 },
       );
       fromCalls.push({ tabla, filtros: (c as { __filtros: Array<[string, unknown]> }).__filtros });
       return c;
@@ -108,6 +112,7 @@ import { GET as vendedorasGet } from "@/app/api/multifashion/vendedoras/route";
 import { GET as wholesaleGet } from "@/app/api/multifashion/clientes-wholesale/route";
 import { GET as retailGet } from "@/app/api/multifashion/retail-recurrentes/route";
 import { GET as cajaGet } from "@/app/api/multifashion/caja/route";
+import { GET as productosGet } from "@/app/api/multifashion/productos/route";
 
 // ── Reloj fijo ───────────────────────────────────────────────────────────────
 // 30-jul-2026 18:00 UTC = 13:00 en Panamá. Mes en curso = julio 2026;
@@ -327,6 +332,31 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     await cajaGet(req("/api/multifashion/caja?fecha=2025-07-15", "gerente_acs"));
     expect(switchCalls).toEqual([{ desde: "2025-07-15", hasta: "2025-07-16" }]);
   });
+
+  // La ruta de Productos NO consulta por RPC sino leyendo la tabla, así que lo
+  // que se mira es el RANGO DE FECHAS que llega a `switch_articulo_diario`.
+  it("productos?year=2019&mes=1 → la tabla se consulta por julio 2026", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2019&mes=1", "gerente_acs"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t, "productos no consultó switch_articulo_diario").toBeTruthy();
+    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+    // Y nunca a otra empresa: Multifashion ES american_classic.
+    expect(t?.filtros).toContainEqual(["eq", "american_classic"]);
+  });
+
+  it("productos?year=2025&mes=12 (año de comparación) conserva el año, no el mes", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2025&mes=12", "gerente_acs"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2025-07-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2025-07-31"]);
+  });
+
+  it("productos: sin params tampoco es un bypass", async () => {
+    await productosGet(req("/api/multifashion/productos", "gerente_acs"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -372,6 +402,19 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
     expect(switchCalls).toEqual([{ desde: "2024-03-05", hasta: "2024-03-06" }]);
   });
 
+  it("productos: un mes viejo cualquiera se consulta tal cual", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2024-12-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2024-12-31"]);
+  });
+
+  it("productos: febrero bisiesto cierra el 29, no el 28", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2024&mes=2", "admin"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["lte", "2024-02-29"]);
+  });
+
   it("las validaciones de siempre siguen devolviendo 400 (no las comió el clamp)", async () => {
     const r1 = await detalleGet(req("/api/multifashion/detalle-mensual?year=1800", "admin"));
     expect(r1.status).toBe(400);
@@ -390,6 +433,7 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
     expect((await overviewGet(sinCookie)).status).toBe(401);
     expect((await bonosGet(req("/api/multifashion/bonos", "bodega"))).status).toBe(403);
     expect((await cajaGet(req("/api/multifashion/caja", "vendedor"))).status).toBe(403);
+    expect((await productosGet(req("/api/multifashion/productos", "bodega"))).status).toBe(403);
   });
 
   // 🩸 3-ago-2026. A Andrea (rol `secretaria`) se le dio el módulo Multifashion
@@ -398,7 +442,7 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
   // salía "Sin permiso" en el ranking y en los bonos. Los permisos se otorgan
   // POR USUARIO y se verifican POR ROL: ese es el desajuste. Daniel: *"si
   // debería de poder verlo"*.
-  it("secretaria ENTRA en las 7 rutas (no 403)", async () => {
+  it("secretaria ENTRA en las 8 rutas (no 403)", async () => {
     const casos: Array<[string, (r: NextRequest) => Promise<Response>]> = [
       ["/api/multifashion/overview?year=2026", overviewGet],
       ["/api/multifashion/detalle-mensual?year=2026&mes=7", detalleGet],
@@ -407,6 +451,7 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
       ["/api/multifashion/clientes-wholesale?desde=2026-07-01&hasta=2026-07-31", wholesaleGet],
       ["/api/multifashion/retail-recurrentes?desde=2026-07-01&hasta=2026-07-31", retailGet],
       ["/api/multifashion/caja?fecha=2026-07-15", cajaGet],
+      ["/api/multifashion/productos?year=2026&mes=7", productosGet],
     ];
     for (const [url, handler] of casos) {
       const res = await handler(req(url, "secretaria"));
@@ -460,6 +505,7 @@ describe("candado estructural — /api/multifashion/**", () => {
       "detalle-mensual",
       "fidelizacion",
       "overview",
+      "productos",
       "retail-recurrentes",
       "vendedoras",
     ]);
@@ -519,8 +565,13 @@ describe("UI — cortesía, no candado", () => {
   });
 
   it("el rol acotado NO ve el selector de mes ni las ventanas rolling", () => {
-    expect(leer("src/components/multifashion/MultifashionView.tsx"))
-      .toContain('subtab === "resumen" && !ventanaAcotada');
+    // El selector de mes dejó de ser exclusivo del Resumen cuando se sumó
+    // Productos (que lee el MISMO mes). Lo que sigue importando es que el rol
+    // acotado no lo vea, sea cual sea el sub-tab.
+    const view = leer("src/components/multifashion/MultifashionView.tsx");
+    expect(view).toContain("usaSelectorMes && !ventanaAcotada");
+    expect(view).toContain("usaSelectorMes && ventanaAcotada");
+    expect(view).toMatch(/const usaSelectorMes =[^;]*subtab === "resumen"/);
     expect(leer("src/components/multifashion/VendedorasSubtab.tsx"))
       .toContain("{!ventanaAcotada && (");
     expect(leer("src/components/multifashion/ClientesMultifashionSubtab.tsx"))
