@@ -6,6 +6,7 @@
 // (precios validados server-side), lo confirma y navega a /pedido-<marca>/[id].
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
@@ -66,7 +67,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   // Cart state
   const [cart, setCart] = useState<CatalogoCartItem[]>([]);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cart.reduce((s, i) => s + i.quantity * theme.bulto(i.category, i.bulto_pzas) * Number(i.unit_price || 0), 0);
+  const cartTotal = resumirDesdeItems(cart, { bultoSize: theme.bulto }).total;
 
   // Persist cart to localStorage
   const cartInitialized = useRef(false);

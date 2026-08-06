@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import {
@@ -49,24 +50,21 @@ export const maxDuration = 300;
 
 /** Total para la RPC: misma maquinaria que el convertir del admin (Reebok:
  *  categoría real vía products con fallback apparel; Joybees: bulto 12). */
-async function totalParaConvertir(cfg: MarcaConfig, items: PedidoPublicoRow["items"]): Promise<number> {
-  if (cfg.categoryLookup) {
-    const categoryMap = await cfg.categoryLookup(items.map((i) => i.product_id));
-    return cfg.calcTotal(
-      items.map((i) => ({
-        quantity: Number(i.quantity) || 0,
-        unit_price: Number((i as { unit_price?: number }).unit_price) || 0,
-        category:
-          (i.product_id && categoryMap.get(i.product_id)) || i.category || cfg.fallbackCategory || undefined,
-      })),
-    );
-  }
-  return cfg.calcTotal(
-    items.map((i) => ({
-      quantity: Number(i.quantity) || 0,
-      unit_price: Number((i as { unit_price?: number }).unit_price) || 0,
-    })),
-  );
+/**
+ * Resumen del pedido del LINK: referencias, piezas y total. Devuelve todo —no
+ * solo el total— porque el aviso de Telegram necesita las mismas cifras.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resumenParaConvertir(cfg: MarcaConfig, db: any, items: PedidoPublicoRow["items"]) {
+  const ids = items.map((i) => i.product_id).filter(Boolean) as string[];
+  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(ids) : new Map<string, string>();
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(db, cfg.productsTable, ids);
+  return resumirDesdeItems(items as never, {
+    bultoSize: cfg.bultoSize,
+    categoryByProduct: categoryMap,
+    bultoPzasByProduct,
+    fallbackCategory: cfg.fallbackCategory,
+  });
 }
 
 /**
@@ -315,7 +313,8 @@ async function handleConfirmar(
       // Misma maquinaria que el convertir del admin: total con helpers JS +
       // RPC atómica idempotente.
       async convertir(pedido) {
-        const total = await totalParaConvertir(cfg, pedido.items);
+        const resumenLink = await resumenParaConvertir(cfg, db as never, pedido.items);
+        const total = resumenLink.total;
 
         const { data, error } = await publicosDb.rpc(cfg.convertRpc, {
           p_short_id: pedido.short_id,
@@ -338,6 +337,7 @@ async function handleConfirmar(
               cliente: pedido.cliente_nombre,
               total,
               numero,
+              resumen: { referencias: resumenLink.referencias, piezas: resumenLink.piezas },
             }),
           );
         }

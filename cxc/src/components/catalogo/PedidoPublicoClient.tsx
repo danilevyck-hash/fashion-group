@@ -10,6 +10,7 @@
 // Reebok. Si agregás un color nuevo, va al tema — no acá.
 
 import { useEffect, useRef, useState } from "react";
+import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -255,8 +256,9 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   };
 
   const renderItem = (item: OrderItem, idx: number) => {
-    const bs = theme.bulto(item.category || "footwear", item.bulto_pzas);
-    const lineTotal = item.quantity * bs * item.unit_price;
+    const l = resolverLineas([item], { bultoSize: theme.bulto, fallbackCategory: "footwear" })[0];
+    const bs = l.bulto_pzas;
+    const lineTotal = l.subtotal;
     const stock = stockPorProducto.get(item.product_id);
     const corto = !!stock && stock.disponible_pzas < stock.pedido_pzas;
     return (
@@ -295,7 +297,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
             ${fmtMoney(item.unit_price)}<span className={`text-xs font-normal ${theme.pedidoPublico.textSoft}`}> c/u</span>
           </p>
           <p className={`text-xs ${theme.pedidoPublico.textSoft} tabular-nums`}>
-            {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) · ${fmtMoney(lineTotal)}
+            {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({l.piezas} pzas) · ${fmtMoney(lineTotal)}
           </p>
         </div>
       </div>

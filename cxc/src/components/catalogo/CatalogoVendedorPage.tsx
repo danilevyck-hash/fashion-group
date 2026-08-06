@@ -8,6 +8,7 @@
 // el CHECKOUT (rediseño 5-jul) — cero llamadas en vivo a Switch desde aquí.
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
@@ -68,7 +69,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [cart, setCart] = useState<CatalogoCartItem[]>([]);
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cart.reduce((s, i) => s + i.quantity * theme.bulto(i.category, i.bulto_pzas) * Number(i.unit_price || 0), 0);
+  const cartTotal = resumirDesdeItems(cart, { bultoSize: theme.bulto }).total;
 
   // ── On mount: hidratar el carrito (session → localStorage según marca). ──
   useEffect(() => {

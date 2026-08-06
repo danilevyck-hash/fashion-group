@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { jsPDF } from "jspdf";
+import { resolverLineas, resumirPedido } from "./lineas-pedido";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
@@ -72,8 +73,11 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   const preorderItems = items.filter((i) => i.is_preorder);
 
   const totalBultos = items.reduce((s, i) => s + i.quantity, 0);
-  const totalPiezas = items.reduce((s, i) => s + i.quantity * bultoSize(i.category, i.bulto_pzas), 0);
-  const total = items.reduce((s, i) => s + i.quantity * bultoSize(i.category, i.bulto_pzas) * Number(i.unit_price), 0);
+  // Las piezas y el total NO se calculan acá: salen de la resolución única del
+  // pedido (ver `lineas-pedido.ts`). Este archivo solo DIBUJA.
+  const resumen = resumirPedido(resolverLineas(items, { bultoSize }));
+  const totalPiezas = resumen.piezas;
+  const total = resumen.total;
 
   const doc = new jsPDF("portrait");
   const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
@@ -116,10 +120,10 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     autoTable(doc, {
       startY: startY + 3,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: sectionItems.map((i) => {
-        const bs = bultoSize(i.category, i.bulto_pzas);
-        return ["", i.name, i.sku, String(i.quantity), String(i.quantity * bs), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * bs * Number(i.unit_price))}`];
-      }),
+      // Cada celda LEE de la línea resuelta: acá no se multiplica nada.
+      body: resolverLineas(sectionItems, { bultoSize }).map((l) => [
+        "", l.name, l.sku, String(l.bultos), String(l.piezas), `$${fmt(l.unit_price)}`, `$${fmt(l.subtotal)}`,
+      ]),
       styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
       headStyles: { fillColor: headFill, textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },

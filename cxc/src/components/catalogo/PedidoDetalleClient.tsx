@@ -6,6 +6,7 @@
 // draft-id de Joybees y micro-clases del tema).
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
@@ -45,10 +46,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // Bulto por item: fallback de category heredado por marca (Reebok "apparel"
   // — NUNCA inflar a 12 a ciegas; Joybees ignora la category, siempre 12).
-  const bs = useCallback((item: { category?: string; bulto_pzas?: number | null }): number =>
-    theme.bulto(item.category || theme.pdfFallbackCategory, item.bulto_pzas),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  []);
+  // Línea RESUELTA del item: piezas y subtotal ya calculados por el único
+  // lugar del sistema que multiplica (lineas-pedido.ts). Acá no se multiplica.
+  const linea = useCallback(
+    (item: OrderItem) =>
+      resolverLineas([item], {
+        bultoSize: theme.bulto,
+        fallbackCategory: theme.pdfFallbackCategory,
+      })[0],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const bs = useCallback((item: OrderItem): number => linea(item).bulto_pzas, [linea]);
   // Orden canónico de items (Reebok: categoría+SKU; default: SKU ascendente).
   const sortItems = useCallback((items: OrderItem[]): OrderItem[] =>
     theme.sortOrderItems
@@ -680,7 +689,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                         Solo se muestra cuando faltaban piezas — que nadie crea
                         que recibe 12 si hay 8. */}
                     {typeof item.disponible_pzas === "number" &&
-                      item.disponible_pzas < item.quantity * bs(item) && (
+                      item.disponible_pzas < linea(item).piezas && (
                         <div className="mt-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 tabular-nums">
                           Disponible al confirmar: {formatBultosPiezas(item.disponible_pzas, item.bulto_pzas || bs(item))}
                         </div>
@@ -695,7 +704,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                       <span className="tabular-nums">{item.quantity}</span>
                     )}
                   </td>
-                  <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{item.quantity * bs(item)}</td>
+                  <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{linea(item).piezas}</td>
                   <td className="py-2 text-right">
                     {canEdit ? (
                       <input type="number" step={1} min={0} value={item.unit_price}
@@ -705,7 +714,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                       <span className="tabular-nums">${fmt(item.unit_price)}</span>
                     )}
                   </td>
-                  <td className="py-2 text-right tabular-nums text-sm">${fmt(item.quantity * bs(item) * Number(item.unit_price))}</td>
+                  <td className="py-2 text-right tabular-nums text-sm">${fmt(linea(item).subtotal)}</td>
                   {canEdit && (
                     <td className="py-2 text-center">
                       <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">x</button>

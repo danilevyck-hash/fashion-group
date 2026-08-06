@@ -91,7 +91,7 @@ describe("🔴 el camino del DINERO: el pedido a Switch usa el bulto del estilo"
 
   it("switch-envio recibe las piezas por producto y las usa", () => {
     expect(envio).toContain("bultoPzasByProduct");
-    expect(envio).toContain("p.bultoPzasByProduct.get(item.product_id)");
+    expect(envio).toContain("bultoPzasByProduct: p.bultoPzasByProduct");
   });
 
   it("el route arma el mapa con el helper compartido", () => {
@@ -217,10 +217,11 @@ describe("🔴 lo que ve el cliente es lo que se cobra", () => {
   it("la tarjeta, el carrito y el checkout usan el mismo tamaño", () => {
     expect(leer("src/components/catalogo/CatalogoProductCard.tsx"))
       .toContain("theme.bulto(product.category, product.bulto_pzas)");
+    // Desde el arreglo de raíz nadie multiplica: todos piden la línea resuelta.
     expect(leer("src/components/catalogo/CatalogoStickyCartBar.tsx"))
-      .toContain('theme.bulto(item.category || "footwear", item.bulto_pzas)');
+      .toContain("resolverLineas([item], { bultoSize: theme.bulto");
     expect(leer("src/components/catalogo/CheckoutClient.tsx"))
-      .toContain("cfg.bulto(i.category, i.bulto_pzas)");
+      .toContain("resolverLineas([i], { bultoSize: cfg.bulto })");
   });
 
   it("la columna viaja en las dos listas de columnas de Tommy", () => {

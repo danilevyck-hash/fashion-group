@@ -5,6 +5,7 @@
 // (preorder, hoy solo Reebok).
 
 import { useState } from "react";
+import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
@@ -83,15 +84,16 @@ export default function CatalogoStickyCartBar({
   const renderItem = (item: CatalogoCartItem) => {
     // Fallback "footwear" heredado del StickyCartBar original de Reebok (solo
     // aplica a items viejos sin category en storage; Joybees ignora el arg).
-    const bs = theme.bulto(item.category || "footwear", item.bulto_pzas);
-    const lineTotal = item.quantity * bs * item.unit_price;
+    const l = resolverLineas([item], { bultoSize: theme.bulto, fallbackCategory: "footwear" })[0];
+    const bs = l.bulto_pzas;
+    const lineTotal = l.subtotal;
     const asProduct = (i: CatalogoCartItem): CatalogoProducto =>
       ({ id: i.product_id, name: i.name, sku: i.sku, price: i.unit_price, image_url: i.image_url });
     return (
       <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
         <div className="flex-1 min-w-0 mr-3">
           <span className={c.itemName}>{item.name}</span>
-          <span className={c.itemMeta}>x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
+          <span className={c.itemMeta}>x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({l.piezas} pzas)</span>
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-0.5">

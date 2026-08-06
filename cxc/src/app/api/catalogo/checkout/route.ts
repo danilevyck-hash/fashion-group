@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -85,14 +86,13 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     cfg.productsTable,
     items.map((i) => i.product_id),
   );
-  const total = items.reduce(
-    (s, i) =>
-      s +
-      Number(i.quantity) *
-        cfg.bultoSize(categoryByProduct.get(i.product_id), bultoPzasByProduct.get(i.product_id)) *
-        Number(i.unit_price),
-    0,
-  );
+  const resumen = resumirDesdeItems(items, {
+    bultoSize: cfg.bultoSize,
+    categoryByProduct,
+    bultoPzasByProduct,
+    fallbackCategory: cfg.fallbackCategory,
+  });
+  const total = resumen.total;
 
   // ── 1) Crear pedido en DB (RPC idempotente de la marca) ──
   const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {

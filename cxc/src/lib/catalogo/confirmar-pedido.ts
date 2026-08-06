@@ -28,6 +28,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 // ── Aviso de stock (S2) ──────────────────────────────────────────────────────
 
+import { resolverLineas } from "./lineas-pedido";
+
 export interface PedidoItemStock {
   product_id: string;
   name?: string;
@@ -70,13 +72,19 @@ export function computeStockLineas(
     if (it.is_preorder) continue;
     const bultos = Number(it.quantity) || 0;
     if (bultos <= 0 || !it.product_id) continue;
-    const bulto = getBulto(it);
+    // Las piezas salen del resolvedor único (lineas-pedido.ts): acá no se
+    // multiplica. `getBulto` sigue existiendo porque cada marca resuelve el
+    // tamaño distinto, pero el producto bultos × tamaño ocurre en un solo sitio.
+    const [resuelta] = resolverLineas([{ ...it, bulto_pzas: undefined }], {
+      bultoSize: () => getBulto(it),
+    });
+    const bulto = resuelta.bulto_pzas;
     lineas.push({
       product_id: it.product_id,
       name: it.name || "Producto",
       sku: it.sku || "",
       pedido_bultos: bultos,
-      pedido_pzas: bultos * bulto,
+      pedido_pzas: resuelta.piezas,
       disponible_pzas: Math.max(0, Number(disponibles.get(it.product_id)) || 0),
       bulto_pzas: bulto,
     });
