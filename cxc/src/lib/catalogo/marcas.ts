@@ -143,7 +143,7 @@ export interface MarcaConfig {
   publicosInsertClient: () => SupabaseClient;
 
   // ── Totales / categorías ──
-  bultoSize: (category?: string | null) => number;
+  bultoSize: (category?: string | null, bultoPzas?: number | null) => number;
   calcTotal: (items: ItemForTotal[]) => number;
   /** Solo Reebok: category por product_id (define bulto 6/12). null = la marca
    *  no maneja categorías (Joybees es 100% footwear, bulto 12 fijo). */
@@ -231,6 +231,14 @@ export interface MarcaConfig {
      *  oculto_manual). Reebok/Joybees mantienen la allow-list clásica
      *  (image_url/badge). */
     nombreEditable?: boolean;
+    /**
+     * ¿Se pueden marcar a mano las piezas por bulto de un estilo?
+     * Solo Tommy: sus bultos vienen de 8 o de 12 y no hay fuente de la que
+     * deducirlo (ver `tommy-bulto.ts`). En Reebok el bulto sale de la categoría
+     * y en Joybees es fijo — dejarlo editable ahí abriría una forma de
+     * contradecir una regla que no tiene excepciones.
+     */
+    bultoEditable?: boolean;
   };
   publicCatalog: {
     db: LazyDb;
@@ -438,7 +446,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     mainDb: mainServerDb,
     publicosDb: tommyServerDb,
     publicosInsertClient,
-    bultoSize: () => tommyBulto(),
+    bultoSize: (c, bultoPzas) => tommyBulto(c, bultoPzas),
     calcTotal: calculateTommyOrderTotal,
     categoryLookup: null,
     fallbackCategory: null,
@@ -481,7 +489,11 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       idField: "sku",
       // Select explícito = TODAS las columnas reales de tommy_products (regla
       // admin round-trip; el DDL 20260724150000 es la fuente).
-      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,keep_visible,image_url,active,badge,nombre_manual,created_at",
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,keep_visible,image_url,active,badge,nombre_manual,bulto_pzas,created_at",
+      // Los bultos de Tommy vienen de 8 o de 12 según el estilo y NO hay fuente
+      // de la que deducirlo (ver `tommy-bulto.ts`): es la única marca donde se
+      // marcan a mano.
+      bultoEditable: true,
       readDb: tommyServerDb,
       writeDb: tommyServerDb,
       hasDelete: false,
@@ -491,7 +503,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       // Mismo caso que Joybees: `stock` = espejo de existencia; el catálogo
       // público decide con `disponibilidad`.
       db: tommyServerDb,
-      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,badge",
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,badge,bulto_pzas",
       conInventario: false,
     },
     fallback: null,

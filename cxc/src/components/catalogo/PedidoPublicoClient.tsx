@@ -27,6 +27,8 @@ interface OrderItem {
   unit_price: number;
   category?: string;
   is_preorder?: boolean;
+  /** Tommy: piezas por bulto congeladas al confirmar el pedido. Vacío = 12. */
+  bulto_pzas?: number | null;
 }
 
 interface Order {
@@ -253,7 +255,7 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
   };
 
   const renderItem = (item: OrderItem, idx: number) => {
-    const bs = theme.bulto(item.category || "footwear");
+    const bs = theme.bulto(item.category || "footwear", item.bulto_pzas);
     const lineTotal = item.quantity * bs * item.unit_price;
     const stock = stockPorProducto.get(item.product_id);
     const corto = !!stock && stock.disponible_pzas < stock.pedido_pzas;

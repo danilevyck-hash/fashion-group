@@ -48,8 +48,16 @@ export interface EnvioParams {
   marcaLabel: string; // para la alerta Telegram
   items: EnvioItem[];
   /** Piezas por bulto según categoría del producto. */
-  bultoSize: (category: string | null | undefined) => number;
+  bultoSize: (category: string | null | undefined, bultoPzas?: number | null) => number;
   categoryByProduct: Map<string, string>;
+  /**
+   * Tommy: piezas por bulto POR PRODUCTO (`tommy_products.bulto_pzas`). Sus
+   * estilos vienen de 8 o de 12 y no hay de dónde deducirlo — ver
+   * `tommy-bulto.ts`. Este es el camino del DINERO: Switch trabaja en PIEZAS y
+   * el pedido en bultos, así que equivocar el tamaño factura de más o de menos.
+   * Vacío / marca sin la columna = el default de la marca.
+   */
+  bultoPzasByProduct?: Map<string, number | null>;
   clienteId: number;
   clienteNombre?: string | null;
   vendedorId: number;
@@ -150,7 +158,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       warnings.push(`SKU ${sku}: no se pudo verificar tallas/colores en Switch`);
     }
 
-    const bulto = p.bultoSize(p.categoryByProduct.get(item.product_id));
+    const bulto = p.bultoSize(
+      p.categoryByProduct.get(item.product_id),
+      p.bultoPzasByProduct?.get(item.product_id),
+    );
     const piezas = (item.quantity || 0) * bulto;
     lineas.push({
       sku,

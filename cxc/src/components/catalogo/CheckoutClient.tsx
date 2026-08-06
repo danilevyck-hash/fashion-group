@@ -23,6 +23,8 @@ export interface CheckoutCartItem {
   quantity: number; // bultos
   unit_price: number;
   category?: string;
+  /** Tommy: piezas por bulto del estilo (copiadas del producto). Vacío = 12. */
+  bulto_pzas?: number | null;
   is_preorder?: boolean;
 }
 
@@ -35,7 +37,7 @@ interface BrandCfg {
   /** storage keys que contienen el carrito (se leen en orden, se escriben todas) */
   cartLocal: string;
   cartSession: string | null;
-  bulto: (category?: string) => number;
+  bulto: (category?: string | null, bultoPzas?: number | null) => number;
   accent: string;
 }
 
@@ -112,7 +114,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   // ── Derivados ──
   const lineas = useMemo(() => cart.map((i) => {
-    const bulto = cfg.bulto(i.category);
+    const bulto = cfg.bulto(i.category, i.bulto_pzas);
     const piezas = i.quantity * bulto;
     return { ...i, bulto, piezas, subtotal: piezas * i.unit_price };
   }), [cart, cfg]);

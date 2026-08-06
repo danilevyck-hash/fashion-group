@@ -62,6 +62,8 @@ export interface AdminProducto {
   oculto_manual?: boolean | null;
   /** Tommy: true = nombre editado a mano (el sync no lo pisa). */
   nombre_manual?: boolean | null;
+  /** Tommy: piezas por bulto del estilo. Vacío = 12. Puede faltar pre-migración. */
+  bulto_pzas?: number | null;
 }
 
 function tieneFotoAdmin(p: AdminProducto): boolean {
@@ -150,7 +152,13 @@ export interface MarcaTheme {
   checkoutTokenKey: string;
 
   // ── Reglas de negocio client-side ──
-  bulto: (category?: string | null) => number;
+  /**
+   * Piezas por bulto. `bultoPzas` es el valor guardado en el producto y solo lo
+   * usa Tommy (`tommy_products.bulto_pzas`): sus estilos vienen de 8 o de 12 y
+   * no hay forma de deducirlo — ver `tommy-bulto.ts`. Reebok ramifica por
+   * categoría y Joybees es fijo, así que las dos ignoran el segundo argumento.
+   */
+  bulto: (category?: string | null, bultoPzas?: number | null) => number;
   calcTotal: (items: { quantity: number; unit_price: number; category?: string }[]) => number;
   /** Orden canónico de items del pedido (Reebok: categoría+SKU) o null = SKU asc. */
   sortOrderItems: (<T extends { sku: string; category?: string }>(items: T[]) => T[]) | null;
@@ -432,6 +440,13 @@ export interface MarcaTheme {
     badgeEditable: boolean;
     /** QUIRK 5 client-side: identificador y verbo del update de products. */
     productEdit: { idField: "id" | "sku"; verb: "PUT" | "POST" };
+    /**
+     * ¿Se marcan a mano las piezas por bulto? Solo Tommy: sus bultos vienen de
+     * 8 o de 12 según el estilo y no hay fuente de la que deducirlo (ver
+     * `tommy-bulto.ts`). Espejo de `products.bultoEditable` en marcas.ts, que
+     * es quien lo hace cumplir en el servidor — esto solo pinta el control.
+     */
+    bultoEditable?: boolean;
     pedidos: {
       linkBadge: string;
       linkBadgeCheck: string;
@@ -1137,7 +1152,7 @@ const TOMMY: MarcaTheme = {
   draftIdKey: "tommy_draft_id",
   checkoutTokenKey: "tommy_checkout_token",
 
-  bulto: () => tommyBulto(),
+  bulto: (c, bultoPzas) => tommyBulto(c, bultoPzas),
   calcTotal: calculateTommyOrderTotal,
   sortOrderItems: null,
   pdfFallbackCategory: "footwear",
@@ -1424,6 +1439,7 @@ const TOMMY: MarcaTheme = {
     importarTab: false,
     badgeEditable: false,
     productEdit: { idField: "sku", verb: "POST" },
+    bultoEditable: true,
     pedidos: {
       linkBadge: "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#152342]/10 text-[#152342]",
       linkBadgeCheck: "w-3 h-3 text-emerald-600",

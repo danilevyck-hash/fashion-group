@@ -7,6 +7,7 @@
 // catálogo se sincroniza por API desde Switch, cron de la marca).
 
 import { useState, useRef } from "react";
+import BultoSelector from "./BultoSelector";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob } from "@/lib/csv-export";
@@ -305,7 +306,13 @@ function ProductRow({
     <div
       className={`bg-white border rounded-lg p-3 ${product.stock === 0 ? "border-gray-100" : "border-gray-200"}`}
     >
-      <div className="flex items-center gap-3">
+      {/* 🩸 `flex-wrap` hasta `sm`: con el control de piezas por bulto (Tommy) los
+          controles ya no entran en 390 px y la fila empujaba la PÁGINA 107 px
+          hacia el costado — medido contra Joybees, que con el mismo componente
+          y sin ese control da 0. Envolver es lo correcto acá: la alternativa
+          era achicar los blancos táctiles, y estos botones deciden cuántas
+          piezas se facturan. Desde `sm` vuelve a ser una sola línea. */}
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
         {/* Image */}
         <div className={`relative w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden ${product.stock === 0 ? "opacity-40" : ""}`}>
           {tieneFoto(product) ? (
@@ -417,6 +424,21 @@ function ProductRow({
         >
           {uploading ? "Subiendo…" : tieneFoto(product) ? "Subir otra" : "Subir foto"}
         </button>
+
+        {/* Piezas por bulto del estilo (solo Tommy — ver BultoSelector). */}
+        {theme.admin.bultoEditable && (
+          <div className="flex-shrink-0">
+            <BultoSelector
+              marca={marca}
+              productId={theme.admin.productEdit.idField === "sku" ? (product.sku ?? "") : product.id}
+              productName={product.name}
+              bultoPzas={product.bulto_pzas}
+              onSaved={onComplete}
+              showToast={showToast}
+              compacto
+            />
+          </div>
+        )}
 
         {/* Ocultar / mostrar en el catálogo (sobrevive al sync). */}
         {confirmandoOculto ? (

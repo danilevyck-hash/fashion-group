@@ -201,3 +201,44 @@ export async function uploadProductPhoto(
     clearTimeout(timer);
   }
 }
+
+
+/**
+ * Guarda las PIEZAS POR BULTO de un estilo (hoy solo Tommy).
+ *
+ * `null` = volver al default de la marca (12). No se guarda "12" explícito: el
+ * default ya dice 12, y una fila con 12 escrito a mano sería un dato más que
+ * mantener sincronizado con la constante sin ganar nada.
+ *
+ * ⚠️ El id va por el campo que declara la marca (`productEdit.idField`), no
+ * siempre `id`: Tommy y Joybees editan por `sku`.
+ */
+export async function updateProductBulto(
+  marca: MarcaUiKey,
+  productId: string,
+  bultoPzas: number | null,
+): Promise<void> {
+  const theme = getMarcaTheme(marca)!;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BADGE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${theme.api}/products`, {
+      method: theme.admin.productEdit.verb,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [theme.admin.productEdit.idField]: productId, bulto_pzas: bultoPzas }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error || "No se pudo guardar las piezas por bulto.");
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Tardó demasiado. Revisa tu conexión e intenta de nuevo.");
+    }
+    if (err instanceof Error) throw err;
+    throw new Error("No se pudo guardar las piezas por bulto.");
+  } finally {
+    clearTimeout(timer);
+  }
+}

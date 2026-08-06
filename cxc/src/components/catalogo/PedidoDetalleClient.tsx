@@ -45,8 +45,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // Bulto por item: fallback de category heredado por marca (Reebok "apparel"
   // — NUNCA inflar a 12 a ciegas; Joybees ignora la category, siempre 12).
-  const bs = useCallback((item: { category?: string }): number =>
-    theme.bulto(item.category || theme.pdfFallbackCategory),
+  const bs = useCallback((item: { category?: string; bulto_pzas?: number | null }): number =>
+    theme.bulto(item.category || theme.pdfFallbackCategory, item.bulto_pzas),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   []);
   // Orden canónico de items (Reebok: categoría+SKU; default: SKU ascendente).

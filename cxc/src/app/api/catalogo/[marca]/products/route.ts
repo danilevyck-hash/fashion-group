@@ -14,6 +14,8 @@
 // `active` con la regla ÚNICA de visibilidad; DELETE (solo Reebok) = soft.
 
 import { NextRequest, NextResponse } from "next/server";
+import { normalizarBultoPzas, BULTO_TOMMY_MAX } from "@/lib/tommy-bulto";
+import { sinColumna } from "@/lib/catalogo/cols-opcionales";
 import { requireAdmin } from "@/lib/api-auth";
 import { requireRole } from "@/lib/requireRole";
 import { catalogoRoles } from "@/lib/catalogo/roles";
@@ -43,7 +45,13 @@ const EDITABLE_FIELDS = ["image_url", "badge"] as const;
 const MAX_NAME_LEN = 200;
 
 function editableFieldsDe(cfg: MarcaConfig): readonly string[] {
-  return cfg.products.nombreEditable ? [...EDITABLE_FIELDS, "name"] : EDITABLE_FIELDS;
+  const campos: string[] = [...EDITABLE_FIELDS];
+  if (cfg.products.nombreEditable) campos.push("name");
+  // `bulto_pzas` solo donde el bulto varía por estilo (hoy: Tommy). Reebok
+  // ramifica por categoría y Joybees es fijo — dejarlo editable ahí abriría una
+  // forma de contradecir una regla que no tiene excepciones.
+  if (cfg.products.bultoEditable) campos.push("bulto_pzas");
+  return campos;
 }
 // badge = etiqueta visual manual. null = sin etiqueta; o uno de estos valores.
 const VALID_BADGES = new Set(["nuevo", "oferta", "proximamente"]);
@@ -84,6 +92,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     if (error && error.message.includes("oculto_manual")) {
       ({ data, error } = await buildQuery(pcfg.cols, false));
     }
+    // Mismo respaldo para `bulto_pzas` (Tommy, DDL 20260806120000): sin él, la
+    // pantalla de administrar no carga NINGÚN producto hasta que se corra.
+    if (error && error.message.includes("bulto_pzas")) {
+      ({ data, error } = await buildQuery(sinColumna(pcfg.cols, "bulto_pzas"), false));
+    }
     if (error) {
       console.error(error);
       return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -114,6 +127,9 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   let { data, error } = await buildQuery(`${pcfg.cols},oculto_manual`);
   if (error && error.message.includes("oculto_manual")) {
     ({ data, error } = await buildQuery(pcfg.cols));
+  }
+  if (error && error.message.includes("bulto_pzas")) {
+    ({ data, error } = await buildQuery(sinColumna(pcfg.cols, "bulto_pzas")));
   }
   if (error) {
     console.error(error);
@@ -164,6 +180,26 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
       return NextResponse.json({ error: "Etiqueta inválida" }, { status: 400 });
     }
   }
+  // Validar piezas por bulto: null (= el default de la marca) o un entero 1..99.
+  // La conversión la hace `normalizarBultoPzas`, NO el llamador: con un
+  // `Number(body.x)` afuera, `null`/`""`/`[]` llegan convertidos en 0 y un 0
+  // dividiendo revienta el cálculo del pedido (misma trampa del divisor del
+  // depurador).
+  if ("bulto_pzas" in updates) {
+    const v = updates.bulto_pzas;
+    if (v === null || v === "") {
+      updates.bulto_pzas = null;
+    } else {
+      const n = normalizarBultoPzas(v);
+      if (n === null) {
+        return NextResponse.json(
+          { error: `Piezas por bulto inválidas (un número entero de 1 a ${BULTO_TOMMY_MAX}).` },
+          { status: 400 },
+        );
+      }
+      updates.bulto_pzas = n;
+    }
+  }
   // Validar image_url: string o null.
   if ("image_url" in updates) {
     const u = updates.image_url;
@@ -188,12 +224,24 @@ async function editProducto(cfg: MarcaConfig, req: NextRequest): Promise<NextRes
   }
 
   const db = await pcfg.writeDb();
-  const { data, error } = await db
-    .from(cfg.productsTable)
-    .update(updates)
-    .eq(pcfg.idField, idValue)
-    .select(pcfg.cols)
-    .single();
+  const guardar = (cols: string) =>
+    db.from(cfg.productsTable).update(updates).eq(pcfg.idField, idValue).select(cols).single();
+  let { data, error } = await guardar(pcfg.cols);
+  if (error?.message?.includes("bulto_pzas")) {
+    // Dos casos MUY distintos con el mismo síntoma:
+    //  · se está GUARDANDO bulto_pzas y la columna no existe → no hay nada que
+    //    hacer más que decirlo. Un mensaje de Postgres crudo dejaría a Daniel
+    //    tocando el botón sin saber por qué no pasa nada.
+    //  · se está guardando otra cosa y el que falla es el SELECT del
+    //    round-trip → se relee sin la columna y el guardado se respeta.
+    if ("bulto_pzas" in updates) {
+      return NextResponse.json(
+        { error: "Falta correr la migración 20260806120000 (columna bulto_pzas)." },
+        { status: 500 },
+      );
+    }
+    ({ data, error } = await guardar(sinColumna(pcfg.cols, "bulto_pzas")));
+  }
   if (error) {
     console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
