@@ -7,6 +7,7 @@
 // Es un RANGO y no un día suelto: unas vacaciones son UNA fila, no diez.
 
 import { NextRequest, NextResponse } from "next/server";
+import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
@@ -14,7 +15,7 @@ import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   const sp = req.nextUrl.searchParams;
   let q = supabaseServer
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   let b: { codigo?: string; desde?: string; hasta?: string; motivo?: string; nota?: string };
   try { b = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
   const id = (req.nextUrl.searchParams.get("id") ?? "").trim();
   if (!id) return NextResponse.json({ error: "Falta el id" }, { status: 400 });

@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { asistenciaRoles } from "@/lib/asistencia/roles";
 import * as XLSX from "xlsx-js-style";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
@@ -26,7 +27,7 @@ export const maxDuration = 60;
 const MAX_FILAS = 20000;
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
   let form: FormData;
