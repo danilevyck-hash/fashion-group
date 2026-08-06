@@ -52,6 +52,23 @@ import { armarReporte, TOLERANCIA_MIN, type Marcacion, type HorarioPersona } fro
 const leer = (rel: string) => fs.readFileSync(path.join(process.cwd(), rel), "utf8");
 const MIGRACION = `supabase/migrations/${MIGRACION_CONFIGURACION}`;
 
+/** Un cuerpo de reglas COMPLETO y válido, tal como lo manda el formulario. */
+const REGLAS_COMPLETAS: Record<string, unknown> = {
+  toleranciaTardanzaMin: "10",
+  extraMinimoMin: "15",
+  almuerzoDefaultMin: "30",
+  recargoExtraDiurno: "1.25",
+  recargoExtraNocturno: "1.5",
+  horaCorteNocturno: "18:00",
+  recargoDomingoFeriado: "1.5",
+  divisor40: "173.33",
+  divisor48: "208",
+  seguroSocialPct: "9.75",
+  seguroEducativoPct: "1.25",
+  excedenteHorasDia: "3",
+  recargoExcedenteNocturnaMixta: "2.625",
+};
+
 /** La basura que un `Number()` afuera del validador convertiría en 0. */
 const SE_VUELVEN_CERO: unknown[] = [null, undefined, "", "   ", [], {}, false];
 const NO_SON_NUMEROS: unknown[] = [NaN, Infinity, -Infinity, "abc", "8 horas", {}, []];
@@ -409,6 +426,50 @@ describe("🔴 divisor de la rata — el 0 es el que revienta el cálculo", () =
 
   it.each(SE_VUELVEN_CERO)("🔑 la basura %p se rechaza, NO se convierte en 0", (v) => {
     expect(validarDivisorRata(v, "El divisor", "208").ok).toBe(false);
+  });
+
+  it("🔴 la palabra 'divisor' NO se le muestra a nadie: es jerga del código", () => {
+    // 🩸 La contable revisó el cuadro entero, validó todo y se trabó justo acá:
+    // *"no sé a qué se refiere eso de divisores"*. Es una de las tres personas
+    // que usa la pantalla (contabilidad tiene el módulo), así que la etiqueta
+    // estaba mal, no ella.
+    const r = validarReglas({ ...REGLAS_COMPLETAS, divisor48: "0" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).not.toMatch(/divisor/i);
+      expect(r.error).toContain("horas al mes");
+      // Y dice para qué sirve, en su idioma: ella ya piensa así ("la rata de
+      // hora depende de la cantidad de horas laborables a la semana").
+      expect(r.error).toContain("rata por hora");
+    }
+    for (const campo of ["divisor40", "divisor48"] as const) {
+      const e = validarReglas({ ...REGLAS_COMPLETAS, [campo]: "abc" });
+      expect(e.ok).toBe(false);
+      if (!e.ok) expect(e.error, campo).not.toMatch(/divisor/i);
+    }
+  });
+
+  it("la pantalla dice 'Horas que se trabajan al mes' con la jornada al lado", () => {
+    const src = leer("src/app/asistencia/ConfiguracionTab.tsx");
+    expect(src).toContain('titulo="Horas que se trabajan al mes"');
+    expect(src).toContain('ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."');
+    expect(src).toContain('label="40 horas por semana"');
+    expect(src).toContain('label="48 horas por semana"');
+    // Ninguna etiqueta visible conserva la palabra vieja.
+    expect(src).not.toMatch(/label="Divisor/);
+    expect(src).not.toMatch(/titulo="Valor de la hora"/);
+  });
+
+  it("⚠️ el nombre TÉCNICO no se tocó: renombrarlo pediría otra migración a mano", () => {
+    // Solo cambió lo que se ve. Las columnas y los campos siguen igual, así que
+    // el SQL que Daniel ya tiene para correr no cambia.
+    expect(Object.keys(REGLAS_DEFAULT)).toContain("divisor40");
+    expect(Object.keys(REGLAS_DEFAULT)).toContain("divisor48");
+    const sql = leer(MIGRACION);
+    expect(sql).toContain("divisor_40");
+    expect(sql).toContain("divisor_48");
+    // Y queda escrito POR QUÉ, para que nadie lo lea como un descuido.
+    expect(leer("src/lib/asistencia/config.ts")).toMatch(/otra migración a mano/);
   });
 
   it("el piso del código y el de la migración son el mismo", () => {

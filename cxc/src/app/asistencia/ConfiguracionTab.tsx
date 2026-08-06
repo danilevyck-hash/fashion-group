@@ -409,11 +409,27 @@ export default function ConfiguracionTab() {
                   valor={form.recargoDomingoFeriado} onChange={(v) => set("recargoDomingoFeriado", v)} />
               </Bloque>
 
-              <Bloque titulo="Valor de la hora">
-                <Campo label="Divisor de 40 horas por semana" ayuda="La hora vale salario ÷ este número. El minuto es esa hora ÷ 60."
-                  sufijo="horas al mes" valor={form.divisor40} onChange={(v) => set("divisor40", v)} />
-                <Campo label="Divisor de 48 horas por semana" ayuda="Igual que el de arriba, para la jornada de 48."
-                  sufijo="horas al mes" valor={form.divisor48} onChange={(v) => set("divisor48", v)} />
+              {/* 🩸 ANTES DECÍA "Divisores" Y LA CONTABLE NO LO ENTENDIÓ. Revisó el
+                  cuadro entero, validó todo y se trabó justo acá: *"no sé a qué se
+                  refiere eso de divisores"*. Ella es una de las tres personas que
+                  usa esta pantalla (contabilidad tiene el módulo), así que la
+                  etiqueta estaba mal, no ella. Y la lógica ya la tiene —dijo *"la
+                  rata de hora depende de la cantidad de horas laborables a la
+                  semana"*—, solo faltaba decirlo en su idioma.
+
+                  ⚠️ El nombre TÉCNICO sigue siendo `divisor40` / `divisor48`, en el
+                  código y en las columnas `divisor_40` / `divisor_48` de la base.
+                  Se deja a propósito: renombrar la columna pediría otra migración a
+                  mano y no cambiaría nada de lo que la contable lee. Lo que importa
+                  es la etiqueta. */}
+              <Bloque
+                titulo="Horas que se trabajan al mes"
+                ayuda="El salario mensual se divide entre estas horas para sacar la rata por hora."
+              >
+                <Campo label="40 horas por semana" ayuda="Total de horas al mes de quien trabaja 40 horas por semana."
+                  sufijo="al mes" valor={form.divisor40} onChange={(v) => set("divisor40", v)} />
+                <Campo label="48 horas por semana" ayuda="Total de horas al mes de quien trabaja 48 horas por semana."
+                  sufijo="al mes" valor={form.divisor48} onChange={(v) => set("divisor48", v)} />
               </Bloque>
 
               <Bloque titulo="Descuentos de ley">
@@ -463,11 +479,14 @@ export default function ConfiguracionTab() {
 }
 
 function Bloque({
-  titulo, nota, children,
-}: { titulo: string; nota?: string; children: React.ReactNode }) {
+  titulo, ayuda, nota, children,
+}: { titulo: string; ayuda?: string; nota?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="text-sm font-medium text-gray-900">{titulo}</h3>
+      {/* `ayuda` explica; `nota` advierte. Van en colores distintos a propósito:
+          si todo fuera ámbar, nada llamaría la atención. */}
+      {ayuda && <p className="mt-1 text-[12px] leading-relaxed text-gray-500">{ayuda}</p>}
       {nota && <p className="mt-1 text-[12px] text-amber-800">{nota}</p>}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">{children}</div>
     </div>
