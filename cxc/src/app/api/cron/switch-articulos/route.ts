@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { syncArticulosDiario, type ArticulosSyncResult } from "@/lib/switch-api/sync-articulos";
+import { syncArticuloMarca, type ArticuloMarcaSyncResult } from "@/lib/switch-api/sync-articulo-marca";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { alertSwitchCronErrors } from "@/lib/switch-api/alert-policy";
@@ -68,6 +69,32 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  // ── Diccionario articulo_id → MARCA (solo american_classic) ───────────────
+  //
+  // Va acá y no en un cron propio porque necesita EXACTAMENTE lo mismo que este:
+  // una sesión de Switch de american_classic ya abierta y el slot horario que
+  // nadie más usa. Un cron aparte sería una segunda sesión contra la misma
+  // empresa — la colisión code 0006 que este proyecto ya pagó (CLAUDE.md).
+  //
+  // NO ES FATAL Y NO TOCA EL HEARTBEAT: si el catálogo falla, las VENTAS por
+  // artículo (que es el dato) ya se guardaron y la pestaña funciona; lo único
+  // que pasa es que el agrupador por marca queda con lo de ayer. Marcarlo como
+  // fallo del cron apagaría el heartbeat de un trabajo que sí se hizo, y eso es
+  // el error que este repo ya cometió con `all-0630` (CLAUDE.md).
+  //
+  // Solo en la corrida sin overrides: un backfill dirigido a un rango de fechas
+  // no tiene nada que ver con el catálogo, que es un snapshot de HOY.
+  let marca: ArticuloMarcaSyncResult | null = null;
+  let marcaError: string | null = null;
+  if (triggeredBy === "cron" && empresas.includes("american_classic" as (typeof universe)[number])) {
+    try {
+      marca = await syncArticuloMarca("american_classic", "cron");
+    } catch (err: unknown) {
+      marcaError = err instanceof Error ? err.message : String(err);
+      console.error("[switch-articulos] diccionario de marcas falló", err);
+    }
+  }
+
   // Heartbeat de éxito SOLO si TODAS las empresas corrieron OK. Si alguna falló,
   // NO registramos éxito (el watchdog/reconciliación lo verán stale y recuperarán)
   // y alertamos vía alertSwitchCronErrors: errores NO-401 alertan de inmediato;
@@ -83,7 +110,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json(
-    { ok: errors.length === 0, range: { desde, hasta }, results, errors },
+    { ok: errors.length === 0, range: { desde, hasta }, results, errors, marca, marcaError },
     { status: errors.length === 0 ? 200 : 207 },
   );
 }

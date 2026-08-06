@@ -603,6 +603,20 @@ export interface SwitchClient {
    *  `saldo` (existencia física) y `disponible` (disponibilidad). Una llamada por
    *  artículo — usar con moderación (no hay bulk). */
   getStock(articuloId: number | string): Promise<SwitchStockData>;
+  /**
+   * Ficha de UN artículo por CÓDIGO DE BARRA (/apiarticulos/info, doc pág 32).
+   *
+   * Es el ÚNICO endpoint que devuelve el NOMBRE de la marca (`marca`), y por eso
+   * existe acá: `/apiarticulos/lista` trae el `marcaId` pero no cómo se llama
+   * (medido el 6-ago-2026 sobre los 9.126 artículos de american_classic —
+   * `marcaId` en el 100%, campo `marca` ausente en el 100%). También trae
+   * `rubro`/`subrubro` con nombre, que la lista tampoco da.
+   *
+   * ⚠️ Va de a UNO y por `codigoBarra` (no por `articuloId`): resolver un
+   * catálogo entero por acá serían miles de requests. Se usa solo para traducir
+   * los `marcaId` NUEVOS (33 la primera vez, 0 en régimen).
+   */
+  getArticuloInfo(codigoBarra: string): Promise<SwitchArticuloInfoData>;
   /** Talla y color de UN artículo por sucursal (/apiarticulos/tallacolor, doc
    *  pág 38). Devuelve el codigoBarraId de cada combinación talla/color con
    *  saldo/disponible por sucursal. `sucursalId` opcional (de /apisucursal/lista)
@@ -712,11 +726,29 @@ export interface SwitchArticulo {
   talla: string | null;
   color: string | null;
   marcaId: number | null;
+  /** EAN del artículo. Es la llave de `/apiarticulos/info` (que va por código de
+   *  barra, no por id) — sin él no hay forma de pedir el NOMBRE de la marca. */
+  codigoBarra: string | null;
   proveedor: string | null;
 }
 
 export interface SwitchArticulosData {
   articulos: SwitchArticulo[];
+}
+
+/** Ficha de /apiarticulos/info (data.articulo). Solo lo que se consume: el
+ *  endpoint devuelve ~29 campos. `marca` es el nombre; `marcaId` el id que
+ *  también trae `/apiarticulos/lista`. */
+export interface SwitchArticuloInfo {
+  id: number;
+  codigo: string;
+  descripcion: string | null;
+  marcaId: number | null;
+  marca: string | null;
+}
+
+export interface SwitchArticuloInfoData {
+  articulo: SwitchArticuloInfo | null;
 }
 
 /** Item de /apiproveedor/lista (data.proveedores[]). */
@@ -1132,6 +1164,16 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apiproveedor/info?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getArticuloInfo(codigoBarra) {
+      const qs = new URLSearchParams({ codigoBarra: String(codigoBarra) });
+      return authedCall<SwitchArticuloInfoData>(
+        empresaKey,
+        cfg,
+        `/apiarticulos/info?${qs.toString()}`,
         "GET",
       );
     },

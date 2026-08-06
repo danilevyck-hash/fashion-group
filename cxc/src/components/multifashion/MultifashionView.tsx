@@ -7,13 +7,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  TrendingUp, Users, UserCircle, Wallet, ChevronLeft, ChevronRight,
+  TrendingUp, Users, UserCircle, Wallet, Package, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { ventanaGerente } from "@/lib/multifashion/ventana-gerente";
 import type { Multifashion } from "@/components/ventas/types";
 import { VendedorasSubtab } from "./VendedorasSubtab";
 import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
+import { ProductosSubtab } from "./ProductosSubtab";
 import { CajaSubtab } from "./CajaSubtab";
 
 // iPhone: los 4 sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de
@@ -21,8 +22,20 @@ import { CajaSubtab } from "./CajaSubtab";
 // min-h-[44px] el alto queda garantizado sin agrandar la letra ni el ancho (el
 // más angosto, "Caja", ya medía 69px de ancho). Los tabs de /ventas ya iban en
 // 44 por su py-3: esto los empareja.
+//
+// 🩸 EL ÍCONO SE ESCONDE EN CELULAR, y no es capricho: con el 5º sub-tab
+// (Productos) la tira pasó a medir 484 px contra los 390 del iPhone — 94 px
+// MEDIDOS en el navegador, o sea que "Caja" quedaba fuera de la pantalla y solo
+// se alcanzaba arrastrando la tira. Cada ícono se lleva 18 px (12 del `h-3 w-3`
+// + 6 del `gap-1.5`, que un hijo con `display:none` deja de generar) y el `px`
+// 4 más por pestaña: 5 × 22 = 110 px, suficiente para volver a 0. El ícono es
+// decoración —el rótulo queda entero— y a partir de `sm` vuelve a aparecer.
 const SUBTAB_TRIGGER_CLASS =
-  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-gray-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-xs text-gray-500 sm:px-3 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+
+/** El ícono de cada sub-tab: decorativo, y oculto en celular para que las 5
+ *  pestañas entren en 390 px sin arrastrar. Ver la nota de arriba. */
+const SUBTAB_ICON_CLASS = "hidden h-3 w-3 sm:inline-block";
 
 interface MultifashionViewProps {
   data: Multifashion;
@@ -101,6 +114,9 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
   const goPrev = () => { if (canPrev) setMes(mes - 1); };
   const goNext = () => { if (canNext) setMes(mes + 1); };
 
+  // Sub-tabs que se manejan con el selector de mes compartido.
+  const usaSelectorMes = subtab === "resumen" || subtab === "productos";
+
   // Aclaración sutil bajo el selector: cuando muestra el ÚLTIMO MES CERRADO por
   // default (ej. mayo estando en junio) explica por qué no es el mes en curso.
   // Solo en ese caso (default + año actual + el mes no es el calendario actual);
@@ -138,7 +154,11 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
       {/* Ventana acotada: no hay nada que elegir — el mes es el mes en curso y
           el servidor lo impone igual. Se muestra como etiqueta para que quede
           claro QUÉ período se está viendo, en vez de un control muerto. */}
-      {subtab === "resumen" && ventanaAcotada && (
+      {/* Los sub-tabs que leen el MES del selector compartido. Vendedoras tiene
+          sus propios chips y Clientes sus pills de rango relativo: mostrarles
+          este selector sería un control que no hace nada. Productos sí lo usa —
+          es el mismo mes del Resumen, a propósito: son la misma pregunta. */}
+      {usaSelectorMes && ventanaAcotada && (
         <div className="mb-4 flex items-center justify-end gap-2">
           <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
           <span className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-700">
@@ -147,7 +167,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
         </div>
       )}
 
-      {subtab === "resumen" && !ventanaAcotada && (
+      {usaSelectorMes && !ventanaAcotada && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
@@ -197,16 +217,19 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
       <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={SUBTAB_TRIGGER_CLASS}>
-            <TrendingUp className="h-3 w-3" /> Resumen
+            <TrendingUp className={SUBTAB_ICON_CLASS} /> Resumen
           </TabsTrigger>
           <TabsTrigger value="vendedoras" className={SUBTAB_TRIGGER_CLASS}>
-            <Users className="h-3 w-3" /> Vendedoras
+            <Users className={SUBTAB_ICON_CLASS} /> Vendedoras
+          </TabsTrigger>
+          <TabsTrigger value="productos" className={SUBTAB_TRIGGER_CLASS}>
+            <Package className={SUBTAB_ICON_CLASS} /> Productos
           </TabsTrigger>
           <TabsTrigger value="clientes" className={SUBTAB_TRIGGER_CLASS}>
-            <UserCircle className="h-3 w-3" /> Clientes
+            <UserCircle className={SUBTAB_ICON_CLASS} /> Clientes
           </TabsTrigger>
           <TabsTrigger value="caja" className={SUBTAB_TRIGGER_CLASS}>
-            <Wallet className="h-3 w-3" /> Caja
+            <Wallet className={SUBTAB_ICON_CLASS} /> Caja
           </TabsTrigger>
         </TabsList>
 
@@ -221,6 +244,12 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
         </TabsContent>
         <TabsContent value="vendedoras" className="mt-5">
           <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} ventanaAcotada={ventanaAcotada} />
+        </TabsContent>
+        <TabsContent value="productos" className="mt-5">
+          {/* No recibe `ventanaAcotada`: no tiene selector de período propio —
+              usa el mes del shell, que ya viene acotado. Y el servidor lo acota
+              igual (clampAnioMes en /api/multifashion/productos). */}
+          <ProductosSubtab selectedYear={selectedYear} mes={mes} />
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} ventanaAcotada={ventanaAcotada} />
