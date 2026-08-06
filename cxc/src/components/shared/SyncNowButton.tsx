@@ -69,7 +69,17 @@ interface SyncNowButtonProps {
   /** Sub-texto bajo el label (ej. "tarda ~3 min" en Reebok). */
   subtext?: string;
   /** Reload de los datos de la vista tras un sync exitoso. */
-  onSuccess?: () => void | Promise<void>;
+  /**
+   * Recarga los datos de la vista. **OBLIGATORIO.**
+   *
+   * 🩸 Era opcional y 8 de los 12 usos no lo pasaban: el botón sincronizaba y
+   * la pantalla se quedaba mostrando lo viejo. Daniel arregló el vendedor de
+   * unos clientes en Switch, tocó "Actualizar ahora" en Comisiones, la base
+   * quedó correcta ($35.511,65 a REINALDO) y la tabla siguió diciendo DEFAULT.
+   * Que sea obligatorio hace que el compilador encuentre al que falte, en vez
+   * de que lo encuentre alguien mirando una cifra que no cambia.
+   */
+  onSuccess: () => void | Promise<void>;
   className?: string;
 }
 
@@ -137,7 +147,7 @@ export default function SyncNowButton({
   // datos de la vista (onSuccess) — un solo lugar para ambos disparos.
   const refrescarVista = async () => {
     window.dispatchEvent(new Event("focus"));
-    await onSuccess?.();
+    await onSuccess();
   };
 
   const disparar = async (opcion: SyncNowOpcion) => {
@@ -152,7 +162,12 @@ export default function SyncNowButton({
         showToast(r.resumen ? `Listo, actualizado. ${r.resumen}` : "Listo, actualizado", false);
         await refrescarVista();
       } else if (r.tipo === "fresco") {
-        showToast(r.detalle, true);
+        // 🩸 "Fresco" NO es un error: significa que la BASE ya está al día. Lo
+        // que faltaba era traerlo a la pantalla — antes se mostraba en rojo y
+        // sin refrescar, o sea el mensaje decía "los datos están frescos"
+        // mientras la tabla seguía mostrando los viejos.
+        await refrescarVista();
+        showToast(r.detalle, false);
       } else {
         showToast(r.mensaje, true);
       }

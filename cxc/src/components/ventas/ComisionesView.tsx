@@ -72,6 +72,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const currentMonth = now.getMonth() + 1;
 
   const [mode, setMode] = useState<Mode>("todas");
+  // 🩸 Contador de recarga. "Actualizar ahora" sincroniza los RECIBOS, pero la
+  // tabla los pidió al abrir la pantalla: sin esto, Daniel arreglaba el
+  // vendedor en Switch, tocaba el botón y la tabla seguía diciendo DEFAULT con
+  // un toast que le aseguraba que los datos estaban frescos.
+  const [refreshKey, setRefreshKey] = useState(0);
   const [year, setYear] = useState<number>(currentYear);
   const [mes, setMes] = useState<number>(currentMonth);
   const [syncStale, setSyncStale] = useState(false);
@@ -151,7 +156,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
         {/* "Actualizar ahora" de RECIBOS (cobros) — vive acá porque la comisión
             sobre cobro lee switch_recibos. Menú para elegir la empresa (una por
             disparo — sesión única Switch). */}
-        <SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} className="shrink-0" />
+        <SyncNowButton
+          opciones={SYNC_NOW_RECIBOS_OPCIONES}
+          className="shrink-0"
+          onSuccess={() => setRefreshKey((k) => k + 1)}
+        />
 
         <button
           type="button"
@@ -164,9 +173,9 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
       </div>
 
       {mode === "todas" ? (
-        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} />
+        <ComisionesConsolidadoView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
       ) : (
-        <ComisionesPorEmpresaView year={year} mes={mes} onExcel={registrarExcel} />
+        <ComisionesPorEmpresaView year={year} mes={mes} onExcel={registrarExcel} refreshKey={refreshKey} />
       )}
     </div>
   );

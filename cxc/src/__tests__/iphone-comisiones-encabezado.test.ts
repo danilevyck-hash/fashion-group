@@ -362,7 +362,67 @@ describe("Comisiones — 44px al tacto y cero scroll lateral en iPhone", () => {
     // costado. shrink-0 evita que un control se achique y parta su texto.
     const barra = barraDeControles();
     expect(barra).toContain("flex flex-wrap items-center");
-    expect(barra).toContain('<SyncNowButton opciones={SYNC_NOW_RECIBOS_OPCIONES} className="shrink-0" />');
+    // Se verifica lo que IMPORTA (que el botón no se comprima), no el formato
+    // exacto del JSX: fijarlo a una línea hizo fallar este test cuando el botón
+    // ganó `onSuccess`, que no tiene nada que ver con el layout.
+    const boton = /<SyncNowButton[\s\S]*?\/>/.exec(barra)?.[0] ?? "";
+    expect(boton).toContain("SYNC_NOW_RECIBOS_OPCIONES");
+    expect(boton).toContain('className="shrink-0"');
     expect(periodo).toContain("shrink-0");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 "Actualizar ahora" tiene que RECARGAR lo que se ve.
+//
+// Daniel arregló el vendedor de unos clientes en Switch, tocó el botón en
+// Comisiones, la base quedó correcta ($35.511,65 a REINALDO ESPINOSA) y la
+// tabla siguió diciendo DEFAULT — con un toast ROJO que le aseguraba que "los
+// datos están frescos". Eran frescos en la base y viejos en la pantalla.
+//
+// Dos defectos, los dos de raíz:
+//   1. `onSuccess` era OPCIONAL y Comisiones no lo pasaba.
+//   2. La rama "fresco" (cooldown) ni refrescaba ni era un éxito.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 sincronizar y no refrescar es peor que no sincronizar", () => {
+  const boton = readFileSync(
+    path.join(process.cwd(), "src/components/shared/SyncNowButton.tsx"),
+    "utf8",
+  );
+
+  it("onSuccess es OBLIGATORIO — que lo cace el compilador", () => {
+    // Con `?` había 12 usos y 8 sin recarga. Ninguno se iba a notar hasta que
+    // alguien mirara una cifra que no cambiaba.
+    expect(boton).toContain("onSuccess: () => void | Promise<void>;");
+    expect(boton).not.toContain("onSuccess?: ()");
+    expect(boton).toContain("await onSuccess();");
+  });
+
+  it('"ya está fresco" REFRESCA la vista y NO es un error', () => {
+    const rama = /r\.tipo === "fresco"[\s\S]*?\} else \{/.exec(boton)?.[0] ?? "";
+    expect(rama).toContain("await refrescarVista()");
+    expect(rama).toContain("showToast(r.detalle, false)"); // false = verde, 3s
+    expect(rama).not.toContain("showToast(r.detalle, true)");
+  });
+
+  it("Comisiones recarga la tabla al terminar", () => {
+    const vista = readFileSync(
+      path.join(process.cwd(), "src/components/ventas/ComisionesView.tsx"),
+      "utf8",
+    );
+    expect(vista).toContain("onSuccess={() => setRefreshKey((k) => k + 1)}");
+    expect(vista).toContain("refreshKey={refreshKey}");
+  });
+
+  it("y las dos vistas hijas vuelven a pedir los datos", () => {
+    for (const f of [
+      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/components/ventas/ComisionesConsolidadoView.tsx",
+    ]) {
+      const src = readFileSync(path.join(process.cwd(), f), "utf8");
+      expect(src, f).toContain("refreshKey");
+      // El contador tiene que estar en las dependencias, si no no dispara nada.
+      expect(src, `${f}: refreshKey no está en las deps`).toMatch(/\}, \[[^\]]*refreshKey\]\)/);
+    }
   });
 });

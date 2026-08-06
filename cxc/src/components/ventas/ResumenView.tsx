@@ -337,7 +337,7 @@ export function ResumenView({
               empresas: UN clic actualiza facturas de las 8 EN SECUENCIA (sin
               menú; sesión única Switch — nunca 2 a la vez) + refresh-vistas
               como paso final (rollup mensual y vw de clientes al día). */}
-          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={onReloadData} />
+          <SyncNowButton opciones={SYNC_NOW_VENTAS_SECUENCIA} secuencial onSuccess={() => onReloadData?.()} />
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-gray-100 p-0.5 text-xs">
