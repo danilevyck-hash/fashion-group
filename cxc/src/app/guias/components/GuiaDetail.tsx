@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import type { Guia } from "./types";
 import PrintDocument from "./PrintDocument";
 import HojaEscalada from "./HojaEscalada";
+import { construirPdfGuia, nombreArchivoGuia } from "@/lib/guias/pdf-guia";
+import { compartirArchivo } from "@/lib/compartir-archivo";
+import { useToast } from "@/components/ToastSystem";
+import { fmtGuia } from "@/lib/format";
 
 interface GuiaDetailProps {
   guia: Guia;
@@ -10,15 +15,52 @@ interface GuiaDetailProps {
 }
 
 export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
+  const { toast } = useToast();
+  const [compartiendo, setCompartiendo] = useState(false);
+
+  // Compartir la guía como PDF por WhatsApp, correo o lo que ofrezca el celular.
+  //
+  // ⚠️ El PDF se arma ANTES de llamar a la hoja de compartir y sin ningún
+  // `await` en el medio: Safari en iOS solo deja abrirla dentro del gesto del
+  // toque, y un `await` largo hace que deje de contar como tal.
+  async function compartir() {
+    setCompartiendo(true);
+    try {
+      const blob = construirPdfGuia(guia).output("blob");
+      const archivo = new File([blob], nombreArchivoGuia(guia), { type: "application/pdf" });
+      const r = await compartirArchivo(archivo, {
+        title: `Guía ${fmtGuia(guia.numero)}`,
+        text: `Guía de transporte ${fmtGuia(guia.numero)} — Fashion Group`,
+      });
+      if (r === "descargado") toast("Guía descargada — revisa tu carpeta de descargas", "success");
+    } catch {
+      toast("No se pudo preparar la guía. Intenta de nuevo en unos segundos.", "error");
+    } finally {
+      setCompartiendo(false);
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center gap-4 mb-8 no-print">
+      <div className="flex flex-wrap items-center gap-3 mb-8 no-print">
         <button onClick={onBack} className="inline-flex min-h-[44px] items-center text-sm text-gray-400 hover:text-black transition">
           ← Guías
         </button>
         <button
+          onClick={() => void compartir()}
+          disabled={compartiendo}
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 text-sm bg-black text-white px-6 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+            <path d="M12 16V4" />
+            <path d="m8 8 4-4 4 4" />
+            <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+          </svg>
+          {compartiendo ? "Preparando…" : "Compartir"}
+        </button>
+        <button
           onClick={() => window.print()}
-          className="inline-flex min-h-[44px] items-center justify-center text-sm bg-black text-white px-6 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+          className="inline-flex min-h-[44px] items-center justify-center text-sm border border-gray-200 text-gray-700 px-6 rounded-md font-medium hover:border-gray-400 hover:text-black active:scale-[0.97] transition-all"
         >
           Imprimir
         </button>
