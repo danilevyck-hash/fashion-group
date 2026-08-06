@@ -51,13 +51,15 @@ export interface EnvioParams {
   bultoSize: (category: string | null | undefined, bultoPzas?: number | null) => number;
   categoryByProduct: Map<string, string>;
   /**
-   * Tommy: piezas por bulto POR PRODUCTO (`tommy_products.bulto_pzas`). Sus
-   * estilos vienen de 8 o de 12 y no hay de dónde deducirlo — ver
-   * `tommy-bulto.ts`. Este es el camino del DINERO: Switch trabaja en PIEZAS y
-   * el pedido en bultos, así que equivocar el tamaño factura de más o de menos.
-   * Vacío / marca sin la columna = el default de la marca.
+   * Tommy: piezas por bulto POR PRODUCTO (`tommy_products.bulto_pzas`).
+   *
+   * 🩸 OBLIGATORIO A PROPÓSITO, aunque un mapa vacío se comporte igual que no
+   * pasarlo. Cuando era opcional, dos de los tres llamadores no lo pasaban y el
+   * pedido TOM-003 salió a Switch con 12 piezas de un estilo de 8. Que sea
+   * obligatorio hace que el compilador encuentre al que falte. Se arma con
+   * `leerCategoriaYBulto`, que devuelve este mapa junto con el de categorías.
    */
-  bultoPzasByProduct?: Map<string, number | null>;
+  bultoPzasByProduct: Map<string, number | null>;
   clienteId: number;
   clienteNombre?: string | null;
   vendedorId: number;
@@ -160,7 +162,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
 
     const bulto = p.bultoSize(
       p.categoryByProduct.get(item.product_id),
-      p.bultoPzasByProduct?.get(item.product_id),
+      p.bultoPzasByProduct.get(item.product_id),
     );
     const piezas = (item.quantity || 0) * bulto;
     lineas.push({

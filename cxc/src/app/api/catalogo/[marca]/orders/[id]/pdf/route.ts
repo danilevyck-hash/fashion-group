@@ -4,6 +4,7 @@
 // de la confirmación del checkout.
 
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { buildCatalogoOrderPdf, type PdfOrderItem } from "@/lib/catalogo/order-pdf";
@@ -29,11 +30,11 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
 
   const row = order as unknown as Record<string, unknown>;
   const rawItems = (row[cfg.itemsRelation] ?? []) as Array<Record<string, unknown>>;
-  const { data: prods } = await db
-    .from(cfg.productsTable)
-    .select("id, category")
-    .in("id", rawItems.map((i) => i.product_id));
-  const categoryMap = new Map((prods || []).map((p) => [String(p.id), p.category as string]));
+  const { categoryByProduct: categoryMap, bultoPzasByProduct } = await leerCategoriaYBulto(
+    db as never,
+    cfg.productsTable,
+    rawItems.map((i) => String(i.product_id)),
+  );
 
   const items: PdfOrderItem[] = rawItems.map((i) => ({
     sku: String(i.sku ?? ""),
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     image_url: String(i.image_url ?? ""),
     is_preorder: i.is_preorder === true,
     category: categoryMap.get(String(i.product_id)) || cfg.pdfFallbackCategory,
+    bulto_pzas: bultoPzasByProduct.get(String(i.product_id)) ?? null,
   }));
 
   const pdf = await buildCatalogoOrderPdf({

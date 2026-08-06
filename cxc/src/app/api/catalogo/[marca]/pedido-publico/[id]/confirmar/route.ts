@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import {
   checkConfirmRateLimit,
@@ -132,11 +133,11 @@ async function enviarPedidoDelLinkASwitch(
     return;
   }
 
-  const { data: prods } = await db
-    .from(cfg.productsTable)
-    .select("id, category")
-    .in("id", items.map((i) => i.product_id));
-  const categoryByProduct = new Map((prods || []).map((p) => [String(p.id), p.category as string]));
+  const { categoryByProduct, bultoPzasByProduct } = await leerCategoriaYBulto(
+    db as never,
+    cfg.productsTable,
+    items.map((i) => i.product_id),
+  );
 
   const result = await enviarPedidoSwitch({
     empresaKey: cfg.empresaKey,
@@ -148,6 +149,7 @@ async function enviarPedidoDelLinkASwitch(
     items,
     bultoSize: cfg.bultoSize,
     categoryByProduct,
+    bultoPzasByProduct,
     clienteId,
     clienteNombre,
     vendedorId,
@@ -274,9 +276,12 @@ async function handleConfirmar(
       },
 
       // Reebok: bulto por categoría con default footwear (patrón original del
-      // aviso de stock). Joybees: bulto 12 fijo.
-      getBulto: (category) =>
-        cfg.marca === "reebok" ? cfg.bultoSize(category || "footwear") : cfg.bultoSize(),
+      // aviso de stock). Joybees: 12 fijo. Tommy: 8 o 12 según el ESTILO, por
+      // eso se pasa el item entero y no solo la categoría.
+      getBulto: (item) =>
+        cfg.marca === "reebok"
+          ? cfg.bultoSize(item.category || "footwear")
+          : cfg.bultoSize(item.category, item.bulto_pzas),
 
       // TOLERANTE a migraciones pendientes: primero se intenta con la foto de
       // stock (columna stock_confirmacion, DDL 20260725130000) y, si esa

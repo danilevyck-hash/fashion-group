@@ -15,7 +15,7 @@ import {
   type PedidoPublicoRow,
 } from "@/lib/catalogo/confirmar-pedido";
 
-const bultoReebok = (category?: string) => (category === "footwear" ? 12 : 6);
+const bultoReebok = (item) => (item.category === "footwear" ? 12 : 6);
 const bultoJoybees = () => 12;
 
 function pedidoBase(overrides: Partial<PedidoPublicoRow> = {}): PedidoPublicoRow {
