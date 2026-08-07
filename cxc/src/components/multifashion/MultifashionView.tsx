@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -114,8 +114,18 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
   const goPrev = () => { if (canPrev) setMes(mes - 1); };
   const goNext = () => { if (canNext) setMes(mes + 1); };
 
+  // Período de Productos. Vive ACÁ y no adentro del sub-tab porque decide si el
+  // selector de mes compartido tiene sentido o no: con "Últimos 12 meses" el mes
+  // no elige nada, y dejar los dos controles en pantalla es la forma más fácil
+  // de mirar un período creyendo que se mira otro (la advertencia que ya estaba
+  // escrita en este archivo). El rol acotado no puede pedir 12 meses.
+  const [periodoProductos, setPeriodoProductos] = useState<"mes" | "12m">(
+    ventanaAcotada ? "mes" : "12m",
+  );
+
   // Sub-tabs que se manejan con el selector de mes compartido.
-  const usaSelectorMes = subtab === "resumen" || subtab === "productos";
+  const usaSelectorMes =
+    subtab === "resumen" || (subtab === "productos" && periodoProductos === "mes");
 
   // Aclaración sutil bajo el selector: cuando muestra el ÚLTIMO MES CERRADO por
   // default (ej. mayo estando en junio) explica por qué no es el mes en curso.
@@ -246,10 +256,17 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
           <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} ventanaAcotada={ventanaAcotada} />
         </TabsContent>
         <TabsContent value="productos" className="mt-5">
-          {/* No recibe `ventanaAcotada`: no tiene selector de período propio —
-              usa el mes del shell, que ya viene acotado. Y el servidor lo acota
-              igual (clampAnioMes en /api/multifashion/productos). */}
-          <ProductosSubtab selectedYear={selectedYear} mes={mes} />
+          {/* `ventanaAcotada` esconde la píldora de "Últimos 12 meses", que cae
+              entera fuera de lo que Jennifer puede ver. Esconderla NO es el
+              candado: el servidor aplasta `periodo=12m` a "mes"
+              (clampPeriodoProductos en /api/multifashion/productos). */}
+          <ProductosSubtab
+            selectedYear={selectedYear}
+            mes={mes}
+            periodo={periodoProductos}
+            onPeriodoChange={setPeriodoProductos}
+            ventanaAcotada={ventanaAcotada}
+          />
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} ventanaAcotada={ventanaAcotada} />

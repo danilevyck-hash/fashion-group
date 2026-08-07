@@ -238,7 +238,11 @@ describe("candado estático — /api/multifashion/productos", () => {
 
   it("acota la ventana de gerente_acs en el SERVIDOR", () => {
     expect(src).toContain('from "@/lib/multifashion/ventana-gerente"');
-    expect(src).toMatch(/clampAnioMes\(\s*auth\.role/);
+    // El clamp pasó de `clampAnioMes` a `clampPeriodoProductos` cuando la ruta
+    // ganó el parámetro `periodo`: acotar year/mes ya no alcanzaba, porque con
+    // `periodo=12m` la ruta ni los mira. Lo que se exige sigue siendo lo mismo
+    // — que el rol de la SESIÓN acote el período ANTES de tocar la base.
+    expect(src).toMatch(/clampPeriodoProductos\(\s*\n?\s*auth\.role/);
   });
 
   it("la empresa es una CONSTANTE, no un parámetro de la URL", () => {

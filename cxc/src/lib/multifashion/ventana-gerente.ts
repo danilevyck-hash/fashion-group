@@ -206,6 +206,42 @@ export function clampFechaDia(
   return { fecha: v.hoy, ajustado: true };
 }
 
+export type PeriodoProductos = "mes" | "12m";
+
+export interface ClampProductos {
+  periodo: PeriodoProductos;
+  year: number;
+  mes: number | null;
+  ajustado: boolean;
+}
+
+/**
+ * Ranking de productos: además del mes, acepta una ventana de 12 meses — que
+ * cae ENTERA fuera de lo que Jennifer puede ver. Para el rol acotado se fuerza
+ * `periodo='mes'` con el mes en curso, exactamente como `clampPeriodoVendedoras`
+ * aplasta trimestre/YTD/rolling.
+ *
+ * 🩸 Sin esto, `?periodo=12m` sería un bypass de UNA palabra: la ruta no mira
+ * `year`/`mes` cuando el período es 12m, así que acotar solo esos dos no cierra
+ * nada. Es el mismo agujero que tendría esconder la píldora en la UI.
+ */
+export function clampPeriodoProductos(
+  role: string | null | undefined,
+  entrada: { periodo: PeriodoProductos; year: number; mes: number | null },
+  ahora: Date,
+): ClampProductos {
+  if (!esRolAcotado(role)) {
+    return { ...entrada, ajustado: false };
+  }
+  const { year, mes } = clampAnioMes(role, { year: entrada.year, mes: entrada.mes }, ahora);
+  return {
+    periodo: "mes",
+    year,
+    mes,
+    ajustado: entrada.periodo !== "mes" || year !== entrada.year || entrada.mes !== mes,
+  };
+}
+
 export type PeriodoVendedoras = "mes" | "trimestre" | "ytd" | "ultimos";
 
 export interface ClampVendedoras {

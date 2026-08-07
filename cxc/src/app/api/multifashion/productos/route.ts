@@ -1,14 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Endpoint del sub-tab "Productos" de Multifashion: lo más vendido del mes,
-// agrupado por ARTÍCULO y por MARCA (unidades, monto y % del total).
+// Endpoint del sub-tab "Productos" de Multifashion: lo más vendido del período,
+// agrupado por CATEGORÍA (la `descripcion` de Switch), por ARTÍCULO (el código)
+// y por MARCA — con unidades, venta, costo, utilidad y margen.
 //
 // Fuente: `switch_articulo_diario` (american_classic), que mantiene al día el
 // cron `switch-articulos` (08:40 UTC). No se le pide NADA a Switch en vivo.
 //
 // Query params (los mismos que overview / detalle-mensual, para que el selector
 // de período del módulo sirva sin traducción):
-//   year int — default: año actual
-//   mes  int — 1..12, default: mes en curso (año actual) / 12 (año cerrado)
+//   year    int — default: año actual
+//   mes     int — 1..12, default: mes en curso (año actual) / 12 (año cerrado)
+//   periodo "mes" | "12m" — default "mes"
+//
+// ⚠️ El default del PARÁMETRO es "mes" y el de la PANTALLA es "12m", y no es un
+// descuido: la ruta ya tenía llamadores (y candados) que piden un mes sin decir
+// `periodo`, y cambiarle el default por debajo les habría cambiado el número que
+// devuelven sin que nadie tocara esa línea. La pantalla manda `periodo=12m`
+// explícito.
 //
 // ── LAS TRES COSAS QUE ESTA RUTA NO PUEDE HACER MAL ─────────────────────────
 //
@@ -23,21 +31,27 @@
 //    `src/lib/multifashion/productos.ts` — módulo puro, con su candado.
 //
 // 3. SE LEE PAGINADO. `db-max-rows` = 1000 y PostgREST corta EN SILENCIO. El mes
-//    más grande medido (dic-2025) tiene 5.321 filas: sin paginar se leerían
-//    1.000 y la pestaña mostraría el 19% de las ventas SIN UN SOLO ERROR. Por eso
-//    va `leerTodoPaginado`, que además verifica contra un COUNT exacto.
+//    más grande medido (dic-2025) tiene 5.321 filas y la ventana de 12 meses
+//    **21.749** (medido contra producción el 7-ago-2026): sin paginar se
+//    leerían 1.000 y la pestaña mostraría el 4,6% de las ventas SIN UN SOLO
+//    ERROR. Por eso va `leerTodoPaginado`, que además verifica contra un COUNT
+//    exacto.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { clampAnioMes } from "@/lib/multifashion/ventana-gerente";
+import { clampPeriodoProductos, type PeriodoProductos } from "@/lib/multifashion/ventana-gerente";
+// `agregarProductos` (agrupador por MARCA) sigue igual: su `FilaArticuloDiario`
+// es un subconjunto de la de acá (le sobra `costo_total`), así que la MISMA
+// lectura alimenta a los dos sin copiar filas ni pedirlas dos veces.
+import { agregarProductos, type FilaMarca } from "@/lib/multifashion/productos";
 import {
-  agregarProductos,
+  agregarRanking,
+  rango12Meses,
   type FilaArticuloDiario,
-  type FilaMarca,
-} from "@/lib/multifashion/productos";
+} from "@/lib/multifashion/productos-ranking";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -73,15 +87,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
+  const periodoParam = (sp.get("periodo") ?? "mes").toLowerCase();
+  if (periodoParam !== "mes" && periodoParam !== "12m") {
+    return NextResponse.json({ error: "periodo inválido (mes | 12m)" }, { status: 400 });
+  }
+
   // CANDADO gerente_acs — ver el punto 1 del encabezado. Admin no cambia en nada.
-  const acotado = clampAnioMes(auth.role, { year: yearPedido, mes: mesPedido }, now);
+  // Se acota el PERÍODO, no solo year/mes: con `periodo=12m` la ruta ni mira
+  // year/mes, así que un clamp que solo tocara esos dos no cerraría nada.
+  const acotado = clampPeriodoProductos(
+    auth.role,
+    { periodo: periodoParam as PeriodoProductos, year: yearPedido, mes: mesPedido },
+    now,
+  );
+  const periodo = acotado.periodo;
   const year = acotado.year;
   const mes = acotado.mes as number;
 
-  // `fecha` es DATE pelado, así que el mes se acota con dos fechas de calendario
-  // (nada de timestamps ni zonas horarias: no hay hora que correr).
-  const desde = `${year}-${dd(mes)}-01`;
-  const hasta = `${year}-${dd(mes)}-${dd(new Date(Date.UTC(year, mes, 0)).getUTCDate())}`;
+  // `fecha` es DATE pelado, así que el período se acota con dos fechas de
+  // calendario (nada de timestamps ni zonas horarias: no hay hora que correr).
+  const ventana = rango12Meses(now);
+  const desde = periodo === "12m" ? ventana.desde : `${year}-${dd(mes)}-01`;
+  const hasta =
+    periodo === "12m"
+      ? ventana.hasta
+      : `${year}-${dd(mes)}-${dd(new Date(Date.UTC(year, mes, 0)).getUTCDate())}`;
 
   try {
     // ── Ventas del período. PAGINADO — ver el punto 3 del encabezado. El orden
@@ -93,7 +123,7 @@ export async function GET(req: NextRequest) {
         supabaseServer
           .from("switch_articulo_diario")
           .select(
-            "articulo_id, codigo, descripcion, tipo, cantidad_total, venta_total",
+            "articulo_id, codigo, descripcion, tipo, cantidad_total, venta_total, costo_total",
             pedirCount ? { count: "exact" } : {},
           )
           .eq("empresa_key", EMPRESA)
@@ -130,9 +160,26 @@ export async function GET(req: NextRequest) {
 
     const resumen = agregarProductos(filas, marcas, TOP_N);
 
+    // ── Los dos agrupadores que pidió Daniel ──────────────────────────────────
+    // Se devuelven ENTEROS (todas las categorías y todos los códigos), no un top
+    // N: la pantalla ordena por cualquier columna con un clic y busca por código
+    // o descripción, y las dos cosas serían MENTIRA sobre un top recortado en el
+    // servidor — "el artículo de mayor margen" saldría del top 50 por unidades,
+    // no del catálogo.
+    //
+    // COSTO MEDIDO (7-ago-2026, ventana de 12 meses en vivo): 570 categorías + 3.925
+    // códigos = **776 KB de JSON crudo, 126 KB comprimido** (Vercel comprime en
+    // el borde). Con SWR cacheando 5 minutos es una descarga por sesión y por
+    // período. Si algún día no alcanza, lo que hay que mover al servidor es el
+    // ORDEN y el FILTRO completos — NO cortar la lista, que es lo que vuelve
+    // mentira al buscador.
+    const porCategoria = agregarRanking(filas, "categoria");
+    const porCodigo = agregarRanking(filas, "codigo");
+
     return NextResponse.json({
       year,
       mes,
+      periodo,
       desde,
       hasta,
       /** Filas crudas leídas — el número que prueba que no hubo truncado. */
@@ -140,6 +187,11 @@ export async function GET(req: NextRequest) {
       marcaDisponible,
       marcaError,
       ...resumen,
+      ranking: {
+        totales: porCategoria.totales,
+        categorias: porCategoria.filas,
+        codigos: porCodigo.filas,
+      },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "error inesperado";
