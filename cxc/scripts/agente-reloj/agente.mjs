@@ -76,10 +76,35 @@ async function probar(config) {
     log(`✔ fashiongr contesta. Leído hasta: ${estado?.estado?.leido_hasta ?? "(nunca)"}`);
   } catch (e) {
     log(`✘ No se llegó a fashiongr: ${e.message}`);
+    if (/no autorizado|401/i.test(e.message)) pistaLlave(config);
     return false;
   }
   log("Todo bien. Ya se puede instalar para que arranque solo.");
   return true;
+}
+
+/**
+ * Qué mirar cuando el servidor dice "No autorizado".
+ *
+ * 🩸 Ese mensaje es de una sola palabra y tiene DOS causas muy distintas: la
+ * llave no coincide con la de Vercel, o la dirección no es la buena y la llave
+ * se perdió en el redirect (ver `normalizarBase`). Sin esta pista hay que
+ * adivinar cuál de las dos, y la llave no se puede mirar por chat.
+ *
+ * ⚠️ NUNCA se imprime la llave. Solo su LARGO y sus dos extremos — alcanza para
+ * cazar el error típico (se copió con un espacio, o quedó "PONER-LA-LLAVE-AQUI")
+ * sin que quede escrita en un log que después se manda por WhatsApp.
+ */
+function pistaLlave(config) {
+  const s = config.secret ?? "";
+  const extremos = s.length >= 4 ? `${s.slice(0, 1)}…${s.slice(-1)}` : "(muy corta)";
+  log("");
+  log("Qué revisar en el archivo .env de esta carpeta:");
+  log(`  1. FASHIONGR_SECRET — la que está puesta mide ${s.length} caracteres (${extremos}).`);
+  log("     Tiene que ser IGUAL a ASISTENCIA_INGEST_SECRET en Vercel. Escríbela a");
+  log("     mano: al copiar y pegar suele venirse un espacio pegado.");
+  log(`  2. FASHIONGR_URL — tiene que ser https://www.fashiongr.com (ahora: ${config.base}).`);
+  log("");
 }
 
 async function main() {
@@ -106,6 +131,10 @@ async function main() {
 
   const unaVez = args.includes("--una-vez");
 
+  // La pista de la llave se imprime UNA vez, no en cada vuelta: con vueltas de
+  // 3 minutos, repetirla convertiría el log en una pared de texto igual.
+  let yaExpliqueLaLlave = false;
+
   // Bucle sin fin y sin salidas. Lo único que puede terminarlo es que Windows
   // apague la máquina, y en ese caso arranca solo cuando se prenda.
   for (;;) {
@@ -116,6 +145,9 @@ async function main() {
           `Vuelta lista: ${r.traidos} del reloj · ${r.guardados} nuevas · ` +
             `${r.descartados} descartadas${r.pedidoCerrado ? " · pedido 'Traer ahora' cumplido" : ""}.`,
         );
+      } else if (!yaExpliqueLaLlave && /no autorizado|401/i.test(r.error ?? "")) {
+        pistaLlave(config);
+        yaExpliqueLaLlave = true;
       }
     } catch (e) {
       // Red de seguridad final. `darVuelta` promete no lanzar; si igual lanzara

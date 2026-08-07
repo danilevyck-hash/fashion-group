@@ -29,6 +29,41 @@ export const VUELTA_MIN_DEFAULT = 3;
  *  largo con la PC apagada y sigue siendo barato (un día tiene ~300 eventos). */
 export const VENTANA_DIAS_DEFAULT = 3;
 
+/**
+ * Corrige la dirección de fashiongr antes de usarla.
+ *
+ * 🩸 MEDIDO EL 7-AGO-2026 EN LA PC DE LA OFICINA. `https://fashiongr.com` (sin
+ * `www`) contesta **307** y manda a `https://www.fashiongr.com`. En un redirect
+ * hacia OTRO host, `fetch` **descarta el encabezado `Authorization`** — lo manda
+ * el estándar, no es un bug de Node. O sea: el agente llegaba al servidor SIN
+ * credencial y recibía `No autorizado`, un mensaje que hace sospechar de la
+ * llave cuando la llave estaba perfecta. Se perdió media hora buscando ahí.
+ *
+ * Por eso la corrección vive ACÁ y no en el `.env`: quien instale el agente
+ * mañana puede copiar un ejemplo viejo o escribir la dirección a mano, y el
+ * error no se ve — se ve como "la llave está mal".
+ */
+export function normalizarBase(url) {
+  const crudo = String(url ?? "").trim().replace(/\/+$/, "");
+  if (!crudo) return "https://www.fashiongr.com";
+  const conEsquema = /^https?:\/\//i.test(crudo) ? crudo : `https://${crudo}`;
+  try {
+    const u = new URL(conEsquema);
+    const host = u.hostname.toLowerCase();
+    if (host === "fashiongr.com" || host === "www.fashiongr.com") {
+      // `http://` también redirige (a `https://`), y un cambio de esquema es
+      // igual de "otro origen" para el estándar: la llave se pierde igual.
+      u.hostname = "www.fashiongr.com";
+      u.protocol = "https:";
+    }
+    return u.origin + u.pathname.replace(/\/+$/, "");
+  } catch {
+    // Una dirección que ni siquiera se puede leer se devuelve tal cual: que
+    // reviente al usarla, con su mensaje, en vez de inventar otra en silencio.
+    return conEsquema;
+  }
+}
+
 function parsearEnv(texto) {
   const salida = {};
   for (const linea of texto.split(/\r?\n/)) {
@@ -80,7 +115,7 @@ export function leerConfig(ruta = join(CARPETA, ".env")) {
     host: env.RELOJ_HOST.startsWith("http") ? env.RELOJ_HOST : `http://${env.RELOJ_HOST}`,
     usuario: env.RELOJ_USUARIO,
     clave: env.RELOJ_CLAVE,
-    base: (env.FASHIONGR_URL || "https://fashiongr.com").replace(/\/+$/, ""),
+    base: normalizarBase(env.FASHIONGR_URL),
     secret: env.FASHIONGR_SECRET,
     // 🔑 Tiene que ser EXACTAMENTE el nombre con el que ya están guardadas las
     // 3.287 marcaciones. Otro nombre = el índice único no reconoce nada y se
