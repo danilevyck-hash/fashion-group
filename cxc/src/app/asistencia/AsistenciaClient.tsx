@@ -21,34 +21,52 @@
 // `asistencia-una-sola-entrada.test.ts`. Si alguien reintroduce una segunda vía
 // con otro `dispositivo`, el build se pone en rojo.
 
+// ── 🩸 POR QUÉ SON 4 PESTAÑAS Y NO 7 (6-ago-2026) ────────────────────────────
+//
+// Eran Reporte · Planilla · Configuración · Horarios · Justificaciones ·
+// Feriados · Cómo funciona. Siete pestañas ya no son una herramienta: son un
+// menú, y todas pesan lo mismo aunque no valgan lo mismo.
+//
+// UNA PESTAÑA SE GANA EL LUGAR POR LO QUE HACÉS AHÍ, NO POR LA TABLA QUE GUARDA.
+//   · Feriados se toca UNA VEZ AL AÑO (los 22 de Panamá ya están cargados).
+//   · Horarios se toca cuando entra alguien.
+// Las dos pasaron a ser SECCIONES de Configuración, que es exactamente lo que
+// son: números que se dejan puestos para que el cálculo signifique algo. No se
+// borró nada — cambió dónde vive.
+//
+// "Cómo funciona" es AYUDA, no un lugar de trabajo, y ocupaba el mismo peso
+// visual que la Planilla. Ahora es el botón «?» del final de la barra.
+//
+// EL ORDEN también cambió: Planilla PRIMERA. La contable entra dos veces al mes
+// y entra a eso; el Reporte es el detalle que la sostiene, y va detrás.
+//
+// El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
+
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import ReporteTab from "./ReporteTab";
 import PlanillaTab from "./PlanillaTab";
 import ConfiguracionTab from "./ConfiguracionTab";
-import HorariosTab from "./HorariosTab";
 import JustificacionesTab from "./JustificacionesTab";
-import FeriadosTab from "./FeriadosTab";
 import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
-  ["reporte", "Reporte"],
-  // La Planilla va segunda: es el destino de todo lo demás — el cuadro
-  // quincenal que la contable armaba a mano en Excel.
+  // A esto viene la contable: el cuadro quincenal, ya cargado en la quincena en
+  // curso. Es la primera y es la que abre por defecto.
   ["planilla", "Planilla"],
-  // Configuración va tercera: es lo primero que hay que llenar para que el
-  // reporte y la planilla signifiquen algo.
-  ["configuracion", "Configuración"],
-  ["horarios", "Horarios"],
+  // El detalle que SOSTIENE la planilla: de dónde salió cada minuto.
+  ["reporte", "Reporte"],
+  // Lo del día a día: lo único que se toca seguido.
   ["justificaciones", "Justificaciones"],
-  ["feriados", "Feriados"],
-  ["ayuda", "Cómo funciona"],
+  // Personas · Horarios · Feriados · Reglas. Se llena una vez y se corrige poco.
+  ["configuracion", "Configuración"],
 ] as const;
 
 type Tab = (typeof TABS)[number][0];
 
 export default function AsistenciaClient() {
-  const [tab, setTab] = useState<Tab>("reporte");
+  const [tab, setTab] = useState<Tab>("planilla");
+  const [ayuda, setAyuda] = useState(false);
 
   return (
     <>
@@ -56,25 +74,60 @@ export default function AsistenciaClient() {
       <div className="mx-auto max-w-6xl px-4 py-6">
         <h1 className="text-xl font-semibold text-gray-900">Asistencia</h1>
 
-        <div className="mt-4 flex gap-1 overflow-x-auto border-b border-gray-200">
-          {TABS.map(([k, label]) => (
-            <button key={k} type="button" onClick={() => setTab(k)}
-              className={`min-h-[44px] whitespace-nowrap px-3 text-sm transition ${
-                tab === k ? "border-b-2 border-black font-medium text-gray-900" : "text-gray-500 hover:text-gray-900"
-              }`}>
-              {label}
-            </button>
-          ))}
+        <div className="mt-4 flex items-end gap-2 border-b border-gray-200">
+          {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
+              adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
+          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+            {TABS.map(([k, label]) => (
+              <button key={k} type="button" onClick={() => { setTab(k); setAyuda(false); }}
+                className={`min-h-[44px] whitespace-nowrap px-3 text-sm transition ${
+                  tab === k && !ayuda
+                    ? "border-b-2 border-black font-medium text-gray-900"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Ayuda, no pestaña: discreto, redondo y con el nombre completo para
+              quien navegue con lector de pantalla o se quede encima con el mouse. */}
+          <button
+            type="button"
+            onClick={() => setAyuda((v) => !v)}
+            aria-pressed={ayuda}
+            aria-label="Cómo funciona"
+            title="Cómo funciona"
+            className={`mb-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-base transition active:scale-[0.97] ${
+              ayuda
+                ? "border-black bg-black text-white"
+                : "border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900"
+            }`}
+          >
+            ?
+          </button>
         </div>
 
         <div className="mt-5">
-          {tab === "reporte" && <ReporteTab />}
-          {tab === "planilla" && <PlanillaTab />}
-          {tab === "configuracion" && <ConfiguracionTab />}
-          {tab === "horarios" && <HorariosTab />}
-          {tab === "justificaciones" && <JustificacionesTab />}
-          {tab === "feriados" && <FeriadosTab />}
-          {tab === "ayuda" && <ComoFuncionaTab />}
+          {ayuda ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-gray-900">Cómo funciona</h2>
+                <button type="button" onClick={() => setAyuda(false)}
+                  className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
+                  Cerrar
+                </button>
+              </div>
+              <ComoFuncionaTab />
+            </div>
+          ) : (
+            <>
+              {tab === "planilla" && <PlanillaTab />}
+              {tab === "reporte" && <ReporteTab />}
+              {tab === "justificaciones" && <JustificacionesTab />}
+              {tab === "configuracion" && <ConfiguracionTab />}
+            </>
+          )}
         </div>
       </div>
     </>

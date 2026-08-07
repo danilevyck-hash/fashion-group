@@ -88,8 +88,10 @@ export default function FeriadosTab() {
 
       <div className="flex items-center gap-2">
         {[anioActual, anioActual + 1].map((a) => (
+          // 44 px, como todo lo táctil de la casa. Medían 38 y pasaron
+          // inadvertidos mientras Feriados era su propia pestaña.
           <button key={a} type="button" onClick={() => setAnio(String(a))}
-            className={`min-h-[38px] rounded-md border px-3 text-sm transition ${
+            className={`min-h-[44px] rounded-md border px-3 text-sm transition ${
               anio === String(a) ? "border-black bg-black text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"
             }`}>{a}</button>
         ))}
@@ -107,8 +109,10 @@ export default function FeriadosTab() {
                 <span className="text-sm text-gray-900">{f.nombre}</span>
                 <span className="ml-2 text-[13px] text-gray-500">{bonito(f.fecha)}</span>
               </div>
+              {/* 44 px: son 22 feriados en la lista y el dedo tiene que caer en
+                  el «Quitar» que se apuntó, no en el del renglón de al lado. */}
               <button type="button" onClick={() => void borrar(f.fecha)}
-                className="min-h-[36px] shrink-0 rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
+                className="-my-1 min-h-[44px] shrink-0 rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
                 Quitar
               </button>
             </div>

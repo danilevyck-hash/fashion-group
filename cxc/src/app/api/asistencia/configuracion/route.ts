@@ -25,11 +25,11 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { diaPanama } from "@/lib/asistencia/reporte";
 import {
   validarPersona,
-  rataPorHora,
   valorMinuto,
   REGLAS_DEFAULT,
   type Jornada,
 } from "@/lib/asistencia/config";
+import { rataPorHoraCalculo } from "@/lib/asistencia/rata";
 import {
   leerReglas,
   leerPersonas,
@@ -149,7 +149,12 @@ export async function GET(req: NextRequest) {
         dispositivo: v?.dispositivo ?? null,
         // Derivados, solo para mirar: confirman que los números configurados
         // producen una rata creíble antes de que se calcule ninguna planilla.
-        rataHora: rataPorHora(salario, jornada, reglas),
+        //
+        // 🔴 `rataPorHoraCalculo` y NO `rataPorHora`: la primera devuelve la
+        // rata A CENTAVOS, que es la que multiplica de verdad en `planilla.ts`.
+        // La segunda devuelve 4 decimales y la pantalla enseñaba `$3.0201` donde
+        // la planilla de la contable dice `$3.02`. Ver `lib/asistencia/rata.ts`.
+        rataHora: rataPorHoraCalculo(salario, jornada, reglas),
         valorMinuto: valorMinuto(salario, jornada, reglas),
       };
     });
