@@ -1,9 +1,18 @@
 /* Verificación en el NAVEGADOR de la pantalla de Configuración de Asistencia.
  *
  * Corre contra el build de producción (`next start`) y datos de PRODUCCIÓN, en
- * los tres anchos que importan (390 · 834 · 1440). Solo lectura salvo el PUT de
- * prueba, que hoy rebota porque la migración todavía no está corrida — que es
- * justamente uno de los casos a verificar.
+ * los tres anchos que importan (390 · 834 · 1440).
+ *
+ * ⚠️ SOLO LECTURA — Y ESO COSTÓ CARO (6-ago-2026). El script mandaba un PUT
+ * VÁLIDO «para comprobar que rebota con 503», apoyado en que la migración
+ * todavía no estaba corrida. Se corrió, el PUT dejó de rebotar y **le escribió
+ * encima a una persona de verdad**: el código 6 (KEVIN LUBO · Fashion Wear ·
+ * $523,47 · 40 h) quedó como «Prueba · Confecciones Boston · $850 · 48 h». Se
+ * restauró desde una captura anterior, pero la fila estuvo mal un rato y esa
+ * ficha alimenta su planilla. Un chequeo que depende de que algo NO exista se
+ * vuelve destructivo el día que existe. Los únicos PUT que quedan son los que
+ * el servidor rechaza con 400 ANTES de tocar la base, y el de la sección 2, que
+ * lo intercepta el propio navegador y nunca sale a la red.
  *
  * Gotchas obligatorios en este repo:
  *  - sembrar la cookie firmada Y `sessionStorage.cxc_role`, o `useAuth` manda
@@ -108,7 +117,7 @@ const run = async () => {
   const browser = await chromium.launch();
   let fallas = 0;
 
-  // ── 1. Contra la base REAL, sin la migración corrida ──────────────────────
+  // ── 1. Contra la base REAL ────────────────────────────────────────────────
   {
     const { ctx, page } = await nuevaPagina(browser, 1440, 900);
     const errores = [];
@@ -119,7 +128,7 @@ const run = async () => {
       const r = await fetch("/api/asistencia/configuracion", { cache: "no-store" });
       return { status: r.status, cuerpo: await r.json() };
     });
-    log("\n── 1. Base real, migración SIN correr ──");
+    log("\n── 1. Base real ──");
     log("   GET /api/asistencia/configuracion →", api.status);
     log("   personas con marcaciones:", api.cuerpo.resumen?.conMarcaciones);
     log("   total en la lista:", api.cuerpo.resumen?.total);
@@ -128,26 +137,20 @@ const run = async () => {
     log("   tolerancia que devuelve:", api.cuerpo.reglas?.toleranciaTardanzaMin);
 
     const texto = await page.locator("body").innerText();
-    const avisaEnPantalla = texto.includes("Falta un paso antes de poder guardar");
+    // La migración YA está corrida: la pantalla no debe avisar de un paso que no
+    // falta, y sobre todo no debe romperse. Si algún día se cayera la tabla, el
+    // aviso vuelve solo (lo decide el servidor) y este chequeo lo destaparía.
+    const migracionOk = api.cuerpo.faltaMigracion === false
+      && !texto.includes("Falta un paso antes de poder guardar");
     const noSeRompio = !texto.includes("Algo salió mal") && errores.length === 0;
-    log("   la pantalla AVISA en vez de romperse:", avisaEnPantalla && noSeRompio);
-    if (!avisaEnPantalla || !noSeRompio || api.status !== 200) fallas++;
+    log("   la migración está corrida y la pantalla no avisa de más:", migracionOk);
+    log("   la pantalla no se rompió:", noSeRompio);
+    if (!migracionOk || !noSeRompio || api.status !== 200) fallas++;
     if (errores.length) { log("   ⚠️ errores de página:", errores); }
 
-    // Guardar sin la migración: tiene que dar 503 con mensaje humano, no un 500.
-    const put = await page.evaluate(async () => {
-      const r = await fetch("/api/asistencia/configuracion", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          codigo: "6", nombre: "Prueba", salarioMensual: "850",
-          jornadaSemanal: 48, empresa: "confecciones_boston",
-        }),
-      });
-      return { status: r.status, cuerpo: await r.json() };
-    });
-    log("   PUT sin migración →", put.status, "·", put.cuerpo.error);
-    if (put.status !== 503) fallas++;
+    // ⛔ Acá había un PUT VÁLIDO contra el código 6. NO se reintroduce: escribe
+    // sobre la ficha de una persona real. Lo que sigue son cuerpos INVÁLIDOS,
+    // que el validador rechaza antes de que la base se entere.
 
     // El REPORTE tiene que seguir saliendo igual, con la tolerancia por defecto.
     const rep = await page.evaluate(async () => {
@@ -217,7 +220,19 @@ const run = async () => {
       const req = route.request();
       if (req.method() === "PUT") {
         putRecibido = JSON.parse(req.postData() ?? "{}");
-        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+        // El servidor devuelve la ficha YA validada: el doble tiene que
+        // devolverla también, o se estaría probando otra respuesta.
+        return route.fulfill({
+          status: 200, contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            persona: {
+              codigo: putRecibido.codigo, nombre: putRecibido.nombre,
+              salarioMensual: Number(putRecibido.salarioMensual),
+              jornadaSemanal: putRecibido.jornadaSemanal, empresa: putRecibido.empresa,
+            },
+          }),
+        });
       }
       return route.fulfill({
         status: 200,
@@ -251,21 +266,24 @@ const run = async () => {
     const texto = await page.locator("body").innerText();
     log("\n── 2. Con la migración corrida (respuesta simulada) ──");
     log("   NO muestra el aviso de migración:", !texto.includes("Falta un paso antes de poder guardar"));
-    log("   destaca al que falta:", /1 de 3 .*persona marca/.test(texto.replace(/\n/g, " ")));
-    log("   avisa del que no tiene salario:", texto.includes("sin salario"));
-    log("   muestra la rata calculada ($850 ÷ 208):", texto.includes("$4.0865") || texto.includes("$4.0865".replace(".", ",")));
+    // UN solo aviso, con las dos clases de pendiente adentro.
+    log("   destaca a los que faltan:", /2 personas de 3 todavía no salen/.test(texto.replace(/\n/g, " ")));
+    log("   avisa del que no tiene salario:", texto.includes("le falta el salario"));
+    log("   muestra la rata del CÁLCULO, a centavos ($850 ÷ 208 = 4.09):", texto.includes("$4.09"));
+    log("   y NO la de 4 decimales:", !texto.includes("$4.0865"));
     if (texto.includes("Falta un paso antes de poder guardar")) fallas++;
 
-    // Guardar una persona
-    await page.getByRole("button", { name: /Sin nombre/ }).click();
+    // Guardar una persona. Ya NO hay botón: se guarda al cambiar, como
+    // HorariosTab. El PUT sale al tocar la píldora de empresa, que es lo que
+    // completa la ficha (sin nombre y empresa el servidor rebotaría).
+    await page.getByRole("button", { name: /Código 6/ }).first().click();
     await page.waitForTimeout(300);
     await page.getByPlaceholder("Ángela García").fill("Kevin Lubo");
     await page.getByPlaceholder("850.00").fill("900");
     // `exact` a propósito: la píldora de filtro se llama "Fashion Wear (0)" y
     // sin esto se toca el filtro, la fila desaparece y el formulario se cierra.
     await page.getByRole("button", { name: "Fashion Wear", exact: true }).click();
-    await page.getByRole("button", { name: "Guardar esta persona" }).click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1000);
     log("   PUT que salió del formulario:", JSON.stringify(putRecibido));
     const bienFormado =
       putRecibido?.codigo === "6" &&
@@ -282,10 +300,25 @@ const run = async () => {
     await page.route("**/api/asistencia/configuracion/reglas", async (route) => {
       if (route.request().method() === "PUT") {
         putReglas = JSON.parse(route.request().postData() ?? "{}");
-        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+        // El servidor devuelve la ficha YA validada: el doble tiene que
+        // devolverla también, o se estaría probando otra respuesta.
+        return route.fulfill({
+          status: 200, contentType: "application/json",
+          body: JSON.stringify({
+            ok: true,
+            persona: {
+              codigo: putRecibido.codigo, nombre: putRecibido.nombre,
+              salarioMensual: Number(putRecibido.salarioMensual),
+              jornadaSemanal: putRecibido.jornadaSemanal, empresa: putRecibido.empresa,
+            },
+          }),
+        });
       }
       return route.continue();
     });
+    // Reglas ahora es una SECCIÓN de Configuración: hay que abrirla primero.
+    await page.getByRole("button", { name: /^Reglas del cálculo/ }).first().click();
+    await page.waitForTimeout(600);
     await page.getByRole("button", { name: "Guardar las reglas" }).click();
     await page.waitForTimeout(800);
     log("   PUT de reglas:", JSON.stringify(putReglas));
@@ -304,7 +337,7 @@ const run = async () => {
     const { ctx, page } = await nuevaPagina(browser, w, h);
     await irAConfiguracion(page);
     // Abrir una ficha: el formulario es lo más ancho de la pantalla.
-    const primera = page.locator("button", { hasText: /código/ }).first();
+    const primera = page.locator("button[aria-expanded]", { hasText: /marcaciones/ }).first();
     if (await primera.count()) { await primera.click(); await page.waitForTimeout(400); }
     const { scroll, cliente } = await medirArrastre(page);
     const chicos = await blancosChicos(page);
