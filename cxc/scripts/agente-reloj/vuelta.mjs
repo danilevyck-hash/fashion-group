@@ -72,7 +72,7 @@ export async function darVuelta({ config, deps, log = () => {} }) {
     // reportar el error —el reporte va por el mismo puente—, así que solo se
     // anota y se reintenta en la vuelta siguiente. El reloj guarda todo.
     log(`No se pudo consultar fashiongr: ${e.message}. Se reintenta en la próxima vuelta.`);
-    return { ok: false, motivo: "puente-inalcanzable" };
+    return { ok: false, motivo: "puente-inalcanzable", error: e.message };
   }
 
   // ── 2. Preguntarle al reloj ────────────────────────────────────────────────
