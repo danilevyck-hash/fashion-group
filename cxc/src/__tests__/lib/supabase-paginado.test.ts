@@ -102,6 +102,10 @@ const SANEADOS = [
   "src/app/api/catalogo/[marca]/public/route.ts",
   "src/app/api/catalogo/reebok/stats/route.ts",
   "src/app/api/catalogo/reebok/inventory/route.ts",
+  // Ranking de productos de Multifashion: 21.749 filas en la ventana de 12
+  // meses. Sin paginar leería 1.000 y la pestaña mostraría el 5% de las ventas
+  // SIN UN SOLO ERROR — el peor de los casos de este bug.
+  "src/app/api/multifashion/productos/route.ts",
 ];
 
 /** Quita comentarios: varios archivos CITAN el anti-patrón para explicarlo. */

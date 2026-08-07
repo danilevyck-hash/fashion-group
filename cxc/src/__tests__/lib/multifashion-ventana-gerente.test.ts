@@ -31,6 +31,7 @@ import {
   clampRangoFechas,
   clampFechaDia,
   clampPeriodoVendedoras,
+  clampPeriodoProductos,
 } from "@/lib/multifashion/ventana-gerente";
 import { signSession } from "@/lib/session-cookie";
 
@@ -357,6 +358,35 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
     expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
   });
+
+  // 🩸 `periodo=12m` sería un bypass de UNA PALABRA: la ruta ni mira year/mes
+  // cuando el período es de 12 meses, así que acotar solo esos dos no cierra
+  // nada. Por eso el clamp es sobre el PERÍODO (clampPeriodoProductos).
+  it("productos?periodo=12m se aplasta al mes en curso", async () => {
+    await productosGet(req("/api/multifashion/productos?periodo=12m", "gerente_acs"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+    // Y NUNCA el arranque de la ventana de 12 meses.
+    expect(t?.filtros).not.toContainEqual(["gte", "2025-08-01"]);
+  });
+
+  it("productos?periodo=12m&year=2019&mes=1: ni el período ni el año se cuelan", async () => {
+    await productosGet(req("/api/multifashion/productos?periodo=12m&year=2019&mes=1", "gerente_acs"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+  });
+
+  it("clampPeriodoProductos: para gerente_acs devuelve siempre 'mes' + mes en curso", () => {
+    expect(clampPeriodoProductos("gerente_acs", { periodo: "12m", year: 2019, mes: 1 }, AHORA)).toEqual({
+      periodo: "mes", year: 2026, mes: 7, ajustado: true,
+    });
+    // Admin no cambia en NADA.
+    expect(clampPeriodoProductos("admin", { periodo: "12m", year: 2019, mes: 1 }, AHORA)).toEqual({
+      periodo: "12m", year: 2019, mes: 1, ajustado: false,
+    });
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -413,6 +443,24 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
     await productosGet(req("/api/multifashion/productos?year=2024&mes=2", "admin"));
     const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
     expect(t?.filtros).toContainEqual(["lte", "2024-02-29"]);
+  });
+
+  it("productos?periodo=12m: admin sí ve los 12 meses (ago-2025 → hoy)", async () => {
+    await productosGet(req("/api/multifashion/productos?periodo=12m", "admin"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2025-08-01"]);
+    expect(t?.filtros).toContainEqual(["lte", "2026-07-30"]);
+  });
+
+  it("productos: el DEFAULT del parámetro sigue siendo 'mes' (no le cambió a nadie)", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
+    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
+    expect(t?.filtros).toContainEqual(["gte", "2024-12-01"]);
+  });
+
+  it("productos?periodo=trimestre → 400 (no se cae al mes en silencio)", async () => {
+    const r = await productosGet(req("/api/multifashion/productos?periodo=trimestre", "admin"));
+    expect(r.status).toBe(400);
   });
 
   it("las validaciones de siempre siguen devolviendo 400 (no las comió el clamp)", async () => {
@@ -526,7 +574,7 @@ describe("candado estructural — /api/multifashion/**", () => {
       expect(src, `${nombre} debe importar @/lib/multifashion/ventana-gerente`)
         .toContain('from "@/lib/multifashion/ventana-gerente"');
       expect(src, `${nombre} importa el clamp pero no lo llama`)
-        .toMatch(/clamp(AnioMes|RangoFechas|FechaDia|PeriodoVendedoras)\s*\(/);
+        .toMatch(/clamp(AnioMes|RangoFechas|FechaDia|PeriodoVendedoras|PeriodoProductos)\s*\(/);
     });
 
     it(`${nombre}: el clamp recibe el rol de la SESIÓN (no una constante)`, () => {
@@ -559,9 +607,13 @@ describe("UI — cortesía, no candado", () => {
     expect(src).toContain("ventanaAcotada={ventanaAcotada}");
   });
 
-  it("los 3 sub-tabs con selector de período reciben el flag", () => {
+  it("los 4 sub-tabs con selector de período reciben el flag", () => {
+    // Productos se sumó cuando ganó su propia píldora de "Últimos 12 meses" —
+    // una ventana que cae ENTERA fuera de lo que puede ver el rol acotado.
     const src = leer("src/components/multifashion/MultifashionView.tsx");
-    expect(src.match(/ventanaAcotada=\{ventanaAcotada\}/g) ?? []).toHaveLength(3);
+    expect(src.match(/ventanaAcotada=\{ventanaAcotada\}/g) ?? []).toHaveLength(4);
+    expect(leer("src/components/multifashion/ProductosSubtab.tsx"))
+      .toContain("{!ventanaAcotada && (");
   });
 
   it("el rol acotado NO ve el selector de mes ni las ventanas rolling", () => {
