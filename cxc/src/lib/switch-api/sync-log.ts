@@ -18,6 +18,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export type SwitchSyncTriggeredBy = "cron" | "manual" | "backfill";
 
+// Los `sync_type` que la base admite viven en un módulo PURO (sin Supabase):
+// el candado que los compara contra el SQL no puede necesitar credenciales para
+// correr. Se re-exportan acá porque este es el archivo que los usa.
+export { SYNC_LOG_TYPES, type SyncLogType } from "./sync-log-tipos";
+import type { SyncLogType } from "./sync-log-tipos";
+
 // ─── Lock de corrida en curso (índice único parcial) ─────────────────────────
 // DDL 20260723150000_switch_sync_running_lock.sql (manual): índice único
 // parcial sobre (empresa_key, sync_type) WHERE status='running'. Con el índice
@@ -188,7 +194,9 @@ export async function barrerRunningAtascados(): Promise<number | null> {
 
 export async function createSwitchSyncLog(opts: {
   empresaKey: string;
-  syncType: string;
+  /** Tipado contra `SYNC_LOG_TYPES` a propósito: un `string` suelto es lo que
+   *  dejó pasar `catalogo_tommy` y `articulo_marca` sin su DDL. */
+  syncType: SyncLogType;
   triggeredBy?: SwitchSyncTriggeredBy;
   rangeFrom?: string | null;
   rangeTo?: string | null;

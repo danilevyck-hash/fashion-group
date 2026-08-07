@@ -109,6 +109,8 @@ export function consecuenciaDeSyncType(syncType: string): string {
     case "utilidad":
     case "articulos":
       return "los costos y la utilidad que ves en los reportes pueden estar viejos.";
+    case "articulo_marca":
+      return "en Multifashion, lo más vendido por marca puede mostrar productos como \"Sin marca\".";
     case "proveedores":
       return "lo que debemos a proveedores puede estar viejo.";
     case "catalogo_reebok":

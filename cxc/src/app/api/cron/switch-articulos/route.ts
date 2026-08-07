@@ -76,11 +76,26 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // nadie más usa. Un cron aparte sería una segunda sesión contra la misma
   // empresa — la colisión code 0006 que este proyecto ya pagó (CLAUDE.md).
   //
+  // Y CABE, medido (7-ago-2026): las 8 empresas del sync de ventas por artículo
+  // tardan 63-71 s (7 días seguidos de switch_sync_log) y el barrido completo
+  // del catálogo —184 páginas, 9.126 renglones— mide 204 s con p50 de 658 ms por
+  // página. Total ~280 s contra los 800 s de `maxDuration`: sobra más del doble.
+  // O sea que "no entra en una corrida" NO era el problema y partirlo en un cron
+  // reanudable habría sido complejidad sin causa (además de la segunda sesión).
+  //
   // NO ES FATAL Y NO TOCA EL HEARTBEAT: si el catálogo falla, las VENTAS por
   // artículo (que es el dato) ya se guardaron y la pestaña funciona; lo único
   // que pasa es que el agrupador por marca queda con lo de ayer. Marcarlo como
   // fallo del cron apagaría el heartbeat de un trabajo que sí se hizo, y eso es
   // el error que este repo ya cometió con `all-0630` (CLAUDE.md).
+  //
+  // 🩸 PERO NO FATAL NO ES SILENCIOSO, y hasta el 7-ago-2026 lo era: el error
+  // se guardaba en una variable, se escribía con console.error y se devolvía en
+  // un JSON que no lee nadie. La corrida del 7-ago dejó el diccionario con
+  // 2.000 de 8.447 artículos —el 8,7% de los códigos vendidos en 12 meses— y
+  // NADIE se enteró. Ahora el fallo pasa por la MISMA política anti-ruido que
+  // el resto (`alertSwitchCronErrors`, regla de los 2 fallos seguidos): se
+  // reusa, no se duplica.
   //
   // Solo en la corrida sin overrides: un backfill dirigido a un rango de fechas
   // no tiene nada que ver con el catálogo, que es un snapshot de HOY.
@@ -100,13 +115,23 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // y alertamos vía alertSwitchCronErrors: errores NO-401 alertan de inmediato;
   // un 401/token (transitorio de sesión única) solo alerta si la empresa acumula
   // 2+ corridas consecutivas con 401 en switch_sync_log.
+  // El heartbeat sigue mirando SOLO las ventas por artículo (ver arriba: el
+  // diccionario de marcas no es el trabajo de este cron).
   if (errors.length === 0) {
     await recordCronHeartbeat(CRON_NAME);
-  } else {
-    await alertSwitchCronErrors(
-      CRON_NAME,
-      errors.map((e) => ({ empresaKey: e.empresaKey, syncType: "articulos", error: e.error })),
-    );
+  }
+
+  // Los avisos, en cambio, salen en UNA sola llamada con todo lo que falló —
+  // ventas y diccionario juntos. Dos llamadas serían dos mensajes por la misma
+  // corrida, que es justo el ruido que la política existe para evitar.
+  const paraAlertar = [
+    ...errors.map((e) => ({ empresaKey: e.empresaKey, syncType: "articulos" as const, error: e.error })),
+    ...(marcaError
+      ? [{ empresaKey: "american_classic", syncType: "articulo_marca" as const, error: marcaError }]
+      : []),
+  ];
+  if (paraAlertar.length > 0) {
+    await alertSwitchCronErrors(CRON_NAME, paraAlertar);
   }
 
   return NextResponse.json(
