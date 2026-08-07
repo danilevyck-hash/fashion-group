@@ -26,3 +26,10 @@ backups/
 data/
 .claude/scheduled_tasks.lock
 .vercel
+
+# 🔒 Agente del reloj: el .env real tiene la CONTRASEÑA DEL RELOJ y la llave de
+# escritura de fashiongr. Vive solo en la PC de la oficina. Al repo va nada más
+# el .env.ejemplo (que está versionado a propósito, sin secretos).
+scripts/agente-reloj/.env
+scripts/agente-reloj/*.log
+scripts/agente-reloj/*.log.viejo

@@ -47,6 +47,11 @@ export const CRON_STALE_HOURS_DEFAULT = 26;
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
   "catalogos-fotos-resumen": 8 * 24,
+  // Corre solo de lunes a viernes (`0 15 * * 1-5`): el lunes por la mañana su
+  // último éxito es del viernes. Con el umbral de siempre saldría stale todos
+  // los lunes por diseño, que es exactamente el falso positivo que enseña a
+  // ignorar el tablero.
+  "asistencia-vigia": 80,
 };
 
 /** Horas de umbral stale para un cron (su override propio o el default). */
@@ -312,6 +317,15 @@ export const SEED_TOLERANT_CRONS = [
   // 3-ago-2026: seed-tolerante hasta que siembre su fila. Promover a
   // CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "guias-pendientes",
+  // Vigía del agente del reloj de asistencia (15:00 UTC = 10:00 a.m. Panamá,
+  // SOLO lunes a viernes). Desplegado el 6-ago-2026: seed-tolerante hasta que
+  // siembre su fila.
+  //
+  // ⚠️ NO promoverlo a CRONS_FAIL_CLOSED sin darle antes un umbral propio en
+  // CRON_STALE_HOURS_POR_CRON: corriendo solo de lunes a viernes, el lunes por
+  // la mañana su último éxito es del viernes —72 horas— y con el umbral de
+  // siempre se reportaría stale TODOS los lunes por diseño.
+  "asistencia-vigia",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
