@@ -6,6 +6,14 @@
 // habla con el mundo entra por `deps`.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import {
+  puedeConsultarReloj,
+  minutosQueFaltan,
+  textoEspera,
+  anotarRechazo,
+  anotarExito,
+} from "./espera.mjs";
+
 /**
  * ⚠️ VENTANA RODANTE, NO "DESDE LA ÚLTIMA VEZ".
  *
@@ -46,8 +54,19 @@ export function ventanaRodante({ ahoraMs, dias = 3, piso = null }) {
  * (que lleva el contador de fallas) y se devuelve el resultado. Un `throw` acá
  * mataría el bucle y la PC quedaría "prendida pero muda", que es el peor de los
  * estados posibles porque no se distingue de "todo bien".
+ *
+ * `estado` es la memoria entre vueltas del castigo del reloj (ver `espera.mjs`).
+ * Va tipado a mano porque este archivo es JS puro: sin la anotación, TypeScript
+ * deduce `null` del valor por defecto y rechaza el objeto real en los tests.
+ *
+ * @param {{
+ *   config: Record<string, any>,
+ *   deps: Record<string, any>,
+ *   estado?: { fallosAuth: number, esperarHastaMs: number } | null,
+ *   log?: (m: string) => void,
+ * }} args
  */
-export async function darVuelta({ config, deps, log = () => {} }) {
+export async function darVuelta({ config, deps, estado = null, log = () => {} }) {
   const { leerEstado, traerEventos, mandarEventos, reportarError, ahora = Date.now } = deps;
   const ahoraMs = ahora();
 
@@ -58,13 +77,13 @@ export async function darVuelta({ config, deps, log = () => {} }) {
   // queda para la vuelta siguiente, como corresponde.
   let pedidoEn = null;
   try {
-    const estado = await leerEstado({
+    const remoto = await leerEstado({
       base: config.base,
       secret: config.secret,
       dispositivo: config.dispositivo,
     });
-    if (estado?.pedidoPendiente) {
-      pedidoEn = estado.pedidoEn;
+    if (remoto?.pedidoPendiente) {
+      pedidoEn = remoto.pedidoEn;
       log("Hay un 'Traer ahora' esperando.");
     }
   } catch (e) {
@@ -76,6 +95,29 @@ export async function darVuelta({ config, deps, log = () => {} }) {
   }
 
   // ── 2. Preguntarle al reloj ────────────────────────────────────────────────
+  //
+  // 🩸 Antes de nada: si el reloj rechazó la contraseña hace poco, NO se le
+  // vuelve a preguntar. Insistir cada 3 minutos contra un reloj bloqueado
+  // renueva el castigo y no se destraba nunca (ver `espera.mjs`).
+  if (estado && !puedeConsultarReloj(estado, ahoraMs)) {
+    log(textoEspera(estado, ahoraMs));
+    // Se manda igual un lote VACÍO: marca que la PC está viva y con qué versión
+    // corre. Sin esto, "esperando al reloj" se vería idéntico a "PC apagada".
+    try {
+      await mandarEventos({
+        base: config.base,
+        secret: config.secret,
+        dispositivo: config.dispositivo,
+        eventos: [],
+        agenteVersion: config.version,
+        log,
+      });
+    } catch {
+      /* si tampoco hay internet, la vuelta siguiente reintenta */
+    }
+    return { ok: false, motivo: "esperando-al-reloj", faltanMin: minutosQueFaltan(estado, ahoraMs) };
+  }
+
   const { desde, hasta } = ventanaRodante({
     ahoraMs,
     dias: config.ventanaDias,
@@ -93,7 +135,26 @@ export async function darVuelta({ config, deps, log = () => {} }) {
       log,
     });
     eventos = r.eventos;
+    if (estado) anotarExito(estado);
   } catch (e) {
+    // Un rechazo de credenciales NO es "el reloj no contesta": es el que hay
+    // que frenar. Los demás errores (red, timeout) sí se reintentan enseguida,
+    // porque no dejan castigo en el aparato.
+    if (estado && e?.codigo === "credenciales") {
+      const min = anotarRechazo(estado, ahoraMs);
+      log(`${e.message} No se le vuelve a preguntar por ${min} minutos.`);
+      try {
+        await reportarError({
+          base: config.base,
+          secret: config.secret,
+          dispositivo: config.dispositivo,
+          error: e.message,
+        });
+      } catch {
+        /* sin internet no hay a quién avisarle */
+      }
+      return { ok: false, motivo: "reloj-rechazo-clave", error: e.message, esperaMin: min };
+    }
     log(`El reloj no respondió: ${e.message}`);
     // Que quede registrado del otro lado: es lo que hace subir el contador y,
     // a la tercera seguida, lo que manda el Telegram.

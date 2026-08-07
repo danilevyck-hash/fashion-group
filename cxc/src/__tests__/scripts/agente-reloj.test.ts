@@ -621,3 +621,139 @@ describe("⚠️ el motivo que da el reloj no se tira a la basura", () => {
     ).rejects.toThrow(/respondió 500/);
   });
 });
+
+/* ── El castigo del reloj ─────────────────────────────────────────────────── */
+
+import * as espera from "../../../scripts/agente-reloj/espera.mjs";
+
+describe("🔴 si el reloj rechaza la contraseña, se ESPERA — no se insiste", () => {
+  // 🩸 VISTO EN VIVO EL 7-AGO-2026 EN LA PC DE LA OFICINA. El reloj bloquea la
+  // cuenta por intentos fallidos y mientras está bloqueado rechaza TAMBIÉN la
+  // contraseña correcta. El agente daba una vuelta cada 3 minutos y cada vuelta
+  // renovaba el castigo: 16:43, 16:46, 16:49, 16:52… El reloj no se iba a
+  // destrabar NUNCA por su cuenta. Y se leía como "contraseña incorrecta",
+  // con la contraseña perfecta.
+
+  const AHORA = Date.parse("2026-08-07T21:00:00Z");
+  const config = { base: "https://x", secret: "s", dispositivo: "reloj cboston", version: "1.0.0", ventanaDias: 3 };
+
+  const errorClave = () => {
+    const e = new Error("El reloj rechazó la contraseña (401).");
+    (e as Error & { codigo: string }).codigo = "credenciales";
+    return e;
+  };
+
+  function deps(traer: () => Promise<unknown>, ahoraMs: number) {
+    const mandados: unknown[] = [];
+    const reportados: string[] = [];
+    return {
+      mandados,
+      reportados,
+      d: {
+        leerEstado: async () => ({ pedidoPendiente: false }),
+        traerEventos: traer,
+        mandarEventos: async (a: { eventos: unknown[] }) => {
+          mandados.push(a.eventos);
+          return { lotes: 1, recibidos: 0, guardados: 0, descartados: 0, pedidoCerrado: false };
+        },
+        reportarError: async (a: { error: string }) => {
+          reportados.push(a.error);
+          return true;
+        },
+        ahora: () => ahoraMs,
+      },
+    };
+  }
+
+  it("la vuelta siguiente NO le pregunta al reloj", async () => {
+    const estado = espera.nuevoEstadoReloj();
+    let consultas = 0;
+    const traer = async () => {
+      consultas += 1;
+      throw errorClave();
+    };
+
+    const a = deps(traer, AHORA);
+    await darVuelta({ config, deps: a.d, estado });
+    expect(consultas).toBe(1);
+
+    // 3 minutos después: la vuelta corre, pero el reloj NO se toca.
+    const b = deps(traer, AHORA + 3 * 60_000);
+    const r = await darVuelta({ config, deps: b.d, estado });
+    expect(consultas).toBe(1); // ← lo que evita el pozo
+    expect(r.motivo).toBe("esperando-al-reloj");
+  });
+
+  it("pasada la espera, vuelve a intentar solo", async () => {
+    const estado = espera.nuevoEstadoReloj();
+    let consultas = 0;
+    const traer = async () => {
+      consultas += 1;
+      throw errorClave();
+    };
+    await darVuelta({ config, deps: deps(traer, AHORA).d, estado });
+    const luego = AHORA + (espera.ESCALONES_MIN[0] + 1) * 60_000;
+    await darVuelta({ config, deps: deps(traer, luego).d, estado });
+    expect(consultas).toBe(2);
+  });
+
+  it("⚠️ mientras espera SIGUE reportándose vivo — si no, se ve igual que la PC apagada", async () => {
+    const estado = espera.nuevoEstadoReloj();
+    await darVuelta({ config, deps: deps(async () => { throw errorClave(); }, AHORA).d, estado });
+    const b = deps(async () => ({ eventos: [] }), AHORA + 60_000);
+    await darVuelta({ config, deps: b.d, estado });
+    expect(b.mandados).toEqual([[]]); // un lote vacío, no silencio
+  });
+
+  it("mientras espera NO manda avisos — el aviso queda espaciado por la espera misma", async () => {
+    // Un aviso cada 3 minutos convierte un problema real en ruido, que es la
+    // forma más rápida de que nadie lo lea. No hace falta una bandera aparte:
+    // durante la espera la vuelta ni llega a intentar, así que el aviso sale
+    // como mucho una vez cada 45 minutos por construcción.
+    const estado = espera.nuevoEstadoReloj();
+    const traer = async () => { throw errorClave(); };
+    const a = deps(traer, AHORA);
+    await darVuelta({ config, deps: a.d, estado });
+    expect(a.reportados).toHaveLength(1);
+    for (const min of [3, 6, 9, 30, 44]) {
+      const b = deps(traer, AHORA + min * 60_000);
+      await darVuelta({ config, deps: b.d, estado });
+      expect(b.reportados).toHaveLength(0);
+    }
+  });
+
+  it("un problema de RED sí se reintenta enseguida — no deja castigo en el aparato", async () => {
+    const estado = espera.nuevoEstadoReloj();
+    let consultas = 0;
+    const traer = async () => {
+      consultas += 1;
+      throw new Error("fetch failed"); // sin `codigo`
+    };
+    await darVuelta({ config, deps: deps(traer, AHORA).d, estado });
+    await darVuelta({ config, deps: deps(traer, AHORA + 60_000).d, estado });
+    expect(consultas).toBe(2);
+  });
+
+  it("un éxito borra el castigo entero", async () => {
+    const estado = espera.nuevoEstadoReloj();
+    await darVuelta({ config, deps: deps(async () => { throw errorClave(); }, AHORA).d, estado });
+    expect(estado.fallosAuth).toBe(1);
+    const luego = AHORA + (espera.ESCALONES_MIN[0] + 1) * 60_000;
+    await darVuelta({ config, deps: deps(async () => ({ eventos: [] }), luego).d, estado });
+    expect(estado.fallosAuth).toBe(0);
+    expect(estado.esperarHastaMs).toBe(0);
+  });
+
+  it("la primera espera supera al castigo del aparato (30 min)", async () => {
+    // Quedarse corto significa gastar el intento cuando todavía está castigado
+    // — o sea, renovarlo. Es el error que este módulo existe para no cometer.
+    expect(espera.minutosDeEspera(1)).toBeGreaterThan(30);
+  });
+
+  it("sube con los rechazos seguidos y tiene tope", async () => {
+    const v = [1, 2, 3, 4, 5, 99].map((n) => espera.minutosDeEspera(n));
+    expect(v[0]).toBeLessThan(v[1]);
+    expect(v[1]).toBeLessThan(v[2]);
+    expect(v[5]).toBe(v[3]); // topa y no crece para siempre
+  });
+});

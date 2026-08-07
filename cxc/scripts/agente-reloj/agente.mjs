@@ -32,6 +32,7 @@ import { CARPETA, leerConfig, VERSION } from "./config.mjs";
 import { traerEventos, relojVivo } from "./reloj.mjs";
 import { leerEstado, mandarEventos, reportarError } from "./puente.mjs";
 import { darVuelta } from "./vuelta.mjs";
+import { nuevoEstadoReloj } from "./espera.mjs";
 
 const RUTA_LOG = join(CARPETA, "agente-reloj.log");
 /** El log se rota a los 5 MB. Sin esto, en una PC que nadie mira, el archivo
@@ -135,11 +136,16 @@ async function main() {
   // 3 minutos, repetirla convertiría el log en una pared de texto igual.
   let yaExpliqueLaLlave = false;
 
+  // 🔑 El castigo del reloj vive ACÁ, no dentro de `darVuelta`: una vuelta sola
+  // no puede saber que la anterior fue rechazada, y sin memoria entre vueltas el
+  // agente vuelve a golpear el aparato cada 3 minutos (ver `espera.mjs`).
+  const estadoReloj = nuevoEstadoReloj();
+
   // Bucle sin fin y sin salidas. Lo único que puede terminarlo es que Windows
   // apague la máquina, y en ese caso arranca solo cuando se prenda.
   for (;;) {
     try {
-      const r = await darVuelta({ config, deps, log });
+      const r = await darVuelta({ config, deps, estado: estadoReloj, log });
       if (r.ok) {
         log(
           `Vuelta lista: ${r.traidos} del reloj · ${r.guardados} nuevas · ` +
