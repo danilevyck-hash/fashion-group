@@ -13,7 +13,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
-  ENTRADA_DEFAULT,
   SALIDA_DEFAULT,
   type Marcacion,
   type HorarioPersona,
@@ -24,10 +23,11 @@ import {
   avisoMigracion,
   EMPRESAS_ASISTENCIA,
   etiquetaEmpresa,
-  type ReglasAsistencia,
 } from "@/lib/asistencia/config";
 import {
   armarPlanilla,
+  jornadaDiariaMin,
+  JORNADA_DIARIA_DEFAULT_MIN,
   normalizarManuales,
   quincenaDesdeClave,
   totalizar,
@@ -49,11 +49,6 @@ function instante(dia: string, fin: boolean): string {
   return new Date(
     Date.parse(`${dia}T${fin ? "23:59:59.999" : "00:00:00.000"}${PANAMA}`),
   ).toISOString();
-}
-
-function hhmmAMin(hhmm: string): number {
-  const [h, m] = String(hhmm ?? "").split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
 }
 
 export async function GET(req: NextRequest) {
@@ -151,23 +146,19 @@ export async function GET(req: NextRequest) {
       incluirNoHabiles: true,
     });
 
-    // Cuánto dura el día de cada quien, según SU horario. Es lo que vale una
-    // ausencia. 🔑 Se usa el MISMO horario con el que se le mide la tardanza y
-    // la hora extra: con otra base, el mismo día valdría dos cosas distintas.
+    // Cuánto dura el día de cada quien. Es lo que vale una ausencia.
+    // 🔑 Con horario confirmado manda el SUYO —el mismo con el que se le mide la
+    // tardanza y la hora extra—; sin horario son 8 horas, que es lo que usa la
+    // contable en su Excel (ver `JORNADA_DIARIA_DEFAULT_MIN`). Antes se derivaba
+    // del horario POR DEFECTO y daba 8,5 h para casi todo el mundo.
     const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
-    const jornadaDiariaMin = (codigo: string) => {
-      const h = horarioDe.get(codigo);
-      const entrada = hhmmAMin(h?.entrada ?? ENTRADA_DEFAULT);
-      const salida = hhmmAMin(h?.salida ?? SALIDA_DEFAULT);
-      const almuerzo = h?.almuerzo_minutos ?? (reglas as ReglasAsistencia).almuerzoDefaultMin;
-      return Math.max(0, salida - entrada - almuerzo);
-    };
+    const jornadaDeCodigo = (codigo: string) => jornadaDiariaMin(horarioDe.get(codigo));
 
     const lineas = armarPlanilla({
       personas,
       fichas,
       manuales: manualesLeidos.porCodigo,
-      jornadaDiariaMin,
+      jornadaDiariaMin: jornadaDeCodigo,
       reglas,
       empresa,
     });
@@ -188,6 +179,10 @@ export async function GET(req: NextRequest) {
         // horas extra Y el valor de la ausencia pueden estar mal.
         sinHorario: lineas.filter((l) => !horarioDe.has(l.codigo)).length,
         salidaAsumida: SALIDA_DEFAULT,
+        // Cuántas horas vale un día ausente sin horario confirmado. Va en la
+        // respuesta para que la pantalla NO lo escriba a mano y no pueda
+        // quedar diciendo 8,5 el día que el default cambie.
+        horasAusenciaDefault: JORNADA_DIARIA_DEFAULT_MIN / 60,
         // Sábados trabajados: el cuadro no tiene columna y acá no se inventa
         // un recargo. Se avisa para que lo resuelva una persona.
         conSabado: lineas.filter((l) => l.horas.sabadoMin > 0).length,

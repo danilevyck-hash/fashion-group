@@ -87,7 +87,10 @@ const COLUMNAS: ReportColumn[] = [
   { header: "Terceros", wch: 11, align: "right", fmt: MONEY_FMT },
   { header: "Mercancía", wch: 11, align: "right", fmt: MONEY_FMT },
   { header: "Total deducciones", wch: 15, align: "right", fmt: MONEY_FMT },
-  { header: "Otros servicios", wch: 13, align: "right", fmt: MONEY_FMT },
+  // 🔴 El «(+)» va en el encabezado a propósito: es la única señal, para quien
+  // reciba el archivo por correo, de que esta columna SUMA al neto mientras las
+  // cuatro de al lado restan.
+  { header: "Otros servicios (+)", wch: 15, align: "right", fmt: MONEY_FMT },
   { header: "Neto a pagar", wch: 14, align: "right", fmt: MONEY_FMT },
 ];
 
@@ -206,9 +209,10 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Seguro social", `${r.seguroSocialPct} % del total bruto.`],
       ["Seguro educativo", `${r.seguroEducativoPct} % del total bruto.`],
       ["ISR, préstamo, terceros, mercancía y otros servicios", "No salen de ningún sistema: los escribe la contable a mano."],
+      ["Otros servicios", "SE SUMA al neto: es un pago extra, no un descuento. Los otros cuatro se restan."],
       [""],
       ["Total bruto", "Quincenal + extras + domingos + feriados − ausencias − tardanzas."],
-      ["Neto a pagar", "Total bruto − total deducciones − otros servicios."],
+      ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
       ["⚠ Sábados", "Si alguien trabajó un sábado, las horas se muestran en la hoja de horas pero NO se pagan en ninguna columna: el cuadro no tiene una para el sábado."],
@@ -252,7 +256,7 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       "Persona", "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
-      "Mercan-\ncía", "Total\ndeducc.", "Otros\nservicios", "Neto a\npagar",
+      "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
     ]],
     body: d.lineas.map((l) => {
       if (!l.dinero) {
