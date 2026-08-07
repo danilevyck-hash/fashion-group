@@ -166,7 +166,17 @@ export function crearClienteDigest({
     });
     if (segunda.status === 401) {
       desafio = null;
-      throw new Error("Usuario o contraseña del reloj incorrectos (401).");
+      // 🩸 Un 401 con la credencial firmada tiene DOS causas que se ven igual:
+      // la contraseña está mal, o el reloj **bloqueó la cuenta** por intentos
+      // fallidos (`retryLoginTime`) y rechaza hasta la contraseña correcta. El
+      // texto lo dice, y `codigo` deja que el agente frene sin adivinar cuál es
+      // — porque en las dos, insistir cada 3 minutos es lo peor que puede hacer.
+      const e = new Error(
+        "El reloj rechazó la contraseña (401). O está mal, o el reloj bloqueó la " +
+          "cuenta por intentos fallidos y ahora rechaza hasta la correcta.",
+      );
+      e.codigo = "credenciales";
+      throw e;
     }
     return segunda;
   }
