@@ -44,7 +44,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSwitchClient, type SwitchArticulo } from "./client";
-import { createSwitchSyncLog, finishSwitchSyncLog } from "./sync-log";
+import { createSwitchSyncLog, finishSwitchSyncLog, type SyncLogType } from "./sync-log";
 import { columnasImposibles, campoSkip, fmtMonto } from "./monto-guard";
 import { calibrarUmbral, avisarMontosImposibles } from "./monto-guard-io";
 import { logCronError } from "@/lib/cron-telemetry";
@@ -108,7 +108,7 @@ export interface CatalogoSyncConfig {
   /** sync_type con el que cada corrida por empresa se registra en switch_sync_log
    *  ('catalogo_reebok' / 'catalogo_joybees') — fuente del streak de la política
    *  anti-ruido 401 (alert-policy.ts). Los dry-run NO se registran. */
-  syncLogType: string;
+  syncLogType: SyncLogType;
   /** Tabla de productos: "products" (Reebok), "joybees_products" (Joybees). */
   productsTable: string;
   empresas: readonly CatalogoEmpresaScope[];
