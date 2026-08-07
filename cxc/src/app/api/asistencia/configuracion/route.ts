@@ -37,8 +37,19 @@ import {
   avisoMigracion,
   TABLA_PERSONAS,
   DIAS_VENTANA_PERSONAS,
+  vigenciaDeFila,
 } from "@/lib/asistencia/config-server";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
+import {
+  avisoMarcasPosteriores,
+  avisoMigracionBajas,
+  esColumnaDeBajaFaltante,
+  fraseBaja,
+  marcoDespuesDeLaBaja,
+  tieneBaja,
+  validarVigencia,
+  type MarcaPosterior,
+} from "@/lib/asistencia/vigencia";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -78,8 +89,14 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas, faltaMigracion: faltaReglas }, { filas, faltaMigracion: faltaPersonas }] =
-      await Promise.all([leerReglas(), leerPersonas()]);
+    const [
+      { reglas, faltaMigracion: faltaReglas },
+      { filas, faltaMigracion: faltaPersonas, faltaColumnasBajas },
+    ] = await Promise.all([leerReglas(), leerPersonas()]);
+
+    // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
+    // vs «Renuncia» cuando la fecha es futura); no filtra ni calcula nada.
+    const hoy = diaPanama(new Date().toISOString());
 
     // Qué se sabe de cada código POR EL RELOJ.
     interface Visto {
@@ -121,6 +138,11 @@ export async function GET(req: NextRequest) {
     // que dejó de marcar hace meses no debe desaparecer de su propia planilla.
     const codigos = new Set<string>([...vistos.keys(), ...fichas.keys()]);
 
+    // Quién ya no trabaja acá. Los que marcaron y NO tienen ficha (48 a 53) no
+    // pasan por acá a propósito: sin ficha no hay baja posible, y quedan como
+    // pendientes de configurar, que es lo que son.
+    const marcasPosteriores: MarcaPosterior[] = [];
+
     const personas = [...codigos].map((codigo) => {
       const v = vistos.get(codigo);
       const f = fichas.get(codigo);
@@ -129,6 +151,20 @@ export async function GET(req: NextRequest) {
           ? null
           : Number(f.salario_mensual);
       const jornada = (Number(f?.jornada_semanal) === 40 ? 40 : 48) as Jornada;
+
+      // La baja de esta persona, si la tiene. Sin las columnas corridas sale
+      // vacía y todo el mundo queda activo — que es como está hoy.
+      const vig = f ? vigenciaDeFila(f) : null;
+      const ultimaMarca = v ? diaPanama(v.ultima) : null;
+      const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
+      if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
+        marcasPosteriores.push({
+          etiqueta,
+          fechaSalida: vig.fechaSalida!,
+          ultimaMarca: ultimaMarca!,
+        });
+      }
+
       return {
         codigo,
         // Del directorio, no de un `??` escrito acá: la regla de respaldo vive
@@ -145,8 +181,18 @@ export async function GET(req: NextRequest) {
         // de las otras y saber a quién le falta el dato.
         faltaSalario: !!f && (salario === null || !Number.isFinite(salario as number)),
         marcaciones: v?.marcaciones ?? 0,
-        ultimaMarca: v ? diaPanama(v.ultima) : null,
+        ultimaMarca,
         dispositivo: v?.dispositivo ?? null,
+        // ── ALTAS Y BAJAS ────────────────────────────────────────────────────
+        // 🔑 `activo` es DERIVADO de la fecha, no un campo aparte: dos fuentes
+        // para el mismo hecho es la forma de que se contradigan.
+        fechaIngreso: vig?.fechaIngreso ?? null,
+        fechaSalida: vig?.fechaSalida ?? null,
+        motivoSalida: vig?.motivoSalida ?? null,
+        activo: !tieneBaja(vig),
+        /** «Renunció el 12 de agosto de 2026». `null` si sigue trabajando. */
+        baja: fraseBaja(vig, hoy),
+        marcoDespuesDeLaBaja: marcoDespuesDeLaBaja(vig, ultimaMarca),
         // Derivados, solo para mirar: confirman que los números configurados
         // producen una rata creíble antes de que se calcule ninguna planilla.
         //
@@ -170,18 +216,32 @@ export async function GET(req: NextRequest) {
       return compararPersonas(pa, pb);
     });
 
+    // 🩸 EL RESUMEN CUENTA SOLO A LOS ACTIVOS. El aviso de pendientes dice
+    // «X de N todavía no salen en la planilla», y quien ya no trabaja acá no es
+    // trabajo pendiente de nadie: meterlo en la N infla para siempre un número
+    // que la contable usa para saber cuánto le falta.
+    const activos = personas.filter((p) => p.activo);
+
     return NextResponse.json({
       personas,
       reglas,
       reglasDefault: REGLAS_DEFAULT,
       resumen: {
-        total: personas.length,
-        sinConfigurar: personas.filter((p) => !p.configurado).length,
-        sinSalario: personas.filter((p) => p.faltaSalario).length,
-        conMarcaciones: personas.filter((p) => p.marcaciones > 0).length,
+        total: activos.length,
+        sinConfigurar: activos.filter((p) => !p.configurado).length,
+        sinSalario: activos.filter((p) => p.faltaSalario).length,
+        conMarcaciones: activos.filter((p) => p.marcaciones > 0).length,
+        /** Los que ya no trabajan acá. Se ven aparte, no mezclados. */
+        bajas: personas.length - activos.length,
       },
       faltaMigracion: faltaPersonas || faltaReglas,
       avisoMigracion: faltaPersonas || faltaReglas ? avisoMigracion() : null,
+      // Sin las columnas de la baja la pantalla funciona igual, pero el botón
+      // de dar de baja no puede guardar: se dice de entrada y no al fallar.
+      avisoMigracionBajas: !faltaPersonas && faltaColumnasBajas ? avisoMigracionBajas() : null,
+      puedeDarDeBaja: !faltaPersonas && !faltaColumnasBajas,
+      // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
+      avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -209,27 +269,73 @@ export async function PUT(req: NextRequest) {
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
   const p = r.valor;
 
-  const { error } = await supabaseServer.from(TABLA_PERSONAS).upsert(
-    {
-      empleado_codigo: p.codigo,
-      nombre: p.nombre,
-      salario_mensual: p.salarioMensual,
-      jornada_semanal: p.jornadaSemanal,
-      empresa: p.empresa,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "empleado_codigo" },
-  );
+  // La vigencia se valida APARTE de la ficha, y no dentro de `validarPersona`,
+  // porque son dos cosas distintas: una dice QUIÉN es la persona y la otra
+  // DESDE CUÁNDO y HASTA CUÁNDO trabaja. Guardar un nombre no debería poder
+  // fallar por una fecha, y al revés tampoco.
+  const rv = validarVigencia(body);
+  if (!rv.ok) return NextResponse.json({ error: rv.error }, { status: 400 });
+  const v = rv.valor;
+
+  const base = {
+    empleado_codigo: p.codigo,
+    nombre: p.nombre,
+    salario_mensual: p.salarioMensual,
+    jornada_semanal: p.jornadaSemanal,
+    empresa: p.empresa,
+    updated_at: new Date().toISOString(),
+  };
+  const conVigencia = {
+    ...base,
+    fecha_ingreso: v.fechaIngreso,
+    fecha_salida: v.fechaSalida,
+    motivo_salida: v.motivoSalida,
+  };
+
+  const { error } = await supabaseServer
+    .from(TABLA_PERSONAS)
+    .upsert(conVigencia, { onConflict: "empleado_codigo" });
 
   if (error) {
+    // 🔴 LA COLUMNA SE PREGUNTA ANTES QUE LA TABLA, y no es un detalle de estilo:
+    // PostgREST dice «Could not find the 'fecha_salida' column of
+    // 'asistencia_personas' in the schema cache» — ese texto nombra la tabla y
+    // trae "could not find", así que `esTablaFaltante` lo daría por bueno y el
+    // usuario leería «falta crear la tabla» cuando lo que falta son tres
+    // columnas. Lo específico primero. (Ver el mismo orden en `leerPersonas`.)
+    //
+    // 🩸 FALTAN LAS COLUMNAS DE LA BAJA. Acá se bifurca a propósito:
+    //  · si NO se estaba dando de baja a nadie, se reintenta sin esas columnas
+    //    para que poner un nombre o un salario siga funcionando igual que ayer;
+    //  · si SÍ se estaba dando de baja, NO se guarda a medias y se dice qué
+    //    falta. Un "guardado" que se traga la fecha de salida es peor que un
+    //    error: la persona seguiría saliendo en la planilla y nadie sabría por qué.
+    if (esColumnaDeBajaFaltante(error)) {
+      if (v.fechaSalida !== null || v.fechaIngreso !== null) {
+        return NextResponse.json(
+          { error: avisoMigracionBajas(), faltaMigracionBajas: true },
+          { status: 503 },
+        );
+      }
+      const reintento = await supabaseServer
+        .from(TABLA_PERSONAS)
+        .upsert(base, { onConflict: "empleado_codigo" });
+      if (!reintento.error) {
+        return NextResponse.json({ ok: true, persona: { ...p, ...v }, faltaMigracionBajas: true });
+      }
+      console.error("[asistencia/configuracion PUT]", reintento.error.message);
+      return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
+    }
+
     // Sin la migración corrida esto no es un error del usuario: es un paso que
     // falta. Se dice cuál, con el nombre del archivo.
     if (esTablaFaltante(error, TABLA_PERSONAS)) {
       return NextResponse.json({ error: avisoMigracion(), faltaMigracion: true }, { status: 503 });
     }
+
     console.error("[asistencia/configuracion PUT]", error.message);
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: p });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v } });
 }
