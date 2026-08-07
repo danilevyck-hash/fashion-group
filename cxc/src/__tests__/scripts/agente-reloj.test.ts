@@ -339,13 +339,44 @@ describe("autenticación Digest", () => {
     expect(construirAutorizacion(args)).toBe(construirAutorizacion(args));
   });
 
-  it("hace el baile del 401 UNA sola vez para las 13 páginas", async () => {
+  it("🔴 pide el desafío de nuevo en CADA página — reusarlo bloquea el reloj", async () => {
+    // 🩸 MEDIDO CONTRA EL EQUIPO REAL EL 7-AGO-2026. Este test decía lo
+    // contrario ("el baile UNA sola vez para las 13 páginas") y ese ahorro era
+    // justo lo que rompía todo: la primera página entra bien —el reloj dice
+    // "hay 1.089 eventos"— y la SEGUNDA, la que reusa el desafío guardado,
+    // vuelve 401. El cliente rehacía el baile y reintentaba, o sea que cada
+    // página costaba UN INTENTO FALLIDO DE LOGIN. A los 5 el aparato bloquea
+    // la cuenta y a partir de ahí todo falla, incluso con la contraseña
+    // correcta — se lee como "contraseña incorrecta" y no lo es.
+    //
+    // Un request SIN credenciales no es un intento fallido: es la primera
+    // mitad normal del Digest, la que hace cualquier navegador. Por eso el
+    // contador del reloj no sube. Cuesta el doble de requests y se paga solo.
     const { fetchImpl } = relojDoble({ total: 371 });
     await pedir(fetchImpl);
+    const paginas = 13;
     const sinAuth = fetchImpl.mock.calls.filter(
       ([, o]) => !(o as { headers?: Record<string, string> })?.headers?.Authorization,
     );
-    expect(sinAuth).toHaveLength(1);
+    expect(sinAuth).toHaveLength(paginas);
+    expect(fetchImpl.mock.calls).toHaveLength(paginas * 2);
+  });
+
+  it("🔴 NINGÚN request con credenciales puede recibir un 401", async () => {
+    // Es la regla de fondo, dicha sobre el efecto y no sobre el mecanismo: lo
+    // que bloquea el reloj no es reusar el nonce, es que un request FIRMADO
+    // sea rechazado. Si algún día se vuelve a permitir el reuso, este test es
+    // el que se pone rojo.
+    const { fetchImpl } = relojDoble({ total: 371 });
+    await pedir(fetchImpl);
+    // ⚠️ `mock.results[i].value` es una PROMESA (la función es async): leerle
+    // `.status` directo da undefined y el test pasaría sin mirar nada.
+    const respuestas = await Promise.all(fetchImpl.mock.results.map((r) => r.value));
+    const firmados = respuestas.filter((_res, i) =>
+      Boolean((fetchImpl.mock.calls[i]?.[1] as { headers?: Record<string, string> })?.headers?.Authorization),
+    );
+    expect(firmados.length).toBeGreaterThan(0); // que de verdad haya firmados que mirar
+    expect(firmados.filter((r) => (r as { status: number }).status === 401)).toHaveLength(0);
   });
 });
 
