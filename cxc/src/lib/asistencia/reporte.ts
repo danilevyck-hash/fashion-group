@@ -101,6 +101,15 @@ export interface DiaReporte {
   ausente: boolean;
   justificado: string | null;
   feriado: string | null;
+  /**
+   * El día cae de lunes a viernes.
+   *
+   * 🩸 Existe por la PLANILLA: los domingos se pagan al 1.5 y para eso el motor
+   * tiene que verlos (`incluirNoHabiles`). Pero un domingo sin marcas NO es una
+   * ausencia —nadie faltó, es domingo—, y sin este campo el mismo `if` que
+   * detecta la ausencia se los tragaría a todos.
+   */
+  habil: boolean;
 }
 
 export interface PersonaReporte {
@@ -156,14 +165,27 @@ function hhmmAMin(hhmm: string): number {
   return (h || 0) * 60 + (m || 0);
 }
 
-/** Días hábiles del rango (lunes a viernes). Nadie trabaja sábado: medido. */
-function diasHabiles(desde: string, hasta: string): string[] {
+/** ¿La fecha cae de lunes a viernes? Nadie trabaja sábado de rutina: medido. */
+export function esHabil(fecha: string): boolean {
+  const dow = new Date(`${fecha}T12:00:00Z`).getUTCDay();
+  return dow >= 1 && dow <= 5;
+}
+
+/**
+ * Los días del rango que el reporte recorre.
+ *
+ * Por defecto solo los hábiles —es lo que el Reporte siempre mostró—. Con
+ * `todos` entran también sábados y domingos, que es lo que necesita la
+ * PLANILLA: el 26 de julio de 2026 (domingo) hay 5 personas con marcas, y sin
+ * este camino esas horas al 1.5 simplemente no existirían para el cálculo.
+ */
+function diasDelRango(desde: string, hasta: string, todos: boolean): string[] {
   const out: string[] = [];
   const d = new Date(`${desde}T12:00:00Z`);
   const fin = new Date(`${hasta}T12:00:00Z`);
   while (d <= fin) {
-    const dow = d.getUTCDay();
-    if (dow >= 1 && dow <= 5) out.push(d.toISOString().slice(0, 10));
+    const iso = d.toISOString().slice(0, 10);
+    if (todos || esHabil(iso)) out.push(iso);
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return out;
@@ -197,6 +219,13 @@ export function armarReporte(opts: {
    * y el PDF— salen con números pelados en la columna Persona.
    */
   nombres?: ReadonlyMap<string, string>;
+  /**
+   * Recorrer TODOS los días del rango, no solo lunes a viernes.
+   *
+   * Lo usa la PLANILLA, que necesita los domingos trabajados (se pagan al 1.5).
+   * El Reporte no lo pasa y sigue viendo exactamente lo que veía antes.
+   */
+  incluirNoHabiles?: boolean;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
 
@@ -210,7 +239,7 @@ export function armarReporte(opts: {
   const almuerzoDefaultMin = num(opts.reglas?.almuerzoDefaultMin, ALMUERZO_DEFAULT_MIN);
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
-  const habiles = diasHabiles(desde, hasta);
+  const habiles = diasDelRango(desde, hasta, opts.incluirNoHabiles === true);
 
   // Agrupar marcaciones por persona y día.
   const porPersona = new Map<string, { nombre: string | null; dias: Map<string, number[]> }>();
@@ -238,13 +267,16 @@ export function armarReporte(opts: {
     for (const fecha of habiles) {
       const feriado = feriados.get(fecha) ?? null;
       const justificado = justificacionDe(justificaciones, codigo, fecha);
+      const habil = esHabil(fecha);
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
-      // Sin marcas: ausente, salvo que sea feriado o esté justificado.
+      // Sin marcas: ausente, salvo que sea feriado, esté justificado… o
+      // simplemente no sea día de trabajo. 🔑 Lo último solo puede pasar con
+      // `incluirNoHabiles`, y sin el guard un domingo libre contaría como falta.
       if (crudas.length === 0) {
         dias.push({
           fecha, marcas: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
-          revisar: false, ausente: !feriado && !justificado, justificado, feriado,
+          revisar: false, ausente: habil && !feriado && !justificado, justificado, feriado, habil,
         });
         continue;
       }
@@ -293,7 +325,7 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, ausente: false, justificado, feriado,
+        revisar, ausente: false, justificado, feriado, habil,
       });
     }
 

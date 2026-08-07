@@ -102,6 +102,21 @@ export default function ComoFuncionaTab() {
         </p>
       </div>
 
+      {/* La Planilla es el destino de todo esto. Se explica acá con las MISMAS
+          reglas configuradas, no con números escritos a mano en el texto. */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h3 className="text-sm font-medium text-gray-900">Cómo sale la planilla quincenal</h3>
+        <ul className="mt-1 space-y-1.5 text-[13px] leading-relaxed text-gray-600">
+          <li>· La quincena va del <b>1 al 15</b> y del <b>16 al fin de mes</b>. El día 31 no paga sueldo de más, pero si se falta ese día sí se descuenta.</li>
+          <li>· La <b>rata por hora</b> es el salario del mes dividido entre {reglas.divisor40} para quien trabaja 40 horas por semana, y entre {reglas.divisor48} para quien trabaja 48.</li>
+          <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. Las que pasan de {reglas.excedenteHorasDia} horas en el día <b>y</b> caen después de esa hora van × {reglas.recargoExcedenteNocturnaMixta}.</li>
+          <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
+          <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (horas × la rata), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
+          <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla.</li>
+          <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
+        </ul>
+      </div>
+
       {/* Lo aprendido el 5-ago: el reloj traía el turno mal en 12 de 31 personas.
           Que quede escrito para que nadie vuelva a confiar en ese dato. */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">

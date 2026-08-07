@@ -24,6 +24,7 @@
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import ReporteTab from "./ReporteTab";
+import PlanillaTab from "./PlanillaTab";
 import ConfiguracionTab from "./ConfiguracionTab";
 import HorariosTab from "./HorariosTab";
 import JustificacionesTab from "./JustificacionesTab";
@@ -32,7 +33,10 @@ import ComoFuncionaTab from "./ComoFuncionaTab";
 
 const TABS = [
   ["reporte", "Reporte"],
-  // Configuración va segunda: es lo primero que hay que llenar para que el
+  // La Planilla va segunda: es el destino de todo lo demás — el cuadro
+  // quincenal que la contable armaba a mano en Excel.
+  ["planilla", "Planilla"],
+  // Configuración va tercera: es lo primero que hay que llenar para que el
   // reporte y la planilla signifiquen algo.
   ["configuracion", "Configuración"],
   ["horarios", "Horarios"],
@@ -65,6 +69,7 @@ export default function AsistenciaClient() {
 
         <div className="mt-5">
           {tab === "reporte" && <ReporteTab />}
+          {tab === "planilla" && <PlanillaTab />}
           {tab === "configuracion" && <ConfiguracionTab />}
           {tab === "horarios" && <HorariosTab />}
           {tab === "justificaciones" && <JustificacionesTab />}
