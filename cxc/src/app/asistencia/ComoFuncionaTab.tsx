@@ -112,7 +112,7 @@ export default function ComoFuncionaTab() {
           <li>· Las <b>horas extra</b> hasta las {reglas.horaCorteNocturno} se pagan × {reglas.recargoExtraDiurno}; desde el minuto siguiente × {reglas.recargoExtraNocturno}. Las que pasan de {reglas.excedenteHorasDia} horas en el día <b>y</b> caen después de esa hora van × {reglas.recargoExcedenteNocturnaMixta}.</li>
           <li>· Los <b>domingos y feriados</b> trabajados se pagan × {reglas.recargoDomingoFeriado}.</li>
           <li>· Se descuentan las <b>tardanzas</b> (minutos × el valor del minuto), las <b>ausencias</b> (horas × la rata), el seguro social ({reglas.seguroSocialPct} %) y el educativo ({reglas.seguroEducativoPct} %).</li>
-          <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla.</li>
+          <li>· El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios</b> no salen de ningún sistema: se escriben a mano en la planilla. Los cuatro primeros se restan; <b>«otros servicios» se SUMA</b>, porque es un pago extra y no un descuento.</li>
           <li>· 🔴 A quien le falte el salario, la jornada o la ficha <b>no se le calcula nada</b>: sale listado con lo que le falta y queda <b>fuera del total</b>. Nunca en $0.</li>
         </ul>
       </div>

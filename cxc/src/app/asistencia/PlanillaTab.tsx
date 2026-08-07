@@ -49,6 +49,7 @@ interface Respuesta {
     faltaMigracionManual: string | null;
     sinHorario: number;
     salidaAsumida: string;
+    horasAusenciaDefault: number;
     conSabado: number;
   };
 }
@@ -61,13 +62,17 @@ const $ = (n: number | null | undefined): string =>
 /** Un monto con su signo de dólares. El cero es una raya PELADA, no "$—". */
 const $$ = (n: number): string => (n === 0 ? "—" : `$${$(n)}`);
 
-/** Los 5 montos que se escriben a mano, en el orden del cuadro. */
-const MANUALES: Array<[keyof ManualesLinea, string]> = [
-  ["isr", "ISR"],
-  ["prestamo", "Préstamo"],
-  ["terceros", "Terceros"],
-  ["mercancia", "Mercancía"],
-  ["otrosServicios", "Otros servicios"],
+/**
+ * Los 5 montos que se escriben a mano, en el orden del cuadro, con el LADO al
+ * que van. 🔴 Cuatro restan y «otros servicios» SUMA: es un pago extra, no un
+ * descuento (la fórmula de la contable es `=+L-S+T`).
+ */
+const MANUALES: Array<[keyof ManualesLinea, string, "+" | "−"]> = [
+  ["isr", "ISR", "−"],
+  ["prestamo", "Préstamo", "−"],
+  ["terceros", "Terceros", "−"],
+  ["mercancia", "Mercancía", "−"],
+  ["otrosServicios", "Otros servicios", "+"],
 ];
 
 export default function PlanillaTab() {
@@ -226,9 +231,9 @@ export default function PlanillaTab() {
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           <b>{data.avisos.sinHorario}</b>{" "}
           {data.avisos.sinHorario === 1 ? "persona no tiene" : "personas no tienen"} su hora de
-          salida confirmada. Mientras tanto se asume {data.avisos.salidaAsumida}, y con eso las
-          horas extra <b>y el valor de una ausencia</b> pueden estar mal. Revísalo en{" "}
-          <b>Horarios</b>.
+          salida confirmada. Mientras tanto se asume {data.avisos.salidaAsumida} para las horas
+          extra, y un día de ausencia se cuenta como{" "}
+          <b>{data.avisos.horasAusenciaDefault} horas</b>. Revísalo en <b>Horarios</b>.
         </p>
       )}
       {!!data?.avisos.conSabado && (
@@ -261,7 +266,10 @@ export default function PlanillaTab() {
                       "Salario\nquincenal", "Extra\n1.25", "Ausen-\ncias", "Tar-\ndanzas",
                       "Extra\n1.50", "Exce-\ndente", "Domin-\ngos", "Feria-\ndos", "Total\nbruto",
                       "Seguro\nsocial", "Seguro\neducativo", "ISR", "Prés-\ntamo", "Ter-\nceros",
-                      "Mercan-\ncía", "Total\ndeducc.", "Otros\nservicios", "Neto a\npagar",
+                      "Mercan-\ncía", "Total\ndeducc.",
+                      // El «(+)» no es adorno: es la única señal en la tabla de
+                      // que esta columna SUMA mientras las cuatro de al lado restan.
+                      "Otros\nservicios (+)", "Neto a\npagar",
                     ].map((h) => (
                       <th key={h} className="whitespace-pre px-2 py-2.5 text-right font-medium">{h}</th>
                     ))}
@@ -486,9 +494,17 @@ function Tarjeta({
             Se escriben a mano
           </p>
           <div className="mt-1 grid grid-cols-2 gap-2">
-            {MANUALES.map(([campo, etiqueta]) => (
+            {MANUALES.map(([campo, etiqueta, signo]) => (
               <label key={campo} className="flex flex-col gap-0.5">
-                <span className="text-[11px] text-gray-500">{etiqueta}</span>
+                {/* El signo va en la etiqueta: cuatro de los cinco se restan y
+                    «otros servicios» SUMA. Sin decirlo, el que lo escribe no
+                    tiene forma de saber para qué lado va su número. */}
+                <span className="text-[11px] text-gray-500">
+                  {etiqueta}{" "}
+                  <span className={signo === "+" ? "text-emerald-700" : "text-red-700"}>
+                    ({signo === "+" ? "suma" : "resta"})
+                  </span>
+                </span>
                 <CeldaManual
                   codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
                   onGuardar={onGuardar} ancho="w-full"
@@ -501,6 +517,12 @@ function Tarjeta({
             <span className="text-gray-500">Total deducciones</span>
             <span className="tabular-nums text-red-700">−${$(d.totalDeducciones)}</span>
           </div>
+          {d.otrosServicios > 0 && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Otros servicios</span>
+              <span className="tabular-nums text-emerald-700">+${$(d.otrosServicios)}</span>
+            </div>
+          )}
           <div className="flex justify-between font-semibold">
             <span>Neto a pagar</span>
             <span className="tabular-nums">${$(d.netoPagar)}</span>

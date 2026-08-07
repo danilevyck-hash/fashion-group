@@ -30,7 +30,8 @@
  *   · Domingo/feriado = horas trabajadas × 1,50.
  *   · Ausencia        = horas del día × rata. SE RESTA.
  *   · Bruto  = quincenal + extras + domingos + feriados − ausencias − tardanzas.
- *   · Neto   = bruto − deducciones − descuentos.
+ *   · Neto   = bruto − deducciones **+ otros servicios** (ver `calcularDinero`:
+ *              otros servicios SUMA, es un pago extra y no un descuento).
  * ────────────────────────────────────────────────────────────────────────── */
 
 import {
@@ -202,6 +203,47 @@ export const HORAS_CERO: HorasPersona = {
 function hhmmAMin(hhmm: string): number {
   const [h, m] = String(hhmm ?? "").split(":").map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+/**
+ * Cuánto vale un día de ausencia cuando la persona NO tiene horario confirmado:
+ * OCHO HORAS.
+ *
+ * 🩸 Sale del Excel de la contable, de sus propias fórmulas de la columna de
+ * ausencias — no de una suposición mía:
+ *
+ *     María Bethancourt   =8*2.88            → un día
+ *     Samir Polo Arrieta  =16*3.02           → dos días
+ *     Cristian Blanco     =(0*24.16)+(0*3.02)   ← 24,16 = 8 × 3,02, el "valor del día"
+ *
+ * Acá se calculaba `salida − entrada − almuerzo` sobre el horario POR DEFECTO
+ * (08:00-17:00 menos 30) y daba **8,5 h**: un 6 % de más en cada día ausente, y
+ * encima sobre un horario que nadie confirmó. Hoy solo UNA persona de las 32
+ * tiene horario propio, así que ese 8,5 era lo que se le aplicaba a todo el
+ * mundo.
+ *
+ * ⚠️ Con horario CONFIRMADO manda el suyo: es el mismo con el que se le mide la
+ * tardanza y la hora extra, y usar otra base ahí haría que el mismo día valiera
+ * dos cosas distintas. El 8 es el default, no un techo.
+ */
+export const JORNADA_DIARIA_DEFAULT_MIN = 8 * 60;
+
+/** El horario de una persona, con lo que hace falta para medirle el día. */
+export interface HorarioDia {
+  entrada: string;
+  salida: string;
+  almuerzo_minutos: number;
+}
+
+/**
+ * Los minutos que dura el día de una persona. Sin horario propio, el default.
+ * 🔑 Un horario guardado que dé 0 o menos no se usa: caería en una ausencia de
+ * $0 —el cero silencioso otra vez, esta vez a favor de la empresa—.
+ */
+export function jornadaDiariaMin(h: HorarioDia | null | undefined): number {
+  if (!h) return JORNADA_DIARIA_DEFAULT_MIN;
+  const min = hhmmAMin(h.salida) - hhmmAMin(h.entrada) - (h.almuerzo_minutos ?? 0);
+  return Number.isFinite(min) && min > 0 ? min : JORNADA_DIARIA_DEFAULT_MIN;
 }
 
 /** El día de la semana de una fecha, 0 = domingo. */
@@ -441,7 +483,14 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) && n > 0 ? centavos(n) : 0;
 };
 
-/** Normaliza lo escrito a mano. Solo montos positivos: son descuentos. */
+/**
+ * Normaliza lo escrito a mano. Solo montos positivos.
+ *
+ * 🔑 El signo NO viaja en el monto: lo pone el cálculo. Cuatro de estos cinco
+ * se restan y «otros servicios» se suma, y todos se escriben en positivo. Un
+ * negativo tecleado por error invertiría el sentido de la columna sin que nadie
+ * lo vea hasta el día de pago, así que se descarta a 0.
+ */
 export function normalizarManuales(m: Partial<ManualesLinea> | null | undefined): ManualesLinea {
   return {
     isr: num(m?.isr),
@@ -502,13 +551,23 @@ export function calcularDinero(
     + manuales.terceros + manuales.mercancia,
   );
 
-  // ⚠️ "Otros servicios" RESTA. La regla que dio Daniel es «Neto = bruto −
-  // deducciones − descuentos» y no menciona ninguna suma después del bruto.
-  // Va como columna aparte —fuera del total de deducciones— porque así está en
-  // el cuadro de la contable, y la fórmula se imprime al pie de la pantalla y
-  // de los dos archivos para que, si algún día es al revés, salte a la vista
-  // en lugar de quedar enterrada acá adentro.
-  const netoPagar = centavos(totalBruto - totalDeducciones - manuales.otrosServicios);
+  // 🔴 "OTROS SERVICIOS" SUMA. NO ES UN DESCUENTO: ES UN PAGO EXTRA.
+  //
+  // 🩸 Salió a la luz cotejando el Excel real de la contable. Su fórmula del
+  // neto, celda por celda, es:
+  //
+  //     U7 = =+L7-S7+T7        (L = total bruto · S = total deducciones ·
+  //                             T = otros servicios)
+  //
+  // Verificada en Boston y en Vistana, en TODAS las filas. Acá se restaba —lo
+  // leí de «Neto = bruto − deducciones − descuentos» y metí «otros servicios»
+  // en el saco de los descuentos porque estaba en la lista de columnas que se
+  // escriben a mano—. Con eso, a cualquiera que tuviera algo en esa columna le
+  // salía el neto **al doble de mal**: le faltaba dos veces el monto.
+  //
+  // ⛔ QUE NADIE LO "ARREGLE" DE VUELTA. El test
+  // `asistencia-planilla.test.ts` lleva la fórmula de ella escrita al lado.
+  const netoPagar = centavos(totalBruto - totalDeducciones + manuales.otrosServicios);
 
   return {
     rataHora, valorMinuto, salarioQuincenal,
@@ -698,4 +757,5 @@ export function ordenarLineas(lineas: readonly LineaPlanilla[]): LineaPlanilla[]
  */
 export const FORMULA_NETO =
   "Total bruto = quincenal + extras + domingos + feriados - ausencias - tardanzas.  "
-  + "Neto a pagar = total bruto - total deducciones - otros servicios.";
+  + "Neto a pagar = total bruto - total deducciones + otros servicios "
+  + "(otros servicios se SUMA: es un pago extra, no un descuento).";

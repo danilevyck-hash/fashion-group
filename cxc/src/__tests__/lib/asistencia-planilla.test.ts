@@ -15,7 +15,8 @@ import { describe, it, expect } from "vitest";
 import {
   centavos, aHoras, quincena, quincenaDesdeClave, quincenasHasta, ultimoDiaDelMes,
   clasificarDia, medirHoras, calcularDinero, armarLinea, totalizar, ordenarLineas,
-  faltantesDe, normalizarManuales, FALTA, HORAS_CERO, MANUALES_CERO,
+  faltantesDe, normalizarManuales, jornadaDiariaMin, FALTA, FORMULA_NETO,
+  HORAS_CERO, JORNADA_DIARIA_DEFAULT_MIN, MANUALES_CERO,
   type FichaPlanilla, type HorasPersona, type ManualesLinea,
 } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
@@ -124,7 +125,125 @@ describe("🔴 LOS CASOS REALES — planilla del 30-jul-2026, Confecciones Bosto
       d.salarioQuincenal + d.extraDiurno + d.extraNocturno + d.excedente
       + d.domingos + d.feriados - d.ausencias - d.tardanzas;
     expect(centavos(aMano)).toBe(d.totalBruto);
-    expect(centavos(d.totalBruto - d.totalDeducciones - d.otrosServicios)).toBe(d.netoPagar);
+    expect(centavos(d.totalBruto - d.totalDeducciones + d.otrosServicios)).toBe(d.netoPagar);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("🔴 «Otros servicios» SUMA — es un pago extra, no un descuento", () => {
+  // 🩸 LA FÓRMULA DE LA CONTABLE, copiada de su Excel:
+  //
+  //     U7 = =+L7-S7+T7
+  //
+  //   L = total bruto · S = total deducciones · T = otros servicios
+  //
+  // Verificada en Confecciones Boston y en Vistana, en TODAS las filas.
+  // Acá se restaba. Con eso, a cualquiera con algo en esa columna le salía el
+  // neto al DOBLE de mal: le faltaba dos veces el monto.
+  //
+  // ⛔ Si algún día este bloque falla, la respuesta NO es cambiar el test.
+
+  it("la fórmula =+L-S+T, con números redondos para poder verla a ojo", () => {
+    const d = calcularDinero(600, 40, horas(), manuales({ otrosServicios: 20 }), R)!;
+
+    const L = d.totalBruto;          // 300.00
+    const S = d.totalDeducciones;    //  33.00  (9,75 % + 1,25 %)
+    const T = d.otrosServicios;      //  20.00
+
+    expect(L).toBe(300);
+    expect(S).toBe(33);
+    expect(T).toBe(20);
+    expect(d.netoPagar).toBe(centavos(L - S + T));
+    expect(d.netoPagar).toBe(287);   // 300 − 33 + 20 — restándolo daban 247
+  });
+
+  it("«otros servicios» NO entra al total de deducciones: va en su propia columna", () => {
+    const d = calcularDinero(600, 40, horas(), manuales({ otrosServicios: 20 }), R)!;
+    expect(d.totalDeducciones).toBe(centavos(d.seguroSocial + d.seguroEducativo));
+  });
+
+  it("los otros cuatro sí restan — el signo no es el mismo para todos", () => {
+    const base = calcularDinero(600, 40, horas(), manuales(), R)!.netoPagar;
+    for (const campo of ["isr", "prestamo", "terceros", "mercancia"] as const) {
+      const d = calcularDinero(600, 40, horas(), manuales({ [campo]: 25 }), R)!;
+      expect(d.netoPagar, `${campo} tiene que RESTAR`).toBe(centavos(base - 25));
+    }
+    const sumado = calcularDinero(600, 40, horas(), manuales({ otrosServicios: 25 }), R)!;
+    expect(sumado.netoPagar, "otros servicios tiene que SUMAR").toBe(centavos(base + 25));
+  });
+
+  it("no toca el bruto ni los seguros: entra recién al final", () => {
+    const sin = calcularDinero(600, 40, horas(), manuales(), R)!;
+    const con = calcularDinero(600, 40, horas(), manuales({ otrosServicios: 500 }), R)!;
+    expect(con.totalBruto).toBe(sin.totalBruto);
+    expect(con.seguroSocial).toBe(sin.seguroSocial);
+    expect(con.seguroEducativo).toBe(sin.seguroEducativo);
+  });
+
+  it("la frase que se imprime dice que SUMA, en la pantalla y en los archivos", () => {
+    expect(FORMULA_NETO).toContain("+ otros servicios");
+    expect(FORMULA_NETO).not.toContain("- otros servicios");
+  });
+
+  it("el total del pie suma en el mismo sentido que las filas", () => {
+    const ficha: FichaPlanilla = {
+      codigo: "8", nombre: "BRICEIDA MONTERO", salarioMensual: 566.52,
+      jornadaSemanal: 40, empresa: "confecciones_boston",
+    };
+    const t = totalizar([armarLinea(ficha, horas(), manuales({ otrosServicios: 20 }), R)]);
+    expect(t.netoPagar).toBe(centavos(t.totalBruto - t.totalDeducciones + t.otrosServicios));
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+describe("🔴 Un día de ausencia son OCHO horas", () => {
+  // 🩸 De las fórmulas de la columna de ausencias del Excel de la contable:
+  //     María Bethancourt   =8*2.88            → un día
+  //     Samir Polo Arrieta  =16*3.02           → dos días
+  //     Cristian Blanco     =(0*24.16)+(0*3.02)   ← 24,16 = 8 × 3,02
+  // Antes se derivaba del horario POR DEFECTO (08:00-17:00 menos 30) y daban
+  // 8,5 h: un 6 % de más en cada día ausente, aplicado a TODO el mundo, porque
+  // solo una persona de las 32 tiene horario propio.
+
+  it("sin horario confirmado, el día vale 8 horas y no 8,5", () => {
+    expect(JORNADA_DIARIA_DEFAULT_MIN).toBe(480);
+    expect(jornadaDiariaMin(null)).toBe(480);
+    expect(jornadaDiariaMin(undefined)).toBe(480);
+    // Lo que daba antes, y que NO debe volver.
+    expect(jornadaDiariaMin(null)).not.toBe(510);
+  });
+
+  it("el caso de María Bethancourt: un día a $2.88 la hora = 8 × 2,88", () => {
+    const h = { ...horas(), ausenciaMin: jornadaDiariaMin(null), ausenciaDias: 1 };
+    // 600 ÷ 208 (jornada de 48 h) = 2,88
+    const d = calcularDinero(600, 48, h, manuales(), R)!;
+    expect(d.rataHora).toBe(2.88);
+    expect(d.ausencias).toBe(centavos(8 * 2.88));   // 23.04
+  });
+
+  it("el caso de Samir Polo Arrieta: dos días a $3.02 = 16 × 3,02", () => {
+    const h = { ...horas(), ausenciaMin: 2 * jornadaDiariaMin(null), ausenciaDias: 2 };
+    const d = calcularDinero(523.47, 40, h, manuales(), R)!;
+    expect(d.rataHora).toBe(3.02);
+    expect(d.ausencias).toBe(centavos(16 * 3.02));  // 48.32
+  });
+
+  it("el «valor del día» de Cristian Blanco: 8 × 3,02 = 24,16", () => {
+    const h = { ...horas(), ausenciaMin: jornadaDiariaMin(null), ausenciaDias: 1 };
+    expect(calcularDinero(523.47, 40, h, manuales(), R)!.ausencias).toBe(24.16);
+  });
+
+  it("con horario CONFIRMADO manda el suyo, no el default", () => {
+    // El código 37 sale 16:30 y almuerza 30 → 8 horas justas.
+    expect(jornadaDiariaMin({ entrada: "08:00", salida: "16:30", almuerzo_minutos: 30 })).toBe(480);
+    // Y uno de jornada más larga vale más, como corresponde.
+    expect(jornadaDiariaMin({ entrada: "07:00", salida: "17:00", almuerzo_minutos: 60 })).toBe(540);
+  });
+
+  it("un horario guardado que dé 0 o menos NO produce una ausencia de $0", () => {
+    // El cero silencioso otra vez, esta vez a favor de la empresa.
+    expect(jornadaDiariaMin({ entrada: "17:00", salida: "08:00", almuerzo_minutos: 30 })).toBe(480);
+    expect(jornadaDiariaMin({ entrada: "08:00", salida: "08:00", almuerzo_minutos: 0 })).toBe(480);
   });
 });
 
@@ -463,11 +582,11 @@ describe("Los centavos y lo que se escribe a mano", () => {
     expect(d.netoPagar).toBe(centavos(300 - d.totalDeducciones));
   });
 
-  it("«otros servicios» va aparte del total de deducciones y RESTA del neto", () => {
+  it("«otros servicios» va aparte del total de deducciones y SUMA al neto", () => {
     const d = calcularDinero(600, 40, horas(), manuales({ otrosServicios: 20 }), R)!;
     expect(d.totalDeducciones).toBe(centavos(29.25 + 3.75));
     expect(d.otrosServicios).toBe(20);
-    expect(d.netoPagar).toBe(centavos(300 - d.totalDeducciones - 20));
+    expect(d.netoPagar).toBe(centavos(300 - d.totalDeducciones + 20));
   });
 
   it("los porcentajes de seguro salen de las reglas, no del código", () => {
