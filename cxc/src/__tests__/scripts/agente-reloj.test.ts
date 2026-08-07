@@ -525,3 +525,68 @@ describe("una vuelta entera del agente", () => {
     expect(r.motivo).toBe("no-se-pudo-guardar");
   });
 });
+
+/* ── El `searchID` y su largo ─────────────────────────────────────────────── */
+
+describe("🔴 el searchID no puede pasar de 20 caracteres", () => {
+  // 🩸 MEDIDO CONTRA EL EQUIPO REAL EL 7-AGO-2026, largo por largo: 1, 4, 8, 16
+  // y 20 responden 200; **21 en adelante responden 400 `badParameters`**. No
+  // son los guiones (un "abc-def" de 7 pasa): es puro largo.
+  //
+  // Acá se usaba `randomUUID()`, que mide 36. O sea que el agente NUNCA pudo
+  // traer una sola marcación: autenticaba bien, la pantalla decía "✔ El reloj
+  // contesta", y la búsqueda moría con un 400 que no nombraba el campo. Se
+  // buscó el problema en la contraseña, en los permisos y en el firmware.
+  it("el que se manda de verdad entra en el límite del aparato", async () => {
+    const { fetchImpl, pedidos } = relojDoble({ total: 95 });
+    await traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl });
+    expect(pedidos.length).toBeGreaterThan(1);
+    for (const p of pedidos) expect(p.searchID.length).toBeLessThanOrEqual(20);
+  });
+
+  it("y sigue siendo el MISMO en todas las páginas", async () => {
+    // Acortarlo no puede romper lo que ya protegía: un searchID por búsqueda,
+    // no por página (si no, `searchResultPosition` deja de significar nada).
+    const { fetchImpl, pedidos } = relojDoble({ total: 95 });
+    await traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl });
+    expect(new Set(pedidos.map((p) => p.searchID)).size).toBe(1);
+  });
+
+  it("dos búsquedas distintas no comparten el mismo", async () => {
+    const a = relojDoble({ total: 5 });
+    const b = relojDoble({ total: 5 });
+    await traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl: a.fetchImpl });
+    await traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl: b.fetchImpl });
+    expect(a.pedidos[0].searchID).not.toBe(b.pedidos[0].searchID);
+  });
+});
+
+describe("⚠️ el motivo que da el reloj no se tira a la basura", () => {
+  // 🩸 El 400 del searchID largo se leyó como "el reloj no responde" y mandó a
+  // revisar contraseñas. El aparato SÍ decía `badParameters` — el agente lo
+  // descartaba antes de que nadie lo viera.
+  it("un 400 llega con lo que el reloj dijo", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ statusCode: 6, statusString: "Invalid Content", subStatusCode: "badParameters" }),
+        { status: 400 },
+      ),
+    );
+    await expect(
+      traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl }),
+    ).rejects.toThrow(/badParameters/);
+  });
+
+  it("si el cuerpo no se puede leer, el error principal NO se pierde", async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      text: async () => {
+        throw new Error("conexión cortada");
+      },
+    }));
+    await expect(
+      traerEventos({ host: "http://reloj", usuario: "admin", clave: "x", desde: "a", hasta: "b", fetchImpl }),
+    ).rejects.toThrow(/respondió 500/);
+  });
+});

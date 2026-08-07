@@ -9,11 +9,58 @@
 // `major: 5` = eventos de control de acceso; `minor: 0` = todos los subtipos.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { crearClienteDigest } from "./digest.mjs";
 
-/** Cuántos eventos por página. 30 es lo que aguanta este firmware sin cortar la
- *  respuesta a la mitad. No subirlo sin medirlo contra el aparato real. */
+/**
+ * 🩸 EL `searchID` NO PUEDE PASAR DE 20 CARACTERES — medido contra el equipo
+ * real el 7-ago-2026, largo por largo: 1, 4, 8, 16 y **20 responden 200; 21 en
+ * adelante responden 400** `badParameters`. No son los guiones (un `"abc-def"`
+ * de 7 pasa): es puro largo.
+ *
+ * Acá se usaba `randomUUID()`, que mide **36**. O sea que el agente NUNCA pudo
+ * traer una marcación: autenticaba bien, y la primera búsqueda moría con un
+ * `400` que solo decía "badParameters" sin nombrar el campo. Se veía como un
+ * problema de permisos o de firmware.
+ *
+ * 16 caracteres hexadecimales (8 bytes al azar) dejan 4 de margen y siguen
+ * siendo irrepetibles de sobra: lo único que tienen que hacer es no chocar
+ * entre dos búsquedas del mismo aparato, que corren de a una.
+ */
+const LARGO_MAX_SEARCH_ID = 20;
+const nuevoSearchID = () => randomBytes(8).toString("hex"); // 16 caracteres
+
+/**
+ * Lo que el reloj dice que estuvo mal, para pegarlo al mensaje de error.
+ * Devuelve "" si no se puede leer — el error principal nunca se pierde por
+ * culpa de esta ayuda.
+ */
+export async function motivoDelReloj(res) {
+  try {
+    const t = (await res.text()).trim();
+    if (!t) return "";
+    try {
+      const j = JSON.parse(t);
+      const partes = [j.statusString, j.subStatusCode].filter(Boolean);
+      if (partes.length) return ` El reloj dice: ${partes.join(" / ")}.`;
+    } catch {
+      /* no era JSON: se manda un pedacito crudo, que es mejor que nada */
+    }
+    return ` El reloj dice: ${t.replace(/\s+/g, " ").slice(0, 160)}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Cuántos eventos se PIDEN por página.
+ *
+ * ⚠️ El firmware devuelve **10 pase lo que pase** — medido pidiendo 10, 30, 50
+ * y 100: las cuatro veces devolvió 10. No es un problema: la paginación avanza
+ * con lo que el reloj DEVOLVIÓ (`numOfMatches`), no con lo que se pidió, así
+ * que traer un día entero solo cuesta más vueltas. Se deja en 30 para que el
+ * día que un firmware nuevo respete el pedido, mejore solo.
+ */
 export const POR_PAGINA = 30;
 
 /** Freno de mano. Un día muy movido tuvo 371 eventos (13 páginas); julio entero
@@ -59,8 +106,8 @@ export async function traerEventos({
   const cliente = crearClienteDigest({ usuario, clave, fetchImpl, timeoutMs });
   const url = `${host.replace(/\/+$/, "")}/ISAPI/AccessControl/AcsEvent?format=json`;
 
-  // Punto 1: UNO para toda la búsqueda.
-  const searchID = randomUUID();
+  // Punto 1: UNO para toda la búsqueda. Y corto — ver `nuevoSearchID`.
+  const searchID = nuevoSearchID();
 
   const eventos = [];
   let posicion = 0;
@@ -86,7 +133,13 @@ export async function traerEventos({
     });
 
     if (!res.ok) {
-      throw new Error(`El reloj respondió ${res.status} al pedir las marcaciones.`);
+      // 🩸 El motivo del propio reloj VIAJA EN EL MENSAJE. Sin esto, el `400`
+      // del `searchID` largo se leyó como "el reloj no responde" y mandó a
+      // revisar contraseñas y permisos: el aparato SÍ decía `badParameters`,
+      // pero el agente lo tiraba a la basura antes de que nadie lo viera.
+      throw new Error(
+        `El reloj respondió ${res.status} al pedir las marcaciones.${await motivoDelReloj(res)}`,
+      );
     }
 
     const json = await res.json();
