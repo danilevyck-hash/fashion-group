@@ -36,14 +36,16 @@ import {
   esTablaFaltante,
   avisoMigracion,
   TABLA_PERSONAS,
+  DIAS_VENTANA_PERSONAS,
 } from "@/lib/asistencia/config-server";
+import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Ventana de marcaciones para armar el universo de códigos. Medio año cubre de
- *  sobra lo cargado (julio y agosto de 2026) sin traer la tabla entera. */
-const DIAS_VENTANA = 180;
+/** La ventana de marcaciones es la MISMA que la del resto del módulo: una
+ *  pantalla que ve 180 días y otra que ve 90 mostrarían universos distintos. */
+const DIAS_VENTANA = DIAS_VENTANA_PERSONAS;
 
 interface FilaMarca {
   empleado_codigo: string | null;
@@ -111,6 +113,9 @@ export async function GET(req: NextRequest) {
     }
 
     const fichas = new Map(filas.map((f) => [String(f.empleado_codigo), f]));
+    // El MISMO traductor que usan Justificaciones, Horarios, el Reporte y los
+    // exports. Se arma con las fichas ya leídas: no hay una segunda consulta.
+    const directorio = crearDirectorio(filas);
 
     // Universo = códigos del reloj ∪ fichas guardadas. La unión importa: alguien
     // que dejó de marcar hace meses no debe desaparecer de su propia planilla.
@@ -126,7 +131,10 @@ export async function GET(req: NextRequest) {
       const jornada = (Number(f?.jornada_semanal) === 40 ? 40 : 48) as Jornada;
       return {
         codigo,
-        nombre: f?.nombre ?? v?.nombreReloj ?? null,
+        // Del directorio, no de un `??` escrito acá: la regla de respaldo vive
+        // en un solo lugar. El nombre del reloj queda de último por si algún día
+        // el aparato empieza a mandarlo (hoy viene vacío en las 3.287 filas).
+        nombre: directorio.nombre(codigo) ?? v?.nombreReloj ?? null,
         salarioMensual: Number.isFinite(salario as number) ? (salario as number) : null,
         jornadaSemanal: jornada,
         empresa: f?.empresa ?? null,
@@ -146,10 +154,15 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Primero los que faltan: es lo que hay que hacer.
+    // ⚠️ ACÁ el orden es al revés que en el resto del módulo, y a propósito:
+    // primero los que FALTAN, porque esta pantalla es la lista de pendientes.
+    // Dentro de cada grupo manda el comparador compartido, que ordena por nombre
+    // y —entre los que no tienen— por número de verdad (5 antes que 49).
     personas.sort((a, b) => {
       if (a.configurado !== b.configurado) return a.configurado ? 1 : -1;
-      return (a.nombre ?? a.codigo).localeCompare(b.nombre ?? b.codigo, "es", { numeric: true });
+      const pa = { codigo: a.codigo, nombre: a.nombre, etiqueta: a.nombre ?? a.codigo, configurado: a.nombre !== null };
+      const pb = { codigo: b.codigo, nombre: b.nombre, etiqueta: b.nombre ?? b.codigo, configurado: b.nombre !== null };
+      return compararPersonas(pa, pb);
     });
 
     return NextResponse.json({

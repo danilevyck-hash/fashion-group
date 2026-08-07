@@ -11,6 +11,7 @@ import * as XLSX from "xlsx-js-style";
 import { useToast } from "@/components/ToastSystem";
 import { construirExcel, construirPdf } from "@/lib/asistencia/exportar";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
+import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 
@@ -114,7 +115,7 @@ export default function ReporteTab() {
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && personas?.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
-          No hay marcaciones en este rango. Si acabas de subir un Excel, revisa las fechas.
+          No hay marcaciones en este rango. Revisa las fechas, y arriba cómo va el reloj.
         </p>
       )}
 
@@ -174,9 +175,16 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
   return (
     <>
       <tr onClick={onToggle} className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50">
+        {/* El NOMBRE manda; el código va chico al lado, y solo si aporta algo.
+            Sin nombre configurado se muestra el código —nunca un blanco— y se
+            dice qué falta, porque un número suelto no se le reclama a nadie. */}
         <td className="px-3 py-2.5 text-gray-900">
-          {p.nombre ?? p.codigo}
-          <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
+          {etiquetaPersona(p.codigo, p.nombre)}
+          {p.nombre ? (
+            <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
+          ) : (
+            <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+          )}
         </td>
         <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>
         <td className="px-2 py-2.5 text-right tabular-nums text-gray-700">{r.diasTrabajados}</td>

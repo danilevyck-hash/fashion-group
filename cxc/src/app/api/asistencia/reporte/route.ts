@@ -15,7 +15,7 @@ import {
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
-import { leerReglas } from "@/lib/asistencia/config-server";
+import { leerReglas, leerDirectorio } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -65,7 +65,12 @@ export async function GET(req: NextRequest) {
 
     // Las reglas configuradas. Sin la migración corrida devuelve los valores por
     // defecto en vez de tirar: el reporte tiene que salir igual.
-    const { reglas } = await leerReglas();
+    // El directorio, en el mismo viaje: es el único lugar que traduce el código
+    // del reloj a un nombre, y de él salen también el Excel y el PDF.
+    const [{ reglas }, { directorio }] = await Promise.all([leerReglas(), leerDirectorio()]);
+    const nombres = new Map<string, string>(
+      directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
+    );
 
     const [hRes, jRes, fRes] = await Promise.all([
       supabaseServer.from("asistencia_horarios").select("empleado_codigo, entrada, salida, almuerzo_minutos"),
@@ -77,12 +82,18 @@ export async function GET(req: NextRequest) {
     if (jRes.error) throw new Error(jRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
+    // 🩸 La búsqueda mira el nombre del DIRECTORIO además del código. Buscando
+    // solo en la marcación, escribir "BRICEIDA" no encontraba nada: el reloj
+    // manda `empleado_nombre` vacío en las 3.287 filas cargadas.
     const visibles = q
-      ? marcaciones.filter(
-          (m) =>
-            (m.empleado_codigo ?? "").toLowerCase().includes(q) ||
-            (m.empleado_nombre ?? "").toLowerCase().includes(q),
-        )
+      ? marcaciones.filter((m) => {
+          const cod = (m.empleado_codigo ?? "").trim();
+          return (
+            cod.toLowerCase().includes(q) ||
+            (m.empleado_nombre ?? "").toLowerCase().includes(q) ||
+            (nombres.get(cod) ?? "").toLowerCase().includes(q)
+          );
+        })
       : marcaciones;
 
     const personas = armarReporte({
@@ -98,6 +109,7 @@ export async function GET(req: NextRequest) {
       desde,
       hasta,
       reglas,
+      nombres,
     });
 
     return NextResponse.json({
