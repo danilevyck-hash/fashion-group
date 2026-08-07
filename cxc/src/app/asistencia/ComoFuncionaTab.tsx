@@ -89,9 +89,15 @@ export default function ComoFuncionaTab() {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <h3 className="text-sm font-medium text-gray-900">De dónde salen los datos</h3>
         <p className="mt-1 text-[13px] leading-relaxed text-gray-600">
-          Del reloj de la entrada. Hoy se cargan subiendo el Excel que se exporta desde
-          iVMS-4200; más adelante entrarán solos. Se puede subir el mismo archivo varias
-          veces sin miedo: las marcaciones repetidas no se duplican.
+          Del reloj de la entrada. Entran <b>solas</b>: un programita instalado en la PC de la
+          oficina le pregunta al reloj cada pocos minutos y las manda para acá. Si esa PC está
+          apagada no se pierde ninguna —el reloj las guarda— y entran todas juntas cuando se
+          prenda. En el <b>Reporte</b>, arriba, siempre dice cómo va.
+        </p>
+        <p className="mt-2 text-[13px] leading-relaxed text-gray-600">
+          El botón <b>Traer ahora</b> deja un pedido que esa PC recoge en su vuelta siguiente
+          (un par de minutos). Y si algún día hiciera falta, todavía se puede subir el Excel de
+          iVMS-4200 a mano en <b>Cargar Excel</b>: repetir un archivo no duplica nada.
         </p>
       </div>
 

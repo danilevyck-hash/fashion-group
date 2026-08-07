@@ -12,6 +12,7 @@ import { useToast } from "@/components/ToastSystem";
 import { construirExcel, construirPdf } from "@/lib/asistencia/exportar";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import RangoFechas from "./RangoFechas";
+import EstadoReloj from "./EstadoReloj";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -77,6 +78,11 @@ export default function ReporteTab() {
 
   return (
     <div className="space-y-4">
+      {/* Arriba de todo a propósito: si el reloj no está entrando, cualquier
+          número de esta pantalla está incompleto y hay que saberlo ANTES de
+          leerlo — no después de descontarle minutos a alguien. */}
+      <EstadoReloj onLlegaron={() => void cargar()} />
+
       <div className="flex flex-wrap items-end gap-3">
         <RangoFechas desde={desde} hasta={hasta} onChange={(d, h) => { setDesde(d); setHasta(h); }} />
         <input
