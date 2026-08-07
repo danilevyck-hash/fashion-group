@@ -105,6 +105,12 @@ export interface DiaReporte {
 
 export interface PersonaReporte {
   codigo: string;
+  /**
+   * El nombre configurado en `asistencia_personas`, o `null` si nadie se lo
+   * puso todavía. 🩸 NO sale del reloj: `empleado_nombre` viene vacío en las
+   * 3.287 marcaciones cargadas. Quien lo pinte usa `etiquetaPersona`, que cae
+   * al código en vez de dejar la celda en blanco.
+   */
   nombre: string | null;
   salida: string;
   almuerzoMin: number;
@@ -183,8 +189,16 @@ export function armarReporte(opts: {
   hasta: string;
   /** Lo configurado en `asistencia_reglas`. Sin esto, los valores por defecto. */
   reglas?: Partial<ReglasReporte>;
+  /**
+   * Código del reloj → nombre, del directorio (`asistencia_personas`).
+   *
+   * 🩸 Manda sobre el nombre que venga en la marcación. El reloj lo manda vacío
+   * en las 3.287 filas cargadas, así que sin esto el reporte —y con él el Excel
+   * y el PDF— salen con números pelados en la columna Persona.
+   */
+  nombres?: ReadonlyMap<string, string>;
 }): PersonaReporte[] {
-  const { marcaciones, horarios, justificaciones, feriados, desde, hasta } = opts;
+  const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
 
   // 🔑 Nunca se toma un valor a medias: un `undefined` en `reglas` cae al
   // default, no a `NaN`. Con `NaN` de tolerancia toda comparación da `false` y
@@ -303,7 +317,9 @@ export function armarReporte(opts: {
 
     out.push({
       codigo,
-      nombre: p.nombre,
+      // El directorio primero: es lo que una persona escribió. El nombre de la
+      // marcación queda de respaldo por si algún día el reloj empieza a mandarlo.
+      nombre: nombres?.get(codigo) ?? p.nombre ?? null,
       salida: h?.salida ?? SALIDA_DEFAULT,
       almuerzoMin: almuerzoProg,
       dias,

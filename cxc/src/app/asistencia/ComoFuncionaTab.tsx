@@ -96,8 +96,9 @@ export default function ComoFuncionaTab() {
         </p>
         <p className="mt-2 text-[13px] leading-relaxed text-gray-600">
           El botón <b>Traer ahora</b> deja un pedido que esa PC recoge en su vuelta siguiente
-          (un par de minutos). Y si algún día hiciera falta, todavía se puede subir el Excel de
-          iVMS-4200 a mano en <b>Cargar Excel</b>: repetir un archivo no duplica nada.
+          (un par de minutos). El reloj es la <b>única</b> forma de que entren marcaciones: ya
+          no se suben Excel a mano, porque las mismas marcaciones entrando por dos caminos se
+          contaban dos veces.
         </p>
       </div>
 

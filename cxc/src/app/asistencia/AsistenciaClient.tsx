@@ -1,13 +1,29 @@
 "use client";
 
-// Módulo de Asistencia. Cinco pestañas; toda la regla de negocio vive en
+// Módulo de Asistencia. Toda la regla de negocio vive en
 // `lib/asistencia/reporte.ts`, que es el MISMO motor que arma el Excel y el
 // PDF — así la pantalla y los archivos no pueden contradecirse.
+//
+// ── 🩸 POR QUÉ YA NO HAY PESTAÑA "CARGAR EXCEL" (6-ago-2026) ─────────────────
+//
+// El reloj es la ÚNICA vía de entrada. La pantalla de Excel no era un extra
+// inofensivo: mandaba `dispositivo = "RELOJ_FG"` y armaba el `evento_id` con un
+// hash del contenido de la fila, mientras el agente manda
+// `dispositivo = "reloj cboston"` con `evento_id = serialNo` del aparato. Son
+// dos llaves distintas para el MISMO punch, así que el índice único
+// `(dispositivo, evento_id)` —el anti-duplicado— no los reconocía como iguales.
+//
+// Ya pasó: las 134 marcaciones subidas por Excel quedaron TODAS duplicadas
+// contra las del reloj y hubo que borrarlas a mano. Con las horas contadas dos
+// veces, el almuerzo de alguien salía medido en 4 horas.
+//
+// El candado que lo impide de verdad no es este borrado, es
+// `asistencia-una-sola-entrada.test.ts`. Si alguien reintroduce una segunda vía
+// con otro `dispositivo`, el build se pone en rojo.
 
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import ReporteTab from "./ReporteTab";
-import CargarTab from "./CargarTab";
 import ConfiguracionTab from "./ConfiguracionTab";
 import HorariosTab from "./HorariosTab";
 import JustificacionesTab from "./JustificacionesTab";
@@ -22,7 +38,6 @@ const TABS = [
   ["horarios", "Horarios"],
   ["justificaciones", "Justificaciones"],
   ["feriados", "Feriados"],
-  ["cargar", "Cargar Excel"],
   ["ayuda", "Cómo funciona"],
 ] as const;
 
@@ -30,9 +45,6 @@ type Tab = (typeof TABS)[number][0];
 
 export default function AsistenciaClient() {
   const [tab, setTab] = useState<Tab>("reporte");
-  // Cambia al cargar marcaciones: fuerza a que el Reporte se vuelva a montar y
-  // muestre lo recién subido en vez de lo que ya tenía en pantalla.
-  const [version, setVersion] = useState(0);
 
   return (
     <>
@@ -52,12 +64,11 @@ export default function AsistenciaClient() {
         </div>
 
         <div className="mt-5">
-          {tab === "reporte" && <ReporteTab key={version} />}
+          {tab === "reporte" && <ReporteTab />}
           {tab === "configuracion" && <ConfiguracionTab />}
           {tab === "horarios" && <HorariosTab />}
           {tab === "justificaciones" && <JustificacionesTab />}
           {tab === "feriados" && <FeriadosTab />}
-          {tab === "cargar" && <CargarTab onCargado={() => setVersion((v) => v + 1)} />}
           {tab === "ayuda" && <ComoFuncionaTab />}
         </div>
       </div>

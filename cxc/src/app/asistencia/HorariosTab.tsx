@@ -12,10 +12,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { etiquetaPersona } from "@/lib/asistencia/directorio";
 
 interface Fila {
   codigo: string;
+  /** Del directorio (`asistencia_personas`), no del reloj: el reloj no lo manda. */
   nombre: string | null;
+  /** `false` = todavía no tiene ficha; se muestra el código y se avisa. */
+  configurado?: boolean;
   salida: string;
   almuerzoMinutos: number;
   guardado: boolean;
@@ -87,7 +91,7 @@ export default function HorariosTab() {
       {filas === null && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {filas?.length === 0 && (
         <p className="py-10 text-center text-sm text-gray-500">
-          Todavía no hay marcaciones. Sube un Excel y acá aparece la gente.
+          Todavía no hay marcaciones. En cuanto el reloj mande las primeras, la gente aparece acá.
         </p>
       )}
 
@@ -103,15 +107,22 @@ export default function HorariosTab() {
             <tbody>
               {filas.map((f) => (
                 <tr key={f.codigo} className="border-b border-gray-100 last:border-0">
+                  {/* El nombre primero, el código chico al lado. Sin ficha se
+                      muestra el código y se dice qué falta: una celda en blanco
+                      es una persona a la que nadie le va a fijar el horario. */}
                   <td className="px-3 py-2">
-                    {f.nombre ?? f.codigo}
-                    <span className="ml-1.5 text-xs text-gray-400">{f.codigo}</span>
+                    {etiquetaPersona(f.codigo, f.nombre)}
+                    {f.nombre ? (
+                      <span className="ml-1.5 text-xs text-gray-400">{f.codigo}</span>
+                    ) : (
+                      <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1">
                       {SALIDAS.map((s) => (
                         <button key={s} type="button" onClick={() => void guardar(f, { salida: s })}
-                          className={`min-h-[36px] rounded-md border px-2.5 text-[13px] tabular-nums transition active:scale-[0.97] ${
+                          className={`min-h-[44px] rounded-md border px-2.5 text-[13px] tabular-nums transition active:scale-[0.97] ${
                             f.salida === s ? "border-black bg-black text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"
                           }`}>{s}</button>
                       ))}
@@ -121,7 +132,7 @@ export default function HorariosTab() {
                     <div className="flex gap-1">
                       {ALMUERZOS.map((a) => (
                         <button key={a} type="button" onClick={() => void guardar(f, { almuerzoMinutos: a })}
-                          className={`min-h-[36px] rounded-md border px-2.5 text-[13px] tabular-nums transition active:scale-[0.97] ${
+                          className={`min-h-[44px] rounded-md border px-2.5 text-[13px] tabular-nums transition active:scale-[0.97] ${
                             f.almuerzoMinutos === a ? "border-black bg-black text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"
                           }`}>{a} min</button>
                       ))}

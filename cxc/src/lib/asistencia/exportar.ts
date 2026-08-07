@@ -18,6 +18,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, ALMUERZO_DEFAULT_MIN, type PersonaReporte, type ReglasReporte } from "./reporte";
+import { etiquetaPersona } from "./directorio";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -34,6 +35,16 @@ function rango(desde: string, hasta: string): string {
 }
 /** 0 se muestra vacío, no como "0": una columna de ceros esconde lo que importa. */
 const n0 = (v: number) => (v === 0 ? "" : v);
+
+/**
+ * La columna «Persona» de los dos archivos.
+ *
+ * 🩸 Pasa por `etiquetaPersona` —la MISMA función que usa la pantalla— y no por
+ * un `?? p.codigo` escrito acá. Un Excel que dice «BRICEIDA MONTERO» y una
+ * pantalla que dice «8» son dos verdades para la misma persona, y el archivo es
+ * justo el que se manda por correo y sobrevive a la discusión.
+ */
+const quien = (p: PersonaReporte) => etiquetaPersona(p.codigo, p.nombre);
 
 const HEAD = { font: { bold: true, sz: 9, color: { rgb: "6B7280" } }, alignment: { horizontal: "left" } };
 const HEAD_R = { ...HEAD, alignment: { horizontal: "right" } };
@@ -82,7 +93,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     for (const d of p.dias) {
       if (!d.marcas.length && !d.ausente && !d.justificado) continue;
       detalle.push([
-        p.nombre ?? p.codigo, p.codigo, fecha(d.fecha),
+        quien(p), p.codigo, fecha(d.fecha),
         d.marcas[0] ?? "", d.marcas[1] ?? "", d.marcas[2] ?? "",
         d.marcas.length > 3 ? d.marcas[d.marcas.length - 1] : (d.marcas.length === 2 ? d.marcas[1] : ""),
         n0(d.tardeMin), n0(d.excesoAlmuerzoMin), n0(d.salidaTempranaMin), n0(d.extraMin),
@@ -112,7 +123,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   for (const p of personas) {
     const r = p.resumen;
     resumen.push([
-      p.nombre ?? p.codigo, p.codigo, p.salida,
+      quien(p), p.codigo, p.salida,
       r.diasTrabajados, n0(r.ausenciasSinJustificar), n0(r.ausenciasJustificadas),
       n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
       n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
@@ -211,7 +222,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     body: personas.map((p) => {
       const r = p.resumen;
       return [
-        p.nombre ?? p.codigo, p.salida, r.diasTrabajados,
+        quien(p), p.salida, r.diasTrabajados,
         r.ausenciasSinJustificar || "", r.vecesTarde || "", r.minutosTarde || "",
         r.excesoAlmuerzoMin || "", r.salidaTempranaMin || "",
         r.tiempoNoTrabajadoMin || "", r.extraMin || "", r.diasARevisar || "",

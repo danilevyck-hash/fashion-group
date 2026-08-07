@@ -11,8 +11,10 @@ import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { MOTIVOS_JUSTIFICACION } from "@/lib/asistencia/motivos";
+import { leerPersonasDelModulo } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, asistenciaRoles());
@@ -27,9 +29,23 @@ export async function GET(req: NextRequest) {
   // Se solapa con el rango pedido, no "está contenido en": unas vacaciones que
   // arrancan antes del rango igual cubren días de adentro.
   if (desde && hasta) q = q.lte("desde", hasta).gte("hasta", desde);
-  const { data, error } = await q;
+
+  // 🩸 La lista de personas se pide ACÁ y no a `/horarios`, que es de donde
+  // salía antes. Aquella devuelve solo a quien marcó en los últimos 90 días y
+  // trae el nombre del RELOJ —que viene vacío—, así que el desplegable listaba
+  // «15, 16, 17, 21…». Ahora sale del directorio, que es el único lugar donde
+  // un código se vuelve un nombre.
+  const [{ data, error }, { personas, faltaMigracion }] = await Promise.all([
+    q,
+    leerPersonasDelModulo(),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ justificaciones: data ?? [], motivos: MOTIVOS_JUSTIFICACION });
+  return NextResponse.json({
+    justificaciones: data ?? [],
+    motivos: MOTIVOS_JUSTIFICACION,
+    personas,
+    faltaMigracion,
+  });
 }
 
 export async function POST(req: NextRequest) {

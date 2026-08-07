@@ -169,8 +169,11 @@ export function estadoAgente(fila: FilaDispositivo | null, ahoraMs: number): Est
       ...base,
       salud: "nunca",
       titulo: "El agente del reloj todavía no está instalado",
+      // Sin agente NO hay otra vía: la carga por Excel se retiró el 6-ago-2026
+      // porque duplicaba las marcaciones que el reloj ya había traído. Ofrecerla
+      // acá como plan B sería invitar al bug que se acaba de cerrar.
       detalle:
-        "Mientras tanto las marcaciones se cargan a mano, subiendo el Excel de iVMS en la pestaña Cargar Excel.",
+        "Hasta que se instale en la PC de la oficina, no entran marcaciones. Es la única vía.",
     };
   }
 

@@ -34,7 +34,12 @@ describe("qué se ve en pantalla", () => {
   it("sin agente instalado NO dice que algo falló: dice que falta instalarlo", () => {
     const e = estadoAgente({ dispositivo: DISPOSITIVO_FG }, AHORA);
     expect(e.salud).toBe("nunca");
-    expect(e.detalle).toContain("Excel");
+    expect(e.detalle).toContain("no entran marcaciones");
+    // 🩸 Y NO ofrece el Excel como plan B. La carga manual se retiró el
+    // 6-ago-2026 porque duplicaba lo que el reloj ya había traído (134
+    // marcaciones duplicadas, borradas a mano). Un cartel que la sigue
+    // recomendando es la forma de que el bug vuelva por la puerta de atrás.
+    expect(e.detalle).not.toMatch(/Excel/i);
   });
 
   it("con noticias recientes, verde", () => {

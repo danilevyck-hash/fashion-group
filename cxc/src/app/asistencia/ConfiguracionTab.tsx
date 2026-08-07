@@ -269,9 +269,22 @@ export default function ConfiguracionTab() {
                   <button type="button" onClick={() => abrir(p)}
                     className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-gray-50">
                     <div className="min-w-0">
+                      {/* 🩸 Antes decía «Sin nombre» en gris, que no identifica
+                          a nadie: dos filas seguidas se veían idénticas. Sin
+                          nombre se muestra EL CÓDIGO, que es el dato que sí
+                          existe y el que aparece pegado al reloj. */}
                       <div className="truncate text-sm text-gray-900">
-                        {p.nombre ?? <span className="text-gray-400">Sin nombre</span>}
-                        <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>
+                        {p.nombre ? (
+                          <>
+                            {p.nombre}
+                            <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>
+                          </>
+                        ) : (
+                          <>
+                            Código {p.codigo}
+                            <span className="ml-1.5 text-xs text-amber-700">falta el nombre</span>
+                          </>
+                        )}
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-gray-500">
                         {p.empresa ? (

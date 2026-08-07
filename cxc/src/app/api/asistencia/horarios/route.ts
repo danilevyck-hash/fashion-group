@@ -14,6 +14,8 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { salidaSugerida, minutosDelDia, diaPanama, ALMUERZO_DEFAULT_MIN } from "@/lib/asistencia/reporte";
+import { leerDirectorio } from "@/lib/asistencia/config-server";
+import { compararPersonas } from "@/lib/asistencia/directorio";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,19 +42,22 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const { data: guardados, error } = await supabaseServer
-      .from("asistencia_horarios")
-      .select("empleado_codigo, empleado_nombre, entrada, salida, almuerzo_minutos");
+    // El traductor código → nombre. Es el MISMO que usan Justificaciones, el
+    // Reporte y los exports: acá no se vuelve a consultar `asistencia_personas`.
+    const [{ data: guardados, error }, { directorio }] = await Promise.all([
+      supabaseServer
+        .from("asistencia_horarios")
+        .select("empleado_codigo, empleado_nombre, entrada, salida, almuerzo_minutos"),
+      leerDirectorio(),
+    ]);
     if (error) throw new Error(error.message);
     const porCodigo = new Map((guardados ?? []).map((h) => [String(h.empleado_codigo), h]));
 
     // Última marca de cada día por persona → mediana → salida sugerida.
-    const nombre = new Map<string, string | null>();
     const ultimaPorDia = new Map<string, number>();
     for (const m of marcas) {
       const cod = (m.empleado_codigo ?? "").trim();
       if (!cod) continue;
-      if (m.empleado_nombre) nombre.set(cod, m.empleado_nombre);
       const k = `${cod}|${diaPanama(m.ocurrio_en)}`;
       const v = minutosDelDia(m.ocurrio_en);
       ultimaPorDia.set(k, Math.max(ultimaPorDia.get(k) ?? 0, v));
@@ -64,12 +69,24 @@ export async function GET(req: NextRequest) {
       if (l) l.push(v); else salidas.set(cod, [v]);
     }
 
-    const personas = [...salidas.keys()].map((cod) => {
+    // Universo = quien marcó ∪ quien tiene ficha. La unión importa: el código 47
+    // tiene ficha y cero marcaciones, y sin él no se le puede fijar el horario.
+    const codigos = new Set<string>([...salidas.keys(), ...directorio.codigos()]);
+
+    const personas = [...codigos].map((cod) => {
       const g = porCodigo.get(cod);
       const sug = salidaSugerida(salidas.get(cod) ?? []);
+      const p = directorio.persona(cod);
       return {
         codigo: cod,
-        nombre: nombre.get(cod) ?? g?.empleado_nombre ?? null,
+        // 🩸 El nombre sale del DIRECTORIO, no del reloj. `empleado_nombre` de
+        // las marcaciones viene vacío en las 3.287 filas cargadas: confiar en él
+        // era lo que hacía que esta tabla mostrara números pelados.
+        nombre: p.nombre,
+        etiqueta: p.etiqueta,
+        // `false` = nadie le puso nombre todavía. Se muestra el código y se
+        // marca como pendiente, nunca en blanco.
+        configurado: p.configurado,
         entrada: g ? String(g.entrada).slice(0, 5) : "08:00",
         salida: g ? String(g.salida).slice(0, 5) : sug,
         almuerzoMinutos: g?.almuerzo_minutos ?? ALMUERZO_DEFAULT_MIN,
@@ -80,7 +97,9 @@ export async function GET(req: NextRequest) {
         diasMedidos: (salidas.get(cod) ?? []).length,
       };
     });
-    personas.sort((a, b) => (a.nombre ?? a.codigo).localeCompare(b.nombre ?? b.codigo, "es"));
+    // Por NOMBRE, no por código como texto: ordenando texto el 5 cae después
+    // del 49. El comparador es el mismo en todas las pantallas del módulo.
+    personas.sort(compararPersonas);
 
     return NextResponse.json({ personas, sinConfirmar: personas.filter((p) => !p.guardado).length });
   } catch (e) {

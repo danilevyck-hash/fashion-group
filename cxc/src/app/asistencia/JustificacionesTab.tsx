@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
 
 interface Justificacion {
   id: string;
@@ -18,7 +19,6 @@ interface Justificacion {
   nota: string | null;
   registrado_por: string | null;
 }
-interface Persona { codigo: string; nombre: string | null }
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function bonito(d: string): string {
@@ -30,7 +30,7 @@ const hoyPanama = () => new Date(Date.now() - 5 * 3600_000).toISOString().slice(
 export default function JustificacionesTab() {
   const { toast } = useToast();
   const [lista, setLista] = useState<Justificacion[] | null>(null);
-  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [personas, setPersonas] = useState<PersonaListada[]>([]);
   const [motivos, setMotivos] = useState<string[]>([]);
   const [codigo, setCodigo] = useState("");
   const [desde, setDesde] = useState(hoyPanama());
@@ -39,20 +39,27 @@ export default function JustificacionesTab() {
   const [nota, setNota] = useState("");
   const [guardando, setGuardando] = useState(false);
 
+  // 🩸 UN solo pedido, y las personas vienen del DIRECTORIO. Antes esta lista
+  // salía de `/api/asistencia/horarios`, que devuelve el nombre que manda el
+  // reloj — vacío en las 3.287 marcaciones cargadas. De ahí salía el
+  // desplegable de «15, 16, 17, 21…» que Daniel fotografió.
   const cargar = useCallback(async () => {
-    const [rj, rh] = await Promise.all([
-      fetch("/api/asistencia/justificaciones", { cache: "no-store" }),
-      fetch("/api/asistencia/horarios", { cache: "no-store" }),
-    ]);
-    const dj = await rj.json(); const dh = await rh.json();
+    const rj = await fetch("/api/asistencia/justificaciones", { cache: "no-store" });
+    const dj = await rj.json();
     setLista(dj.justificaciones ?? []);
     setMotivos(dj.motivos ?? []);
     if (dj.motivos?.length && !motivo) setMotivo(dj.motivos[0]);
-    setPersonas(dh.personas ?? []);
+    setPersonas(dj.personas ?? []);
   }, [motivo]);
   useEffect(() => { void cargar(); }, [cargar]);
 
-  const nombreDe = (cod: string) => personas.find((p) => p.codigo === cod)?.nombre ?? cod;
+  // El nombre de quien ya tiene una justificación cargada. Si no está en la
+  // lista (ficha borrada, código viejo) se muestra el código, nunca un blanco.
+  const nombreDe = (cod: string) =>
+    etiquetaPersona(cod, personas.find((p) => p.codigo === cod)?.nombre);
+
+  const conNombre = personas.filter((p) => p.configurado);
+  const sinNombre = personas.filter((p) => !p.configurado);
 
   async function agregar() {
     if (!codigo) return toast("Elige la persona", "error");
@@ -95,9 +102,26 @@ export default function JustificacionesTab() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">Persona</label>
+            {/* Los que tienen nombre van arriba y alfabéticos; los que todavía
+                no, agrupados abajo y por número de verdad (5 antes que 49).
+                Siguen siendo ELEGIBLES: son gente que marca y a la que hay que
+                poder justificarle un día. Solo se ven como lo que son. */}
             <select value={codigo} onChange={(e) => setCodigo(e.target.value)} className={campo}>
               <option value="">Elegir…</option>
-              {personas.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre ?? p.codigo}</option>)}
+              {conNombre.length > 0 && (
+                <optgroup label="Personas">
+                  {conNombre.map((p) => (
+                    <option key={p.codigo} value={p.codigo}>{p.etiqueta}</option>
+                  ))}
+                </optgroup>
+              )}
+              {sinNombre.length > 0 && (
+                <optgroup label="Falta ponerles nombre en Configuración">
+                  {sinNombre.map((p) => (
+                    <option key={p.codigo} value={p.codigo}>Código {p.etiqueta}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
           <div>
@@ -161,7 +185,7 @@ export default function JustificacionesTab() {
                   <td className="px-3 py-2 text-gray-400">{j.registrado_por ?? ""}</td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" onClick={() => void borrar(j.id)}
-                      className="min-h-[36px] rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
+                      className="min-h-[44px] rounded-md px-2 text-[13px] text-gray-500 transition hover:bg-red-50 hover:text-red-600">
                       Quitar
                     </button>
                   </td>
