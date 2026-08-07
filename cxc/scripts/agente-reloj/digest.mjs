@@ -88,13 +88,43 @@ export function construirAutorizacion({ desafio, usuario, clave, metodo, uri, nc
  * sola vez y se reintenta. Un segundo 401 ya es credencial mala, y ahí sí se
  * dice claro: "usuario o contraseña del reloj incorrectos".
  */
-export function crearClienteDigest({ usuario, clave, fetchImpl = fetch, timeoutMs = 20_000 }) {
+/**
+ * 🩸 EL NONCE DE ESTE RELOJ NO SE PUEDE REUSAR, Y REUSARLO LO BLOQUEA.
+ *
+ * Medido el 7-ago-2026 contra el equipo real: la primera página de marcaciones
+ * entra bien (el reloj dice "hay 1.089 eventos") y la SEGUNDA —la que reusa el
+ * desafío guardado— vuelve **401**. El cliente rehacía el baile y reintentaba,
+ * o sea que cada página costaba **un intento fallido de login**. A las 5 el
+ * aparato bloquea la cuenta (`retryLoginTime`) y a partir de ahí TODO falla,
+ * incluso con la contraseña correcta. Se veía como "contraseña incorrecta" —
+ * y la contraseña estaba bien.
+ *
+ * Por eso `reusarDesafio` va en **false** por defecto: cada request arranca
+ * pidiendo el desafío SIN credenciales. Un request sin credenciales no es un
+ * intento de login fallido —es la primera mitad normal del Digest, la que hace
+ * cualquier navegador—, así que el contador del reloj nunca sube.
+ *
+ * Cuesta el doble de requests (dos por página). Traer un día entero pasa de
+ * ~110 a ~220 requests contra un aparato de la red local: se paga solo con no
+ * volver a bloquear el reloj.
+ */
+export function crearClienteDigest({
+  usuario,
+  clave,
+  fetchImpl = fetch,
+  timeoutMs = 20_000,
+  reusarDesafio = false,
+}) {
   let desafio = null;
   let nc = 0;
 
   async function pedir(url, opciones = {}) {
     const metodo = opciones.method ?? "GET";
     const uri = new URL(url).pathname + new URL(url).search;
+    if (!reusarDesafio) {
+      desafio = null; // nunca se presenta una credencial que pueda estar vencida
+      nc = 0;
+    }
     const base = {
       ...opciones,
       signal: opciones.signal ?? AbortSignal.timeout(timeoutMs),
