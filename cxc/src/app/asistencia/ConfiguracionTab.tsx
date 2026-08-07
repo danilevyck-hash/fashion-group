@@ -43,6 +43,15 @@ import {
   faltaEnPersona,
   fraseFalta,
 } from "@/lib/asistencia/configuracion-avisos";
+import { hoyPanama } from "@/lib/fecha-panama";
+import {
+  fraseBaja,
+  marcoDespuesDeLaBaja,
+  MOTIVOS_SALIDA,
+  OPCION_MOTIVO,
+  tieneBaja,
+  type MotivoSalida,
+} from "@/lib/asistencia/vigencia";
 import HorariosTab from "./HorariosTab";
 import FeriadosTab from "./FeriadosTab";
 
@@ -58,6 +67,15 @@ interface Persona {
   ultimaMarca: string | null;
   rataHora: number | null;
   valorMinuto: number | null;
+  // ── Altas y bajas ──────────────────────────────────────────────────────────
+  fechaIngreso: string | null;
+  fechaSalida: string | null;
+  motivoSalida: MotivoSalida | null;
+  /** Derivado de la fecha en el servidor, nunca un campo aparte. */
+  activo: boolean;
+  /** «Renunció el 12 de agosto de 2026». `null` si sigue trabajando. */
+  baja: string | null;
+  marcoDespuesDeLaBaja: boolean;
 }
 
 interface Resumen {
@@ -65,6 +83,7 @@ interface Resumen {
   sinConfigurar: number;
   sinSalario: number;
   conMarcaciones: number;
+  bajas: number;
 }
 
 interface Datos {
@@ -73,6 +92,9 @@ interface Datos {
   resumen: Resumen;
   faltaMigracion: boolean;
   avisoMigracion: string | null;
+  avisoMigracionBajas: string | null;
+  puedeDarDeBaja: boolean;
+  avisoBajas: { titulo: string; detalle: string[] } | null;
 }
 
 /** El formulario guarda TEXTO: hay que poder borrar un campo para reescribirlo.
@@ -87,6 +109,13 @@ interface Borrador {
   salario: string;
   jornada: number;
   empresa: string;
+  /** YYYY-MM-DD o "". Se guarda y NO prorratea el salario: esa regla no está
+   *  definida y hay que preguntarla antes de inventar medio sueldo. */
+  fechaIngreso: string;
+  /** YYYY-MM-DD o "". Vacía = trabaja acá. */
+  fechaSalida: string;
+  /** Obligatorio si hay fecha de salida: los dos, o ninguno. */
+  motivoSalida: string;
 }
 
 const CAMPO =
@@ -134,7 +163,17 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
 
 /** La firma de un borrador. Sirve para no mandar dos veces el mismo PUT cuando
  *  el `blur` de un campo dispara justo después de que la píldora ya guardó. */
-const firma = (b: Borrador) => `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`;
+const firma = (b: Borrador) =>
+  `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
+  + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}`;
+
+/**
+ * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
+ * motivo es la mitad del dato que la liquidación va a necesitar, y el servidor
+ * la rechaza. Se frena acá para no mandar un PUT que ya se sabe que rebota.
+ */
+const bajaCompleta = (b: Borrador) =>
+  (b.fechaSalida.trim() === "") === (b.motivoSalida.trim() === "");
 
 export default function ConfiguracionTab() {
   const { toast } = useToast();
@@ -183,6 +222,9 @@ export default function ConfiguracionTab() {
       salario: p.salarioMensual === null ? "" : String(p.salarioMensual),
       jornada: p.jornadaSemanal,
       empresa: p.empresa ?? "",
+      fechaIngreso: p.fechaIngreso ?? "",
+      fechaSalida: p.fechaSalida ?? "",
+      motivoSalida: p.motivoSalida ?? "",
     };
     setAbierta(p.codigo);
     setBorrador(b);
@@ -206,7 +248,7 @@ export default function ConfiguracionTab() {
    */
   const guardar = useCallback(
     async (codigo: string, b: Borrador) => {
-      const completo = b.nombre.trim() !== "" && b.empresa !== "";
+      const completo = b.nombre.trim() !== "" && b.empresa !== "" && bajaCompleta(b);
       if (!completo) {
         setEstadoFila(null);
         return;
@@ -231,6 +273,12 @@ export default function ConfiguracionTab() {
             salarioMensual: b.salario,
             jornadaSemanal: b.jornada,
             empresa: b.empresa,
+            // Vacío viaja como vacío: el servidor lo convierte en `null` y eso
+            // es exactamente "reactivar". Mandar `null` desde acá sería la misma
+            // decisión tomada dos veces, en dos lugares.
+            fechaIngreso: b.fechaIngreso,
+            fechaSalida: b.fechaSalida,
+            motivoSalida: b.motivoSalida,
           }),
         });
         const d = await res.json();
@@ -241,7 +289,15 @@ export default function ConfiguracionTab() {
         // sea no viniera la ficha de vuelta, se cae al borrador en vez de
         // reventar: una excepción acá tumbaría la pantalla entera.
         const eco = d.persona as
-          | { nombre: string; salarioMensual: number | null; jornadaSemanal: number; empresa: string }
+          | {
+              nombre: string;
+              salarioMensual: number | null;
+              jornadaSemanal: number;
+              empresa: string;
+              fechaIngreso?: string | null;
+              fechaSalida?: string | null;
+              motivoSalida?: MotivoSalida | null;
+            }
           | undefined;
         const salarioTexto = b.salario.trim().replace(",", ".");
         const salarioNum = Number(salarioTexto);
@@ -251,6 +307,15 @@ export default function ConfiguracionTab() {
             salarioTexto !== "" && Number.isFinite(salarioNum) && salarioNum > 0 ? salarioNum : null,
           jornadaSemanal: b.jornada,
           empresa: b.empresa,
+          fechaIngreso: b.fechaIngreso || null,
+          fechaSalida: b.fechaSalida || null,
+          motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
+        };
+        // La vigencia que quedó guardada, ya normalizada por el servidor.
+        const vig = {
+          fechaIngreso: p.fechaIngreso ?? null,
+          fechaSalida: p.fechaSalida ?? null,
+          motivoSalida: p.motivoSalida ?? null,
         };
         setDatos((prev) => {
           if (!prev) return prev;
@@ -267,15 +332,27 @@ export default function ConfiguracionTab() {
                   faltaSalario: p.salarioMensual === null,
                   // La MISMA función que usa la planilla para multiplicar.
                   rataHora: rataPorHoraCalculo(p.salarioMensual, p.jornadaSemanal, prev.reglas),
+                  ...vig,
+                  // 🔑 `activo` y la frase se DERIVAN de la fecha con las mismas
+                  // funciones que usa el servidor: dos redacciones distintas para
+                  // el mismo hecho es la forma de que se contradigan.
+                  activo: !tieneBaja(vig),
+                  baja: fraseBaja(vig, hoyPanama()),
+                  marcoDespuesDeLaBaja: marcoDespuesDeLaBaja(vig, x.ultimaMarca),
                 },
           );
           return {
             ...prev,
             personas,
+            // 🔑 Todas las cuentas van sobre los ACTIVOS. Quien ya no trabaja
+            // acá no es trabajo pendiente de nadie; contarlo inflaría para
+            // siempre el número que la contable usa para saber cuánto le falta.
             resumen: {
               ...prev.resumen,
-              sinConfigurar: personas.filter((x) => !x.configurado).length,
-              sinSalario: personas.filter((x) => x.faltaSalario).length,
+              total: personas.filter((x) => x.activo).length,
+              bajas: personas.filter((x) => !x.activo).length,
+              sinConfigurar: personas.filter((x) => x.activo && !x.configurado).length,
+              sinSalario: personas.filter((x) => x.activo && x.faltaSalario).length,
             },
           };
         });
@@ -300,6 +377,89 @@ export default function ConfiguracionTab() {
     void guardar(codigo, nuevo);
   };
 
+  /**
+   * DAR DE BAJA Y REACTIVAR.
+   *
+   * 🩸 ACÁ NO SE GUARDA SOLO, Y ES A PROPÓSITO. Todo lo demás de esta pantalla
+   * guarda al tocarse porque corregir un salario es corregir un dato. Dar de
+   * baja NO es un dato: es sacar a una persona de todas las planillas que
+   * vienen. Una fecha elegida a medias no puede disparar eso, así que hay un
+   * botón que dice exactamente lo que va a pasar.
+   *
+   * Manda la ficha COMPLETA (nombre, salario, jornada, empresa) porque el PUT
+   * es un upsert de la fila entera: mandar solo la fecha borraría lo demás.
+   */
+  const guardarBaja = useCallback(
+    async (p: Persona, fechaSalida: string, motivoSalida: string) => {
+      setGuardando(true);
+      try {
+        const res = await fetch("/api/asistencia/configuracion", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            codigo: p.codigo,
+            nombre: p.nombre ?? "",
+            salarioMensual: p.salarioMensual === null ? "" : String(p.salarioMensual),
+            jornadaSemanal: p.jornadaSemanal,
+            empresa: p.empresa ?? "",
+            fechaIngreso: p.fechaIngreso ?? "",
+            fechaSalida,
+            motivoSalida,
+          }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
+
+        const vig = {
+          fechaIngreso: p.fechaIngreso ?? null,
+          fechaSalida: fechaSalida || null,
+          motivoSalida: (motivoSalida || null) as MotivoSalida | null,
+        };
+        setDatos((prev) => {
+          if (!prev) return prev;
+          const personas = prev.personas.map((x) =>
+            x.codigo !== p.codigo
+              ? x
+              : {
+                  ...x,
+                  ...vig,
+                  activo: !tieneBaja(vig),
+                  baja: fraseBaja(vig, hoyPanama()),
+                  marcoDespuesDeLaBaja: marcoDespuesDeLaBaja(vig, x.ultimaMarca),
+                },
+          );
+          return {
+            ...prev,
+            personas,
+            resumen: {
+              ...prev.resumen,
+              total: personas.filter((x) => x.activo).length,
+              bajas: personas.filter((x) => !x.activo).length,
+              sinConfigurar: personas.filter((x) => x.activo && !x.configurado).length,
+              sinSalario: personas.filter((x) => x.activo && x.faltaSalario).length,
+            },
+          };
+        });
+        // La persona cambia de lista, así que la fila abierta ya no está donde
+        // estaba: se cierra en vez de dejar un formulario huérfano.
+        setAbierta(null);
+        setBorrador(null);
+        const quien = p.nombre ?? `el código ${p.codigo}`;
+        toast(
+          fechaSalida
+            ? `Listo. ${quien} no sale en las quincenas posteriores al ${fechaSalida}; las anteriores quedan igual.`
+            : `Listo. ${quien} vuelve a salir en la planilla.`,
+          "success",
+        );
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "No se pudo guardar", "error");
+      } finally {
+        setGuardando(false);
+      }
+    },
+    [toast],
+  );
+
   async function guardarReglas() {
     if (!form) return;
     setGuardandoReglas(true);
@@ -320,12 +480,20 @@ export default function ConfiguracionTab() {
     }
   }
 
+  /**
+   * 🩸 LAS BAJAS NO SE MEZCLAN CON LOS ACTIVOS. Una lista donde conviven los que
+   * trabajan acá y los que se fueron obliga a leer fila por fila para saber a
+   * quién hay que configurarle algo — y la ficha de quien se fue está completa,
+   * así que se ve idéntica a la de quien está. Van en su propio bloque, abajo.
+   */
+  const activos = useMemo(() => (datos?.personas ?? []).filter((p) => p.activo), [datos]);
+  const bajas = useMemo(() => (datos?.personas ?? []).filter((p) => !p.activo), [datos]);
+
   const visibles = useMemo(() => {
-    const lista = datos?.personas ?? [];
-    if (filtro === "todos") return lista;
-    if (filtro === "faltan") return lista.filter((p) => !p.configurado || p.faltaSalario);
-    return lista.filter((p) => p.empresa === filtro);
-  }, [datos, filtro]);
+    if (filtro === "todos") return activos;
+    if (filtro === "faltan") return activos.filter((p) => !p.configurado || p.faltaSalario);
+    return activos.filter((p) => p.empresa === filtro);
+  }, [activos, filtro]);
 
   // UN solo aviso, con el desglose adentro. Antes eran dos carteles ámbar
   // apilados que decían casi lo mismo y competían entre ellos.
@@ -389,6 +557,26 @@ export default function ConfiguracionTab() {
               </div>
             )}
 
+            {/* 🩸 EL AVISO QUE NO SE ESCONDE: dada de baja y sigue marcando. Va
+                en ROJO y arriba de la lista porque las dos explicaciones posibles
+                —volvió, o alguien usa su huella— piden que alguien haga algo. */}
+            {datos.avisoBajas && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-900">
+                <b>{datos.avisoBajas.titulo}</b>
+                <ul className="mt-1 space-y-0.5 text-red-800">
+                  {datos.avisoBajas.detalle.map((d) => (
+                    <li key={d}>· {d}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {datos.avisoMigracionBajas && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+                {datos.avisoMigracionBajas}
+              </p>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setFiltro("todos")}
                 className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
@@ -401,7 +589,9 @@ export default function ConfiguracionTab() {
               {EMPRESAS_ASISTENCIA.map((e) => (
                 <button key={e} type="button" onClick={() => setFiltro(e)}
                   className={`${PILL_BASE} ${filtro === e ? PILL_ON : PILL_OFF}`}>
-                  {etiquetaEmpresa(e)} ({datos.personas.filter((p) => p.empresa === e).length})
+                  {/* Cuenta ACTIVOS: la planilla de Boston no incluye a los que
+                      se fueron, así que la píldora tampoco puede contarlos. */}
+                  {etiquetaEmpresa(e)} ({activos.filter((p) => p.empresa === e).length})
                 </button>
               ))}
             </div>
@@ -548,7 +738,34 @@ export default function ConfiguracionTab() {
                                 ))}
                               </div>
                             </div>
+                            <div>
+                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+                                Empezó a trabajar
+                              </label>
+                              <input
+                                type="date"
+                                value={borrador.fechaIngreso}
+                                onChange={(e) =>
+                                  setBorrador({ ...borrador, fechaIngreso: e.target.value })
+                                }
+                                onBlur={() => void guardar(p.codigo, borrador)}
+                                className={`${CAMPO} tabular-nums`}
+                              />
+                              {/* ⚠️ Se GUARDA y no reparte el salario. La regla de
+                                  proporción de quien entra a mitad de quincena no
+                                  está definida: inventarla sería inventar plata. */}
+                              <p className="mt-1 text-[11px] text-gray-400">
+                                Opcional. El sueldo de la quincena no se reparte por días.
+                              </p>
+                            </div>
                           </div>
+
+                          <BloqueBaja
+                            persona={p}
+                            puede={datos.puedeDarDeBaja}
+                            ocupado={guardando}
+                            onGuardar={(fecha, motivo) => void guardarBaja(p, fecha, motivo)}
+                          />
 
                           <div className="mt-3 flex flex-wrap items-center gap-3">
                             <button type="button" onClick={() => { setAbierta(null); setBorrador(null); }}
@@ -580,6 +797,55 @@ export default function ConfiguracionTab() {
                   );
                 })}
               </div>
+            )}
+
+            {/* ── LOS QUE YA NO TRABAJAN ACÁ ────────────────────────────────
+                Aparte de los activos y al final: no son trabajo pendiente. No
+                se borra a nadie —la ficha es lo que hace que una quincena vieja
+                se pueda reimprimir— y se puede reactivar de un clic. */}
+            {bajas.length > 0 && (
+              <details className="rounded-lg border border-gray-200 bg-gray-50">
+                <summary className="flex min-h-[44px] cursor-pointer items-center px-3 py-2.5 text-sm text-gray-700">
+                  Ya no trabajan acá ({bajas.length})
+                </summary>
+                <div className="border-t border-gray-200 bg-white">
+                  <p className="px-3 py-2 text-[12px] text-gray-500">
+                    Siguen apareciendo enteras en las quincenas en que trabajaron —incluida la
+                    de su salida— y no salen en las siguientes. Si alguien volvió, se reactiva
+                    acá.
+                  </p>
+                  {bajas.map((p) => (
+                    <div
+                      key={p.codigo}
+                      className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-3 py-2.5"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-gray-900">
+                          {p.nombre ?? `Código ${p.codigo}`}
+                          <span className="ml-1.5 text-xs text-gray-400">código {p.codigo}</span>
+                        </span>
+                        <span className="block text-[12px] text-gray-500">
+                          {p.baja}
+                          {p.empresa ? ` · ${etiquetaEmpresa(p.empresa)}` : ""}
+                        </span>
+                        {p.marcoDespuesDeLaBaja && (
+                          <span className="mt-0.5 block text-[12px] text-red-700">
+                            Marcó en el reloj después de esa fecha (última {p.ultimaMarca}).
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={guardando || !datos.puedeDarDeBaja}
+                        onClick={() => void guardarBaja(p, "", "")}
+                        className={`${PILL_BASE} ${PILL_OFF} disabled:opacity-50`}
+                      >
+                        Volvió a trabajar acá
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </details>
             )}
           </Seccion>
 
@@ -762,6 +1028,94 @@ function NombrePersona({ p }: { p: { nombre: string | null; codigo: string; marc
         {p.marcaciones} marcaciones{p.ultimaMarca ? ` · última ${p.ultimaMarca}` : ""}
       </span>
     </span>
+  );
+}
+
+/**
+ * DAR DE BAJA — con fecha y motivo, nunca borrando.
+ *
+ * 🩸 POR QUÉ NO HAY UN BOTÓN DE BORRAR. Borrar la ficha se lleva el nombre, el
+ * salario y la empresa: o sea, todo lo que hace falta para volver a armar una
+ * quincena vieja. La planilla de julio en que esa persona SÍ trabajó dejaría de
+ * cuadrar, y una planilla cerrada tiene que poder reimprimirse igual dentro de
+ * dos años.
+ *
+ * 🔑 EL BOTÓN ES EXPLÍCITO aunque el resto de la pantalla guarde solo: elegir
+ * una fecha a medias no puede sacar a nadie de las planillas que vienen.
+ */
+function BloqueBaja({
+  persona, puede, ocupado, onGuardar,
+}: {
+  persona: Persona;
+  /** `false` = falta correr el SQL de las bajas. Se dice, no se esconde el botón. */
+  puede: boolean;
+  ocupado: boolean;
+  onGuardar: (fechaSalida: string, motivo: string) => void;
+}) {
+  // El borrador de la baja vive acá y no en el de la ficha: es otra acción, con
+  // su propio botón. Este bloque solo se pinta en la ficha de alguien ACTIVO —
+  // la baja se corrige desde la lista de abajo, reactivando y volviendo a dar.
+  const [fecha, setFecha] = useState(persona.fechaSalida ?? "");
+  const [motivo, setMotivo] = useState<string>(persona.motivoSalida ?? "");
+  const listo = fecha.trim() !== "" && motivo.trim() !== "";
+
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+      <h4 className="text-sm font-medium text-gray-900">¿Se fue de la empresa?</h4>
+      <p className="mt-1 text-[12px] leading-relaxed text-gray-500">
+        Se da de baja con la <b>fecha de su último día</b>. Sigue apareciendo entera en las
+        quincenas en que trabajó, incluida la de su salida, y desaparece de las siguientes.
+        No se borra nada: si vuelve, se reactiva.
+      </p>
+
+      {!puede && (
+        <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
+          Todavía no se puede guardar una baja: falta correr el archivo de la base de datos.
+        </p>
+      )}
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+            Último día de trabajo
+          </label>
+          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+            className={`${CAMPO} tabular-nums`} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+            ¿Por qué salió?
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {MOTIVOS_SALIDA.map((m) => (
+              <button key={m} type="button" onClick={() => setMotivo(m)}
+                className={`${PILL_BASE} ${motivo === m ? PILL_ON : PILL_OFF}`}>
+                {OPCION_MOTIVO[m]}
+              </button>
+            ))}
+          </div>
+          {/* Se guarda para la LIQUIDACIÓN, no para el cálculo de la quincena:
+              ahí un despido injustificado paga indemnización y una renuncia no.
+              La planilla trata los tres motivos exactamente igual. */}
+          <p className="mt-1 text-[11px] text-gray-400">
+            La planilla se calcula igual en los tres casos. Se guarda para la liquidación.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!listo || ocupado || !puede}
+          onClick={() => onGuardar(fecha, motivo)}
+          className="min-h-[44px] rounded-md bg-black px-4 text-sm text-white transition active:scale-[0.97] disabled:opacity-40">
+          Dar de baja
+        </button>
+        {!listo && (
+          <span className="text-[12px] text-gray-400">
+            Elige la fecha y el motivo.
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 

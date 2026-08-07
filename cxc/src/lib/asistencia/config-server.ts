@@ -33,6 +33,13 @@ import {
   type Directorio,
   type PersonaListada,
 } from "./directorio";
+import {
+  COLUMNAS_BAJAS,
+  esColumnaDeBajaFaltante,
+  MOTIVOS_SALIDA,
+  type MotivoSalida,
+  type Vigencia,
+} from "./vigencia";
 
 // Se re-exportan para que las rutas importen todo de un solo lugar. La
 // DETECCIÓN es pura y vive en `config.ts`; acá solo está el I/O.
@@ -79,24 +86,101 @@ export interface FilaPersonaDb {
   salario_mensual: number | string | null;
   jornada_semanal: number | null;
   empresa: string | null;
+  /** Opcionales: no existen hasta que se corra `MIGRACION_BAJAS`. */
+  fecha_ingreso?: string | null;
+  fecha_salida?: string | null;
+  motivo_salida?: string | null;
 }
 
 export interface PersonasLeidas {
   filas: FilaPersonaDb[];
   faltaMigracion: boolean;
+  /** `true` = la tabla existe pero le faltan las columnas de la baja. Todas las
+   *  personas se leen como activas, que es exactamente como estaban antes. */
+  faltaColumnasBajas: boolean;
 }
 
-/** Las fichas guardadas. Sin la migración corrida devuelve la lista vacía. */
-export async function leerPersonas(): Promise<PersonasLeidas> {
-  const { data, error } = await supabaseServer
-    .from(TABLA_PERSONAS)
-    .select("empleado_codigo, nombre, salario_mensual, jornada_semanal, empresa");
+/** Lo que se pedía antes de que existieran las altas y bajas. */
+const COLS_BASE = "empleado_codigo, nombre, salario_mensual, jornada_semanal, empresa";
+/** Lo que se pide ahora. Las columnas nuevas salen de `vigencia.ts` para que el
+ *  `select` y la detección del error no se puedan separar.
+ *
+ *  ⚠️ Armado al ejecutar, así que los tipos generados de Supabase no pueden
+ *  seguirlo y el resultado llega sin forma: por eso las dos lecturas de abajo
+ *  castean `as unknown as FilaPersonaDb[]`. Se prefiere el cast a repetir los
+ *  nombres de las columnas en dos lugares —esa es la duplicación que en este
+ *  proyecto ya costó dos bugs caros. */
+const COLS_CON_BAJAS = `${COLS_BASE}, ${COLUMNAS_BAJAS.join(", ")}`;
 
-  if (error) {
-    if (esTablaFaltante(error, TABLA_PERSONAS)) return { filas: [], faltaMigracion: true };
+/**
+ * Las fichas guardadas.
+ *
+ * Aguanta DOS grados de migración pendiente, y los dos pasaron de verdad en este
+ * proyecto:
+ *   · sin la tabla  → lista vacía y `faltaMigracion` (la pantalla nombra el SQL);
+ *   · con la tabla y SIN las columnas de la baja → se relee sin ellas y todo el
+ *     mundo queda activo, que es como está hoy. Una lista explícita de columnas
+ *     hace que PostgREST rechace el select ENTERO: sin este reintento, Asistencia
+ *     no cargaría ni una ficha hasta que alguien corriera el DDL.
+ */
+export async function leerPersonas(): Promise<PersonasLeidas> {
+  const { data, error } = await supabaseServer.from(TABLA_PERSONAS).select(COLS_CON_BAJAS);
+
+  if (!error) {
+    return {
+      filas: (data ?? []) as unknown as FilaPersonaDb[],
+      faltaMigracion: false,
+      faltaColumnasBajas: false,
+    };
+  }
+  // 🔴 EL ORDEN DE ESTOS DOS `if` NO ES ESTÉTICO, Y COSTÓ UNA VERIFICACIÓN EN
+  // EL NAVEGADOR (7-ago-2026). Postgres dice «column asistencia_personas.
+  // fecha_ingreso does not exist»: ese texto NOMBRA la tabla y trae "does not
+  // exist", así que `esTablaFaltante` lo da por bueno. Preguntando primero por
+  // la tabla, faltar TRES COLUMNAS se leía como «falta la tabla entera» y la
+  // pantalla escondía las 32 fichas reales detrás de un aviso equivocado —
+  // medido: las 37 personas salían «sin configurar», sin nombre y sin salario.
+  // Lo específico se pregunta antes que lo general.
+  //
+  // ⚠️ Y solo se reintenta cuando el error NOMBRA una columna de la baja: releer
+  // ante cualquier error convertiría un problema real en una lectura incompleta.
+  if (!esColumnaDeBajaFaltante(error)) {
+    if (esTablaFaltante(error, TABLA_PERSONAS)) {
+      return { filas: [], faltaMigracion: true, faltaColumnasBajas: true };
+    }
     throw new Error(error.message);
   }
-  return { filas: (data ?? []) as FilaPersonaDb[], faltaMigracion: false };
+
+  const segunda = await supabaseServer.from(TABLA_PERSONAS).select(COLS_BASE);
+  if (segunda.error) {
+    if (esTablaFaltante(segunda.error, TABLA_PERSONAS)) {
+      return { filas: [], faltaMigracion: true, faltaColumnasBajas: true };
+    }
+    throw new Error(segunda.error.message);
+  }
+  return {
+    filas: (segunda.data ?? []) as FilaPersonaDb[],
+    faltaMigracion: false,
+    faltaColumnasBajas: true,
+  };
+}
+
+/** La vigencia de una ficha leída. Sin las columnas —o con la migración sin
+ *  correr— sale «activa», que es el estado real de las 32 fichas de hoy. */
+export function vigenciaDeFila(f: FilaPersonaDb): Vigencia {
+  const motivo = typeof f.motivo_salida === "string" ? f.motivo_salida.trim() : "";
+  return {
+    fechaIngreso: f.fecha_ingreso ?? null,
+    fechaSalida: f.fecha_salida ?? null,
+    motivoSalida: (MOTIVOS_SALIDA as readonly string[]).includes(motivo)
+      ? (motivo as MotivoSalida)
+      : null,
+  };
+}
+
+/** código → vigencia, que es lo que necesita el filtro de la planilla. */
+export function vigenciasDeFilas(filas: readonly FilaPersonaDb[]): Map<string, Vigencia> {
+  return new Map(filas.map((f) => [String(f.empleado_codigo), vigenciaDeFila(f)]));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

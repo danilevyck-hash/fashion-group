@@ -47,6 +47,13 @@ interface Respuesta {
   avisos: {
     faltaMigracionConfiguracion: string | null;
     faltaMigracionManual: string | null;
+    faltaMigracionBajas: string | null;
+    /** Fichas que no entran a ESTA quincena: ya se habían ido, o todavía no
+     *  habían entrado. Una quincena vieja NO cambia por esto: se compara contra
+     *  las fechas de la quincena, nunca contra hoy. */
+    fueraPorBaja: number;
+    /** Dadas de baja que igual marcaron después de irse. */
+    marcoDespuesDeIrse: number;
     sinHorario: number;
     salidaAsumida: string;
     horasAusenciaDefault: number;
@@ -225,6 +232,32 @@ export default function PlanillaTab() {
       {data?.avisos.faltaMigracionManual && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.faltaMigracionManual}
+        </p>
+      )}
+      {data?.avisos.faltaMigracionBajas && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionBajas}
+        </p>
+      )}
+      {/* 🩸 Que alguien siga marcando después de darse de baja no se esconde:
+          o volvió, o alguien está usando su huella. Va en ROJO porque las dos
+          explicaciones piden que una persona haga algo. */}
+      {!!data?.avisos.marcoDespuesDeIrse && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
+          <b>{data.avisos.marcoDespuesDeIrse}</b>{" "}
+          {data.avisos.marcoDespuesDeIrse === 1
+            ? "persona marcó en el reloj después de la fecha en que salió"
+            : "personas marcaron en el reloj después de la fecha en que salieron"}
+          . O volvieron a trabajar —hay que reactivarlas en <b>Configuración</b> o la planilla
+          les paga cero— o alguien más está usando su huella.
+        </p>
+      )}
+      {!!data?.avisos.fueraPorBaja && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+          <b>{data.avisos.fueraPorBaja}</b>{" "}
+          {data.avisos.fueraPorBaja === 1 ? "persona no sale" : "personas no salen"} en esta
+          quincena: ya no trabajaban acá, o entraron después. Las quincenas en las que sí
+          trabajaron siguen igual — se ven eligiendo esa quincena arriba.
         </p>
       )}
       {!!data?.avisos.sinHorario && (

@@ -18,7 +18,13 @@ import {
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
-import { leerReglas, leerPersonas } from "@/lib/asistencia/config-server";
+import { leerReglas, leerPersonas, vigenciasDeFilas } from "@/lib/asistencia/config-server";
+import {
+  avisoMigracionBajas,
+  codigosFueraDeRango,
+  marcoDespuesDeLaBaja,
+  ultimoDiaConMarcas,
+} from "@/lib/asistencia/vigencia";
 import {
   avisoMigracion,
   EMPRESAS_ASISTENCIA,
@@ -118,10 +124,26 @@ export async function GET(req: NextRequest) {
       salida: String(h.salida).slice(0, 5),
     })) as HorarioPersona[];
 
+    // ── QUIÉN ENTRA A ESTA QUINCENA ──────────────────────────────────────────
+    //
+    // 🩸 EL FILTRO DE LAS BAJAS VA ACÁ, EN LA CAPA QUE ARMA LA LISTA, Y NO EN EL
+    // MOTOR. `planilla.ts` convierte minutos en dólares; quién es parte de la
+    // planilla es una pregunta de calendario que el motor no necesita para
+    // multiplicar nada. Además así queda UN solo punto donde se decide, en vez
+    // de una regla de fechas metida entre los recargos.
+    //
+    // 🔑 Y ES LO QUE HACE QUE UNA QUINCENA VIEJA NO CAMBIE NUNCA: la baja se
+    // compara contra las fechas DE ESA QUINCENA, no contra hoy. Dar de baja a
+    // alguien esta tarde no puede mover un centavo de la planilla de julio.
+    const vigencias = vigenciasDeFilas(personasDb.filas);
+    const fuera = codigosFueraDeRango(vigencias, q.desde, q.hasta);
+
     const fichas = new Map<string, FichaPlanilla>();
     for (const f of personasDb.filas) {
-      fichas.set(String(f.empleado_codigo), {
-        codigo: String(f.empleado_codigo),
+      const codigo = String(f.empleado_codigo);
+      if (fuera.has(codigo)) continue;
+      fichas.set(codigo, {
+        codigo,
         nombre: f.nombre ?? null,
         salarioMensual: f.salario_mensual === null ? null : Number(f.salario_mensual),
         jornadaSemanal: f.jornada_semanal ?? null,
@@ -154,8 +176,24 @@ export async function GET(req: NextRequest) {
     const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
     const jornadaDeCodigo = (codigo: string) => jornadaDiariaMin(horarioDe.get(codigo));
 
+    // 🩸 La baja tiene que sacar a la persona de las DOS listas. Si solo se
+    // sacara la ficha, quien marcó después de irse volvería a entrar como "sin
+    // ficha en Configuración" —con nombre en blanco y sin un dólar— que es peor
+    // que dejarla: parece una persona nueva sin configurar.
+    const personasVigentes = personas.filter((p) => !fuera.has(p.codigo));
+
+    // Marcó DESPUÉS del día en que se fue. No se esconde: o volvió —y hay que
+    // reactivarla o la planilla le paga cero— o alguien más está usando su
+    // huella. Se cuenta con el ÚLTIMO DÍA CON MARCAS, no con estar afuera de la
+    // quincena: así también se ve el caso de quien se fue el 20 y marcó el 25
+    // de su MISMA quincena, que sí entra al cuadro. El detalle con nombres vive
+    // en Configuración, que es donde se arregla.
+    const marcoDespuesDeIrse = personas.filter((p) =>
+      marcoDespuesDeLaBaja(vigencias.get(p.codigo), ultimoDiaConMarcas(p.dias)),
+    ).length;
+
     const lineas = armarPlanilla({
-      personas,
+      personas: personasVigentes,
       fichas,
       manuales: manualesLeidos.porCodigo,
       jornadaDiariaMin: jornadaDeCodigo,
@@ -175,6 +213,18 @@ export async function GET(req: NextRequest) {
       avisos: {
         faltaMigracionConfiguracion: personasDb.faltaMigracion ? avisoMigracion() : null,
         faltaMigracionManual: manualesLeidos.faltaMigracion ? avisoMigracionPlanilla() : null,
+        // Sin las columnas de la baja NADIE queda afuera —todos activos, como
+        // hoy— pero se dice, porque si alguien ya dio de baja a una persona en
+        // su cabeza va a esperar no verla en el cuadro.
+        faltaMigracionBajas:
+          !personasDb.faltaMigracion && personasDb.faltaColumnasBajas
+            ? avisoMigracionBajas()
+            : null,
+        // Cuántas personas se quedaron afuera de ESTA quincena por su fecha de
+        // salida (o porque todavía no habían entrado). Sirve para que un cuadro
+        // con menos gente que el mes pasado tenga una explicación a la vista.
+        fueraPorBaja: fuera.size,
+        marcoDespuesDeIrse,
         // Sin horario fijado se asume la salida por defecto, y con eso las
         // horas extra Y el valor de la ausencia pueden estar mal.
         sinHorario: lineas.filter((l) => !horarioDe.has(l.codigo)).length,
