@@ -72,6 +72,60 @@ export function esEmpresaDelGrupo(empresa: string | null | undefined): boolean {
   return !!empresa && GRUPO.has(empresa);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LAS DOS PUERTAS DE AL LADO — Boston y Multifashion se siguen leyendo, pero
+// NUNCA por la misma puerta que "la lista de clientes".
+//
+// Daniel, textual: *"clientes de boston solo quiero verlos solo en su tab.
+// igual que multifashion. esos no deben de convivir con el resto del sistema"*.
+//
+// Se nombran acá para que pedirlos sea una decisión ESCRITA y no un `.eq()`
+// suelto que alguien copió de otra consulta. Quien lea `EMPRESA_CARTERA_BOSTON`
+// está diciendo "quiero Boston"; quien lea `EMPRESAS_DEL_GRUPO` está diciendo
+// "quiero clientes". No hay una tercera forma cómoda de pedir "todos juntos",
+// y esa ausencia es el diseño.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** La pestaña CXC › Boston, y nada más. */
+export const EMPRESA_CARTERA_BOSTON = "confecciones_boston" as const;
+
+/** El módulo Multifashion, y nada más. */
+export const EMPRESA_MOSTRADOR_MULTIFASHION = "american_classic" as const;
+
+/**
+ * El código de cliente del grupo tiene la forma `D-<número>`.
+ *
+ * 🩸 **NO es una llave global, y por eso este predicado NO alcanza solo.**
+ * Medido contra producción el 8-ago-2026: cada empresa de Switch lleva su
+ * PROPIA numeración, así que el mismo `D-XXX` puede nombrar a dos clientes
+ * distintos en dos empresas. Ejemplo real: `D-170` es *"Nova Lux, S.A."* en
+ * cinco empresas y *"El Machetazo-Calidonia"* en `active_wear`.
+ *
+ * Por eso el criterio de "es cliente" son las DOS cosas juntas — tener código
+ * D-XXX **y** pertenecer a alguna de las 6 —, que es exactamente lo que hace
+ * `soloClientesDelGrupo` con los conjuntos de `mundosDeClientes()`.
+ *
+ * Boston y Multifashion usan códigos NUMÉRICOS pelados (`181`, `12188`,
+ * `111380`) y el mostrador usa `TCKCTA`: ninguno pasa este predicado.
+ */
+export function esCodigoDeCliente(codigo: string | null | undefined): boolean {
+  return /^D-\d+$/i.test((codigo ?? "").trim());
+}
+
+/**
+ * El pseudo-cliente de mostrador. La identidad es el CÓDIGO, nunca el nombre:
+ * se llama "Contado" en active_shoes/active_wear/joystep, "VENTAS" en
+ * fashion_wear/vistana y "VENTAS LOCA" en fashion_shoes (medido). Comparar por
+ * nombre sería un colador — es la misma regla que ya aplican las RPC de
+ * comisión y el checkout público.
+ */
+export const CODIGO_MOSTRADOR = "TCKCTA" as const;
+
+/** ¿Es el pseudo-cliente de mostrador y no una persona/empresa de verdad? */
+export function esMostrador(codigo: string | null | undefined): boolean {
+  return (codigo ?? "").trim().toUpperCase() === CODIGO_MOSTRADOR;
+}
+
 /** Lo que hace falta para clasificar: qué códigos son del grupo y cuáles conoce
  *  Switch. Se leen JUNTOS porque salen de la misma tabla — dos consultas al
  *  mismo lugar es la forma de que un día se contradigan. */
