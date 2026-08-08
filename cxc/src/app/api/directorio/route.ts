@@ -9,6 +9,7 @@ import {
   textoObligatorio,
   validarObligatorios,
 } from "@/lib/campos-obligatorios";
+import { guardarTolerandoColumnaNueva } from "@/lib/clientes/directorio-columna-opcional";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 
@@ -103,13 +104,19 @@ export async function POST(req: NextRequest) {
   const falta = validarObligatorios(body, CAMPOS_OBLIGATORIOS.directorio_clientes);
   if (falta) return falta;
 
-  const { empresa, telefono, celular, correo, contacto, notas } = body;
-  const { data, error } = await supabaseServer
-    .from("directorio_clientes")
-    .insert({ nombre: textoObligatorio(body.nombre), empresa, telefono, celular, correo, contacto, notas })
-    .select()
-    .single();
+  // 🩸 `whatsapp` FALTABA en el INSERT y en el UPDATE (8-ago-2026): el campo
+  // WhatsApp del formulario del catálogo era un control MUERTO — se escribía, se
+  // mandaba, y no se guardaba nunca. Ahora entra como el resto.
+  const { empresa, telefono, celular, correo, contacto, notas, whatsapp, cliente_codigo } = body;
+  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(
+    {
+      nombre: textoObligatorio(body.nombre),
+      empresa, telefono, celular, correo, contacto, notas, whatsapp,
+      cliente_codigo: cliente_codigo ?? null,
+    },
+    (campos) => supabaseServer.from("directorio_clientes").insert(campos).select().single(),
+  );
 
   if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › crear cliente" });
-  return NextResponse.json(data);
+  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
 }
