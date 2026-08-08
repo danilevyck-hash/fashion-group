@@ -12,6 +12,14 @@
 // El orden de arriba hacia abajo es el orden en que un dueño PREGUNTA, no el
 // orden en que estaban las columnas:
 //
+//   0. **Marcas** — cuánto vende y cuánto margen deja cada una de las cinco, y
+//      el FILTRO de toda la pantalla. Daniel: *"y si quiero ver mis articulos top
+//      sellers? o descripciones top seller?"* — el agrupador lo obligaba a bajar
+//      nivel por nivel. Un toque en "Tommy" y las cuatro respuestas de abajo (y
+//      la tabla, y la comparación contra el año pasado) son de Tommy. UN toque,
+//      no cuatro. Ojo: lo que Switch llama "marca" son 32 valores que en realidad
+//      son marca + departamento (`TH MENSWEAR`); el mapa a las 5 marcas reales es
+//      explícito y vive en `src/lib/multifashion/marcas-grupo.ts`.
 //   1. **Cómo vamos** — unidades, venta y utilidad del período, cada una con
 //      cuánto cambió contra el mismo período del año pasado. El cambio es lo
 //      primero que se mira y antes NO EXISTÍA en esta pantalla.
@@ -107,6 +115,16 @@ import {
   type TopFila,
   type Variacion,
 } from "@/lib/multifashion/productos-resumen";
+import type { GrupoMarcaId } from "@/lib/multifashion/marcas-grupo";
+import {
+  indexarPorGrupo,
+  mapaDetalles,
+  rehidratar,
+  rehidratarComparativo,
+  type PorMarca,
+  type PorMarcaComparativo,
+  type TotalesMarca,
+} from "@/lib/multifashion/productos-marca";
 
 type Vista = "categoria" | "articulo" | "marca";
 type Periodo = "mes" | "12m";
@@ -118,6 +136,8 @@ interface RenglonMarca {
   venta: number;
   pct: number | null;
   articulos: number;
+  /** A qué MARCA REAL pertenece este departamento de Switch. */
+  grupo: GrupoMarcaId;
 }
 
 interface Comparativo {
@@ -128,6 +148,8 @@ interface Comparativo {
   totales: TotalesRanking;
   categorias: RenglonComparativo[];
   codigos: RenglonComparativo[];
+  /** El mismo comparativo repartido por marca. `null` = sin diccionario. */
+  porMarca: PorMarcaComparativo | null;
 }
 
 interface ProductosResp {
@@ -141,6 +163,9 @@ interface ProductosResp {
   totales: { unidades: number; venta: number; articulos: number };
   marcas: RenglonMarca[];
   sinMarca: { articulos: number; venta: number };
+  /** El período repartido en las 5 marcas reales (+ "Otros"). `null` = no hay
+   *  diccionario de marcas y la pantalla se dibuja sin filtro, como antes. */
+  porMarca: PorMarca | null;
   ranking: {
     totales: TotalesRanking;
     categorias: RenglonRanking[];
@@ -244,6 +269,8 @@ export function ProductosSubtab({
   const [categoria, setCategoria] = useState("");
   const [visibles, setVisibles] = useState(TANDA);
   const [detalleAbierto, setDetalleAbierto] = useState(false);
+  /** `null` = todas las marcas, que es como abre la pantalla. */
+  const [marca, setMarca] = useState<GrupoMarcaId | null>(null);
 
   const url = `/api/multifashion/productos?year=${selectedYear}&mes=${mes}&periodo=${periodo}`;
   const { data: resp, error, isLoading, mutate } = useSWR<ProductosResp>(
@@ -273,9 +300,59 @@ export function ProductosSubtab({
       ? "últimos 12 meses"
       : `${MES_FULL[mes - 1]} ${selectedYear}`;
 
-  const base = vista === "categoria" ? resp?.ranking.categorias : resp?.ranking.codigos;
-  const baseComparativa =
-    vista === "categoria" ? resp?.comparativo?.categorias : resp?.comparativo?.codigos;
+  // ── EL FILTRO DE MARCA ────────────────────────────────────────────────────
+  // Todo lo de abajo —el pulso, las dos listas, la alerta de margen, lo que más
+  // cambió y la tabla— sale de `base` / `baseComparativa` / `totales`. Filtrar
+  // por marca es cambiar ESAS TRES COSAS, y nada más: si cada bloque se filtrara
+  // por su cuenta, el día que uno se olvidara la pantalla mostraría el pulso de
+  // Tommy con la tabla de todas las marcas y nadie lo notaría.
+  //
+  // Los números NO se recalculan acá: el servidor ya agregó cada marca con la
+  // MISMA función que el total (ver productos-marca.ts). `rehidratar` solo rearma
+  // `utilidad` y `margen` con las mismas cuentas, para no mandar dos veces lo
+  // que se deriva.
+  const grupos = resp?.porMarca?.grupos ?? [];
+  const conFiltro = grupos.length > 1;
+  // Una marca elegida que este período no vendió nada no existe en `grupos`:
+  // se vuelve a "Todas" sola, en vez de dejar la pantalla vacía sin decir por qué.
+  const marcaSel = conFiltro && marca && grupos.some(g => g.id === marca) ? marca : null;
+
+  const indices = useMemo(() => {
+    const pm = resp?.porMarca;
+    const pmc = resp?.comparativo?.porMarca ?? null;
+    return {
+      categorias: indexarPorGrupo(pm?.categorias ?? []),
+      codigos: indexarPorGrupo(pm?.codigos ?? []),
+      compCategorias: indexarPorGrupo(pmc?.categorias ?? []),
+      compCodigos: indexarPorGrupo(pmc?.codigos ?? []),
+      // Las descripciones de los artículos ya viajaron enteras una vez; se reusan
+      // en vez de repetirlas dentro de cada marca (es el texto más pesado del
+      // payload). Un código pertenece a UNA marca, así que la descripción es la
+      // misma que ya tenía en la lista completa.
+      detalles: mapaDetalles(resp?.ranking.codigos ?? []),
+    };
+  }, [resp]);
+
+  const delGrupo = useMemo(() => {
+    if (!resp || !marcaSel) return null;
+    return {
+      categorias: rehidratar(indices.categorias.get(marcaSel) ?? []),
+      codigos: rehidratar(indices.codigos.get(marcaSel) ?? [], indices.detalles),
+      compCategorias: rehidratarComparativo(indices.compCategorias.get(marcaSel) ?? []),
+      compCodigos: rehidratarComparativo(indices.compCodigos.get(marcaSel) ?? []),
+    };
+  }, [resp, marcaSel, indices]);
+
+  const categorias = delGrupo ? delGrupo.categorias : resp?.ranking.categorias;
+  const codigos = delGrupo ? delGrupo.codigos : resp?.ranking.codigos;
+  const base = vista === "categoria" ? categorias : codigos;
+  const baseComparativa = delGrupo
+    ? vista === "categoria"
+      ? delGrupo.compCategorias
+      : delGrupo.compCodigos
+    : vista === "categoria"
+      ? resp?.comparativo?.categorias
+      : resp?.comparativo?.codigos;
 
   // Filtro + orden, en ese orden y los dos PUROS. El filtro va primero para que
   // el "mostrando N de M" cuente lo que el filtro dejó, no el catálogo entero.
@@ -288,7 +365,15 @@ export function ProductosSubtab({
     return ordenarRanking(filtradas, orden.col, orden.dir);
   }, [base, texto, categoria, vista, orden.col, orden.dir]);
 
-  const totales = resp?.ranking.totales;
+  // Los totales del pulso son los de la marca elegida, calculados en el servidor
+  // con la misma función que los de "Todas" — no una resta de la pantalla.
+  const totales = marcaSel
+    ? grupos.find(g => g.id === marcaSel)?.totales
+    : resp?.ranking.totales;
+  const totalesAnterior = marcaSel
+    ? (resp?.comparativo?.porMarca?.grupos.find(g => g.id === marcaSel)?.totales ?? null)
+    : (resp?.comparativo?.totales ?? null);
+  const nombreMarca = marcaSel ? (grupos.find(g => g.id === marcaSel)?.nombre ?? null) : null;
 
   // ── Las cuatro respuestas de arriba. Se calculan sobre la lista COMPLETA del
   //    agrupador (sin el buscador ni el filtro de la tabla): son el resumen del
@@ -314,10 +399,12 @@ export function ProductosSubtab({
   );
 
   // Las categorías del desplegable salen del MISMO payload, ordenadas por lo que
-  // más se vende (no alfabéticas): las que Daniel va a buscar están arriba.
+  // más se vende (no alfabéticas): las que Daniel va a buscar están arriba. Con
+  // una marca elegida son SUS categorías — ofrecer una que no tiene sería un
+  // filtro que deja la tabla vacía sin explicar por qué.
   const categoriasDisponibles = useMemo(
-    () => (resp?.ranking.categorias ?? []).map(c => c.etiqueta),
-    [resp],
+    () => (categorias ?? []).map(c => c.etiqueta),
+    [categorias],
   );
 
   const clic = (col: ColumnaRanking) => {
@@ -343,6 +430,17 @@ export function ProductosSubtab({
 
   const cambiarPeriodo = (p: Periodo) => {
     onPeriodoChange(p);
+    setVisibles(TANDA);
+  };
+
+  /** Un toque cambia de marca. El agrupador y el orden se CONSERVAN —quien está
+   *  mirando artículos por utilidad quiere seguir viéndolos así en la otra
+   *  marca—, pero el buscador y el filtro de categoría se limpian: son textos de
+   *  la marca anterior y dejarían la tabla vacía sin decir por qué. */
+  const cambiarMarca = (g: GrupoMarcaId | null) => {
+    setMarca(g);
+    setTexto("");
+    setCategoria("");
     setVisibles(TANDA);
   };
 
@@ -381,13 +479,35 @@ export function ProductosSubtab({
         </div>
       )}
 
+      {/* MARCA. Va arriba de todo lo demás porque filtra todo lo demás — el
+          mismo lugar y la misma lógica que el período. Y no es solo un control:
+          muestra la venta y el MARGEN de cada marca, que es el hallazgo que el
+          filtro existe para dejar a la vista (Karl Lagerfeld y Reebok venden
+          $78.496 al año con 23,4% y 18,2% de margen contra el 37,8% de Tommy).
+          Esconderlo dentro de un selector habría sido tapar justo eso. */}
+      {conFiltro && (
+        <SelectorMarcas
+          grupos={grupos}
+          totalPeriodo={resp?.ranking.totales.venta ?? 0}
+          totalUnidades={resp?.ranking.totales.unidades ?? 0}
+          margenGeneral={resp?.ranking.totales.margen ?? null}
+          seleccion={marcaSel}
+          onSeleccion={cambiarMarca}
+          loading={loading}
+        />
+      )}
+
       <div className={cn("space-y-3", loading && "opacity-60 transition-opacity")}>
         <h3 className="font-display text-base font-semibold text-gray-950">
-          Más vendido · {rotuloPeriodo}
+          Más vendido · {nombreMarca ? `${nombreMarca} · ` : ""}{rotuloPeriodo}
         </h3>
 
         {totales && (
-          <Pulso totales={totales} comparativo={resp?.comparativo ?? null} />
+          <Pulso
+            totales={totales}
+            comparativo={resp?.comparativo ?? null}
+            totalesAnterior={totalesAnterior}
+          />
         )}
 
         {/* Se dice de dónde sale el número Y qué se le restó. Las devoluciones
@@ -409,8 +529,12 @@ export function ProductosSubtab({
         <Pill activo={vista === "articulo"} onClick={() => cambiarVista("articulo")}>
           <Package className="h-3.5 w-3.5" /> Por artículo
         </Pill>
+        {/* "Por departamento" y ya no "Por marca": lo que Switch guarda en su
+            campo `marca` son 32 valores del tipo `TH MENSWEAR`, o sea marca +
+            departamento pegados. Con el filtro de marca arriba, llamarle "marca"
+            a las dos cosas dejaba un control mintiendo. */}
         <Pill activo={vista === "marca"} onClick={() => cambiarVista("marca")}>
-          <Tag className="h-3.5 w-3.5" /> Por marca
+          <Tag className="h-3.5 w-3.5" /> Por departamento
         </Pill>
       </div>
 
@@ -437,7 +561,11 @@ export function ProductosSubtab({
       )}
 
       {vista === "marca" ? (
-        <VistaMarca renglones={resp?.marcas ?? []} loading={loading} periodo={rotuloPeriodo} />
+        <VistaMarca
+          renglones={(resp?.marcas ?? []).filter(m => !marcaSel || m.grupo === marcaSel)}
+          loading={loading}
+          periodo={rotuloPeriodo}
+        />
       ) : (
         <div className={cn("space-y-4", loading && "opacity-60 pointer-events-none transition-opacity")}>
           {resp && base && base.length === 0 ? (
@@ -566,11 +694,17 @@ function sumaPct(filas: TopFila[]): number | null {
 function Pulso({
   totales,
   comparativo,
+  totalesAnterior,
 }: {
   totales: TotalesRanking;
   comparativo: Comparativo | null;
+  /** Los totales del MISMO corte (marca elegida o todas) un año antes. Se pasa
+   *  aparte de `comparativo` porque `comparativo.totales` es siempre el del
+   *  período completo: con Tommy elegido, comparar contra el todo daría una
+   *  caída del 35% que es puro artefacto del filtro. */
+  totalesAnterior: TotalesRanking | null;
 }) {
-  const c = comparativo?.totales;
+  const c = totalesAnterior;
   return (
     <Card className="overflow-hidden p-0">
       {/* Celdas apiladas en celular y en fila desde `sm`: tres montos de cinco
@@ -637,6 +771,10 @@ function Pulso({
           <>
             Comparado con {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}
             {comparativo.parcial && " (los mismos días del año pasado, para que sea comparable)"}
+            {/* Una marca que no existía el año pasado no tiene contra qué
+                compararse, y decirlo es más útil que dejar tres "sin
+                comparación" sueltos arriba sin explicación. */}
+            {!c && ". En ese período esta marca no vendió nada."}
           </>
         ) : (
           "Sin comparación contra el año pasado en este momento."
@@ -1112,7 +1250,17 @@ function Dato({ rotulo, valor, fuerte = false }: { rotulo: string; valor: string
   );
 }
 
-// ── Vista por marca (agrupador previo, #420 — sin cambios de fondo) ─────────
+// ── Vista por DEPARTAMENTO ──────────────────────────────────────────────────
+//
+// Es el agrupador que antes se llamaba "por marca" (#420). Los números no
+// cambiaron; el nombre sí, porque el campo `marca` de Switch guarda 32 valores
+// del tipo `TH MENSWEAR` = marca + departamento pegados. Con el filtro de marca
+// arriba, llamarle "marca" a estos 32 dejaba dos controles diciendo cosas
+// distintas con la misma palabra.
+//
+// Lo único que cambió del dato: los departamentos que Switch tiene escritos de
+// dos formas (`TH ACCESORIES` / `TH ACCESSORIES`) se muestran juntos — aprobado
+// por Daniel, con lista EXPLÍCITA en marcas-grupo.ts.
 
 function VistaMarca({
   renglones,
@@ -1138,7 +1286,7 @@ function VistaMarca({
             <thead>
               <tr className="bg-gray-100">
                 <th className="w-10 border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">#</th>
-                <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Marca</th>
+                <th className="border-b border-gray-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Departamento</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Unidades</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Monto</th>
                 <th className="border-b border-gray-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-gray-500">% del total</th>
@@ -1185,6 +1333,167 @@ function VistaMarca({
         ))}
       </div>
     </div>
+  );
+}
+
+// ── El filtro de marca ──────────────────────────────────────────────────────
+
+/**
+ * Las marcas del período, y el filtro de la pantalla: son la MISMA cosa.
+ *
+ * 🩸 **Un solo control.** La tentación era píldoras arriba (el filtro) y una
+ * tabla de marcas abajo (los números). Serían dos controles para la misma
+ * decisión, y en este módulo eso ya se pagó una vez: con dos selectores de
+ * período en pantalla, uno de los dos siempre está desactualizado (CLAUDE.md,
+ * "Mes a mes"). Acá se toca lo que se está leyendo.
+ *
+ * **Y muestra el margen a propósito.** Medido: Karl Lagerfeld y Reebok venden
+ * $78.496 al año con 23,4% y 18,2% de margen contra el 37,8% de Tommy. Ese
+ * hallazgo no puede vivir dentro de un desplegable — se ve al abrir la pantalla,
+ * sin tocar nada.
+ *
+ * El ámbar es el MISMO criterio que la alerta de más abajo: por debajo del margen
+ * general del período, que es el número contra el que un dueño mide su negocio.
+ */
+function SelectorMarcas({
+  grupos,
+  totalPeriodo,
+  totalUnidades,
+  margenGeneral,
+  seleccion,
+  onSeleccion,
+  loading,
+}: {
+  grupos: TotalesMarca[];
+  totalPeriodo: number;
+  totalUnidades: number;
+  margenGeneral: number | null;
+  seleccion: GrupoMarcaId | null;
+  onSeleccion: (g: GrupoMarcaId | null) => void;
+  loading: boolean;
+}) {
+  // Por venta, de mayor a menor: el orden en que un dueño las nombra. Desempate
+  // por nombre, para que dos marcas parejas no se intercambien entre renders.
+  const orden = [...grupos].sort(
+    (a, b) => b.totales.venta - a.totales.venta || a.nombre.localeCompare(b.nombre, "es"),
+  );
+
+  return (
+    <Card className={cn("overflow-hidden p-0", loading && "opacity-60 transition-opacity")}>
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h4 className="font-display text-sm font-semibold text-gray-950">Marcas</h4>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Tocá una marca y todo lo de abajo muestra solo lo suyo.
+          {margenGeneral != null && (
+            <>
+              {" "}En <span className="text-amber-700">ámbar</span>, el margen por debajo del general
+              del período (<span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
+            </>
+          )}
+        </p>
+      </div>
+      {/* Una columna hasta `xl`. A 1216 px útiles la fila de una sola columna
+          deja ~900 px de blanco entre el nombre y el monto —el ojo pierde de
+          vista qué monto es de quién—, así que ahí van dos columnas. NO antes:
+          a 610 px útiles (iPad) dos columnas dejan ~300 y el renglón de "% del
+          total · N piezas" empieza a recortarse. */}
+      <div
+        role="group"
+        aria-label="Filtrar por marca"
+        className="divide-y divide-gray-100 xl:grid xl:grid-cols-2 xl:divide-y-0 xl:[&>*]:border-b xl:[&>*]:border-gray-100 xl:[&>*:nth-child(odd)]:border-r"
+      >
+        <FilaMarcaFiltro
+          nombre="Todas las marcas"
+          venta={totalPeriodo}
+          pct={totalPeriodo > 0 ? 1 : null}
+          unidades={totalUnidades}
+          margen={margenGeneral}
+          margenGeneral={margenGeneral}
+          activo={seleccion == null}
+          onClick={() => onSeleccion(null)}
+        />
+        {orden.map(g => (
+          <FilaMarcaFiltro
+            key={g.id}
+            nombre={g.nombre}
+            venta={g.totales.venta}
+            pct={totalPeriodo > 0 ? g.totales.venta / totalPeriodo : null}
+            unidades={g.totales.unidades}
+            margen={g.totales.margen}
+            margenGeneral={margenGeneral}
+            activo={seleccion === g.id}
+            // Tocar la marca ya elegida vuelve a "todas": el camino de vuelta es
+            // el mismo dedo, sin buscar dónde se quita el filtro.
+            onClick={() => onSeleccion(seleccion === g.id ? null : g.id)}
+          />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function FilaMarcaFiltro({
+  nombre,
+  venta,
+  pct,
+  unidades,
+  margen,
+  margenGeneral,
+  activo,
+  onClick,
+}: {
+  nombre: string;
+  venta: number;
+  pct: number | null;
+  unidades: number;
+  margen: number | null;
+  margenGeneral: number | null;
+  activo: boolean;
+  onClick: () => void;
+}) {
+  const flojo = margen != null && margenGeneral != null && margen < margenGeneral;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={activo}
+      // 44 px de alto: es el control que más se toca de la pestaña, y en este
+      // módulo ya hubo píldoras de 26 px (CLAUDE.md).
+      className={cn(
+        "block min-h-[44px] w-full px-4 py-2.5 text-left transition",
+        activo ? "bg-teal-50" : "hover:bg-gray-50",
+      )}
+    >
+      <div className="flex items-baseline gap-2">
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-sm",
+            activo ? "font-semibold text-teal-900" : "font-medium text-gray-950",
+          )}
+        >
+          {nombre}
+        </span>
+        {/* Teal = plata, como en toda la pantalla. */}
+        <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-teal-800">
+          {fmtMoney(venta)}
+        </span>
+      </div>
+      {/* El margen va ÚLTIMO y pegado a la derecha en las dos líneas: así las seis
+          marcas lo muestran en la misma columna y se comparan de un barrido, que
+          es justo lo que la pantalla vino a hacer posible. */}
+      <div className="mt-0.5 flex items-baseline justify-between gap-2 text-xs text-gray-500">
+        <span className="min-w-0 truncate">
+          <span className="font-mono tabular-nums">{fmtPctTotal(pct)}</span> del total ·{" "}
+          <span className="font-mono tabular-nums">{fmtUnidades(unidades)}</span> piezas
+        </span>
+        <span className="shrink-0">
+          margen{" "}
+          <span className={cn("font-mono tabular-nums", flojo ? "font-medium text-amber-700" : "text-gray-700")}>
+            {fmtMargen(margen)}
+          </span>
+        </span>
+      </div>
+    </button>
   );
 }
 
