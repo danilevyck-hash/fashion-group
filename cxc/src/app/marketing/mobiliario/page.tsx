@@ -17,7 +17,7 @@
 //     un scroller propio adentro para que crecer nunca vuelva a ser recortar
 //     (el resumen gana una columna por cada marca nueva).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -27,6 +27,11 @@ import { formatearMonto } from "@/lib/marketing/normalizar";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import NotasProveedorMobiliario from "@/components/marketing/NotasProveedorMobiliario";
+// Reusa el compresor que ya usa Reclamos: baja la foto de celular a ~1600px
+// JPEG antes de subirla. Importa porque la MISMA foto termina incrustada en el
+// PDF de la nota de entrega, y una foto de 8 MB haría un papel que no se puede
+// mandar por WhatsApp.
+import { compressImage, validateFotoFile } from "@/app/reclamos/components/fotoUpload";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type {
   EntregaConItems,
@@ -43,6 +48,10 @@ interface ProductoEditState {
   precio: string;
   stockTotal: string;
   precioOriginal: number | null; // precio al abrir (para detectar cambio)
+  /** Ruta en el bucket `marketing`. null = sin foto. */
+  fotoPath: string | null;
+  /** URL para la vista previa (firmada o local recién subida). */
+  fotoUrl: string | null;
 }
 
 // Impacto de cambiar el precio (preview del endpoint impacto-precio).
@@ -81,6 +90,8 @@ export default function MobiliarioPage() {
     null,
   );
   const [deleting, setDeleting] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [editEntrega, setEditEntrega] = useState<EntregaConItems | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -226,6 +237,8 @@ export default function MobiliarioPage() {
       precio: "0",
       stockTotal: "0",
       precioOriginal: null,
+      fotoPath: null,
+      fotoUrl: null,
     });
   };
   const abrirEditarProducto = (p: MkInventarioProducto) => {
@@ -235,7 +248,62 @@ export default function MobiliarioPage() {
       precio: String(p.precio),
       stockTotal: String(p.stock_total),
       precioOriginal: Number(p.precio),
+      fotoPath: p.foto_path,
+      fotoUrl: p.foto_url,
     });
+  };
+
+  // ── Foto del producto: URL firmada → PUT directo a Storage ───────────────
+  // Mismo patrón que Notas del proveedor. El archivo NO pasa por Vercel.
+  const subirFotoProducto = async (file: File) => {
+    if (!editProd) return;
+    const errValidacion = validateFotoFile(file);
+    if (errValidacion) {
+      toast(errValidacion, "error");
+      return;
+    }
+    setSubiendoFoto(true);
+    try {
+      const comprimida = await compressImage(file);
+      const urlRes = await fetch(
+        "/api/marketing/inventario/productos/upload-url",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: comprimida.name || file.name }),
+        },
+      );
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo preparar la subida");
+      }
+      const { uploadUrl, path } = (await urlRes.json()) as {
+        uploadUrl: string;
+        path: string;
+      };
+      const put = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": comprimida.type || "application/octet-stream",
+        },
+        body: comprimida,
+      });
+      if (!put.ok) throw new Error("No se pudo subir la foto");
+      setEditProd((prev) =>
+        prev === null
+          ? prev
+          : {
+              ...prev,
+              fotoPath: path,
+              fotoUrl: URL.createObjectURL(comprimida),
+            },
+      );
+      toast("Foto lista — se guarda al tocar Guardar", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo subir", "error");
+    } finally {
+      setSubiendoFoto(false);
+    }
   };
 
   // Escribe el producto (POST/PATCH). El PATCH propaga el precio vivo a las
@@ -248,6 +316,7 @@ export default function MobiliarioPage() {
         nombre: editProd.nombre.trim(),
         precio: Number(editProd.precio),
         stockTotal: Number(editProd.stockTotal),
+        fotoPath: editProd.fotoPath,
       };
       const url = editProd.id
         ? `/api/marketing/inventario/productos/${editProd.id}`
@@ -264,7 +333,17 @@ export default function MobiliarioPage() {
       }
       const data = (await res.json().catch(() => null)) as {
         impacto?: ImpactoPrecio | null;
+        foto_path?: string | null;
       } | null;
+      // cols-opcionales: si se mandó foto y volvió sin ella, la columna
+      // todavía no existe. Se dice con todas las letras en vez de dejar creer
+      // que la foto quedó guardada.
+      if (editProd.fotoPath && data && !data.foto_path) {
+        toast(
+          "El producto se guardó, pero la foto todavía no: falta correr en Supabase la migración 20260808160000_mk_mobiliario_bultos_y_foto.sql",
+          "error",
+        );
+      }
       const n = data?.impacto?.entregasAfectadas ?? 0;
       toast(
         !editProd.id
@@ -445,11 +524,14 @@ export default function MobiliarioPage() {
                       data-fg-fila={p.id}
                       className="rounded-[10px] border border-gray-200 bg-white p-3"
                     >
-                      <div
-                        data-fg-campo="producto"
-                        className="text-sm font-medium text-gray-900 break-words"
-                      >
-                        {p.nombre}
+                      <div className="flex items-center gap-3">
+                        <FotoProducto url={p.foto_url} nombre={p.nombre} />
+                        <div
+                          data-fg-campo="producto"
+                          className="min-w-0 flex-1 text-sm font-medium text-gray-900 break-words"
+                        >
+                          {p.nombre}
+                        </div>
                       </div>
                       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
                         <Dato campo="precio" label="Precio" valor={formatearMonto(p.precio)} />
@@ -529,6 +611,9 @@ export default function MobiliarioPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
+                  {/* La foto no lleva encabezado: se entiende sola y ahorra
+                      ancho en una tabla que ya tuvo un recorte grave. */}
+                  <th className="w-16 px-3 py-2" aria-label="Foto" />
                   <th className="text-left font-medium px-3 py-2">Producto</th>
                   <th className="text-right font-medium px-3 py-2 w-24">Precio</th>
                   <th className="text-right font-medium px-3 py-2 w-24">Comprado</th>
@@ -541,13 +626,13 @@ export default function MobiliarioPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400 text-sm">
+                    <td colSpan={8} className="px-3 py-6 text-center text-gray-400 text-sm">
                       Cargando…
                     </td>
                   </tr>
                 ) : productos.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400 text-sm">
+                    <td colSpan={8} className="px-3 py-6 text-center text-gray-400 text-sm">
                       No hay productos. Agrega el primero.
                     </td>
                   </tr>
@@ -563,6 +648,9 @@ export default function MobiliarioPage() {
                           data-fg-fila={p.id}
                           className="border-t border-gray-100"
                         >
+                          <td className="px-3 py-2">
+                            <FotoProducto url={p.foto_url} nombre={p.nombre} />
+                          </td>
                           <td data-fg-campo="producto" className="px-3 py-2 text-gray-900">
                             {p.nombre}
                           </td>
@@ -606,6 +694,7 @@ export default function MobiliarioPage() {
                       data-fg-fila="TOTAL"
                       className="border-t border-gray-200 bg-gray-50/50 font-semibold text-gray-900"
                     >
+                      <td />
                       <td className="px-3 py-2">TOTAL</td>
                       <td />
                       <td data-fg-campo="comprado" className="px-3 py-2 text-right tabular-nums">
@@ -922,7 +1011,7 @@ export default function MobiliarioPage() {
                   onChange={(e) =>
                     setEditProd({ ...editProd, nombre: e.target.value })
                   }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+                  className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm focus:border-black focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -936,7 +1025,7 @@ export default function MobiliarioPage() {
                     onChange={(e) =>
                       setEditProd({ ...editProd, precio: e.target.value })
                     }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
+                    className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm tabular-nums focus:border-black focus:outline-none"
                   />
                 </div>
                 <div>
@@ -948,8 +1037,68 @@ export default function MobiliarioPage() {
                     onChange={(e) =>
                       setEditProd({ ...editProd, stockTotal: e.target.value })
                     }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
+                    className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm tabular-nums focus:border-black focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* Foto del mueble. Sale también en la nota de entrega, que es
+                  para lo que Daniel la pidió: quien recibe en la tienda no
+                  sabe qué es un "Norte colgador", con la foto sí. */}
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Foto</label>
+                <div className="flex items-center gap-3">
+                  {editProd.fotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={editProd.fotoUrl}
+                      alt=""
+                      className="h-20 w-20 rounded-md border border-gray-200 object-cover bg-gray-50"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-md border border-dashed border-gray-200 bg-gray-50" />
+                  )}
+                  <div className="flex flex-col gap-1">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) subirFotoProducto(f);
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={subiendoFoto || savingProd}
+                      className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] text-sm hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-50"
+                    >
+                      {subiendoFoto
+                        ? "Subiendo…"
+                        : editProd.fotoPath
+                          ? "Cambiar foto"
+                          : "+ Agregar foto"}
+                    </button>
+                    {editProd.fotoPath && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditProd({
+                            ...editProd,
+                            fotoPath: null,
+                            fotoUrl: null,
+                          })
+                        }
+                        disabled={subiendoFoto || savingProd}
+                        className="text-xs text-gray-500 hover:text-red-600 underline min-h-[44px] px-1 text-left disabled:opacity-50"
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -957,16 +1106,16 @@ export default function MobiliarioPage() {
               <button
                 type="button"
                 onClick={() => setEditProd(null)}
-                disabled={savingProd}
-                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                disabled={savingProd || subiendoFoto}
+                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] text-sm hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={guardarProducto}
-                disabled={savingProd || checkingPrecio || !editProd.nombre.trim()}
-                className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
+                disabled={savingProd || checkingPrecio || subiendoFoto || !editProd.nombre.trim()}
+                className="rounded-md bg-black text-white px-4 min-h-[44px] text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
               >
                 {checkingPrecio
                   ? "Revisando…"
@@ -1080,6 +1229,40 @@ function Dato({
         {valor}
       </dd>
     </div>
+  );
+}
+
+/**
+ * Miniatura del mueble. Sin foto se ve un recuadro vacío del MISMO tamaño, no
+ * un hueco: así la lista no se descuadra entre productos con y sin foto.
+ *
+ * ⚠️ Es la foto del INVENTARIO (el mueble que se entrega y que sale en la nota
+ * de entrega). No tiene nada que ver con las fotos de "Notas del proveedor",
+ * que son la libreta de costos y viven aparte a propósito.
+ */
+function FotoProducto({
+  url,
+  nombre,
+}: {
+  url: string | null;
+  nombre: string;
+}) {
+  if (!url) {
+    return (
+      <div
+        aria-hidden
+        className="h-11 w-11 shrink-0 rounded-md border border-dashed border-gray-200 bg-gray-50"
+      />
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt={nombre}
+      loading="lazy"
+      className="h-11 w-11 shrink-0 rounded-md border border-gray-200 object-cover bg-gray-50"
+    />
   );
 }
 

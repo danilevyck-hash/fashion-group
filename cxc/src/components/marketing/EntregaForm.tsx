@@ -12,6 +12,16 @@
 //   3) Bloque "Accesorios": tablas, conjunto, norte, barra. Al escribir paneles
 //      se autorrellenan según la curva sugerida (3/3/1/3). Editables a mano.
 //   4) Resumen en vivo: total $ + desglose por marca (al 100%, por %).
+//
+// 🔴 CADA RENGLÓN LLEVA DOS NÚMEROS: **PIEZAS** y **BULTOS**.
+//   Las piezas son la mercancía y son lo ÚNICO que descuenta el inventario.
+//   Los bultos son en cuántas cajas/atados viajó ese renglón, y son sólo
+//   información para la nota de entrega. Daniel, textual: *"puedo mandar 30
+//   norte colgador en 1 bulto. o 20 norte colgador en un bulto"* — o sea que
+//   el bulto es VARIABLE y NO hay conversión fija. Nunca escribir acá una
+//   cuenta que pase de uno al otro. La regla vive en
+//   `src/lib/marketing/piezas-bultos.ts`.
+//   Los bultos son OPCIONALES: en blanco = "no se anotó", nunca 0.
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
@@ -24,6 +34,11 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
+import {
+  bultosParaInput,
+  normalizarBultos,
+  textoPiezasBultos,
+} from "@/lib/marketing/piezas-bultos";
 
 interface Props {
   open: boolean;
@@ -159,7 +174,17 @@ export default function EntregaForm({
     barra: false,
     otros: false,
   });
+  // BULTOS por categoría y por producto "otros". Vacío = no se anotó.
+  const [bultosCat, setBultosCat] = useState<Record<Categoria, string>>({
+    paneles: "",
+    tablas: "",
+    conjunto: "",
+    norte: "",
+    barra: "",
+    otros: "",
+  });
   const [otrosCant, setOtrosCant] = useState<Record<string, string>>({});
+  const [otrosBultos, setOtrosBultos] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
   // La "foto" de los campos para el cierre por clic fuera solo puede tomarse
   // DESPUÉS de hidratar el form; si no, la hidratación se vería como si el
@@ -185,6 +210,17 @@ export default function EntregaForm({
         otros: 0,
       };
       const otros: Record<string, string> = {};
+      // Bultos: se acumulan igual que las piezas, pero POR SEPARADO. `null`
+      // (no anotado) queda como cadena vacía, no como 0.
+      const bultosByCat: Record<Categoria, number | null> = {
+        paneles: null,
+        tablas: null,
+        conjunto: null,
+        norte: null,
+        barra: null,
+        otros: null,
+      };
+      const otrosB: Record<string, string> = {};
       for (const it of initial.items ?? []) {
         const nombreProd = productoNombreById.get(it.producto_id) ?? "";
         const cat = categorizarProducto(nombreProd);
@@ -192,10 +228,13 @@ export default function EntregaForm({
         for (const r of it.reparto ?? []) {
           totalItem += Number(r.cantidad ?? 0);
         }
+        const b = normalizarBultos(it.bultos);
         if (cat === "otros") {
           otros[it.producto_id] = String(totalItem);
+          if (b !== null) otrosB[it.producto_id] = String(b);
         } else {
           cantsByCat[cat] += totalItem;
+          if (b !== null) bultosByCat[cat] = (bultosByCat[cat] ?? 0) + b;
         }
       }
       // Reconstruir marcas con % desde las proporciones de total_por_marca,
@@ -242,7 +281,16 @@ export default function EntregaForm({
         barra: true,
         otros: true,
       });
+      setBultosCat({
+        paneles: bultosParaInput(bultosByCat.paneles),
+        tablas: bultosParaInput(bultosByCat.tablas),
+        conjunto: bultosParaInput(bultosByCat.conjunto),
+        norte: bultosParaInput(bultosByCat.norte),
+        barra: bultosParaInput(bultosByCat.barra),
+        otros: "",
+      });
       setOtrosCant(otros);
+      setOtrosBultos(otrosB);
     } else {
       setNombre("");
       setMarcasSel([]);
@@ -263,7 +311,16 @@ export default function EntregaForm({
         barra: false,
         otros: false,
       });
+      setBultosCat({
+        paneles: "",
+        tablas: "",
+        conjunto: "",
+        norte: "",
+        barra: "",
+        otros: "",
+      });
       setOtrosCant({});
+      setOtrosBultos({});
     }
     setHidratado(true);
   }, [open, initial, productos]);
@@ -316,20 +373,34 @@ export default function EntregaForm({
     productosByCat[c][0] ?? null;
 
   // ---- Cálculo en vivo ----
+  // `cant` son PIEZAS (lo que descuenta el stock) y `bultos` es transporte.
+  // Van en el mismo objeto pero no se tocan entre sí en ningún cálculo.
   const filasParaResumen = useMemo(() => {
-    const filas: Array<{ producto: MkInventarioProducto; cant: number }> = [];
+    const filas: Array<{
+      producto: MkInventarioProducto;
+      cant: number;
+      bultos: number | null;
+    }> = [];
     const cats: Categoria[] = ["paneles", "tablas", "conjunto", "norte", "barra"];
     for (const c of cats) {
       const prod = productoDe(c);
       const cant = trunc(Number(accesorios[c]));
-      if (prod && cant > 0) filas.push({ producto: prod, cant });
+      if (prod && cant > 0) {
+        filas.push({ producto: prod, cant, bultos: normalizarBultos(bultosCat[c]) });
+      }
     }
     for (const p of productosByCat.otros) {
       const cant = trunc(Number(otrosCant[p.id] ?? 0));
-      if (cant > 0) filas.push({ producto: p, cant });
+      if (cant > 0) {
+        filas.push({
+          producto: p,
+          cant,
+          bultos: normalizarBultos(otrosBultos[p.id]),
+        });
+      }
     }
     return filas;
-  }, [accesorios, otrosCant, productosByCat]);
+  }, [accesorios, bultosCat, otrosCant, otrosBultos, productosByCat]);
 
   const totalEntrega = useMemo(() => {
     let t = 0;
@@ -369,6 +440,12 @@ export default function EntregaForm({
 
   const setPaneles = (value: string) => {
     setPanelesStr(value.replace(/[^0-9]/g, ""));
+  };
+
+  // Bultos: sólo dígitos. Dejarlo vacío es válido y significa "no se anotó".
+  // 🔴 No dispara NINGÚN autorrelleno de piezas: no hay conversión.
+  const setBultos = (cat: Categoria, value: string) => {
+    setBultosCat((prev) => ({ ...prev, [cat]: value.replace(/[^0-9]/g, "") }));
   };
 
   const recalcularCurva = () => {
@@ -461,7 +538,9 @@ export default function EntregaForm({
     try {
       const items = filasParaResumen.map((f) => ({
         productoId: f.producto.id,
+        // `cantidad` son PIEZAS — el servidor descuenta esto y nada más.
         cantidad: f.cant,
+        bultos: f.bultos,
       }));
       const marcas = marcasSel.map((m) => ({
         marcaId: m.marcaId,
@@ -541,7 +620,7 @@ export default function EntregaForm({
             type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-sm text-gray-500 hover:text-black transition disabled:opacity-50"
+            className="text-sm text-gray-500 hover:text-black transition disabled:opacity-50 min-h-[44px] px-1"
           >
             Cerrar
           </button>
@@ -577,7 +656,7 @@ export default function EntregaForm({
                   disabled={guardando}
                   maxLength={120}
                   placeholder="Ej: Reposición vitrina, kit local nuevo…"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                  className="w-full rounded-md border border-gray-300 px-3 min-h-[44px] text-sm focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
                 />
               </section>
 
@@ -639,7 +718,7 @@ export default function EntregaForm({
                               setMarcaPct(m.marcaId, e.target.value)
                             }
                             disabled={guardando}
-                            className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-right font-mono tabular-nums focus:border-gray-900 focus:outline-none disabled:bg-gray-50"
+                            className="w-20 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm text-right font-mono tabular-nums focus:border-gray-900 focus:outline-none disabled:bg-gray-50"
                           />
                           <span className="text-sm text-gray-500">%</span>
                         </div>
@@ -671,18 +750,40 @@ export default function EntregaForm({
                   los accesorios se llenan según la curva sugerida (×3 tablas,
                   ×3 conjunto, ×1 colgador, ×3 barra). Podés ajustarlos a mano.
                 </p>
-                <input
-                  id="entrega-paneles"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  step={1}
-                  value={panelesStr}
-                  onChange={(e) => setPaneles(e.target.value)}
-                  disabled={guardando}
-                  className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
-                  placeholder="0"
-                />
+                {/* Piezas (grande, es el driver del kit) + bultos (chico, es
+                    sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <input
+                      id="entrega-paneles"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      step={1}
+                      value={panelesStr}
+                      onChange={(e) => setPaneles(e.target.value)}
+                      disabled={guardando}
+                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                      placeholder="0"
+                    />
+                    <div className="text-xs text-gray-400 mt-0.5">Piezas</div>
+                  </div>
+                  <div className="w-24 shrink-0">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={bultosCat.paneles}
+                      onChange={(e) => setBultos("paneles", e.target.value)}
+                      disabled={guardando}
+                      aria-label="Bultos de paneles"
+                      className="w-full rounded-md border border-gray-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                      placeholder="—"
+                    />
+                    <div className="text-xs text-gray-400 mt-0.5">Bultos</div>
+                  </div>
+                </div>
                 {hayManualEditado && panelesOk && (
                   <button
                     type="button"
@@ -718,17 +819,38 @@ export default function EntregaForm({
                               </span>
                             )}
                           </label>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            step={1}
-                            value={value}
-                            onChange={(e) => setAccesorio(cat, e.target.value)}
-                            disabled={guardando || !prod}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
-                            placeholder="0"
-                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={1}
+                              value={value}
+                              onChange={(e) => setAccesorio(cat, e.target.value)}
+                              disabled={guardando || !prod}
+                              aria-label={`Piezas de ${labelAccesorio(cat)}`}
+                              className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                              placeholder="0"
+                            />
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              step={1}
+                              value={bultosCat[cat]}
+                              onChange={(e) => setBultos(cat, e.target.value)}
+                              disabled={guardando || !prod}
+                              aria-label={`Bultos de ${labelAccesorio(cat)}`}
+                              className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm font-mono tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                              placeholder="—"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-400 mt-0.5">
+                            <span>Piezas</span>
+                            <span className="w-20 shrink-0 text-right">
+                              Bultos
+                            </span>
+                          </div>
                           {muestraSugerido && (
                             <div className="text-xs text-gray-400 mt-0.5">
                               Sugerido: {sugerido}
@@ -753,24 +875,45 @@ export default function EntregaForm({
                         <label className="block text-sm text-gray-700 mb-1">
                           {p.nombre}
                         </label>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={0}
-                          step={1}
-                          value={otrosCant[p.id] ?? ""}
-                          onChange={(e) =>
-                            setOtrosCant((prev) => ({
-                              ...prev,
-                              [p.id]: e.target.value.replace(/[^0-9]/g, ""),
-                            }))
-                          }
-                          disabled={guardando}
-                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
-                          placeholder="0"
-                        />
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          Stock disponible: {p.stock_total}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            step={1}
+                            value={otrosCant[p.id] ?? ""}
+                            onChange={(e) =>
+                              setOtrosCant((prev) => ({
+                                ...prev,
+                                [p.id]: e.target.value.replace(/[^0-9]/g, ""),
+                              }))
+                            }
+                            disabled={guardando}
+                            aria-label={`Piezas de ${p.nombre}`}
+                            className="flex-1 min-w-0 rounded-md border border-gray-300 px-3 min-h-[44px] text-sm font-mono tabular-nums focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                            placeholder="0"
+                          />
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            step={1}
+                            value={otrosBultos[p.id] ?? ""}
+                            onChange={(e) =>
+                              setOtrosBultos((prev) => ({
+                                ...prev,
+                                [p.id]: e.target.value.replace(/[^0-9]/g, ""),
+                              }))
+                            }
+                            disabled={guardando}
+                            aria-label={`Bultos de ${p.nombre}`}
+                            className="w-20 shrink-0 rounded-md border border-gray-300 px-2 min-h-[44px] text-sm font-mono tabular-nums text-right focus:border-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 disabled:bg-gray-50"
+                            placeholder="—"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-400 mt-0.5">
+                          <span>Piezas · Stock disponible: {p.stock_total}</span>
+                          <span className="w-20 shrink-0 text-right">Bultos</span>
                         </div>
                       </div>
                     ))}
@@ -778,17 +921,21 @@ export default function EntregaForm({
                 )}
               </section>
 
-              {/* Warnings stock */}
+              {/* Aviso de stock.
+                  🟡 AVISA, NO BLOQUEA. Decisión de Daniel: "negativo".
+                  Entregar más de lo que estaba cargado es un hecho real; el
+                  sistema lo muestra en vez de esconderlo. */}
               {warningsStock.length > 0 && (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-                  ⚠ Algunas cantidades superan el stock disponible:{" "}
+                  ⚠ Vas a entregar más piezas de las que hay en el inventario:{" "}
                   {warningsStock
                     .map(
-                      (w) => `${w.nombre} (pedido ${w.pedido}, disp. ${w.disponible})`,
+                      (w) =>
+                        `${w.nombre} (entregas ${w.pedido}, hay ${w.disponible})`,
                     )
                     .join(", ")}
-                  . Podés guardar igual; el stock quedará negativo hasta la
-                  próxima compra.
+                  . Puedes guardar igual — el inventario va a quedar en negativo
+                  hasta que cargues la próxima compra.
                 </div>
               )}
 
@@ -797,6 +944,25 @@ export default function EntregaForm({
                 <div className="text-xs uppercase tracking-wide text-gray-500">
                   Resumen
                 </div>
+                {/* Cómo va a salir cada renglón en la nota de entrega. Es el
+                    formato que escribió Daniel: "150 piezas en 5 bultos". */}
+                {filasParaResumen.length > 0 && (
+                  <div className="text-xs text-gray-600 space-y-0.5 pb-1 border-b border-gray-200">
+                    {filasParaResumen.map((f) => (
+                      <div
+                        key={f.producto.id}
+                        className="flex justify-between gap-3"
+                      >
+                        <span className="min-w-0 break-words">
+                          {f.producto.nombre}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {textoPiezasBultos(f.cant, f.bultos)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-700">Total entrega</span>
                   <span className="font-mono tabular-nums font-semibold text-gray-900">
@@ -825,7 +991,7 @@ export default function EntregaForm({
                 type="button"
                 onClick={handleEliminar}
                 disabled={guardando}
-                className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50 min-h-[44px] px-1"
               >
                 Eliminar entrega
               </button>
@@ -837,7 +1003,7 @@ export default function EntregaForm({
                 type="button"
                 onClick={onClose}
                 disabled={guardando}
-                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] text-sm hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
@@ -845,7 +1011,7 @@ export default function EntregaForm({
                 type="button"
                 onClick={handleGuardar}
                 disabled={!puedeGuardar}
-                className="rounded-md bg-gray-900 text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
+                className="rounded-md bg-gray-900 text-white px-4 min-h-[44px] text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
                 title={
                   !marcasOk
                     ? "Selecciona marca(s) y que el % sume 100"

@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       nombre?: string;
       precio?: number;
       stockTotal?: number;
+      fotoPath?: string | null;
     };
     if (!body.nombre || body.precio === undefined || body.stockTotal === undefined) {
       return NextResponse.json(
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
       nombre: body.nombre,
       precio: Number(body.precio),
       stockTotal: Number(body.stockTotal),
+      fotoPath: body.fotoPath ?? null,
     });
     return NextResponse.json(producto);
   } catch (err) {

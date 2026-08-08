@@ -363,6 +363,15 @@ export interface MkInventarioProducto {
   nombre: string;
   precio: number;
   stock_total: number; // unidades disponibles ahora mismo (no histórico).
+  /**
+   * Ruta de la foto dentro del bucket privado `marketing`. `null` = sin foto.
+   * Se guarda el PATH, no la URL firmada (que caduca).
+   * ⚠️ NO confundir con `mk_mobiliario_notas_proveedor.foto_paths`: esa es la
+   * libreta de COSTOS DEL PROVEEDOR y va separada a propósito.
+   */
+  foto_path: string | null;
+  /** URL firmada lista para un `<img>`. Vacía cuando no hay foto. */
+  foto_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -385,6 +394,13 @@ export interface MkEntregaItem {
   // No persiste en la tabla (la columna fue eliminada en el schema 2026-05).
   // Existe solo como compat para callers que aún leen el shape viejo.
   cantidad_por_marca: Record<string, number>;
+  /**
+   * Cuántos bultos (cajas/atados) usó este renglón. `null` = no se anotó.
+   * 🔴 INFORMATIVO. El stock se descuenta en PIEZAS (`reparto[].cantidad`),
+   * nunca en bultos: el bulto es variable y no hay conversión fija.
+   * Ver `src/lib/marketing/piezas-bultos.ts`.
+   */
+  bultos: number | null;
   precio_unitario: number;
   created_at: string;
 }
@@ -426,6 +442,11 @@ export interface EntregaItemInput {
   // producto en la entrega. La marca/% vive a nivel entrega (`marcas`), no por
   // item. `reparto` queda como legacy (back-compat) — la UI ya no lo emite.
   cantidad?: number;
+  /**
+   * Bultos del renglón. Opcional; `null`/ausente = no se anotó.
+   * 🔴 NO participa del stock — ver `src/lib/marketing/piezas-bultos.ts`.
+   */
+  bultos?: number | null;
   reparto?: RepartoItemInput[];
 }
 
@@ -448,11 +469,15 @@ export interface CreateProductoInput {
   nombre: string;
   precio: number;
   stockTotal: number;
+  /** Ruta en el bucket `marketing`. `null`/ausente = sin foto. */
+  fotoPath?: string | null;
 }
 
 export interface UpdateProductoInput {
   nombre?: string;
   precio?: number;
   stockTotal?: number;
+  /** `null` explícito quita la foto; `undefined` la deja como está. */
+  fotoPath?: string | null;
 }
 
