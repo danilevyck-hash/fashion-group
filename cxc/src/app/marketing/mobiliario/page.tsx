@@ -26,6 +26,7 @@ import { ConfirmDeleteModal, ConfirmModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
+import NotasProveedorMobiliario from "@/components/marketing/NotasProveedorMobiliario";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import type {
   EntregaConItems,
@@ -884,6 +885,15 @@ export default function MobiliarioPage() {
             </div>
           </div>
         </section>
+
+        {/* Notas del proveedor — SOLO ADMIN.
+            🔴 Es una libreta con los costos del proveedor. NO suma ni entra
+            en `metricas` (arriba): esas se calculan solo con `productos` y
+            `entregas`, y este bloque no le pasa nada a nadie. Daniel:
+            "que no sume ni nada, solo info personal".
+            Esconderlo acá es cortesía — el candado real está en el servidor,
+            en `requireRole(req, ["admin"])` de las 3 rutas de la API. */}
+        {role === "admin" && <NotasProveedorMobiliario />}
       </main>
 
       {/* Modal edit/nuevo producto */}
