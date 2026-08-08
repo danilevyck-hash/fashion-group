@@ -750,6 +750,43 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > Candados: `src/__tests__/lib/multifashion-productos-resumen.test.ts` (34 casos) y los 4 nuevos de `multifashion-ventana-gerente.test.ts`. Verificado por mutación: comparar contra el mes COMPLETO rompe 2, comparar contra el mes anterior rompe 7, medir la barra contra el total rompe 1, dejar entrar los márgenes "—" en la alerta rompe 3, rankear los movimientos por % en vez de por dólares rompe 2, y aceptar el rango de comparación sin mirar el rol rompe 3.
 
+### Multifashion › Productos — el filtro de MARCA (8-ago-2026)
+
+> Daniel, textual: *"y si quiero ver mis articulos top sellers? o descripciones top seller?"*. El agrupador (categoría / artículo / marca) lo obligaba a **bajar nivel por nivel**. Lo aprobado: **un filtro de marca ARRIBA que filtra todo lo de abajo — un toque, no cuatro.**
+>
+> 🔴 **LO QUE SWITCH LLAMA "MARCA" NO SON MARCAS, y ese es el corazón del cambio.** El campo `marca` del catálogo de american_classic trae **marca + departamento pegados** (`TH MENSWEAR`, `TH FOOTWEAR`, `CK JEANS`): por eso hay **32 valores con ventas**. **Marcas de verdad hay CINCO.** Medido contra producción el 8-ago (ventana de 12 meses `2025-09-01 → 2026-08-08`, NC restadas, total **$690.034,75**):
+>
+> | Marca | Venta | % | Margen |
+> |---|---:|---:|---:|
+> | Tommy Hilfiger | $447.830,67 | 64,9% | 37,8% |
+> | Calvin Klein | $160.286,09 | 23,2% | 32,4% |
+> | Karl Lagerfeld | $63.296,14 | 9,2% | **23,4%** |
+> | Reebok | $15.200,40 | 2,2% | **18,2%** |
+> | Joybees | $2.590,80 | 0,4% | 25,3% |
+> | Otros | $830,65 | 0,1% | 58,4% |
+>
+> ⚠️ **Karl Lagerfeld y Reebok venden $78.496 al año con márgenes de 23,4% y 18,2% contra el 37,8% de Tommy.** Ese es el hallazgo, y por eso el filtro **no es un desplegable**: es una tarjeta "Marcas" siempre visible que muestra venta, % y **margen** de cada una, y que además ES el control. **Un solo control** — dos (píldoras arriba + tabla abajo) es el error que este módulo ya pagó con los dos selectores de período. El **ámbar** marca el margen por debajo del general del período (34,7%), el MISMO criterio de la alerta "se vende mucho pero deja poco" que ya existía más abajo.
+>
+> **El mapa prefijo → marca es EXPLÍCITO** (`src/lib/multifashion/marcas-grupo.ts`, módulo PURO): `TH`→Tommy Hilfiger, `CK`→Calvin Klein, `KL`→Karl Lagerfeld, `RBK`→Reebok, `JOYBEES`→Joybees. Se compara la **PRIMERA PALABRA COMPLETA**, por igualdad exacta — **nada de `startsWith`**, que es un colador: un `THX SPORT` empieza con "TH" y no es Tommy. Todo lo que no esté en el mapa (incluido un nombre que aparezca mañana en Switch) cae en **"Otros"**: la pantalla sigue funcionando y sumando 100%, y nunca se le inventa una marca a un texto que nadie definió.
+>
+> **Departamentos mal escritos: se juntan AL MOSTRAR (aprobado por Daniel; corregirlo en Switch es tarea suya, aparte).** Lista EXPLÍCITA y corta, no un algoritmo de parecido — `TH MEN` y `TH MENSWEAR` se parecen, pero dos departamentos legítimamente distintos también, y una fusión equivocada no deja rastro. Medido: `TH ACCESSORIES` ($57.669,44) + `TH ACCESORIES` ($2.923,55) = **$60.592,99** · `TH MENSWEAR` + `TH MEN` · `TH OTHER` + `TH OTHERS`. Los 32 departamentos quedan en **29**.
+>
+> **El agrupador "Por marca" pasó a llamarse "Por departamento"**, y es lo único que cambió de nombre: con el filtro de marca arriba, llamarle "marca" a los 32 valores de Switch dejaba dos controles diciendo cosas distintas con la misma palabra. Sus números no cambiaron (salvo la fusión de los mal escritos).
+>
+> **NINGÚN NÚMERO CAMBIA, y no se recalcula nada a mano.** Cada marca se agrega con `agregarRanking`, la MISMA función que produce los totales de siempre: las NC siguen restando **dentro de cada marca**, el margen sale del agregado y los "—" siguen siendo "—". Verificado contra producción: **la suma de las 6 marcas da $690.034,75, exactamente el total sin filtrar (diferencia $0,00)**, y lo mismo en el comparativo ($616.960,32). El orden por defecto sigue siendo unidades y la línea de "las devoluciones ya están restadas" sigue ahí.
+>
+> 🔴 **EL FILTRO NO ES UN PARÁMETRO DE LA RUTA — y eso es lo que lo mantiene fuera del clamp.** Las mismas filas ya leídas se reparten en las 5 marcas (+Otros) y viajan particionadas en `porMarca`; el navegador filtra **sin red**. Un `?marca=TH` habría sido (a) otro rango contra la base por cada toque —20.445 filas, 9 s— contra una base que ya se cayó por saturación, y (b) una superficie nueva que tendría que pasar por `clampPeriodoProductos`. **No se agregó ni un parámetro ni una lectura**, así que el inventario de rutas de `multifashion-ventana-gerente.test.ts` no se movió y el candado sigue verde. Jennifer ve el filtro sobre SU mes, con la comparación de SU mes.
+>
+> **La comparación contra el año pasado también se filtra**, y por eso el comparativo viaja particionado igual: con Tommy elegido, compararlo contra el total del período daría una caída del 35% que es puro artefacto del filtro. Una marca que no existía el año pasado lo DICE ("En ese período esta marca no vendió nada") en vez de dejar tres "sin comparación" sueltos.
+>
+> **Las filas particionadas viajan LIVIANAS** (`{g,c,u,v,k,a}`, nombres de un carácter porque se repiten 4.573 veces) y el navegador rearma `utilidad = venta − costo` y el margen con `margenDe` — **las MISMAS funciones del servidor**, no una segunda definición de margen. La descripción del artículo se reusa del arreglo completo que ya viajaba (es el texto más pesado del payload). **Costo medido, 12 meses: 1.721 KB crudos / ~303 KB comprimidos (antes 190 KB) y 9,1 s contra los 60 s de `maxDuration`; un mes suelto 129 KB y 1,87 s (sin cambio).** Si algún día hay que bajarlo, la palanca es mandar los códigos con una etiqueta de marca en vez de particionarlos (un código pertenece a UNA marca: medido, 0 de 3.928 caen en dos) — no cortar listas.
+>
+> **Fail-open:** sin diccionario de marcas (`marcaDisponible=false`) `porMarca` sale `null`, no se dibuja el filtro y la pantalla queda **exactamente como estaba**. Un artículo que el diccionario no conoce cae en "Otros", nunca se descarta: si se descartara, las marcas no sumarían el total. Medido el 8-ago: **0 filas del período sin entrada en el diccionario.**
+>
+> **Los 3 anchos, medidos en el navegador contra el build de producción** (`BASE=… node scripts/_medir-productos-marca.mjs`, solo lectura), en tres estados (Todas / una marca / una marca con "Ver todo" abierto): **390 (útil 390) · 834 (útil 610) · 1440 (útil 1216) → 0 px de arrastre, 0 recortados y 0 blancos táctiles bajo 44 px en los NUEVE estados.** El selector mide 447 px de alto en celular y iPad (7 filas de ~56 px, ya en el piso táctil) y **253 px desde `xl`**, donde va a dos columnas: a 1216 px útiles una sola columna dejaba ~900 px de blanco entre el nombre y el monto. No se pasa a dos columnas antes de `xl` porque a 610 px útiles el renglón "% del total · N piezas" empieza a recortarse.
+>
+> Candados: `src/__tests__/lib/multifashion-marcas-grupo.test.ts` (30 casos: los 32 departamentos reales caen en su marca, `THX SPORT`→Otros, las 3 equivalencias y solo esas, las particiones suman el total, las NC restan por marca, rehidratar es idéntico campo por campo a `agregarRanking`) y **`src/__tests__/components/multifashion-filtro-marca.test.tsx`** (11 casos que RENDERIZAN el componente real y tocan la marca: el riesgo verdadero no es la matemática sino que el filtro llegue a unos bloques y a otros no — un pulso de Tommy con la tabla de todas se ve normal y es una pantalla mintiendo). Verificado por mutación: dejar la tabla sin filtrar rompe 3, dejar el pulso con los totales globales rompe 2, comparar la marca contra el período completo rompe 1, cambiar el mapa a `startsWith` rompe 1, quitar las equivalencias rompe 2, descartar los artículos sin marca rompe 6 y tocar la cuenta de utilidad al rehidratar rompe 10. Diagnóstico read-only: `npx tsx scripts/_diag-marcas-multifashion.ts`.
+
 ### Multifashion › Resumen — los números pegados de "Mes a mes" (30-jul-2026)
 
 > Daniel, mirando el iPhone: *"mira en multifashion, en resumen, lo pegado que estan los numeros, arreglalo"*. Medido en el navegador a 390 px con las cifras reales (5 dígitos con centavos, el peor caso es la fila YTD): el aire entre el monto del año actual y el del anterior era **−4,8 px**. **No estaban apretados: se SUPERPONÍAN** (`$302,556.86$271,191.20`).

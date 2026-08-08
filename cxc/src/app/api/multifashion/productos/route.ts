@@ -61,6 +61,17 @@
 //      `null`, la pantalla se dibuja completa sin los deltas y el error viaja en
 //      `comparativoError`. Una comparación que no cargó nunca puede tumbar los
 //      números que sí cargaron.
+//
+// 5. EL FILTRO DE MARCA **NO ES UN PARÁMETRO**. Las mismas filas ya leídas se
+//    reparten en las 5 marcas reales (+ "Otros") y viajan particionadas en
+//    `porMarca`; el navegador filtra sin red. Dos razones, y las dos pesan:
+//    · un `?marca=TH` sería un rango más contra la base por cada toque —20.445
+//      filas, 7,6 s— y encima una superficie nueva que tendría que pasar por el
+//      clamp del punto 1;
+//    · "un toque" con espera de 2 s no es un toque.
+//    Lo que Switch llama "marca" son 32 valores que en realidad son MARCA +
+//    DEPARTAMENTO (`TH MENSWEAR`); las marcas de verdad son cinco. El mapa es
+//    EXPLÍCITO y vive en `src/lib/multifashion/marcas-grupo.ts`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -84,6 +95,13 @@ import {
   type RenglonRanking,
 } from "@/lib/multifashion/productos-ranking";
 import type { RenglonComparativo } from "@/lib/multifashion/productos-resumen";
+import {
+  armarPorMarca,
+  armarPorMarcaComparativo,
+  departamentoCanonico,
+  grupoDeDepartamento,
+  mapaArticuloGrupo,
+} from "@/lib/multifashion/productos-marca";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -230,7 +248,17 @@ export async function GET(req: NextRequest) {
       console.error("[multifashion/productos] diccionario de marcas no disponible", err);
     }
 
-    const resumen = agregarProductos(filas, marcas, TOP_N);
+    // ── Los departamentos de Switch se CANONIZAN antes de agrupar ────────────
+    //    `TH ACCESORIES` (sin la S) y `TH ACCESSORIES` son el mismo departamento
+    //    escrito de dos formas: juntarlos AL MOSTRAR está aprobado por Daniel
+    //    (corregirlo en Switch es tarea aparte). La lista de equivalencias es
+    //    explícita y vive en marcas-grupo.ts — nada de parecido de textos.
+    const marcasCanon: FilaMarca[] = marcas.map(m => ({
+      ...m,
+      marca_nombre: m.marca_nombre == null ? m.marca_nombre : departamentoCanonico(m.marca_nombre),
+    }));
+
+    const resumen = agregarProductos(filas, marcasCanon, TOP_N);
 
     // ── Los dos agrupadores que pidió Daniel ──────────────────────────────────
     // Se devuelven ENTEROS (todas las categorías y todos los códigos), no un top
@@ -254,6 +282,19 @@ export async function GET(req: NextRequest) {
     const compCategoria = filasComp ? agregarRanking(filasComp, "categoria") : null;
     const compCodigo = filasComp ? agregarRanking(filasComp, "codigo") : null;
 
+    // ── EL FILTRO DE MARCA ────────────────────────────────────────────────────
+    // Las mismas filas, repartidas en las 5 marcas reales (+ "Otros") y agregadas
+    // con la MISMA función. Viajan CON el payload —no por otra consulta— para que
+    // el filtro sea un toque y no una espera: cada cambio de marca costaría otra
+    // lectura de 20.445 filas contra una base que ya se cayó por saturación.
+    // Peso medido: +268 KB crudos sobre los 768 KB que la pantalla ya bajaba.
+    // Si el diccionario de marcas no está, no hay filtro y la pantalla queda
+    // exactamente como estaba (el cliente lo trata como ausente).
+    const mapaGrupo = mapaArticuloGrupo(marcasCanon);
+    const porMarca = marcaDisponible ? armarPorMarca(filas, mapaGrupo) : null;
+    const porMarcaComp =
+      marcaDisponible && filasComp ? armarPorMarcaComparativo(filasComp, mapaGrupo) : null;
+
     return NextResponse.json({
       year,
       mes,
@@ -265,6 +306,11 @@ export async function GET(req: NextRequest) {
       marcaDisponible,
       marcaError,
       ...resumen,
+      // Cada departamento dice a qué MARCA pertenece, para que el agrupador
+      // "por departamento" se filtre con el mismo toque que el resto. Va DESPUÉS
+      // del spread de `resumen`, que ya trae su propio `marcas`.
+      marcas: resumen.marcas.map(m => ({ ...m, grupo: grupoDeDepartamento(m.marca).id })),
+      porMarca,
       ranking: {
         totales: porCategoria.totales,
         categorias: porCategoria.filas,
@@ -280,6 +326,7 @@ export async function GET(req: NextRequest) {
               totales: compCategoria.totales,
               categorias: aliviar(compCategoria.filas),
               codigos: aliviar(compCodigo.filas),
+              porMarca: porMarcaComp,
             }
           : null,
       comparativoError: fallo.comparativo,
