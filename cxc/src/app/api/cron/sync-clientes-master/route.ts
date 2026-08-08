@@ -48,6 +48,21 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   console.log(
     `[cron/sync-clientes-master] ${result.upserted} clientes refrescados (fiscal) desde switch_clientes`,
   );
+
+  // Los códigos con más de un nombre NO son un fallo del sync: es un dato que
+  // hay que corregir en el panel de Switch. Se dejan en el log y en el JSON de
+  // la respuesta —donde ya los busca quien audita— y NO se manda Telegram: la
+  // lista cerrada de 3 alertas de sistema no incluye esto, y avisar todos los
+  // días de algo que sólo Daniel puede arreglar a mano es exactamente la
+  // alerta-que-suena-para-siempre que este repo ya eliminó dos veces.
+  if (result.codigos_ambiguos.length > 0) {
+    console.warn(
+      `[cron/sync-clientes-master] ${result.codigos_ambiguos.length} código(s) con más de un nombre en Switch: ` +
+        result.codigos_ambiguos
+          .map((a) => `${a.codigo} = ${a.variantes.map((v) => `"${v.nombre}" (${v.empresas.join("/")})`).join(" | ")}`)
+          .join(" · "),
+    );
+  }
   await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json(result);
 }
