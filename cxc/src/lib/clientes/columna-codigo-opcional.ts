@@ -1,15 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Escribir en `directorio_clientes` MIENTRAS `cliente_codigo` todavía no existe.
+// Escribir `cliente_codigo` MIENTRAS esa columna todavía no existe.
+//
+// La usan `directorio_clientes` y `cheques`: las dos estrenan la misma columna
+// y las dos tienen que poder guardar ANTES de que corra el DDL.
 //
 // En este proyecto los DDL los corre Daniel A MANO, y varios se quedaron
 // "PENDIENTES" semanas. La regla de la casa es que **cada pantalla funciona
 // ANTES de que corra la migración, degradando limpio y diciendo qué falta**.
 //
-// Leer no es problema: el GET del directorio usa `select("*")`, así que una
-// columna de más o de menos le da igual. **Escribir sí**: mandar una columna
-// que la tabla no tiene hace que PostgREST rechace el INSERT/UPDATE entero con
-// `PGRST204`, o sea que guardar un teléfono fallaría por una columna que ni
-// siquiera se está usando.
+// Leer no es problema: los dos GET usan `select("*")`, así que una columna de
+// más o de menos les da igual. **Escribir sí**: mandar una columna que la tabla
+// no tiene hace que PostgREST rechace el INSERT/UPDATE entero con `PGRST204`,
+// o sea que guardar un teléfono —o un CHEQUE, que es plata— fallaría por una
+// columna que ni siquiera se está usando.
 //
 // La salida es la misma que ya usan `catalogo/cols-opcionales` y el sync del
 // catálogo: intentar con la columna y, **sólo si el error la NOMBRA**, volver a
@@ -17,7 +20,7 @@
 // real —permisos, RLS, red— en una escritura silenciosamente incompleta.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** La única columna que todavía puede no existir en `directorio_clientes`. */
+/** La columna nueva que todavía puede no existir en la tabla destino. */
 export const COLUMNA_NUEVA = "cliente_codigo";
 
 /** ¿Este error de PostgREST/Postgres es "esa columna no existe"? */

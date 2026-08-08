@@ -9,7 +9,7 @@ import {
   textoObligatorio,
   validarObligatorios,
 } from "@/lib/campos-obligatorios";
-import { guardarTolerandoColumnaNueva } from "@/lib/clientes/directorio-columna-opcional";
+import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 

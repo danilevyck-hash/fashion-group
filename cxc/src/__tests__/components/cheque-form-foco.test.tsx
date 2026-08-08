@@ -172,6 +172,7 @@ const CHEQUE_VIEJO: ChequeFormValues = {
   numero_cheque: "18835",
   monto: "11069.32",
   fecha_deposito: "2026-04-30",
+  cliente_codigo: "D-126",
   notas: "",
   vendedor: "Rey",
 };

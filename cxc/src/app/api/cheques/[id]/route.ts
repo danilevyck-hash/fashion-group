@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { getCompany } from "@/lib/companies";
+import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHEQUES_ROLES = ["admin", "secretaria"];
@@ -14,7 +15,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const allowed = ["cliente", "empresa", "numero_cheque", "monto", "fecha_deposito", "notas", "vendedor", "estado", "motivo_rebote", "fecha_depositado"];
+  const allowed = ["cliente", "cliente_codigo", "empresa", "numero_cheque", "monto", "fecha_deposito", "notas", "vendedor", "estado", "motivo_rebote", "fecha_depositado"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (k in body) update[k] = body[k]; }
   if ("numero_cheque" in update && typeof update.numero_cheque === "string") update.numero_cheque = update.numero_cheque.trim();
@@ -32,7 +33,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Este cheque ya fue depositado" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.from("cheques").update(update).eq("id", params.id).select().single();
+  // `cliente_codigo` es la columna nueva (DDL a mano): si todavía no existe se
+  // guarda todo lo demás en vez de fallar la edición entera.
+  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(update, (campos) =>
+    supabaseServer.from("cheques").update(campos).eq("id", params.id).select().single(),
+  );
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const session = getSession(req);

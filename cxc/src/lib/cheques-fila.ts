@@ -77,6 +77,9 @@ export type EntradaCheque = {
   fecha_deposito: string;
   notas?: unknown;
   vendedor: string;
+  /** Código D-XXX del cliente elegido. `undefined`/"" = sin vincular, que es un
+   *  estado legítimo (la opción "Otro" del selector). */
+  cliente_codigo?: string | null;
 };
 
 /**
@@ -94,5 +97,8 @@ export function construirFilaCheque(e: EntradaCheque): Record<string, unknown> {
     notas: typeof e.notas === "string" ? e.notas : "",
     vendedor: e.vendedor.trim(),
     estado: "pendiente",
+    // El texto de `cliente` se conserva SIEMPRE como display; esto es el
+    // vínculo. Vacío → null, para que "sin vincular" sea NULL y no "".
+    cliente_codigo: (e.cliente_codigo ?? "").trim() || null,
   };
 }
