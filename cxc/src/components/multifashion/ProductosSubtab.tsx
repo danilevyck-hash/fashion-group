@@ -2,18 +2,34 @@
 
 // Sub-tab "Productos" de Multifashion: lo más vendido.
 //
-// TRES agrupadores, que son la misma pregunta a tres alturas:
-//   · Por categoría — la `descripcion` de Switch ("Women-Bags", "Men-Polos S/S")
-//   · Por artículo  — el código suelto, con buscador y filtro por categoría
-//                     (para bajar de "Women-Bags vende $62K" a CUÁL cartera)
-//   · Por marca     — el diccionario del catálogo (agrupador previo, #420)
+// ── QUÉ RESPONDE ESTA PANTALLA, Y EN QUÉ ORDEN ──────────────────────────────
+//
+// Daniel, textual: *"no me encanta, piensa como un CEO quisiera ver de manera
+// simple rapida y minimalista y arreglalo asi"*. Los números estaban bien; el
+// problema era que llegaban como PLANILLA — 600 filas × 6 columnas de cifras—,
+// y una planilla no es una respuesta: hay que leerla entera para sacar una.
+//
+// El orden de arriba hacia abajo es el orden en que un dueño PREGUNTA, no el
+// orden en que estaban las columnas:
+//
+//   1. **Cómo vamos** — unidades, venta y utilidad del período, cada una con
+//      cuánto cambió contra el mismo período del año pasado. El cambio es lo
+//      primero que se mira y antes NO EXISTÍA en esta pantalla.
+//   2. **Qué se vende más** y **qué deja más plata**, en dos listas separadas.
+//      Son dos preguntas distintas y antes competían en la misma fila de la
+//      tabla; separarlas hace visible cuando la respuesta NO es la misma.
+//   3. **Qué se vende mucho y deja poco** — la conclusión de negocio que los
+//      datos ya permitían y que nadie estaba mostrando.
+//   4. **Qué movió la aguja** contra el año pasado, en dólares.
+//   5. El detalle completo, detrás de "Ver todo". Sigue entero: la tabla, el
+//      buscador, el filtro por categoría, el orden por columna y el paginado.
 //
 // ── LO QUE NO SE PUEDE CAMBIAR SIN ROMPER EL INFORME ────────────────────────
 //
-// 1. EL ORDEN CON EL QUE ABRE ES **UNIDADES**, no monto. Decisión de Daniel
-//    ("por unidad pero dejame hacerle sort a las otras opciones"). Las columnas
-//    de venta, costo, utilidad y margen se ordenan con un clic, sin volver a
-//    pedirle nada al servidor: la lista completa ya está en memoria.
+// 1. EL ORDEN CON EL QUE ABRE LA TABLA ES **UNIDADES**, no monto. Decisión de
+//    Daniel ("por unidad pero dejame hacerle sort a las otras opciones"). Las
+//    columnas de venta, costo, utilidad y margen se ordenan con un clic, sin
+//    volver a pedirle nada al servidor: la lista completa ya está en memoria.
 //
 // 2. LAS NOTAS DE CRÉDITO YA ESTÁN RESTADAS, y la pantalla lo DICE. Sin esa
 //    línea, alguien va a cuadrar el mes contra Switch y no le va a dar — y la
@@ -24,6 +40,29 @@
 //    margen: un 0% ahí sería mentira. Al ordenar por margen, los "—" van
 //    siempre al final, suba o baje.
 //
+// 4. LAS DESCRIPCIONES SE MUESTRAN TAL CUAL VIENEN DE SWITCH. No se normalizan
+//    ni se agrupan por parecido: sería inventar estructura de negocio.
+//
+// 5. LA COMPARACIÓN ES CONTRA EL MISMO PERÍODO DEL AÑO PASADO, MEDIDO. Y si el
+//    mes todavía no cerró, contra los MISMOS DÍAS — la pantalla lo dice con las
+//    dos fechas. Comparar 7 días contra un mes entero mostraría una caída del
+//    78% que no ocurrió.
+//
+// ── DECISIONES DE DISEÑO ────────────────────────────────────────────────────
+// Se trabaja DENTRO del sistema que ya existe (no se inventa uno): tarjetas
+// `rounded-lg` con borde y sin sombra, acento teal, Playfair (`font-display`)
+// en los títulos y Geist Mono (`font-mono tabular-nums`) en TODA cifra. Lo
+// único que se agrega es jerarquía:
+//   · **Escala**: la cifra del pulso a 24 px contra los 13-14 px del resto. Es
+//     lo que hace que los tres números se lean en el primer vistazo.
+//   · **Color con significado, no decorativo**: teal = plata, gris = piezas
+//     (son unidades distintas y no deben verse igual), verde/rojo SOLO para la
+//     dirección del cambio, ámbar SOLO para la advertencia de margen. El acento
+//     y los colores semánticos no se mezclan.
+//   · **La barra compara contra el líder de SU lista, no contra el total**: con
+//     570 categorías, medir contra el total deja cinco hilos de 1 px que no
+//     comparan nada. El % del total va como número al lado.
+//
 // ── DECISIONES DE ANCHO (regla de los 3 anchos: 390 / 834 / 1440) ───────────
 // Tabla en `lg` para arriba y TARJETAS abajo, igual que Vendedoras. El corte es
 // `lg` y no `md` porque lo que manda es el ancho ÚTIL: la barra lateral se lleva
@@ -33,6 +72,10 @@
 // — CLAUDE.md). La tabla vive dentro de un `overflow-x-auto` propio: si algún
 // día no entra, se arrastra — nunca se pierde.
 //
+// Por la misma razón las dos listas del punto 2 van una debajo de otra hasta
+// `lg`: a 610 px de ancho útil, dos columnas dejarían ~295 px por lista y un
+// monto de 5 cifras con centavos pide 92 px sin contar la etiqueta ni la barra.
+//
 // En tarjetas el orden no se puede pedir con un clic en el encabezado (no hay
 // encabezado), así que va un selector propio de 44 px: esconder el control
 // habría dejado el celular con UN solo orden posible.
@@ -40,8 +83,11 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { Card } from "@/components/ui/card";
-import { Package, Tag, Layers, Info, Search, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Package, Tag, Layers, Info, Search, ArrowUp, ArrowDown, ChevronDown, AlertTriangle,
+} from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
+import { fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import {
   ordenarRanking,
@@ -52,6 +98,15 @@ import {
   type DireccionOrden,
   type TotalesRanking,
 } from "@/lib/multifashion/productos-ranking";
+import {
+  variacion,
+  topPor,
+  margenFlojo,
+  movimientos,
+  type RenglonComparativo,
+  type TopFila,
+  type Variacion,
+} from "@/lib/multifashion/productos-resumen";
 
 type Vista = "categoria" | "articulo" | "marca";
 type Periodo = "mes" | "12m";
@@ -63,6 +118,16 @@ interface RenglonMarca {
   venta: number;
   pct: number | null;
   articulos: number;
+}
+
+interface Comparativo {
+  desde: string;
+  hasta: string;
+  /** El período actual no cerró: la comparación se recortó a los mismos días. */
+  parcial: boolean;
+  totales: TotalesRanking;
+  categorias: RenglonComparativo[];
+  codigos: RenglonComparativo[];
 }
 
 interface ProductosResp {
@@ -81,6 +146,7 @@ interface ProductosResp {
     categorias: RenglonRanking[];
     codigos: RenglonRanking[];
   };
+  comparativo: Comparativo | null;
 }
 
 const MES_FULL = [
@@ -92,6 +158,19 @@ const MES_FULL = [
  *  enteras en el DOM cuelgan el iPhone;
  *  el botón de abajo agrega de a tandas y el conteo dice siempre cuántas hay. */
 const TANDA = 100;
+
+/** Cuántos van en cada lista de arriba. Cinco es lo que se lee de un vistazo:
+ *  con diez ya hay que recorrer, y recorrer es lo que hacía la tabla. */
+const TOP_VISIBLE = 5;
+
+/** La alerta de margen mira los 10 más vendidos y muestra hasta 3. Diez porque
+ *  es el pelotón que de verdad mueve el período; tres porque una lista larga de
+ *  advertencias deja de ser una advertencia. */
+const ALERTA_ENTRE = 10;
+const ALERTA_MAX = 3;
+
+/** Cuántos grupos se muestran de cada lado en "qué movió la aguja". */
+const MOVIMIENTOS_N = 3;
 
 /** Unidades: la columna es `numeric(14,4)` pero en la práctica son piezas
  *  enteras. Se muestran sin decimales salvo que realmente los tengan. */
@@ -109,11 +188,34 @@ function fmtPctTotal(p: number | null): string {
   return p == null ? "—" : `${(p * 100).toFixed(1)}%`;
 }
 
+/** Monto con signo. El menos es el signo tipográfico (−), no un guion. */
+function fmtMontoConSigno(n: number): string {
+  return `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`;
+}
+
+function fmtUnidadesConSigno(n: number): string {
+  return `${n >= 0 ? "+" : "−"}${fmtUnidades(Math.abs(n))}`;
+}
+
 /** "1 de septiembre de 2025" → "1 sep 2025". Fecha corta y en español simple. */
 const MES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 function fmtFecha(iso: string): string {
   const [a, m, d] = iso.split("-");
   return `${Number(d)} ${MES_CORTO[Number(m) - 1]} ${a}`;
+}
+
+/** El tono del cambio. Gris cuando no hay con qué comparar: un "—" en verde
+ *  diría que algo mejoró. */
+function tonoVariacion(n: number | null): string {
+  if (n == null) return "text-gray-500";
+  if (n > 0) return "text-emerald-700";
+  if (n < 0) return "text-rose-700";
+  return "text-gray-500";
+}
+
+function flechaVariacion(n: number | null): string {
+  if (n == null || n === 0) return "";
+  return n > 0 ? "▲" : "▼";
 }
 
 interface ProductosSubtabProps {
@@ -141,6 +243,7 @@ export function ProductosSubtab({
   const [texto, setTexto] = useState("");
   const [categoria, setCategoria] = useState("");
   const [visibles, setVisibles] = useState(TANDA);
+  const [detalleAbierto, setDetalleAbierto] = useState(false);
 
   const url = `/api/multifashion/productos?year=${selectedYear}&mes=${mes}&periodo=${periodo}`;
   const { data: resp, error, isLoading, mutate } = useSWR<ProductosResp>(
@@ -171,6 +274,8 @@ export function ProductosSubtab({
       : `${MES_FULL[mes - 1]} ${selectedYear}`;
 
   const base = vista === "categoria" ? resp?.ranking.categorias : resp?.ranking.codigos;
+  const baseComparativa =
+    vista === "categoria" ? resp?.comparativo?.categorias : resp?.comparativo?.codigos;
 
   // Filtro + orden, en ese orden y los dos PUROS. El filtro va primero para que
   // el "mostrando N de M" cuente lo que el filtro dejó, no el catálogo entero.
@@ -182,6 +287,31 @@ export function ProductosSubtab({
     });
     return ordenarRanking(filtradas, orden.col, orden.dir);
   }, [base, texto, categoria, vista, orden.col, orden.dir]);
+
+  const totales = resp?.ranking.totales;
+
+  // ── Las cuatro respuestas de arriba. Se calculan sobre la lista COMPLETA del
+  //    agrupador (sin el buscador ni el filtro de la tabla): son el resumen del
+  //    período, no del filtro que alguien dejó puesto abajo.
+  const topUnidades = useMemo(
+    () => (base && totales ? topPor(base, "unidades", TOP_VISIBLE, totales.unidades) : []),
+    [base, totales],
+  );
+  const topUtilidad = useMemo(
+    () => (base && totales ? topPor(base, "utilidad", TOP_VISIBLE, totales.utilidad) : []),
+    [base, totales],
+  );
+  const flojos = useMemo(
+    () =>
+      base && totales
+        ? margenFlojo(base, totales.margen, { entreLosPrimeros: ALERTA_ENTRE, maximo: ALERTA_MAX })
+        : [],
+    [base, totales],
+  );
+  const cambios = useMemo(
+    () => (base && baseComparativa ? movimientos(base, baseComparativa, MOVIMIENTOS_N) : null),
+    [base, baseComparativa],
+  );
 
   // Las categorías del desplegable salen del MISMO payload, ordenadas por lo que
   // más se vende (no alfabéticas): las que Daniel va a buscar están arriba.
@@ -208,6 +338,7 @@ export function ProductosSubtab({
     setTexto("");
     setCategoria("");
     setVisibles(TANDA);
+    setDetalleAbierto(false);
   };
 
   const cambiarPeriodo = (p: Periodo) => {
@@ -215,7 +346,7 @@ export function ProductosSubtab({
     setVisibles(TANDA);
   };
 
-  const totales = resp?.ranking.totales;
+  const sustantivo = vista === "categoria" ? "categorías" : "artículos";
 
   return (
     <div className="space-y-4">
@@ -231,24 +362,11 @@ export function ProductosSubtab({
         </div>
       )}
 
-      {/* Agrupador. 44 px de alto (regla táctil): es el control que más se toca
-          de la pestaña y en este módulo ya hubo píldoras de 26 px (CLAUDE.md).
-          `-my-1.5` para que crecer no despegue el filtro del título. */}
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Agrupar por">
-        <Pill activo={vista === "categoria"} onClick={() => cambiarVista("categoria")}>
-          <Layers className="h-3.5 w-3.5" /> Por categoría
-        </Pill>
-        <Pill activo={vista === "articulo"} onClick={() => cambiarVista("articulo")}>
-          <Package className="h-3.5 w-3.5" /> Por artículo
-        </Pill>
-        <Pill activo={vista === "marca"} onClick={() => cambiarVista("marca")}>
-          <Tag className="h-3.5 w-3.5" /> Por marca
-        </Pill>
-      </div>
-
-      {/* Período. Se esconde para la ventana acotada — ahí solo existe el mes en
-          curso, y una píldora que no se puede elegir es ruido. Esconderla NO es
-          el candado: el servidor aplasta `periodo=12m` a "mes" para ese rol. */}
+      {/* Período. Va PRIMERO porque enmarca todo lo de abajo: los tres números
+          del pulso dependen de él y no del agrupador. Se esconde para la ventana
+          acotada — ahí solo existe el mes en curso, y una píldora que no se puede
+          elegir es ruido. Esconderla NO es el candado: el servidor aplasta
+          `periodo=12m` a "mes" para ese rol. */}
       {!ventanaAcotada && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período">
           <Pill activo={periodo === "12m"} onClick={() => cambiarPeriodo("12m")}>
@@ -263,57 +381,38 @@ export function ProductosSubtab({
         </div>
       )}
 
-      <div className={cn(loading && "opacity-60 transition-opacity")}>
+      <div className={cn("space-y-3", loading && "opacity-60 transition-opacity")}>
         <h3 className="font-display text-base font-semibold text-gray-950">
           Más vendido · {rotuloPeriodo}
         </h3>
+
         {totales && (
-          <p className="mt-0.5 text-xs text-gray-500">
-            <span className="font-mono tabular-nums text-gray-700">{fmtUnidades(totales.unidades)}</span> unidades ·{" "}
-            <span className="font-mono tabular-nums text-gray-700">{fmtMoney(totales.venta)}</span> de venta ·{" "}
-            <span className="font-mono tabular-nums text-gray-700">{fmtMoney(totales.utilidad)}</span> de utilidad ·{" "}
-            <span className="font-mono tabular-nums text-gray-700">{fmtMargen(totales.margen)}</span> de margen
-          </p>
+          <Pulso totales={totales} comparativo={resp?.comparativo ?? null} />
         )}
+
         {/* Se dice de dónde sale el número Y qué se le restó. Las devoluciones
             YA están descontadas; sin la nota, alguien va a sumar el período a
             mano contra Switch y no le va a cuadrar. */}
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="text-xs text-gray-400">
           Ventas netas: las devoluciones (notas de crédito) ya están restadas. El margen es la utilidad dividida entre
           la venta.
         </p>
       </div>
 
-      {/* Buscador + filtro por categoría. Solo en "Por artículo": es la vista que
-          tiene ~3.900 renglones, y es la pregunta que sigue a la de categoría. */}
-      {vista === "articulo" && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              value={texto}
-              onChange={e => { setTexto(e.target.value); setVisibles(TANDA); }}
-              placeholder="Buscar por código o descripción"
-              aria-label="Buscar por código o descripción"
-              // 44 px de alto y letra de 16 px en celular: por debajo de 16, iOS
-              // hace zoom solo al enfocar y deja la pantalla corrida.
-              className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
-            />
-          </div>
-          <select
-            value={categoria}
-            onChange={e => { setCategoria(e.target.value); setVisibles(TANDA); }}
-            aria-label="Filtrar por categoría"
-            className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-64 sm:text-sm"
-          >
-            <option value="">Todas las categorías</option>
-            {categoriasDisponibles.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      {/* Agrupador. 44 px de alto (regla táctil): es el control que más se toca
+          de la pestaña y en este módulo ya hubo píldoras de 26 px (CLAUDE.md).
+          `-my-1.5` para que crecer no despegue el filtro del título. */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Agrupar por">
+        <Pill activo={vista === "categoria"} onClick={() => cambiarVista("categoria")}>
+          <Layers className="h-3.5 w-3.5" /> Por categoría
+        </Pill>
+        <Pill activo={vista === "articulo"} onClick={() => cambiarVista("articulo")}>
+          <Package className="h-3.5 w-3.5" /> Por artículo
+        </Pill>
+        <Pill activo={vista === "marca"} onClick={() => cambiarVista("marca")}>
+          <Tag className="h-3.5 w-3.5" /> Por marca
+        </Pill>
+      </div>
 
       {/* El agrupador por marca depende del diccionario del catálogo de Switch.
           Si todavía no está cargado se DICE — la alternativa sería deducir la
@@ -340,24 +439,459 @@ export function ProductosSubtab({
       {vista === "marca" ? (
         <VistaMarca renglones={resp?.marcas ?? []} loading={loading} periodo={rotuloPeriodo} />
       ) : (
-        <VistaRanking
-          vista={vista}
-          filas={filas}
-          totalSinFiltrar={base?.length ?? 0}
-          visibles={visibles}
-          onVerMas={() => setVisibles(v => v + TANDA)}
-          orden={orden}
-          onOrdenar={clic}
-          loading={loading}
-          hayDatos={Boolean(resp)}
-          periodo={rotuloPeriodo}
-        />
+        <div className={cn("space-y-4", loading && "opacity-60 pointer-events-none transition-opacity")}>
+          {resp && base && base.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-sm text-gray-700">No hubo ventas en {rotuloPeriodo}.</p>
+            </Card>
+          ) : (
+            <>
+              {/* Las dos preguntas separadas: volumen y plata. Una debajo de la
+                  otra hasta `lg` — ver las decisiones de ancho del encabezado. */}
+              <div className="grid gap-3 lg:grid-cols-2">
+                <ListaTop
+                  titulo="Lo que más se vende"
+                  ayuda={`Por piezas. Suman el ${fmtPctTotal(sumaPct(topUnidades))} de las unidades del período.`}
+                  filas={topUnidades}
+                  unidad="piezas"
+                  vista={vista}
+                />
+                <ListaTop
+                  titulo="Lo que más plata deja"
+                  ayuda={`Por utilidad. Suman el ${fmtPctTotal(sumaPct(topUtilidad))} de la utilidad del período.`}
+                  filas={topUtilidad}
+                  unidad="plata"
+                  vista={vista}
+                />
+              </div>
+
+              <MargenFlojo filas={flojos} margenGeneral={totales?.margen ?? null} sustantivo={sustantivo} />
+
+              {cambios && resp?.comparativo && (
+                <Movimientos cambios={cambios} comparativo={resp.comparativo} sustantivo={sustantivo} />
+              )}
+
+              {/* El detalle completo, cerrado. Sigue estando todo: buscador,
+                  filtro, orden por columna y paginado. */}
+              <Card className="overflow-hidden p-0">
+                <button
+                  type="button"
+                  onClick={() => setDetalleAbierto(v => !v)}
+                  aria-expanded={detalleAbierto}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
+                >
+                  <span className="text-sm font-medium text-gray-950">
+                    Ver todo
+                    <span className="ml-2 font-normal text-gray-500">
+                      {(base?.length ?? 0).toLocaleString("en-US")} {sustantivo}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-gray-500 transition-transform",
+                      detalleAbierto && "rotate-180",
+                    )}
+                  />
+                </button>
+
+                {detalleAbierto && (
+                  <div className="space-y-3 border-t border-gray-200 bg-gray-50/60 p-3">
+                    {/* Buscador + filtro por categoría. Solo en "Por artículo":
+                        es la vista que tiene ~3.900 renglones, y es la pregunta
+                        que sigue a la de categoría. */}
+                    {vista === "articulo" && (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="relative flex-1">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="search"
+                            value={texto}
+                            onChange={e => { setTexto(e.target.value); setVisibles(TANDA); }}
+                            placeholder="Buscar por código o descripción"
+                            aria-label="Buscar por código o descripción"
+                            // 44 px de alto y letra de 16 px en celular: por
+                            // debajo de 16, iOS hace zoom solo al enfocar y deja
+                            // la pantalla corrida.
+                            className="h-11 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:text-sm"
+                          />
+                        </div>
+                        <select
+                          value={categoria}
+                          onChange={e => { setCategoria(e.target.value); setVisibles(TANDA); }}
+                          aria-label="Filtrar por categoría"
+                          className="h-11 w-full rounded-md border border-gray-200 bg-white px-3 text-base text-gray-900 focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-64 sm:text-sm"
+                        >
+                          <option value="">Todas las categorías</option>
+                          {categoriasDisponibles.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <VistaRanking
+                      vista={vista}
+                      filas={filas}
+                      totalSinFiltrar={base?.length ?? 0}
+                      visibles={visibles}
+                      onVerMas={() => setVisibles(v => v + TANDA)}
+                      orden={orden}
+                      onOrdenar={clic}
+                    />
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-// ── Vista de ranking (categoría / artículo) ─────────────────────────────────
+/** Qué parte del total juntan los que se muestran. `null` si alguno no lo sabe
+ *  (total no positivo) — no se suman "—" como si fueran ceros. */
+function sumaPct(filas: TopFila[]): number | null {
+  if (filas.length === 0) return null;
+  let acc = 0;
+  for (const f of filas) {
+    if (f.pctDelTotal == null) return null;
+    acc += f.pctDelTotal;
+  }
+  return acc;
+}
+
+// ── 1. El pulso: cómo vamos ─────────────────────────────────────────────────
+
+function Pulso({
+  totales,
+  comparativo,
+}: {
+  totales: TotalesRanking;
+  comparativo: Comparativo | null;
+}) {
+  const c = comparativo?.totales;
+  return (
+    <Card className="overflow-hidden p-0">
+      {/* Celdas apiladas en celular y en fila desde `sm`: tres montos de cinco
+          cifras con centavos no entran en 358 px útiles ni con la letra al
+          piso, y esta pantalla es de plata (nada de "$33.2K"). */}
+      <div className="divide-y divide-gray-100 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <CeldaPulso
+          rotulo="Unidades"
+          valor={fmtUnidades(totales.unidades)}
+          tono="volumen"
+          delta={c ? variacion(totales.unidades, c.unidades) : null}
+          anterior={c ? `${fmtUnidades(c.unidades)} piezas` : null}
+          fmtAbs={fmtUnidadesConSigno}
+        />
+        <CeldaPulso
+          rotulo="Venta"
+          valor={fmtMoney(totales.venta)}
+          tono="plata"
+          delta={c ? variacion(totales.venta, c.venta) : null}
+          anterior={c ? fmtMoney(c.venta) : null}
+          fmtAbs={fmtMontoConSigno}
+        />
+        <CeldaPulso
+          rotulo="Utilidad"
+          valor={fmtMoney(totales.utilidad)}
+          tono="plata"
+          delta={c ? variacion(totales.utilidad, c.utilidad) : null}
+          anterior={c ? fmtMoney(c.utilidad) : null}
+          fmtAbs={fmtMontoConSigno}
+        />
+      </div>
+
+      {/* El margen va en su propia línea y no como cuarta celda: es una
+          proporción, no un monto, y meterlo entre los tres montos lo hacía
+          leerse como uno más. Su comparación va en PUNTOS, que es como se
+          compara un porcentaje contra otro. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-gray-200 bg-gray-50 px-4 py-2.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Margen</span>
+        <span className="font-mono text-sm font-medium tabular-nums text-gray-950">
+          {fmtMargen(totales.margen)}
+        </span>
+        {c && (
+          <span className="text-xs text-gray-500">
+            {c.margen == null || totales.margen == null ? (
+              <>el año pasado {fmtMargen(c.margen)}</>
+            ) : (
+              <>
+                <span className={cn("font-mono tabular-nums", tonoVariacion(totales.margen - c.margen))}>
+                  {flechaVariacion(totales.margen - c.margen)}{" "}
+                  {(totales.margen - c.margen >= 0 ? "+" : "−")}
+                  {Math.abs((totales.margen - c.margen) * 100).toFixed(1)} puntos
+                </span>{" "}
+                contra {fmtMargen(c.margen)} el año pasado
+              </>
+            )}
+          </span>
+        )}
+      </div>
+
+      {/* Contra QUÉ se compara, con las dos fechas. Sin esta línea, "−12%" es un
+          número sin período: nadie puede verificarlo ni repetirlo. */}
+      <div className="border-t border-gray-100 px-4 py-2 text-xs text-gray-400">
+        {comparativo ? (
+          <>
+            Comparado con {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}
+            {comparativo.parcial && " (los mismos días del año pasado, para que sea comparable)"}
+          </>
+        ) : (
+          "Sin comparación contra el año pasado en este momento."
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function CeldaPulso({
+  rotulo,
+  valor,
+  tono,
+  delta,
+  anterior,
+  fmtAbs,
+}: {
+  rotulo: string;
+  valor: string;
+  /** "plata" va en el acento de la app; "volumen" en gris. Son unidades
+   *  distintas y verlas iguales es la mitad del problema que se vino a
+   *  arreglar (unidades y dólares compitiendo en la misma fila). */
+  tono: "plata" | "volumen";
+  delta: Variacion | null;
+  anterior: string | null;
+  fmtAbs: (n: number) => string;
+}) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{rotulo}</p>
+      <p
+        className={cn(
+          "mt-1 font-mono text-2xl font-medium leading-tight tabular-nums",
+          tono === "plata" ? "text-teal-800" : "text-gray-950",
+        )}
+      >
+        {valor}
+      </p>
+      {delta && anterior ? (
+        <p className="mt-1 text-xs text-gray-500">
+          <span className={cn("font-mono font-medium tabular-nums", tonoVariacion(delta.pct ?? delta.abs))}>
+            {flechaVariacion(delta.pct ?? delta.abs)}{" "}
+            {delta.pct != null ? fmtVariacionPct(delta.pct, true, 1) : fmtAbs(delta.abs)}
+          </span>{" "}
+          contra <span className="font-mono tabular-nums">{anterior}</span> el año pasado
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-gray-400">Sin comparación</p>
+      )}
+    </div>
+  );
+}
+
+// ── 2. Los primeros 5 de cada corte ─────────────────────────────────────────
+
+function ListaTop({
+  titulo,
+  ayuda,
+  filas,
+  unidad,
+  vista,
+}: {
+  titulo: string;
+  ayuda: string;
+  filas: TopFila[];
+  unidad: "piezas" | "plata";
+  vista: Vista;
+}) {
+  if (filas.length === 0) return null;
+  const esPlata = unidad === "plata";
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h4 className="font-display text-sm font-semibold text-gray-950">{titulo}</h4>
+        <p className="mt-0.5 text-xs text-gray-500">{ayuda}</p>
+      </div>
+      <ol className="divide-y divide-gray-100">
+        {filas.map((f, i) => (
+          <li key={f.clave} className="px-4 py-2.5">
+            <div className="flex items-baseline gap-2">
+              <span className="w-4 shrink-0 font-mono text-xs tabular-nums text-gray-400">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={f.etiqueta}>
+                {f.etiqueta}
+              </span>
+              <span
+                className={cn(
+                  "shrink-0 font-mono text-sm font-medium tabular-nums",
+                  esPlata ? "text-teal-800" : "text-gray-950",
+                )}
+              >
+                {esPlata ? fmtMoney(f.valor) : fmtUnidades(f.valor)}
+              </span>
+            </div>
+            {/* La barra va DEBAJO y a lo ancho: en la misma línea que el monto
+                le quedarían ~60 px y dejaría de comparar nada. */}
+            <div className="mt-1.5 flex items-center gap-2 pl-6">
+              <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
+                <div
+                  className={cn("h-full rounded-full", esPlata ? "bg-teal-600" : "bg-gray-400")}
+                  style={{ width: `${(f.fraccion * 100).toFixed(1)}%` }}
+                />
+              </div>
+              <span className="shrink-0 font-mono text-xs tabular-nums text-gray-500">
+                {fmtPctTotal(f.pctDelTotal)} del total
+              </span>
+            </div>
+            {/* La segunda cifra, la que la otra lista responde: quien vende
+                mucho puede dejar poco, y verlo acá es medio hallazgo. */}
+            <p className="mt-0.5 pl-6 text-xs text-gray-500">
+              {esPlata ? (
+                <>
+                  {fmtUnidades(f.unidades)} piezas · margen{" "}
+                  <span className="font-mono tabular-nums">{fmtMargen(f.margen)}</span>
+                </>
+              ) : (
+                <>
+                  {fmtMoney(f.venta)} de venta · margen{" "}
+                  <span className="font-mono tabular-nums">{fmtMargen(f.margen)}</span>
+                </>
+              )}
+              {vista === "articulo" && f.detalle && <> · {f.detalle}</>}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
+}
+
+// ── 3. Se vende mucho pero deja poco ────────────────────────────────────────
+
+function MargenFlojo({
+  filas,
+  margenGeneral,
+  sustantivo,
+}: {
+  filas: ReturnType<typeof margenFlojo>;
+  margenGeneral: number | null;
+  sustantivo: string;
+}) {
+  if (filas.length === 0 || margenGeneral == null) return null;
+  return (
+    <Card className="overflow-hidden border-amber-200 p-0">
+      <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50 px-4 py-3">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" strokeWidth={1.75} />
+        <div className="min-w-0">
+          <h4 className="font-display text-sm font-semibold text-amber-950">
+            Se vende mucho pero deja poco
+          </h4>
+          {/* La regla se dice completa. Una advertencia cuyo criterio no se ve
+              es una advertencia en la que nadie confía. */}
+          <p className="mt-0.5 text-xs text-amber-900">
+            {sustantivo === "categorías" ? "Categorías" : "Artículos"} entre los {ALERTA_ENTRE} más vendidos
+            del período con margen por debajo del margen general (
+            <span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
+          </p>
+        </div>
+      </div>
+      <ul className="divide-y divide-gray-100">
+        {filas.map(f => (
+          <li key={f.clave} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-4 py-2.5">
+            <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={f.etiqueta}>
+              {f.etiqueta}
+            </span>
+            <span className="font-mono text-sm font-medium tabular-nums text-amber-800">
+              {fmtMargen(f.margen)}
+            </span>
+            <p className="w-full text-xs text-gray-500">
+              N.º {f.puesto} en unidades · {fmtUnidades(f.unidades)} piezas ·{" "}
+              {fmtMoney(f.venta)} de venta · {fmtMoney(f.utilidad)} de utilidad
+            </p>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+// ── 4. Qué movió la aguja ───────────────────────────────────────────────────
+
+function Movimientos({
+  cambios,
+  comparativo,
+  sustantivo,
+}: {
+  cambios: ReturnType<typeof movimientos>;
+  comparativo: Comparativo;
+  sustantivo: string;
+}) {
+  if (cambios.subieron.length === 0 && cambios.bajaron.length === 0) return null;
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-gray-100 px-4 py-3">
+        <h4 className="font-display text-sm font-semibold text-gray-950">Lo que más cambió</h4>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {sustantivo === "categorías" ? "Categorías" : "Artículos"} con la mayor diferencia de venta
+          contra {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}. En dólares, no en
+          porcentaje: lo que sube 400% desde $40 no mueve el mes.
+        </p>
+      </div>
+      <div className="grid divide-y divide-gray-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+        <ColumnaMovimiento titulo="Subió" filas={cambios.subieron} />
+        <ColumnaMovimiento titulo="Bajó" filas={cambios.bajaron} />
+      </div>
+    </Card>
+  );
+}
+
+function ColumnaMovimiento({
+  titulo,
+  filas,
+}: {
+  titulo: string;
+  filas: ReturnType<typeof movimientos>["subieron"];
+}) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{titulo}</p>
+      {filas.length === 0 ? (
+        <p className="mt-1 text-xs text-gray-400">Nada por acá.</p>
+      ) : (
+        <ul className="mt-1.5 space-y-2">
+          {filas.map(m => (
+            <li key={m.clave}>
+              <div className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-950" title={m.etiqueta}>
+                  {m.etiqueta}
+                </span>
+                <span className={cn("shrink-0 font-mono text-sm font-medium tabular-nums", tonoVariacion(m.abs))}>
+                  {fmtMontoConSigno(m.abs)}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500">
+                {m.nuevo ? (
+                  <>no se vendía el año pasado</>
+                ) : m.desaparecido ? (
+                  <>dejó de venderse · el año pasado {fmtMoney(m.ventaAnterior)}</>
+                ) : (
+                  <>
+                    <span className={cn("font-mono tabular-nums", tonoVariacion(m.pct))}>
+                      {fmtVariacionPct(m.pct, true, 1)}
+                    </span>{" "}
+                    · {fmtMoney(m.ventaAnterior)} → {fmtMoney(m.ventaActual)}
+                  </>
+                )}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── 5. El detalle: tabla (categoría / artículo) ─────────────────────────────
 
 /** Las columnas ordenables, en el orden en que se dibujan. `numero: false` es la
  *  única de texto (se alinea a la izquierda y arranca de la A). */
@@ -386,9 +920,6 @@ function VistaRanking({
   onVerMas,
   orden,
   onOrdenar,
-  loading,
-  hayDatos,
-  periodo,
 }: {
   vista: Vista;
   filas: RenglonRanking[];
@@ -397,29 +928,22 @@ function VistaRanking({
   onVerMas: () => void;
   orden: { col: ColumnaRanking; dir: DireccionOrden };
   onOrdenar: (c: ColumnaRanking) => void;
-  loading: boolean;
-  hayDatos: boolean;
-  periodo: string;
 }) {
   const cols = COLUMNAS.filter(c => vista === "categoria" || !c.soloCategoria).map(c =>
     c.col === "etiqueta" ? { ...c, titulo: vista === "categoria" ? "Categoría" : "Artículo" } : c,
   );
   const mostradas = filas.slice(0, visibles);
 
-  if (hayDatos && filas.length === 0) {
+  if (filas.length === 0) {
     return (
       <Card className="p-8 text-center">
-        <p className="text-sm text-gray-700">
-          {totalSinFiltrar === 0
-            ? `No hubo ventas en ${periodo}.`
-            : "Ningún artículo coincide con la búsqueda."}
-        </p>
+        <p className="text-sm text-gray-700">Ningún artículo coincide con la búsqueda.</p>
       </Card>
     );
   }
 
   return (
-    <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
+    <div className="space-y-3">
       {/* Orden en celular/iPad: sin encabezados no hay dónde hacer clic. Columna
           en el desplegable y sentido en su propio botón — meter los dos en un
           solo select da el doble de opciones para la misma decisión. */}
@@ -547,27 +1071,25 @@ function VistaRanking({
 
       {/* Cuántas se ven de cuántas hay. Sin este renglón, "las 100 primeras"
           se lee como "esto es todo" y el buscador parece de adorno. */}
-      {filas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 px-1">
-          <p className="text-xs text-gray-500">
-            Mostrando{" "}
-            <span className="font-mono tabular-nums">{Math.min(visibles, filas.length).toLocaleString("en-US")}</span>{" "}
-            de <span className="font-mono tabular-nums">{filas.length.toLocaleString("en-US")}</span>
-            {filas.length !== totalSinFiltrar && (
-              <> (de {totalSinFiltrar.toLocaleString("en-US")} en total)</>
-            )}
-          </p>
-          {visibles < filas.length && (
-            <button
-              type="button"
-              onClick={onVerMas}
-              className="-my-1.5 inline-flex min-h-[44px] items-center rounded-full border border-gray-200 bg-white px-4 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950"
-            >
-              Ver {Math.min(TANDA, filas.length - visibles)} más
-            </button>
+      <div className="flex flex-wrap items-center gap-3 px-1">
+        <p className="text-xs text-gray-500">
+          Mostrando{" "}
+          <span className="font-mono tabular-nums">{Math.min(visibles, filas.length).toLocaleString("en-US")}</span>{" "}
+          de <span className="font-mono tabular-nums">{filas.length.toLocaleString("en-US")}</span>
+          {filas.length !== totalSinFiltrar && (
+            <> (de {totalSinFiltrar.toLocaleString("en-US")} en total)</>
           )}
-        </div>
-      )}
+        </p>
+        {visibles < filas.length && (
+          <button
+            type="button"
+            onClick={onVerMas}
+            className="-my-1.5 inline-flex min-h-[44px] items-center rounded-full border border-gray-200 bg-white px-4 text-xs font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-950"
+          >
+            Ver {Math.min(TANDA, filas.length - visibles)} más
+          </button>
+        )}
+      </div>
     </div>
   );
 }

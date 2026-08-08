@@ -242,6 +242,36 @@ export function clampPeriodoProductos(
   };
 }
 
+/**
+ * Rango de COMPARACIÓN de Productos ("qué cambió contra el año pasado").
+ *
+ * Es un período NUEVO, y por eso pasa por acá: la ventana de Jennifer se cierra
+ * en el servidor rango por rango, no "por ruta". Devuelve `null` cuando el rango
+ * no cabe entero dentro de UNO de los dos meses permitidos → la ruta no lo
+ * consulta y la pantalla se dibuja sin comparación.
+ *
+ * En la práctica, para el rol acotado el rango pedido SIEMPRE es el mismo mes
+ * del año pasado —que es justo la mitad de su ventana—, así que Jennifer sí ve
+ * su comparación. Este guard existe para que eso siga siendo cierto el día que
+ * alguien cambie `rangoComparativo`: si el período de comparación se moviera a
+ * un mes que ella no puede ver, se apaga solo en vez de convertirse en fuga.
+ *
+ * 🩸 Se exige que quepa en UN mes, no que sus dos puntas estén "dentro de la
+ * ventana": la ventana son dos meses DISJUNTOS, así que un rango que arrancara
+ * en el mes de comparación y terminara en el mes en curso tendría las dos
+ * puntas válidas y los once meses del medio adentro.
+ */
+export function clampRangoComparativo(
+  role: string | null | undefined,
+  rango: RangoIso,
+  ahora: Date,
+): RangoIso | null {
+  if (!esRolAcotado(role)) return rango;
+  const v = ventanaGerente(ahora);
+  const cabeEn = (w: RangoIso) => rango.inicio >= w.inicio && rango.fin <= w.fin;
+  return cabeEn(v.actual) || cabeEn(v.anterior) ? rango : null;
+}
+
 export type PeriodoVendedoras = "mes" | "trimestre" | "ytd" | "ultimos";
 
 export interface ClampVendedoras {
