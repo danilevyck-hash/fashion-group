@@ -4,6 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { CAMPOS_OBLIGATORIOS, respuestaErrorEscritura, validarObligatorios } from "@/lib/campos-obligatorios";
+import { guardarTolerandoColumnaNueva } from "@/lib/clientes/directorio-columna-opcional";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -19,14 +20,40 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const falta = validarObligatorios(body, CAMPOS_OBLIGATORIOS.directorio_clientes);
     if (falta) return falta;
   }
-  const { nombre, empresa, telefono, celular, correo, contacto, notas } = body;
-  const { data, error } = await supabaseServer.from("directorio_clientes").update({ nombre, empresa, telefono, celular, correo, contacto, notas }).eq("id", params.id).select().single();
+  // 🩸 SOLO SE ESCRIBEN LOS CAMPOS QUE VINIERON (8-ago-2026).
+  //
+  // Antes se armaba el UPDATE con las 7 columnas SIEMPRE, así que un formulario
+  // que no las mostrara todas las mandaba en `""` y las BORRABA. No era
+  // hipotético: el tab "Clientes" del catálogo (`components/catalogo/
+  // ClientesClient.tsx`) sólo edita nombre/empresa/correo/WhatsApp y mandaba
+  // `telefono: "", celular: "", contacto: "", notas: ""` en cada guardada.
+  // Medido: **22 de las 33 fichas** tienen alguno de esos cuatro datos, y son lo
+  // único que esa tabla aporta — los cargó Daniel a mano, uno por uno.
+  //
+  // `nombre` sigue teniendo su validación aparte (es NOT NULL).
+  const EDITABLES = [
+    "nombre", "empresa", "telefono", "celular", "correo",
+    "contacto", "notas", "whatsapp", "cliente_codigo",
+  ] as const;
+  const cambios: Record<string, unknown> = {};
+  for (const k of EDITABLES) if (k in body) cambios[k] = body[k];
+  if (Object.keys(cambios).length === 0) {
+    return NextResponse.json({ error: "No mandaste ningún cambio" }, { status: 400 });
+  }
+  const nombre = cambios.nombre;
+
+  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(cambios, (campos) =>
+    supabaseServer.from("directorio_clientes").update(campos).eq("id", params.id).select().single(),
+  );
   if (error) return respuestaErrorEscritura(error, { tabla: "directorio_clientes", accion: "Clientes › editar cliente" });
 
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "directorio_update", "directorio", { clienteId: params.id, nombre }, session?.userName);
 
-  return NextResponse.json(data);
+  // `sinColumna` = se guardó todo lo demás pero el vínculo NO, porque la
+  // migración todavía no corrió. La pantalla lo dice con todas las letras en vez
+  // de mostrar un cliente vinculado que en la base no lo está.
+  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

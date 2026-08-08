@@ -9,8 +9,17 @@ import { useRouter } from "next/navigation";
 import { Toast, EmptyState } from "@/components/ui";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
 
-interface Cliente { id: string; nombre: string; empresa: string; correo: string; whatsapp: string; }
+interface Cliente {
+  id: string;
+  nombre: string;
+  empresa: string;
+  correo: string;
+  whatsapp: string;
+  /** Código D-XXX del cliente real. `undefined` mientras el DDL no haya corrido. */
+  cliente_codigo?: string | null;
+}
 
 export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -28,6 +37,10 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
   const [fEmpresa, setFEmpresa] = useState("");
   const [fCorreo, setFCorreo] = useState("");
   const [fWhatsapp, setFWhatsapp] = useState("");
+  // Vínculo con el cliente real del grupo. `fCodigo` vacío = sin vincular, que
+  // es un estado legítimo y el que tienen 8 de las 33 fichas.
+  const [fVinculoNombre, setFVinculoNombre] = useState("");
+  const [fCodigo, setFCodigo] = useState("");
   const [saving, setSaving] = useState(false);
   // Clic fuera / Escape cierran el modal, salvo que ya haya datos escritos sin
   // guardar (alta o edición de cliente): ahí solo se sale con Cancelar/Guardar.
@@ -64,23 +77,49 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
 
   function openNew() {
     setEditingId(null); setFNombre(""); setFEmpresa(""); setFCorreo(""); setFWhatsapp("");
+    setFVinculoNombre(""); setFCodigo("");
     setShowModal(true);
   }
 
   function openEdit(c: Cliente) {
     setEditingId(c.id); setFNombre(c.nombre); setFEmpresa(c.empresa || ""); setFCorreo(c.correo || ""); setFWhatsapp(c.whatsapp || "");
+    // Si la ficha ya está vinculada, el typeahead arranca mostrando a quién.
+    setFCodigo(c.cliente_codigo || "");
+    setFVinculoNombre(c.cliente_codigo ? c.nombre : "");
     setShowModal(true);
   }
 
   async function save() {
     if (!fNombre.trim()) { showToast("Nombre requerido"); return; }
     setSaving(true);
-    const body = { nombre: fNombre.trim(), empresa: fEmpresa, correo: fCorreo, whatsapp: fWhatsapp, telefono: "", celular: "", contacto: "", notas: "" };
+    // 🩸 NO se mandan telefono/celular/contacto/notas.
+    //
+    // Este formulario NO los muestra, y los mandaba en `""` en cada guardada: el
+    // servidor los escribía y los BORRABA. Medido: 22 de las 33 fichas tienen
+    // alguno de esos cuatro datos, y son lo único que esa tabla aporta — los
+    // cargó Daniel a mano, uno por uno. Lo que no se edita, no se manda.
+    const body = {
+      nombre: fNombre.trim(),
+      empresa: fEmpresa,
+      correo: fCorreo,
+      whatsapp: fWhatsapp,
+      cliente_codigo: fCodigo || null,
+    };
     try {
       const url = editingId ? `/api/directorio/${editingId}` : "/api/directorio";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) { showToast(editingId ? "Cliente actualizado" : "Cliente creado"); setShowModal(false); load(); }
+      if (res.ok) {
+        const guardado = await res.json().catch(() => null);
+        // El servidor avisa si tuvo que guardar SIN el vínculo porque la
+        // migración todavía no corrió. Se dice, no se finge que quedó.
+        if (guardado?._falta_migracion_codigo && fCodigo) {
+          showToast("Se guardó, pero el vínculo con el cliente todavía no se puede guardar. Avisa a Daniel.");
+        } else {
+          showToast(editingId ? "Cliente actualizado" : "Cliente creado");
+        }
+        setShowModal(false); load();
+      }
       else showToast("Error al guardar");
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
@@ -120,7 +159,17 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
             <tbody>
               {filtered.map(c => (
                 <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium">{c.nombre}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {c.nombre}
+                    {/* El vínculo va DEBAJO del nombre, no en una columna nueva:
+                        esta tabla ya tiene 5 columnas y a 390 px una sexta la
+                        haría desbordar. */}
+                    <span className="block text-[11px] font-normal mt-0.5">
+                      {c.cliente_codigo
+                        ? <span className="text-emerald-600">{c.cliente_codigo}</span>
+                        : <span className="text-gray-300">Sin vincular</span>}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-gray-500">{c.empresa || "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{c.correo || "—"}</td>
                   <td className="px-4 py-3">
@@ -160,6 +209,35 @@ export default function ClientesClient({ marca }: { marca: MarcaUiKey }) {
               <div>
                 <label className="text-xs text-gray-400 uppercase block mb-1">WhatsApp</label>
                 <input value={fWhatsapp} onChange={e => setFWhatsapp(e.target.value)} placeholder="+507 6000-0000" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 uppercase block mb-1">Cliente del sistema</label>
+                {fCodigo ? (
+                  <div className="flex items-center gap-2 py-2">
+                    <span className="text-sm">
+                      Vinculado a <span className="font-medium">{fCodigo}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { setFCodigo(""); setFVinculoNombre(""); }}
+                      className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-2"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ) : (
+                  <ClienteTypeahead
+                    value={fVinculoNombre}
+                    codigo={fCodigo}
+                    onSelect={(nombre, codigo) => { setFVinculoNombre(nombre); setFCodigo(codigo); }}
+                    onFreeText={(texto) => { setFVinculoNombre(texto); setFCodigo(""); }}
+                    placeholder="Buscar el cliente…"
+                    inputClassName="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition"
+                  />
+                )}
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Opcional. Sirve para cruzar este contacto con sus guías, cheques y cuenta por cobrar.
+                </p>
               </div>
             </div>
             <div className="flex gap-2 mt-6">
