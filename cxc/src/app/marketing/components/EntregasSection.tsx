@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import EntregaForm from "@/components/marketing/EntregaForm";
+import NotaEntregaAcciones from "@/components/marketing/NotaEntregaAcciones";
+import { textoPiezasBultos } from "@/lib/marketing/piezas-bultos";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -283,8 +285,21 @@ export default function EntregasSection({
                                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
                                   {formatearMonto(it.precio_unitario)}
                                 </td>
+                                {/* 🔴 PIEZAS y BULTOS, en la MISMA columna a
+                                    propósito: agregar una columna más a una
+                                    tabla que ya vive dentro de un scroller
+                                    empeora el ancho, y el texto
+                                    "150 piezas en 5 bultos" es exactamente
+                                    como lo escribió Daniel. Sin bultos
+                                    anotados dice sólo "150 piezas" — nunca
+                                    "en 0 bultos".
+                                    SIN `whitespace-nowrap`: medido a 390 px,
+                                    forzar una línea empujaba la tabla 5 px
+                                    fuera de su scroller. Que el texto se
+                                    parta en dos renglones no cuesta nada;
+                                    tener que arrastrar, sí. */}
                                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
-                                  {unidadesTotales}
+                                  {textoPiezasBultos(unidadesTotales, it.bultos)}
                                 </td>
                                 <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-900">
                                   {formatearMonto(totalLinea)}
@@ -296,20 +311,15 @@ export default function EntregasSection({
                       </table>
                     </div>
 
-                    <div className="flex justify-end items-center gap-3">
-                      {/* Comprobante de entrega: el papel del gasto de
-                          mobiliario. Se genera al abrirlo (no es un adjunto
-                          guardado) — ver lib/marketing/pdf-entrega-mueble.ts. */}
-                      <a
-                        href={`/api/marketing/entregas-pdf/${e.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(ev) => ev.stopPropagation()}
-                        className="text-xs rounded-md bg-black text-white px-3 py-2 active:scale-[0.97] transition min-h-[44px] inline-flex items-center"
-                        title="Abrir el comprobante de entrega en PDF (para imprimir y firmar)"
-                      >
-                        Ver comprobante
-                      </a>
+                    <div className="flex flex-wrap justify-end items-center gap-3">
+                      {/* Nota de entrega: el papel que acompaña al mueble. Se
+                          genera al momento (no es un adjunto guardado) — ver
+                          lib/marketing/pdf-entrega-mueble.ts. Daniel la quiere
+                          "para las dos cosas: compartir e imprimir", así que
+                          son dos botones. "Imprimir" abre el mismo PDF que
+                          antes abría "Ver comprobante", con el diálogo de
+                          impresión ya lanzado: no se perdió nada. */}
+                      <NotaEntregaAcciones entregaId={e.id} />
                       <button
                         type="button"
                         onClick={(ev) => {

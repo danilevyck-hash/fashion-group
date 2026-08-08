@@ -26,6 +26,8 @@ export async function PATCH(
       nombre?: string;
       precio?: number;
       stockTotal?: number;
+      /** `null` explícito quita la foto; ausente la deja como está. */
+      fotoPath?: string | null;
     };
     // Precio anterior (para saber si el cambio debe propagarse a las entregas).
     const precioAntes =
@@ -36,6 +38,7 @@ export async function PATCH(
       precio: body.precio !== undefined ? Number(body.precio) : undefined,
       stockTotal:
         body.stockTotal !== undefined ? Number(body.stockTotal) : undefined,
+      fotoPath: body.fotoPath,
     });
 
     // Precio vivo: si el precio cambió de verdad, recalcular el total y el

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
+import { normalizarBultos } from "@/lib/marketing/piezas-bultos";
 import {
   createEntrega,
   listAllEntregas,
@@ -21,7 +22,14 @@ interface CreateEntregaBody {
   marcas?: MarcaPctBody[];
   items?: Array<{
     productoId?: string;
+    /** PIEZAS del renglón. Es lo único que mueve el stock. */
     cantidad?: number | string;
+    /**
+     * BULTOS del renglón (cajas/atados). Informativo, para la nota de
+     * entrega. 🔴 NUNCA se descuenta del inventario: el bulto es variable y
+     * no hay conversión fija. Ver src/lib/marketing/piezas-bultos.ts.
+     */
+    bultos?: number | string | null;
   }>;
 }
 
@@ -73,6 +81,7 @@ export async function POST(req: NextRequest) {
     const items = body.items.map((it) => ({
       productoId: String(it.productoId ?? ""),
       cantidad: Number(it.cantidad ?? 0),
+      bultos: normalizarBultos(it.bultos),
     }));
     const entrega = await createEntrega({
       proyectoId: body.proyectoId ?? null,

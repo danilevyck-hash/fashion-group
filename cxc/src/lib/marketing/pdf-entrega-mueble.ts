@@ -25,6 +25,21 @@
 // tirarlo sería perder información. Con notas vacías (las 21 entregas de hoy)
 // no se dibuja nada.
 //
+// ── LO QUE SÍ PIDIÓ AGREGAR DESPUÉS (ago-2026), y por qué no contradice la
+//    poda de arriba ──────────────────────────────────────────────────────────
+//   · **FOTO de cada mueble.** Textual: *"en la nota de entrega que vaya con
+//     foto"*. Quien recibe en la tienda no sabe qué es un "Norte colgador";
+//     con la foto sí. Es lo contrario de un adorno: es lo que hace que el
+//     papel se pueda verificar contra la mercancía. Si un producto no tiene
+//     foto, la celda queda vacía y el renglón se ve igual de bien.
+//   · **PIEZAS y BULTOS en columnas separadas.** Textual: *"puedo mandar 30
+//     norte colgador en 1 bulto. o 20 norte colgador en un bulto"*. Son dos
+//     datos distintos: las piezas son la mercancía (y lo que descuenta el
+//     inventario), los bultos son cuántos paquetes bajaron del camión, que es
+//     justo lo que cuenta quien recibe. La columna "Cantidad" pasó a llamarse
+//     "Piezas" para que nadie las confunda. Sin bultos anotados la celda va
+//     en blanco, NUNCA en 0 (ver ./piezas-bultos.ts).
+//
 // ⚠️ OJO CON EL LOGO: `addImage` va envuelto en try/catch, así que si el base64
 // estuviera mal el logo desaparecería SIN error (fue el bug del 26-jul-2026, a
 // la cadena le faltaba un `=`). El candado del base64 es
@@ -36,17 +51,35 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
+import { textoBultos } from "./piezas-bultos";
 
 const PAGE_W = 216; // Letter
 const MARGIN = 15;
 const ANCHO = PAGE_W - 2 * MARGIN;
 const NAVY: [number, number, number] = [27, 58, 92];
 
+/** Lado de la miniatura de la foto, en mm. Cuadrada para que la grilla cuadre. */
+const FOTO_MM = 14;
+
 export interface EntregaMuebleItemPdf {
   /** Nombre del mueble/artículo (mk_inventario_productos.nombre). */
   articulo: string;
+  /**
+   * PIEZAS entregadas. 🔴 Es lo que descuenta el inventario.
+   * (El campo se sigue llamando `cantidad` para no romper a los llamadores.)
+   */
   cantidad: number;
+  /**
+   * BULTOS en los que viajó el renglón. `null` = no se anotó → celda VACÍA.
+   * 🔴 Informativo: no se convierte a piezas ni se le suma nada.
+   */
+  bultos?: number | null;
   precioUnitario: number;
+  /**
+   * Foto del mueble como data URL (`data:image/jpeg;base64,…`), ya bajada por
+   * `entrega-comprobante.ts`. `null` = sin foto → celda vacía, sin hueco raro.
+   */
+  fotoDataUrl?: string | null;
 }
 
 export interface EntregaMueblePdfData {
@@ -200,26 +233,69 @@ export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
   campo(doc, "Marca del gasto", marcas, MARGIN, 57, ANCHO);
 
   // ── Detalle de los muebles ────────────────────────────────────────────────
+  // La primera columna es la FOTO: autoTable no dibuja imágenes, así que la
+  // celda va vacía y la imagen se pinta en `didDrawCell` sobre sus
+  // coordenadas ya calculadas. Las filas sólo crecen cuando hay alguna foto
+  // que mostrar — un comprobante sin fotos queda idéntico al de antes.
+  const hayFotos = d.items.some((i) => !!i.fotoDataUrl);
+
   autoTable(doc, {
     startY: 71,
     margin: { left: MARGIN, right: MARGIN },
-    head: [["Artículo", "Cantidad", "Precio unitario", "Importe"]],
+    head: [["", "Artículo", "Piezas", "Bultos", "Precio unitario", "Importe"]],
     body:
       d.items.length > 0
         ? d.items.map((i) => [
+            "",
             i.articulo || "—",
             String(i.cantidad ?? 0),
+            textoBultos(i.bultos),
             `$${fmt(i.precioUnitario)}`,
             `$${fmt((Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0))}`,
           ])
-        : [["Sin detalle de artículos registrado", "—", "—", `$${fmt(d.total)}`]],
-    styles: { fontSize: 9.5, cellPadding: 3, textColor: [40, 40, 40] },
+        : [
+            [
+              "",
+              "Sin detalle de artículos registrado",
+              "—",
+              "",
+              "—",
+              `$${fmt(d.total)}`,
+            ],
+          ],
+    styles: {
+      fontSize: 9.5,
+      cellPadding: 3,
+      textColor: [40, 40, 40],
+      valign: "middle",
+    },
     headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontSize: 8.5 },
     alternateRowStyles: { fillColor: [248, 249, 250] },
     columnStyles: {
-      1: { halign: "center", cellWidth: 24 },
-      2: { halign: "right", cellWidth: 32 },
-      3: { halign: "right", cellWidth: 32 },
+      0: {
+        cellWidth: hayFotos ? FOTO_MM + 4 : 0,
+        cellPadding: 2,
+        minCellHeight: hayFotos ? FOTO_MM + 4 : 0,
+      },
+      2: { halign: "center", cellWidth: 18 },
+      3: { halign: "center", cellWidth: 18 },
+      4: { halign: "right", cellWidth: 30 },
+      5: { halign: "right", cellWidth: 30 },
+    },
+    didDrawCell: (data) => {
+      if (data.section !== "body" || data.column.index !== 0) return;
+      const foto = d.items[data.row.index]?.fotoDataUrl;
+      if (!foto) return;
+      // Centrada en su celda; "FAST" es la misma compresión que usan las
+      // firmas de la guía de transporte (lib/guias/pdf-guia.ts).
+      const x = data.cell.x + (data.cell.width - FOTO_MM) / 2;
+      const y = data.cell.y + (data.cell.height - FOTO_MM) / 2;
+      try {
+        doc.addImage(foto, "JPEG", x, y, FOTO_MM, FOTO_MM, undefined, "FAST");
+      } catch {
+        // Una foto que jsPDF no sabe leer NO puede tumbar el comprobante:
+        // el papel vale por los números, la foto es ayuda visual.
+      }
     },
   });
 

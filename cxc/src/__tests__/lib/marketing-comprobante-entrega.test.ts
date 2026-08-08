@@ -214,3 +214,130 @@ describe("buildComprobanteEntregaPdf", () => {
     expect(contiene(buildComprobanteEntregaPdf(datos), "NOTAS")).toBe(false);
   });
 });
+
+// ============================================================================
+// AGOSTO 2026 — lo que Daniel pidió agregar: FOTO por renglón y BULTOS aparte.
+//
+//   *"en la nota de entrega que vaya con foto"*
+//   *"puedo mandar 30 norte colgador en 1 bulto. o 20 norte colgador en un
+//     bulto"*
+//
+// 🔴 Las piezas y los bultos son DOS columnas. Fundirlas —o peor, imprimir
+//    bultos donde va la mercancía— es lo que descuadra el conteo de quien
+//    recibe en la tienda.
+// ============================================================================
+
+/** JPEG real de 1×1 px: jsPDF PARSEA la cabecera, no acepta cualquier base64. */
+const FOTO_1PX =
+  "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsL" +
+  "DBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAAB" +
+  "AAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==";
+
+const conFotoYBultos: EntregaMueblePdfData = {
+  ...datos,
+  items: [
+    {
+      articulo: "Norte colgador",
+      cantidad: 150,
+      bultos: 5,
+      precioUnitario: 66,
+      fotoDataUrl: FOTO_1PX,
+    },
+    {
+      articulo: "Paneles",
+      cantidad: 38,
+      bultos: null,
+      precioUnitario: 130,
+      fotoDataUrl: null,
+    },
+  ],
+};
+
+describe("nota de entrega — foto de cada mueble", () => {
+  it("LA FOTO SALE: con 1 foto hay un XObject de imagen MÁS que sin ella", () => {
+    // Contra el logo, que siempre está: se compara el mismo documento con y
+    // sin foto. `addImage` va en try/catch, así que una foto que no se dibuja
+    // desaparecería sin error — es el mismo bug del logo del 26-jul.
+    const sinFoto = imagenes(buildComprobanteEntregaPdf(datos));
+    const conFoto = imagenes(buildComprobanteEntregaPdf(conFotoYBultos));
+    expect(conFoto).toBe(sinFoto + 1);
+  });
+
+  it("un renglón SIN foto no rompe el papel ni pierde su fila", () => {
+    const buf = buildComprobanteEntregaPdf(conFotoYBultos);
+    expect(contiene(buf, "Paneles")).toBe(true);
+    expect(contiene(buf, "Norte colgador")).toBe(true);
+  });
+
+  it("una foto corrupta NO tumba el comprobante", () => {
+    const buf = buildComprobanteEntregaPdf({
+      ...conFotoYBultos,
+      items: [
+        {
+          articulo: "Norte colgador",
+          cantidad: 150,
+          bultos: 5,
+          precioUnitario: 66,
+          fotoDataUrl: "data:image/jpeg;base64,esto-no-es-una-imagen",
+        },
+      ],
+    });
+    expect(contiene(buf, "Norte colgador")).toBe(true);
+    expect(contiene(buf, "150")).toBe(true);
+  });
+});
+
+describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
+  it("las dos columnas existen y se llaman por su nombre", () => {
+    const buf = buildComprobanteEntregaPdf(conFotoYBultos);
+    expect(contiene(buf, "Piezas")).toBe(true);
+    expect(contiene(buf, "Bultos")).toBe(true);
+    // "Cantidad" era ambiguo: se retiró justamente para no confundirlas.
+    expect(contiene(buf, "Cantidad")).toBe(false);
+  });
+
+  it("las piezas mandan el importe — los bultos NO lo tocan", () => {
+    // 150 piezas × $66 = $9,900.00. Con bultos (5) darían $330.
+    const buf = buildComprobanteEntregaPdf({
+      ...conFotoYBultos,
+      items: [conFotoYBultos.items[0]],
+      total: 9900,
+    });
+    expect(contiene(buf, "9,900.00")).toBe(true);
+    expect(contiene(buf, "330.00")).toBe(false);
+  });
+
+  it("sin bultos anotados la celda va VACÍA, nunca en 0", () => {
+    const buf = buildComprobanteEntregaPdf({
+      ...datos,
+      items: [
+        { articulo: "Paneles", cantidad: 38, bultos: null, precioUnitario: 130 },
+      ],
+    });
+    expect(contiene(buf, "Bultos")).toBe(true);
+    // El único "0" suelto del renglón sería el de un bulto inventado.
+    expect(crudo(buf)).not.toMatch(/\(0\)\s*Tj/);
+  });
+
+  it("cada número cae DEBAJO de su columna (piezas antes que bultos)", () => {
+    // Sin esto, intercambiar las dos columnas pasaría en verde: los mismos
+    // encabezados y los mismos números, en el orden equivocado. Se mide la
+    // POSICIÓN en el flujo del PDF, que es el orden en que autoTable dibuja
+    // las celdas de la fila.
+    const buf = buildComprobanteEntregaPdf({
+      ...datos,
+      items: [
+        { articulo: "Norte colgador", cantidad: 150, bultos: 7, precioUnitario: 66 },
+      ],
+      total: 9900,
+    });
+    const txt = crudo(buf);
+    const desde = txt.indexOf("Bultos"); // fin del encabezado
+    expect(desde).toBeGreaterThan(0);
+    const piezas = txt.indexOf("(150)", desde);
+    const bultos = txt.indexOf("(7)", desde);
+    expect(piezas).toBeGreaterThan(0);
+    expect(bultos).toBeGreaterThan(0);
+    expect(piezas).toBeLessThan(bultos);
+  });
+});

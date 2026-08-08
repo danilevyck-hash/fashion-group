@@ -17,6 +17,25 @@
 //   - Marca interna (Joybees, tipo='interna'): 100% para la marca, empresa
 //     se ignora/no aplica (no contribuye a total_por_empresa_interna).
 //   - Stock se descuenta al insertar/actualizar (delta neto). Permite negativo.
+//
+// 🔴 EL STOCK SE MUEVE EN **PIEZAS**, NUNCA EN BULTOS.
+//   `mk_entrega_items.bultos` es información de transporte para la nota de
+//   entrega y NO entra en ninguna resta de inventario. El bulto es variable
+//   (30 colgadores pueden ir en 1 bulto y 20 en otro): no hay conversión.
+//   La regla completa, con el porqué, vive en ./piezas-bultos.ts, y el
+//   candado que impide colarla acá es
+//   `src/__tests__/lib/marketing-piezas-bultos.test.ts`.
+//
+// 🟡 EL STOCK PUEDE QUEDAR NEGATIVO, A PROPÓSITO. Decisión de Daniel
+//   ("negativo"): entregar más de lo que estaba cargado es un hecho real, y
+//   esconderlo sería peor que mostrarlo. La entrega NO se bloquea; el aviso
+//   lo da la pantalla (EntregaForm).
+//
+// 🟡 TOLERANTE A DDL PENDIENTE (patrón `cols-opcionales`): `bultos` y
+//   `foto_path` los agrega la migración 20260808160000, que Daniel corre A
+//   MANO. Mientras no exista la columna, las escrituras se reintentan sin
+//   ella y todo lo demás se guarda igual — nunca se pierde una entrega ni un
+//   producto por una migración pendiente.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -25,6 +44,8 @@ import {
   calcularTotalPorMarca,
   sumaUnidadesPorProducto,
 } from "@/lib/inventario-calc";
+import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
+import { firmarPath } from "./storage";
 import type {
   CreateEntregaInput,
   CreateProductoInput,
@@ -45,15 +66,57 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * "Esa columna todavía no existe" — 42703 es `undefined_column` de Postgres y
+ * PGRST204 es lo que devuelve PostgREST cuando la columna no está en su schema
+ * cache. Cualquier otro error es un error de verdad y se propaga.
+ *
+ * Es el patrón `cols-opcionales` del repo: la migración la corre Daniel a mano
+ * y la pantalla tiene que funcionar ANTES.
+ */
+function esColumnaAusente(
+  error: { code?: string | null; message?: string } | null,
+): boolean {
+  const code = error?.code ?? "";
+  return code === "42703" || code === "PGRST204";
+}
+
 function mapProducto(row: Record<string, unknown>): MkInventarioProducto {
+  const foto = row.foto_path;
   return {
     id: String(row.id),
     nombre: String(row.nombre ?? ""),
     precio: Number(row.precio ?? 0),
     stock_total: Number(row.stock_total ?? 0),
+    foto_path: typeof foto === "string" && foto !== "" ? foto : null,
+    foto_url: null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
+}
+
+/**
+ * Firma las fotos para que el `<img>` las pueda mostrar (el bucket `marketing`
+ * es privado). Una foto que no se puede firmar se cae de la fila en vez de
+ * tumbar la lista entera: el dato que importa es nombre + precio + stock.
+ */
+async function firmarFotosProductos(
+  productos: MkInventarioProducto[],
+): Promise<MkInventarioProducto[]> {
+  return Promise.all(
+    productos.map(async (p) => {
+      if (!p.foto_path) return p;
+      try {
+        return { ...p, foto_url: await firmarPath(p.foto_path) };
+      } catch (err) {
+        console.warn(
+          `inventario: no se pudo firmar la foto de ${p.nombre}`,
+          err instanceof Error ? err.message : err,
+        );
+        return p;
+      }
+    }),
+  );
 }
 
 function normalizeReparto(raw: unknown): RepartoItemEntry[] {
@@ -106,6 +169,9 @@ function mapItem(row: Record<string, unknown>): MkEntregaItem {
     producto_id: String(row.producto_id),
     reparto,
     cantidad_por_marca: cantidadPorMarca,
+    // Ausente mientras la migración 20260808160000 no esté corrida → null,
+    // que es exactamente lo que significa "no se anotó".
+    bultos: normalizarBultos(row.bultos),
     precio_unitario: Number(row.precio_unitario ?? 0),
     created_at: String(row.created_at ?? ""),
   };
@@ -152,7 +218,17 @@ export async function listProductos(): Promise<MkInventarioProducto[]> {
     .select("*")
     .order("nombre", { ascending: true });
   if (error) throw new Error(`listProductos: ${error.message}`);
-  return (data ?? []).map((r) => mapProducto(r as Record<string, unknown>));
+  const productos = (data ?? []).map((r) =>
+    mapProducto(r as Record<string, unknown>),
+  );
+  return firmarFotosProductos(productos);
+}
+
+/** Ruta de foto ya limpia: string no vacío, `null` para "sin foto". */
+function normalizarFotoPath(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const p = raw.trim();
+  return p === "" ? null : p;
 }
 
 export async function createProducto(
@@ -164,16 +240,35 @@ export async function createProducto(
   if (!Number.isFinite(precio) || precio < 0) throw new Error("Precio inválido");
   const stock = Math.trunc(Number(input.stockTotal));
   if (!Number.isFinite(stock)) throw new Error("Stock inválido");
+  const fotoPath = normalizarFotoPath(input.fotoPath);
 
-  const { data, error } = await supabaseServer
+  const base = { nombre, precio: round2(precio), stock_total: stock };
+  let { data, error } = await supabaseServer
     .from("mk_inventario_productos")
-    .insert({ nombre, precio: round2(precio), stock_total: stock })
+    .insert(fotoPath ? { ...base, foto_path: fotoPath } : base)
     .select("*")
     .single();
+
+  // cols-opcionales: sin la migración corrida, el producto se crea igual —
+  // sin foto. Perder la foto es reversible (se vuelve a subir); perder el
+  // producto entero por una columna que falta, no.
+  if (error && fotoPath && esColumnaAusente(error)) {
+    const reintento = await supabaseServer
+      .from("mk_inventario_productos")
+      .insert(base)
+      .select("*")
+      .single();
+    data = reintento.data;
+    error = reintento.error;
+  }
+
   if (error || !data) {
     throw new Error(`createProducto: ${error?.message ?? "sin datos"}`);
   }
-  return mapProducto(data as Record<string, unknown>);
+  const [firmado] = await firmarFotosProductos([
+    mapProducto(data as Record<string, unknown>),
+  ]);
+  return firmado;
 }
 
 export async function updateProducto(
@@ -197,19 +292,46 @@ export async function updateProducto(
     if (!Number.isFinite(s)) throw new Error("Stock inválido");
     payload.stock_total = s;
   }
+  // `null` explícito quita la foto; `undefined` la deja como está.
+  const tocaFoto = input.fotoPath !== undefined;
+  if (tocaFoto) payload.foto_path = normalizarFotoPath(input.fotoPath);
+
   if (Object.keys(payload).length === 0) {
     throw new Error("updateProducto: nada que actualizar");
   }
-  const { data, error } = await supabaseServer
+  let { data, error } = await supabaseServer
     .from("mk_inventario_productos")
     .update(payload)
     .eq("id", id)
     .select("*")
     .single();
+
+  // cols-opcionales: sin la migración, el resto del producto se guarda igual.
+  if (error && tocaFoto && esColumnaAusente(error)) {
+    const { foto_path: _descartada, ...sinFoto } = payload;
+    if (Object.keys(sinFoto).length > 0) {
+      const reintento = await supabaseServer
+        .from("mk_inventario_productos")
+        .update(sinFoto)
+        .eq("id", id)
+        .select("*")
+        .single();
+      data = reintento.data;
+      error = reintento.error;
+    } else {
+      throw new Error(
+        "Todavía no se puede guardar la foto: falta correr la migración 20260808160000_mk_mobiliario_bultos_y_foto.sql en Supabase.",
+      );
+    }
+  }
+
   if (error || !data) {
     throw new Error(`updateProducto: ${error?.message ?? "sin datos"}`);
   }
-  return mapProducto(data as Record<string, unknown>);
+  const [firmado] = await firmarFotosProductos([
+    mapProducto(data as Record<string, unknown>),
+  ]);
+  return firmado;
 }
 
 // ----------------------------------------------------------------------------
@@ -471,7 +593,10 @@ function normalizarReparto(
 
 interface NormalizedItem {
   productoId: string;
+  /** PIEZAS. Es lo único que mueve el stock. */
   cantidad?: number;
+  /** BULTOS. Informativo — nunca entra en el stock. */
+  bultos: number | null;
   reparto: RepartoItemInput[];
 }
 
@@ -492,6 +617,7 @@ function normalizarItems(
       return {
         productoId: String(it.productoId ?? ""),
         cantidad,
+        bultos: normalizarBultos(it.bultos),
         reparto,
       };
     })
@@ -517,6 +643,17 @@ async function loadPreciosByProductoId(
   return out;
 }
 
+/**
+ * Mueve el stock. `delta` viene EN PIEZAS y se resta (entregar saca del
+ * inventario; un delta negativo devuelve).
+ *
+ * 🔴 Nunca recibe bultos. El único productor legítimo de este mapa es
+ * `itemsAUnidades()`, que sale de `piezasParaStock()`.
+ *
+ * 🟡 Deja el stock quedar NEGATIVO a propósito (decisión de Daniel). Un
+ * inventario en −12 dice "entregaste 12 más de lo que tenías cargado", que es
+ * un dato; forzarlo a 0 sería inventar uno.
+ */
 async function ajustarStock(
   delta: Map<string, number>,
 ): Promise<void> {
@@ -585,20 +722,41 @@ function normalizarMarcasEntrega(
   return out;
 }
 
-// Unidades totales por producto (cantidad explícita o suma del reparto legacy).
+/**
+ * PIEZAS totales por producto (cantidad explícita o suma del reparto legacy),
+ * más los BULTOS del renglón.
+ *
+ * 🔴 `cantidad` es lo ÚNICO que se le pasa a `ajustarStock`. `bultos` viaja al
+ * lado para poder guardarlo, y ahí termina su recorrido: no se suma a la
+ * cantidad, no la multiplica y no la reemplaza. Si un producto aparece en dos
+ * renglones, las piezas se suman (es la misma mercancía) y los bultos también
+ * (salieron dos paquetes), pero cada suma por su lado.
+ */
 function itemsAUnidades(
   items: ReadonlyArray<NormalizedItem>,
-): Array<{ productoId: string; cantidad: number }> {
-  const out = new Map<string, number>();
+): Array<{ productoId: string; cantidad: number; bultos: number | null }> {
+  const piezas = new Map<string, number>();
+  const bultos = new Map<string, number | null>();
   for (const it of items) {
     const cant =
       it.cantidad != null && Number.isFinite(it.cantidad)
-        ? Math.trunc(Number(it.cantidad))
-        : it.reparto.reduce((s, r) => s + Number(r.cantidad || 0), 0);
+        ? piezasParaStock({ piezas: it.cantidad, bultos: it.bultos })
+        : normalizarPiezas(
+            it.reparto.reduce((s, r) => s + Number(r.cantidad || 0), 0),
+          );
     if (!it.productoId || cant <= 0) continue;
-    out.set(it.productoId, (out.get(it.productoId) ?? 0) + cant);
+    piezas.set(it.productoId, (piezas.get(it.productoId) ?? 0) + cant);
+    if (it.bultos !== null) {
+      bultos.set(it.productoId, (bultos.get(it.productoId) ?? 0) + it.bultos);
+    } else if (!bultos.has(it.productoId)) {
+      bultos.set(it.productoId, null);
+    }
   }
-  return Array.from(out, ([productoId, cantidad]) => ({ productoId, cantidad }));
+  return Array.from(piezas, ([productoId, cantidad]) => ({
+    productoId,
+    cantidad,
+    bultos: bultos.get(productoId) ?? null,
+  }));
 }
 
 // Total de la entrega + total_por_marca (100% repartido por % entre marcas).
@@ -626,6 +784,47 @@ function computeTotalesEntrega(
     acumulado = round2(acumulado + monto);
   });
   return { total, totalPorMarca };
+}
+
+/**
+ * Inserta los renglones de una entrega.
+ *
+ * cols-opcionales: `bultos` la agrega la migración 20260808160000. Mientras no
+ * exista, los renglones se guardan SIN bultos en vez de perderse la entrega
+ * entera — que es lo que pasaría si el insert fallara. Las piezas (que son las
+ * que mueven el stock) van en `reparto` y no dependen de la migración.
+ */
+async function insertarItemsEntrega(
+  entregaId: string,
+  itemsUnidades: ReadonlyArray<{
+    productoId: string;
+    cantidad: number;
+    bultos: number | null;
+  }>,
+  primaryMarca: string,
+  precios: Map<string, number>,
+): Promise<{ data: unknown[] | null; error: { message: string } | null }> {
+  const base = itemsUnidades.map((it) => ({
+    entrega_id: entregaId,
+    producto_id: it.productoId,
+    reparto: [
+      { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
+    ] as RepartoItemEntry[],
+    precio_unitario: precios.get(it.productoId) ?? 0,
+  }));
+  const conBultos = base.map((row, i) => ({
+    ...row,
+    bultos: itemsUnidades[i].bultos,
+  }));
+
+  const primero = await supabaseServer
+    .from("mk_entrega_items")
+    .insert(conBultos)
+    .select("*");
+  if (!primero.error) return primero;
+  if (!esColumnaAusente(primero.error)) return primero;
+
+  return supabaseServer.from("mk_entrega_items").insert(base).select("*");
 }
 
 export async function createEntrega(
@@ -704,29 +903,28 @@ export async function createEntrega(
   }
   const entrega = mapEntrega(entRow as Record<string, unknown>);
 
-  // 2) Insert items. El reparto guarda las unidades bajo la marca primaria
+  // 2) Insert items. El reparto guarda las PIEZAS bajo la marca primaria
   // (empresa null); el reparto de dinero por marca vive en total_por_marca.
-  const itemsPayload = itemsUnidades.map((it) => ({
-    entrega_id: entrega.id,
-    producto_id: it.productoId,
-    reparto: [
-      { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
-    ] as RepartoItemEntry[],
-    precio_unitario: precios.get(it.productoId) ?? 0,
-  }));
-  const { data: itemRows, error: itemErr } = await supabaseServer
-    .from("mk_entrega_items")
-    .insert(itemsPayload)
-    .select("*");
+  // `bultos` va al lado, como dato de transporte.
+  const { data: itemRows, error: itemErr } = await insertarItemsEntrega(
+    entrega.id,
+    itemsUnidades,
+    primaryMarca,
+    precios,
+  );
   if (itemErr) {
     await supabaseServer.from("mk_entregas_muebles").delete().eq("id", entrega.id);
     throw new Error(`createEntrega[items]: ${itemErr.message}`);
   }
 
-  // 3) Descontar stock (unidades por producto).
+  // 3) Descontar stock. 🔴 EN PIEZAS (`it.cantidad`), nunca en bultos.
   const stockDelta = new Map<string, number>();
   for (const it of itemsUnidades) {
-    stockDelta.set(it.productoId, (stockDelta.get(it.productoId) ?? 0) + it.cantidad);
+    stockDelta.set(
+      it.productoId,
+      (stockDelta.get(it.productoId) ?? 0) +
+        piezasParaStock({ piezas: it.cantidad, bultos: it.bultos }),
+    );
   }
   await ajustarStock(stockDelta);
 
@@ -809,25 +1007,31 @@ export async function updateEntrega(
     .eq("entrega_id", id);
   if (delErr) throw new Error(`updateEntrega[delete items]: ${delErr.message}`);
 
-  const itemsPayload = itemsUnidades.map((it) => ({
-    entrega_id: id,
-    producto_id: it.productoId,
-    reparto: [
-      { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
-    ] as RepartoItemEntry[],
-    precio_unitario: precios.get(it.productoId) ?? 0,
-  }));
-  const { data: itemRows, error: insErr } = await supabaseServer
-    .from("mk_entrega_items")
-    .insert(itemsPayload)
-    .select("*");
+  const { data: itemRows, error: insErr } = await insertarItemsEntrega(
+    id,
+    itemsUnidades,
+    primaryMarca,
+    precios,
+  );
   if (insErr) throw new Error(`updateEntrega[insert items]: ${insErr.message}`);
 
-  // 3) Stock delta (unidades nuevas − previas, por producto).
+  // 3) Stock delta: PIEZAS nuevas − PIEZAS previas, por producto.
+  //
+  // 🔑 Es un DELTA sobre lo que la entrega tenía guardado, no una resta nueva.
+  // De ahí salen dos garantías que Daniel pidió por escrito:
+  //   · Editar DEVUELVE lo que sobra: bajar de 150 a 100 piezas da delta −50 y
+  //     `ajustarStock` suma 50 de vuelta al inventario.
+  //   · Guardar dos veces lo MISMO no descuenta dos veces: la segunda corrida
+  //     lee los items ya guardados, el delta da 0 y no se escribe nada.
+  // El candado es `src/__tests__/lib/marketing-stock-piezas.test.ts`.
   const sumaPrev = sumaUnidadesPorProducto(prevItems);
   const sumaNew = new Map<string, number>();
   for (const it of itemsUnidades) {
-    sumaNew.set(it.productoId, (sumaNew.get(it.productoId) ?? 0) + it.cantidad);
+    sumaNew.set(
+      it.productoId,
+      (sumaNew.get(it.productoId) ?? 0) +
+        piezasParaStock({ piezas: it.cantidad, bultos: it.bultos }),
+    );
   }
   const delta = new Map<string, number>();
   const allIds = new Set<string>([...sumaPrev.keys(), ...sumaNew.keys()]);
@@ -852,6 +1056,18 @@ export async function updateEntrega(
   };
 }
 
+/**
+ * Borra una entrega y DEVUELVE su mercancía al inventario.
+ *
+ * 🔑 Orden a propósito: primero se leen los renglones, después se borra la
+ * entrega (los renglones se van por CASCADE) y recién entonces se suma el
+ * stock de vuelta. Leerlos después del DELETE devolvería una lista vacía y la
+ * mercancía se perdería en silencio.
+ *
+ * 🔑 Correr esto DOS VECES no devuelve el stock dos veces: en la segunda
+ * corrida los renglones ya no existen, el delta queda vacío y `ajustarStock`
+ * sale sin escribir. Candado: `marketing-stock-piezas.test.ts`.
+ */
 export async function deleteEntrega(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
   const { data: prevRows, error: prevErr } = await supabaseServer
