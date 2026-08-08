@@ -18,13 +18,20 @@
 // devuelven sin que nadie tocara esa línea. La pantalla manda `periodo=12m`
 // explícito.
 //
-// ── LAS TRES COSAS QUE ESTA RUTA NO PUEDE HACER MAL ─────────────────────────
+// ── LAS CUATRO COSAS QUE ESTA RUTA NO PUEDE HACER MAL ───────────────────────
 //
 // 1. LA VENTANA DE `gerente_acs` SE ACOTA ACÁ, EN EL SERVIDOR. Jennifer ve el
 //    mes en curso y el mismo mes del año pasado. Esconder el selector en la UI
 //    no cierra nada: con su cookie se llama a esta URL a mano. (Ver
 //    src/lib/multifashion/ventana-gerente.ts y el candado
 //    multifashion-ventana-gerente.test.ts, que exige el clamp en toda ruta nueva.)
+//
+//    ⚠️ **SON DOS RANGOS, y los DOS pasan por el clamp.** El comparativo contra
+//    el año pasado es un período NUEVO: se deriva del ya acotado y encima vuelve
+//    a validarse con `clampRangoComparativo`. La regla de esta ruta no es "la
+//    ruta tiene un clamp", es **ningún rango llega a la DB sin que el rol lo
+//    haya aprobado** — un `.gte()/.lte()` nuevo sin su clamp es una fuga, aunque
+//    el clamp de arriba siga en su lugar.
 //
 // 2. LAS NOTAS DE CRÉDITO RESTAN. La tabla guarda MAGNITUDES positivas y el
 //    signo lo pone la lectura, mirando `tipo`. La matemática vive en
@@ -36,13 +43,35 @@
 //    leerían 1.000 y la pestaña mostraría el 4,6% de las ventas SIN UN SOLO
 //    ERROR. Por eso va `leerTodoPaginado`, que además verifica contra un COUNT
 //    exacto.
+//
+// 4. EL COMPARATIVO ES UNA LECTURA, NO UNA ESTIMACIÓN. "Qué cambió" se responde
+//    leyendo el MISMO período un año antes de la MISMA tabla y agregándolo con
+//    la MISMA función pura (`rangoComparativo` + `agregarRanking`). Nada se
+//    proyecta ni se prorratea. Y un mes empezado se compara contra los MISMOS
+//    días del año pasado: el 7 de agosto, medir 7 días contra los 31 de agosto
+//    del año pasado mostraría una caída del 78% que no ocurrió.
+//    · **Duplica la lectura**, y el costo está MEDIDO contra producción
+//      (7-ago-2026, build de producción): ventana de 12 meses = 20.445 filas +
+//      18.281 del comparativo = 38.726 en total, **7,6 s** de respuesta contra
+//      los 60 s de `maxDuration`. Un mes suelto: 344 + 236 filas, **1,9 s**.
+//      Van EN PARALELO y SWR cachea 5 minutos, o sea una descarga por sesión y
+//      por período. Payload comprimido: **129 KB → 190 KB** (el comparativo
+//      viaja aliviado — clave + 3 cifras, sin costo ni margen ni etiquetas).
+//    · **Falla ABIERTO**: si esa segunda lectura se cae, `comparativo` sale
+//      `null`, la pantalla se dibuja completa sin los deltas y el error viaja en
+//      `comparativoError`. Una comparación que no cargó nunca puede tumbar los
+//      números que sí cargaron.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { clampPeriodoProductos, type PeriodoProductos } from "@/lib/multifashion/ventana-gerente";
+import {
+  clampPeriodoProductos,
+  clampRangoComparativo,
+  type PeriodoProductos,
+} from "@/lib/multifashion/ventana-gerente";
 // `agregarProductos` (agrupador por MARCA) sigue igual: su `FilaArticuloDiario`
 // es un subconjunto de la de acá (le sobra `costo_total`), así que la MISMA
 // lectura alimenta a los dos sin copiar filas ni pedirlas dos veces.
@@ -50,8 +79,11 @@ import { agregarProductos, type FilaMarca } from "@/lib/multifashion/productos";
 import {
   agregarRanking,
   rango12Meses,
+  rangoComparativo,
   type FilaArticuloDiario,
+  type RenglonRanking,
 } from "@/lib/multifashion/productos-ranking";
+import type { RenglonComparativo } from "@/lib/multifashion/productos-resumen";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,6 +98,17 @@ const EMPRESA = "american_classic";
 const TOP_N = 50;
 
 const dd = (n: number) => String(n).padStart(2, "0");
+
+/** El período de comparación viaja LIGERO: la pantalla solo parea por `clave` y
+ *  resta. Mandar el renglón completo por segunda vez duplicaría un payload que
+ *  ya se mide en cientos de KB (ver el comentario de costo más abajo). */
+const aliviar = (filas: readonly RenglonRanking[]): RenglonComparativo[] =>
+  filas.map(f => ({
+    clave: f.clave,
+    unidades: f.unidades,
+    venta: f.venta,
+    utilidad: f.utilidad,
+  }));
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
@@ -113,12 +156,24 @@ export async function GET(req: NextRequest) {
       ? ventana.hasta
       : `${year}-${dd(mes)}-${dd(new Date(Date.UTC(year, mes, 0)).getUTCDate())}`;
 
-  try {
-    // ── Ventas del período. PAGINADO — ver el punto 3 del encabezado. El orden
-    //    es el de la PAGINACIÓN (id, único y estable), no el de presentación:
-    //    el orden que ve Daniel lo decide la agregación, por monto.
-    const filas = await leerTodoPaginado<FilaArticuloDiario>(
-      `switch_articulo_diario (${EMPRESA} ${desde}→${hasta})`,
+  // ── El MISMO período un año antes (ver el punto 4 del encabezado). Se deriva
+  //    del período YA ACOTADO, y aun así vuelve a pasar por el clamp: es un
+  //    rango nuevo contra la base, y en esta ruta ningún rango llega a la DB sin
+  //    que `auth.role` lo haya aprobado. `null` = no se consulta y no hay
+  //    comparación (la pantalla se dibuja igual).
+  const compRango = rangoComparativo(periodo, { year, mes, desde, hasta }, now);
+  const compPermitido = clampRangoComparativo(
+    auth.role,
+    { inicio: compRango.desde, fin: compRango.hasta },
+    now,
+  );
+
+  /** Una lectura completa del período. PAGINADO — ver el punto 3 del encabezado.
+   *  El orden es el de la PAGINACIÓN (id, único y estable), no el de
+   *  presentación: el orden que ve Daniel lo decide la agregación, por monto. */
+  const leerPeriodo = (d: string, h: string) =>
+    leerTodoPaginado<FilaArticuloDiario>(
+      `switch_articulo_diario (${EMPRESA} ${d}→${h})`,
       (pedirCount, ini, fin) =>
         supabaseServer
           .from("switch_articulo_diario")
@@ -127,11 +182,28 @@ export async function GET(req: NextRequest) {
             pedirCount ? { count: "exact" } : {},
           )
           .eq("empresa_key", EMPRESA)
-          .gte("fecha", desde)
-          .lte("fecha", hasta)
+          .gte("fecha", d)
+          .lte("fecha", h)
           .order("id", { ascending: true })
           .range(ini, fin),
     );
+
+  try {
+    // Los dos períodos se leen EN PARALELO: son independientes y secuenciarlos
+    // duplicaría la espera de una pantalla que ya lee ~22.000 filas.
+    // El `catch` de la comparación va PEGADO a su promesa: sin él, si la lectura
+    // principal falla primero, la otra quedaría como rechazo sin manejar.
+    const fallo: { comparativo: string | null } = { comparativo: null };
+    const [filas, filasComp] = await Promise.all([
+      leerPeriodo(desde, hasta),
+      compPermitido
+        ? leerPeriodo(compPermitido.inicio, compPermitido.fin).catch(err => {
+            fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
+            console.error("[multifashion/productos] comparativo no disponible", err);
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
 
     // ── Diccionario de marcas. ADITIVO: si todavía no existe la tabla (la DDL
     //    se aplica a mano en este proyecto) o está vacía, la pestaña sigue
@@ -176,6 +248,12 @@ export async function GET(req: NextRequest) {
     const porCategoria = agregarRanking(filas, "categoria");
     const porCodigo = agregarRanking(filas, "codigo");
 
+    // El comparativo se agrega con LA MISMA función que el período actual: dos
+    // matemáticas para dos períodos que después se restan entre sí es la forma
+    // más barata de inventar una diferencia que no existe.
+    const compCategoria = filasComp ? agregarRanking(filasComp, "categoria") : null;
+    const compCodigo = filasComp ? agregarRanking(filasComp, "codigo") : null;
+
     return NextResponse.json({
       year,
       mes,
@@ -192,6 +270,19 @@ export async function GET(req: NextRequest) {
         categorias: porCategoria.filas,
         codigos: porCodigo.filas,
       },
+      comparativo:
+        compCategoria && compCodigo
+          ? {
+              desde: compRango.desde,
+              hasta: compRango.hasta,
+              parcial: compRango.parcial,
+              filasLeidas: filasComp?.length ?? 0,
+              totales: compCategoria.totales,
+              categorias: aliviar(compCategoria.filas),
+              codigos: aliviar(compCodigo.filas),
+            }
+          : null,
+      comparativoError: fallo.comparativo,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "error inesperado";

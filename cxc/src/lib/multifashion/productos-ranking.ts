@@ -371,10 +371,90 @@ export interface RangoFechas {
  * con fechas fijas, igual que `ventana-gerente.ts`.
  */
 export function rango12Meses(ahora: Date): RangoFechas {
-  const hoy = new Date(ahora.getTime() - PANAMA_OFFSET_MS).toISOString().slice(0, 10);
+  const hoy = diaPanama(ahora);
   const anio = Number(hoy.slice(0, 4));
   const mes = Number(hoy.slice(5, 7));
   // 11 meses hacia atrás desde el 1 del mes en curso.
   const inicio = new Date(Date.UTC(anio, mes - 1 - 11, 1)).toISOString().slice(0, 10);
   return { desde: inicio, hasta: hoy };
+}
+
+/** Día de calendario en Panamá (UTC-5 fijo) para un instante dado. */
+function diaPanama(ahora: Date): string {
+  return new Date(ahora.getTime() - PANAMA_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Último día del mes (1..31). Aritmética en UTC, sin zona horaria local. */
+function ultimoDia(anio: number, mes: number): number {
+  return new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+}
+
+const dd2 = (n: number): string => String(n).padStart(2, "0");
+
+/** La misma fecha un año antes. El 29-feb cae en el 28 del año no bisiesto. */
+function unAnioAntes(fecha: string): string {
+  const anio = Number(fecha.slice(0, 4)) - 1;
+  const mes = Number(fecha.slice(5, 7));
+  const dia = Math.min(Number(fecha.slice(8, 10)), ultimoDia(anio, mes));
+  return `${anio}-${dd2(mes)}-${dd2(dia)}`;
+}
+
+export interface RangoComparativo extends RangoFechas {
+  /** El período actual todavía no cerró, así que la comparación se recortó a
+   *  los MISMOS días del mes. Ver el punto 2 del bloque de abajo. */
+  parcial: boolean;
+}
+
+/**
+ * El MISMO período, un año antes. Es contra lo que se mide "qué cambió".
+ *
+ * ── LAS DOS COSAS QUE HACEN QUE ESTA COMPARACIÓN NO MIENTA ──────────────────
+ *
+ * 1. **Un año atrás, no "el mes anterior".** En una tienda de ropa el mes
+ *    anterior no es comparable con el actual —la temporada manda—, y además es
+ *    el único período que el rol acotado (`gerente_acs`) puede ver: su ventana
+ *    es exactamente "mes en curso + el mismo mes del año pasado". Comparar
+ *    contra el mes anterior habría sido, para ese rol, un bypass.
+ *
+ * 2. 🩸 **Un mes empezado se compara contra los MISMOS DÍAS del año pasado.**
+ *    El 7 de agosto, medir 7 días contra los 31 del agosto pasado daría una
+ *    caída de ~78% que no ocurrió — el error más caro posible en esta pantalla,
+ *    porque se ve como un dato y es un artefacto del calendario. Se recorta el
+ *    período de COMPARACIÓN al mismo día del mes; nunca se infla el actual con
+ *    una proyección. Un mes ya cerrado se compara entero contra entero.
+ *
+ * Para la ventana de 12 meses el corte ya es "el 1 del mes hasta hoy", así que
+ * la comparación es esa misma ventana corrida 12 meses: mismo largo, mismo
+ * corte de día, sin recorte que anunciar.
+ *
+ * PURO: `ahora` explícito, como todo lo que decide fechas en este módulo.
+ */
+export function rangoComparativo(
+  periodo: "mes" | "12m",
+  actual: { year: number; mes: number; desde: string; hasta: string },
+  ahora: Date,
+): RangoComparativo {
+  if (periodo === "12m") {
+    return {
+      desde: unAnioAntes(actual.desde),
+      hasta: unAnioAntes(actual.hasta),
+      parcial: false,
+    };
+  }
+
+  const hoy = diaPanama(ahora);
+  const finMes = ultimoDia(actual.year, actual.mes);
+  // Hasta dónde llega el período actual DE VERDAD: un mes en curso se corta hoy.
+  const finReal = actual.hasta < hoy ? actual.hasta : hoy;
+  // Un mes enteramente futuro (`hoy` antes del 1) no tiene días transcurridos:
+  // no hay nada que recortar y se compara contra el mes completo.
+  const diaCorte = finReal >= actual.desde ? Number(finReal.slice(8, 10)) : finMes;
+
+  const anioAnt = actual.year - 1;
+  const diaAnt = Math.min(diaCorte, ultimoDia(anioAnt, actual.mes));
+  return {
+    desde: `${anioAnt}-${dd2(actual.mes)}-01`,
+    hasta: `${anioAnt}-${dd2(actual.mes)}-${dd2(diaAnt)}`,
+    parcial: diaCorte < finMes,
+  };
 }

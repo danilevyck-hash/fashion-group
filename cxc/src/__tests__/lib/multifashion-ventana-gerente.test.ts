@@ -378,6 +378,45 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
   });
 
+  // 🩸 Productos consulta la tabla DOS veces: el período pedido y el MISMO
+  // período un año antes (la comparación "qué cambió"). Mirar solo la primera
+  // llamada dejaría la segunda sin vigilancia — y un `.gte()/.lte()` nuevo sin
+  // clamp es una fuga aunque el clamp de arriba siga en su lugar. Acá se miran
+  // TODAS las lecturas de la tabla, no la primera.
+  it("productos: TODAS las lecturas caen dentro de la ventana (mes en curso o su comparación)", async () => {
+    await productosGet(req("/api/multifashion/productos?periodo=12m&year=2019&mes=1", "gerente_acs"));
+    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    expect(lecturas.length, "productos no consultó switch_articulo_diario").toBeGreaterThan(0);
+
+    // El criterio es el MES de calendario, no `v.actual.fin` (que es HOY): la
+    // ruta pide el mes en curso completo desde siempre —los tests de arriba lo
+    // congelan— y eso no es una fuga, porque el futuro no tiene filas. Lo que
+    // no puede pasar es que una lectura se salga de los DOS meses permitidos.
+    const v = ventanaGerente(AHORA);
+    const mesActual = { inicio: v.actual.inicio, fin: "2026-07-31" };
+    for (const l of lecturas) {
+      const desde = l.filtros.find(([k]) => k === "gte")?.[1] as string;
+      const hasta = l.filtros.find(([k]) => k === "lte")?.[1] as string;
+      const cabeEn = (w: { inicio: string; fin: string }) => desde >= w.inicio && hasta <= w.fin;
+      expect(
+        cabeEn(mesActual) || cabeEn(v.anterior),
+        `lectura fuera de ventana: ${desde}→${hasta}`,
+      ).toBe(true);
+    }
+  });
+
+  it("productos: la comparación de gerente_acs es julio 2025, su OTRO mes permitido", async () => {
+    await productosGet(req("/api/multifashion/productos", "gerente_acs"));
+    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    expect(lecturas).toHaveLength(2);
+    // Julio 2026 va del 1 al 31 (el mes se pide entero); la comparación se
+    // recorta al día 30 porque el mes en curso todavía no cerró.
+    expect(lecturas[0].filtros).toContainEqual(["gte", "2026-07-01"]);
+    expect(lecturas[0].filtros).toContainEqual(["lte", "2026-07-31"]);
+    expect(lecturas[1].filtros).toContainEqual(["gte", "2025-07-01"]);
+    expect(lecturas[1].filtros).toContainEqual(["lte", "2025-07-30"]);
+  });
+
   it("clampPeriodoProductos: para gerente_acs devuelve siempre 'mes' + mes en curso", () => {
     expect(clampPeriodoProductos("gerente_acs", { periodo: "12m", year: 2019, mes: 1 }, AHORA)).toEqual({
       periodo: "mes", year: 2026, mes: 7, ajustado: true,
@@ -450,6 +489,22 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
     const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
     expect(t?.filtros).toContainEqual(["gte", "2025-08-01"]);
     expect(t?.filtros).toContainEqual(["lte", "2026-07-30"]);
+  });
+
+  it("productos: admin sí compara contra el año pasado, sin recorte de ventana", async () => {
+    await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
+    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    expect(lecturas).toHaveLength(2);
+    expect(lecturas[1].filtros).toContainEqual(["gte", "2023-12-01"]);
+    expect(lecturas[1].filtros).toContainEqual(["lte", "2023-12-31"]);
+  });
+
+  it("productos?periodo=12m: la comparación de admin es la ventana corrida 12 meses", async () => {
+    await productosGet(req("/api/multifashion/productos?periodo=12m", "admin"));
+    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    expect(lecturas).toHaveLength(2);
+    expect(lecturas[1].filtros).toContainEqual(["gte", "2024-08-01"]);
+    expect(lecturas[1].filtros).toContainEqual(["lte", "2025-07-30"]);
   });
 
   it("productos: el DEFAULT del parámetro sigue siendo 'mes' (no le cambió a nadie)", async () => {
