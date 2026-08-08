@@ -42,6 +42,8 @@ export interface Cheque {
   motivo_rebote?: string;
   fecha_depositado: string | null;
   created_at: string;
+  /** Código D-XXX del cliente. `undefined` mientras el DDL no haya corrido. */
+  cliente_codigo?: string | null;
 }
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -394,6 +396,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       fecha_deposito: c.fecha_deposito,
       notas: c.notas || "",
       vendedor: c.vendedor || "",
+      // Si el cheque ya está vinculado, el selector abre mostrando el vínculo
+      // en vez de pedir que se vuelva a elegir.
+      cliente_codigo: c.cliente_codigo || "",
     });
     setEditingId(c.id); setEditingEstado(c.estado); setError(null); setShowForm(true);
   }
@@ -406,7 +411,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     }
     if (parseFloat(v.monto) <= 0) { setError("El monto debe ser mayor a 0."); return; }
     setSaving(true); setError(null);
-    const body = { cliente: v.cliente.trim(), empresa: v.empresa, numero_cheque: v.numero_cheque.trim(), monto: parseFloat(v.monto), fecha_deposito: v.fecha_deposito, notas: v.notas, vendedor: v.vendedor.trim() };
+    const body = { cliente: v.cliente.trim(), empresa: v.empresa, numero_cheque: v.numero_cheque.trim(), monto: parseFloat(v.monto), fecha_deposito: v.fecha_deposito, notas: v.notas, vendedor: v.vendedor.trim(), cliente_codigo: v.cliente_codigo || null };
     try {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";

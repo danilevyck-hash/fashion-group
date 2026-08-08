@@ -40,6 +40,9 @@ export interface ChequeFormValues {
   fecha_deposito: string;
   notas: string;
   vendedor: string;
+  /** Código D-XXX del cliente elegido. "" = sin vincular (la opción "Otro"),
+   *  que es un estado legítimo y se conserva tal cual. */
+  cliente_codigo: string;
 }
 
 interface Props {
@@ -61,7 +64,7 @@ function hoyStr() {
 }
 
 export function chequeFormVacio(): ChequeFormValues {
-  return { cliente: "", empresa: "", numero_cheque: "", monto: "", fecha_deposito: hoyStr(), notas: "", vendedor: "" };
+  return { cliente: "", empresa: "", numero_cheque: "", monto: "", fecha_deposito: hoyStr(), notas: "", vendedor: "", cliente_codigo: "" };
 }
 
 /** Nombres guardados en el navegador por la versión vieja (pre-base). */
@@ -125,10 +128,11 @@ export default function ChequeFormModal({
   open, editingId, initial, onClose, onSave, saving, isOnline, error,
 }: Props) {
   const [v, setV] = useState<ChequeFormValues>(initial);
-  // Código del cliente elegido. NO se guarda (la tabla `cheques` solo tiene el
-  // nombre); vive acá para que el selector sepa qué eligió el usuario en esta
-  // sesión de edición. Por eso el distintivo verde/ámbar va apagado.
-  const [clienteCodigo, setClienteCodigo] = useState("");
+  // Código del cliente elegido. Desde el 8-ago-2026 SÍ se guarda
+  // (`cheques.cliente_codigo`), así que el distintivo del selector se enciende:
+  // el vínculo ya existe de verdad. El texto de `cliente` se sigue conservando
+  // como display — mismo patrón que mk_proyectos.tienda + tienda_codigo.
+  const [clienteCodigo, setClienteCodigo] = useState(initial.cliente_codigo ?? "");
   const [tocado, setTocado] = useState<Record<string, boolean>>({});
   const [agregandoVendedor, setAgregandoVendedor] = useState(false);
   const [nuevoVendedor, setNuevoVendedor] = useState("");
@@ -145,7 +149,10 @@ export default function ChequeFormModal({
   useEffect(() => {
     if (!open) return;
     setV(initialRef.current);
-    setClienteCodigo("");
+    // Al EDITAR se conserva el vínculo que trae el cheque; al dar de alta viene
+    // vacío. Resetearlo a "" siempre habría desvinculado en silencio cualquier
+    // cheque que se abriera a editar y se volviera a guardar.
+    setClienteCodigo(initialRef.current.cliente_codigo ?? "");
     setTocado({});
     setAgregandoVendedor(false);
     setNuevoVendedor("");
@@ -309,9 +316,6 @@ export default function ChequeFormModal({
                 value={v.cliente}
                 codigo={clienteCodigo}
                 topClientes={clientesTop}
-                // La tabla `cheques` no guarda el código, así que no se promete
-                // un vínculo que no existe. Ver el prop en ClientePicker.
-                mostrarVinculo={false}
                 hasError={err("cliente", v.cliente)}
                 onChange={(nombre, codigo) => {
                   set("cliente", nombre);
@@ -432,7 +436,7 @@ export default function ChequeFormModal({
         >
           <button
             type="button"
-            onClick={() => onSave(v)}
+            onClick={() => onSave({ ...v, cliente_codigo: clienteCodigo })}
             disabled={saving || !isOnline}
             title={!isOnline ? "Sin conexión" : undefined}
             className="bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"

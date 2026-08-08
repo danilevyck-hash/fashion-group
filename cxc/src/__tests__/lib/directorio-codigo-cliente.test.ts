@@ -38,7 +38,7 @@ import { POST } from "@/app/api/directorio/route";
 import {
   esColumnaFaltante,
   guardarTolerandoColumnaNueva,
-} from "@/lib/clientes/directorio-columna-opcional";
+} from "@/lib/clientes/columna-codigo-opcional";
 
 process.env.SESSION_SECRET ||= "test-secret-para-firmar-sesiones";
 

@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { getCompany } from "@/lib/companies";
 import { construirFilaCheque } from "@/lib/cheques-fila";
+import { guardarTolerandoColumnaNueva } from "@/lib/clientes/columna-codigo-opcional";
 
 const CHEQUES_ROLES = ["admin", "secretaria"];
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !CHEQUES_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
+  const { cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor, cliente_codigo } = body;
 
   if (typeof cliente !== "string" || !cliente.trim()) return NextResponse.json({ error: "cliente requerido" }, { status: 400 });
   if (!fechaValida(fecha_deposito)) return NextResponse.json({ error: "fecha de depósito requerida" }, { status: 400 });
@@ -52,12 +53,14 @@ export async function POST(req: NextRequest) {
   // sin default y el formulario no lo captura — dejarlo fuera del INSERT es lo
   // que rompió el guardado durante 3 meses y medio (23502). Ver el encabezado
   // de ese archivo.
-  const { data, error } = await supabaseServer
-    .from("cheques")
-    .insert(construirFilaCheque({ cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor }))
-    .select()
-    .single();
+  // `cliente_codigo` es la columna nueva y el DDL lo corre Daniel a mano: si
+  // todavía no existe se guarda el cheque SIN el vínculo en vez de fallar
+  // entero. Un cheque que no se puede guardar es plata que no queda registrada.
+  const { data, error, sinColumna } = await guardarTolerandoColumnaNueva(
+    construirFilaCheque({ cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor, cliente_codigo }),
+    (campos) => supabaseServer.from("cheques").insert(campos).select().single(),
+  );
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
-  return NextResponse.json(data);
+  return NextResponse.json(sinColumna ? { ...data, _falta_migracion_codigo: true } : data);
 }
