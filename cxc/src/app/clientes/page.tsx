@@ -57,7 +57,7 @@ export default async function ClientesPage() {
   // `count` de la base contaría miles que no se van a mostrar y la paginación
   // prometería páginas vacías. Mismo criterio que `/api/clientes`, que ya leía
   // así — el primer render y el refetch tienen que dar el MISMO total.
-  const [todosRes, provinciasRes, mundos] = await Promise.all([
+  const [todosRes, mundos] = await Promise.all([
     leerTodoPaginado<Cliente>(
       "clientes_master (primer render del Directorio)",
       (pedirCount, from, to) =>
@@ -71,11 +71,6 @@ export default async function ClientesPage() {
           .order("id", { ascending: true })
           .range(from, to),
     ).catch(() => [] as Cliente[]),
-    supabaseServer
-      .from("clientes_master")
-      .select("provincia")
-      .eq("deleted", false)
-      .not("provincia", "is", null),
     mundosDeClientes(),
   ]);
 
@@ -83,12 +78,17 @@ export default async function ClientesPage() {
   visibles.sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
   const clientes = visibles.slice(0, PAGE_SIZE);
   const total = visibles.length;
+
+  // Las provincias salen de los clientes que SE VEN, no de la tabla entera.
+  //
+  // 🩸 Era una segunda consulta a `clientes_master` sin paginar y sin filtro de
+  // mundo: PostgREST cortaba en 1.000 de 5.062 filas EN SILENCIO, y las que sí
+  // llegaban eran casi todas de Boston (4.883 de 5.062). O sea que el
+  // desplegable ofrecía provincias donde no vive NINGÚN cliente visible — se
+  // elegía una y la lista quedaba vacía. Derivarlas de `visibles` no cuesta una
+  // consulta más, no se puede truncar y no puede desincronizarse de la lista.
   const provincias = [
-    ...new Set(
-      (provinciasRes.data ?? [])
-        .map(r => (r.provincia ?? "").trim())
-        .filter(Boolean) as string[],
-    ),
+    ...new Set(visibles.map(c => (c.provincia ?? "").trim()).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b, "es"));
 
   return (

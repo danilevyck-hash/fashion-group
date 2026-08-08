@@ -81,6 +81,26 @@ async function leerDelaBase(provincia: string): Promise<FilaCliente[]> {
 }
 
 /**
+ * 🚪 **LA PUERTA ÚNICA para "dame la lista de clientes".**
+ *
+ * Todo módulo que necesite clientes entra por acá y recibe SOLO los del grupo,
+ * ya filtrados y sin truncar. Nadie tiene que acordarse de nada: la puerta
+ * correcta es también la más cómoda, que es la única forma de que se use.
+ *
+ * 🩸 **Por qué existe (8-ago-2026).** Los dos selectores de "más usados"
+ * armaban su propia consulta a `clientes_master`. El de Cheques la hacía **sin
+ * paginar y sin `.order()`** con un comentario que afirmaba *"son 149 filas
+ * vivas"*: son **5.062**, así que PostgREST devolvía **1.000 EN SILENCIO**.
+ * Medido contra producción: **64 de los 146 clientes del grupo eran
+ * inofrecibles**, incluido *"Jerusalem De Panamá"* — que es el cliente de
+ * **11 de los 19 cheques** y por lo tanto el que SIEMPRE debió encabezar sus
+ * propios chips. Además ninguno de los dos filtraba por mundo, así que un
+ * nombre compartido con Boston (hay 10) podía resolver a un código de Boston.
+ *
+ * Los clientes de Boston y de Multifashion se piden por SU puerta
+ * (`EMPRESA_CARTERA_BOSTON` / `EMPRESA_MOSTRADOR_MULTIFASHION` en
+ * `lib/clientes/mundos`), nunca por esta.
+ *
  * Los clientes del grupo, ya filtrados. Sirve del caché mientras esté fresco.
  *
  * Se cachea la PROMESA, no el resultado: si llegan tres pedidos a la vez con el
@@ -88,7 +108,7 @@ async function leerDelaBase(provincia: string): Promise<FilaCliente[]> {
  * fallo borra la entrada para que el próximo intento vuelva a probar en vez de
  * quedar envenenada por 60 s.
  */
-export function leerDirectorioGrupo(provincia = ""): Promise<FilaCliente[]> {
+export function leerClientesDelGrupo(provincia = ""): Promise<FilaCliente[]> {
   const ahora = Date.now();
   const hit = cache.get(provincia);
   if (hit && hit.expiraEn > ahora) return hit.datos;

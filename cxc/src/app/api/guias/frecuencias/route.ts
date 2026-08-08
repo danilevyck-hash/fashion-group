@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/require-auth";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -62,17 +63,15 @@ export async function GET(req: NextRequest) {
       .slice(0, 12)
       .map(([c]) => c);
 
+    // Resolver código → nombre por LA PUERTA ÚNICA de clientes, la misma que
+    // usa el selector de Cheques. Antes era una consulta propia a
+    // `clientes_master` sin filtro de mundo: un código de Boston que llegara a
+    // `guia_items.cliente_codigo` se habría ofrecido como si fuera del grupo.
     let clientes: Array<{ codigo: string; nombre: string }> = [];
     if (topCodigos.length > 0) {
-      const { data: cmData, error: cmErr } = await supabaseServer
-        .from("clientes_master")
-        .select("codigo, nombre")
-        .in("codigo", topCodigos)
-        .eq("deleted", false);
-      if (cmErr) throw new Error(cmErr.message);
       const nameByCod = new Map<string, string>();
-      for (const c of (cmData ?? []) as Array<{ codigo: string; nombre: string }>) {
-        nameByCod.set(c.codigo, c.nombre);
+      for (const c of await leerClientesDelGrupo()) {
+        if (c.codigo && c.nombre) nameByCod.set(c.codigo, c.nombre);
       }
       // Conserva el orden por frecuencia; descarta códigos sin nombre vivo.
       clientes = topCodigos

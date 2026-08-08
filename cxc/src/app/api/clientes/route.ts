@@ -39,7 +39,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/require-auth";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
-import { leerDirectorioGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
+import { leerClientesDelGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   // Va antes de la búsqueda y del conteo, así que `total` ya sale correcto.
   let visibles: FilaCliente[];
   try {
-    visibles = await leerDirectorioGrupo(provincia);
+    visibles = await leerClientesDelGrupo(provincia);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[api/clientes] list error:", msg);

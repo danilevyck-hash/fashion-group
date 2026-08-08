@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/require-auth";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -74,20 +75,23 @@ export async function GET(req: NextRequest) {
 
     if (topNombres.length === 0) return NextResponse.json({ clientes: [] });
 
-    // Resolver nombre → código contra el directorio vivo. Se traen los clientes
-    // y se parean en memoria por nombre normalizado: PostgREST no tiene un
-    // "IN sobre una expresión", y son 149 filas vivas (medido) — muy por debajo
-    // del tope de 1000 de `db-max-rows`, así que no hace falta paginar.
-    const { data: cmData, error: cmErr } = await supabaseServer
-      .from("clientes_master")
-      .select("codigo, nombre")
-      .eq("deleted", false);
-    if (cmErr) throw new Error(cmErr.message);
+    // Resolver nombre → código por LA PUERTA ÚNICA de clientes. Se parea en
+    // memoria por nombre normalizado (PostgREST no tiene un "IN sobre una
+    // expresión") sobre los clientes DEL GRUPO, ya paginados y ya filtrados.
+    //
+    // 🩸 Acá había una consulta propia a `clientes_master` sin paginar y con un
+    // comentario que decía "son 149 filas vivas". Son 5.062: PostgREST cortaba
+    // en 1.000 EN SILENCIO y **64 de los 146 clientes del grupo no podían
+    // aparecer nunca** en estos chips — entre ellos "Jerusalem De Panamá", el
+    // cliente de 11 de los 19 cheques. Ver `lib/clientes/directorio-cache`.
+    const delGrupo = await leerClientesDelGrupo();
 
     const porNombre = new Map<string, { codigo: string; nombre: string }>();
-    for (const c of (cmData ?? []) as Array<{ codigo: string; nombre: string }>) {
-      const clave = norm(c.nombre);
-      if (clave && !porNombre.has(clave)) porNombre.set(clave, c);
+    for (const c of delGrupo) {
+      const clave = norm(c.nombre ?? "");
+      if (clave && c.codigo && !porNombre.has(clave)) {
+        porNombre.set(clave, { codigo: c.codigo, nombre: c.nombre ?? "" });
+      }
     }
 
     // Conserva el orden por frecuencia; descarta los que no están en el

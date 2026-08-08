@@ -13,6 +13,15 @@ vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: { from: (...a: unknown[]) => mockFrom(...a) },
 }));
 
+// El selector resuelve nombre → código por LA PUERTA ÚNICA de clientes
+// (`leerClientesDelGrupo`), no con una consulta propia. Se dobla la puerta para
+// que estos tests midan lo que le toca al route —contar, normalizar y ordenar—
+// sin arrastrar el caché de 60 s del módulo real.
+const puerta = vi.hoisted(() => ({ clientes: [] as Array<{ codigo: string; nombre: string }> }));
+vi.mock("@/lib/clientes/directorio-cache", () => ({
+  leerClientesDelGrupo: async () => puerta.clientes,
+}));
+
 import { NextRequest } from "next/server";
 import { signSession } from "@/lib/session-cookie";
 import { POST as postCheque } from "@/app/api/cheques/route";
@@ -78,9 +87,10 @@ describe("POST /api/cheques — la fecha de depósito se valida en el servidor",
 
 describe("GET /api/cheques/frecuencias — los más usados salen de CHEQUES", () => {
   function conDatos(cheques: Array<{ cliente: string; created_at: string }>, master: Array<{ codigo: string; nombre: string }>) {
+    puerta.clientes = master;
     mockFrom.mockImplementation((tabla: string) => {
       if (tabla === "cheques") return { select: () => ({ eq: async () => ({ data: cheques, error: null }) }) };
-      return { select: () => ({ eq: async () => ({ data: master, error: null }) }) };
+      return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
     });
   }
 

@@ -31,7 +31,7 @@ const patch = leer("src/app/api/clientes/[codigo]/route.ts");
 
 describe("🔴 el endpoint ya no lee la base en cada llamada", () => {
   it("delega en el caché en vez de leer clientes_master directo", () => {
-    expect(route).toContain("leerDirectorioGrupo(provincia)");
+    expect(route).toContain("leerClientesDelGrupo(provincia)");
     expect(route).not.toContain('.from("clientes_master")');
   });
 
@@ -83,6 +83,6 @@ describe("⚠️ que no se rompa en silencio", () => {
 
   it("la provincia es parte de la clave (se filtra en la base)", () => {
     expect(cache).toContain("cache = new Map<string, Entrada>()");
-    expect(cache).toContain("leerDirectorioGrupo(provincia = \"\")");
+    expect(cache).toContain("leerClientesDelGrupo(provincia = \"\")");
   });
 });
