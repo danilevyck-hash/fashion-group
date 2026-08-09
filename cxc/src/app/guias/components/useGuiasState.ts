@@ -6,7 +6,7 @@
 // mover el form a rutas dedicadas.
 
 import { useState, useCallback } from "react";
-import type { Guia } from "./types";
+import type { Guia, GuiaItem } from "./types";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
 export function useGuiasState() {
@@ -23,6 +23,14 @@ export function useGuiasState() {
 
   // Confirm delete state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // ── Atar el cliente de una línea ──────────────────────────────────────────
+  // Va por su propio endpoint (`/api/guias/[id]/cliente`) y NO por el PUT: el
+  // 98% de las guías están Completadas y el PUT las rechaza. El porqué está en
+  // la cabecera de ese route.
+  const [atarItem, setAtarItem] = useState<GuiaItem | null>(null);
+  const [atarGuardando, setAtarGuardando] = useState(false);
+  const [atarError, setAtarError] = useState<string | null>(null);
 
   // Despacho state
   const [bPlaca, setBPlaca] = useState("");
@@ -210,6 +218,71 @@ export function useGuiasState() {
     }
   }
 
+  function abrirAtarCliente(item: GuiaItem) {
+    setAtarError(null);
+    setAtarItem(item);
+  }
+  function cerrarAtarCliente() {
+    setAtarItem(null);
+    setAtarError(null);
+  }
+
+  /**
+   * Guarda (o quita) el código de cliente de UNA línea. `codigo === null`
+   * desata.
+   *
+   * ⚠️ La lista NO se recarga entera: se parcha la línea del acordeón abierto.
+   * `loadGuias()` trae las 177 guías con sus ítems y esto se dispara una vez
+   * por línea — atar una guía de 4 destinos serían 4 recargas completas.
+   */
+  async function guardarAtarCliente(codigo: string | null) {
+    if (!atarItem?.id || !expandedGuia) return;
+    setAtarGuardando(true);
+    setAtarError(null);
+    try {
+      const res = await fetch(`/api/guias/${expandedGuia.id}/cliente`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: atarItem.id, cliente_codigo: codigo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setAtarError(data.error || "No se pudo guardar");
+        return;
+      }
+      const nuevo: string | undefined = data.cliente_codigo ?? undefined;
+      setExpandedGuia((g) =>
+        g
+          ? {
+              ...g,
+              guia_items: (g.guia_items || []).map((it) =>
+                it.id === atarItem.id ? { ...it, cliente_codigo: nuevo } : it
+              ),
+            }
+          : g
+      );
+      // Y en la lista de arriba, para que el resumen no quede desfasado.
+      setGuias((prev) =>
+        prev.map((g) =>
+          g.id === expandedGuia.id
+            ? {
+                ...g,
+                guia_items: (g.guia_items || []).map((it) =>
+                  it.id === atarItem.id ? { ...it, cliente_codigo: nuevo } : it
+                ),
+              }
+            : g
+        )
+      );
+      showToast(codigo ? `Cliente atado a ${codigo}` : "Cliente desatado");
+      setAtarItem(null);
+    } catch {
+      setAtarError("Sin conexión. Intenta de nuevo en unos segundos.");
+    } finally {
+      setAtarGuardando(false);
+    }
+  }
+
   async function rejectGuia(id: string, motivo: string) {
     let res: Response;
     try {
@@ -254,5 +327,7 @@ export function useGuiasState() {
     requestDeleteGuia, confirmDeleteGuia,
     confirmarDespacho,
     rejectGuia,
+    atarItem, atarGuardando, atarError,
+    abrirAtarCliente, cerrarAtarCliente, guardarAtarCliente,
   };
 }

@@ -51,6 +51,9 @@ interface GuiasListProps {
   onPrint: (id: string) => void;
   onDelete: (id: string) => void;
   onReject: (id: string, motivo: string) => void;
+  /** Abrir la ventana de "¿a qué cliente fue esta línea?". Sin esto, el enlace
+   *  no se ofrece (rol de solo lectura). */
+  onAtarCliente?: (item: GuiaItem) => void;
   readOnly?: boolean;
 }
 
@@ -69,9 +72,13 @@ export default function GuiasList({
   bChofer, setBChofer, bNumeroGuiaTransp, setBNumeroGuiaTransp,
   bSaving, onConfirmarDespacho, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
-  onEdit, onPrint, onDelete, onReject,
+  onEdit, onPrint, onDelete, onReject, onAtarCliente,
   readOnly,
 }: GuiasListProps) {
+  // Atar el cliente lo pueden hacer los mismos que despachan. NO depende del
+  // estado de la guía: una guía Completada sigue estando cerrada a edición y
+  // esto no la edita — ver `api/guias/[id]/cliente/route.ts`.
+  const puedeAtarCliente = Boolean(onAtarCliente) && !readOnly && DESPACHO_ROLES.includes(role || "");
   const [visibleCount, setVisibleCount] = useState(15);
   const [groupedView, setGroupedView] = useState(true);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -422,9 +429,52 @@ export default function GuiasList({
                                       </thead>
                                       <tbody>
                                         {(expandedGuia.guia_items || []).map((item, idx) => (
-                                          <tr key={idx} className="border-b border-gray-50">
+                                          <tr key={item.id || idx} className="border-b border-gray-50">
                                             <td className="py-1.5 px-2 text-gray-300">{idx + 1}</td>
-                                            <td className="py-1.5 px-2">{item.cliente}</td>
+                                            {/* El cliente y su código van APILADOS, no en dos
+                                                columnas: la tabla ya mide 600 px y en un iPhone
+                                                de 390 una columna más sería más arrastre. */}
+                                            <td className="py-1.5 px-2">
+                                              <span className="block">{item.cliente}</span>
+                                              {/* La segunda línea SIEMPRE mide 44 px, esté atada
+                                                  o no, para que las filas no queden desparejas
+                                                  según el estado de cada una. */}
+                                              <span className="flex items-center min-h-[44px]">
+                                                {/* 🩸 El código YA PUESTO también se toca. Si el
+                                                    chip fuera solo texto, una línea atada al
+                                                    cliente equivocado no se podría corregir nunca
+                                                    desde la pantalla — y hay una así en producción
+                                                    (GT-183, atada a `111380`, que es de Boston). */}
+                                                {item.cliente_codigo ? (
+                                                  puedeAtarCliente && item.id ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => onAtarCliente?.(item)}
+                                                      title="Cambiar o quitar el cliente"
+                                                      className="inline-flex items-center min-h-[44px] pr-3 text-xs font-mono text-emerald-700 hover:text-emerald-900 transition"
+                                                    >
+                                                      <span className="bg-emerald-50 hover:bg-emerald-100 rounded px-1.5 py-0.5 transition">
+                                                        {item.cliente_codigo}
+                                                      </span>
+                                                    </button>
+                                                  ) : (
+                                                    <span className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5">
+                                                      {item.cliente_codigo}
+                                                    </span>
+                                                  )
+                                                ) : puedeAtarCliente && item.id ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onAtarCliente?.(item)}
+                                                    className="inline-flex items-center min-h-[44px] pr-3 text-xs text-gray-400 hover:text-black underline underline-offset-2 transition"
+                                                  >
+                                                    Atar cliente
+                                                  </button>
+                                                ) : (
+                                                  <span className="text-xs text-gray-300">sin atar</span>
+                                                )}
+                                              </span>
+                                            </td>
                                             <td className="py-1.5 px-2 text-gray-500">{item.direccion}</td>
                                             <td className="py-1.5 px-2 text-gray-500">{item.empresa}</td>
                                             <td className="py-1.5 px-2 text-gray-500">{item.facturas}</td>

@@ -65,6 +65,22 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - Estado en `guia_transporte.estado` (TEXT, **sin CHECK constraint** — valores válidos por convención de código).
 - Flujo: **Pendiente Bodega** (default al crear) → **Completada** (al despachar; exige receptor, cédula, placa, ≥1 bulto y firmas; queda **bloqueada** para edición) → **Rechazada** (solo desde Completada, con `motivo_rechazo`).
 
+> **EL CLIENTE DE UNA GUÍA VIVE EN LAS LÍNEAS, y atarlo NO es editar la guía (8-ago-2026).**
+>
+> Una guía sale con VARIOS destinos: la real GT-189 lleva America Clasic, Jerusalem, City Mall Paso Canoa y City Mall David en el mismo viaje. Por eso el cliente es `guia_items.cliente_codigo` (D-XXX), uno por renglón. ⚠️ **`guia_transporte.receptor_nombre` NO es el cliente** — es quien FIRMA el recibido, y son choferes ("Nicolás guillen", "Reynel", "Walter arauz"): de 109 guías con receptor, **0 coinciden** con el nombre de un cliente. Daniel, textual: *"en guía el cliente es a dónde se despachó, no el nombre del transportista"*. Candado en `src/__tests__/api/guias.test.ts`.
+>
+> **El estado del arte, medido contra producción:** 441 líneas vivas · **441 con el nombre escrito (100%)** · 120 con código (27%). El cliente SÍ se anota siempre, pero **a mano**, y cada quien lo escribe distinto: `"City Mall"` / `"City Mall "` / `"City Mall Paso Canoa"`, `"Jerusalem Panama"` vs `"Jerusalem De Panamá"`.
+>
+> 🩸 **`PATCH /api/guias/[id]/cliente` existe PORQUE el 98% de las guías están cerradas.** 174 de 177 guías vivas están **Completada**, y el PUT y el PATCH de `/api/guias/[id]` las rechazan con *"Guía ya despachada, no se puede editar"* — un candado que protege el DESPACHO (bultos, facturas, firmas, placa) y que **sigue intacto**. Anotar a qué cliente fue un renglón no es editar el despacho: no cambia el texto que escribió bodega, ni un bulto, ni una firma. Si atar el cliente pasara por el PUT, el 98% de las guías serían inatables para siempre. Por eso el endpoint **toca UNA columna de UNA línea y ni siquiera consulta el estado** — candado en `src/__tests__/api/guias-atar-cliente-route.test.ts`.
+>
+> **En pantalla:** en el acordeón de `/guias`, cada renglón muestra debajo del nombre o el chip verde `D-XXX` o el enlace *"Atar cliente"*. **Los dos abren la misma ventana** — el chip también es un botón, y eso no es cosmético: sin él, una línea atada al cliente EQUIVOCADO no se podría corregir nunca (y hay una así, ver abajo). El texto escrito a mano **se conserva siempre** como display; solo se guarda el código. Mismo patrón que `mk_proyectos.tienda` + `tienda_codigo` y que `cheques.cliente_codigo`.
+>
+> **Elegir cliente NO es obligatorio para crear una guía, y es una decisión de Daniel, no del código.** La pantalla la usa bodega todos los días y **272 de las 441 líneas (62%) tienen un destino que hoy NO existe en el directorio** — volverlo obligatorio de un día para otro les traba el trabajo. El selector cerrado (`ClientePicker`, con su opción "Otro") ya hace que elegir de la lista sea el camino cómodo.
+>
+> ⚠️ **`clientes_master.nombre_normalized` NO es único entre los D-XXX vivos.** El comentario de la migración de jun-2026 afirmaba que un índice UNIQUE parcial lo garantizaba; **es falso**, medido: `"CITY MODA CHORRERA"` → D-30 **y** D-26, `"METRO SHOES PANAMA SA"` → D-103 y D-173, `"EL MACHETAZO SAN MIGUELITO"` → D-171 y D-101. Un `UPDATE … FROM` con dos candidatos elige uno EN SILENCIO y sin determinismo. Cualquier pareo automático por nombre necesita el `NOT EXISTS` que exige **un solo** código vivo.
+>
+> 🔴 **UNA línea atada a `111380`, que no es del grupo** (GT-183, "American Classic Store"). Se coló por el backfill de jun-2026 (`20260607131000`), que filtraba `cm.codigo IS NOT NULL` en vez de `LIKE 'D-%'` — y Boston/Multifashion usan códigos numéricos pelados. **No se corrigió automáticamente porque no es inequívoco** si va a NULL o a un D-XXX ("American Classic Store" de Boston vs "American Classics" D-201 del grupo no son obviamente el mismo negocio). Se arregla desde la pantalla: `/guias` → GT-183 → tocar el chip `111380` → elegir o "Quitar".
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
