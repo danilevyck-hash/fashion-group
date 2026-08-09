@@ -18,6 +18,7 @@ import AppHeader from "@/components/AppHeader";
 import { PullToRefresh } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
+import { VentaHoyCard } from "@/components/multifashion/VentaHoyCard";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -146,6 +147,14 @@ export function MultifashionShell({
           </Select>
         </div>
       </header>
+
+      {/* Venta del día — lo PRIMERO que se ve, arriba de los sub-tabs y del
+          selector de mes: es la pregunta con la que se abre el módulo. Se pide
+          aparte del overview (que es anual y pesado) para que aparezca sin
+          esperarlo, y se re-pide tras un "Actualizar ahora". No se le pasa
+          `ventanaAcotada`: "hoy" está dentro de la ventana de gerente_acs, y
+          el recorte real de los comparativos lo hace el servidor. */}
+      <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
 
       {fetchError && (
         <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
