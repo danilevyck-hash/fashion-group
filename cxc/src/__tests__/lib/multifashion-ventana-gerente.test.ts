@@ -62,10 +62,27 @@ function chain(result: { data: unknown; error: unknown; count?: number }) {
 // Caja: la tabla de caché "no existe" → modo directo (sin escribir nada).
 const ERROR_TABLA_AUSENTE = { code: "PGRST205", message: "could not find the table" };
 
+/** Cuando vale `true`, las dos RPC de Productos contestan "esa función no
+ *  existe" — el estado real mientras Daniel no haya corrido la migración. Sirve
+ *  para probar que el camino de fallback TAMBIÉN va acotado. */
+let rpcProductosAusente = false;
+
 vi.mock("@/lib/supabase-server", () => ({
   supabaseServer: {
     rpc: async (name: string, args: Record<string, unknown>) => {
       rpcCalls.push({ name, args });
+      // Las dos RPC de Productos: o contestan vacío con su forma real, o dicen
+      // que no existen (ver `rpcProductosAusente`).
+      if (name === "multifashion_articulo_diario_agrupado_v1") {
+        return rpcProductosAusente
+          ? { data: null, error: { code: "PGRST202", message: "Could not find the function" } }
+          : { data: { n: 0, f: [] }, error: null };
+      }
+      if (name === "multifashion_articulo_marca_v1") {
+        return rpcProductosAusente
+          ? { data: null, error: { code: "PGRST202", message: "Could not find the function" } }
+          : { data: [], error: null };
+      }
       // proyeccion_mensual_retail_v1 devuelve filas por empresa; el resto, jsonb.
       return name.startsWith("proyeccion_")
         ? { data: [], error: null }
@@ -129,6 +146,7 @@ afterAll(() => { process.env.SESSION_SECRET = SECRET_PREV; });
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(AHORA);
+  rpcProductosAusente = false;
   rpcCalls.length = 0;
   fromCalls.length = 0;
   fetchMultifashionCalls.length = 0;
@@ -146,6 +164,50 @@ const rpc = (name: string): Record<string, unknown> => {
   if (!c) throw new Error(`no se llamó ${name}. Llamados: ${rpcCalls.map(r => r.name).join(", ")}`);
   return c.args;
 };
+
+// ── Las lecturas del período de Productos, POR CUALQUIER CAMINO ──────────────
+// 🩸 Productos tiene DOS formas de leer `switch_articulo_diario`, y las dos
+// llegan a la MISMA base con el MISMO rango:
+//   · la RPC que agrupa en Postgres (el camino normal), y
+//   · las páginas de la tabla (el fallback mientras la migración no esté
+//     corrida — las DDL en este proyecto las aplica Daniel a mano).
+// Vigilar una sola dejaría la otra abierta, que es exactamente el error que
+// este archivo ya había corregido cuando la ruta pasó a leer DOS períodos.
+// Por eso el candado normaliza las dos a la misma forma y las mira juntas.
+interface LecturaArticulos { desde: string; hasta: string; empresa: string; via: "rpc" | "tabla" }
+
+function lecturasArticulos(): LecturaArticulos[] {
+  const porRpc: LecturaArticulos[] = rpcCalls
+    .filter(r => r.name === "multifashion_articulo_diario_agrupado_v1")
+    .map(r => ({
+      desde: String(r.args.p_desde),
+      hasta: String(r.args.p_hasta),
+      empresa: String(r.args.p_empresa_key),
+      via: "rpc",
+    }));
+  const porTabla: LecturaArticulos[] = fromCalls
+    .filter(f => f.tabla === "switch_articulo_diario")
+    .map(f => ({
+      desde: String(f.filtros.find(([k]) => k === "gte")?.[1]),
+      hasta: String(f.filtros.find(([k]) => k === "lte")?.[1]),
+      empresa: String(f.filtros.find(([k]) => k === "eq")?.[1]),
+      via: "tabla",
+    }));
+  return [...porRpc, ...porTabla];
+}
+
+/** La primera lectura del período (la del período pedido). */
+function lecturaArticulos(): LecturaArticulos {
+  const l = lecturasArticulos();
+  if (l.length === 0) {
+    throw new Error(
+      `productos no leyó el período por ningún camino. RPC: ${rpcCalls
+        .map(r => r.name)
+        .join(", ")} · tablas: ${fromCalls.map(f => f.tabla).join(", ")}`,
+    );
+  }
+  return l[0];
+}
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 1. La función pura — incluido el borde de mes en UTC-5
@@ -336,29 +398,27 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     expect(switchCalls).toEqual([{ desde: "2025-07-15", hasta: "2025-07-16" }]);
   });
 
-  // La ruta de Productos NO consulta por RPC sino leyendo la tabla, así que lo
-  // que se mira es el RANGO DE FECHAS que llega a `switch_articulo_diario`.
+  // Lo que se mira es el RANGO DE FECHAS que llega a `switch_articulo_diario`,
+  // venga por la RPC agrupada o por la lectura paginada (ver `lecturasArticulos`).
   it("productos?year=2019&mes=1 → la tabla se consulta por julio 2026", async () => {
     await productosGet(req("/api/multifashion/productos?year=2019&mes=1", "gerente_acs"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t, "productos no consultó switch_articulo_diario").toBeTruthy();
-    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2026-07-01");
+    expect(t.hasta).toBe("2026-07-31");
     // Y nunca a otra empresa: Multifashion ES american_classic.
-    expect(t?.filtros).toContainEqual(["eq", "american_classic"]);
+    expect(t.empresa).toBe("american_classic");
   });
 
   it("productos?year=2025&mes=12 (año de comparación) conserva el año, no el mes", async () => {
     await productosGet(req("/api/multifashion/productos?year=2025&mes=12", "gerente_acs"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2025-07-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2025-07-31"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2025-07-01");
+    expect(t.hasta).toBe("2025-07-31");
   });
 
   it("productos: sin params tampoco es un bypass", async () => {
     await productosGet(req("/api/multifashion/productos", "gerente_acs"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
+    expect(lecturaArticulos().desde).toBe("2026-07-01");
   });
 
   // 🩸 `periodo=12m` sería un bypass de UNA PALABRA: la ruta ni mira year/mes
@@ -366,18 +426,18 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
   // nada. Por eso el clamp es sobre el PERÍODO (clampPeriodoProductos).
   it("productos?periodo=12m se aplasta al mes en curso", async () => {
     await productosGet(req("/api/multifashion/productos?periodo=12m", "gerente_acs"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2026-07-01");
+    expect(t.hasta).toBe("2026-07-31");
     // Y NUNCA el arranque de la ventana de 12 meses.
-    expect(t?.filtros).not.toContainEqual(["gte", "2025-08-01"]);
+    expect(lecturasArticulos().map(l => l.desde)).not.toContain("2025-08-01");
   });
 
   it("productos?periodo=12m&year=2019&mes=1: ni el período ni el año se cuelan", async () => {
     await productosGet(req("/api/multifashion/productos?periodo=12m&year=2019&mes=1", "gerente_acs"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2026-07-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2026-07-31"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2026-07-01");
+    expect(t.hasta).toBe("2026-07-31");
   });
 
   // 🩸 Productos consulta la tabla DOS veces: el período pedido y el MISMO
@@ -387,8 +447,8 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
   // TODAS las lecturas de la tabla, no la primera.
   it("productos: TODAS las lecturas caen dentro de la ventana (mes en curso o su comparación)", async () => {
     await productosGet(req("/api/multifashion/productos?periodo=12m&year=2019&mes=1", "gerente_acs"));
-    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
-    expect(lecturas.length, "productos no consultó switch_articulo_diario").toBeGreaterThan(0);
+    const lecturas = lecturasArticulos();
+    expect(lecturas.length, "productos no leyó el período por ningún camino").toBeGreaterThan(0);
 
     // El criterio es el MES de calendario, no `v.actual.fin` (que es HOY): la
     // ruta pide el mes en curso completo desde siempre —los tests de arriba lo
@@ -396,9 +456,7 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     // no puede pasar es que una lectura se salga de los DOS meses permitidos.
     const v = ventanaGerente(AHORA);
     const mesActual = { inicio: v.actual.inicio, fin: "2026-07-31" };
-    for (const l of lecturas) {
-      const desde = l.filtros.find(([k]) => k === "gte")?.[1] as string;
-      const hasta = l.filtros.find(([k]) => k === "lte")?.[1] as string;
+    for (const { desde, hasta } of lecturas) {
       const cabeEn = (w: { inicio: string; fin: string }) => desde >= w.inicio && hasta <= w.fin;
       expect(
         cabeEn(mesActual) || cabeEn(v.anterior),
@@ -407,16 +465,50 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     }
   });
 
+  // 🩸 Y lo mismo POR EL OTRO CAMINO. Mientras la migración de la RPC no esté
+  // corrida, la ruta lee la tabla paginada — si el clamp viviera del lado de la
+  // RPC, ese camino quedaría abierto y nadie lo notaría hasta que alguien
+  // borrara la función.
+  it("productos: el fallback SIN la RPC va igual de acotado", async () => {
+    rpcProductosAusente = true;
+    await productosGet(req("/api/multifashion/productos?periodo=12m&year=2019&mes=1", "gerente_acs"));
+    const lecturas = lecturasArticulos().filter(l => l.via === "tabla");
+    // Las dos: el período pedido y su comparación. Ninguna sale de la ventana.
+    expect(lecturas.length, "el fallback no leyó la tabla").toBe(2);
+    const v = ventanaGerente(AHORA);
+    const mesActual = { inicio: v.actual.inicio, fin: "2026-07-31" };
+    for (const { desde, hasta, empresa } of lecturas) {
+      const cabeEn = (w: { inicio: string; fin: string }) => desde >= w.inicio && hasta <= w.fin;
+      expect(
+        cabeEn(mesActual) || cabeEn(v.anterior),
+        `fallback fuera de ventana: ${desde}→${hasta}`,
+      ).toBe(true);
+      expect(empresa).toBe("american_classic");
+    }
+    // Y el arranque de los 12 meses NUNCA se cuela por este camino tampoco.
+    expect(lecturas.map(l => l.desde)).not.toContain("2025-08-01");
+  });
+
   it("productos: la comparación de gerente_acs es julio 2025, su OTRO mes permitido", async () => {
     await productosGet(req("/api/multifashion/productos", "gerente_acs"));
-    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    const lecturas = lecturasArticulos();
     expect(lecturas).toHaveLength(2);
     // Julio 2026 va del 1 al 31 (el mes se pide entero); la comparación se
     // recorta al día 30 porque el mes en curso todavía no cerró.
-    expect(lecturas[0].filtros).toContainEqual(["gte", "2026-07-01"]);
-    expect(lecturas[0].filtros).toContainEqual(["lte", "2026-07-31"]);
-    expect(lecturas[1].filtros).toContainEqual(["gte", "2025-07-01"]);
-    expect(lecturas[1].filtros).toContainEqual(["lte", "2025-07-30"]);
+    expect(lecturas[0].desde).toBe("2026-07-01");
+    expect(lecturas[0].hasta).toBe("2026-07-31");
+    expect(lecturas[1].desde).toBe("2025-07-01");
+    expect(lecturas[1].hasta).toBe("2025-07-30");
+  });
+
+  // El diccionario de marcas también se pide con la empresa FIJA: aceptarla por
+  // query sería la fuga más barata de todas (gerente_acs solo ve esta tienda).
+  it("productos: la empresa es CONSTANTE — ni por query se cambia", async () => {
+    await productosGet(
+      req("/api/multifashion/productos?year=2019&mes=1&empresa=vistana&empresa_key=vistana", "gerente_acs"),
+    );
+    expect(rpc("multifashion_articulo_marca_v1")).toEqual({ p_empresa_key: "american_classic" });
+    for (const l of lecturasArticulos()) expect(l.empresa).toBe("american_classic");
   });
 
   // venta-hoy no acepta parámetros: el día es SIEMPRE hoy Panamá, que para el
@@ -526,44 +618,42 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
 
   it("productos: un mes viejo cualquiera se consulta tal cual", async () => {
     await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2024-12-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2024-12-31"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2024-12-01");
+    expect(t.hasta).toBe("2024-12-31");
   });
 
   it("productos: febrero bisiesto cierra el 29, no el 28", async () => {
     await productosGet(req("/api/multifashion/productos?year=2024&mes=2", "admin"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["lte", "2024-02-29"]);
+    expect(lecturaArticulos().hasta).toBe("2024-02-29");
   });
 
   it("productos?periodo=12m: admin sí ve los 12 meses (ago-2025 → hoy)", async () => {
     await productosGet(req("/api/multifashion/productos?periodo=12m", "admin"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2025-08-01"]);
-    expect(t?.filtros).toContainEqual(["lte", "2026-07-30"]);
+    const t = lecturaArticulos();
+    expect(t.desde).toBe("2025-08-01");
+    expect(t.hasta).toBe("2026-07-30");
   });
 
   it("productos: admin sí compara contra el año pasado, sin recorte de ventana", async () => {
     await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
-    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    const lecturas = lecturasArticulos();
     expect(lecturas).toHaveLength(2);
-    expect(lecturas[1].filtros).toContainEqual(["gte", "2023-12-01"]);
-    expect(lecturas[1].filtros).toContainEqual(["lte", "2023-12-31"]);
+    expect(lecturas[1].desde).toBe("2023-12-01");
+    expect(lecturas[1].hasta).toBe("2023-12-31");
   });
 
   it("productos?periodo=12m: la comparación de admin es la ventana corrida 12 meses", async () => {
     await productosGet(req("/api/multifashion/productos?periodo=12m", "admin"));
-    const lecturas = fromCalls.filter(f => f.tabla === "switch_articulo_diario");
+    const lecturas = lecturasArticulos();
     expect(lecturas).toHaveLength(2);
-    expect(lecturas[1].filtros).toContainEqual(["gte", "2024-08-01"]);
-    expect(lecturas[1].filtros).toContainEqual(["lte", "2025-07-30"]);
+    expect(lecturas[1].desde).toBe("2024-08-01");
+    expect(lecturas[1].hasta).toBe("2025-07-30");
   });
 
   it("productos: el DEFAULT del parámetro sigue siendo 'mes' (no le cambió a nadie)", async () => {
     await productosGet(req("/api/multifashion/productos?year=2024&mes=12", "admin"));
-    const t = fromCalls.find(f => f.tabla === "switch_articulo_diario");
-    expect(t?.filtros).toContainEqual(["gte", "2024-12-01"]);
+    expect(lecturaArticulos().desde).toBe("2024-12-01");
   });
 
   it("productos?periodo=trimestre → 400 (no se cae al mes en silencio)", async () => {

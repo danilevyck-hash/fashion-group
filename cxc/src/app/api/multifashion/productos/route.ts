@@ -37,12 +37,26 @@
 //    signo lo pone la lectura, mirando `tipo`. La matemática vive en
 //    `src/lib/multifashion/productos.ts` — módulo puro, con su candado.
 //
-// 3. SE LEE PAGINADO. `db-max-rows` = 1000 y PostgREST corta EN SILENCIO. El mes
-//    más grande medido (dic-2025) tiene 5.321 filas y la ventana de 12 meses
-//    **21.749** (medido contra producción el 7-ago-2026): sin paginar se
-//    leerían 1.000 y la pestaña mostraría el 4,6% de las ventas SIN UN SOLO
-//    ERROR. Por eso va `leerTodoPaginado`, que además verifica contra un COUNT
-//    exacto.
+// 3. LA SUMA LA HACE POSTGRES, Y ESO NO CAMBIA UN CENTAVO. La ruta pide el
+//    período YA AGRUPADO por (artículo, código, descripción, **tipo**) con la
+//    RPC `multifashion_articulo_diario_agrupado_v1`, y la agregación de negocio
+//    sigue viviendo entera en los módulos puros de siempre. Es seguro porque la
+//    llave de la RPC es más FINA que la que usa el código (que además colapsa
+//    espacios): lo que Postgres deja separado, el código lo junta igual que
+//    antes. Y `tipo` VIAJA: la RPC suma magnitudes, nunca firma — el signo de
+//    las NC lo sigue poniendo `signoDeTipo()` y nadie más.
+//    · Medido contra producción el 9-ago-2026: 20.483 filas del período +
+//      18.417 del comparativo + 8.454 del diccionario de marcas = **48 páginas
+//      de PostgREST, una atrás de otra**, y 8,6-9,0 s de respuesta. Agrupadas
+//      son 4.740 filas (4,32× menos) en UNA llamada, y las tres lecturas van en
+//      paralelo.
+//    · **Si la función todavía no existe** (las DDL las corre Daniel a mano) la
+//      ruta se cae sola al camino paginado de siempre y lo DICE en `fuentes`.
+//
+//    ⚠️ EL CAMINO PAGINADO SIGUE ENTERO, y no es decorado: `db-max-rows` = 1000
+//    y PostgREST corta EN SILENCIO. Sin paginar se leerían 1.000 filas de
+//    20.483 y la pestaña mostraría el 4,9% de las ventas SIN UN SOLO ERROR. Por
+//    eso el fallback es `leerTodoPaginado`, que verifica contra un COUNT exacto.
 //
 // 4. EL COMPARATIVO ES UNA LECTURA, NO UNA ESTIMACIÓN. "Qué cambió" se responde
 //    leyendo el MISMO período un año antes de la MISMA tabla y agregándolo con
@@ -50,13 +64,11 @@
 //    proyecta ni se prorratea. Y un mes empezado se compara contra los MISMOS
 //    días del año pasado: el 7 de agosto, medir 7 días contra los 31 de agosto
 //    del año pasado mostraría una caída del 78% que no ocurrió.
-//    · **Duplica la lectura**, y el costo está MEDIDO contra producción
-//      (7-ago-2026, build de producción): ventana de 12 meses = 20.445 filas +
-//      18.281 del comparativo = 38.726 en total, **7,6 s** de respuesta contra
-//      los 60 s de `maxDuration`. Un mes suelto: 344 + 236 filas, **1,9 s**.
-//      Van EN PARALELO y SWR cachea 5 minutos, o sea una descarga por sesión y
-//      por período. Payload comprimido: **129 KB → 190 KB** (el comparativo
-//      viaja aliviado — clave + 3 cifras, sin costo ni margen ni etiquetas).
+//    · **Duplica la lectura**, y el costo está MEDIDO contra producción. Las
+//      TRES lecturas (período, comparativo y diccionario de marcas) van EN
+//      PARALELO —el diccionario también, que antes esperaba a las otras dos— y
+//      SWR cachea 5 minutos, o sea una descarga por sesión y por período. El
+//      payload al navegador NO cambia con la RPC: son las mismas cifras.
 //    · **Falla ABIERTO**: si esa segunda lectura se cae, `comparativo` sale
 //      `null`, la pantalla se dibuja completa sin los deltas y el error viaja en
 //      `comparativoError`. Una comparación que no cargó nunca puede tumbar los
@@ -96,6 +108,14 @@ import {
 } from "@/lib/multifashion/productos-ranking";
 import type { RenglonComparativo } from "@/lib/multifashion/productos-resumen";
 import {
+  RPC_MARCAS,
+  RPC_PERIODO,
+  esFuncionAusente,
+  marcasDesdeRpc,
+  periodoDesdeRpc,
+  type FuenteLectura,
+} from "@/lib/multifashion/productos-lectura";
+import {
   armarPorMarca,
   armarPorMarcaComparativo,
   departamentoCanonico,
@@ -116,6 +136,14 @@ const EMPRESA = "american_classic";
 const TOP_N = 50;
 
 const dd = (n: number) => String(n).padStart(2, "0");
+
+/** Una lectura de período resuelta, venga por RPC o por el camino paginado. */
+interface LecturaPeriodo {
+  filas: FilaArticuloDiario[];
+  /** Filas CRUDAS de la tabla (no grupos) — lo que publica `filasLeidas`. */
+  filasCrudas: number;
+  fuente: FuenteLectura;
+}
 
 /** El período de comparación viaja LIGERO: la pantalla solo parea por `clave` y
  *  resta. Mandar el renglón completo por segunda vez duplicaría un payload que
@@ -186,10 +214,34 @@ export async function GET(req: NextRequest) {
     now,
   );
 
-  /** Una lectura completa del período. PAGINADO — ver el punto 3 del encabezado.
-   *  El orden es el de la PAGINACIÓN (id, único y estable), no el de
-   *  presentación: el orden que ve Daniel lo decide la agregación, por monto. */
-  const leerPeriodo = (d: string, h: string) =>
+  /** El período, agrupado por Postgres. UNA llamada — ver el punto 3. */
+  const leerPeriodoRpc = async (d: string, h: string): Promise<LecturaPeriodo> => {
+    const { data, error } = await supabaseServer.rpc(RPC_PERIODO, {
+      p_empresa_key: EMPRESA,
+      p_desde: d,
+      p_hasta: h,
+    });
+    if (!error) {
+      const { filas, filasCrudas } = periodoDesdeRpc(data, `${RPC_PERIODO} (${d}→${h})`);
+      return { filas, filasCrudas, fuente: "rpc" };
+    }
+    // Solo el caso "la DDL todavía no se corrió" cae al camino lento. Cualquier
+    // otro error se propaga: taparlo con 21 consultas más contra una base que
+    // ya se cayó por saturación sería esconder el problema y agrandarlo.
+    if (!esFuncionAusente(error)) {
+      throw new Error(`${RPC_PERIODO} (${d}→${h}): ${error.message}`);
+    }
+    console.warn(
+      `[multifashion/productos] ${RPC_PERIODO} no existe todavía (falta correr la migración 20260809140000) — se lee paginado`,
+    );
+    const filas = await leerPeriodoPaginado(d, h);
+    return { filas, filasCrudas: filas.length, fuente: "paginado" };
+  };
+
+  /** El camino de SIEMPRE. Paginado porque `db-max-rows` = 1000 y PostgREST
+   *  corta EN SILENCIO. El orden es el de la PAGINACIÓN (id, único y estable),
+   *  no el de presentación: el orden que ve Daniel lo decide la agregación. */
+  const leerPeriodoPaginado = (d: string, h: string) =>
     leerTodoPaginado<FilaArticuloDiario>(
       `switch_articulo_diario (${EMPRESA} ${d}→${h})`,
       (pedirCount, ini, fin) =>
@@ -206,47 +258,62 @@ export async function GET(req: NextRequest) {
           .range(ini, fin),
     );
 
+  /** El diccionario `articulo_id → marca`. Mismo trato: una llamada, y si la
+   *  función no está, las 9 páginas de siempre. */
+  const leerMarcas = async (): Promise<{ marcas: FilaMarca[]; fuente: FuenteLectura }> => {
+    const { data, error } = await supabaseServer.rpc(RPC_MARCAS, { p_empresa_key: EMPRESA });
+    if (!error) return { marcas: marcasDesdeRpc(data, RPC_MARCAS), fuente: "rpc" };
+    if (!esFuncionAusente(error)) throw new Error(`${RPC_MARCAS}: ${error.message}`);
+    const marcas = await leerTodoPaginado<FilaMarca>(
+      `switch_articulo_marca (${EMPRESA})`,
+      (pedirCount, ini, fin) =>
+        supabaseServer
+          .from("switch_articulo_marca")
+          .select("articulo_id, marca_id, marca_nombre", pedirCount ? { count: "exact" } : {})
+          .eq("empresa_key", EMPRESA)
+          .order("articulo_id", { ascending: true })
+          .range(ini, fin),
+    );
+    return { marcas, fuente: "paginado" };
+  };
+
   try {
-    // Los dos períodos se leen EN PARALELO: son independientes y secuenciarlos
-    // duplicaría la espera de una pantalla que ya lee ~22.000 filas.
-    // El `catch` de la comparación va PEGADO a su promesa: sin él, si la lectura
-    // principal falla primero, la otra quedaría como rechazo sin manejar.
+    // Las TRES lecturas van EN PARALELO: son independientes, y secuenciarlas es
+    // exactamente lo que hacía que esta pantalla tardara 9 s. El diccionario de
+    // marcas también entra acá — antes esperaba a que terminaran las otras dos
+    // para recién ahí pedir sus 9 páginas.
+    // Cada `catch` va PEGADO a su promesa: sin eso, si la lectura principal
+    // falla primero, las otras quedarían como rechazos sin manejar.
     const fallo: { comparativo: string | null } = { comparativo: null };
-    const [filas, filasComp] = await Promise.all([
-      leerPeriodo(desde, hasta),
-      compPermitido
-        ? leerPeriodo(compPermitido.inicio, compPermitido.fin).catch(err => {
-            fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
-            console.error("[multifashion/productos] comparativo no disponible", err);
-            return null;
-          })
-        : Promise.resolve(null),
-    ]);
 
     // ── Diccionario de marcas. ADITIVO: si todavía no existe la tabla (la DDL
     //    se aplica a mano en este proyecto) o está vacía, la pestaña sigue
     //    funcionando y el agrupador por marca lo DICE, en vez de inventar la
     //    marca a partir del código del proveedor.
-    let marcas: FilaMarca[] = [];
     let marcaDisponible = true;
     let marcaError: string | null = null;
-    try {
-      marcas = await leerTodoPaginado<FilaMarca>(
-        `switch_articulo_marca (${EMPRESA})`,
-        (pedirCount, ini, fin) =>
-          supabaseServer
-            .from("switch_articulo_marca")
-            .select("articulo_id, marca_id, marca_nombre", pedirCount ? { count: "exact" } : {})
-            .eq("empresa_key", EMPRESA)
-            .order("articulo_id", { ascending: true })
-            .range(ini, fin),
-      );
-      marcaDisponible = marcas.length > 0;
-    } catch (err) {
-      marcaDisponible = false;
-      marcaError = err instanceof Error ? err.message : "error inesperado";
-      console.error("[multifashion/productos] diccionario de marcas no disponible", err);
-    }
+
+    const [periodo1, periodoComp, dicc] = await Promise.all([
+      leerPeriodoRpc(desde, hasta),
+      compPermitido
+        ? leerPeriodoRpc(compPermitido.inicio, compPermitido.fin).catch(err => {
+            fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
+            console.error("[multifashion/productos] comparativo no disponible", err);
+            return null;
+          })
+        : Promise.resolve(null),
+      leerMarcas().catch(err => {
+        marcaDisponible = false;
+        marcaError = err instanceof Error ? err.message : "error inesperado";
+        console.error("[multifashion/productos] diccionario de marcas no disponible", err);
+        return null;
+      }),
+    ]);
+
+    const filas = periodo1.filas;
+    const filasComp = periodoComp ? periodoComp.filas : null;
+    const marcas: FilaMarca[] = dicc?.marcas ?? [];
+    if (marcaDisponible) marcaDisponible = marcas.length > 0;
 
     // ── Los departamentos de Switch se CANONIZAN antes de agrupar ────────────
     //    `TH ACCESORIES` (sin la S) y `TH ACCESSORIES` son el mismo departamento
@@ -301,8 +368,18 @@ export async function GET(req: NextRequest) {
       periodo,
       desde,
       hasta,
-      /** Filas crudas leídas — el número que prueba que no hubo truncado. */
-      filasLeidas: filas.length,
+      /** Filas crudas leídas — el número que prueba que no hubo truncado.
+       *  Sigue contando las filas CRUDAS de la tabla, no los grupos: la RPC lo
+       *  devuelve junto con la agregación, en la misma pasada. */
+      filasLeidas: periodo1.filasCrudas,
+      /** Por qué camino salió cada lectura: `rpc` (la suma la hizo Postgres) o
+       *  `paginado` (la migración todavía no se corrió). No cambia ni un
+       *  número; está para poder verlo desde afuera sin adivinar. */
+      fuentes: {
+        periodo: periodo1.fuente,
+        comparativo: periodoComp?.fuente ?? null,
+        marcas: dicc?.fuente ?? null,
+      },
       marcaDisponible,
       marcaError,
       ...resumen,
@@ -322,7 +399,7 @@ export async function GET(req: NextRequest) {
               desde: compRango.desde,
               hasta: compRango.hasta,
               parcial: compRango.parcial,
-              filasLeidas: filasComp?.length ?? 0,
+              filasLeidas: periodoComp?.filasCrudas ?? 0,
               totales: compCategoria.totales,
               categorias: aliviar(compCategoria.filas),
               codigos: aliviar(compCodigo.filas),
