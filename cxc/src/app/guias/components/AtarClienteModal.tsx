@@ -21,6 +21,7 @@
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import ClientePicker from "@/components/ClientePicker";
+import SugerenciasCliente from "./SugerenciasCliente";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 interface Props {
@@ -33,6 +34,8 @@ interface Props {
   nombreActual?: string;
   /** Clientes más usados en guías, para no tener que teclear. */
   topClientes?: ClienteHit[];
+  /** El directorio del grupo, para el "¿quisiste decir…?". Vacío = aún no cargó. */
+  clientesDelGrupo?: readonly ClienteHit[];
   guardando: boolean;
   error: string | null;
   onClose: () => void;
@@ -46,6 +49,7 @@ export default function AtarClienteModal({
   codigoActual,
   nombreActual,
   topClientes,
+  clientesDelGrupo,
   guardando,
   error,
   onClose,
@@ -106,6 +110,21 @@ export default function AtarClienteModal({
         <div className="px-5 py-4">
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">En la guía dice</p>
           <p className="text-sm font-medium text-black mb-4 break-words">{clienteTexto || "—"}</p>
+
+          {/* Las sugerencias van ARRIBA del buscador y solo mientras no haya
+              nada elegido: una vez que hay cliente, seguir ofreciendo otros es
+              invitar a cambiarlo sin motivo. Tocarlas no guarda: llena el
+              campo de abajo y desaparecen. */}
+          {!codigo.trim() && (
+            <SugerenciasCliente
+              clienteTexto={clienteTexto}
+              clientes={clientesDelGrupo ?? []}
+              onElegir={(n, c) => {
+                setNombre(n);
+                setCodigo(c);
+              }}
+            />
+          )}
 
           <label htmlFor="atar-cliente-picker" className="block text-xs uppercase tracking-wide text-gray-400 mb-1">
             Es este cliente

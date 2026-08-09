@@ -9,7 +9,11 @@ import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
 import AtarClienteModal from "./components/AtarClienteModal";
-import { useNombresDeClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
+import {
+  useClientesDelGrupo,
+  useNombresDeClientes,
+  type ClienteHit,
+} from "@/lib/hooks/useBusquedaClientes";
 
 function GuiaDeleteModal({
   open,
@@ -80,6 +84,10 @@ export default function GuiasPage() {
   // `D-XXX` → nombre, para que el chip de cada línea diga de quién se trata.
   // Comparte el caché del selector: si ya se abrió un ClientePicker, no hay red.
   const nombresPorCodigo = useNombresDeClientes(authChecked);
+  // El directorio entero, para el "¿quisiste decir…?" de la ventana de atar.
+  // Sale del MISMO caché de módulo que el mapa de arriba y que el selector: no
+  // agrega ni una lectura.
+  const clientesDelGrupo = useClientesDelGrupo(authChecked);
   usePersistedScroll("guias", !s.loading && s.guias.length > 0);
 
   const [guiasReadonly, setGuiasReadonly] = useState(false);
@@ -167,6 +175,7 @@ export default function GuiasPage() {
           codigoActual={s.atarItem?.cliente_codigo || ""}
           nombreActual={nombresPorCodigo.get((s.atarItem?.cliente_codigo || "").trim().toUpperCase()) || ""}
           topClientes={clientesTop}
+          clientesDelGrupo={clientesDelGrupo}
           guardando={s.atarGuardando}
           error={s.atarError}
           onClose={s.cerrarAtarCliente}

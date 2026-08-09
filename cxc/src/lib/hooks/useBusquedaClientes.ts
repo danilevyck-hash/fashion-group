@@ -134,6 +134,43 @@ export function useNombresDeClientes(activa: boolean): ReadonlyMap<string, strin
 }
 
 /**
+ * El directorio del grupo ENTERO, para quien necesite mirarlo de una sola vez
+ * en vez de buscar por tecleo — hoy, el "¿quisiste decir…?" de Guías.
+ *
+ * **Reusa el MISMO caché de módulo** que el selector y que `useNombresDeClientes`:
+ * abrir la ventana de atar no dispara ni una lectura extra.
+ *
+ * Devuelve `[]` mientras no haya podido leerlo COMPLETO —incluido el caso
+ * `completo: false`, o sea la lista recortada—. 🩸 Eso no es pereza: quien lo
+ * usa saca conclusiones del vacío ("no hay ningún cliente parecido"), y sacar
+ * esa conclusión de una lista a medias mandaría a dar de alta en Switch un
+ * cliente que ya existe. Un arreglo vacío significa "todavía no sé", y la
+ * pantalla no dice nada hasta saber.
+ */
+export function useClientesDelGrupo(activa: boolean): ClienteHit[] {
+  const [clientes, setClientes] = useState<ClienteHit[]>([]);
+
+  useEffect(() => {
+    if (!activa) return;
+    let cancel = false;
+    void (async () => {
+      try {
+        const dir = await obtenerDirectorio();
+        if (cancel || !dir.completo) return;
+        setClientes(dir.clientes);
+      } catch {
+        /* sin directorio: quien lo use se calla, no adivina */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [activa]);
+
+  return clientes;
+}
+
+/**
  * @param query    lo que el usuario está escribiendo
  * @param activa   false = no buscar (dropdown cerrado). Evita pedir por pedir.
  */
