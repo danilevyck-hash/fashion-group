@@ -46,11 +46,9 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
+import { sumRetail } from "@/lib/multifashion/retail-dia";
 
 export { hoyPanama };
-
-const VIEW = "_multifashion_sf_vw";
-const PAGE = 1000;
 
 export interface AcsResumenDiario {
   fecha: string;          // día del resumen (hoy Panamá) — el que se anuncia
@@ -127,25 +125,10 @@ export async function ventasAcsSyncFresco(fecha: string): Promise<boolean> {
   return (data?.length ?? 0) > 0;
 }
 
-/** SUM(subtotal) retail en [desde, hasta] (fechas Panamá, inclusive) —
- *  paginado con orden estable para no caer en el cap de 1000 de PostgREST. */
-async function sumRetail(desde: string, hasta: string): Promise<number> {
-  let sum = 0;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabaseServer
-      .from(VIEW)
-      .select("subtotal, n_sistema")
-      .eq("is_wholesale", false)
-      .gte("fecha", desde)
-      .lte("fecha", hasta)
-      .order("n_sistema", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(`${VIEW} [${desde}..${hasta}]: ${error.message}`);
-    for (const r of data ?? []) sum += Number(r.subtotal) || 0;
-    if (!data || data.length < PAGE) break;
-  }
-  return Math.round(sum * 100) / 100;
-}
+// SUM(subtotal) retail en [desde, hasta] vive en `@/lib/multifashion/retail-dia`
+// — la MISMA función que usa la tarjeta "HOY" de la pantalla. Dos cuentas
+// separadas para el mismo número es cómo se llega a que el Telegram y la app se
+// contradigan; ver la cabecera de ese archivo.
 
 export async function calcularResumenDiario(
   fecha: string,

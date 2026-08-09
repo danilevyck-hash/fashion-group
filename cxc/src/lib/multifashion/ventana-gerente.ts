@@ -206,6 +206,30 @@ export function clampFechaDia(
   return { fecha: v.hoy, ajustado: true };
 }
 
+/**
+ * Día suelto que se usa sólo como COMPARACIÓN (la tarjeta "HOY": el mismo día
+ * de la semana pasada, y ayer). Fuera de la ventana devuelve `null` → la ruta
+ * no lo consulta y la pantalla se dibuja sin ese comparativo.
+ *
+ * 🩸 NO se puede reusar `clampFechaDia` acá: ése empuja el día fuera de rango
+ * hacia HOY, y para un comparativo eso sería comparar hoy contra hoy — un
+ * "0%" perfectamente falso, que es peor que no mostrar nada. Un comparativo que
+ * no se puede ver simplemente NO SE MUESTRA.
+ *
+ * En la práctica le pega a Jennifer los primeros días de cada mes: el 3 de
+ * agosto, "la semana pasada" es el 27 de julio y "ayer" es el 2 de agosto — el
+ * primero cae fuera de su ventana y el segundo adentro. Es exactamente lo que
+ * significa la ventana que pidió Daniel; el resto del mes los dos entran.
+ */
+export function clampDiaComparable(
+  role: string | null | undefined,
+  fecha: string,
+  ahora: Date,
+): string | null {
+  if (!esRolAcotado(role)) return fecha;
+  return dentroDeVentana(fecha, ventanaGerente(ahora)) ? fecha : null;
+}
+
 export type PeriodoProductos = "mes" | "12m";
 
 export interface ClampProductos {

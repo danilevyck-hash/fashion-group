@@ -32,6 +32,7 @@ import {
   clampFechaDia,
   clampPeriodoVendedoras,
   clampPeriodoProductos,
+  clampDiaComparable,
 } from "@/lib/multifashion/ventana-gerente";
 import { signSession } from "@/lib/session-cookie";
 
@@ -114,6 +115,7 @@ import { GET as wholesaleGet } from "@/app/api/multifashion/clientes-wholesale/r
 import { GET as retailGet } from "@/app/api/multifashion/retail-recurrentes/route";
 import { GET as cajaGet } from "@/app/api/multifashion/caja/route";
 import { GET as productosGet } from "@/app/api/multifashion/productos/route";
+import { GET as ventaHoyGet } from "@/app/api/multifashion/venta-hoy/route";
 
 // ── Reloj fijo ───────────────────────────────────────────────────────────────
 // 30-jul-2026 18:00 UTC = 13:00 en Panamá. Mes en curso = julio 2026;
@@ -417,6 +419,57 @@ describe("rutas — gerente_acs no puede pedir fuera de la ventana", () => {
     expect(lecturas[1].filtros).toContainEqual(["lte", "2025-07-30"]);
   });
 
+  // venta-hoy no acepta parámetros: el día es SIEMPRE hoy Panamá, que para el
+  // rol acotado está dentro de la ventana. El clamp va igual (regla del módulo)
+  // y lo que SÍ se puede caer afuera son los días COMPARATIVOS.
+  it("venta-hoy: gerente_acs consulta el día de hoy, en hora Panamá", async () => {
+    await ventaHoyGet(req("/api/multifashion/venta-hoy", "gerente_acs"));
+    const lecturas = fromCalls.filter(f => f.tabla === "_multifashion_sf_vw");
+    expect(lecturas.length, "venta-hoy no consultó la vista").toBeGreaterThan(0);
+    expect(lecturas[0].filtros).toContainEqual(["gte", "2026-07-30"]);
+    expect(lecturas[0].filtros).toContainEqual(["lte", "2026-07-30"]);
+    // Retail puro: la misma semántica del módulo y del Telegram.
+    expect(lecturas[0].filtros).toContainEqual(["eq", false]);
+  });
+
+  it("venta-hoy: TODAS las lecturas de gerente_acs caen dentro de la ventana", async () => {
+    await ventaHoyGet(req("/api/multifashion/venta-hoy", "gerente_acs"));
+    const v = ventanaGerente(AHORA);
+    for (const l of fromCalls.filter(f => f.tabla === "_multifashion_sf_vw")) {
+      const desde = l.filtros.find(([k]) => k === "gte")?.[1] as string;
+      const hasta = l.filtros.find(([k]) => k === "lte")?.[1] as string;
+      const cabeEn = (w: { inicio: string; fin: string }) => desde >= w.inicio && hasta <= w.fin;
+      expect(cabeEn(v.actual) || cabeEn(v.anterior), `lectura fuera de ventana: ${desde}`).toBe(true);
+    }
+  });
+
+  it("venta-hoy: el 3-ago 'hace 7 días' cae en julio y NO se consulta", async () => {
+    vi.setSystemTime(new Date("2026-08-03T18:00:00.000Z")); // 1 pm en Panamá
+    fromCalls.length = 0;
+    await ventaHoyGet(req("/api/multifashion/venta-hoy", "gerente_acs"));
+    for (const l of fromCalls.filter(f => f.tabla === "_multifashion_sf_vw")) {
+      const desde = l.filtros.find(([k]) => k === "gte")?.[1] as string;
+      expect(desde >= "2026-08-01", `fuga a julio: ${desde}`).toBe(true);
+    }
+  });
+
+  it("venta-hoy: admin SÍ ve el 27-jul como comparativo el 3-ago", async () => {
+    vi.setSystemTime(new Date("2026-08-03T18:00:00.000Z"));
+    fromCalls.length = 0;
+    await ventaHoyGet(req("/api/multifashion/venta-hoy", "admin"));
+    const desdes = fromCalls
+      .filter(f => f.tabla === "_multifashion_sf_vw")
+      .map(l => l.filtros.find(([k]) => k === "gte")?.[1]);
+    expect(desdes).toContain("2026-07-27");
+  });
+
+  it("clampDiaComparable: fuera de ventana devuelve null, NUNCA 'hoy'", () => {
+    // 🩸 Caer a "hoy" convertiría el comparativo en hoy-contra-hoy: un 0% falso.
+    expect(clampDiaComparable("gerente_acs", "2026-06-15", AHORA)).toBeNull();
+    expect(clampDiaComparable("gerente_acs", "2026-07-23", AHORA)).toBe("2026-07-23");
+    expect(clampDiaComparable("admin", "2019-01-01", AHORA)).toBe("2019-01-01");
+  });
+
   it("clampPeriodoProductos: para gerente_acs devuelve siempre 'mes' + mes en curso", () => {
     expect(clampPeriodoProductos("gerente_acs", { periodo: "12m", year: 2019, mes: 1 }, AHORA)).toEqual({
       periodo: "mes", year: 2026, mes: 7, ajustado: true,
@@ -545,8 +598,9 @@ describe("rutas — admin sigue viendo todo el histórico", () => {
   // salía "Sin permiso" en el ranking y en los bonos. Los permisos se otorgan
   // POR USUARIO y se verifican POR ROL: ese es el desajuste. Daniel: *"si
   // debería de poder verlo"*.
-  it("secretaria ENTRA en las 8 rutas (no 403)", async () => {
+  it("secretaria ENTRA en las 9 rutas (no 403)", async () => {
     const casos: Array<[string, (r: NextRequest) => Promise<Response>]> = [
+      ["/api/multifashion/venta-hoy", ventaHoyGet],
       ["/api/multifashion/overview?year=2026", overviewGet],
       ["/api/multifashion/detalle-mensual?year=2026&mes=7", detalleGet],
       ["/api/multifashion/bonos?year=2026&mes=7", bonosGet],
@@ -611,6 +665,7 @@ describe("candado estructural — /api/multifashion/**", () => {
       "productos",
       "retail-recurrentes",
       "vendedoras",
+      "venta-hoy",
     ]);
   });
 
