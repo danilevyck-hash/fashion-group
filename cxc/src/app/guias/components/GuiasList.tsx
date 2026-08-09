@@ -54,7 +54,65 @@ interface GuiasListProps {
   /** Abrir la ventana de "¿a qué cliente fue esta línea?". Sin esto, el enlace
    *  no se ofrece (rol de solo lectura). */
   onAtarCliente?: (item: GuiaItem) => void;
+  /** `D-XXX` → cómo se llama, para que el chip diga un NOMBRE y no un código.
+   *  Si viene vacío (directorio no leído), el chip muestra solo el código. */
+  nombresPorCodigo?: ReadonlyMap<string, string>;
   readOnly?: boolean;
+}
+
+/**
+ * El chip de una línea ya atada: **el NOMBRE adelante, el código al lado**.
+ *
+ * 🩸 Antes decía solo `D-108`, y Daniel lo dijo con todas las letras: así
+ * *"el personal no va a saber"* de qué cliente se trata. El orden importa —
+ * lo que se lee es el nombre; el código queda de apoyo, chico, porque es lo
+ * que identifica sin ambigüedad y lo que se corrige si está mal.
+ *
+ * El nombre sale de `nombreParaMostrar` (vía el mapa del directorio), el MISMO
+ * que usa la lista del selector. Si el directorio no cargó, el chip queda
+ * exactamente como estaba: el código solo. Nunca inventa un nombre.
+ *
+ * ⚠️ La jerarquía va por COLOR y tipografía, no por tamaño: el código sale en
+ * mono y en un verde más tenue, pero NO más chico. En guías nada baja de 12 px
+ * (candado `iphone-targets-guias`), y esta celda es de las que se leen a un
+ * brazo de distancia en la bodega.
+ *
+ * ⚠️ NO SE TRUNCA. Esconder el nombre para que entre sería deshacer justo lo
+ * que se vino a arreglar. El peor caso real, medido sobre los 148 clientes
+ * D-XXX vivos, es de 47 caracteres ("Sistema Nacional De Proteccion Civil
+ * (Sinaproc)"), así que el nombre BAJA DE LÍNEA y el chip crece hacia abajo,
+ * que es lo único que la tabla puede regalar sin ensancharse.
+ */
+function ChipCliente({
+  codigo,
+  nombres,
+  interactivo = false,
+}: {
+  codigo: string;
+  nombres?: ReadonlyMap<string, string>;
+  interactivo?: boolean;
+}) {
+  const nombre = nombres?.get(codigo.trim().toUpperCase()) ?? "";
+  return (
+    <span
+      className={`inline-flex items-start gap-1.5 rounded px-1.5 py-1 min-w-0 text-left transition bg-emerald-50${
+        interactivo ? " hover:bg-emerald-100" : ""
+      }`}
+      title={nombre ? `${nombre} (${codigo})` : codigo}
+    >
+      <span aria-hidden className="mt-[0.3rem] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+      <span className="min-w-0">
+        {nombre ? (
+          <>
+            <span className="text-emerald-900 break-words">{nombre}</span>
+            <span className="ml-1.5 font-mono text-emerald-600">{codigo}</span>
+          </>
+        ) : (
+          <span className="font-mono text-emerald-800">{codigo}</span>
+        )}
+      </span>
+    </span>
+  );
 }
 
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
@@ -73,6 +131,7 @@ export default function GuiasList({
   bSaving, onConfirmarDespacho, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete, onReject, onAtarCliente,
+  nombresPorCodigo,
   readOnly,
 }: GuiasListProps) {
   // Atar el cliente lo pueden hacer los mismos que despachan. NO depende del
@@ -372,6 +431,19 @@ export default function GuiasList({
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
                               ) : expandedGuia ? (
                                 <>
+                                  {/* 🩸 QUÉ SE PUEDE TOCAR, DICHO EN LA CABECERA.
+                                      Una guía Completada está cerrada: bultos, facturas,
+                                      placa y firmas no se editan más (el candado del PUT
+                                      sigue intacto). Pero el chip del cliente SÍ se toca, y
+                                      eso, sin explicación, se lee como si el despacho entero
+                                      fuera editable. Va acá arriba y UNA vez por guía — no
+                                      por línea, que lo repetiría cinco veces. */}
+                                  {isDispatched && puedeAtarCliente && (
+                                    <p className="text-xs text-gray-500 pt-3">
+                                      Solo se puede cambiar el cliente
+                                    </p>
+                                  )}
+
                                   {/* Acciones rápidas (header de la card expandida) */}
                                   <div className="flex items-center justify-end gap-3 pt-3">
                                     {canEdit && !isDispatched && (
@@ -450,16 +522,14 @@ export default function GuiasList({
                                                     <button
                                                       type="button"
                                                       onClick={() => onAtarCliente?.(item)}
-                                                      title="Cambiar o quitar el cliente"
-                                                      className="inline-flex items-center min-h-[44px] pr-3 text-xs font-mono text-emerald-700 hover:text-emerald-900 transition"
+                                                      title={`Cambiar o quitar el cliente (${item.cliente_codigo})`}
+                                                      className="inline-flex items-center min-h-[44px] pr-3 text-xs text-emerald-700 hover:text-emerald-900 transition max-w-full"
                                                     >
-                                                      <span className="bg-emerald-50 hover:bg-emerald-100 rounded px-1.5 py-0.5 transition">
-                                                        {item.cliente_codigo}
-                                                      </span>
+                                                      <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} interactivo />
                                                     </button>
                                                   ) : (
-                                                    <span className="text-xs font-mono text-emerald-700 bg-emerald-50 rounded px-1.5 py-0.5">
-                                                      {item.cliente_codigo}
+                                                    <span className="inline-flex items-center text-xs text-emerald-700 max-w-full">
+                                                      <ChipCliente codigo={item.cliente_codigo} nombres={nombresPorCodigo} />
                                                     </span>
                                                   )
                                                 ) : puedeAtarCliente && item.id ? (

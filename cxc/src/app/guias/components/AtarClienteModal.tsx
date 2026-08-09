@@ -29,6 +29,8 @@ interface Props {
   clienteTexto: string;
   /** Código ya guardado, si lo hay. "" = sin atar. */
   codigoActual: string;
+  /** Cómo se llama el cliente ya atado. "" = no se pudo leer el directorio. */
+  nombreActual?: string;
   /** Clientes más usados en guías, para no tener que teclear. */
   topClientes?: ClienteHit[];
   guardando: boolean;
@@ -42,6 +44,7 @@ export default function AtarClienteModal({
   open,
   clienteTexto,
   codigoActual,
+  nombreActual,
   topClientes,
   guardando,
   error,
@@ -50,7 +53,7 @@ export default function AtarClienteModal({
 }: Props) {
   // El nombre que muestra el selector arranca del texto de la línea: así el
   // campo no aparece vacío y se ve de entrada contra qué se está pareando.
-  const [nombre, setNombre] = useState(clienteTexto);
+  const [nombre, setNombre] = useState(nombreActual || clienteTexto);
   const [codigo, setCodigo] = useState(codigoActual);
 
   // Al ABRIR se copian los valores de la línea. Sin esto, atar una línea y
@@ -58,10 +61,12 @@ export default function AtarClienteModal({
   // en Cheques desvinculaba en silencio al editar.
   useEffect(() => {
     if (open) {
-      setNombre(clienteTexto);
+      // Si ya está atada, el campo muestra el NOMBRE del cliente atado (no el
+      // texto de la guía): así se ve de una a quién apunta hoy el código.
+      setNombre(nombreActual || clienteTexto);
       setCodigo(codigoActual);
     }
-  }, [open, clienteTexto, codigoActual]);
+  }, [open, clienteTexto, codigoActual, nombreActual]);
 
   useEffect(() => {
     if (!open) return;

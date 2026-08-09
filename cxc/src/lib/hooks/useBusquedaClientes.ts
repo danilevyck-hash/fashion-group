@@ -30,6 +30,7 @@
 
 import { useEffect, useState } from "react";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { camposDeBusquedaCliente, nombreParaMostrar } from "@/lib/clientes/nombre-display";
 
 export interface ClienteHit {
   codigo: string;
@@ -84,8 +85,52 @@ function obtenerDirectorio(): Promise<Directorio> {
 
 function filtrar(clientes: readonly ClienteHit[], q: string): ClienteHit[] {
   return clientes
-    .filter((c) => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
+    .filter((c) => coincideBusqueda(q, camposDeBusquedaCliente(c)))
     .slice(0, MAX_SUGERENCIAS);
+}
+
+/**
+ * Mapa `D-XXX → cómo se llama` para poder mostrar el NOMBRE junto al código.
+ *
+ * 🩸 Un chip que dice `D-108` y nada más no le sirve a nadie. El nombre no
+ * viaja en la línea de guía (ahí solo se guarda el código), así que hay que
+ * traerlo del directorio.
+ *
+ * **Reusa el MISMO caché de módulo que el selector**: si alguien ya abrió un
+ * `ClientePicker` en la pantalla, esto no toca la red. Y el nombre pasa por
+ * `nombreParaMostrar`, así que el chip y la lista del selector dicen lo mismo.
+ *
+ * Degrada en silencio: si el directorio no se puede leer o vino RECORTADO
+ * (`completo: false`), devuelve un mapa vacío y quien lo use muestra solo el
+ * código. Nunca muestra un nombre a medias ni inventa uno.
+ */
+export function useNombresDeClientes(activa: boolean): ReadonlyMap<string, string> {
+  const [nombres, setNombres] = useState<ReadonlyMap<string, string>>(() => new Map());
+
+  useEffect(() => {
+    if (!activa) return;
+    let cancel = false;
+    void (async () => {
+      try {
+        const dir = await obtenerDirectorio();
+        if (cancel || !dir.completo) return;
+        const m = new Map<string, string>();
+        for (const c of dir.clientes) {
+          const cod = (c.codigo ?? "").trim();
+          const nombre = nombreParaMostrar(cod, c.nombre);
+          if (cod && nombre) m.set(cod.toUpperCase(), nombre);
+        }
+        setNombres(m);
+      } catch {
+        /* sin nombres: se muestra el código pelado, que es lo de antes */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [activa]);
+
+  return nombres;
 }
 
 /**
