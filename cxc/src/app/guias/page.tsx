@@ -8,6 +8,8 @@ import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
+import AtarClienteModal from "./components/AtarClienteModal";
+import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 function GuiaDeleteModal({
   open,
@@ -82,6 +84,22 @@ export default function GuiasPage() {
     if (sessionStorage.getItem("fg_guias_readonly") === "1") setGuiasReadonly(true);
   }, []);
 
+  // Los clientes más usados EN GUÍAS, para que atar una línea vieja no obligue
+  // a teclear. Se piden una sola vez y solo cuando hay sesión. Si falla, el
+  // buscador del selector sigue funcionando igual — por eso no hay error visible.
+  const [clientesTop, setClientesTop] = useState<ClienteHit[]>([]);
+  useEffect(() => {
+    if (!authChecked) return;
+    let cancel = false;
+    fetch("/api/guias/frecuencias", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { clientes?: ClienteHit[] } | null) => {
+        if (!cancel && d && Array.isArray(d.clientes)) setClientesTop(d.clientes);
+      })
+      .catch(() => { /* sin chips; el buscador sigue funcionando */ });
+    return () => { cancel = true; };
+  }, [authChecked]);
+
   useEffect(() => {
     if (authChecked) {
       s.loadGuias();
@@ -136,7 +154,18 @@ export default function GuiasPage() {
           onPrint={(id) => router.push(`/guias/${id}/imprimir`)}
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}
+          onAtarCliente={s.abrirAtarCliente}
           readOnly={guiasReadonly}
+        />
+        <AtarClienteModal
+          open={!!s.atarItem}
+          clienteTexto={s.atarItem?.cliente || ""}
+          codigoActual={s.atarItem?.cliente_codigo || ""}
+          topClientes={clientesTop}
+          guardando={s.atarGuardando}
+          error={s.atarError}
+          onClose={s.cerrarAtarCliente}
+          onGuardar={s.guardarAtarCliente}
         />
         <GuiaDeleteModal
           open={!!s.confirmDeleteId}

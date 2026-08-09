@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/require-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -43,14 +44,20 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabaseServer
-      .from("guia_items")
-      .select("cliente_codigo, empresa");
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<{
+    // ⚠️ PAGINADO OBLIGATORIO. Esto leía `guia_items` con un `select` pelado:
+    // hoy son 462 filas, pero `db-max-rows` = 1000 y PostgREST corta EN
+    // SILENCIO. A partir de la línea 1.001 los "más usados" habrían empezado a
+    // envejecer sin error ni señal — es el bug que este repo ya pagó una vez.
+    const rows = await leerTodoPaginado<{
       cliente_codigo: string | null;
       empresa: string | null;
-    }>;
+    }>("guia_items (frecuencias)", (pedirCount, from, to) =>
+      supabaseServer
+        .from("guia_items")
+        .select("cliente_codigo, empresa", pedirCount ? { count: "exact" } : {})
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
 
     // ── Clientes: contar por código ──
     const cntCod = new Map<string, number>();
