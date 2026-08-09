@@ -9,7 +9,7 @@ import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
 import AtarClienteModal from "./components/AtarClienteModal";
-import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
+import { useNombresDeClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 function GuiaDeleteModal({
   open,
@@ -77,6 +77,9 @@ export default function GuiasPage() {
   });
 
   const s = useGuiasState();
+  // `D-XXX` → nombre, para que el chip de cada línea diga de quién se trata.
+  // Comparte el caché del selector: si ya se abrió un ClientePicker, no hay red.
+  const nombresPorCodigo = useNombresDeClientes(authChecked);
   usePersistedScroll("guias", !s.loading && s.guias.length > 0);
 
   const [guiasReadonly, setGuiasReadonly] = useState(false);
@@ -155,12 +158,14 @@ export default function GuiasPage() {
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}
           onAtarCliente={s.abrirAtarCliente}
+          nombresPorCodigo={nombresPorCodigo}
           readOnly={guiasReadonly}
         />
         <AtarClienteModal
           open={!!s.atarItem}
           clienteTexto={s.atarItem?.cliente || ""}
           codigoActual={s.atarItem?.cliente_codigo || ""}
+          nombreActual={nombresPorCodigo.get((s.atarItem?.cliente_codigo || "").trim().toUpperCase()) || ""}
           topClientes={clientesTop}
           guardando={s.atarGuardando}
           error={s.atarError}

@@ -61,6 +61,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import { nombreParaMostrar } from "@/lib/clientes/nombre-display";
 
 interface ClientePickerProps {
   /** Nombre ya guardado en la fila. */
@@ -111,6 +112,29 @@ function Opcion({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Una fila de cliente del desplegable.
+ *
+ * El nombre pasa por `nombreParaMostrar`, así que la lista dice EXACTAMENTE lo
+ * mismo que el chip de la guía — y lo que se guarda al elegir es ese mismo
+ * texto, no la razón social que nadie reconoce.
+ */
+function OpcionCliente({
+  hit,
+  onElegir,
+}: {
+  hit: ClienteHit;
+  onElegir: (nombre: string, codigo: string) => void;
+}) {
+  const nombre = nombreParaMostrar(hit.codigo, hit.nombre) || hit.nombre;
+  return (
+    <Opcion onElegir={() => onElegir(nombre, hit.codigo)}>
+      <span className="truncate">{nombre}</span>
+      <span className="text-xs text-gray-400 font-mono shrink-0">{hit.codigo}</span>
+    </Opcion>
   );
 }
 
@@ -237,10 +261,7 @@ export default function ClientePicker({
           {q.length >= 2 &&
             !cargando &&
             hits.map((h) => (
-              <Opcion key={h.codigo} onElegir={() => elegir(h.nombre, h.codigo)}>
-                <span className="truncate">{h.nombre}</span>
-                <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>
-              </Opcion>
+              <OpcionCliente key={h.codigo} hit={h} onElegir={elegir} />
             ))}
 
           {listaTop.length > 0 && (
@@ -249,10 +270,7 @@ export default function ClientePicker({
                 Más usados
               </div>
               {listaTop.map((h) => (
-                <Opcion key={h.codigo} onElegir={() => elegir(h.nombre, h.codigo)}>
-                  <span className="truncate">{h.nombre}</span>
-                  <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>
-                </Opcion>
+                <OpcionCliente key={h.codigo} hit={h} onElegir={elegir} />
               ))}
             </>
           )}

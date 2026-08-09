@@ -19,6 +19,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
+import { camposDeBusquedaCliente } from "@/lib/clientes/nombre-display";
 
 const hook = readFileSync(
   path.join(process.cwd(), "src/lib/hooks/useBusquedaClientes.ts"),
@@ -36,14 +37,18 @@ const CLIENTES = [
 ];
 
 const buscar = (q: string) =>
-  CLIENTES.filter((c) => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo])).map(
-    (c) => c.codigo,
-  );
+  CLIENTES.filter((c) => coincideBusqueda(q, camposDeBusquedaCliente(c))).map((c) => c.codigo);
 
 describe("🔴 el filtro local usa el mismo criterio que el servidor", () => {
   it("el hook importa `coincideBusqueda`, no escribe el suyo", () => {
     expect(hook).toContain('from "@/lib/buscar-normalizado"');
-    expect(hook).toContain("coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo])");
+    // Los CAMPOS ya no van escritos a mano acá: salen de
+    // `camposDeBusquedaCliente`, la misma lista que usa `/api/clientes` — así
+    // el alias de display ("American Classics Store" → D-108) es buscable por
+    // los dos caminos y no puede haber dos resultados para la misma consulta.
+    expect(hook).toContain("coincideBusqueda(q, camposDeBusquedaCliente(c))");
+    expect(hook).toContain('from "@/lib/clientes/nombre-display"');
+    expect(hook).not.toMatch(/coincideBusqueda\(q, \[/);
   });
 
   it("no quedó un filtro a mano (toLowerCase + includes)", () => {

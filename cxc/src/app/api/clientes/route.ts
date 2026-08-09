@@ -40,6 +40,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/require-auth";
 import { coincideBusqueda } from "@/lib/buscar-normalizado";
 import { leerClientesDelGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
+import { camposDeBusquedaCliente } from "@/lib/clientes/nombre-display";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,10 @@ export async function GET(req: NextRequest) {
   // llamada traía un array recién creado y mutarlo no tenía consecuencia; ahora
   // sí. (`filter` ya devuelve uno nuevo, por eso solo la otra rama lo necesita.)
   const filtrados = q
-    ? visibles.filter(c => coincideBusqueda(q, [c.nombre, c.razon_social, c.codigo]))
+    // Los campos vienen de `camposDeBusquedaCliente` — la MISMA lista que usa
+    // el selector del navegador, e incluye el alias de display (sin él,
+    // "american classics store" daba 0 resultados: medido).
+    ? visibles.filter(c => coincideBusqueda(q, camposDeBusquedaCliente(c)))
     : visibles.slice();
 
   // Orden de presentación: por nombre, con collation española (ñ y acentos en
