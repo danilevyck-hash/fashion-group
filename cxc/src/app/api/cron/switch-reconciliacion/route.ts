@@ -81,6 +81,8 @@ import {
   logCronError,
   reconciliarSlotsSwitchSync,
   COLATERAL_RECOVER_AFTER_HOUR_UTC,
+  COLATERALES_LOGIN_WEB,
+  pasadaPuedeUsarLoginWeb,
   catalogoCicloSinceIso,
   type HeartbeatRow,
   type SlotDesatendido,
@@ -276,6 +278,12 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
+    // ⚠️ ÚNICO colateral que abre el LOGIN WEB de Switch (`changesession=SI`),
+    // que EXPULSA a quien esté trabajando en el panel de esa empresa — y el
+    // usuario de las env vars es el de Daniel. Por eso está en
+    // COLATERALES_LOGIN_WEB y `findMissingColaterales` lo deja pasar en las
+    // pasadas de las 14:00 y 18:00 UTC (9 a.m. y 1 p.m. de Panamá). Su ventana
+    // de recuperación es la pasada de las 10:00 UTC (5 a.m.).
     cronName: "sync-utilidad",
     label: "utilidad",
     recover: async () => {
@@ -574,8 +582,17 @@ const COLATERAL_CRONS: ColateralCron[] = [
   },
 ];
 
+/** Lo que devuelve `findMissingColaterales`: los que se recuperan en esta pasada
+ *  y los que se dejan pasar porque su recuperación abriría el login web de
+ *  Switch en horario de oficina (ver COLATERALES_LOGIN_WEB). */
+interface ColateralesFaltantes {
+  recuperables: ColateralCron[];
+  /** Nombres omitidos por login web en oficina — se reportan, no se esconden. */
+  omitidosLoginWeb: string[];
+}
+
 /** Heartbeats de los colaterales que NO tienen success de hoy (= se perdieron). */
-async function findMissingColaterales(dayStartIso: string): Promise<ColateralCron[]> {
+async function findMissingColaterales(dayStartIso: string): Promise<ColateralesFaltantes> {
   const names = COLATERAL_CRONS.map((c) => c.cronName);
   const { data, error } = await supabaseServer
     .from("cron_heartbeats")
@@ -583,7 +600,8 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
     .in("cron_name", names);
   if (error) {
     console.error(`[reconciliacion] no pude leer cron_heartbeats: ${error.message}`);
-    return []; // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
+    // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
+    return { recuperables: [], omitidosLoginWeb: [] };
   }
   // Umbral por-cron: ventana propia (successSinceIso) si el colateral la define
   // —los 3 catálogos usan el ciclo de su horario, grupo-resumen-mensual el día 3
@@ -608,12 +626,33 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
   // COLATERAL_RECOVER_AFTER_HOUR_UTC): su run normal aún puede correr;
   // recuperarlo antes duplicaría su alerta.
   const nowHourUtc = new Date().getUTCHours();
-  return COLATERAL_CRONS.filter(
+  const faltantes = COLATERAL_CRONS.filter(
     (c) =>
       (c.recoverOnlyIf?.() ?? true) &&
       !successHoy.has(c.cronName) &&
       nowHourUtc >= (COLATERAL_RECOVER_AFTER_HOUR_UTC[c.cronName] ?? 0),
   );
+
+  // 🔴 El login WEB de Switch (`changesession=SI`) EXPULSA a quien esté adentro
+  // del panel, y el usuario configurado es el de Daniel. Las pasadas de las
+  // 14:00 y 18:00 UTC caen 9:00 a.m. y 1:00 p.m. de Panamá: recuperar ahí
+  // significaba sacarlo de Switch en plena jornada. Se dejan pasar; su ventana
+  // es la pasada de las 10:00 UTC (5:00 a.m.), y perder una recuperación NO
+  // pierde datos (utilidad re-lee el mes entero y upserta). Ver
+  // COLATERALES_LOGIN_WEB en cron-telemetry.ts.
+  const puedeLoginWeb = pasadaPuedeUsarLoginWeb(nowHourUtc);
+  const omitidosLoginWeb = puedeLoginWeb
+    ? []
+    : faltantes.filter((c) => COLATERALES_LOGIN_WEB.has(c.cronName)).map((c) => c.cronName);
+  if (omitidosLoginWeb.length > 0) {
+    console.log(
+      `[reconciliacion] omito ${omitidosLoginWeb.join(", ")}: su recuperación abre el login web de Switch y estamos en horario de oficina de Panamá (${nowHourUtc}:00 UTC). Se recupera en la pasada de las 10:00 UTC.`,
+    );
+  }
+  return {
+    recuperables: faltantes.filter((c) => !omitidosLoginWeb.includes(c.cronName)),
+    omitidosLoginWeb,
+  };
 }
 
 /**
@@ -848,18 +887,25 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   // 1. Detección inicial (switch-sync por par + colaterales por heartbeat).
   const logBefore = await fetchTodayLog(sinceIso);
   const missingPairs = findMissing(expected, logBefore);
-  const missingColaterales = await findMissingColaterales(sinceIso);
+  const { recuperables: missingColaterales, omitidosLoginWeb } =
+    await findMissingColaterales(sinceIso);
 
-  // Todo OK desde el inicio → cero ruido de alertas. Único envío posible: el
-  // resumen post-recuperación de una caída de Switch que ya sanó SIN esta
-  // pasada (ej. el propio slot siguiente del cron recuperó el par) y aún no se
-  // reportó (dedup por watermark en cron_email_errors). Best-effort, no lanza.
+  // Nada que recuperar en esta pasada → cero ruido de alertas. Único envío
+  // posible: el resumen post-recuperación de una caída de Switch que ya sanó SIN
+  // esta pasada (ej. el propio slot siguiente del cron recuperó el par) y aún no
+  // se reportó (dedup por watermark en cron_email_errors). Best-effort, no lanza.
+  //
+  // `allHealthy` es false si algo quedó omitido por login web: NO está todo bien
+  // —falta la corrida de utilidad—, lo que pasa es que su recuperación espera a
+  // la pasada de las 10:00 UTC para no expulsar a nadie de Switch. Decir "todo
+  // sano" acá escondería justo el estado que hay que poder auditar después.
   if (missingPairs.length === 0 && missingColaterales.length === 0 && slotsDesatendidos.length === 0) {
     const outage = await enviarResumenCaidaSiAplica();
     return NextResponse.json({
       ok: true,
       fecha,
-      allHealthy: true,
+      allHealthy: omitidosLoginWeb.length === 0,
+      omitidosLoginWeb,
       reconciled: [],
       stillFailing: [],
       telegram: "none",
@@ -1018,6 +1064,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       ok: !hayProblemas,
       fecha,
       allHealthy: false,
+      // Colaterales que esta pasada dejó pasar a propósito porque su
+      // recuperación abre el login web de Switch y estamos en horario de
+      // oficina. No son un fallo: su ventana es la pasada de las 10:00 UTC.
+      omitidosLoginWeb,
       elapsedMs: elapsed(),
       reconciled: [
         ...recoveredPairs.map((p) => ({ empresa: p.empresa, syncType: p.syncType })),

@@ -60,6 +60,22 @@ export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   // último éxito era del viernes. Al pasar a diario ese 80 dejó de proteger de
   // nada y empezó a tapar: tres días enteros del vigía caído sin que el tablero
   // dijera una palabra.
+  //
+  // sync-utilidad y boston-cartera NO llevan override, a propósito (10-ago-2026,
+  // al apagar la recuperación de utilidad en horario de oficina). El cálculo del
+  // hueco máximo entre dos éxitos, que es lo único que mide este umbral:
+  //   • Camino feliz: su cron corre 1×/día (07:00 y 08:10 UTC) → hueco 24h, y el
+  //     default de 26h deja 2h de margen. Ese hueco NO cambió: no se movió una
+  //     sola entrada de vercel.json.
+  //   • Peor caso con recuperación: 07:00 falla y recupera la pasada de las
+  //     10:00 UTC → el heartbeat queda a las 10:00 y el éxito siguiente es el
+  //     07:00 del otro día = 21h. Sigue debajo de 26h.
+  //   • Antes se podía recuperar hasta las 18:00 UTC (peor caso 13h al éxito
+  //     siguiente). Quitar esas dos pasadas ALARGA el peor caso de 13h a 21h —
+  //     y 21h < 26h, así que el umbral aguanta sin tocarlo.
+  //   • Si fallan el 07:00 Y el 10:00, a las ~26h el cron aparece stale. Eso es
+  //     lo que se quiere: dos días seguidos sin utilidad TIENE que verse. Subir
+  //     el umbral para "acomodar" ese caso taparía justo lo que hay que mirar.
 };
 
 /** Horas de umbral stale para un cron (su override propio o el default). */
@@ -91,6 +107,77 @@ export function cronIsStale(
 /** Horas UTC de las pasadas de switch-reconciliacion (espejo de vercel.json). */
 export const RECONCILIACION_PASS_HOURS = [10, 14, 18];
 
+// ─── El login WEB de Switch expulsa a quien esté trabajando ──────────────────
+//
+// Switch tiene dos puertas: la API JSON (token por empresa, `client.ts`) y la
+// APP WEB del panel (`web-client.ts`). La segunda hace `POST /users/login` con
+// `changesession="SI"`, y ese "SI" **TOMA la sesión**: quien esté adentro del
+// panel de esa empresa queda expulsado en el acto. Peor: el usuario configurado
+// en `SWITCH_<EMPRESA>_WEB_USER` es el de Daniel, así que cada login web en
+// horario de oficina lo saca a él de Switch mientras trabaja.
+//
+// Los dos crons que usan esa puerta ya corren de madrugada por diseño
+// (sync-utilidad 07:00 UTC = 02:00 Panamá, boston-cartera 08:10 = 03:10). El
+// hueco que quedaba era la RECUPERACIÓN: `sync-utilidad` es un colateral de
+// switch-reconciliacion, y la reconciliación pasa a las 10:00, 14:00 y 18:00
+// UTC = 05:00, **09:00** y **13:00** de Panamá. Las dos últimas caen en plena
+// oficina, así que un fallo de la corrida de las 2 a.m. se "arreglaba" sacando
+// a Daniel de Switch a las 9 de la mañana.
+//
+// Regla: **un colateral que abre el login web solo se recupera en las pasadas
+// fuera del horario de oficina de Panamá.** Perder una recuperación no pierde
+// datos — cada corrida de utilidad re-lee el MES ENTERO y hace upsert por
+// (empresa, secuencial), así que la corrida siguiente repara todo el hueco. Y
+// si el problema persiste, quien avisa es la regla de los 2 fallos seguidos del
+// mismo par (`alert-policy.ts`), no esta recuperación.
+
+/** Panamá es UTC−5 FIJO, sin horario de verano. */
+const PANAMA_UTC_OFFSET_HORAS = -5;
+
+/** Horario de oficina de Panamá (hora local, [desde, hasta)). 8 a.m. a 6 p.m.:
+ *  la franja en la que hay alguien adentro del panel de Switch. */
+export const OFICINA_PANAMA_DESDE_HORA = 8;
+export const OFICINA_PANAMA_HASTA_HORA = 18;
+
+/** Hora local de Panamá para una hora UTC (acepta fraccional: 14.5 = 14:30). */
+export function horaPanamaDeUtc(horaUtc: number): number {
+  return ((horaUtc + PANAMA_UTC_OFFSET_HORAS) % 24 + 24) % 24;
+}
+
+/** ¿Esa hora UTC cae en horario de oficina de Panamá? */
+export function esHorarioDeOficinaPanama(horaUtc: number): boolean {
+  const local = horaPanamaDeUtc(horaUtc);
+  return local >= OFICINA_PANAMA_DESDE_HORA && local < OFICINA_PANAMA_HASTA_HORA;
+}
+
+/**
+ * Colaterales cuya recuperación abre el LOGIN WEB de Switch (y por lo tanto
+ * expulsa a quien esté en el panel). Lista corta y explícita a propósito: cada
+ * nombre acá es una recuperación que se apaga durante la oficina.
+ *
+ * Hoy solo `sync-utilidad`. `boston-cartera` también usa el login web pero NO es
+ * colateral de la reconciliación (solo corre en su horario de las 08:10 UTC), así
+ * que no tiene nada que apagar. Candado: `cron-login-web-oficina.test.ts` pone el
+ * build ROJO si aparece un tercer módulo que importe `web-client` o si un
+ * colateral nuevo llama a una función de login web sin estar en esta lista.
+ */
+export const COLATERALES_LOGIN_WEB: ReadonlySet<string> = new Set(["sync-utilidad"]);
+
+/** ¿Una pasada de reconciliación a esta hora UTC puede abrir el login web? */
+export function pasadaPuedeUsarLoginWeb(horaUtc: number): boolean {
+  return !esHorarioDeOficinaPanama(horaUtc);
+}
+
+/** Pasadas de reconciliación elegibles para recuperar un colateral dado. Un
+ *  colateral con login web solo se recupera fuera de la oficina: hoy queda la
+ *  pasada de las 10:00 UTC (05:00 a.m. Panamá). */
+export function pasadasElegiblesParaColateral(cronName: string): number[] {
+  const minima = COLATERAL_RECOVER_AFTER_HOUR_UTC[cronName] ?? 0;
+  return RECONCILIACION_PASS_HOURS.filter(
+    (p) => p >= minima && (!COLATERALES_LOGIN_WEB.has(cronName) || pasadaPuedeUsarLoginWeb(p)),
+  );
+}
+
 /**
  * Crons cuya recuperación es una pasada de reconciliación, con su hora UTC
  * mínima de recuperación (0 = recuperable en cualquier pasada). Debe reflejar
@@ -105,6 +192,10 @@ export const RECONCILIACION_PASS_HOURS = [10, 14, 18];
 export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "switch-sync": 0,
   "sync-clientes-master": 0,
+  // Su cron corre 07:00 UTC, así que por HORA es recuperable en cualquier
+  // pasada. Lo que lo acota no es este mapa sino COLATERALES_LOGIN_WEB: abre el
+  // login web de Switch, que expulsa a quien esté en el panel, y por eso solo se
+  // recupera fuera del horario de oficina de Panamá → la pasada de las 10:00 UTC.
   "sync-utilidad": 0,
   "sync-recibos": 0,
   "switch-articulos": 0,
@@ -253,17 +344,23 @@ export const NUNCA_SILENCIAR = new Set([
  * fraccional: 14.5 = 14:30 UTC.)
  *   - Entradas extra propias: viene si aún queda alguna por delante.
  *   - Colateral: viene si queda una pasada de reconciliación POSTERIOR a ahora
- *     entre las elegibles (hora >= su recoverAfterHourUtc). Estricto (>): la
- *     pasada en curso no cuenta como "por venir" — si su recuperación falla, la
- *     propia reconciliación alerta con mensaje preciso (failedColaterales).
+ *     entre las elegibles (hora >= su recoverAfterHourUtc, y fuera de la oficina
+ *     si el colateral abre el login web). Estricto (>): la pasada en curso no
+ *     cuenta como "por venir" — si su recuperación falla, la propia
+ *     reconciliación alerta con mensaje preciso (failedColaterales).
+ *
+ * Ojo con los colaterales de login web (COLATERALES_LOGIN_WEB): para ellos la
+ * única pasada elegible es la de las 10:00 UTC, así que a partir de esa hora ya
+ * NO hay recuperación en camino y un stale deja de silenciarse. Es lo correcto:
+ * antes se silenciaba hasta las 18:00 prometiendo una recuperación que ahora no
+ * va a ocurrir.
  */
 export function recoveryStillComingToday(cronName: string, nowHourUtc: number): boolean {
   if (NUNCA_SILENCIAR.has(cronName)) return false;
   const extras = EXTRA_ENTRY_HOURS_UTC[cronName];
   if (extras !== undefined) return extras.some((h) => h > nowHourUtc);
-  const after = COLATERAL_RECOVER_AFTER_HOUR_UTC[cronName];
-  if (after === undefined) return false; // sin recuperación conocida → alertar normal
-  const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
+  if (COLATERAL_RECOVER_AFTER_HOUR_UTC[cronName] === undefined) return false; // sin recuperación conocida → alertar normal
+  const eligible = pasadasElegiblesParaColateral(cronName);
   if (eligible.length === 0) return false;
   return Math.max(...eligible) > nowHourUtc;
 }
