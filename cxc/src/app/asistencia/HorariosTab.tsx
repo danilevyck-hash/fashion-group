@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface Fila {
   codigo: string;
@@ -76,10 +77,17 @@ export default function HorariosTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
-        Lo que fijes acá manda sobre lo que diga el reloj. Arranca con la hora a la que
-        <b> cada quien sale de verdad</b>, medida de sus marcaciones.
-      </p>
+      {/* 🩸 El PORQUÉ de esta pantalla —el `Turno` del reloj viene mal— se
+          aprende una vez y no cambia ninguna decisión al abrirla. Pasa al ⓘ;
+          lo que SÍ pide acción («N sin confirmar») se queda abajo, a la vista. */}
+      <div className="-ml-2 -mt-2">
+        <Ayuda titulo="De dónde sale la hora sugerida" etiqueta="De dónde sale la sugerencia">
+          <p>
+            Lo que fijes acá manda sobre lo que diga el reloj. Arranca con la hora a la que
+            <b> cada quien sale de verdad</b>, medida de sus marcaciones.
+          </p>
+        </Ayuda>
+      </div>
 
       {sinConfirmar > 0 && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">

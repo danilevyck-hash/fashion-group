@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { downloadWorkbook } from "@/lib/excel-export";
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
 import type { ReglasAsistencia } from "@/lib/asistencia/config";
@@ -393,11 +394,19 @@ export default function PlanillaTab() {
         </>
       )}
 
-      <p className="text-xs text-gray-400">
-        {FORMULA_NETO} Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
-        <b>Configuración</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
-        servicios se escriben a mano acá: no salen de ningún sistema.
-      </p>
+      {/* La fórmula se aprende UNA vez y no cambia ninguna decisión al abrir la
+          pantalla: va al ⓘ. Todo lo de arriba —los avisos de plata— se queda
+          en pantalla. */}
+      <div className="-ml-2">
+        <Ayuda titulo="Cómo se calcula el neto" etiqueta="Cómo se calcula el neto">
+          <p>{FORMULA_NETO}</p>
+          <p className="mt-1.5">
+            Los recargos, los porcentajes de seguro y la hora de corte se cambian en{" "}
+            <b>Configuración</b>. El ISR, el préstamo, los terceros, la mercancía y los otros
+            servicios se escriben a mano acá: no salen de ningún sistema.
+          </p>
+        </Ayuda>
+      </div>
     </div>
   );
 }
@@ -523,10 +532,10 @@ function Tarjeta({
             {linea("Seguro educativo", d.seguroEducativo, true)}
           </div>
 
-          <p className="mt-3 text-xs uppercase tracking-wide text-gray-400">
-            Se escriben a mano
-          </p>
-          <div className="mt-1 grid grid-cols-2 gap-2">
+          {/* Sin rótulo de grupo: cada campo ya dice su nombre y para qué lado
+              va («resta» / «suma»), y que se escriben a mano lo dice el ⓘ del
+              pie de la pantalla. */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {MANUALES.map(([campo, etiqueta, signo]) => (
               <label key={campo} className="flex flex-col gap-0.5">
                 {/* El signo va en la etiqueta: cuatro de los cinco se restan y

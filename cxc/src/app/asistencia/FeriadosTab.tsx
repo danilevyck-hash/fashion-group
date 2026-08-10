@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface Feriado { fecha: string; nombre: string }
 
@@ -63,10 +64,17 @@ export default function FeriadosTab() {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-500">
-        Estos días <b>no cuentan como ausencia de nadie</b>. Los feriados de Panamá ya
-        están cargados; agrega acá tus cierres propios (inventario, capacitación).
-      </p>
+      {/* Lo que se aprende UNA vez vive en el ⓘ; lo que hay que hacer, en la
+          pantalla. El aviso de que estos días no cuentan como ausencia sigue
+          alcanzable de un toque, sin ocupar lugar en cada carga. */}
+      <div className="-ml-2 -mt-2">
+        <Ayuda titulo="Para qué sirven los feriados" etiqueta="Para qué sirven">
+          <p>
+            Estos días <b>no cuentan como ausencia de nadie</b>. Los feriados de Panamá ya
+            están cargados; agrega acá tus cierres propios (inventario, capacitación).
+          </p>
+        </Ayuda>
+      </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -98,9 +106,6 @@ export default function FeriadosTab() {
       </div>
 
       {lista === null && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
-      {lista?.length === 0 && (
-        <p className="py-10 text-center text-sm text-gray-500">No hay feriados cargados en {anio}.</p>
-      )}
       {!!lista?.length && (
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
           {lista.map((f) => (
