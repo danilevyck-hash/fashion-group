@@ -10,6 +10,8 @@ export interface FilaMultiExcel {
   descripcion: string;
   empresa: string;
   stats: ReferenciaStats | null;
+  /** Existencia actual del catálogo (switch_articulo_info); null/ausente = sin dato. */
+  existencia?: number | null;
 }
 
 export function estadoTexto(stats: ReferenciaStats | null): string {
@@ -36,6 +38,7 @@ export async function buildReferenciasSheet(
       { header: "12 m", wch: 8, align: "right", fmt: "#,##0" },
       { header: "u/mes real", wch: 11, align: "right", fmt: "#,##0.0" },
       { header: "Precio real", wch: 12, align: "right", fmt: MONEY_FMT },
+      { header: "Existencia", wch: 11, align: "right", fmt: "#,##0" },
       { header: "Estado", wch: 20 },
     ],
     rows: filas.map((f) => [
@@ -47,6 +50,7 @@ export async function buildReferenciasSheet(
       f.stats ? f.stats.m12.unidades : null,
       f.stats?.uMesReal != null ? Number(f.stats.uMesReal.toFixed(1)) : null,
       f.stats?.precioReal != null ? Number(f.stats.precioReal.toFixed(2)) : null,
+      f.existencia ?? null,
       estadoTexto(f.stats),
     ]),
   });

@@ -35,6 +35,7 @@ import {
   type VentanaTemporada,
 } from "@/lib/ventas/temporadas-referencia";
 import { estadoTexto, exportReferenciasToExcel, type FilaMultiExcel } from "@/lib/ventas/referencia-excel";
+import { fmtFrescura } from "@/lib/ventas/referencia-info";
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
 
@@ -117,24 +118,28 @@ function VistaUna() {
   const [periodo, setPeriodo] = useState<Periodo>("12");
   const [temporada, setTemporada] = useState<string | null>(null);
   const [selectorTemporada, setSelectorTemporada] = useState(false);
+  // Lo último buscado con éxito: es lo que se re-consulta después de
+  // "Actualizar datos de Switch" para que la tarjeta muestre lo recién traído.
+  const [ultimaBusqueda, setUltimaBusqueda] = useState<string | null>(null);
 
-  const buscar = async (texto: string) => {
+  const buscar = async (texto: string, silencioso = false) => {
     const query = texto.trim();
     if (query.length < 3) {
       setError("Escribe al menos 3 caracteres.");
       return;
     }
-    setLoading(true);
+    if (!silencioso) setLoading(true);
     setError(null);
     try {
       const r = await fetchJsonWithRetry<ReferenciaApiResp>(
         `/api/ventas/referencia?q=${encodeURIComponent(query)}`,
       );
       setResp(r);
+      setUltimaBusqueda(query);
     } catch (err) {
       setError(describeFetchError(err));
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   };
 
@@ -237,6 +242,10 @@ function VistaUna() {
             hoyMes={resp.hoyMes}
             periodo={periodo}
             temporada={temporada}
+            infoDisponible={resp.infoDisponible !== false}
+            onActualizado={() => {
+              if (ultimaBusqueda) void buscar(ultimaBusqueda, true);
+            }}
           />
         ))}
       {!loading && resp?.modo === "referencias" && !modelos.length && (
@@ -332,12 +341,16 @@ function TarjetaModelo({
   hoyMes,
   periodo,
   temporada,
+  infoDisponible,
+  onActualizado,
 }: {
   modelo: string;
   refs: ReferenciaSerie[];
   hoyMes: string;
   periodo: Periodo;
   temporada: string | null;
+  infoDisponible: boolean;
+  onActualizado: () => void;
 }) {
   const serieModelo = useMemo(() => sumarSeries(refs.map((r) => r.serie)), [refs]);
   const stats = useMemo(() => calcularStats(serieModelo, hoyMes), [serieModelo, hoyMes]);
@@ -348,6 +361,19 @@ function TarjetaModelo({
   const barras = useMemo(() => serieContinua(serieModelo, hoyMes), [serieModelo, hoyMes]);
   const descripcion = refs[0]?.descripcion ?? "";
   const empresa = refs[0]?.empresa ?? "";
+  // Nombre COMERCIAL del catálogo ("KAHLO PASSCASE") — la descripción de las
+  // ventas es solo categoría+género. Se muestra si el catálogo lo tiene.
+  const nombreComercial = refs.find((r) => r.info?.descripcion)?.info?.descripcion ?? null;
+  const hayInfo = refs.some((r) => r.info != null);
+  const conExistencia = refs.filter((r) => r.info?.existencia != null);
+  const existenciaTotal = conExistencia.length
+    ? conExistencia.reduce((s, r) => s + (r.info?.existencia ?? 0), 0)
+    : null;
+  const frescura = refs
+    .map((r) => r.info?.syncedAt)
+    .filter((s): s is string => !!s)
+    .sort()
+    .at(-1);
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -356,9 +382,12 @@ function TarjetaModelo({
         <div className="min-w-0">
           <div className="text-[17px] font-extrabold tracking-tight text-gray-950">
             <span className="font-mono">{modelo}</span>
-            {descripcion && <span className="ml-2 text-[13px] font-normal text-gray-500">· {descripcion}</span>}
+            {(nombreComercial || descripcion) && (
+              <span className="ml-2 text-[13px] font-normal text-gray-500">· {nombreComercial ?? descripcion}</span>
+            )}
           </div>
           <div className="text-[13px] text-gray-500">
+            {nombreComercial && descripcion && <>{descripcion} · </>}
             {refs.length} {refs.length === 1 ? "color" : "colores"}
             {stats.primeraVenta && <> · vende desde {fmtMes(stats.primeraVenta)}</>}
           </div>
@@ -367,6 +396,17 @@ function TarjetaModelo({
           {etiquetaEmpresa(empresa)}
         </span>
       </div>
+
+      {/* Datos de catálogo (Switch) + botón de actualizar. costo_api NUNCA se
+          muestra: la API de Switch no dice si es FOB o CIF (Fase 2 parada). */}
+      <FranjaCatalogo
+        empresa={empresa}
+        infoDisponible={infoDisponible}
+        hayInfo={hayInfo}
+        existenciaTotal={existenciaTotal}
+        frescura={frescura ?? null}
+        onActualizado={onActualizado}
+      />
 
       {/* KPIs */}
       {ventanas ? (
@@ -414,12 +454,14 @@ function TarjetaModelo({
               )}
               <Th right>u/mes real</Th>
               <Th right>Precio real</Th>
+              {hayInfo && <Th right>Exist.</Th>}
+              {hayInfo && <Th right>Etiqueta</Th>}
               <Th>Estado</Th>
             </tr>
           </thead>
           <tbody>
             {refs.map((r) => (
-              <FilaColor key={r.codigo} referencia={r} hoyMes={hoyMes} ventanas={ventanas} />
+              <FilaColor key={r.codigo} referencia={r} hoyMes={hoyMes} ventanas={ventanas} conInfo={hayInfo} />
             ))}
           </tbody>
         </table>
@@ -428,6 +470,84 @@ function TarjetaModelo({
         Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los meses
         en que HABÍA mercancía.
       </p>
+    </div>
+  );
+}
+
+// ─── Franja de catálogo: existencia + frescura + "Actualizar datos de Switch" ─
+//
+// 🔴 costo_api NO se pinta acá ni en ningún lado: el `costo` de la API de
+// Switch no está etiquetado FOB/CIF (sondeo 9-ago-2026) y mostrarlo como FOB
+// está prohibido. Queda guardado en la tabla; encenderlo cuando Daniel
+// confirme qué es será agregar el campo en infoParaCliente() y una celda acá.
+function FranjaCatalogo({
+  empresa,
+  infoDisponible,
+  hayInfo,
+  existenciaTotal,
+  frescura,
+  onActualizado,
+}: {
+  empresa: string;
+  infoDisponible: boolean;
+  hayInfo: boolean;
+  existenciaTotal: number | null;
+  frescura: string | null;
+  onActualizado: () => void;
+}) {
+  const [actualizando, setActualizando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const actualizar = async () => {
+    setActualizando(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/ventas/referencia/actualizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresa }),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error ?? "No se pudo actualizar.");
+      onActualizado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar. Intenta de nuevo en unos segundos.");
+    } finally {
+      setActualizando(false);
+    }
+  };
+
+  return (
+    <div className="border-b border-gray-200 bg-gray-50/60 px-4 py-2.5 sm:px-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[13px] text-gray-700">
+          {hayInfo ? (
+            <>
+              {existenciaTotal != null ? (
+                <>
+                  Existencia: <b className="tabular-nums">{fmtInt(existenciaTotal)} u</b>
+                </>
+              ) : (
+                <>Existencia: sin dato</>
+              )}
+              {frescura && <span className="text-gray-500"> · datos de Switch al {fmtFrescura(frescura)}</span>}
+            </>
+          ) : infoDisponible ? (
+            <>Sin datos de catálogo todavía — toca «Actualizar datos de Switch».</>
+          ) : (
+            <>Los datos de catálogo (existencia y precio de etiqueta) estarán cuando se corra la migración.</>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => void actualizar()}
+          disabled={actualizando}
+          className="min-h-[44px] rounded-lg border border-gray-300 bg-white px-3.5 text-[13px] font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+        >
+          {actualizando ? "Actualizando… (puede tardar 1-2 min)" : "Actualizar datos de Switch"}
+        </button>
+      </div>
+      {error && <p className="mt-1.5 text-xs text-red-700">{error}</p>}
     </div>
   );
 }
@@ -564,10 +684,13 @@ function FilaColor({
   referencia,
   hoyMes,
   ventanas,
+  conInfo,
 }: {
   referencia: ReferenciaSerie;
   hoyMes: string;
   ventanas: VentanaTemporada[] | null;
+  /** true = la tabla lleva las columnas de catálogo (Exist. / Etiqueta). */
+  conInfo: boolean;
 }) {
   const stats = useMemo(() => calcularStats(referencia.serie, hoyMes), [referencia.serie, hoyMes]);
   const color = colorDe(referencia.codigo);
@@ -594,6 +717,10 @@ function FilaColor({
       )}
       <Td right>{fmtU(stats.uMesReal)}</Td>
       <Td right>{stats.precioReal != null ? fmtMoney(stats.precioReal) : "—"}</Td>
+      {conInfo && <Td right>{referencia.info?.existencia != null ? fmtInt(referencia.info.existencia) : "—"}</Td>}
+      {conInfo && (
+        <Td right>{referencia.info?.precioEtiqueta != null ? fmtMoney(referencia.info.precioEtiqueta) : "—"}</Td>
+      )}
       <Td>
         <PillEstado stats={stats} />
       </Td>
@@ -640,20 +767,31 @@ function VistaVarias() {
     if (!resp?.referencias) return [];
     const halladas: FilaMultiExcel[] = resp.referencias.map((r) => ({
       codigo: r.codigo,
-      descripcion: r.descripcion,
+      // El nombre COMERCIAL del catálogo pisa la categoría de ventas.
+      descripcion: r.info?.descripcion || r.descripcion,
       empresa: etiquetaEmpresa(r.empresa),
       stats: calcularStats(r.serie, resp.hoyMes),
+      existencia: r.info?.existencia ?? null,
     }));
     const noEnc: FilaMultiExcel[] = (resp.noEncontrados ?? []).map((c) => ({
       codigo: c,
       descripcion: "",
       empresa: "",
       stats: null,
+      existencia: null,
     }));
     return [...halladas, ...noEnc];
   }, [resp]);
 
   const encontradas = filas.filter((f) => f.stats != null).length;
+  const hayInfoMulti = filas.some((f) => f.existencia != null);
+  const frescuraMulti = useMemo(() => {
+    const sellos = (resp?.referencias ?? [])
+      .map((r) => r.info?.syncedAt)
+      .filter((s): s is string => !!s)
+      .sort();
+    return sellos.at(-1) ?? null;
+  }, [resp]);
 
   return (
     <div>
@@ -718,6 +856,7 @@ function VistaVarias() {
                   <Th right>12 m</Th>
                   <Th right>u/mes real</Th>
                   <Th right>Precio real</Th>
+                  {hayInfoMulti && <Th right>Exist.</Th>}
                   <Th>Estado</Th>
                 </tr>
               </thead>
@@ -737,6 +876,7 @@ function VistaVarias() {
                     <Td right>{f.stats ? fmtInt(f.stats.m12.unidades) : "—"}</Td>
                     <Td right>{f.stats ? fmtU(f.stats.uMesReal) : "—"}</Td>
                     <Td right>{f.stats?.precioReal != null ? fmtMoney(f.stats.precioReal) : "—"}</Td>
+                    {hayInfoMulti && <Td right>{f.existencia != null ? fmtInt(f.existencia) : "—"}</Td>}
                     <Td>
                       <PillEstado stats={f.stats} />
                     </Td>
@@ -749,6 +889,7 @@ function VistaVarias() {
             Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los
             meses en que HABÍA mercancía — una referencia puede marcar 0 en 12 m y aun así un ritmo alto: se agotó,
             no dejó de gustar.
+            {frescuraMulti && <> Existencias de Switch al {fmtFrescura(frescuraMulti)}.</>}
           </p>
         </div>
       )}

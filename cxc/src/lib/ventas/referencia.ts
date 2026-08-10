@@ -81,6 +81,10 @@ export interface ReferenciaSerie {
   empresa: string;
   descripcion: string;
   serie: MesSerie[]; // ordenada por mes ascendente
+  /** Datos de catálogo (switch_articulo_info): nombre comercial, existencia,
+   *  precio de etiqueta y su frescura. null = ese código no está en el
+   *  catálogo sincronizado; ausente = la tabla todavía no existe. */
+  info?: import("./referencia-info").InfoCliente | null;
 }
 
 // ─── Contrato del API (/api/ventas/referencia) ───────────────────────────────
@@ -101,6 +105,9 @@ export interface ReferenciaApiResp {
   referencias?: ReferenciaSerie[];
   coincidencias?: CoincidenciaDescripcion[];
   noEncontrados?: string[];
+  /** false = switch_articulo_info todavía no existe (migración pendiente):
+   *  la pantalla ofrece el botón de actualizar pero no promete existencias. */
+  infoDisponible?: boolean;
 }
 
 // ─── Aritmética de meses (strings YYYY-MM — sin Date, sin zonas) ─────────────

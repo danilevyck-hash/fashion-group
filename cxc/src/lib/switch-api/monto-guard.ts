@@ -70,7 +70,8 @@ export type FamiliaMonto =
   | "utilidad"
   | "recibo"
   | "proveedor"
-  | "producto";
+  | "producto"
+  | "articulo_info";
 
 export interface DefinicionGuard {
   /** Tabla donde vive la historia con la que se calibra. */
@@ -210,6 +211,21 @@ export const GUARDS: Readonly<Record<FamiliaMonto, DefinicionGuard>> = {
     record: 64.0,
     porEmpresa: false,
     que: "el precio de un producto del catálogo",
+  },
+  // Récord REAL medido (9-ago-2026, switch_articulo_diario de las 6 FG): la
+  // venta unitaria más cara de la historia es $850,00 (CLICHE600, vistana).
+  // Mismo piso de $10.000 que el catálogo (11,8× el récord): ninguna prenda ni
+  // calzado concebible lo alcanza, y frena tanto la clase $1.000.000.049,22
+  // como el punto decimal corrido. `costo_api` entra en la simetría aunque hoy
+  // NO se muestre — cuando se encienda, ya llega filtrado.
+  articulo_info: {
+    tabla: "switch_articulo_info",
+    anclaje: "precio_etiqueta",
+    columnas: ["precio_etiqueta", "costo_api"],
+    piso: 10_000,
+    record: 850.0,
+    porEmpresa: true,
+    que: "el precio de etiqueta de un artículo",
   },
 };
 
