@@ -47,11 +47,14 @@ export const CRON_STALE_HOURS_DEFAULT = 26;
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
   "catalogos-fotos-resumen": 8 * 24,
-  // Corre solo de lunes a viernes (`0 15 * * 1-5`): el lunes por la mañana su
-  // último éxito es del viernes. Con el umbral de siempre saldría stale todos
-  // los lunes por diseño, que es exactamente el falso positivo que enseña a
-  // ignorar el tablero.
-  "asistencia-vigia": 80,
+  // Cuatro pasadas TODOS los días (13:45, 15:00, 20:00 y 22:15 UTC): entre la
+  // última de una noche y la primera de la mañana siguiente pasan 15h30. El
+  // umbral de siempre (26h) le queda holgado y no hace falta override.
+  //
+  // 🩸 Antes valía 80 porque corría solo de lunes a viernes y el lunes su
+  // último éxito era del viernes. Al pasar a diario ese 80 dejó de proteger de
+  // nada y empezó a tapar: tres días enteros del vigía caído sin que el tablero
+  // dijera una palabra.
 };
 
 /** Horas de umbral stale para un cron (su override propio o el default). */

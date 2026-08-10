@@ -21,7 +21,13 @@ import { parseDesafio, construirAutorizacion } from "../../../scripts/agente-rel
 // @ts-expect-error — idem.
 import { mandarEventos, POR_LOTE } from "../../../scripts/agente-reloj/puente.mjs";
 // @ts-expect-error — idem.
-import { ventanaRodante, darVuelta } from "../../../scripts/agente-reloj/vuelta.mjs";
+import {
+  ventanaRodante,
+  darVuelta,
+  decidirVentana,
+  anotarRecuperacion,
+  RECUPERACION_CADA_HORAS,
+} from "../../../scripts/agente-reloj/vuelta.mjs";
 import { normalizarEventos } from "@/lib/asistencia/ingest";
 
 /* ── Un reloj de mentira ──────────────────────────────────────────────────── */
@@ -237,6 +243,126 @@ describe("🔴 correrlo dos veces no puede duplicar nada", () => {
     // día 6 perdería las marcaciones de la tarde.
     const v = ventanaRodante({ ahoraMs: Date.parse("2026-08-07T02:00:00Z"), dias: 1 });
     expect(v.hasta).toBe("2026-08-06T23:59:59-05:00");
+  });
+});
+
+/* ── La ventana larga, solo cuando falta algo ─────────────────────────────── */
+
+interface EstadoAgente {
+  fallosAuth: number;
+  esperarHastaMs: number;
+  ultimaRecuperacionMs?: number;
+}
+
+describe("🔴 la PC apagada una semana: se pide la ventana larga, y UNA sola vez", () => {
+  const AHORA = Date.parse("2026-08-10T19:00:00Z"); // 14:00 en Panamá
+  const base = { ahoraMs: AHORA, ventanaDias: 3, ventanaRecuperacionDias: 15 };
+
+  it("la ventana de siempre es corta cuando no falta nada", () => {
+    // Lo último leído es de hoy: la ventana normal lo tapa de sobra.
+    const d = decidirVentana({ ...base, leidoHasta: "2026-08-10T13:00:00Z" });
+    expect(d).toEqual({ dias: 3, recupera: false });
+  });
+
+  it("un fin de semana normal NO dispara el barrido largo", () => {
+    // La ventana de 3 días arranca el 8 a las 00:00 de Panamá. Lo leído el 8 a
+    // las 22:00 UTC (17:00 de Panamá) cae adentro: no hay hueco.
+    const d = decidirVentana({ ...base, leidoHasta: "2026-08-08T22:00:00Z" });
+    expect(d.recupera).toBe(false);
+  });
+
+  it("si lo leído queda ANTES del arranque de la ventana normal, se pide la larga", () => {
+    const d = decidirVentana({ ...base, leidoHasta: "2026-08-03T13:00:00Z" });
+    expect(d).toEqual({ dias: 15, recupera: true });
+  });
+
+  it("la ventana larga cubre de verdad el hueco de la semana apagada", () => {
+    const { dias } = decidirVentana({ ...base, leidoHasta: "2026-08-03T13:00:00Z" });
+    const v = ventanaRodante({ ahoraMs: AHORA, dias });
+    expect(v.desde).toBe("2026-07-27T00:00:00-05:00");
+    expect(Date.parse("2026-08-03T13:00:00Z")).toBeGreaterThan(Date.parse(v.desde));
+  });
+
+  it("🩸 no se repite cada 3 minutos: hay candado de 6 horas", () => {
+    const estado: EstadoAgente = { fallosAuth: 0, esperarHastaMs: 0 };
+    const args = { ...base, leidoHasta: "2026-08-03T13:00:00Z" };
+
+    const primera = decidirVentana({ ...args, ultimaRecuperacionMs: estado.ultimaRecuperacionMs });
+    expect(primera.recupera).toBe(true);
+    anotarRecuperacion(estado, AHORA);
+
+    // Tres minutos después el hueco SIGUE ahí (nadie marcó, `leido_hasta` no se
+    // movió). Sin candado, acá arrancaba el barrido de 125 páginas otra vez.
+    const enseguida = decidirVentana({
+      ...args,
+      ahoraMs: AHORA + 3 * 60_000,
+      ultimaRecuperacionMs: estado.ultimaRecuperacionMs,
+    });
+    expect(enseguida).toEqual({ dias: 3, recupera: false });
+
+    const despues = decidirVentana({
+      ...args,
+      ahoraMs: AHORA + (RECUPERACION_CADA_HORAS * 60 + 1) * 60_000,
+      ultimaRecuperacionMs: estado.ultimaRecuperacionMs,
+    });
+    expect(despues.recupera).toBe(true);
+  });
+
+  it("🩸 sin `leido_hasta` NO se barre largo — un reloj sin marcaciones lo haría para siempre", () => {
+    expect(decidirVentana({ ...base, leidoHasta: null }).recupera).toBe(false);
+    expect(decidirVentana({ ...base, leidoHasta: "no es una fecha" }).recupera).toBe(false);
+  });
+
+  it("una ventana de recuperación que no es más grande no se usa", () => {
+    const d = decidirVentana({
+      ...base,
+      ventanaRecuperacionDias: 3,
+      leidoHasta: "2026-08-03T13:00:00Z",
+    });
+    expect(d.recupera).toBe(false);
+  });
+
+  it("el piso manda: no se pide historia anterior a `DESDE_FECHA`", () => {
+    const { dias } = decidirVentana({ ...base, leidoHasta: "2026-08-03T13:00:00Z" });
+    const v = ventanaRodante({ ahoraMs: AHORA, dias, piso: "2026-08-01" });
+    expect(v.desde).toBe("2026-08-01T00:00:00-05:00");
+  });
+
+  it("la vuelta entera pide la ventana larga cuando el puente dice que falta algo", async () => {
+    const pedidos: { desde: string; hasta: string }[] = [];
+    const estado: EstadoAgente = { fallosAuth: 0, esperarHastaMs: 0 };
+    const config: Record<string, unknown> = {
+      host: "http://192.168.10.10",
+      usuario: "admin",
+      clave: "x",
+      base: "https://fashiongr.com",
+      secret: "s",
+      dispositivo: "reloj cboston",
+      ventanaDias: 3,
+      ventanaRecuperacionDias: 15,
+      piso: null,
+      version: "1.1.0",
+    };
+    const deps = {
+      leerEstado: async () => ({
+        pedidoPendiente: false,
+        estado: { leido_hasta: "2026-08-03T13:00:00Z" },
+      }),
+      traerEventos: async (a: { desde: string; hasta: string }) => {
+        pedidos.push({ desde: a.desde, hasta: a.hasta });
+        return { eventos: [] };
+      },
+      mandarEventos: async () => ({ lotes: 0, guardados: 0, descartados: 0, pedidoCerrado: false }),
+      reportarError: async () => true,
+      ahora: () => AHORA,
+    };
+
+    await darVuelta({ config, deps, estado });
+    expect(pedidos[0].desde).toBe("2026-07-27T00:00:00-05:00");
+
+    // Y la vuelta siguiente, con el mismo hueco sin cerrar, vuelve a la corta.
+    await darVuelta({ config, deps: { ...deps, ahora: () => AHORA + 3 * 60_000 }, estado });
+    expect(pedidos[1].desde).toBe("2026-08-08T00:00:00-05:00");
   });
 });
 
