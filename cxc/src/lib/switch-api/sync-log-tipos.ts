@@ -34,6 +34,7 @@ export const SYNC_LOG_TYPES = [
   "proveedores",
   "articulos",
   "articulo_marca",
+  "articulo_info",
   "multifashion",
   "catalogo_reebok",
   "catalogo_joybees",

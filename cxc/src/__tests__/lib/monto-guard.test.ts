@@ -74,6 +74,11 @@ describe("los picos históricos REALES pasan todos (falso positivo = el peor fal
     { familia: "producto", que: "el precio más alto del catálogo (tommy, $64)", fila: { price: 64.0 } },
     { familia: "producto", que: "Reebok CLUB C REVENGE VINTAGE ($58)", fila: { price: 58.0 } },
     { familia: "producto", que: "producto de $0 (existe en el catálogo)", fila: { price: 0 } },
+
+    // switch_articulo_info — la venta unitaria más cara de la historia FG
+    { familia: "articulo_info", que: "CLICHE600 (vistana), el precio unitario récord ($850)", fila: { precio_etiqueta: 850.0, costo_api: 850.0 } },
+    { familia: "articulo_info", que: "31KAE22003001 medido en vivo (9-ago-2026)", fila: { precio_etiqueta: 23.0, costo_api: 16.94 } },
+    { familia: "articulo_info", que: "artículo sin precio cargado", fila: { precio_etiqueta: 0, costo_api: 0 } },
   ];
 
   it.each(PICOS_REALES)("$familia — $que", ({ familia, fila }) => {
