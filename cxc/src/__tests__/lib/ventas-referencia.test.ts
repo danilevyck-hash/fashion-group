@@ -17,6 +17,10 @@ import {
   parsearListaCodigos,
   MAX_CODIGOS_MULTI,
   SERIE_GRAFICO_MESES,
+  UMBRAL_TANDAS,
+  calcularTandas,
+  tendenciaTandas,
+  rangoDuracionTandas,
   type FilaDiario,
   type MesSerie,
 } from "@/lib/ventas/referencia";
@@ -450,5 +454,143 @@ describe("sumar series (colores de un modelo)", () => {
       { mes: "2026-01", unidades: 1, venta: 10 },
       { mes: "2026-02", unidades: 5, venta: 50 },
     ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TANDAS — el bloque principal (10-ago-2026). Daniel: "quiero saber cuánto
+// vendí de esa referencia para saber cuánto comprar" — los 3/6/12 meses de un
+// agotado dan 0, y 0 no responde. Series REALES de producción (medidas el
+// 10-ago-2026 contra switch_articulo_diario, vistana). Si el cálculo no da
+// esto, está mal — no ajustar el test, ajustar el código.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const u = (mes: string, unidades: number): MesSerie => ({ mes, unidades, venta: unidades * 10 });
+
+// NB2075902 (vistana) — la serie REAL medida (10-ago-2026): total 138 u,
+// última may-24. (SERIE_NB2075902 de arriba es la del caso descontinuado,
+// con otro reparto mensual — acá los meses exactos son lo que se prueba.)
+const SERIE_TANDAS_NB902: MesSerie[] = [
+  u("2023-03", 30),
+  u("2023-10", 26),
+  u("2023-11", 36),
+  u("2023-12", 1),
+  u("2024-03", 36),
+  u("2024-05", 9),
+];
+
+// NB2075908 (vistana) — 120 u.
+const SERIE_TANDAS_NB908: MesSerie[] = [
+  u("2023-03", 60),
+  u("2023-04", 12),
+  u("2023-05", 36),
+  u("2023-06", 7),
+  u("2024-01", 5),
+];
+
+describe("tandas — períodos de venta continua", () => {
+  it("la regla del hueco tiene nombre y es 2", () => {
+    expect(UMBRAL_TANDAS.SALTO_MAX_MESES).toBe(2);
+  });
+
+  it("caso contrato NB2075902: 3 tandas — mar-23 (30/1/30) · oct→dic-23 (63/3/21) · mar→may-24 (45/3/15)", () => {
+    const tandas = calcularTandas(SERIE_TANDAS_NB902);
+    expect(tandas).toHaveLength(3);
+    expect(tandas[0]).toMatchObject({ desde: "2023-03", hasta: "2023-03", unidades: 30, meses: 1, uMes: 30 });
+    expect(tandas[1]).toMatchObject({ desde: "2023-10", hasta: "2023-12", unidades: 63, meses: 3, uMes: 21 });
+    expect(tandas[2]).toMatchObject({ desde: "2024-03", hasta: "2024-05", unidades: 45, meses: 3, uMes: 15 });
+    // El total de vida es la suma de las tandas (acá no hay meses sueltos fuera).
+    expect(tandas.reduce((s, t) => s + t.unidades, 0)).toBe(138);
+  });
+
+  it("caso contrato NB2075908: 2 tandas — mar→jun-23 (115/4/28.8) · ene-24 (5/1/5)", () => {
+    const tandas = calcularTandas(SERIE_TANDAS_NB908);
+    expect(tandas).toHaveLength(2);
+    expect(tandas[0]).toMatchObject({ desde: "2023-03", hasta: "2023-06", unidades: 115, meses: 4 });
+    expect(tandas[0].uMes).toBeCloseTo(28.75, 4);
+    expect(tandas[1]).toMatchObject({ desde: "2024-01", hasta: "2024-01", unidades: 5, meses: 1, uMes: 5 });
+  });
+
+  it("caso contrato 31KAE22003001 (serie real de HOY): el goteo lento, el contraste que la ventana de 12 meses tapaba", () => {
+    // Serie medida el 10-ago-2026: 51 u netas, última venta 2026-05.
+    const serie: MesSerie[] = [
+      u("2025-02", 3), u("2025-03", 4), u("2025-04", 6), u("2025-05", 2),
+      u("2025-06", 2), u("2025-07", 3), u("2025-09", 1), u("2025-10", 5),
+      u("2025-11", 6), u("2026-02", 6), u("2026-03", 2), u("2026-04", 3),
+      u("2026-05", 8),
+    ];
+    const tandas = calcularTandas(serie);
+    // jul-25 → sep-25 es salto 2 (un mes vacío): MISMA tanda.
+    // nov-25 → feb-26 es salto 3 (dic y ene vacíos): corta.
+    expect(tandas).toHaveLength(2);
+    expect(tandas[0]).toMatchObject({ desde: "2025-02", hasta: "2025-11", unidades: 32, meses: 10 });
+    expect(tandas[0].uMes).toBeCloseTo(3.2, 4);
+    expect(tandas[1]).toMatchObject({ desde: "2026-02", hasta: "2026-05", unidades: 19, meses: 4 });
+    expect(tandas[1].uMes).toBeCloseTo(4.75, 4);
+    // El contraste con NB2075902: éste gotea ~3-5 u/mes por meses; aquél vendía
+    // 15-30 u/mes y se acababa en 1-3 meses. Son negocios distintos.
+    expect(Math.max(...tandas.map((t) => t.uMes))).toBeLessThan(15);
+  });
+
+  it("borde del hueco: salto de 2 meses NO corta, salto de 3 SÍ", () => {
+    const salto2 = calcularTandas([u("2026-01", 5), u("2026-03", 5)]);
+    expect(salto2).toHaveLength(1);
+    expect(salto2[0]).toMatchObject({ desde: "2026-01", hasta: "2026-03", meses: 3 });
+
+    const salto3 = calcularTandas([u("2026-01", 5), u("2026-04", 5)]);
+    expect(salto3).toHaveLength(2);
+  });
+
+  it("el mes vacío DENTRO de la tanda cuenta en la duración (mar→may-24 son 3 meses, no 2)", () => {
+    const [tanda] = calcularTandas([u("2024-03", 36), u("2024-05", 9)]);
+    expect(tanda.meses).toBe(3);
+    expect(tanda.uMes).toBe(15); // 45 ÷ 3 — dividir entre 2 daría 22.5
+  });
+
+  it("las NC restan DENTRO de la tanda: un mes negativo interno descuenta y no la corta en falso", () => {
+    // feb vende 10, mar devuelve 2 (neto −2, NO es mes activo), abr vende 10.
+    const serie: MesSerie[] = [
+      { mes: "2026-02", unidades: 10, venta: 100 },
+      { mes: "2026-03", unidades: -2, venta: -20 },
+      { mes: "2026-04", unidades: 10, venta: 100 },
+    ];
+    const tandas = calcularTandas(serie);
+    expect(tandas).toHaveLength(1); // feb→abr es salto 2 entre activos: una tanda
+    expect(tandas[0].unidades).toBe(18); // 10 − 2 + 10 — sumar la NC daría 22
+    expect(tandas[0].venta).toBe(180);
+    // La firma del error del doble: 22 − 18 = 4 = 2 × la NC.
+  });
+
+  it("un mes que queda en neto ≤ 0 no abre ni sostiene una tanda", () => {
+    const tandas = calcularTandas([
+      { mes: "2026-01", unidades: -3, venta: -30 }, // solo devoluciones: no abre
+      u("2026-05", 5),
+    ]);
+    expect(tandas).toHaveLength(1);
+    expect(tandas[0].desde).toBe("2026-05");
+  });
+
+  it("sin ventas no hay tandas", () => {
+    expect(calcularTandas([])).toEqual([]);
+  });
+
+  it("tendencia: bajando (30 → 21 → 15), subiendo, y mixta = sin tendencia", () => {
+    expect(tendenciaTandas(calcularTandas(SERIE_TANDAS_NB902))).toBe("baja");
+    expect(tendenciaTandas(calcularTandas(SERIE_TANDAS_NB908))).toBe("baja"); // 28.75 → 5
+    const subiendo = calcularTandas([u("2025-01", 5), u("2025-06", 20)]);
+    expect(tendenciaTandas(subiendo)).toBe("sube");
+    const mixta = calcularTandas([u("2025-01", 20), u("2025-06", 5), u("2025-11", 20)]);
+    expect(tendenciaTandas(mixta)).toBeNull();
+  });
+
+  it("con UNA sola tanda NO hay tendencia — no se inventa", () => {
+    const una = calcularTandas([u("2026-01", 5), u("2026-02", 8)]);
+    expect(una).toHaveLength(1);
+    expect(tendenciaTandas(una)).toBeNull();
+  });
+
+  it("el rango de duración alimenta 'se te acaba en 1 a 3 meses'", () => {
+    expect(rangoDuracionTandas(calcularTandas(SERIE_TANDAS_NB902))).toEqual({ min: 1, max: 3 });
+    expect(rangoDuracionTandas([])).toBeNull();
   });
 });

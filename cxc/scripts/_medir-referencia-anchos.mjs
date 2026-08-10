@@ -106,7 +106,7 @@ for (const ancho of ANCHOS) {
   // Estado 1 — una referencia con historia real (agotado + colores)
   // ⚠️ Los "Buscar" se buscan DENTRO del form del tab: el AppHeader tiene su
   // propio botón "Buscar" (el buscador global) antes en el DOM.
-  await page.locator('form input[placeholder*="Código"]').fill("31KAE22003");
+  await page.locator('form input[placeholder*="Código"]').fill(process.env.Q ?? "31KAE22003");
   await page.locator("form").getByRole("button", { name: "Buscar" }).first().click();
   await page.waitForTimeout(5000);
   reportar("una-ref", ancho, await page.evaluate(SONDA));
