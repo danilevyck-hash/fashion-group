@@ -35,7 +35,10 @@ import {
   type VentanaTemporada,
 } from "@/lib/ventas/temporadas-referencia";
 import { estadoTexto, exportReferenciasToExcel, type FilaMultiExcel } from "@/lib/ventas/referencia-excel";
-import { fmtFrescura } from "@/lib/ventas/referencia-info";
+import { fmtFrescura, fobEstimado, margenSobreFob, PCT_IMPORTACION_DEFAULT } from "@/lib/ventas/referencia-info";
+
+/** "1.10" — para decir en pantalla de dónde sale el FOB estimado. */
+const DIVISOR_FOB_EST = (1 + PCT_IMPORTACION_DEFAULT).toFixed(2);
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +61,10 @@ function fmtU(n: number | null): string {
   return n == null ? "—" : n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
+function fmtPct(n: number | null): string {
+  return n == null ? "—" : (n * 100).toFixed(1) + "%";
+}
+
 function etiquetaEmpresa(key: string): string {
   return key.replace(/_/g, " ").toUpperCase();
 }
@@ -70,7 +77,11 @@ export function ReferenciaView() {
   const [modo, setModo] = useState<"una" | "varias">("una");
 
   return (
-    <div className="max-w-[860px]">
+    // 860 es el ancho del mockup aprobado; desde xl se abre a 1140 para que la
+    // tabla con las columnas de costos (CIF / FOB est. / margen) entre sin
+    // arrastre en escritorio. En celular/iPad la tabla scrollea en su propio
+    // contenedor, como en el mockup.
+    <div className="max-w-[860px] xl:max-w-[1140px]">
       {/* Selector de modo */}
       <div className="mb-4 flex gap-2">
         <BotonModo activo={modo === "una"} onClick={() => setModo("una")}>
@@ -374,6 +385,14 @@ function TarjetaModelo({
     .filter((s): s is string => !!s)
     .sort()
     .at(-1);
+  // Costo CIF del modelo: solo si TODOS los colores con dato coinciden (lo
+  // normal). Si varía por color, la franja calla y manda la tabla.
+  const cifs = refs.map((r) => r.info?.costoCif).filter((c): c is number => c != null && c > 0);
+  const cifModelo = cifs.length && cifs.every((c) => c === cifs[0]) ? cifs[0] : null;
+  const fobEstModelo = fobEstimado(cifModelo);
+  // Margen sobre el precio REAL de ventas; sin ventas, sobre la etiqueta.
+  const precioEtiquetaModelo = refs.find((r) => r.info?.precioEtiqueta != null)?.info?.precioEtiqueta ?? null;
+  const margenFobModelo = margenSobreFob(stats.precioReal ?? precioEtiquetaModelo, fobEstModelo);
 
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -397,13 +416,17 @@ function TarjetaModelo({
         </span>
       </div>
 
-      {/* Datos de catálogo (Switch) + botón de actualizar. costo_api NUNCA se
-          muestra: la API de Switch no dice si es FOB o CIF (Fase 2 parada). */}
+      {/* Datos de catálogo (Switch) + botón de actualizar. El costo de la API
+          se muestra como CIF (identificado 3/3); el FOB SOLO derivado y
+          etiquetado "est." — decisión final de Daniel, 10-ago-2026. */}
       <FranjaCatalogo
         empresa={empresa}
         infoDisponible={infoDisponible}
         hayInfo={hayInfo}
         existenciaTotal={existenciaTotal}
+        costoCif={cifModelo}
+        fobEst={fobEstModelo}
+        margenFobEst={margenFobModelo}
         frescura={frescura ?? null}
         onActualizado={onActualizado}
       />
@@ -456,6 +479,9 @@ function TarjetaModelo({
               <Th right>Precio real</Th>
               {hayInfo && <Th right>Exist.</Th>}
               {hayInfo && <Th right>Etiqueta</Th>}
+              {hayInfo && <Th right>Costo CIF</Th>}
+              {hayInfo && <Th right>FOB est.</Th>}
+              {hayInfo && <Th right>Margen s/FOB est.</Th>}
               <Th>Estado</Th>
             </tr>
           </thead>
@@ -469,22 +495,31 @@ function TarjetaModelo({
       <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-500 sm:px-5">
         Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los meses
         en que HABÍA mercancía.
+        {hayInfo && (
+          <>
+            {" "}
+            El Costo CIF es de Switch; <b>FOB y margen son estimados</b> (CIF ÷ {DIVISOR_FOB_EST}).
+          </>
+        )}
       </p>
     </div>
   );
 }
 
-// ─── Franja de catálogo: existencia + frescura + "Actualizar datos de Switch" ─
+// ─── Franja de catálogo: existencia + costos + frescura + botón de Switch ────
 //
-// 🔴 costo_api NO se pinta acá ni en ningún lado: el `costo` de la API de
-// Switch no está etiquetado FOB/CIF (sondeo 9-ago-2026) y mostrarlo como FOB
-// está prohibido. Queda guardado en la tabla; encenderlo cuando Daniel
-// confirme qué es será agregar el campo en infoParaCliente() y una celda acá.
+// 🔴 El costo de la API se pinta como "Costo CIF" (identificado 3/3 contra la
+// ficha de Switch). El FOB SOLO existe derivado — CIF ÷ (1 + %imp), división
+// de vuelta, nunca ×0.9 — y SIEMPRE con la etiqueta "est.". Presentarlo como
+// FOB a secas es lo que el candado de articulo-info.test.ts caza.
 function FranjaCatalogo({
   empresa,
   infoDisponible,
   hayInfo,
   existenciaTotal,
+  costoCif,
+  fobEst,
+  margenFobEst,
   frescura,
   onActualizado,
 }: {
@@ -492,6 +527,10 @@ function FranjaCatalogo({
   infoDisponible: boolean;
   hayInfo: boolean;
   existenciaTotal: number | null;
+  /** CIF del modelo (si todos los colores coinciden; si no, va solo en la tabla). */
+  costoCif: number | null;
+  fobEst: number | null;
+  margenFobEst: number | null;
   frescura: string | null;
   onActualizado: () => void;
 }) {
@@ -529,6 +568,21 @@ function FranjaCatalogo({
                 </>
               ) : (
                 <>Existencia: sin dato</>
+              )}
+              {costoCif != null && (
+                <>
+                  {" · "}Costo CIF: <b className="tabular-nums">{fmtMoney(costoCif)}</b>
+                </>
+              )}
+              {fobEst != null && (
+                <>
+                  {" · "}FOB est.: <b className="tabular-nums">{fmtMoney(fobEst)}</b>
+                </>
+              )}
+              {margenFobEst != null && (
+                <>
+                  {" · "}margen s/FOB est.: <b className="tabular-nums">{fmtPct(margenFobEst)}</b>
+                </>
               )}
               {frescura && <span className="text-gray-500"> · datos de Switch al {fmtFrescura(frescura)}</span>}
             </>
@@ -694,6 +748,10 @@ function FilaColor({
 }) {
   const stats = useMemo(() => calcularStats(referencia.serie, hoyMes), [referencia.serie, hoyMes]);
   const color = colorDe(referencia.codigo);
+  // FOB SOLO derivado del CIF (división) y margen sobre el precio real de
+  // ventas — sin ventas, sobre la etiqueta. Etiquetas "est." obligatorias.
+  const fobEst = fobEstimado(referencia.info?.costoCif ?? null);
+  const margenFob = margenSobreFob(stats.precioReal ?? referencia.info?.precioEtiqueta ?? null, fobEst);
   return (
     <tr>
       <Td>
@@ -721,6 +779,9 @@ function FilaColor({
       {conInfo && (
         <Td right>{referencia.info?.precioEtiqueta != null ? fmtMoney(referencia.info.precioEtiqueta) : "—"}</Td>
       )}
+      {conInfo && <Td right>{referencia.info?.costoCif != null ? fmtMoney(referencia.info.costoCif) : "—"}</Td>}
+      {conInfo && <Td right>{fobEst != null ? fmtMoney(fobEst) : "—"}</Td>}
+      {conInfo && <Td right>{fmtPct(margenFob)}</Td>}
       <Td>
         <PillEstado stats={stats} />
       </Td>
@@ -772,6 +833,8 @@ function VistaVarias() {
       empresa: etiquetaEmpresa(r.empresa),
       stats: calcularStats(r.serie, resp.hoyMes),
       existencia: r.info?.existencia ?? null,
+      costoCif: r.info?.costoCif ?? null,
+      precioEtiqueta: r.info?.precioEtiqueta ?? null,
     }));
     const noEnc: FilaMultiExcel[] = (resp.noEncontrados ?? []).map((c) => ({
       codigo: c,
@@ -779,6 +842,8 @@ function VistaVarias() {
       empresa: "",
       stats: null,
       existencia: null,
+      costoCif: null,
+      precioEtiqueta: null,
     }));
     return [...halladas, ...noEnc];
   }, [resp]);
@@ -857,6 +922,9 @@ function VistaVarias() {
                   <Th right>u/mes real</Th>
                   <Th right>Precio real</Th>
                   {hayInfoMulti && <Th right>Exist.</Th>}
+                  {hayInfoMulti && <Th right>Costo CIF</Th>}
+                  {hayInfoMulti && <Th right>FOB est.</Th>}
+                  {hayInfoMulti && <Th right>Margen s/FOB est.</Th>}
                   <Th>Estado</Th>
                 </tr>
               </thead>
@@ -877,6 +945,25 @@ function VistaVarias() {
                     <Td right>{f.stats ? fmtU(f.stats.uMesReal) : "—"}</Td>
                     <Td right>{f.stats?.precioReal != null ? fmtMoney(f.stats.precioReal) : "—"}</Td>
                     {hayInfoMulti && <Td right>{f.existencia != null ? fmtInt(f.existencia) : "—"}</Td>}
+                    {hayInfoMulti && <Td right>{f.costoCif != null ? fmtMoney(f.costoCif) : "—"}</Td>}
+                    {hayInfoMulti && (
+                      <Td right>
+                        {(() => {
+                          const fob = fobEstimado(f.costoCif ?? null);
+                          return fob != null ? fmtMoney(fob) : "—";
+                        })()}
+                      </Td>
+                    )}
+                    {hayInfoMulti && (
+                      <Td right>
+                        {fmtPct(
+                          margenSobreFob(
+                            f.stats?.precioReal ?? f.precioEtiqueta ?? null,
+                            fobEstimado(f.costoCif ?? null),
+                          ),
+                        )}
+                      </Td>
+                    )}
                     <Td>
                       <PillEstado stats={f.stats} />
                     </Td>
@@ -889,7 +976,13 @@ function VistaVarias() {
             Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los
             meses en que HABÍA mercancía — una referencia puede marcar 0 en 12 m y aun así un ritmo alto: se agotó,
             no dejó de gustar.
-            {frescuraMulti && <> Existencias de Switch al {fmtFrescura(frescuraMulti)}.</>}
+            {hayInfoMulti && (
+              <>
+                {" "}
+                El Costo CIF es de Switch; <b>FOB y margen son estimados</b> (CIF ÷ {DIVISOR_FOB_EST}).
+              </>
+            )}
+            {frescuraMulti && <> Datos de Switch al {fmtFrescura(frescuraMulti)}.</>}
           </p>
         </div>
       )}

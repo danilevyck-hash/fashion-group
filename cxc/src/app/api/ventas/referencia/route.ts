@@ -12,7 +12,8 @@
 //     de etiqueta + frescura). Lo llena el botón "Actualizar datos de Switch".
 //     Si la tabla todavía no existe (migración 20260810120000 pendiente), el
 //     tab funciona igual con `infoDisponible: false`.
-//     🔴 `costo_api` JAMÁS entra al payload — ver infoParaCliente().
+//     🔴 `costo_api` = Costo CIF (medido 3/3): viaja SOLO como `costoCif` y
+//     el FOB solo existe derivado + etiquetado "est." — ver referencia-info.ts.
 //
 // La búsqueda por descripción mira LAS DOS: la del diario es categoría+género
 // ("Men-Small Leather"); la del catálogo es el nombre comercial ("KAHLO
@@ -50,8 +51,10 @@ import { infoParaCliente, type ArticuloInfoFila } from "@/lib/ventas/referencia-
 export const dynamic = "force-dynamic";
 
 const COLUMNAS = "empresa_key, fecha, codigo, descripcion, tipo, cantidad_total, venta_total";
-// SIN costo_api a propósito: ni siquiera se lee — no puede filtrarse al payload.
-const COLUMNAS_INFO = "empresa_key, codigo, descripcion, existencia, precio_etiqueta, synced_at";
+// costo_api SÍ se lee: es el Costo CIF (identificado 3/3 el 10-ago-2026) y se
+// muestra como tal. Al payload viaja SOLO bajo el nombre `costoCif`
+// (infoParaCliente) — nunca como FOB: el FOB solo existe derivado y etiquetado.
+const COLUMNAS_INFO = "empresa_key, codigo, descripcion, existencia, precio_etiqueta, costo_api, synced_at";
 
 /** El filtro de una búsqueda, como dato (no closure), para aplicarlo igual al
  *  pre-conteo y a cada página de la lectura. */

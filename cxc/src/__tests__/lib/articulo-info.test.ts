@@ -20,7 +20,14 @@ import {
   syncArticuloInfo,
   type FilaArticuloInfo,
 } from "@/lib/switch-api/sync-articulo-info";
-import { infoParaCliente, fmtFrescura, type ArticuloInfoFila } from "@/lib/ventas/referencia-info";
+import {
+  infoParaCliente,
+  fmtFrescura,
+  fobEstimado,
+  margenSobreFob,
+  PCT_IMPORTACION_DEFAULT,
+  type ArticuloInfoFila,
+} from "@/lib/ventas/referencia-info";
 import { GUARDS } from "@/lib/switch-api/monto-guard";
 import { SYNC_LOG_TYPES } from "@/lib/switch-api/sync-log-tipos";
 
@@ -94,7 +101,7 @@ describe("dedupePorCodigo — el catálogo de Switch repite renglones", () => {
   });
 });
 
-describe("costo_api NUNCA viaja al cliente", () => {
+describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisión final 10-ago)", () => {
   const fila: ArticuloInfoFila = {
     empresa_key: "vistana",
     codigo: "31KAE22003001",
@@ -105,37 +112,84 @@ describe("costo_api NUNCA viaja al cliente", () => {
     costo_api: "16.9400",
   };
 
-  it("infoParaCliente elige los campos UNO POR UNO y costo_api no está", () => {
+  it("infoParaCliente presenta costo_api SIEMPRE como `costoCif` — nunca como FOB ni pelado", () => {
     const info = infoParaCliente(fila);
     expect(info).toEqual({
       descripcion: "KAHLO PASSCASE",
       existencia: 0,
       precioEtiqueta: 23,
+      costoCif: 16.94,
       syncedAt: ISO,
     });
+    // El nombre ES el contrato: ni costo_api crudo, ni fob, ni "costo" a secas.
+    expect(Object.keys(info)).toContain("costoCif");
     expect(Object.keys(info)).not.toContain("costo_api");
-    expect(JSON.stringify(info)).not.toMatch(/costo/i);
+    expect(JSON.stringify(info)).not.toMatch(/fob/i);
   });
 
-  it("el route del tab ni siquiera SELECCIONA costo_api", () => {
+  it("el route SÍ selecciona costo_api (es el CIF que se muestra)", () => {
     const ruta = fs.readFileSync(
       path.resolve(process.cwd(), "src/app/api/ventas/referencia/route.ts"),
       "utf8",
     );
     const m = ruta.match(/const COLUMNAS_INFO = "([^"]+)"/);
     expect(m, "no encontré COLUMNAS_INFO en el route").toBeTruthy();
-    expect(m![1]).not.toMatch(/costo/);
+    expect(m![1]).toMatch(/costo_api/);
   });
 
-  it("la vista no pinta ningún costo del catálogo", () => {
-    const vista = fs.readFileSync(
-      path.resolve(process.cwd(), "src/components/ventas/ReferenciaView.tsx"),
-      "utf8",
-    );
-    // La palabra puede aparecer en comentarios que explican la prohibición;
-    // lo vedado es LEERLA de los datos.
-    expect(vista).not.toMatch(/info\??\.costo/);
-    expect(vista).not.toMatch(/costoApi/);
+  it("en la vista y el Excel, 'FOB' JAMÁS aparece sin su etiqueta de estimado", () => {
+    for (const rel of ["src/components/ventas/ReferenciaView.tsx", "src/lib/ventas/referencia-excel.ts"]) {
+      const texto = fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
+      const lineas = texto.split("\n");
+      for (const [i, linea] of lineas.entries()) {
+        if (!/FOB/.test(linea)) continue;
+        const esComentario = /^\s*(\/\/|\*|\/\*)/.test(linea);
+        if (esComentario) continue;
+        expect(
+          /est/i.test(linea),
+          `${rel}:${i + 1} dice "FOB" sin "est." — el FOB solo existe como estimado:\n${linea.trim()}`,
+        ).toBe(true);
+      }
+    }
+  });
+});
+
+describe("FOB estimado — DIVISIÓN de vuelta, nunca CIF × (1 − %)", () => {
+  it("los 3 casos reales de la ficha de Switch: CIF ÷ 1.1 = el FOB de pantalla", () => {
+    // QD3636001, KCSALYA929, K10K109927DWE — medidos el 10-ago-2026.
+    expect(fobEstimado(3.19)).toBeCloseTo(2.9, 4);
+    expect(fobEstimado(10.01)).toBeCloseTo(9.1, 4);
+    expect(fobEstimado(39.6)).toBeCloseTo(36.0, 4);
+  });
+
+  it("restar el 10% NO es lo mismo: 3.19 × 0.9 = 2.871 ≠ 2.90 (Daniel cazó la diferencia)", () => {
+    expect(3.19 * 0.9).toBeCloseTo(2.871, 4);
+    expect(fobEstimado(3.19)!).not.toBeCloseTo(2.871, 3);
+  });
+
+  it("el % es configurable y el default es 10%", () => {
+    expect(PCT_IMPORTACION_DEFAULT).toBe(0.1);
+    expect(fobEstimado(3.19, 0.177)).toBeCloseTo(3.19 / 1.177, 6); // CK Jeans importó a 17,7%
+  });
+
+  it("sin CIF (null, 0, negativo) no hay FOB estimado — no se inventa", () => {
+    expect(fobEstimado(null)).toBeNull();
+    expect(fobEstimado(0)).toBeNull();
+    expect(fobEstimado(-3.19)).toBeNull();
+  });
+
+  it("margen s/FOB est.: sobre el FOB estimado, NO sobre el CIF", () => {
+    const fob = fobEstimado(3.19)!; // 2.90
+    // Precio real 7.00 (QD3636001): margen = (7 − 2.90) / 7 = 58.6%
+    expect(margenSobreFob(7, fob)).toBeCloseTo((7 - 2.9) / 7, 4);
+    // Si alguien lo calcula sobre el CIF daría 54.4% — distinto, y el test lo ve.
+    expect(margenSobreFob(7, fob)!).not.toBeCloseTo((7 - 3.19) / 7, 3);
+  });
+
+  it("sin precio no hay margen", () => {
+    expect(margenSobreFob(null, 2.9)).toBeNull();
+    expect(margenSobreFob(0, 2.9)).toBeNull();
+    expect(margenSobreFob(7, null)).toBeNull();
   });
 });
 
