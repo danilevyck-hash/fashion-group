@@ -13,7 +13,10 @@ export const ADMIN_COMPANIES: Company[] = [
   { key: "vistana", name: "Vistana International", brand: "Calvin Klein", vendedor: "Edwin", vendedorPhone: "50768344909" },
   { key: "fashion_shoes", name: "Fashion Shoes", brand: "Tommy Hilfiger Footwear" },
   { key: "fashion_wear", name: "Fashion Wear", brand: "Tommy Hilfiger Apparel" },
-  { key: "active_shoes", name: "Active Shoes", brand: "Reebok Footwear" },
+  // "Reebok" a secas, NO "Reebok Footwear": desde que Daniel movió el inventario,
+  // Active Shoes lleva TODO Reebok —calzado Y ropa—, así que "Footwear" describía
+  // media empresa. Mismo motivo que el cambio de Active Wear de abajo.
+  { key: "active_shoes", name: "Active Shoes", brand: "Reebok" },
   // Active Wear pasó de Reebok a Karl Lagerfeld: Daniel movió el inventario, y HOY
   // todo el catálogo de Reebok sale de Active Shoes. `brand` solo se lee en el
   // mensaje de estado de cuenta de /admin ("Active Wear (Karl Lagerfeld): $X"),

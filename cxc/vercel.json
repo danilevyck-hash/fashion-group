@@ -254,10 +254,6 @@
     },
     {
       "path": "/api/cron/asistencia-vigia",
-      "schedule": "45 13 * * *"
-    },
-    {
-      "path": "/api/cron/asistencia-vigia",
       "schedule": "0 15 * * *"
     },
     {
