@@ -31,15 +31,8 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
   stone:   "text-gray-500",
 };
 
-// Label legible del sort actual para el subtitle del header.
-const SORT_LABELS: Record<SortKey, string> = {
-  rank:    "rank",
-  nombre:  "nombre",
-  empresa: "empresa",
-  ytd:     "compras YTD",
-  delta:   "delta",
-  ultima:  "última compra",
-};
+// (SORT_LABELS se retiró con el subtítulo "ordenados por X": el encabezado de
+// columna activo ya muestra el criterio, y en celular lo dice el SortSheet.)
 
 // Pills visibles del filtro de empresa. Joystep, Confecciones Boston y
 // Multifashion se ocultan del filtro (decisión visual). Joystep sigue B2B y
@@ -364,7 +357,9 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-gray-500 lg:flex">
             <p>
-              <span className="font-mono text-gray-950">{filtered.length}</span> clientes activos · ordenados por {SORT_LABELS[sortBy]}
+              {/* "ordenados por X" se fue: el encabezado de columna activo ya
+                  lo dice con su flecha, en la misma pantalla y a la vista. */}
+              <span className="font-mono text-gray-950">{filtered.length}</span> clientes
             </p>
             {isClosedYear ? (
               <span

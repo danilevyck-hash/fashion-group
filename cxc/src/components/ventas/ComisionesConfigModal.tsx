@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface ConfigRow {
   vendedor_nombre: string;
@@ -122,7 +123,15 @@ export function ComisionesConfigModal({ open, onClose, onSaved }: ComisionesConf
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="text-base font-medium">Configurar comisiones</h2>
+          {/* La tasa con la que entra un vendedor nuevo se aprende una vez y no
+              cambia nada de lo que se hace en esta pantalla → ⓘ. No se borra:
+              es la que explica por qué alguien aparece ya con un número. */}
+          <h2 className="flex items-center gap-1 text-base font-medium">
+            Configurar comisiones
+            <Ayuda titulo="Cómo se calcula">
+              <p>Los vendedores nuevos entran con 0.50%.</p>
+            </Ayuda>
+          </h2>
           <button
             onClick={() => { if (!saving) onClose(); }}
             className="text-2xl leading-none text-gray-400 hover:text-black"
@@ -195,8 +204,7 @@ export function ComisionesConfigModal({ open, onClose, onSaved }: ComisionesConf
           {error && <p className="mt-3 text-xs text-rose-600">{error}</p>}
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-5 py-4">
-          <p className="text-xs text-gray-400">Los vendedores nuevos entran con 0.50%.</p>
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-4">
           <div className="flex items-center gap-2">
             <button
               onClick={() => { if (!saving) onClose(); }}

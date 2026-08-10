@@ -12,6 +12,7 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { Download, Search } from "lucide-react";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import {
@@ -70,6 +71,34 @@ function etiquetaEmpresa(key: string): string {
 }
 
 type Periodo = "3" | "6" | "12";
+
+// ─── El pie de tabla, en UN solo lugar ───────────────────────────────────────
+//
+// El mismo párrafo vivía DUPLICADO al pie de las dos vistas (una referencia y
+// pegar lista). Se parte en dos según qué hace cada frase:
+//
+//  · QUEDA EN PANTALLA — "las devoluciones ya están restadas". 🩸 Sin esa línea,
+//    quien cuadra contra Switch suma las notas de crédito otra vez y le da el
+//    DOBLE de las devoluciones. Es un aviso, no una explicación: no se esconde.
+//  · PASA AL ⓘ — qué es "u/mes real" y de dónde sale el FOB. Se aprende una vez
+//    y después estorba en cada carga de pantalla. 🩸 NO se borra: sin ello
+//    alguien lee el FOB estimado como si fuera el FOB real de la factura.
+//
+// Vive acá y no copiado en cada vista para que los dos pies no puedan divergir.
+function AyudaPieReferencia({ conInfo }: { conInfo: boolean }) {
+  return (
+    <Ayuda titulo="Cómo se calcula" etiqueta="Cómo se calcula">
+      <p>
+        <b>u/mes real</b> cuenta solo los meses en que HABÍA mercancía.
+      </p>
+      {conInfo && (
+        <p className="mt-2">
+          El Costo CIF es de Switch; <b>FOB y margen son estimados</b> (CIF ÷ {DIVISOR_FOB_EST}).
+        </p>
+      )}
+    </Ayuda>
+  );
+}
 
 // ─── Vista principal ─────────────────────────────────────────────────────────
 
@@ -178,7 +207,10 @@ function VistaUna() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Código, modelo o descripción…"
+            /* El instructivo que estaba debajo del campo se mudó acá: dice lo
+               mismo, en el lugar donde se escribe, y no ocupa una línea fija de
+               la pantalla. */
+            placeholder="Código, modelo o descripción — ej. 31KAE22003"
             autoCapitalize="characters"
             autoCorrect="off"
             className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 text-[15px] text-gray-900 outline-none focus:border-gray-400"
@@ -187,10 +219,6 @@ function VistaUna() {
             <Search className="mr-1.5 h-4 w-4" /> Buscar
           </Button>
         </div>
-        <p className="mt-2 text-xs text-gray-500">
-          Escribe el modelo (<b>31KAE22003</b> → todos los colores), el código exacto (<b>31KAE22003001</b>) o la
-          descripción (<b>kahlo</b>).
-        </p>
       </form>
 
       {/* Chips de período */}
@@ -319,7 +347,19 @@ function SelectorTemporada({
   const familias = ["Tommy/Calvin", "Reebok"] as const;
   return (
     <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">
-      <p className="mb-2.5 text-sm font-semibold text-gray-900">¿Para qué temporada compras?</p>
+      {/* Por qué son ESAS dos ventanas es metodología: se aprende una vez y
+          después no cambia ninguna decisión del día. Va al ⓘ, con el ejemplo
+          calculado sobre el mes de hoy. */}
+      <p className="mb-2.5 flex items-center gap-1 text-sm font-semibold text-gray-900">
+        ¿Para qué temporada compras?
+        <Ayuda titulo="Qué temporadas se muestran">
+          <p>
+            Se muestran las 2 temporadas ya terminadas más recientes
+            {hoyMes ? ` (ej. SP → ${ventanasTemporada("SP", hoyMes).map((v) => v.etiqueta).join(" y ")})` : ""} — lo
+            que se vendió la temporada pasada es lo que mejor predice la que viene.
+          </p>
+        </Ayuda>
+      </p>
       {familias.map((fam) => (
         <div key={fam} className="mb-2 flex flex-wrap items-center gap-2">
           <span className="w-full text-xs font-semibold uppercase tracking-wide text-gray-400 sm:w-24">{fam}</span>
@@ -335,11 +375,6 @@ function SelectorTemporada({
           ))}
         </div>
       ))}
-      <p className="mt-2 text-[13px] text-gray-500">
-        Se muestran las 2 temporadas ya terminadas más recientes
-        {hoyMes ? ` (ej. SP → ${ventanasTemporada("SP", hoyMes).map((v) => v.etiqueta).join(" y ")})` : ""} — lo que
-        se vendió la temporada pasada es lo que mejor predice la que viene.
-      </p>
     </div>
   );
 }
@@ -502,15 +537,9 @@ function TarjetaModelo({
           </tbody>
         </table>
       </div>
-      <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-500 sm:px-5">
-        Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los meses
-        en que HABÍA mercancía.
-        {hayInfo && (
-          <>
-            {" "}
-            El Costo CIF es de Switch; <b>FOB y margen son estimados</b> (CIF ÷ {DIVISOR_FOB_EST}).
-          </>
-        )}
+      <p className="flex flex-wrap items-center gap-x-1 border-t border-gray-100 px-4 py-0.5 text-xs text-gray-500 sm:px-5">
+        <span>Ventas netas: las devoluciones (notas de crédito) ya están restadas.</span>
+        <AyudaPieReferencia conInfo={hayInfo} />
       </p>
     </div>
   );
@@ -885,16 +914,14 @@ function VistaVarias() {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           rows={4}
-          placeholder={"31KAE22003 31KAE22002 31KAE22001…"}
+          /* El instructivo de debajo se mudó al placeholder: dice el tope, el
+             separador y el formato, en el campo donde se pega. */
+          placeholder={`Pega hasta ${MAX_CODIGOS_MULTI} códigos separados por espacios o saltos de línea:\n31KAE22003 31KAE22002 31KAE22001…`}
           autoCapitalize="characters"
           autoCorrect="off"
           className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-sm text-gray-900 outline-none focus:border-gray-400"
         />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-gray-500">
-            Pega los códigos separados por espacios o saltos de línea — directo desde el Excel del proveedor. Hasta{" "}
-            {MAX_CODIGOS_MULTI}.
-          </p>
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
           <Button type="submit" disabled={loading} className="min-h-[44px] px-5">
             <Search className="mr-1.5 h-4 w-4" /> Buscar
           </Button>
@@ -986,17 +1013,17 @@ function VistaVarias() {
               </tbody>
             </table>
           </div>
-          <p className="px-4 py-2.5 text-xs text-gray-500 sm:px-5">
-            Ventas netas: las devoluciones (notas de crédito) ya están restadas. <b>u/mes real</b> cuenta solo los
-            meses en que HABÍA mercancía — una referencia puede marcar 0 en 12 m y aun así un ritmo alto: se agotó,
-            no dejó de gustar.
-            {hayInfoMulti && (
-              <>
-                {" "}
-                El Costo CIF es de Switch; <b>FOB y margen son estimados</b> (CIF ÷ {DIVISOR_FOB_EST}).
-              </>
-            )}
-            {frescuraMulti && <> Datos de Switch al {fmtFrescura(frescuraMulti)}.</>}
+          {/* Los DOS avisos se quedan: que las devoluciones ya están restadas
+              (o cuadrar contra Switch da el doble) y que un 0 en 12 m puede ser
+              un agotado, no un fracaso — eso último cambia una decisión de
+              compra. La metodología va en el MISMO ⓘ que la otra vista. */}
+          <p className="flex flex-wrap items-center gap-x-1 px-4 py-0.5 text-xs text-gray-500 sm:px-5">
+            <span>
+              Ventas netas: las devoluciones (notas de crédito) ya están restadas. Una referencia puede marcar 0 en
+              12 m y aun así tener un <b>u/mes real</b> alto: se agotó, no dejó de gustar.
+              {frescuraMulti && <> Datos de Switch al {fmtFrescura(frescuraMulti)}.</>}
+            </span>
+            <AyudaPieReferencia conInfo={hayInfoMulti} />
           </p>
         </div>
       )}

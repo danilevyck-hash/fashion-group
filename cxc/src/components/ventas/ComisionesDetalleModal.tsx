@@ -27,6 +27,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, tipoDocCorto, comisionLinea, type ComisionDetalle, type ComisionDescuento, type VentaDoc, type CobroDoc } from "@/lib/ventas/comisionExcel";
 import { ModalOverlay } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -457,7 +458,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
             <div className="space-y-6 print:space-y-0">
               {/* ══════════ PANTALLA — VENTAS ══════════ */}
               <section className="print:hidden">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Ventas</h3>
+                {/* La fórmula de la línea y por qué el total no es la suma
+                    exacta son metodología: se aprenden una vez. 🩸 El texto no
+                    desaparece — sin él, "de a poquito" no da y parece un error
+                    de cálculo. */}
+                <h3 className="mb-2 flex items-center gap-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                  Ventas
+                  <Ayuda titulo="Cómo se calcula">
+                    <p>Comisión de cada línea = subtotal × {pctTasaV}%.</p>
+                    <p className="mt-2">{NOTA_COMISION_LINEA}</p>
+                  </Ayuda>
+                </h3>
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
@@ -501,13 +512,17 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     </tfoot>
                   </table>
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Comisión de cada línea = subtotal × {pctTasaV}%. {NOTA_COMISION_LINEA}</p>
-
               </section>
 
               {/* ══════════ PANTALLA — COBROS + CIERRE ══════════ */}
               <section className="print:hidden">
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Cobros</h3>
+                <h3 className="mb-2 flex items-center gap-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                  Cobros
+                  <Ayuda titulo="Cómo se calcula">
+                    <p>Comisión de cada línea = monto × {pctTasaC}%.</p>
+                    <p className="mt-2">{NOTA_COMISION_LINEA}</p>
+                  </Ayuda>
+                </h3>
 
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <table className="w-full text-sm">
@@ -541,8 +556,9 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     </tfoot>
                   </table>
                 </div>
+                {/* SE QUEDA: explica por qué la columna del número de recibo
+                    viene vacía. Sin eso parece un dato perdido. */}
                 <p className="mt-1 text-xs text-gray-400 print:hidden">El API de Switch no expone el número de recibo.</p>
-                <p className="mt-0.5 text-xs text-gray-400 print:hidden">Comisión de cada línea = monto × {pctTasaC}%. {NOTA_COMISION_LINEA}</p>
 
                 {/* Suma de las BASES sobre las que se comisiona (no de las comisiones). */}
                 <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900 print:hidden">
