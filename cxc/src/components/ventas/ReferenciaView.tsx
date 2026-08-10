@@ -438,18 +438,28 @@ function TarjetaModelo({
         <KpisPeriodo stats={stats} periodo={periodo} />
       )}
 
-      {/* Aviso de agotado */}
+      {/* Aviso de agotado — UN solo ritmo, el que sostiene la sugerencia
+          (u/mes real). Decir dos (el de los últimos meses y el real) era
+          contradecirse en la misma frase. */}
       {stats.seAgoto && (
         <div className="mx-4 my-3.5 rounded-r-lg border-l-[3px] border-amber-500 bg-amber-50 px-3.5 py-2.5 text-[13px] text-gray-800 sm:mx-5">
           ⚠️ <b className="text-amber-700">Se agotó</b> — última venta hace {stats.mesesDesdeUltimaVenta} meses
-          {stats.ultimaVenta && <> ({fmtMes(stats.ultimaVenta)})</>}, venía vendiendo{" "}
-          <b className="tabular-nums">{fmtU(stats.ritmoUltimosActivos)} u/mes</b>. Ritmo real con mercancía:{" "}
-          <b className="tabular-nums">{fmtU(stats.uMesReal)} u/mes</b>.{" "}
+          {stats.ultimaVenta && <> ({fmtMes(stats.ultimaVenta)})</>}, vendía{" "}
+          <b className="tabular-nums">{fmtU(stats.uMesReal)} u/mes</b> con mercancía.{" "}
           {stats.sugerencia6m != null && (
             <span className="font-extrabold tabular-nums">
               Para {UMBRALES_AGOTADO.MESES_SUGERENCIA} meses: ~{fmtInt(stats.sugerencia6m)} unidades.
             </span>
           )}
+        </div>
+      )}
+
+      {/* Descontinuado — estado propio y SIN sugerencia de compra (🩸 antes
+          recomendaba ~138 unidades de algo sin vender hacía 27 meses). */}
+      {stats.descontinuado && (
+        <div className="mx-4 my-3.5 rounded-r-lg border-l-[3px] border-gray-400 bg-gray-50 px-3.5 py-2.5 text-[13px] text-gray-800 sm:mx-5">
+          <b className="text-gray-900">Descontinuado</b> — última venta hace {stats.mesesDesdeUltimaVenta} meses
+          {stats.ultimaVenta && <> ({fmtMes(stats.ultimaVenta)})</>}. Pasó más de un año: no se sugiere compra.
         </div>
       )}
 
@@ -723,12 +733,16 @@ function Td({ children, right }: { children: React.ReactNode; right?: boolean })
 
 function PillEstado({ stats }: { stats: ReferenciaStats | null }) {
   const texto = estadoTexto(stats);
+  // Descontinuado va en gris (no hay nada que hacer); "se agotó" en rojo,
+  // que es el que pide una decisión de compra.
   const clase =
     texto === "ACTIVO"
       ? "bg-emerald-50 text-emerald-700"
       : texto === "NUNCA VENDIDO"
         ? "bg-gray-100 text-gray-600"
-        : "bg-red-50 text-red-700";
+        : stats?.descontinuado
+          ? "bg-gray-200 text-gray-700"
+          : "bg-red-50 text-red-700";
   return (
     <span className={`whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${clase}`}>{texto}</span>
   );

@@ -72,6 +72,19 @@ const SERIE_22003001: MesSerie[] = [
   { mes: "2026-05", unidades: 8, venta: 180 },
 ];
 
+// Serie del caso REAL que destapó el bug del tope de antigüedad: NB2075902,
+// última venta may-2024 (27 meses antes de HOY). Sus cifras son las que la
+// pantalla mostraba: 23.0 u/mes real y "Para 6 meses: ~138 unidades" — una
+// recomendación de compra sobre un artículo muerto hacía más de dos años.
+const SERIE_NB2075902: MesSerie[] = [
+  { mes: "2023-12", unidades: 35, venta: 700 },
+  { mes: "2024-01", unidades: 30, venta: 600 },
+  { mes: "2024-02", unidades: 27, venta: 540 },
+  { mes: "2024-03", unidades: 20, venta: 400 },
+  { mes: "2024-04", unidades: 15, venta: 300 },
+  { mes: "2024-05", unidades: 11, venta: 220 },
+];
+
 const HOY = "2026-08";
 
 describe("signo NC — lo que resta, RESTA", () => {
@@ -184,17 +197,28 @@ describe("SE AGOTÓ — heurística validada con datos reales", () => {
     expect(UMBRALES_AGOTADO.MESES_SIN_VENTA).toBe(3);
     expect(UMBRALES_AGOTADO.RITMO_MINIMO).toBe(3);
     expect(UMBRALES_AGOTADO.VENTANA_RITMO_MESES).toBe(3);
+    expect(UMBRALES_AGOTADO.MESES_MAX_AGOTADO).toBe(12);
     expect(UMBRALES_AGOTADO.MESES_SUGERENCIA).toBe(6);
   });
 
-  it("caso real 31KAE22001001: última venta 2025-07 → hace 13 meses, ritmo final 4 u/mes → SE AGOTÓ", () => {
+  it("caso real 31KAE22003001: última venta 2026-05 → hace 3 meses → SE AGOTÓ, con su sugerencia", () => {
+    const s = calcularStats(SERIE_22003001, HOY);
+    expect(s.mesesDesdeUltimaVenta).toBe(3);
+    expect(s.descontinuado).toBe(false);
+    expect(s.seAgoto).toBe(true);
+    expect(s.sugerencia6m).toBe(24); // 3.923 u/mes × 6
+    expect(estadoTexto(s)).toBe("SE AGOTÓ hace 3 m");
+  });
+
+  it("caso real 31KAE22001001: 13 meses PASA el tope de 12 → ya no es agotado, es DESCONTINUADO", () => {
     const s = calcularStats(SERIE_22001001, HOY);
     expect(s.mesesDesdeUltimaVenta).toBe(13);
-    expect(s.ritmoUltimosActivos).toBeCloseTo(4, 5); // (8+2+2)/3
-    expect(s.seAgoto).toBe(true);
-    // Sugerencia = ritmo real × 6 = 6.857 × 6 ≈ 41
-    expect(s.sugerencia6m).toBe(41);
-    expect(estadoTexto(s)).toBe("SE AGOTÓ hace 13 m");
+    expect(s.ritmoUltimosActivos).toBeCloseTo(4, 5); // (8+2+2)/3 — buen ritmo, y aun así
+    expect(s.descontinuado).toBe(true);
+    expect(s.seAgoto).toBe(false);
+    // Antes del tope sugería 41 unidades de algo sin vender hace más de un año.
+    expect(s.sugerencia6m).toBeNull();
+    expect(estadoTexto(s)).toBe("DESCONTINUADO hace 13 m");
   });
 
   it("borde: última venta hace 2 meses NO es agotado (necesita ≥3)", () => {
@@ -260,6 +284,83 @@ describe("SE AGOTÓ — heurística validada con datos reales", () => {
     expect(s.sugerencia6m).toBeNull();
     expect(estadoTexto(s)).toBe("NUNCA VENDIDO");
     expect(estadoTexto(null)).toBe("NUNCA VENDIDO");
+  });
+});
+
+describe("DESCONTINUADO — el tope de antigüedad del 'se agotó'", () => {
+  it("caso real NB2075902: 27 meses sin vender → DESCONTINUADO y SIN sugerencia de compra", () => {
+    const s = calcularStats(SERIE_NB2075902, HOY);
+    expect(s.ultimaVenta).toBe("2024-05");
+    expect(s.mesesDesdeUltimaVenta).toBe(27);
+    // El ritmo que tenía sigue siendo alto — por eso el bug: la vieja regla
+    // solo miraba el ritmo y proponía comprar 138 unidades (23 u/mes × 6).
+    expect(s.uMesReal).toBeCloseTo(23, 5);
+    expect(Math.round(s.uMesReal! * UMBRALES_AGOTADO.MESES_SUGERENCIA)).toBe(138);
+    expect(s.descontinuado).toBe(true);
+    expect(s.seAgoto).toBe(false);
+    expect(s.sugerencia6m).toBeNull();
+    expect(estadoTexto(s)).toBe("DESCONTINUADO hace 27 m");
+  });
+
+  it("los dos estados son EXCLUYENTES: nunca puede estar agotado y descontinuado a la vez", () => {
+    for (const serie of [SERIE_22001001, SERIE_22003001, SERIE_NB2075902, []]) {
+      const s = calcularStats(serie, HOY);
+      expect(s.descontinuado && s.seAgoto).toBe(false);
+    }
+  });
+
+  it("descontinuado NUNCA lleva sugerencia, aunque el ritmo dé de sobra", () => {
+    const serie: MesSerie[] = [
+      { mes: "2024-11", unidades: 50, venta: 500 },
+      { mes: "2024-12", unidades: 50, venta: 500 },
+    ];
+    const s = calcularStats(serie, HOY);
+    expect(s.ritmoUltimosActivos).toBe(50);
+    expect(s.descontinuado).toBe(true);
+    expect(s.sugerencia6m).toBeNull();
+  });
+
+  it("borde: 12 meses exactos TODAVÍA es agotado (el tope es >, no ≥)", () => {
+    const serie: MesSerie[] = [
+      { mes: "2025-06", unidades: 5, venta: 50 },
+      { mes: "2025-07", unidades: 5, venta: 50 },
+      { mes: "2025-08", unidades: 5, venta: 50 },
+    ];
+    const s = calcularStats(serie, HOY);
+    expect(s.mesesDesdeUltimaVenta).toBe(12);
+    expect(s.descontinuado).toBe(false);
+    expect(s.seAgoto).toBe(true);
+    expect(s.sugerencia6m).toBe(30);
+  });
+
+  it("borde: 13 meses ya es descontinuado", () => {
+    const serie: MesSerie[] = [
+      { mes: "2025-05", unidades: 5, venta: 50 },
+      { mes: "2025-06", unidades: 5, venta: 50 },
+      { mes: "2025-07", unidades: 5, venta: 50 },
+    ];
+    const s = calcularStats(serie, HOY);
+    expect(s.mesesDesdeUltimaVenta).toBe(13);
+    expect(s.descontinuado).toBe(true);
+    expect(s.seAgoto).toBe(false);
+  });
+
+  it("el tope NO mira el ritmo: un artículo flojo que lleva más de un año sin vender también es descontinuado", () => {
+    const serie: MesSerie[] = [
+      { mes: "2025-01", unidades: 1, venta: 10 },
+      { mes: "2025-02", unidades: 2, venta: 20 },
+    ];
+    const s = calcularStats(serie, HOY);
+    expect(s.ritmoUltimosActivos).toBeCloseTo(1.5, 5); // por debajo del RITMO_MINIMO
+    expect(s.seAgoto).toBe(false);
+    expect(s.descontinuado).toBe(true);
+    expect(estadoTexto(s)).toBe("DESCONTINUADO hace 18 m");
+  });
+
+  it("nunca vendido no es descontinuado: no hay última venta que envejecer", () => {
+    const s = calcularStats([], HOY);
+    expect(s.descontinuado).toBe(false);
+    expect(estadoTexto(s)).toBe("NUNCA VENDIDO");
   });
 });
 
