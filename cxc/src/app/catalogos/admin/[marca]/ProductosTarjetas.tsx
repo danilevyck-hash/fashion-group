@@ -76,8 +76,9 @@ export function FaltanFotoTarjetasTab({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <p className="text-gray-900 font-medium">Todo al día</p>
-          <p className="text-gray-400 text-sm mt-1">Ningún producto activo sin foto.</p>
+          {/* Una sola línea: "todo al día" y "ningún producto activo sin foto"
+              decían lo mismo. Queda la que dice QUÉ está al día. */}
+          <p className="text-gray-900 font-medium">Ningún producto activo sin foto</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">

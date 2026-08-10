@@ -230,12 +230,18 @@ function ProveedoresList() {
           {loading ? (
             <SkeletonTable rows={8} cols={4} />
           ) : items.length === 0 ? (
-            <EmptyState title="Sin proveedores" subtitle={q ? "Probá con otra búsqueda." : "No hay datos sincronizados aún."} />
+            // Con el buscador lleno delante, "probá con otra búsqueda" no agrega
+            // nada a "Sin proveedores". Sin búsqueda, la segunda línea dice algo
+            // distinto (no hay datos) y se queda.
+            <EmptyState title="Sin proveedores" subtitle={q ? undefined : "No hay datos sincronizados aún."} />
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 mb-2">
+                {/* Sin "· ordenados por monto": el orden acá es fijo y se ve
+                    solo en la primera columna de montos. En CXC esa coletilla sí
+                    se queda, porque ahí el orden cambia con la píldora. */}
                 <div className="text-xs text-gray-500 tabular-nums">
-                  {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
+                  {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"}
                 </div>
                 {/* min-w fijo: el texto cambia a "Preparando…" mientras baja
                     el chunk de Excel y sin ancho fijo el botón daría un salto. */}

@@ -573,10 +573,10 @@ function AdminDashboardInner() {
             </button>
             {showExport && (<>
               <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
+              {/* El alcance del export ya está dicho arriba de la tabla
+                  ("{N} de {M} clientes"): repetirlo acá era el MISMO número dos
+                  veces en la misma pantalla. */}
               <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-72 py-1">
-                <div className="px-3 py-2 border-b border-gray-200">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Se exportaran {filtered.length} clientes</p>
-                </div>
                 <button
                   onClick={() => {
                     const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";

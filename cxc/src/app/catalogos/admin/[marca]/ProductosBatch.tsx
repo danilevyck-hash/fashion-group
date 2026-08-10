@@ -693,8 +693,9 @@ function ImportSection({
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Actualizar inventario</h3>
-      <p className="text-xs text-gray-400 mb-4">{products.length} productos en catalogo</p>
+      {/* El total del catálogo ya está arriba, en la misma pestaña, encima de la
+          lista de productos. Repetirlo acá era el mismo número dos veces. */}
+      <h3 className="text-sm font-semibold text-gray-900 mb-4">Actualizar inventario</h3>
 
       <div className="flex flex-wrap gap-3 mb-4">
         <button
@@ -741,8 +742,10 @@ function ImportSection({
         <svg className="w-7 h-7 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
+        {/* "o haz click para seleccionar" se fue: la zona entera es clickeable y
+            el puntero ya lo dice. La línea que queda es la que informa (qué
+            formatos entran). */}
         <p className="text-sm text-gray-500">Arrastra un .csv, .xlsx o .xls aquí</p>
-        <p className="text-xs text-gray-400 mt-1">o haz click para seleccionar</p>
       </div>
       <input
         ref={fileRef}
@@ -994,8 +997,9 @@ function BatchPhotosSection({
         <svg className="w-7 h-7 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
+        {/* La regla del nombre por SKU ya está dicha —con ejemplo— en la bajada
+            de esta misma tarjeta. Decirla dos veces no la hacía más clara. */}
         <p className="text-sm text-gray-500">Selecciona o arrastra imagenes</p>
-        <p className="text-xs text-gray-400 mt-1">Nombra cada archivo con el SKU del producto</p>
       </div>
       <input
         ref={photoInputRef}

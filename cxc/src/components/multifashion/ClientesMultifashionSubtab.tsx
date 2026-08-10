@@ -28,7 +28,24 @@ import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Package, Users, ChevronDown, Store, Repeat, UserPlus, Moon, Percent, MessageCircle } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+
+// "Escala compartida entre mayoreo y retail" vivía escrito DOS veces —una en la
+// lista vertical del celular, otra en la tira del escritorio— y por eso podían
+// divergir. Ahora es una sola constante, y se lee a un toque en vez de ocupar un
+// renglón bajo cada mini-gráfico: es metodología (por qué las barras se pueden
+// comparar entre secciones), no un aviso.
+const ESCALA_COMPARTIDA = "Escala compartida entre mayoreo y retail";
+
+function AyudaEscala() {
+  return (
+    <Ayuda titulo="Cómo leer las barras">
+      {ESCALA_COMPARTIDA}: la barra más alta de la pantalla es el mejor mes, y todas las demás se miden
+      contra ella.
+    </Ayuda>
+  );
+}
 import { cn } from "@/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -424,9 +441,13 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, ventanaAcotada =
               <div className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-500">
                 <Store className="h-4 w-4" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-1 items-center gap-1">
                 <p className="text-sm font-medium text-gray-900">Anónimos (mostrador)</p>
-                <p className="text-xs text-gray-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
+                {/* Qué códigos de Switch caen en este bucket es composición: se
+                    aprende una vez y no cambia con el período. */}
+                <Ayuda titulo="Qué entra acá">
+                  Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.
+                </Ayuda>
               </div>
               <div className="text-right">
                 <p className="font-mono text-sm tabular-nums text-gray-950">{fmtMoney(retail.ventas_anonimas)}</p>
@@ -728,7 +749,9 @@ function ClienteMesesLista({
           );
         })}
       </ul>
-      <p className="mt-2 text-xs text-gray-500">Escala compartida entre mayoreo y retail</p>
+      <div className="mt-1 -ml-2">
+        <AyudaEscala />
+      </div>
     </div>
   );
 }
@@ -869,9 +892,9 @@ function ClienteSparkline({
           );
         })}
       </div>
-      <p className="mt-2 text-xs text-gray-500">
-        Escala compartida entre mayoreo y retail
-      </p>
+      <div className="mt-1 -ml-2">
+        <AyudaEscala />
+      </div>
     </div>
   );
 }

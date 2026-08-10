@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { useFormGuard } from "@/lib/hooks/useModalDismiss";
 import type { ConsolidatedClient } from "@/lib/types";
 import { composeEmailHtml } from "@/lib/cxc/estado-cuenta-email";
@@ -200,16 +201,20 @@ export default function EnviarEmailModal({ client, companyFilter, onClose, onSen
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje</label>
+                {/* Qué va adjunto y qué no se puede editar se aprende UNA vez:
+                    vive en el ⓘ, no ocupando un renglón en cada envío. */}
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="block text-xs font-medium text-gray-600">Mensaje</label>
+                  <Ayuda titulo="Qué se envía">
+                    La tabla de saldos se arma automáticamente y no se edita. Se adjunta un PDF por empresa.
+                  </Ayuda>
+                </div>
                 <textarea
                   value={cuerpo}
                   onChange={(e) => setCuerpo(e.target.value)}
                   rows={6}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  La tabla de saldos se arma automáticamente y no se edita. Se adjunta un PDF por empresa.
-                </p>
               </div>
 
               <div>

@@ -164,7 +164,10 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               if (campos.length === 0) return null;
               return (
                 <section className="border border-gray-200 rounded-lg p-4 mb-4">
-                  <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos · sincronizados de Switch</h2>
+                  {/* "· sincronizados de Switch" se fue: el pie de esta misma
+                      sección ya dice "Última sincronización: {fecha}", que
+                      además dice CUÁNDO. */}
+                  <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
                     {campos.map((c) => (
                       <Field key={c.label} label={c.label} value={c.value} tabularNums={c.tabularNums} fullWidth={c.fullWidth} href={c.href} />

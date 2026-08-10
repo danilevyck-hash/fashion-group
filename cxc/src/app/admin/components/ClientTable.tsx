@@ -329,8 +329,9 @@ export default function ClientTable({
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5" className="mx-auto mb-3">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
+            {/* Una sola línea: "probá con otra búsqueda" no agrega nada a "Sin
+                resultados" con el buscador lleno delante. */}
             <p className="text-sm text-gray-400">Sin resultados</p>
-            {search && <p className="text-xs text-gray-300 mt-1">Intenta con otro termino de busqueda</p>}
           </div>
         )}
 
