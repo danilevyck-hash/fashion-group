@@ -8,6 +8,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fmt } from "@/lib/format";
+import { Ayuda } from "@/components/shared/Ayuda";
 import type { SwitchDiarioVentas } from "@/lib/switch-api/client";
 
 interface CajaResponse {
@@ -88,6 +89,12 @@ export function CajaSubtab({ ventanaAcotada = false }: CajaSubtabProps) {
           <div className="flex items-center gap-2 text-xs text-gray-400 tabular-nums">
             {data.stale && <span className="text-amber-600 font-medium">Switch no respondió — mostrando último dato</span>}
             <span>Actualizado hace {minutosDesde(data.synced_at)} min</span>
+            {/* Cada cuánto se refresca solo estaba escrito al pie de la pantalla,
+                lejos de la única línea que habla de frescura. Ahora vive acá y a
+                un toque: es metodología, no un aviso. */}
+            <Ayuda titulo="Cada cuánto se actualiza">
+              El día en curso se refresca cada 10 minutos.
+            </Ayuda>
             <button
               onClick={() => mutate()}
               disabled={isValidating}
@@ -172,9 +179,6 @@ export function CajaSubtab({ ventanaAcotada = false }: CajaSubtabProps) {
             )}
           </div>
 
-          <p className="text-xs text-gray-400">
-            El día en curso se refresca cada 10 minutos.
-          </p>
         </>
       ) : null}
     </div>

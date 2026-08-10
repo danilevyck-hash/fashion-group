@@ -95,6 +95,7 @@ import {
   Package, Tag, Layers, Info, Search, ArrowUp, ArrowDown, ChevronDown, AlertTriangle,
 } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { fmtVariacionPct } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import {
@@ -510,12 +511,17 @@ export function ProductosSubtab({
           />
         )}
 
-        {/* Se dice de dónde sale el número Y qué se le restó. Las devoluciones
+        {/* 🩸 LO QUE SE LE RESTÓ AL NÚMERO SE QUEDA EN PANTALLA. Las devoluciones
             YA están descontadas; sin la nota, alguien va a sumar el período a
-            mano contra Switch y no le va a cuadrar. */}
-        <p className="text-xs text-gray-400">
-          Ventas netas: las devoluciones (notas de crédito) ya están restadas. El margen es la utilidad dividida entre
-          la venta.
+            mano contra Switch y no le va a cuadrar — y la diferencia va a ser
+            exactamente el DOBLE de las notas de crédito (CLAUDE.md, "Signos
+            contables"). Lo que SÍ se guardó en el ⓘ es la fórmula del margen:
+            eso se aprende una vez y no cambia con el período. */}
+        <p className="flex flex-wrap items-center gap-x-1 text-xs text-gray-400">
+          <span>Ventas netas: las devoluciones (notas de crédito) ya están restadas.</span>
+          <Ayuda titulo="Cómo se calcula el margen">
+            El margen es la utilidad dividida entre la venta.
+          </Ayuda>
         </p>
       </div>
 
@@ -821,9 +827,10 @@ function CeldaPulso({
           </span>{" "}
           contra <span className="font-mono tabular-nums">{anterior}</span> el año pasado
         </p>
-      ) : (
-        <p className="mt-1 text-xs text-gray-400">Sin comparación</p>
-      )}
+      ) : null}
+      {/* Sin "Sin comparación" en cada celda: el pie de la tarjeta ya dice, UNA
+          vez y con el motivo, por qué no hay contra qué comparar. Tres avisos
+          idénticos sin explicación eran ruido. */}
     </div>
   );
 }
@@ -847,9 +854,12 @@ function ListaTop({
   const esPlata = unidad === "plata";
   return (
     <Card className="overflow-hidden p-0">
-      <div className="border-b border-gray-100 px-4 py-3">
+      {/* El título ya dice qué se rankea ("lo que más se vende" / "lo que más
+          plata deja"); con qué vara y cuánto del período cubren los cinco es
+          metodología, y vive en el ⓘ. */}
+      <div className="flex items-center gap-1 border-b border-gray-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">{titulo}</h4>
-        <p className="mt-0.5 text-xs text-gray-500">{ayuda}</p>
+        <Ayuda titulo="Cómo se arma esta lista">{ayuda}</Ayuda>
       </div>
       <ol className="divide-y divide-gray-100">
         {filas.map((f, i) => (
@@ -920,17 +930,21 @@ function MargenFlojo({
     <Card className="overflow-hidden border-amber-200 p-0">
       <div className="flex items-start gap-2 border-b border-amber-100 bg-amber-50 px-4 py-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" strokeWidth={1.75} />
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1">
           <h4 className="font-display text-sm font-semibold text-amber-950">
             Se vende mucho pero deja poco
           </h4>
-          {/* La regla se dice completa. Una advertencia cuyo criterio no se ve
-              es una advertencia en la que nadie confía. */}
-          <p className="mt-0.5 text-xs text-amber-900">
+          {/* 🩸 LA REGLA SE SIGUE PUDIENDO LEER COMPLETA — una advertencia cuyo
+              criterio no se puede consultar es una advertencia en la que nadie
+              confía. Lo que cambió es que ya no se repite en cada carga: es una
+              definición de bucket (se aprende una vez), así que vive a UN toque
+              en vez de ocupar dos renglones arriba de la lista. El AVISO —la
+              tarjeta ámbar y sus filas— sigue entero y a la vista. */}
+          <Ayuda titulo="Qué entra en esta lista">
             {sustantivo === "categorías" ? "Categorías" : "Artículos"} entre los {ALERTA_ENTRE} más vendidos
             del período con margen por debajo del margen general (
             <span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
-          </p>
+          </Ayuda>
         </div>
       </div>
       <ul className="divide-y divide-gray-100">
@@ -966,13 +980,24 @@ function Movimientos({
 }) {
   if (cambios.subieron.length === 0 && cambios.bajaron.length === 0) return null;
   return (
-    <Card className="overflow-hidden p-0">
+    // `data-bloque` para que el candado del filtro de marca agarre la tarjeta
+    // ENTERA sin depender de cuántos <div> haya entre el título y el borde: con
+    // `closest("div").parentElement` bastaba envolver el título para que el test
+    // midiera otra cosa y se pusiera rojo sin que nada de negocio cambiara.
+    <Card data-bloque="movimientos" className="overflow-hidden p-0">
       <div className="border-b border-gray-100 px-4 py-3">
-        <h4 className="font-display text-sm font-semibold text-gray-950">Lo que más cambió</h4>
+        <div className="flex items-center gap-1">
+          <h4 className="font-display text-sm font-semibold text-gray-950">Lo que más cambió</h4>
+          {/* 🩸 Contra QUÉ se compara se queda en pantalla (las dos fechas son
+              del período, cambian con él). Por qué se rankea en dólares y no en
+              porcentaje se aprende una vez: va al ⓘ. */}
+          <Ayuda titulo="Por qué en dólares">
+            Se ordena por la diferencia en dólares, no en porcentaje: lo que sube 400% desde $40 no mueve el mes.
+          </Ayuda>
+        </div>
         <p className="mt-0.5 text-xs text-gray-500">
           {sustantivo === "categorías" ? "Categorías" : "Artículos"} con la mayor diferencia de venta
-          contra {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}. En dólares, no en
-          porcentaje: lo que sube 400% desde $40 no mueve el mes.
+          contra {fmtFecha(comparativo.desde)} – {fmtFecha(comparativo.hasta)}.
         </p>
       </div>
       <div className="grid divide-y divide-gray-100 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
@@ -1380,17 +1405,18 @@ function SelectorMarcas({
 
   return (
     <Card className={cn("overflow-hidden p-0", loading && "opacity-60 transition-opacity")}>
-      <div className="border-b border-gray-100 px-4 py-3">
+      {/* "Tocá una marca…" se fue: las filas son botones con estado, y decir en
+          prosa lo que el control ya hace era un instructivo. Qué significa el
+          ámbar es metodología (el mismo criterio que la alerta de abajo) y vive
+          en el ⓘ. */}
+      <div className="flex items-center gap-1 border-b border-gray-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-gray-950">Marcas</h4>
-        <p className="mt-0.5 text-xs text-gray-500">
-          Tocá una marca y todo lo de abajo muestra solo lo suyo.
-          {margenGeneral != null && (
-            <>
-              {" "}En <span className="text-amber-700">ámbar</span>, el margen por debajo del general
-              del período (<span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
-            </>
-          )}
-        </p>
+        {margenGeneral != null && (
+          <Ayuda titulo="Qué significa el ámbar">
+            En <span className="text-amber-700">ámbar</span>, el margen por debajo del general del
+            período (<span className="font-mono tabular-nums">{fmtMargen(margenGeneral)}</span>).
+          </Ayuda>
+        )}
       </div>
       {/* Una columna hasta `xl`. A 1216 px útiles la fila de una sola columna
           deja ~900 px de blanco entre el nombre y el monto —el ojo pierde de

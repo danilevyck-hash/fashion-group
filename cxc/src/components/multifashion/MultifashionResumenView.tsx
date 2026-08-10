@@ -726,8 +726,9 @@ function ChartMesAnioMount({
           ) : (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-center">
               <Info className="h-6 w-6 text-gray-400" strokeWidth={1.5} />
-              <p className="text-sm text-gray-500">No hay datos para este período</p>
-              <p className="text-xs text-gray-400">{mes_label} {year} no registra ventas retail.</p>
+              {/* Una sola línea: el período ya está dicho en el selector de mes
+                  de arriba, así que la segunda decía lo mismo con otras palabras. */}
+              <p className="text-sm text-gray-500">{mes_label} {year} no registra ventas retail</p>
             </div>
           )}
         </Card>

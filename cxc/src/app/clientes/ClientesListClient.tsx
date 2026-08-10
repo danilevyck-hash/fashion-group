@@ -194,9 +194,12 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
         {loading ? (
           <SkeletonTable rows={8} cols={5} />
         ) : clientes.length === 0 ? (
+          // Con filtros puestos, "probá con otros" no agrega nada a "Sin
+          // resultados": los filtros están a la vista, arriba. Sin filtros, la
+          // segunda línea SÍ dice otra cosa (no hay nada cargado) y se queda.
           <EmptyState
             title="Sin resultados"
-            subtitle={q || provincia ? "Probá con otros filtros." : "No hay clientes cargados aún."}
+            subtitle={q || provincia ? undefined : "No hay clientes cargados aún."}
           />
         ) : (
           <>

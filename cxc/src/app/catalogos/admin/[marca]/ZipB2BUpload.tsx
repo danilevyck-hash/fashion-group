@@ -9,6 +9,7 @@
 // reporte final (asignadas · sin match · con foto elegida a mano).
 
 import { useRef, useState } from "react";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { getMarcaTheme, type AdminProducto, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import type { ProgresoZip, ResultadoZip } from "@/lib/catalogos/zip-b2b-client";
 import type { StorageMarcaKey } from "@/lib/catalogos/variantes-paths";
@@ -82,12 +83,18 @@ export default function ZipB2BUpload({
   return (
     <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between gap-2 mb-3">
-        <div>
+        {/* Cómo trata el ZIP —que no hay que descomprimirlo, que se guardan
+            todas las vistas y elige sola, y que el archivo no viaja entero— se
+            aprende UNA vez y no cambia. Va en el ⓘ; lo que se hace (arrastrar)
+            lo dice la zona de abajo. "No cierres esta pestaña" NO entra acá: eso
+            es un aviso y sigue en pantalla, durante la subida. */}
+        <div className="flex items-center gap-1">
           <h3 className="text-sm font-semibold text-gray-900">Subir ZIP del B2B</h3>
-          <p className="text-xs text-gray-400">
-            Arrastra el ZIP tal como lo bajas del portal. Se guardan todas las fotos de cada código y
-            se elige la mejor automáticamente.
-          </p>
+          <Ayuda titulo="Cómo funciona">
+            Arrastra el ZIP tal como lo bajas del portal, sin descomprimirlo. Se guardan todas las fotos
+            de cada código y se elige la mejor automáticamente. Puede pesar 80 MB — se procesa en tu
+            navegador, no se sube entero.
+          </Ayuda>
         </div>
         {(resultado || error) && (
           <button onClick={reset} className="text-xs text-gray-400 hover:text-gray-700">
@@ -118,7 +125,6 @@ export default function ZipB2BUpload({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2h7M12 8h.01M12 12h.01M12 16h.01" />
           </svg>
           <p className="text-sm text-gray-600 font-medium">Arrastra el ZIP aquí o haz clic para seleccionarlo</p>
-          <p className="text-xs text-gray-400 mt-0.5">Puede pesar 80 MB — se procesa en tu navegador, no se sube entero</p>
         </div>
       )}
 

@@ -139,7 +139,7 @@ export default function PanelCxcMobile({
           onSyncedNow={onSyncedNow}
         />
 
-        <MobileHero total={totals.total} clientCount={roleClients.length} />
+        <MobileHero total={totals.total} />
 
         <MobileAgingChips
           totals={{ current: totals.current, watch: totals.watch, overdue: totals.overdue }}
@@ -294,7 +294,10 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 // Hero — total pendiente Stone-900
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MobileHero({ total, clientCount }: { total: number; clientCount: number }) {
+// El conteo de clientes NO vive acá: unos centímetros más abajo, arriba de la
+// lista, está el MISMO número y encima sabe de los filtros. Verlo dos veces era
+// leerlo dos veces y creerle a uno de los dos.
+function MobileHero({ total }: { total: number }) {
   return (
     <section className="rounded-xl bg-gray-900 px-5 py-4 text-white shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
@@ -302,9 +305,6 @@ function MobileHero({ total, clientCount }: { total: number; clientCount: number
       </p>
       <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
         {formatCompactCurrency(total)}
-      </p>
-      <p className="mt-2 text-xs text-gray-400">
-        {clientCount} {clientCount === 1 ? "cliente" : "clientes"}
       </p>
     </section>
   );

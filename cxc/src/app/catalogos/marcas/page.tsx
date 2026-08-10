@@ -12,8 +12,12 @@ import { CATALOGO_ADMIN_ROLES, catalogoRoles } from "@/lib/catalogo/roles";
 // los pasos intermedios (elegir marca → Administrar → elegir marca otra vez).
 //
 // Los COLORES de cada tarjeta salen del tema de la marca (MARCA_THEME.hub) —
-// aquí solo vive la identidad no-visual (nombre, tagline, rutas). Agregar una
-// marca = agregar una entrada a BRANDS + su tema.
+// aquí solo vive la identidad no-visual (nombre, rutas). Agregar una marca =
+// agregar una entrada a BRANDS + su tema.
+//
+// La tarjeta NO lleva bajada ("Calzado deportivo", "Clogs, sandalias y más"):
+// describía la marca a gente que trabaja con esa marca todos los días. Lo que sí
+// se queda son los contadores, que son los que hacen tocar la tarjeta.
 
 interface BrandCounters {
   total: number;
@@ -23,7 +27,6 @@ interface BrandCounters {
 interface Brand {
   key: MarcaUiKey;
   name: string;
-  tagline: string;
   productsUrl: string;   // endpoint para contar (active=true)
   catalogoHref: string;  // "Ver catálogo"
   adminHref: string;     // "Administrar" (CATALOGO_ADMIN_ROLES)
@@ -33,7 +36,6 @@ const BRANDS: Brand[] = [
   {
     key: "reebok",
     name: "REEBOK",
-    tagline: "Calzado deportivo",
     productsUrl: "/api/catalogo/reebok/products?active=true",
     catalogoHref: "/catalogo/reebok",
     adminHref: "/catalogos/admin/reebok",
@@ -41,7 +43,6 @@ const BRANDS: Brand[] = [
   {
     key: "joybees",
     name: "JOYBEES",
-    tagline: "Clogs, sandalias y más",
     productsUrl: "/api/catalogo/joybees/products?active=true",
     catalogoHref: "/catalogo/joybees",
     adminHref: "/catalogos/admin/joybees",
@@ -49,7 +50,6 @@ const BRANDS: Brand[] = [
   {
     key: "tommy",
     name: "TOMMY HILFIGER",
-    tagline: "Calzado casual",
     productsUrl: "/api/catalogo/tommy/products?active=true",
     catalogoHref: "/catalogo/tommy",
     adminHref: "/catalogos/admin/tommy",
@@ -106,7 +106,6 @@ export default function CatalogosMarcasPage() {
                 <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-10 translate-x-10 ${hub.blob}`} />
                 <div className="relative">
                   <h2 className={`text-3xl font-extrabold tracking-tight ${hub.name}`}>{b.name}</h2>
-                  <p className={`text-sm mt-1 ${hub.tag}`}>{b.tagline}</p>
 
                   {/* Contadores */}
                   <div className={`mt-4 text-sm font-medium tabular-nums ${hub.counter}`}>

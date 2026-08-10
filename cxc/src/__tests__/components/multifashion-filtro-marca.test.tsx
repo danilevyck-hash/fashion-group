@@ -183,7 +183,10 @@ describe("un toque y TODO lo de abajo queda en esa marca", () => {
   it("4. 'lo que más cambió' compara contra el año pasado DE LA MARCA", () => {
     abrir();
     tocarMarca("Karl Lagerfeld");
-    const bloque = screen.getByText("Lo que más cambió").closest("div")?.parentElement as HTMLElement;
+    // Se agarra la tarjeta por su `data-bloque`, no contando <div> hacia arriba:
+    // lo que este candado tiene que vigilar es QUÉ filas muestra el bloque, no
+    // cuántos contenedores tiene el encabezado.
+    const bloque = screen.getByText("Lo que más cambió").closest("[data-bloque='movimientos']") as HTMLElement;
     expect(bloque.textContent).toContain("Karl-Botas");
     expect(bloque.textContent).not.toContain("Tommy-Camisas");
   });

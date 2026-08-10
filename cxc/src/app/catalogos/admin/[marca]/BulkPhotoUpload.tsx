@@ -170,8 +170,9 @@ export default function BulkPhotoUpload({
         <svg className="w-7 h-7 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.9A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 13l3-3m0 0l3 3m-3-3v9" />
         </svg>
+        {/* "Puedes soltar muchas a la vez" se fue: la línea de arriba ya habla
+            en plural y el selector es múltiple. */}
         <p className="text-sm text-gray-600 font-medium">Arrastra las fotos aquí o haz clic para seleccionar</p>
-        <p className="text-xs text-gray-400 mt-0.5">Puedes soltar muchas a la vez (20+)</p>
       </div>
 
       {/* Preview de asignación */}

@@ -10,6 +10,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { telHref, mailtoHref } from "@/lib/contact-links";
 import { ALL_COMPANIES } from "@/lib/companies";
 import SyncNowButton from "@/components/shared/SyncNowButton";
+import { Ayuda } from "@/components/shared/Ayuda";
 import {
   opcionesFichaCliente,
   ROLES_SYNC_FICHA_CLIENTE,
@@ -253,9 +254,25 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
         {/* Historial por empresa */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">
-              Historial · YTD {new Date().getFullYear()}
-            </h2>
+            <div className="flex items-center gap-1">
+              <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">
+                Historial · YTD {new Date().getFullYear()}
+              </h2>
+              {/* 🩸 POR QUÉ "VENTAS" Y "CXC" NO CUADRAN ENTRE SÍ — la pregunta
+                  que se hace cualquiera al ver las dos cifras juntas. Daniel lo
+                  dijo así: *"cxc si se muestra con itbms, porq es lo que tengo q
+                  cobrar"*. NO SE BORRA NUNCA: sin esta explicación, la tabla se
+                  lee como un error de la app. Lo que cambió es dónde vive —a un
+                  toque, arriba de la tabla que explica, en vez de cuatro
+                  renglones al pie de una ficha que se abre todos los días. */}
+              <Ayuda titulo="Por qué las cifras no cuadran entre sí">
+                <span className="font-medium text-gray-900">Ventas</span> va sin ITBMS — el impuesto se
+                cobra para el fisco, no es venta de la empresa.{" "}
+                <span className="font-medium text-gray-900">Cobrado</span> y{" "}
+                <span className="font-medium text-gray-900">CXC</span> van con ITBMS, porque es la plata
+                que entra y la que falta cobrar.
+              </Ayuda>
+            </div>
             <div className="flex items-center gap-2">
               {cxcVencido > 0 && (
                 <span
@@ -338,16 +355,6 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               </tr>
             </tbody>
           </table>
-          {/* Por qué "Ventas" y "CXC" no cuadran entre sí — la pregunta que se
-              hace cualquiera al ver las dos cifras juntas. Daniel lo dijo así:
-              *"cxc si se muestra con itbms, porq es lo que tengo q cobrar"*.
-              Dicho una sola vez, al pie, en vez de repetirlo por columna. */}
-          <p className="mt-3 text-xs leading-relaxed text-gray-400">
-            <span className="font-medium text-gray-500">Ventas</span> va sin ITBMS — el impuesto se cobra
-            para el fisco, no es venta de la empresa. <span className="font-medium text-gray-500">Cobrado</span> y{" "}
-            <span className="font-medium text-gray-500">CXC</span> van con ITBMS, porque es la plata que
-            entra y la que falta cobrar. Por eso las cifras no cuadran entre sí.
-          </p>
         </section>
 
         {/* Últimas guías del cliente (vínculo por cliente_codigo). Tappable al detalle. */}
