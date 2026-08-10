@@ -14,7 +14,12 @@ export const ADMIN_COMPANIES: Company[] = [
   { key: "fashion_shoes", name: "Fashion Shoes", brand: "Tommy Hilfiger Footwear" },
   { key: "fashion_wear", name: "Fashion Wear", brand: "Tommy Hilfiger Apparel" },
   { key: "active_shoes", name: "Active Shoes", brand: "Reebok Footwear" },
-  { key: "active_wear", name: "Active Wear", brand: "Reebok Apparel" },
+  // Active Wear pasó de Reebok a Karl Lagerfeld: Daniel movió el inventario, y HOY
+  // todo el catálogo de Reebok sale de Active Shoes. `brand` solo se lee en el
+  // mensaje de estado de cuenta de /admin ("Active Wear (Karl Lagerfeld): $X"),
+  // que le llega al cliente por WhatsApp — decía una marca que esa empresa ya no
+  // vende. Los catálogos NO leen de acá: van por MARCA_CATALOGO / marcas-grupo.ts.
+  { key: "active_wear", name: "Active Wear", brand: "Karl Lagerfeld" },
 ];
 
 // 2 empresas adicionales (solo admin las ve)
