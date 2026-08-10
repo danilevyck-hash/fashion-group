@@ -21,6 +21,10 @@ export interface FilaMultiExcel {
   costoCif?: number | null;
   /** Precio de etiqueta — respaldo del margen cuando no hubo ventas. */
   precioEtiqueta?: number | null;
+  /** Cuántas tandas (períodos de venta continua) tuvo la referencia. */
+  tandas?: number | null;
+  /** u/mes de la ÚLTIMA tanda — el ritmo más reciente con mercancía. */
+  uMesUltimaTanda?: number | null;
 }
 
 export function estadoTexto(stats: ReferenciaStats | null): string {
@@ -44,6 +48,9 @@ export async function buildReferenciasSheet(
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 30 },
       { header: "Empresa", wch: 16 },
+      { header: "Total vida", wch: 11, align: "right", fmt: "#,##0" },
+      { header: "Tandas", wch: 8, align: "right", fmt: "#,##0" },
+      { header: "u/mes últ. tanda", wch: 15, align: "right", fmt: "#,##0.0" },
       { header: "3 m", wch: 8, align: "right", fmt: "#,##0" },
       { header: "6 m", wch: 8, align: "right", fmt: "#,##0" },
       { header: "12 m", wch: 8, align: "right", fmt: "#,##0" },
@@ -62,6 +69,9 @@ export async function buildReferenciasSheet(
         f.codigo,
         f.descripcion || "—",
         f.empresa || "—",
+        f.stats ? f.stats.unidadesNetas : null,
+        f.tandas ?? null,
+        f.uMesUltimaTanda != null ? Number(f.uMesUltimaTanda.toFixed(1)) : null,
         f.stats ? f.stats.m3.unidades : null,
         f.stats ? f.stats.m6.unidades : null,
         f.stats ? f.stats.m12.unidades : null,

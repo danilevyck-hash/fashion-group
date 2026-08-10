@@ -195,6 +195,97 @@ export function agruparReferencias(filas: FilaDiario[]): ReferenciaSerie[] {
   return out.sort((a, b) => a.codigo.localeCompare(b.codigo));
 }
 
+// ─── TANDAS — el bloque principal (10-ago-2026) ──────────────────────────────
+//
+// Daniel rechazó el marco de períodos fijos: *"no hace sentido entonces, no
+// responde mi pregunta. quiero saber cuánto vendí de esa referencia para saber
+// cuánto comprar"*. Para un artículo agotado, 3/6/12 meses dan 0 — y 0 no
+// responde "cuánto compro". `NB2075902` vendió 138 unidades y mostraba cero.
+//
+// Una TANDA = un período de venta continua: meses activos (unidades netas > 0)
+// donde el salto entre dos activos consecutivos no pasa de SALTO_MAX_MESES.
+// Un hueco de MÁS de 2 meses corta la tanda; un mes vacío suelto NO corta y
+// SÍ cuenta en la duración (estuvo a la venta, no se vendió).
+//
+// Validado contra producción (10-ago-2026):
+//   NB2075902 → mar-23 (30u/1m/30) · oct→dic-23 (63/3/21) · mar→may-24
+//               (45/3/15, con abr-24 vacío ADENTRO) — 3 tandas, total 138.
+//   NB2075908 → mar→jun-23 (115/4/28.8) · ene-24 (5/1/5).
+
+export const UMBRAL_TANDAS = {
+  /** Salto máximo (en meses) entre dos meses ACTIVOS consecutivos para seguir
+   *  en la misma tanda. 2 = tolera UN mes vacío en el medio (jul → sep sigue);
+   *  un hueco mayor (dic-23 → mar-24) corta. */
+  SALTO_MAX_MESES: 2,
+} as const;
+
+/** Un período de venta continua de una referencia. */
+export interface Tanda {
+  desde: string; // YYYY-MM del primer mes activo
+  hasta: string; // YYYY-MM del último mes activo
+  /** Unidades NETAS de la tanda (NC restadas; un mes negativo interno resta). */
+  unidades: number;
+  venta: number;
+  /** Meses calendario desde..hasta, huecos internos INCLUIDOS. */
+  meses: number;
+  /** unidades ÷ meses — el ritmo real de esa tanda. */
+  uMes: number;
+}
+
+/** Corta la serie en tandas. Los meses con neto ≤ 0 no abren ni sostienen una
+ *  tanda, pero si caen DENTRO de una (entre dos activos cercanos) su neto se
+ *  suma — una devolución dentro de la tanda resta de la tanda. */
+export function calcularTandas(serie: MesSerie[]): Tanda[] {
+  const activos = serie.filter((p) => p.unidades > 0);
+  if (!activos.length) return [];
+  const porMes = new Map(serie.map((p) => [p.mes, p]));
+
+  const grupos: { desde: string; hasta: string }[] = [];
+  let desde = activos[0].mes;
+  let hasta = activos[0].mes;
+  for (const p of activos.slice(1)) {
+    if (diffMeses(p.mes, hasta) > UMBRAL_TANDAS.SALTO_MAX_MESES) {
+      grupos.push({ desde, hasta });
+      desde = p.mes;
+    }
+    hasta = p.mes;
+  }
+  grupos.push({ desde, hasta });
+
+  return grupos.map((g) => {
+    let unidades = 0;
+    let venta = 0;
+    let mes = g.desde;
+    const meses = diffMeses(g.hasta, g.desde) + 1;
+    for (let i = 0; i < meses; i += 1) {
+      const p = porMes.get(mes);
+      if (p) {
+        unidades += p.unidades;
+        venta += p.venta;
+      }
+      mes = restarMeses(mes, -1);
+    }
+    return { desde: g.desde, hasta: g.hasta, unidades, venta, meses, uMes: unidades / meses };
+  });
+}
+
+/** "Va bajando: 30 → 21 → 15" / "va subiendo". Estrictamente monótono sobre el
+ *  u/mes de cada tanda. Con UNA sola tanda NO hay tendencia — no se inventa. */
+export function tendenciaTandas(tandas: readonly Tanda[]): "baja" | "sube" | null {
+  if (tandas.length < 2) return null;
+  const baja = tandas.every((t, i) => i === 0 || t.uMes < tandas[i - 1].uMes);
+  if (baja) return "baja";
+  const sube = tandas.every((t, i) => i === 0 || t.uMes > tandas[i - 1].uMes);
+  return sube ? "sube" : null;
+}
+
+/** "Se te acaba en 1 a 3 meses" — el rango de duración de las tandas. */
+export function rangoDuracionTandas(tandas: readonly Tanda[]): { min: number; max: number } | null {
+  if (!tandas.length) return null;
+  const meses = tandas.map((t) => t.meses);
+  return { min: Math.min(...meses), max: Math.max(...meses) };
+}
+
 /** Suma varias series (los colores de un modelo) en una sola, mes a mes. */
 export function sumarSeries(series: MesSerie[][]): MesSerie[] {
   const meses = new Map<string, { unidades: number; venta: number }>();

@@ -17,6 +17,9 @@ import { Download, Search } from "lucide-react";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import {
   calcularStats,
+  calcularTandas,
+  tendenciaTandas,
+  rangoDuracionTandas,
   serieContinua,
   sumarSeries,
   modeloDe,
@@ -28,6 +31,7 @@ import {
   type ReferenciaSerie,
   type ReferenciaStats,
   type ReferenciaApiResp,
+  type Tanda,
 } from "@/lib/ventas/referencia";
 import {
   TEMPORADAS,
@@ -64,6 +68,11 @@ function fmtU(n: number | null): string {
 
 function fmtPct(n: number | null): string {
   return n == null ? "—" : (n * 100).toFixed(1) + "%";
+}
+
+/** u/mes de una tanda: entero cuando es exacto ("30"), 1 decimal si no ("28.8"). */
+function fmtUMes(n: number): string {
+  return n % 1 === 0 ? fmtInt(n) : n.toFixed(1);
 }
 
 function etiquetaEmpresa(key: string): string {
@@ -400,6 +409,7 @@ function TarjetaModelo({
 }) {
   const serieModelo = useMemo(() => sumarSeries(refs.map((r) => r.serie)), [refs]);
   const stats = useMemo(() => calcularStats(serieModelo, hoyMes), [serieModelo, hoyMes]);
+  const tandas = useMemo(() => calcularTandas(serieModelo), [serieModelo]);
   const ventanas = useMemo(
     () => (temporada ? ventanasTemporada(temporada, hoyMes) : null),
     [temporada, hoyMes],
@@ -466,7 +476,13 @@ function TarjetaModelo({
         onActualizado={onActualizado}
       />
 
-      {/* KPIs */}
+      {/* TANDAS — el bloque principal. Responde "¿cuánto vendí de esto?" con
+          el total de vida y cada período de venta continua; los 3/6/12 meses
+          para un agotado dan 0, y 0 no dice cuánto comprar. */}
+      {tandas.length > 0 && <BloqueTandas tandas={tandas} stats={stats} />}
+
+      {/* Los períodos fijos bajan a segunda fila — sirven para lo que SÍ se
+          vende hoy. Las temporadas se quedan. */}
       {ventanas ? (
         <KpisTemporada serie={serieModelo} ventanas={ventanas} stats={stats} />
       ) : (
@@ -641,6 +657,77 @@ function FranjaCatalogo({
         </button>
       </div>
       {error && <p className="mt-1.5 text-xs text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+// ─── Tandas: el bloque principal de la tarjeta ───────────────────────────────
+//
+// "138 unidades · en 3 tandas · última may-24" + una fila por tanda + la línea
+// de cierre: cuánto dura el stock y, si hay ≥2 tandas con dirección clara, la
+// tendencia ("va bajando: 30 → 21 → 15"). Con una sola tanda NO se inventa.
+function BloqueTandas({ tandas, stats }: { tandas: Tanda[]; stats: ReferenciaStats }) {
+  const tendencia = tendenciaTandas(tandas);
+  const rango = rangoDuracionTandas(tandas);
+  const fmtMeses = (n: number) => (n === 1 ? "1 mes" : `${n} meses`);
+  return (
+    <div className="border-b border-gray-200 px-4 py-3.5 sm:px-5">
+      <div className="text-3xl font-extrabold tracking-tight text-gray-950 tabular-nums">
+        {fmtInt(stats.unidadesNetas)} unidades
+      </div>
+      <div className="text-[13px] text-gray-500">
+        en {tandas.length} {tandas.length === 1 ? "tanda" : "tandas"}
+        {stats.ultimaVenta && <> · última {fmtMes(stats.ultimaVenta)}</>}
+      </div>
+
+      {/* 4 columnas angostas: entra entera a 390 sin recortar ni arrastrar. */}
+      <table className="mt-2.5 w-full border-collapse text-[13px]">
+        <thead>
+          <tr>
+            <th className="border-b border-gray-200 py-1.5 pr-2 text-left text-xs font-bold uppercase tracking-wide text-gray-500">
+              Cuándo
+            </th>
+            <th className="border-b border-gray-200 px-2 py-1.5 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
+              Vendió
+            </th>
+            <th className="border-b border-gray-200 px-2 py-1.5 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
+              Duró
+            </th>
+            <th className="border-b border-gray-200 py-1.5 pl-2 text-right text-xs font-bold uppercase tracking-wide text-gray-500">
+              Por mes
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {tandas.map((t) => (
+            <tr key={t.desde}>
+              <td className="border-b border-gray-100 py-1.5 pr-2 tabular-nums">
+                {t.desde === t.hasta ? fmtMes(t.desde) : `${fmtMes(t.desde)} → ${fmtMes(t.hasta)}`}
+              </td>
+              <td className="border-b border-gray-100 px-2 py-1.5 text-right tabular-nums">{fmtInt(t.unidades)} u</td>
+              <td className="border-b border-gray-100 px-2 py-1.5 text-right tabular-nums">{fmtMeses(t.meses)}</td>
+              <td className="border-b border-gray-100 py-1.5 pl-2 text-right font-semibold tabular-nums">
+                {fmtUMes(t.uMes)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {rango && (
+        <p className="mt-2 text-[13px] text-gray-800">
+          <b>
+            Se te acaba en {rango.min === rango.max ? `~${fmtMeses(rango.max)}` : `${rango.min} a ${rango.max} meses`}.
+          </b>
+          {tendencia && (
+            <>
+              {" "}
+              Y va {tendencia === "baja" ? "bajando" : "subiendo"}:{" "}
+              <span className="tabular-nums">{tandas.map((t) => fmtUMes(t.uMes)).join(" → ")}</span>.
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }
@@ -869,16 +956,21 @@ function VistaVarias() {
   // Filas calculadas (referencias halladas + no encontradas), en el orden pegado.
   const filas = useMemo<FilaMultiExcel[]>(() => {
     if (!resp?.referencias) return [];
-    const halladas: FilaMultiExcel[] = resp.referencias.map((r) => ({
-      codigo: r.codigo,
-      // El nombre COMERCIAL del catálogo pisa la categoría de ventas.
-      descripcion: r.info?.descripcion || r.descripcion,
-      empresa: etiquetaEmpresa(r.empresa),
-      stats: calcularStats(r.serie, resp.hoyMes),
-      existencia: r.info?.existencia ?? null,
-      costoCif: r.info?.costoCif ?? null,
-      precioEtiqueta: r.info?.precioEtiqueta ?? null,
-    }));
+    const halladas: FilaMultiExcel[] = resp.referencias.map((r) => {
+      const tandas = calcularTandas(r.serie);
+      return {
+        codigo: r.codigo,
+        // El nombre COMERCIAL del catálogo pisa la categoría de ventas.
+        descripcion: r.info?.descripcion || r.descripcion,
+        empresa: etiquetaEmpresa(r.empresa),
+        stats: calcularStats(r.serie, resp.hoyMes),
+        existencia: r.info?.existencia ?? null,
+        costoCif: r.info?.costoCif ?? null,
+        precioEtiqueta: r.info?.precioEtiqueta ?? null,
+        tandas: tandas.length,
+        uMesUltimaTanda: tandas.at(-1)?.uMes ?? null,
+      };
+    });
     const noEnc: FilaMultiExcel[] = (resp.noEncontrados ?? []).map((c) => ({
       codigo: c,
       descripcion: "",
@@ -887,6 +979,8 @@ function VistaVarias() {
       existencia: null,
       costoCif: null,
       precioEtiqueta: null,
+      tandas: null,
+      uMesUltimaTanda: null,
     }));
     return [...halladas, ...noEnc];
   }, [resp]);
@@ -957,6 +1051,9 @@ function VistaVarias() {
               <thead>
                 <tr>
                   <Th>Referencia</Th>
+                  <Th right>Total vida</Th>
+                  <Th right>Tandas</Th>
+                  <Th right>u/mes últ. tanda</Th>
                   <Th right>3 m</Th>
                   <Th right>6 m</Th>
                   <Th right>12 m</Th>
@@ -980,6 +1077,9 @@ function VistaVarias() {
                         </span>
                       )}
                     </Td>
+                    <Td right>{f.stats ? fmtInt(f.stats.unidadesNetas) : "—"}</Td>
+                    <Td right>{f.tandas != null && f.tandas > 0 ? fmtInt(f.tandas) : "—"}</Td>
+                    <Td right>{f.uMesUltimaTanda != null ? fmtUMes(f.uMesUltimaTanda) : "—"}</Td>
                     <Td right>{f.stats ? fmtInt(f.stats.m3.unidades) : "—"}</Td>
                     <Td right>{f.stats ? fmtInt(f.stats.m6.unidades) : "—"}</Td>
                     <Td right>{f.stats ? fmtInt(f.stats.m12.unidades) : "—"}</Td>
