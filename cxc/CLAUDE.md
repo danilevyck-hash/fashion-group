@@ -300,6 +300,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/db-salud | 01:45, 04:35, 07:25, 09:55, 12:25, 14:45, 16:45, 18:45, 20:25, 21:45, 22:45 (11 entradas — vigía de recursos, ver nota abajo) |
 | /api/cron/cleanup-sessions | 02:30 (revoca sesiones inactivas — ver nota abajo) |
 | /api/cron/cleanup-packing-lists | 03:00 |
+| /api/cron/sync-articulo-info (3 grupos de 2 empresas FG) | 04:30 (vistana, active_wear), 04:40 (fashion_shoes, fashion_wear), 04:50 (active_shoes, joystep) — catálogo del tab Ventas › Referencia (existencia, precio de etiqueta, nombre real, CIF). 3 entradas y NO una de 6: vistana sola midió **155 s / 8.122 artículos** (10-ago-2026) y 6 así desbordan los 800 s (el caso Boston). La franja 00:30-05:15 es la única sin sesiones de Switch de estas 6; cada grupo queda a 60/55/50 min de SU par del bloque `all`. Boston y ACS EXCLUIDOS (decisión de Daniel, la misma del tab). El botón "Actualizar datos de Switch" del tab SE QUEDA para el dato del momento. Candado: `cron-sync-articulo-info.test.ts` |
 | /api/cron/switch-sync tipo=all (vistana, active_wear) | 05:30 |
 | /api/cron/switch-sync tipo=all (fashion_shoes, fashion_wear) | 05:35 |
 | /api/cron/switch-sync tipo=all (active_shoes, joystep) | 05:40 |

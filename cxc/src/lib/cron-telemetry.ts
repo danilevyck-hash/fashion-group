@@ -317,6 +317,13 @@ export const SEED_TOLERANT_CRONS = [
   // 3-ago-2026: seed-tolerante hasta que siembre su fila. Promover a
   // CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "guias-pendientes",
+  // Snapshot de catálogo del tab Ventas › Referencia (3 entradas de 2 empresas,
+  // 04:30/04:40/04:50 UTC — ver SWITCH_CRON_ENTRADAS). Desplegado el
+  // 10-ago-2026: seed-tolerante hasta que siembre su fila. Las 3 entradas
+  // comparten este heartbeat (como db-salud): se refresca solo si TODAS las
+  // empresas del grupo salieron bien. Promover a CRONS_FAIL_CLOSED cuando lleve
+  // días corriendo.
+  "sync-articulo-info",
   // Vigía del agente del reloj de asistencia (15:00 UTC = 10:00 a.m. Panamá,
   // SOLO lunes a viernes). Desplegado el 6-ago-2026: seed-tolerante hasta que
   // siembre su fila.
@@ -388,6 +395,20 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // con la escritura de multifashion_tickets (tabla congelada, ver CLAUDE.md).
   // Era la única entrada de la madrugada que tocaba american_classic antes del
   // bloque `all` de las 06:30; su baja libera esa sesión de Switch.
+  // Snapshot de catálogo del tab Ventas › Referencia (switch_articulo_info):
+  // existencia, precio de etiqueta, nombre real y costo CIF de las 6 FG.
+  // TRES entradas de 2 empresas (espejo de los pares del bloque `all`), NO una
+  // de 6: el único barrido medido en producción (vistana, 10-ago-2026) tardó
+  // 155 s para 8.122 artículos — 6 empresas de ese tamaño rondan los 15-20 min
+  // contra el techo de 800 s (la muerte garantizada del caso Boston). La franja
+  // 04:30-04:50 es la única banda del día sin NINGUNA sesión de Switch de estas
+  // empresas (antes: facturas-0015, solo ACS; después: el bloque all 05:3x), y
+  // cada grupo queda a 60/55/50 min de SU par del bloque all — la regla de la
+  // casa para crons largos (≥50 min, no solo los 15 del test). 23:30-23:50
+  // Panamá = tras el cierre: la existencia guardada es la del día completo.
+  { cron: "sync-articulo-info", hhmmUtc: "0430", empresas: ["vistana", "active_wear"] },
+  { cron: "sync-articulo-info", hhmmUtc: "0440", empresas: ["fashion_shoes", "fashion_wear"] },
+  { cron: "sync-articulo-info", hhmmUtc: "0450", empresas: ["active_shoes", "joystep"] },
   { cron: "switch-sync all", hhmmUtc: "0530", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0535", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync all", hhmmUtc: "0540", empresas: ["active_shoes", "joystep"] },
@@ -1584,6 +1605,13 @@ export function describirCronParaDaniel(tipo: string): string {
     return (
       "No se pudieron traer las ventas por artículo de Switch y el problema no se resolvió solo.\n" +
       `Qué significa: los reportes de costo y utilidad pueden estar viejos.\n${avisame}`
+    );
+  }
+  if (t.startsWith("sync-articulo-info") || t.startsWith("articulo_info")) {
+    return (
+      "No se pudo traer el catálogo de Switch para el tab Referencia de Ventas y el problema " +
+      "no se resolvió solo.\nQué significa: la existencia y el precio de etiqueta que ves en " +
+      `Referencia pueden estar viejos (el botón de actualizar de la pantalla sigue sirviendo).\n${avisame}`
     );
   }
   if (t.startsWith("sync-utilidad") || t.startsWith("sync_utilidad")) {

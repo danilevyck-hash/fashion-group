@@ -230,9 +230,17 @@ describe("el sync respeta los límites del tab", () => {
     expect(SYNC_LOG_TYPES).toContain("articulo_info");
   });
 
-  it("sin cron: vercel.json no programa articulo_info — lo dispara el botón", () => {
-    const vercel = fs.readFileSync(path.resolve(process.cwd(), "vercel.json"), "utf8");
-    expect(vercel).not.toMatch(/articulo-info|articulo_info/);
+  it("CON cron desde el 10-ago-2026: vercel.json programa las 3 entradas — y el botón sigue", () => {
+    // Daniel: "es que debería ser ya automático". El detalle del calendario
+    // (grupos, horas, cobertura exacta de las 6 FG) vive en
+    // cron-sync-articulo-info.test.ts; acá solo se fija que el cron EXISTE.
+    const vercel = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "vercel.json"), "utf8")) as {
+      crons: Array<{ path: string }>;
+    };
+    const entradas = vercel.crons.filter((c) => c.path.startsWith("/api/cron/sync-articulo-info"));
+    expect(entradas).toHaveLength(3);
+    // Y el botón manual no se retiró: el route del tab sigue existiendo.
+    expect(fs.existsSync(path.resolve(process.cwd(), "src/app/api/ventas/referencia/actualizar/route.ts"))).toBe(true);
   });
 
   it("la sonda de 'tabla no existe' va con GET, nunca con HEAD (un HEAD sobre tabla ausente da 204 mudo)", () => {

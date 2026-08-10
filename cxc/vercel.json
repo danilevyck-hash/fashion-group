@@ -53,6 +53,18 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/sync-articulo-info?empresas=vistana,active_wear",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-articulo-info?empresas=fashion_shoes,fashion_wear",
+      "schedule": "40 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-articulo-info?empresas=active_shoes,joystep",
+      "schedule": "50 4 * * *"
+    },
+    {
       "path": "/api/cron/switch-sync?tipo=all&empresas=vistana,active_wear&slot=all-0530",
       "schedule": "30 5 * * *"
     },

@@ -5,7 +5,9 @@
 // Body: { "empresa": "<una de las 6 FG>" }. Corre syncArticuloInfo para ESA
 // empresa (la de la referencia buscada), con el lock existente de
 // switch_sync_log (fila 'running' + índice único parcial — sesión única de
-// Switch). SIN CRON a propósito: este botón es el único disparador.
+// Switch). Desde el 10-ago-2026 también hay CRON diario
+// (/api/cron/sync-articulo-info, 04:30-04:50 UTC); este botón SE QUEDA para
+// cuando se quiere el dato del momento antes de comprar.
 //
 // El `finally` cierra las sesiones de Switch abiertas por este proceso
 // (logoutAllSwitchSessions) — sin eso el token queda vivo ~60 min y tumba el
