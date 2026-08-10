@@ -4,6 +4,12 @@
 // usando useGuiaFormState (archivo hermano). Este hook ya no maneja estado de
 // edición, vista (form/list/print) ni editingId — todo eso se resolvió al
 // mover el form a rutas dedicadas.
+//
+// 🩸 Y desde el rediseño de ago-2026 tampoco maneja el DESPACHO. Placa,
+// receptor, cédula, chofer, N° del transportista y las dos firmas se mudaron a
+// `useDespachoGuia`, el hook de `/guias/[id]`. Dejarlos acá habría dejado el
+// estado del despacho vivo en una pantalla que ya no despacha — y era ese
+// formulario desplegado dentro de la fila lo que confundía.
 
 import { useState, useCallback } from "react";
 import type { Guia, GuiaItem } from "./types";
@@ -32,44 +38,7 @@ export function useGuiasState() {
   const [atarGuardando, setAtarGuardando] = useState(false);
   const [atarError, setAtarError] = useState<string | null>(null);
 
-  // Despacho state
-  const [bPlaca, setBPlaca] = useState("");
-  const [bReceptor, setBReceptor] = useState("");
-  const [bCedula, setBCedula] = useState("");
-  const [bChofer, setBChofer] = useState("");
-  const [bNumeroGuiaTransp, setBNumeroGuiaTransp] = useState("");
-  const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
-  const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
-  const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
-  const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
-
-  function setPendingFirma1(v: string | null) {
-    _setPendingFirma1(v);
-    try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_transportista`, v); else localStorage.removeItem(`guia_firma_${expandedId}_transportista`); } } catch { /* */ }
-  }
-  function setPendingFirma2(v: string | null) {
-    _setPendingFirma2(v);
-    try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_entregador`, v); else localStorage.removeItem(`guia_firma_${expandedId}_entregador`); } } catch { /* */ }
-  }
-
-  // Campos del despacho persistidos por guía (mismo patrón que las firmas):
-  // si la PWA se recarga a mitad del despacho, lo tipeado no se pierde.
-  function persistDespachoField(field: string, v: string) {
-    try {
-      if (!expandedId) return;
-      const key = `guia_despacho_${expandedId}`;
-      const cur = JSON.parse(localStorage.getItem(key) || "{}");
-      cur[field] = v;
-      localStorage.setItem(key, JSON.stringify(cur));
-    } catch { /* */ }
-  }
-  function setBPlacaPersist(v: string) { setBPlaca(v); persistDespachoField("placa", v); }
-  function setBReceptorPersist(v: string) { setBReceptor(v); persistDespachoField("receptor", v); }
-  function setBCedulaPersist(v: string) { setBCedula(v); persistDespachoField("cedula", v); }
-  function setBChoferPersist(v: string) { setBChofer(v); persistDespachoField("chofer", v); }
-  function setBNumeroGuiaTranspPersist(v: string) { setBNumeroGuiaTransp(v); persistDespachoField("numeroGuiaTransp", v); }
-  function setTipoDespachoPersist(v: "externo" | "directo") { setTipoDespacho(v); persistDespachoField("tipoDespacho", v); }
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -95,7 +64,6 @@ export function useGuiasState() {
     if (expandedId === id) {
       setExpandedId(null);
       setExpandedGuia(null);
-      resetDespachoFields();
       return;
     }
     setExpandedId(id);
@@ -105,41 +73,9 @@ export function useGuiasState() {
       if (res.ok) {
         const g = await res.json();
         setExpandedGuia(g);
-        setBPlaca(g.placa || "");
-        setBReceptor(g.receptor_nombre || "");
-        setBCedula(g.cedula || "");
-        setBChofer(g.nombre_chofer || "");
-        setBNumeroGuiaTransp(g.numero_guia_transp || "");
-        setTipoDespacho(g.tipo_despacho || "externo");
-        try {
-          const saved1 = localStorage.getItem(`guia_firma_${id}_transportista`);
-          const saved2 = localStorage.getItem(`guia_firma_${id}_entregador`);
-          if (saved1) _setPendingFirma1(saved1);
-          if (saved2) _setPendingFirma2(saved2);
-          // Draft de campos tipeados (si la PWA se recargó a mitad): pisa
-          // solo lo que el server no trae.
-          const draft = JSON.parse(localStorage.getItem(`guia_despacho_${id}`) || "{}");
-          if (draft.placa && !g.placa) setBPlaca(draft.placa);
-          if (draft.receptor && !g.receptor_nombre) setBReceptor(draft.receptor);
-          if (draft.cedula && !g.cedula) setBCedula(draft.cedula);
-          if (draft.chofer && !g.nombre_chofer) setBChofer(draft.chofer);
-          if (draft.numeroGuiaTransp && !g.numero_guia_transp) setBNumeroGuiaTransp(draft.numeroGuiaTransp);
-          if (draft.tipoDespacho && !g.tipo_despacho) setTipoDespacho(draft.tipoDespacho);
-        } catch { /* */ }
       }
     } catch { showToast("Error al cargar detalles"); }
     setExpandedLoading(false);
-  }
-
-  function resetDespachoFields() {
-    setBPlaca("");
-    setBReceptor("");
-    setBCedula("");
-    setBChofer("");
-    setBNumeroGuiaTransp("");
-    setTipoDespacho("externo");
-    setPendingFirma1(null);
-    setPendingFirma2(null);
   }
 
   function requestDeleteGuia(id: string) {
@@ -162,60 +98,6 @@ export function useGuiasState() {
     setExpandedId(null);
     setExpandedGuia(null);
     loadGuias();
-  }
-
-  async function confirmarDespacho(firma1: string, firma2: string) {
-    if (!expandedGuia) return;
-    setBSaving(true);
-
-    const payload: Record<string, unknown> = {
-      estado: "Completada",
-      tipo_despacho: tipoDespacho,
-      placa: bPlaca, // placa obligatoria siempre, sin importar tipo de despacho
-      receptor_nombre: bReceptor,
-      cedula: bCedula,
-      firma_base64: firma1,
-      firma_entregador_base64: firma2,
-    };
-
-    if (tipoDespacho === "externo") {
-      payload.numero_guia_transp = bNumeroGuiaTransp;
-    } else {
-      payload.nombre_chofer = bChofer;
-    }
-
-    // try/catch + finally: sin esto, un fetch rechazado (WiFi caído en bodega)
-    // dejaba el botón en "Guardando..." para siempre y sin aviso.
-    try {
-      const res = await fetch(`/api/guias/${expandedGuia.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        showToast(`Guía GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
-        try {
-          localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`);
-          localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`);
-          localStorage.removeItem(`guia_despacho_${expandedGuia.id}`);
-        } catch { /* */ }
-
-        const fullRes = await fetch(`/api/guias/${expandedGuia.id}`).catch(() => null);
-        if (fullRes?.ok) {
-          const updated = await fullRes.json();
-          setExpandedGuia(updated);
-        }
-        loadGuias();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        showToast(errData.error || "Error al guardar");
-      }
-    } catch {
-      showToast("Sin conexión. Tus datos y firmas quedaron guardados — intenta de nuevo.");
-    } finally {
-      setBSaving(false);
-    }
   }
 
   function abrirAtarCliente(item: GuiaItem) {
@@ -312,20 +194,10 @@ export function useGuiasState() {
     search, setSearch,
     showPending, setShowPending,
     expandedId, expandedGuia, expandedLoading, toggleExpand,
-    tipoDespacho, setTipoDespacho: setTipoDespachoPersist,
-    bPlaca, setBPlaca: setBPlacaPersist,
-    bReceptor, setBReceptor: setBReceptorPersist,
-    bCedula, setBCedula: setBCedulaPersist,
-    bChofer, setBChofer: setBChoferPersist,
-    bNumeroGuiaTransp, setBNumeroGuiaTransp: setBNumeroGuiaTranspPersist,
-    bSaving,
-    pendingFirma1, setPendingFirma1,
-    pendingFirma2, setPendingFirma2,
     toast, showToast,
     loadGuias,
     confirmDeleteId, setConfirmDeleteId,
     requestDeleteGuia, confirmDeleteGuia,
-    confirmarDespacho,
     rejectGuia,
     atarItem, atarGuardando, atarError,
     abrirAtarCliente, cerrarAtarCliente, guardarAtarCliente,

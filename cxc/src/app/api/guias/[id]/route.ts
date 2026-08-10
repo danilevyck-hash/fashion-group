@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer } = body;
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer, items_guia_transp } = body;
 
   // Sprint 2: validar modo_entrega cuando el cliente lo manda (edición de
   // cabecera). En el flujo de despacho de bodega no viene y eso es OK.
@@ -220,6 +220,32 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     } else {
       // Empty items array = delete all
       await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+    }
+  }
+
+  // ── N° DE GUÍA DEL TRANSPORTISTA, UNO POR LÍNEA ───────────────────────────
+  // 🩸 El transportista arma VARIAS guías suyas por cada guía nuestra, así que
+  // el número es del renglón, no de la guía. La columna `guia_items.
+  // numero_guia_transp` ya existía; lo que faltaba era poder escribirla renglón
+  // por renglón desde el despacho.
+  //
+  // 🔴 Va por su propio campo y NO por `items`. `items` es un REEMPLAZO
+  // COMPLETO —borra todos los renglones e inserta otros nuevos— y usarlo acá le
+  // cambiaría el id a cada línea en pleno despacho, tirando de paso el trabajo
+  // de atar clientes. Esto toca UNA columna de las líneas de ESTA guía.
+  if (Array.isArray(items_guia_transp)) {
+    for (const fila of items_guia_transp as Array<{ id?: unknown; numero_guia_transp?: unknown }>) {
+      const itemId = typeof fila?.id === "string" ? fila.id.trim() : "";
+      if (!UUID_RE.test(itemId)) continue;
+      const numero = typeof fila?.numero_guia_transp === "string" ? fila.numero_guia_transp.trim() : "";
+      // El `.eq("guia_id", id)` no es cosmético: sin él, el id de cualquier
+      // línea del sistema bastaría para escribirle encima desde acá.
+      const { error: lineaErr } = await supabaseServer
+        .from("guia_items")
+        .update({ numero_guia_transp: numero })
+        .eq("id", itemId)
+        .eq("guia_id", id);
+      if (lineaErr) return NextResponse.json({ error: lineaErr.message }, { status: 500 });
     }
   }
 

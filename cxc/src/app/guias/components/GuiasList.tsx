@@ -4,10 +4,8 @@ import { useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, destinosSummary } from "./constants";
-import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable, SwipeableRow } from "@/components/ui";
-import type { SwipeAction } from "@/components/ui";
+import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
-import DespachoForm from "./DespachoForm";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 
@@ -26,26 +24,6 @@ interface GuiasListProps {
   expandedGuia: Guia | null;
   expandedLoading: boolean;
   onToggleExpand: (id: string) => void;
-  // Despacho
-  tipoDespacho: "externo" | "directo";
-  setTipoDespacho: (v: "externo" | "directo") => void;
-  bPlaca: string;
-  setBPlaca: (v: string) => void;
-  bReceptor: string;
-  setBReceptor: (v: string) => void;
-  bCedula: string;
-  setBCedula: (v: string) => void;
-  bChofer: string;
-  setBChofer: (v: string) => void;
-  bNumeroGuiaTransp: string;
-  setBNumeroGuiaTransp: (v: string) => void;
-  bSaving: boolean;
-  onConfirmarDespacho: (firma1: string, firma2: string) => void;
-  showToast: (msg: string) => void;
-  pendingFirma1?: string | null;
-  pendingFirma2?: string | null;
-  onFirma1Change?: (v: string | null) => void;
-  onFirma2Change?: (v: string | null) => void;
   // Actions
   onEdit: (id: string) => void;
   onPrint: (id: string) => void;
@@ -125,11 +103,6 @@ export default function GuiasList({
   showPending, setShowPending, role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
-  tipoDespacho, setTipoDespacho,
-  bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
-  bChofer, setBChofer, bNumeroGuiaTransp, setBNumeroGuiaTransp,
-  bSaving, onConfirmarDespacho, showToast,
-  pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete, onReject, onAtarCliente,
   nombresPorCodigo,
   readOnly,
@@ -168,7 +141,6 @@ export default function GuiasList({
     exportGuiasExcel(selected, `${selected.length} guías seleccionadas`);
   }
   const canCreate = !readOnly && role && CREATE_ROLES.includes(role);
-  const canDespacho = !readOnly && role && DESPACHO_ROLES.includes(role);
   const canDelete = !readOnly && role && DELETE_ROLES.includes(role);
   const canEdit = !readOnly && role && ["admin", "secretaria", "bodega"].includes(role);
   const canReject = !readOnly && role && REJECT_ROLES.includes(role);
@@ -334,14 +306,6 @@ export default function GuiasList({
                 const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;
                       const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
-                      const isPendingDespacho = g.estado === "Pendiente Bodega" && canDespacho;
-
-                      const despachoSwipeAction: SwipeAction | undefined = isPendingDespacho ? {
-                        label: "Despachar",
-                        color: "bg-blue-500",
-                        icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>,
-                        onAction: () => onToggleExpand(g.id),
-                      } : undefined;
 
                       // Status-based left border color
                       const statusBorderClass = g.estado === "Completada"
@@ -445,6 +409,16 @@ export default function GuiasList({
                                   )}
 
                                   {/* Acciones rápidas (header de la card expandida) */}
+                                  {/* 🔴 UN SOLO BOTÓN para entrar a la guía.
+                                      Acá vivía TAMBIÉN el formulario de despacho
+                                      entero, desplegado más abajo en esta misma
+                                      tarjeta: dos caminos para lo mismo. Daniel,
+                                      textual: *"solo quiero una y en boton de
+                                      editar para entrar a la guia y terminarla"*.
+                                      "Editar" lleva a `/guias/[id]`, y ahí se
+                                      corrige y se despacha. No agregar un botón
+                                      "Despachar" al lado: eso es exactamente lo
+                                      que se vino a sacar. */}
                                   <div className="flex items-center justify-end gap-3 pt-3">
                                     {canEdit && !isDispatched && (
                                       <button
@@ -625,31 +599,6 @@ export default function GuiasList({
                                     </div>
                                   )}
 
-                                  {/* Pending: despacho form */}
-                                  {!isDispatched && canDespacho && (
-                                    <DespachoForm
-                                      tipoDespacho={tipoDespacho}
-                                      setTipoDespacho={setTipoDespacho}
-                                      bPlaca={bPlaca}
-                                      setBPlaca={setBPlaca}
-                                      bReceptor={bReceptor}
-                                      setBReceptor={setBReceptor}
-                                      bCedula={bCedula}
-                                      setBCedula={setBCedula}
-                                      bChofer={bChofer}
-                                      setBChofer={setBChofer}
-                                      bNumeroGuiaTransp={bNumeroGuiaTransp}
-                                      setBNumeroGuiaTransp={setBNumeroGuiaTransp}
-                                      bSaving={bSaving}
-                                      onConfirmar={onConfirmarDespacho}
-                                      showToast={showToast}
-                                      pendingFirma1={pendingFirma1}
-                                      pendingFirma2={pendingFirma2}
-                                      onFirma1Change={onFirma1Change}
-                                      onFirma2Change={onFirma2Change}
-                                    />
-                                  )}
-
                                   {/* Rechazar (solo en despachadas no-rechazadas) — queda abajo porque
                                       requiere flujo con input de motivo */}
                                   {/* Input de motivo de rechazo — se dispara desde "Rechazar/Devolver"
@@ -670,14 +619,6 @@ export default function GuiasList({
                           </AccordionContent>
                         </div>
                       );
-
-                      if (despachoSwipeAction) {
-                        return (
-                          <SwipeableRow key={g.id} rightAction={despachoSwipeAction} className="rounded-lg">
-                            {cardContent}
-                          </SwipeableRow>
-                        );
-                      }
 
                       return <div key={g.id}>{cardContent}</div>;
                 };

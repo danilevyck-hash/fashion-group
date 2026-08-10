@@ -36,6 +36,7 @@ import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia } from "@/app/guias/components/types";
+import { numeroTranspDeLinea, numeroTranspUnico } from "@/lib/guias/falta-para-despachar";
 
 const PAGE_W = 216; // Letter
 const MARGIN = 15;
@@ -168,7 +169,10 @@ export function construirPdfGuia(g: Guia): jsPDF {
     ["DESPACHADO POR:", g.entregado_por ?? ""],
     ["TIPO:", esDirecta ? "Entrega directa" : "Transportista externo"],
   ];
-  if (g.numero_guia_transp) campos.push(["N GUIA TRANSP.:", g.numero_guia_transp]);
+  // ⚠️ Solo se anuncia arriba cuando hay UN número en toda la guía; con varios
+  // por línea, un encabezado con uno de ellos mentiría. Ver `PrintDocument`.
+  const transpUnico = numeroTranspUnico(items, g.numero_guia_transp);
+  if (transpUnico) campos.push(["N GUIA TRANSP.:", transpUnico]);
   if (esDirecta && g.nombre_chofer) campos.push(["CHOFER:", g.nombre_chofer]);
 
   let y = bloqueCampos(doc, campos, 32);
@@ -189,7 +193,7 @@ export function construirPdfGuia(g: Guia): jsPDF {
         it.empresa ?? "",
         it.facturas ?? "",
         it.bultos ? String(it.bultos) : "",
-        g.numero_guia_transp ?? "",
+        numeroTranspDeLinea(it.numero_guia_transp, g.numero_guia_transp),
       ]),
       [
         { content: "TOTAL DE BULTOS DESPACHADOS", colSpan: 5, styles: { halign: "right" as const, fontStyle: "bold" as const } },
