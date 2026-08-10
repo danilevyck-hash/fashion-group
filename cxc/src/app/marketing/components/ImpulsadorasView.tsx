@@ -160,9 +160,6 @@ export default function ImpulsadorasView({ marcas }: Props) {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Impulsadoras</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Pago mensual fijo por marca · con comprobante
-          </p>
         </div>
         <button
           type="button"
@@ -194,9 +191,7 @@ export default function ImpulsadorasView({ marcas }: Props) {
         </div>
       ) : (items?.length ?? 0) === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-          <p className="text-sm text-gray-500">
-            Aún no hay impulsadoras. Agrega la primera con “+ Nueva impulsadora”.
-          </p>
+          <p className="text-sm text-gray-500">Aún no hay impulsadoras.</p>
         </div>
       ) : (
         <div className="space-y-3">

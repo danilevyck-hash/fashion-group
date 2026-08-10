@@ -417,14 +417,13 @@ export default function EmpresaList({
         if (allEmpresaRecs.length > 0) {
           return (
             <div className="flex flex-col items-center py-12 text-center">
-              <p className="text-sm text-gray-400 mb-1">
+              <p className="text-sm text-gray-400">
                 {search ? `No encontramos reclamos para "${search}"` : `No hay reclamos ${filterEstado !== "all" ? estadoLabel(filterEstado).toLowerCase() : ""} para esta empresa`}
               </p>
-              <p className="text-xs text-gray-300">{search ? "Intenta con otro termino" : "Prueba con otro filtro"}</p>
             </div>
           );
         }
-        return <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" />;
+        return <EmptyState title="Sin reclamos para esta empresa" />;
       })() : (
         <div className="overflow-x-auto -mx-4 lg:mx-0 hidden lg:block" data-vista="tabla">
           <div className="min-w-[600px] px-4 sm:px-0">

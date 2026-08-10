@@ -53,8 +53,7 @@ export default function ReglasView() {
     <div className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-5 border-b-2 border-stone-900 pb-4">
         <p className="text-sm text-stone-500">
-          Referencia de cómo se limpian y mapean las descripciones. Si el proveedor cambia algo, manda
-          captura a Daniel para actualizar estas reglas en el código.
+          Si el proveedor cambia algo, manda captura a Daniel para actualizar estas reglas.
         </p>
       </div>
 

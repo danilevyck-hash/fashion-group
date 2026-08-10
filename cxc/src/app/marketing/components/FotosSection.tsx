@@ -9,6 +9,7 @@ import { FotoLightbox } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { subirAdjunto } from "./uploadHelpers";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface FotosSectionProps {
   proyectoId: string;
@@ -138,11 +139,12 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
 
   return (
     <section className="space-y-3">
-      <div>
+      <div className="flex items-center gap-1">
         <h2 className="text-base font-semibold text-gray-900">Fotos del proyecto</h2>
-        <p className="text-xs text-gray-500">
-          Respaldo visual que se adjunta a la cobranza a la marca.
-        </p>
+        {/* Para qué sirven las fotos: se aprende una vez → ⓘ. */}
+        <Ayuda titulo="Para qué sirven" className="-my-2">
+          <p>Respaldo visual que se adjunta a la cobranza a la marca.</p>
+        </Ayuda>
       </div>
 
       {errorCarga && (

@@ -409,11 +409,9 @@ export default function NotasProveedorMobiliario() {
                   onChange={(e) =>
                     setEdicion({ ...edicion, precio: e.target.value })
                   }
+                  placeholder="Déjalo vacío si todavía no lo sabes"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  Si todavía no sabes el precio, déjalo vacío.
-                </p>
               </div>
 
               <div>

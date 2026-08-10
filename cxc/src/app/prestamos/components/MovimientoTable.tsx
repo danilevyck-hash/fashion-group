@@ -81,7 +81,7 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEd
       </div>
 
       {movs.length === 0 ? (
-        <EmptyState title="Sin movimientos" subtitle={filtro === "todos" ? "Registra el primer movimiento" : "No hay movimientos con este estado"} />
+        <EmptyState title={filtro === "todos" ? "Sin movimientos" : "Sin movimientos con este estado"} />
       ) : (
         <>
         {/* ── Tarjetas (celular y iPad) ──────────────────────────────────────

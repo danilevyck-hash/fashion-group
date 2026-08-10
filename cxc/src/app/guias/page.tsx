@@ -44,8 +44,11 @@ function GuiaDeleteModal({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">Eliminar guía {guiaNumero ? `GT-${String(guiaNumero).padStart(3, "0")}` : ""}</h3>
+        {/* La instrucción de qué escribir vive en el placeholder del campo:
+            decirla dos veces no frenaba a nadie más. Lo que sí frena —que no
+            se puede deshacer— se queda. */}
         <p className="text-sm text-gray-500 mb-4">
-          Esta acción no se puede deshacer. Para confirmar, escribe <span className="font-semibold text-black">ELIMINAR</span>
+          Esta acción no se puede deshacer.
         </p>
         <input
           type="text"

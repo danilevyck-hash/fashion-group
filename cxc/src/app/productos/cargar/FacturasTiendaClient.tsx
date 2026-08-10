@@ -35,6 +35,7 @@ import {
   type FacturaRow,
   type FacturaProcessResult,
 } from "@/lib/depurador/tienda";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 const BLANK_FORMULA: MarcaFormula = { marca: "", divisor: 0, extra: 0, redondeo: "int" };
 
@@ -392,9 +393,6 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
           Facturas Tienda
         </h1>
-        <p className="mt-0.5 text-[12px] text-stone-500">
-          Convierte la factura de una empresa del grupo (a Multifashion/ACS) en la plantilla de Switch.
-        </p>
       </div>
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
@@ -471,10 +469,15 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
               className={inputCls}
             />
           </div>
-          <p className="pb-1 text-[12px] text-stone-500">
-            La factura .xls no trae fecha — la temporada sale de aquí ({temporadaFallback}).
-            El CSV/XLSX trae FECHA y la usa directo.
-          </p>
+          {/* De dónde sale la temporada según el formato: se aprende una vez. */}
+          <div className="pb-1">
+            <Ayuda titulo="De dónde sale la temporada" etiqueta="De dónde sale la temporada">
+              <p>
+                La factura .xls no trae fecha — la temporada sale de aquí ({temporadaFallback}). El
+                CSV/XLSX trae FECHA y la usa directo.
+              </p>
+            </Ayuda>
+          </div>
         </div>
       )}
 
@@ -623,10 +626,15 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-[11px] text-stone-500">
-              Jerarquía: precio fijo &gt; fórmula de la descripción &gt; fórmula de la marca
-              (se configuran en la pestaña &ldquo;Fórmulas por marca&rdquo; → Tienda).
-            </p>
+            {/* Jerarquía de precios: se aprende una vez → ⓘ. */}
+            <div className="mt-2 -ml-2">
+              <Ayuda titulo="Qué precio gana" etiqueta="Qué precio gana">
+                <p>
+                  Jerarquía: precio fijo &gt; fórmula de la descripción &gt; fórmula de la marca (se
+                  configuran en la pestaña &ldquo;Fórmulas por marca&rdquo; → Tienda).
+                </p>
+              </Ayuda>
+            </div>
           </div>
 
           {/* Preview */}
@@ -706,11 +714,6 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         </>
       )}
 
-      {!result && !error && (
-        <div className="py-16 text-center text-stone-500">
-          <p>Aún no has cargado ninguna factura.</p>
-        </div>
-      )}
     </div>
   );
 }

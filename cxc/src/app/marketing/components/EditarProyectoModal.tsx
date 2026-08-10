@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui";
 import { useToast } from "@/components/ToastSystem";
 import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
+import { AyudaClienteVinculado } from "@/components/marketing/AyudaClienteVinculado";
 import type { MkMarca, ProyectoConMarcas } from "@/lib/marketing/types";
 
 interface Props {
@@ -82,9 +83,12 @@ export default function EditarProyectoModal({
     <Modal open={open} onClose={onClose} title="Editar proyecto" maxWidth="max-w-lg">
       <div className="space-y-4">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
-            Cliente <span className="text-red-500">*</span>
-          </label>
+          <div className="flex items-center gap-1 mb-1">
+            <label className="block text-xs text-gray-500">
+              Cliente <span className="text-red-500">*</span>
+            </label>
+            <AyudaClienteVinculado />
+          </div>
           <ClienteTypeahead
             value={tienda}
             codigo={tiendaCodigo}
@@ -99,9 +103,6 @@ export default function EditarProyectoModal({
             placeholder="Busca el cliente en el directorio…"
             inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Elige del directorio para vincular; si no está, se guarda como texto.
-          </p>
         </div>
 
         <div>
@@ -115,11 +116,8 @@ export default function EditarProyectoModal({
             onChange={(e) => setNombre(e.target.value)}
             disabled={guardando}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none disabled:opacity-50"
-            placeholder="Opcional — ej: Remodelación tienda Abril 2026"
+            placeholder="Opcional — si lo dejas vacío se genera solo"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Opcional. Si lo dejas vacío, se genera automático.
-          </p>
         </div>
 
         <div>

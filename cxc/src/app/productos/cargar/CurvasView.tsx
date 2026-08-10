@@ -12,6 +12,7 @@ import {
   parseCurvas, pickCurvasSheet, buildCurvasAoa, curvasFilename,
   type Curva, type CurvasResult,
 } from "@/lib/depurador/curvas";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 const keyDe = (c: Curva) => `${c.referencia}|||${c.codigo}`;
 
@@ -113,11 +114,16 @@ export default function CurvasView() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Tallas por bulto</h2>
-        <p className="mt-1.5 text-sm text-stone-500">
-          Sube el Excel crudo de Fashion Shoes (con CODIGO_PREPACK), marca las curvas que quieres y
-          descarga el detalle de tallas por bulto para enviarlo al cliente.
-        </p>
+        <div className="flex items-center gap-1">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Tallas por bulto</h2>
+          {/* Los 3 pasos se aprenden una vez → ⓘ. */}
+          <Ayuda titulo="Cómo se usa" className="-my-2">
+            <p>
+              Sube el Excel crudo de Fashion Shoes (con CODIGO_PREPACK), marca las curvas que quieres y
+              descarga el detalle de tallas por bulto para enviarlo al cliente.
+            </p>
+          </Ayuda>
+        </div>
       </div>
 
       {/* Dropzone (mismo patrón del Depurador) */}

@@ -556,7 +556,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         {loading ? (
           <SkeletonTable rows={5} cols={4} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No se encontraron empleados" subtitle="Registra el primer empleado para gestionar préstamos" actionLabel="+ Nuevo empleado" onAction={openNewEmp} />
+          <EmptyState title="No se encontraron empleados" actionLabel="+ Nuevo empleado" onAction={openNewEmp} />
         ) : (
           <ul className="space-y-2">
             {filtered.map(({ emp, prestado, saldo, pct, pendientes }) => {
@@ -659,7 +659,6 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               <div>
                 <label className="text-xs text-gray-400 uppercase">Deducción Quincenal ($)</label>
                 <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full min-h-[44px] border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
-                <p className="text-xs text-gray-400 mt-1">Monto que se deduce cada quincena del salario del colaborador</p>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Notas</label>

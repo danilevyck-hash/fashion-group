@@ -43,7 +43,9 @@ export default function SaldosBancarios({ bancos, onGuardado }: Props) {
 
       {abierto && (
         <>
-          <p className="text-xs text-gray-500 mb-3">Banco General — una cuenta por empresa</p>
+          {/* "una cuenta por empresa" se ve solo: son las 8 filas de abajo. El
+              nombre del banco no está en ningún otro lado, así que se queda. */}
+          <p className="text-xs text-gray-500 mb-3">Banco General</p>
           <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
             {ALL_EMPRESA_KEYS.map((key) => (
               <BancoRow key={key} empresaKey={key} banco={porEmpresa.get(key)} onGuardado={onGuardado} />

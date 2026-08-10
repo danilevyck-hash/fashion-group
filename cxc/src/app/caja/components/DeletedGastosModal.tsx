@@ -88,10 +88,10 @@ export default function DeletedGastosModal({
         </header>
 
         <div className="flex-1 overflow-y-auto">
+          {/* El encabezado ya dice "Gastos eliminados (0)": acá alcanza con que
+              la lista vacía tenga algo que mirar. */}
           {deletedGastos.length === 0 ? (
-            <p className="text-sm text-gray-400 p-8 text-center">
-              No hay gastos eliminados en este período.
-            </p>
+            <p className="text-sm text-gray-400 p-8 text-center">Ninguno.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs min-w-[720px]">

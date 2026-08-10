@@ -840,12 +840,10 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
                     </tbody>
                   </table>
                 </div>
-                {descsNuevas.length > 0 && (
-                  <p className="mt-2.5 text-[12px] font-semibold text-red-600">
-                    🔒 {descsNuevas.length} descripción(es) nueva(s) no están en el catálogo: la descarga está
-                    bloqueada hasta aprobarlas al catálogo.
-                  </p>
-                )}
+                {/* El mismo 🔒 vivía también acá abajo. El de arriba se queda
+                    —es el único con el botón "Ver y aprobar"— y este se fue:
+                    repetir el bloqueo dos veces en una pantalla no frenaba a
+                    nadie dos veces. */}
               </>
             )}
           </div>
@@ -1002,11 +1000,6 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         </>
       )}
 
-      {!processed && !error && (
-        <div className="py-16 text-center text-stone-500">
-          <p>Aún no has cargado ningún archivo.</p>
-        </div>
-      )}
     </div>
   );
 }

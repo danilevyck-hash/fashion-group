@@ -124,9 +124,12 @@ export default function SettlementModal({
         className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg bg-white p-5 shadow-xl"
       >
         <h2 className="text-base font-semibold">{title}</h2>
+        {/* "Anota cuánto recuperó el proveedor" describía el formulario que ya
+            está a la vista. Lo que sí cambia una decisión —que el monto puede
+            ser menor al reclamado— se queda, y por eso NO va a un ⓘ. */}
         {reclamado != null && (
           <p className="mt-0.5 text-xs text-gray-500">
-            Reclamado: ${money(reclamado)} · anota cuánto recuperó el proveedor (puede ser parcial).
+            Reclamado: ${money(reclamado)} · puede ser parcial.
           </p>
         )}
 

@@ -4,6 +4,7 @@ import { useRef, useState, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { Reclamo, RItem, Contacto } from "./types";
 import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -418,7 +419,15 @@ export default function ReclamoDetail({
               Marcar como Pagado
             </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1.5">El comprobante es opcional para En proceso; para marcar Pagado es obligatorio (foto o PDF).</p>
+          {/* La regla de comprobantes se aprende una vez y se repetía también
+              en la ventana de "En proceso": ahora vive acá, en el ⓘ. Lo que
+              FRENA de verdad —"obligatorio para marcar Pagado"— sigue en
+              pantalla dentro de esa ventana, al lado del adjunto. */}
+          <div className="mt-1.5 -ml-2">
+            <Ayuda titulo="Cuándo hace falta el comprobante" etiqueta="Cuándo hace falta el comprobante">
+              <p>El comprobante es opcional para En proceso; para marcar Pagado es obligatorio (foto o PDF).</p>
+            </Ayuda>
+          </div>
         </div>
       )}
       {!editMode && current.estado === "En proceso" && (
@@ -449,18 +458,10 @@ export default function ReclamoDetail({
       )}
 
       {/* El stepper "Creado -> Pagado ?" se elimino: el pill de estado (arriba) es
-          el UNICO indicador de estado. Aqui solo queda la metadata de ultimo cambio. */}
-      {!editMode && (
-        <p className="text-xs text-gray-400 mb-2">
-          Último cambio: {(() => {
-            const latestSeg = seg.length > 0 ? seg[0]?.created_at : null;
-            const raw = current.updated_at || latestSeg || current.created_at;
-            const d = raw ? new Date(raw) : null;
-            if (!d) return "\u2014";
-            return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-          })()}
-        </p>
-      )}
+          el UNICO indicador de estado. La linea "Ultimo cambio" tambien se fue
+          (poda de textos, ago-2026): la ficha de arriba ya muestra Fecha y
+          Antiguedad, y el Seguimiento de mas abajo lleva la fecha, la hora y el
+          autor de cada movimiento. */}
 
       {/* Totals — en edición se recalculan en vivo desde los ítems editados */}
       <div className="flex items-center justify-between mb-2 mt-6">
@@ -503,7 +504,9 @@ export default function ReclamoDetail({
           </div>
 
           {/* Lista de notas de crédito */}
-          {settlements.length > 0 ? (
+          {/* Sin NC no se dibuja nada: el KPI "Recuperado" y la barra de
+              arriba ya lo dicen en la misma tarjeta. */}
+          {settlements.length > 0 && (
             <ul className="divide-y divide-gray-100 mb-3">
               {settlements.map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2 text-sm">
@@ -522,8 +525,6 @@ export default function ReclamoDetail({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="text-xs text-gray-400 mb-3">Sin notas de crédito registradas.</p>
           )}
 
           {/* Agregar NC (settlement fraccionado) */}
@@ -755,8 +756,7 @@ export default function ReclamoDetail({
 
       {/* Evidencia fotográfica */}
       <div className="mb-8">
-        <div className="text-sm font-semibold text-gray-700 mb-1">Evidencia fotográfica</div>
-        <p className="text-xs text-gray-400 mb-3">Adjunta fotos para agilizar la resolución</p>
+        <div className="text-sm font-semibold text-gray-700 mb-3">Evidencia fotográfica</div>
 
         {/* Thumbnail row — horizontal scroll on mobile */}
         {fotos.length > 0 && (
@@ -790,9 +790,6 @@ export default function ReclamoDetail({
               <span className="text-xs text-gray-300 hidden sm:inline">({fotos.length}/5)</span>
             </button>
           </>
-        )}
-        {fotos.length === 0 && (
-          <p className="text-xs text-gray-300 mt-2 italic">Sin fotos adjuntas</p>
         )}
       </div>
 

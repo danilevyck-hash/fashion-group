@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { PLIndexRow } from "@/lib/parse-packing-list";
 import { ScrollableTable } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface BultoOrderEntry {
   id: string;
@@ -585,10 +586,14 @@ export default function PackingListDetailPage() {
           </div>
         )}
 
-        {/* Clave de lectura de la tabla — línea propia, debajo de los datos. */}
-        <p className="text-xs text-gray-400">
-          Muestra = bulto con talla M o 32 · OS = otro tamaño
-        </p>
+        {/* Clave de lectura de la tabla. Es un glosario —se aprende una vez—
+            así que vive en el ⓘ. El PDF descargable conserva la línea
+            impresa: ahí no hay nada que tocar. */}
+        <div>
+          <Ayuda titulo="Cómo se lee la tabla" etiqueta="Cómo se lee la tabla" className="-ml-2">
+            <p>Muestra = bulto con talla M o 32 · OS = otro tamaño</p>
+          </Ayuda>
+        </div>
 
         </div>{/* close pl-print-area */}
       </div>

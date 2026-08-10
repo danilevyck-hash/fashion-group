@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import ClientePicker from "@/components/ClientePicker";
 import SugerenciasCliente from "./SugerenciasCliente";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
@@ -126,9 +127,20 @@ export default function AtarClienteModal({
             />
           )}
 
-          <label htmlFor="atar-cliente-picker" className="block text-xs uppercase tracking-wide text-gray-400 mb-1">
-            Es este cliente
-          </label>
+          {/* El "no cambia nada de la guía" NO se borra — es lo que hace que
+              alguien se anime a tocar una guía cerrada. Pero se aprende una
+              sola vez, así que vive en el ⓘ en vez de gritar cada vez. */}
+          <div className="flex items-center gap-1 mb-1">
+            <label htmlFor="atar-cliente-picker" className="block text-xs uppercase tracking-wide text-gray-400">
+              Es este cliente
+            </label>
+            <Ayuda titulo="Qué se guarda" className="-my-2">
+              <p>
+                Lo que dice la guía no cambia. Solo se guarda a qué cliente
+                corresponde.
+              </p>
+            </Ayuda>
+          </div>
           <ClientePicker
             id="atar-cliente-picker"
             value={nombre}
@@ -140,10 +152,6 @@ export default function AtarClienteModal({
             }}
             inputClassName="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition min-h-[44px]"
           />
-
-          <p className="text-xs text-gray-400 mt-2">
-            Lo que dice la guía no cambia. Solo se guarda a qué cliente corresponde.
-          </p>
 
           {error && (
             <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
