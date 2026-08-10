@@ -31,6 +31,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { Ayuda } from "@/components/shared/Ayuda";
 import {
   EMPRESAS_ASISTENCIA,
   JORNADAS,
@@ -539,12 +540,19 @@ export default function ConfiguracionTab() {
             abierta={!!seccion.personas}
             onToggle={() => alternar("personas")}
           >
-            <p className="text-sm text-gray-500">
-              El reloj solo manda un número por persona. Acá le pones nombre, sueldo y
-              <b> a qué empresa pertenece</b> — eso último es lo que separa la planilla de
-              Boston, la de Vistana y la de Fashion Wear, que comparten el mismo reloj.
-              <b> Se guarda solo</b> apenas cambias algo.
-            </p>
+            {/* Cómo se llena la lista se aprende una vez: al ⓘ. Lo que sí pide
+                acción —cuántas fichas faltan, quién sigue marcando después de
+                irse— se queda en pantalla, abajo. */}
+            <div className="-ml-2 -mt-1">
+              <Ayuda titulo="Cómo se llena esta lista" etiqueta="Cómo se llena">
+                <p>
+                  El reloj solo manda un número por persona. Acá le pones nombre, sueldo y
+                  <b> a qué empresa pertenece</b> — eso último es lo que separa la planilla de
+                  Boston, la de Vistana y la de Fashion Wear, que comparten el mismo reloj.
+                  <b> Se guarda solo</b> apenas cambias algo.
+                </p>
+              </Ayuda>
+            </div>
 
             {aviso && (
               <div className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
@@ -595,12 +603,6 @@ export default function ConfiguracionTab() {
                 </button>
               ))}
             </div>
-
-            {visibles.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-500">
-                No hay nadie en este filtro.
-              </p>
-            )}
 
             {visibles.length > 0 && (
               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -680,9 +682,7 @@ export default function ConfiguracionTab() {
 
                           <div className="grid gap-3 sm:grid-cols-2">
                             <div>
-                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                                Nombre
-                              </label>
+                              <Etiqueta texto="Nombre" />
                               <input
                                 type="text"
                                 value={borrador.nombre}
@@ -695,25 +695,21 @@ export default function ConfiguracionTab() {
                               />
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                                Salario mensual
-                              </label>
+                              <Etiqueta texto="Salario mensual" />
+                              {/* «Déjalo vacío si todavía no lo sabes» vive en el
+                                  propio campo: es una instrucción de un campo
+                                  obvio, no algo que haya que leer aparte. */}
                               <input
                                 type="text" inputMode="decimal"
                                 value={borrador.salario}
                                 onChange={(e) => setBorrador({ ...borrador, salario: e.target.value })}
                                 onBlur={() => void guardar(p.codigo, borrador)}
-                                placeholder="850.00"
+                                placeholder="850.00 — vacío si no lo sabes"
                                 className={`${CAMPO} tabular-nums`}
                               />
-                              <p className="mt-1 text-[11px] text-gray-400">
-                                Déjalo vacío si todavía no lo sabes.
-                              </p>
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                                Jornada por semana
-                              </label>
+                              <Etiqueta texto="Jornada por semana" />
                               <div className="flex gap-2">
                                 {JORNADAS.map((j) => (
                                   <button key={j} type="button"
@@ -725,9 +721,7 @@ export default function ConfiguracionTab() {
                               </div>
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                                Empresa
-                              </label>
+                              <Etiqueta texto="Empresa" />
                               <div className="flex flex-wrap gap-2">
                                 {EMPRESAS_ASISTENCIA.map((e) => (
                                   <button key={e} type="button"
@@ -739,9 +733,14 @@ export default function ConfiguracionTab() {
                               </div>
                             </div>
                             <div>
-                              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-                                Empezó a trabajar
-                              </label>
+                              {/* ⚠️ Se GUARDA y no reparte el salario. La regla de
+                                  proporción de quien entra a mitad de quincena no
+                                  está definida: inventarla sería inventar plata. Eso
+                                  se aprende una vez → ⓘ. */}
+                              <Etiqueta
+                                texto="Empezó a trabajar"
+                                ayuda="Opcional. El sueldo de la quincena no se reparte por días."
+                              />
                               <input
                                 type="date"
                                 value={borrador.fechaIngreso}
@@ -751,12 +750,6 @@ export default function ConfiguracionTab() {
                                 onBlur={() => void guardar(p.codigo, borrador)}
                                 className={`${CAMPO} tabular-nums`}
                               />
-                              {/* ⚠️ Se GUARDA y no reparte el salario. La regla de
-                                  proporción de quien entra a mitad de quincena no
-                                  está definida: inventarla sería inventar plata. */}
-                              <p className="mt-1 text-[11px] text-gray-400">
-                                Opcional. El sueldo de la quincena no se reparte por días.
-                              </p>
                             </div>
                           </div>
 
@@ -809,11 +802,11 @@ export default function ConfiguracionTab() {
                   Ya no trabajan acá ({bajas.length})
                 </summary>
                 <div className="border-t border-gray-200 bg-white">
-                  <p className="px-3 py-2 text-[12px] text-gray-500">
-                    Siguen apareciendo enteras en las quincenas en que trabajaron —incluida la
-                    de su salida— y no salen en las siguientes. Si alguien volvió, se reactiva
-                    acá.
-                  </p>
+                  <div className="px-1 py-0.5">
+                    <Ayuda titulo="Qué pasa con quien ya no trabaja acá" etiqueta="Qué pasa con sus quincenas">
+                      <ExplicacionBaja />
+                    </Ayuda>
+                  </div>
                   {bajas.map((p) => (
                     <div
                       key={p.codigo}
@@ -878,10 +871,14 @@ export default function ConfiguracionTab() {
           >
             {form && (
               <>
-                <p className="text-sm text-gray-500">
-                  Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
-                  se cambia acá y el reporte lo usa de inmediato — no hay que tocar el sistema.
-                </p>
+                <div className="-ml-2 -mt-1">
+                  <Ayuda titulo="Para qué sirven estos números" etiqueta="Para qué sirven">
+                    <p>
+                      Todos los números con los que se calcula. Si la ley o un acuerdo cambia,
+                      se cambia acá y el reporte lo usa de inmediato — no hay que tocar el sistema.
+                    </p>
+                  </Ayuda>
+                </div>
 
                 <Bloque titulo="Tardanzas, almuerzo y horas extra">
                   <Campo label="Tolerancia de tardanza" ayuda="Minutos de gracia a la entrada. Pasados, la tardanza se cuenta desde las 8:00."
@@ -903,7 +900,9 @@ export default function ConfiguracionTab() {
                   <Campo label="Hora de corte de la tarde"
                     ayuda="Hasta esta hora la extra va al recargo de día; desde el minuto siguiente al de noche. Es la misma frontera que marca la jornada nocturna."
                     valor={form.horaCorteNocturno} onChange={(v) => set("horaCorteNocturno", v)} />
-                  <Campo label="Domingos y feriados" ayuda="También es un factor."
+                  {/* Sin ayuda propia: el ⓘ de «Hora extra de día», dos campos
+                      arriba, ya explica qué es un factor. Repetirlo no agrega. */}
+                  <Campo label="Domingos y feriados"
                     valor={form.recargoDomingoFeriado} onChange={(v) => set("recargoDomingoFeriado", v)} />
                 </Bloque>
 
@@ -931,9 +930,10 @@ export default function ConfiguracionTab() {
                 </Bloque>
 
                 <Bloque titulo="Descuentos de ley">
-                  <Campo label="Seguro social" ayuda="En por ciento." sufijo="%"
+                  {/* Sin ayuda: el sufijo «%» del campo ya dice lo mismo. */}
+                  <Campo label="Seguro social" sufijo="%"
                     valor={form.seguroSocialPct} onChange={(v) => set("seguroSocialPct", v)} />
-                  <Campo label="Seguro educativo" ayuda="En por ciento." sufijo="%"
+                  <Campo label="Seguro educativo" sufijo="%"
                     valor={form.seguroEducativoPct} onChange={(v) => set("seguroEducativoPct", v)} />
                 </Bloque>
 
@@ -952,16 +952,23 @@ export default function ConfiguracionTab() {
                 {/* ⛔ Se dice en la pantalla para que nadie lo pida como campo: son
                     la FORMA del cálculo, no números sueltos. Ver `config.ts`. */}
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <h3 className="text-sm font-medium text-gray-900">Esto no se cambia desde acá</h3>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <h3 className="text-sm font-medium text-gray-900">Esto no se cambia desde acá</h3>
+                    {/* El POR QUÉ no son campos se lee una vez. Las tres reglas
+                        siguen a la vista: son las que hay que conocer para
+                        cuadrar contra el Excel de la contable. */}
+                    <Ayuda titulo="Por qué no se pueden cambiar" className="-my-3">
+                      <p>
+                        No son números: es la forma del cálculo. Si alguna vez cambia, se cambia
+                        en el sistema — así nadie rompe la planilla sin querer.
+                      </p>
+                    </Ayuda>
+                  </div>
                   <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-gray-600">
                     <li>· La ausencia se descuenta como horas × valor de la hora.</li>
                     <li>· La quincena va del 1 al 15 y del 16 al 30.</li>
                     <li>· El día 31 no se paga, pero sí se descuenta si se falta.</li>
                   </ul>
-                  <p className="mt-1.5 text-[12px] text-gray-500">
-                    No son números: es la forma del cálculo. Si alguna vez cambia, se cambia
-                    en el sistema — así nadie rompe la planilla sin querer.
-                  </p>
                 </div>
 
                 <button type="button" onClick={() => void guardarReglas()} disabled={guardandoReglas}
@@ -1061,12 +1068,15 @@ function BloqueBaja({
 
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
-      <h4 className="text-sm font-medium text-gray-900">¿Se fue de la empresa?</h4>
-      <p className="mt-1 text-[12px] leading-relaxed text-gray-500">
-        Se da de baja con la <b>fecha de su último día</b>. Sigue apareciendo entera en las
-        quincenas en que trabajó, incluida la de su salida, y desaparece de las siguientes.
-        No se borra nada: si vuelve, se reactiva.
-      </p>
+      <div className="flex flex-wrap items-center gap-1">
+        <h4 className="text-sm font-medium text-gray-900">¿Se fue de la empresa?</h4>
+        {/* Qué le pasa a sus quincenas se aprende una vez. El aviso de que
+            todavía no se puede guardar (falta la migración) NO se esconde: va
+            abajo, en pantalla. */}
+        <Ayuda titulo="Qué pasa al dar de baja" className="-my-3">
+          <ExplicacionBaja conFecha />
+        </Ayuda>
+      </div>
 
       {!puede && (
         <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
@@ -1076,16 +1086,18 @@ function BloqueBaja({
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-            Último día de trabajo
-          </label>
+          <Etiqueta texto="Último día de trabajo" />
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
             className={`${CAMPO} tabular-nums`} />
         </div>
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-            ¿Por qué salió?
-          </label>
+          {/* Se guarda para la LIQUIDACIÓN, no para el cálculo de la quincena:
+              ahí un despido injustificado paga indemnización y una renuncia no.
+              La planilla trata los tres motivos exactamente igual. */}
+          <Etiqueta
+            texto="¿Por qué salió?"
+            ayuda="La planilla se calcula igual en los tres casos. Se guarda para la liquidación."
+          />
           <div className="flex flex-wrap gap-2">
             {MOTIVOS_SALIDA.map((m) => (
               <button key={m} type="button" onClick={() => setMotivo(m)}
@@ -1094,12 +1106,6 @@ function BloqueBaja({
               </button>
             ))}
           </div>
-          {/* Se guarda para la LIQUIDACIÓN, no para el cálculo de la quincena:
-              ahí un despido injustificado paga indemnización y una renuncia no.
-              La planilla trata los tres motivos exactamente igual. */}
-          <p className="mt-1 text-[11px] text-gray-400">
-            La planilla se calcula igual en los tres casos. Se guarda para la liquidación.
-          </p>
         </div>
       </div>
 
@@ -1141,15 +1147,66 @@ function Dato({ etiqueta, valor, numero }: { etiqueta: string; valor: string; nu
   );
 }
 
+/**
+ * Qué le pasa a las quincenas de quien se fue. Se escribe UNA vez y se muestra
+ * en los dos lugares donde hace falta (el bloque de dar de baja y la lista de
+ * los que ya no trabajan acá): dos redacciones del mismo hecho es la forma de
+ * que terminen contradiciéndose.
+ */
+function ExplicacionBaja({ conFecha }: { conFecha?: boolean }) {
+  return (
+    <p>
+      {conFecha && (
+        <>
+          Se da de baja con la <b>fecha de su último día</b>.{" "}
+        </>
+      )}
+      Sigue apareciendo entera en las quincenas en que trabajó, incluida la de su salida, y
+      desaparece de las siguientes. No se borra nada: si vuelve, se reactiva.
+    </p>
+  );
+}
+
+/**
+ * La etiqueta de un campo, con su ⓘ al lado cuando hace falta explicar CÓMO se
+ * usa el número.
+ *
+ * 🔑 La metodología va detrás del toque, no debajo de cada campo: son textos
+ * que se aprenden una vez y que, repetidos en cada carga de pantalla, hacen que
+ * se deje de leer también lo que sí importa. Lo que cambia una decisión —lo que
+ * falta, lo que no se puede guardar todavía— sigue SIEMPRE a la vista.
+ */
+function Etiqueta({ texto, ayuda }: { texto: string; ayuda?: string }) {
+  return (
+    <div className="mb-1 flex flex-wrap items-center gap-0.5">
+      <label className="block text-xs uppercase tracking-wide text-gray-400">{texto}</label>
+      {ayuda && (
+        // -my-3: el botón sigue midiendo 44 px (regla de la casa), solo deja de
+        // empujar el renglón de la etiqueta.
+        <Ayuda titulo={texto} className="-my-3">
+          <p>{ayuda}</p>
+        </Ayuda>
+      )}
+    </div>
+  );
+}
+
 function Bloque({
   titulo, ayuda, nota, children,
 }: { titulo: string; ayuda?: string; nota?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="text-sm font-medium text-gray-900">{titulo}</h3>
-      {/* `ayuda` explica; `nota` advierte. Van en colores distintos a propósito:
-          si todo fuera ámbar, nada llamaría la atención. */}
-      {ayuda && <p className="mt-1 text-[12px] leading-relaxed text-gray-500">{ayuda}</p>}
+      <div className="flex flex-wrap items-center gap-1">
+        <h3 className="text-sm font-medium text-gray-900">{titulo}</h3>
+        {/* `ayuda` EXPLICA → va al ⓘ, que se aprende una vez. `nota` ADVIERTE
+            → se queda en pantalla y en ámbar: esconder un aviso detrás de un
+            toque es exactamente igual que borrarlo. */}
+        {ayuda && (
+          <Ayuda titulo={titulo} className="-my-3">
+            <p>{ayuda}</p>
+          </Ayuda>
+        )}
+      </div>
       {nota && <p className="mt-1 text-[12px] text-amber-800">{nota}</p>}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">{children}</div>
     </div>
@@ -1160,20 +1217,21 @@ function Campo({
   label, ayuda, sufijo, valor, onChange,
 }: {
   label: string;
-  ayuda: string;
+  /** Cómo se usa el número. Opcional: si el sufijo del campo ya lo dice («%»),
+   *  repetirlo abajo es texto que nadie vuelve a leer. */
+  ayuda?: string;
   sufijo?: string;
   valor: string;
   onChange: (v: string) => void;
 }) {
   return (
     <div>
-      <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">{label}</label>
+      <Etiqueta texto={label} ayuda={ayuda} />
       <div className="flex items-center gap-2">
         <input type="text" inputMode="decimal" value={valor}
           onChange={(e) => onChange(e.target.value)} className={`${CAMPO} tabular-nums`} />
         {sufijo && <span className="shrink-0 text-[12px] text-gray-400">{sufijo}</span>}
       </div>
-      <p className="mt-1 text-[11px] text-gray-400">{ayuda}</p>
     </div>
   );
 }

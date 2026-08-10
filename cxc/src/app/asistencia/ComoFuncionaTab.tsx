@@ -65,12 +65,7 @@ export default function ComoFuncionaTab() {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <div>
-        <h2 className="text-base font-semibold text-gray-900">Cómo funciona la marcación</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Esto es lo que mide el sistema. Sirve para imprimirlo y pegarlo al lado del reloj.
-        </p>
-      </div>
+      <h2 className="text-base font-semibold text-gray-900">Cómo funciona la marcación</h2>
 
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         {REGLAS.map((r, i) => (

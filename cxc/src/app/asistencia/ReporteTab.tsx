@@ -12,6 +12,7 @@ import { useToast } from "@/components/ToastSystem";
 import { construirExcel, construirPdf } from "@/lib/asistencia/exportar";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
+import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
 
@@ -159,13 +160,20 @@ export default function ReporteTab() {
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
-        Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
-        tolerancia · almuerzo según cada persona · extras desde{" "}
-        {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
-        <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
-        Estos números se cambian en <b>Configuración</b>.
-      </p>
+      {/* La metodología del cuadro se aprende una vez: va al ⓘ. Los avisos que
+          cambian una decisión —el reloj callado, las horas de salida sin
+          confirmar— siguen arriba y a la vista. */}
+      <div className="-ml-2">
+        <Ayuda titulo="Cómo se leen estos números" etiqueta="Cómo se leen estos números">
+          <p>
+            Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
+            tolerancia · almuerzo según cada persona · extras desde{" "}
+            {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
+            <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
+            Estos números se cambian en <b>Configuración</b>.
+          </p>
+        </Ayuda>
+      </div>
     </div>
   );
 }

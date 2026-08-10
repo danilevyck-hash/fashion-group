@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona, type PersonaListada } from "@/lib/asistencia/directorio";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface Justificacion {
   id: string;
@@ -93,10 +94,16 @@ export default function JustificacionesTab() {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-500">
-        Márcalas el día que pasan y la quincena se cierra sola. También puedes
-        cargarlas <b>hacia atrás</b>.
-      </p>
+      {/* Cuándo conviene cargarlas se aprende una vez: va en el ⓘ. Lo que hay
+          que hacer está en el formulario de abajo. */}
+      <div className="-ml-2 -mt-2">
+        <Ayuda titulo="Cuándo cargar una justificación" etiqueta="Cuándo cargarlas">
+          <p>
+            Márcalas el día que pasan y la quincena se cierra sola. También puedes
+            cargarlas <b>hacia atrás</b>.
+          </p>
+        </Ayuda>
+      </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
