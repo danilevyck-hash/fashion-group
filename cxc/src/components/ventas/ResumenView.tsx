@@ -591,8 +591,11 @@ function MesVsMesCard({
           </span>
         )}
       </div>
+      {/* El "en {mes} {año-1}" repetía palabra por palabra el rótulo de arriba
+          de la misma tarjeta. El MONTO sí se queda: es el único lugar de la
+          pantalla donde se ve cuánto se vendió ese mes el año pasado. */}
       <p className="mt-1.5 text-xs text-gray-500">
-        vs <span className="font-mono tabular-nums">{fmtMoney(prev)}</span> en {mes} {year - 1}
+        vs <span className="font-mono tabular-nums">{fmtMoney(prev)}</span>
       </p>
     </Card>
   );

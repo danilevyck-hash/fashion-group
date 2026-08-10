@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 
@@ -323,7 +324,20 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
 function Equilibrio({ eq }: { eq: VistaGeneral["equilibrio"] }) {
   return (
     <div className="rounded-[14px] border border-stone-200 bg-white p-5 mb-8">
-      <h2 className="text-sm font-semibold text-stone-900 mb-2">Punto de equilibrio</h2>
+      {/* La FÓRMULA ("gastos fijos ÷ margen") se aprende una vez: vive en el ⓘ,
+          no en una línea que se lee todos los días. Los dos números siguen
+          alcanzables de un toque — el gasto fijo del mes no está en ninguna
+          otra parte de esta pantalla y borrarlo habría sido perder un dato. */}
+      <h2 className="mb-2 flex items-center gap-1 text-sm font-semibold text-stone-900">
+        Punto de equilibrio
+        {eq && (
+          <Ayuda titulo="Cómo se calcula">
+            <p className="tabular-nums">
+              Gastos fijos {money(eq.gastosFijos)} ÷ margen {pct(eq.margenPct)}
+            </p>
+          </Ayuda>
+        )}
+      </h2>
       {eq ? (
         <>
           <p className="text-sm text-stone-700 tabular-nums">
@@ -338,9 +352,6 @@ function Equilibrio({ eq }: { eq: VistaGeneral["equilibrio"] }) {
             {/* Marca del 100% */}
             <div className="absolute top-0 right-0 h-full w-0.5 bg-stone-400" />
           </div>
-          <p className="text-xs text-stone-400 mt-2 tabular-nums">
-            Gastos fijos {money(eq.gastosFijos)} ÷ margen {pct(eq.margenPct)}
-          </p>
         </>
       ) : (
         <p className="text-sm text-stone-500">

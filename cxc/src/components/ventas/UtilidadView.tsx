@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, Search } from "lucide-react";
 import { SkeletonTable } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import {
   fmtMargen,
   fmtMoneySigned,
@@ -125,22 +126,29 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         })}
       </div>
 
-      {/* Totales + alcance */}
+      {/* Totales + alcance. De dónde sale el costo se aprende UNA vez → ⓘ. Lo
+          que sí se queda en pantalla es el aviso de utilidades negativas: eso
+          cambia a quién hay que mirar este mes. */}
       {data && !loading && (
-        <p className="mb-3 text-sm text-gray-600">
-          Ventas <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.ventas)}</span>
-          <span className="mx-2 text-gray-300">·</span>
-          Utilidad <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.utilidad)}</span>
-          <span className="mx-2 text-gray-300">·</span>
-          Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+        <p className="mb-3 flex flex-wrap items-center text-sm text-gray-600">
+          <span>
+            Ventas <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.ventas)}</span>
+            <span className="mx-2 text-gray-300">·</span>
+            Utilidad <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMoneySigned(data.totales.utilidad)}</span>
+            <span className="mx-2 text-gray-300">·</span>
+            Margen <span className="font-mono font-semibold tabular-nums text-gray-900">{fmtMargen(data.totales.margen)}</span>
+          </span>
+          <Ayuda titulo="Cómo se calcula">
+            <p>Costo real por documento (5 empresas B2B).</p>
+          </Ayuda>
         </p>
       )}
 
-      <p className="mb-3 text-xs text-gray-400">
-        Costo real por documento (5 empresas B2B). {negativos > 0 && (
-          <span className="text-rose-600">{negativos} cliente{negativos === 1 ? "" : "s"} con utilidad negativa (devoluciones netas).</span>
-        )}
-      </p>
+      {data && !loading && negativos > 0 && (
+        <p className="mb-3 text-xs text-rose-600">
+          {negativos} cliente{negativos === 1 ? "" : "s"} con utilidad negativa (devoluciones netas).
+        </p>
+      )}
 
       {error && (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-700">

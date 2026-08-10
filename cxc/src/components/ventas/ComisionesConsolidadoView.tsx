@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Coins } from "lucide-react";
+import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -344,11 +345,19 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
         </>
       )}
 
+      {/* "Toca para ver el detalle" SE QUEDA: es la única señal de que la celda
+          se puede abrir, y esconderla detrás de un ⓘ sería lo mismo que
+          borrarla. Lo que pasa al ⓘ es la metodología —qué ya viene restado—,
+          que se aprende una vez.
+          🩸 Ese texto NO se borra nunca: antes decía solo "lo devuelto" y el
+          número parecía mal, porque los descuentos fijos no estaban restados en
+          la matriz y el detalle sí los restaba. */}
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        {/* Antes decía solo "lo devuelto" y por eso el número parecía mal: los
-            descuentos fijos NO estaban restados y el detalle sí los restaba. */}
-        Ya están descontados lo devuelto y los descuentos · Toca para ver el detalle
+        Toca para ver el detalle
+        <Ayuda titulo="Cómo se calcula">
+          <p>Ya están descontados lo devuelto y los descuentos.</p>
+        </Ayuda>
       </p>
 
       {detalle && (
