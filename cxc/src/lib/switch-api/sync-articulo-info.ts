@@ -15,10 +15,14 @@
 // real no viaja por la API v1.0; hasta que Switch lo exponga, esta columna
 // queda almacenada sin pintar.
 //
-// SIN CRON a propósito: lo dispara el botón "Actualizar datos de Switch" del
-// tab (POST /api/ventas/referencia/actualizar), por la empresa de la referencia
-// buscada. El lock es el de siempre: la fila 'running' de `switch_sync_log`
-// (índice único parcial) — sesión única de Switch por empresa.
+// DOS disparadores (10-ago-2026 — Daniel: "es que debería ser ya automático"):
+//   · CRON diario /api/cron/sync-articulo-info — 3 entradas de 2 empresas
+//     (04:30/04:40/04:50 UTC), las 6 FG. Garantiza el piso de frescura.
+//   · el botón "Actualizar datos de Switch" del tab (POST
+//     /api/ventas/referencia/actualizar), por empresa — SE QUEDA para el dato
+//     del momento antes de comprar.
+// El lock es el de siempre en los dos caminos: la fila 'running' de
+// `switch_sync_log` (índice único parcial) — sesión única de Switch por empresa.
 //
 // Patrón heredado de sync-articulo-marca.ts (los mismos gotchas medidos):
 //   · el endpoint ignora `porPagina` → el corte es por página VACÍA;
