@@ -5,7 +5,18 @@
  * switch_factura_utilidad (atribución por cartera). Ver sync-utilidad.ts.
  *
  * ⚠️ El login web usa changesession=SI → EXPULSA al humano logueado en esa
- * empresa (single-session). Por eso el cron corre off-hours (vercel.json).
+ * empresa (single-session), y el usuario de `SWITCH_<EMPRESA>_WEB_USER` es el de
+ * Daniel: cada corrida en horario de oficina lo saca de Switch mientras trabaja.
+ * Por eso el cron corre a las 07:00 UTC = 2 a.m. de Panamá (vercel.json) y su
+ * RECUPERACIÓN desde switch-reconciliacion solo ocurre en la pasada de las 10:00
+ * UTC = 5 a.m. (las de 14:00 y 18:00 caen 9 a.m. y 1 p.m. — ver
+ * COLATERALES_LOGIN_WEB en cron-telemetry.ts).
+ *
+ * 🔴 LO QUE SIGUE EXPUESTO SON LAS CORRIDAS A MANO. Este route acepta query
+ * params (`empresas`, `year`, `mes`, `backfill`) y esa puerta no tiene horario:
+ * pegarle a las 10 de la mañana expulsa a Daniel igual que antes. No se le puso
+ * un candado de hora a propósito — un backfill es justamente lo que hay que
+ * poder correr cuando hace falta —, pero si no es urgente, correrlo de noche.
  *
  * Auth: Authorization: Bearer ${CRON_SECRET}.
  * Query params (opcionales):
