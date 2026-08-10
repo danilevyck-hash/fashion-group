@@ -34,6 +34,7 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
+import { Ayuda } from "@/components/shared/Ayuda";
 import {
   bultosParaInput,
   normalizarBultos,
@@ -739,17 +740,24 @@ export default function EntregaForm({
 
               {/* Paso 2: Paneles destacado */}
               <section className="space-y-2">
-                <label
-                  htmlFor="entrega-paneles"
-                  className="block text-base font-semibold text-gray-900"
-                >
-                  Cantidad de paneles
-                </label>
-                <p className="text-xs text-gray-500">
-                  Los paneles definen el kit. Cuando escribas la cantidad,
-                  los accesorios se llenan según la curva sugerida (×3 tablas,
-                  ×3 conjunto, ×1 colgador, ×3 barra). Podés ajustarlos a mano.
-                </p>
+                <div className="flex items-center gap-1">
+                  <label
+                    htmlFor="entrega-paneles"
+                    className="block text-base font-semibold text-gray-900"
+                  >
+                    Cantidad de paneles
+                  </label>
+                  {/* La curva del kit se aprende una vez → ⓘ. Los accesorios
+                      se siguen viendo llenos abajo, así que el efecto no se
+                      esconde: lo que se esconde es la explicación. */}
+                  <Ayuda titulo="Cómo se llena el kit" className="-my-2">
+                    <p>
+                      Los paneles definen el kit. Cuando escribas la cantidad, los accesorios se
+                      llenan según la curva sugerida (×3 tablas, ×3 conjunto, ×1 colgador, ×3 barra).
+                      Podés ajustarlos a mano.
+                    </p>
+                  </Ayuda>
+                </div>
                 {/* Piezas (grande, es el driver del kit) + bultos (chico, es
                     sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
                 <div className="flex items-end gap-2">

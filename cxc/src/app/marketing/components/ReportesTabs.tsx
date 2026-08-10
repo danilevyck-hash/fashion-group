@@ -7,10 +7,12 @@ import ReportePorProyectoView from "./ReportePorProyectoView";
 
 type Tab = "marca" | "tienda" | "proyecto";
 
-const TABS: Array<{ value: Tab; label: string; sub: string }> = [
-  { value: "marca", label: "Por Marca", sub: "Gasto total por marca" },
-  { value: "tienda", label: "Por Tienda", sub: "Gasto por tienda, desglosado por marca" },
-  { value: "proyecto", label: "Por Proyecto", sub: "Detalle de cada proyecto" },
+// El `sub` de cada pestaña se fue (poda de textos, ago-2026): decía lo mismo
+// que la pestaña que ya está encendida arriba.
+const TABS: Array<{ value: Tab; label: string }> = [
+  { value: "marca", label: "Por Marca" },
+  { value: "tienda", label: "Por Tienda" },
+  { value: "proyecto", label: "Por Proyecto" },
 ];
 
 export function ReportesTabs() {
@@ -42,7 +44,6 @@ export function ReportesTabs() {
         ))}
       </div>
 
-      <p className="text-xs text-gray-500">{active.sub}</p>
 
       {tab === "marca" && <ReportePorMarcaView />}
       {tab === "tienda" && <ReportePorTiendaView />}

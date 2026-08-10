@@ -95,9 +95,6 @@ function GastosEmpresaInner() {
         {!empresa && (
           <div className="mb-5">
             <h1 className="text-xl font-semibold tracking-tight text-gray-900">Gastos de Empresa</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Carga los gastos del mes por empresa y actualiza los saldos de banco.
-            </p>
           </div>
         )}
 

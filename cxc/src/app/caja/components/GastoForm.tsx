@@ -419,11 +419,13 @@ export default function GastoForm({
               ariaLabel="Proveedor"
             />
           </Field>
-          <Field label="Nº de factura" hint="Opcional">
+          {/* Sin `hint`: es el único campo sin el asterisco rojo, y "Opcional"
+              vive donde el ojo ya está mirando — dentro del casillero. */}
+          <Field label="Nº de factura">
             <TextInput
               value={gNroFactura}
               onChange={setGNroFactura}
-              placeholder="—"
+              placeholder="Opcional"
               ariaLabel="Nº de factura"
             />
           </Field>

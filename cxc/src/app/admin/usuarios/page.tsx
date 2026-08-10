@@ -8,6 +8,7 @@ import VendedorSwitchSection from "./VendedorSwitchSection";
 import IconButton from "@/components/IconButton";
 import { ALL_MODULES, getDefaultModulesForRole } from "@/lib/modules";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -194,7 +195,6 @@ export default function UsuariosPage() {
             >
               Usuarios
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Define qué módulos ve cada quien</p>
           </div>
           <button onClick={openNewUser} className="text-sm bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition flex items-center gap-1.5 active:scale-[0.97]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
@@ -385,10 +385,18 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em] block mb-1.5">
-                    Empresa <span className="font-normal text-gray-400 normal-case">(opcional)</span>
-                  </label>
+                  {/* El ⓘ va FUERA de la <label>: un <button> adentro haría que
+                      tocarlo también active el campo. */}
+                  <div className="flex items-center gap-1 mb-1.5">
+                    <label htmlFor="usuario-empresa" className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">
+                      Empresa <span className="font-normal text-gray-400 normal-case">(opcional)</span>
+                    </label>
+                    <Ayuda titulo="Para qué sirve" className="-my-2 shrink-0">
+                      <p>Solo cambia algo para los vendedores: los deja ver en Cuentas por Cobrar únicamente los clientes de esa empresa. En blanco, ven las de todas.</p>
+                    </Ayuda>
+                  </div>
                   <input
+                    id="usuario-empresa"
                     value={uCompany}
                     onChange={e => setUCompany(e.target.value)}
                     placeholder="vistana, fashion_wear, etc."
@@ -396,7 +404,6 @@ export default function UsuariosPage() {
                        demás campos del modal. */
                     className="w-full bg-white border border-gray-200 rounded-md px-3 py-3 text-base sm:text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-700 transition"
                   />
-                  <p className="text-xs text-gray-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
                 </div>
 
                 {/* Override de módulos per-usuario */}
@@ -405,27 +412,31 @@ export default function UsuariosPage() {
                       que se vea mal. El área táctil de 44 la pone la <label>
                       que lo envuelve: toda la fila (incluido el texto) activa
                       el checkbox porque el input está adentro. */}
-                  <label className="flex min-h-[44px] items-center justify-between gap-3 cursor-pointer">
-                    <span className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
-                    <input
-                      type="checkbox"
-                      checked={customPerms}
-                      onChange={e => {
-                        const on = e.target.checked;
-                        setCustomPerms(on);
-                        // Al activar, precargar los módulos que el usuario YA tiene por su rol.
-                        // El override REEMPLAZA al rol (no suma), así que sin precargar se
-                        // perderían los demás módulos al guardar.
-                        if (on && uModules.length === 0) setUModules(getDefaultModulesForRole(uRole));
-                      }}
-                      className="accent-teal-700 w-4 h-4"
-                    />
-                  </label>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {customPerms
-                      ? "Este usuario verá solo los módulos marcados (ignora los del rol)."
-                      : "Apagado: usa los módulos por defecto de su rol."}
-                  </p>
+                  {/* El ⓘ queda FUERA de la <label> (un <button> adentro se
+                      comería el clic y marcaría la casilla). La <label> sigue
+                      envolviendo al input, que es lo que da los 44 px. */}
+                  <div className="flex items-center gap-1">
+                    <label className="flex flex-1 min-h-[44px] items-center justify-between gap-3 cursor-pointer">
+                      <span className="text-xs font-medium text-gray-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
+                      <input
+                        type="checkbox"
+                        checked={customPerms}
+                        onChange={e => {
+                          const on = e.target.checked;
+                          setCustomPerms(on);
+                          // Al activar, precargar los módulos que el usuario YA tiene por su rol.
+                          // El override REEMPLAZA al rol (no suma), así que sin precargar se
+                          // perderían los demás módulos al guardar.
+                          if (on && uModules.length === 0) setUModules(getDefaultModulesForRole(uRole));
+                        }}
+                        className="accent-teal-700 w-4 h-4"
+                      />
+                    </label>
+                    <Ayuda titulo="Permisos personalizados" className="-my-2 shrink-0">
+                      <p>Apagados, el usuario ve los módulos que le da su rol.</p>
+                      <p className="mt-1.5">Encendidos, ve <span className="font-medium text-gray-900">solo</span> los que marques acá: la lista reemplaza a la del rol, no se suma.</p>
+                    </Ayuda>
+                  </div>
                   {customPerms && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-3">
                       {MODULES.map(mod => {

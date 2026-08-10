@@ -7,6 +7,7 @@ import { fmt } from "@/lib/format";
 import AppHeader from "@/components/AppHeader";
 import PeriodoDetailHeader from "../../components/PeriodoDetailHeader";
 import GastoForm, { normalizeStr } from "../../components/GastoForm";
+import AvisoSaldoNegativo from "../../components/AvisoSaldoNegativo";
 import { useEscapeClose, useBackdropDismiss } from "@/lib/hooks/useModalDismiss";
 import { CajaPeriodo, CajaResponsable } from "../../components/types";
 import "../../skin.css";
@@ -392,39 +393,15 @@ function NuevoGastoPage() {
       </div>
 
       {pendingNeg && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" {...negBackdrop}>
-          {/* Sin stopPropagation: el hook del fondo solo cierra si el mousedown Y
-              el click cayeron sobre el fondo mismo. */}
-          <div className="skin-caja bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4" style={{ border: "1px solid var(--caja-border-default)" }}>
-            <h3 className="text-base font-medium mb-3" style={{ color: "var(--caja-fg-strong)" }}>¿Continuar con saldo negativo?</h3>
-            <p className="text-sm mb-2" style={{ color: "var(--caja-fg-default)" }}>
-              Este gasto deja el fondo en <strong className="caja-mono">${fmt(pendingNeg.saldoFuturo)}</strong> (fondo <span className="caja-mono">${fmt(pendingNeg.fondo)}</span>, gastos <span className="caja-mono">${fmt(pendingNeg.gastado)}</span>, nuevo <span className="caja-mono">${fmt(pendingNeg.nuevo)}</span>).
-            </p>
-            <p className="text-xs mb-6" style={{ color: "var(--caja-fg-muted)" }}>
-              Considera solicitar reabastecimiento antes de seguir gastando.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={confirmNeg}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium text-white active:scale-[0.97] transition-all min-h-[44px]"
-                style={{ background: "var(--caja-danger)" }}
-              >
-                Sí, guardar igual
-              </button>
-              <button
-                onClick={cancelNeg}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm transition-all min-h-[44px]"
-                style={{
-                  background: "#fff",
-                  color: "var(--caja-fg-default)",
-                  border: "1px solid var(--caja-border-default)",
-                }}
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AvisoSaldoNegativo
+          fondo={pendingNeg.fondo}
+          gastado={pendingNeg.gastado}
+          nuevo={pendingNeg.nuevo}
+          saldoFuturo={pendingNeg.saldoFuturo}
+          onConfirm={confirmNeg}
+          onCancel={cancelNeg}
+          backdropProps={negBackdrop}
+        />
       )}
     </div>
   );

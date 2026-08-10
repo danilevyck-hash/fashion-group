@@ -953,13 +953,14 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-3">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
-            <p className="text-sm text-gray-500 mb-1">
+            {/* Una sola línea: los chips de abajo YA son el "prueba con otro
+                filtro" y el buscador está a la vista. */}
+            <p className="text-sm text-gray-500 mb-4">
               {search
                 ? `No encontramos cheques para "${search}"`
                 : `No hay cheques ${filter === "pendiente" ? "pendientes" : filter === "depositado" ? "depositados" : filter === "vencido" ? "vencidos" : filter === "rebotado" ? "rebotados" : filter === "vencen_hoy" ? "que vencen hoy" : filter === "vencen_semana" ? "que vencen esta semana" : ""}`
               }
             </p>
-            <p className="text-xs text-gray-400 mb-4">{search ? "Revisa el nombre del cliente o numero de cheque" : "Prueba con otro filtro"}</p>
             <div className="flex flex-wrap justify-center gap-2">
               {(
                 [

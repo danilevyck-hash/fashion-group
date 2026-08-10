@@ -5,6 +5,7 @@ import { mutate } from "swr";
 import { norm } from "@/lib/depurador/logic";
 import { fmtDate } from "@/lib/format";
 import { CATALOGO_DESCRIPCIONES_KEY } from "@/lib/hooks/useCatalogoDescripciones";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 // Vista SOLO admin: catálogo completo de descripciones del Depurador (tabla
 // depurador_descripciones), con origen, quién aprobó y cuándo, y toggle
@@ -84,11 +85,16 @@ export default function CatalogoDescripcionesAdmin() {
   return (
     <div className="mx-auto max-w-4xl px-4 pb-10">
       <div className="mb-4 border-b-2 border-stone-900 pb-3">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Catálogo de descripciones</h2>
-        <p className="mt-1 text-sm text-stone-500">
-          La fuente de verdad del Depurador y Facturas Tienda. Desactivar no borra: la descripción
-          deja de valer en el catálogo pero el histórico queda.
-        </p>
+        <div className="flex items-center gap-1">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900">Catálogo de descripciones</h2>
+          {/* Qué es y qué pasa al desactivar: se aprende una vez → ⓘ. */}
+          <Ayuda titulo="Qué es este catálogo" className="-my-2">
+            <p>
+              La fuente de verdad del Depurador y Facturas Tienda. Desactivar no borra: la descripción
+              deja de valer en el catálogo pero el histórico queda.
+            </p>
+          </Ayuda>
+        </div>
       </div>
 
       {rows === null && !fallo && (

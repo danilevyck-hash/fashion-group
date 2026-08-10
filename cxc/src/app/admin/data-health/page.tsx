@@ -171,12 +171,9 @@ export default function DataHealthPage() {
         {/* Header con resumen + botón */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
+            {/* Sin subtítulo: cada check ya muestra su "Último check" en la
+                lista de abajo, y el mapa de 30 días ya muestra las corridas. */}
             <h1 className="text-2xl font-semibold text-gray-900">Data Health</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Última corrida: <span title={fmtAbsolute(data?.last_run ?? null)} className="cursor-default">{fmtRelative(data?.last_run ?? null)}</span>
-              {" · "}
-              {data?.total_runs_30d ?? 0} corridas en 30d
-            </p>
           </div>
           <button
             onClick={runChecksNow}

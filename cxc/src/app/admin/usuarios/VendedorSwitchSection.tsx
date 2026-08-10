@@ -27,6 +27,7 @@
 // siempre, anotado acá para que nadie lo redescubra.
 
 import { useEffect, useState } from "react";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { MARCAS_UI, getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
@@ -105,12 +106,22 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
 
   return (
     <div className="mt-5 border-t border-gray-100 pt-4">
-      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-        Vendedor en Switch <span className="normal-case font-normal text-gray-400">· para pedidos de catálogos</span>
+      <div className="flex items-center gap-1 mb-1">
+        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          Vendedor en Switch <span className="normal-case font-normal text-gray-400">· para pedidos de catálogos</span>
+        </div>
+        <Ayuda titulo="Para qué sirve" className="-my-2 shrink-0">
+          <p>Cuando este usuario arma un pedido desde un catálogo, el pedido sale a Switch a nombre del vendedor que elijas acá, uno por marca.</p>
+        </Ayuda>
       </div>
+      {/* 🩸 AVISO, NO metodología: mientras esto aparezca, el vendedor NO se
+          puede asignar y el pedido no sale a Switch. Va en pantalla, nunca
+          adentro del ⓘ. El nombre del archivo .sql se sacó a propósito: quien
+          usa esta pantalla no tiene por qué ver una ruta de migración, tiene
+          que saber a quién avisarle. */}
       {ddlPendiente ? (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-          Falta correr el DDL <code>20260705100000_fg_user_switch_vendedor.sql</code> en Supabase.
+          Todavía no se puede asignar el vendedor de Switch: falta activar esta función en el sistema. Avísale a Daniel.
         </p>
       ) : (
         <div className="space-y-2">
@@ -135,9 +146,6 @@ export default function VendedorSwitchSection({ userId, showToast }: { userId: s
               </label>
             );
           })}
-          <p className="text-xs text-gray-400">
-            El pedido del catálogo sale a Switch con este vendedor según quién esté logueado.
-          </p>
         </div>
       )}
     </div>

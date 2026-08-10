@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 interface EnviarProveedorModalProps {
   open: boolean;
@@ -224,13 +225,24 @@ export default function EnviarProveedorModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-medium">Enviar al proveedor</h2>
+          <div className="flex items-center gap-1">
+            <h2 className="text-base font-medium">Enviar al proveedor</h2>
+            {/* Qué viaja en el correo se aprende una vez: al ⓘ. */}
+            <Ayuda titulo="Qué se envía" className="-my-2">
+              <p className="mb-1.5">
+                Se adjunta el Excel, con links a facturas y fotos que abren con un clic.
+              </p>
+              <p>
+                Debajo del mensaje se agrega automáticamente la tabla resumen y la descarga.
+              </p>
+            </Ayuda>
+          </div>
           <button onClick={() => { if (!sending) onClose(); }} className="text-gray-400 hover:text-black text-2xl leading-none">×</button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
           <p className="text-xs text-gray-400">
-            {empresa} — {count} reclamo{count === 1 ? "" : "s"} · se adjunta el Excel (con links a facturas y fotos que abren con un clic)
+            {empresa} — {count} reclamo{count === 1 ? "" : "s"}
           </p>
 
           <div>
@@ -239,10 +251,9 @@ export default function EnviarProveedorModal({
               type="text"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              placeholder="correo@proveedor.com"
+              placeholder="correo@proveedor.com, otro@proveedor.com"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
-            <p className="text-xs text-gray-300 mt-1">Separa varios correos con coma.</p>
           </div>
 
           <div>
@@ -251,10 +262,9 @@ export default function EnviarProveedorModal({
               type="text"
               value={cc}
               onChange={(e) => setCc(e.target.value)}
-              placeholder="copia@correo.com (opcional)"
+              placeholder="copia@correo.com, otra@correo.com (opcional)"
               className="w-full border border-gray-200 rounded-md px-3 py-2.5 sm:py-2 text-base sm:text-sm outline-none focus:border-black transition"
             />
-            <p className="text-xs text-gray-300 mt-1">Separa varios correos con coma.</p>
           </div>
 
           {/* Libreta global de contactos */}
@@ -299,9 +309,7 @@ export default function EnviarProveedorModal({
                 {libretaErr && <p className="text-xs text-red-500">{libretaErr}</p>}
 
                 {/* Lista de contactos */}
-                {libreta.length === 0 ? (
-                  <p className="text-xs text-gray-300 py-1">Aún no hay contactos guardados.</p>
-                ) : (
+                {libreta.length > 0 && (
                   <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
                     {libreta.map((ct) => (
                       <div key={ct.id} className="py-1.5">
@@ -366,7 +374,6 @@ export default function EnviarProveedorModal({
               rows={6}
               className="w-full border border-gray-200 rounded-md px-3 py-2 text-base sm:text-sm outline-none focus:border-black transition resize-y"
             />
-            <p className="text-xs text-gray-300 mt-1">Debajo del mensaje se agrega automáticamente la tabla resumen y la descarga.</p>
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}

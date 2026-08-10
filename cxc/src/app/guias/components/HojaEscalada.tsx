@@ -166,8 +166,13 @@ export default function HojaEscalada({ children }: { children: ReactNode }) {
 
       {puedeAmpliar && (
         <div className="no-print mb-2 flex items-center justify-between gap-3">
+          {/* El micro-hint se QUEDA: que la hoja misma sea tocable es una
+              afordancia invisible, y esta hoja se ve achicada justamente
+              porque no entra (ver la nota de arriba). Lo que se fue es el
+              "arrastra para ver el resto" del estado ampliado — ahí el botón
+              de al lado ya dice cómo volver. */}
           <p className="text-xs text-gray-400">
-            {ampliado ? "Arrastra para ver el resto de la hoja." : "Toca la hoja para verla más grande."}
+            {ampliado ? null : "Toca la hoja para verla más grande."}
           </p>
           <button
             type="button"

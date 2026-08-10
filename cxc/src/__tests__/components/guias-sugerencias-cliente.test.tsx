@@ -136,6 +136,23 @@ describe("la ventana sigue haciendo lo de antes", () => {
   it("el texto escrito por bodega se muestra y NO se toca", () => {
     abrir();
     expect(screen.getByText("Hanna Calzado")).toBeTruthy();
+  });
+
+  /**
+   * 🩸 "Lo que dice la guía no cambia" es lo que hace que alguien se anime a
+   * tocar una guía CERRADA. Desde la poda de textos (ago-2026) no está suelto
+   * en la ventana: vive dentro del ⓘ "Qué se guarda". Escondido detrás de un
+   * toque sigue valiendo; BORRADO, no. Por eso el candado ya no busca el texto
+   * a secas —eso volvería a ponerse verde el día que alguien lo dejara en un
+   * comentario— sino que ABRE el ⓘ y comprueba que se puede leer.
+   */
+  it("🩸 el ⓘ dice que la guía no cambia, y se llega tocándolo", () => {
+    abrir();
+    expect(screen.queryByText(/Lo que dice la guía no cambia/i)).toBeNull();
+
+    const ayuda = screen.getByRole("button", { name: "Qué se guarda" });
+    fireEvent.click(ayuda);
+
     expect(screen.getByText(/Lo que dice la guía no cambia/i)).toBeTruthy();
   });
 

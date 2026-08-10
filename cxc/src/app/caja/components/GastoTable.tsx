@@ -248,10 +248,7 @@ export default function GastoTable({
           entra con 26 px de aire — medido, no supuesto. */}
       <div className="lg:hidden space-y-3">
         {sortedGastos.length === 0 ? (
-          <EmptyState
-            title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"}
-            subtitle={selectedCat ? "Cambia o quita el filtro" : "Agrega el primer gasto de este período"}
-          />
+          <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
         ) : (
           <>
             {sortedGastos.map((g) => (
@@ -343,10 +340,7 @@ export default function GastoTable({
               {sortedGastos.length === 0 ? (
                 <tr>
                   <td colSpan={dataCols + (isOpen ? 1 : 0)}>
-                    <EmptyState
-                      title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"}
-                      subtitle={selectedCat ? "Cambia o quita el filtro" : "Agrega el primer gasto de este período"}
-                    />
+                    <EmptyState title={selectedCat ? `Sin gastos de ${selectedCat}` : "Sin gastos registrados"} />
                   </td>
                 </tr>
               ) : (

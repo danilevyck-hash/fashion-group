@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, ConfirmModal, ScrollableTable } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { fmtDate } from "@/lib/format";
 import {
   parseMultiplePackingLists,
@@ -823,9 +824,6 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
               <p className="text-sm font-medium text-gray-700">
                 {uploading ? "Leyendo PDF..." : "Subir PDF de Packing List"}
               </p>
-              <p className="text-xs text-gray-400">
-                Arrastra el archivo aquí o haz clic para seleccionar
-              </p>
             </div>
           </div>
         )}
@@ -834,15 +832,17 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
         {previewItems.length > 0 && (
           <div className="space-y-3">
             {/* Banner de validación obligatoria */}
+            {/* El aviso y QUÉ comparar se quedan en pantalla: los dos cambian
+                lo que se hace acá. Lo que se fue al ⓘ es el porqué, que se
+                aprende una vez. Los 3 datos pasaron de lista a una línea. */}
             <div className="bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded">
-              <p className="text-base font-bold">⚠ Valida cada PL contra el PDF original antes de guardar</p>
-              <p className="text-sm mt-2">Compara estos 3 datos del PDF original:</p>
-              <ul className="text-sm mt-1 ml-5 list-disc">
-                <li>Número de PL</li>
-                <li>Total de piezas</li>
-                <li>Total de bultos</li>
-              </ul>
-              <p className="text-sm mt-2">Bodega necesita esta información correcta para inventario.</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-base font-bold">⚠ Valida cada PL contra el PDF original antes de guardar</p>
+                <Ayuda titulo="Por qué importa" className="-my-2 shrink-0">
+                  <p>Bodega necesita esta información correcta para inventario.</p>
+                </Ayuda>
+              </div>
+              <p className="text-sm mt-2">Compara el número de PL, el total de piezas y el total de bultos.</p>
             </div>
             {/* Summary bar */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
@@ -945,9 +945,19 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                               );
                             })}
                           </div>
-                          <p className="text-xs text-red-500 mt-2">
-                            &quot;Usar total del PDF&quot;: confía en el total del PDF y colapsa a 1 item. &quot;Resolver con IA&quot;: manda el texto del bulto a Claude y reconstruye el desglose por estilo.
-                          </p>
+                          {/* Qué hace cada botón se aprende una vez: al ⓘ. */}
+                          <div className="mt-1">
+                            <Ayuda titulo="Qué hace cada botón" etiqueta="Qué hace cada botón" className="-my-2">
+                              <p className="mb-1.5">
+                                <span className="font-medium text-gray-900">Usar total del PDF</span>: confía en el
+                                total del PDF y colapsa a 1 item.
+                              </p>
+                              <p>
+                                <span className="font-medium text-gray-900">Resolver con IA</span>: manda el texto del
+                                bulto a Claude y reconstruye el desglose por estilo.
+                              </p>
+                            </Ayuda>
+                          </div>
                         </div>
                       )}
 
@@ -1148,11 +1158,6 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
               <p className="text-sm text-gray-500">
                 No hay packing lists registrados
               </p>
-              {canEdit && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Sube un PDF para comenzar
-                </p>
-              )}
             </div>
           ) : (
             <>

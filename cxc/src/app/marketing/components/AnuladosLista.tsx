@@ -375,9 +375,6 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-gray-900">Anulados</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Puedes restaurarlos o eliminarlos permanentemente.
-        </p>
       </div>
 
       {/* Filtros */}
@@ -456,9 +453,6 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
       ) : itemsFiltrados.length === 0 ? (
         <div className="rounded-lg border border-gray-200 p-8 text-center">
           <p className="text-sm text-gray-600">No hay registros anulados.</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Los proyectos y facturas anulados aparecerán aquí.
-          </p>
         </div>
       ) : (
         <>
@@ -712,19 +706,14 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
               {confirmEliminarItem ? `: ${targetEliminacion.etiqueta}` : ""}.
               Esta acción <strong>NO</strong> se puede deshacer.
             </p>
-            <p className="text-xs text-gray-600 mb-2">
-              Para confirmar, escribe{" "}
-              <span className="font-mono font-semibold text-red-700">
-                ELIMINAR
-              </span>
-              :
-            </p>
+            {/* La instrucción vive en el placeholder; el aviso de que NO se
+                puede deshacer, que es lo que frena, sigue arriba. */}
             <input
               autoFocus
               type="text"
               value={textoConfirm}
               onChange={(e) => setTextoConfirm(e.target.value)}
-              placeholder="ELIMINAR"
+              placeholder="Escribe ELIMINAR para confirmar"
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none mb-4 uppercase"
             />
             <div className="flex gap-3">

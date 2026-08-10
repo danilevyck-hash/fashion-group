@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { Ayuda } from "@/components/shared/Ayuda";
 import {
   API_BASE,
   GRUPO_KEY,
@@ -113,18 +114,25 @@ export default function EmpresaGastosForm({
           Volver al checklist
         </button>
         <h1 className="text-xl font-semibold tracking-tight text-gray-900 mt-1">{nombre}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Gastos de {mesLabel(mes)}
-          {empresaKey === GRUPO_KEY ? " · se reparte entre las empresas según sus ventas del mes" : ""}
-        </p>
+        {/* El mes NO se repite en ningún otro lado de esta pantalla (el selector
+            vive en el checklist), así que se queda. Lo que se fue al ⓘ es el
+            criterio de reparto: se aprende una vez. */}
+        <div className="flex items-center gap-1 mt-0.5">
+          <p className="text-sm text-gray-500">Gastos de {mesLabel(mes)}</p>
+          {empresaKey === GRUPO_KEY && (
+            <Ayuda titulo="Cómo se reparte" etiqueta="Cómo se reparte" className="-my-2">
+              Lo que cargues acá se reparte entre las empresas según sus ventas del mes.
+            </Ayuda>
+          )}
+        </div>
       </div>
 
       {/* Filas por categoría */}
       <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100">
+        {/* El botón "+ Agregar categoría" está justo abajo: no hace falta decir
+            dónde. */}
         {categorias.length === 0 && (
-          <p className="p-4 text-sm text-gray-400">
-            Todavía no hay categorías. Agrega la primera aquí abajo.
-          </p>
+          <p className="p-4 text-sm text-gray-400">Todavía no hay categorías.</p>
         )}
         {categorias.map((c) => {
           const id = String(c.id);
@@ -257,21 +265,27 @@ function AgregarCategoria({ onCreada }: { onCreada: () => Promise<unknown> | voi
         onChange={(e) => { setNombre(e.target.value); setError(""); }}
         className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-sm outline-none focus:border-black transition"
       />
-      <label className="flex items-center gap-2.5 mt-3 cursor-pointer select-none min-h-[44px]">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={esFijo}
-          onClick={() => setEsFijo((v) => !v)}
-          className={`relative w-10 h-6 rounded-full transition shrink-0 ${esFijo ? "bg-green-600" : "bg-gray-300"}`}
-        >
-          <span
-            className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${esFijo ? "left-[1.125rem]" : "left-0.5"}`}
-          />
-        </button>
-        <span className="text-sm text-gray-700">Gasto fijo</span>
-      </label>
-      <p className="text-xs text-gray-400 mt-0.5">Los gastos fijos se usan para el punto de equilibrio</p>
+      {/* El ⓘ va FUERA de la <label>: adentro, tocarlo activaría el interruptor
+          (un click dentro de una label activa su control). */}
+      <div className="flex items-center gap-1 mt-3">
+        <label className="flex items-center gap-2.5 cursor-pointer select-none min-h-[44px]">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={esFijo}
+            onClick={() => setEsFijo((v) => !v)}
+            className={`relative w-10 h-6 rounded-full transition shrink-0 ${esFijo ? "bg-green-600" : "bg-gray-300"}`}
+          >
+            <span
+              className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${esFijo ? "left-[1.125rem]" : "left-0.5"}`}
+            />
+          </button>
+          <span className="text-sm text-gray-700">Gasto fijo</span>
+        </label>
+        <Ayuda titulo="Qué es un gasto fijo" className="-my-2">
+          Los gastos fijos se usan para el punto de equilibrio.
+        </Ayuda>
+      </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       <div className="flex gap-2 mt-3">
         <button

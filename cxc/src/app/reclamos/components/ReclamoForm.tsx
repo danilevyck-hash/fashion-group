@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, LocalFoto } from "./types";
 import { AccordionContent, FotoLightbox } from "@/components/ui";
+import { Ayuda } from "@/components/shared/Ayuda";
 import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, reclamoTaxes, esActiveShoes, impLabel } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
@@ -138,10 +139,18 @@ export default function ReclamoForm({
 
       {/* ── Factura PDF + autocompletado por IA (opcional, no bloquea) ── */}
       <div className="mb-10">
-        <div className="text-sm font-semibold text-gray-900 mb-4">Factura (PDF) — autocompletar</div>
+        {/* Qué rellena la IA y qué no se aprende una sola vez: va al ⓘ. */}
+        <div className="flex items-center gap-1 mb-4">
+          <div className="text-sm font-semibold text-gray-900">Factura (PDF) — autocompletar</div>
+          <Ayuda titulo="Qué hace la IA" className="-my-2">
+            <p>
+              Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido. Revisa y corrige.
+              Los ítems a reclamar se siguen agregando a mano.
+            </p>
+          </Ayuda>
+        </div>
         <div className="max-w-xl">
           <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
-          <p className="text-xs text-gray-400 mt-2">Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido. Revisa y corrige. Los ítems a reclamar se siguen agregando a mano.</p>
         </div>
       </div>
 
@@ -382,8 +391,14 @@ export default function ReclamoForm({
 
       {/* ── Evidencia fotográfica (opcional) — se adjuntan ANTES de guardar ── */}
       <div className="mb-10">
-        <div className="text-sm font-semibold text-gray-900 mb-1">Evidencia fotográfica <span className="font-normal text-gray-400">(opcional)</span></div>
-        <p className="text-xs text-gray-400 mb-3">Adjunta las fotos ahora; se guardan junto con el reclamo en un solo paso.</p>
+        {/* Que las fotos viajen con el reclamo en un solo paso se aprende una
+            vez; el botón de abajo ya dice qué hacer. */}
+        <div className="flex items-center gap-1 mb-3">
+          <div className="text-sm font-semibold text-gray-900">Evidencia fotográfica <span className="font-normal text-gray-400">(opcional)</span></div>
+          <Ayuda titulo="Cuándo se guardan" className="-my-2">
+            <p>Adjunta las fotos ahora; se guardan junto con el reclamo en un solo paso.</p>
+          </Ayuda>
+        </div>
 
         {pendingFotos.length > 0 && (
           <div className="flex flex-wrap gap-4 mb-3">

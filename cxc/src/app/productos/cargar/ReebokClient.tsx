@@ -27,6 +27,7 @@ import {
 } from "@/lib/depurador/reebok";
 import { marcaKey, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
+import { Ayuda } from "@/components/shared/Ayuda";
 
 type NameMode = "formula" | "fijo";
 interface NameEdit { divisor: number; extra: number; redondeo: Redondeo; precioFijo: number | null; modo: NameMode; dirty: boolean }
@@ -385,11 +386,6 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
         <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
           Reebok · Active Shoes
         </h1>
-        {!embedded && (
-          <p className="mt-1 text-[13px] text-stone-500">
-            Sube el Excel del proveedor Reebok. Genera dos archivos: pedido para clientes y plantilla de Switch.
-          </p>
-        )}
       </div>
 
       {/* Drop zone propia (oculta en modo dispatcher: el padre tiene la dropzone) */}
@@ -508,10 +504,15 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
             </button>
             {excOpen && (
               <div className="border-t border-stone-200 p-3">
-                <p className="mb-2 text-[12px] text-stone-500">
-                  Vacío = hereda la fórmula de marca. <b className="text-red-700">Precio fijo</b> gana a todo.
-                  El precio del modelo aplica a Precio A, Precio B y a la plantilla Switch.
-                </p>
+                {/* Jerarquía de precios: se aprende una vez → ⓘ. */}
+                <div className="mb-2 -ml-2">
+                  <Ayuda titulo="Qué gana a qué" etiqueta="Qué gana a qué">
+                    <p>
+                      Vacío = hereda la fórmula de marca. <b>Precio fijo</b> gana a todo. El precio del
+                      modelo aplica a Precio A, Precio B y a la plantilla Switch.
+                    </p>
+                  </Ayuda>
+                </div>
                 <input
                   value={excFilter} onChange={(e) => setExcFilter(e.target.value)} placeholder="Buscar modelo…"
                   className="mb-2 w-full max-w-xs rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-[13px] focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/20"
@@ -699,11 +700,6 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
         </>
       )}
 
-      {!items && !error && !embedded && (
-        <div className="py-16 text-center text-stone-500">
-          <p>Aún no has cargado ningún archivo.</p>
-        </div>
-      )}
     </div>
   );
 }

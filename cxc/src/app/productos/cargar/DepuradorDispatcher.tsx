@@ -94,8 +94,10 @@ export default function DepuradorDispatcher({ onDownloaded }: DispatcherProps) {
               onChange={(e) => { if (e.target.files?.[0]) detect(e.target.files[0]); }}
             />
           </label>
+      {/* "Arrastra el Excel" ya lo dice la caja de arriba. Queda el dato que
+          no se ve en ningún lado: no hay que elegir la marca. */}
       <p className="text-center text-[12px] text-stone-500">
-        Arrastra el Excel del proveedor — se detecta la marca sola.
+        La marca se detecta sola.
       </p>
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>

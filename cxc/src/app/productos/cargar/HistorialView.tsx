@@ -45,11 +45,6 @@ export default function HistorialView({ refreshKey = 0 }: HistorialViewProps) {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-5 border-b-2 border-stone-900 pb-4">
-        <p className="text-sm text-stone-500">
-          Cada plantilla descargada queda registrada aquí, de la más reciente a la más antigua.
-        </p>
-      </div>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">

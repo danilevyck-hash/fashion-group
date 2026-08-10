@@ -12,6 +12,7 @@ import type {
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
 import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
+import { AyudaClienteVinculado } from "./AyudaClienteVinculado";
 
 export interface ProyectoFormValues {
   tienda: string;
@@ -80,9 +81,12 @@ export function ProyectoForm({
         </div>
 
         <div>
-          <label className="block text-sm text-gray-600 mb-1">
-            Cliente<span className="text-red-500 ml-0.5">*</span>
-          </label>
+          <div className="flex items-center gap-1 mb-1">
+            <label className="block text-sm text-gray-600">
+              Cliente<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <AyudaClienteVinculado />
+          </div>
           <ClienteTypeahead
             value={tienda}
             codigo={tiendaCodigo}
@@ -99,10 +103,6 @@ export function ProyectoForm({
                enfocar. min-h-[44px] porque el campo medía 39 de alto. */
             inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Elige del directorio para vincular; si no está, se guarda como texto
-            (sin vincular).
-          </p>
         </div>
 
         <div>
