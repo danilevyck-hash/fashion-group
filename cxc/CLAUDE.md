@@ -293,7 +293,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-64 entradas configuradas (53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+67 entradas configuradas (53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -348,6 +348,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/acs-resumen-diario | 01:00 (resumen diario ventas ACS a Telegram; 20:00 Panamá = 8pm, tras el sync de cierre de 00:15) |
 | /api/cron/grupo-resumen-mensual | 13:00 el día 3 de cada mes (`0 13 3 * *` — resumen mensual del grupo a Telegram; único cron NO diario, umbral propio en health-crons) |
 | /api/cron/switch-sync tipo=estadocuenta (3 pares B2B) | 16:00/16:05/16:10 y 21:10/21:15/21:20 (6 entradas — CXC intradía; ronda 1 con active_shoes,joystep PRIMERO para dar 60 min a reebok-catalogo 17:00) |
+| /api/cron/asistencia-vigia | 13:45, 15:00, 20:00, 22:15 (4 entradas, TODOS los días = 8:45 a.m. / 10:00 a.m. / 3:00 p.m. / 5:15 p.m. Panamá — el reloj de asistencia lleva +6h sin reportar; ver nota abajo) |
 
 > **`cheques-alert` — aviso el DÍA HÁBIL ANTERIOR, 14:15 UTC = 9:15 a.m. Panamá (27-jul-2026).** Pedido de Daniel, textual: *"QUIERO aviso de cuando se vence un cheque un dia antes, almenos q venca el lunes, avisame el viernes."* Corriendo un día hábil D, la ventana de `fecha_deposito` es **[D, N]** con N = el próximo día hábil después de D: jueves→viernes, **viernes→sábado+domingo+lunes**, sábado/domingo→**no se manda nada**. La regla vive en `src/lib/cheques-aviso-ventana.ts` (módulo PURO, sin base ni Telegram); el I/O en `cheques-alert.ts`.
 > - **Por qué la ventana llega hasta el próximo día hábil y no solo "mañana":** si el viernes solo mirara mañana, un cheque que vence el **sábado** no se avisaría nunca — sábado y domingo no hay aviso y el lunes ya venció. Antes el cron miraba hoy+mañana a secas y ese hueco existía. **HOY sigue incluido** (comportamiento previo, y a Daniel le sirve el recordatorio del día): un cheque del lunes se anuncia el viernes *"el lunes 3 ago"* y otra vez el lunes *"HOY"* — días distintos, no un duplicado.

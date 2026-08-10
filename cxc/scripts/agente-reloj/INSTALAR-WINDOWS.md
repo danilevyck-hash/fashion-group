@@ -124,20 +124,37 @@ sistema, pero **solo si el problema es de verdad**:
   un problema);
 - si falla **3 veces seguidas**, ahí sí llega el aviso, con qué pasó y qué
   hacer;
-- si la PC lleva **más de 6 horas apagada** un día de semana, a las 10 de la
-  mañana llega el aviso;
+- si la PC lleva **más de 6 horas sin reportar**, llega el aviso en la revisión
+  siguiente. Se revisa **todos los días** (también sábado y domingo) a las 8:45
+  y 10:00 de la mañana y a las 3:00 y 5:15 de la tarde. De noche no se revisa a
+  propósito: nadie va a ir a la oficina a las 3 a.m. a prender una PC;
 - y cuando se arregla, llega un *"ya volvieron a entrar"* para no dejar a nadie
   con la última noticia mala.
 
 ---
 
-## Traer marcaciones viejas (rellenar un hueco)
+## Si la PC estuvo apagada muchos días
 
-Si la PC estuvo apagada una semana, el agente solo mira los últimos 3 días y
-faltarían los otros cuatro. Para traerlos:
+**No hay que hacer nada.** El agente se da cuenta solo.
+
+Cada vuelta le pregunta a fashiongr hasta qué día tiene guardado. Si ve que le
+falta un pedazo —porque la PC estuvo apagada por vacaciones, o por un apagón
+largo— pide **15 días** de una sola vez en lugar de los 3 de siempre, rellena el
+hueco, y vuelve solo a los 3. En el log queda escrito cuando pasa.
+
+Ese barrido largo tarda unos minutos y se hace **como mucho una vez cada 6
+horas**, para no tener al reloj de la entrada contestando preguntas todo el día.
+
+> **¿Por qué no pedir siempre 15 días y listo?** Porque el reloj entrega las
+> marcaciones de 10 en 10: 3 días son ~25 preguntas, pero 15 días son ~125. Cada
+> 3 minutos, para siempre, eso es castigar al aparato sin necesidad.
+
+### Traer historia todavía más vieja (un mes, dos meses)
+
+Solo para casos raros, a mano:
 
 1. Abrir el archivo `.env`
-2. Cambiar `VENTANA_DIAS=3` por `VENTANA_DIAS=30`
+2. Cambiar `VENTANA_DIAS=3` por `VENTANA_DIAS=60`
 3. Guardar y esperar unos minutos (o reiniciar la PC)
 4. **Volver a dejarlo en 3**
 
@@ -159,8 +176,10 @@ Cuando vuelve, la PC arranca y el agente arranca con ella. Las marcaciones de
 mientras estuvo apagada las trae igual, porque el reloj las guardó.
 
 **¿Y si alguien apaga la PC a propósito?**
-Lo mismo. No se pierde nada, solo llegan tarde. Y a las 10 de la mañana del día
-siguiente llega el aviso a Telegram.
+Lo mismo. No se pierde nada, solo llegan tarde. Y en la revisión siguiente (ver
+arriba) llega el aviso a Telegram. Cuando la PC vuelve a prenderse llega un
+segundo mensaje diciendo que ya volvieron a entrar, así nadie va a la oficina a
+revisar algo que ya se arregló.
 
 **¿Consume mucho la PC?**
 No. Duerme casi todo el tiempo y cada 3 minutos hace una consulta que tarda

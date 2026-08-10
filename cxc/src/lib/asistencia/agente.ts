@@ -263,10 +263,20 @@ export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", a
  * el silencio no dispara ningún código. Por eso hace falta que alguien del lado
  * de Vercel mire el reloj de pared una vez al día.
  *
- * ⚠️ Corre solo de lunes a viernes por la mañana (ver `vercel.json`). Si
- * corriera de madrugada avisaría todas las noches que la PC de la oficina está
- * apagada — que es lo NORMAL. La pregunta útil es otra: "son las 10 de la
- * mañana de un martes, ¿por qué no han entrado las marcaciones de hoy?".
+ * ⚠️ SOLO CORRE DE DÍA, Y ESO LO DECIDE `vercel.json`, NO ESTE ARCHIVO. Cuatro
+ * pasadas entre las 8:45 a.m. y las 5:15 p.m. de Panamá (13:45, 15:00, 20:00 y
+ * 22:15 UTC — Panamá es UTC-5 todo el año). De madrugada no se revisa a
+ * propósito: nadie va a levantarse a las 3 a.m. a prender una PC, así que un
+ * aviso a esa hora solo enseña a silenciar el canal.
+ *
+ * ⚠️ TODOS LOS DÍAS, incluidos sábado y domingo. La oficina cierra, pero la PC
+ * no: el agente reporta cada 3 minutos aunque no haya nadie. Un domingo mudo
+ * es una PC apagada de verdad, y enterarse el domingo a las 9 de la mañana es
+ * mejor que enterarse el lunes con dos días de asistencia sin entrar.
+ *
+ * Que corra cuatro veces NO multiplica los avisos: `alertado_en` es el candado
+ * y deja pasar uno solo por episodio (ver `vigiaDebeAlertar`). Las otras tres
+ * pasadas solo achican la demora entre que la PC se apaga y Daniel se entera.
  */
 export const HORAS_PARA_VIGIA = 6;
 

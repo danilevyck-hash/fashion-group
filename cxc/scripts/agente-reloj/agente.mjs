@@ -127,7 +127,8 @@ async function main() {
 
   log(
     `Agente v${VERSION} arrancado. Reloj ${config.host} · dispositivo "${config.dispositivo}" · ` +
-      `ventana ${config.ventanaDias} día(s) · vuelta cada ${config.vueltaMin} min.`,
+      `ventana ${config.ventanaDias} día(s) (${config.ventanaRecuperacionDias} si falta algo) · ` +
+      `vuelta cada ${config.vueltaMin} min.`,
   );
 
   const unaVez = args.includes("--una-vez");
