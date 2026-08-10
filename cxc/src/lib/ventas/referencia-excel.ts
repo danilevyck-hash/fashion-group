@@ -25,6 +25,8 @@ export interface FilaMultiExcel {
 
 export function estadoTexto(stats: ReferenciaStats | null): string {
   if (!stats || stats.mesesActivos === 0) return "NUNCA VENDIDO";
+  // Va ANTES del agotado: son excluyentes, y el descontinuado no se recompra.
+  if (stats.descontinuado) return `DESCONTINUADO hace ${stats.mesesDesdeUltimaVenta} m`;
   if (stats.seAgoto) return `SE AGOTÓ hace ${stats.mesesDesdeUltimaVenta} m`;
   return "ACTIVO";
 }
@@ -51,7 +53,7 @@ export async function buildReferenciasSheet(
       { header: "Costo CIF", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "FOB est.", wch: 10, align: "right", fmt: MONEY_FMT },
       { header: "Margen s/FOB est.", wch: 17, align: "right", fmt: PCT_FMT },
-      { header: "Estado", wch: 20 },
+      { header: "Estado", wch: 24 },
     ],
     rows: filas.map((f) => {
       const fobEst = fobEstimado(f.costoCif ?? null);

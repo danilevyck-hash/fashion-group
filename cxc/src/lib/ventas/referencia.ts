@@ -10,6 +10,14 @@
 // de este repo es que la diferencia da EXACTO el doble de las NC (se pagó dos
 // veces); hay un test que la fija.
 //
+// 🩸 "SE AGOTÓ" TIENE TOPE DE ANTIGÜEDAD, y por eso existe DESCONTINUADO.
+// Sin tope, `NB2075902` —última venta may-2024, 27 MESES atrás— se anunciaba
+// como "Se agotó" y la pantalla recomendaba comprar ~138 unidades de algo
+// muerto hacía más de dos años. Que no venda hace 3 meses es un agotado que se
+// recompra; que no venda hace más de un año es otra cosa y NO se recompra sola.
+// Los dos estados son EXCLUYENTES por construcción y el descontinuado nunca
+// lleva `sugerencia6m`.
+//
 // 🔴 EMPRESAS: SOLO las 6 de Fashion Group. `confecciones_boston` y
 // `american_classic` (Multifashion/ACS) quedan FUERA por decisión explícita
 // de Daniel. La lista se DERIVA de `B2B_EMPRESA_KEYS` (fuente única, son
@@ -31,6 +39,10 @@ export const UMBRALES_AGOTADO = {
   RITMO_MINIMO: 3,
   /** Cuántos de los últimos meses ACTIVOS se promedian para medir el ritmo. */
   VENTANA_RITMO_MESES: 3,
+  /** TOPE de antigüedad del "se agotó". Pasados MÁS de estos meses sin vender
+   *  (>, no ≥) el artículo está DESCONTINUADO: estado propio y SIN sugerencia
+   *  de compra. Ver la nota 🩸 del encabezado. */
+  MESES_MAX_AGOTADO: 12,
   /** La sugerencia de compra proyecta el ritmo real a esta cantidad de meses. */
   MESES_SUGERENCIA: 6,
 } as const;
@@ -225,7 +237,11 @@ export interface ReferenciaStats {
   mesesDesdeUltimaVenta: number | null;
   /** Promedio de los últimos ≤3 meses ACTIVOS (el ritmo que traía). */
   ritmoUltimosActivos: number | null;
-  /** Última venta hace ≥3 meses Y venía vendiendo ≥3 u/mes. */
+  /** Última venta hace MÁS de MESES_MAX_AGOTADO meses. Estado propio: no se
+   *  recompra por ritmo, así que NUNCA lleva sugerencia. Excluyente con
+   *  `seAgoto` por construcción. */
+  descontinuado: boolean;
+  /** Última venta hace ≥3 meses (y ≤ el tope) Y venía vendiendo ≥3 u/mes. */
   seAgoto: boolean;
   /** ritmo real × 6 — "para 6 meses: ~N unidades". Solo si seAgoto. */
   sugerencia6m: number | null;
@@ -267,7 +283,13 @@ export function calcularStats(serie: MesSerie[], hoyMes: string): ReferenciaStat
     ? ultimosActivos.reduce((s, p) => s + p.unidades, 0) / ultimosActivos.length
     : null;
 
+  // El tope va PRIMERO y no mira el ritmo: pasado un año sin vender, lo que
+  // vendía antes ya no dice cuánto comprar hoy.
+  const descontinuado =
+    mesesDesdeUltimaVenta != null && mesesDesdeUltimaVenta > UMBRALES_AGOTADO.MESES_MAX_AGOTADO;
+
   const seAgoto =
+    !descontinuado &&
     mesesDesdeUltimaVenta != null &&
     ritmoUltimosActivos != null &&
     mesesDesdeUltimaVenta >= UMBRALES_AGOTADO.MESES_SIN_VENTA &&
@@ -289,6 +311,7 @@ export function calcularStats(serie: MesSerie[], hoyMes: string): ReferenciaStat
     ultimaVenta,
     mesesDesdeUltimaVenta,
     ritmoUltimosActivos,
+    descontinuado,
     seAgoto,
     sugerencia6m,
   };
