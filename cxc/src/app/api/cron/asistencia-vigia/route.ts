@@ -10,8 +10,18 @@
 // ── POR QUÉ SOLO DE DÍA, Y POR QUÉ AHORA TAMBIÉN SÁBADO Y DOMINGO ────────────
 // De día: un aviso a las 3 a.m. diciendo que hay que prender una PC no lo va a
 // atender nadie hasta la mañana, y una alerta que no se puede accionar en el
-// momento es lo que enseña a silenciar el canal. Cuatro pasadas entre las 8:45
-// a.m. y las 5:15 p.m. de Panamá (13:45, 15:00, 20:00 y 22:15 UTC).
+// momento es lo que enseña a silenciar el canal. Tres pasadas entre las 10:00
+// a.m. y las 5:15 p.m. de Panamá (15:00, 20:00 y 22:15 UTC).
+//
+// 🩸 Y por qué NINGUNA a primera hora (se quitó la de las 13:45 UTC = 8:45 a.m.
+// Panamá, 10-ago-2026). Daniel empezó a apagar la PC de la oficina a las 5/6 de
+// la tarde. Apagada desde las 6 p.m., a las 8:45 a.m. lleva ~14 horas de
+// silencio: el umbral de 6 h se cruza SIEMPRE y el vigía avisaba todos los días
+// de algo que no es una falla, sino el horario normal. Una alerta que suena
+// todos los días deja de leerse, y el día que la PC de verdad no vuelva a
+// prender el mensaje va a llegar igual de ignorado. La primera pasada que queda
+// es a las 10 a.m.: a esa hora la oficina ya abrió, y que nadie haya prendido la
+// PC sí merece que suene.
 //
 // 🩸 Todos los días, y ANTES eran solo lunes a viernes (`0 15 * * 1-5`). El
 // razonamiento viejo —"la PC apagada el fin de semana es lo normal"— confundía
@@ -24,7 +34,7 @@
 // acá: un cron que corre y decide no hacer nada gasta invocación y deja logs
 // que confunden.
 //
-// ⚠️ Correr 4 veces NO multiplica los avisos — `alertado_en` deja pasar UNO por
+// ⚠️ Correr 3 veces NO multiplica los avisos — `alertado_en` deja pasar UNO por
 // episodio (ver `vigiaDebeAlertar`). Lo único que se achica es la demora entre
 // que la PC se apaga y Daniel se entera.
 //

@@ -263,19 +263,25 @@ export function decidirAlerta(prev: ContadorAlerta, evento: "falla" | "exito", a
  * el silencio no dispara ningún código. Por eso hace falta que alguien del lado
  * de Vercel mire el reloj de pared una vez al día.
  *
- * ⚠️ SOLO CORRE DE DÍA, Y ESO LO DECIDE `vercel.json`, NO ESTE ARCHIVO. Cuatro
- * pasadas entre las 8:45 a.m. y las 5:15 p.m. de Panamá (13:45, 15:00, 20:00 y
- * 22:15 UTC — Panamá es UTC-5 todo el año). De madrugada no se revisa a
- * propósito: nadie va a levantarse a las 3 a.m. a prender una PC, así que un
- * aviso a esa hora solo enseña a silenciar el canal.
+ * ⚠️ SOLO CORRE DE DÍA, Y ESO LO DECIDE `vercel.json`, NO ESTE ARCHIVO. Tres
+ * pasadas entre las 10:00 a.m. y las 5:15 p.m. de Panamá (15:00, 20:00 y 22:15
+ * UTC — Panamá es UTC-5 todo el año). De madrugada no se revisa a propósito:
+ * nadie va a levantarse a las 3 a.m. a prender una PC, así que un aviso a esa
+ * hora solo enseña a silenciar el canal.
+ *
+ * 🩸 Y TAMPOCO a primera hora: la pasada de las 8:45 a.m. (13:45 UTC) se quitó
+ * el 10-ago-2026. Daniel apaga la PC de la oficina a las 5/6 p.m., así que a las
+ * 8:45 a.m. lleva ~14 h de silencio y estas 6 h se cruzan SIEMPRE — era una
+ * falsa alarma diaria. NO se tocó `HORAS_PARA_VIGIA`: el umbral está bien, lo
+ * que estaba mal era la hora a la que se preguntaba.
  *
  * ⚠️ TODOS LOS DÍAS, incluidos sábado y domingo. La oficina cierra, pero la PC
  * no: el agente reporta cada 3 minutos aunque no haya nadie. Un domingo mudo
  * es una PC apagada de verdad, y enterarse el domingo a las 9 de la mañana es
  * mejor que enterarse el lunes con dos días de asistencia sin entrar.
  *
- * Que corra cuatro veces NO multiplica los avisos: `alertado_en` es el candado
- * y deja pasar uno solo por episodio (ver `vigiaDebeAlertar`). Las otras tres
+ * Que corra tres veces NO multiplica los avisos: `alertado_en` es el candado
+ * y deja pasar uno solo por episodio (ver `vigiaDebeAlertar`). Las otras dos
  * pasadas solo achican la demora entre que la PC se apaga y Daniel se entera.
  */
 export const HORAS_PARA_VIGIA = 6;

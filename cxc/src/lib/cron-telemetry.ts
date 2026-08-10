@@ -47,9 +47,14 @@ export const CRON_STALE_HOURS_DEFAULT = 26;
 export const CRON_STALE_HOURS_POR_CRON: Record<string, number> = {
   "grupo-resumen-mensual": 33 * 24,
   "catalogos-fotos-resumen": 8 * 24,
-  // Cuatro pasadas TODOS los días (13:45, 15:00, 20:00 y 22:15 UTC): entre la
-  // última de una noche y la primera de la mañana siguiente pasan 15h30. El
-  // umbral de siempre (26h) le queda holgado y no hace falta override.
+  // Tres pasadas TODOS los días (15:00, 20:00 y 22:15 UTC): entre la última de
+  // una noche y la primera de la mañana siguiente pasan 16h45 (22:15 → 15:00 del
+  // día siguiente). El umbral de siempre (26h) le sigue quedando holgado —9h15
+  // de margen— y no hace falta override. Se quitó la pasada de las 13:45 UTC
+  // (8:45 a.m. Panamá) el 10-ago-2026: Daniel apaga la PC de la oficina a las
+  // 5/6 p.m., así que a las 8:45 a.m. lleva ~14h de silencio por diseño y el
+  // aviso sonaba TODOS los días sin decir nada. A las 10 a.m. (15:00 UTC), en
+  // cambio, que nadie la haya prendido sí es noticia.
   //
   // 🩸 Antes valía 80 porque corría solo de lunes a viernes y el lunes su
   // último éxito era del viernes. Al pasar a diario ese 80 dejó de proteger de
@@ -327,14 +332,13 @@ export const SEED_TOLERANT_CRONS = [
   // empresas del grupo salieron bien. Promover a CRONS_FAIL_CLOSED cuando lleve
   // días corriendo.
   "sync-articulo-info",
-  // Vigía del agente del reloj de asistencia (15:00 UTC = 10:00 a.m. Panamá,
-  // SOLO lunes a viernes). Desplegado el 6-ago-2026: seed-tolerante hasta que
-  // siembre su fila.
+  // Vigía del agente del reloj de asistencia (3 entradas TODOS los días: 15:00,
+  // 20:00 y 22:15 UTC = 10:00 a.m., 3:00 p.m. y 5:15 p.m. Panamá). Desplegado el
+  // 6-ago-2026: seed-tolerante hasta que siembre su fila.
   //
-  // ⚠️ NO promoverlo a CRONS_FAIL_CLOSED sin darle antes un umbral propio en
-  // CRON_STALE_HOURS_POR_CRON: corriendo solo de lunes a viernes, el lunes por
-  // la mañana su último éxito es del viernes —72 horas— y con el umbral de
-  // siempre se reportaría stale TODOS los lunes por diseño.
+  // Ya NO hace falta umbral propio: corriendo todos los días su hueco más largo
+  // es 16h45 y el default de 26h lo cubre (ver CRON_STALE_HOURS_POR_CRON). El
+  // umbral propio hacía falta cuando corría solo de lunes a viernes.
   "asistencia-vigia",
 ];
 
