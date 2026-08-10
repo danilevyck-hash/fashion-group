@@ -131,6 +131,10 @@ export default function GuiasPage() {
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
         <AppHeader module="Guías de Despacho" />
+        {/* 🔴 "Editar" (`onEdit`) lleva a LA PÁGINA DE LA GUÍA, donde se
+            corrige y se despacha. Antes iba directo a `/editar` (solo los
+            renglones) y el despacho se hacía desplegando el formulario dentro
+            de la fila: eran dos caminos para lo mismo y confundían. */}
         <GuiasList
           guias={s.guias}
           loading={s.loading}
@@ -145,26 +149,7 @@ export default function GuiasPage() {
           expandedGuia={s.expandedGuia}
           expandedLoading={s.expandedLoading}
           onToggleExpand={s.toggleExpand}
-          tipoDespacho={s.tipoDespacho}
-          setTipoDespacho={s.setTipoDespacho}
-          bPlaca={s.bPlaca}
-          setBPlaca={s.setBPlaca}
-          bReceptor={s.bReceptor}
-          setBReceptor={s.setBReceptor}
-          bCedula={s.bCedula}
-          setBCedula={s.setBCedula}
-          bChofer={s.bChofer}
-          setBChofer={s.setBChofer}
-          bNumeroGuiaTransp={s.bNumeroGuiaTransp}
-          setBNumeroGuiaTransp={s.setBNumeroGuiaTransp}
-          bSaving={s.bSaving}
-          onConfirmarDespacho={s.confirmarDespacho}
-          showToast={s.showToast}
-          pendingFirma1={s.pendingFirma1}
-          pendingFirma2={s.pendingFirma2}
-          onFirma1Change={s.setPendingFirma1}
-          onFirma2Change={s.setPendingFirma2}
-          onEdit={(id) => router.push(`/guias/${id}/editar`)}
+          onEdit={(id) => router.push(`/guias/${id}`)}
           onPrint={(id) => router.push(`/guias/${id}/imprimir`)}
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}

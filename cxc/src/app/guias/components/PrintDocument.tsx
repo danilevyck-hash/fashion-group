@@ -1,4 +1,5 @@
 import { fmtDate, fmtGuia } from "@/lib/format";
+import { numeroTranspDeLinea, numeroTranspUnico } from "@/lib/guias/falta-para-despachar";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import type { Guia } from "./types";
 
@@ -10,6 +11,12 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
   const guiaItems = g.guia_items || [];
   const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
   const isDirect = g.tipo_despacho === "directo";
+  // ⚠️ EL N° DEL TRANSPORTISTA ES POR LÍNEA. El encabezado solo lo anuncia
+  // cuando en toda la guía hay UNO SOLO — que es el caso de las guías viejas,
+  // donde el mismo número se repetía en todos los renglones. Con varios
+  // números distintos, un encabezado con uno de ellos sería una mentira
+  // impresa en un documento que alguien firma.
+  const transpUnico = numeroTranspUnico(guiaItems, g.numero_guia_transp);
 
   return (
     <>
@@ -80,11 +87,11 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
               {isDirect ? "Entrega directa" : "Transportista externo"}
             </span>
           </div>
-          {g.numero_guia_transp && (
+          {transpUnico && (
             <div className="flex gap-2">
               <span className="font-medium">N GUIA TRANSP.:</span>
               <span className="border-b border-gray-300 flex-1 text-center">
-                {g.numero_guia_transp}
+                {transpUnico}
               </span>
             </div>
           )}
@@ -121,7 +128,9 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.facturas}</td>
                 <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
-                <td className="border border-gray-300 px-2 py-1">{g.numero_guia_transp || "\u00A0"}</td>
+                <td className="border border-gray-300 px-2 py-1">
+                  {numeroTranspDeLinea(item.numero_guia_transp, g.numero_guia_transp) || "\u00A0"}
+                </td>
               </tr>
             ))}
             <tr className="font-bold bg-gray-50">

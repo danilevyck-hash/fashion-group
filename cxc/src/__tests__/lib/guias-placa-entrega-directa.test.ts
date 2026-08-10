@@ -25,6 +25,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
+import { faltaParaDespachar } from "@/lib/guias/falta-para-despachar";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 const sinComentarios = (s: string) =>
@@ -35,6 +36,15 @@ const sinComentarios = (s: string) =>
 
 const api = sinComentarios(leer("src/app/api/guias/[id]/route.ts"));
 const form = sinComentarios(leer("src/app/guias/components/DespachoForm.tsx"));
+
+// ⚠️ Desde el rediseño de ago-2026 el formulario ya no decide con `if`s propios:
+// el botón se APAGA y debajo dice qué falta, y esa lista la arma el módulo puro
+// `falta-para-despachar`. Lo que se congela acá sigue siendo lo mismo —quién
+// exige placa y quién no— pero se prueba sobre la función, que es donde vive.
+const base = {
+  placa: "", receptor: "Juan", cedula: "8-888-8888", chofer: "Pedro",
+  numerosTransp: ["TR-1"], tieneFirma1: true, tieneFirma2: true,
+} as const;
 
 describe("🔴 la placa ya no traba la entrega directa", () => {
   it("el servidor (PUT) condiciona la placa al tipo de despacho", () => {
@@ -52,13 +62,19 @@ describe("🔴 la placa ya no traba la entrega directa", () => {
     expect(api).toContain('select("estado, placa, tipo_despacho")');
   });
 
-  it("el formulario no bloquea el envío por falta de placa en directo", () => {
-    expect(form).toContain('tipoDespacho === "externo" && !bPlaca.trim()');
+  it("en entrega directa, sin placa NO falta nada — se puede despachar", () => {
+    expect(faltaParaDespachar({ ...base, tipoDespacho: "directo" })).toEqual([]);
   });
 
   it("ya NO existe la validación incondicional de placa", () => {
     // La forma vieja era `if (!bPlaca.trim()) return showToast(...)` suelta.
     expect(form).not.toMatch(/^\s*if \(!bPlaca\.trim\(\)\) return showToast/m);
+    // Y la nueva tampoco puede mirar la placa sin mirar el tipo.
+    const modulo = sinComentarios(leer("src/lib/guias/falta-para-despachar.ts"));
+    const i = modulo.indexOf('if (vacio(e.placa))');
+    expect(i).toBeGreaterThan(0);
+    expect(modulo.slice(0, i)).toContain('const externo = e.tipoDespacho === "externo"');
+    expect(modulo.slice(0, i)).toContain("if (externo) {");
   });
 });
 
@@ -67,8 +83,8 @@ describe("⚠️ en transportista externo NADA se aflojó", () => {
     expect(api).toContain('{ error: "Placa del vehículo requerida" }');
   });
 
-  it("y del lado del formulario", () => {
-    expect(form).toContain('showToast("Ingresa la placa del vehiculo")');
+  it("y del lado de la pantalla: sin placa el botón queda apagado y lo dice", () => {
+    expect(faltaParaDespachar({ ...base, tipoDespacho: "externo" })).toContain("placa");
   });
 
   it("el N° de guía del transportista sigue exigiéndose", () => {
@@ -87,7 +103,18 @@ describe("⚠️ el resto de requisitos de despacho no se tocó", () => {
     expect(api).toContain(fragmento);
   });
 
-  it("el formulario sigue pidiendo las dos firmas", () => {
-    expect(form).toContain("Se requiere la firma");
+  it("la pantalla sigue pidiendo las DOS firmas, en los dos modos", () => {
+    expect(faltaParaDespachar({ ...base, placa: "AB-1234", tipoDespacho: "externo", tieneFirma1: false }))
+      .toEqual(["la firma del transportista"]);
+    expect(faltaParaDespachar({ ...base, placa: "AB-1234", tipoDespacho: "externo", tieneFirma2: false }))
+      .toEqual(["la firma del entregador"]);
+    expect(faltaParaDespachar({ ...base, tipoDespacho: "directo", tieneFirma1: false }))
+      .toEqual(["la firma del chofer"]);
+    expect(faltaParaDespachar({ ...base, tipoDespacho: "directo", tieneFirma2: false }))
+      .toEqual(["la firma del cliente"]);
+    // Y el botón mira ESA lista, no el canvas: un ref no re-renderiza.
+    expect(form).toContain("faltaParaDespachar(");
+    expect(form).toContain("const puedeDespachar = faltantes.length === 0");
+    expect(form).toContain("disabled={!puedeDespachar || bSaving}");
   });
 });

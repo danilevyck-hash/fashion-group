@@ -1,0 +1,241 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// GUÍAS — UNA SOLA PUERTA PARA DESPACHAR, Y EL N° DEL TRANSPORTISTA POR LÍNEA.
+//
+// Lo que este archivo impide que vuelva:
+//
+//  1. **Dos caminos para lo mismo en la misma tarjeta.** Abrir una guía
+//     pendiente en la lista desplegaba el formulario de despacho ENTERO (placa,
+//     N° de guía, receptor, cédula, dos canvas de firma y "Confirmar despacho")
+//     y, arriba, un botón "Editar". Daniel lo vio en ESCRITORIO —no era un
+//     problema de pantalla chica— y fue textual: *"mira como me sale editar al
+//     hacer clic en por despachar y esta ya aparece el campo para editar,
+//     confunde, solo quiero una y en boton de editar para entrar a la guia y
+//     terminarla"*.
+//
+//  2. **Deslizar para despachar.** *"al hacer slide a la izquierda de una guia
+//     no despachada da la opcion de despachar, no quiero eso asi"*. Un gesto
+//     invisible que dispara el paso más caro del módulo.
+//
+//  3. **Un solo N° del transportista para toda la guía.** *"la info de guia de
+//     transp, debe de ser por linea, no por guia porque nos hacen varias guias
+//     el transportista por guia"*. La columna `guia_items.numero_guia_transp`
+//     ya existía; lo que se imprimía en TODOS los renglones era el de la
+//     cabecera, así que aunque las líneas tuvieran número propio, el papel
+//     mostraba el mismo en todas.
+//
+//  4. **El botón que se puede tocar y contesta con un toast por vez.** Ahora se
+//     apaga y debajo dice qué falta, todo junto y quieto.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import {
+  faltaParaDespachar,
+  textoFalta,
+  numeroGuiaDeCabecera,
+  numeroTranspDeLinea,
+  numeroTranspUnico,
+} from "@/lib/guias/falta-para-despachar";
+
+const leer = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+const LISTA = leer("src/app/guias/components/GuiasList.tsx");
+const PAGE_LISTA = leer("src/app/guias/page.tsx");
+const PAGE_GUIA = leer("src/app/guias/[id]/page.tsx");
+const FORM = leer("src/app/guias/components/DespachoForm.tsx");
+const ESTADO_LISTA = leer("src/app/guias/components/useGuiasState.ts");
+const RUTA = leer("src/app/api/guias/[id]/route.ts");
+const IMPRESO = leer("src/app/guias/components/PrintDocument.tsx");
+const PDF = leer("src/lib/guias/pdf-guia.ts");
+
+describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario", () => {
+  it("el swipe de 'Despachar' ya no existe", () => {
+    expect(LISTA).not.toContain("SwipeableRow");
+    expect(LISTA).not.toContain("despachoSwipeAction");
+    expect(LISTA).not.toContain('label: "Despachar"');
+  });
+
+  it("el formulario de despacho no se dibuja dentro de la fila", () => {
+    expect(LISTA).not.toContain("DespachoForm");
+    // Y tampoco por la puerta de atrás: ni un campo del despacho en la lista.
+    for (const campo of ["bPlaca", "bReceptor", "bCedula", "bChofer", "pendingFirma1"]) {
+      expect(LISTA, campo).not.toContain(campo);
+    }
+  });
+
+  it("el hook de la LISTA se quedó sin estado de despacho", () => {
+    // Dejarlo vivo en una pantalla que ya no despacha es la mitad del problema
+    // de vuelta: dos lugares con la misma verdad.
+    for (const campo of ["bPlaca", "confirmarDespacho", "pendingFirma1", "tipoDespacho"]) {
+      expect(ESTADO_LISTA, campo).not.toContain(campo);
+    }
+  });
+
+  it("queda UN botón para entrar a la guía, y dice 'Editar'", () => {
+    // Nada de "Despachar" + "Editar" uno al lado del otro: eso es exactamente
+    // lo que Daniel pidió sacar.
+    const acciones = LISTA.slice(
+      LISTA.indexOf("{/* Acciones rápidas (header de la card expandida) */}"),
+      LISTA.indexOf("{/* Items table */}")
+    );
+    expect(acciones).toContain("Editar");
+    expect(acciones).toContain("Imprimir");
+    expect(acciones).not.toContain(">Despachar<");
+    expect((acciones.match(/onEdit\(/g) ?? []).length).toBe(1);
+  });
+
+  it("'Editar' lleva a la PÁGINA de la guía, no directo a los renglones", () => {
+    expect(PAGE_LISTA).toContain("onEdit={(id) => router.push(`/guias/${id}`)}");
+  });
+});
+
+describe("🔴 la página de la guía es donde se termina", () => {
+  it("tiene el encabezado aprobado: ‹ Atrás y el número de la guía", () => {
+    expect(PAGE_GUIA).toContain("‹ Atrás");
+    expect(PAGE_GUIA).toContain("fmtGuia(g.numero)");
+    expect(PAGE_GUIA).toContain('router.push("/guias")');
+  });
+
+  it("desde ahí también se llega a cambiar los envíos — no se perdió el camino viejo", () => {
+    expect(PAGE_GUIA).toContain("/guias/${id}/editar");
+  });
+
+  it("los hooks van ANTES del primer return condicional (regla de React)", () => {
+    const iHook = PAGE_GUIA.indexOf("useDespachoGuia(");
+    const iReturn = PAGE_GUIA.indexOf("if (!authChecked");
+    expect(iHook).toBeGreaterThan(0);
+    expect(iHook).toBeLessThan(iReturn);
+  });
+
+  it("una guía ya despachada se muestra de solo lectura, sin formulario", () => {
+    const i = PAGE_GUIA.indexOf("{s.despachada ? (");
+    const j = PAGE_GUIA.indexOf(") : puedeDespachar ? (");
+    expect(i).toBeGreaterThan(0);
+    expect(j).toBeGreaterThan(i);
+    expect(PAGE_GUIA.slice(i, j)).not.toContain("<DespachoForm");
+  });
+
+  it("vendedor entra pero no despacha", () => {
+    expect(PAGE_GUIA).toContain('const DESPACHO_ROLES = ["admin", "secretaria", "bodega"]');
+    expect(PAGE_GUIA).toContain("DESPACHO_ROLES.includes(role");
+  });
+});
+
+describe("🔴 el N° del transportista es POR LÍNEA", () => {
+  it("el formulario pide uno por cada envío, no uno para toda la guía", () => {
+    expect(FORM).toContain("items.map((item, idx)");
+    expect(FORM).toContain("setNumeroTransp(idx, e.target.value)");
+    // El campo único de guía ya no existe en el formulario.
+    expect(FORM).not.toContain("bNumeroGuiaTransp");
+  });
+
+  it("se guarda con su propio campo, NUNCA mandando `items` (que reemplaza todo)", () => {
+    // `items` en el PUT borra e inserta los renglones: usarlo acá le cambiaría
+    // el id a cada línea en pleno despacho y tiraría los clientes atados.
+    const hook = leer("src/app/guias/components/useDespachoGuia.ts");
+    expect(hook).toContain("items_guia_transp");
+    expect(hook).not.toMatch(/payload\.items\s*=/);
+    expect(hook).not.toMatch(/\bitems:\s/);
+  });
+
+  it("el servidor escribe UNA columna y solo de líneas de ESTA guía", () => {
+    const i = RUTA.indexOf("if (Array.isArray(items_guia_transp))");
+    expect(i).toBeGreaterThan(0);
+    const bloque = RUTA.slice(i, i + 1400);
+    expect(bloque).toContain('.update({ numero_guia_transp: numero })');
+    expect(bloque).toContain('.eq("guia_id", id)');
+    expect(bloque).toContain("UUID_RE.test(itemId)");
+    // Nada más de la línea se toca.
+    expect(bloque).not.toContain("cliente");
+    expect(bloque).not.toContain("bultos");
+  });
+
+  it("el papel imprime el de CADA línea, no el de la cabecera repetido", () => {
+    expect(IMPRESO).toContain("numeroTranspDeLinea(item.numero_guia_transp, g.numero_guia_transp)");
+    expect(PDF).toContain("numeroTranspDeLinea(it.numero_guia_transp, g.numero_guia_transp)");
+  });
+
+  it("el encabezado del papel solo anuncia un número cuando hay UNO solo", () => {
+    // Con varios distintos, poner uno arriba sería una mentira impresa en un
+    // documento que alguien firma.
+    expect(IMPRESO).toContain("numeroTranspUnico(guiaItems, g.numero_guia_transp)");
+    expect(PDF).toContain("numeroTranspUnico(items, g.numero_guia_transp)");
+    expect(IMPRESO).not.toContain("{g.numero_guia_transp && (");
+  });
+
+  it("una guía VIEJA sale igual que siempre: la línea hereda el de la cabecera", () => {
+    // Las guías despachadas antes de este cambio no tienen número por línea.
+    expect(numeroTranspDeLinea("", "TR-900")).toBe("TR-900");
+    expect(numeroTranspDeLinea(null, "TR-900")).toBe("TR-900");
+    expect(numeroTranspDeLinea("TR-901", "TR-900")).toBe("TR-901");
+    expect(numeroTranspUnico([{ numero_guia_transp: "" }, { numero_guia_transp: "" }], "TR-900")).toBe("TR-900");
+  });
+
+  it("con dos números distintos, el encabezado se calla", () => {
+    expect(numeroTranspUnico(
+      [{ numero_guia_transp: "TR-4471" }, { numero_guia_transp: "TR-4472" }],
+      "TR-4471"
+    )).toBe("");
+  });
+
+  it("la columna de la GUÍA no se retira: se llena con el primer número que haya", () => {
+    // La usan el buscador de la lista, el Excel y el encabezado del papel.
+    expect(numeroGuiaDeCabecera(["", "TR-4472", "TR-4473"])).toBe("TR-4472");
+    expect(numeroGuiaDeCabecera(["  ", ""])).toBe("");
+  });
+});
+
+describe("🔴 el botón se apaga y DICE qué falta", () => {
+  const lleno = {
+    tipoDespacho: "externo" as const,
+    placa: "AB-1234", receptor: "Juan", cedula: "8-8-8", chofer: "",
+    numerosTransp: ["TR-1", ""], tieneFirma1: true, tieneFirma2: true,
+  };
+
+  it("todo lleno → no falta nada", () => {
+    expect(faltaParaDespachar(lleno)).toEqual([]);
+  });
+
+  it("el caso del mockup: 'Falta: placa, recibido por y cédula'", () => {
+    const falta = faltaParaDespachar({ ...lleno, placa: "", receptor: "", cedula: "" });
+    expect(falta).toEqual(["placa", "recibido por", "cédula"]);
+    expect(textoFalta(falta)).toBe("Falta: placa, recibido por y cédula");
+  });
+
+  it("con uno solo no dice 'y'", () => {
+    expect(textoFalta(["placa"])).toBe("Falta: placa");
+    expect(textoFalta([])).toBe("");
+  });
+
+  it("una línea sin número NO traba el despacho — sí lo hace que no haya ninguna", () => {
+    // En el mockup aprobado, "Grupo Hanna" va sin número y el botón no lo pide.
+    expect(faltaParaDespachar(lleno)).toEqual([]);
+    expect(faltaParaDespachar({ ...lleno, numerosTransp: ["", ""] }))
+      .toEqual(["N° de guía del transportista"]);
+  });
+
+  it("en entrega directa se pide chofer y NO se piden placa ni N° de transportista", () => {
+    const directo = { ...lleno, tipoDespacho: "directo" as const, placa: "", chofer: "", numerosTransp: [""] };
+    expect(faltaParaDespachar(directo)).toEqual(["chofer"]);
+    expect(faltaParaDespachar({ ...directo, chofer: "Pedro" })).toEqual([]);
+  });
+
+  it("los espacios en blanco no cuentan como lleno", () => {
+    expect(faltaParaDespachar({ ...lleno, placa: "   " })).toContain("placa");
+    expect(faltaParaDespachar({ ...lleno, numerosTransp: ["  "] }))
+      .toContain("N° de guía del transportista");
+  });
+
+  it("el texto de lo que falta va en español simple, sin jerga ni nombres de columna", () => {
+    const todo = faltaParaDespachar({
+      tipoDespacho: "externo", placa: "", receptor: "", cedula: "", chofer: "",
+      numerosTransp: [""], tieneFirma1: false, tieneFirma2: false,
+    });
+    for (const t of todo) {
+      expect(t, t).not.toMatch(/_/); // nada de `receptor_nombre` ni `firma_base64`
+      expect(t, t).not.toMatch(/[A-Z]{2,}/); // ni siglas ni constantes
+    }
+    expect(todo).toContain("recibido por");
+    expect(todo).toContain("cédula");
+  });
+});
