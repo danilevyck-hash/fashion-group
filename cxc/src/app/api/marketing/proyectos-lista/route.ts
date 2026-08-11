@@ -3,6 +3,10 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import { esMultifashion } from "@/lib/marketing/multifashion";
+import {
+  marcasDeEntrega,
+  porcionEntregaParaMarca,
+} from "@/lib/marketing/resumen-inicio";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -289,20 +293,28 @@ export async function GET(req: NextRequest) {
       entregasCountByProy.set(pid, (entregasCountByProy.get(pid) ?? 0) + 1);
       // Bruto: el total completo de la entrega.
       grossByProy.set(pid, (grossByProy.get(pid) ?? 0) + Number(e.total ?? 0));
-      const tpm = e.total_por_marca ?? {};
-      const tpe = e.total_por_empresa_interna ?? {};
       const set = marcasByProy.get(pid) ?? new Set<string>();
+      // 🩸 La entrega TAMBIÉN mete al proyecto en el bucket de su marca.
+      // Antes solo lo hacían las facturas, y un proyecto sin facturas cuya
+      // ÚNICA marca venía de una entrega de muebles no aparecía en ninguna
+      // tarjeta ni en ninguna lista (el caso "Nova Lux" del 11-ago-2026).
+      // Misma regla que la tarjeta: lib/marketing/resumen-inicio.ts.
+      const nonLegacy = nonLegacyMarcasByProy.get(pid) ?? new Set<string>();
       const inner =
         cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
-      for (const [mid, monto] of Object.entries(tpm)) {
-        const n = Number(monto);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        const emp = marcaById.get(mid)?.empresa_codigo;
-        const interna = emp && tpe[emp] ? Number(tpe[emp]) : 0;
+      for (const mid of marcasDeEntrega(e)) {
+        const monto = porcionEntregaParaMarca(
+          e,
+          mid,
+          marcaById.get(mid)?.empresa_codigo,
+        );
+        if (monto <= 0) continue;
         set.add(mid);
-        inner.set(mid, (inner.get(mid) ?? 0) + n + interna);
+        nonLegacy.add(mid);
+        inner.set(mid, (inner.get(mid) ?? 0) + monto);
       }
       marcasByProy.set(pid, set);
+      nonLegacyMarcasByProy.set(pid, nonLegacy);
       cobrableFactByProyMarca.set(pid, inner);
     }
 

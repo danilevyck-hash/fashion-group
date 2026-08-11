@@ -174,6 +174,37 @@ export default function ProyectoOverlay({
     };
   }, [facturas, entregas]);
 
+  // Marcas REALES del proyecto. Un proyecto es del CLIENTE y su marca vive en
+  // los DOCUMENTOS: una factura por marca y una entrega de muebles por marca.
+  //
+  // 🩸 `mk_proyecto_marcas` NO sirve para esto: medido el 11-ago-2026, solo 3
+  // de 22 proyectos vivos tienen filas ahí (Nova Lux, ninguna). Mostrar esa
+  // tabla habría dejado el bloque vacío justo en el proyecto que originó el
+  // arreglo. Se usa la MISMA regla que las tarjetas del inicio — facturas ∪
+  // entregas — más lo que traiga mk_proyecto_marcas, por si algún día se usa.
+  const marcasDelProyecto = useMemo(() => {
+    const nombres = new Map<string, string>(
+      marcasCatalogo.map((m) => [String(m.id), m.nombre]),
+    );
+    const out = new Map<string, string>();
+    const anotar = (id: string, nombre?: string) => {
+      const key = String(id);
+      const n = nombres.get(key) ?? nombre;
+      if (n) out.set(key, n);
+    };
+    for (const pm of proyecto?.marcas ?? []) anotar(pm.marca.id, pm.marca.nombre);
+    for (const f of facturas) {
+      if (f.anulado_en) continue;
+      for (const fm of f.marcas ?? []) anotar(fm.marca.id, fm.marca.nombre);
+    }
+    for (const e of entregas) {
+      for (const [mid, monto] of Object.entries(e.total_por_marca ?? {})) {
+        if (Number(monto) > 0) anotar(mid);
+      }
+    }
+    return [...out.entries()].map(([id, nombre]) => ({ id, nombre }));
+  }, [proyecto, facturas, entregas, marcasCatalogo]);
+
   if (loading || !proyecto) {
     return (
       <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
@@ -305,6 +336,34 @@ export default function ProyectoOverlay({
                 </div>
               </div>
             </div>
+
+            {/* Marcas del proyecto. Un proyecto es del CLIENTE y puede
+                trabajar varias marcas a la vez (medido 11-ago-2026: 14 de 16
+                proyectos con facturas tienen más de una). En el inicio eso
+                hace que aparezca en VARIAS tarjetas de marca — correcto, pero
+                se lee raro si la ficha no lo dice. Acá se dice. */}
+            {marcasDelProyecto.length > 0 && (
+              <div className="mt-3">
+                <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+                  Marcas
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {marcasDelProyecto.map((m) => (
+                    <span
+                      key={m.id}
+                      className="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700"
+                    >
+                      {m.nombre}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[12px] text-gray-500 mt-1.5">
+                  {marcasDelProyecto.length > 1
+                    ? `Este proyecto trabaja ${marcasDelProyecto.length} marcas, así que en el inicio aparece en la tarjeta de cada una. Es el mismo proyecto, no está duplicado.`
+                    : "En el inicio, este proyecto aparece en la tarjeta de esa marca."}
+                </p>
+              </div>
+            )}
 
             {proyecto.notas && (
               <div className="mt-3 pt-3 border-t border-gray-100">
