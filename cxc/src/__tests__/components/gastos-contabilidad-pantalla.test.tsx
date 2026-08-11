@@ -20,6 +20,7 @@ import DetalleEmpresa from "@/app/gastos-contabilidad/components/DetalleEmpresa"
 import type { EmpresaResumen } from "@/app/gastos-contabilidad/components/tipos";
 import { resumirMes, type Cobertura } from "@/lib/mayor/gastos";
 import { parsearMayorCsv } from "@/lib/mayor/parser";
+import { ALL_MODULES } from "@/lib/modules";
 import fs from "fs";
 import path from "path";
 
@@ -180,5 +181,45 @@ describe("los avisos se muestran", () => {
     });
     const { container } = render(<DetalleEmpresa empresa={e} />);
     expect(container.textContent).toMatch(/Boston paga el alquiler completo/i);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dos módulos de gastos conviven en el grupo "Operación" y hacen cosas
+// DISTINTAS: `gastos-empresa` es la carga a mano por categorías, y
+// `gastos-contabilidad` es lo que sale del mayor de Switch.
+//
+// 🩸 La primera versión de este PR los dejó como "Gastos de Empresa" y "Gastos
+// por Empresa": UNA PREPOSICIÓN de diferencia, uno debajo del otro en el menú.
+// Para alguien no técnico eso no son dos módulos, es un typo. Este candado
+// existe para que el parecido no vuelva por descuido.
+describe("los dos módulos de gastos no se confunden en el menú", () => {
+  it("sus nombres se distinguen por algo más que una palabra", () => {
+    const manual = ALL_MODULES.find((m) => m.key === "gastos-empresa")!;
+    const mayor = ALL_MODULES.find((m) => m.key === "gastos-contabilidad")!;
+    expect(manual).toBeTruthy();
+    expect(mayor).toBeTruthy();
+
+    // El módulo viejo NO se renombró: cambiar un label que la gente ya conoce
+    // se pregunta antes, no se hace de paso.
+    expect(manual.label).toBe("Gastos de Empresa");
+
+    const palabras = (s: string) =>
+      new Set(s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/));
+    const a = palabras(manual.label);
+    const b = palabras(mayor.label);
+    const distintas = [...b].filter((w) => !a.has(w));
+    expect(
+      distintas.length,
+      `"${manual.label}" vs "${mayor.label}" se parecen demasiado`,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("los dos siguen viviendo en Operación y no se pisan la ruta", () => {
+    const manual = ALL_MODULES.find((m) => m.key === "gastos-empresa")!;
+    const mayor = ALL_MODULES.find((m) => m.key === "gastos-contabilidad")!;
+    expect(manual.group).toBe("operacion");
+    expect(mayor.group).toBe("operacion");
+    expect(mayor.href).not.toBe(manual.href);
   });
 });
