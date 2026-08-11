@@ -233,7 +233,13 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
   // extra y las ausencias que necesita para llenarla salen de ese módulo.
   // Cambio DELIBERADO — este candado hizo lo suyo y frenó el build hasta acá.
-  contabilidad: ["proveedores", "gastos-empresa", "prestamos", "asistencia"],
+  // `saldos-banco` se suma el 11-ago-2026: los saldos de banco salieron de
+  // "Gastos de Empresa" a su propio módulo (el de gastos se retira cuando el
+  // nuevo, automático, esté publicado). Contabilidad es quien los carga — las
+  // 52 filas de `bancos_saldos` están firmadas "Contabilidad" — así que el
+  // módulo tiene que seguir siendo suyo. Cambio DELIBERADO: este candado hizo
+  // lo suyo y frenó el build hasta acá.
+  contabilidad: ["proveedores", "gastos-empresa", "saldos-banco", "prestamos", "asistencia"],
   vendedor: ["cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };
@@ -252,7 +258,7 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
 
   it("a la secretaria NO se le abrió ningún módulo nuevo", () => {
     const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
-      "gastos-empresa", "prestamos", "usuarios", "data-health"];
+      "gastos-empresa", "saldos-banco", "prestamos", "usuarios", "data-health"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {
       expect(suyos, `secretaria no debe tener ${m}`).not.toContain(m);
