@@ -30,6 +30,7 @@ import { UtilidadView } from "@/components/ventas/UtilidadView";
 import { ComisionesConfigModal } from "@/components/ventas/ComisionesConfigModal";
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
+import { resumirArticulo } from "@/lib/ventas/compras";
 import type { ComprasApiResp, CompraMedida } from "@/lib/ventas/compras";
 import type { UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
@@ -116,6 +117,8 @@ const COMPRA_40HM265032: CompraMedida = {
   estado: "medida",
   meses: 16.39,
   fechaUmbral: "2025-04-10",
+  fechaCorte: "2025-04-10",
+  mesesTranscurridos: 32.62,
   mesesConVenta: ["2024-01", "2024-02", "2024-03", "2024-04", "2025-04"],
   precioVendido: 16,
   descuento: 0,
@@ -131,6 +134,9 @@ const REFERENCIA_RESP: ComprasApiResp = {
       descripcion: "KAHLO PASSCASE",
       compras: [COMPRA_40HM265032],
       comprasFueraDeVentana: 0,
+      // Derivado con la MISMA función que usa el servidor: un resumen escrito a
+      // mano acá podría contradecir al de producción sin que nadie se entere.
+      resumen: resumirArticulo([COMPRA_40HM265032], 0),
       cuadre: { comprado: 280, vendido: 279, existencia: 0, residuo: 1, ajusteConfiable: true },
       stockSinRespaldo: 0,
       vendidoAntes: 0,
@@ -167,11 +173,22 @@ async function buscarUnaReferencia() {
 }
 
 describe("Referencia · una fila por COMPRA, sin veredictos ni promedios", () => {
-  it("la compra real se ve: cuándo llegó, cuánto llegó y en cuánto se vendió", async () => {
+  it("la compra real se ve: cuándo llegó, cuánto llegó, CUÁNTO SE VENDIÓ y en cuánto tiempo", async () => {
     await buscarUnaReferencia();
     expect(screen.getAllByText("28 nov 2023").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/280 u/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("16 meses").length).toBeGreaterThan(0);
+    // 🩸 Las UNIDADES VENDIDAS y los meses van juntos en una sola celda. Antes
+    // acá decía solo "16 meses" y, en una tanda viva, "te quedan N" — que
+    // repetía la columna QUEDA y se comía el dato que Daniel vino a buscar.
+    expect(screen.getAllByText("279 u en 16 meses").length).toBeGreaterThan(0);
+  });
+
+  it("el resumen del artículo dice cuánto hay en bodega y cuánto tardó lo agotado", async () => {
+    await buscarUnaReferencia();
+    // Artículo agotado: el total dice 0 CLARO, no desaparece.
+    expect(screen.getAllByText(/En bodega/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0 u").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Ya se acabó 1 compra: 280 u en 16 meses").length).toBeGreaterThan(0);
   });
 
   it("🩸 los textos del diseño viejo NO están en pantalla — no se mudaron a un ⓘ, se fueron", async () => {

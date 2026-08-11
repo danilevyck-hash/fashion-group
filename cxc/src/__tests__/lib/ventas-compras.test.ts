@@ -33,6 +33,7 @@ import {
   type VentaDia,
 } from "@/lib/ventas/compras";
 import { signoTipo, diffMeses } from "@/lib/ventas/referencia";
+import { mesesDeCompra, textoAgotadas, textoSeVendio } from "@/lib/ventas/referencia-excel";
 
 const HOY = "2026-08-11";
 
@@ -270,7 +271,7 @@ describe("el 'se vendió en N meses' se mide en DÍAS", () => {
       { fecha: "2024-03-01", unidades: 90, venta: 900 },
       { fecha: "2024-12-31", unidades: 10, venta: 100 }, // la cola larga
     ];
-    const m = medirCompra(c, dias, 0, 0);
+    const m = medirCompra(c, dias, 0, 0, HOY);
     expect(m.fechaUmbral).toBe("2024-03-01");
     expect(m.meses).toBeCloseTo(diasEntre("2024-01-01", "2024-03-01") / DIAS_POR_MES, 10);
   });
@@ -793,7 +794,7 @@ describe("D1617001 — cuatro llegadas, cada una con SU duración", () => {
 
 describe("medirCompra — los cuatro estados", () => {
   it("'sin-ventas': llegó y no vendió nada, sin stock que la sostenga", () => {
-    const m = medirCompra(compra("2024-01-01", 100), [], 0, 100);
+    const m = medirCompra(compra("2024-01-01", 100), [], 0, 100, HOY);
     expect(m.estado).toBe("sin-ventas");
     expect(m.meses).toBeNull();
     expect(m.fechaUmbral).toBeNull();
@@ -802,7 +803,7 @@ describe("medirCompra — los cuatro estados", () => {
   });
 
   it("'viva': todavía queda mercancía de esta llegada", () => {
-    const m = medirCompra(compra("2024-01-01", 100), [{ fecha: "2024-02-01", unidades: 10, venta: 100 }], 90, 0);
+    const m = medirCompra(compra("2024-01-01", 100), [{ fecha: "2024-02-01", unidades: 10, venta: 100 }], 90, 0, HOY);
     expect(m.estado).toBe("viva");
     expect(m.meses).toBeNull();
   });
@@ -816,6 +817,7 @@ describe("medirCompra — los cuatro estados", () => {
       ],
       0,
       50,
+      HOY,
     );
     expect(m.estado).toBe("cerrada-sin-90");
     expect(m.fechaUmbral).toBeNull();
@@ -824,14 +826,14 @@ describe("medirCompra — los cuatro estados", () => {
 
   it("el descuento sale de lo que se vendió CONTRA la lista de la compra", () => {
     const c = compra("2024-01-01", 100, { costos: { cif: 5, fob: 4, fobOrigen: "real", lista: 20 } });
-    const m = medirCompra(c, [{ fecha: "2024-02-01", unidades: 90, venta: 90 * 15 }], 10, 0);
+    const m = medirCompra(c, [{ fecha: "2024-02-01", unidades: 90, venta: 90 * 15 }], 10, 0, HOY);
     expect(m.precioVendido).toBeCloseTo(15, 6);
     expect(m.descuento).toBeCloseTo(0.25, 6); // (20 − 15) ÷ 20
   });
 
   it("sin precio de lista no hay descuento — no se inventa uno", () => {
     const c = compra("2024-01-01", 100, { costos: { cif: 5, fob: 4, fobOrigen: "real", lista: null } });
-    const m = medirCompra(c, [{ fecha: "2024-02-01", unidades: 90, venta: 900 }], 0, 10);
+    const m = medirCompra(c, [{ fecha: "2024-02-01", unidades: 90, venta: 900 }], 0, 10, HOY);
     expect(m.precioVendido).toBeCloseTo(10, 6);
     expect(m.descuento).toBeNull();
   });
@@ -845,6 +847,7 @@ describe("medirCompra — los cuatro estados", () => {
       ],
       10,
       0,
+      HOY,
     );
     expect(m.mesesConVenta).toEqual(["2024-02"]);
   });
@@ -880,5 +883,391 @@ describe("ventana de 3 años — el recorte es de PANTALLA, no del reparto", () 
     expect(a.compras[0].vendidas).toBe(90);
     expect(a.vendidoAntes).toBe(0);
     expect(a.vendidoDeMas).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL RESUMEN DEL ARTÍCULO — "cuánto tengo" y "en cuántos meses se vendió".
+//
+// 🩸 EL CASO QUE MANDA ES `NB2570001` (Vistana), medido contra producción:
+// existencia 345, y DOS compras agotadas de 240 que llegaron con OCHO DÍAS de
+// diferencia (1 y 9 de abril de 2025) y tardaron 7,20 y 15,21 meses. El 15,21
+// no es "lo que tarda un lote de 240": es lo que tardó ESE lote esperando en
+// bodega a que se acabara el de adelante. Por eso acá NO hay promedio (daría
+// 11, que no es ninguno de los dos) ni rango (haría creer que 240 unidades
+// pueden tardar 15 meses solas).
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+describe("resumen del artículo", () => {
+  /**
+   * `NB2570001` reconstruido con los números medidos contra producción:
+   * 2 tandas de 240 encoladas (1 y 9 de abril), 3 vivas, existencia 345.
+   * Las NC van en POSITIVO, como llegan de Switch.
+   *
+   * El reparto FIFO que producen estas ventas es el REAL:
+   *   · 6-nov-2025: 216 u → toda a la tanda A, que cruza su 90% ese día (7,20 m)
+   *   · 16-jul-2026: 264 FA − 24 NC = 240 netas → 24 completan A y 216 cruzan
+   *     el 90% de B, quince meses después de llegar (15,21 m)
+   */
+  const NB = {
+    empresa: "vistana",
+    codigo: "NB2570001",
+    descripcion: "Men-Boxer Brief",
+    ingresos: [
+      ingreso({ codigo_articulo: "NB2570001", fecha: "2025-04-01", n_interno: "A", cantidad: 240 }),
+      ingreso({ codigo_articulo: "NB2570001", fecha: "2025-04-09", n_interno: "B", cantidad: 240 }),
+      ingreso({ codigo_articulo: "NB2570001", fecha: "2025-10-21", n_interno: "C", cantidad: 60 }),
+      ingreso({ codigo_articulo: "NB2570001", fecha: "2026-02-11", n_interno: "D", cantidad: 120 }),
+      ingreso({ codigo_articulo: "NB2570001", fecha: "2026-02-19", n_interno: "E", cantidad: 180 }),
+    ],
+    ventas: [
+      v("2025-11-06", "FA", 216, 2160),
+      v("2026-07-16", "FA", 264, 2640),
+      v("2026-07-16", "NC", 24, 240),
+    ],
+    existencia: 345,
+    precioEtiqueta: 10,
+    catalogoSyncedAt: null,
+  };
+
+  it("da el total de bodega del artículo entero, no fila por fila", () => {
+    const a = armarArticulo(NB, HOY);
+    // 180 + 120 + 45 = 345, que es lo que Daniel tenía que sumar de cabeza.
+    expect(a.resumen.enBodega).toBe(345);
+    expect(a.resumen.bodegaDeSwitch).toBe(true);
+    expect(a.compras.reduce((s, c) => s + c.quedan, 0)).toBe(345);
+  });
+
+  it("las dos tandas encoladas dan 7 y 15 meses — el reparto FIFO es el real", () => {
+    const a = armarArticulo(NB, HOY);
+    const agotadas = a.compras.filter((c) => c.fechaCorte != null);
+    expect(agotadas).toHaveLength(2);
+    expect(agotadas.map((c) => Math.round(c.meses!)).sort((x, y) => x - y)).toEqual([7, 15]);
+  });
+
+  it("mide las tandas encoladas como UN bloque, sin sumarlas dos veces", () => {
+    const r = armarArticulo(NB, HOY).resumen;
+    expect(r.comprasAgotadas).toBe(2);
+    expect(r.unidadesAgotadas).toBe(480);
+
+    // Unión 1-abr-2025 → 16-jul-2026 = 471 días = 15,47 meses.
+    expect(r.mesesAgotadas).toBeCloseTo(15.47, 1);
+
+    // 🔴 Las tres formas descartadas NO pueden colarse de vuelta:
+    // sumar las duraciones daría 22,4 (contaría dos veces el tramo compartido)…
+    expect(r.mesesAgotadas!).toBeLessThan(22);
+    // …y el promedio simple daría 11, que no describe ninguna de las dos tandas.
+    expect(Math.round(r.mesesAgotadas!)).toBe(15);
+    // Y jamás se divide para sacar un ritmo: las unidades viajan al lado.
+    expect(textoAgotadas(r)).toBe("Ya se acabaron 2 compras: 480 u en 15 meses");
+  });
+
+  it("las NC restan: sumarlas cambiaría los meses medidos", () => {
+    // Una tanda sola de 100: el 90% son 90 unidades.
+    const base = {
+      empresa: "vistana",
+      codigo: "NCTEST",
+      descripcion: "X",
+      ingresos: [ingreso({ codigo_articulo: "NCTEST", fecha: "2025-01-01", cantidad: 100 })],
+      existencia: 10,
+      precioEtiqueta: null,
+      catalogoSyncedAt: null,
+    };
+    // 90 FA − 10 NC = 80 netas en abril (NO llega al 90%), y recién en
+    // septiembre cruza el umbral → 8 meses.
+    const bien = armarArticulo(
+      { ...base, ventas: [v("2025-04-01", "FA", 90, 900), v("2025-04-01", "NC", 10, 100), v("2025-09-01", "FA", 10, 100)] },
+      HOY,
+    );
+    // Si la NC se SUMARA, abril daría 100 netas y el 90% caería ese mismo día.
+    const mal = armarArticulo(
+      { ...base, ventas: [v("2025-04-01", "FA", 90, 900), v("2025-04-01", "FA", 10, 100), v("2025-09-01", "FA", 10, 100)] },
+      HOY,
+    );
+    expect(Math.round(bien.resumen.mesesAgotadas!)).toBe(8);
+    expect(Math.round(mal.resumen.mesesAgotadas!)).toBe(3);
+  });
+
+  it("cuando las filas no explican todo el stock, manda el de Switch y se avisa", () => {
+    // Medido en `17FN443460`: Switch dice 36 y la única compra solo sostiene 24.
+    const a = armarArticulo(
+      {
+        empresa: "fashion_wear",
+        codigo: "17FN443460",
+        descripcion: "X",
+        ingresos: [ingreso({ codigo_articulo: "17FN443460", fecha: "2025-06-01", cantidad: 24 })],
+        ventas: [],
+        existencia: 36,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    expect(a.resumen.enBodega).toBe(36); // el de Switch, nunca el deducido
+    expect(a.resumen.bodegaFueraDeLasFilas).toBe(12); // y se dice, no se esconde
+  });
+
+  it("sin compras agotadas no inventa un número", () => {
+    const a = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "VIVO",
+        descripcion: "X",
+        ingresos: [ingreso({ codigo_articulo: "VIVO", fecha: "2026-06-01", cantidad: 50 })],
+        ventas: [v("2026-06-10", "FA", 5, 50)],
+        existencia: 45,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    expect(a.resumen.comprasAgotadas).toBe(0);
+    expect(a.resumen.mesesAgotadas).toBeNull(); // ni 0 ni un guion mudo
+    expect(a.resumen.unidadesAgotadas).toBe(0);
+    expect(a.resumen.enBodega).toBe(45);
+    expect(textoAgotadas(a.resumen)).toBe("Todavía no se ha acabado ninguna compra");
+  });
+
+  it("un artículo agotado dice 0, no desaparece", () => {
+    const a = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "SECO",
+        descripcion: "X",
+        ingresos: [ingreso({ codigo_articulo: "SECO", fecha: "2025-01-01", cantidad: 10 })],
+        ventas: [v("2025-03-15", "FA", 10, 100)],
+        existencia: 0,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    expect(a.resumen.enBodega).toBe(0);
+    expect(a.resumen.bodegaDeSwitch).toBe(true);
+    expect(a.resumen.comprasAgotadas).toBe(1);
+  });
+
+  it("sin existencia de Switch el número queda MARCADO como deducido", () => {
+    const a = armarArticulo(
+      {
+        empresa: "fashion_wear",
+        codigo: "SINCAT",
+        descripcion: "X",
+        ingresos: [ingreso({ codigo_articulo: "SINCAT", fecha: "2025-01-01", cantidad: 10 })],
+        ventas: [v("2025-02-01", "FA", 4, 40)],
+        existencia: null,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    expect(a.resumen.bodegaDeSwitch).toBe(false);
+    expect(a.resumen.enBodega).toBe(6);
+  });
+
+  // ── EL CANDADO DEL MES EN CURSO ───────────────────────────────────────────
+  // Daniel rechazó los promedios de 3/6/12 meses porque metían el mes en curso
+  // adentro: medido, los "últimos 3 meses" daban 18,3 u/mes contra 34,3 con
+  // meses completos, el DOBLE. El resumen sale SOLO de tandas ya terminadas,
+  // cuyas dos puntas son hechos PASADOS (el día que llegó y el día que se
+  // acabó), así que ni el calendario ni una venta de hoy pueden moverlo.
+  it("el resumen no depende de qué día es hoy", () => {
+    const alDia11 = armarArticulo(NB, "2026-08-11").resumen;
+    const alDia31 = armarArticulo(NB, "2026-08-31").resumen;
+    expect(alDia31.mesesAgotadas).toBe(alDia11.mesesAgotadas);
+    expect(alDia31.unidadesAgotadas).toBe(alDia11.unidadesAgotadas);
+    expect(alDia31.comprasAgotadas).toBe(alDia11.comprasAgotadas);
+  });
+
+  it("vender HOY sobre una tanda viva no mueve el resumen", () => {
+    const base = armarArticulo(NB, HOY).resumen;
+    // La venta de hoy sale de una tanda que sigue viva: no acaba nada.
+    const conVentaDeHoy = armarArticulo({ ...NB, ventas: [...NB.ventas, v(HOY, "FA", 10, 100)] }, HOY);
+    expect(conVentaDeHoy.resumen.mesesAgotadas).toBe(base.mesesAgotadas);
+    expect(conVentaDeHoy.resumen.unidadesAgotadas).toBe(base.unidadesAgotadas);
+    expect(conVentaDeHoy.resumen.comprasAgotadas).toBe(base.comprasAgotadas);
+  });
+
+  it("un hueco sin mercancía entre dos tandas no se cuenta como tiempo vendiendo", () => {
+    // Tanda 1: llega ene-2025, se acaba feb-2025. Hueco de casi un año SIN nada.
+    // Tanda 2: llega ene-2026, se acaba feb-2026. Son ~2 meses vendiendo, no 13.
+    const a = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "HUECO",
+        descripcion: "X",
+        ingresos: [
+          ingreso({ codigo_articulo: "HUECO", fecha: "2025-01-01", n_interno: "P", cantidad: 10 }),
+          ingreso({ codigo_articulo: "HUECO", fecha: "2026-01-01", n_interno: "Q", cantidad: 10 }),
+        ],
+        ventas: [v("2025-02-01", "FA", 10, 100), v("2026-02-01", "FA", 10, 100)],
+        existencia: 0,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    expect(a.resumen.comprasAgotadas).toBe(2);
+    // ~1 mes + ~1 mes = ~2, NO los 13 meses de punta a punta.
+    expect(a.resumen.mesesAgotadas!).toBeLessThan(3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// "SE VENDIÓ" — unidades + tiempo, y el inventario UNA sola vez.
+//
+// 🩸 Daniel, mirando la pantalla publicada: *"me sale dos veces mi inv, esta
+// bien? que opinas? y no me esta diciendo cuanto vendi y cuantos meses"*. La
+// celda decía "te quedan 126" al lado de la columna QUEDA que ya decía 126.
+//
+// El caso medido es `QD3958033` (Vistana): llegó el 26-dic-2025 con 180 u, van
+// 54 vendidas (netas) y quedan 126 en Switch. 180 − 54 = 126: CUADRA EXACTO.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("la columna SE VENDIÓ", () => {
+  const QD = {
+    empresa: "vistana",
+    codigo: "QD3958033",
+    descripcion: "Women-Panties",
+    ingresos: [ingreso({ codigo_articulo: "QD3958033", fecha: "2025-12-26", cantidad: 180, precio: 7 })],
+    ventas: [
+      v("2026-01-29", "FA", 12, 84),
+      v("2026-02-12", "FA", 12, 84),
+      v("2026-03-05", "FA", 6, 30),
+      v("2026-04-10", "FA", 24, 168),
+      v("2026-04-10", "NC", 12, 84), // devolución: llega POSITIVA y RESTA
+      v("2026-05-18", "FA", 12, 84),
+    ],
+    existencia: 126,
+    precioEtiqueta: 7,
+    catalogoSyncedAt: null,
+  };
+
+  it("dice las UNIDADES vendidas, no repite el inventario", () => {
+    const c = armarArticulo(QD, HOY).compras[0];
+    expect(c.estado).toBe("viva");
+    expect(c.vendidas).toBe(54);
+    expect(c.quedan).toBe(126);
+    // 🔴 El texto NO puede volver a decir lo que ya dice la columna QUEDA.
+    const texto = textoSeVendio(c);
+    expect(texto).toBe("54 u en 7 meses");
+    expect(texto).not.toContain("te quedan");
+    expect(texto).not.toContain("126");
+  });
+
+  it("la cuenta CUADRA: lo comprado menos lo vendido es lo que dice Switch", () => {
+    const a = armarArticulo(QD, HOY);
+    // 180 − 54 = 126, el mismo número que reporta Switch. No hay ajuste que
+    // mostrar, y no se inventa uno: el residuo es CERO.
+    expect(a.cuadre.comprado).toBe(180);
+    expect(a.cuadre.vendido).toBe(54);
+    expect(a.cuadre.residuo).toBe(0);
+    expect(a.resumen.bodegaFueraDeLasFilas).toBe(0);
+  });
+
+  it("el precio real sale de las ventas NETAS", () => {
+    const c = armarArticulo(QD, HOY).compras[0];
+    // $366.00 ÷ 54 = $6.78. Sumar las NC daría $450 ÷ 66 = $6.82.
+    expect(c.precioVendido).toBeCloseTo(6.78, 2);
+  });
+
+  it("una tanda viva cuenta el tiempo que lleva en la casa; una acabada, lo que tardó", () => {
+    const viva = armarArticulo(QD, HOY).compras[0];
+    expect(viva.estado).toBe("viva");
+    // 26-dic-2025 → 11-ago-2026 = 228 días ≈ 7,5 meses.
+    expect(viva.mesesTranscurridos).toBeCloseTo(7.49, 1);
+    expect(mesesDeCompra(viva)).toBe(viva.mesesTranscurridos);
+
+    // La misma compra ya acabada mide hasta el 90%, no hasta hoy.
+    const acabada = armarArticulo({ ...QD, ventas: [...QD.ventas, v("2026-06-01", "FA", 108, 756)], existencia: 18 }, HOY)
+      .compras[0];
+    expect(acabada.estado).toBe("medida");
+    expect(mesesDeCompra(acabada)).toBe(acabada.meses);
+    expect(acabada.meses!).toBeLessThan(acabada.mesesTranscurridos);
+  });
+
+  it("sin ninguna venta lo dice con todas las letras, no con un cero pelado", () => {
+    const c = armarArticulo({ ...QD, ventas: [], existencia: 180 }, HOY).compras[0];
+    // Llegó hace 7 meses y no vendió NADA: el tiempo es justo lo que hay que ver.
+    expect(textoSeVendio(c)).toBe("nada en 7 meses");
+    expect(textoSeVendio(c)).not.toContain("0 u");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL EXCEL DICE LO MISMO QUE LA PANTALLA.
+//
+// Daniel baja este Excel para trabajarlo aparte. Si dijera otra cosa que la
+// pantalla tendríamos dos verdades, y él no dejaría de creerle al que está mal:
+// dejaría de creerles a los dos.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("el Excel de Referencia", () => {
+  const ART = () =>
+    armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "NB2570001",
+        descripcion: "Men-Boxer Brief",
+        ingresos: [
+          ingreso({ codigo_articulo: "NB2570001", fecha: "2025-04-01", n_interno: "A", cantidad: 240 }),
+          ingreso({ codigo_articulo: "NB2570001", fecha: "2026-02-19", n_interno: "E", cantidad: 180 }),
+        ],
+        ventas: [v("2025-11-06", "FA", 216, 2160)],
+        existencia: 204,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+
+  async function filasDelSheet() {
+    const XLSX = await import("xlsx-js-style");
+    const { buildComprasSheet } = await import("@/lib/ventas/referencia-excel");
+    const ws = await buildComprasSheet([ART()], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const encabezado = filas.find((f) => f.includes("Referencia")) as string[];
+    const cuerpo = filas.slice(filas.indexOf(encabezado) + 1);
+    const porNombre = (f: unknown[]) =>
+      Object.fromEntries(encabezado.map((h, i) => [h, f[i]])) as Record<string, unknown>;
+    return { encabezado, cuerpo: cuerpo.map(porNombre) };
+  }
+
+  it("baja el resumen del artículo, en columnas que se pueden ordenar", async () => {
+    const { encabezado, cuerpo } = await filasDelSheet();
+    for (const col of ["En bodega (artículo)", "Compras ya acabadas", "U. ya acabadas", "Meses vendiéndolas"]) {
+      expect(encabezado, `falta la columna "${col}"`).toContain(col);
+    }
+    const r = ART().resumen;
+    // El resumen es del ARTÍCULO: se repite igual en cada una de sus compras.
+    for (const fila of cuerpo) {
+      expect(fila["En bodega (artículo)"]).toBe(r.enBodega);
+      expect(fila["Compras ya acabadas"]).toBe(r.comprasAgotadas);
+      expect(fila["U. ya acabadas"]).toBe(r.unidadesAgotadas);
+    }
+  });
+
+  it("baja las unidades vendidas y los meses de CADA compra, como números", async () => {
+    const { encabezado, cuerpo } = await filasDelSheet();
+    expect(encabezado).toContain("U. vendidas");
+    expect(encabezado).toContain("Meses");
+    // La compra agotada: 240 u que tardaron 7,2 meses.
+    const agotada = cuerpo.find((f) => f["Llegó"] === "2025-04-01")!;
+    expect(agotada["U. vendidas"]).toBe(216);
+    expect(agotada["Meses"]).toBeCloseTo(7.2, 1);
+    // La viva: 0 vendidas, y los meses son los que lleva en la casa.
+    const viva = cuerpo.find((f) => f["Llegó"] === "2026-02-19")!;
+    expect(viva["U. vendidas"]).toBe(0);
+    expect(typeof viva["Meses"]).toBe("number");
+  });
+
+  it("la columna del precio NO se llama como si fuera una cantidad", async () => {
+    const { encabezado } = await filasDelSheet();
+    expect(encabezado).toContain("Salió a");
+    // "Vendido" a secas se leía como unidades — el defecto que cazó Daniel.
+    expect(encabezado).not.toContain("Vendido");
+    // Y el inventario aparece UNA sola vez por compra.
+    expect(encabezado.filter((h) => h === "Queda")).toHaveLength(1);
   });
 });

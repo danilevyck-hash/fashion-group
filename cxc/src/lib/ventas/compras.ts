@@ -435,6 +435,15 @@ export interface CompraMedida extends Compra {
   meses: number | null;
   /** El día exacto en que se cruzó el 90% — la prueba del número de arriba. */
   fechaUmbral: string | null;
+  /** El día en que esta llegada dejó de venderse: el del 90%, o el de su última
+   *  venta cuando se cerró por ajuste sin llegar al 90%. `null` = todavía no
+   *  terminó. Es la punta derecha de su ventana de venta. */
+  fechaCorte: string | null;
+  /** Meses que esta llegada lleva en la casa (desde que llegó hasta hoy). Es lo
+   *  que se muestra en una tanda VIVA: "54 u en 7 meses" = hace 7 meses que
+   *  llegó y van 54 vendidas. No es un promedio ni un ritmo — es el tiempo que
+   *  Daniel lleva con esa mercancía encima. */
+  mesesTranscurridos: number;
   /** Meses YYYY-MM en los que esta llegada vendió, ordenados. */
   mesesConVenta: string[];
   /** Venta neta asignada ÷ unidades vendidas — a cuánto salió DE VERDAD. */
@@ -455,6 +464,7 @@ export function medirCompra(
   diasAsignados: readonly { fecha: string; unidades: number; venta: number }[],
   quedan: number,
   noVendidoNiEnBodega: number,
+  hoy: string,
 ): CompraMedida {
   const vendidas = diasAsignados.reduce((s, d) => s + d.unidades, 0);
   const ventaTotal = diasAsignados.reduce((s, d) => s + d.venta, 0);
@@ -503,6 +513,8 @@ export function medirCompra(
     estado,
     meses,
     fechaUmbral,
+    fechaCorte,
+    mesesTranscurridos: diasEntre(compra.fecha, hoy) / DIAS_POR_MES,
     mesesConVenta,
     precioVendido,
     descuento,
@@ -556,6 +568,132 @@ export function repartirExistencia(
     quedan,
     noVendidoNiEnBodega: capacidad.map((c, i) => c - quedan[i]),
     sinRespaldo: pendiente,
+  };
+}
+
+// ─── Resumen del artículo ────────────────────────────────────────────────────
+//
+// Daniel: *"quiero que me diga en cuantos meses se vendio. y total que tengo en
+// inv. es info util que necesito ver no?"*. La tabla ya contesta las dos cosas
+// COMPRA POR COMPRA; lo que faltaba era el número del artículo entero, para no
+// tener que sumar 180 + 120 + 45 de cabeza.
+//
+// 🩸 EL PROMEDIO SIMPLE MIENTE, Y ACÁ ESTÁ MEDIDO POR QUÉ.
+// En `NB2570001` (Vistana) las dos compras agotadas tardaron 7,20 y 15,21 meses.
+// "Promedio: 11 meses" no describe NINGUNA de las dos. Y el 15,21 no significa
+// que 240 unidades tarden 15 meses: esa tanda llegó el 9-abr-2025, OCHO DÍAS
+// después de otra de 240, y se pasó medio año esperando en bodega a que se
+// acabara la de adelante (lo que entra primero se vende primero). Las mismas
+// 480 unidades, compradas de una sola vez, habrían dado UN número.
+//
+// Formas que se descartaron, cada una con la medición que la tumbó (300 códigos
+// reales muestreados, scripts/_diag-formas-resumen.ts):
+//   · PROMEDIO SIMPLE — no describe ningún lote. Descartado por pedido explícito.
+//   · RANGO ("se vende en 7 a 15 meses") — PROPAGA el artefacto de la cola: hace
+//     creer que un lote de 240 puede tardar 15 meses cuando solo, tardó 7. Y en
+//     el catálogo real los rangos salen inservibles de anchos: 0,6–19,3 en
+//     `FM0FM048210GQ`, 0,2–6,9 en `CKFHA12F100`, 0,0–3,0 en `AM0AM13836BDS`.
+//   · ÚLTIMA COMPRA AGOTADA — es una lotería: en `CKFHA12F100` la última es la
+//     MÁS RÁPIDA (0,2 meses) y en `FM0FM048210GQ` la MÁS LENTA (19,3). En
+//     `NB2570001` justo cae en la tanda encolada, o sea la peor representante.
+//   · RITMO (u/mes) — se dispara con ventanas cortas: `3629` (Vistana) da 14.899
+//     u/mes y `100230410` 196,7. Un número así no se puede mostrar.
+//
+// LO QUE QUEDÓ: las compras agotadas se miran como UN BLOQUE — cuántas unidades
+// fueron y cuánto duró vendiéndolas. La duración es la UNIÓN de las ventanas
+// [llegada → día en que se acabó] de cada tanda:
+//   · si dos tandas se solapan (el caso de la cola) la unión NO las suma dos
+//     veces — `NB2570001` da 15,5 meses, no 7,2 + 15,2 = 22,4;
+//   · si entre dos tandas hubo un hueco SIN mercancía, ese hueco no cuenta: no
+//     se puede vender lo que no está, y cargarlo haría parecer lento a un
+//     artículo que solo estuvo agotado.
+// El resultado se dice con las unidades AL LADO ("480 u en 15 meses"), nunca
+// dividido: la división es la que produce los 14.899 u/mes, y con las unidades
+// a la vista Daniel escala solo, sin que el módulo opine.
+//
+// 🔴 NADA DE ESTO PUEDE MOVERSE CON EL MES EN CURSO. Las dos puntas de cada
+// ventana son hechos PASADOS (el día que llegó y el día que se acabó), no "hoy",
+// y las tandas VIVAS no entran. Vender hoy no cambia el resumen. Hay un test.
+
+export interface ResumenArticulo {
+  /** Lo que hay en bodega del artículo completo, sumando TODAS sus compras —
+   *  también las de más de 3 años que la tabla no muestra. */
+  enBodega: number | null;
+  /** `true` = `enBodega` es la existencia de Switch, la fuente de verdad del
+   *  stock. `false` = Switch no tiene el código en el catálogo y el número se
+   *  dedujo de compras − ventas; la pantalla lo dice. */
+  bodegaDeSwitch: boolean;
+  /** Unidades en bodega que las filas VISIBLES no explican (compras viejas
+   *  ocultas con stock, o stock sin respaldo). Se avisa en vez de esconderlo:
+   *  si no, el total y la suma de la columna "QUEDA" se contradicen a la vista. */
+  bodegaFueraDeLasFilas: number;
+  /** Cuántas de las compras visibles ya se acabaron. */
+  comprasAgotadas: number;
+  /** Unidades que trajeron esas compras. MISMA base que la columna "CUÁNTO",
+   *  para que el resumen y las filas midan con la misma vara. */
+  unidadesAgotadas: number;
+  /** Meses que duró venderlas, como unión de sus ventanas. `null` = ninguna se
+   *  ha acabado todavía, y entonces NO hay número que dar. */
+  mesesAgotadas: number | null;
+}
+
+/**
+ * Unión (en meses) de las ventanas [llegada → día en que se acabó] de las
+ * compras ya agotadas. Los tramos que se pisan se cuentan UNA vez; los huecos
+ * entre tramos no se cuentan.
+ */
+export function mesesVendiendo(agotadas: readonly CompraMedida[]): number | null {
+  const tramos = agotadas
+    .filter((c) => c.fechaCorte != null)
+    .map((c) => ({ a: c.fecha, b: c.fechaCorte as string }))
+    .sort((x, y) => x.a.localeCompare(y.a) || x.b.localeCompare(y.b));
+  if (!tramos.length) return null;
+
+  let dias = 0;
+  let a = tramos[0].a;
+  let b = tramos[0].b;
+  for (const t of tramos.slice(1)) {
+    if (t.a <= b) {
+      if (t.b > b) b = t.b; // se solapan → se estira el mismo tramo
+    } else {
+      dias += diasEntre(a, b); // hueco sin mercancía → se cierra y se abre otro
+      a = t.a;
+      b = t.b;
+    }
+  }
+  dias += diasEntre(a, b);
+  return dias / DIAS_POR_MES;
+}
+
+/** ¿Esta compra ya se acabó? Es la que tiene fecha de corte: llegó al 90% o se
+ *  cerró por ajuste. Una tanda VIVA no se puede medir — todavía no terminó. */
+export function estaAgotada(c: CompraMedida): boolean {
+  return c.fechaCorte != null;
+}
+
+/**
+ * El resumen de UN artículo. `visibles` son las compras que la tabla muestra
+ * (misma vara que las filas); `enBodega` sale de la existencia de Switch,
+ * que YA incluye lo que sostienen las compras viejas ocultas.
+ */
+export function resumirArticulo(
+  visibles: readonly CompraMedida[],
+  existencia: number | null,
+): ResumenArticulo {
+  const agotadas = visibles.filter(estaAgotada);
+  const quedanVisibles = visibles.reduce((s, c) => s + c.quedan, 0);
+
+  // Sin existencia de Switch el único número posible es el que ya muestran las
+  // filas. Se devuelve marcado, y la pantalla NO lo presenta como stock real.
+  const enBodega = existencia ?? quedanVisibles;
+
+  return {
+    enBodega,
+    bodegaDeSwitch: existencia != null,
+    bodegaFueraDeLasFilas: existencia != null ? existencia - quedanVisibles : 0,
+    comprasAgotadas: agotadas.length,
+    unidadesAgotadas: agotadas.reduce((s, c) => s + c.unidades, 0),
+    mesesAgotadas: mesesVendiendo(agotadas),
   };
 }
 
@@ -626,6 +764,9 @@ export interface ArticuloCompras {
   compras: CompraMedida[];
   /** Compras que existen pero quedaron fuera de la ventana de 3 años. */
   comprasFueraDeVentana: number;
+  /** El artículo COMPLETO en una línea: cuánto hay en bodega y cuánto tardó en
+   *  venderse lo que ya se acabó. Va arriba de la tabla. */
+  resumen: ResumenArticulo;
   cuadre: Cuadre;
   /** Stock en bodega que no sale de ninguna compra registrada. Se avisa. */
   stockSinRespaldo: number;
@@ -683,16 +824,19 @@ export function armarArticulo(e: EntradaArticulo, hoy: string): ArticuloCompras 
       fuera += 1;
       return;
     }
-    medidas.push(medirCompra(c, reparto.diasPorCompra[i], quedan[i], noVendidoNiEnBodega[i]));
+    medidas.push(medirCompra(c, reparto.diasPorCompra[i], quedan[i], noVendidoNiEnBodega[i], hoy));
   });
+
+  // La más NUEVA primero: es la que se está decidiendo comprar otra vez.
+  const visibles = medidas.reverse();
 
   return {
     empresa: e.empresa,
     codigo: e.codigo,
     descripcion: e.descripcion,
-    // La más NUEVA primero: es la que se está decidiendo comprar otra vez.
-    compras: medidas.reverse(),
+    compras: visibles,
     comprasFueraDeVentana: fuera,
+    resumen: resumirArticulo(visibles, e.existencia),
     cuadre,
     stockSinRespaldo: sinRespaldo,
     vendidoAntes: reparto.vendidoAntes,

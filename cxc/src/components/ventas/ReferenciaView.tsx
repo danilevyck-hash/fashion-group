@@ -40,9 +40,10 @@ import {
 } from "@/lib/ventas/compras";
 import {
   exportComprasToExcel,
+  textoAgotadas,
   textoMeses,
   textoOrigenFob,
-  textoSeVendioEn,
+  textoSeVendio,
 } from "@/lib/ventas/referencia-excel";
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
 
@@ -244,6 +245,8 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
         <span className="ml-auto text-xs text-gray-600">{etiquetaEmpresa(art.empresa)}</span>
       </header>
 
+      <ResumenArticuloLinea art={art} />
+
       {art.sinCompraRegistrada ? (
         <div className="px-3.5 py-4">
           <p className="text-sm text-gray-900">No hay ninguna compra registrada de este código.</p>
@@ -270,12 +273,17 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-600">
                   <th className="px-1.5 py-2 text-left font-medium xl:px-3">Llegó</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">Cuánto</th>
-                  <th className="px-1.5 py-2 text-left font-medium xl:px-3">Se vendió en</th>
+                  {/* "Se vendió" son UNIDADES + tiempo. Antes decía "te quedan
+                      126" y repetía la columna de al lado — el defecto que
+                      Daniel cazó: *"me sale dos veces mi inv"*. */}
+                  <th className="px-1.5 py-2 text-left font-medium xl:px-3">Se vendió</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">Queda</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">CIF</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">FOB</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">Lista</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Vendido</th>
+                  {/* "Vendido" a secas se leía como cantidad ($6.78 → "vendí
+                      6,78"). "Salió a" solo puede leerse como precio. */}
+                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Salió a</th>
                   <th className="px-1.5 py-2 text-right font-medium xl:px-3">Desc.</th>
                 </tr>
               </thead>
@@ -301,6 +309,67 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
   );
 }
 
+// ─── El resumen del artículo ─────────────────────────────────────────────────
+//
+// Daniel: *"quiero que me diga en cuantos meses se vendio. y total que tengo en
+// inv."*. Antes había que sumar 180 + 120 + 45 de cabeza para saber cuánto hay.
+//
+// 🩸 ACÁ NO VA UN PROMEDIO, Y ESTÁ MEDIDO POR QUÉ (ver la nota larga de
+// compras.ts). Las dos compras agotadas de `NB2570001` tardaron 7 y 15 meses;
+// "promedio 11" no describe ninguna de las dos, y el 15 solo es 15 porque esa
+// tanda esperó medio año en bodega a que se acabara la de adelante. Se muestran
+// las unidades AL LADO de los meses, nunca divididas: dividir es lo que produce
+// los "14.899 u/mes" que salieron en la medición de 300 códigos reales.
+//
+// 🔴 Es UNA LÍNEA. Daniel ya rechazó dos diseños de este módulo por complicados;
+// esto no es un panel nuevo. Y envuelve (flex-wrap) en vez de crecer a lo ancho:
+// a 1024 la barra lateral deja 766 px útiles y la tabla ya usa todos.
+function ResumenArticuloLinea({ art }: { art: ArticuloCompras }) {
+  const r = art.resumen;
+  const enBodega = r.enBodega ?? 0;
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-gray-200 bg-gray-50 px-3.5 py-2.5">
+      <p className="text-sm text-gray-700">
+        En bodega{" "}
+        <span className="font-semibold tabular-nums text-gray-900">{fmtInt(enBodega)} u</span>
+        {!r.bodegaDeSwitch && <span className="ml-1 text-xs text-gray-600">(deducido)</span>}
+      </p>
+
+      {!art.sinCompraRegistrada && (
+        <p className="text-sm text-gray-700">
+          {textoAgotadas(r)}
+          <Ayuda titulo="Cómo se mide">
+            Solo cuentan las compras que YA se acabaron — una tanda que todavía tiene mercancía no se puede medir,
+            porque no ha terminado. Los meses son el tiempo que estuvo vendiéndose: si dos tandas se solaparon no se
+            cuenta dos veces, y si entre una y otra estuviste sin mercancía, ese tiempo no se cuenta.
+            <br />
+            <br />
+            No hay promedio a propósito. En este código una tanda tardó 7 meses y otra 15, y las 15 fueron así solo
+            porque esperó en bodega a que se acabara la de adelante — un &quot;promedio 11&quot; no describiría
+            ninguna de las dos.
+          </Ayuda>
+        </p>
+      )}
+
+      {!r.bodegaDeSwitch && (
+        <p className="w-full text-xs text-gray-600">
+          Switch no tiene este código en el catálogo, así que lo de bodega no es su existencia: es lo que queda según
+          las compras y las ventas.
+        </p>
+      )}
+
+      {r.bodegaDeSwitch && r.bodegaFueraDeLasFilas !== 0 && !art.sinCompraRegistrada && (
+        <p className="w-full text-xs text-gray-600">
+          {r.bodegaFueraDeLasFilas > 0
+            ? `Las filas de abajo solo explican ${fmtInt(enBodega - r.bodegaFueraDeLasFilas)} de esas ${fmtInt(enBodega)} u; el total es el de Switch.`
+            : `Switch reporta ${fmtInt(enBodega)} u, menos de lo que suman las filas de abajo; el total es el de Switch.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Una compra, en tabla ────────────────────────────────────────────────────
 
 function FilaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedida; hoyMes: string }) {
@@ -312,7 +381,7 @@ function FilaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedida;
         <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right font-medium text-gray-900">
           {fmtInt(c.unidades)} u
         </td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-gray-900">{textoSeVendioEn(c)}</td>
+        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-gray-900">{textoSeVendio(c)}</td>
         <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-900">{fmtInt(c.quedan)}</td>
         <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">{fmtMoney(c.costos.cif)}</td>
         <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">
@@ -347,7 +416,7 @@ function TarjetaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedi
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-sm font-semibold text-gray-900">{fmtFecha(c.fecha)}</span>
         <span className="text-sm text-gray-900">· {fmtInt(c.unidades)} u</span>
-        <span className="ml-auto text-sm font-medium text-gray-900">{textoSeVendioEn(c)}</span>
+        <span className="ml-auto text-sm font-medium text-gray-900">{textoSeVendio(c)}</span>
       </div>
 
       <dl className="mt-2 grid grid-cols-[auto_auto] justify-between gap-x-4 gap-y-1 text-sm tabular-nums sm:grid-cols-[repeat(3,auto)]">
@@ -355,7 +424,7 @@ function TarjetaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedi
         <Dato k="CIF" v={fmtMoney(c.costos.cif)} />
         <Dato k="FOB" v={<Fob c={c} />} />
         <Dato k="Lista" v={fmtMoney(c.costos.lista)} />
-        <Dato k="Vendido" v={fmtMoney(c.precioVendido)} />
+        <Dato k="Salió a" v={fmtMoney(c.precioVendido)} />
         <Dato k="Desc." v={fmtPct(c.descuento)} />
       </dl>
 
