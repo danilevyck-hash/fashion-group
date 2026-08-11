@@ -7,7 +7,10 @@ import {
   deleteNotaProveedor,
   updateNotaProveedor,
 } from "@/lib/marketing/notas-proveedor-server";
-import { validarNotaProveedor } from "@/lib/marketing/notas-proveedor";
+import {
+  traeFotoPaths,
+  validarNotaProveedor,
+} from "@/lib/marketing/notas-proveedor";
 import { logActivity } from "@/lib/log-activity";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +38,15 @@ export async function PUT(
     if (!validada.ok) {
       return NextResponse.json({ error: validada.error }, { status: 400 });
     }
-    const nota = await updateNotaProveedor(params.id, validada.valor);
+    // Si el cuerpo NO habla de fotos, las fotos no se tocan. El "?" de
+    // Mobiliario edita precio y aclaración sin mencionarlas, y sin esto la
+    // validación (que devuelve `[]` cuando falta el campo) se las llevaría.
+    const conservarFotos = !traeFotoPaths(body);
+    const nota = await updateNotaProveedor(
+      params.id,
+      validada.valor,
+      conservarFotos,
+    );
     logActivity(
       auth.role,
       "mobiliario_nota_proveedor_editada",

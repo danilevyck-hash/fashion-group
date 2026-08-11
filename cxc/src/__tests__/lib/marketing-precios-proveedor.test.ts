@@ -39,7 +39,7 @@
 //   * cambiar `["admin"]` por `["admin","secretaria"]` en la ruta rompe 1;
 //   * quitar `<FotoProducto` de la tabla o de las tarjetas rompe 1.
 // ============================================================================
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -48,12 +48,55 @@ import {
   paresDeFotos,
 } from "@/lib/marketing/fotos-pares";
 
+vi.hoisted(() => {
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||= "https://test.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||= "test-anon-key";
+  process.env.SESSION_SECRET ||= "test-secret";
+});
+
+// ── Doble mínimo de Supabase: se guarda el payload REAL que recibe .update(),
+//    que es lo único que este candado necesita ver.
+const ultimoUpdate: { payload: Record<string, unknown> | null } = {
+  payload: null,
+};
+vi.mock("@/lib/supabase-server", () => {
+  const fila = {
+    id: "n1",
+    producto: "Paneles",
+    precio: 65,
+    nota: null,
+    foto_paths: ["notas-proveedor/changalo/paneles.jpg"],
+    orden: 0,
+    created_at: "",
+  };
+  const cadena = {
+    update(payload: Record<string, unknown>) {
+      ultimoUpdate.payload = payload;
+      return cadena;
+    },
+    eq: () => cadena,
+    select: () => cadena,
+    single: async () => ({ data: fila, error: null }),
+  };
+  return { supabaseServer: { from: () => cadena }, HAS_SERVICE_ROLE: false };
+});
+vi.mock("@/lib/marketing/storage", () => ({
+  firmarPath: async (p: string) => `https://firmada/${p}`,
+  esPathStorage: () => true,
+}));
+
+import { traeFotoPaths } from "@/lib/marketing/notas-proveedor";
+import { updateNotaProveedor } from "@/lib/marketing/notas-proveedor-server";
+
 const raiz = process.cwd();
 const leer = (p: string) => readFileSync(join(raiz, p), "utf8");
 
 const PAGINA = "src/app/marketing/mobiliario/page.tsx";
 const AYUDA = "src/components/marketing/PreciosProveedorAyuda.tsx";
 const RUTA_NOTAS = "src/app/api/marketing/mobiliario/notas-proveedor/route.ts";
+const RUTA_NOTA_ID =
+  "src/app/api/marketing/mobiliario/notas-proveedor/[id]/route.ts";
+const SERVER_NOTAS = "src/lib/marketing/notas-proveedor-server.ts";
 
 /** El código sin comentarios: un comentario que diga "reduce" no es código. */
 function soloCodigo(src: string): string {
@@ -142,7 +185,7 @@ describe('un solo "?" arriba, y "Notas del proveedor" fuera de la pantalla', () 
   it("cierra con Escape y con clic afuera, y se alcanza con teclado", () => {
     const src = soloCodigo(leer(AYUDA));
     expect(src).toMatch(/e\.key === "Escape"/);
-    expect(src).toMatch(/e\.target === e\.currentTarget/);
+    expect(src).toMatch(/e\.target\s*[!=]==\s*e\.currentTarget/);
     expect(src).toContain("createPortal");
     expect(src).toContain("inset-0");
     expect(src).toContain("useBodyScrollLock");
@@ -283,5 +326,191 @@ describe("los costos del proveedor son solo de admin", () => {
   it("la pantalla tampoco lo muestra a la secretaria", () => {
     const src = soloCodigo(leer(PAGINA));
     expect(src).toMatch(/role === "admin" && <PreciosProveedorAyuda \/>/);
+  });
+
+  it("las 4 rutas que usa el ? exigen admin (editar y borrar también)", () => {
+    for (const ruta of [RUTA_NOTAS, RUTA_NOTA_ID]) {
+      const src = soloCodigo(leer(ruta));
+      expect(src, ruta).toMatch(/requireRole\(req,\s*\["admin"\]\)/);
+      expect(src, ruta).not.toContain("secretaria");
+      expect(src, ruta).not.toMatch(/requireAdmin\s*\(/);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Se puede EDITAR, AGREGAR y BORRAR — sin que vuelva la tabla vieja
+//    y sin que las fotos se vayan por el desagüe
+// ─────────────────────────────────────────────────────────────────────────────
+describe("editar los precios del proveedor desde el ?", () => {
+  it("editar, agregar y borrar están adentro del ?", () => {
+    const src = leer(AYUDA);
+    expect(src).toContain("+ Agregar precio");
+    expect(src).toMatch(/Editar el precio de/);
+    expect(src).toMatch(/¿Borrar el precio de/);
+    // Guardar usa PUT si ya existe y POST si es nuevo.
+    expect(soloCodigo(src)).toMatch(/edicion\.id \? "PUT" : "POST"/);
+    expect(soloCodigo(src)).toMatch(/method: "DELETE"/);
+  });
+
+  it("reusa las rutas que YA existían: no se inventaron endpoints nuevos", () => {
+    const src = soloCodigo(leer(AYUDA));
+    const rutas = src.match(/\/api\/marketing\/[a-z0-9/\-${}.[\]]*/gi) ?? [];
+    expect(rutas.length).toBeGreaterThan(0);
+    for (const r of rutas) {
+      expect(r).toContain("/api/marketing/mobiliario/notas-proveedor");
+    }
+  });
+
+  it("NO vuelve la tabla de Notas del proveedor a la pantalla", () => {
+    const pagina = soloCodigo(leer(PAGINA));
+    expect(pagina).not.toContain("NotasProveedorMobiliario");
+    expect(pagina).not.toContain("Notas del proveedor");
+    // Y el "?" sigue siendo lo único que monta la página, una sola vez.
+    expect((pagina.match(/<PreciosProveedorAyuda/g) ?? []).length).toBe(1);
+  });
+
+  it("nada de modales anidados: la confirmación de borrado es EN LÍNEA", () => {
+    const src = soloCodigo(leer(AYUDA));
+    // ConfirmDeleteModal monta ModalOverlay (z-50) y quedaría DEBAJO de este
+    // cuadro (z-[70]), además de enganchar su propio Escape en `document`.
+    expect(src).not.toContain("ConfirmDeleteModal");
+    expect(src).not.toContain("ConfirmModal");
+    expect(src).not.toContain("ModalOverlay");
+    // Un solo createPortal en todo el componente.
+    expect((src.match(/createPortal\(/g) ?? []).length).toBe(1);
+  });
+
+  it("Escape va en escalera: no cierra los dos de una", () => {
+    const src = soloCodigo(leer(AYUDA));
+    const escalera = src.slice(
+      src.indexOf("const alEscape"),
+      src.indexOf("useEffect", src.indexOf("const alEscape")),
+    );
+    expect(escalera.length).toBeGreaterThan(100);
+    // El borrado se deshace ANTES que la edición, y la edición antes que la
+    // ventana. Si el orden se invirtiera, un Escape sobre la confirmación
+    // cerraría la ventana entera.
+    const iBorrado = escalera.indexOf("confirmarBorrado");
+    const iEdicion = escalera.indexOf("edicion !== null");
+    const iCierre = escalera.indexOf("cerrarTodo()");
+    expect(iBorrado).toBeGreaterThan(-1);
+    expect(iBorrado).toBeLessThan(iEdicion);
+    expect(iEdicion).toBeLessThan(iCierre);
+    // Con cambios sin guardar no cierra nada.
+    expect(escalera).toMatch(/hayCambios/);
+    // Y con una escritura en vuelo tampoco.
+    expect(escalera).toMatch(/if \(ocupado\) return/);
+  });
+
+  it("el clic afuera respeta la MISMA escalera que el Escape", () => {
+    const src = soloCodigo(leer(AYUDA));
+    const fuera = src.slice(
+      src.indexOf("onMouseDown={(e)"),
+      src.indexOf("onMouseDown={(e)") + 600,
+    );
+    expect(fuera).toMatch(/confirmarBorrado !== null\) return/);
+    expect(fuera).toMatch(/edicion !== null\) return/);
+    expect(fuera).toMatch(/ocupado/);
+  });
+
+  it("los blancos táctiles nuevos llegan a 44 px", () => {
+    const src = leer(AYUDA);
+    // Editar, Guardar, Cancelar, Borrar, Sí borrar, + Agregar, Entendido y
+    // los 3 campos del formulario.
+    const botones = src.match(/<button[\s\S]{0,700}?<\/button>/g) ?? [];
+    expect(botones.length).toBeGreaterThanOrEqual(7);
+    for (const b of botones) {
+      expect(b, b.slice(0, 90)).toContain("min-h-[44px]");
+    }
+    const inputs = src.match(/<input[\s\S]{0,700}?\/>/g) ?? [];
+    expect(inputs.length).toBeGreaterThanOrEqual(3);
+    for (const i of inputs) {
+      expect(i, i.slice(0, 90)).toContain("min-h-[44px]");
+    }
+  });
+
+  it("editar un precio NO puede borrar las fotos del renglón", () => {
+    // 🔴 La trampa: `validarNotaProveedor` convierte un `fotoPaths` ausente en
+    //    `[]`, y `[]` guardado significa "sin fotos". Como el "?" no edita
+    //    fotos, un PUT ingenuo le vaciaría `foto_paths` — que es de donde
+    //    salieron las fotos que hoy se ven en la tabla de Productos.
+    const ayuda = soloCodigo(leer(AYUDA));
+    expect(ayuda).not.toMatch(/fotoPaths/);
+    expect(ayuda).not.toMatch(/foto_paths/);
+
+    // La ruta traduce "no vino el campo" a "no las toques".
+    const ruta = soloCodigo(leer(RUTA_NOTA_ID));
+    expect(ruta).toMatch(/traeFotoPaths\(body\)/);
+    expect(ruta).toMatch(/conservarFotos/);
+
+    // Y el servidor deja `foto_paths` FUERA del update cuando se conserva.
+    const server = soloCodigo(leer(SERVER_NOTAS));
+    expect(server).toMatch(/conservarFotos/);
+    expect(server).toMatch(/if \(!conservarFotos\) cambios\.foto_paths/);
+  });
+
+  it("un cuerpo que SÍ manda fotoPaths las sigue escribiendo", () => {
+    // El caso contrario importa igual: si conservar fuera incondicional, el
+    // componente viejo (única puerta para subir fotos) no podría cambiarlas.
+    const server = soloCodigo(leer(SERVER_NOTAS));
+    expect(server).toMatch(/conservarFotos: boolean = false/);
+  });
+
+  it("el ? dice dónde se cambia la foto", () => {
+    expect(leer(AYUDA)).toMatch(
+      /La foto de cada mueble se cambia con .Editar. en la tabla de/,
+    );
+  });
+
+  // ── El candado que de verdad protege las fotos: COMPORTAMIENTO ──────────
+  it("traeFotoPaths distingue 'no hablaron de fotos' de 'no hay fotos'", () => {
+    // Ausente → no tocar.
+    expect(traeFotoPaths({ producto: "Paneles", precio: "65" })).toBe(false);
+    expect(traeFotoPaths({ fotoPaths: undefined })).toBe(false);
+    expect(traeFotoPaths({ fotoPaths: null })).toBe(false);
+    expect(traeFotoPaths(null)).toBe(false);
+    expect(traeFotoPaths(undefined)).toBe(false);
+    // Presente → esas son las fotos, INCLUIDO el vacío explícito.
+    expect(traeFotoPaths({ fotoPaths: [] })).toBe(true);
+    expect(traeFotoPaths({ fotoPaths: ["a.jpg"] })).toBe(true);
+  });
+
+  it("editar el precio SIN mencionar fotos no manda foto_paths al UPDATE", async () => {
+    ultimoUpdate.payload = null;
+    await updateNotaProveedor(
+      "n1",
+      { producto: "Paneles", precio: 70, nota: null, fotoPaths: [] },
+      true, // conservarFotos: el cuerpo no habló de fotos
+    );
+    expect(ultimoUpdate.payload).not.toBeNull();
+    // Lo que importa: la columna NO viaja, así que la base conserva su valor.
+    expect(ultimoUpdate.payload).not.toHaveProperty("foto_paths");
+    expect(ultimoUpdate.payload).toMatchObject({
+      producto: "Paneles",
+      precio: 70,
+    });
+  });
+
+  it("cuando SÍ se mandan fotos, se escriben (el componente viejo sigue pudiendo)", async () => {
+    ultimoUpdate.payload = null;
+    await updateNotaProveedor("n1", {
+      producto: "Paneles",
+      precio: 65,
+      nota: null,
+      fotoPaths: ["nueva.jpg"],
+    });
+    expect(ultimoUpdate.payload).toHaveProperty("foto_paths", ["nueva.jpg"]);
+  });
+
+  it("editar sigue sin sumar nada", () => {
+    const src = soloCodigo(leer(AYUDA));
+    expect(src).not.toMatch(/\.reduce\s*\(/);
+    expect(src).not.toMatch(/\bn\.precio\s*[*+\-/]/);
+    expect(src).not.toMatch(/[*+\-/]\s*n\.precio\b/);
+    // El precio viaja como TEXTO tal cual se escribió: quien lo convierte a
+    // número es la validación compartida con el servidor, no este archivo.
+    expect(src).toMatch(/precio: edicion\.precio/);
+    expect(src).not.toMatch(/Number\(edicion\.precio\)/);
   });
 });
