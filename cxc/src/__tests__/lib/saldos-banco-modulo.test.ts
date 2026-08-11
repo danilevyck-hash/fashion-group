@@ -169,8 +169,13 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
 
   it("las TABLAS no se borraron — 0 filas no es motivo para un DROP", () => {
     // `empresa_gastos_mensuales` tiene 0 filas y `gastos_categorias` 6, pero
-    // borrar tablas es irreversible y Daniel no lo pidió. Vista General las
-    // sigue leyendo y no se rompe con la tabla vacía (hoy ya está vacía).
+    // borrar tablas es irreversible y Daniel no lo pidió: quedan en la base.
+    //
+    // ⚠️ Desde el 11-ago-2026 Vista General YA NO LAS LEE — su gasto sale del
+    // mayor contable de Switch. Que nadie las lea NO es lo mismo que borrarlas,
+    // y este candado protege lo segundo, que es lo irreversible. Por eso lo que
+    // se verifica es que ninguna migración las dropee, no que alguien las
+    // consulte.
     const dir = join(raiz, "supabase", "migrations");
     for (const f of readdirSync(dir)) {
       if (!f.endsWith(".sql")) continue;
@@ -180,9 +185,9 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
         expect(sql, `${f} no puede borrar ${t}`).not.toMatch(new RegExp(`DROP\\s+TABLE[^;]*${t}`, "i"));
       }
     }
+    // La Disponibilidad SÍ tiene que seguir saliendo de `bancos_saldos`: esa
+    // es la tabla viva de las tres y su número no puede moverse ni un centavo.
     const vg = leer("src/app/api/dashboard/vista-general/route.ts");
-    expect(vg).toContain('.from("empresa_gastos_mensuales")');
-    expect(vg).toContain('.from("gastos_categorias")');
     expect(vg).toContain('.from("bancos_saldos")');
   });
 });

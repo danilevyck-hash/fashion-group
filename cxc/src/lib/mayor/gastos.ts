@@ -372,6 +372,79 @@ export function avisosDelMes(
   return avisos;
 }
 
+// ── ¿Este gasto se puede mostrar como un número? ─────────────────────────────
+
+/**
+ * Por qué el gasto de un mes NO se puede mostrar como una cifra.
+ *
+ *  - `sin_cerrar`   → se pidió el mes y volvió sin un solo asiento.
+ *  - `parcial`      → hay movimientos sueltos pero la contadora no cerró el mes.
+ *  - `sin_datos`    → ese mes nunca se trajo de Switch.
+ *  - `sin_planilla` → el mes está CERRADO pero no tiene ni un peso de salarios.
+ *                     Para una empresa con empleados eso significa que falta el
+ *                     asiento más grande del mes.
+ */
+export type MotivoSinGasto = "sin_cerrar" | "parcial" | "sin_datos" | "sin_planilla";
+
+export interface GastoMostrable {
+  /** `true` sólo si el número se puede presentar como un hecho. */
+  usable: boolean;
+  /** El gasto en centavos cuando `usable`; `null` si no. NUNCA 0 por defecto. */
+  totalCent: number | null;
+  motivo: MotivoSinGasto | null;
+}
+
+/**
+ * 🔑 LA REGLA MÁS IMPORTANTE DEL MÓDULO, en una función.
+ *
+ * Un mes sin cerrar, incompleto, no traído o **sin el gasto de planilla** NO
+ * puede pintarse como un monto. Si se pintara, Daniel leería un gasto que es una
+ * fracción del verdadero y decidiría con un número inventado — y un $0 o un
+ * total corto se ven exactamente igual que un dato bueno.
+ *
+ * El caso de la planilla no es teórico: enero-2026 de Vistana está CERRADO y no
+ * trae una sola línea de `6.01`. Un mes así suma menos de lo que costó y no hay
+ * forma de saber cuánto falta, así que se muestra el motivo, no el número.
+ */
+export function gastoMostrable(r: ResumenMes): GastoMostrable {
+  if (r.estado !== "cerrado") {
+    return { usable: false, totalCent: null, motivo: r.estado };
+  }
+  if (r.salarios.totalCent === 0) {
+    return { usable: false, totalCent: null, motivo: "sin_planilla" };
+  }
+  return { usable: true, totalCent: r.totalCent, motivo: null };
+}
+
+/**
+ * La frase que ve el usuario cuando no hay número. Español simple, sin jerga
+ * contable, y NUNCA le pide cargar nada: la carga manual ya no existe.
+ * `hastaMes` es el último mes cerrado de ESA empresa, ya formateado
+ * ("enero 2026"), o `null` si nunca cerró ninguno.
+ */
+export function textoSinGasto(motivo: MotivoSinGasto, hastaMes: string | null): string {
+  switch (motivo) {
+    case "sin_cerrar":
+      return hastaMes
+        ? `La contabilidad de esta empresa llega hasta ${hastaMes}.`
+        : "Todavía no hay contabilidad cerrada de esta empresa.";
+    case "parcial":
+      return "Este mes tiene movimientos sueltos, pero la contadora todavía no lo cerró. Lo que hay está incompleto.";
+    case "sin_datos":
+      return "Este mes todavía no se ha traído de Switch.";
+    case "sin_planilla":
+      return "A este mes le falta el gasto de planilla, así que el total quedaría corto.";
+  }
+}
+
+/** Etiqueta corta para la píldora del semáforo. Tiene que caber en la tabla. */
+export const ETIQUETA_SIN_GASTO: Record<MotivoSinGasto, string> = {
+  sin_cerrar: "Sin cerrar",
+  parcial: "Incompleto",
+  sin_datos: "Sin datos",
+  sin_planilla: "Falta planilla",
+};
+
 // ── Utilidades de dinero ─────────────────────────────────────────────────────
 
 /** Centavos enteros → dólares con 2 decimales exactos. */

@@ -4,9 +4,11 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
-import { Ayuda } from "@/components/shared/Ayuda";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
+// Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
+// hay número" salen del MISMO lugar que las usa el servidor.
+import { ETIQUETA_SIN_GASTO, type MotivoSinGasto } from "@/lib/mayor/gastos";
 
 // ── Tipos del API ─────────────────────────────────────────────────────────────
 
@@ -17,20 +19,42 @@ interface SemaforoRow {
   name: string;
   ventas: number;
   utilidad: number;
-  gastosDirectos: number;
-  prorrateo: number;
+  /** Gasto del mayor. `null` cuando el mes de ESA empresa no se puede mostrar. */
+  gasto: number | null;
+  motivo: MotivoSinGasto | null;
+  /** Frase honesta cuando no hay número. */
+  texto: string | null;
+  ultimoMesCerrado: string | null;
   rentabilidad: number | null;
   pct: number | null;
   estado: "verde" | "ambar" | "rojo" | "sin_gastos";
+}
+
+interface GastoEmpresa {
+  key: string;
+  name: string;
+  gasto: number | null;
+  motivo: MotivoSinGasto | null;
+  texto: string | null;
+  ultimoMesCerrado: string | null;
 }
 
 interface VistaGeneral {
   mes: string;
   ventas: null | { total: number; prevYear: number | null; yoyPct: number | null; parcial: boolean; empresasCount: number; byEmpresa: EmpresaVentas[] };
   margen: null | { pct: number | null; utilidad: number };
-  gastos: { totalMes: number; gastosFijos: number; grupoTotal: number; empresasConGastos: string[] };
-  rentabilidad: null | { mes: string; monto: number; pct: number | null; parcial: boolean; esMesSeleccionado: boolean };
-  equilibrio: null | { necesitas: number; real: number; progresoPct: number; gastosFijos: number; margenPct: number };
+  gastos: {
+    disponible: boolean;
+    total: number | null;
+    empresasConGasto: number;
+    empresasTotal: number;
+    porEmpresa: GastoEmpresa[];
+  };
+  rentabilidad: null | {
+    mes: string; monto: number; pct: number | null; parcial: boolean;
+    ventas: number; utilidad: number; gastos: number;
+    empresasConGasto: number; empresasTotal: number;
+  };
   disponibilidad: null | { total: number; fechaMasVieja: string; cuentas: number };
   semaforo: SemaforoRow[];
   cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
@@ -73,13 +97,6 @@ function mesLabel(ym: string): string {
 /** "2026-07" → "julio 2026" (para texto corrido) */
 function mesLabelMin(ym: string): string {
   return mesLabel(ym).toLowerCase();
-}
-
-/** "2026-07" → "Julio" */
-function mesNombre(ym: string): string {
-  if (!mesValido(ym)) return ym;
-  const m = Number(ym.split("-")[1]);
-  return MESES_ES[m - 1];
 }
 
 /** "2026-07-15" → "15 jul" */
@@ -184,7 +201,6 @@ function VistaGeneralInner() {
         ) : data ? (
           <>
             <KpiGrid data={data} mes={mes} />
-            <Equilibrio eq={data.equilibrio} />
             <Semaforo rows={data.semaforo} mes={mes} />
             <Atencion data={data} />
           </>
@@ -197,8 +213,15 @@ function VistaGeneralInner() {
 // ── KPIs ─────────────────────────────────────────────────────────────────────
 
 function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
-  const { ventas, margen, rentabilidad, disponibilidad, cxc, cxp } = data;
+  const { ventas, margen, gastos, rentabilidad, disponibilidad, cxc, cxp } = data;
   const mesPrevAnio = mesLabelMin(sumarMeses(mes, -12));
+  // Cuántas empresas tienen la contabilidad de ESTE mes lista. Es el número que
+  // decide si un total se puede leer como "el gasto del grupo" o como "el gasto
+  // de estas N empresas" — y por eso viaja pegado a las dos tarjetas.
+  const nConGasto = gastos.empresasConGasto;
+  const nTotal = gastos.empresasTotal;
+  const tagEmpresas = nConGasto > 0 && nConGasto < nTotal ? [`${nConGasto} de ${nTotal} empresas`] : [];
+  const faltan = nTotal - nConGasto;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
@@ -231,20 +254,46 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         sub={margen ? <span className="text-stone-400">{moneyK(margen.utilidad)} utilidad bruta</span> : <span className="text-stone-400">Sin datos</span>}
       />
 
-      {/* Rentabilidad */}
+      {/* Gastos — el mayor contable de Switch. NUNCA muestra $0 cuando lo que
+          pasa es que la contadora no cerró el mes: en ese caso va "—" y el
+          subtítulo dice por qué. Un cero y un total corto se ven idénticos. */}
       <KpiCard
-        href="/gastos-contabilidad"
+        href={`/gastos-contabilidad?mes=${mes}`}
+        label="Gastos"
+        hoverLabel="Ir a Gastos"
+        value={gastos.total != null ? moneyK(gastos.total) : "—"}
+        tags={tagEmpresas}
+        sub={
+          !gastos.disponible ? (
+            <span className="text-stone-400">La contabilidad de Switch todavía no está conectada</span>
+          ) : nConGasto === 0 ? (
+            <span className="text-stone-400">Ninguna empresa tiene {mesLabelMin(mes)} cerrado</span>
+          ) : faltan === 0 ? (
+            <span className="text-stone-400">las {nTotal} empresas, mes cerrado</span>
+          ) : (
+            <span className="text-amber-600 font-medium">
+              faltan {faltan}: su contabilidad no llega a {mesLabelMin(mes)}
+            </span>
+          )
+        }
+      />
+
+      {/* Rentabilidad — utilidad bruta − gastos, SIEMPRE de las mismas empresas.
+          Con 4 de 8 empresas cerradas, restarle su gasto a la utilidad de las 8
+          daría un número inflado que se ve perfectamente normal. */}
+      <KpiCard
+        href={`/gastos-contabilidad?mes=${mes}`}
         label="Rentabilidad"
         hoverLabel="Ir a Gastos"
         value={rentabilidad ? moneyK(rentabilidad.monto) : "—"}
         valueClass={rentabilidad ? (rentabilidad.monto >= 0 ? "text-green-600" : "text-red-600") : undefined}
         tags={rentabilidad ? [
-          ...(!rentabilidad.esMesSeleccionado ? [`de ${mesNombre(rentabilidad.mes)}`] : []),
-          ...(rentabilidad.parcial ? ["parcial"] : []),
+          ...tagEmpresas,
+          ...(rentabilidad.parcial ? ["mes en curso"] : []),
         ] : []}
         sub={rentabilidad
-          ? <span className="text-stone-400">{pct(rentabilidad.pct)} sobre ventas</span>
-          : <span className="text-stone-400">Sin gastos completos (8/8)</span>}
+          ? <span className="text-stone-400">{pct(rentabilidad.pct)} sobre sus ventas</span>
+          : <span className="text-stone-400">Sin gasto de contabilidad de {mesLabelMin(mes)}</span>}
       />
 
       {/* Disponibilidad — sale de los saldos de banco, que ahora tienen módulo
@@ -321,58 +370,15 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
   );
 }
 
-// ── Punto de equilibrio ──────────────────────────────────────────────────────
-
-function Equilibrio({ eq }: { eq: VistaGeneral["equilibrio"] }) {
-  return (
-    <div className="rounded-[14px] border border-stone-200 bg-white p-5 mb-8">
-      {/* La FÓRMULA ("gastos fijos ÷ margen") se aprende una vez: vive en el ⓘ,
-          no en una línea que se lee todos los días. Los dos números siguen
-          alcanzables de un toque — el gasto fijo del mes no está en ninguna
-          otra parte de esta pantalla y borrarlo habría sido perder un dato. */}
-      <h2 className="mb-2 flex items-center gap-1 text-sm font-semibold text-stone-900">
-        Punto de equilibrio
-        {eq && (
-          <Ayuda titulo="Cómo se calcula">
-            <p className="tabular-nums">
-              Gastos fijos {money(eq.gastosFijos)} ÷ margen {pct(eq.margenPct)}
-            </p>
-          </Ayuda>
-        )}
-      </h2>
-      {eq ? (
-        <>
-          <p className="text-sm text-stone-700 tabular-nums">
-            Necesitas <span className="font-semibold">{money(eq.necesitas)}</span>/mes para no perder — vas en <span className="font-semibold">{money(eq.real)}</span>.
-            {eq.real >= eq.necesitas && <span className="text-green-600 font-medium"> ✓ Cubierto</span>}
-          </p>
-          <div className="relative h-3 rounded-full bg-stone-100 mt-3 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${eq.real >= eq.necesitas ? "bg-green-500" : "bg-teal-600"}`}
-              style={{ width: `${Math.min(eq.progresoPct, 1) * 100}%` }}
-            />
-            {/* Marca del 100% */}
-            <div className="absolute top-0 right-0 h-full w-0.5 bg-stone-400" />
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-stone-500">
-          Para calcularlo carga los gastos del mes en{" "}
-          {/* 44 px de alto sin romper el párrafo: el enlace sigue en línea, sólo
-              se le da blanco tocable arriba y abajo. Medía 129×17. */}
-          <Link
-            href="/gastos-contabilidad"
-            className="inline-flex min-h-[44px] items-center text-teal-600 hover:text-teal-700 font-medium"
-          >
-            Gastos
-          </Link>.
-        </p>
-      )}
-    </div>
-  );
-}
-
 // ── Semáforo por empresa ─────────────────────────────────────────────────────
+//
+// 🔴 EL "PUNTO DE EQUILIBRIO" SE RETIRÓ DE ESTA PANTALLA (11-ago-2026).
+// Su fórmula es `gastos fijos ÷ margen`, y la marca de "fijo" venía de la carga
+// manual de gastos, que ya no existe. El mayor contable no la trae. Antes de
+// retirarlo, la tarjeta le pedía al usuario que cargara los gastos del mes en
+// un módulo que ya no existe, y calcularlo con una clasificación
+// de cuentas que Daniel no aprobó habría dado un "necesitás vender $X" con un X
+// inventado. Vuelve el día que exista esa clasificación aprobada.
 
 const SEMAFORO_DOT: Record<SemaforoRow["estado"], string> = {
   verde: "bg-green-500",
@@ -385,8 +391,21 @@ const SEMAFORO_PILL: Record<SemaforoRow["estado"], { label: string; cls: string 
   verde: { label: "Sana", cls: "bg-green-50 text-green-700" },
   ambar: { label: "Al límite", cls: "bg-amber-50 text-amber-700" },
   rojo: { label: "Pierde plata", cls: "bg-red-50 text-red-700" },
-  sin_gastos: { label: "Sin gastos cargados", cls: "bg-stone-100 text-stone-500" },
+  // Sin gasto utilizable la píldora DICE POR QUÉ (ver `pillDe`); esto es sólo el
+  // caso en que ni siquiera hay contabilidad conectada.
+  sin_gastos: { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" },
 };
+
+/**
+ * La píldora de una empresa. Cuando no hay número, en vez de un genérico dice el
+ * motivo exacto — "Sin cerrar" no es lo mismo que "Falta planilla", y confundir
+ * los dos es lo que haría que alguien crea que ya tiene el dato.
+ */
+function pillDe(e: SemaforoRow): { label: string; cls: string } {
+  if (e.rentabilidad !== null) return SEMAFORO_PILL[e.estado];
+  if (e.motivo) return { label: ETIQUETA_SIN_GASTO[e.motivo], cls: "bg-stone-100 text-stone-500" };
+  return SEMAFORO_PILL.sin_gastos;
+}
 
 function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
   const [abierta, setAbierta] = useState<string | null>(null);
@@ -417,7 +436,7 @@ function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
             <SemaforoTarjeta
               key={e.key}
               e={e}
-              pill={SEMAFORO_PILL[e.estado]}
+              pill={pillDe(e)}
               abierta={abiertaEsta}
               onToggle={() => setAbierta(abiertaEsta ? null : e.key)}
               mes={mes}
@@ -440,7 +459,7 @@ function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
             {rows.length === 0 ? (
               <tr><td colSpan={4} className="px-3 py-6 text-center text-stone-400">Sin datos este mes.</td></tr>
             ) : rows.map((e) => {
-              const pill = SEMAFORO_PILL[e.estado];
+              const pill = pillDe(e);
               const abiertaEsta = abierta === e.key;
               return (
                 <SemaforoFila
@@ -466,14 +485,20 @@ function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
  * párrafo es exactamente como divergen los números entre pantallas.
  */
 function SemaforoDesglose({ e }: { e: SemaforoRow }) {
-  if (e.rentabilidad == null) {
-    return <p className="text-sm text-stone-500">Aún no hay gastos cargados para esta empresa este mes.</p>;
+  // 🔑 Sin número, la pantalla DICE POR QUÉ — y no le pide al usuario que cargue
+  // nada, porque no hay dónde cargarlo. El texto lo arma el servidor con la
+  // misma función para todas las empresas (`textoSinGasto`).
+  if (e.rentabilidad == null || e.gasto == null) {
+    return (
+      <p data-col="sin-gasto" className="text-sm text-stone-500">
+        {e.texto ?? "Todavía no hay gasto de contabilidad de esta empresa para este mes."}
+      </p>
+    );
   }
   return (
     <p className="text-sm text-stone-700 tabular-nums">
       Utilidad bruta <span data-col="utilidad" className="font-medium">{money(e.utilidad)}</span>
-      {" − "}Gastos directos <span data-col="gastos-directos" className="font-medium">{money(e.gastosDirectos)}</span>
-      {" − "}Parte de gastos de Grupo <span data-col="prorrateo" className="font-medium">{money(e.prorrateo)}</span>
+      {" − "}Gastos de contabilidad <span data-col="gastos" className="font-medium">{money(e.gasto)}</span>
       {" = "}Rentabilidad <span data-col="rentabilidad-detalle" className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
     </p>
   );

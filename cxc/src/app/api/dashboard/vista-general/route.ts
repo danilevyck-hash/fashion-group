@@ -4,11 +4,14 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
+import { estadoSemaforo, rentabilidadGrupo } from "@/lib/vista-general-calc";
+import { leerMayorMes } from "@/lib/mayor/leer";
 import {
-  prorratearGrupo,
-  estadoSemaforo,
-  puntoEquilibrio,
-} from "@/lib/vista-general-calc";
+  centAUsd,
+  gastoMostrable,
+  textoSinGasto,
+  type MotivoSinGasto,
+} from "@/lib/mayor/gastos";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +26,33 @@ export const dynamic = "force-dynamic";
 //     MV diaria, para cuadrar al centavo con /admin). 6 empresas. Vencido = ≥91d.
 //   - CXP: switch_proveedor_estadocuenta (6 empresas que tienen CXP). Vencido = ≥91d.
 //   - Reclamos: sin pagar antiguos.
-//   - Gastos / Rentabilidad / Equilibrio / Disponibilidad / Semáforo (v2):
-//     empresa_gastos_mensuales + gastos_categorias + bancos_saldos, con
-//     ?mes=YYYY-MM seleccionable (default = mes actual Panamá, futuros se
-//     ajustan al actual). Los gastos 'grupo' se prorratean por % de ventas del
-//     mes (cent-exact, ver src/lib/vista-general-calc.ts).
+//   - Gastos / Rentabilidad / Semáforo: el MAYOR CONTABLE de Switch, leído con
+//     `leerMayorMes` (src/lib/mayor/leer.ts) — la MISMA función que alimenta el
+//     módulo "Gastos". El gasto es `débito − crédito` de las cuentas que
+//     empiezan con `6.`, y puede ser negativo en alguna cuenta: es un reverso,
+//     no un error.
+//   - Disponibilidad: bancos_saldos (sin cambios).
 // Cada KPI reporta SOLO las empresas que tienen ese módulo (empresasCount), sin
 // inventar data de las que no lo tienen.
+//
+// ── Lo que se retiró, y por qué (11-ago-2026) ────────────────────────────────
+//
+// 🔴 **`empresa_gastos_mensuales` y `gastos_categorias` YA NO SE LEEN.** Eran la
+// carga manual de gastos, y el módulo que las llenaba se retiró (#467). La tabla
+// tiene 0 filas y se va a quedar así para siempre, así que todo lo que colgaba
+// de ella —el gasto del mes, la rentabilidad y el punto de equilibrio— mostraba
+// un estado vacío permanente. **Las tablas NO se borran** (eso es irreversible y
+// Daniel no lo pidió; hay un test que pone el build rojo ante un DROP): quedan
+// como respaldo histórico, simplemente sin lectores.
+//
+// 🔴 **El PUNTO DE EQUILIBRIO se retiró entero.** Su fórmula es
+// `gastos fijos ÷ margen`, y separar gasto FIJO de VARIABLE era la marca
+// `gastos_categorias.es_fijo` de la carga manual. El mayor NO trae esa marca:
+// sólo el código de cuenta. Clasificar las ~60 cuentas del grupo 6 en fijo y
+// variable es una decisión de negocio que Daniel no aprobó, y calcularlo con
+// supuestos propios daría un "necesitas vender $X" con un X inventado. Se
+// prefiere no mostrarlo antes que inventarlo. Vuelve el día que exista esa
+// clasificación aprobada.
 
 // Tramos de aging IDÉNTICOS para CXC y CXP. Partición LIMPIA en 2 que suma al
 // total: Corriente (0-90) + Vencido (≥91 = "+90 días") = Total. La columna
@@ -60,17 +83,31 @@ interface ReclamoRow { id: string; nro_reclamo: string | null; empresa: string |
 interface SummaryRow { empresa: string; mes: number; total_subtotal: number | string | null; total_utilidad: number | string | null; total_costo: number | string | null; }
 // Fila de ventas_rollup_mensual_mv (año anterior, para YoY y fallback de rentabilidad).
 interface MvRow { empresa_key: string; mes_num: number; ventas_netas: number | string | null; utilidad: number | string | null; }
-interface GastoRow { id: string; empresa_key: string; mes: string; categoria_id: string; monto: number | string | null; }
-interface CategoriaRow { id: string; es_fijo: boolean; }
 interface BancoRow { empresa_key: string; saldo: number | string | null; fecha_dato: string; }
 
-// ── Helpers de aritmética de meses (bucket "YYYY-MM") ──
-function mesKeyStr(y: number, m: number): string {
-  return `${y}-${String(m).padStart(2, "0")}`;
+/** El gasto del mes de UNA empresa, listo para pintar. */
+interface GastoEmpresa {
+  key: string;
+  name: string;
+  /** Dólares. `null` cuando el mes NO se puede mostrar como número. */
+  gasto: number | null;
+  motivo: MotivoSinGasto | null;
+  /** Frase honesta para el usuario cuando no hay número. */
+  texto: string | null;
+  /** Último mes cerrado de ESA empresa (`YYYY-MM`), o `null`. */
+  ultimoMesCerrado: string | null;
 }
-function addMonths(y: number, m: number, delta: number): { y: number; m: number } {
-  const idx = y * 12 + (m - 1) + delta;
-  return { y: Math.floor(idx / 12), m: ((idx % 12) + 12) % 12 + 1 };
+
+const MESES_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+/** `"2026-01"` → `"enero 2026"`. Tabla fija: el mismo texto en todo servidor. */
+function mesLargo(mes: string | null): string | null {
+  if (!mes || !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) return mes;
+  const [y, m] = mes.split("-");
+  return `${MESES_ES[Number(m) - 1]} ${y}`;
 }
 
 export async function GET(req: NextRequest) {
@@ -97,14 +134,7 @@ export async function GET(req: NextRequest) {
   const anioSel = parseInt(mesSelStr.slice(0, 4), 10);
   const mesSelNum = parseInt(mesSelStr.slice(5, 7), 10);
 
-  // Ventana de gastos: 12 meses terminando en el mes seleccionado (cubre el mes
-  // pedido + la búsqueda del último mes "completo" para el fallback de
-  // rentabilidad). empresa_gastos_mensuales.mes siempre es día 1.
-  const winStart = addMonths(anioSel, mesSelNum, -11);
-  const gastosDesde = `${mesKeyStr(winStart.y, winStart.m)}-01`;
-  const gastosHasta = `${mesSelStr}-01`;
-
-  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, gastosRes, categoriasRes, bancosRes] = await Promise.all([
+  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, mayorRes, bancosRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: anioSel }),
     // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
@@ -121,20 +151,18 @@ export async function GET(req: NextRequest) {
       .select("id,nro_reclamo,empresa,estado,fecha_reclamo")
       .eq("deleted", false).neq("estado", "Pagado")
       .order("fecha_reclamo", { ascending: true }),
-    // Año ANTERIOR completo desde la MV: YoY del mes seleccionado + fuente de
-    // ventas/utilidad cuando el fallback de rentabilidad cae en anioSel-1.
+    // Año ANTERIOR completo desde la MV: YoY del mes seleccionado.
     supabaseServer.from("ventas_rollup_mensual_mv")
       .select("empresa_key,mes_num,ventas_netas,utilidad")
       .eq("anio", anioSel - 1),
-    // Gastos vivos de la ventana de 12 meses (mes seleccionado + fallback).
-    supabaseServer.from("empresa_gastos_mensuales")
-      .select("id,empresa_key,mes,categoria_id,monto")
-      .is("anulado_en", null)
-      .gte("mes", gastosDesde)
-      .lte("mes", gastosHasta),
-    // TODAS las categorías (incl. inactivas: filas viejas pueden referenciar
-    // categorías ya desactivadas y su es_fijo sigue contando).
-    supabaseServer.from("gastos_categorias").select("id,es_fijo"),
+    // EL GASTO: el mayor contable de Switch, con la MISMA función que usa el
+    // módulo "Gastos". Falla ABIERTO: si la migración no corrió o la lectura se
+    // cae, la pantalla se dibuja entera y el gasto dice por qué no está — jamás
+    // un $0, que es indistinguible de un dato bueno.
+    leerMayorMes(mesSelStr).catch((e) => {
+      console.error("[vista-general] mayor:", e);
+      return null;
+    }),
     // Saldos bancarios: orden fecha_dato DESC → el primero por empresa es el
     // más reciente.
     supabaseServer.from("bancos_saldos")
@@ -152,8 +180,7 @@ export async function GET(req: NextRequest) {
 
   // Ventas/utilidad POR EMPRESA de un mes dado: si el mes cae en el año
   // seleccionado se lee del RPC; si cae en el año anterior, de la MV. null si
-  // ninguna fuente tiene filas de ese mes (mes sin data → el fallback de
-  // rentabilidad lo trata como "no encontrado").
+  // ninguna fuente tiene filas de ese mes.
   const ventasDelMes = (y: number, m: number): Map<string, { ventas: number; utilidad: number }> | null => {
     let src: { key: string; v: number; u: number }[] = [];
     if (y === anioSel) {
@@ -211,110 +238,76 @@ export async function GET(req: NextRequest) {
     margen = { pct: ventasTotal > 0 ? utilidadTotal / ventasTotal : null, utilidad: utilidadTotal };
   }
 
-  // ── GASTOS del mes seleccionado ──
-  const gastoRows = (gastosRes.data as GastoRow[] | null) ?? [];
-  const categoriaRows = (categoriasRes.data as CategoriaRow[] | null) ?? [];
-  if (gastosRes.error) console.error("[vista-general] empresa_gastos_mensuales:", gastosRes.error.message);
-  if (categoriasRes.error) console.error("[vista-general] gastos_categorias:", categoriasRes.error.message);
-  const esFijoById = new Map(categoriaRows.map((c) => [c.id, c.es_fijo]));
-
-  // Filas de gastos agrupadas por mes "YYYY-MM" (toda la ventana de 12 meses).
-  const gastosPorMes = new Map<string, GastoRow[]>();
-  for (const g of gastoRows) {
-    const k = (g.mes ?? "").slice(0, 7);
-    const arr = gastosPorMes.get(k);
-    if (arr) arr.push(g);
-    else gastosPorMes.set(k, [g]);
-  }
-
-  // Resumen de gastos de un mes: directos por empresa, total 'grupo', total del
-  // mes (incl. grupo), fijos (incl. grupo — alimentan el punto de equilibrio) y
-  // set de empresas reales con ≥1 gasto cargado.
-  const resumenGastosMes = (k: string) => {
-    const rows = gastosPorMes.get(k) ?? [];
-    const directosPorEmpresa = new Map<string, number>();
-    const empresasConGastos = new Set<string>();
-    let grupoTotal = 0, totalMes = 0, gastosFijos = 0;
-    for (const g of rows) {
-      const monto = num(g.monto);
-      totalMes += monto;
-      if (esFijoById.get(g.categoria_id)) gastosFijos += monto;
-      if (g.empresa_key === "grupo") {
-        grupoTotal += monto;
-      } else {
-        directosPorEmpresa.set(g.empresa_key, (directosPorEmpresa.get(g.empresa_key) ?? 0) + monto);
-        empresasConGastos.add(g.empresa_key);
-      }
-    }
-    return { directosPorEmpresa, empresasConGastos, grupoTotal, totalMes, gastosFijos };
-  };
-
-  const gastosSel = resumenGastosMes(mesSelStr);
-  // Prorrateo del gasto 'grupo' por % de ventas del mes seleccionado
-  // (cent-exact: las partes suman grupoTotal EXACTO, ver vista-general-calc).
-  const prorrateoSel = prorratearGrupo(
-    gastosSel.grupoTotal,
-    byEmpresa.map((e) => ({ key: e.key, ventas: e.ventas }))
+  // ── GASTOS del mes seleccionado (mayor contable de Switch) ──
+  //
+  // 🔑 LA REGLA QUE MANDA ACÁ: un mes sin cerrar, incompleto o sin el asiento de
+  // planilla NO produce número. `gastoMostrable` (módulo puro, `mayor/gastos.ts`)
+  // es quien lo decide, y es la MISMA función que usa el módulo "Gastos". Un
+  // gasto corto se ve igual que uno bueno; por eso, cuando no se puede, va el
+  // motivo en palabras y NUNCA un $0.
+  const mayorInstalado = mayorRes?.instalado === true;
+  const mayorPorEmpresa = new Map(
+    (mayorRes?.empresas ?? []).map((e) => [e.empresaKey, e]),
   );
-  const gastos = {
-    totalMes: gastosSel.totalMes,
-    gastosFijos: gastosSel.gastosFijos,
-    grupoTotal: gastosSel.grupoTotal,
-    empresasConGastos: [...gastosSel.empresasConGastos],
-  };
 
-  // ── RENTABILIDAD (utilidad − gastos) con FALLBACK al último mes completo ──
-  // Un mes está "completo" cuando las 8 empresas cargaron ≥1 gasto. Si el mes
-  // seleccionado no está completo, se retrocede (hasta 11 meses) al último mes
-  // completo y se recalcula ESE mes: utilidad del RPC si cae en el año
-  // seleccionado, de la MV si cae en el año anterior; si ninguna fuente tiene
-  // ese mes se sigue buscando. Sin mes completo con data → null (la UI muestra
-  // "sin datos suficientes"). Nota: el prorrateo del gasto 'grupo' no altera el
-  // TOTAL del mes (las partes suman grupoTotal exacto), así que para el KPI
-  // consolidado basta restar totalMes.
-  const mesCompleto = (k: string): boolean => {
-    const rows = gastosPorMes.get(k);
-    if (!rows) return false;
-    const empresas = new Set(rows.filter((g) => g.empresa_key !== "grupo").map((g) => g.empresa_key));
-    return ALL_EMPRESA_KEYS.every((e) => empresas.has(e));
-  };
-
-  let rentabilidad = null as null | {
-    mes: string; monto: number; pct: number | null; parcial: boolean; esMesSeleccionado: boolean;
-  };
-  for (let back = 0; back < 12; back++) {
-    const { y, m } = addMonths(anioSel, mesSelNum, -back);
-    const k = mesKeyStr(y, m);
-    if (!mesCompleto(k)) continue;
-    const vMap = ventasDelMes(y, m);
-    if (!vMap) continue; // gastos completos pero sin fuente de ventas → seguir buscando
-    const res = resumenGastosMes(k);
-    let vTot = 0, uTot = 0;
-    for (const v of vMap.values()) {
-      vTot += v.ventas;
-      uTot += v.utilidad;
+  const gastosPorEmpresa: GastoEmpresa[] = ALL_EMPRESA_KEYS.map((key) => {
+    const name = EMPRESA_KEY_TO_NAME[key] ?? key;
+    const m = mayorPorEmpresa.get(key);
+    if (!m) {
+      // Sin mayor (migración sin correr, o la lectura se cayó): no se sabe nada.
+      return {
+        key, name, gasto: null, motivo: null,
+        texto: "La contabilidad de Switch todavía no está conectada.",
+        ultimoMesCerrado: null,
+      };
     }
-    const monto = uTot - res.totalMes;
-    rentabilidad = {
-      mes: k,
-      monto,
-      pct: vTot > 0 ? monto / vTot : null,
-      parcial: k === mesActualPanama,
-      esMesSeleccionado: k === mesSelStr,
+    const g = gastoMostrable(m.resumen);
+    return {
+      key,
+      name,
+      gasto: g.usable ? centAUsd(g.totalCent ?? 0) : null,
+      motivo: g.motivo,
+      texto: g.motivo ? textoSinGasto(g.motivo, mesLargo(m.ultimoMesCerrado)) : null,
+      ultimoMesCerrado: m.ultimoMesCerrado,
     };
-    break;
-  }
+  });
 
-  // ── PUNTO DE EQUILIBRIO (mes seleccionado) ──
-  const margenPctSel = margen?.pct ?? null;
-  const necesitas = puntoEquilibrio(gastosSel.gastosFijos, margenPctSel);
-  const equilibrio = necesitas === null ? null : {
-    necesitas,
-    real: ventasTotal,
-    // La UI capea el display (>100% se muestra como cumplido).
-    progresoPct: ventasTotal / necesitas,
-    gastosFijos: gastosSel.gastosFijos,
-    margenPct: margenPctSel,
+  const conGasto = gastosPorEmpresa.filter((g) => g.gasto !== null);
+  const gastos = {
+    /** `false` = el mayor no está conectado o no se pudo leer. */
+    disponible: mayorInstalado,
+    /** Suma SÓLO de las empresas cuyo mes se puede mostrar. `null` si son cero. */
+    total: conGasto.length > 0 ? conGasto.reduce((s, g) => s + (g.gasto ?? 0), 0) : null,
+    empresasConGasto: conGasto.length,
+    empresasTotal: ALL_EMPRESA_KEYS.length,
+    porEmpresa: gastosPorEmpresa,
+  };
+
+  // ── RENTABILIDAD (utilidad bruta − gasto) ──
+  //
+  // 🔴 SOBRE EL MISMO SUBCONJUNTO DE EMPRESAS, siempre. Restarle el gasto de 4
+  // empresas a la utilidad de las 8 daría una rentabilidad inflada que se ve
+  // perfectamente normal. Las ventas, la utilidad y el gasto salen de las MISMAS
+  // empresas, y el payload dice cuántas son para que la pantalla lo escriba.
+  // Sin ninguna empresa con el mes utilizable → `null`: no hay nada honesto que
+  // mostrar. (Antes había un "fallback al último mes completo": se retiró porque
+  // exigía que las 8 empresas tuvieran el mismo mes, y la contadora va meses
+  // atrasada de forma DISTINTA en cada una — Boston está en junio 2025 y Vistana
+  // en enero 2026. Nunca hay un mes completo, y retroceder mezclaba meses.)
+  const gastoPorKey = new Map(gastosPorEmpresa.map((g) => [g.key, g.gasto]));
+  const rentBase = rentabilidadGrupo(
+    byEmpresa.map((e) => ({
+      key: e.key,
+      ventas: e.ventas,
+      utilidad: e.utilidad,
+      gasto: gastoPorKey.get(e.key) ?? null,
+    })),
+  );
+  const rentabilidad = rentBase === null ? null : {
+    mes: mesSelStr,
+    ...rentBase,
+    parcial: mesSelStr === mesActualPanama,
+    empresasTotal: ALL_EMPRESA_KEYS.length,
   };
 
   // ── DISPONIBILIDAD (último saldo bancario por empresa) ──
@@ -338,23 +331,24 @@ export async function GET(req: NextRequest) {
   }
 
   // ── SEMÁFORO por empresa (mes seleccionado, orden canónico) ──
-  // Rentabilidad por empresa SOLO si la empresa cargó gastos ese mes; sin
-  // gastos el número saldría inflado → null + estado "sin_gastos".
+  // Rentabilidad por empresa SOLO si el mes de ESA empresa se puede mostrar; si
+  // no, `null` + el motivo en palabras. Restarle a la utilidad un gasto corto
+  // pintaría de verde una empresa que puede estar perdiendo plata.
   const byEmpresaByKey = new Map(byEmpresa.map((e) => [e.key, e]));
+  const gastoByKey = new Map(gastosPorEmpresa.map((g) => [g.key, g]));
   const semaforo = ALL_EMPRESA_KEYS.map((key) => {
     const e = byEmpresaByKey.get(key)!;
-    const gastosDirectos = gastosSel.directosPorEmpresa.get(key) ?? 0;
-    const prorrateo = prorrateoSel.get(key) ?? 0;
-    const rent = gastosSel.empresasConGastos.has(key)
-      ? e.utilidad - (gastosDirectos + prorrateo)
-      : null;
+    const g = gastoByKey.get(key)!;
+    const rent = g.gasto !== null ? e.utilidad - g.gasto : null;
     return {
       key,
       name: e.name,
       ventas: e.ventas,
       utilidad: e.utilidad,
-      gastosDirectos,
-      prorrateo,
+      gasto: g.gasto,
+      motivo: g.motivo,
+      texto: g.texto,
+      ultimoMesCerrado: g.ultimoMesCerrado,
       rentabilidad: rent,
       pct: rent !== null && e.ventas > 0 ? rent / e.ventas : null,
       estado: estadoSemaforo(rent, e.ventas),
@@ -425,7 +419,7 @@ export async function GET(req: NextRequest) {
     generadoEn: new Date().toISOString(),
     ms: Date.now() - t0,
     mes: mesSelStr,
-    ventas, margen, gastos, rentabilidad, equilibrio, disponibilidad, semaforo,
+    ventas, margen, gastos, rentabilidad, disponibilidad, semaforo,
     cxc, cxp, reclamos,
   });
 }

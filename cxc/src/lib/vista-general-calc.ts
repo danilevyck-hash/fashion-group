@@ -6,49 +6,6 @@
 
 export type EstadoSemaforo = "verde" | "ambar" | "rojo" | "sin_gastos";
 
-/** Redondeo a centavos (2 decimales). */
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/**
- * Prorratea un gasto compartido ('grupo') entre empresas según su % de ventas
- * del mes.
- *
- * Reglas:
- *   - Empresas con ventas <= 0 reciben 0 (no participan del reparto).
- *   - Si el total de ventas participantes es <= 0, todas reciben 0 (no hay
- *     base para prorratear).
- *   - CENT-EXACT: cada parte se redondea a centavos y el residuo del redondeo
- *     se asigna a la empresa con MÁS ventas, para que la suma de las partes sea
- *     EXACTAMENTE grupoTotal — sin esto los redondeos individuales derivan
- *     ±$0.01-0.04 y el total no cuadra al centavo.
- */
-export function prorratearGrupo(
-  grupoTotal: number,
-  ventasPorEmpresa: { key: string; ventas: number }[]
-): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const e of ventasPorEmpresa) out.set(e.key, 0);
-
-  const participantes = ventasPorEmpresa.filter((e) => e.ventas > 0);
-  const totalVentas = participantes.reduce((s, e) => s + e.ventas, 0);
-  if (totalVentas <= 0 || grupoTotal === 0) return out;
-
-  let asignado = 0;
-  let mayor = participantes[0];
-  for (const e of participantes) {
-    if (e.ventas > mayor.ventas) mayor = e;
-    const parte = round2((grupoTotal * e.ventas) / totalVentas);
-    out.set(e.key, parte);
-    asignado = round2(asignado + parte);
-  }
-  // Residuo del redondeo → a la empresa más grande (mata el drift de centavos).
-  const residuo = round2(grupoTotal - asignado);
-  if (residuo !== 0) out.set(mayor.key, round2((out.get(mayor.key) ?? 0) + residuo));
-  return out;
-}
-
 /**
  * Estado del semáforo de rentabilidad por empresa.
  *
@@ -74,15 +31,72 @@ export function estadoSemaforo(
   return "verde";
 }
 
-/**
- * Punto de equilibrio: ventas necesarias para cubrir los gastos fijos con el
- * margen bruto actual. null cuando no se puede calcular (margen desconocido o
- * <= 0, o sin gastos fijos cargados).
- */
-export function puntoEquilibrio(
-  gastosFijos: number,
-  margenPct: number | null
-): number | null {
-  if (margenPct === null || margenPct <= 0 || gastosFijos <= 0) return null;
-  return gastosFijos / margenPct;
+// ── Rentabilidad del grupo ───────────────────────────────────────────────────
+
+/** Una empresa con sus ventas, su utilidad bruta y su gasto del mes. */
+export interface EmpresaConGasto {
+  key: string;
+  ventas: number;
+  utilidad: number;
+  /** `null` = el mes de ESA empresa no se puede mostrar (sin cerrar, sin planilla…). */
+  gasto: number | null;
 }
+
+export interface RentabilidadGrupo {
+  monto: number;
+  pct: number | null;
+  /** Ventas, utilidad y gasto SÓLO de las empresas contadas. */
+  ventas: number;
+  utilidad: number;
+  gastos: number;
+  empresasConGasto: number;
+}
+
+/**
+ * Rentabilidad consolidada = utilidad bruta − gasto, **sobre las mismas
+ * empresas**.
+ *
+ * 🩸 EL ERROR QUE ESTA FUNCIÓN EXISTE PARA IMPEDIR. Con 4 de 8 empresas con el
+ * mes cerrado, restarle el gasto de esas 4 a la utilidad de las 8 da una
+ * rentabilidad inflada que se ve perfectamente normal — nada en pantalla
+ * delataría que la resta mezcló dos universos. Por eso las tres cifras
+ * (`ventas`, `utilidad`, `gastos`) se acumulan en el MISMO bucle, y sólo entra
+ * la empresa cuyo `gasto` no es `null`.
+ *
+ * Devuelve `null` si ninguna empresa tiene gasto utilizable: no hay nada honesto
+ * que mostrar, y un $0 se leería como "no gasté nada".
+ */
+export function rentabilidadGrupo(rows: EmpresaConGasto[]): RentabilidadGrupo | null {
+  let ventas = 0, utilidad = 0, gastos = 0, n = 0;
+  for (const e of rows) {
+    if (e.gasto === null) continue;
+    ventas += e.ventas;
+    utilidad += e.utilidad;
+    gastos += e.gasto;
+    n++;
+  }
+  if (n === 0) return null;
+  const monto = utilidad - gastos;
+  return {
+    monto,
+    pct: ventas > 0 ? monto / ventas : null,
+    ventas,
+    utilidad,
+    gastos,
+    empresasConGasto: n,
+  };
+}
+
+// ── Lo que se retiró de este archivo (11-ago-2026) ───────────────────────────
+//
+// `prorratearGrupo` y `puntoEquilibrio` se borraron junto con la carga manual de
+// gastos, su única fuente de datos:
+//
+//  · `prorratearGrupo` repartía el gasto de la fila `empresa_key = 'grupo'`.
+//    El mayor contable NO tiene esa fila: cada gasto ya viene con la empresa que
+//    lo pagó.
+//  · `puntoEquilibrio` era `gastos fijos ÷ margen`, y "fijo" salía de
+//    `gastos_categorias.es_fijo`. El mayor sólo trae el código de cuenta, sin
+//    esa marca. Clasificar las ~60 cuentas del grupo 6 en fijo/variable es una
+//    decisión de negocio de Daniel; hasta que exista, el punto de equilibrio no
+//    se calcula (ver el encabezado de `api/dashboard/vista-general/route.ts`).

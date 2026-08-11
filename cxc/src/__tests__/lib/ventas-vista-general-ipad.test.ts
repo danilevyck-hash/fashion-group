@@ -178,14 +178,21 @@ describe("Vista General › Semáforo — tarjetas en iPhone, tabla desde md", (
   it("el desglose se dibuja UNA vez para las dos formas", () => {
     expect(vistaGeneral).toContain("function SemaforoDesglose");
     // Dos copias del mismo párrafo es como divergen los números entre pantallas.
-    expect(vistaGeneral.match(/Parte de gastos de Grupo/g) ?? []).toHaveLength(1);
+    // (El desglose pasó a ser "utilidad − gastos de contabilidad" cuando el gasto
+    // dejó de venir de la carga manual y empezó a salir del mayor de Switch: ya
+    // no hay gasto de "grupo" que prorratear, cada gasto trae su empresa.)
+    expect(vistaGeneral.match(/Gastos de contabilidad/g) ?? []).toHaveLength(1);
     expect(vistaGeneral).toContain("function VerGastosLink");
   });
 
-  it("la píldora de estado conserva sus cuatro textos", () => {
-    for (const label of ["Sana", "Al límite", "Pierde plata", "Sin gastos cargados"]) {
+  it("la píldora de estado conserva sus textos", () => {
+    for (const label of ["Sana", "Al límite", "Pierde plata"]) {
       expect(vistaGeneral).toContain(`label: "${label}"`);
     }
+    // 🔑 Sin número, la píldora dice POR QUÉ y no un genérico: los cuatro
+    // motivos salen de `ETIQUETA_SIN_GASTO` (módulo puro compartido con el
+    // servidor), no de una lista copiada acá.
+    expect(vistaGeneral).toContain("ETIQUETA_SIN_GASTO");
   });
 });
 
@@ -216,8 +223,10 @@ describe("blancos táctiles de 44 px en lo que se toca", () => {
     }
   });
 
-  it("Vista General: el enlace de gastos deja de medir 129×17", () => {
-    expect(vistaGeneral).toContain("inline-flex min-h-[44px] items-center text-teal-600");
+  it("Vista General: el enlace a Gastos respeta los 44 px de alto", () => {
+    // Era el enlace del punto de equilibrio (129×17), que se retiró con la
+    // tarjeta entera; el que queda es "Ver gastos de <empresa> →" del semáforo.
+    expect(vistaGeneral).toContain("inline-flex min-h-[44px] items-center text-xs text-teal-600");
   });
 });
 
