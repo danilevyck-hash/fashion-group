@@ -79,9 +79,9 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   ["components/marketing/AyudaClienteVinculado.tsx", "Elige del directorio para vincular"],
   ["app/marketing/components/FotosSection.tsx", "Respaldo visual que se adjunta a la cobranza a la marca"],
 
-  // ── Gastos de Empresa ────────────────────────────────────────────────────
-  ["app/gastos-empresa/components/EmpresaGastosForm.tsx", "se reparte entre las empresas según sus ventas del mes"],
-  ["app/gastos-empresa/components/EmpresaGastosForm.tsx", "Los gastos fijos se usan para el punto de equilibrio"],
+  // ── Gastos de Empresa: el módulo se retiró (11-ago-2026) ─────────────────
+  // Sus dos textos de ayuda explicaban la carga MANUAL de gastos, que ya no
+  // existe. No se "perdieron": se fueron con la pantalla que los alojaba.
 
   // ── Usuarios ─────────────────────────────────────────────────────────────
   ["app/admin/usuarios/page.tsx", "los deja ver en Cuentas por Cobrar únicamente los clientes de esa empresa"],

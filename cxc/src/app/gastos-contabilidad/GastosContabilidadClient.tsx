@@ -90,7 +90,7 @@ function GastosContabilidadInner() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AppHeader
-        module="Gastos según Contabilidad"
+        module="Gastos"
         breadcrumbs={empresaAbierta ? [{ label: empresaAbierta.nombre }] : undefined}
       />
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
@@ -102,7 +102,7 @@ function GastosContabilidadInner() {
           <>
             <div className="mb-4">
               <h1 className="text-xl font-semibold tracking-tight text-gray-900">
-                Gastos según Contabilidad
+                Gastos
               </h1>
               <p className="mt-1 text-sm text-gray-600">
                 Lo que gastó cada empresa según la contabilidad, mes por mes.

@@ -185,41 +185,44 @@ describe("los avisos se muestran", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dos módulos de gastos conviven en el grupo "Operación" y hacen cosas
-// DISTINTAS: `gastos-empresa` es la carga a mano por categorías, y
-// `gastos-contabilidad` es lo que sale del mayor de Switch.
+// EL MÓDULO SE LLAMA "Gastos", A SECAS — y es el ÚNICO de gastos que queda.
 //
-// 🩸 La primera versión de este PR los dejó como "Gastos de Empresa" y "Gastos
-// por Empresa": UNA PREPOSICIÓN de diferencia, uno debajo del otro en el menú.
-// Para alguien no técnico eso no son dos módulos, es un typo. Este candado
-// existe para que el parecido no vuelva por descuido.
-describe("los dos módulos de gastos no se confunden en el menú", () => {
-  it("sus nombres se distinguen por algo más que una palabra", () => {
-    const manual = ALL_MODULES.find((m) => m.key === "gastos-empresa")!;
+// 🩸 Historia, porque explica por qué este bloque existe: la primera versión de
+// este PR lo estrenó como "Gastos por Empresa" al lado del viejo "Gastos de
+// Empresa" — UNA PREPOSICIÓN de diferencia, uno debajo del otro en el menú.
+// Para alguien no técnico eso no son dos módulos, es un typo. Se corrigió a
+// "Gastos según Contabilidad", y después Daniel decidió el paso siguiente:
+// retirar el módulo viejo (la carga MANUAL, 0 filas en toda su historia) y
+// dejar éste con el nombre corto.
+//
+// El candado NO se desactivó al desaparecer el par: se GENERALIZÓ a todo el
+// catálogo y vive en `src/__tests__/lib/saldos-banco-modulo.test.ts`
+// ("los nombres de los módulos no se confunden entre sí"). Acá quedan las dos
+// cosas propias de ESTE módulo: cómo se llama y que la `key` no se mueva.
+describe("el módulo del mayor se llama \"Gastos\" y es el único", () => {
+  it("label corto, key intacta, y ningún otro módulo de gastos", () => {
     const mayor = ALL_MODULES.find((m) => m.key === "gastos-contabilidad")!;
-    expect(manual).toBeTruthy();
     expect(mayor).toBeTruthy();
+    expect(mayor.label).toBe("Gastos");
+    expect(mayor.href).toBe("/gastos-contabilidad");
+    expect(mayor.group).toBe("operacion");
 
-    // El módulo viejo NO se renombró: cambiar un label que la gente ya conoce
-    // se pregunta antes, no se hace de paso.
-    expect(manual.label).toBe("Gastos de Empresa");
-
-    const palabras = (s: string) =>
-      new Set(s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/));
-    const a = palabras(manual.label);
-    const b = palabras(mayor.label);
-    const distintas = [...b].filter((w) => !a.has(w));
-    expect(
-      distintas.length,
-      `"${manual.label}" vs "${mayor.label}" se parecen demasiado`,
-    ).toBeGreaterThanOrEqual(2);
+    // 🔴 La `key` NO cambia con el label: la migración del #463 y la fila de
+    // `role_permissions` ya corrieron con `gastos-contabilidad`.
+    expect(ALL_MODULES.find((m) => m.key === "gastos-empresa")).toBeUndefined();
+    expect(ALL_MODULES.filter((m) => /gasto/i.test(m.label))).toHaveLength(1);
   });
 
-  it("los dos siguen viviendo en Operación y no se pisan la ruta", () => {
-    const manual = ALL_MODULES.find((m) => m.key === "gastos-empresa")!;
-    const mayor = ALL_MODULES.find((m) => m.key === "gastos-contabilidad")!;
-    expect(manual.group).toBe("operacion");
-    expect(mayor.group).toBe("operacion");
-    expect(mayor.href).not.toBe(manual.href);
+  it("la pantalla dice el mismo nombre que el menú", () => {
+    const fuente = fs.readFileSync(
+      path.join(__dirname, "..", "..", "app", "gastos-contabilidad", "GastosContabilidadClient.tsx"),
+      "utf8",
+    );
+    expect(fuente).toContain('module="Gastos"');
+    // El <h1> dice lo mismo, y no queda ningún nombre largo en la pantalla.
+    expect(fuente).toMatch(/>\s*Gastos\s*<\/h1>/);
+    expect(fuente).not.toContain("Gastos según Contabilidad");
+    expect(fuente).not.toContain("Gastos por Empresa");
+    expect(fuente).not.toContain("Gastos de Empresa");
   });
 });

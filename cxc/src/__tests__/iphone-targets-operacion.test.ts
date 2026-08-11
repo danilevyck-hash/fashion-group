@@ -119,7 +119,6 @@ describe("Tamaño de letra · nada por debajo de text-xs (13px)", () => {
   const modulos: Record<string, string[]> = {
     marketing: ["app/marketing"],
     reclamos: ["app/reclamos"],
-    "gastos-empresa": ["app/gastos-empresa"],
     "saldos-banco": ["app/saldos-banco"],
     multifashion: ["components/multifashion"],
   };

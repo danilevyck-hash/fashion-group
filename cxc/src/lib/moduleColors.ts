@@ -28,7 +28,7 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   "packing-lists": { border: "border-teal-500",    text: "text-teal-500",    hex: "#14b8a6" },
   proveedores: { border: "border-purple-600",  text: "text-purple-600",  hex: "#9333ea" },
   cargar:      { border: "border-teal-600",     text: "text-teal-600",    hex: "#0d9488" },
-  "gastos-empresa": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
+  "gastos-contabilidad": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
   "saldos-banco":   { border: "border-lime-600",  text: "text-lime-600",  hex: "#65a30d" },
 };
 
@@ -48,7 +48,7 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/packing-lists"))   return "packing-lists";
   if (pathname.startsWith("/proveedores"))     return "proveedores";
   if (pathname.startsWith("/productos/cargar")) return "cargar";
-  if (pathname.startsWith("/gastos-empresa"))  return "gastos-empresa";
+  if (pathname.startsWith("/gastos-contabilidad")) return "gastos-contabilidad";
   if (pathname.startsWith("/saldos-banco"))    return "saldos-banco";
   return null;
 }

@@ -88,8 +88,10 @@ export const ALL_MODULES: AppModule[] = [
   { key: "comisiones",     label: "Comisiones",        href: "/comisiones",       icon: Coins,         roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
-  { key: "gastos-empresa", label: "Gastos de Empresa", href: "/gastos-empresa",   icon: Receipt,       roles: ["admin", "contabilidad"],                     group: "operacion" },
-  { key: "gastos-contabilidad", label: "Gastos según Contabilidad", href: "/gastos-contabilidad", icon: Receipt, roles: ["admin", "contabilidad"],  group: "operacion" },
+  // "Gastos" a secas: es el ÚNICO módulo de gastos que queda. La `key` sigue
+  // siendo `gastos-contabilidad` a propósito — la migración y la fila de
+  // role_permissions ya corrieron con ese nombre y renombrarla no compra nada.
+  { key: "gastos-contabilidad", label: "Gastos",         href: "/gastos-contabilidad", icon: Receipt,   roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "saldos-banco",   label: "Saldos de Banco",   href: "/saldos-banco",     icon: Landmark,      roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
@@ -145,8 +147,11 @@ export function getDefaultModulesForRole(role: string): string[] {
  *  contabilidad contiene 'saldos-banco'). Quitarlo antes se ve exactamente
  *  igual que "a contabilidad le desapareció un módulo". */
 export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
-  // Los saldos de banco eran una sección de "Gastos de Empresa" (#463 y su
-  // continuación los separan en dos módulos).
+  // Los saldos de banco eran una sección de "Gastos de Empresa", que ya se
+  // retiró. La key vieja SIGUE en `role_permissions.contabilidad.modulos`
+  // mientras nadie corra la migración, así que la herencia es justamente lo
+  // que hace que retirar el módulo NO le apague el menú a quien carga los
+  // saldos. Se quita cuando la DDL esté corrida y verificada.
   "saldos-banco": "gastos-empresa",
 };
 

@@ -1,7 +1,7 @@
 // Medición del módulo "Saldos de Banco" en los TRES anchos: 390 · 834 · 1440.
 //
-// Qué mide, en /saldos-banco, /gastos-empresa (el viejo, que todavía los
-// muestra) y /vista-general:
+// Qué mide, en /saldos-banco, el módulo de gastos que esté vivo
+// (`RUTA_GASTOS`, por defecto /gastos-contabilidad) y /vista-general:
 //   · ARRASTRE — la página pide más ancho del que se ve.
 //   · RECORTE  — un contenedor pide más de lo que muestra (peor que arrastrar:
 //                el dato queda fuera y no hay forma de alcanzarlo).
@@ -29,6 +29,8 @@ import crypto from "crypto";
 
 const BASE = process.env.BASE ?? "http://localhost:3461";
 const OUT = process.env.OUT ?? "/tmp/saldos-banco";
+// El módulo de gastos que convive con éste. Antes del retiro era /gastos-empresa.
+const RUTA_GASTOS = process.env.RUTA_GASTOS ?? "/gastos-contabilidad";
 mkdirSync(OUT, { recursive: true });
 
 const ANCHOS = [
@@ -122,13 +124,13 @@ for (const a of ANCHOS) {
   const filas = await page.evaluate(LEER_FILAS);
   await page.screenshot({ path: `${OUT}/saldos-banco-${a.w}.png`, fullPage: true });
 
-  // ── /gastos-empresa (el viejo: los saldos siguen ahí) ────────────────────
-  await page.goto(`${BASE}/gastos-empresa`, { waitUntil: "networkidle", timeout: 120_000 });
-  await page.waitForSelector('input[inputmode="decimal"]', { timeout: 60_000 });
-  await page.waitForTimeout(400);
+  // ── El módulo de gastos que convive con éste ─────────────────────────────
+  await page.goto(`${BASE}${RUTA_GASTOS}`, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.waitForSelector("main", { timeout: 60_000 });
+  await page.waitForTimeout(1200);
   const viejo = await page.evaluate(MEDIR);
   const filasViejo = await page.evaluate(LEER_FILAS);
-  await page.screenshot({ path: `${OUT}/gastos-empresa-${a.w}.png`, fullPage: true });
+  await page.screenshot({ path: `${OUT}/gastos-${a.w}.png`, fullPage: true });
 
   // ── /vista-general (Disponibilidad) ──────────────────────────────────────
   await page.goto(`${BASE}/vista-general`, { waitUntil: "networkidle", timeout: 180_000 });

@@ -86,7 +86,7 @@ describe("Saldos de Banco — permiso heredado mientras la DDL no corra", () => 
     expect(getVisibleModules("contabilidad", conDdl).map((m) => m.key)).toContain("saldos-banco");
   });
 
-  it("el día que se retire `gastos-empresa` de la lista guardada, la herencia ya no alcanza → la DDL es obligatoria antes de ese PR", () => {
+  it("si `gastos-empresa` se va de la lista GUARDADA, la herencia ya no alcanza → ahí sí la DDL es obligatoria", () => {
     const sinElViejo = ["asistencia", "prestamos", "proveedores", "ventas"];
     expect(getVisibleModules("contabilidad", sinElViejo).map((m) => m.key)).not.toContain("saldos-banco");
   });
@@ -136,36 +136,54 @@ describe("Saldos de Banco — permiso heredado mientras la DDL no corra", () => 
 // 3. 🔴 EL ORDEN DE MERGE — la carga manual de gastos NO se va en este PR
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("la carga manual de gastos sigue en pie (se retira en OTRO PR)", () => {
-  it("el módulo `gastos-empresa` sigue en el menú, con su nombre de siempre", () => {
-    const viejo = ALL_MODULES.find((m) => m.key === "gastos-empresa");
-    expect(viejo, "no se puede retirar acá: el módulo nuevo todavía no está publicado").toBeTruthy();
-    expect(viejo!.label).toBe("Gastos de Empresa");
-    expect(viejo!.href).toBe("/gastos-empresa");
+describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () => {
+  it("queda UN solo módulo de gastos, y se llama \"Gastos\"", () => {
+    const deGastos = ALL_MODULES.filter((m) => /gasto/i.test(m.label) || /gastos/.test(m.key));
+    expect(deGastos.map((m) => m.key)).toEqual(["gastos-contabilidad"]);
+    expect(deGastos[0].label).toBe("Gastos");
+    expect(deGastos[0].href).toBe("/gastos-contabilidad");
+    // 🔴 La `key` NO cambió: la migración del #463 y la fila de role_permissions
+    // ya corrieron con ese nombre. Renombrarla no compra nada y rompe las dos.
+    expect(deGastos[0].key).toBe("gastos-contabilidad");
   });
 
-  it("la pantalla y las rutas de la carga manual siguen existiendo", () => {
-    for (const p of [
-      "src/app/gastos-empresa/page.tsx",
-      "src/app/gastos-empresa/components/EmpresaGastosForm.tsx",
-      "src/app/gastos-empresa/components/ChecklistView.tsx",
-      "src/app/api/gastos-empresa/resumen/route.ts",
-      "src/app/api/gastos-empresa/gastos/route.ts",
-      "src/app/api/gastos-empresa/categorias/route.ts",
-      "src/app/api/gastos-empresa/copiar-mes/route.ts",
-    ]) {
-      expect(existsSync(join(raiz, p)), `${p} no se toca en este PR`).toBe(true);
+  it("el módulo viejo se fue del menú y de la app", () => {
+    expect(ALL_MODULES.find((m) => m.key === "gastos-empresa")).toBeUndefined();
+    for (const p of ["src/app/gastos-empresa", "src/app/api/gastos-empresa"]) {
+      expect(existsSync(join(raiz, p)), `${p} debía retirarse`).toBe(false);
     }
   });
 
-  it("mientras el módulo viejo exista sigue MOSTRANDO los saldos — nadie se queda sin el dato en el medio", () => {
-    const cliente = leer("src/app/gastos-empresa/GastosEmpresaClient.tsx");
-    expect(cliente).toMatch(/<SaldosBancarios\b/);
-    // Y usa el componente MUDADO, no una copia: dos copias divergen y sólo se
-    // nota cuando una guarda distinto que la otra.
-    expect(cliente).toContain('from "@/app/saldos-banco/components/SaldosBancarios"');
-    expect(existsSync(join(raiz, "src/app/gastos-empresa/components/SaldosBancarios.tsx")))
-      .toBe(false);
+  it("🔴 el módulo nuevo TIENE que estar publicado para que esto sea seguro", () => {
+    // El candado que sostiene el orden: si esto se mergeara sin el módulo del
+    // mayor, no quedaría ningún módulo de gastos y Daniel se queda sin ninguno.
+    expect(existsSync(join(raiz, "src/app/gastos-contabilidad/page.tsx"))).toBe(true);
+    expect(existsSync(join(raiz, "src/app/api/gastos-contabilidad/resumen/route.ts"))).toBe(true);
+  });
+
+  it("los saldos de banco NO se fueron con él: siguen teniendo su módulo", () => {
+    expect(ALL_MODULES.find((m) => m.key === "saldos-banco")).toBeTruthy();
+    expect(existsSync(join(raiz, "src/app/saldos-banco/components/SaldosBancarios.tsx"))).toBe(true);
+    expect(existsSync(join(raiz, "src/app/api/saldos-banco/route.ts"))).toBe(true);
+  });
+
+  it("las TABLAS no se borraron — 0 filas no es motivo para un DROP", () => {
+    // `empresa_gastos_mensuales` tiene 0 filas y `gastos_categorias` 6, pero
+    // borrar tablas es irreversible y Daniel no lo pidió. Vista General las
+    // sigue leyendo y no se rompe con la tabla vacía (hoy ya está vacía).
+    const dir = join(raiz, "supabase", "migrations");
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".sql")) continue;
+      const sql = readFileSync(join(dir, f), "utf8")
+        .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+      for (const t of ["empresa_gastos_mensuales", "gastos_categorias", "bancos_saldos"]) {
+        expect(sql, `${f} no puede borrar ${t}`).not.toMatch(new RegExp(`DROP\\s+TABLE[^;]*${t}`, "i"));
+      }
+    }
+    const vg = leer("src/app/api/dashboard/vista-general/route.ts");
+    expect(vg).toContain('.from("empresa_gastos_mensuales")');
+    expect(vg).toContain('.from("gastos_categorias")');
+    expect(vg).toContain('.from("bancos_saldos")');
   });
 });
 

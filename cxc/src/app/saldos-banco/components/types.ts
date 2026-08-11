@@ -3,8 +3,7 @@
 // Este archivo es la CASA de los helpers de saldo bancario (empresa, fecha,
 // monto). Vivían dentro de `app/gastos-empresa/components/types.ts` porque los
 // saldos eran una sección de esa pantalla; al mudarse a su propio módulo se
-// mudaron con ella. `gastos-empresa` los RE-EXPORTA desde acá mientras exista
-// — una sola definición, nunca dos que puedan divergir.
+// mudaron con ella. Ese módulo ya se retiró: ésta es la única casa que tienen.
 
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
