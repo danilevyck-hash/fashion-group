@@ -78,6 +78,13 @@ export interface VentaDia {
   venta: number;
 }
 
+/** Un mes de venta NETA del artículo (NC ya restadas). */
+export interface MesVenta {
+  mes: string; // YYYY-MM
+  unidades: number;
+  venta: number;
+}
+
 function num(v: number | string | null | undefined): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
@@ -105,6 +112,28 @@ export function ventasNetasPorDia(
   return [...porDia.entries()]
     .map(([fecha, v]) => ({ fecha, unidades: v.unidades, venta: v.venta }))
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+/**
+ * Días netos → meses netos, ordenados por mes ascendente.
+ *
+ * 🔴 NO se vuelve a firmar nada: los días ya vienen netos de
+ * `ventasNetasPorDia()`, que es el ÚNICO lugar donde se aplica `signoTipo()`.
+ * Un mes puede quedar NEGATIVO (más devoluciones que ventas) y así se muestra:
+ * ponerlo en cero inflaría lo vendido.
+ */
+export function ventasPorMes(dias: readonly VentaDia[]): MesVenta[] {
+  const porMes = new Map<string, { unidades: number; venta: number }>();
+  for (const d of dias) {
+    const m = mesDeFecha(d.fecha);
+    const g = porMes.get(m) ?? { unidades: 0, venta: 0 };
+    g.unidades += d.unidades;
+    g.venta += d.venta;
+    porMes.set(m, g);
+  }
+  return [...porMes.entries()]
+    .map(([mes, v]) => ({ mes, unidades: v.unidades, venta: v.venta }))
+    .sort((a, b) => a.mes.localeCompare(b.mes));
 }
 
 // ─── Costos ──────────────────────────────────────────────────────────────────
@@ -762,6 +791,12 @@ export interface ArticuloCompras {
   descripcion: string;
   /** Compras dentro de la ventana de historia, la más nueva PRIMERO. */
   compras: CompraMedida[];
+  /** Venta NETA mes a mes, TODA su historia, ascendente. De acá salen las
+   *  barras de los 12 meses completos, el "vendo por mes" y el precio real
+   *  (`@/lib/ventas/resumen-articulo`). Va la historia entera y no solo los 12
+   *  meses porque hace falta saber CUÁNDO empezó a venderse: un artículo que
+   *  llegó en diciembre no se promedia entre 12. */
+  serie: MesVenta[];
   /** Compras que existen pero quedaron fuera de la ventana de 3 años. */
   comprasFueraDeVentana: number;
   /** El artículo COMPLETO en una línea: cuánto hay en bodega y cuánto tardó en
@@ -835,6 +870,7 @@ export function armarArticulo(e: EntradaArticulo, hoy: string): ArticuloCompras 
     codigo: e.codigo,
     descripcion: e.descripcion,
     compras: visibles,
+    serie: ventasPorMes(dias),
     comprasFueraDeVentana: fuera,
     resumen: resumirArticulo(visibles, e.existencia),
     cuadre,

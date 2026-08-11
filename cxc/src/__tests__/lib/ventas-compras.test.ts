@@ -1234,18 +1234,55 @@ describe("el Excel de Referencia", () => {
     return { encabezado, cuerpo: cuerpo.map(porNombre) };
   }
 
-  it("baja el resumen del artículo, en columnas que se pueden ordenar", async () => {
-    const { encabezado, cuerpo } = await filasDelSheet();
-    for (const col of ["En bodega (artículo)", "Compras ya acabadas", "U. ya acabadas", "Meses vendiéndolas"]) {
+  // 🔴 LA HOJA 1 ES LA PANTALLA: una fila por ARTÍCULO con los tres números
+  // grandes, el precio real, el margen y los 12 meses. Daniel baja este archivo
+  // para escribir en él la cantidad que va a pedir — si trajera solo la materia
+  // prima tendría que rehacer la cuenta afuera.
+  async function filasDeReferencia() {
+    const XLSX = await import("xlsx-js-style");
+    const { buildReferenciaSheet } = await import("@/lib/ventas/referencia-excel");
+    const ws = await buildReferenciaSheet([ART()], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const encabezado = filas.find((f) => f.includes("Referencia")) as string[];
+    const cuerpo = filas.slice(filas.indexOf(encabezado) + 1);
+    const porNombre = (f: unknown[]) =>
+      Object.fromEntries(encabezado.map((h, i) => [h, f[i]])) as Record<string, unknown>;
+    return { encabezado, cuerpo: cuerpo.map(porNombre) };
+  }
+
+  it("la hoja 1 trae los TRES números y el margen — una fila por artículo", async () => {
+    const { encabezado, cuerpo } = await filasDeReferencia();
+    for (const col of [
+      "Mi última compra",
+      "Vendo por mes",
+      "Me queda para (meses)",
+      "Vendí a",
+      "Me costó (CIF)",
+      "Margen",
+      "En bodega",
+    ]) {
       expect(encabezado, `falta la columna "${col}"`).toContain(col);
     }
-    const r = ART().resumen;
-    // El resumen es del ARTÍCULO: se repite igual en cada una de sus compras.
-    for (const fila of cuerpo) {
-      expect(fila["En bodega (artículo)"]).toBe(r.enBodega);
-      expect(fila["Compras ya acabadas"]).toBe(r.comprasAgotadas);
-      expect(fila["U. ya acabadas"]).toBe(r.unidadesAgotadas);
-    }
+    expect(cuerpo).toHaveLength(1); // un artículo = una fila
+    expect(cuerpo[0]["Referencia"]).toBe("NB2570001");
+    expect(cuerpo[0]["En bodega"]).toBe(204);
+    // La ÚLTIMA compra es la del 19-feb-2026, no la agotada de abril.
+    expect(cuerpo[0]["Llegó"]).toBe("2026-02-19");
+    expect(cuerpo[0]["Anterior: llegó"]).toBe("2025-04-01");
+  });
+
+  it("la hoja 1 trae los 12 meses COMPLETOS en columnas, sin el mes en curso", async () => {
+    const { encabezado } = await filasDeReferencia();
+    // Corte 2026-08 → la ventana termina en jul 2026 y arranca en ago 2025.
+    expect(encabezado).toContain("jul 2026");
+    expect(encabezado).toContain("ago 2025");
+    expect(encabezado).not.toContain("ago 2026"); // 🔴 el mes en curso NUNCA
+  });
+
+  it("🩸 la columna DESC. (descuento) se fue de las dos hojas — Daniel: 'no sirve'", async () => {
+    const { encabezado: hoja1 } = await filasDeReferencia();
+    const { encabezado: hoja2 } = await filasDelSheet();
+    for (const h of [...hoja1, ...hoja2]) expect(h).not.toBe("Desc.");
   });
 
   it("baja las unidades vendidas y los meses de CADA compra, como números", async () => {

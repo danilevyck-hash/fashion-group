@@ -133,6 +133,16 @@ const REFERENCIA_RESP: ComprasApiResp = {
       codigo: "40HM265032",
       descripcion: "KAHLO PASSCASE",
       compras: [COMPRA_40HM265032],
+      // Su venta real mes a mes. TODA es anterior a la ventana de 12 meses
+      // completos que mira la pantalla (ago-2025 → jul-2026), así que este
+      // artículo ejerce el camino "no vendió nada en el período".
+      serie: [
+        { mes: "2024-01", unidades: 70, venta: 1120 },
+        { mes: "2024-02", unidades: 70, venta: 1120 },
+        { mes: "2024-03", unidades: 70, venta: 1120 },
+        { mes: "2024-04", unidades: 66, venta: 1056 },
+        { mes: "2025-04", unidades: 3, venta: 48 },
+      ],
       comprasFueraDeVentana: 0,
       // Derivado con la MISMA función que usa el servidor: un resumen escrito a
       // mano acá podría contradecir al de producción sin que nadie se entere.
@@ -162,6 +172,11 @@ const PROHIBIDOS = [
   "Descontinuado",
   "DESCONTINUADO",
   "u/mes",
+  // Podados el 11-ago-2026: la línea de resumen del artículo y la columna del
+  // descuento. Daniel: la última compra le basta, y el descuento *"no sirve"*.
+  "Ya se acabaron",
+  "Ya se acabó",
+  "Todavía no se ha acabado ninguna compra",
 ];
 
 async function buscarUnaReferencia() {
@@ -172,23 +187,40 @@ async function buscarUnaReferencia() {
   await screen.findAllByText("40HM265032");
 }
 
-describe("Referencia · una fila por COMPRA, sin veredictos ni promedios", () => {
-  it("la compra real se ve: cuándo llegó, cuánto llegó, CUÁNTO SE VENDIÓ y en cuánto tiempo", async () => {
+describe("Referencia · los TRES números, sin veredictos ni promedios", () => {
+  it("'Mi última compra' dice cuánto llegó y en cuánto tiempo se vendió", async () => {
     await buscarUnaReferencia();
-    expect(screen.getAllByText("28 nov 2023").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/280 u/).length).toBeGreaterThan(0);
-    // 🩸 Las UNIDADES VENDIDAS y los meses van juntos en una sola celda. Antes
-    // acá decía solo "16 meses" y, en una tanda viva, "te quedan N" — que
-    // repetía la columna QUEDA y se comía el dato que Daniel vino a buscar.
-    expect(screen.getAllByText("279 u en 16 meses").length).toBeGreaterThan(0);
+    // 🩸 El número grande son las unidades que LLEGARON, y el pie dice cuándo
+    // llegó y cuándo se acabó. Es el formato del mockup aprobado
+    // ("240 u en 15 meses · llegó 9 abr 2025 · se acabó jul 2026"). En una
+    // compra que TODAVÍA no se acaba el titular lo dice y el pie muestra
+    // "van N" — o sea que lo vendido nunca queda invisible.
+    expect(screen.getAllByText("280 u en 16 meses").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/llegó 28 nov 2023 · se acabó abr 2025/).length).toBeGreaterThan(0);
   });
 
-  it("el resumen del artículo dice cuánto hay en bodega y cuánto tardó lo agotado", async () => {
+  it("los otros dos números están, y el stock se sigue viendo", async () => {
     await buscarUnaReferencia();
-    // Artículo agotado: el total dice 0 CLARO, no desaparece.
-    expect(screen.getAllByText(/En bodega/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("0 u").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Ya se acabó 1 compra: 280 u en 16 meses").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Vendo por mes").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Me queda para").length).toBeGreaterThan(0);
+    // Artículo agotado: el 0 de bodega se dice CLARO, no desaparece.
+    expect(screen.getAllByText(/0 en bodega/).length).toBeGreaterThan(0);
+  });
+
+  it("🔴 el margen NO se inventa: si no vendió en el período, la pantalla LO DICE", async () => {
+    await buscarUnaReferencia();
+    expect(screen.getAllByText(/No se puede calcular el margen/).length).toBeGreaterThan(0);
+    // Y no aparece ningún porcentaje de margen fabricado.
+    expect(screen.queryByText(/^margen/)).toBeNull();
+  });
+
+  it("la tabla con UNA FILA POR COMPRA se fue — Daniel: 'la ultima me basta'", async () => {
+    await buscarUnaReferencia();
+    // Ni la tabla de escritorio ni las tarjetas por compra siguen montadas.
+    expect(document.querySelector('[data-vista="tabla"]')).toBeNull();
+    expect(document.querySelector('[data-vista="tarjetas"]')).toBeNull();
+    // Y la columna DESC. (descuento) — textual: "no sirve".
+    expect(document.body.textContent ?? "").not.toContain("Desc.");
   });
 
   it("🩸 los textos del diseño viejo NO están en pantalla — no se mudaron a un ⓘ, se fueron", async () => {

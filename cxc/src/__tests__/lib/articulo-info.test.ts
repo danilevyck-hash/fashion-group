@@ -169,18 +169,21 @@ describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisió
       path.resolve(process.cwd(), "src/components/ventas/ReferenciaView.tsx"),
       "utf8",
     );
-    // Un `fmtMoney(c.costos.fob)` suelto sería un FOB desnudo. El único lugar
-    // donde puede aparecer es adentro del componente <Fob/>.
+    // Un `costos.fob` suelto sería un FOB desnudo. El único lugar donde puede
+    // aparecer es adentro del componente <Fob/>.
     const cuerpoFob = vista.slice(vista.indexOf("function Fob("));
-    const usos = [...vista.matchAll(/fmtMoney\((?:[a-z]\.)?costos\.fob\)/g)];
+    const usos = [...vista.matchAll(/costos\.fob/g)];
     for (const u of usos) {
       expect(
         cuerpoFob.includes(u[0]),
         `"${u[0]}" aparece fuera del componente <Fob/> — sería un FOB sin procedencia`,
       ).toBe(true);
     }
-    // Y la vista tiene que usar <Fob/> en las DOS caras (tabla y tarjetas).
-    expect(vista.match(/<Fob c=\{c\} \/>/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // Y la vista tiene que USAR <Fob/>. ⚠️ Antes se exigían DOS usos porque la
+    // pantalla tenía dos caras (tabla en escritorio, tarjetas en celular). La
+    // poda del 11-ago-2026 dejó UNA sola fila de costos, que sirve a los tres
+    // anchos: exigir dos sería exigir la tabla de vuelta.
+    expect(vista.match(/<Fob c=\{[a-z]\} \/>/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 });
 

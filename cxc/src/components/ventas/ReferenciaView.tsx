@@ -4,26 +4,30 @@
 // Tab "Referencia" de /ventas (solo admin — el guard real es el SSR de la
 // página + requireRole en el API; esta vista es solo la cara).
 //
-// ES UNA TABLA. UNA FILA POR COMPRA. Daniel, después de rechazar dos diseños
-// por complicados: *"quiero la data clara y simple. cuando me llego, cuanto me
-// lllego y en cuanto tiempo lo vendi, punto"* y *"normalmente cuando hago
-// ingreso de mercancia veo por articulo por ejemplo compre 60 piezas, y veo
-// cuanto tiempo me demoro en venderlas y que meses"*.
+// 🔴 LA ESPECIFICACIÓN ES UNA FRASE DE DANIEL, y la pantalla no muestra nada más:
+//   *"cuánto tiempo demoré en vender mi compra, cuánto por mes, para cuántos
+//    meses me queda el stock actual"*
+// Tres números grandes por artículo (color), las barras de los 12 meses
+// completos con oct·nov·dic resaltados, el precio real de venta con su margen, y
+// la fila de costos. Se usa PARA HACER PEDIDO: mira, decide y escribe la
+// cantidad en su Excel.
 //
-// 🩸 LO QUE SE FUE, Y POR QUÉ NO VUELVE:
-//   · "Se te acaba en ~46 meses" — medía cuánto duró LO DE ANTES, no lo que
-//     hay. Con 89 unidades vendiendo ~32/mes se acaba en 2,8, no en 46.
-//   · "compra ~138 unidades" y los veredictos SE AGOTÓ / DESCONTINUADO. Él mira
-//     los números y decide; ya rechazó dos diseños por eso.
-//   · Los promedios de 3/6/12 meses, que metían el mes en curso adentro y
-//     hacían parecer moribundo a todo el catálogo los primeros días del mes.
-//     Acá NO HAY NI UN PROMEDIO: por construcción, el defecto no puede volver.
-//   · La pestaña "Varias · pegar lista". Daniel: *"porq columna de varias pegar
-//     por lista? enves de ponerlo en el mismo buscador que una?"*. Un solo
-//     buscador: si pegás un código busca uno, si pegás veinte busca veinte.
+// 🩸 LO QUE SE FUE EN ESTA PODA, Y POR QUÉ NO VUELVE:
+//   · La tabla con UNA FILA POR COMPRA. *"la ultima me basta"* — las viejas
+//     quedan detrás de "Ver las N compras anteriores".
+//   · La línea "En bodega 345 u · Ya se acabaron 2 compras…".
+//   · La columna DESC. (descuento). Textual: *"no sirve"*.
+//   · Y de antes: "Se te acaba en ~46 meses", "compra ~138 unidades", los
+//     veredictos SE AGOTÓ / DESCONTINUADO y la pestaña "Varias · pegar lista".
 //
-// Toda la matemática viene de los módulos PUROS (@/lib/ventas/compras y
-// referencia) — acá no se suma ni se firma nada.
+// 🔴 LO QUE ENTRÓ, Y ES LA MITAD DE SU DECISIÓN: el PRECIO REAL DE VENTA y el
+// MARGEN. Daniel no compra si *"vendi a margen bajo o negativo"*, y ese número
+// no existía: la pantalla mostraba el precio de LISTA, que no es a lo que
+// vendió (los descuentos se lo comen). El precio real sale de
+// `venta_total ÷ cantidad_total` con las NC restadas; el margen, contra el CIF.
+//
+// Toda la matemática viene de los módulos PUROS (@/lib/ventas/resumen-articulo,
+// compras y referencia) — acá no se suma, no se divide y no se firma nada.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useMemo, useState } from "react";
@@ -32,15 +36,20 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { Download, Search } from "lucide-react";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import { colorDe, modeloDe, MAX_CODIGOS_MULTI } from "@/lib/ventas/referencia";
+import type { ArticuloCompras, CompraMedida, ComprasApiResp } from "@/lib/ventas/compras";
 import {
-  textoMesesVendidos,
-  type ArticuloCompras,
-  type CompraMedida,
-  type ComprasApiResp,
-} from "@/lib/ventas/compras";
+  armarFicha,
+  fmtFechaCorta,
+  fmtMesCorto,
+  resumirCompra,
+  textoSinMargen,
+  MESES_VENTANA,
+  type FichaArticulo,
+  type MesBarra,
+} from "@/lib/ventas/resumen-articulo";
 import {
   exportComprasToExcel,
-  textoAgotadas,
+  mesesDeCompra,
   textoMeses,
   textoOrigenFob,
   textoSeVendio,
@@ -48,14 +57,6 @@ import {
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
-
-const MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-/** "28 nov 2023" — el formato de fecha de la casa. */
-function fmtFecha(f: string): string {
-  const [a, m, d] = f.split("-");
-  return `${Number(d)} ${MESES_CORTO[Number(m) - 1] ?? m} ${a}`;
-}
 
 function fmtInt(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -67,10 +68,19 @@ function fmtMoney(n: number | null | undefined): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** El descuento se muestra ENTERO: al 0,4% no le cambia la decisión a nadie. */
 function fmtPct(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return `${Math.round(n * 100)}%`;
+}
+
+/** Las cifras bajo las barras viven en una columna de ~28 px a 390. Con 12 px
+ *  de letra (el piso de la casa) tres dígitos entran; cuatro no. Por eso desde
+ *  mil se abrevia — abreviar es la única salida que NO baja el tamaño. */
+function fmtBarra(n: number): string {
+  if (n === 0) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1000) return `${n < 0 ? "-" : ""}${(abs / 1000).toFixed(1)}k`;
+  return String(Math.round(n));
 }
 
 const EMPRESAS: Record<string, string> = {
@@ -235,7 +245,13 @@ function TituloModelo({ modelo, arts }: { modelo: string; arts: ArticuloCompras[
 // ─── Un artículo ─────────────────────────────────────────────────────────────
 
 function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string }) {
+  // 🔴 Hooks ANTES de cualquier return condicional (regla de React de la casa).
+  const [verViejas, setVerViejas] = useState(false);
+  const ficha = useMemo(() => armarFicha(art, hoyMes), [art, hoyMes]);
+
   const color = colorDe(art.codigo);
+  const frescura = art.catalogoSyncedAt ? fmtFrescura(art.catalogoSyncedAt) : null;
+
   return (
     <section className="rounded-xl border border-gray-200 bg-white">
       <header className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-gray-200 px-3.5 py-3">
@@ -245,209 +261,279 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
         <span className="ml-auto text-xs text-gray-600">{etiquetaEmpresa(art.empresa)}</span>
       </header>
 
-      <ResumenArticuloLinea art={art} />
+      <TresNumeros art={art} ficha={ficha} />
 
-      {art.sinCompraRegistrada ? (
-        <div className="px-3.5 py-4">
-          <p className="text-sm text-gray-900">No hay ninguna compra registrada de este código.</p>
-          <p className="mt-1 text-xs text-gray-600">
-            {art.cuadre.vendido > 0
-              ? `Vendió ${unidades(art.cuadre.vendido)}, pero`
-              : art.cuadre.vendido < 0
-                ? // Neto negativo = puras devoluciones. Decir "vendió −22" no es
-                  // castellano y encima suena a error de la pantalla.
-                  `Tiene ${unidades(-art.cuadre.vendido)} devueltas y ninguna venta, y`
-                : "No registra ventas, y"}{" "}
-            no aparece en los ingresos de mercancía, así que no se puede decir cuándo llegó ni en cuánto tiempo se
-            vendió.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* ESCRITORIO — la tabla. Por debajo de lg el ancho útil no alcanza:
-              un iPad de 834 deja 610 px con la barra lateral, más angosto que
-              un iPhone acostado. Ahí van tarjetas (patrón PanelCxcMobile). */}
-          <div className="hidden overflow-x-auto lg:block" data-vista="tabla">
-            <table className="w-full text-sm tabular-nums">
-              <thead>
-                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-600">
-                  <th className="px-1.5 py-2 text-left font-medium xl:px-3">Llegó</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Cuánto</th>
-                  {/* "Se vendió" son UNIDADES + tiempo. Antes decía "te quedan
-                      126" y repetía la columna de al lado — el defecto que
-                      Daniel cazó: *"me sale dos veces mi inv"*. */}
-                  <th className="px-1.5 py-2 text-left font-medium xl:px-3">Se vendió</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Queda</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">CIF</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">FOB</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Lista</th>
-                  {/* "Vendido" a secas se leía como cantidad ($6.78 → "vendí
-                      6,78"). "Salió a" solo puede leerse como precio. */}
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Salió a</th>
-                  <th className="px-1.5 py-2 text-right font-medium xl:px-3">Desc.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {art.compras.map((c) => (
-                  <FilaCompra key={`${c.fecha}·${c.documento}`} art={art} c={c} hoyMes={hoyMes} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* CELULAR / IPAD */}
-          <div className="divide-y divide-gray-200 lg:hidden" data-vista="tarjetas">
-            {art.compras.map((c) => (
-              <TarjetaCompra key={`${c.fecha}·${c.documento}`} art={art} c={c} hoyMes={hoyMes} />
-            ))}
-          </div>
-        </>
+      {ficha.comparacion && (
+        <p className="border-b border-gray-100 px-3.5 py-2 text-xs text-gray-600">{ficha.comparacion}</p>
       )}
 
+      <MesAMes ficha={ficha} />
+
+      <MargenLinea ficha={ficha} />
+
+      <FilaCostos art={art} ficha={ficha} />
+
       <Avisos art={art} />
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 px-3.5 py-2">
+        {frescura && (
+          <p className="text-xs text-gray-500">Lo que queda en bodega es de Switch, al {frescura}.</p>
+        )}
+        {ficha.viejas.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerViejas((v) => !v)}
+            className="min-h-[44px] text-xs font-medium text-gray-900 underline underline-offset-2 hover:text-gray-600"
+          >
+            {verViejas
+              ? "Ocultar las compras anteriores"
+              : `Ver ${ficha.viejas.length === 1 ? "la compra anterior" : `las ${ficha.viejas.length} compras anteriores`}`}
+          </button>
+        )}
+      </div>
+
+      {verViejas && ficha.viejas.length > 0 && <ComprasViejas compras={ficha.viejas} />}
     </section>
   );
 }
 
-// ─── El resumen del artículo ─────────────────────────────────────────────────
+// ─── Los tres números ────────────────────────────────────────────────────────
 //
-// Daniel: *"quiero que me diga en cuantos meses se vendio. y total que tengo en
-// inv."*. Antes había que sumar 180 + 120 + 45 de cabeza para saber cuánto hay.
-//
-// 🩸 ACÁ NO VA UN PROMEDIO, Y ESTÁ MEDIDO POR QUÉ (ver la nota larga de
-// compras.ts). Las dos compras agotadas de `NB2570001` tardaron 7 y 15 meses;
-// "promedio 11" no describe ninguna de las dos, y el 15 solo es 15 porque esa
-// tanda esperó medio año en bodega a que se acabara la de adelante. Se muestran
-// las unidades AL LADO de los meses, nunca divididas: dividir es lo que produce
-// los "14.899 u/mes" que salieron en la medición de 300 códigos reales.
-//
-// 🔴 Es UNA LÍNEA. Daniel ya rechazó dos diseños de este módulo por complicados;
-// esto no es un panel nuevo. Y envuelve (flex-wrap) en vez de crecer a lo ancho:
-// a 1024 la barra lateral deja 766 px útiles y la tabla ya usa todos.
-function ResumenArticuloLinea({ art }: { art: ArticuloCompras }) {
-  const r = art.resumen;
-  const enBodega = r.enBodega ?? 0;
+// 🔴 "Mi última compra" es SIEMPRE la última, aunque no se haya acabado —
+// decisión A de Daniel. Si todavía le queda mercancía dice "todavía no se
+// acaba · van 54 de 180"; NO se cae a la última compra agotada, que hablaría de
+// mercancía que ya no está mientras la que se acaba de traer no dice nada.
 
+function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
+  if (!ficha.ultima) {
+    return (
+      <div className="px-3.5 py-4">
+        <p className="text-sm text-gray-900">No hay ninguna compra registrada de este código.</p>
+        <p className="mt-1 text-xs text-gray-600">
+          {art.cuadre.vendido > 0
+            ? `Vendió ${unidades(art.cuadre.vendido)}, pero`
+            : art.cuadre.vendido < 0
+              ? // Neto negativo = puras devoluciones. Decir "vendió −22" no es
+                // castellano y encima suena a error de la pantalla.
+                `Tiene ${unidades(-art.cuadre.vendido)} devueltas y ninguna venta, y`
+              : "No registra ventas, y"}{" "}
+          no aparece en los ingresos de mercancía, así que no se puede decir cuándo llegó ni en cuánto tiempo se
+          vendió.
+        </p>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Numero
+            rotulo="Vendo por mes"
+            valor={ficha.promedio.porMes != null ? `${fmtInt(Math.round(ficha.promedio.porMes))} u` : "—"}
+            pie={pieDelPromedio(ficha)}
+          />
+          <Numero
+            rotulo="Me queda para"
+            valor={ficha.alcance != null ? textoMeses(ficha.alcance) : "—"}
+            pie={art.existencia != null ? `${fmtInt(art.existencia)} en bodega` : "sin existencia en Switch"}
+          />
+        </dl>
+      </div>
+    );
+  }
+
+  const u = resumirCompra(ficha.ultima);
   return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-gray-200 bg-gray-50 px-3.5 py-2.5">
-      <p className="text-sm text-gray-700">
-        En bodega{" "}
-        <span className="font-semibold tabular-nums text-gray-900">{fmtInt(enBodega)} u</span>
-        {!r.bodegaDeSwitch && <span className="ml-1 text-xs text-gray-600">(deducido)</span>}
-      </p>
+    <dl className="grid gap-3 px-3.5 py-3.5 sm:grid-cols-3">
+      <Numero rotulo="Mi última compra" valor={u.titular} pie={u.detalle} />
+      <Numero
+        rotulo="Vendo por mes"
+        valor={ficha.promedio.porMes != null ? `${fmtInt(Math.round(ficha.promedio.porMes))} u` : "no vendió"}
+        pie={pieDelPromedio(ficha)}
+      />
+      <Numero
+        rotulo="Me queda para"
+        // Con la bodega en cero, "menos de 1 mes" se lee como que todavía queda
+        // algo. No queda nada, y eso se dice con una palabra.
+        valor={ficha.alcance === 0 ? "nada" : ficha.alcance != null ? textoMeses(ficha.alcance) : "—"}
+        pie={
+          art.existencia != null
+            ? `${fmtInt(art.existencia)} en bodega`
+            : "Switch no tiene este código en el catálogo"
+        }
+      />
+    </dl>
+  );
+}
 
-      {!art.sinCompraRegistrada && (
-        <p className="text-sm text-gray-700">
-          {textoAgotadas(r)}
-          <Ayuda titulo="Cómo se mide">
-            Solo cuentan las compras que YA se acabaron — una tanda que todavía tiene mercancía no se puede medir,
-            porque no ha terminado. Los meses son el tiempo que estuvo vendiéndose: si dos tandas se solaparon no se
-            cuenta dos veces, y si entre una y otra estuviste sin mercancía, ese tiempo no se cuenta.
-            <br />
-            <br />
-            No hay promedio a propósito. En este código una tanda tardó 7 meses y otra 15, y las 15 fueron así solo
-            porque esperó en bodega a que se acabara la de adelante — un &quot;promedio 11&quot; no describiría
-            ninguna de las dos.
-          </Ayuda>
-        </p>
-      )}
+/** El pie del promedio DICE entre cuántos meses se dividió. Sin eso, un artículo
+ *  que llegó en diciembre parecería vender la mitad de lo que vende. */
+function pieDelPromedio(ficha: FichaArticulo): string {
+  if (ficha.promedio.meses === 0) return "todavía no se vendía en estos meses";
+  if (ficha.promedio.desdeQueEmpezo) {
+    return `promedio desde que empezó a venderse · ${ficha.promedio.meses} ${ficha.promedio.meses === 1 ? "mes" : "meses"}`;
+  }
+  return `promedio de los últimos ${MESES_VENTANA} meses`;
+}
 
-      {!r.bodegaDeSwitch && (
-        <p className="w-full text-xs text-gray-600">
-          Switch no tiene este código en el catálogo, así que lo de bodega no es su existencia: es lo que queda según
-          las compras y las ventas.
-        </p>
-      )}
-
-      {r.bodegaDeSwitch && r.bodegaFueraDeLasFilas !== 0 && !art.sinCompraRegistrada && (
-        <p className="w-full text-xs text-gray-600">
-          {r.bodegaFueraDeLasFilas > 0
-            ? `Las filas de abajo solo explican ${fmtInt(enBodega - r.bodegaFueraDeLasFilas)} de esas ${fmtInt(enBodega)} u; el total es el de Switch.`
-            : `Switch reporta ${fmtInt(enBodega)} u, menos de lo que suman las filas de abajo; el total es el de Switch.`}
-        </p>
-      )}
+function Numero({ rotulo, valor, pie }: { rotulo: string; valor: string; pie: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-gray-600">{rotulo}</dt>
+      <dd className="mt-0.5 text-xl font-semibold leading-tight tracking-tight text-gray-900 tabular-nums">
+        {valor}
+      </dd>
+      <p className="mt-0.5 text-xs text-gray-600">{pie}</p>
     </div>
   );
 }
 
-// ─── Una compra, en tabla ────────────────────────────────────────────────────
+// ─── Mes a mes ───────────────────────────────────────────────────────────────
+//
+// 🔴 SIEMPRE LOS 12 MESES COMPLETOS, aunque el artículo sea nuevo: si se
+// recortaran, oct·nov·dic cambiarían de lugar de un artículo a otro y dejarían
+// de servir para comparar de un vistazo. El mes EN CURSO nunca entra.
 
-function FilaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedida; hoyMes: string }) {
-  const meses = textoMesesVendidos(c.mesesConVenta, hoyMes);
+function MesAMes({ ficha }: { ficha: FichaArticulo }) {
+  const pico = Math.max(1, ...ficha.barras.map((b) => Math.max(0, b.unidades)));
+  const t = ficha.temporada;
+
   return (
-    <>
-      <tr className="border-b border-gray-100">
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-gray-900">{fmtFecha(c.fecha)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right font-medium text-gray-900">
-          {fmtInt(c.unidades)} u
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-gray-900">{textoSeVendio(c)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-900">{fmtInt(c.quedan)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">{fmtMoney(c.costos.cif)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">
-          <Fob c={c} />
-        </td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">{fmtMoney(c.costos.lista)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">{fmtMoney(c.precioVendido)}</td>
-        <td className="whitespace-nowrap px-1.5 py-2.5 xl:px-3 text-right text-gray-700">{fmtPct(c.descuento)}</td>
-      </tr>
-      {(meses || (art.cuadre.ajusteConfiable && c.noVendidoNiEnBodega > 0)) && (
-        <tr className="border-b border-gray-100">
-          <td colSpan={9} className="px-1.5 pb-2.5 text-xs text-gray-600 xl:px-3">
-            {meses}
-            {art.cuadre.ajusteConfiable && c.noVendidoNiEnBodega > 0 && (
-              <span className={meses ? "ml-2" : ""}>
-                · de las {fmtInt(c.unidades)}, {fmtInt(c.noVendidoNiEnBodega)} se perdió en ajuste
-              </span>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
+    <div className="border-t border-gray-100 px-3.5 py-3">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-600">Mes a mes · unidades</p>
 
-// ─── Una compra, en tarjeta ──────────────────────────────────────────────────
-
-function TarjetaCompra({ art, c, hoyMes }: { art: ArticuloCompras; c: CompraMedida; hoyMes: string }) {
-  const meses = textoMesesVendidos(c.mesesConVenta, hoyMes);
-  return (
-    <div className="px-3.5 py-3">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-sm font-semibold text-gray-900">{fmtFecha(c.fecha)}</span>
-        <span className="text-sm text-gray-900">· {fmtInt(c.unidades)} u</span>
-        <span className="ml-auto text-sm font-medium text-gray-900">{textoSeVendio(c)}</span>
+      <div className="grid grid-cols-12 items-end gap-[2px]" style={{ height: 44 }} aria-hidden="true">
+        {ficha.barras.map((b) => (
+          <Barra key={b.mes} b={b} pico={pico} />
+        ))}
       </div>
 
-      <dl className="mt-2 grid grid-cols-[auto_auto] justify-between gap-x-4 gap-y-1 text-sm tabular-nums sm:grid-cols-[repeat(3,auto)]">
-        <Dato k="Queda" v={fmtInt(c.quedan)} />
-        <Dato k="CIF" v={fmtMoney(c.costos.cif)} />
-        <Dato k="FOB" v={<Fob c={c} />} />
-        <Dato k="Lista" v={fmtMoney(c.costos.lista)} />
-        <Dato k="Salió a" v={fmtMoney(c.precioVendido)} />
-        <Dato k="Desc." v={fmtPct(c.descuento)} />
-      </dl>
+      <div className="mt-1 grid grid-cols-12 gap-[2px]">
+        {ficha.barras.map((b) => (
+          <span
+            key={b.mes}
+            className={`overflow-hidden text-center text-xs ${b.fuerte ? "font-semibold text-gray-900" : "text-gray-500"}`}
+          >
+            {fmtMesCorto(b.mes)}
+          </span>
+        ))}
+      </div>
 
-      {meses && <p className="mt-2 text-xs text-gray-600">{meses}</p>}
-      {art.cuadre.ajusteConfiable && c.noVendidoNiEnBodega > 0 && (
-        <p className="mt-1 text-xs text-gray-600">
-          De las {fmtInt(c.unidades)}, {fmtInt(c.noVendidoNiEnBodega)} se perdió en ajuste.
-        </p>
-      )}
+      <div className="grid grid-cols-12 gap-[2px]">
+        {ficha.barras.map((b) => (
+          <span
+            key={b.mes}
+            className="overflow-hidden text-center text-xs tabular-nums text-gray-900"
+            title={`${b.mes}: ${fmtInt(b.unidades)} u`}
+          >
+            {b.antesDeEmpezar ? "" : fmtBarra(b.unidades)}
+          </span>
+        ))}
+      </div>
+
+      <p className="mt-2 text-xs text-gray-600">
+        {t.todaviaNoPaso
+          ? "Todavía no ha pasado por su temporada fuerte (oct–dic)."
+          : t.parte == null
+            ? "No vendió nada en estos 12 meses."
+            : t.unidades <= 0
+              ? "Oct · nov · dic no vendieron nada."
+              : `Oct · nov · dic fueron ${fmtInt(t.unidades)} unidades — el ${fmtPct(t.parte)} del año en tres meses.`}
+      </p>
     </div>
   );
 }
 
-function Dato({ k, v }: { k: string; v: React.ReactNode }) {
+function Barra({ b, pico }: { b: MesBarra; pico: number }) {
+  // Un mes anterior a su primera venta NO es un cero de venta: es un mes en el
+  // que el artículo no estaba en la calle. Se dibuja distinto a propósito.
+  if (b.antesDeEmpezar) {
+    return <span className="block h-[2px] self-end rounded-sm bg-gray-100" />;
+  }
+  const alto = b.unidades > 0 ? Math.max(3, Math.round((b.unidades / pico) * 44)) : 3;
   return (
-    <div className="flex items-baseline gap-1.5">
-      <dt className="text-xs text-gray-600">{k}</dt>
-      <dd className="text-gray-900">{v}</dd>
+    <span
+      className={`block rounded-t-sm ${b.unidades > 0 ? (b.fuerte ? "bg-gray-900" : "bg-gray-400") : "bg-gray-200"}`}
+      style={{ height: alto }}
+    />
+  );
+}
+
+// ─── Precio real y margen ────────────────────────────────────────────────────
+//
+// 🔴 ESTA LÍNEA ES LA MITAD DE LA DECISIÓN. Daniel no compra si *"vendi a margen
+// bajo o negativo"*. El precio de LISTA (que está abajo, en los costos) NO es a
+// lo que vendió: los descuentos se lo comen. Acá va lo que salió DE VERDAD.
+
+function MargenLinea({ ficha }: { ficha: FichaArticulo }) {
+  const m = ficha.margen;
+
+  if (m.motivo) {
+    return (
+      <div className="border-t border-gray-100 bg-gray-50 px-3.5 py-2.5">
+        <p className="text-sm text-gray-700">{textoSinMargen(m.motivo, ficha.promedio.meses)}</p>
+        {m.precioReal != null && (
+          <p className="mt-0.5 text-xs text-gray-600">Vendí a {fmtMoney(m.precioReal)} en promedio.</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm">
+      <span className="text-gray-700">
+        Vendí a <span className="font-semibold tabular-nums text-gray-900">{fmtMoney(m.precioReal)}</span>
+      </span>
+      <span className="text-gray-400">·</span>
+      <span className="text-gray-700">
+        me costó <span className="font-semibold tabular-nums text-gray-900">{fmtMoney(m.costo)}</span>
+      </span>
+      <span className="text-gray-400">·</span>
+      <span className="text-gray-700">
+        margen{" "}
+        <span
+          className={`font-semibold tabular-nums ${(m.margen ?? 0) < 0 ? "text-red-700" : "text-gray-900"}`}
+        >
+          {fmtPct(m.margen)}
+        </span>
+      </span>
+      <Ayuda titulo="De dónde salen estos dos números">
+        <b>Vendí a</b> es la venta real dividida entre las unidades reales de los últimos {ficha.promedio.meses}{" "}
+        {ficha.promedio.meses === 1 ? "mes completo" : "meses completos"} — con los descuentos ya adentro y las
+        devoluciones (notas de crédito) ya restadas. El precio de lista de abajo no es a lo que vendiste.
+        <br />
+        <br />
+        <b>El margen se calcula contra el CIF</b> de tu última compra, que es lo que costó de verdad poner la pieza
+        en bodega (mercancía + flete + seguro). No se usa el FOB: en 93 de cada 100 líneas Switch lo manda igual al
+        CIF por un error de carga, así que un margen sobre FOB sería el mismo número en unos artículos y otro
+        distinto en otros.
+      </Ayuda>
     </div>
   );
 }
 
-/** El FOB va con su procedencia: en el 86% de las líneas Switch lo manda IGUAL
+// ─── La fila de costos ───────────────────────────────────────────────────────
+
+function FilaCostos({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
+  const u = ficha.ultima;
+  const lista = u?.costos.lista ?? art.precioEtiqueta;
+  if (!u && lista == null) return null;
+
+  return (
+    <dl className="flex flex-wrap gap-x-6 gap-y-2 border-t border-gray-100 px-3.5 py-2.5">
+      {u && <Costo k="CIF de hoy" v={fmtMoney(u.costos.cif)} />}
+      {/* Sin compra anterior la celda se OMITE — un guion mudo no dice nada. */}
+      {ficha.anterior && <Costo k="CIF de la compra anterior" v={fmtMoney(ficha.anterior.costos.cif)} />}
+      {u && <Costo k="FOB" v={<Fob c={u} />} />}
+      {lista != null && <Costo k="Precio de lista" v={fmtMoney(lista)} />}
+    </dl>
+  );
+}
+
+function Costo({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-gray-600">{k}</dt>
+      <dd className="text-sm font-medium tabular-nums text-gray-900">{v}</dd>
+    </div>
+  );
+}
+
+/** El FOB va con su procedencia: en el 93% de las líneas Switch lo manda IGUAL
  *  al CIF y eso es un error de carga conocido. NO se corrige ni se estima —
  *  Daniel quiere saber a cuál creerle, así que se marca. */
 function Fob({ c }: { c: CompraMedida }) {
@@ -459,12 +545,32 @@ function Fob({ c }: { c: CompraMedida }) {
       {fobOrigen === "estimado" && <span className="ml-1 text-xs">est.</span>}
       {fobOrigen === "igual-al-cif" && (
         <Ayuda titulo="Este FOB no es confiable">
-          Switch lo mandó IGUAL al costo CIF, y eso es un error de carga conocido — pasa en el 86% de las líneas. Se
+          Switch lo mandó IGUAL al costo CIF, y eso es un error de carga conocido — pasa en el 93% de las líneas. Se
           muestra tal cual, sin corregirlo ni estimarlo. Cuando el FOB es distinto del CIF, sí viene de Switch y se
-          puede creer.
+          puede creer. Por eso el margen se calcula contra el CIF.
         </Ayuda>
       )}
     </span>
+  );
+}
+
+// ─── Las compras anteriores, detrás del enlace ───────────────────────────────
+
+function ComprasViejas({ compras }: { compras: CompraMedida[] }) {
+  return (
+    <ul className="divide-y divide-gray-100 border-t border-gray-100">
+      {compras.map((c) => (
+        <li key={`${c.fecha}·${c.documento}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3.5 py-2">
+          <span className="text-sm text-gray-900">{fmtFechaCorta(c.fecha)}</span>
+          <span className="text-sm tabular-nums text-gray-900">{fmtInt(c.unidades)} u</span>
+          <span className="text-sm text-gray-700">{textoSeVendio(c)}</span>
+          <span className="ml-auto text-xs tabular-nums text-gray-600">
+            CIF {fmtMoney(c.costos.cif)}
+            {mesesDeCompra(c) != null && c.quedan > 0 && ` · quedan ${fmtInt(c.quedan)}`}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -498,22 +604,28 @@ function Avisos({ art }: { art: ArticuloCompras }) {
       `Hay ${art.comprasFueraDeVentana} ${art.comprasFueraDeVentana === 1 ? "compra más vieja" : "compras más viejas"} de 3 años que no se muestran (sí cuentan para el reparto).`,
     );
   }
+  // 🔴 EL AJUSTE DE INVENTARIO SE QUEDA EN PANTALLA. Daniel: *"si hay menos es
+  // porq robaron"* — es plata que se fue, no metodología, y no se esconde
+  // detrás de un ⓘ. Antes iba renglón por renglón en la tabla; ahora que la
+  // tabla no está, va una vez por artículo, sumado.
+  if (art.cuadre.ajusteConfiable) {
+    const perdido = art.compras.reduce((s, c) => s + Math.max(0, c.noVendidoNiEnBodega), 0);
+    const llegaron = art.compras.reduce((s, c) => s + c.unidades, 0);
+    if (perdido > 0) {
+      avisos.push(
+        `De las ${fmtInt(llegaron)} unidades que llegaron, ${fmtInt(perdido)} ${perdido === 1 ? "se perdió" : "se perdieron"} en ajuste de inventario.`,
+      );
+    }
+  }
 
-  const frescura = art.catalogoSyncedAt ? fmtFrescura(art.catalogoSyncedAt) : null;
-
-  if (!avisos.length && !frescura) return null;
+  if (!avisos.length) return null;
   return (
-    <div className="border-t border-gray-200 px-3.5 py-2.5">
+    <div className="border-t border-gray-100 px-3.5 py-2">
       {avisos.map((a) => (
         <p key={a} className="text-xs text-gray-600">
           {a}
         </p>
       ))}
-      {frescura && (
-        <p className="mt-0.5 text-xs text-gray-500">
-          Lo que queda en bodega es de Switch, al {frescura}.
-        </p>
-      )}
     </div>
   );
 }
@@ -549,5 +661,5 @@ function Coincidencias({
   );
 }
 
-// Reexport para que el texto de "se vendió en" tenga una sola definición.
+// Reexport para que el texto tenga una sola definición.
 export { textoMeses, textoOrigenFob };
