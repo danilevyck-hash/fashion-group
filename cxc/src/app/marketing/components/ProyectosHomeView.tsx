@@ -428,7 +428,14 @@ export default function ProyectosHomeView({
           )}
         </div>
       ) : (
+        /* El div interno es el SCROLLER: sin él, el `overflow-hidden` del
+           borde redondeado recorta la tabla sin salida (medido 11-ago-2026:
+           176 px a 390 y 147 px a 834, idénticos en el bucket "Gastos Tommy y
+           Calvin", o sea PRE-EXISTENTES). Mismo arreglo que ya llevaba
+           AnuladosLista. Se vuelve visible ahora porque las tarjetas de marca
+           por fin abren una lista con proyectos adentro. */
         <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr className="text-xs uppercase tracking-wide text-gray-500">
@@ -624,6 +631,7 @@ export default function ProyectosHomeView({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

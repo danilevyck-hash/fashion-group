@@ -1,8 +1,37 @@
 "use client";
 
-// Nivel 1 del rediseño: cards por marca/compañía (fijas, patrón tipo Reclamos)
-// + una card fija "Gastos Tommy y Calvin" que agrupa el archivo legacy (las
-// facturas grupo_legacy=true). Al hacer clic se entra al home filtrado.
+// ============================================================================
+// Inicio de Marketing — jerarquía por uso real (11-ago-2026)
+//
+// Daniel, textual: *"ya no quiero usar más eso, quisiera congelarlo y quitarlo
+// del home de marketing, ponerlo arriba como archivado y ya. y hoy en día
+// trabajar el módulo día a día"* · *"pon inmobiliario e impulsadoras más
+// grandes porq son usables. y tiene que hacer sentido con el módulo, siento
+// eso desorganizado"*.
+//
+// El orden de la pantalla ES el orden de uso:
+//   1. Marcas — la puerta a los proyectos del día a día (lo que el módulo ES).
+//   2. Herramientas — Mobiliario e Impulsadoras, tarjetas de verdad. Antes
+//      eran dos textos perdidos en una fila con Reportes/Anulados/Exportar.
+//   3. Consulta y archivo — enlaces chicos ARRIBA, fuera del camino:
+//      Reportes · Exportar · Anulados · Multifashion · Gastos Tommy y Calvin.
+//      **Nada se borró**: los dos buckets siguen abriendo la misma pantalla
+//      con el mismo contenido.
+//
+// 🩸 LA TARJETA DE MARCA CUENTA TAMBIÉN LAS ENTREGAS DE MUEBLES. Hasta hoy se
+// armaba SOLO desde las facturas, así que un proyecto sin facturas cuya única
+// marca venía de una entrega no aparecía en ninguna parte (el caso "Nova Lux":
+// $1.040 de muebles asignados a Calvin Klein, invisible). Ver
+// lib/marketing/resumen-inicio.ts.
+//
+// 🔴 FACTURAS Y MUEBLES VAN EN LÍNEAS SEPARADAS, NO SUMADOS. Medido el
+// 11-ago-2026: los muebles son $71.765 que NO se contaban en ninguna tarjeta.
+// Sumarlos al mismo `$` habría llevado Tommy de $17.800 a $58.365 y Calvin de
+// $4.800 a $34.460 — el número que Daniel ya conoce, triplicado, sin nada que
+// lo explique. Además son cosas distintas: una factura es un gasto pagado a un
+// proveedor; un mueble es mercancía que salió del inventario propio. El número
+// que resuelve su problema es el CONTADOR DE PROYECTOS, y por eso va primero.
+// ============================================================================
 
 import { useCallback, useEffect, useState } from "react";
 import { saveAs } from "file-saver";
@@ -10,11 +39,20 @@ import type { MkMarca } from "@/lib/marketing/types";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 
+interface Bucket {
+  count: number;
+  total: number;
+}
+
 interface Resumen {
-  legacy: { count: number; total: number };
+  legacy: Bucket;
   /** Bucket independiente (fuera del grupo de marcas). */
-  multifashion?: { count: number; total: number };
-  porMarca: Record<string, { count: number; total: number }>;
+  multifashion?: Bucket & { entregas?: number; muebles?: number };
+  porMarca: Record<string, Bucket>;
+  mueblesPorMarca?: Record<string, Bucket>;
+  proyectosPorMarca?: Record<string, number>;
+  mobiliario?: { entregas: number; total: number };
+  impulsadoras?: { count: number | null; montoMensual: number | null };
 }
 
 interface Props {
@@ -49,6 +87,69 @@ function acentoMarca(codigo: string): string {
   if (codigo === "J") return "border-emerald-200 hover:border-emerald-400";
   if (codigo === "FC") return "border-fuchsia-200 hover:border-fuchsia-400";
   return "border-amber-200 hover:border-amber-400";
+}
+
+function plural(n: number, uno: string, varios: string): string {
+  return `${n} ${n === 1 ? uno : varios}`;
+}
+
+/** Enlace chico de la barra de arriba (consulta / archivo). 44 px de toque. */
+function EnlaceBarra({
+  onClick,
+  children,
+  tenue,
+  disabled,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  tenue?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`transition min-h-[44px] inline-flex items-center disabled:opacity-50 disabled:cursor-not-allowed ${
+        tenue
+          ? "text-xs text-gray-400 hover:text-gray-700"
+          : "text-sm text-gray-600 hover:text-black"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Separador() {
+  return <span className="text-gray-300 select-none">·</span>;
+}
+
+/** Fila "Facturas $X · N" dentro de la tarjeta de marca. */
+function LineaGasto({
+  etiqueta,
+  bucket,
+  unidad,
+  unidadPlural,
+}: {
+  etiqueta: string;
+  bucket: Bucket;
+  unidad: string;
+  unidadPlural: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-[12px] text-gray-500">
+        {etiqueta}{" "}
+        <span className="text-gray-400">
+          · {plural(bucket.count, unidad, unidadPlural)}
+        </span>
+      </span>
+      <span className="text-[13px] font-medium text-gray-900 tabular-nums">
+        {formatearMonto(bucket.total)}
+      </span>
+    </div>
+  );
 }
 
 export default function MarcaSelector({
@@ -124,153 +225,230 @@ export default function MarcaSelector({
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
+  const mobiliario = resumen?.mobiliario;
+  const impulsadoras = resumen?.impulsadoras;
+
   return (
-    <div className="space-y-5">
-      {/* Header — acciones globales del módulo */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
+    <div className="space-y-6">
+      {/* ---------------------------------------------------------------- */}
+      {/* Encabezado: título + la única acción principal del módulo.        */}
+      {/* ---------------------------------------------------------------- */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
-        </div>
-        {/* Toda esta barra era texto suelto de 18-21 px de alto (Mobiliario,
-            Reportes, Impulsadoras, Anulados, Exportar): imposible de acertar con
-            el dedo. min-h-[44px] + inline-flex en cada uno; -my-1 compensa el
-            crecimiento para que la fila no se separe del título. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
-          <button type="button" onClick={onOpenInventario} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
-            Mobiliario
-          </button>
-          <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenReportes} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
-            Reportes
-          </button>
-          <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenImpulsadoras} className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center">
-            Impulsadoras
-          </button>
-          <span className="text-gray-300">·</span>
-          <button type="button" onClick={onOpenAnulados} className="text-xs text-gray-400 hover:text-gray-700 transition min-h-[44px] inline-flex items-center">
-            Anulados
-          </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={exportarZip}
-            disabled={exportando}
-            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] inline-flex items-center"
-          >
-            {exportando ? "Generando ZIP…" : "Exportar"}
-          </button>
           <button
             type="button"
             onClick={onNuevoProyecto}
-            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
+            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
           >
             + Nuevo proyecto
           </button>
         </div>
+
+        {/* Consulta y archivo — chiquitos, arriba, fuera del camino.
+            "Gastos Tommy y Calvin" y "Multifashion" bajaron de tarjeta grande
+            a enlace por pedido de Daniel. NO se borró nada: los dos abren la
+            misma pantalla con su contenido intacto. */}
+        {/* Dos grupos que NO se parten por dentro: si los separadores
+            estuvieran todos en el mismo flex-wrap, a 390 px la línea corta
+            justo después de un "·" y queda un punto colgando. */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-0 -my-1">
+          <div className="flex items-center gap-x-3">
+            <EnlaceBarra onClick={onOpenReportes}>Reportes</EnlaceBarra>
+            <Separador />
+            <EnlaceBarra onClick={exportarZip} disabled={exportando}>
+              {exportando ? "Generando ZIP…" : "Exportar"}
+            </EnlaceBarra>
+            <Separador />
+            <EnlaceBarra onClick={onOpenAnulados} tenue>
+              Anulados
+            </EnlaceBarra>
+          </div>
+          <div className="flex items-center gap-x-3">
+            <EnlaceBarra onClick={onSelectMultifashion} tenue>
+              Multifashion
+            </EnlaceBarra>
+            <Separador />
+            <EnlaceBarra onClick={onSelectLegacy} tenue>
+              Gastos Tommy y Calvin
+              {/* 12 px es el piso de la casa (candado iphone-targets): nada
+                  más chico, ni en una etiqueta decorativa. */}
+              <span className="ml-1.5 rounded bg-gray-100 text-gray-500 text-[12px] px-1.5 py-0.5">
+                Archivo
+              </span>
+            </EnlaceBarra>
+          </div>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-24 rounded-lg bg-gray-100 animate-pulse" />
-          ))}
+      {/* ---------------------------------------------------------------- */}
+      {/* 1. Marcas — la puerta a los proyectos del día a día.              */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="space-y-2">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">
+            Proyectos por marca
+          </h2>
+          <p className="text-[12px] text-gray-500">
+            Un proyecto es de un cliente y puede trabajar varias marcas. Si
+            trabaja dos, aparece en las dos tarjetas — no está duplicado.
+          </p>
         </div>
-      ) : (
-        <>
-          {/* Card legacy: archivo Tommy + Calvin (congelado) */}
-          <button
-            type="button"
-            onClick={onSelectLegacy}
-            className="w-full text-left rounded-xl border border-gray-300 bg-white p-4 hover:border-gray-500 hover:shadow-sm transition flex items-center justify-between gap-4"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">Gastos Tommy y Calvin</span>
-                <span className="rounded bg-gray-100 text-gray-500 text-xs px-1.5 py-0.5">Archivo</span>
-              </div>
-              <div className="text-[12px] text-gray-500 mt-0.5">
-                Gastos anteriores al rediseño · congelado
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <div className="font-semibold text-gray-900 tabular-nums">
-                {formatearMonto(resumen?.legacy.total ?? 0)}
-              </div>
-              <div className="text-[12px] text-gray-500">
-                {resumen?.legacy.count ?? 0}{" "}
-                {(resumen?.legacy.count ?? 0) === 1 ? "factura" : "facturas"}
-              </div>
-            </div>
-          </button>
 
-          {/* Multifashion — marca INDEPENDIENTE, fuera del grupo de marcas
-              (pedido de Daniel). Va en su propia fila, arriba del grid de
-              marcas, para que se lea como "otra cosa" y no como una más del
-              grupo. Sus gastos NO se cuentan en la card de arriba ni en las de
-              abajo: ver api/marketing/marca-resumen. */}
-          <button
-            type="button"
-            onClick={onSelectMultifashion}
-            className="w-full text-left rounded-xl border-2 border-indigo-200 bg-white p-4 hover:border-indigo-400 hover:shadow-sm transition flex items-center justify-between gap-4"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">Multifashion</span>
-                <span className="rounded bg-indigo-50 text-indigo-700 text-xs px-1.5 py-0.5 font-medium">
-                  Independiente
-                </span>
-              </div>
-              <div className="text-[12px] text-gray-500 mt-0.5">
-                Tienda propia del grupo · aparte de las marcas
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <div className="font-semibold text-gray-900 tabular-nums">
-                {formatearMonto(resumen?.multifashion?.total ?? 0)}
-              </div>
-              <div className="text-[12px] text-gray-500">
-                {resumen?.multifashion?.count ?? 0}{" "}
-                {(resumen?.multifashion?.count ?? 0) === 1 ? "factura" : "facturas"}
-              </div>
-            </div>
-          </button>
-
-          {/* Cards por marca */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-32 rounded-lg bg-gray-100 animate-pulse" />
+            ))}
+          </div>
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {marcasOrdenadas.map((m) => {
-              const r = resumen?.porMarca[m.id];
+              const facturas = resumen?.porMarca[m.id] ?? { count: 0, total: 0 };
+              const muebles =
+                resumen?.mueblesPorMarca?.[m.id] ?? { count: 0, total: 0 };
+              const proyectos = resumen?.proyectosPorMarca?.[m.id] ?? 0;
               const empresa = EMPRESA_LABEL[m.empresa_codigo ?? ""] ?? "";
+              const vacia = facturas.count === 0 && muebles.count === 0;
               return (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => onSelectMarca(m.id)}
-                  className={`text-left rounded-xl border bg-white p-4 hover:shadow-sm transition ${acentoMarca(m.codigo)}`}
+                  className={`text-left rounded-xl border bg-white p-4 hover:shadow-sm transition flex flex-col ${acentoMarca(m.codigo)}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">{m.nombre}</div>
+                      <div className="font-semibold text-gray-900 truncate">
+                        {m.nombre}
+                      </div>
                       <div className="text-[12px] text-gray-500 mt-0.5">
                         {empresa || (m.tipo === "interna" ? "Interna" : "—")}
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-gray-400">{m.codigo}</span>
-                  </div>
-                  <div className="mt-3 flex items-baseline justify-between">
-                    <span className="font-semibold text-gray-900 tabular-nums">
-                      {formatearMonto(r?.total ?? 0)}
-                    </span>
-                    <span className="text-[12px] text-gray-500">
-                      {r?.count ?? 0} {(r?.count ?? 0) === 1 ? "factura" : "facturas"}
+                    <span className="text-xs font-bold text-gray-400">
+                      {m.codigo}
                     </span>
                   </div>
+
+                  {/* El contador de proyectos es LO que Daniel vino a buscar
+                      ("no veo nova lux, dónde lo encuentro?"): va grande. */}
+                  <div className="mt-3 text-[15px] font-semibold text-gray-900">
+                    {vacia && proyectos === 0
+                      ? "Sin proyectos todavía"
+                      : plural(proyectos, "proyecto", "proyectos")}
+                  </div>
+
+                  {!vacia && (
+                    <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+                      {facturas.count > 0 && (
+                        <LineaGasto
+                          etiqueta="Facturas"
+                          bucket={facturas}
+                          unidad="factura"
+                          unidadPlural="facturas"
+                        />
+                      )}
+                      {muebles.count > 0 && (
+                        <LineaGasto
+                          etiqueta="Muebles"
+                          bucket={muebles}
+                          unidad="entrega"
+                          unidadPlural="entregas"
+                        />
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
-        </>
-      )}
+        )}
+      </section>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* 2. Herramientas del día a día — antes eran dos textos sueltos.    */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-gray-900">Herramientas</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onOpenInventario}
+            className="text-left rounded-xl border border-teal-200 bg-white p-4 hover:border-teal-400 hover:shadow-sm transition flex items-center gap-3 min-h-[76px]"
+          >
+            <span
+              aria-hidden="true"
+              className="shrink-0 w-10 h-10 rounded-lg bg-teal-50 text-teal-700 inline-flex items-center justify-center"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M16.5 9.4l-9-5.19" />
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <path d="M3.27 6.96L12 12.01l8.73-5.05" />
+                <path d="M12 22.08V12" />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold text-gray-900">Mobiliario</span>
+              <span className="block text-[12px] text-gray-500">
+                {mobiliario
+                  ? `${plural(mobiliario.entregas, "entrega", "entregas")} · ${formatearMonto(mobiliario.total)} entregados`
+                  : "Inventario y entregas de muebles"}
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenImpulsadoras}
+            className="text-left rounded-xl border border-violet-200 bg-white p-4 hover:border-violet-400 hover:shadow-sm transition flex items-center gap-3 min-h-[76px]"
+          >
+            <span
+              aria-hidden="true"
+              className="shrink-0 w-10 h-10 rounded-lg bg-violet-50 text-violet-700 inline-flex items-center justify-center"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold text-gray-900">
+                Impulsadoras
+              </span>
+              <span className="block text-[12px] text-gray-500">
+                {impulsadoras && impulsadoras.count !== null
+                  ? `${plural(impulsadoras.count, "impulsadora", "impulsadoras")}${
+                      impulsadoras.montoMensual
+                        ? ` · ${formatearMonto(impulsadoras.montoMensual)} al mes`
+                        : ""
+                    }`
+                  : "Pagos mensuales por marca"}
+              </span>
+            </span>
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
