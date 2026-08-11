@@ -234,13 +234,17 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // extra y las ausencias que necesita para llenarla salen de ese módulo.
   // Cambio DELIBERADO — este candado hizo lo suyo y frenó el build hasta acá.
   // `gastos-contabilidad` (el gasto leído del mayor de Switch) se suma el
-  // 10-ago-2026: es la misma gente que ya tiene `gastos-empresa`, y la contable
-  // es quien cierra los meses que ese módulo muestra. Cambio DELIBERADO — el
-  // candado se puso rojo y por eso se toca acá a mano.
+  // 10-ago-2026, y `saldos-banco` el 11-ago: los saldos de banco salieron de
+  // "Gastos de Empresa" a su propio módulo, y el de gastos se retira cuando el
+  // nuevo, automático, esté publicado. Es la misma gente en los tres — la
+  // contable es quien cierra los meses que el módulo del mayor muestra, y las
+  // 52 filas de `bancos_saldos` están firmadas "Contabilidad".
+  // Cambio DELIBERADO: el candado hizo lo suyo y frenó el build hasta acá.
   contabilidad: [
     "proveedores",
     "gastos-empresa",
     "gastos-contabilidad",
+    "saldos-banco",
     "prestamos",
     "asistencia",
   ],
@@ -262,7 +266,7 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
 
   it("a la secretaria NO se le abrió ningún módulo nuevo", () => {
     const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
-      "gastos-empresa", "prestamos", "usuarios", "data-health"];
+      "gastos-empresa", "saldos-banco", "prestamos", "usuarios", "data-health"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {
       expect(suyos, `secretaria no debe tener ${m}`).not.toContain(m);

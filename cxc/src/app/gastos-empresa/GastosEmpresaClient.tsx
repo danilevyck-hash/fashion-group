@@ -18,7 +18,11 @@ import {
 } from "./components/types";
 import ChecklistView from "./components/ChecklistView";
 import EmpresaGastosForm from "./components/EmpresaGastosForm";
-import SaldosBancarios from "./components/SaldosBancarios";
+// Los saldos de banco se mudaron a su propio módulo (/saldos-banco). Esta
+// pantalla los sigue mostrando —el mismo componente, la misma tabla— hasta que
+// el módulo viejo se retire: sacárselos antes dejaría a contabilidad sin
+// ninguna puerta al dato si el menú nuevo todavía no le llegó.
+import SaldosBancarios from "@/app/saldos-banco/components/SaldosBancarios";
 
 const fetcher = (url: string) =>
   fetch(url, { cache: "no-store" }).then((r) => {

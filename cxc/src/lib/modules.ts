@@ -18,6 +18,7 @@ import {
   Contact,
   FileText,
   HandCoins,
+  Landmark,
   AlertTriangle,
   ClipboardList,
   TrendingUp,
@@ -89,6 +90,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "gastos-empresa", label: "Gastos de Empresa", href: "/gastos-empresa",   icon: Receipt,       roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "gastos-contabilidad", label: "Gastos según Contabilidad", href: "/gastos-contabilidad", icon: Receipt, roles: ["admin", "contabilidad"],  group: "operacion" },
+  { key: "saldos-banco",   label: "Saldos de Banco",   href: "/saldos-banco",     icon: Landmark,      roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
@@ -126,12 +128,42 @@ export function getDefaultModulesForRole(role: string): string[] {
   return ALL_MODULES.filter(m => m.roles.includes(role)).map(m => m.key);
 }
 
+/** Un módulo que SE MUDÓ de casa hereda el permiso del módulo del que salió,
+ *  mientras la DDL que agrega su key a `role_permissions` no haya corrido.
+ *
+ *  🩸 POR QUÉ EXISTE: `role_permissions.contabilidad.modulos` es una lista de
+ *  keys guardada en la base, y el login la copia a `fg_modules`. Un módulo
+ *  NUEVO no está en esa lista, así que su ficha NO aparece en el menú de
+ *  contabilidad hasta que alguien corra la migración a mano. Y las 52 filas de
+ *  `bancos_saldos` las carga justamente **contabilidad** (`created_by` =
+ *  "Contabilidad" en las 52), no admin: sin esto, el día que se retire
+ *  "Gastos de Empresa" la persona que carga los saldos se queda sin ninguna
+ *  puerta al dato. Este repo tiene DDLs pendientes de correr desde hace
+ *  semanas — la pantalla tiene que funcionar ANTES de que corra, como el resto.
+ *
+ *  Se retira cuando la DDL esté corrida (verificable: `role_permissions` de
+ *  contabilidad contiene 'saldos-banco'). Quitarlo antes se ve exactamente
+ *  igual que "a contabilidad le desapareció un módulo". */
+export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
+  // Los saldos de banco eran una sección de "Gastos de Empresa" (#463 y su
+  // continuación los separan en dos módulos).
+  "saldos-banco": "gastos-empresa",
+};
+
+/** ¿La lista de módulos guardada le da acceso a esta key? Directo, o heredado
+ *  del módulo del que ésta se mudó. */
+function fgModulesIncluye(fgModules: string[], key: string): boolean {
+  if (fgModules.includes(key)) return true;
+  const heredaDe = MODULO_HEREDA_PERMISO_DE[key];
+  return heredaDe ? fgModules.includes(heredaDe) : false;
+}
+
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),
  *  prevalece sobre el default por rol. */
 export function getVisibleModules(role: string, fgModules?: string[] | null): AppModule[] {
   if (role === "admin") return ALL_MODULES;
   if (fgModules && fgModules.length > 0) {
-    return ALL_MODULES.filter(m => fgModules.includes(m.key));
+    return ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m.key));
   }
   return ALL_MODULES.filter(m => m.roles.includes(role));
 }

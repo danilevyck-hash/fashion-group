@@ -19,29 +19,35 @@ import {
 interface Props {
   bancos: BancoSaldo[];
   onGuardado: () => Promise<unknown> | void;
+  /** Título de la sección plegable. `null` = sin plegable (la pantalla ya
+   *  tiene su propio título; repetirlo sería decir dos veces lo mismo). */
+  titulo?: string | null;
 }
 
-export default function SaldosBancarios({ bancos, onGuardado }: Props) {
+export default function SaldosBancarios({ bancos, onGuardado, titulo = "Saldos bancarios" }: Props) {
   const [abierto, setAbierto] = useState(true);
   const porEmpresa = new Map(bancos.map((b) => [b.empresa_key, b]));
+  const visible = titulo === null ? true : abierto;
 
   return (
     <section className="mb-8">
-      <button
-        onClick={() => setAbierto((v) => !v)}
-        className="w-full flex items-center justify-between gap-2 min-h-[44px] py-2"
-      >
-        <span className="text-sm font-semibold text-gray-900">Saldos bancarios</span>
-        <svg
-          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          className={`text-gray-400 transition-transform ${abierto ? "rotate-180" : ""}`}
+      {titulo !== null && (
+        <button
+          onClick={() => setAbierto((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 min-h-[44px] py-2"
         >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
+          <span className="text-sm font-semibold text-gray-900">{titulo}</span>
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={`text-gray-400 transition-transform ${abierto ? "rotate-180" : ""}`}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      )}
 
-      {abierto && (
+      {visible && (
         <>
           {/* "una cuenta por empresa" se ve solo: son las 8 filas de abajo. El
               nombre del banco no está en ningún otro lado, así que se queda. */}
@@ -79,7 +85,7 @@ function BancoRow({
     if (parsed == null || !fecha) return;
     setGuardando(true);
     try {
-      const res = await fetch(`${API_BASE}/bancos`, {
+      const res = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ empresa_key: empresaKey, saldo: parsed, fecha_dato: fecha }),

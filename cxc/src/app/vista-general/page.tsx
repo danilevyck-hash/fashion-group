@@ -247,11 +247,13 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
           : <span className="text-stone-400">Sin gastos completos (8/8)</span>}
       />
 
-      {/* Disponibilidad */}
+      {/* Disponibilidad — sale de los saldos de banco, que ahora tienen módulo
+          propio. El NÚMERO no cambia: lo sigue calculando la misma ruta sobre
+          la misma tabla (bancos_saldos); solo cambia a dónde lleva el toque. */}
       <KpiCard
-        href="/gastos-empresa"
+        href="/saldos-banco"
         label="Disponibilidad"
-        hoverLabel="Ir a Gastos"
+        hoverLabel="Ir a Saldos de Banco"
         value={disponibilidad ? moneyK(disponibilidad.total) : "—"}
         sub={disponibilidad
           ? <span className="text-stone-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>

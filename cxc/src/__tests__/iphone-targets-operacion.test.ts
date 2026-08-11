@@ -34,7 +34,9 @@ const depurador = read("app", "productos", "cargar", "page.tsx");
 const prestamos = read("app", "prestamos", "PrestamosClient.tsx");
 const nuevoProyecto = read("app", "marketing", "components", "NuevoProyectoModal.tsx");
 const empresaSelector = read("app", "reclamos", "components", "EmpresaSelector.tsx");
-const saldosBancarios = read("app", "gastos-empresa", "components", "SaldosBancarios.tsx");
+// Se mudó con su módulo: los saldos de banco salieron de "Gastos de Empresa"
+// (11-ago-2026). El componente es el MISMO archivo, no una copia.
+const saldosBancarios = read("app", "saldos-banco", "components", "SaldosBancarios.tsx");
 const mfResumen = read("components", "multifashion", "MultifashionResumenView.tsx");
 const mfView = read("components", "multifashion", "MultifashionView.tsx");
 const mfCharts = read("components", "multifashion", "DetalleMensualCharts.tsx");
@@ -90,7 +92,7 @@ describe("Targets de 44px", () => {
     expect(empresaSelector.slice(i, i + 400)).toContain("min-h-[44px]");
   });
 
-  it("Gastos de Empresa · Guardar llega a 44 (medía 41)", () => {
+  it("Saldos de Banco · Guardar llega a 44 (medía 41)", () => {
     expect(saldosBancarios).toMatch(/bg-black text-white px-3 min-h-\[44px\]/);
   });
 
@@ -118,6 +120,7 @@ describe("Tamaño de letra · nada por debajo de text-xs (13px)", () => {
     marketing: ["app/marketing"],
     reclamos: ["app/reclamos"],
     "gastos-empresa": ["app/gastos-empresa"],
+    "saldos-banco": ["app/saldos-banco"],
     multifashion: ["components/multifashion"],
   };
 
