@@ -449,39 +449,46 @@ export async function fetchCarteraAntiguedad(
 // LÍNEA de asiento, separador `;`, fecha DD-MM-YYYY, y el nombre del archivo con
 // la forma `listaasientos_<sucursalId>_<ddmmyyyyhhmmss>.csv`.
 //
-// 🔴 ESTA ES LA ÚNICA PARTE DEL MÓDULO QUE NO ESTÁ VERIFICADA CONTRA SWITCH.
-// Se escribió SIN conectarse (la sesión web estaba ocupada por otra corrida y el
-// login es de sesión única). La ruta exacta del "Descargar" y sus parámetros son
-// una DEDUCCIÓN a partir de:
-//   · el nombre del archivo que produce (`listaasientos_…`),
-//   · los controladores que se midieron vivos en jun/ago-2026 (`asientos`,
-//     `reportecontable`, `cuentacontable` → 302 a login; las rutas falsas
-//     devuelven el HTML "Exception - SWITCH SOFT"),
-//   · y la convención de esta app Laravel, verificada en los otros dos reportes:
-//     una página HTML que entrega el `_token` y una segunda ruta que entrega los
-//     datos (`/reportesventa/comprobantes` → `/reportesventa/facturas`;
-//     `/estadodecuenta` → `/estadodecuenta/obtener`).
+// ─── EL MECANISMO, MEDIDO CONTRA SWITCH (11-ago-2026) ───────────────────────
+// Salió del JS de la propia página, `/assets/js/asientos/asientos.js` — que es
+// un asset PÚBLICO: se lee sin sesión, así que descubrirlo no costó ni una
+// expulsión del panel. Son TRES pasos y los tres hacen falta:
 //
-// Por eso NO se cablea una sola ruta a ciegas: se prueban en orden los
-// candidatos de `MAYOR_CANDIDATOS` y se usa el primero que devuelva algo que
-// PAREZCA EL MAYOR DE VERDAD (`pareceCsvDelMayor`). Si ninguno lo hace, se
-// lanza un error que lista lo que respondió cada uno — la corrida queda en
-// `error` y NO se escribe una sola fila. Ese es el punto: es preferible un
-// módulo que no cargó a uno que cargó basura, porque acá lo que se guarda son
-// los gastos con los que se toman decisiones.
+//   1. GET  /asientos                → HTML con el `_token`.
+//   2. POST /asientos/lista          → el DataTables. **ACÁ VIAJA EL RANGO**
+//      (`desde`/`hasta`), y el servidor se lo guarda EN LA SESIÓN.
+//   3. POST /asientos/exportasientos → ACUMULADOR, igual que
+//      `/estadodecuenta/obtener` y que el reporte de ingreso de mercancía:
+//      solo `{chunk:500, key, file, _token}`; mientras responda
+//      `response:true` se repide con `key += chunk`, y la ronda que responde
+//      `response:false` deja el archivo en `GET /log/<file>`.
 //
-// La primera corrida supervisada contra Switch va a decir cuál es el bueno;
-// entonces se fija con `SWITCH_MAYOR_PATH` (env) o se deja el candidato
-// ganador solo, y este comentario se reemplaza por el hecho medido.
+// 🔴 EL PASO 2 NO ES OPCIONAL Y ES EL QUE SE PRESTA AL ERROR CARO. La descarga
+// NO lleva fechas: las lee de la sesión. Saltárselo devuelve un CSV perfecto
+// del rango por defecto (el mes en curso) — un reporte válido del período
+// EQUIVOCADO, sin un solo error que lo delate. Por eso `fetchMayorAsientos`
+// hace los tres pasos en orden y `sync-mayor` no puede pedir un rango sin
+// fijarlo antes.
+//
+// ⚠️ Ninguno de los candidatos que se habían DEDUCIDO existía
+// (`/asientos/descargar`, `/asientos/exportar`, `/reportecontable/…`): Switch
+// contesta HTTP 200 con su HTML de excepción para toda ruta inexistente, así
+// que el código de estado no sirve para descartar — hay que mirar el contenido
+// (`pareceCsvDelMayor`).
+//
+// CERTIFICADO: el CSV que baja este código para vistana 2026-01-01 → 2026-12-31
+// es IDÉNTICO (SHA-256) al que Daniel bajó a mano del panel.
 
-/** Rutas candidatas del reporte: [página con el _token, ruta de descarga]. */
-const MAYOR_CANDIDATOS: Array<{ pagina: string; descarga: string }> = [
-  { pagina: "/asientos", descarga: "/asientos/descargar" },
-  { pagina: "/asientos", descarga: "/asientos/exportar" },
-  { pagina: "/asientos/lista", descarga: "/asientos/lista/descargar" },
-  { pagina: "/reportecontable/asientos", descarga: "/reportecontable/asientos/descargar" },
-  { pagina: "/reportecontable", descarga: "/reportecontable/listaasientos" },
-];
+/** La página que entrega el `_token` del reporte. */
+const MAYOR_PAGINA = "/asientos";
+/** El DataTables que FIJA el rango de fechas en la sesión (paso 2). */
+const MAYOR_LISTA = "/asientos/lista";
+/** El acumulador que arma el CSV (paso 3). */
+const MAYOR_EXPORT = "/asientos/exportasientos";
+/** Lo que manda el JS de la página. No se toca: es el tamaño que el servidor espera. */
+const MAYOR_CHUNK = 500;
+/** Techo del acumulador — frena un bucle infinito si nunca dijera `response:false`. */
+const MAYOR_MAX_RONDAS = 4000;
 
 /** El encabezado del CSV real, ya normalizado (dobles espacios colapsados). */
 const MAYOR_HEADER_ESPERADO = ["asiento", "descripcion", "fecha", "nombre cuenta", "cuenta"];
@@ -504,8 +511,12 @@ export function pareceCsvDelMayor(texto: string): boolean {
 
 export interface MayorDescarga {
   csv: string;
-  /** Qué ruta funcionó — se registra para poder fijarla después. */
+  /** Qué ruta entregó el archivo — queda registrada en `switch_sync_log`. */
   rutaUsada: string;
+  /** Cuántos asientos declaró el DataTables para ese rango (telemetría). */
+  asientosDeclarados: number | null;
+  /** Cuántas rondas del acumulador hicieron falta (telemetría). */
+  rondas: number;
 }
 
 /**
@@ -519,70 +530,132 @@ export async function fetchMayorAsientos(
 ): Promise<MayorDescarga> {
   const { empresaKey, baseUrl, cookies } = session;
 
-  // Un override por env permite fijar la ruta buena sin tocar código, y
-  // también probar una nueva si Switch cambia, sin re-desplegar el módulo.
-  const fijada = process.env.SWITCH_MAYOR_PATH;
-  const candidatos = fijada
-    ? [{ pagina: process.env.SWITCH_MAYOR_PAGINA ?? "/asientos", descarga: fijada }]
-    : MAYOR_CANDIDATOS;
-
-  const intentos: string[] = [];
-
-  for (const cand of candidatos) {
-    let token: string | null = null;
-    try {
-      const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}${cand.pagina}`, cookies, {
-        headers: { Accept: "text/html" },
-      });
-      if (pgRes.status === 200) token = extractToken(pgHtml);
-      if (pgRes.status !== 200) {
-        intentos.push(`${cand.pagina} → HTTP ${pgRes.status}`);
-        continue;
-      }
-    } catch (err) {
-      intentos.push(`${cand.pagina} → ${err instanceof Error ? err.message : "error de red"}`);
-      continue;
-    }
-
-    // Los filtros del reporte van como el resto de esta app: rango de fechas +
-    // sucursal. El `_token` es obligatorio en todo POST de Laravel.
-    const body = new URLSearchParams({
-      desde,
-      hasta,
-      fechaDesde: desde,
-      fechaHasta: hasta,
-      sucursalId: "1",
-      ...(token ? { _token: token } : {}),
-    }).toString();
-
-    try {
-      const { res, text } = await webFetch(`${baseUrl}${cand.descarga}`, cookies, {
-        method: "POST",
-        body,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          Accept: "text/csv,application/octet-stream,*/*",
-          Origin: baseUrl,
-          Referer: `${baseUrl}${cand.pagina}`,
-        },
-      });
-
-      if (pareceCsvDelMayor(text)) {
-        return { csv: text, rutaUsada: cand.descarga };
-      }
-      intentos.push(
-        `${cand.descarga} → HTTP ${res.status}, ${text.length} bytes, no es el CSV del mayor`,
-      );
-    } catch (err) {
-      intentos.push(`${cand.descarga} → ${err instanceof Error ? err.message : "error de red"}`);
-    }
+  // ── 1) la página, que trae el `_token` ────────────────────────────────────
+  const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}${MAYOR_PAGINA}`, cookies, {
+    headers: { Accept: "text/html" },
+  });
+  if (pgRes.status !== 200) {
+    throw new SwitchWebError(empresaKey, "mayor-pagina", `${MAYOR_PAGINA} devolvió ${pgRes.status}`);
+  }
+  const token = extractToken(pgHtml);
+  if (!token) {
+    throw new SwitchWebError(empresaKey, "mayor-token", "no se encontró el _token del reporte");
   }
 
-  throw new SwitchWebError(
-    empresaKey,
-    "mayor-descarga",
-    `ninguna ruta devolvió el CSV del mayor. Intentos: ${intentos.join(" | ")}`,
-  );
+  // ── 2) FIJAR EL RANGO EN LA SESIÓN ────────────────────────────────────────
+  // Ver el encabezado: sin esto el CSV sale del rango por defecto y NADA lo
+  // delata. Las columnas van con los mismos nombres que manda el DataTables.
+  const listaBody = new URLSearchParams({
+    draw: "1",
+    start: "0",
+    length: "10",
+    currentPage: "1",
+    searchInput: "",
+    "order[0][column]": "1",
+    "order[0][dir]": "desc",
+    "columns[0][data]": "",
+    "columns[1][data]": "numeroAsiento",
+    "columns[2][data]": "descripcion",
+    "columns[3][data]": "fecha",
+    "columns[4][data]": "totalDebitos",
+    "columns[5][data]": "totalCreditos",
+    "columns[6][data]": "detalle",
+    "columns[7][data]": "asientoId",
+    desde,
+    hasta,
+    _token: token,
+  }).toString();
+
+  const { res: lisRes, text: lisText } = await webFetch(`${baseUrl}${MAYOR_LISTA}`, cookies, {
+    method: "POST",
+    body: listaBody,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      Accept: "application/json",
+      Origin: baseUrl,
+      Referer: `${baseUrl}${MAYOR_PAGINA}`,
+    },
+  });
+  let asientosDeclarados: number | null = null;
+  try {
+    const j = JSON.parse(lisText) as { recordsTotal?: number; recordsFiltered?: number };
+    const n = Number(j.recordsTotal ?? j.recordsFiltered);
+    asientosDeclarados = Number.isFinite(n) ? n : null;
+  } catch {
+    throw new SwitchWebError(
+      empresaKey,
+      "mayor-rango",
+      `${MAYOR_LISTA} no devolvió JSON (status ${lisRes.status}); el rango no quedó fijado`,
+    );
+  }
+
+  // ── 3) el acumulador ──────────────────────────────────────────────────────
+  let key = 0;
+  let file = "";
+  let ronda = 0;
+  while (ronda < MAYOR_MAX_RONDAS) {
+    ronda++;
+    const body = new URLSearchParams({
+      chunk: String(MAYOR_CHUNK),
+      key: String(key),
+      file,
+      _token: token,
+    }).toString();
+
+    const { res, text } = await webFetch(`${baseUrl}${MAYOR_EXPORT}`, cookies, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "application/json",
+        Origin: baseUrl,
+        Referer: `${baseUrl}${MAYOR_PAGINA}`,
+      },
+    });
+
+    let j: { response?: boolean; file?: string };
+    try {
+      j = JSON.parse(text) as { response?: boolean; file?: string };
+    } catch {
+      throw new SwitchWebError(
+        empresaKey,
+        "mayor-descarga",
+        `${MAYOR_EXPORT} respondió algo que no es JSON en la ronda ${ronda} (status ${res.status})`,
+      );
+    }
+    if (j.file) file = j.file;
+    if (j.response === true) {
+      key += MAYOR_CHUNK;
+      continue;
+    }
+    break;
+  }
+  if (!file) {
+    throw new SwitchWebError(empresaKey, "mayor-descarga", "el servidor nunca devolvió un archivo");
+  }
+  if (ronda >= MAYOR_MAX_RONDAS) {
+    throw new SwitchWebError(
+      empresaKey,
+      "mayor-descarga",
+      `el reporte no terminó en ${MAYOR_MAX_RONDAS} rondas; no se usa un archivo a medias`,
+    );
+  }
+
+  // ── 4) recoger el archivo ─────────────────────────────────────────────────
+  const { res: dlRes, text: csv } = await webFetch(`${baseUrl}/log/${file}`, cookies, {
+    headers: { Accept: "text/csv,application/octet-stream,*/*" },
+  });
+  if (dlRes.status !== 200 || !pareceCsvDelMayor(csv)) {
+    throw new SwitchWebError(
+      empresaKey,
+      "mayor-descarga",
+      `/log/${file} devolvió ${dlRes.status} y ${csv.length} bytes que no son el CSV del mayor`,
+    );
+  }
+
+  return { csv, rutaUsada: MAYOR_EXPORT, asientosDeclarados, rondas: ronda };
 }
 
 /**
