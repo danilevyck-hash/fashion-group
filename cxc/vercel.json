@@ -105,6 +105,10 @@
       "schedule": "40 8 * * *"
     },
     {
+      "path": "/api/cron/sync-mayor",
+      "schedule": "5 9 * * *"
+    },
+    {
       "path": "/api/cron/acs-fidelizacion",
       "schedule": "30 11 * * *"
     },

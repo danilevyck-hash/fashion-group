@@ -39,6 +39,7 @@ export const SYNC_LOG_TYPES = [
   "catalogo_reebok",
   "catalogo_joybees",
   "catalogo_tommy",
+  "mayor",
 ] as const;
 
 export type SyncLogType = (typeof SYNC_LOG_TYPES)[number];

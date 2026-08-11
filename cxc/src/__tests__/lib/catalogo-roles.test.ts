@@ -233,7 +233,17 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
   // extra y las ausencias que necesita para llenarla salen de ese módulo.
   // Cambio DELIBERADO — este candado hizo lo suyo y frenó el build hasta acá.
-  contabilidad: ["proveedores", "gastos-empresa", "prestamos", "asistencia"],
+  // `gastos-contabilidad` (el gasto leído del mayor de Switch) se suma el
+  // 10-ago-2026: es la misma gente que ya tiene `gastos-empresa`, y la contable
+  // es quien cierra los meses que ese módulo muestra. Cambio DELIBERADO — el
+  // candado se puso rojo y por eso se toca acá a mano.
+  contabilidad: [
+    "proveedores",
+    "gastos-empresa",
+    "gastos-contabilidad",
+    "prestamos",
+    "asistencia",
+  ],
   vendedor: ["cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };

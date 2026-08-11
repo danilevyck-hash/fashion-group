@@ -443,6 +443,148 @@ export async function fetchCarteraAntiguedad(
   );
 }
 
+// ─── MAYOR CONTABLE (Contabilidad → Listado de Asientos → "Descargar") ───────
+//
+// Es el mismo reporte que Daniel baja a mano. Devuelve un CSV con una fila por
+// LÍNEA de asiento, separador `;`, fecha DD-MM-YYYY, y el nombre del archivo con
+// la forma `listaasientos_<sucursalId>_<ddmmyyyyhhmmss>.csv`.
+//
+// 🔴 ESTA ES LA ÚNICA PARTE DEL MÓDULO QUE NO ESTÁ VERIFICADA CONTRA SWITCH.
+// Se escribió SIN conectarse (la sesión web estaba ocupada por otra corrida y el
+// login es de sesión única). La ruta exacta del "Descargar" y sus parámetros son
+// una DEDUCCIÓN a partir de:
+//   · el nombre del archivo que produce (`listaasientos_…`),
+//   · los controladores que se midieron vivos en jun/ago-2026 (`asientos`,
+//     `reportecontable`, `cuentacontable` → 302 a login; las rutas falsas
+//     devuelven el HTML "Exception - SWITCH SOFT"),
+//   · y la convención de esta app Laravel, verificada en los otros dos reportes:
+//     una página HTML que entrega el `_token` y una segunda ruta que entrega los
+//     datos (`/reportesventa/comprobantes` → `/reportesventa/facturas`;
+//     `/estadodecuenta` → `/estadodecuenta/obtener`).
+//
+// Por eso NO se cablea una sola ruta a ciegas: se prueban en orden los
+// candidatos de `MAYOR_CANDIDATOS` y se usa el primero que devuelva algo que
+// PAREZCA EL MAYOR DE VERDAD (`pareceCsvDelMayor`). Si ninguno lo hace, se
+// lanza un error que lista lo que respondió cada uno — la corrida queda en
+// `error` y NO se escribe una sola fila. Ese es el punto: es preferible un
+// módulo que no cargó a uno que cargó basura, porque acá lo que se guarda son
+// los gastos con los que se toman decisiones.
+//
+// La primera corrida supervisada contra Switch va a decir cuál es el bueno;
+// entonces se fija con `SWITCH_MAYOR_PATH` (env) o se deja el candidato
+// ganador solo, y este comentario se reemplaza por el hecho medido.
+
+/** Rutas candidatas del reporte: [página con el _token, ruta de descarga]. */
+const MAYOR_CANDIDATOS: Array<{ pagina: string; descarga: string }> = [
+  { pagina: "/asientos", descarga: "/asientos/descargar" },
+  { pagina: "/asientos", descarga: "/asientos/exportar" },
+  { pagina: "/asientos/lista", descarga: "/asientos/lista/descargar" },
+  { pagina: "/reportecontable/asientos", descarga: "/reportecontable/asientos/descargar" },
+  { pagina: "/reportecontable", descarga: "/reportecontable/listaasientos" },
+];
+
+/** El encabezado del CSV real, ya normalizado (dobles espacios colapsados). */
+const MAYOR_HEADER_ESPERADO = ["asiento", "descripcion", "fecha", "nombre cuenta", "cuenta"];
+
+/**
+ * ¿Esto que volvió es el CSV del mayor y no un HTML de error / una página vacía?
+ *
+ * Switch responde HTTP 200 con el HTML de excepción cuando la ruta no existe, y
+ * 200 con cuerpo vacío en otros casos: el código de estado NO alcanza para
+ * distinguir. Lo único confiable es mirar el contenido.
+ */
+export function pareceCsvDelMayor(texto: string): boolean {
+  const primera = texto.replace(/^\uFEFF/, "").split(/\r\n|\n|\r/)[0] ?? "";
+  if (primera.includes("<") || /<!DOCTYPE|<html/i.test(texto.slice(0, 400))) return false;
+  const cols = primera
+    .split(";")
+    .map((c) => c.replace(/\s+/g, " ").trim().toLowerCase());
+  return MAYOR_HEADER_ESPERADO.every((c) => cols.includes(c));
+}
+
+export interface MayorDescarga {
+  csv: string;
+  /** Qué ruta funcionó — se registra para poder fijarla después. */
+  rutaUsada: string;
+}
+
+/**
+ * Baja el mayor de un rango de fechas (inclusive), como CSV crudo.
+ * NO parsea: de eso se encarga `src/lib/mayor/parser.ts`, que es puro y testeado.
+ */
+export async function fetchMayorAsientos(
+  session: WebSession,
+  desde: string, // YYYY-MM-DD
+  hasta: string, // YYYY-MM-DD
+): Promise<MayorDescarga> {
+  const { empresaKey, baseUrl, cookies } = session;
+
+  // Un override por env permite fijar la ruta buena sin tocar código, y
+  // también probar una nueva si Switch cambia, sin re-desplegar el módulo.
+  const fijada = process.env.SWITCH_MAYOR_PATH;
+  const candidatos = fijada
+    ? [{ pagina: process.env.SWITCH_MAYOR_PAGINA ?? "/asientos", descarga: fijada }]
+    : MAYOR_CANDIDATOS;
+
+  const intentos: string[] = [];
+
+  for (const cand of candidatos) {
+    let token: string | null = null;
+    try {
+      const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}${cand.pagina}`, cookies, {
+        headers: { Accept: "text/html" },
+      });
+      if (pgRes.status === 200) token = extractToken(pgHtml);
+      if (pgRes.status !== 200) {
+        intentos.push(`${cand.pagina} → HTTP ${pgRes.status}`);
+        continue;
+      }
+    } catch (err) {
+      intentos.push(`${cand.pagina} → ${err instanceof Error ? err.message : "error de red"}`);
+      continue;
+    }
+
+    // Los filtros del reporte van como el resto de esta app: rango de fechas +
+    // sucursal. El `_token` es obligatorio en todo POST de Laravel.
+    const body = new URLSearchParams({
+      desde,
+      hasta,
+      fechaDesde: desde,
+      fechaHasta: hasta,
+      sucursalId: "1",
+      ...(token ? { _token: token } : {}),
+    }).toString();
+
+    try {
+      const { res, text } = await webFetch(`${baseUrl}${cand.descarga}`, cookies, {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          Accept: "text/csv,application/octet-stream,*/*",
+          Origin: baseUrl,
+          Referer: `${baseUrl}${cand.pagina}`,
+        },
+      });
+
+      if (pareceCsvDelMayor(text)) {
+        return { csv: text, rutaUsada: cand.descarga };
+      }
+      intentos.push(
+        `${cand.descarga} → HTTP ${res.status}, ${text.length} bytes, no es el CSV del mayor`,
+      );
+    } catch (err) {
+      intentos.push(`${cand.descarga} → ${err instanceof Error ? err.message : "error de red"}`);
+    }
+  }
+
+  throw new SwitchWebError(
+    empresaKey,
+    "mayor-descarga",
+    `ninguna ruta devolvió el CSV del mayor. Intentos: ${intentos.join(" | ")}`,
+  );
+}
+
 /**
  * Cierra la sesión web. El login usa `changesession=SI`, que EXPULSA a quien
  * esté trabajando en el panel de esa empresa; dejar la sesión abierta alarga ese
