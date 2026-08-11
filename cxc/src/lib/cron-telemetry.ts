@@ -437,6 +437,10 @@ export const SEED_TOLERANT_CRONS = [
   // es 16h45 y el default de 26h lo cubre (ver CRON_STALE_HOURS_POR_CRON). El
   // umbral propio hacía falta cuando corría solo de lunes a viernes.
   "asistencia-vigia",
+  // Mayor contable de las 8 empresas (09:05 UTC = 04:05 a.m. Panamá).
+  // Desplegado el 10-ago-2026: seed-tolerante hasta que siembre su fila.
+  // Promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
+  "sync-mayor",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -526,6 +530,14 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // sync-recibos (07:50) y a 30 de switch-articulos (08:40).
   { cron: "boston-cartera", hhmmUtc: "0810", empresas: ["confecciones_boston"] },
   { cron: "switch-articulos", hhmmUtc: "0840", empresas: CRON_EMPRESAS_TODAS },
+  // MAYOR CONTABLE de las 8 empresas (09:05 UTC = 04:05 a.m. Panamá). Abre
+  // sesión web con changesession=SI, o sea que EXPULSA a quien esté en el panel
+  // — por eso va en la franja de madrugada de Panamá (06:00-11:00 UTC), la
+  // misma donde ya viven sync-utilidad (07:00) y boston-cartera (08:10), y NO
+  // en la 00:20-05:20 UTC, que en Panamá es la tarde-noche (19:20-00:20).
+  // Toca las 8 empresas: queda a 25 min de switch-articulos (08:40) y a 25 de
+  // sync-proveedores (09:30), sobre los 15 de SEPARACION_MINIMA_MIN.
+  { cron: "sync-mayor", hhmmUtc: "0905", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },

@@ -147,7 +147,7 @@ describe("B. el silenciamiento sigue la misma regla", () => {
 });
 
 describe("C. quién importa web-client", () => {
-  it("SOLO sync-utilidad.ts y sync-estadocuenta-web.ts", () => {
+  it("SOLO sync-utilidad.ts, sync-estadocuenta-web.ts y sync-mayor.ts", () => {
     const importadores = archivosFuente()
       .filter((f) => !f.endsWith(path.join("switch-api", "web-client.ts")))
       .filter((f) => /from\s+["'][^"']*web-client["']/.test(fs.readFileSync(f, "utf8")))
@@ -158,6 +158,10 @@ describe("C. quién importa web-client", () => {
     // recupera la reconciliación, sumarlo a COLATERALES_LOGIN_WEB.
     expect(importadores).toEqual([
       path.join("lib", "switch-api", "sync-estadocuenta-web.ts"),
+      // Mayor contable: corre 09:05 UTC = 04:05 a.m. Panamá (madrugada, igual
+      // que los otros dos). NO es colateral de la reconciliación, así que no
+      // entra en COLATERALES_LOGIN_WEB — como boston-cartera.
+      path.join("lib", "switch-api", "sync-mayor.ts"),
       path.join("lib", "switch-api", "sync-utilidad.ts"),
     ]);
   });

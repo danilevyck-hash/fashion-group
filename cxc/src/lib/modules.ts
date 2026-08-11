@@ -89,6 +89,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "gastos-empresa", label: "Gastos de Empresa", href: "/gastos-empresa",   icon: Receipt,       roles: ["admin", "contabilidad"],                     group: "operacion" },
+  { key: "gastos-contabilidad", label: "Gastos según Contabilidad", href: "/gastos-contabilidad", icon: Receipt, roles: ["admin", "contabilidad"],  group: "operacion" },
   { key: "saldos-banco",   label: "Saldos de Banco",   href: "/saldos-banco",     icon: Landmark,      roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
