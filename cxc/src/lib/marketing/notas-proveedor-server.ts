@@ -157,20 +157,34 @@ export async function createNotaProveedor(
   return firmada;
 }
 
-/** Edita un renglón (producto, precio, aclaración y/o fotos). */
+/**
+ * Edita un renglón (producto, precio, aclaración y/o fotos).
+ *
+ * 🔴 `conservarFotos` = "el que llamó NO habló de fotos, no las toques".
+ *    Sin esto, editar solo el precio vaciaba `foto_paths`: la validación
+ *    convierte un `fotoPaths` ausente en `[]`, y `[]` guardado significa "sin
+ *    fotos". Es lo que pasaría cada vez que Daniel corrige un precio desde el
+ *    "?" de Mobiliario, que no muestra ni edita fotos. Y esas rutas son el
+ *    origen de las fotos que hoy se ven en la tabla de Productos.
+ *    Ver `traeFotoPaths` en ./notas-proveedor.ts y el candado en
+ *    `marketing-precios-proveedor.test.ts`.
+ */
 export async function updateNotaProveedor(
   id: string,
   input: NotaProveedorInput,
+  conservarFotos: boolean = false,
 ): Promise<NotaProveedorRenglon> {
+  const cambios: Record<string, unknown> = {
+    producto: input.producto,
+    precio: input.precio,
+    nota: input.nota,
+    updated_at: new Date().toISOString(),
+  };
+  if (!conservarFotos) cambios.foto_paths = input.fotoPaths;
+
   const { data, error } = await supabaseServer
     .from(TABLA)
-    .update({
-      producto: input.producto,
-      precio: input.precio,
-      nota: input.nota,
-      foto_paths: input.fotoPaths,
-      updated_at: new Date().toISOString(),
-    })
+    .update(cambios)
     .eq("id", id)
     .select(COLUMNAS)
     .single();

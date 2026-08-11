@@ -155,6 +155,28 @@ export function validarProductoNota(
 }
 
 /**
+ * ¿El cuerpo de la petición trae `fotoPaths`?
+ *
+ * 🩸 POR QUÉ EXISTE ESTO. `normalizarFotoPaths(undefined)` devuelve `[]`, y
+ * `[]` guardado es "este renglón no tiene fotos". O sea: un PUT que no
+ * mencione las fotos las BORRARÍA. Eso importa desde que el "?" de Mobiliario
+ * edita precios sin tocar fotos — sin esta distinción, corregirle el precio a
+ * "Paneles" le vaciaría `foto_paths`, que es de donde salieron las fotos que
+ * hoy se ven en la tabla de Productos.
+ *
+ * Ausente  → "no toques las fotos".
+ * Presente → "las fotos son EXACTAMENTE estas" (incluido `[]` = ninguna).
+ */
+export function traeFotoPaths(entrada: object | null | undefined): boolean {
+  if (entrada === null || entrada === undefined) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(entrada, "fotoPaths") &&
+    (entrada as { fotoPaths?: unknown }).fotoPaths !== undefined &&
+    (entrada as { fotoPaths?: unknown }).fotoPaths !== null
+  );
+}
+
+/**
  * Limpia la lista de fotos: saca vacíos y repetidos, conserva el orden en
  * que se subieron y corta en el tope. Duplicar una foto no rompe nada pero
  * la muestra dos veces, que es un error visible.
