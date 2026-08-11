@@ -144,9 +144,16 @@ describe("1 · NO SUMA — la nota es información, no un cálculo", () => {
     expect(src).toContain("}, [productos, entregas])");
   });
 
-  it("la página no le pasa datos al bloque de notas (no puede contaminar nada)", () => {
+  // ⚠️ ago-2026: el bloque "Notas del proveedor" YA NO SE MONTA en Mobiliario
+  // (Daniel: "y despues eliminar notas proveedor"). Los costos ahora se ven en
+  // un solo "?" arriba, `PreciosProveedorAyuda`, que tiene su propio candado en
+  // `marketing-precios-proveedor.test.ts`. Acá se conserva lo que sigue siendo
+  // cierto y sigue importando: la página no le pasa NI RECIBE datos a nadie que
+  // maneje precios del proveedor, así que no hay por dónde contaminar un total.
+  it("la página no monta ningún bloque de notas ni recibe sus precios", () => {
     const src = leer(RUTA_PAGINA);
-    expect(src).toContain("<NotasProveedorMobiliario />");
+    expect(src).not.toContain("<NotasProveedorMobiliario");
+    expect(src).toContain("<PreciosProveedorAyuda />");
   });
 
   it("la pantalla lo DICE, no solo el código", () => {
@@ -177,9 +184,11 @@ describe("2 · SOLO ADMIN, y el candado está en el SERVIDOR", () => {
     expect(src).not.toMatch(/requireAdmin\s*\(/);
   });
 
-  it("la página esconde el bloque para quien no es admin (cortesía)", () => {
+  // El bloque se fue de la pantalla, pero la puerta de cortesía sigue: hoy la
+  // que la usa es el "?" con los mismos costos.
+  it("la pantalla esconde los costos del proveedor a quien no es admin (cortesía)", () => {
     expect(leer(RUTA_PAGINA)).toContain(
-      '{role === "admin" && <NotasProveedorMobiliario />}',
+      'role === "admin" && <PreciosProveedorAyuda />',
     );
   });
 });

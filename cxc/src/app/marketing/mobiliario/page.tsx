@@ -16,6 +16,18 @@
 //   * ≥ lg → las mismas tablas (útil 752px a 1024 y 1104px a 1440: entran), con
 //     un scroller propio adentro para que crecer nunca vuelva a ser recortar
 //     (el resumen gana una columna por cada marca nueva).
+//
+// 🩸 UNA SOLA TABLA (ago-2026). La pantalla listaba los MISMOS 6 muebles dos
+// veces: en "Productos" (lo que valen para Daniel) y en "Notas del proveedor"
+// (lo que le cobra Changalo), con precios distintos y fotos solo abajo.
+// Daniel, textual: *"quiero productos tal cual como esta, solo que con las
+// fotos de notas proveedor. y con ? global que muestre los precios reales que
+// son los que estan en nota proveedor. y despues eliminar notas proveedor"*.
+//   * Las fotos se MUDARON a `mk_inventario_productos.foto_path` (backfill en
+//     la migración 20260811150000, la corre Daniel a mano).
+//   * Los costos del proveedor viven en UN solo "?" arriba, de solo lectura.
+//   * El bloque de abajo desapareció. La TABLA `mk_mobiliario_notas_proveedor`
+//     NO se borró: es de donde el "?" saca los precios.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +38,7 @@ import { ConfirmDeleteModal, ConfirmModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
-import NotasProveedorMobiliario from "@/components/marketing/NotasProveedorMobiliario";
+import PreciosProveedorAyuda from "@/components/marketing/PreciosProveedorAyuda";
 // Reusa el compresor que ya usa Reclamos: baja la foto de celular a ~1600px
 // JPEG antes de subirla. Importa porque la MISMA foto termina incrustada en el
 // PDF de la nota de entrega, y una foto de 8 MB haría un papel que no se puede
@@ -489,17 +501,23 @@ export default function MobiliarioPage() {
 
         {/* Tabla productos */}
         <section className="space-y-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
               Productos
             </h2>
-            <button
-              type="button"
-              onClick={abrirNuevoProducto}
-              className="text-xs text-gray-500 hover:text-black underline min-h-[44px] px-1"
-            >
-              + Agregar producto
-            </button>
+            {/* UN SOLO "?" con los costos del proveedor, al lado de Agregar.
+                Solo admin: es la misma puerta que tenía el bloque viejo de
+                "Notas del proveedor", y el candado real está en el servidor. */}
+            <div className="flex items-center gap-2">
+              {role === "admin" && <PreciosProveedorAyuda />}
+              <button
+                type="button"
+                onClick={abrirNuevoProducto}
+                className="text-xs text-gray-500 hover:text-black underline min-h-[44px] px-1"
+              >
+                + Agregar producto
+              </button>
+            </div>
           </div>
           {/* TARJETAS — hasta lg. Mismos datos y mismas etiquetas que la tabla. */}
           <div className="lg:hidden space-y-2">
@@ -975,14 +993,14 @@ export default function MobiliarioPage() {
           </div>
         </section>
 
-        {/* Notas del proveedor — SOLO ADMIN.
-            🔴 Es una libreta con los costos del proveedor. NO suma ni entra
-            en `metricas` (arriba): esas se calculan solo con `productos` y
-            `entregas`, y este bloque no le pasa nada a nadie. Daniel:
-            "que no sume ni nada, solo info personal".
-            Esconderlo acá es cortesía — el candado real está en el servidor,
-            en `requireRole(req, ["admin"])` de las 3 rutas de la API. */}
-        {role === "admin" && <NotasProveedorMobiliario />}
+        {/* 🔴 "Notas del proveedor" YA NO ES UN BLOQUE DE ESTA PANTALLA.
+            Daniel: *"quiero productos tal cual como esta, solo que con las
+            fotos de notas proveedor (…) y despues eliminar notas proveedor"*.
+            Los mismos 6 muebles se listaban DOS veces con precios distintos y
+            eso confundía. Ahora: las fotos viven en la tabla de Productos y
+            los costos del proveedor en el "?" de arriba.
+            ⚠️ La TABLA `mk_mobiliario_notas_proveedor` sigue existiendo y con
+            sus 6 filas — es de donde sale el contenido del "?". */}
       </main>
 
       {/* Modal edit/nuevo producto */}

@@ -4,6 +4,18 @@
 // Marketing › Mobiliario — bloque "Notas del proveedor"
 // ============================================================================
 //
+// ⚠️ HOY ESTE BLOQUE NO SE MONTA EN NINGUNA PANTALLA (ago-2026). Daniel:
+//    *"y despues eliminar notas proveedor"* — los mismos 6 muebles salían dos
+//    veces con precios distintos. Las fotos se mudaron a la tabla de Productos
+//    y los costos se leen en el "?" de arriba (`PreciosProveedorAyuda`), que
+//    es de SOLO LECTURA.
+//
+//    🔴 EL ARCHIVO SE DEJA A PROPÓSITO, y no es descuido: es la ÚNICA forma de
+//    editar, agregar o borrar un renglón de `mk_mobiliario_notas_proveedor`
+//    desde la app. Volver a mostrarlo es una línea en
+//    `src/app/marketing/mobiliario/page.tsx`. Borrarlo dejaría la tabla sin
+//    ninguna puerta de edición. La API (las 3 rutas) tampoco se tocó.
+//
 // 🔴 ESTO NO SUMA. Es una libreta con los costos que cobra el proveedor
 //    (Changalo). Daniel, textual: "que no sume ni nada, solo info personal".
 //    * NO hay total, ni promedio, ni "N renglones × precio".
