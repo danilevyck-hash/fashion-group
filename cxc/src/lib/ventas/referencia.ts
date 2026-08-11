@@ -1,22 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab "Referencia" de /ventas — módulo PURO (sin Supabase, sin red).
 //
-// Responde la pregunta de compra de Daniel: "¿cuánto vendió esta referencia?"
-// sobre `switch_articulo_diario`. Todas las reglas de cálculo viven acá para
-// que el API route y la UI usen LA MISMA matemática y los tests la fijen.
+// Piezas compartidas del tab: signo de los comprobantes, aritmética de meses,
+// modelo/color y parseo de la búsqueda. La medición de una COMPRA (cuánto
+// llegó, en cuánto tiempo se vendió, qué queda) vive en `compras.ts`.
 //
 // 🔴 LAS NC RESTAN. `tipo='NC'` viene con el monto en POSITIVO (magnitud) —
 // el signo se aplica acá y en NINGÚN otro lado. La firma del error histórico
 // de este repo es que la diferencia da EXACTO el doble de las NC (se pagó dos
 // veces); hay un test que la fija.
 //
-// 🩸 "SE AGOTÓ" TIENE TOPE DE ANTIGÜEDAD, y por eso existe DESCONTINUADO.
-// Sin tope, `NB2075902` —última venta may-2024, 27 MESES atrás— se anunciaba
-// como "Se agotó" y la pantalla recomendaba comprar ~138 unidades de algo
-// muerto hacía más de dos años. Que no venda hace 3 meses es un agotado que se
-// recompra; que no venda hace más de un año es otra cosa y NO se recompra sola.
-// Los dos estados son EXCLUYENTES por construcción y el descontinuado nunca
-// lleva `sugerencia6m`.
+// 🩸 ACÁ NO SE CALCULA NINGÚN VEREDICTO, Y ES A PROPÓSITO. Este archivo tenía
+// "se agotó", "descontinuado" y `sugerencia6m` ("compra ~138 unidades"), más
+// ventanas de 3/6/12 meses que METÍAN EL MES EN CURSO adentro del promedio —
+// medido el 10-ago: los "últimos 3 meses" de `40HM265001` daban 18,3 u/mes
+// contando 10 días de agosto contra 34,3 con meses completos, el DOBLE. Daniel
+// rechazó dos diseños por recomendarle qué comprar: *"quiero la data clara y
+// simple"*. Todo eso se fue. Lo que queda acá es aritmética de meses, el signo
+// de los comprobantes y la búsqueda; las COMPRAS viven en `compras.ts`.
 //
 // 🔴 EMPRESAS: SOLO las 6 de Fashion Group. `confecciones_boston` y
 // `american_classic` (Multifashion/ACS) quedan FUERA por decisión explícita
@@ -30,22 +31,6 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 export const REFERENCIA_EMPRESA_KEYS: readonly string[] = B2B_EMPRESA_KEYS;
 
 // ─── Umbrales con nombre — nada de números mágicos regados ───────────────────
-
-export const UMBRALES_AGOTADO = {
-  /** Meses SIN venta para considerar que se agotó (≥). */
-  MESES_SIN_VENTA: 3,
-  /** Ritmo mínimo (u/mes) en los últimos meses activos para que "se agotó"
-   *  signifique "se agotó" y no "dejó de gustar" (≥). */
-  RITMO_MINIMO: 3,
-  /** Cuántos de los últimos meses ACTIVOS se promedian para medir el ritmo. */
-  VENTANA_RITMO_MESES: 3,
-  /** TOPE de antigüedad del "se agotó". Pasados MÁS de estos meses sin vender
-   *  (>, no ≥) el artículo está DESCONTINUADO: estado propio y SIN sugerencia
-   *  de compra. Ver la nota 🩸 del encabezado. */
-  MESES_MAX_AGOTADO: 12,
-  /** La sugerencia de compra proyecta el ritmo real a esta cantidad de meses. */
-  MESES_SUGERENCIA: 6,
-} as const;
 
 /** Tope de filas que una búsqueda puede leer de PostgREST (20 páginas).
  *  Protege a Supabase de un término demasiado amplio — el usuario afina. */
@@ -195,97 +180,6 @@ export function agruparReferencias(filas: FilaDiario[]): ReferenciaSerie[] {
   return out.sort((a, b) => a.codigo.localeCompare(b.codigo));
 }
 
-// ─── TANDAS — el bloque principal (10-ago-2026) ──────────────────────────────
-//
-// Daniel rechazó el marco de períodos fijos: *"no hace sentido entonces, no
-// responde mi pregunta. quiero saber cuánto vendí de esa referencia para saber
-// cuánto comprar"*. Para un artículo agotado, 3/6/12 meses dan 0 — y 0 no
-// responde "cuánto compro". `NB2075902` vendió 138 unidades y mostraba cero.
-//
-// Una TANDA = un período de venta continua: meses activos (unidades netas > 0)
-// donde el salto entre dos activos consecutivos no pasa de SALTO_MAX_MESES.
-// Un hueco de MÁS de 2 meses corta la tanda; un mes vacío suelto NO corta y
-// SÍ cuenta en la duración (estuvo a la venta, no se vendió).
-//
-// Validado contra producción (10-ago-2026):
-//   NB2075902 → mar-23 (30u/1m/30) · oct→dic-23 (63/3/21) · mar→may-24
-//               (45/3/15, con abr-24 vacío ADENTRO) — 3 tandas, total 138.
-//   NB2075908 → mar→jun-23 (115/4/28.8) · ene-24 (5/1/5).
-
-export const UMBRAL_TANDAS = {
-  /** Salto máximo (en meses) entre dos meses ACTIVOS consecutivos para seguir
-   *  en la misma tanda. 2 = tolera UN mes vacío en el medio (jul → sep sigue);
-   *  un hueco mayor (dic-23 → mar-24) corta. */
-  SALTO_MAX_MESES: 2,
-} as const;
-
-/** Un período de venta continua de una referencia. */
-export interface Tanda {
-  desde: string; // YYYY-MM del primer mes activo
-  hasta: string; // YYYY-MM del último mes activo
-  /** Unidades NETAS de la tanda (NC restadas; un mes negativo interno resta). */
-  unidades: number;
-  venta: number;
-  /** Meses calendario desde..hasta, huecos internos INCLUIDOS. */
-  meses: number;
-  /** unidades ÷ meses — el ritmo real de esa tanda. */
-  uMes: number;
-}
-
-/** Corta la serie en tandas. Los meses con neto ≤ 0 no abren ni sostienen una
- *  tanda, pero si caen DENTRO de una (entre dos activos cercanos) su neto se
- *  suma — una devolución dentro de la tanda resta de la tanda. */
-export function calcularTandas(serie: MesSerie[]): Tanda[] {
-  const activos = serie.filter((p) => p.unidades > 0);
-  if (!activos.length) return [];
-  const porMes = new Map(serie.map((p) => [p.mes, p]));
-
-  const grupos: { desde: string; hasta: string }[] = [];
-  let desde = activos[0].mes;
-  let hasta = activos[0].mes;
-  for (const p of activos.slice(1)) {
-    if (diffMeses(p.mes, hasta) > UMBRAL_TANDAS.SALTO_MAX_MESES) {
-      grupos.push({ desde, hasta });
-      desde = p.mes;
-    }
-    hasta = p.mes;
-  }
-  grupos.push({ desde, hasta });
-
-  return grupos.map((g) => {
-    let unidades = 0;
-    let venta = 0;
-    let mes = g.desde;
-    const meses = diffMeses(g.hasta, g.desde) + 1;
-    for (let i = 0; i < meses; i += 1) {
-      const p = porMes.get(mes);
-      if (p) {
-        unidades += p.unidades;
-        venta += p.venta;
-      }
-      mes = restarMeses(mes, -1);
-    }
-    return { desde: g.desde, hasta: g.hasta, unidades, venta, meses, uMes: unidades / meses };
-  });
-}
-
-/** "Va bajando: 30 → 21 → 15" / "va subiendo". Estrictamente monótono sobre el
- *  u/mes de cada tanda. Con UNA sola tanda NO hay tendencia — no se inventa. */
-export function tendenciaTandas(tandas: readonly Tanda[]): "baja" | "sube" | null {
-  if (tandas.length < 2) return null;
-  const baja = tandas.every((t, i) => i === 0 || t.uMes < tandas[i - 1].uMes);
-  if (baja) return "baja";
-  const sube = tandas.every((t, i) => i === 0 || t.uMes > tandas[i - 1].uMes);
-  return sube ? "sube" : null;
-}
-
-/** "Se te acaba en 1 a 3 meses" — el rango de duración de las tandas. */
-export function rangoDuracionTandas(tandas: readonly Tanda[]): { min: number; max: number } | null {
-  if (!tandas.length) return null;
-  const meses = tandas.map((t) => t.meses);
-  return { min: Math.min(...meses), max: Math.max(...meses) };
-}
-
 /** Suma varias series (los colores de un modelo) en una sola, mes a mes. */
 export function sumarSeries(series: MesSerie[][]): MesSerie[] {
   const meses = new Map<string, { unidades: number; venta: number }>();
@@ -300,127 +194,6 @@ export function sumarSeries(series: MesSerie[][]): MesSerie[] {
   return [...meses.entries()]
     .map(([mes, v]) => ({ mes, unidades: v.unidades, venta: v.venta }))
     .sort((a, b) => a.mes.localeCompare(b.mes));
-}
-
-// ─── Estadísticas de una serie ───────────────────────────────────────────────
-
-export interface VentanaStats {
-  unidades: number;
-  venta: number;
-}
-
-export interface ReferenciaStats {
-  unidadesNetas: number;
-  ventaNeta: number;
-  /** Venta neta ÷ unidades netas — al que salió DE VERDAD. null si unidades ≤ 0. */
-  precioReal: number | null;
-  /** Ventanas calendario que terminan en el mes actual (inclusive). */
-  m3: VentanaStats;
-  m6: VentanaStats;
-  m12: VentanaStats;
-  /** Meses con unidades netas > 0 — NO meses calendario. */
-  mesesActivos: number;
-  /** unidades netas ÷ meses activos. La columna que distingue "no gustó" de
-   *  "no había mercancía". null si nunca vendió. */
-  uMesReal: number | null;
-  primeraVenta: string | null; // YYYY-MM
-  ultimaVenta: string | null; // YYYY-MM
-  mesesDesdeUltimaVenta: number | null;
-  /** Promedio de los últimos ≤3 meses ACTIVOS (el ritmo que traía). */
-  ritmoUltimosActivos: number | null;
-  /** Última venta hace MÁS de MESES_MAX_AGOTADO meses. Estado propio: no se
-   *  recompra por ritmo, así que NUNCA lleva sugerencia. Excluyente con
-   *  `seAgoto` por construcción. */
-  descontinuado: boolean;
-  /** Última venta hace ≥3 meses (y ≤ el tope) Y venía vendiendo ≥3 u/mes. */
-  seAgoto: boolean;
-  /** ritmo real × 6 — "para 6 meses: ~N unidades". Solo si seAgoto. */
-  sugerencia6m: number | null;
-}
-
-function statsVentana(serie: MesSerie[], desde: string, hasta: string): VentanaStats {
-  let unidades = 0;
-  let venta = 0;
-  for (const p of serie) {
-    // Rango sobre strings YYYY-MM (semiabierto no hace falta: son meses enteros).
-    if (p.mes >= desde && p.mes <= hasta) {
-      unidades += p.unidades;
-      venta += p.venta;
-    }
-  }
-  return { unidades, venta };
-}
-
-/**
- * Calcula todas las estadísticas de una serie. `hoyMes` = mes actual en hora
- * PANAMÁ (YYYY-MM) — lo manda el servidor; nunca se calcula con Date en UTC.
- */
-export function calcularStats(serie: MesSerie[], hoyMes: string): ReferenciaStats {
-  const unidadesNetas = serie.reduce((s, p) => s + p.unidades, 0);
-  const ventaNeta = serie.reduce((s, p) => s + p.venta, 0);
-  const activos = serie.filter((p) => p.unidades > 0);
-  const mesesActivos = activos.length;
-  const primeraVenta = activos.length ? activos[0].mes : null;
-  const ultimaVenta = activos.length ? activos[activos.length - 1].mes : null;
-  const mesesDesdeUltimaVenta = ultimaVenta ? diffMeses(hoyMes, ultimaVenta) : null;
-
-  const ventana = (n: number) => statsVentana(serie, restarMeses(hoyMes, n - 1), hoyMes);
-
-  const uMesReal = mesesActivos > 0 ? unidadesNetas / mesesActivos : null;
-  const precioReal = unidadesNetas > 0 ? ventaNeta / unidadesNetas : null;
-
-  const ultimosActivos = activos.slice(-UMBRALES_AGOTADO.VENTANA_RITMO_MESES);
-  const ritmoUltimosActivos = ultimosActivos.length
-    ? ultimosActivos.reduce((s, p) => s + p.unidades, 0) / ultimosActivos.length
-    : null;
-
-  // El tope va PRIMERO y no mira el ritmo: pasado un año sin vender, lo que
-  // vendía antes ya no dice cuánto comprar hoy.
-  const descontinuado =
-    mesesDesdeUltimaVenta != null && mesesDesdeUltimaVenta > UMBRALES_AGOTADO.MESES_MAX_AGOTADO;
-
-  const seAgoto =
-    !descontinuado &&
-    mesesDesdeUltimaVenta != null &&
-    ritmoUltimosActivos != null &&
-    mesesDesdeUltimaVenta >= UMBRALES_AGOTADO.MESES_SIN_VENTA &&
-    ritmoUltimosActivos >= UMBRALES_AGOTADO.RITMO_MINIMO;
-
-  const sugerencia6m =
-    seAgoto && uMesReal != null ? Math.round(uMesReal * UMBRALES_AGOTADO.MESES_SUGERENCIA) : null;
-
-  return {
-    unidadesNetas,
-    ventaNeta,
-    precioReal,
-    m3: ventana(3),
-    m6: ventana(6),
-    m12: ventana(12),
-    mesesActivos,
-    uMesReal,
-    primeraVenta,
-    ultimaVenta,
-    mesesDesdeUltimaVenta,
-    ritmoUltimosActivos,
-    descontinuado,
-    seAgoto,
-    sugerencia6m,
-  };
-}
-
-/** Serie CONTINUA para el gráfico: desde la primera venta hasta hoy, con los
- *  meses sin movimiento en 0, recortada a los últimos SERIE_GRAFICO_MESES. */
-export function serieContinua(serie: MesSerie[], hoyMes: string): MesSerie[] {
-  if (!serie.length) return [];
-  const porMes = new Map(serie.map((p) => [p.mes, p]));
-  const out: MesSerie[] = [];
-  let mes = serie[0].mes;
-  // Cota dura por si llega un mes futuro corrupto (no debería).
-  for (let i = 0; i < 600 && mes <= hoyMes; i += 1) {
-    out.push(porMes.get(mes) ?? { mes, unidades: 0, venta: 0 });
-    mes = restarMeses(mes, -1);
-  }
-  return out.slice(-SERIE_GRAFICO_MESES);
 }
 
 // ─── Modelo y color ──────────────────────────────────────────────────────────

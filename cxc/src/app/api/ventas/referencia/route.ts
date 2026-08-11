@@ -1,30 +1,30 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/ventas/referencia — tab "Referencia" de /ventas. SOLO ADMIN.
 //
-// Dos modos:
-//   ?q=…        una búsqueda: código exacto / modelo (prefijo) / descripción
-//   ?codigos=…  vista múltiple: hasta 50 códigos exactos separados por coma
+// UN SOLO BUSCADOR. Daniel: *"porq columna de varias pegar por lista? enves de
+// ponerlo en el mismo buscador que una?"*. `?q=` acepta lo mismo para uno que
+// para veinte: si lo pegado trae varios códigos se buscan todos, si trae uno se
+// busca el modelo entero (todos sus colores), y si no parece código se busca por
+// descripción. La pestaña "Varias · pegar lista" se fue.
 //
-// DOS fuentes, fusionadas:
-//   · switch_articulo_diario — las VENTAS (serie mensual neta, NC restadas en
-//     signoTipo(), un solo lugar). SOLO las 6 empresas de Fashion Group.
-//   · switch_articulo_info — el CATÁLOGO (nombre comercial, existencia, precio
-//     de etiqueta + frescura). Lo llena el botón "Actualizar datos de Switch".
-//     Si la tabla todavía no existe (migración 20260810120000 pendiente), el
-//     tab funciona igual con `infoDisponible: false`.
-//     🔴 `costo_api` = Costo CIF (medido 3/3): viaja SOLO como `costoCif` y
-//     el FOB solo existe derivado + etiquetado "est." — ver referencia-info.ts.
+// TRES fuentes:
+//   · switch_ingresos_mercancia — LAS COMPRAS REALES (34.792 líneas desde
+//     oct-2022). Es la fuente nueva y la razón de ser del módulo: antes las
+//     "tandas" se ADIVINABAN desde las ventas y no correspondían a ninguna
+//     compra que hubiera ocurrido.
+//   · switch_articulo_diario — las ventas (NC restadas en signoTipo(), un solo
+//     lugar).
+//   · switch_articulo_info — existencia y precio de etiqueta.
 //
-// La búsqueda por descripción mira LAS DOS: la del diario es categoría+género
-// ("Men-Small Leather"); la del catálogo es el nombre comercial ("KAHLO
-// PASSCASE"). Antes "kahlo" no encontraba nada — esa era la limitación
-// reportada en la Fase 1.
+// Lectura SIEMPRE con leerTodoPaginado (db-max-rows=1000 corta en SILENCIO) y
+// pre-conteo que rechaza búsquedas demasiado amplias — Supabase ya se cayó por
+// lecturas así.
 //
-// Lectura SIEMPRE con leerTodoPaginado (db-max-rows=1000 corta en silencio) y
-// pre-conteo que rechaza búsquedas demasiado amplias (tope MAX_FILAS_BUSQUEDA)
-// en vez de arrastrar 200 páginas — Supabase ya se cayó por lecturas así.
-//
-// `hoyMes` va en hora PANAMÁ desde el servidor: el cliente nunca usa Date UTC.
+// ⚠️ DEGRADA LIMPIO. `switch_ingresos_mercancia` la está cargando otro agente y
+// le sigue agregando empresas (joystep, boston, multifashion). Si la tabla o
+// alguna columna todavía no existe, el tab responde igual con
+// `comprasDisponibles: false` en vez de mostrar TODO como "sin compra
+// registrada", que sería una mentira con forma de dato.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -35,166 +35,202 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import {
   REFERENCIA_EMPRESA_KEYS,
   MAX_FILAS_BUSQUEDA,
-  MAX_CODIGOS_MULTI,
-  agruparReferencias,
   normalizarBusqueda,
-  esCodigo,
   escapeLike,
   modeloDe,
-  type FilaDiario,
-  type ReferenciaSerie,
-  type CoincidenciaDescripcion,
-  type ReferenciaApiResp,
+  parsearListaCodigos,
 } from "@/lib/ventas/referencia";
-import { infoParaCliente, type ArticuloInfoFila } from "@/lib/ventas/referencia-info";
+import {
+  armarArticulo,
+  type ArticuloCompras,
+  type ComprasApiResp,
+  type FilaIngreso,
+} from "@/lib/ventas/compras";
 
 export const dynamic = "force-dynamic";
 
-const COLUMNAS = "empresa_key, fecha, codigo, descripcion, tipo, cantidad_total, venta_total";
-// costo_api SÍ se lee: es el Costo CIF (identificado 3/3 el 10-ago-2026) y se
-// muestra como tal. Al payload viaja SOLO bajo el nombre `costoCif`
-// (infoParaCliente) — nunca como FOB: el FOB solo existe derivado y etiquetado.
-const COLUMNAS_INFO = "empresa_key, codigo, descripcion, existencia, precio_etiqueta, costo_api, synced_at";
+const COLS_VENTAS = "empresa_key, fecha, codigo, descripcion, tipo, cantidad_total, venta_total";
+const COLS_INFO = "empresa_key, codigo, descripcion, existencia, precio_etiqueta, synced_at";
+/** Las 2 últimas las agregó el sync de ingresos y pueden no existir todavía. */
+const COLS_INGRESOS_COMPLETO =
+  "empresa_key, fecha, n_interno, linea, proveedor, codigo_articulo, articulo, precio, cantidad, costo_fob, costo_cif, costo_sin_desglosar, fob_confiable";
+const COLS_INGRESOS_BASE =
+  "empresa_key, fecha, n_interno, linea, proveedor, codigo_articulo, articulo, precio, cantidad, costo_fob, costo_cif";
 
-/** El filtro de una búsqueda, como dato (no closure), para aplicarlo igual al
- *  pre-conteo y a cada página de la lectura. */
+interface FilaVenta {
+  empresa_key: string;
+  fecha: string;
+  codigo: string | null;
+  descripcion: string | null;
+  tipo: string;
+  cantidad_total: number | string;
+  venta_total: number | string;
+}
+
+interface FilaInfo {
+  empresa_key: string;
+  codigo: string;
+  descripcion: string | null;
+  existencia: number | string | null;
+  precio_etiqueta: number | string | null;
+  synced_at: string;
+}
+
 type Filtro =
   | { tipo: "codigos"; codigos: string[] }
   | { tipo: "prefijo"; patron: string }
   | { tipo: "descripcion"; patron: string };
 
-function base(opts: { count?: "exact"; head?: boolean }) {
+function esTablaOColumnaAusente(msg: string): boolean {
+  return /does not exist|schema cache|PGRST20[0-9]|42703|42P01/i.test(msg);
+}
+
+// ─── Ventas ──────────────────────────────────────────────────────────────────
+
+function baseVentas(opts: { count?: "exact"; head?: boolean }) {
   return supabaseServer
     .from("switch_articulo_diario")
-    .select(COLUMNAS, opts)
+    .select(COLS_VENTAS, opts)
     .in("empresa_key", [...REFERENCIA_EMPRESA_KEYS]);
 }
 
-function conFiltro(sel: ReturnType<typeof base>, f: Filtro): ReturnType<typeof base> {
+function conFiltro<T extends { in: unknown }>(sel: T, f: Filtro, campo: string): T {
+  const s = sel as unknown as {
+    in: (c: string, v: string[]) => T;
+    like: (c: string, v: string) => T;
+    ilike: (c: string, v: string) => T;
+  };
   switch (f.tipo) {
     case "codigos":
-      return sel.in("codigo", f.codigos);
+      return s.in(campo, f.codigos);
     case "prefijo":
-      return sel.like("codigo", f.patron);
+      return s.like(campo, f.patron);
     case "descripcion":
-      return sel.ilike("descripcion", f.patron);
+      return s.ilike("descripcion", f.patron);
   }
 }
 
-/** Pre-conteo (head-only): si la búsqueda matchea más de MAX_FILAS_BUSQUEDA
- *  filas, se rechaza con mensaje claro en vez de leer 200 páginas. */
-async function contarFilas(f: Filtro): Promise<number> {
-  const { count, error } = await conFiltro(base({ count: "exact", head: true }), f);
+async function contarVentas(f: Filtro): Promise<number> {
+  const { count, error } = await conFiltro(baseVentas({ count: "exact", head: true }), f, "codigo");
   if (error) throw new Error(`conteo: ${error.message}`);
   return count ?? 0;
 }
 
-async function leerFilas(etiqueta: string, f: Filtro): Promise<FilaDiario[]> {
-  return leerTodoPaginado<FilaDiario>(etiqueta, (pedirCount, desde, hasta) =>
-    conFiltro(base(pedirCount ? { count: "exact" } : {}), f)
+async function leerVentas(etiqueta: string, f: Filtro): Promise<FilaVenta[]> {
+  return leerTodoPaginado<FilaVenta>(etiqueta, (pedirCount, desde, hasta) =>
+    conFiltro(baseVentas(pedirCount ? { count: "exact" } : {}), f, "codigo")
       .order("id", { ascending: true })
       .range(desde, hasta),
   );
 }
 
-// ─── Lecturas de switch_articulo_info (tolerantes a "tabla no existe") ───────
+// ─── Compras (la fuente nueva) ───────────────────────────────────────────────
 
-function esTablaAusente(msg: string): boolean {
-  return /does not exist|schema cache/i.test(msg);
-}
-
-interface LecturaInfo {
-  filas: ArticuloInfoFila[];
-  disponible: boolean;
-}
-
-function baseInfo(opts: { count?: "exact"; head?: boolean }) {
-  return supabaseServer
-    .from("switch_articulo_info")
-    .select(COLUMNAS_INFO, opts)
-    .in("empresa_key", [...REFERENCIA_EMPRESA_KEYS]);
-}
-
-type FiltroInfo = { tipo: "codigos"; codigos: string[] } | { tipo: "prefijo"; patron: string } | { tipo: "descripcion"; patron: string };
-
-function conFiltroInfo(sel: ReturnType<typeof baseInfo>, f: FiltroInfo): ReturnType<typeof baseInfo> {
-  switch (f.tipo) {
-    case "codigos":
-      return sel.in("codigo", f.codigos);
-    case "prefijo":
-      return sel.like("codigo", f.patron);
-    case "descripcion":
-      return sel.ilike("descripcion", f.patron);
-  }
-}
-
-/** Lee del catálogo con el mismo paginado defensivo. Si la tabla no existe
- *  (migración pendiente), devuelve vacío con `disponible: false` — el tab de
- *  ventas no se cae por el catálogo. */
-async function leerInfo(etiqueta: string, f: FiltroInfo): Promise<LecturaInfo> {
-  try {
-    const { count, error } = await conFiltroInfo(baseInfo({ count: "exact", head: true }), f);
-    if (error) throw new Error(error.message);
-    if ((count ?? 0) > MAX_FILAS_BUSQUEDA) {
-      // Demasiado amplio para el catálogo: se ignora esta fuente (la búsqueda
-      // del diario ya tiene su propio rechazo con mensaje).
-      return { filas: [], disponible: true };
+async function leerIngresos(f: Filtro): Promise<{ filas: FilaIngreso[]; disponible: boolean }> {
+  for (const cols of [COLS_INGRESOS_COMPLETO, COLS_INGRESOS_BASE]) {
+    try {
+      const filas = await leerTodoPaginado<FilaIngreso>("ingresos_mercancia", (pedirCount, desde, hasta) =>
+        conFiltro(
+          supabaseServer
+            .from("switch_ingresos_mercancia")
+            .select(cols, pedirCount ? { count: "exact" } : {})
+            .in("empresa_key", [...REFERENCIA_EMPRESA_KEYS]),
+          f,
+          "codigo_articulo",
+        )
+          // Orden TOTAL: paginar con filas empatadas puede repetir o saltear.
+          .order("fecha", { ascending: true })
+          .order("empresa_key", { ascending: true })
+          .order("n_interno", { ascending: true })
+          .order("linea", { ascending: true })
+          .range(desde, hasta),
+      );
+      return { filas, disponible: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!esTablaOColumnaAusente(msg)) throw err;
+      // columna nueva ausente → reintenta con el juego base; tabla ausente → sale
+      if (cols === COLS_INGRESOS_BASE) return { filas: [], disponible: false };
     }
-    const filas = await leerTodoPaginado<ArticuloInfoFila>(etiqueta, (pedirCount, desde, hasta) =>
-      conFiltroInfo(baseInfo(pedirCount ? { count: "exact" } : {}), f)
+  }
+  return { filas: [], disponible: false };
+}
+
+// ─── Catálogo ────────────────────────────────────────────────────────────────
+
+async function leerInfo(f: Filtro): Promise<{ filas: FilaInfo[]; disponible: boolean }> {
+  try {
+    const filas = await leerTodoPaginado<FilaInfo>("articulo_info", (pedirCount, desde, hasta) =>
+      conFiltro(
+        supabaseServer
+          .from("switch_articulo_info")
+          .select(COLS_INFO, pedirCount ? { count: "exact" } : {})
+          .in("empresa_key", [...REFERENCIA_EMPRESA_KEYS]),
+        f,
+        "codigo",
+      )
         .order("codigo", { ascending: true })
+        .order("empresa_key", { ascending: true })
         .range(desde, hasta),
     );
     return { filas, disponible: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (esTablaAusente(msg)) return { filas: [], disponible: false };
+    if (esTablaOColumnaAusente(msg)) return { filas: [], disponible: false };
     throw err;
   }
 }
 
-/** Info por códigos exactos, en tandas de 100 (una URL con 50+ códigos × 6
- *  empresas queda lejos del tope de 1.000 filas por página). */
-async function leerInfoPorCodigos(codigos: string[]): Promise<LecturaInfo> {
-  const filas: ArticuloInfoFila[] = [];
-  let disponible = true;
-  for (let i = 0; i < codigos.length; i += 100) {
-    const r = await leerInfo("articulo_info (codigos)", { tipo: "codigos", codigos: codigos.slice(i, i + 100) });
-    if (!r.disponible) return { filas: [], disponible: false };
-    filas.push(...r.filas);
-    disponible = r.disponible;
-  }
-  return { filas, disponible };
-}
+// ─── Fusión ──────────────────────────────────────────────────────────────────
 
-/** Adjunta a cada referencia su fila de catálogo (por empresa+codigo, con
- *  fallback a codigo pelado) y agrega referencias SIN ventas para los códigos
- *  que solo existen en el catálogo — "nunca vendido" también es una respuesta. */
+/**
+ * Arma un artículo por cada `(empresa, código)` que aparezca en CUALQUIERA de
+ * las tres fuentes.
+ *
+ * Normalmente una referencia vive en UNA sola empresa; cuando por dato sucio
+ * aparece en dos, se muestran las dos por separado en vez de mezclarlas — una
+ * compra de una empresa no puede explicar la venta de otra.
+ */
 function fusionar(
-  referencias: ReferenciaSerie[],
-  info: LecturaInfo,
-): ReferenciaSerie[] {
-  if (!info.disponible) return referencias;
-  const porClave = new Map(info.filas.map((f) => [`${f.empresa_key}·${f.codigo}`, f]));
-  const porCodigo = new Map(info.filas.map((f) => [f.codigo, f]));
-  const vistos = new Set<string>();
-  const out = referencias.map((r) => {
-    vistos.add(r.codigo);
-    const fila = porClave.get(`${r.empresa}·${r.codigo}`) ?? porCodigo.get(r.codigo) ?? null;
-    return { ...r, info: fila ? infoParaCliente(fila) : null };
-  });
-  for (const f of info.filas) {
-    if (vistos.has(f.codigo)) continue;
-    vistos.add(f.codigo);
-    out.push({
-      codigo: f.codigo,
-      empresa: f.empresa_key,
-      descripcion: f.descripcion ?? "",
-      serie: [],
-      info: infoParaCliente(f),
-    });
+  ventas: FilaVenta[],
+  ingresos: FilaIngreso[],
+  info: FilaInfo[],
+  hoy: string,
+): ArticuloCompras[] {
+  const claves = new Set<string>();
+  const k = (e: string, c: string) => `${e} ${c}`;
+  for (const v of ventas) if (v.codigo) claves.add(k(v.empresa_key, v.codigo));
+  for (const i of ingresos) claves.add(k(i.empresa_key, i.codigo_articulo));
+  for (const i of info) claves.add(k(i.empresa_key, i.codigo));
+
+  const out: ArticuloCompras[] = [];
+  for (const clave of claves) {
+    const [empresa, codigo] = clave.split(" ");
+    const vs = ventas.filter((v) => v.empresa_key === empresa && v.codigo === codigo);
+    const gs = ingresos.filter((g) => g.empresa_key === empresa && g.codigo_articulo === codigo);
+    const inf = info.find((i) => i.empresa_key === empresa && i.codigo === codigo) ?? null;
+    const num = (x: number | string | null | undefined) => {
+      if (x == null || x === "") return null;
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    };
+    out.push(
+      armarArticulo(
+        {
+          empresa,
+          codigo,
+          descripcion: inf?.descripcion || vs[0]?.descripcion || gs[0]?.articulo || "",
+          ingresos: gs,
+          ventas: vs,
+          existencia: num(inf?.existencia),
+          precioEtiqueta: num(inf?.precio_etiqueta),
+          catalogoSyncedAt: inf?.synced_at ?? null,
+        },
+        hoy,
+      ),
+    );
   }
-  return out.sort((a, b) => a.codigo.localeCompare(b.codigo));
+  return out.sort((a, b) => a.codigo.localeCompare(b.codigo) || a.empresa.localeCompare(b.empresa));
 }
 
 function errorAmplia(): NextResponse {
@@ -204,128 +240,108 @@ function errorAmplia(): NextResponse {
   );
 }
 
+// ─── Handler ─────────────────────────────────────────────────────────────────
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
-  const sp = req.nextUrl.searchParams;
-  const hoyMes = hoyPanama().slice(0, 7);
+  const hoy = hoyPanama().slice(0, 10);
+  const hoyMes = hoy.slice(0, 7);
+  const crudo = req.nextUrl.searchParams.get("q") ?? "";
 
   try {
-    // ── Vista múltiple: códigos exactos ──────────────────────────────────────
-    const codigosRaw = sp.get("codigos");
-    if (codigosRaw != null) {
-      const codigos = [
-        ...new Set(
-          codigosRaw
-            .split(",")
-            .map((c) => normalizarBusqueda(c))
-            .filter((c) => c.length >= 3 && esCodigo(c)),
-        ),
-      ].slice(0, MAX_CODIGOS_MULTI);
-      if (!codigos.length) {
-        return NextResponse.json({ error: "No hay códigos válidos en la lista." }, { status: 400 });
-      }
-      const filtro: Filtro = { tipo: "codigos", codigos };
-      if ((await contarFilas(filtro)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
-      const info = await leerInfoPorCodigos(codigos);
-      const referencias = fusionar(agruparReferencias(await leerFilas("referencia (multi)", filtro)), info);
-      const hallados = new Set(referencias.map((r) => r.codigo));
-      const body: ReferenciaApiResp = {
-        modo: "referencias",
-        hoyMes,
-        referencias,
-        noEncontrados: codigos.filter((c) => !hallados.has(c)),
-        infoDisponible: info.disponible,
-      };
-      return NextResponse.json(body);
-    }
-
-    // ── Búsqueda única ───────────────────────────────────────────────────────
-    const q = normalizarBusqueda(sp.get("q") ?? "");
-    if (q.length < 3) {
+    if (crudo.trim().length < 3) {
       return NextResponse.json({ error: "Escribe al menos 3 caracteres." }, { status: 400 });
     }
-    if (q.length > 60) {
-      return NextResponse.json({ error: "Búsqueda demasiado larga." }, { status: 400 });
+
+    // ── UN SOLO BUSCADOR ───────────────────────────────────────────────────
+    // Lo pegado se parte igual siempre. Con 2 o más códigos se buscan exactos;
+    // con uno solo se busca por PREFIJO, que es lo que trae todos los colores
+    // del modelo (`40HM265` → 40HM265001, 40HM265032, …). Daniel ve por color.
+    const { codigos, descartados } = parsearListaCodigos(crudo);
+
+    let filtro: Filtro;
+    if (codigos.length >= 2) {
+      filtro = { tipo: "codigos", codigos };
+    } else if (codigos.length === 1) {
+      filtro = { tipo: "prefijo", patron: `${escapeLike(codigos[0])}%` };
+    } else {
+      const q = normalizarBusqueda(crudo);
+      if (q.length > 60) return NextResponse.json({ error: "Búsqueda demasiado larga." }, { status: 400 });
+      filtro = { tipo: "descripcion", patron: `%${escapeLike(q)}%` };
     }
 
-    // 1) Código o modelo: prefijo sobre `codigo`, en las DOS fuentes. Exacto =
-    //    el prefijo devuelve su propio código; modelo = todos los colores.
-    if (esCodigo(q)) {
-      const patron = `${escapeLike(q)}%`;
-      const filtro: Filtro = { tipo: "prefijo", patron };
-      const n = await contarFilas(filtro);
-      if (n > MAX_FILAS_BUSQUEDA) return errorAmplia();
-      const info = await leerInfo(`articulo_info (prefijo ${q})`, { tipo: "prefijo", patron });
-      if (n > 0 || info.filas.length > 0) {
-        const referencias = fusionar(
-          n > 0 ? agruparReferencias(await leerFilas(`referencia (codigo ${q})`, filtro)) : [],
-          info,
-        );
-        const body: ReferenciaApiResp = {
-          modo: "referencias",
-          hoyMes,
-          referencias,
-          infoDisponible: info.disponible,
-        };
-        return NextResponse.json(body);
+    if (filtro.tipo !== "descripcion") {
+      if ((await contarVentas(filtro)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
+
+      const [ventas, ingresos, info] = await Promise.all([
+        leerVentas("referencia", filtro),
+        leerIngresos(filtro),
+        leerInfo(filtro),
+      ]);
+
+      const articulos = fusionar(ventas, ingresos.filas, info.filas, hoy);
+      const hallados = new Set(articulos.map((a) => a.codigo));
+      const pedidos = filtro.tipo === "codigos" ? filtro.codigos : [codigos[0]];
+
+      // Un código pedido que no aparece en NINGUNA fuente. Si lo escrito era un
+      // modelo (prefijo) que sí trajo colores, no hay nada que reportar.
+      const noEncontrados =
+        filtro.tipo === "codigos"
+          ? pedidos.filter((c) => !hallados.has(c))
+          : articulos.length === 0
+            ? pedidos
+            : [];
+
+      const body: ComprasApiResp = {
+        hoy,
+        hoyMes,
+        articulos,
+        noEncontrados,
+        comprasDisponibles: ingresos.disponible,
+        infoDisponible: info.disponible,
+      };
+      if (articulos.length > 0 || noEncontrados.length > 0) {
+        return NextResponse.json(descartados > 0 ? { ...body, descartados } : body);
       }
-      // 0 filas por código en las dos fuentes → cae a descripción ("KAHLO"
-      // también pasa esCodigo pero es una palabra, no un código).
+      // Nada por código: puede que fuera una palabra ("KAHLO"). Cae a descripción.
+      filtro = { tipo: "descripcion", patron: `%${escapeLike(normalizarBusqueda(crudo))}%` };
     }
 
-    // 2) Descripción: ilike en LAS DOS fuentes, dedupe por modelo.
-    //    · diario: categoría+género ("Men-Small Leather")
-    //    · catálogo: nombre comercial ("KAHLO PASSCASE") — el que Daniel conoce
-    const patronDesc = `%${escapeLike(q)}%`;
-    const filtroDesc: Filtro = { tipo: "descripcion", patron: patronDesc };
-    if ((await contarFilas(filtroDesc)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
-    const [filas, infoDesc] = await Promise.all([
-      leerFilas(`referencia (descripcion ${q})`, filtroDesc),
-      leerInfo(`articulo_info (descripcion ${q})`, { tipo: "descripcion", patron: patronDesc }),
-    ]);
+    // ── Descripción: se ofrecen los modelos que coinciden ───────────────────
+    if ((await contarVentas(filtro)) > MAX_FILAS_BUSQUEDA) return errorAmplia();
+    const [ventas, info] = await Promise.all([leerVentas("referencia (desc)", filtro), leerInfo(filtro)]);
 
     const porModelo = new Map<string, { descripcion: string; empresa: string; colores: Set<string> }>();
-    for (const f of filas) {
-      if (!f.codigo) continue;
-      const modelo = modeloDe(f.codigo);
-      const m = porModelo.get(modelo) ?? {
-        descripcion: f.descripcion ?? "",
-        empresa: f.empresa_key,
-        colores: new Set<string>(),
-      };
-      m.colores.add(f.codigo);
+    const sumar = (codigo: string, empresa: string, desc: string | null, pisa: boolean) => {
+      const modelo = modeloDe(codigo);
+      const m = porModelo.get(modelo) ?? { descripcion: "", empresa, colores: new Set<string>() };
+      if (desc && (pisa || !m.descripcion)) m.descripcion = desc;
+      m.colores.add(codigo);
       porModelo.set(modelo, m);
-    }
+    };
+    for (const v of ventas) if (v.codigo) sumar(v.codigo, v.empresa_key, v.descripcion, false);
     // El nombre comercial del catálogo PISA la categoría del diario: es el que
-    // Daniel reconoce, y es el campo por el que probablemente buscó.
-    for (const f of infoDesc.filas) {
-      const modelo = modeloDe(f.codigo);
-      const m = porModelo.get(modelo) ?? {
-        descripcion: "",
-        empresa: f.empresa_key,
-        colores: new Set<string>(),
-      };
-      if (f.descripcion) m.descripcion = f.descripcion;
-      m.colores.add(f.codigo);
-      porModelo.set(modelo, m);
-    }
-    const coincidencias: CoincidenciaDescripcion[] = [...porModelo.entries()]
-      .map(([modelo, m]) => ({
-        modelo,
-        descripcion: m.descripcion,
-        empresa: m.empresa,
-        colores: m.colores.size,
-      }))
-      .sort((a, b) => a.modelo.localeCompare(b.modelo))
-      .slice(0, 100);
+    // Daniel reconoce y probablemente por el que buscó.
+    for (const i of info.filas) sumar(i.codigo, i.empresa_key, i.descripcion, true);
 
-    const body: ReferenciaApiResp = {
-      modo: "coincidencias",
+    const body: ComprasApiResp = {
+      hoy,
       hoyMes,
-      coincidencias,
-      infoDisponible: infoDesc.disponible,
+      articulos: [],
+      noEncontrados: [],
+      coincidencias: [...porModelo.entries()]
+        .map(([modelo, m]) => ({
+          modelo,
+          descripcion: m.descripcion,
+          empresa: m.empresa,
+          colores: m.colores.size,
+        }))
+        .sort((a, b) => a.modelo.localeCompare(b.modelo))
+        .slice(0, 100),
+      comprasDisponibles: true,
+      infoDisponible: info.disponible,
     };
     return NextResponse.json(body);
   } catch (err) {

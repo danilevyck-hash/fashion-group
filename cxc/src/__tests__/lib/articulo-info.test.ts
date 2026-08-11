@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { textoOrigenFob } from "@/lib/ventas/referencia-excel";
 
 // El sync importa supabase-server (que exige env) y el cliente de Switch.
 // Acá solo se ejercita la parte PURA + el rechazo de empresas: dobles mínimos.
@@ -127,30 +128,59 @@ describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisió
     expect(JSON.stringify(info)).not.toMatch(/fob/i);
   });
 
-  it("el route SÍ selecciona costo_api (es el CIF que se muestra)", () => {
+  // 🩸 ESTE INVARIANTE CAMBIÓ, Y NO ES UNA CONCESIÓN — es que apareció el dato
+  // bueno. Cuando el tab no tenía las compras reales, el único costo a mano era
+  // `costo_api` del catálogo (un promedio de HOY) y el FOB solo podía existir
+  // derivado, así que "FOB siempre dice est." era correcto. Ahora cada fila es
+  // una COMPRA y trae SU costo del documento de ingreso: el CIF es el de esa
+  // llegada y el FOB tiene TRES procedencias distintas, de las cuales solo una
+  // es estimada. Exigirle "est." a las otras dos sería etiquetar de estimado un
+  // dato que Switch mandó.
+  it("el route lee los costos de la COMPRA, no el promedio del catálogo", () => {
     const ruta = fs.readFileSync(
       path.resolve(process.cwd(), "src/app/api/ventas/referencia/route.ts"),
       "utf8",
     );
-    const m = ruta.match(/const COLUMNAS_INFO = "([^"]+)"/);
-    expect(m, "no encontré COLUMNAS_INFO en el route").toBeTruthy();
-    expect(m![1]).toMatch(/costo_api/);
+    // El CIF/FOB que se muestra sale del documento de ingreso.
+    expect(ruta).toMatch(/costo_cif/);
+    expect(ruta).toMatch(/costo_fob/);
+    // Fashion Shoes no desglosa: su columna única también se pide.
+    expect(ruta).toMatch(/costo_sin_desglosar/);
+    // Y el catálogo se sigue leyendo, pero solo por existencia/precio/frescura.
+    expect(ruta).toMatch(/switch_articulo_info/);
+    expect(ruta).toMatch(/existencia/);
   });
 
-  it("en la vista y el Excel, 'FOB' JAMÁS aparece sin su etiqueta de estimado", () => {
-    for (const rel of ["src/components/ventas/ReferenciaView.tsx", "src/lib/ventas/referencia-excel.ts"]) {
-      const texto = fs.readFileSync(path.resolve(process.cwd(), rel), "utf8");
-      const lineas = texto.split("\n");
-      for (const [i, linea] of lineas.entries()) {
-        if (!/FOB/.test(linea)) continue;
-        const esComentario = /^\s*(\/\/|\*|\/\*)/.test(linea);
-        if (esComentario) continue;
-        expect(
-          /est/i.test(linea),
-          `${rel}:${i + 1} dice "FOB" sin "est." — el FOB solo existe como estimado:\n${linea.trim()}`,
-        ).toBe(true);
-      }
+  it("el FOB NUNCA se muestra sin decir de dónde salió", () => {
+    // Las 4 procedencias tienen texto, y ninguna miente sobre otra.
+    expect(textoOrigenFob("real")).toBe("de Switch");
+    expect(textoOrigenFob("igual-al-cif")).toMatch(/igual al CIF/i);
+    expect(textoOrigenFob("estimado")).toMatch(/estimado/i);
+    expect(textoOrigenFob("sin-dato")).toBe("—");
+    // Solo la estimada puede decir "estimado": si "de Switch" lo dijera, la
+    // columna dejaría de distinguir el dato real del derivado, que es TODO lo
+    // que Daniel pidió de esta columna ("quiero saber cuáles creer").
+    expect(textoOrigenFob("real")).not.toMatch(/estimad/i);
+    expect(textoOrigenFob("igual-al-cif")).not.toMatch(/estimad/i);
+  });
+
+  it("la vista pinta el FOB SOLO por el componente que lo etiqueta", () => {
+    const vista = fs.readFileSync(
+      path.resolve(process.cwd(), "src/components/ventas/ReferenciaView.tsx"),
+      "utf8",
+    );
+    // Un `fmtMoney(c.costos.fob)` suelto sería un FOB desnudo. El único lugar
+    // donde puede aparecer es adentro del componente <Fob/>.
+    const cuerpoFob = vista.slice(vista.indexOf("function Fob("));
+    const usos = [...vista.matchAll(/fmtMoney\((?:[a-z]\.)?costos\.fob\)/g)];
+    for (const u of usos) {
+      expect(
+        cuerpoFob.includes(u[0]),
+        `"${u[0]}" aparece fuera del componente <Fob/> — sería un FOB sin procedencia`,
+      ).toBe(true);
     }
+    // Y la vista tiene que usar <Fob/> en las DOS caras (tabla y tarjetas).
+    expect(vista.match(/<Fob c=\{c\} \/>/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 });
 

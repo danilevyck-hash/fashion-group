@@ -30,7 +30,7 @@ import { UtilidadView } from "@/components/ventas/UtilidadView";
 import { ComisionesConfigModal } from "@/components/ventas/ComisionesConfigModal";
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
-import type { ReferenciaApiResp } from "@/lib/ventas/referencia";
+import type { ComprasApiResp, CompraMedida } from "@/lib/ventas/compras";
 import type { UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
 
@@ -86,124 +86,139 @@ function tocarAyuda(titulo: string) {
 
 // ── Fixture de Referencia ────────────────────────────────────────────────────
 //
-// Un modelo con dos colores, con datos de catálogo (para que aparezcan las
-// columnas de costo) y con la última venta hace rato → estado "se agotó".
-const REFERENCIA_RESP: ReferenciaApiResp = {
-  modo: "referencias",
-  hoyMes: "2026-08",
-  infoDisponible: true,
-  referencias: [
-    {
-      codigo: "31KAE22003001",
-      empresa: "vistana",
-      descripcion: "BOLSOS DAMA",
-      serie: [
-        { mes: "2026-01", unidades: 40, venta: 2000 },
-        { mes: "2026-02", unidades: 35, venta: 1750 },
-      ],
-      info: {
-        descripcion: "KAHLO PASSCASE",
-        existencia: 0,
-        precioEtiqueta: 79.9,
-        costoCif: 3.19,
-        syncedAt: "2026-08-09T12:00:00.000Z",
-      },
-    },
-    {
-      codigo: "31KAE22003002",
-      empresa: "vistana",
-      descripcion: "BOLSOS DAMA",
-      serie: [{ mes: "2026-01", unidades: 10, venta: 500 }],
-      info: {
-        descripcion: "KAHLO PASSCASE",
-        existencia: 0,
-        precioEtiqueta: 79.9,
-        costoCif: 3.19,
-        syncedAt: "2026-08-09T12:00:00.000Z",
-      },
-    },
-  ],
+// 🩸 EL TAB SE REESCRIBIÓ (ago-2026): es UNA TABLA, UNA FILA POR COMPRA REAL
+// (`switch_ingresos_mercancia`). Lo que este bloque prueba cambió con él, y el
+// cambio es el que importa: los textos VIEJOS eran los que había que podar de
+// verdad, no mudarlos a un ⓘ. Se fueron del código y no pueden volver.
+//   · "Se te acaba en ~46 meses" — medía cuánto duró LO DE ANTES.
+//   · "compra ~138 unidades" y los veredictos SE AGOTÓ / DESCONTINUADO.
+//   · Los promedios de 3/6/12 meses, que metían el MES EN CURSO adentro.
+//   · La pestaña "Varias · pegar lista" — ahora es un solo buscador.
+//
+// El fixture es el caso REAL que Daniel reconstruyó a mano con el Kardex:
+// `40HM265032`, 280 unidades el 28-nov-2023, 279 vendidas, 0 en bodega, 1
+// perdida en ajuste. (Los números salen medidos en `ventas-compras.test.ts`;
+// acá lo que se mira es la PANTALLA.)
+
+const COMPRA_40HM265032: CompraMedida = {
+  empresa: "vistana",
+  codigo: "40HM265032",
+  fecha: "2023-11-28",
+  documento: "19-000000100",
+  proveedor: "American Designer Fashion",
+  articulo: "40HM265032",
+  unidades: 280,
+  // FOB igual al CIF: el error de carga conocido, que se muestra tal cual.
+  costos: { cif: 11.55, fob: 11.55, fobOrigen: "igual-al-cif", lista: 16 },
+  vendidas: 279,
+  quedan: 0,
+  noVendidoNiEnBodega: 1,
+  estado: "medida",
+  meses: 16.39,
+  fechaUmbral: "2025-04-10",
+  mesesConVenta: ["2024-01", "2024-02", "2024-03", "2024-04", "2025-04"],
+  precioVendido: 16,
+  descuento: 0,
 };
 
-function buscarUnaReferencia() {
+const REFERENCIA_RESP: ComprasApiResp = {
+  hoyMes: "2026-08",
+  hoy: "2026-08-11",
+  articulos: [
+    {
+      empresa: "vistana",
+      codigo: "40HM265032",
+      descripcion: "KAHLO PASSCASE",
+      compras: [COMPRA_40HM265032],
+      comprasFueraDeVentana: 0,
+      cuadre: { comprado: 280, vendido: 279, existencia: 0, residuo: 1, ajusteConfiable: true },
+      stockSinRespaldo: 0,
+      vendidoAntes: 0,
+      vendidoDeMas: 0,
+      sinCompraRegistrada: false,
+      existencia: 0,
+      precioEtiqueta: 16,
+      catalogoSyncedAt: "2026-08-09T12:00:00.000Z",
+    },
+  ],
+  noEncontrados: [],
+  comprasDisponibles: true,
+  infoDisponible: true,
+};
+
+/** Textos del diseño VIEJO. Ninguno puede volver a la pantalla. */
+const PROHIBIDOS = [
+  "Se te acaba",
+  "compra ~",
+  "Varias · pegar lista",
+  "Se agotó",
+  "SE AGOTÓ",
+  "Descontinuado",
+  "DESCONTINUADO",
+  "u/mes",
+];
+
+async function buscarUnaReferencia() {
   rutas.push((u) => (u.includes("/api/ventas/referencia?q=") ? REFERENCIA_RESP : undefined));
   render(<ReferenciaView />);
-  const campo = screen.getByPlaceholderText(/Código, modelo o descripción/);
-  fireEvent.change(campo, { target: { value: "31KAE22003" } });
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "40HM265032" } });
   fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+  await screen.findAllByText("40HM265032");
 }
 
-describe("Referencia · el pie de tabla se partió en aviso (queda) + metodología (ⓘ)", () => {
-  it("🩸 'las devoluciones ya están restadas' SIGUE EN PANTALLA, sin tocar nada", async () => {
-    buscarUnaReferencia();
-    await screen.findByText(/las devoluciones \(notas de crédito\) ya están restadas/);
+describe("Referencia · una fila por COMPRA, sin veredictos ni promedios", () => {
+  it("la compra real se ve: cuándo llegó, cuánto llegó y en cuánto se vendió", async () => {
+    await buscarUnaReferencia();
+    expect(screen.getAllByText("28 nov 2023").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/280 u/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("16 meses").length).toBeGreaterThan(0);
   });
 
-  it("cerrado, el ⓘ NO deja la metodología en pantalla — si la dejara, no se podó nada", async () => {
-    buscarUnaReferencia();
-    await screen.findByText(/ya están restadas/);
-    expect(screen.queryByText(/cuenta solo los meses en que HABÍA mercancía/)).toBeNull();
-    expect(screen.queryByText(/FOB y margen son estimados/)).toBeNull();
+  it("🩸 los textos del diseño viejo NO están en pantalla — no se mudaron a un ⓘ, se fueron", async () => {
+    await buscarUnaReferencia();
+    const pantalla = document.body.textContent ?? "";
+    for (const t of PROHIBIDOS) expect(pantalla).not.toContain(t);
   });
 
-  it("al tocarlo salen las DOS metodologías: u/mes real y el FOB estimado", async () => {
-    buscarUnaReferencia();
-    await screen.findByText(/ya están restadas/);
-    tocarAyuda("Cómo se calcula");
-    expect(screen.getByText(/cuenta solo los meses en que HABÍA mercancía/)).toBeTruthy();
-    // El divisor sigue dicho con todas las letras: CIF ÷ 1.10.
-    expect(screen.getByText(/CIF ÷ 1\.10/)).toBeTruthy();
-    expect(screen.getByText(/FOB y margen son estimados/)).toBeTruthy();
+  it("🩸 tampoco están en el CÓDIGO de la vista — un texto borrado de una rama vuelve por otra", async () => {
+    const fuente = await import("node:fs/promises").then((fs) =>
+      fs.readFile("src/components/ventas/ReferenciaView.tsx", "utf8"),
+    );
+    // El encabezado del archivo los cita para explicar por qué no vuelven: se
+    // mira solo el código, no los comentarios.
+    const codigo = fuente
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"))
+      .join("\n");
+    for (const t of ["Se te acaba", "Varias · pegar lista", "sugerencia", "u/mes"]) {
+      expect(codigo).not.toContain(t);
+    }
   });
 
-  it("🩸 el aviso de 'Se agotó' NO se movió a ningún ⓘ — decide una compra", async () => {
-    buscarUnaReferencia();
-    expect(await screen.findByText(/Se agotó/)).toBeTruthy();
-  });
-
-  it("el instructivo del buscador vive en el placeholder, no en una línea fija", () => {
+  it("UN SOLO buscador: no hay pestaña de 'pegar lista', y el mismo campo acepta varios códigos", () => {
     render(<ReferenciaView />);
-    expect(screen.getByPlaceholderText(/Código, modelo o descripción — ej\. 31KAE22003/)).toBeTruthy();
-    expect(screen.queryByText(/Escribe el modelo/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Varias · pegar lista/ })).toBeNull();
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.getByText(/Podés pegar hasta \d+ códigos juntos/)).toBeTruthy();
+  });
+
+  it("el aviso del ajuste QUEDA en pantalla — es plata que se fue, no metodología", async () => {
+    await buscarUnaReferencia();
+    expect(screen.getAllByText(/1 se perdió en ajuste/).length).toBeGreaterThan(0);
   });
 });
 
-describe("Referencia · pegar lista", () => {
-  function montarVarias() {
-    render(<ReferenciaView />);
-    fireEvent.click(screen.getByRole("button", { name: /Varias · pegar lista/ }));
-  }
-
-  it("el instructivo de pegado vive en el placeholder (con el tope adentro)", () => {
-    montarVarias();
-    expect(screen.getByPlaceholderText(/Pega hasta \d+ códigos separados por espacios o saltos de línea/)).toBeTruthy();
-    expect(screen.queryByText(/directo desde el Excel del proveedor/)).toBeNull();
+describe("Referencia · el ⓘ del FOB que no es confiable", () => {
+  it("cerrado NO deja el motivo en pantalla — si lo dejara, no se podó nada", async () => {
+    await buscarUnaReferencia();
+    expect(screen.queryByText(/error de carga conocido/)).toBeNull();
   });
 
-  it("🩸 el aviso 'se agotó, no dejó de gustar' QUEDA en pantalla, y con él las devoluciones", async () => {
-    rutas.push((u) => (u.includes("/api/ventas/referencia?codigos=") ? REFERENCIA_RESP : undefined));
-    montarVarias();
-    fireEvent.change(screen.getByPlaceholderText(/Pega hasta/), {
-      target: { value: "31KAE22003001 31KAE22003002" },
-    });
-    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[1]);
-    await screen.findByText(/se agotó, no dejó de gustar/);
-    expect(screen.getByText(/las devoluciones \(notas de crédito\) ya están restadas/)).toBeTruthy();
-    // Y la metodología, acá también, detrás del MISMO ⓘ.
-    expect(screen.queryByText(/cuenta solo los meses en que HABÍA mercancía/)).toBeNull();
-    tocarAyuda("Cómo se calcula");
-    expect(screen.getByText(/cuenta solo los meses en que HABÍA mercancía/)).toBeTruthy();
-  });
-});
-
-describe("Referencia · el porqué de las 2 temporadas", () => {
-  it("está en un ⓘ que se toca, no en un párrafo bajo los botones", () => {
-    render(<ReferenciaView />);
-    fireEvent.click(screen.getByRole("button", { name: /Temporada…/ }));
-    expect(screen.queryByText(/temporadas ya terminadas más recientes/)).toBeNull();
-    tocarAyuda("Qué temporadas se muestran");
-    expect(screen.getByText(/temporadas ya terminadas más recientes/)).toBeTruthy();
-    expect(screen.getByText(/mejor predice la que viene/)).toBeTruthy();
+  it("al tocarlo dice por qué ese FOB no se puede creer, y que NO se corrige", async () => {
+    await buscarUnaReferencia();
+    tocarAyuda("Este FOB no es confiable");
+    expect(screen.getByText(/Switch lo mandó IGUAL al costo CIF/)).toBeTruthy();
+    expect(screen.getByText(/sin corregirlo ni estimarlo/)).toBeTruthy();
   });
 });
 
