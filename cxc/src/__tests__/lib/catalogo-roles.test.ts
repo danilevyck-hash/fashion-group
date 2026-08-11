@@ -198,7 +198,7 @@ describe("catálogos — el gate de UI real es fg_modules, no allowedRoles", () 
 
   it("un rol SIN el módulo catalogos no entra ni por URL", async () => {
     const { hasModuleAccess } = await import("@/lib/auth-check");
-    conSesion("contabilidad", ["prestamos", "proveedores", "ventas", "gastos-empresa"]);
+    conSesion("contabilidad", ["prestamos", "proveedores", "ventas", "gastos-contabilidad"]);
     expect(hasModuleAccess("catalogos", catalogoAdminRoles())).toBe(false);
     conSesion("gerente_acs", ["multifashion"]);
     expect(hasModuleAccess("catalogos", catalogoAdminRoles())).toBe(false);
@@ -239,10 +239,11 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // nuevo, automático, esté publicado. Es la misma gente en los tres — la
   // contable es quien cierra los meses que el módulo del mayor muestra, y las
   // 52 filas de `bancos_saldos` están firmadas "Contabilidad".
+  // Y el 11-ago `gastos-empresa` SE FUE: publicado el módulo automático, la
+  // carga manual (0 filas en toda su historia) se retiró.
   // Cambio DELIBERADO: el candado hizo lo suyo y frenó el build hasta acá.
   contabilidad: [
     "proveedores",
-    "gastos-empresa",
     "gastos-contabilidad",
     "saldos-banco",
     "prestamos",
@@ -266,7 +267,7 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
 
   it("a la secretaria NO se le abrió ningún módulo nuevo", () => {
     const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
-      "gastos-empresa", "saldos-banco", "prestamos", "usuarios", "data-health"];
+      "gastos-contabilidad", "saldos-banco", "prestamos", "usuarios", "data-health"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {
       expect(suyos, `secretaria no debe tener ${m}`).not.toContain(m);

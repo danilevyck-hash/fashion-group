@@ -38,7 +38,7 @@ interface VistaGeneral {
   reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
 }
 
-// ── Helpers de meses (copiados de gastos-empresa, locales a esta página) ─────
+// ── Helpers de meses (locales a esta página) ─────────────────────────────────
 
 const MESES_ES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -233,7 +233,7 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
 
       {/* Rentabilidad */}
       <KpiCard
-        href="/gastos-empresa"
+        href="/gastos-contabilidad"
         label="Rentabilidad"
         hoverLabel="Ir a Gastos"
         value={rentabilidad ? moneyK(rentabilidad.monto) : "—"}
@@ -361,10 +361,10 @@ function Equilibrio({ eq }: { eq: VistaGeneral["equilibrio"] }) {
           {/* 44 px de alto sin romper el párrafo: el enlace sigue en línea, sólo
               se le da blanco tocable arriba y abajo. Medía 129×17. */}
           <Link
-            href="/gastos-empresa"
+            href="/gastos-contabilidad"
             className="inline-flex min-h-[44px] items-center text-teal-600 hover:text-teal-700 font-medium"
           >
-            Gastos de Empresa
+            Gastos
           </Link>.
         </p>
       )}
@@ -483,7 +483,7 @@ function SemaforoDesglose({ e }: { e: SemaforoRow }) {
 function VerGastosLink({ e, mes }: { e: SemaforoRow; mes: string }) {
   return (
     <Link
-      href={`/gastos-empresa?mes=${mes}&empresa=${e.key}`}
+      href={`/gastos-contabilidad?mes=${mes}&empresa=${e.key}`}
       onClick={(ev) => ev.stopPropagation()}
       className="inline-flex min-h-[44px] items-center text-xs text-teal-600 hover:text-teal-700 font-medium"
     >
