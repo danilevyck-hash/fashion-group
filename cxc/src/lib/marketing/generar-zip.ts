@@ -3,18 +3,45 @@
 // ============================================================================
 // Estructura del ZIP:
 //   <Proyecto>.zip
-//     ├── respaldo.xlsx                 (1 hoja, 1 fila por factura)
+//     ├── respaldo.xlsx                 (1 hoja, 1 fila por factura/entrega)
 //     ├── <Marca>/<numero>.pdf          (PDFs directo dentro de la carpeta de marca)
+//     ├── <Marca>/<fecha> · Entrega de mobiliario ME-XXXX.pdf
+//     │                                 (comprobante de cada entrega de muebles,
+//     │                                  SIN bultos — es el papel de la marca)
 //     └── fotos/                        (fotos del proyecto)
 //
 // Nota: ya no se genera "cobranza-<marca>.pdf" — simplificación pedida.
 // Tampoco hay subcarpeta "facturas/" dentro de la marca — los PDFs van directo.
+//
+// ── Comprobantes de entrega de mobiliario (12-ago-2026) ─────────────────────
+// Bug reportado por Daniel con el proyecto "Apertura" (2 entregas, 0 facturas):
+// el ZIP traía las 2 entregas en el Excel pero NINGÚN comprobante PDF — este
+// archivo nunca los generó (el ZIP global y el ZIP por marca sí, desde
+// zip-export.ts 7a-bis y zip-marca.ts 8b). Ahora el comprobante se dibuja acá,
+// en el navegador, con los datos que ya trae `datos-zip` (mismo módulo
+// entrega-comprobante.ts del servidor) y el MISMO generador de siempre
+// (pdf-entrega-mueble.ts) con `incluirBultos: false`, porque este papel va a
+// la marca — los bultos son del envío al cliente (#492).
+//
+// 🔴 UNA COPIA POR MARCA CON MONTO > 0 (`marcasDeEntrega`, la misma regla que
+// zip-marca usa para decidir qué entregas entran al ZIP de una marca). Una
+// entrega repartida CK/TH sale en las DOS carpetas: cada marca recibe su
+// papel, y el comprobante mismo dice el reparto ("Marca del gasto:
+// Calvin Klein $X · Tommy Hilfiger $Y"), así que ninguna copia miente.
+// Una entrega sin marca asignada va a la raíz del ZIP — perderla sería
+// repetir el bug.
 // ============================================================================
 
 import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { CASA_PALETTE, MONEY_FMT } from "@/lib/excel-export";
+import {
+  buildComprobanteEntregaDoc,
+  nombreArchivoComprobante,
+  type EntregaMueblePdfData,
+} from "./pdf-entrega-mueble";
+import { marcasDeEntrega } from "./resumen-inicio";
 import type {
   EntregaConItems,
   MarcaConPorcentaje,
@@ -102,6 +129,11 @@ export interface DatosZipProyecto {
   // Entregas de muebles del proyecto. Se suman al gasto por marca como
   // una sola fila más en el Excel maestro (sin desglose factura/entrega).
   entregas?: EntregaConItems[];
+  // Datos del comprobante de cada entrega (por id), ya con las fotos en
+  // base64 — los arma `entrega-comprobante.ts` en el servidor y el PDF se
+  // dibuja acá. Opcional para tolerar un payload viejo, pero si falta y hay
+  // entregas, el ZIP lo anota en README_errores.txt en vez de callarse.
+  comprobantesEntrega?: Record<string, EntregaMueblePdfData>;
 }
 
 function sanitizar(s: string): string {
@@ -350,11 +382,36 @@ function generarRespaldoExcel(
 }
 
 // ----------------------------------------------------------------------------
+// Comprobantes de entrega — a qué carpeta(s) del ZIP va cada uno.
+//
+// PURA y exportada para el test. La regla es la de zip-marca (`marcasDeEntrega`):
+// una copia en la carpeta de CADA marca con monto > 0 en `total_por_marca`.
+// `""` = raíz del ZIP (entrega sin marca asignada — no se pierde).
+// ----------------------------------------------------------------------------
+export function carpetasDeComprobante(
+  entrega: Pick<EntregaConItems, "total_por_marca">,
+  marcasInvolucradas: ReadonlyArray<Pick<MkMarca, "id" | "nombre">>,
+): string[] {
+  const ids = new Set(
+    marcasDeEntrega({
+      proyecto_id: null,
+      total: null,
+      total_por_marca: entrega.total_por_marca ?? null,
+    }),
+  );
+  const carpetas = marcasInvolucradas
+    .filter((m) => ids.has(String(m.id)))
+    .map((m) => sanitizar(m.nombre));
+  return carpetas.length > 0 ? carpetas : [""];
+}
+
+// ----------------------------------------------------------------------------
 // Ensamblador principal
 // ----------------------------------------------------------------------------
 
 export type EtapaZip =
   | "Descargando facturas..."
+  | "Generando comprobantes..."
   | "Procesando fotos..."
   | "Generando Excel..."
   | "Comprimiendo archivo...";
@@ -373,7 +430,15 @@ export async function generarZipProyecto(
   datos: DatosZipProyecto,
   opts: GenerarZipOptions = {},
 ): Promise<void> {
-  const { proyecto, facturas, adjuntosFacturas, fotosProyecto, marcasInvolucradas, entregas = [] } = datos;
+  const {
+    proyecto,
+    facturas,
+    adjuntosFacturas,
+    fotosProyecto,
+    marcasInvolucradas,
+    entregas = [],
+    comprobantesEntrega = {},
+  } = datos;
   const { onEtapa } = opts;
   const vigentes = facturas.filter((f) => !f.anulado_en);
   const zip = new JSZip();
@@ -400,7 +465,6 @@ export async function generarZipProyecto(
     const facturasDeMarca = vigentes.filter((f) =>
       f.marcas.some((m) => m.marca.id === marca.id),
     );
-    if (facturasDeMarca.length === 0) continue;
 
     for (const f of facturasDeMarca) {
       const adjs = adjuntosByFactura.get(f.id) ?? [];
@@ -420,6 +484,40 @@ export async function generarZipProyecto(
           });
         }
       }
+    }
+  }
+
+  // ── Etapa 1b: comprobantes de entrega de mobiliario ─────────────────────
+  // Se DIBUJAN acá (no existen como adjunto), con el generador de siempre y
+  // SIN bultos: este papel va a la marca, no viaja con la mercancía (#492).
+  // Una copia por carpeta de marca con monto > 0; sin marca → raíz del ZIP.
+  // Un comprobante que falle no tumba el ZIP: queda en README_errores.txt.
+  if (entregas.length > 0) {
+    onEtapa?.("Generando comprobantes...");
+    await yieldUI();
+  }
+  for (const e of entregas) {
+    const datosComp = comprobantesEntrega[e.id];
+    if (!datosComp) {
+      errores.push({
+        id: e.id,
+        tipo: "comprobante_entrega",
+        razon: "sin datos del comprobante en la respuesta del servidor",
+      });
+      continue;
+    }
+    try {
+      const blob = buildComprobanteEntregaDoc(datosComp, {
+        incluirBultos: false,
+      }).output("blob");
+      const nombre = `${sanitizar(nombreArchivoComprobante(datosComp))}.pdf`;
+      for (const carpeta of carpetasDeComprobante(e, marcasInvolucradas)) {
+        zip.file(carpeta ? `${carpeta}/${nombre}` : nombre, blob);
+      }
+    } catch (err) {
+      const razon = err instanceof Error ? err.message : "desconocido";
+      console.warn(`[zip] comprobante entrega ${e.id} skip: ${razon}`);
+      errores.push({ id: e.id, tipo: "comprobante_entrega", razon });
     }
   }
 
