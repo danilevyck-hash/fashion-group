@@ -88,8 +88,10 @@ export default function ConfirmacionClient({ marca, orderId }: { marca: MarcaUiK
                 Revisa el panel de Switch antes de reintentar.
               </p>
             ) : sinIntento ? (
+              /* "Puedes enviarlo con el botón de abajo" se podó (12-ago-2026):
+                 señalaba el único botón primario de la tarjeta, a 20 px. */
               <p className="mt-1 text-sm text-gray-600">
-                Este pedido aún no se ha enviado a Switch. Puedes enviarlo con el botón de abajo.
+                Este pedido aún no se ha enviado a Switch.
               </p>
             ) : (
               <div className="mt-1 text-sm text-red-800">

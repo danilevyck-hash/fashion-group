@@ -100,7 +100,14 @@ export default function CatalogosMarcasPage() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Catálogos" breadcrumbs={[{ label: "Marcas" }]} />
       <div className="max-w-3xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Catálogos</h1>
+        {/* El h1 VISIBLE decía "Catálogos" justo debajo de la barra que ya dice
+            "Catálogos" — en escritorio el breadcrumb ("Catálogos › Marcas") y en
+            celular el chip sticky del AppHeader. Es la MISMA repetición que el
+            propio AppHeader ya había recortado ("nombre 3×: chip + breadcrumb +
+            h1", ver su comentario); acá se termina el trabajo. Se queda como
+            sr-only para que la página no pierda su encabezado accesible: podar
+            ruido visual no es motivo para dejar un documento sin h1. */}
+        <h1 className="sr-only">Catálogos</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {BRANDS.map((b) => {

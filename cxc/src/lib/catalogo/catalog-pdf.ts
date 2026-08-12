@@ -120,9 +120,11 @@ const THEMES: Record<"reebok" | "joybees" | "tommy" | "calvin", BrandTheme> = {
     bandText: WHITE,
     bandCount: [185, 190, 205],
     drawLogo: (doc, x, y, big) => {
-      // Wordmark oscuro (#102039) sobre página clara. Aspecto ~14.5:1.
+      // Wordmark navy oficial (#00154D) sobre página clara. El aspecto REAL del
+      // arte es 17.31:1 — antes se dibujaba 50x3.4 / 38x2.6 ("~14.5:1"), o sea
+      // estirado a lo alto, porque el número venía del SVG viejo (12-ago-2026).
       if (TOMMY_LOGO_BASE64) {
-        try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 50 : 38, big ? 3.4 : 2.6); } catch { /* */ }
+        try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 50 : 38, big ? 2.9 : 2.2); } catch { /* */ }
       }
     },
   },
@@ -217,11 +219,19 @@ export function buildCatalogPdfDoc(opts: CatalogPdfOpts): jsPDF {
   doc.text(`${totalCount} productos`, PW - M, y, { align: "right" });
   y += 5;
 
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...GRAY_LIGHT);
-  doc.text(subtitle.toUpperCase(), M, y);
-  y += 8;
+  // El subtítulo solo se dibuja si DICE algo: con filtros trae "HOMBRE ·
+  // CALZADO", y sin filtros llega vacío desde el catálogo (antes decía "TODOS
+  // LOS PRODUCTOS", relleno al lado del "{n} productos" de arriba). Cuando no
+  // hay línea tampoco se reserva su alto, o quedaría un hueco donde estaba.
+  if (subtitle) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...GRAY_LIGHT);
+    doc.text(subtitle.toUpperCase(), M, y);
+    y += 8;
+  } else {
+    y += 3;
+  }
 
   // ── Secciones ──
   for (const section of sections) {

@@ -421,8 +421,11 @@ export default function PedidoPublicoClient({ marca }: { marca: MarcaUiKey }) {
                 ? `Tu pedido #${order.ped_order_number} está en proceso`
                 : `Listo — tu pedido #${order.ped_order_number} quedó confirmado`}
             </p>
+            {/* El "(opcional)" del final se podó (12-ago-2026): la misma frase
+                ya empieza con "Si quieres". "Ya lo recibimos" se QUEDA — no es
+                relleno, es la confirmación que el cliente vino a buscar. */}
             <p className="text-xs text-emerald-700/70 mt-1 mb-3">
-              Ya lo recibimos. Si quieres, avísanos también por WhatsApp (opcional).
+              Ya lo recibimos. Si quieres, avísanos también por WhatsApp.
             </p>
             <p className="sr-only" id="wa-ayuda">
               Toca a la persona a la que le quieres escribir por WhatsApp.

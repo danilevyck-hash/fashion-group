@@ -125,7 +125,11 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
     expect(text).toContain("20 bultos · 240 piezas");
   });
 
-  it("sin pre-orden la sección se titula Detalle", async () => {
+  // Antes este test fijaba que la sección se titulara "Detalle". Se podó
+  // (12-ago-2026): sin pre-órdenes hay UNA sola tabla en el documento y ese
+  // rótulo no distinguía nada. "Pedido"/"Pre-orden" sí, y siguen (test de
+  // arriba). Ahora fija lo contrario, que es el candado de la poda.
+  it("sin pre-orden la tabla va SIN rótulo (ni 'Detalle' ni 'Pre-orden')", async () => {
     const doc = buildOrderPdfDoc({
       marca: "reebok",
       orderNumber: "RBK-003",
@@ -136,8 +140,11 @@ describe("order-pdf-core — PDF de pedido único Reebok/Joybees", () => {
       images: {},
     });
     const text = (await extractPagesText(docBytes(doc))).join(" ");
-    expect(text).toContain("Detalle");
+    expect(text).not.toContain("Detalle");
     expect(text).not.toContain("Pre-orden");
+    // Y la tabla SÍ está: que no haya rótulo no puede significar que se perdió.
+    expect(text).toContain("Producto");
+    expect(text).toContain("Subtotal");
   });
 });
 

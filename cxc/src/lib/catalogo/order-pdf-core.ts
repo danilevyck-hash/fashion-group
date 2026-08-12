@@ -126,11 +126,19 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
           ? [10, 10, 10]
           : [26, 38, 86];
 
-  function drawSectionTable(title: string, startY: number, sectionItems: PdfOrderItem[]) {
-    doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-    doc.text(title, 14, startY);
+  // `title` en null = tabla ÚNICA, sin encabezado. "Pedido" y "Pre-orden" sí
+  // distinguen dos tablas y se quedan; el "Detalle" que se ponía cuando no hay
+  // pre-órdenes rotulaba la única tabla del documento y se podó (12-ago-2026).
+  function drawSectionTable(title: string | null, startY: number, sectionItems: PdfOrderItem[]) {
+    if (title) {
+      doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
+      doc.text(title, 14, startY);
+    }
     autoTable(doc, {
-      startY: startY + 3,
+      // Sin rótulo la tabla sube, pero NO hasta donde estaba el texto: la línea
+      // "Cliente / Pedido / Fecha" tiene su base en y=26 y pegarle la tabla la
+      // pisaría. 30 deja 4 mm de aire y recupera igual el alto del rótulo.
+      startY: title ? startY + 3 : startY - 2,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
       // Cada celda LEE de la línea resuelta: acá no se multiplica nada.
       body: resolverLineas(sectionItems, { bultoSize }).map((l) => [
@@ -157,7 +165,7 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
 
   let cursor = 32;
   if (regularItems.length > 0) {
-    cursor = drawSectionTable(preorderItems.length > 0 ? "Pedido" : "Detalle", cursor, regularItems);
+    cursor = drawSectionTable(preorderItems.length > 0 ? "Pedido" : null, cursor, regularItems);
     cursor += 6;
   }
   if (preorderItems.length > 0) {

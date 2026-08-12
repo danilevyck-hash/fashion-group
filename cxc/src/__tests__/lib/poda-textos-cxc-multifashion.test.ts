@@ -158,7 +158,42 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/catalogos/admin/[marca]/ProductosBatch.tsx", que: "Catálogos · regla del SKU dicha dos veces en la misma tarjeta", texto: "Nombra cada archivo con el SKU" },
   { archivo: "app/catalogos/admin/[marca]/BulkPhotoUpload.tsx", que: "Catálogos · 'puedes soltar muchas a la vez'", texto: "soltar muchas a la vez" },
   { archivo: "app/catalogos/admin/[marca]/ProductosTarjetas.tsx", que: "Catálogos · vacío de fotos en dos líneas", texto: "Todo al día" },
+  // Daniel (12-ago-2026, con captura del catálogo Calvin): "quítame las palabras
+  // obvias como Catálogo Panamá" — ya estás EN el catálogo y TODO el negocio es
+  // Panamá. Se podó en las 4 marcas. OJO: los "Fashion Group · Panamá" de los
+  // PDFs/emails SÍ se quedan — un documento suelto necesita decir quién lo emite.
+  { archivo: "lib/catalogo/marcas-ui.tsx", que: "Catálogos · subtítulo 'Catálogo Panamá' bajo el logo (las 4 marcas)", texto: "Catálogo Panamá" },
+  { archivo: "lib/catalogo/marcas-ui.tsx", que: "Catálogos · 'Panamá' suelto bajo el logo del pedido público (las 4 marcas)", texto: ">Panamá<" },
+  // Segunda vuelta del mismo pedido — barrido del módulo entero (12-ago-2026).
+  // La regla que se aplicó: se va lo que repite dónde estás, lo que narra lo que
+  // ya se está viendo, y lo que señala el único botón de la pantalla.
+  { archivo: "app/catalogos/marcas/page.tsx", que: "Catálogos · h1 VISIBLE 'Catálogos' bajo la barra que ya lo dice", texto: 'mb-8">Catálogos' },
+  { archivo: "components/catalogo/CheckoutClient.tsx", que: "Catálogos · el subtítulo narraba los tres bloques de la pantalla", texto: "revisa, elige cliente y envía a Switch" },
+  { archivo: "components/catalogo/ConfirmacionClient.tsx", que: "Catálogos · señalaba el único botón primario, a 20 px", texto: "Puedes enviarlo con el botón de abajo" },
+  { archivo: "components/catalogo/PedidoPublicoClient.tsx", que: "Catálogos · '(opcional)' en la misma frase que ya dice 'Si quieres'", texto: "por WhatsApp (opcional)" },
+  { archivo: "components/catalogo/CatalogoVendedorPage.tsx", que: "Catálogos · subtítulo 'Todos los productos' del PDF sin filtros", texto: "Todos los productos" },
+  { archivo: "lib/catalogo/order-pdf-core.ts", que: "Pedidos · rótulo 'Detalle' sobre la única tabla del PDF", texto: '"Detalle"' },
+  { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · rótulo 'Detalle' sobre la única tabla del correo", texto: '"Detalle"' },
+  { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · 'Este es el detalle' con la tabla justo debajo (cliente)", texto: "Este es el detalle" },
+  { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · 'A continuación el detalle:' con la tabla justo debajo (equipo)", texto: "A continuación el detalle" },
+  { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · pie 'generado automáticamente' al equipo, que no recibe pedidos de otro lado", texto: "generado automáticamente desde fashiongr.com" },
 ];
+
+// El chip "Oferta" pegado al precio se podó, pero la palabra SIGUE en el archivo
+// (el badge sobre la foto). Un `not.toContain` no sirve: lo que hay que fijar es
+// que se diga UNA sola vez por card.
+describe("poda · la card no dice 'Oferta' tres veces", () => {
+  it("CatalogoProductCard nombra la oferta una sola vez (el badge de la foto)", () => {
+    const fuente = leer("components/catalogo/CatalogoProductCard.tsx");
+    expect((fuente.match(/>\s*Oferta\s*</g) || []).length).toBe(1);
+  });
+
+  it("…y el badge y el precio rojo, que son los que informan, siguen ahí", () => {
+    const fuente = leer("components/catalogo/CatalogoProductCard.tsx");
+    expect(fuente).toContain('product.badge === "oferta"');
+    expect(fuente).toContain("text-[#E4002B]");
+  });
+});
 
 describe("lo que se fue no volvió por la ventana", () => {
   for (const { archivo, que, texto } of SE_FUE) {
