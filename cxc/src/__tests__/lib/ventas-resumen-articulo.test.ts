@@ -38,13 +38,24 @@ import {
   listaDeCompras,
   margenReal,
   mesesDeStock,
+  leyendaLlegadas,
+  medirNoventa,
   primerMesConVenta,
   promedioMensual,
+  subDesdeLlegada,
   temporadaFuerte,
   textoCompra,
+  textoLineaNoventa,
+  textoNoventa,
+  textoNoventaCorto,
+  textoParteVendida,
   textoRestantes,
   textoSinMargen,
+  textoVendoPorMes,
+  tituloDesdeLlegada,
+  tresGrandes,
   ultimosMesesCompletos,
+  vistaDeBarras,
 } from "@/lib/ventas/resumen-articulo";
 import { armarArticulo, ventasPorMes, ventasNetasPorDia, type FilaIngreso } from "@/lib/ventas/compras";
 
@@ -326,6 +337,372 @@ describe("QD3958033 — el artículo NUEVO, que es donde el promedio se rompía"
     // jun y jul 2026 SÍ cuentan: el artículo ya estaba en la calle y no vendió.
     expect(b.find((x) => x.mes === "2026-06")!.antesDeEmpezar).toBe(false);
     expect(b.find((x) => x.mes === "2026-07")!.antesDeEmpezar).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LOS TRES GRANDES: Compré · Vendí · Me quedan (12-ago-2026)
+//
+// Daniel, textual: *"cuanto compre es importante, cuanto vendi en total es
+// importante"*. Tres fuentes distintas, y NO se fuerza el cuadre entre ellas.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("los tres grandes", () => {
+  it("NB2570001: Compré 935 (TODAS las compras, también las de +3 años) · Vendí 552 · Me quedan 345", () => {
+    const g = armarFicha(NB2570001(), HOY_MES).grandes;
+    // 935 = 39+56+240+240+60+120+180 — las 7 compras, no solo las 4 visibles.
+    expect(g.comprado).toBe(935);
+    expect(g.vendido).toBe(552);
+    // 🔴 Me quedan = existencia de Switch, NUNCA deducido: 935 − 552 = 383 ≠ 345.
+    // El cuadre NO se fuerza — esa diferencia la explican los avisos.
+    expect(g.quedan).toBe(345);
+    expect(g.quedan).not.toBe(g.comprado! - g.vendido);
+  });
+
+  it("Vendí dice qué parte de lo comprado es: 552 ÷ 935 = el 59%", () => {
+    const g = armarFicha(NB2570001(), HOY_MES).grandes;
+    expect(textoParteVendida(g.parteVendida)).toBe("el 59% de lo comprado");
+  });
+
+  it("QD3958033: Compré 180 · Vendí 54 (el 30%) · Me quedan 126", () => {
+    const g = armarFicha(QD3958033(), HOY_MES).grandes;
+    expect(g.comprado).toBe(180);
+    expect(g.vendido).toBe(54);
+    expect(g.quedan).toBe(126);
+    expect(textoParteVendida(g.parteVendida)).toBe("el 30% de lo comprado");
+  });
+
+  it("sin compra registrada Compré es null — no se inventa un 0 que parecería dato", () => {
+    const g = tresGrandes({
+      cuadre: { comprado: 0, vendido: 40, existencia: null, residuo: null, ajusteConfiable: false },
+      existencia: null,
+      sinCompraRegistrada: true,
+    });
+    expect(g.comprado).toBeNull();
+    expect(g.vendido).toBe(40);
+    expect(g.parteVendida).toBeNull(); // sin compras no hay porcentaje honesto
+  });
+
+  it("con vendido negativo (puras devoluciones) no hay porcentaje — '−5% de lo comprado' no es castellano", () => {
+    const g = tresGrandes({
+      cuadre: { comprado: 100, vendido: -5, existencia: 100, residuo: 5, ajusteConfiable: false },
+      existencia: 100,
+      sinCompraRegistrada: false,
+    });
+    expect(g.parteVendida).toBeNull();
+  });
+
+  it("textoParteVendida — bordes: menos del 1%, y más del 100% se dice tal cual", () => {
+    expect(textoParteVendida(0.004)).toBe("menos del 1% de lo comprado");
+    expect(textoParteVendida(1)).toBe("el 100% de lo comprado");
+    // Vendió MÁS de lo comprado (vendidoDeMas): el número es verdad y el aviso
+    // de descuadre explica el hueco. No se recorta a 100.
+    expect(textoParteVendida(1.2)).toBe("el 120% de lo comprado");
+    expect(textoParteVendida(null)).toBeNull();
+  });
+
+  it("una respuesta vieja cacheada (sin `cuadre`) degrada, no revienta", () => {
+    const art = { ...QD3958033(), cuadre: undefined } as unknown as ReturnType<typeof QD3958033>;
+    const g = armarFicha(art, HOY_MES).grandes;
+    expect(g.comprado).toBeNull();
+    expect(g.vendido).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA LÍNEA DEL 90% — en cuánto se vende una compra (12-ago-2026)
+//
+// Daniel: *"creo que es mas importante saber en cuanto meses se vendio digamos
+// que el 80%? 90%? siento que es mas util que unidades por mes"*. Confirmó 90%.
+// Y el "vendo N u por mes" quedó de dato chiquito al final de la línea.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("la línea del 90%", () => {
+  it("🔴 el caso del mockup (CVM253CR02001): compra viva → 'En 10 meses va el 80% de la compra'", () => {
+    // Compró 120 el 23-oct-2025 (única) · vendió 96 · quedan 24.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "CVM253CR02001",
+        descripcion: "Men-Socks Sport",
+        ingresos: [
+          ing("2025-10-23", 120, { codigo_articulo: "CVM253CR02001", precio: 13.5, costo_fob: 8.47, costo_cif: 8.47 }),
+        ],
+        ventas: [
+          v("2025-11-15", "FA", 12, 162),
+          v("2025-12-15", "FA", 24, 324),
+          v("2026-03-15", "FA", 36, 486),
+          v("2026-05-15", "FA", 24, 324),
+        ],
+        existencia: 24,
+        precioEtiqueta: 13.5,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.grandes).toMatchObject({ comprado: 120, vendido: 96, quedan: 24 });
+    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 80% de lo comprado");
+    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 10, parte: 0.8 });
+    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
+      "En 10 meses va el 80% de la compra · vendo 11 u por mes",
+    );
+    expect(textoNoventaCorto(f.noventa)).toBe("va el 80%");
+  });
+
+  it("🔴 compra única que ya cruzó el 90%: 'El 90% se vendió en N meses'", () => {
+    // 280 u el 28-nov-2023; 90% = 252; el acumulado cruza en abr-2024 (276).
+    const n = medirNoventa(
+      {
+        compras: [
+          {
+            empresa: "vistana",
+            codigo: "40HM265032",
+            fecha: "2023-11-28",
+            documento: "D",
+            proveedor: null,
+            articulo: null,
+            unidades: 280,
+            costos: { cif: 11.55, fob: null, fobOrigen: "sin-dato", lista: 16 },
+          },
+        ],
+        comprasFueraDeVentana: 0,
+        serie: [
+          { mes: "2024-01", unidades: 70, venta: 1120 },
+          { mes: "2024-02", unidades: 70, venta: 1120 },
+          { mes: "2024-03", unidades: 70, venta: 1120 },
+          { mes: "2024-04", unidades: 66, venta: 1056 },
+        ],
+        sinCompraRegistrada: false,
+      },
+      HOY_MES,
+    );
+    expect(n).toEqual({ tipo: "vendido", meses: 5 }); // nov-2023 → abr-2024
+    expect(textoNoventa(n)).toBe("El 90% se vendió en 5 meses");
+    expect(textoNoventaCorto(n)).toBe("5 meses");
+  });
+
+  it("🔴 las NC RESTAN también acá: una devolución puede des-cruzar la meta, pero el PRIMER cruce manda", () => {
+    const base = {
+      compras: [
+        {
+          empresa: "vistana",
+          codigo: "X",
+          fecha: "2026-01-10",
+          documento: "D",
+          proveedor: null,
+          articulo: null,
+          unidades: 100,
+          costos: { cif: 5, fob: null, fobOrigen: "sin-dato" as const, lista: 10 },
+        },
+      ],
+      comprasFueraDeVentana: 0,
+      sinCompraRegistrada: false,
+    };
+    // Cruza en feb (95 ≥ 90) aunque marzo devuelva 20.
+    const n = medirNoventa(
+      { ...base, serie: [
+        { mes: "2026-01", unidades: 50, venta: 500 },
+        { mes: "2026-02", unidades: 45, venta: 450 },
+        { mes: "2026-03", unidades: -20, venta: -200 },
+      ] },
+      HOY_MES,
+    );
+    expect(n).toEqual({ tipo: "vendido", meses: 1 });
+  });
+
+  it("🔴 con VARIAS compras NO se atribuye por tanda: agregado rotulado, anclado en la primera llegada de la ventana", () => {
+    // NB2570001: 5 compras en 3 años + 2 más viejas. Ancla = oct-2025 (la
+    // primera de los últimos 12 meses); llegaron 60+120+180 = 360; vendidas
+    // desde oct-2025 = 295 (mes en curso incluido: es un acumulado).
+    const f = armarFicha(NB2570001(), HOY_MES);
+    expect(f.noventa).toEqual({ tipo: "agregado", desdeMes: "2025-10", llegaron: 360, van: 295 });
+    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
+      "Desde oct 2025 llegaron 360 u · van vendidas 295 · vendo 28 u por mes",
+    );
+    expect(textoNoventaCorto(f.noventa)).toBe("van 295 de 360");
+  });
+
+  it("🩸 el ancla se EXTIENDE hacia atrás cuando lo llegado no cubre lo vendido — el caso real NB3705906", () => {
+    // Compra grande de jul-2024 (120 u) todavía viva + refuerzo de sep-2025
+    // (20 u). Anclado en sep (la única llegada de los últimos 12 meses), la
+    // línea decía "llegaron 20 · van vendidas 36" — vendió más de lo que llegó,
+    // un número que se lee ROTO. El grupo de compras vivas es el sufijo que
+    // alcanza a cubrir las ventas: se retrocede hasta jul-2024.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "NB3705906",
+        descripcion: "Men-Trunk",
+        ingresos: [
+          ing("2024-07-16", 120, { codigo_articulo: "NB3705906", precio: 27, costo_cif: 9.46, costo_fob: 9.46 }),
+          ing("2025-09-15", 20, { codigo_articulo: "NB3705906", precio: 27, costo_cif: 16.555, costo_fob: 16.555 }),
+        ],
+        ventas: [
+          v("2024-09-15", "FA", 30, 810),
+          v("2025-03-15", "FA", 31, 837),
+          v("2025-11-15", "FA", 20, 540),
+          v("2026-02-15", "FA", 16, 432),
+        ],
+        existencia: 43,
+        precioEtiqueta: 27,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const n = medirNoventa(art, HOY_MES);
+    expect(n).toEqual({ tipo: "agregado", desdeMes: "2024-07", llegaron: 140, van: 97 });
+    expect(textoNoventaCorto(n)).toBe("van 97 de 140");
+    // La mutación que esto caza: anclar en sep-2025 daría "van 36 de 20".
+    expect(textoNoventaCorto(n)).not.toContain("de 20");
+  });
+
+  it("compra única viva SIN historia rara: QD3958033 va por el 30% a los 8 meses", () => {
+    const f = armarFicha(QD3958033(), HOY_MES);
+    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3 });
+    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
+      "En 8 meses va el 30% de la compra · vendo 8 u por mes",
+    );
+  });
+
+  it("🔴 sin compra registrada no se inventa: queda solo el dato chiquito (o nada)", () => {
+    const n = medirNoventa(
+      { compras: [], comprasFueraDeVentana: 0, serie: [{ mes: "2026-05", unidades: 40, venta: 400 }], sinCompraRegistrada: true },
+      HOY_MES,
+    );
+    expect(n).toEqual({ tipo: "sin-dato" });
+    expect(textoNoventa(n)).toBeNull();
+    expect(textoNoventaCorto(n)).toBe("—");
+    // Con ventas, el tail solo; sin ventas, la línea entera desaparece.
+    expect(textoLineaNoventa(n, 13.3)).toBe("vendo 13 u por mes");
+    expect(textoLineaNoventa(n, null)).toBeNull();
+  });
+
+  it("🔴 nada de '∞' ni '0 meses': los bordes hablan castellano", () => {
+    expect(textoNoventa({ tipo: "vendido", meses: 0 })).toBe("El 90% se vendió en menos de 1 mes");
+    expect(textoNoventa({ tipo: "en-curso", meses: 0, parte: 0.12 })).toBe(
+      "En menos de 1 mes va el 12% de la compra",
+    );
+    expect(textoNoventa({ tipo: "en-curso", meses: 4, parte: 0 })).toBe(
+      "En 4 meses no se ha vendido nada de la compra",
+    );
+    expect(textoNoventa({ tipo: "en-curso", meses: 4, parte: 0.004 })).toBe(
+      "En 4 meses va menos del 1% de la compra",
+    );
+    expect(textoVendoPorMes(0)).toBeNull(); // "vendo 0 u por mes" no se dice
+    expect(textoVendoPorMes(0.3)).toBe("vendo menos de 1 u por mes");
+  });
+
+  it("van vendidas NEGATIVAS (devoluciones netas desde el ancla) se dicen como lo que son", () => {
+    expect(textoNoventa({ tipo: "agregado", desdeMes: "2026-02", llegaron: 100, van: -5 })).toBe(
+      "Desde feb 2026 llegaron 100 u · van devueltas 5",
+    );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LAS BARRAS ANCLADAS A LA LLEGADA (12-ago-2026, mockup aprobado)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("la vista de las barras", () => {
+  const CVM = () =>
+    armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "CVM253CR02001",
+        descripcion: "Men-Socks Sport",
+        ingresos: [
+          ing("2025-10-23", 120, { codigo_articulo: "CVM253CR02001", precio: 13.5, costo_fob: 8.47, costo_cif: 8.47 }),
+        ],
+        ventas: [
+          v("2025-11-15", "FA", 12, 162),
+          v("2025-12-15", "FA", 24, 324),
+          v("2026-03-15", "FA", 36, 486),
+          v("2026-05-15", "FA", 24, 324),
+        ],
+        existencia: 24,
+        precioEtiqueta: 13.5,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+
+  it("🔴 una sola compra: las barras ARRANCAN el mes que llegó, con el acumulado del mockup", () => {
+    const vista = vistaDeBarras(CVM(), HOY_MES);
+    expect(vista.modo).toBe("desde-llegada");
+    expect(vista.barras.map((b) => b.mes)).toEqual([
+      "2025-10", "2025-11", "2025-12", "2026-01", "2026-02",
+      "2026-03", "2026-04", "2026-05", "2026-06", "2026-07",
+    ]);
+    // El acumulado del mockup aprobado: 0 · 12 · 36 · 36 · 36 · 72 · 72 · 96 · 96 · 96
+    expect(vista.acumulado).toEqual([0, 12, 36, 36, 36, 72, 72, 96, 96, 96]);
+    expect(vista.recortada).toBe(false);
+    expect(tituloDesdeLlegada(vista.llegada!)).toBe("Desde que llegó · 23 oct 2025 · 120 u");
+    expect(subDesdeLlegada(vista, HOY_MES)).toBe("10 meses en bodega · van vendidas 96 de 120");
+    // Desde que llegó, la mercancía está en la calle: no hay "antes de empezar".
+    expect(vista.barras.every((b) => !b.antesDeEmpezar)).toBe(true);
+    // Oct·nov·dic siguen resaltados.
+    expect(vista.barras.filter((b) => b.fuerte).map((b) => b.mes)).toEqual(["2025-10", "2025-11", "2025-12"]);
+  });
+
+  it("🔴 una compra de más de 12 meses se RECORTA a los primeros 12, y el subtítulo lo dice", () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "40HM265032",
+        descripcion: "KAHLO",
+        ingresos: [ing("2023-11-28", 280, { codigo_articulo: "40HM265032", precio: 16, costo_cif: 11.55, costo_fob: 11.55 })],
+        ventas: [v("2024-01-15", "FA", 70, 1120)],
+        existencia: 0,
+        precioEtiqueta: 16,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const vista = vistaDeBarras(art, HOY_MES);
+    expect(vista.modo).toBe("desde-llegada");
+    expect(vista.barras).toHaveLength(12);
+    expect(vista.barras[0].mes).toBe("2023-11");
+    expect(vista.barras[11].mes).toBe("2024-10");
+    expect(vista.recortada).toBe(true);
+    expect(subDesdeLlegada(vista, HOY_MES)).toContain("se muestran los primeros 12 meses");
+  });
+
+  it("🔴 varias compras: últimos 12 meses con cada llegada marcada con ▲ y su leyenda", () => {
+    const vista = vistaDeBarras(NB2570001(), HOY_MES);
+    expect(vista.modo).toBe("ultimos-12");
+    expect(vista.barras).toHaveLength(12);
+    expect(vista.acumulado).toBeNull();
+    // Las llegadas DE LA VENTANA: oct-2025 (60) y feb-2026 (120 y 180). Las de
+    // abr-2025 quedan fuera de los 12 meses y no se marcan.
+    expect(vista.llegadas).toEqual([
+      { mes: "2025-10", cantidades: [60] },
+      { mes: "2026-02", cantidades: [120, 180] },
+    ]);
+    expect(leyendaLlegadas(vista.llegadas)).toBe("▲ oct: llegaron 60 u · ▲▲ feb: llegaron 120 y 180 u");
+  });
+
+  it("sin llegadas en la ventana no hay leyenda — no se dibuja un pie vacío", () => {
+    expect(leyendaLlegadas([])).toBeNull();
+  });
+
+  it("una compra que llegó EN el mes en curso cae a últimos-12 (no hay mes completo que anclar)", () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "NUEVO001",
+        descripcion: "NUEVO",
+        ingresos: [ing("2026-08-05", 100, { codigo_articulo: "NUEVO001" })],
+        ventas: [],
+        existencia: 100,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const vista = vistaDeBarras(art, HOY_MES);
+    expect(vista.modo).toBe("ultimos-12");
+    expect(vista.barras).toHaveLength(12);
   });
 });
 

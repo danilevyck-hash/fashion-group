@@ -22,15 +22,19 @@
 // 🩸 Y ANTES SE HABÍA IDO "DESC.". Daniel, textual: *"no sirve"*. Lo que sí
 // sirve para su decisión es el PRECIO REAL y el MARGEN.
 //
-// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (11-ago-2026): `Precio
-// prom` · `Costo CIF` · `CIF anterior (solo si cambió)` · `Costo FOB
-// (calculado)` · `Margen` · `Lista`. Los tres cambios de fondo:
+// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (12-ago-2026): los tres
+// grandes primero — `Compré` · `Vendí` · `En bodega` (= Me quedan) — y la fila
+// de plata en el MISMO orden agrupado de la tarjeta: `Precio prom` · `Lista` ·
+// `Costo CIF` · `CIF anterior (solo si cambió)` · `Costo FOB` · `Margen`.
+//   · **Compré** es la suma de TODAS las compras registradas (también las de
+//     más de 3 años) y **Vendí** el neto histórico con las NC restadas — los
+//     mismos números grandes de la pantalla. NO se fuerza el cuadre entre
+//     ellos y "En bodega": la columna "Nota" explica los huecos.
 //   · El **Costo FOB es CALCULADO** (CIF ÷ 1,10, con `fobEstimado()`), no el que
 //     manda Switch — que llega igual al CIF en el 93% de las líneas por un error
-//     de carga conocido. Por eso la columna "FOB de dónde" se fue de esta hoja:
-//     ya no hay dos procedencias que distinguir, hay una cuenta. El rótulo dice
-//     "(calculado)" — un número que parece traído y no lo es sería peor que no
-//     tenerlo.
+//     de carga conocido. Por eso la columna "FOB de dónde" se fue de esta hoja.
+//     La palabra "(calculado)" se fue del ENCABEZADO (Daniel: *"esta de mas"*);
+//     el subtítulo de la hoja sigue diciendo de dónde sale.
 //   · El **CIF anterior solo se llena cuando DIFIERE** del de hoy. La columna se
 //     queda (una columna que aparece y desaparece rompe cualquier planilla que
 //     apunte a ella), pero vacía significa "no cambió", igual que en pantalla:
@@ -48,6 +52,7 @@ import {
   centavos,
   fmtMesAnio,
   textoMeses,
+  textoNoventaCorto,
   textoSinMargen,
   MESES_VENTANA,
   type FichaArticulo,
@@ -116,9 +121,12 @@ export async function buildReferenciaSheet(
     subtitle:
       `${articulos.length} referencias · corte ${hoyMes} · ` +
       `los ${MESES_VENTANA} meses son COMPLETOS (el mes en curso NO entra) · ` +
+      `"Compré" son TODAS las compras registradas y "Vendí" el neto histórico con las NC restadas · ` +
+      `"En bodega" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
+      `"90% en" dice en cuántos meses se vendió el 90% de la compra (la cola no cuenta) · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
       `el margen se calcula contra el Costo CIF de la última compra · ` +
-      `el Costo FOB es CALCULADO (Costo CIF ÷ 1,10), no el que manda Switch · ` +
+      `el Costo FOB es calculado (Costo CIF ÷ 1,10), no el que manda Switch · ` +
       `"CIF anterior" solo se llena cuando la compra anterior costó distinto; vacío = no cambió · ` +
       `NO se dice cuánto tardó cada compra en venderse: con stock encima eso no se sabe · ` +
       `las notas de crédito ya están restadas`,
@@ -126,6 +134,9 @@ export async function buildReferenciaSheet(
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },
       { header: "Empresa", wch: 14 },
+      // ── Los tres grandes, en el orden de la pantalla ──
+      { header: "Compré", wch: 10, align: "right", fmt: "#,##0" },
+      { header: "Vendí", wch: 10, align: "right", fmt: "#,##0" },
       { header: "En bodega", wch: 11, align: "right", fmt: "#,##0" },
       // ── Compras: fecha y cantidad, crudas ──
       { header: "Última compra: llegó", wch: 18 },
@@ -134,17 +145,22 @@ export async function buildReferenciaSheet(
       { header: "Anterior: cuánto", wch: 15, align: "right", fmt: "#,##0" },
       { header: "Compras (últimos 3 años)", wch: 22, align: "right", fmt: "#,##0" },
       { header: "Compras de más de 3 años", wch: 23, align: "right", fmt: "#,##0" },
-      // ── Vendo por mes / me queda para ──
+      // ── El ritmo ──
+      // 🔴 "90% en" es la MISMA métrica de la pantalla y del modo pedido
+      // (`textoNoventaCorto`): "16 meses" = el 90% de la compra única se vendió
+      // en eso; "va el 80%" = compra viva; "van 258 de 360" = varias compras,
+      // agregado desde la primera llegada de los últimos 12 meses.
+      { header: "90% en", wch: 16 },
       { header: "Vendo por mes", wch: 13, align: "right", fmt: "#,##0.0" },
       { header: "Meses promediados", wch: 17, align: "right", fmt: "#,##0" },
       { header: "Me queda para (meses)", wch: 20, align: "right", fmt: "#,##0.0" },
-      // ── La fila de plata de la pantalla, en el mismo orden ──
+      // ── La fila de plata, en el mismo orden agrupado de la pantalla ──
       { header: "Precio prom", wch: 12, align: "right", fmt: MONEY_FMT },
+      { header: "Lista", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "Costo CIF", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "CIF anterior (solo si cambió)", wch: 27, align: "right", fmt: MONEY_FMT },
-      { header: "Costo FOB (calculado)", wch: 20, align: "right", fmt: MONEY_FMT },
+      { header: "Costo FOB", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "Margen", wch: 9, align: "right", fmt: PCT_FMT },
-      { header: "Lista", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "Si no hay margen, por qué", wch: 46 },
       // ── Temporada ──
       { header: "Oct-nov-dic (u)", wch: 14, align: "right", fmt: "#,##0" },
@@ -165,6 +181,9 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     art.codigo,
     art.descripcion || "—",
     art.empresa || "—",
+    // Los tres grandes de la pantalla: Compré · Vendí · En bodega (Me quedan).
+    f.grandes.comprado,
+    f.grandes.vendido,
     art.existencia,
     u?.fecha ?? "sin compra registrada",
     u?.unidades ?? null,
@@ -172,17 +191,18 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     a?.unidades ?? null,
     art.compras.length,
     art.comprasFueraDeVentana,
+    textoNoventaCorto(f.noventa),
     n1(f.promedio.porMes),
     f.promedio.meses,
     n1(f.alcance),
     n2(m.precioReal),
+    n2(u?.costos.lista ?? art.precioEtiqueta),
     n2(m.costo),
     // Vacío = el costo no cambió. La celda vacía ES el dato, igual que en
     // pantalla: repetir el mismo número en cada fila era el relleno que se fue.
     n2(f.cambioCosto?.anterior),
     n2(f.fobCalculado),
     n4(m.margen),
-    n2(u?.costos.lista ?? art.precioEtiqueta),
     m.motivo ? textoSinMargen(m.motivo, f.promedio.meses) : "",
     f.temporada.unidades,
     n4(f.temporada.parte),

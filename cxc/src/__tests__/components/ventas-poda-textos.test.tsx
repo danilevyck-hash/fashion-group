@@ -201,6 +201,12 @@ const PROHIBIDOS = [
   "Lo que queda en bodega es de Switch",
   "compras más viejas de 3 años",
   "más de hace años",
+  // 🩸 Podados el 12-ago-2026: las cajas grandes del ritmo ("lo que mas llama
+  // la atencion y no es lo mas importante" — Daniel vende B2B al por mayor) y
+  // la palabra "(calculado)" del rótulo del FOB (*"esta de mas"*).
+  "Vendo por mes",
+  "Me queda para",
+  "(calculado)",
 ];
 
 async function buscar(resp: ComprasApiResp, codigo: string) {
@@ -267,7 +273,8 @@ const RESP_COSTO_SUBIO: ComprasApiResp = {
 describe("Referencia · la caja de COMPRAS, cruda", () => {
   it("🔴 dice FECHA y CANTIDAD, la más reciente arriba — y nada más", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    expect(screen.getAllByText("Compras").length).toBeGreaterThan(0);
+    // La lista vive ahora BAJO el número grande de "Compré".
+    expect(screen.getAllByText("Compré").length).toBeGreaterThan(0);
     for (const linea of [
       "19 feb 2026 · 180 u",
       "11 feb 2026 · 120 u",
@@ -296,13 +303,13 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
     expect(pantalla).not.toContain("Lo que queda en bodega es de Switch");
     // 🔴 Y el total de bodega NO cambió: sale de `existencia` de Switch, no de
     // las compras que se ven. Era lo que el primer pie venía a explicar.
-    expect(screen.getAllByText(/345 en bodega/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("345").length).toBeGreaterThan(0); // el Me quedan grande
+    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
   });
 
-  it("una sola compra lo dice: 'única compra', sin línea de restantes", async () => {
+  it("una sola compra lo dice: fecha + 'única compra', sin repetir la cantidad (ya es el número grande)", async () => {
     await buscarUnaReferencia();
-    expect(screen.getAllByText("28 nov 2023 · 280 u").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("única compra").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("28 nov 2023 · única compra").length).toBeGreaterThan(0);
     expect(screen.queryByText(/y \d+ compras? más/)).toBeNull();
     expect(screen.queryByRole("button", { name: /compra/i })).toBeNull();
   });
@@ -316,13 +323,77 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
   });
 });
 
-describe("Referencia · los otros dos números, sin veredictos ni promedios", () => {
-  it("los otros dos números están, y el stock se sigue viendo", async () => {
+// ── Los TRES GRANDES: Compré · Vendí · Me quedan ─────────────────────────────
+//
+// 🔴 Daniel (12-ago-2026): *"el numero importante estan chiquito. cuanto compre
+// es importante, cuanto vendi en total es importante"*. Y el ritmo bajó a UNA
+// línea: *"me queda 2 meses de venta / vendo 11u mes es lo que mas llama la
+// atencion y no es lo mas importante… vendo b2b al por mayor no retail"*.
+
+describe("Referencia · los tres grandes y la línea de ritmo", () => {
+  it("🔴 Compré · Vendí · Me quedan están en grande, con sus subtítulos", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    for (const rotulo of ["Compré", "Vendí", "Me quedan"]) {
+      expect(screen.getAllByText(rotulo).length, `falta el rótulo "${rotulo}"`).toBeGreaterThan(0);
+    }
+    // Los números del fixture: comprado 960 · vendido 615 · existencia 345.
+    expect(screen.getAllByText("960").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("615").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("345").length).toBeGreaterThan(0);
+    // Vendí dice qué parte de lo comprado es: 615 ÷ 960 = 64%.
+    expect(screen.getAllByText("el 64% de lo comprado").length).toBeGreaterThan(0);
+    // Me quedan viene de Switch y lo dice sin ceremonia.
+    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
+  });
+
+  it("🔴 la línea del 90%: con varias compras es el AGREGADO rotulado + el dato chiquito", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    // 6 compras en 3 años + 3 más viejas → nada de "va el X% de la compra":
+    // agregado desde la primera llegada de los últimos 12 meses (oct-2025),
+    // 60 + 120 + 180 = 360 llegadas y 295 vendidas desde entonces.
+    expect(
+      screen.getAllByText("Desde oct 2025 llegaron 360 u · van vendidas 295 · vendo 28 u por mes").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("🔴 compra única ya vendida: 'El 90% se vendió en N meses', sin 'vendo 0 por mes'", async () => {
+    // El fixture de 40HM265032: 280 u en nov-2023, el 90% (252) se cruza en
+    // abr-2024 = 5 meses. Sin ventas en los últimos 12 meses no hay tail.
     await buscarUnaReferencia();
-    expect(screen.getAllByText("Vendo por mes").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Me queda para").length).toBeGreaterThan(0);
-    // Artículo agotado: el 0 de bodega se dice CLARO, no desaparece.
-    expect(screen.getAllByText(/0 en bodega/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("El 90% se vendió en 5 meses").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/vendo 0/)).toBeNull();
+  });
+
+  it("el artículo agotado muestra Me quedan 0 — el 0 se dice claro, no desaparece", async () => {
+    await buscarUnaReferencia();
+    // El fixture: comprado 280 · vendido 279 · 0 en bodega.
+    expect(screen.getAllByText("280").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("279").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
+  });
+
+  it("🔴 sin compra registrada: Compré queda en '—' con el texto honesto, y Vendí igual se dice", async () => {
+    const RESP_SIN_COMPRA: ComprasApiResp = {
+      ...REFERENCIA_RESP,
+      articulos: [
+        {
+          ...REFERENCIA_RESP.articulos[0],
+          codigo: "RETENCION",
+          descripcion: "RETENCION",
+          compras: [],
+          serie: [{ mes: "2026-05", unidades: 40, venta: 400 }],
+          sinCompraRegistrada: true,
+          cuadre: { comprado: 0, vendido: 40, existencia: null, residuo: null, ajusteConfiable: false },
+          existencia: null,
+          precioEtiqueta: null,
+        },
+      ],
+    };
+    await buscar(RESP_SIN_COMPRA, "RETENCION");
+    expect(screen.getAllByText(/sin compra registrada — no aparece en los ingresos de mercancía/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("40").length).toBeGreaterThan(0); // el Vendí grande
+    expect(screen.getAllByText("Switch no tiene este código en el catálogo").length).toBeGreaterThan(0);
   });
 
   it("🔴 el margen NO se inventa: si no vendió en el período, la pantalla LO DICE", async () => {
@@ -361,9 +432,18 @@ describe("Referencia · los otros dos números, sin veredictos ni promedios", ()
   });
 
   it("🩸 tampoco están en el CÓDIGO de la vista — un texto borrado de una rama vuelve por otra", async () => {
-    const fuente = await import("node:fs/promises").then((fs) =>
-      fs.readFile("src/components/ventas/ReferenciaView.tsx", "utf8"),
-    );
+    // La vista son TRES archivos desde el 12-ago-2026 (buscador, tarjeta y
+    // modo pedido): se barren juntos.
+    const fs = await import("node:fs/promises");
+    const fuente = (
+      await Promise.all(
+        [
+          "src/components/ventas/ReferenciaView.tsx",
+          "src/components/ventas/ReferenciaTarjeta.tsx",
+          "src/components/ventas/ReferenciaTablaPedido.tsx",
+        ].map((f) => fs.readFile(f, "utf8")),
+      )
+    ).join("\n");
     // El encabezado del archivo los cita para explicar por qué no vuelven: se
     // mira solo el código, no los comentarios.
     const codigo = fuente
@@ -401,11 +481,13 @@ function filaDePlata(): string {
     .trim();
 }
 
-describe("Referencia · la fila de plata", () => {
-  it("🔴 es UNA sola fila, y dice exactamente lo aprobado", async () => {
+describe("Referencia · la fila de plata, agrupada", () => {
+  it("🔴 es UNA sola fila y va AGRUPADA: precios juntos | costos juntos | margen", async () => {
+    // Daniel: *"precio prom y precio lista porque estan separado"*. Juntos se ve
+    // de un vistazo si está descontando; los costos juntos dicen cuánto cuesta.
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
     expect(filaDePlata()).toBe(
-      "Precio prom $26.92 · Costo CIF $16.56 · Costo FOB (calculado) $15.05 · margen 39% · lista $27.00",
+      "Precio prom $26.92 · lista $27.00 | Costo CIF $16.56 · FOB $15.05 | margen 39%",
     );
   });
 
@@ -415,13 +497,13 @@ describe("Referencia · la fila de plata", () => {
     expect(veces).toBe(1);
   });
 
-  it("🔴 el Costo FOB se ROTULA como calculado — no es el que manda Switch", async () => {
+  it("🔴 el FOB sigue siendo el CALCULADO, pero el rótulo ya no dice '(calculado)' — *'esta de mas'*", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    expect(screen.getAllByText("Costo FOB (calculado)").length).toBeGreaterThan(0);
     // El FOB del payload llega igual al CIF (el error de carga del 93%). Si se
     // mostrara ése, la fila diría $16.56 dos veces.
     expect(RESP_MUCHAS_COMPRAS.articulos[0].compras[0].costos.fob).toBeCloseTo(16.555, 3);
-    expect(filaDePlata()).toContain("Costo FOB (calculado) $15.05");
+    expect(filaDePlata()).toContain("FOB $15.05"); // 16,555 ÷ 1,10 — la cuenta sigue
+    expect(document.body.textContent ?? "").not.toContain("(calculado)");
   });
 
   it("🔴 si el CIF NO cambió, no se muestra ningún '(antes …)'", async () => {

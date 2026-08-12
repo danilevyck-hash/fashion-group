@@ -772,9 +772,13 @@ describe("el Excel de Referencia", () => {
   // 🔴 LA HOJA 1 ES LA PANTALLA: una fila por ARTÍCULO. Daniel baja este archivo
   // para escribir en él la cantidad que va a pedir — si trajera solo la materia
   // prima tendría que rehacer la cuenta afuera.
-  it("la hoja 1 refleja la caja nueva: las compras crudas y los otros dos números", async () => {
+  it("la hoja 1 refleja la ficha: los tres grandes, las compras crudas y el ritmo", async () => {
     const { encabezado, cuerpo } = await leerHoja("Referencia");
     for (const col of [
+      // 🔴 Los tres grandes de la pantalla, primero.
+      "Compré",
+      "Vendí",
+      "En bodega",
       "Última compra: llegó",
       "Última compra: cuánto",
       "Compras (últimos 3 años)",
@@ -785,15 +789,19 @@ describe("el Excel de Referencia", () => {
       "Precio prom",
       "Costo CIF",
       "CIF anterior (solo si cambió)",
-      "Costo FOB (calculado)",
+      "Costo FOB",
       "Margen",
       "Lista",
-      "En bodega",
     ]) {
       expect(encabezado, `falta la columna "${col}"`).toContain(col);
     }
     expect(cuerpo).toHaveLength(1); // un artículo = una fila
     expect(cuerpo[0]["Referencia"]).toBe("NB2570001");
+    // 🔴 Compré = TODAS las compras (240 + 180) y Vendí = el neto histórico.
+    // En bodega es la existencia de Switch — y NO se fuerza el cuadre: acá
+    // 420 − 216 = 204 sí cierra, pero la columna no sale de esa resta.
+    expect(cuerpo[0]["Compré"]).toBe(420);
+    expect(cuerpo[0]["Vendí"]).toBe(216);
     expect(cuerpo[0]["En bodega"]).toBe(204);
     // La ÚLTIMA compra es la del 19-feb-2026, no la más vieja.
     expect(cuerpo[0]["Última compra: llegó"]).toBe("2026-02-19");
@@ -803,16 +811,33 @@ describe("el Excel de Referencia", () => {
     expect(cuerpo[0]["Compras de más de 3 años"]).toBe(0);
   });
 
-  it("🔴 el Costo FOB de la hoja 1 es CALCULADO (CIF ÷ 1,10), no el de Switch", async () => {
-    const { cuerpo } = await leerHoja("Referencia");
+  it("🔴 el orden de precios y costos sigue al de la pantalla: precios juntos, costos juntos, margen al final", async () => {
+    const { encabezado } = await leerHoja("Referencia");
+    const pos = (h: string) => encabezado.indexOf(h);
+    // Precio prom · Lista | Costo CIF · CIF anterior · Costo FOB | Margen
+    expect(pos("Precio prom")).toBeGreaterThan(-1);
+    expect(pos("Lista")).toBe(pos("Precio prom") + 1);
+    expect(pos("Costo CIF")).toBe(pos("Lista") + 1);
+    expect(pos("CIF anterior (solo si cambió)")).toBe(pos("Costo CIF") + 1);
+    expect(pos("Costo FOB")).toBe(pos("CIF anterior (solo si cambió)") + 1);
+    expect(pos("Margen")).toBe(pos("Costo FOB") + 1);
+    // Y los tres grandes van juntos, en el orden de la pantalla.
+    expect(pos("Vendí")).toBe(pos("Compré") + 1);
+    expect(pos("En bodega")).toBe(pos("Vendí") + 1);
+  });
+
+  it("🔴 el Costo FOB de la hoja 1 es calculado (CIF ÷ 1,10), no el de Switch — y el encabezado ya no dice '(calculado)'", async () => {
+    const { encabezado, cuerpo } = await leerHoja("Referencia");
     expect(cuerpo[0]["Costo CIF"]).toBe(5);
-    expect(cuerpo[0]["Costo FOB (calculado)"]).toBe(4.55); // 5 ÷ 1,1
+    expect(cuerpo[0]["Costo FOB"]).toBe(4.55); // 5 ÷ 1,1
     // El FOB que manda Switch para esta línea es 4 — si se copiara ése, la
     // planilla diría otra cosa que la pantalla.
-    expect(cuerpo[0]["Costo FOB (calculado)"]).not.toBe(4);
+    expect(cuerpo[0]["Costo FOB"]).not.toBe(4);
+    // 🔴 Daniel: *"la palabra calculado esta de mas"*. El subtítulo de la hoja
+    // sigue diciendo de dónde sale; el encabezado ya no.
+    expect(encabezado).not.toContain("Costo FOB (calculado)");
     // Y la columna del origen del FOB se fue de esta hoja: ya no hay dos
     // procedencias que distinguir, hay una cuenta.
-    const { encabezado } = await leerHoja("Referencia");
     expect(encabezado).not.toContain("FOB de dónde");
   });
 
