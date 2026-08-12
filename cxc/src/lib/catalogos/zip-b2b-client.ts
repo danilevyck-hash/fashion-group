@@ -26,6 +26,7 @@ import {
   type ManifiestoItem,
 } from "./fotos-b2b";
 import { variantePath, type StorageMarcaKey } from "./variantes-paths";
+import { medirRecorte } from "./foto-recorte";
 
 /** Lado mayor de las fotos guardadas (variantes y foto elegida). */
 export const LADO_MAYOR = 720;
@@ -83,7 +84,13 @@ function pixelesDe(bmp: ImageBitmap): RgbaImage {
  */
 function recortarYEncuadrar(bmp: ImageBitmap, small: RgbaImage): Blob | Promise<Blob | null> {
   const fondo = colorFondo(small);
-  const bboxSmall = detectarBBox(small, fondo);
+  // El fondo de estudio de PVH viene en DEGRADADO: detectarBBox (esquinas +
+  // tolerancia fija) lo marca entero como producto y la caja da la imagen
+  // completa. medirRecorte estima el fondo por fila y saca la caja real; si no
+  // es confiable (fail-open), se cae al detector de siempre — nunca se pierde
+  // una foto por esto.
+  const med = medirRecorte(small, bmp.width, bmp.height);
+  const bboxSmall = med.ok && med.caja ? med.caja : detectarBBox(small, fondo);
   const fx = bmp.width / small.width;
   const fy = bmp.height / small.height;
   const bbox = {

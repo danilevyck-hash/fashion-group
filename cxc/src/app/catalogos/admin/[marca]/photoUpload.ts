@@ -7,6 +7,7 @@
 // 413), timeout, y LANZA Error con mensaje legible (nunca un spinner colgado).
 
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { recortarEnCanvas } from "@/lib/catalogos/foto-recorte";
 
 const MIN_BYTES = 5 * 1024;            // espejo de upload/route.ts (>5KB)
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif", "image/gif"];
@@ -41,24 +42,38 @@ async function decode(file: File): Promise<{ src: CanvasImageSource; w: number; 
   }
 }
 
-// Redimensiona a 1600px (nunca agranda) y exporta JPEG 0.82. Tolerante a fallos:
-// si algo sale mal o no achica, devuelve el archivo original.
+// Recorta el fondo sobrante (banco B2B de PVH: producto chico sobre fondo
+// enorme), redimensiona a 1600px (nunca agranda) y exporta JPEG 0.82.
+// FAIL-OPEN en dos capas: recortarEnCanvas devuelve null ante CUALQUIER duda o
+// error (y se sigue con la foto entera), y si algo más revienta se devuelve el
+// archivo original — el recorte jamás bloquea ni degrada una subida.
 async function compress(file: File): Promise<File> {
   if (!COMPRESSIBLE.includes(file.type)) return file;
   try {
     const { src, w, h, close } = await decode(file);
-    const longest = Math.max(w, h);
-    const scale = longest > MAX_DIMENSION ? MAX_DIMENSION / longest : 1;
-    const tw = Math.max(1, Math.round(w * scale));
-    const th = Math.max(1, Math.round(h * scale));
-    const canvas = document.createElement("canvas");
-    canvas.width = tw; canvas.height = th;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) { close(); return file; }
-    ctx.drawImage(src, 0, 0, tw, th);
-    close();
+    // Paso 1 — auto-recorte (null = no confiable → foto entera, como siempre).
+    const recortado = recortarEnCanvas(src, w, h);
+    let canvas: HTMLCanvasElement;
+    if (recortado) {
+      canvas = recortado; // ya viene ≤1600 y con el producto centrado
+      close();
+    } else {
+      const longest = Math.max(w, h);
+      const scale = longest > MAX_DIMENSION ? MAX_DIMENSION / longest : 1;
+      const tw = Math.max(1, Math.round(w * scale));
+      const th = Math.max(1, Math.round(h * scale));
+      canvas = document.createElement("canvas");
+      canvas.width = tw; canvas.height = th;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { close(); return file; }
+      ctx.drawImage(src, 0, 0, tw, th);
+      close();
+    }
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", JPEG_QUALITY));
-    if (!blob || blob.size >= file.size) return file;
+    if (!blob) return file;
+    // Sin recorte, un JPEG más pesado que el original no aporta (regla de
+    // siempre); recortada, el encuadre ES la mejora — se usa aunque pese más.
+    if (!recortado && blob.size >= file.size) return file;
     return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
   } catch {
     return file;
