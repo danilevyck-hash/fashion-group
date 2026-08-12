@@ -27,6 +27,7 @@ import {
 } from "./groupByModel";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
+import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -70,19 +71,22 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = resumirDesdeItems(cart, { bultoSize: theme.bulto }).total;
 
-  // Persist cart to localStorage
+  // El carrito vive en la SESIÓN de la pestaña, igual que el del vendedor
+  // (lib/catalogo/carrito.ts): sobrevive un refresh o irse a mirar otra cosa y
+  // volver, y muere al cerrar la pestaña. Un cliente que abre el link dos
+  // semanas después arranca en blanco — que es justo lo que se pidió: entrar,
+  // hacer el pedido e irse. Su NOMBRE sí sigue en localStorage: no es una
+  // selección que confunda, es no volver a teclear quién es.
   const cartInitialized = useRef(false);
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(theme.publicCartKey);
-      if (saved) setCart(JSON.parse(saved));
-    } catch { /* ignore */ }
+    const items = leerCarrito<CatalogoCartItem>(theme.publicCartKey);
+    if (items.length > 0) setCart(items);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!cartInitialized.current) { cartInitialized.current = true; return; }
-    try { localStorage.setItem(theme.publicCartKey, JSON.stringify(cart)); } catch { /* */ }
+    guardarCarrito(theme.publicCartKey, cart);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart]);
 
@@ -425,7 +429,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
       // Confirmado → vaciar carrito y abrir su página permanente del pedido.
       setCart([]);
-      try { localStorage.removeItem(theme.publicCartKey); } catch { /* */ }
+      limpiarCarrito(theme.publicCartKey);
       window.location.href = `${theme.pedidoPublicoBase}/${shortId}`;
     } catch {
       setToast("Error al enviar el pedido. Intenta de nuevo.");
@@ -436,7 +440,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearCart() {
     setCart([]);
-    try { localStorage.removeItem(theme.publicCartKey); } catch { /* */ }
+    limpiarCarrito(theme.publicCartKey);
   }
 
   // Skeleton loading

@@ -4,8 +4,15 @@
 // parametrizada por MARCA_THEME. Pipelines de datos por feature:
 //   · flat (Reebok): products + inventory por talla, secciones categoría+género.
 //   · agrupado (Joybees): groupByModel + secciones por género (SECTION_ORDER).
-// El carrito vive en storage (keys históricas por marca) y el pedido nace en
-// el CHECKOUT (rediseño 5-jul) — cero llamadas en vivo a Switch desde aquí.
+// El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y el
+// pedido nace en el CHECKOUT (rediseño 5-jul) — cero llamadas en vivo a Switch
+// desde aquí.
+//
+// MODO PEDIDO (`?agregarA=<id>`, 12-ago-2026): la MISMA pantalla, con una barra
+// arriba que dice a qué pedido se está agregando y con cada "Agregar" —y cada
+// +/− y cada cantidad tecleada— escribiendo en ESE pedido vía PATCH /item. El
+// carrito NO se lee ni se escribe mientras el modo está vivo, así que lo que el
+// vendedor tuviera armado aparte queda intacto. Ver lib/catalogo/modo-pedido.ts.
 
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
@@ -29,6 +36,10 @@ import {
 } from "./groupByModel";
 import { precioTexto } from "@/lib/catalogo/precio";
 import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
+import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
+import { idAgregarA, querySinPerderModo, tituloPedido } from "@/lib/catalogo/modo-pedido";
+import { useModoPedido } from "@/lib/hooks/useModoPedido";
+import BarraModoPedido from "./BarraModoPedido";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -72,25 +83,17 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = resumirDesdeItems(cart, { bultoSize: theme.bulto }).total;
 
-  // ── On mount: hidratar el carrito (session → localStorage según marca). ──
+  // ── On mount: hidratar el carrito de la SESIÓN (y migrar el viejo una vez). ──
   useEffect(() => {
-    try {
-      const raw =
-        (theme.cartKeySession ? sessionStorage.getItem(theme.cartKeySession) : null) ||
-        localStorage.getItem(theme.cartKeyLocal);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed) && parsed.length > 0) setCart(parsed);
-    } catch { /* data corrupta — carrito vacío */ }
+    const items = leerCarrito<CatalogoCartItem>(theme.cartKey);
+    if (items.length > 0) setCart(items);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const cartInitialized = useRef(false);
   useEffect(() => {
     if (!cartInitialized.current) { cartInitialized.current = true; return; }
-    if (theme.cartKeySession) sessionStorage.setItem(theme.cartKeySession, JSON.stringify(cart));
-    try {
-      localStorage.setItem(theme.cartKeyLocal, JSON.stringify(cart));
-    } catch { /* */ }
+    guardarCarrito(theme.cartKey, cart);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart]);
 
@@ -128,6 +131,20 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     router.push(theme.checkoutHref);
   }
 
+  // ── MODO PEDIDO (`?agregarA=<id>`) ──
+  // El rol sale de la sesión igual que en el resto del catálogo. Quien no puede
+  // editar el pedido (bodega, el 'cliente' legacy de Reebok) ve el catálogo
+  // NORMAL: el modo ni se enciende, en vez de ofrecer un botón que el server
+  // rechazaría.
+  const [role, setRole] = useState("");
+  useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); }, []);
+  const agregarA = idAgregarA(searchParams);
+  const avisar = useCallback((m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
+  const modo = useModoPedido({ marca, theme, role, orderId: agregarA, onAviso: avisar });
+
   // ── Scroll, search, filters ──
   useEffect(() => {
     function onScroll() { setShowScrollTop(window.scrollY > 400); }
@@ -148,11 +165,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (search) params.set("search", search);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
     if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
-    const qs = params.toString();
+    // El modo pedido viaja en la URL y esta línea la reescribe entera: sin
+    // conservarlo, tocar un filtro apagaba el modo y el "Agregar" siguiente se
+    // iba al carrito — un pedido perdido sin que nadie se entere.
+    const qs = querySinPerderModo(params, agregarA);
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, bultosFilter, precioRango]);
+  }, [gender, category, search, bultosFilter, precioRango, agregarA]);
 
   // loadProducts también lo reusa el botón "Actualizar ahora" (CatalogoSyncNow)
   // para refrescar la vista tras un sync manual exitoso.
@@ -298,7 +318,10 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     });
 
   const isGrouped = sortBy === "relevancia";
-  const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
+  // En modo pedido las tarjetas muestran lo que tiene EL PEDIDO y el +/− escribe
+  // ahí; el carrito queda intacto y fuera de la pantalla.
+  const cartMap = modo.activo ? modo.enPedido : new Map(cart.map(i => [i.product_id, i.quantity]));
+  const onQtyChange = modo.activo ? modo.setQty : handleQtyChange;
 
   type Group = { label: string; items: typeof filtered };
   const groups: Group[] = [];
@@ -472,8 +495,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearCart() {
     setCart([]);
-    if (theme.cartKeySession) sessionStorage.removeItem(theme.cartKeySession);
-    try { localStorage.removeItem(theme.cartKeyLocal); } catch { /* */ }
+    limpiarCarrito(theme.cartKey);
   }
 
   // Skeleton
@@ -526,7 +548,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                       marca={marca}
                       group={g}
                       cartMap={cartMap}
-                      onQtyChange={handleQtyChange}
+                      onQtyChange={onQtyChange}
                       showBultos
                       showStock
                     />
@@ -544,7 +566,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                 marca={marca}
                 group={gs.group}
                 cartMap={cartMap}
-                onQtyChange={handleQtyChange}
+                onQtyChange={onQtyChange}
                 showBultos
                 showStock
               />
@@ -568,7 +590,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                     marca={marca}
                     product={p}
                     qty={cartMap.get(p.id) || 0}
-                    onQtyChange={handleQtyChange}
+                    onQtyChange={onQtyChange}
                     showBultos
                     showStock
                   />
@@ -586,7 +608,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
               marca={marca}
               product={p}
               qty={cartMap.get(p.id) || 0}
-              onQtyChange={handleQtyChange}
+              onQtyChange={onQtyChange}
               showBultos
               showStock
             />
@@ -622,12 +644,21 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   return (
     <div className={theme.grid.pageBg}>
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Barra del modo pedido — pegada arriba, con la salida adentro. */}
+        {modo.activo && (
+          <BarraModoPedido
+            titulo={tituloPedido(modo.pedido)}
+            totalBultos={modo.totalBultos}
+            hrefVolver={modo.hrefVolver}
+            estado={modo.estado}
+          />
+        )}
         {theme.vendorShare.enHeader ? (
           /* Layout heredado Joybees: header + [Ver pedido | Compartir] arriba */
           <div className="flex items-start justify-between">
             <CatalogoHeader marca={marca} variant="vendor" />
             <div className="flex items-center gap-2">
-              {cartCount > 0 && (
+              {!modo.activo && cartCount > 0 && (
                 <button onClick={goCheckout} className={theme.vendorShare.verPedidoBtn!}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
@@ -683,8 +714,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
             className={theme.grid.scrollTopBtn}>&uarr;</button>
         )}
 
-        {/* ── Sticky cart bar ── */}
-        {cartCount > 0 && (
+        {/* ── Sticky cart bar ── (jamás en modo pedido: ahí no hay carrito) */}
+        {!modo.activo && cartCount > 0 && (
           <CatalogoStickyCartBar
             marca={marca}
             cart={cart}

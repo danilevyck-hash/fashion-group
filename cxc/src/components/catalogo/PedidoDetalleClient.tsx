@@ -11,13 +11,13 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
-import AgregarProductosModal, { type ProductoAgregable } from "@/components/catalogo/AgregarProductosModal";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import ClienteSwitchPicker, { type ClienteSwitchOpcion, nombreDeCliente } from "@/components/catalogo/ClienteSwitchPicker";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Foto del stock al confirmar el pedido del link (piezas que HABÍA en ese
@@ -97,8 +97,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
   // un fallo silencioso se sentiría como "no pasó nada".
   const [dupError, setDupError] = useState<string | null>(null);
-  // ── Buscador "Agregar productos" (líneas nuevas vía PATCH /item) ──
-  const [showAgregarModal, setShowAgregarModal] = useState(false);
   const switchLockRef = useRef(false);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -211,13 +209,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // Guardado unico para auto-save y boton manual. Evita PUT simultaneos via
   // saveInFlight; si llega otra peticion mientras guarda, encola un trailing
   // save con los datos mas recientes (refs). No manda status ni envia correo.
-  async function performSave() {
+  // Devuelve `true` si lo que había pendiente quedó guardado (o no había nada
+  // que guardar). Lo usa "+ Agregar productos" para no irse al catálogo con
+  // ediciones sin guardar — el debounce de 2 s convierte "toqué y me fui" en
+  // trabajo perdido.
+  async function performSave(): Promise<boolean> {
     // Pedido bloqueado por Switch: no hay nada editable que guardar.
-    if (switchLockRef.current) { setAutoSaveStatus(null); return; }
-    if (saveInFlight.current) { pendingSave.current = true; return; }
+    if (switchLockRef.current) { setAutoSaveStatus(null); return true; }
+    if (saveInFlight.current) { pendingSave.current = true; return true; }
     if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
     saveInFlight.current = true;
     setAutoSaveStatus("saving");
+    let guardado = false;
     try {
       const res = await fetch(`${theme.api}/orders/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
@@ -239,6 +242,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         const now = new Date().toISOString();
         setAutoSaveStatus("saved");
         setLastSavedAt(now);
+        guardado = true;
         // Marca de editado para pedidos confirmados (registro interno difiere
         // de lo enviado). No reenvia correo: solo persiste y deja constancia.
         if (order?.status === "confirmado") setEditedAt(now);
@@ -250,6 +254,21 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     }
     saveInFlight.current = false;
     if (pendingSave.current) { pendingSave.current = false; performSave(); }
+    return guardado;
+  }
+
+  // ── AGREGAR PRODUCTOS: al CATÁLOGO de la marca, en modo pedido ──
+  // Daniel, 12-ago-2026: *"¿por qué al agregar me sale así? en vez de mandarme
+  // al catálogo?"*. Ahí están las fotos grandes, los filtros y el stock; cada
+  // "Agregar" del catálogo escribe en ESTE pedido (mismo PATCH /item que hacía
+  // el buscador que se retiró) y "Listo, volver al pedido" trae de vuelta acá.
+  async function irAlCatalogoAgregando() {
+    const ok = await performSave();
+    if (!ok) {
+      showToast("No se pudo guardar lo que cambiaste — intenta de nuevo antes de agregar productos.");
+      return;
+    }
+    router.push(hrefCatalogoAgregando(theme.catalogoHref, id));
   }
 
   // Aviso nativo si hay cambios sin guardar al cerrar/navegar.
@@ -451,55 +470,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     setDuplicando(false);
   }
 
-  // ── AGREGAR PRODUCTO (línea nueva o +1 bulto) vía PATCH /item ──
-  // El endpoint respeta el candado Switch (409 → el pedido ya está en el ERP).
-  // Éxito → se refleja en el estado local; el auto-save de siempre persiste el
-  // resto de la edición como hasta ahora.
-  async function agregarProducto(p: ProductoAgregable): Promise<boolean> {
-    const existente = items.find((i) => i.product_id === p.id);
-    const quantity = (existente?.quantity || 0) + 1;
-    // Precio: si la línea ya existe se respeta su precio (pudo editarse a
-    // mano); línea nueva sale con el precio del catálogo.
-    const unitPrice = existente ? existente.unit_price : Number(p.price) || 0;
-    try {
-      const res = await fetch(`${theme.api}/orders/${id}/item`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_id: p.id, sku: p.sku || "", name: p.name, image_url: p.image_url || "",
-          quantity, unit_price: unitPrice,
-          ...(theme.features.preorder ? { is_preorder: p.badge === "proximamente" } : {}),
-        }),
-      });
-      if (res.status === 409) {
-        setShowAgregarModal(false);
-        showToast("Este pedido ya está en Switch — no se puede editar aquí.");
-        load();
-        return false;
-      }
-      if (!res.ok) {
-        showToast("No se pudo agregar el producto. Intenta de nuevo.");
-        return false;
-      }
-      setItems((prev) => {
-        const yaEsta = prev.some((i) => i.product_id === p.id);
-        const nuevos = yaEsta
-          ? prev.map((i) => (i.product_id === p.id ? { ...i, quantity } : i))
-          : [...prev, {
-              product_id: p.id, sku: p.sku || "", name: p.name, image_url: p.image_url || "",
-              quantity, unit_price: unitPrice,
-              category: p.category || undefined, bulto_pzas: p.bulto_pzas ?? undefined,
-              ...(theme.features.preorder ? { is_preorder: p.badge === "proximamente" } : {}),
-            } as OrderItem];
-        return sortItems(nuevos);
-      });
-      showToast(existente ? `${p.sku || p.name}: ahora ${quantity} bultos` : "Producto agregado al pedido");
-      return true;
-    } catch {
-      showToast("No se pudo agregar el producto. Revisa tu conexion.");
-      return false;
-    }
-  }
-
   async function deleteOrder() {
     setDeletingOrder(true);
     try {
@@ -641,11 +611,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Add more products — abre el buscador inline (agrega líneas a ESTE
-              pedido); antes era un link al catálogo, que mete al carrito y el
-              checkout crea un pedido NUEVO. */}
+          {/* Add more products — lleva al CATÁLOGO de la marca en modo
+              "agregando a este pedido" (?agregarA=<id>): fotos grandes,
+              filtros y stock, y cada Agregar escribe en ESTE pedido. */}
           {canEdit && (
-            <button onClick={() => setShowAgregarModal(true)}
+            <button onClick={irAlCatalogoAgregando}
               className="text-xs bg-gray-100 text-gray-600 px-3 py-2.5 rounded-full hover:bg-gray-200 transition min-h-[44px]">
               + Agregar productos
             </button>
@@ -775,7 +745,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       ) : (
         <div className="py-12 text-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg mb-4">
           {canEdit ? (
-            <>No hay productos. <button onClick={() => setShowAgregarModal(true)} className="text-black underline min-h-[44px]">Agregar productos</button></>
+            <>No hay productos. <button onClick={irAlCatalogoAgregando} className="text-black underline min-h-[44px]">Agregar productos</button></>
           ) : (
             <>No hay productos.</>
           )}
@@ -1054,16 +1024,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             </button>
           </div>
         </ModalOverlay>
-      )}
-
-      {/* Buscador para agregar líneas al pedido (solo borradores editables) */}
-      {showAgregarModal && canEdit && (
-        <AgregarProductosModal
-          theme={theme}
-          enPedido={new Map(items.map((i) => [i.product_id, i.quantity || 0]))}
-          onAgregar={agregarProducto}
-          onClose={() => setShowAgregarModal(false)}
-        />
       )}
 
       {/* Mini-modal de "Duplicar y corregir": una sola decisión y un solo toque
