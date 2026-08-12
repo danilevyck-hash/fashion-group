@@ -207,6 +207,13 @@ const PROHIBIDOS = [
   "Vendo por mes",
   "Me queda para",
   "(calculado)",
+  // 🩸 Podados el 12-ago-2026 (noche): la regla del 90% se fue del módulo
+  // ENTERO — Daniel: *"debe de ser cuanto tiempo de venta tiene y % de la
+  // venta, asi en todo el modulo"* (y cazó la contradicción: *"como stock 0 y
+  // vendido 90%?"*). El tiempo cierra en la ÚLTIMA VENTA, no en ningún cruce.
+  "El 90% se vendió",
+  "en vender el 90%",
+  "(bajó por devoluciones)",
 ];
 
 async function buscar(resp: ComprasApiResp, codigo: string) {
@@ -351,7 +358,7 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     expect(screen.queryByText("Me quedan")).toBeNull();
   });
 
-  it("🔴 la línea del 90%: con varias compras es el AGREGADO rotulado + el dato chiquito", async () => {
+  it("🔴 la línea de venta: con varias compras VIVAS es el AGREGADO rotulado + el dato chiquito", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
     // 6 compras en 3 años + 3 más viejas → nada de "va el X% de la compra":
     // agregado desde la primera llegada de los últimos 12 meses (oct-2025),
@@ -362,14 +369,16 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("🔴 compra única ya vendida: 'El 90% se vendió en N meses' con el ritmo de MIENTRAS se vendía", async () => {
-    // El fixture de 40HM265032: 280 u en nov-2023, el 90% (252) se cruza en
-    // abr-2024 = 5 meses con 276 acumuladas → 276 ÷ 5 = 55,2 u/mes.
+  it("🔴 artículo AGOTADO: 'Se vendió todo en N meses' — el reloj cierra en la ÚLTIMA venta, con el ritmo de MIENTRAS se vendía", async () => {
+    // El fixture de 40HM265032: 280 u en nov-2023, stock 0, última venta
+    // abr-2025 → nov-2023 a abr-2025 inclusive = 18 meses; 279 ÷ 18 = 15,5
+    // u/mes. NO son los 33 meses de calendario hasta hoy: la cola en bodega
+    // vacía no infla el tiempo de venta.
     await buscarUnaReferencia();
-    expect(screen.getAllByText("Vendo 55 u por mes · El 90% se vendió en 5 meses").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Vendo 16 u por mes · Se vendió todo en 18 meses").length).toBeGreaterThan(0);
     expect(screen.queryByText(/[Vv]endo 0/)).toBeNull();
     // El cuarto grande dice cuánto TARDÓ, no cuánto lleva en bodega.
-    expect(screen.getAllByText("en vender el 90%").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("en venderse").length).toBeGreaterThan(0);
   });
 
   it("el artículo agotado muestra Stock 0 — el 0 se dice claro, no desaparece", async () => {

@@ -276,54 +276,77 @@ export function textoParteVendida(parte: number | null): string | null {
   return `el ${pct}% de lo comprado`;
 }
 
-// ─── LA LÍNEA DEL 90%: en cuánto se vende una compra ────────────────────────
+// ─── LA LÍNEA DE VENTA: cuánto tiempo de venta y qué % va ────────────────────
 //
-// 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA. Daniel, textual: *"creo
-// que es mas importante saber en cuanto meses se vendio digamos que el 80%?
-// 90%? siento que es mas util que unidades por mes"*. Confirmó 90% — viene de
-// su regla vieja: la cola no cuenta.
+// 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA (12-ago-2026). Y LA REGLA
+// DEL 90% SE FUE DEL MÓDULO ENTERO ese mismo día — Daniel, textual: *"debe de
+// ser cuanto tiempo de venta tiene y % de la venta, asi en todo el modulo…
+// podemos no tener esa regla y entender la info?"*. La regla anterior congelaba
+// el reloj en el cruce del 90% y producía contradicciones que él mismo cazó
+// (*"como stock 0 y vendido 90%?"*). Ahora hay UNA sola definición:
 //
-// Tres formas, según lo que se pueda AFIRMAR sin inventar:
-//   · Compra ÚNICA que ya cruzó el 90%:  "El 90% se vendió en 16 meses"
-//   · Compra ÚNICA viva:                 "En 10 meses va el 80% de la compra"
-//   · VARIAS compras (o historia vieja): agregado ROTULADO como lo que es —
-//     "Desde oct 2025 llegaron 360 u · van vendidas 295". NO se atribuye por
-//     tanda: el FIFO sigue prohibido (nadie marcó las cajas).
+//   · % VENDIDO = lo REAL: Vendí ÷ Compré (los totales de los tres grandes).
+//   · MESES = tiempo de venta, meses CALENDARIO desde la llegada (el ancla
+//     extendida de siempre): si el artículo está AGOTADO (stock 0), hasta el
+//     mes de su ÚLTIMA venta neta — el reloj se CIERRA ahí y la cola de bodega
+//     no lo infla; si sigue VIVO, hasta hoy — el reloj corre.
+//
+// El caso que lo exigió (4G5004G030, captura de Daniel): 2 compras el MISMO
+// día (5-oct-2025: 30 + 6 = 36), vendió 12 en oct y 24 en nov — TODO — y la
+// ficha decía "Meses: 10 · de venta, desde oct 2025", con el reloj corriendo
+// hasta hoy. Daniel: *"dice que vendi 36 en 10 meses, pero enverdad fueron en
+// dos meses"*. Ahora: 100% · 2 meses (oct y nov).
+//
+// Las formas, según lo que se pueda AFIRMAR sin inventar:
+//   · AGOTADO (stock 0, vendió algo): "Se vendió todo en 2 meses" (o "Se
+//     vendió el 80% en 2 meses" si el % real no llega a 100 — el resto lo
+//     explican los avisos de descuadre). Aplica igual con 1 o N compras: el
+//     mes de la última venta es un HECHO del artículo, no una atribución por
+//     tanda — el FIFO sigue prohibido.
+//   · Compra ÚNICA viva:  "En 10 meses va el 80% de la compra".
+//   · VARIAS compras vivas: agregado ROTULADO como lo que es — "Desde oct 2025
+//     llegaron 360 u · van vendidas 295".
 // El "vendo N u por mes" queda como dato chiquito al final de la línea.
 //
-// Granularidad: MESES (las ventas llegan agregadas por día pero la pregunta de
-// Daniel es en meses). "A los N meses" = diferencia de índice de mes entre la
-// llegada y el mes en que el acumulado cruzó el 90%.
+// Granularidad: MESES CALENDARIO (las ventas llegan agregadas por día pero la
+// pregunta de Daniel es en meses).
+// 🔴 EL CONTEO DEL AGOTADO ES INCLUSIVE: del mes del ancla al mes de la última
+// venta contando los dos — llegó en oct y terminó de venderse en nov = 2 meses,
+// que es como cuenta Daniel (*"fueron en dos meses"*). El VIVO sigue contando
+// meses TRANSCURRIDOS (oct-2025 → ago-2026 = 10): es un reloj abierto, no un
+// episodio cerrado; al agotarse, el mes que lo cierra se suma.
 
-/** La parte de la compra que cuenta. La cola (el 10% final) no. */
-export const PARTE_NOVENTA = 0.9;
-
-export type LineaNoventa =
-  /** Compra única y el acumulado NETO cruzó el 90% y SIGUE arriba: se vendió
-   *  en `meses`. `alCruce` = unidades netas acumuladas al mes del cruce. */
-  | { tipo: "vendido"; meses: number; alCruce?: number }
-  /** Compra única viva: van `parte` (0-1) a los `meses` de llegada.
-   *  `retrocedio` = llegó a cruzar el 90% pero las devoluciones lo bajaron. */
-  | { tipo: "en-curso"; meses: number; parte: number; retrocedio?: boolean }
-  /** Varias compras: agregado desde la primera llegada de la ventana de 12
-   *  meses (o la última compra, si ninguna cae en la ventana). */
+export type LineaAvance =
+  /** AGOTADO (stock 0): el reloj se CERRÓ en el mes de la última venta neta.
+   *  `parte` = Vendí ÷ Compré (0-1); `null` = no afirmable (TERMO: vendido >
+   *  comprado). `desdeMes` = el ancla (llegada única o ancla extendida). */
+  | { tipo: "agotado"; meses: number; desdeMes: string; parte: number | null }
+  /** Compra única viva: van `parte` (0-1) a los `meses` de llegada. */
+  | { tipo: "en-curso"; meses: number; parte: number }
+  /** Varias compras vivas: agregado desde la primera llegada de la ventana de
+   *  12 meses (extendida hacia atrás si no cubre lo vendido). */
   | { tipo: "agregado"; desdeMes: string; llegaron: number; van: number }
   /** Sin compra registrada (o sin fecha utilizable): no se inventa. */
   | { tipo: "sin-dato" };
 
 /**
- * Mide la línea del 90% de un artículo.
+ * Mide la línea de venta de un artículo.
  *
  * 🔴 CON UNA SOLA COMPRA la cuenta es limpia: todo lo vendido desde que llegó
  * salió de ella. CON VARIAS no se reparte nada — se suma lo llegado desde el
  * ancla y lo vendido desde el ancla, y el texto lo dice tal cual.
- * ⚠️ El mes en curso SÍ entra acá: es un acumulado ("van vendidas"), no un
- * promedio — excluirlo diría menos de lo que ya pasó.
+ * ⚠️ El mes en curso SÍ entra acá: la última venta y el "van vendidas" son
+ * HECHOS acumulados, no promedios — excluirlos diría menos de lo que ya pasó.
+ * (El mes en curso sigue FUERA de todos los promedios, como siempre.)
  */
-export function medirNoventa(
-  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana" | "serie" | "sinCompraRegistrada">,
+export function medirAvance(
+  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana" | "serie" | "sinCompraRegistrada"> &
+    // `cuadre` y `existencia` son opcionales acá SOLO por las respuestas viejas
+    // cacheadas tras un deploy (misma degradación honesta que `serie ?? []`):
+    // sin ellos no se puede afirmar el agotado y la línea cae a la forma viva.
+    Partial<Pick<ArticuloCompras, "cuadre" | "existencia">>,
   hoyMes: string,
-): LineaNoventa {
+): LineaAvance {
   const todas = art.compras ?? [];
   const fuera = art.comprasFueraDeVentana ?? 0;
   const serie = art.serie ?? [];
@@ -332,46 +355,14 @@ export function medirNoventa(
   if (todas.length === 0) return { tipo: "sin-dato" };
 
   const unica = todas.length === 1 && fuera === 0;
-  if (unica) {
-    const compra = todas[0];
-    const total = compra.unidades;
-    if (!(total > 0)) return { tipo: "sin-dato" };
-    const mesLlegada = compra.fecha.slice(0, 7);
-    const meta = total * PARTE_NOVENTA;
-    // 🔴 EL 90% ES SOBRE LA CURVA NETA, Y SOLO SE AFIRMA SI SE SOSTIENE.
-    // El caso real que lo exige (4D5077G001, 12-ago-2026): llegó 36 u en
-    // marzo, mayo vendió +36 y junio devolvió −18. El acumulado CRUZÓ el 90%
-    // en mayo y la devolución lo bajó al 50% — decir "el 90% se vendió en 2
-    // meses" es una verdad a medias con la que Daniel COMPRA. Se afirma
-    // "vendido" solo si el neto sigue ≥90% hoy: el cruce que vale es el primer
-    // mes desde el cual el acumulado nunca volvió a bajar de la meta. Si cruzó
-    // y cayó, se dice el estado real en curso, marcado (`retrocedio`).
-    let acum = 0;
-    let cruce: { mes: string; alCruce: number } | null = null;
-    let cruzoAlgunaVez = false;
-    for (const m of serie) {
-      if (m.mes < mesLlegada || m.mes > hoyMes) continue;
-      acum += m.unidades;
-      if (acum >= meta) {
-        cruzoAlgunaVez = true;
-        if (!cruce) cruce = { mes: m.mes, alCruce: acum };
-      } else {
-        cruce = null;
-      }
-    }
-    if (cruce) {
-      return { tipo: "vendido", meses: diffMeses(cruce.mes, mesLlegada), alCruce: cruce.alCruce };
-    }
-    return {
-      tipo: "en-curso",
-      meses: diffMeses(hoyMes, mesLlegada),
-      parte: acum / total,
-      retrocedio: cruzoAlgunaVez,
-    };
-  }
+  const van = (mes: string) =>
+    serie.filter((m) => m.mes >= mes && m.mes <= hoyMes).reduce((s, m) => s + m.unidades, 0);
+  const llegaronDesde = (mes: string) =>
+    todas.filter((c) => c.fecha.slice(0, 7) >= mes).reduce((s, c) => s + c.unidades, 0);
 
-  // Varias compras: ancla = la primera llegada dentro de los últimos 12 meses
-  // completos (la ventana de las barras); si ninguna cae ahí, la más reciente.
+  // El ANCLA: la llegada de la compra única, o — con varias — la primera
+  // llegada dentro de los últimos 12 meses completos (la ventana de las
+  // barras); si ninguna cae ahí, la más reciente.
   //
   // 🩸 Y EL ANCLA SE EXTIENDE HACIA ATRÁS si lo llegado desde ahí NO alcanza a
   // cubrir lo vendido desde ahí. El caso real que lo exige: NB3705906 tiene una
@@ -382,39 +373,84 @@ export function medirNoventa(
   // "compras vivas" es el SUFIJO que alcanza a cubrir las ventas: se retrocede
   // compra por compra hasta que llegaron ≥ van (o hasta la más vieja con
   // fecha). Sigue siendo agregado — nada se atribuye a una tanda.
-  const inicioVentana = restarMeses(hoyMes, MESES_VENTANA);
-  const enVentana = todas.filter((c) => c.fecha.slice(0, 7) >= inicioVentana);
-  const van = (mes: string) =>
-    serie.filter((m) => m.mes >= mes && m.mes <= hoyMes).reduce((s, m) => s + m.unidades, 0);
-  const llegaronDesde = (mes: string) =>
-    todas.filter((c) => c.fecha.slice(0, 7) >= mes).reduce((s, c) => s + c.unidades, 0);
-
-  // `todas` viene la más NUEVA primero.
-  let idx = enVentana.length ? todas.indexOf(enVentana[enVentana.length - 1]) : 0;
-  for (; idx < todas.length; idx += 1) {
-    const mesAncla = todas[idx].fecha.slice(0, 7);
-    if (llegaronDesde(mesAncla) >= van(mesAncla) || idx === todas.length - 1) break;
+  let mesAncla: string;
+  if (unica) {
+    mesAncla = todas[0].fecha.slice(0, 7);
+  } else {
+    const inicioVentana = restarMeses(hoyMes, MESES_VENTANA);
+    const enVentana = todas.filter((c) => c.fecha.slice(0, 7) >= inicioVentana);
+    // `todas` viene la más NUEVA primero.
+    let idx = enVentana.length ? todas.indexOf(enVentana[enVentana.length - 1]) : 0;
+    for (; idx < todas.length; idx += 1) {
+      const mes = todas[idx].fecha.slice(0, 7);
+      if (llegaronDesde(mes) >= van(mes) || idx === todas.length - 1) break;
+    }
+    mesAncla = todas[Math.min(idx, todas.length - 1)].fecha.slice(0, 7);
   }
-  const mesAncla = todas[Math.min(idx, todas.length - 1)].fecha.slice(0, 7);
+
+  // 🔴 AGOTADO: stock 0 y vendió algo → el reloj se CIERRA en la última venta.
+  // `existencia === 0` es la foto de Switch, no una deducción. La última venta
+  // neta es el último mes con unidades NETAS > 0 (una devolución posterior no
+  // "revive" la venta) y PUEDE ser el mes en curso: es un hecho, no un
+  // promedio.
+  //
+  // ⚠️ Si una compra llegó DESPUÉS de la última venta (mercancía que llegó
+  // tarde a un artículo que ya se había terminado de vender), el reloj igual
+  // cierra en la última venta: el tiempo de venta es de lo que SE VENDIÓ. Hay
+  // un test con ese borde.
+  const vendidoTotal = art.cuadre?.vendido ?? null;
+  if (art.existencia === 0 && vendidoTotal != null && vendidoTotal > 0) {
+    const ultimaVenta = serie
+      .filter((m) => m.unidades > 0 && m.mes <= hoyMes)
+      .reduce<string | null>((max, m) => (max == null || m.mes > max ? m.mes : max), null);
+    if (ultimaVenta != null) {
+      const comprado = art.cuadre?.comprado ?? null;
+      // El % real. Vendido > comprado (el caso TERMO: faltan compras EN
+      // Switch) no es un % afirmable — la celda dice "—" y el aviso explica.
+      const parte = comprado != null && comprado > 0 && vendidoTotal <= comprado ? vendidoTotal / comprado : null;
+      return {
+        tipo: "agotado",
+        // INCLUSIVE, y nunca menos de 1: oct → nov son 2 meses.
+        meses: Math.max(1, diffMeses(ultimaVenta, mesAncla) + 1),
+        desdeMes: mesAncla,
+        parte,
+      };
+    }
+  }
+
+  // VIVO (o agotado sin dato utilizable): el reloj corre.
+  if (unica) {
+    const total = todas[0].unidades;
+    if (!(total > 0)) return { tipo: "sin-dato" };
+    return {
+      tipo: "en-curso",
+      meses: diffMeses(hoyMes, mesAncla),
+      parte: van(mesAncla) / total,
+    };
+  }
   return { tipo: "agregado", desdeMes: mesAncla, llegaron: llegaronDesde(mesAncla), van: van(mesAncla) };
 }
 
-/** El texto de la línea del 90%, en español simple. `null` = no hay nada
+/** El texto de la línea de venta, en español simple. `null` = no hay nada
  *  honesto que decir (la caja de Compras ya dijo lo suyo). */
-export function textoNoventa(n: LineaNoventa): string | null {
+export function textoAvance(n: LineaAvance): string | null {
   switch (n.tipo) {
-    case "vendido":
-      return `El 90% se vendió en ${textoMeses(n.meses)}`;
+    case "agotado": {
+      const cuando = textoMeses(n.meses);
+      const pct = n.parte == null ? null : Math.round(n.parte * 100);
+      // Con el % real por debajo de 100 no se dice "todo": el resto no se
+      // vendió (ajustes, robo) y los avisos lo explican. Con TERMO (parte
+      // null: vendió MÁS de lo comprado) todo lo que llegó sí se fue.
+      if (pct != null && pct < 100) return `Se vendió el ${pct}% en ${cuando}`;
+      return `Se vendió todo en ${cuando}`;
+    }
     case "en-curso": {
       const cuando = `En ${textoMeses(n.meses)}`;
-      // La marca de la devolución: cruzó el 90% y volvió a bajar. Sin esto,
-      // pasar de "El 90% se vendió en 2 meses" a "va el 50%" parecería un bug.
-      const nota = n.retrocedio ? " (bajó por devoluciones)" : "";
-      if (n.parte <= 0) return `${cuando} no se ha vendido nada de la compra${nota}`;
+      if (n.parte <= 0) return `${cuando} no se ha vendido nada de la compra`;
       const pct = Math.round(n.parte * 100);
       return pct < 1
-        ? `${cuando} va menos del 1% de la compra${nota}`
-        : `${cuando} va el ${pct}% de la compra${nota}`;
+        ? `${cuando} va menos del 1% de la compra`
+        : `${cuando} va el ${pct}% de la compra`;
     }
     case "agregado":
       return n.van < 0
@@ -425,12 +461,11 @@ export function textoNoventa(n: LineaNoventa): string | null {
   }
 }
 
-/** La versión CORTA de la línea del 90% — la usaba la columna "90% en" del
- *  modo pedido (reemplazada por VENDIDO · MESES el 12-ago-2026) y la sigue
- *  usando la verificación contra producción. */
-export function textoNoventaCorto(n: LineaNoventa): string {
+/** La versión CORTA de la línea de venta — la usa la verificación contra
+ *  producción (el modo pedido usa VENDIDO · MESES). */
+export function textoAvanceCorto(n: LineaAvance): string {
   switch (n.tipo) {
-    case "vendido":
+    case "agotado":
       return textoMeses(n.meses);
     case "en-curso": {
       if (n.parte <= 0) return "va 0%";
@@ -452,59 +487,62 @@ export function textoNoventaCorto(n: LineaNoventa): string {
 //
 //   CÓDIGO       COMPRÉ VENDÍ STOCK  VENDIDO  MESES
 //   4F5003G001     48    14    34      29%      8     ← vivo (gris)
-//   4K5026G102     24    24     0      90%      2     ← terminado (negro)
+//   4K5026G102     24    24     0     100%      3     ← agotado (negro)
 //
-//   · TERMINADO (el acumulado neto cruzó el 90% y se sostiene): VENDIDO = 90%
-//     y MESES = los meses calendario en que se cruzó — CONGELADOS ahí (regla
-//     vieja de Daniel: la cola no cuenta). Es EXACTAMENTE el caso "vendido" de
-//     `medirNoventa`, sin una segunda medición.
-//   · VIVO (no cruzó — con ventas, sin ventas, o retrocedido por devoluciones):
-//     VENDIDO = Vendí ÷ Compré (LOS TOTALES de los tres grandes, redondeado a
-//     entero al mostrar) y MESES = meses calendario desde la llegada — la MISMA
-//     ancla de la ficha (`medirRitmo`): la única compra, o el ancla EXTENDIDA
-//     con varias. El mes en curso sigue fuera de todo promedio, pero los meses
-//     TRANSCURRIDOS cuentan el calendario real (y una venta de hoy sí mueve
+//   · VENDIDO es SIEMPRE el % REAL: Vendí ÷ Compré (los TOTALES de los tres
+//     grandes, redondeado a entero al mostrar). 🩸 La versión anterior lo
+//     congelaba en "90%" al cruzar, y Daniel cazó la contradicción en la
+//     muestra (12-ago-2026): *"como stock 0 y vendido 90%?"* — con la bodega
+//     en cero el % que se lee tiene que ser 100.
+//   · MESES = el tiempo de venta de `medirAvance`: AGOTADO (stock 0) = hasta
+//     su última venta, CERRADO ahí (la cola de bodega no infla el tiempo);
+//     vivo = meses calendario desde la llegada — la MISMA ancla de la ficha
+//     (`medirRitmo`): la única compra, o el ancla EXTENDIDA con varias. El mes
+//     en curso sigue fuera de todo promedio, pero los meses TRANSCURRIDOS y la
+//     última venta cuentan el calendario real (y una venta de hoy sí mueve
 //     el %: Vendí es el neto histórico).
 //   · SIN DATO: la celda que no se puede afirmar dice "—", nunca se inventa.
 //     Sin compra con fecha → las dos en "—". Vendido > comprado (el caso TERMO:
-//     faltan compras EN Switch) → el % sería mentira, pero los meses desde la
-//     llegada SÍ se saben y se dicen.
+//     faltan compras EN Switch) o negativo → el % sería mentira, pero los meses
+//     de venta SÍ se saben y se dicen.
 //
 // UNA función para pantalla y Excel: si cada una hiciera su cuenta, la tabla y
 // la planilla dirían dos cosas distintas de la misma fila.
 
 export interface VendidoMeses {
-  /** La celda VENDIDO, como fracción 0-1 (0,9 CONGELADO si terminó).
+  /** La celda VENDIDO: el % REAL (Vendí ÷ Compré), como fracción 0-1.
    *  `null` = "—": no hay porcentaje honesto que afirmar. */
   parte: number | null;
-  /** La celda MESES (meses calendario, enteros). `null` = "—": sin fecha. */
+  /** La celda MESES (meses calendario, enteros): hasta la última venta si está
+   *  agotado (cerrados), o desde la llegada si sigue vivo. `null` = "—". */
   meses: number | null;
-  /** `true` = cruzó el 90% sostenido: congelado, va en negro.
-   *  `false` = en curso, va en gris. */
+  /** `true` = AGOTADO: el tiempo quedó cerrado en la última venta, va en
+   *  negro. `false` = en curso, va en gris. */
   terminado: boolean;
 }
 
 export function medirVendidoMeses(
-  f: Pick<FichaArticulo, "grandes" | "noventa" | "ritmo">,
+  f: Pick<FichaArticulo, "grandes" | "avance" | "ritmo">,
 ): VendidoMeses {
-  // Cruzó el 90% y se sostiene: se congela ahí. `noventa.meses` es el mes del
-  // cruce, no "cuánto lleva en bodega" — la cola no cuenta.
-  if (f.noventa.tipo === "vendido") {
-    return { parte: PARTE_NOVENTA, meses: f.noventa.meses, terminado: true };
-  }
   const { comprado, vendido } = f.grandes;
-  // El % vivo sale de los TOTALES (Vendí ÷ Compré). Un vendido negativo ("el
-  // −5% de lo comprado") o mayor que lo comprado (TERMO) no es un % afirmable.
+  // 🔴 El % es SIEMPRE el real (Vendí ÷ Compré) — Daniel: *"como stock 0 y
+  // vendido 90%?"*. Un vendido negativo ("el −5% de lo comprado") o mayor que
+  // lo comprado (TERMO) no es un % afirmable.
   const parte =
     comprado != null && comprado > 0 && vendido >= 0 && vendido <= comprado
       ? vendido / comprado
       : null;
+  // Agotado: los MESES quedan cerrados en la última venta. `avance.meses` no
+  // es "cuánto lleva en bodega" — la cola no cuenta.
+  if (f.avance.tipo === "agotado") {
+    return { parte, meses: f.avance.meses, terminado: true };
+  }
   // `ritmo.meses` ya es la ancla de la ficha: llegada de la única compra, o el
   // ancla EXTENDIDA del agregado. No se inventa una segunda.
   return { parte, meses: f.ritmo.meses, terminado: false };
 }
 
-/** "29%" / "0%" / "90%" / "—" — el texto de la celda VENDIDO. */
+/** "29%" / "0%" / "100%" / "—" — el texto de la celda VENDIDO. */
 export function textoVendidoCelda(v: VendidoMeses): string {
   if (v.parte == null) return "—";
   return `${Math.round(v.parte * 100)}%`;
@@ -523,7 +561,7 @@ export function textoMesesCelda(v: VendidoMeses): string {
 // vendió 18 netas → **3.6 u/mes** — la ventana de 12 meses decía "6 u por mes",
 // que sale de otra base y no contesta su pregunta.
 //
-// El ancla es LA MISMA de la línea del 90% (`medirNoventa`): compra única = su
+// El ancla es LA MISMA de la línea de venta (`medirAvance`): compra única = su
 // llegada; varias compras = el ancla del agregado ("Desde oct 2025 llegaron
 // 360…"). Si el ritmo usara otra ventana que el avance, las dos líneas se
 // desmentirían entre sí. Sin compra registrada se cae al promedio de los 12
@@ -534,12 +572,13 @@ export function textoMesesCelda(v: VendidoMeses): string {
 // meses (de venta) y abajo u/mes"*. El u/mes va abajo, en la línea secundaria.
 
 export interface RitmoVenta {
-  /** Meses desde el ancla — el CUARTO número grande. Para una compra ya
-   *  vendida (90% sostenido) son los meses QUE TARDÓ. `null` = sin fecha. */
+  /** Meses de venta — el CUARTO número grande. Para un artículo AGOTADO son
+   *  los meses QUE TARDÓ (hasta su última venta). `null` = sin fecha. */
   meses: number | null;
   /** Unidades netas por mes sobre esos meses. `null` = no se puede decir. */
   porMes: number | null;
-  base: "unica-vendida" | "unica-viva" | "agregado" | "ventana-12" | null;
+  /** `agotado` = stock 0: el tiempo quedó CERRADO en la última venta. */
+  base: "agotado" | "unica-viva" | "agregado" | "ventana-12" | null;
   /** El mes del ancla (llegada o inicio del agregado). */
   desdeMes: string | null;
 }
@@ -547,7 +586,7 @@ export interface RitmoVenta {
 export function medirRitmo(
   art: Pick<ArticuloCompras, "compras" | "serie">,
   hoyMes: string,
-  noventa: LineaNoventa,
+  avance: LineaAvance,
   promedio: Promedio,
 ): RitmoVenta {
   const serie = art.serie ?? [];
@@ -555,36 +594,36 @@ export function medirRitmo(
     serie.filter((m) => m.mes >= mes && m.mes <= hoyMes).reduce((s, m) => s + m.unidades, 0);
   const llegada = (art.compras ?? [])[0]?.fecha.slice(0, 7) ?? null;
 
-  switch (noventa.tipo) {
-    case "vendido": {
-      // Compra única ya vendida: el ritmo es el de MIENTRAS se vendía —
-      // unidades al cruce ÷ meses del cruce. Dividir entre los meses en bodega
-      // diluiría el ritmo con los meses posteriores al agote.
-      const alCruce = noventa.alCruce ?? (llegada != null ? vanDesde(llegada) : null);
-      const divisor = Math.max(1, noventa.meses);
+  switch (avance.tipo) {
+    case "agotado": {
+      // Artículo agotado: el ritmo es el de MIENTRAS se vendía — lo vendido
+      // desde el ancla ÷ los meses hasta la última venta. Dividir entre los
+      // meses en bodega diluiría el ritmo con los meses posteriores al agote.
+      const van = vanDesde(avance.desdeMes);
+      const divisor = Math.max(1, avance.meses);
       return {
-        meses: noventa.meses,
-        porMes: alCruce != null && alCruce > 0 ? alCruce / divisor : null,
-        base: "unica-vendida",
-        desdeMes: llegada,
+        meses: avance.meses,
+        porMes: van > 0 ? van / divisor : null,
+        base: "agotado",
+        desdeMes: avance.desdeMes,
       };
     }
     case "en-curso": {
       const van = llegada != null ? vanDesde(llegada) : 0;
       return {
-        meses: noventa.meses,
-        porMes: noventa.meses > 0 && van > 0 ? van / noventa.meses : null,
+        meses: avance.meses,
+        porMes: avance.meses > 0 && van > 0 ? van / avance.meses : null,
         base: "unica-viva",
         desdeMes: llegada,
       };
     }
     case "agregado": {
-      const meses = diffMeses(hoyMes, noventa.desdeMes);
+      const meses = diffMeses(hoyMes, avance.desdeMes);
       return {
         meses,
-        porMes: meses > 0 && noventa.van > 0 ? noventa.van / meses : null,
+        porMes: meses > 0 && avance.van > 0 ? avance.van / meses : null,
         base: "agregado",
-        desdeMes: noventa.desdeMes,
+        desdeMes: avance.desdeMes,
       };
     }
     case "sin-dato":
@@ -614,15 +653,16 @@ export function textoVendoPorMes(porMes: number | null): string | null {
 }
 
 /** La línea secundaria completa, tal como se lee bajo los cuatro grandes:
- *  "Vendo 3.6 u por mes · En 5 meses va el 50% de la compra". Pantalla y
- *  verificación comparan contra ESTO — una sola definición. */
-export function textoLineaNoventa(n: LineaNoventa, ritmo: RitmoVenta): string | null {
+ *  "Vendo 3.6 u por mes · En 5 meses va el 50% de la compra" / "Vendo 18 u por
+ *  mes · Se vendió todo en 2 meses". Pantalla y verificación comparan contra
+ *  ESTO — una sola definición. */
+export function textoLineaVenta(n: LineaAvance, ritmo: RitmoVenta): string | null {
   const vendo = textoVendoPorMes(ritmo.porMes);
   // Cuando el ritmo NO sale de la llegada (sin compra registrada), se dice de
   // dónde sale — un número con otra base sin rotular sería una mentirita.
   const vendoRotulado =
     vendo && ritmo.base === "ventana-12" ? `${vendo} (promedio de los últimos 12 meses)` : vendo;
-  const partes = [vendoRotulado, textoNoventa(n)].filter((t): t is string => t != null);
+  const partes = [vendoRotulado, textoAvance(n)].filter((t): t is string => t != null);
   return partes.length ? partes.join(" · ") : null;
 }
 
@@ -634,8 +674,9 @@ export function valorGrandeMeses(r: RitmoVenta): string {
 /** El pie del cuarto número grande. Corto a propósito (vive bajo un 34 px). */
 export function pieGrandeMeses(r: RitmoVenta): string {
   switch (r.base) {
-    case "unica-vendida":
-      return "en vender el 90%";
+    case "agotado":
+      // El reloj quedó cerrado en la última venta (la cola no cuenta).
+      return "en venderse";
     case "unica-viva":
       return "de venta";
     case "agregado":
@@ -1005,10 +1046,10 @@ export function cambioDeCosto(cif: number | null, cifAnterior: number | null): C
 export interface FichaArticulo {
   /** Compré · Vendí · Stock — los primeros tres grandes. */
   grandes: TresGrandes;
-  /** La línea del 90%: en cuánto se vende una compra. */
-  noventa: LineaNoventa;
+  /** La línea de venta: cuánto tiempo de venta tiene y qué % va. */
+  avance: LineaAvance;
   /** El CUARTO grande (Meses) y el "Vendo X u por mes" de la línea secundaria:
-   *  meses y unidades por mes DESDE LA LLEGADA (la misma ancla del 90%). */
+   *  meses y unidades por mes DESDE LA LLEGADA (la misma ancla del avance). */
   ritmo: RitmoVenta;
   /** La vista de las barras: anclada a la llegada o últimos 12 meses. */
   vista: VistaBarras;
@@ -1051,12 +1092,12 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   const ultima = todas[0] ?? null;
   const anterior = todas[1] ?? null;
   const cif = ultima?.costos.cif ?? null;
-  const noventa = medirNoventa(art, hoyMes);
-  const ritmo = medirRitmo(art, hoyMes, noventa, promedio);
+  const avance = medirAvance(art, hoyMes);
+  const ritmo = medirRitmo(art, hoyMes, avance, promedio);
 
   return {
     grandes: tresGrandes(art),
-    noventa,
+    avance,
     ritmo,
     vista: vistaDeBarras(art, hoyMes),
     barras,

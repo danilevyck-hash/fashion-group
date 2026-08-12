@@ -74,9 +74,11 @@ function articulo(codigo: string, over: Partial<ArticuloCompras> = {}): Articulo
 /** La respuesta llega ORDENADA ALFABÉTICAMENTE (así la manda el route) — la
  *  vista es la que tiene que reordenarla como se pegó.
  *
- *  ZZZ999001 es el TERMINADO de la captura de Daniel (24/24/0 → 90% · 2, acá
- *  con 120 u): cruzó el 90% en dic-2025, a los 2 meses de la llegada — al
- *  corte 2026-08 lleva 10 meses en bodega y la celda tiene que decir 2 igual. */
+ *  ZZZ999001 es el AGOTADO de la captura de Daniel (acá con 120 u): llegó en
+ *  oct-2025 y su última venta fue dic-2025 → 3 meses (inclusive) — al corte
+ *  2026-08 lleva 10 meses en bodega y la celda tiene que decir 3 igual, con el
+ *  % REAL (100%), no un "90%" congelado (Daniel: *"como stock 0 y vendido
+ *  90%?"*). */
 const RESP: ComprasApiResp = {
   hoyMes: "2026-08",
   hoy: "2026-08-12",
@@ -131,18 +133,19 @@ describe("modo pedido — la tabla", () => {
     expect(screen.queryByText("en bodega")).toBeNull();
   });
 
-  it("🔴 TERMINADO se congela en 90% y los meses del CRUCE, en negro; el VIVO dice su % actual y sus meses, en gris", async () => {
+  it("🔴 AGOTADO dice su % REAL y los meses hasta la ÚLTIMA VENTA, en negro; el VIVO dice su % actual y sus meses, en gris", async () => {
     await buscarPegado();
     const celdasDe = (codigo: string) => {
       const fila = screen.getAllByText(codigo)[0].closest("tr")!;
       const tds = [...fila.querySelectorAll("td")];
       return { vendido: tds[4], meses: tds[5] };
     };
-    // ZZZ999001 cruzó el 90% en 2 meses. Lleva 10 en bodega: la celda dice 2
-    // igual (la cola no cuenta) y va en NEGRO — dato cerrado.
+    // ZZZ999001 se agotó: vendió TODO (100%, lo real — no un "90%" congelado)
+    // y su última venta fue a los 3 meses de la llegada. Lleva 10 en bodega:
+    // la celda dice 3 igual (la cola no cuenta) y va en NEGRO — dato cerrado.
     const term = celdasDe("ZZZ999001");
-    expect(term.vendido.textContent).toBe("90%");
-    expect(term.meses.textContent).toBe("2");
+    expect(term.vendido.textContent).toBe("100%");
+    expect(term.meses.textContent).toBe("3");
     expect(term.vendido.className).toContain("text-gray-900");
     expect(term.meses.className).toContain("text-gray-900");
     // AAA111001 sigue vivo: 96/120 = 80% a los 10 meses de la llegada, en GRIS.

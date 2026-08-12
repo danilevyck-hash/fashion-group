@@ -14,7 +14,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { armarArticulo } from "../src/lib/ventas/compras";
 import { REFERENCIA_EMPRESA_KEYS } from "../src/lib/ventas/referencia";
-import { medirNoventa, textoNoventa } from "../src/lib/ventas/resumen-articulo";
+import { medirAvance, textoAvance } from "../src/lib/ventas/resumen-articulo";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
@@ -129,7 +129,7 @@ async function main() {
         existencia: art.cuadre.existencia,
         residuo: art.cuadre.residuo,
         compras: g.compras.size,
-        noventa: textoNoventa(medirNoventa(art, HOY_MES)),
+        noventa: textoAvance(medirAvance(art, HOY_MES)),
       });
     }
   }
