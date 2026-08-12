@@ -17,7 +17,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolverLineas } from "./lineas-pedido";
+import { resolverLineas, resumirPedido } from "./lineas-pedido";
+import { avisoPedidoEnviado } from "./telegram-pedido";
 import { shortError } from "@/lib/telegram";
 import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 import {
@@ -304,8 +305,21 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       .eq("id", envio.id);
   }
 
+  // Mismo cuerpo que el aviso de creación (armador único en telegram-pedido.ts):
+  // referencias · bultos · piezas · monto salen de las MISMAS líneas resueltas
+  // que se acaban de enviar — no se recalcula nada.
+  const resumen = resumirPedido([...lineasResueltas.values()]);
   await enviarNegocio(
-    `📦 Pedido ${p.marcaLabel} ${p.orderNumber} enviado a Switch → ${numeroInterno}${verificado ? " ✓ verificado" : " ⚠️ sin verificar"} · ${p.clienteNombre || `cliente ${p.clienteId}`} / ${p.vendedorNombre || `vendedor ${p.vendedorId}`}`,
+    avisoPedidoEnviado({
+      label: p.marcaLabel,
+      numero: p.orderNumber,
+      cliente: p.clienteNombre || `cliente ${p.clienteId}`,
+      vendedor: p.vendedorNombre || `vendedor ${p.vendedorId}`,
+      total: resumen.total,
+      resumen,
+      numeroSwitch: numeroInterno,
+      verificado,
+    }),
   );
 
   return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings };
