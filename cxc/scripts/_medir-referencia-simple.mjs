@@ -98,7 +98,7 @@ for (const ancho of ANCHOS) {
       // La línea del 90% (la p entre los tres grandes y las barras).
       const linea90 = [...document.querySelectorAll("p")]
         .map((x) => (x.textContent ?? "").replace(/\s+/g, " ").trim())
-        .find((t) => /^(El 90% se vendió|En .*va |En .*no se ha vendido|Desde .* llegaron|vendo .* por mes)/.test(t)) ?? null;
+        .find((t) => /^(Se vendió |En .*va |En .*no se ha vendido|Desde .* llegaron|Llegaron .* u en |Vendo .* por mes)/.test(t)) ?? null;
       // 🔴 LA FILA DE PLATA, tal como se lee. Es UNA sola y es la más larga de
       // la tarjeta: a 390 px tiene que envolver sin empujar nada de lado.
       const marca = [...document.querySelectorAll("span")].find(
@@ -143,10 +143,17 @@ for (const ancho of ANCHOS) {
           "Lo que queda en bodega es de Switch",
           "compras más viejas de 3 años",
           "más de hace años",
+          // 🔴 Podado el 12-ago (noche): el "me quedan N u" de la frase de la
+          // llegada. Decía 11 mientras el grande Stock decía 12 — dos cifras
+          // para la misma pregunta. La que manda es la de bodega.
+          "me quedan",
         ].filter((t) =>
           (document.body.textContent ?? "").includes(t),
         ),
         temporada: [...document.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").find((t) => /^(Oct · nov · dic|Todavía no ha pasado|No vendió nada)/.test(t)) ?? null,
+        // 🔴 El histórico en chico bajo la lista de compras: con los grandes de
+        // la ÚLTIMA llegada, es lo que garantiza que el total no desaparezca.
+        historico: [...document.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").find((t) => /^\d[\d,]* u en total · /.test(t)) ?? null,
       };
     });
 
@@ -172,6 +179,7 @@ for (const ancho of ANCHOS) {
     if (m.recortados.length) console.log("   recortados:", JSON.stringify(m.recortados));
     if (m.atribucion.length) console.log("   🔴 ATRIBUCIÓN DE VUELTA:", JSON.stringify(m.atribucion));
     for (const t of m.tres) console.log(`   ${t}`);
+    if (m.historico) console.log(`   histórico (gris): ${m.historico}`);
     if (m.linea90) console.log(`   ${m.linea90}`);
     if (m.temporada) console.log(`   ${m.temporada}`);
     if (m.plata) console.log(`   ${m.plata}   [${m.plataAlto} px de alto]`);

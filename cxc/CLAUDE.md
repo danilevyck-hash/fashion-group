@@ -1186,6 +1186,8 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 
 ### Ventas › Referencia — el reloj se REINICIA cuando la bodega quedó en 0 (12-ago-2026)
 
+> ⚠️ **DOS COSAS DE ESTA SECCIÓN QUEDARON SUPERADAS esa misma noche** — ver *"los TRES GRANDES pasan a ser de la ÚLTIMA LLEGADA"* más abajo: **(a)** *"Compré · Vendí · Stock siguen siendo los históricos TOTALES (72 · 61 · 12)"* — Compré y Vendí ahora son de la última llegada (36 · 25) y **solo Stock** sigue siendo el total de bodega; **(b)** la frase perdió el `→ me quedan 11 u` **y** el `→ va el 69% en 5 meses`, y quedó en `Llegaron 36 u en mar 2026 · vendo 8.7 u por mes`. **Todo el motor de llegadas (`medirTandas`, el umbral del cero, los tres vetos del timeline, el ritmo sin los meses vacíos) sigue vigente tal cual** — es la misma medida, mostrada en más lugares.
+
 > 🩸 **EL TIEMPO DE VENTA SEGUÍA SUMANDO LOS MESES CON LA BODEGA VACÍA.** El caso de la captura de Daniel (`4G5004G001`, vistana): compró 36 u en oct-2025 (30 + 6 el MISMO día), las vendió TODAS en oct-nov, estuvo **dic-feb sin una sola unidad**, y en mar-2026 llegaron 36 más. La ficha decía *"Meses: 10 · de venta, desde oct 2025"* y *"Vendo 6.1 u por mes"*. Daniel, textual: *"no me hace sentido que me dice 10 meses de venta, entonces pense no comprar porque yo compro para 3 o 4 meses. pero me lo suma y me lo aplaza"*, y la regla la fijó él: *"si llego a 0 y llego mercancia, cual es la logica q me muestre 10 meses? me debe de mostrar la ultima (y mira q hubo dos el mismo dia (se tienen que sumar))"*.
 >
 > **EL MOTOR: una LLEGADA (episodio) se corta donde la bodega quedó en 0.** `medirTandas()` en `resumen-articulo.ts` recorre el **neto acumulado compras − ventas mes a mes** (la misma granularidad MENSUAL de todo el módulo, con los datos que la ficha ya tenía) y abre episodio **solo** cuando entra mercancía con el saldo en cero. Compras que llegan con **stock vivo — o el mismo día, o el mismo mes — se SUMAN** a la llegada abierta.
@@ -1211,6 +1213,40 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > **Medido en el navegador contra el build de producción y datos de producción** (`_medir-referencia-simple.mjs` en los 6 artículos y `_medir-referencia-pedido.mjs` con la tabla cerrada y abierta): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos <44 px, 0 textos <12 px**. En la tabla se lee `4G5004G001 · 69% · 5` en gris (viva) contra `4G5004G030 · 100% · 2` en negro (agotada), una al lado de la otra.
 >
 > Candados: `ventas-resumen-articulo.test.ts` (el fixture `4G5004G001` EXACTO, mismo-día que suma, stock vivo que NO abre, cero que SÍ abre, el umbral chico/grande, los tres vetos del timeline, 3+ llegadas y la regresión "una sola = idéntico") y `ventas-poda-textos.test.tsx` (renderiza la pantalla y compara la frase carácter por carácter; **"Tanda " y "tandas anteriores" quedaron PROHIBIDOS**). Verificado por mutación: no sumar el mismo día rompe 4, que toda compra abra llegada rompe 5, que nunca corte en 0 rompe 12, dividir el vendo/mes por los meses vacíos rompe 4, activar el camino nuevo con una sola llegada rompe 4 y no cerrar el reloj de la llegada agotada rompe 9.
+
+### Ventas › Referencia — los TRES GRANDES pasan a ser de la ÚLTIMA LLEGADA (12-ago-2026, noche)
+
+> 🩸 **LA FICHA SE CONTRADECÍA CONSIGO MISMA, Y DANIEL LO VIO EN LA MISMA PANTALLA.** Sobre `4G5004G001`, textual: *"mira que sigue diciendo compre 72 cuando enverdad son 36"*. El #501 había puesto la frase y el KPI sobre la ÚLTIMA llegada, pero los tres números grandes seguían siendo el histórico:
+> ```
+> ANTES                                          AHORA
+> Compré 72  Vendí 61  Stock 12  Meses 5          Compré 36  Vendí 25  Stock 12  Meses 5
+>   ↑ (29 mar 36u · 5 oct 30u · 5 oct 6u)           ↑ las mismas 3 fechas
+>                                                   72 u en total · 61 vendidas   ← gris
+> Llegaron 36 u en mar 2026 → va el 69% en 5      Llegaron 36 u en mar 2026 · vendo 8.7 u por mes
+> meses → me quedan 11 u · vendo 8.7 u por mes    La anterior (oct 2025): 36 u — se vendió toda en 2 meses
+> ```
+> Él eligió la salida entre las opciones que se le ofrecieron: *"(a) Los grandes pasan a ser de la última llegada: Compré 36 · Vendí 25 · Stock 12 — **que sea coherente**"*.
+>
+> 🔴 **NO ES UNA SEGUNDA CUENTA.** `tresGrandes(art, tandas)` recibe la MISMA `medirTandas()` que ya alimenta la frase, el reloj y el ritmo desde el #501, y `armarFicha` le pasa la misma medida a los cuatro. Si acá se volviera a calcular la llegada, dos definiciones del mismo episodio se separarían con el tiempo — hay un candado de mutación para eso.
+>
+> 🔴 **STOCK SIGUE SIENDO LA EXISTENCIA REAL DE BODEGA** (`switch_articulo_info.existencia`), nunca deducida y **nunca recortada a la llegada**. Lo eligió Daniel explícitamente. En `4G5004G001` dice **12** mientras la llegada da 36 − 25 = **11**: el cuadre NO se fuerza, como siempre, y la unidad la explica el aviso de siempre (*"Hay 1 unidad en bodega que no sale de ninguna compra registrada"* — de paso se le corrigió el verbo, decía "no salen" con "1 unidad").
+>
+> **UNA SOLA CIFRA POR CONCEPTO — de la frase se podó DOS veces, y las dos por lo mismo: decía números que ya estaban arriba.**
+> - **`→ me quedan 11 u`**: era lo que quedaba DE ESA llegada mientras el grande Stock decía **12**. Dos cifras para *"¿cuántas me quedan?"* hacen desconfiar de las dos, y la que hay que creer es la de bodega.
+> - **`→ va el 69% en 5 meses`** (y su gemelo cerrado *"se vendió toda en 2 meses"*): con los grandes ya de la llegada quedó repetido palabra por palabra — el 69% es el pie de Vendí y los 5 meses son el KPI "Meses". Es la misma poda del *"$16.56 tres veces"* de la fila de plata.
+> - Lo que la frase SÍ aporta es la **FECHA** de la llegada (que ningún grande dice) y el ritmo. `fraseLlegadaActual` quedó en una línea. **La historia gris NO se tocó** (`La anterior (oct 2025): 36 u — se vendió toda en 2 meses`): habla de OTRA llegada, no repite nada. El estado sigue diciéndose con el peso de la letra (negro = agotada, gris = viva) y con el Stock.
+>
+> **EL HISTÓRICO NO SE PIERDE:** viaja en `grandes.historico` y se lee en chico bajo la lista de compras — **`72 u en total · 61 vendidas`** (`textoHistoricoTotal`). Con **UNA sola llegada** en toda la historia, esa llegada ES el histórico: `historico` sale `null`, la línea no se dibuja y la ficha queda **idéntica a la de ayer** (repetir el mismo número dos veces en la misma caja sería el defecto que este módulo viene podando).
+>
+> **COHERENCIA EN TODO EL MÓDULO, sin encabezados nuevos:**
+> - **Tabla del modo pedido:** las celdas `Compré`/`Vendí` leían `art.cuadre` CRUDO — o sea que la misma fila decía *72 · 61* al lado de *69% · 5*. Ahora salen de `armarFicha`, la misma ficha que se abre al tocarla. `Stock` sigue siendo la existencia.
+> - **Excel:** las filas ya salían de `f.grandes`, así que se corrigieron solas. **Los 13 encabezados NO se tocaron** (candado `TRECE`): matizarlos rompería cualquier planilla que apunte a ellos, y el que decide es el mismo criterio que ya rige VENDIDO·MESES desde el #501. Lo que se actualizó es la **leyenda de la hoja**, que ahora dice que `Compré`, `Vendí`, `Vendido` y `Meses` son de la última llegada cuando la bodega quedó en 0, y que `Stock` es SIEMPRE la existencia total.
+>
+> **Medido contra producción** (`scripts/_verif-compras-referencia.ts`, corre los MISMOS módulos puros): `4G5004G001` → **Compré 36 · Vendí 25 (el 69% de esa llegada) · Stock 12 · Meses 5**, frase `Llegaron 36 u en mar 2026 · vendo 8.7 u por mes`, histórico `72 u en total · 61 vendidas`. **`4G5004G030` (una sola llegada) → 36 · 36 (el 100% de lo comprado) · 0 · 2, sin un carácter de diferencia**; `CVM253CR02001` 120·96·24·10, `NB2570001` 935·552·345·10, `QD3958033` 180·54·126·8, `40HM265032` 280·279·0·23, `RETENCION` y `TERMO` (207% de lo comprado, sin tope) **idénticos**.
+>
+> **Medido en el navegador contra el build de producción y datos de producción** (`_medir-referencia-simple.mjs` en 7 casos —incluido el modelo `40HM265` con 43 tarjetas— y `_medir-referencia-pedido.mjs` con la tabla cerrada y abierta): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos <44 px, 0 textos <12 px**. En la tabla se lee `4G5004G001 | 36 | 25 | 12 | 69% | 5` contra `4G5004G030 | 36 | 36 | 0 | 100% | 2`, y al abrir la primera la ficha dice los MISMOS cuatro números. El script de medición ahora **falla si aparece "me quedan" en pantalla**.
+>
+> Candados: `ventas-resumen-articulo.test.ts` (los grandes de la llegada, Stock = existencia real y ≠ llegaron − vendidas, el histórico visible, "no queda ninguna cifra rival de lo que me queda" y la regresión de **una sola llegada = idéntica**), `referencia-tabla-pedido.test.tsx` (renderiza la tabla real, lee las celdas y las compara contra la ficha que abre debajo) y `ventas-compras.test.ts` (la fila del Excel + la leyenda). Verificado por mutación: dejar los grandes en el histórico rompe 5, devolver el `me quedan` a la frase rompe 7, deducir Stock de la llegada rompe 5 y volver a repetir el % y los meses en la frase rompe 7.
 
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows

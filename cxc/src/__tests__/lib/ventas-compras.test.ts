@@ -971,6 +971,51 @@ describe("el Excel de Referencia", () => {
     expect(cuerpo[0]["Meses"]).toBe(6);
   });
 
+  it("🔴 con 2+ LLEGADAS el Excel baja Compré · Vendí de la ÚLTIMA — y Stock sigue siendo la existencia REAL", async () => {
+    // El caso de la captura (4G5004G001): 36 u en oct-2025 vendidas TODAS,
+    // bodega en 0 dic-feb, 36 más en mar-2026 y 25 vendidas. La planilla decía
+    // Compré 72 · Vendí 61 mientras Vendido/Meses ya eran de la última llegada
+    // (69% · 5) — Daniel: *"que sea coherente"*.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4G5004G001",
+        descripcion: "Men-Tee",
+        ingresos: [
+          ingreso({ codigo_articulo: "4G5004G001", fecha: "2025-10-05", n_interno: "A", cantidad: 30 }),
+          ingreso({ codigo_articulo: "4G5004G001", fecha: "2025-10-05", n_interno: "B", cantidad: 6 }),
+          ingreso({ codigo_articulo: "4G5004G001", fecha: "2026-03-29", n_interno: "C", cantidad: 36 }),
+        ],
+        ventas: [
+          v("2025-10-20", "FA", 12, 120),
+          v("2025-11-20", "FA", 24, 240),
+          v("2026-04-15", "FA", 6, 60),
+          v("2026-05-15", "FA", 18, 180),
+          v("2026-06-15", "FA", 1, 10),
+        ],
+        existencia: 12,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const XLSX = await import("xlsx-js-style");
+    const mod = await import("@/lib/ventas/referencia-excel");
+    const ws = await mod.buildReferenciaSheet([art], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const enc = filas.find((f) => f.includes("Referencia")) as string[];
+    const fila = filas[filas.indexOf(enc) + 1];
+    expect(fila[enc.indexOf("Compré")]).toBe(36); // no 72
+    expect(fila[enc.indexOf("Vendí")]).toBe(25); // no 61
+    expect(fila[enc.indexOf("Stock")]).toBe(12); // la existencia, sin recortar
+    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(25 / 36, 10);
+    expect(fila[enc.indexOf("Meses")]).toBe(5);
+    // Y la leyenda lo DICE: el encabezado "Compré" no puede mentir en silencio.
+    const subtitulo = String((filas[1] ?? [])[0] ?? "");
+    expect(subtitulo).toContain("ÚLTIMA LLEGADA");
+    expect(subtitulo).toMatch(/"Stock" es SIEMPRE la existencia total/);
+  });
+
   it("🔴 AGOTADO: el Excel baja el % REAL y los meses hasta la ÚLTIMA VENTA, no los de bodega", async () => {
     // Única compra nov-2023 (280 u); vendió 276 entre ene y abr 2024; stock 0.
     // Al corte 2026-08 lleva 33 meses de calendario — la celda dice 6 (nov-2023

@@ -52,6 +52,7 @@ import {
   textoLineaVenta,
   textoAvance,
   textoAvanceCorto,
+  textoHistoricoTotal,
   textoParteVendida,
   textoRestantes,
   textoMesesCelda,
@@ -1504,17 +1505,13 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     expect(textoVendoPorMes(f.ritmo.porMes)).toBe("Vendo 8.7 u por mes");
   });
 
-  it("🔴 la FRASE aprobada por Daniel, con los tres números en su orden — y sin la palabra 'tanda'", () => {
+  it("🔴 la FRASE aprobada por Daniel — y sin la palabra 'tanda'", () => {
     const f = armarFicha(G4G5004G001(), HOY_MES);
     expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
-      "Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u · vendo 8.7 u por mes",
+      "Llegaron 36 u en mar 2026 · vendo 8.7 u por mes",
     );
     // La historia, en gris, debajo.
     expect(textoLlegadaAnterior(f.tandas)).toBe("La anterior (oct 2025): 36 u — se vendió toda en 2 meses");
-    // "me quedan 11" es lo que queda DE ESA llegada (36 − 25); el stock de
-    // Switch dice 12 y esa unidad la explica el aviso de siempre — el cuadre
-    // NO se fuerza.
-    expect(armarFicha(G4G5004G001(), HOY_MES).grandes.quedan).toBe(12);
     // La palabra "tanda" no puede salir en ningún texto de pantalla.
     for (const t of [
       textoLineaVenta(f.avance, f.ritmo, f.tandas)!,
@@ -1525,10 +1522,51 @@ describe("TANDAS — el caso de la captura (4G5004G001)", () => {
     }
   });
 
-  it("los tres grandes NO cambian: Compré 72 · Vendí 61 · Stock 12, históricos", () => {
+  it("🩸 UNA sola cifra por concepto: la frase NO repite 'me quedan', ni el %, ni los meses", () => {
+    // Decía "me quedan 11" (36 llegaron − 25 vendidas de ESA llegada) mientras
+    // el grande Stock decía 12 (la existencia real de Switch). La que hay que
+    // creer es la de bodega; la unidad de diferencia la explica el aviso de
+    // siempre ("1 en bodega que no sale de ninguna compra registrada").
+    // Y el "va el 69% en 5 meses" quedó repetido palabra por palabra cuando los
+    // grandes pasaron a ser de la llegada: el 69% es el pie de Vendí y los 5
+    // meses son el KPI "Meses". La frase aporta la FECHA y el ritmo.
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    const frase = fraseLlegadaActual(f.tandas![1]);
+    expect(frase).toBe("Llegaron 36 u en mar 2026");
+    const linea = textoLineaVenta(f.avance, f.ritmo, f.tandas)!;
+    for (const repetido of ["me quedan", "69%", "5 meses", "se vendió"]) {
+      expect(linea, `la línea repite "${repetido}"`).not.toContain(repetido);
+    }
+    // Lo que sí tiene que estar: cuándo llegó y a qué ritmo se vende.
+    expect(linea).toContain("mar 2026");
+    expect(linea).toContain("vendo 8.7 u por mes");
+    expect(f.grandes.quedan).toBe(12);
+    expect(f.grandes.quedan).not.toBe(f.tandas![1].llegaron - f.tandas![1].vendidas); // 11
+  });
+
+  it("🔴 LOS GRANDES son de la ÚLTIMA LLEGADA: Compré 36 · Vendí 25 (69%) · Stock 12 — *'que sea coherente'*", () => {
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    const g = f.grandes;
+    expect(g).toMatchObject({ comprado: 36, vendido: 25, quedan: 12, deLlegada: true });
+    // La mutación que esto caza: dejar los grandes en el histórico (72 · 61).
+    expect(g.comprado).not.toBe(72);
+    expect(g.vendido).not.toBe(61);
+    expect(textoParteVendida(g.parteVendida, g.deLlegada)).toBe("el 69% de esa llegada");
+    // Y las tres cifras dicen LO MISMO que la frase y que la tabla del pedido.
+    expect(textoVendidoCelda(medirVendidoMeses(f))).toBe("69%");
+    expect(fraseLlegadaActual(f.tandas![1])).toContain("Llegaron 36 u");
+  });
+
+  it("🔴 STOCK sigue siendo la existencia REAL de bodega, nunca la de la llegada", () => {
     const g = armarFicha(G4G5004G001(), HOY_MES).grandes;
-    expect(g).toMatchObject({ comprado: 72, vendido: 61, quedan: 12 });
-    expect(textoParteVendida(g.parteVendida)).toBe("el 85% de lo comprado");
+    expect(g.quedan).toBe(12); // switch_articulo_info.existencia
+    expect(g.quedan).not.toBe(g.comprado! - g.vendido); // 36 − 25 = 11
+  });
+
+  it("🔴 el histórico NO se pierde: viaja en `historico` y se lee '72 u en total · 61 vendidas'", () => {
+    const g = armarFicha(G4G5004G001(), HOY_MES).grandes;
+    expect(g.historico).toEqual({ comprado: 72, vendido: 61 });
+    expect(textoHistoricoTotal(g.historico)).toBe("72 u en total · 61 vendidas");
   });
 });
 
@@ -1577,7 +1615,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(f.tandas).toHaveLength(2);
     expect(f.tandas![0]).toMatchObject({ desdeMes: "2026-01", llegaron: 24, vendidas: 24, cerrada: true, meses: 2 });
     expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", llegaron: 24, vendidas: 0, cerrada: false, meses: 4 });
-    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026 → va el 0% en 4 meses → me quedan 24 u");
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026");
   });
 
   it("⚠️ el umbral del 'quedó en 0' tolera la cola de ruido (±2) en tandas de tamaño real…", () => {
@@ -1646,6 +1684,12 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(f30.tandas).toBeNull();
     expect(medirTandas(G4G5004G030(), HOY_MES)!.tandas).toHaveLength(1);
     expect(medirVendidoMeses(f30)).toEqual({ parte: 1, meses: 2, terminado: true });
+    // 🔴 Y LOS GRANDES son los de SIEMPRE, con la línea del histórico APAGADA:
+    // con una sola llegada, esa llegada ES el histórico y repetirlo sería el
+    // mismo número dos veces en la misma caja.
+    expect(f30.grandes).toMatchObject({ comprado: 36, vendido: 36, quedan: 0, deLlegada: false, historico: null });
+    expect(textoHistoricoTotal(f30.grandes.historico)).toBeNull();
+    expect(textoParteVendida(f30.grandes.parteVendida)).toBe("el 100% de lo comprado");
     // QD3958033 (única compra viva): sin cambios.
     const fqd = armarFicha(QD3958033(), HOY_MES);
     expect(fqd.tandas).toBeNull();
@@ -1672,7 +1716,7 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     );
     expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
       // 60 vendidas ÷ 11 meses CON stock (2 + 2 + 7) = 5.5
-      "Llegaron 24 u en ene 2026 → va el 50% en 7 meses → me quedan 12 u · vendo 5.5 u por mes",
+      "Llegaron 24 u en ene 2026 · vendo 5.5 u por mes",
     );
   });
 
@@ -1690,9 +1734,11 @@ describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", (
     expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", cerrada: true, meses: 2 });
     const vm = medirVendidoMeses(f);
     expect(vm).toEqual({ parte: 1, meses: 2, terminado: true });
-    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026 → se vendió toda en 2 meses");
-    // Sin "me quedan": la bodega quedó en 0, no hay nada que contar.
+    // La frase NO repite ni el % ni los meses: los dice el par Vendí/Meses de
+    // los grandes (100% · 2). Lo que aporta es CUÁNDO llegó.
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026");
     expect(fraseLlegadaActual(f.tandas![1])).not.toContain("me quedan");
+    expect(fraseLlegadaActual(f.tandas![1])).not.toContain("se vendió");
     expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");
   });
 });

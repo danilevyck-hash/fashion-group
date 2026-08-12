@@ -12,7 +12,12 @@
 //   1. LOS CUATRO GRANDES: **Compré · Vendí · Stock · Meses** (en grande).
 //      Compré trae debajo la lista de compras aprobada (4 fechas + "y N más");
 //      Vendí dice qué % de lo comprado es; Stock es `existencia` de Switch;
-//      Meses es el tiempo de venta desde la llegada (el ancla del 90%).
+//      Meses es el tiempo de venta desde la llegada.
+//      🔴 CUANDO LA BODEGA QUEDÓ EN 0 Y VOLVIÓ A LLEGAR MERCANCÍA, Compré y
+//      Vendí son de la ÚLTIMA LLEGADA (Daniel, 12-ago-2026: *"mira que sigue
+//      diciendo compre 72 cuando enverdad son 36"* → *"que sea coherente"*), el
+//      histórico total queda en chico bajo la lista de compras, y **Stock sigue
+//      siendo la existencia REAL de bodega** — eso lo eligió él.
 //      ⚠️ NO SE FUERZA EL CUADRE entre los tres: los avisos de descuadre que ya
 //      existen explican los huecos (ajuste, venta sin compra, robo).
 //   2. LA LÍNEA DE VENTA — cuánto tiempo de venta y qué % va (la regla del 90%
@@ -62,6 +67,7 @@ import {
   pieGrandeMeses,
   subDesdeLlegada,
   textoCompra,
+  textoHistoricoTotal,
   textoLineaVenta,
   textoLlegadaAnterior,
   textoParteVendida,
@@ -70,6 +76,7 @@ import {
   tituloDesdeLlegada,
   valorGrandeMeses,
   type FichaArticulo,
+  type HistoricoTotal,
   type ListaCompras,
   type MesBarra,
 } from "@/lib/ventas/resumen-articulo";
@@ -195,10 +202,10 @@ function CuatroGrandes({ art, ficha }: { art: ArticuloCompras; ficha: FichaArtic
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-4 px-3.5 py-4 xl:grid-cols-4">
       <Grande rotulo="Compré" valor={g.comprado != null ? fmtInt(g.comprado) : "—"} unidad={g.comprado != null}>
-        <PieCompras art={art} lista={ficha.compras} />
+        <PieCompras art={art} lista={ficha.compras} historico={g.historico} />
       </Grande>
       <Grande rotulo="Vendí" valor={fmtInt(g.vendido)} unidad>
-        <p className="text-xs text-gray-600">{pieDeVendido(art, g.parteVendida)}</p>
+        <p className="text-xs text-gray-600">{pieDeVendido(g)}</p>
       </Grande>
       <Grande rotulo="Stock" valor={g.quedan != null ? fmtInt(g.quedan) : "—"} unidad={g.quedan != null}>
         <p className="text-xs text-gray-600">
@@ -243,8 +250,21 @@ function Grande({
  *
  * 🔴 CERO INTERPRETACIÓN. No dice cuánto tardó, ni cuántas van, ni si se acabó:
  * nada de eso se sabe por compra.
+ *
+ * 🔴 EL HISTÓRICO NO SE PIERDE. Cuando el número grande es el de la ÚLTIMA
+ * LLEGADA, acá abajo va en chico el total de siempre — "72 u en total · 61
+ * vendidas" — al lado de las fechas que lo componen. Es el mismo dato de antes,
+ * en el lugar donde deja de competir con la decisión de hoy.
  */
-function PieCompras({ art, lista }: { art: ArticuloCompras; lista: ListaCompras }) {
+function PieCompras({
+  art,
+  lista,
+  historico,
+}: {
+  art: ArticuloCompras;
+  lista: ListaCompras;
+  historico: HistoricoTotal | null;
+}) {
   if (art.sinCompraRegistrada) {
     // El texto honesto de siempre: no se rellena con una adivinanza. Lo que
     // vendió ya lo dice el número grande de Vendí, al lado.
@@ -259,6 +279,7 @@ function PieCompras({ art, lista }: { art: ArticuloCompras; lista: ListaCompras 
     return <p className="text-xs text-gray-600">{fmtFechaCorta(lista.visibles[0].fecha)} · única compra</p>;
   }
   const restantes = textoRestantes(lista.restantes);
+  const total = textoHistoricoTotal(historico);
   return (
     <div>
       <ul className="text-sm leading-6 text-gray-900 tabular-nums">
@@ -267,17 +288,23 @@ function PieCompras({ art, lista }: { art: ArticuloCompras; lista: ListaCompras 
         ))}
       </ul>
       {restantes && <p className="text-xs text-gray-600">{restantes}</p>}
+      {total && <p className="text-xs text-gray-500">{total}</p>}
     </div>
   );
 }
 
-/** El subtítulo de Vendí: qué parte de lo comprado es. Cuando no hay porcentaje
- *  honesto que decir, se dice OTRA verdad — nunca un número inventado. */
-function pieDeVendido(art: ArticuloCompras, parte: number | null): string {
-  const texto = textoParteVendida(parte);
+/** El subtítulo de Vendí: qué parte de lo comprado (o de esa llegada) es.
+ *  Cuando no hay porcentaje honesto que decir, se dice OTRA verdad — nunca un
+ *  número inventado.
+ *
+ *  ⚠️ Mira el vendido de LOS GRANDES, no el del cuadre: con los grandes de la
+ *  última llegada, "sin ventas registradas" tiene que hablar de ESA llegada
+ *  (el artículo puede tener toda una historia de ventas detrás). */
+function pieDeVendido(g: FichaArticulo["grandes"]): string {
+  if (g.vendido < 0) return "más devoluciones que ventas";
+  if (g.vendido === 0) return g.deLlegada ? "todavía sin ventas de esa llegada" : "sin ventas registradas";
+  const texto = textoParteVendida(g.parteVendida, g.deLlegada);
   if (texto) return texto;
-  if (art.cuadre.vendido < 0) return "más devoluciones que ventas";
-  if (art.cuadre.vendido === 0) return "sin ventas registradas";
   // Vendió pero no hay compras contra las cuales comparar.
   return "neto, con devoluciones restadas";
 }
@@ -289,14 +316,19 @@ function pieDeVendido(art: ArticuloCompras, parte: number | null): string {
 // (`textoLineaVenta`) — acá no se arma ni media frase.
 //
 // 🔴 Cuando la bodega quedó en 0 y VOLVIÓ a llegar mercancía (2+ llegadas
-// sobre bodega en 0), la protagonista es la frase de la ÚLTIMA llegada —
+// sobre bodega en 0), la línea dice la FECHA de la última llegada y el ritmo —
 // redacción aprobada por Daniel, sin la palabra "tanda":
 //
-//   Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u
+//   Llegaron 36 u en mar 2026 · vendo 8.7 u por mes
 //
 // y debajo, en gris, la historia: "La anterior (oct 2025): 36 u — se vendió
 // toda en 2 meses" (+ "y N llegadas anteriores" si hubo más). Viva = gris (en
 // curso); agotada = negro (cerrada), como en la tabla del modo pedido.
+//
+// 🩸 DE ESTA LÍNEA SE FUE TODO LO QUE YA ESTABA ARRIBA: el "→ me quedan 11 u"
+// (decía 11 mientras el grande Stock decía 12, la existencia real) y el "→ va
+// el 69% en 5 meses" (el 69% es el pie de Vendí y los 5 meses son el KPI, desde
+// que los grandes son de la llegada). Una sola cifra por concepto.
 
 function LineaVenta({ ficha }: { ficha: FichaArticulo }) {
   const texto = textoLineaVenta(ficha.avance, ficha.ritmo, ficha.tandas);
@@ -595,7 +627,14 @@ function Avisos({ art }: { art: ArticuloCompras }) {
       );
     }
     if (art.stockSinRespaldo > 0) {
-      avisos.push(`Hay ${unidades(art.stockSinRespaldo)} en bodega que no salen de ninguna compra registrada.`);
+      // "1 unidad … que no salen" se lee como descuido, y este aviso es justo el
+      // que explica por qué Stock (12) no es Compré − Vendí (11) en la ficha que
+      // Daniel mira: tiene que estar bien escrito.
+      avisos.push(
+        `Hay ${unidades(art.stockSinRespaldo)} en bodega que ${
+          Math.abs(art.stockSinRespaldo) === 1 ? "no sale" : "no salen"
+        } de ninguna compra registrada.`,
+      );
     }
   }
   // 🔴 EL AJUSTE DE INVENTARIO SE QUEDA EN PANTALLA. Daniel: *"si hay menos es

@@ -12,10 +12,11 @@
 // importante… me queda 2 meses de venta / vendo 11u mes es lo que mas llama la
 // atencion y no es lo mas importante ya que un mes puedo vender mucho y otros
 // meses no, vendo b2b al por mayor no retail"*. De ahí:
-//   · Los tres GRANDES: **Compré · Vendí · Me quedan** (unidades, tipografía
-//     grande). Compré = TODAS las compras registradas; Vendí = ventas netas de
-//     toda la historia (NC restadas); Me quedan = `existencia` de Switch, NUNCA
-//     deducido.
+//   · Los tres GRANDES: **Compré · Vendí · Stock** (unidades, tipografía
+//     grande). Compré = lo que llegó y Vendí = lo vendido neto (NC restadas):
+//     el histórico completo, o —cuando la bodega quedó en 0 y volvió a llegar
+//     mercancía— los de la ÚLTIMA LLEGADA, que es lo que decide reponer hoy.
+//     Stock = `existencia` de Switch, NUNCA deducido y NUNCA recortado.
 //   · El RITMO ("vendo por mes", "me queda para") baja a UNA línea secundaria.
 //   · ⚠️ `Compré − Vendí` NO siempre da `Me quedan` (ajustes, ventas sin compra
 //     registrada, robos). NO se fuerza el cuadre: cada número dice su verdad y
@@ -226,54 +227,116 @@ export function mesesDeStock(existencia: number | null, porMes: number | null): 
   return existencia / porMes;
 }
 
-// ─── Los TRES GRANDES: Compré · Vendí · Me quedan ────────────────────────────
+// ─── Los TRES GRANDES: Compré · Vendí · Stock ────────────────────────────────
 //
 // 🔴 SON TRES FUENTES DISTINTAS Y NO SE FUERZA EL CUADRE ENTRE ELLAS:
-//   · Compré  = suma de TODAS las compras registradas (también las de más de 3
-//               años que la lista no muestra). Es `cuadre.comprado`.
-//   · Vendí   = ventas NETAS de toda la historia, con las NC ya restadas (la
-//               firma del error de signos es que la diferencia da EXACTO el
-//               doble). Es `cuadre.vendido`.
-//   · Me quedan = `switch_articulo_info.existencia`, la fuente de verdad.
-//               NUNCA se deduce de los otros dos.
+//   · Compré  = lo que llegó. Con UNA sola llegada en toda la historia son
+//               TODAS las compras registradas (`cuadre.comprado`, también las
+//               de más de 3 años que la lista no muestra); con VARIAS llegadas
+//               sobre bodega en 0, es lo que trajo la ÚLTIMA (ver abajo).
+//   · Vendí   = lo vendido, neto, con las NC ya restadas (la firma del error de
+//               signos es que la diferencia da EXACTO el doble): histórico o de
+//               la última llegada, SIEMPRE en el mismo par que Compré.
+//   · Stock   = `switch_articulo_info.existencia`, la fuente de verdad.
+//               🔴 NUNCA se deduce, y NUNCA se recorta a una llegada: es lo que
+//               hay en la bodega, contado por Switch. Decisión explícita de
+//               Daniel (12-ago-2026).
 // Cuando no cierran (ajuste de inventario, venta sin compra registrada, robo —
 // Daniel: *"si hay menos es porq robaron"*), los avisos de descuadre que ya
 // existen lo explican. Acá cada número dice su verdad.
+//
+// 🔴 CON 2+ LLEGADAS SOBRE BODEGA EN 0, LOS GRANDES SON DE LA ÚLTIMA. Daniel,
+// sobre la ficha de `4G5004G001` (12-ago-2026), textual: *"mira que sigue
+// diciendo compre 72 cuando enverdad son 36"*, y eligió la salida: *"(a) Los
+// grandes pasan a ser de la última llegada: Compré 36 · Vendí 25 · Stock 12 —
+// que sea coherente"*. Los grandes DECÍAN el histórico (72 · 61) mientras la
+// frase, el KPI "Meses" y las columnas VENDIDO·MESES ya hablaban de la última
+// llegada: la misma tarjeta contaba dos historias a la vez.
+//   ⚠️ NO ES UNA SEGUNDA CUENTA: sale de la MISMA `medirTandas()` que ya mide
+//   el reloj, la frase y el ritmo. Si acá se recalculara la llegada, dos
+//   definiciones del mismo episodio podrían separarse con el tiempo.
+//   ⚠️ EL HISTÓRICO NO SE PIERDE: viaja en `historico` y la ficha lo muestra en
+//   chico bajo la lista de compras ("72 u en total · 61 vendidas").
+
+/** El total de toda la historia, cuando los grandes son de la última llegada. */
+export interface HistoricoTotal {
+  /** Todas las compras registradas. `null` = sin compra registrada. */
+  comprado: number | null;
+  /** Neto histórico con las NC restadas. */
+  vendido: number;
+}
 
 export interface TresGrandes {
   /** `null` = sin compra registrada: no se inventa un 0 que parecería dato. */
   comprado: number | null;
-  /** Neto histórico. Puede ser NEGATIVO (más devoluciones que ventas). */
+  /** Puede ser NEGATIVO (más devoluciones que ventas). */
   vendido: number;
-  /** `null` = Switch no tiene este código en el catálogo. */
+  /** `null` = Switch no tiene este código en el catálogo. SIEMPRE es la
+   *  existencia REAL de bodega, también cuando los otros dos son de la última
+   *  llegada. */
   quedan: number | null;
   /** vendido ÷ comprado. `null` cuando no se puede decir (sin compras, o
    *  vendido negativo — "el −5% de lo comprado" no es castellano). */
   parteVendida: number | null;
+  /** `true` = Compré y Vendí son de la ÚLTIMA LLEGADA, no del histórico. */
+  deLlegada: boolean;
+  /** El histórico total. `null` = los grandes YA son el histórico y repetirlo
+   *  sería el mismo número dos veces. */
+  historico: HistoricoTotal | null;
 }
 
 export function tresGrandes(
   art: Pick<ArticuloCompras, "cuadre" | "existencia" | "sinCompraRegistrada">,
+  // Con 2+ llegadas manda la ACTUAL. `null` (una sola, o timeline no
+  // afirmable) = los grandes son los históricos de siempre.
+  tandas: MedidaTandas | null = null,
 ): TresGrandes {
   // `cuadre` puede faltar en una respuesta vieja cacheada tras un deploy —
   // misma degradación honesta que `serie ?? []`.
   const comprado = art.sinCompraRegistrada || art.cuadre == null ? null : art.cuadre.comprado;
   const vendido = art.cuadre?.vendido ?? 0;
+  // ⚠️ SIN TOPE en el histórico: vendido > comprado es un descuadre REAL (el
+  // caso TERMO) y "el 120% de lo comprado" es la verdad que hay que ver.
+  const parteDe = (c: number | null, v: number) => (c != null && c > 0 && v > 0 ? v / c : null);
+  const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
+  if (actual) {
+    return {
+      comprado: actual.llegaron,
+      vendido: actual.vendidas,
+      // 🔴 La existencia REAL, sin recortar. La diferencia contra
+      // (llegaron − vendidas) la explican los avisos de descuadre de siempre.
+      quedan: art.existencia,
+      parteVendida: parteDeTanda(actual),
+      deLlegada: true,
+      historico: { comprado, vendido },
+    };
+  }
   return {
     comprado,
     vendido,
     quedan: art.existencia,
-    parteVendida: comprado != null && comprado > 0 && vendido > 0 ? vendido / comprado : null,
+    parteVendida: parteDe(comprado, vendido),
+    deLlegada: false,
+    historico: null,
   };
 }
 
-/** "el 80% de lo comprado" — el subtítulo de Vendí. `null` = no hay porcentaje
- *  honesto que decir y el que llama pone su propio texto. */
-export function textoParteVendida(parte: number | null): string | null {
+/** "el 80% de lo comprado" / "el 69% de esa llegada" — el subtítulo de Vendí.
+ *  `null` = no hay porcentaje honesto que decir y el que llama pone su propio
+ *  texto. */
+export function textoParteVendida(parte: number | null, deLlegada = false): string | null {
   if (parte == null || !Number.isFinite(parte)) return null;
+  const de = deLlegada ? "de esa llegada" : "de lo comprado";
   const pct = Math.round(parte * 100);
-  if (pct < 1) return "menos del 1% de lo comprado";
-  return `el ${pct}% de lo comprado`;
+  if (pct < 1) return `menos del 1% ${de}`;
+  return `el ${pct}% ${de}`;
+}
+
+/** "72 u en total · 61 vendidas" — el histórico completo, en chico, cuando los
+ *  grandes son de la última llegada. `null` = no hay nada distinto que contar. */
+export function textoHistoricoTotal(h: HistoricoTotal | null): string | null {
+  if (!h || h.comprado == null) return null;
+  return `${fmtNum(h.comprado)} u en total · ${fmtNum(h.vendido)} vendidas`;
 }
 
 // ─── TANDAS: episodios entre CEROS de bodega ─────────────────────────────────
@@ -454,34 +517,38 @@ export function parteDeTanda(t: Pick<Tanda, "llegaron" | "vendidas">): number | 
 }
 
 // 🔴 EN PANTALLA LA PALABRA "TANDA" NO EXISTE (redacción aprobada por Daniel,
-// 12-ago-2026): se habla de la LLEGADA y del movimiento real. La frase
-// protagonista de la ficha es sobre la ÚLTIMA llegada, con los tres números en
-// este orden:
+// 12-ago-2026): se habla de la LLEGADA y del movimiento real. La frase de la
+// ficha dice lo ÚNICO que los números grandes no pueden decir — CUÁNDO llegó la
+// mercancía que están midiendo — y el ritmo:
 //
-//   Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u
+//   Llegaron 36 u en mar 2026 · vendo 8.7 u por mes
 //
-// Viva: "va el X% en Y meses" (en curso, gris). Agotada: "se vendió toda en Y
-// meses" (cerrada, negro) — sin el "me quedan": la bodega quedó en 0.
-// ⚠️ "me quedan" es lo que queda DE ESA llegada (llegaron − vendidas); si
-// difiere del stock total por ajustes, los avisos de descuadre explican — el
-// cuadre NO se fuerza, como siempre.
+// 🩸 LA FRASE SE PODÓ DOS VECES EL MISMO DÍA, Y LAS DOS POR LO MISMO: DECÍA
+// NÚMEROS QUE YA ESTABAN ARRIBA.
+//   · El "→ me quedan 11 u" era lo que quedaba DE ESA llegada (llegaron −
+//     vendidas) mientras el grande "Stock" decía 12 (la existencia REAL). Dos
+//     cifras para la misma pregunta —*"¿cuántas me quedan?"*— hacen desconfiar
+//     de las dos; la que hay que creer es la de bodega. La unidad de diferencia
+//     la explica el aviso de siempre (*"Hay 1 unidad en bodega que no sale de
+//     ninguna compra registrada"*): el cuadre NO se fuerza.
+//   · El "→ va el 69% en 5 meses" (y su gemelo cerrado "→ se vendió toda en 2
+//     meses") quedó repetido palabra por palabra cuando los GRANDES pasaron a
+//     ser de la llegada: el 69% ya está bajo Vendí y los 5 meses son el KPI
+//     "Meses". Es la misma poda del "$16.56 tres veces" de la fila de plata.
+// Lo que la frase SÍ aporta es la FECHA de la llegada y el "vendo N u por mes"
+// (que lo agrega `textoLineaVenta`). La historia gris de abajo
+// (`textoLlegadaAnterior`) se queda entera: ésa habla de OTRA llegada, no
+// repite nada.
+//
+// Viva = gris (en curso); agotada = negro (cerrada), como en la tabla del modo
+// pedido: el estado se dice con el peso de la letra y con el Stock, no con una
+// frase que repita el KPI.
 
-/** "Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u" —
- *  la frase de la ÚLTIMA llegada, tal como se lee en la ficha. */
+/** "Llegaron 36 u en mar 2026" — la cabeza de la línea de venta cuando la
+ *  bodega quedó en 0 y volvió a llegar mercancía. Los CUÁNTO/CUÁNTO VA/CUÁNTO
+ *  TIEMPO son los números grandes de arriba: acá no se repiten. */
 export function fraseLlegadaActual(t: Tanda): string {
-  const cabeza = `Llegaron ${fmtNum(t.llegaron)} u en ${fmtMesAnio(t.desdeMes)}`;
-  const cuando = textoMeses(t.meses);
-  if (t.cerrada) {
-    const parte = parteDeTanda(t);
-    const pct = parte == null ? null : Math.round(parte * 100);
-    return pct != null && pct < 100
-      ? `${cabeza} → se vendió el ${pct}% en ${cuando}`
-      : `${cabeza} → se vendió toda en ${cuando}`;
-  }
-  if (t.vendidas < 0) return `${cabeza} → van devueltas ${fmtNum(-t.vendidas)}`;
-  const parte = parteDeTanda(t) ?? 0;
-  const quedan = Math.max(0, t.llegaron - t.vendidas);
-  return `${cabeza} → va el ${Math.round(parte * 100)}% en ${cuando} → me quedan ${fmtNum(quedan)} u`;
+  return `Llegaron ${fmtNum(t.llegaron)} u en ${fmtMesAnio(t.desdeMes)}`;
 }
 
 /** "La anterior (oct 2025): 36 u — se vendió toda en 2 meses" — la historia,
@@ -775,6 +842,9 @@ export function medirVendidoMeses(
   // para ficha, tabla del modo pedido y Excel, como siempre.
   const actual = f.tandas && f.tandas.length >= 2 ? f.tandas[f.tandas.length - 1] : null;
   if (actual) {
+    // Los mismos números que los grandes de la ficha (que desde el 12-ago-2026
+    // también son de la llegada): Compré/Vendí de arriba y este % dicen lo
+    // mismo, por construcción.
     return { parte: parteDeTanda(actual), meses: actual.meses, terminado: actual.cerrada };
   }
   const { comprado, vendido } = f.grandes;
@@ -935,10 +1005,10 @@ export function textoLineaVenta(
   // dónde sale — un número con otra base sin rotular sería una mentirita.
   const vendoRotulado =
     vendo && ritmo.base === "ventana-12" ? `${vendo} (promedio de los últimos 12 meses)` : vendo;
-  // 🔴 Con 2+ llegadas sobre bodega en 0, la protagonista es la FRASE de la
-  // ÚLTIMA llegada ("Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me
-  // quedan 11 u") y el "vendo N u por mes" queda de dato chiquito al final.
-  // La historia (la anterior + cuántas más) va en OTRA línea, gris
+  // 🔴 Con 2+ llegadas sobre bodega en 0, la línea es la FECHA de la última
+  // llegada + el ritmo: "Llegaron 36 u en mar 2026 · vendo 8.7 u por mes". El
+  // % y los meses NO se repiten acá — son los números grandes de arriba. La
+  // historia (la anterior + cuántas más) va en OTRA línea, gris
   // (`textoLlegadaAnterior`) — acá no entra.
   if (tandas && tandas.length >= 2) {
     const frase = fraseLlegadaActual(tandas[tandas.length - 1]);
@@ -1331,7 +1401,9 @@ export function cambioDeCosto(cif: number | null, cifAnterior: number | null): C
 // ─── La ficha completa ───────────────────────────────────────────────────────
 
 export interface FichaArticulo {
-  /** Compré · Vendí · Stock — los primeros tres grandes. */
+  /** Compré · Vendí · Stock — los primeros tres grandes. Con 2+ llegadas sobre
+   *  bodega en 0, Compré y Vendí son de la ÚLTIMA (y el histórico viaja en
+   *  `grandes.historico`); Stock es SIEMPRE la existencia real. */
   grandes: TresGrandes;
   /** La línea de venta: cuánto tiempo de venta tiene y qué % va. */
   avance: LineaAvance;
@@ -1391,7 +1463,10 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   const ritmo = medirRitmo(art, hoyMes, avance, promedio, tandasActivas);
 
   return {
-    grandes: tresGrandes(art),
+    // 🔴 Con 2+ llegadas, Compré y Vendí son de la ACTUAL (Stock NO: es la
+    // existencia real de bodega). Se le pasa la MISMA medida que ya usan el
+    // avance y el ritmo — una sola cuenta de llegadas para toda la ficha.
+    grandes: tresGrandes(art, tandasActivas),
     avance,
     ritmo,
     tandas: tandasActivas ? tandasActivas.tandas : null,

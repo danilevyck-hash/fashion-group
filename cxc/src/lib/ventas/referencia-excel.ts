@@ -35,10 +35,13 @@
 // anterior, Costo FOB, "Si no hay margen, por qué" (su contenido se FUSIONÓ en
 // la Nota), Oct-nov-dic (las dos) y los 12 meses en columnas. Hay un candado
 // que fija el encabezado EXACTO.
-//   · **Compré** es la suma de TODAS las compras registradas (también las de
-//     más de 3 años) y **Vendí** el neto histórico con las NC restadas — los
-//     mismos números grandes de la pantalla. NO se fuerza el cuadre entre
-//     ellos y "Stock": la columna "Nota" explica los huecos.
+//   · **Compré** y **Vendí** son los MISMOS números grandes de la pantalla: la
+//     suma de TODAS las compras registradas (también las de más de 3 años) y el
+//     neto histórico con las NC restadas… salvo cuando la bodega quedó en 0 y
+//     volvió a llegar mercancía, y entonces los dos son de la ÚLTIMA LLEGADA
+//     (12-ago-2026, Daniel: *"que sea coherente"*). **Stock es SIEMPRE la
+//     existencia total de bodega.** NO se fuerza el cuadre entre los tres: la
+//     columna "Nota" explica los huecos.
 //   · **Vendido · Meses** son las celdas de `medirVendidoMeses` (las MISMAS del
 //     modo pedido): Vendido es SIEMPRE el % real (Vendí ÷ Compré — Daniel:
 //     *"como stock 0 y vendido 90%?"*); Meses es el TIEMPO DE VENTA — hasta la
@@ -127,11 +130,11 @@ export async function buildReferenciaSheet(
     // El subtítulo describe LO QUE HAY: las 13 columnas que quedaron.
     subtitle:
       `${articulos.length} referencias · corte ${hoyMes} · ` +
-      `"Compré" son TODAS las compras registradas y "Vendí" el neto histórico con las NC restadas · ` +
-      `"Stock" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
+      `"Compré" es lo que llegó y "Vendí" lo vendido neto con las NC restadas · ` +
+      `si la bodega quedó en 0 y volvió a llegar mercancía, "Compré", "Vendí", "Vendido" y "Meses" son de la ÚLTIMA LLEGADA (la que llegó sobre bodega en 0), igual que en pantalla; si no, son de toda la historia registrada · ` +
+      `"Stock" es SIEMPRE la existencia total de Switch, NUNCA deducida y nunca recortada a una llegada — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
       `"Vendido" es lo REAL: Vendí ÷ Compré · ` +
       `"Meses" es el tiempo de venta, en meses calendario desde la llegada: hasta la última venta si está agotado (la cola en bodega no cuenta), o hasta hoy si sigue vivo · ` +
-      `si la bodega quedó en 0 y volvió a llegar mercancía, "Vendido" y "Meses" son de la ÚLTIMA LLEGADA (la que llegó sobre bodega en 0), igual que en pantalla · ` +
       `vacío en Vendido/Meses = no se puede afirmar · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
       (conMargen ? `el margen se calcula contra el Costo CIF de la última compra · ` : ``) +

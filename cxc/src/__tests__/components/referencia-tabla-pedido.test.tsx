@@ -235,6 +235,62 @@ describe("modo pedido — la tabla", () => {
     expect(document.querySelector("thead")).toBeNull();
   });
 
+  it("🔴 COMPRÉ · VENDÍ de la fila son de la ÚLTIMA LLEGADA, y dicen lo MISMO que la ficha que se abre debajo", async () => {
+    // El caso de la captura (4G5004G001): 36 u en oct-2025 vendidas TODAS,
+    // bodega en 0 dic-feb, 36 más en mar-2026 y 25 vendidas. La tabla decía
+    // 72 · 61 (el histórico) mientras la misma fila decía "69% · 5" de la
+    // última llegada — Daniel: *"que sea coherente"*.
+    const conDosLlegadas = articulo("4G5004G001", {
+      compras: [
+        ["2026-03-29", "C", 36],
+        ["2025-10-05", "A", 30],
+        ["2025-10-05", "B", 6],
+      ].map(([fecha, doc, unidades]) => ({
+        empresa: "vistana",
+        codigo: "4G5004G001",
+        fecha: fecha as string,
+        documento: doc as string,
+        proveedor: "PROV",
+        articulo: "4G5004G001",
+        unidades: unidades as number,
+        costos: { cif: 4, fob: 4, fobOrigen: "igual-al-cif" as const, lista: 10 },
+      })),
+      serie: [
+        { mes: "2025-10", unidades: 12, venta: 120 },
+        { mes: "2025-11", unidades: 24, venta: 240 },
+        { mes: "2026-04", unidades: 6, venta: 60 },
+        { mes: "2026-05", unidades: 18, venta: 180 },
+        { mes: "2026-06", unidades: 1, venta: 10 },
+      ],
+      cuadre: { comprado: 72, vendido: 61, existencia: 12, residuo: -1, ajusteConfiable: false },
+      stockSinRespaldo: 1,
+      existencia: 12,
+      precioEtiqueta: 10,
+    });
+    const resp: ComprasApiResp = { ...RESP, articulos: [articulo("AAA111001"), conDosLlegadas] };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "4G5004G001 AAA111001" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("4G5004G001");
+
+    const fila = () => screen.getAllByText("4G5004G001")[0].closest("tr")!;
+    const celdas = () => [...fila().querySelectorAll("td")].map((td) => td.textContent);
+    // Compré · Vendí · Stock · Vendido · Meses
+    expect(celdas()[1]).toBe("36"); // no 72
+    expect(celdas()[2]).toBe("25"); // no 61
+    expect(celdas()[3]).toBe("12"); // la existencia REAL, sin recortar
+    expect(celdas()[4]).toBe("69%");
+    expect(celdas()[5]).toBe("5");
+
+    // Y el detalle que se abre al tocar dice EXACTAMENTE lo mismo.
+    fireEvent.click(fila());
+    expect(screen.getAllByText("el 69% de esa llegada").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("72 u en total · 61 vendidas").length).toBeGreaterThan(0);
+    const dds = [...document.querySelectorAll("dd")].map((d) => (d.textContent ?? "").replace(/\s+/g, ""));
+    expect(dds.slice(0, 4)).toEqual(["36u", "25u", "12u", "5"]);
+  });
+
   it("la tabla scrollea ELLA SOLA: las filas viven dentro de un overflow-x-auto", async () => {
     await buscarPegado();
     const tabla = document.querySelector("tbody")!.closest("div");
