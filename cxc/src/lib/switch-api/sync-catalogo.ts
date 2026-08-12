@@ -54,7 +54,15 @@ import { enParalelo } from "./en-paralelo";
 import type { MarcaKey } from "@/lib/catalogo/marcas";
 
 const PER_PAGE = 50;
-const MAX_PAGES = 80;
+/**
+ * 🩸 Freno de emergencia, NO un límite de trabajo (12-ago-2026). Con 80 estaba
+ * DEBAJO del catálogo real de vistana (8.173 artículos = 164 páginas): el barrido
+ * de Calvin se cortaba en 4.000 EN SILENCIO y se anotaba success con 4 productos.
+ * El corte legítimo del barrido es la página corta (arr.length < PER_PAGE);
+ * llegar a MAX_PAGES sin verla ahora es un ERROR, nunca un éxito a medias.
+ * 250 páginas = 12.500 artículos: 1,5× la empresa más grande del grupo.
+ */
+const MAX_PAGES = 250;
 
 /**
  * Cuántas llamadas `/apiarticulos/stock` van a la vez.
@@ -196,11 +204,22 @@ function num(s: string | null | undefined): number {
 async function fetchAllArticulos(empresaKey: string): Promise<SwitchArticulo[]> {
   const client = createSwitchClient(empresaKey);
   const all: SwitchArticulo[] = [];
+  let vioElFinal = false;
   for (let pagina = 1; pagina <= MAX_PAGES; pagina++) {
     const data = await client.getArticulos({ porPagina: PER_PAGE, paginaActual: pagina });
     const arr = data?.articulos ?? [];
     all.push(...arr);
-    if (arr.length < PER_PAGE) break;
+    if (arr.length < PER_PAGE) {
+      vioElFinal = true;
+      break;
+    }
+  }
+  if (!vioElFinal) {
+    // Un catálogo a medias escribiría "agregados: pocos" con cara de success —
+    // el mismo silencio del db-max-rows. Mejor la corrida en error y el dato intacto.
+    throw new Error(
+      `El barrido de artículos de ${empresaKey} llegó al tope de ${MAX_PAGES} páginas sin ver la última — catálogo incompleto, no se escribe nada.`,
+    );
   }
   return all;
 }
