@@ -46,6 +46,7 @@ import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
+import { syncCatalogoCalvin } from "@/lib/switch-api/sync-catalogo-calvin";
 import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { clearStaleRunning, isRunningLockConflict } from "@/lib/switch-api/sync-log";
 import {
@@ -223,12 +224,15 @@ async function ejecutar(
     }
     case "catalogo-reebok":
     case "catalogo-joybees":
-    case "catalogo-tommy": {
+    case "catalogo-tommy":
+    case "catalogo-calvin": {
       const r = await (modulo === "catalogo-reebok"
         ? syncCatalogoReebok({ triggeredBy: "manual" })
         : modulo === "catalogo-joybees"
           ? syncCatalogoJoybees({ triggeredBy: "manual" })
-          : syncCatalogoTommy({ triggeredBy: "manual" }));
+          : modulo === "catalogo-tommy"
+            ? syncCatalogoTommy({ triggeredBy: "manual" })
+            : syncCatalogoCalvin({ triggeredBy: "manual" }));
       const emp = r.empresas[0];
       if (r.hadError || !emp || emp.error) {
         return { error: emp?.error ?? "sync de catálogo falló" };
@@ -240,7 +244,13 @@ async function ejecutar(
       // cron las filas ya existían y dejaban de ser "nuevas". Best-effort: si
       // el aviso falla, el sync ya terminó bien y se reporta bien.
       const aviso = await avisarNuevosSinFoto(
-        modulo === "catalogo-reebok" ? "reebok" : modulo === "catalogo-joybees" ? "joybees" : "tommy",
+        modulo === "catalogo-reebok"
+          ? "reebok"
+          : modulo === "catalogo-joybees"
+            ? "joybees"
+            : modulo === "catalogo-tommy"
+              ? "tommy"
+              : "calvin",
       );
       const sufijoAviso = aviso.codigos.length > 0
         ? ` · avisé de ${aviso.codigos.length} sin foto`

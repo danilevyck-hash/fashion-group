@@ -58,15 +58,17 @@ export function watermarkNuevosSinFoto(marca: MarcaKey): string {
   return `catalogos-fotos-nuevos:${marca}`;
 }
 
-/** Las 3 marcas, para que `HEARTBEATS_NO_CRON` no tenga que repetir strings. */
+/** Las 4 marcas, para que `HEARTBEATS_NO_CRON` no tenga que repetir strings. */
 export const WATERMARKS_NUEVOS_SIN_FOTO: readonly string[] = (
-  ["reebok", "joybees", "tommy"] as const
+  ["reebok", "joybees", "tommy", "calvin"] as const
 ).map(watermarkNuevosSinFoto);
 
 /** Etiqueta corta de la marca en el mensaje (igual que el resumen semanal). */
 function labelDe(marca: MarcaKey): string {
   const l = MARCAS_CONFIG[marca].label;
-  return l === "Tommy Hilfiger" ? "Tommy" : l;
+  if (l === "Tommy Hilfiger") return "Tommy";
+  if (l === "Calvin Klein") return "Calvin";
+  return l;
 }
 
 export interface AvisoNuevosResult {

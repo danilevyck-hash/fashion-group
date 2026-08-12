@@ -17,6 +17,7 @@ import { resolverLineas, resumirPedido } from "./lineas-pedido";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BLANCO_BASE64, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT } from "@/lib/tommy-logo";
+import { CALVIN_LOGO_BLANCO_BASE64, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT } from "@/lib/calvin-logo";
 import { JOYBEES_LOGO_BLANCO_BASE64, JOYBEES_LOGO_WIDTH, JOYBEES_LOGO_HEIGHT } from "@/lib/joybees-logo";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { precioTexto } from "@/lib/catalogo/precio";
@@ -34,7 +35,7 @@ export interface PdfOrderItem {
 }
 
 export interface OrderPdfOpts {
-  marca: "reebok" | "joybees" | "tommy";
+  marca: "reebok" | "joybees" | "tommy" | "calvin";
   orderNumber: string;
   clientName: string;
   createdAt: string;
@@ -93,6 +94,11 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
     doc.setFillColor(21, 35, 66);
     doc.rect(0, 0, 210, 18, "F");
     try { doc.addImage(TOMMY_LOGO_BLANCO_BASE64, "PNG", 14, 9 - TOMMY_LOGO_HEIGHT / 2, TOMMY_LOGO_WIDTH, TOMMY_LOGO_HEIGHT); } catch { /* */ }
+  } else if (marca === "calvin") {
+    // Banda negra Calvin + wordmark BLANCO (blanco/negro minimalista).
+    doc.setFillColor(10, 10, 10);
+    doc.rect(0, 0, 210, 18, "F");
+    try { doc.addImage(CALVIN_LOGO_BLANCO_BASE64, "PNG", 14, 9 - CALVIN_LOGO_HEIGHT / 2, CALVIN_LOGO_WIDTH, CALVIN_LOGO_HEIGHT); } catch { /* */ }
   } else {
     // Banda navy Joybees + logo BLANCO (el wordmark #404041 no se ve sobre navy).
     doc.setFillColor(26, 38, 86);
@@ -112,7 +118,13 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
   doc.text(`Fecha: ${fechaLabel}`, 150, 26);
 
   const headFill: [number, number, number] =
-    marca === "reebok" ? [26, 26, 26] : marca === "tommy" ? [21, 35, 66] : [26, 38, 86];
+    marca === "reebok"
+      ? [26, 26, 26]
+      : marca === "tommy"
+        ? [21, 35, 66]
+        : marca === "calvin"
+          ? [10, 10, 10]
+          : [26, 38, 86];
 
   function drawSectionTable(title: string, startY: number, sectionItems: PdfOrderItem[]) {
     doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
@@ -164,7 +176,9 @@ export function buildOrderPdfDoc(opts: OrderPdfOpts): jsPDF {
       ? "Fashion Group Panamá · Reebok Authorized Distributor"
       : marca === "tommy"
         ? "Fashion Group Panamá · Tommy Hilfiger"
-        : "Fashion Group Panamá · Joybees",
+        : marca === "calvin"
+          ? "Fashion Group Panamá · Calvin Klein"
+          : "Fashion Group Panamá · Joybees",
     14,
     fy + 10,
   );

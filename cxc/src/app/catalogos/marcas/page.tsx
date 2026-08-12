@@ -54,6 +54,13 @@ const BRANDS: Brand[] = [
     catalogoHref: "/catalogo/tommy",
     adminHref: "/catalogos/admin/tommy",
   },
+  {
+    key: "calvin",
+    name: "CALVIN KLEIN",
+    productsUrl: "/api/catalogo/calvin/products?active=true",
+    catalogoHref: "/catalogo/calvin",
+    adminHref: "/catalogos/admin/calvin",
+  },
 ];
 
 export default function CatalogosMarcasPage() {

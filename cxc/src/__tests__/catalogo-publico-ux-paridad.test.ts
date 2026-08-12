@@ -31,7 +31,7 @@ import {
   DOMINIO_PUBLICO,
 } from "@/lib/catalogo/metadata-publica";
 
-const MARCAS = ["reebok", "joybees", "tommy"] as const;
+const MARCAS = ["reebok", "joybees", "tommy", "calvin"] as const;
 
 function src(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");

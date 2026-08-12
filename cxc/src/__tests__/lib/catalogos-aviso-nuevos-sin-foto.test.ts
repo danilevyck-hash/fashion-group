@@ -141,8 +141,8 @@ describe("ordenarCodigosAZ", () => {
 });
 
 describe("marcas de agua: no se vigilan como crons", () => {
-  it("los 3 nombres están en HEARTBEATS_NO_CRON y coinciden con watermarkNuevosSinFoto()", () => {
-    for (const marca of ["reebok", "joybees", "tommy"] as const) {
+  it("los 4 nombres están en HEARTBEATS_NO_CRON y coinciden con watermarkNuevosSinFoto()", () => {
+    for (const marca of ["reebok", "joybees", "tommy", "calvin"] as const) {
       const nombre = watermarkNuevosSinFoto(marca);
       expect(nombre).toBe(`catalogos-fotos-nuevos:${marca}`);
       expect(HEARTBEATS_NO_CRON as readonly string[]).toContain(nombre);
@@ -150,7 +150,7 @@ describe("marcas de agua: no se vigilan como crons", () => {
       expect(esHeartbeatNoVigilable(nombre)).toBe(true);
     }
     expect([...WATERMARKS_NUEVOS_SIN_FOTO].sort()).toEqual(
-      ["reebok", "joybees", "tommy"].map((m) => `catalogos-fotos-nuevos:${m}`).sort(),
+      ["calvin", "reebok", "joybees", "tommy"].map((m) => `catalogos-fotos-nuevos:${m}`).sort(),
     );
   });
 });
@@ -172,22 +172,28 @@ describe("barrido estático: ningún camino de sync de catálogo se queda mudo",
   it("todo archivo que dispara un sync de catálogo también llama a avisarNuevosSinFoto", () => {
     // Se excluyen los wrappers que DEFINEN los syncs (ahí vive la función, no
     // el disparo) y el motor compartido.
-    const definiciones = ["sync-catalogo-reebok.ts", "sync-catalogo-joybees.ts", "sync-catalogo-tommy.ts"];
+    const definiciones = [
+      "sync-catalogo-reebok.ts",
+      "sync-catalogo-joybees.ts",
+      "sync-catalogo-tommy.ts",
+      "sync-catalogo-calvin.ts",
+    ];
     const culpables: string[] = [];
     for (const f of archivosTs(SRC)) {
       if (definiciones.some((d) => f.endsWith(d))) continue;
       const s = fs.readFileSync(f, "utf8");
-      const dispara = /syncCatalogo(Reebok|Joybees|Tommy)\s*\(/.test(s);
+      const dispara = /syncCatalogo(Reebok|Joybees|Tommy|Calvin)\s*\(/.test(s);
       if (dispara && !s.includes("avisarNuevosSinFoto")) culpables.push(path.relative(SRC, f));
     }
     expect(culpables).toEqual([]);
   });
 
-  it("los 3 crons de catálogo + sync-now + la reconciliación lo llaman", () => {
+  it("los 4 crons de catálogo + sync-now + la reconciliación lo llaman", () => {
     const esperados = [
       "app/api/cron/reebok-catalogo/route.ts",
       "app/api/cron/joybees-catalogo/route.ts",
       "app/api/cron/tommy-catalogo/route.ts",
+      "app/api/cron/calvin-catalogo/route.ts",
       "app/api/admin/sync-now/route.ts",
       "app/api/cron/switch-reconciliacion/route.ts",
     ];
@@ -202,6 +208,7 @@ describe("barrido estático: ningún camino de sync de catálogo se queda mudo",
       "app/api/cron/reebok-catalogo/route.ts",
       "app/api/cron/joybees-catalogo/route.ts",
       "app/api/cron/tommy-catalogo/route.ts",
+      "app/api/cron/calvin-catalogo/route.ts",
     ]) {
       const s = fs.readFileSync(path.join(SRC, rel), "utf8");
       expect(s, `${rel} no puede volver al aviso por evento`).not.toContain("nuevosSinFotoTotal");

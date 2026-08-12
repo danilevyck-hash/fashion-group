@@ -21,6 +21,7 @@ export const STORAGE_PREFIX = {
   reebok: "products",
   joybees: "joybees",
   tommy: "tommy",
+  calvin: "calvin",
 } as const;
 
 export type StorageMarcaKey = keyof typeof STORAGE_PREFIX;

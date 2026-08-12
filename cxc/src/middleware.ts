@@ -46,6 +46,9 @@ const PUBLIC_PREFIXES = [
   "/pedido-tommy/",                 // Tommy public order view page (no auth)
   "/api/catalogo/tommy/pedido-publico", // Tommy public order API (no auth)
   "/api/catalogo/tommy/public",         // Tommy public catalog (no auth)
+  "/pedido-calvin/",                // Calvin public order view page (no auth)
+  "/api/catalogo/calvin/pedido-publico", // Calvin public order API (no auth)
+  "/api/catalogo/calvin/public",         // Calvin public catalog (no auth)
   "/_next/",
   "/icon-",
   "/manifest",

@@ -100,7 +100,7 @@ describe("Catálogos · los controles de cantidad y el mini-carrito", () => {
 
   it('"Vaciar" es táctil en las TRES marcas (medía 38×18)', () => {
     const vaciar = marcasUi.match(/vaciarBtn: "[^"]*"/g) ?? [];
-    expect(vaciar).toHaveLength(3);
+    expect(vaciar).toHaveLength(4);
     for (const v of vaciar) {
       expect(v).toContain("min-h-[44px]");
       expect(v).toContain("min-w-[44px]");
@@ -109,9 +109,9 @@ describe("Catálogos · los controles de cantidad y el mini-carrito", () => {
 });
 
 describe("Catálogos · el campo del nombre, lo último antes de confirmar", () => {
-  it("mide 44 de alto en las tres marcas (medía 41)", () => {
+  it("mide 44 de alto en las cuatro marcas (medía 41)", () => {
     const campos = marcasUi.match(/nameInput:\s*\n\s*"[^"]*"/g) ?? [];
-    expect(campos).toHaveLength(3);
+    expect(campos).toHaveLength(4);
     for (const c of campos) expect(c).toContain("min-h-[44px]");
   });
 

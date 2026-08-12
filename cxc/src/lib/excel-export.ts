@@ -77,6 +77,17 @@ export const TOMMY_PALETTE: ExcelPalette = {
   altBg: "FFFFFF",
 };
 
+/** Negro de marca Calvin Klein (#1A1A1A) — blanco/negro minimalista: el
+ *  separador también va en negro, la marca no tiene color de acento. */
+export const CALVIN_PALETTE: ExcelPalette = {
+  pri: "1A1A1A",
+  mid: "3D3D3D",
+  sep: "1A1A1A",
+  brd: "D5DBDB",
+  dataBg: "F8F9F9",
+  altBg: "FFFFFF",
+};
+
 /** Paleta de Excel por marca de catálogo — fuente única. Antes las 3 marcas
  *  usaban REEBOK_PALETTE, así que el Excel de Joybees y el de Tommy salían con
  *  el navy de Reebok. */
@@ -84,6 +95,7 @@ export const CATALOGO_PALETTES: Record<string, ExcelPalette> = {
   reebok: REEBOK_PALETTE,
   joybees: JOYBEES_PALETTE,
   tommy: TOMMY_PALETTE,
+  calvin: CALVIN_PALETTE,
 };
 
 /** Paleta de la marca; Reebok como red de seguridad si llega una marca nueva

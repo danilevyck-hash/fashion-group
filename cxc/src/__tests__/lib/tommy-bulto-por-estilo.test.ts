@@ -129,12 +129,21 @@ describe("🔴 solo Tommy lo marca a mano", () => {
   const marcas = leer("src/lib/catalogo/marcas.ts");
   const route = leer("src/app/api/catalogo/[marca]/products/route.ts");
 
-  it("la bandera está SOLO en Tommy", () => {
+  it("la bandera está SOLO en Tommy y Calvin (las dos PVH, bulto 8/12 a mano)", () => {
     // Reebok ramifica por categoría y Joybees es fijo: dejarlo editable ahí
     // abriría una forma de contradecir una regla que no tiene excepciones.
-    expect((marcas.match(/bultoEditable: true/g) ?? []).length).toBe(1);
-    const tommy = marcas.slice(marcas.indexOf('productsTable: "tommy_products"'));
+    // Calvin la ganó el 12-ago-2026 con la MISMA justificación que Tommy
+    // (cantidadPorCaja en 0.0000 en todo el catálogo, estilos de 8 o de 12).
+    expect((marcas.match(/bultoEditable: true/g) ?? []).length).toBe(2);
+    const antesDeTommy = marcas.slice(0, marcas.indexOf('productsTable: "tommy_products"'));
+    expect(antesDeTommy).not.toContain("bultoEditable: true"); // ni Reebok ni Joybees
+    const tommy = marcas.slice(
+      marcas.indexOf('productsTable: "tommy_products"'),
+      marcas.indexOf('productsTable: "calvin_products"'),
+    );
     expect(tommy).toContain("bultoEditable: true");
+    const calvin = marcas.slice(marcas.indexOf('productsTable: "calvin_products"'));
+    expect(calvin).toContain("bultoEditable: true");
   });
 
   it("el servidor lo hace cumplir, no la pantalla", () => {

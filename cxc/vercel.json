@@ -129,6 +129,10 @@
       "schedule": "40 12 * * *"
     },
     {
+      "path": "/api/cron/calvin-catalogo",
+      "schedule": "50 12 * * *"
+    },
+    {
       "path": "/api/cron/sync-clientes-master",
       "schedule": "0 7 * * *"
     },
@@ -183,6 +187,10 @@
     {
       "path": "/api/cron/tommy-catalogo",
       "schedule": "40 17 * * *"
+    },
+    {
+      "path": "/api/cron/calvin-catalogo",
+      "schedule": "40 16 * * *"
     },
     {
       "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-1900",

@@ -54,6 +54,16 @@ const MARCAS = [
     logo: `<img src="${dataUri("tommy/tommy-flag.png")}" style="height:110px" />
            <img src="${dataUri("tommy/tommy-horizontal-blanco.png")}" style="height:46px" />`,
   },
+  {
+    marca: "calvin",
+    // Blanco/negro minimalista: fondo negro, sin color de acento (el blob va
+    // en blanco tenue). Wordmark tipográfico placeholder (ver calvin-logo.ts).
+    fondo: "#0A0A0A",
+    acento: "#FFFFFF",
+    texto: "#FFFFFF",
+    tenue: "rgba(255,255,255,0.55)",
+    logo: `<img src="${dataUri("calvin/calvin-wordmark-blanco.png")}" style="height:64px" />`,
+  },
 ];
 
 const html = (m) => `<!doctype html><html><head><meta charset="utf-8"><style>

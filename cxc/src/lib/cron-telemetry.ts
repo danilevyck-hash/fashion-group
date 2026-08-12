@@ -218,6 +218,7 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   "joybees-catalogo": 12, // su cron corre 11:00 UTC
   "reebok-catalogo": 13, // slot temprano 12:10 + ~1h (no adelantarse a su run normal)
   "tommy-catalogo": 13, // slot temprano 12:40 (no adelantarse a su run normal)
+  "calvin-catalogo": 13, // slot temprano 12:50 (no adelantarse a su run normal)
   // catalogos-fotos-resumen: run normal lunes 13:30 UTC → hora mínima 14
   // (patrón cheques-alert, no adelantarse) y su recuperación solo aplica los
   // lunes (recoverOnlyIf en la reconciliación). Sigue en NUNCA_SILENCIAR:
@@ -253,6 +254,7 @@ export const CATALOGO_CRON_SLOTS_UTC: Record<string, readonly string[]> = {
   "joybees-catalogo": ["11:00", "17:05"],
   "reebok-catalogo": ["12:10", "17:00"],
   "tommy-catalogo": ["12:40", "17:40"],
+  "calvin-catalogo": ["12:50", "16:40"],
 };
 
 /** Ciclo del catálogo en horas: el hueco MÁS LARGO entre dos corridas
@@ -403,6 +405,12 @@ export const SEED_TOLERANT_CRONS = [
   // NOTA: tommy-catalogo se PROMOVIÓ a EXPECTED_CRONS (health-crons, vigilancia
   // fail-closed 26h como reebok/joybees-catalogo) en el PR "encender Tommy":
   // la DDL 20260724150000 ya corrió y el heartbeat lleva días sembrado.
+  // Catálogo Calvin Klein (vistana, 12:50/16:40 UTC). Seed-tolerante DOBLE:
+  // además de la siembra normal, mientras la DDL 20260812150000 no corra el
+  // cron se omite limpio (503, sin heartbeat) — fila ausente = pendiente, no
+  // caído. Promover a CRONS_FAIL_CLOSED cuando la DDL esté corrida y el
+  // heartbeat lleve días sembrado (mismo camino que recorrió Tommy).
+  "calvin-catalogo",
   // Resumen semanal de fotos faltantes (lunes 13:30 UTC). Seed-tolerante para
   // NO disparar un 503 falso antes de su primera corrida (puede tardar hasta
   // una semana en sembrar la fila). Umbral propio semanal de 8 días en
@@ -548,6 +556,9 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync facturas", hhmmUtc: "1150", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
   { cron: "tommy-catalogo", hhmmUtc: "1240", empresas: ["fashion_shoes"] },
+  // Catálogo Calvin (vistana): 60 min después de las ventas de 11:50 y 70 antes
+  // de la reconciliación de las 14:00. Barrido medido 103 s (12-ago-2026).
+  { cron: "calvin-catalogo", hhmmUtc: "1250", empresas: ["vistana"] },
   { cron: "switch-sync facturas", hhmmUtc: "1300", empresas: ["american_classic"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
   { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: CRON_EMPRESAS_VENTAS },
@@ -556,6 +567,10 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-sync estadocuenta", hhmmUtc: "1605", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1610", empresas: ["vistana", "active_wear"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
+  // Catálogo Calvin, refresh de la tarde: 30 min después del estadocuenta de
+  // vistana (16:10) y 80 antes de la reconciliación de las 18:00 — sin heredar
+  // el par ajustado de 20 min que Tommy aceptó (17:40 → 18:00).
+  { cron: "calvin-catalogo", hhmmUtc: "1640", empresas: ["vistana"] },
   { cron: "reebok-catalogo", hhmmUtc: "1700", empresas: ["active_shoes"] },
   { cron: "switch-sync facturas", hhmmUtc: "1700", empresas: ["american_classic"] },
   { cron: "joybees-catalogo", hhmmUtc: "1705", empresas: ["joystep"] },
@@ -801,6 +816,7 @@ export const HEARTBEATS_NO_CRON = [
   "catalogos-fotos-nuevos:reebok",
   "catalogos-fotos-nuevos:joybees",
   "catalogos-fotos-nuevos:tommy",
+  "catalogos-fotos-nuevos:calvin",
 ] as const;
 
 /** Heartbeat que escribe el VIGÍA EXTERNO cada vez que llama a
