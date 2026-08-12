@@ -14,10 +14,30 @@
 // La única acción destructiva de la fila es "Registrado por error — eliminar"
 // (la mecánica de anular de siempre: esconde el proyecto, sus gastos dejan de
 // contar, y el aviso con "Deshacer" queda hasta que la persona lo cierre).
+//
+// 🔴 PODA del 11-ago-2026 (los 7 sobrantes del PR #480, aprobados por Daniel).
+// NO vuelven a esta lista:
+//   - la columna MARCAS (chips C/T): las marcas del proyecto se ven en su ficha,
+//     y acá la lista YA está acotada a una marca — la columna repetía el título.
+//   - el subtítulo "Proyectos con gasto de esta marca" (decía lo que el título
+//     y el breadcrumb ya dicen).
+//   - la etiqueta Apertura/Remodelacion en la fila (p.nombre): queda en
+//     Editar/ficha como etiqueta opcional, no como ruido de la lista.
+//   - el chip "Muebles": redundante con el contador "N entregas".
+//   - los enlaces Mobiliario · Reportes · Impulsadoras de la cabecera: viven en
+//     el inicio de Marketing (Reportes ganó su tarjeta ahí en este mismo
+//     cambio). La línea de cuadre de Impulsadoras al pie SÍ se queda: es un
+//     dato de esta marca, no un enlace de navegación.
+// Los contadores del subtítulo solo dicen los que NO son cero
+// (contadoresDeProyecto en lib/marketing/normalizar.ts).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
-import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  contadoresDeProyecto,
+  formatearFecha,
+  formatearMonto,
+} from "@/lib/marketing/normalizar";
 import { indiceBloquePorMarcaId } from "@/lib/marketing/bloques";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
@@ -55,9 +75,8 @@ interface Props {
   marcas: MkMarca[];
   onOpenProyecto: (id: string) => void;
   onRegistrarGasto: () => void;
-  onOpenReportes: () => void;
+  /** Solo para la línea de cuadre de Impulsadoras al pie — no hay más enlaces. */
   onOpenImpulsadoras: () => void;
-  onOpenInventario: () => void;
   refreshKey: number;
   /**
    * Bloque del inicio del que se entró: el CÓDIGO de la marca (`TH` | `CK` |
@@ -70,26 +89,11 @@ interface Props {
   onBack: () => void;
 }
 
-
-function colorParaMarca(codigo: string): string {
-  if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
-  if (codigo === "CK") return "bg-gray-100 text-gray-800 border-gray-300";
-  if (codigo === "RBK") return "bg-blue-50 text-blue-700 border-blue-200";
-  if (codigo === "J") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
-}
-
-function inicial(s: string): string {
-  return (s || "?").charAt(0).toUpperCase();
-}
-
 export default function ProyectosHomeView({
   marcas,
   onOpenProyecto,
   onRegistrarGasto,
-  onOpenReportes,
   onOpenImpulsadoras,
-  onOpenInventario,
   refreshKey,
   bloque,
   bucketLabel,
@@ -259,50 +263,20 @@ export default function ProyectosHomeView({
       >
         ← Marketing
       </button>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">
-            {bucketLabel || "Marketing"}
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Proyectos con gasto de esta marca
-          </p>
-        </div>
-        {/* Eran textos sueltos de 18-21 px de alto. 44 px de área táctil en
-            cada uno; -my-1 evita que la fila empuje el título al crecer. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
-          <button
-            type="button"
-            onClick={onOpenInventario}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Mobiliario
-          </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={onOpenReportes}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Reportes
-          </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={onOpenImpulsadoras}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Impulsadoras
-          </button>
-          <button
-            type="button"
-            onClick={onRegistrarGasto}
-            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
-          >
-            + Registrar gasto
-          </button>
-        </div>
+      {/* Header — el título y la ÚNICA acción. Los enlaces Mobiliario ·
+          Reportes · Impulsadoras se retiraron: viven en el inicio (poda del
+          11-ago-2026, ver el encabezado del archivo). */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold text-gray-900">
+          {bucketLabel || "Marketing"}
+        </h1>
+        <button
+          type="button"
+          onClick={onRegistrarGasto}
+          className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
+        >
+          + Registrar gasto
+        </button>
       </div>
 
       {/* La vuelta atrás de anular. Ver el comentario del state. */}
@@ -379,9 +353,6 @@ export default function ProyectosHomeView({
             <thead className="bg-gray-50">
               <tr className="text-xs uppercase tracking-wide text-gray-500">
                 <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
-                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
-                  Marcas
-                </th>
                 <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
                   Gastado
                 </th>
@@ -395,13 +366,13 @@ export default function ProyectosHomeView({
             </thead>
             <tbody>
               {proyectos.map((p) => {
-                // Cliente (tienda) es el ancla visual principal; el tipo de
-                // gasto (nombre) cae al subtítulo junto con los contadores.
+                // Cliente (tienda) es el ancla visual principal. El tipo de
+                // gasto (nombre: "Apertura", "Remodelacion") ya NO se dibuja
+                // en la fila — queda en Editar/ficha como etiqueta opcional.
                 // nombreVis se sigue usando como etiqueta canónica en
                 // confirmaciones, ARIA y menús — refleja lo que el usuario
                 // está viendo en la fila.
                 const tituloVis = p.tienda || p.nombre || "";
-                const subtituloTipo = p.nombre && p.nombre !== p.tienda ? p.nombre : "";
                 const nombreVis = tituloVis;
                 // Archivo plano: solo fecha de creación, sin label de transición.
                 const fechaIso = p.created_at;
@@ -426,68 +397,16 @@ export default function ProyectosHomeView({
                   >
                     {/* Proyecto */}
                     <td className="px-[18px] py-3 align-middle">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-semibold text-gray-900 truncate">
-                          {tituloVis}
-                        </span>
-                        {(p.entregas_count ?? 0) > 0 && (
-                          <span
-                            title="Este proyecto tiene entregas de muebles"
-                            className="inline-flex items-center gap-1 shrink-0 bg-white border border-teal-300 text-teal-700 rounded-md px-2 py-0.5 text-xs"
-                          >
-                            <svg
-                              width="11"
-                              height="11"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M16.5 9.4l-9-5.19" />
-                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                              <path d="M3.27 6.96L12 12.01l8.73-5.05" />
-                              <path d="M12 22.08V12" />
-                            </svg>
-                            Muebles
-                          </span>
-                        )}
+                      <div className="font-semibold text-gray-900 truncate">
+                        {tituloVis}
                       </div>
                       <div className="text-[12px] text-gray-500 truncate">
-                        {subtituloTipo ? `${subtituloTipo} · ` : ""}
-                        {p.facturas_count}{" "}
-                        {p.facturas_count === 1 ? "factura" : "facturas"}
-                        {(p.entregas_count ?? 0) > 0 && (
-                          <>
-                            {" · "}
-                            {p.entregas_count}{" "}
-                            {p.entregas_count === 1 ? "entrega" : "entregas"}
-                          </>
-                        )}
-                        {" · "}
-                        {p.fotos_count}{" "}
-                        {p.fotos_count === 1 ? "foto" : "fotos"}
+                        {contadoresDeProyecto({
+                          facturas: p.facturas_count,
+                          entregas: p.entregas_count ?? 0,
+                          fotos: p.fotos_count,
+                        })}
                       </div>
-                    </td>
-                    {/* Marcas */}
-                    <td className="px-[18px] py-3 align-middle hidden md:table-cell">
-                      {p.marcas.length === 0 ? (
-                        <span className="text-gray-300 text-xs">—</span>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {p.marcas.map((m) => (
-                            <span
-                              key={m.id}
-                              title={m.nombre}
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-xs font-bold ${colorParaMarca(m.codigo)}`}
-                            >
-                              {inicial(m.nombre)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </td>
                     {/* Gastado */}
                     <td

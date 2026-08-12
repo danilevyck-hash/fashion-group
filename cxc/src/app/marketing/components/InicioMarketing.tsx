@@ -104,6 +104,12 @@ interface Props {
   onRegistrarGasto: () => void;
   onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
+  /**
+   * Reportes vive ACÁ desde la poda del 11-ago-2026: su enlace en la lista de
+   * marca se retiró y esta tarjeta es su única puerta. No quitarla sin darle
+   * otra.
+   */
+  onOpenReportes: () => void;
   refreshKey: number;
 }
 
@@ -189,6 +195,7 @@ export default function InicioMarketing({
   onRegistrarGasto,
   onOpenImpulsadoras,
   onOpenInventario,
+  onOpenReportes,
   refreshKey,
 }: Props) {
   const { toast } = useToast();
@@ -492,8 +499,10 @@ export default function InicioMarketing({
 
           {/* -------------------------------------------------------------- */}
           {/* Herramientas — se usan a diario y llevan su dato encima.        */}
+          {/* Reportes vive acá desde la poda del 11-ago-2026: es su ÚNICA    */}
+          {/* puerta (el enlace de la lista de marca se retiró).              */}
           {/* -------------------------------------------------------------- */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               type="button"
               onClick={onOpenInventario}
@@ -520,6 +529,16 @@ export default function InicioMarketing({
                         : ""
                     }`
                   : "Pagos mensuales de las impulsadoras"}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={onOpenReportes}
+              className="text-left rounded-lg border border-gray-200 bg-white p-4 min-h-[72px] hover:border-gray-400 active:scale-[0.99] transition"
+            >
+              <div className="font-semibold text-gray-900">Reportes</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Por marca, por tienda y por proyecto
               </div>
             </button>
           </section>
