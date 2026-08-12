@@ -11,11 +11,23 @@ import {
   normalizarBusqueda,
   esCodigo,
   escapeLike,
+  ordenarComoPegado,
   parsearListaCodigos,
+  pedidosNoEncontrados,
+  posicionEnPegado,
   MAX_CODIGOS_MULTI,
   type FilaDiario,
   type MesSerie,
 } from "@/lib/ventas/referencia";
+
+// La lista REAL que pegó Daniel (12-ago-2026), tal cual: 48 tokens, duplicados
+// y guiones finales incluidos. Es EL caso del bug — el modo pedido contestaba
+// "No encontré los códigos… ni en ventas ni en compras" para TODOS.
+const LISTA_REAL_DANIEL =
+  "4D5029G 4D5029G 4D5077G 4D5077G 4D5077G- 4D5173G 4D5173G 4D5175G 4D5175G 4D5175G 4D5179G 4D5179G 4D5179G " +
+  "4D5213G 4D5213G 4D5214G 4D5214G 4D5221G 4D5221G 4D5222G 4D5223G 4D5223G 4D5228G 4D5228G 4D5231G 4D5231G " +
+  "4D5231G 4D5233G 4D5234G 4D5235G 4G5004G 4G5004G 4G5004G 4G5020G 4G5032G 4G5032G 4G5032G 4G5032G 4G5002G- " +
+  "4G5002G- 4D4036G 4D1060G- 4D1138G- 4D1062G 4D1063G- 4D1454G 4D1455G 4D1440G";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Candados de las piezas COMPARTIDAS del tab "Referencia" de /ventas: el signo
@@ -137,6 +149,72 @@ describe("búsqueda", () => {
     const r = parsearListaCodigos(muchos);
     expect(r.codigos).toHaveLength(MAX_CODIGOS_MULTI);
     expect(r.descartados).toBe(10);
+  });
+
+  it("🔴 el GUIÓN FINAL se quita — medido: no existe NI UN código terminado en guión en las 3 fuentes", () => {
+    // `scripts/_diag-referencia-guiones.ts` (12-ago-2026): LIKE '%-' da 0 en
+    // switch_articulo_info, switch_articulo_diario y switch_ingresos_mercancia.
+    // Es un artefacto del Excel del que Daniel copia.
+    expect(parsearListaCodigos("4D5077G-").codigos).toEqual(["4D5077G"]);
+    // Y `4D5077G` + `4D5077G-` son EL MISMO pedido: se deduplican en silencio.
+    expect(parsearListaCodigos("4D5077G 4D5077G-").codigos).toEqual(["4D5077G"]);
+    // Los guiones INTERIORES no se tocan (SKU reales los llevan).
+    expect(parsearListaCodigos("KACKS26-0046").codigos).toEqual(["KACKS26-0046"]);
+    expect(parsearListaCodigos("T1A8-32600-").codigos).toEqual(["T1A8-32600"]);
+  });
+
+  it("🔴 la lista REAL de Daniel: 48 tokens → 27 códigos únicos, orden = primera aparición, sin descartes", () => {
+    const { codigos, descartados } = parsearListaCodigos(LISTA_REAL_DANIEL);
+    expect(codigos).toHaveLength(27);
+    expect(descartados).toBe(0);
+    // Los del guión final quedan normalizados…
+    for (const c of ["4D5077G", "4G5002G", "4D1060G", "4D1138G", "4D1063G"]) {
+      expect(codigos).toContain(c);
+    }
+    // …y ninguno queda con el guión puesto.
+    expect(codigos.every((c) => !c.endsWith("-"))).toBe(true);
+    // El orden es el de la primera aparición: así se lee la tabla con su Excel.
+    expect(codigos.slice(0, 4)).toEqual(["4D5029G", "4D5077G", "4D5173G", "4D5175G"]);
+    expect(codigos[codigos.length - 1]).toBe("4D1440G");
+  });
+});
+
+describe("pareo por PREFIJO — la MISMA semántica para 1 código que para 50", () => {
+  it("posicionEnPegado: el modelo pegado es dueño de sus colores; gana la primera aparición", () => {
+    expect(posicionEnPegado("4D5029G002", ["4D5029G", "4D5077G"])).toBe(0);
+    expect(posicionEnPegado("4D5077G110", ["4D5029G", "4D5077G"])).toBe(1);
+    // Un código con color pegado tal cual también matchea (prefijo de sí mismo).
+    expect(posicionEnPegado("4D5029G002", ["4D5029G002"])).toBe(0);
+    expect(posicionEnPegado("OTRACOSA", ["4D5029G"])).toBe(-1);
+  });
+
+  it("pedidosNoEncontrados: SOLO los que no trajeron ni un color — los genuinamente inexistentes", () => {
+    const hallados = ["4D5029G002", "4D5077G001", "4D5077G110"];
+    expect(pedidosNoEncontrados(["4D5029G", "4D5077G", "4D5173G"], hallados)).toEqual(["4D5173G"]);
+    // La mutación del bug original: con match EXACTO, los 3 saldrían como no
+    // encontrados aunque sus colores existan.
+    expect(pedidosNoEncontrados(["4D5029G", "4D5077G", "4D5173G"], hallados)).not.toContain("4D5029G");
+  });
+
+  it("🔴 ordenarComoPegado parea por prefijo: los colores ordenan en el lugar de SU modelo", () => {
+    const arts = [
+      { codigo: "4D5029G002", empresa: "vistana" },
+      { codigo: "4G5004G030", empresa: "vistana" },
+      { codigo: "4G5004G001", empresa: "vistana" },
+      { codigo: "4D5077G110", empresa: "vistana" },
+      { codigo: "4D5077G001", empresa: "vistana" },
+    ];
+    // Pegado en un orden que NO es el alfabético.
+    const orden = ordenarComoPegado(arts, ["4G5004G", "4D5077G", "4D5029G"]).map((a) => a.codigo);
+    expect(orden).toEqual(["4G5004G001", "4G5004G030", "4D5077G001", "4D5077G110", "4D5029G002"]);
+  });
+
+  it("ordenarComoPegado: un artículo que no matchea ningún pegado va al final, nunca se pierde", () => {
+    const arts = [
+      { codigo: "XXX", empresa: "vistana" },
+      { codigo: "4D5029G002", empresa: "vistana" },
+    ];
+    expect(ordenarComoPegado(arts, ["4D5029G"]).map((a) => a.codigo)).toEqual(["4D5029G002", "XXX"]);
   });
 });
 

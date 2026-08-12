@@ -772,13 +772,16 @@ describe("el Excel de Referencia", () => {
   // 🔴 LA HOJA 1 ES LA PANTALLA: una fila por ARTÍCULO. Daniel baja este archivo
   // para escribir en él la cantidad que va a pedir — si trajera solo la materia
   // prima tendría que rehacer la cuenta afuera.
-  it("la hoja 1 refleja la ficha: los tres grandes, las compras crudas y el ritmo", async () => {
+  it("la hoja 1 refleja la ficha: los cuatro grandes, las compras crudas y el ritmo", async () => {
     const { encabezado, cuerpo } = await leerHoja("Referencia");
     for (const col of [
-      // 🔴 Los tres grandes de la pantalla, primero.
+      // 🔴 Los cuatro grandes de la pantalla, primero. "Stock" es la palabra
+      // de Daniel (*"¿por qué 'me quedan' en vez de stock?"*) y "Meses de
+      // venta" es el cuarto KPI (*"compre, vendi, stock, meses"*).
       "Compré",
       "Vendí",
-      "En bodega",
+      "Stock",
+      "Meses de venta",
       "Última compra: llegó",
       "Última compra: cuánto",
       "Compras (últimos 3 años)",
@@ -795,14 +798,16 @@ describe("el Excel de Referencia", () => {
     ]) {
       expect(encabezado, `falta la columna "${col}"`).toContain(col);
     }
+    // El rótulo viejo no puede quedar a medias en ninguna hoja.
+    expect(encabezado).not.toContain("En bodega");
     expect(cuerpo).toHaveLength(1); // un artículo = una fila
     expect(cuerpo[0]["Referencia"]).toBe("NB2570001");
     // 🔴 Compré = TODAS las compras (240 + 180) y Vendí = el neto histórico.
-    // En bodega es la existencia de Switch — y NO se fuerza el cuadre: acá
+    // Stock es la existencia de Switch — y NO se fuerza el cuadre: acá
     // 420 − 216 = 204 sí cierra, pero la columna no sale de esa resta.
     expect(cuerpo[0]["Compré"]).toBe(420);
     expect(cuerpo[0]["Vendí"]).toBe(216);
-    expect(cuerpo[0]["En bodega"]).toBe(204);
+    expect(cuerpo[0]["Stock"]).toBe(204);
     // La ÚLTIMA compra es la del 19-feb-2026, no la más vieja.
     expect(cuerpo[0]["Última compra: llegó"]).toBe("2026-02-19");
     expect(cuerpo[0]["Última compra: cuánto"]).toBe(180);
@@ -821,9 +826,33 @@ describe("el Excel de Referencia", () => {
     expect(pos("CIF anterior (solo si cambió)")).toBe(pos("Costo CIF") + 1);
     expect(pos("Costo FOB")).toBe(pos("CIF anterior (solo si cambió)") + 1);
     expect(pos("Margen")).toBe(pos("Costo FOB") + 1);
-    // Y los tres grandes van juntos, en el orden de la pantalla.
+    // Y los cuatro grandes van juntos, en el orden de la pantalla.
     expect(pos("Vendí")).toBe(pos("Compré") + 1);
-    expect(pos("En bodega")).toBe(pos("Vendí") + 1);
+    expect(pos("Stock")).toBe(pos("Vendí") + 1);
+    expect(pos("Meses de venta")).toBe(pos("Stock") + 1);
+  });
+
+  it("🔴 sin margen (vendedor/bodega): la columna Margen y su 'por qué' NO bajan; todo lo demás sí", async () => {
+    // Daniel: *"quita margen, lo demas dejalo"*. Esconderlo solo en pantalla
+    // y dejarlo bajar en el Excel sería teatro.
+    const XLSX = await import("xlsx-js-style");
+    const mod = await import("@/lib/ventas/referencia-excel");
+    const ws = await mod.buildReferenciaSheet([ART()], "2026-08", { margen: false });
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const encabezado = filas.find((f) => f.includes("Referencia")) as string[];
+    const cuerpo = filas.slice(filas.indexOf(encabezado) + 1);
+    expect(encabezado).not.toContain("Margen");
+    expect(encabezado).not.toContain("Si no hay margen, por qué");
+    // Lo demás se queda: costos, precios y la señal del CIF anterior.
+    for (const col of ["Precio prom", "Lista", "Costo CIF", "CIF anterior (solo si cambió)", "Costo FOB", "Nota"]) {
+      expect(encabezado, `falta la columna "${col}"`).toContain(col);
+    }
+    // Y la fila no queda CORRIDA: quitar dos columnas del medio sin quitar sus
+    // celdas dejaría la temporada bajo el encabezado del margen. El precio de
+    // lista tiene que caer bajo "Lista", igual que con margen.
+    const fila = Object.fromEntries(encabezado.map((h, i) => [h, cuerpo[0][i]]));
+    expect(fila["Lista"]).toBe(10);
+    expect(fila["Oct-nov-dic (u)"]).toBe(216); // las 216 de nov-2025, en su columna
   });
 
   it("🔴 el Costo FOB de la hoja 1 es calculado (CIF ÷ 1,10), no el de Switch — y el encabezado ya no dice '(calculado)'", async () => {

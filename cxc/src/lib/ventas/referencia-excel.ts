@@ -22,8 +22,8 @@
 // 🩸 Y ANTES SE HABÍA IDO "DESC.". Daniel, textual: *"no sirve"*. Lo que sí
 // sirve para su decisión es el PRECIO REAL y el MARGEN.
 //
-// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (12-ago-2026): los tres
-// grandes primero — `Compré` · `Vendí` · `En bodega` (= Me quedan) — y la fila
+// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (12-ago-2026): los cuatro
+// grandes primero — `Compré` · `Vendí` · `Stock` · `Meses de venta` — y la fila
 // de plata en el MISMO orden agrupado de la tarjeta: `Precio prom` · `Lista` ·
 // `Costo CIF` · `CIF anterior (solo si cambió)` · `Costo FOB` · `Margen`.
 //   · **Compré** es la suma de TODAS las compras registradas (también las de
@@ -108,8 +108,12 @@ const n4 = (x: number | null | undefined): number | null =>
 export async function buildReferenciaSheet(
   articulos: readonly ArticuloCompras[],
   hoyMes: string,
+  opts: { margen?: boolean } = {},
 ): Promise<import("xlsx-js-style").WorkSheet> {
   const { buildReportSheet, MONEY_FMT, PCT_FMT } = await import("@/lib/excel-export");
+  // Daniel: *"quita margen, lo demas dejalo"* — para vendedor/bodega el Excel
+  // tampoco baja el margen (esconderlo solo en pantalla sería teatro).
+  const conMargen = opts.margen !== false;
 
   const fichas = articulos.map((a) => ({ art: a, f: armarFicha(a, hoyMes) }));
   // Los encabezados de los meses se derivan de la MISMA ventana que la
@@ -117,15 +121,18 @@ export async function buildReferenciaSheet(
   const meses = fichas[0]?.f.barras.map((b) => b.mes) ?? [];
 
   return buildReportSheet({
-    title: "FASHION GROUP — Referencia: cuánto vendo, cuánto me queda y a qué margen",
+    title: conMargen
+      ? "FASHION GROUP — Referencia: cuánto vendo, cuánto me queda y a qué margen"
+      : "FASHION GROUP — Referencia: cuánto vendo y cuánto me queda",
     subtitle:
       `${articulos.length} referencias · corte ${hoyMes} · ` +
       `los ${MESES_VENTANA} meses son COMPLETOS (el mes en curso NO entra) · ` +
       `"Compré" son TODAS las compras registradas y "Vendí" el neto histórico con las NC restadas · ` +
-      `"En bodega" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
+      `"Stock" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
       `"90% en" dice en cuántos meses se vendió el 90% de la compra (la cola no cuenta) · ` +
+      `"Meses de venta" y "Vendo por mes" cuentan DESDE QUE LLEGÓ la mercancía (la misma ancla del 90%) · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
-      `el margen se calcula contra el Costo CIF de la última compra · ` +
+      (conMargen ? `el margen se calcula contra el Costo CIF de la última compra · ` : ``) +
       `el Costo FOB es calculado (Costo CIF ÷ 1,10), no el que manda Switch · ` +
       `"CIF anterior" solo se llena cuando la compra anterior costó distinto; vacío = no cambió · ` +
       `NO se dice cuánto tardó cada compra en venderse: con stock encima eso no se sabe · ` +
@@ -134,10 +141,11 @@ export async function buildReferenciaSheet(
       { header: "Referencia", wch: 18 },
       { header: "Descripción", wch: 26 },
       { header: "Empresa", wch: 14 },
-      // ── Los tres grandes, en el orden de la pantalla ──
+      // ── Los cuatro grandes, en el orden de la pantalla ──
       { header: "Compré", wch: 10, align: "right", fmt: "#,##0" },
       { header: "Vendí", wch: 10, align: "right", fmt: "#,##0" },
-      { header: "En bodega", wch: 11, align: "right", fmt: "#,##0" },
+      { header: "Stock", wch: 11, align: "right", fmt: "#,##0" },
+      { header: "Meses de venta", wch: 14, align: "right", fmt: "#,##0" },
       // ── Compras: fecha y cantidad, crudas ──
       { header: "Última compra: llegó", wch: 18 },
       { header: "Última compra: cuánto", wch: 19, align: "right", fmt: "#,##0" },
@@ -152,7 +160,6 @@ export async function buildReferenciaSheet(
       // agregado desde la primera llegada de los últimos 12 meses.
       { header: "90% en", wch: 16 },
       { header: "Vendo por mes", wch: 13, align: "right", fmt: "#,##0.0" },
-      { header: "Meses promediados", wch: 17, align: "right", fmt: "#,##0" },
       { header: "Me queda para (meses)", wch: 20, align: "right", fmt: "#,##0.0" },
       // ── La fila de plata, en el mismo orden agrupado de la pantalla ──
       { header: "Precio prom", wch: 12, align: "right", fmt: MONEY_FMT },
@@ -160,8 +167,12 @@ export async function buildReferenciaSheet(
       { header: "Costo CIF", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "CIF anterior (solo si cambió)", wch: 27, align: "right", fmt: MONEY_FMT },
       { header: "Costo FOB", wch: 11, align: "right", fmt: MONEY_FMT },
-      { header: "Margen", wch: 9, align: "right", fmt: PCT_FMT },
-      { header: "Si no hay margen, por qué", wch: 46 },
+      ...(conMargen
+        ? [
+            { header: "Margen", wch: 9, align: "right" as const, fmt: PCT_FMT },
+            { header: "Si no hay margen, por qué", wch: 46 },
+          ]
+        : []),
       // ── Temporada ──
       { header: "Oct-nov-dic (u)", wch: 14, align: "right", fmt: "#,##0" },
       { header: "Oct-nov-dic (% del año)", wch: 21, align: "right", fmt: PCT_FMT },
@@ -169,11 +180,11 @@ export async function buildReferenciaSheet(
       ...meses.map((m) => ({ header: fmtMesAnio(m), wch: 10, align: "right" as const, fmt: "#,##0" })),
       { header: "Nota", wch: 46 },
     ],
-    rows: fichas.map(({ art, f }) => filaReferencia(art, f)),
+    rows: fichas.map(({ art, f }) => filaReferencia(art, f, conMargen)),
   });
 }
 
-function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | number | null)[] {
+function filaReferencia(art: ArticuloCompras, f: FichaArticulo, conMargen: boolean): (string | number | null)[] {
   const u = f.ultima;
   const a = f.anterior;
   const m = f.margen;
@@ -181,10 +192,11 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     art.codigo,
     art.descripcion || "—",
     art.empresa || "—",
-    // Los tres grandes de la pantalla: Compré · Vendí · En bodega (Me quedan).
+    // Los cuatro grandes de la pantalla: Compré · Vendí · Stock · Meses.
     f.grandes.comprado,
     f.grandes.vendido,
     art.existencia,
+    f.ritmo.meses,
     u?.fecha ?? "sin compra registrada",
     u?.unidades ?? null,
     a?.fecha ?? "—",
@@ -192,8 +204,7 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     art.compras.length,
     art.comprasFueraDeVentana,
     textoNoventaCorto(f.noventa),
-    n1(f.promedio.porMes),
-    f.promedio.meses,
+    n1(f.ritmo.porMes),
     n1(f.alcance),
     n2(m.precioReal),
     n2(u?.costos.lista ?? art.precioEtiqueta),
@@ -202,8 +213,7 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     // pantalla: repetir el mismo número en cada fila era el relleno que se fue.
     n2(f.cambioCosto?.anterior),
     n2(f.fobCalculado),
-    n4(m.margen),
-    m.motivo ? textoSinMargen(m.motivo, f.promedio.meses) : "",
+    ...(conMargen ? [n4(m.margen), m.motivo ? textoSinMargen(m.motivo, f.promedio.meses) : ""] : []),
     f.temporada.unidades,
     n4(f.temporada.parte),
     ...f.barras.map((b) => b.unidades),
@@ -302,9 +312,10 @@ export async function buildComprasSheet(
 export async function exportComprasToExcel(
   articulos: readonly ArticuloCompras[],
   hoyMes: string,
+  opts: { margen?: boolean } = {},
 ): Promise<void> {
   const [referencia, compras] = await Promise.all([
-    buildReferenciaSheet(articulos, hoyMes),
+    buildReferenciaSheet(articulos, hoyMes, opts),
     buildComprasSheet(articulos, hoyMes),
   ]);
   const { workbookFromSheets, downloadWorkbook, exportFilename } = await import("@/lib/excel-export");

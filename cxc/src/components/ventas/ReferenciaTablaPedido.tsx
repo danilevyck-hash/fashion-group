@@ -34,18 +34,22 @@ import { armarFicha, fmtMesAnio, textoNoventaCorto } from "@/lib/ventas/resumen-
 import { CuerpoArticulo, etiquetaEmpresa, fmtInt, fmtPct } from "./ReferenciaTarjeta";
 
 /** Anchos FIJOS por columna: los segmentos de tabla alrededor del detalle
- *  abierto tienen que quedar alineados entre sí. La suma es el min-width. */
-const COLS: { titulo: string; px: number; derecha?: boolean }[] = [
-  { titulo: "Código", px: 210 },
-  { titulo: "Compré", px: 72, derecha: true },
-  { titulo: "Vendí", px: 72, derecha: true },
-  { titulo: "Quedan", px: 72, derecha: true },
-  { titulo: "90% en", px: 118, derecha: true },
-  { titulo: "Margen", px: 66, derecha: true },
-  { titulo: "Últ. compra", px: 92, derecha: true },
-  { titulo: "", px: 36 },
-];
-const ANCHO_MIN = COLS.reduce((s, c) => s + c.px, 0);
+ *  abierto tienen que quedar alineados entre sí. La suma es el min-width.
+ *  "Stock" es la palabra de Daniel (*"¿por qué 'me quedan' en vez de
+ *  stock?"*); la columna Margen NO existe para vendedor/bodega (*"quita
+ *  margen, lo demas dejalo"*). */
+function colsPedido(mostrarMargen: boolean): { titulo: string; px: number; derecha?: boolean }[] {
+  return [
+    { titulo: "Código", px: 210 },
+    { titulo: "Compré", px: 72, derecha: true },
+    { titulo: "Vendí", px: 72, derecha: true },
+    { titulo: "Stock", px: 72, derecha: true },
+    { titulo: "90% en", px: 118, derecha: true },
+    ...(mostrarMargen ? [{ titulo: "Margen", px: 66, derecha: true }] : []),
+    { titulo: "Últ. compra", px: 92, derecha: true },
+    { titulo: "", px: 36 },
+  ];
+}
 
 interface FilaPedido {
   art: ArticuloCompras;
@@ -74,14 +78,18 @@ function armarFila(art: ArticuloCompras, hoyMes: string): FilaPedido {
 export function ReferenciaTablaPedido({
   articulos,
   hoyMes,
+  mostrarMargen = true,
 }: {
   articulos: ArticuloCompras[];
   hoyMes: string;
+  mostrarMargen?: boolean;
 }) {
   // Una sola fila abierta a la vez (acordeón): el detalle es la tarjeta entera
   // y dos abiertas a la vez vuelven la tabla una pila de tarjetas otra vez.
   const [abierta, setAbierta] = useState<string | null>(null);
   const filas = useMemo(() => articulos.map((a) => armarFila(a, hoyMes)), [articulos, hoyMes]);
+  const COLS = useMemo(() => colsPedido(mostrarMargen), [mostrarMargen]);
+  const ANCHO_MIN = COLS.reduce((s, c) => s + c.px, 0);
 
   // La tabla se parte en segmentos alrededor de la fila abierta para que el
   // detalle quede FUERA del scroller horizontal.
@@ -129,6 +137,7 @@ export function ReferenciaTablaPedido({
                       key={f.clave}
                       f={f}
                       abierta={f.clave === abierta}
+                      mostrarMargen={mostrarMargen}
                       onToggle={() => setAbierta(f.clave === abierta ? null : f.clave)}
                     />
                   ))}
@@ -138,7 +147,7 @@ export function ReferenciaTablaPedido({
           )}
           {seg.detalle && (
             <div className="border-b border-gray-200 bg-emerald-50/40">
-              <CuerpoArticulo art={seg.detalle.art} hoyMes={hoyMes} />
+              <CuerpoArticulo art={seg.detalle.art} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
             </div>
           )}
         </Fragment>
@@ -147,7 +156,17 @@ export function ReferenciaTablaPedido({
   );
 }
 
-function FilaTabla({ f, abierta, onToggle }: { f: FilaPedido; abierta: boolean; onToggle: () => void }) {
+function FilaTabla({
+  f,
+  abierta,
+  mostrarMargen,
+  onToggle,
+}: {
+  f: FilaPedido;
+  abierta: boolean;
+  mostrarMargen: boolean;
+  onToggle: () => void;
+}) {
   const g = f.art.cuadre;
   const quedan = f.art.existencia;
   return (
@@ -175,7 +194,7 @@ function FilaTabla({ f, abierta, onToggle }: { f: FilaPedido; abierta: boolean; 
         {quedan != null ? fmtInt(quedan) : "—"}
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{f.noventaCorto}</td>
-      <td className="px-3 py-2.5 text-right tabular-nums">{f.margen}</td>
+      {mostrarMargen && <td className="px-3 py-2.5 text-right tabular-nums">{f.margen}</td>}
       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{f.ultCompra}</td>
       <td className="px-3 py-2.5 text-right text-gray-500" aria-hidden="true">
         {abierta ? "⌄" : "›"}

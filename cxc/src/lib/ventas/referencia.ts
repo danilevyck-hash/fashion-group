@@ -235,11 +235,22 @@ export function escapeLike(q: string): string {
 }
 
 /** Pega la lista de la vista múltiple: separada por espacios, comas o saltos
- *  de línea. Devuelve hasta MAX_CODIGOS_MULTI únicos + cuántos se descartaron. */
+ *  de línea. Devuelve hasta MAX_CODIGOS_MULTI únicos + cuántos se descartaron.
+ *
+ *  🔴 EL GUIÓN FINAL SE QUITA (`4D5077G-` → `4D5077G`), y no es una adivinanza:
+ *  medido el 12-ago-2026 contra producción (`scripts/_diag-referencia-guiones.ts`),
+ *  NO EXISTE ni un código que termine en guión en ninguna de las tres fuentes
+ *  (`switch_articulo_info`, `switch_articulo_diario`, `switch_ingresos_mercancia`
+ *  → 0 · 0 · 0 filas `LIKE '%-'`). Es un artefacto del Excel del que Daniel
+ *  copia. Los guiones INTERIORES (`KACKS26-0046`, `T1A8-32600`) no se tocan.
+ *
+ *  Los duplicados se deduplican EN SILENCIO (la lista real de Daniel trae
+ *  `4D5077G` y `4D5077G-` juntos: son el mismo pedido) y el orden que queda es
+ *  el de la PRIMERA aparición — de ahí sale el orden de la tabla. */
 export function parsearListaCodigos(texto: string): { codigos: string[]; descartados: number } {
   const todos = texto
     .split(/[\s,;]+/)
-    .map((c) => normalizarBusqueda(c))
+    .map((c) => normalizarBusqueda(c).replace(/-+$/, ""))
     .filter((c) => c.length >= 3 && esCodigo(c));
   const unicos = [...new Set(todos)];
   return {
@@ -249,22 +260,56 @@ export function parsearListaCodigos(texto: string): { codigos: string[]; descart
 }
 
 /**
+ * ¿A cuál código pegado pertenece este artículo? Por PREFIJO: lo pegado suele
+ * ser el MODELO y el código real lleva el color al final (`4D5029G` trae
+ * `4D5029G002`); un código con color pegado tal cual también matchea (es
+ * prefijo de sí mismo). Gana la PRIMERA aparición en la lista. −1 = ninguno.
+ *
+ * Es LA MISMA semántica con la que el route busca (LIKE 'pegado%'): si acá se
+ * pareara distinto, la tabla ordenaría con otra verdad que la búsqueda.
+ */
+export function posicionEnPegado(codigo: string, codigos: readonly string[]): number {
+  const c = codigo.toUpperCase();
+  return codigos.findIndex((p) => c.startsWith(p.toUpperCase()));
+}
+
+/** Los códigos pegados que NO trajeron ni un artículo (por prefijo) — los
+ *  genuinamente inexistentes. Es el único criterio del "no encontré". */
+export function pedidosNoEncontrados(
+  pedidos: readonly string[],
+  codigosHallados: readonly string[],
+): string[] {
+  const hallados = codigosHallados.map((c) => c.toUpperCase());
+  return pedidos.filter((p) => {
+    const pref = p.toUpperCase();
+    return !hallados.some((c) => c.startsWith(pref));
+  });
+}
+
+/**
  * Ordena los artículos EN EL ORDEN EN QUE SE PEGARON los códigos (modo pedido):
  * Daniel lee la tabla con su Excel al lado y el orden de su lista es el mapa.
  *
- * Un artículo cuyo código no está en la lista (no debería pasar: la búsqueda
- * múltiple es exacta) va al final, por código — nunca se pierde. El MISMO
- * código en dos empresas queda junto, desempatado por empresa para que el
- * orden sea determinista. El Excel recibe esta misma lista.
+ * El pareo es POR PREFIJO (`posicionEnPegado`): pegar el modelo `4D5029G`
+ * trae `4D5029G002`, y esa fila ordena en el lugar del modelo. Los colores de
+ * un mismo modelo quedan juntos, por código; un artículo que no matchea ningún
+ * pegado va al final — nunca se pierde. El Excel recibe esta misma lista.
  */
 export function ordenarComoPegado<T extends { codigo: string; empresa: string }>(
   articulos: readonly T[],
   codigos: readonly string[],
 ): T[] {
-  const pos = new Map(codigos.map((c, i) => [c.toUpperCase(), i]));
+  const pos = new Map(
+    articulos.map((a) => {
+      const i = posicionEnPegado(a.codigo, codigos);
+      return [a, i === -1 ? codigos.length : i] as const;
+    }),
+  );
   return [...articulos].sort((a, b) => {
-    const pa = pos.get(a.codigo.toUpperCase()) ?? codigos.length;
-    const pb = pos.get(b.codigo.toUpperCase()) ?? codigos.length;
-    return pa - pb || a.codigo.localeCompare(b.codigo) || a.empresa.localeCompare(b.empresa);
+    return (
+      (pos.get(a) ?? codigos.length) - (pos.get(b) ?? codigos.length) ||
+      a.codigo.localeCompare(b.codigo) ||
+      a.empresa.localeCompare(b.empresa)
+    );
   });
 }

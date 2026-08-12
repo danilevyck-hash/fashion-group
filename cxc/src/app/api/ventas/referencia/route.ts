@@ -1,11 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/ventas/referencia — tab "Referencia" de /ventas. SOLO ADMIN.
+// GET /api/ventas/referencia — tab "Referencia" de /ventas y página /referencia.
 //
 // UN SOLO BUSCADOR. Daniel: *"porq columna de varias pegar por lista? enves de
 // ponerlo en el mismo buscador que una?"*. `?q=` acepta lo mismo para uno que
-// para veinte: si lo pegado trae varios códigos se buscan todos, si trae uno se
-// busca el modelo entero (todos sus colores), y si no parece código se busca por
-// descripción. La pestaña "Varias · pegar lista" se fue.
+// para veinte: si lo pegado parece código(s) se buscan todos, y si no parece
+// código se busca por descripción. La pestaña "Varias · pegar lista" se fue.
+//
+// 🔴 UNA SOLA RESOLUCIÓN PARA 1 Y PARA 50 CÓDIGOS: cada código pegado busca por
+// PREFIJO (LIKE 'pegado%'), venga solo o en lista. El modelo trae todos sus
+// colores (`4D5029G` → 4D5029G002…) y un código con color pegado tal cual se
+// encuentra igual (es prefijo de sí mismo).
+//
+// 🩸 EL BUG QUE ESTO ARREGLA (12-ago-2026): con VARIOS códigos la búsqueda era
+// `.in()` EXACTO mientras que con UNO era prefijo. Daniel pegó su lista real de
+// 47 modelos (sin el color al final, porque su Excel lista modelos) y el modo
+// pedido contestó "No encontré los códigos … ni en ventas ni en compras" para
+// TODOS — mientras el mismo `4D5029G` buscado solo devolvía su tarjeta
+// perfecta. Dos semánticas para la misma caja era el error; ahora es UNA.
+//
+// 🔴 ROLES (12-ago-2026, Daniel: *"habilita referencia para los vendedores y
+// bodega"*): admin, vendedor y bodega. Para vendedor/bodega la respuesta lleva
+// `margenVisible: false` — Daniel: *"quita margen, lo demas dejalo"* — y la
+// vista no calcula ni muestra el margen. Todo lo demás (compras, ventas,
+// stock, costos, precios) lo ven igual.
 //
 // TRES fuentes:
 //   · switch_ingresos_mercancia — LAS COMPRAS REALES (34.792 líneas desde
@@ -39,6 +56,7 @@ import {
   escapeLike,
   modeloDe,
   parsearListaCodigos,
+  pedidosNoEncontrados,
 } from "@/lib/ventas/referencia";
 import {
   armarArticulo,
@@ -77,8 +95,8 @@ interface FilaInfo {
 }
 
 type Filtro =
+  /** 1..50 códigos pegados; CADA UNO busca por PREFIJO (modelo → colores). */
   | { tipo: "codigos"; codigos: string[] }
-  | { tipo: "prefijo"; patron: string }
   | { tipo: "descripcion"; patron: string };
 
 function esTablaOColumnaAusente(msg: string): boolean {
@@ -96,15 +114,22 @@ function baseVentas(opts: { count?: "exact"; head?: boolean }) {
 
 function conFiltro<T extends { in: unknown }>(sel: T, f: Filtro, campo: string): T {
   const s = sel as unknown as {
-    in: (c: string, v: string[]) => T;
     like: (c: string, v: string) => T;
     ilike: (c: string, v: string) => T;
+    or: (filtros: string) => T;
   };
   switch (f.tipo) {
     case "codigos":
-      return s.in(campo, f.codigos);
-    case "prefijo":
-      return s.like(campo, f.patron);
+      // 🔴 LA RESOLUCIÓN ÚNICA: cada código pegado es un PREFIJO. Con uno solo
+      // es el mismo LIKE de siempre; con varios, el OR de sus prefijos.
+      //
+      // El comodín en la sintaxis de `.or()` de PostgREST es `*` (se traduce a
+      // `%`) — verificado contra producción el 12-ago-2026. Los valores van sin
+      // escapar porque `esCodigo()` —la puerta de `parsearListaCodigos`, lo
+      // ÚNICO que llega acá— solo deja pasar [A-Z0-9-/.#]: ni comas, ni
+      // paréntesis, ni comillas, ni comodines.
+      if (f.codigos.length === 1) return s.like(campo, `${escapeLike(f.codigos[0])}%`);
+      return s.or(f.codigos.map((c) => `${campo}.like.${c}*`).join(","));
     case "descripcion":
       return s.ilike("descripcion", f.patron);
   }
@@ -243,8 +268,12 @@ function errorAmplia(): NextResponse {
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin"]);
+  // Daniel: *"habilita referencia para los vendedores y bodega"*.
+  const auth = requireRole(req, ["admin", "vendedor", "bodega"]);
   if (auth instanceof NextResponse) return auth;
+  // Daniel: *"quita margen, lo demas dejalo"* — solo admin ve el margen. La
+  // vista no lo calcula cuando esto viene en false (y el Excel tampoco).
+  const margenVisible = auth.role === "admin";
 
   const hoy = hoyPanama().slice(0, 10);
   const hoyMes = hoy.slice(0, 7);
@@ -255,17 +284,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Escribe al menos 3 caracteres." }, { status: 400 });
     }
 
-    // ── UN SOLO BUSCADOR ───────────────────────────────────────────────────
-    // Lo pegado se parte igual siempre. Con 2 o más códigos se buscan exactos;
-    // con uno solo se busca por PREFIJO, que es lo que trae todos los colores
+    // ── UN SOLO BUSCADOR, UNA SOLA RESOLUCIÓN ──────────────────────────────
+    // Lo pegado se parte igual siempre, y CADA código busca por PREFIJO —
+    // venga solo o en lista de 50. El prefijo es lo que trae todos los colores
     // del modelo (`40HM265` → 40HM265001, 40HM265032, …). Daniel ve por color.
     const { codigos, descartados } = parsearListaCodigos(crudo);
 
     let filtro: Filtro;
-    if (codigos.length >= 2) {
+    if (codigos.length >= 1) {
       filtro = { tipo: "codigos", codigos };
-    } else if (codigos.length === 1) {
-      filtro = { tipo: "prefijo", patron: `${escapeLike(codigos[0])}%` };
     } else {
       const q = normalizarBusqueda(crudo);
       if (q.length > 60) return NextResponse.json({ error: "Búsqueda demasiado larga." }, { status: 400 });
@@ -282,17 +309,14 @@ export async function GET(req: NextRequest) {
       ]);
 
       const articulos = fusionar(ventas, ingresos.filas, info.filas, hoy);
-      const hallados = new Set(articulos.map((a) => a.codigo));
-      const pedidos = filtro.tipo === "codigos" ? filtro.codigos : [codigos[0]];
 
-      // Un código pedido que no aparece en NINGUNA fuente. Si lo escrito era un
-      // modelo (prefijo) que sí trajo colores, no hay nada que reportar.
-      const noEncontrados =
-        filtro.tipo === "codigos"
-          ? pedidos.filter((c) => !hallados.has(c))
-          : articulos.length === 0
-            ? pedidos
-            : [];
+      // Un código pedido que no trajo NI UN artículo por prefijo, en NINGUNA
+      // fuente: ese sí no existe. Los que trajeron colores no se reportan —
+      // el criterio es el MISMO para 1 código que para 50.
+      const noEncontrados = pedidosNoEncontrados(
+        codigos,
+        articulos.map((a) => a.codigo),
+      );
 
       const body: ComprasApiResp = {
         hoy,
@@ -301,6 +325,7 @@ export async function GET(req: NextRequest) {
         noEncontrados,
         comprasDisponibles: ingresos.disponible,
         infoDisponible: info.disponible,
+        margenVisible,
       };
       if (articulos.length > 0 || noEncontrados.length > 0) {
         return NextResponse.json(descartados > 0 ? { ...body, descartados } : body);
@@ -342,6 +367,7 @@ export async function GET(req: NextRequest) {
         .slice(0, 100),
       comprasDisponibles: true,
       infoDisponible: info.disponible,
+      margenVisible,
     };
     return NextResponse.json(body);
   } catch (err) {

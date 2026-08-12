@@ -100,7 +100,7 @@ async function main() {
       const g = f.grandes;
       const pieVendi = textoParteVendida(g.parteVendida) ?? "—";
       console.log(
-        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Me quedan ${g.quedan ?? "—"} u`,
+        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"}`,
       );
 
       // ── El pie de Compré (la lista aprobada) ──
@@ -113,7 +113,7 @@ async function main() {
       }
 
       // ── LA LÍNEA DEL 90% (y su versión corta del modo pedido) ──
-      const linea = textoLineaNoventa(f.noventa, f.promedio.porMes);
+      const linea = textoLineaNoventa(f.noventa, f.ritmo);
       console.log(`   90%: ${linea ?? "(sin línea)"}   [tabla: ${textoNoventaCorto(f.noventa)}]`);
 
       // ── La vista de barras ──

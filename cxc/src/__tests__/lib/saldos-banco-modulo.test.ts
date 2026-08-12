@@ -96,11 +96,26 @@ describe("Saldos de Banco — permiso heredado mientras la DDL no corra", () => 
       .not.toContain("saldos-banco");
   });
 
-  it("la herencia es de UNA sola key y apunta al módulo del que salió", () => {
+  it("la herencia es una lista CERRADA y cada entrada apunta al módulo del que salió", () => {
     // Que no se convierta en un cajón de sastre: cada entrada acá es un permiso
     // que alguien recibe sin que nadie lo haya escrito en la base.
-    expect(Object.keys(MODULO_HEREDA_PERMISO_DE)).toEqual(["saldos-banco"]);
+    // `referencia` se sumó el 12-ago-2026 (Daniel: *"habilita referencia para
+    // los vendedores y bodega"*) mientras su DDL 20260812120000 no corra.
+    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["referencia", "saldos-banco"]);
     expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBe("gastos-empresa");
+    expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
+  });
+
+  it("🔴 la herencia solo alcanza a los roles que el módulo declara: secretaria tiene catalogos y NO ve referencia", () => {
+    // Sin este recorte, "referencia hereda de catalogos" le pintaría la ficha
+    // a secretaria — una ficha que la página le rebota es peor que ninguna.
+    const secretaria = ["upload", "guias", "caja", "reclamos", "cheques", "directorio", "catalogos"];
+    expect(getVisibleModules("secretaria", secretaria).map((m) => m.key)).not.toContain("referencia");
+    // Vendedor y bodega SÍ están en el roles[] del módulo: la heredan.
+    expect(getVisibleModules("vendedor", ["cxc", "catalogos"]).map((m) => m.key)).toContain("referencia");
+    expect(getVisibleModules("bodega", ["guias", "catalogos"]).map((m) => m.key)).toContain("referencia");
+    // Y sin `catalogos` en la lista guardada no hay de dónde heredar.
+    expect(getVisibleModules("vendedor", ["cxc", "guias"]).map((m) => m.key)).not.toContain("referencia");
   });
 
   it("existe la migración que agrega la key, y NO toca bancos_saldos", () => {

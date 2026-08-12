@@ -90,6 +90,8 @@ export function ReferenciaView() {
   }, [resp]);
 
   const hayResultados = (resp?.articulos.length ?? 0) > 0;
+  // Daniel: *"quita margen, lo demas dejalo"* — el servidor dice quién lo ve.
+  const mostrarMargen = resp?.margenVisible !== false;
 
   return (
     <div>
@@ -153,8 +155,8 @@ export function ReferenciaView() {
             variant="outline"
             className="min-h-[44px]"
             // 🔴 El Excel baja LO MISMO que se ve: en modo pedido, en el orden
-            // en que se pegaron los códigos.
-            onClick={() => void exportComprasToExcel(articulosOrdenados, resp!.hoyMes)}
+            // en que se pegaron los códigos, y sin margen si el rol no lo ve.
+            onClick={() => void exportComprasToExcel(articulosOrdenados, resp!.hoyMes, { margen: mostrarMargen })}
           >
             <Download className="mr-1.5 h-4 w-4" /> Bajar a Excel
           </Button>
@@ -162,7 +164,7 @@ export function ReferenciaView() {
       )}
 
       {modoPedido ? (
-        <ReferenciaTablaPedido articulos={articulosOrdenados} hoyMes={resp!.hoyMes} />
+        <ReferenciaTablaPedido articulos={articulosOrdenados} hoyMes={resp!.hoyMes} mostrarMargen={mostrarMargen} />
       ) : (
         porModelo.map(([modelo, arts]) => (
           <div key={modelo} className="mt-4">
@@ -172,7 +174,12 @@ export function ReferenciaView() {
             {arts.length > 1 && <TituloModelo modelo={modelo} arts={arts} />}
             <div className="space-y-4">
               {arts.map((a) => (
-                <TarjetaArticulo key={`${a.empresa}·${a.codigo}`} art={a} hoyMes={resp!.hoyMes} />
+                <TarjetaArticulo
+                  key={`${a.empresa}·${a.codigo}`}
+                  art={a}
+                  hoyMes={resp!.hoyMes}
+                  mostrarMargen={mostrarMargen}
+                />
               ))}
             </div>
           </div>

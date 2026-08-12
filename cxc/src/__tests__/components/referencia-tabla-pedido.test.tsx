@@ -113,11 +113,12 @@ describe("modo pedido — la tabla", () => {
   it("🔴 varios códigos pegados → TABLA (una fila por color), no tarjetas apiladas", async () => {
     await buscarPegado();
     // Las columnas del mockup aprobado.
-    for (const col of ["Código", "Compré", "Vendí", "Quedan", "90% en", "Margen", "Últ. compra"]) {
+    for (const col of ["Código", "Compré", "Vendí", "Stock", "90% en", "Margen", "Últ. compra"]) {
       expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
     }
-    // Sin detalle abierto, los tres grandes de la tarjeta no están montados.
-    expect(screen.queryByText("Me quedan")).toBeNull();
+    // Sin detalle abierto, los grandes de la tarjeta no están montados ("en
+    // bodega" es el pie del Stock grande y solo existe en el cuerpo).
+    expect(screen.queryByText("en bodega")).toBeNull();
   });
 
   it("🔴 las filas van EN EL ORDEN EN QUE SE PEGARON, no en el alfabético del route", async () => {
@@ -131,10 +132,10 @@ describe("modo pedido — la tabla", () => {
   it("🔴 tocar una fila abre el detalle AHÍ MISMO — el cuerpo REAL de la tarjeta — y el orden no se pierde", async () => {
     await buscarPegado();
     fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
-    // El detalle es CuerpoArticulo: los tres grandes + la línea del 90% + la plata.
+    // El detalle es CuerpoArticulo: los cuatro grandes + la línea del ritmo + la plata.
     expect(screen.getAllByText("Compré").length).toBeGreaterThan(1); // th + dt
-    expect(screen.getAllByText("Me quedan").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("En 10 meses va el 80% de la compra · vendo 11 u por mes").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Vendo 9.6 u por mes · En 10 meses va el 80% de la compra").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
     // Y las filas siguen todas, en el mismo orden.
     const codigos = [...document.querySelectorAll("tbody td:first-child")].map(
@@ -143,16 +144,16 @@ describe("modo pedido — la tabla", () => {
     expect(codigos).toEqual(["ZZZ999001", "AAA111001", "CVM253CR02001"]);
     // Tocar otra vez la cierra (acordeón).
     fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
-    expect(screen.queryByText("Me quedan")).toBeNull();
+    expect(screen.queryByText("en bodega")).toBeNull();
   });
 
-  it("🔴 Quedan 0 va en rojo — es la fila que decide una compra", async () => {
+  it("🔴 Stock 0 va en rojo — es la fila que decide una compra", async () => {
     await buscarPegado();
     const fila = screen.getAllByText("ZZZ999001")[0].closest("tr")!;
     const celdas = [...fila.querySelectorAll("td")];
-    const quedan = celdas[3];
-    expect(quedan.textContent).toBe("0");
-    expect(quedan.className).toContain("text-red-700");
+    const stock = celdas[3];
+    expect(stock.textContent).toBe("0");
+    expect(stock.className).toContain("text-red-700");
   });
 
   it("🔴 el Excel baja LA MISMA lista, en el orden pegado", async () => {
@@ -170,8 +171,8 @@ describe("modo pedido — la tabla", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "CVM253CR02001" } });
     fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
     await screen.findAllByText("CVM253CR02001");
-    // Tarjeta: los tres grandes montados de una; tabla: ni una celda th.
-    expect(screen.getAllByText("Me quedan").length).toBeGreaterThan(0);
+    // Tarjeta: los grandes montados de una; tabla: ni una celda th.
+    expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
     expect(document.querySelector("thead")).toBeNull();
   });
 
@@ -179,6 +180,28 @@ describe("modo pedido — la tabla", () => {
     await buscarPegado();
     const tabla = document.querySelector("tbody")!.closest("div");
     expect(tabla?.className).toContain("overflow-x-auto");
+  });
+
+  it("🔴 margenVisible:false (vendedor/bodega): SIN columna Margen, y el detalle tampoco lo dibuja — lo demás queda", async () => {
+    // Daniel: *"quita margen, lo demas dejalo"*. El servidor decide y la vista
+    // obedece: ni la columna en la tabla ni el "margen X%" en la fila de plata.
+    const resp: ComprasApiResp = { ...RESP, margenVisible: false };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: PEGADO } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("CVM253CR02001");
+
+    expect(screen.queryByText("Margen")).toBeNull();
+    // Las demás columnas siguen enteras.
+    for (const col of ["Código", "Compré", "Vendí", "Stock", "90% en", "Últ. compra"]) {
+      expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
+    }
+    // Abrir el detalle: la fila de plata trae precios y costos, pero NO margen.
+    fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
+    expect(screen.getAllByText("Costo CIF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
+    expect(screen.queryByText("margen")).toBeNull();
   });
 });
 

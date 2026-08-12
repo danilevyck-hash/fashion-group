@@ -9,9 +9,10 @@
 // es importante… me queda 2 meses de venta / vendo 11u mes es lo que mas llama
 // la atencion y no es lo mas importante ya que un mes puedo vender mucho y
 // otros meses no, vendo b2b al por mayor no retail"*. La tarjeta quedó así:
-//   1. LOS TRES GRANDES: **Compré · Vendí · Me quedan** (unidades, en grande).
+//   1. LOS CUATRO GRANDES: **Compré · Vendí · Stock · Meses** (en grande).
 //      Compré trae debajo la lista de compras aprobada (4 fechas + "y N más");
-//      Vendí dice qué % de lo comprado es; Me quedan es `existencia` de Switch.
+//      Vendí dice qué % de lo comprado es; Stock es `existencia` de Switch;
+//      Meses es el tiempo de venta desde la llegada (el ancla del 90%).
 //      ⚠️ NO SE FUERZA EL CUADRE entre los tres: los avisos de descuadre que ya
 //      existen explican los huecos (ajuste, venta sin compra, robo).
 //   2. LA LÍNEA DEL 90% — *"creo que es mas importante saber en cuanto meses se
@@ -56,6 +57,7 @@ import {
   fmtFechaCorta,
   fmtMesCorto,
   leyendaLlegadas,
+  pieGrandeMeses,
   subDesdeLlegada,
   textoCompra,
   textoLineaNoventa,
@@ -63,6 +65,7 @@ import {
   textoRestantes,
   textoSinMargen,
   tituloDesdeLlegada,
+  valorGrandeMeses,
   type FichaArticulo,
   type ListaCompras,
   type MesBarra,
@@ -116,7 +119,15 @@ function unidades(n: number): string {
 
 // ─── La tarjeta y su cuerpo ──────────────────────────────────────────────────
 
-export function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string }) {
+export function TarjetaArticulo({
+  art,
+  hoyMes,
+  mostrarMargen = true,
+}: {
+  art: ArticuloCompras;
+  hoyMes: string;
+  mostrarMargen?: boolean;
+}) {
   const color = colorDe(art.codigo);
 
   return (
@@ -127,52 +138,72 @@ export function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes:
         <span className="text-sm text-gray-700">{art.descripcion || "—"}</span>
         <span className="ml-auto text-xs text-gray-600">{etiquetaEmpresa(art.empresa)}</span>
       </header>
-      <CuerpoArticulo art={art} hoyMes={hoyMes} />
+      <CuerpoArticulo art={art} hoyMes={hoyMes} mostrarMargen={mostrarMargen} />
     </section>
   );
 }
 
 /** El cuerpo entero de la tarjeta, SIN el encabezado. Es lo que el modo pedido
- *  muestra al expandir una fila: la MISMA vista, no un resumen distinto. */
-export function CuerpoArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string }) {
+ *  muestra al expandir una fila: la MISMA vista, no un resumen distinto.
+ *  `mostrarMargen=false` (vendedor/bodega — Daniel: *"quita margen, lo demas
+ *  dejalo"*) esconde SOLO el margen; el resto no cambia. */
+export function CuerpoArticulo({
+  art,
+  hoyMes,
+  mostrarMargen = true,
+}: {
+  art: ArticuloCompras;
+  hoyMes: string;
+  mostrarMargen?: boolean;
+}) {
   // 🔴 Hooks ANTES de cualquier return condicional (regla de React de la casa).
   const ficha = useMemo(() => armarFicha(art, hoyMes), [art, hoyMes]);
 
   return (
     <>
-      <TresGrandesVista art={art} ficha={ficha} />
+      <CuatroGrandes art={art} ficha={ficha} />
       <LineaNoventa ficha={ficha} />
       <MesAMes ficha={ficha} hoyMes={hoyMes} />
-      <FilaPlata art={art} ficha={ficha} />
+      <FilaPlata art={art} ficha={ficha} mostrarMargen={mostrarMargen} />
       <Avisos art={art} />
     </>
   );
 }
 
-// ─── Los TRES GRANDES: Compré · Vendí · Me quedan ────────────────────────────
+// ─── Los CUATRO GRANDES: Compré · Vendí · Stock · Meses ─────────────────────
 //
-// 🔴 LOS NÚMEROS QUE DECIDEN, EN GRANDE. Daniel: *"cuanto compre es importante,
-// cuanto vendi en total es importante"*. Tres columnas (a 390 px se apilan de a
-// una, y está bien); debajo de Compré va la lista de compras que él ya aprobó.
+// 🔴 LOS NÚMEROS QUE DECIDEN, EN GRANDE. Daniel (12-ago-2026), textual: *"que
+// me diga cuanto tiempo lleva alado de los 3 kpi. deberia de ser: compre,
+// vendi, stock, meses (de venta) y abajo u/mes"*. Y sobre el tercero: *"¿por
+// qué 'me quedan' en vez de stock?"* — es SU palabra, así que la caja se llama
+// Stock (el pie "en bodega" se queda). El u/mes vive abajo, en la línea
+// secundaria, no como número grande.
 //
-// ⚠️ NO SE FUERZA EL CUADRE: `Compré − Vendí` no siempre da `Me quedan`
-// (ajustes, ventas sin compra registrada, robos). Cada número dice su verdad y
-// los avisos de abajo explican los huecos.
+// A 390 px van 2×2 (cuatro apilados alargan la tarjeta al doble); desde xl las
+// cuatro en una fila. Debajo de Compré va la lista de compras que él aprobó.
+//
+// ⚠️ NO SE FUERZA EL CUADRE: `Compré − Vendí` no siempre da `Stock` (ajustes,
+// ventas sin compra registrada, robos). Cada número dice su verdad y los
+// avisos de abajo explican los huecos.
 
-function TresGrandesVista({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
+function CuatroGrandes({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
   const g = ficha.grandes;
+  const r = ficha.ritmo;
   return (
-    <dl className="grid gap-x-3 gap-y-4 px-3.5 py-4 sm:grid-cols-3">
+    <dl className="grid grid-cols-2 gap-x-3 gap-y-4 px-3.5 py-4 xl:grid-cols-4">
       <Grande rotulo="Compré" valor={g.comprado != null ? fmtInt(g.comprado) : "—"} unidad={g.comprado != null}>
         <PieCompras art={art} lista={ficha.compras} />
       </Grande>
       <Grande rotulo="Vendí" valor={fmtInt(g.vendido)} unidad>
         <p className="text-xs text-gray-600">{pieDeVendido(art, g.parteVendida)}</p>
       </Grande>
-      <Grande rotulo="Me quedan" valor={g.quedan != null ? fmtInt(g.quedan) : "—"} unidad={g.quedan != null}>
+      <Grande rotulo="Stock" valor={g.quedan != null ? fmtInt(g.quedan) : "—"} unidad={g.quedan != null}>
         <p className="text-xs text-gray-600">
           {g.quedan != null ? "en bodega" : "Switch no tiene este código en el catálogo"}
         </p>
+      </Grande>
+      <Grande rotulo="Meses" valor={valorGrandeMeses(r)}>
+        <p className="text-xs text-gray-600">{pieGrandeMeses(r)}</p>
       </Grande>
     </dl>
   );
@@ -256,7 +287,7 @@ function pieDeVendido(art: ArticuloCompras, parte: number | null): string {
 // del módulo puro (`textoLineaNoventa`) — acá no se arma ni media frase.
 
 function LineaNoventa({ ficha }: { ficha: FichaArticulo }) {
-  const texto = textoLineaNoventa(ficha.noventa, ficha.promedio.porMes);
+  const texto = textoLineaNoventa(ficha.noventa, ficha.ritmo);
   if (!texto) return null;
   return <p className="border-t border-gray-100 px-3.5 py-2.5 text-sm text-gray-700">{texto}</p>;
 }
@@ -401,7 +432,15 @@ function Barra({ b, pico }: { b: MesBarra; pico: number }) {
 // el FOB de Switch) y el ⓘ lo explica. El "(antes $…)" del CIF cuando cambió
 // SE QUEDA, pegado al Costo CIF — es la señal de que te subieron el costo.
 
-function FilaPlata({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
+function FilaPlata({
+  art,
+  ficha,
+  mostrarMargen,
+}: {
+  art: ArticuloCompras;
+  ficha: FichaArticulo;
+  mostrarMargen: boolean;
+}) {
   const m = ficha.margen;
   const lista = ficha.ultima?.costos.lista ?? art.precioEtiqueta;
   const cambio = ficha.cambioCosto;
@@ -435,13 +474,15 @@ function FilaPlata({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo 
     costos.push(<Plata key="fob" k="FOB" v={fmtMoney(ficha.fobCalculado)} />);
   }
 
+  // 🔴 Daniel: *"quita margen, lo demas dejalo"* — para vendedor/bodega el
+  // margen NO se dibuja (ni su "por qué no hay margen"). El resto queda igual.
   const margen: React.ReactNode[] = [];
-  if (m.margen != null) {
+  if (mostrarMargen && m.margen != null) {
     margen.push(<Plata key="margen" k="margen" v={fmtPct(m.margen)} rojo={m.margen < 0} />);
   }
 
   const grupos = [precios, costos, margen].filter((g) => g.length > 0);
-  if (!grupos.length && !m.motivo) return null;
+  if (!grupos.length && !(mostrarMargen && m.motivo)) return null;
 
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-3.5 py-2.5">
@@ -468,10 +509,14 @@ function FilaPlata({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo 
           {ficha.promedio.meses} {ficha.promedio.meses === 1 ? "mes completo" : "meses completos"} — con los
           descuentos ya adentro y las devoluciones (notas de crédito) ya restadas. El precio de lista no es a lo
           que vendiste: van juntos justamente para ver de un vistazo si estás descontando.
-          <br />
-          <br />
-          <b>El margen se calcula contra el Costo CIF</b> de tu última compra, que es lo que costó de verdad poner
-          la pieza en bodega (mercancía + flete + seguro).
+          {mostrarMargen && (
+            <>
+              <br />
+              <br />
+              <b>El margen se calcula contra el Costo CIF</b> de tu última compra, que es lo que costó de verdad
+              poner la pieza en bodega (mercancía + flete + seguro).
+            </>
+          )}
           <br />
           <br />
           <b>El FOB es una cuenta, no un dato traído:</b> Costo CIF ÷ 1,10. El FOB que manda Switch llega
@@ -482,7 +527,7 @@ function FilaPlata({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo 
           <b>(antes $…)</b>. Si no cambió, no se muestra nada.
         </Ayuda>
       </div>
-      {m.motivo && (
+      {mostrarMargen && m.motivo && (
         <p className="mt-1 text-sm text-gray-700">{textoSinMargen(m.motivo, ficha.promedio.meses)}</p>
       )}
     </div>

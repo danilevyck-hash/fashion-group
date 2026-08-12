@@ -228,7 +228,12 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     // que un módulo NO se le abra de rebote, y funcionó: el test se puso rojo.
     "asistencia",
   ],
-  bodega: ["catalogos", "guias", "packing-lists"],
+  // `referencia` se abrió el 12-ago-2026 por pedido de Daniel, textual:
+  // *"habilita referencia para los vendedores y bodega"*. Es la pestaña
+  // Referencia de Ventas con ruta propia (/referencia); el resto de Ventas
+  // sigue solo-admin y el margen NO viaja para estos roles. Cambio DELIBERADO
+  // — este candado hizo lo suyo y frenó el build hasta acá.
+  bodega: ["catalogos", "guias", "packing-lists", "referencia"],
   // `asistencia` se le abrió el 6-ago-2026 por pedido de Daniel: la planilla
   // quincenal la arma la contable a mano, y los minutos de tardanza, las horas
   // extra y las ausencias que necesita para llenarla salen de ese módulo.
@@ -249,7 +254,8 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
     "prestamos",
     "asistencia",
   ],
-  vendedor: ["cxc", "directorio", "catalogos", "guias"],
+  // `referencia` — mismo pedido del 12-ago-2026 de arriba (bodega).
+  vendedor: ["cxc", "directorio", "catalogos", "guias", "referencia"],
   gerente_acs: ["multifashion"],
 };
 
