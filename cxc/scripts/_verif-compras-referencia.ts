@@ -5,14 +5,27 @@
 //
 // Uso: DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-compras-referencia.ts [CODIGO...]
 //
-// 🔴 La caja de Compras es CRUDA: fecha y cantidad. No hay "se vendió en N
-// meses" por compra y no debe volver — con stock encima, de qué llegada salió
-// cada venta NO se sabe.
+// 🔴 Imprime la ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí · Me
+// quedan), la lista de compras, la LÍNEA DEL 90% (y su versión corta del modo
+// pedido), la vista de barras (anclada a la llegada o últimos 12 con ▲) y la
+// fila de plata agrupada. Sin atribución por compra: eso no se sabe.
 
 import { createClient } from "@supabase/supabase-js";
 import { armarArticulo, type FilaIngreso } from "../src/lib/ventas/compras";
 import { REFERENCIA_EMPRESA_KEYS } from "../src/lib/ventas/referencia";
-import { armarFicha, centavos, textoCompra, textoMeses, textoRestantes } from "../src/lib/ventas/resumen-articulo";
+import {
+  armarFicha,
+  centavos,
+  fmtFechaCorta,
+  leyendaLlegadas,
+  subDesdeLlegada,
+  textoCompra,
+  textoLineaNoventa,
+  textoNoventaCorto,
+  textoParteVendida,
+  textoRestantes,
+  tituloDesdeLlegada,
+} from "../src/lib/ventas/resumen-articulo";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
@@ -20,7 +33,7 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 const CODIGOS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["NB2570001", "QD3958033", "40HM265032", "TWCAPRE001"];
+  : ["CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
 
 const HOY = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const HOY_MES = HOY.slice(0, 7);
@@ -83,34 +96,54 @@ async function main() {
         console.log(`   ⚠️  SIN COMPRA REGISTRADA (vendió ${art.cuadre.vendido} u)`);
       }
 
-      // ── LA CAJA DE COMPRAS, exactamente como se dibuja ──
-      console.log("   Compras");
-      for (const c of f.compras.visibles) console.log(`     ${textoCompra(c)}`);
-      const restantes = textoRestantes(f.compras.restantes);
-      if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
-      if (f.compras.unica) console.log("     única compra");
+      // ── LOS TRES GRANDES, exactamente como se leen ──
+      const g = f.grandes;
+      const pieVendi = textoParteVendida(g.parteVendida) ?? "—";
+      console.log(
+        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Me quedan ${g.quedan ?? "—"} u`,
+      );
 
-      // ── Las otras dos cajas ──
-      const porMes = f.promedio.porMes == null ? "no vendió" : `${Math.round(f.promedio.porMes)} u`;
-      console.log(`   Vendo por mes: ${porMes} (${f.promedio.meses} meses promediados)`);
-      const alcance = f.alcance === 0 ? "nada" : f.alcance == null ? "—" : textoMeses(f.alcance);
-      console.log(`   Me queda para: ${alcance} · ${art.existencia ?? "—"} en bodega`);
+      // ── El pie de Compré (la lista aprobada) ──
+      if (f.compras.unica && f.compras.visibles[0]) {
+        console.log(`     ${fmtFechaCorta(f.compras.visibles[0].fecha)} · única compra`);
+      } else {
+        for (const c of f.compras.visibles) console.log(`     ${textoCompra(c)}`);
+        const restantes = textoRestantes(f.compras.restantes);
+        if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
+      }
 
-      // ── LA FILA DE PLATA, exactamente como se lee en pantalla ──
+      // ── LA LÍNEA DEL 90% (y su versión corta del modo pedido) ──
+      const linea = textoLineaNoventa(f.noventa, f.promedio.porMes);
+      console.log(`   90%: ${linea ?? "(sin línea)"}   [tabla: ${textoNoventaCorto(f.noventa)}]`);
+
+      // ── La vista de barras ──
+      const vb = f.vista;
+      if (vb.modo === "desde-llegada" && vb.llegada) {
+        console.log(`   Barras: ${tituloDesdeLlegada(vb.llegada)} — ${subDesdeLlegada(vb, HOY_MES)}`);
+        console.log(`     meses: ${vb.barras.map((b) => `${b.mes.slice(5)}:${b.unidades}`).join(" ")}`);
+        console.log(`     acum : ${vb.acumulado?.join(" · ")}`);
+      } else {
+        const ley = leyendaLlegadas(vb.llegadas);
+        console.log(`   Barras: últimos 12 meses${ley ? ` — ${ley}` : " (sin llegadas en la ventana)"}`);
+      }
+
+      // ── LA FILA DE PLATA, agrupada, exactamente como se lee ──
       const m = f.margen;
       const lista = f.ultima?.costos.lista ?? art.precioEtiqueta;
-      const partes: string[] = [];
-      if (m.precioReal != null) partes.push(`Precio prom ${money(m.precioReal)}`);
+      const precios: string[] = [];
+      if (m.precioReal != null) precios.push(`Precio prom ${money(m.precioReal)}`);
+      if (lista != null) precios.push(`lista ${money(lista)}`);
+      const costosTx: string[] = [];
       if (m.costo != null) {
         const c = f.cambioCosto;
-        partes.push(
+        costosTx.push(
           `Costo CIF ${money(m.costo)}${c ? ` (antes ${money(c.anterior)} ${c.subio ? "↑" : "↓"})` : ""}`,
         );
       }
-      if (f.fobCalculado != null) partes.push(`Costo FOB (calculado) ${money(f.fobCalculado)}`);
-      if (m.margen != null) partes.push(`margen ${(m.margen * 100).toFixed(0)}%`);
-      if (lista != null) partes.push(`lista ${money(lista)}`);
-      console.log(`   ${partes.join(" · ")}`);
+      if (f.fobCalculado != null) costosTx.push(`FOB ${money(f.fobCalculado)}`);
+      const margenTx = m.margen != null ? [`margen ${(m.margen * 100).toFixed(0)}%`] : [];
+      const gruposTx = [precios, costosTx, margenTx].filter((x) => x.length > 0);
+      console.log(`   ${gruposTx.map((x) => x.join(" · ")).join(" | ")}`);
       if (m.motivo) console.log(`   (sin margen: ${m.motivo})`);
 
       // ── Avisos ──

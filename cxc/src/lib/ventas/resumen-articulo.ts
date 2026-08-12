@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// LA FICHA DE UN ARTÍCULO — las TRES cajas del tab Ventas › Referencia.
+// LA FICHA DE UN ARTÍCULO — los TRES GRANDES del tab Ventas › Referencia.
 // Módulo PURO (sin red, sin DOM, sin "ahora").
 //
 // Lo que Daniel quiere saber para decidir si repone, textual:
@@ -7,13 +7,25 @@
 //    si con el stock actual que tengo debo de comprar mas, menos o no comprar.
 //    pero no quiero que decidas tu, lo decido yo con la data que me extraigas"*
 //
-// De ahí salen las tres cajas: **Compras** (fecha y cantidad, crudas), **Vendo
-// por mes** y **Me queda para**. Más las barras de los 12 meses completos, el
-// precio real de venta y el margen. La PANTALLA y el EXCEL lo llaman a ÉL: si
-// cada uno hiciera su cuenta tendríamos dos verdades sobre la misma decisión.
+// 🔴 LA JERARQUÍA LA FIJÓ ÉL (12-ago-2026), textual: *"el numero importante
+// estan chiquito. cuanto compre es importante, cuanto vendi en total es
+// importante… me queda 2 meses de venta / vendo 11u mes es lo que mas llama la
+// atencion y no es lo mas importante ya que un mes puedo vender mucho y otros
+// meses no, vendo b2b al por mayor no retail"*. De ahí:
+//   · Los tres GRANDES: **Compré · Vendí · Me quedan** (unidades, tipografía
+//     grande). Compré = TODAS las compras registradas; Vendí = ventas netas de
+//     toda la historia (NC restadas); Me quedan = `existencia` de Switch, NUNCA
+//     deducido.
+//   · El RITMO ("vendo por mes", "me queda para") baja a UNA línea secundaria.
+//   · ⚠️ `Compré − Vendí` NO siempre da `Me quedan` (ajustes, ventas sin compra
+//     registrada, robos). NO se fuerza el cuadre: cada número dice su verdad y
+//     los avisos de descuadre explican el hueco.
 //
-// 🔴 LA PRIMERA CAJA NO INTERPRETA NADA, y esa es la corrección de este PR. Ver
-// la nota larga sobre por qué se fue el reparto FIFO, más abajo.
+// La PANTALLA y el EXCEL lo llaman a ÉL: si cada uno hiciera su cuenta
+// tendríamos dos verdades sobre la misma decisión.
+//
+// 🔴 LA CAJA DE COMPRAS NO INTERPRETA NADA (11-ago-2026). Ver la nota larga
+// sobre por qué se fue el reparto FIFO, más abajo.
 //
 // 🔴 NUNCA ENTRA EL MES EN CURSO. Medido el 10-ago-2026 en `40HM265001`: los
 // "últimos 3 meses" daban 18,3 u/mes con 10 días de agosto adentro y 34,3 con
@@ -31,7 +43,7 @@
 // DECIR CUÁNDO NO SE PUEDE CALCULAR — que es lo contrario de un veredicto.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { restarMeses } from "./referencia";
+import { diffMeses, restarMeses } from "./referencia";
 import { fobEstimado } from "./referencia-info";
 import type { ArticuloCompras, Compra, MesVenta } from "./compras";
 
@@ -214,6 +226,345 @@ export function mesesDeStock(existencia: number | null, porMes: number | null): 
   return existencia / porMes;
 }
 
+// ─── Los TRES GRANDES: Compré · Vendí · Me quedan ────────────────────────────
+//
+// 🔴 SON TRES FUENTES DISTINTAS Y NO SE FUERZA EL CUADRE ENTRE ELLAS:
+//   · Compré  = suma de TODAS las compras registradas (también las de más de 3
+//               años que la lista no muestra). Es `cuadre.comprado`.
+//   · Vendí   = ventas NETAS de toda la historia, con las NC ya restadas (la
+//               firma del error de signos es que la diferencia da EXACTO el
+//               doble). Es `cuadre.vendido`.
+//   · Me quedan = `switch_articulo_info.existencia`, la fuente de verdad.
+//               NUNCA se deduce de los otros dos.
+// Cuando no cierran (ajuste de inventario, venta sin compra registrada, robo —
+// Daniel: *"si hay menos es porq robaron"*), los avisos de descuadre que ya
+// existen lo explican. Acá cada número dice su verdad.
+
+export interface TresGrandes {
+  /** `null` = sin compra registrada: no se inventa un 0 que parecería dato. */
+  comprado: number | null;
+  /** Neto histórico. Puede ser NEGATIVO (más devoluciones que ventas). */
+  vendido: number;
+  /** `null` = Switch no tiene este código en el catálogo. */
+  quedan: number | null;
+  /** vendido ÷ comprado. `null` cuando no se puede decir (sin compras, o
+   *  vendido negativo — "el −5% de lo comprado" no es castellano). */
+  parteVendida: number | null;
+}
+
+export function tresGrandes(
+  art: Pick<ArticuloCompras, "cuadre" | "existencia" | "sinCompraRegistrada">,
+): TresGrandes {
+  // `cuadre` puede faltar en una respuesta vieja cacheada tras un deploy —
+  // misma degradación honesta que `serie ?? []`.
+  const comprado = art.sinCompraRegistrada || art.cuadre == null ? null : art.cuadre.comprado;
+  const vendido = art.cuadre?.vendido ?? 0;
+  return {
+    comprado,
+    vendido,
+    quedan: art.existencia,
+    parteVendida: comprado != null && comprado > 0 && vendido > 0 ? vendido / comprado : null,
+  };
+}
+
+/** "el 80% de lo comprado" — el subtítulo de Vendí. `null` = no hay porcentaje
+ *  honesto que decir y el que llama pone su propio texto. */
+export function textoParteVendida(parte: number | null): string | null {
+  if (parte == null || !Number.isFinite(parte)) return null;
+  const pct = Math.round(parte * 100);
+  if (pct < 1) return "menos del 1% de lo comprado";
+  return `el ${pct}% de lo comprado`;
+}
+
+// ─── LA LÍNEA DEL 90%: en cuánto se vende una compra ────────────────────────
+//
+// 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA. Daniel, textual: *"creo
+// que es mas importante saber en cuanto meses se vendio digamos que el 80%?
+// 90%? siento que es mas util que unidades por mes"*. Confirmó 90% — viene de
+// su regla vieja: la cola no cuenta.
+//
+// Tres formas, según lo que se pueda AFIRMAR sin inventar:
+//   · Compra ÚNICA que ya cruzó el 90%:  "El 90% se vendió en 16 meses"
+//   · Compra ÚNICA viva:                 "En 10 meses va el 80% de la compra"
+//   · VARIAS compras (o historia vieja): agregado ROTULADO como lo que es —
+//     "Desde oct 2025 llegaron 360 u · van vendidas 295". NO se atribuye por
+//     tanda: el FIFO sigue prohibido (nadie marcó las cajas).
+// El "vendo N u por mes" queda como dato chiquito al final de la línea.
+//
+// Granularidad: MESES (las ventas llegan agregadas por día pero la pregunta de
+// Daniel es en meses). "A los N meses" = diferencia de índice de mes entre la
+// llegada y el mes en que el acumulado cruzó el 90%.
+
+/** La parte de la compra que cuenta. La cola (el 10% final) no. */
+export const PARTE_NOVENTA = 0.9;
+
+export type LineaNoventa =
+  /** Compra única y el acumulado ya cruzó el 90%: se vendió en `meses`. */
+  | { tipo: "vendido"; meses: number }
+  /** Compra única viva: van `parte` (0-1) a los `meses` de llegada. */
+  | { tipo: "en-curso"; meses: number; parte: number }
+  /** Varias compras: agregado desde la primera llegada de la ventana de 12
+   *  meses (o la última compra, si ninguna cae en la ventana). */
+  | { tipo: "agregado"; desdeMes: string; llegaron: number; van: number }
+  /** Sin compra registrada (o sin fecha utilizable): no se inventa. */
+  | { tipo: "sin-dato" };
+
+/**
+ * Mide la línea del 90% de un artículo.
+ *
+ * 🔴 CON UNA SOLA COMPRA la cuenta es limpia: todo lo vendido desde que llegó
+ * salió de ella. CON VARIAS no se reparte nada — se suma lo llegado desde el
+ * ancla y lo vendido desde el ancla, y el texto lo dice tal cual.
+ * ⚠️ El mes en curso SÍ entra acá: es un acumulado ("van vendidas"), no un
+ * promedio — excluirlo diría menos de lo que ya pasó.
+ */
+export function medirNoventa(
+  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana" | "serie" | "sinCompraRegistrada">,
+  hoyMes: string,
+): LineaNoventa {
+  const todas = art.compras ?? [];
+  const fuera = art.comprasFueraDeVentana ?? 0;
+  const serie = art.serie ?? [];
+  if (art.sinCompraRegistrada || (todas.length === 0 && fuera === 0)) return { tipo: "sin-dato" };
+  // Solo compras de más de 3 años: no viajan sus fechas, no hay ancla honesta.
+  if (todas.length === 0) return { tipo: "sin-dato" };
+
+  const unica = todas.length === 1 && fuera === 0;
+  if (unica) {
+    const compra = todas[0];
+    const total = compra.unidades;
+    if (!(total > 0)) return { tipo: "sin-dato" };
+    const mesLlegada = compra.fecha.slice(0, 7);
+    const meta = total * PARTE_NOVENTA;
+    let acum = 0;
+    for (const m of serie) {
+      if (m.mes < mesLlegada || m.mes > hoyMes) continue;
+      acum += m.unidades;
+      if (acum >= meta) return { tipo: "vendido", meses: diffMeses(m.mes, mesLlegada) };
+    }
+    // ⚠️ El bucle de arriba avanza en orden porque `serie` viene ascendente de
+    // `ventasPorMes()`. Si un mes posterior devolviera el acumulado por debajo
+    // de la meta ya cruzada, el corte se queda con el PRIMER cruce — que es lo
+    // que se preguntó ("¿en cuánto se vendió el 90%?").
+    return { tipo: "en-curso", meses: diffMeses(hoyMes, mesLlegada), parte: acum / total };
+  }
+
+  // Varias compras: ancla = la primera llegada dentro de los últimos 12 meses
+  // completos (la ventana de las barras); si ninguna cae ahí, la más reciente.
+  //
+  // 🩸 Y EL ANCLA SE EXTIENDE HACIA ATRÁS si lo llegado desde ahí NO alcanza a
+  // cubrir lo vendido desde ahí. El caso real que lo exige: NB3705906 tiene una
+  // compra grande de jul-2024 (120 u) todavía viva y un refuerzo chico de
+  // sep-2025 (20 u); anclado en sep, la línea decía "llegaron 20 · van
+  // vendidas 36" — vendió más de lo que llegó, un número que se lee roto. Lo
+  // que se vendió salió TAMBIÉN de la compra anterior, así que el grupo de
+  // "compras vivas" es el SUFIJO que alcanza a cubrir las ventas: se retrocede
+  // compra por compra hasta que llegaron ≥ van (o hasta la más vieja con
+  // fecha). Sigue siendo agregado — nada se atribuye a una tanda.
+  const inicioVentana = restarMeses(hoyMes, MESES_VENTANA);
+  const enVentana = todas.filter((c) => c.fecha.slice(0, 7) >= inicioVentana);
+  const van = (mes: string) =>
+    serie.filter((m) => m.mes >= mes && m.mes <= hoyMes).reduce((s, m) => s + m.unidades, 0);
+  const llegaronDesde = (mes: string) =>
+    todas.filter((c) => c.fecha.slice(0, 7) >= mes).reduce((s, c) => s + c.unidades, 0);
+
+  // `todas` viene la más NUEVA primero.
+  let idx = enVentana.length ? todas.indexOf(enVentana[enVentana.length - 1]) : 0;
+  for (; idx < todas.length; idx += 1) {
+    const mesAncla = todas[idx].fecha.slice(0, 7);
+    if (llegaronDesde(mesAncla) >= van(mesAncla) || idx === todas.length - 1) break;
+  }
+  const mesAncla = todas[Math.min(idx, todas.length - 1)].fecha.slice(0, 7);
+  return { tipo: "agregado", desdeMes: mesAncla, llegaron: llegaronDesde(mesAncla), van: van(mesAncla) };
+}
+
+/** El texto de la línea del 90%, en español simple. `null` = no hay nada
+ *  honesto que decir (la caja de Compras ya dijo lo suyo). */
+export function textoNoventa(n: LineaNoventa): string | null {
+  switch (n.tipo) {
+    case "vendido":
+      return `El 90% se vendió en ${textoMeses(n.meses)}`;
+    case "en-curso": {
+      const cuando = `En ${textoMeses(n.meses)}`;
+      if (n.parte <= 0) return `${cuando} no se ha vendido nada de la compra`;
+      const pct = Math.round(n.parte * 100);
+      return pct < 1
+        ? `${cuando} va menos del 1% de la compra`
+        : `${cuando} va el ${pct}% de la compra`;
+    }
+    case "agregado":
+      return n.van < 0
+        ? `Desde ${fmtMesAnio(n.desdeMes)} llegaron ${fmtNum(n.llegaron)} u · van devueltas ${fmtNum(-n.van)}`
+        : `Desde ${fmtMesAnio(n.desdeMes)} llegaron ${fmtNum(n.llegaron)} u · van vendidas ${fmtNum(n.van)}`;
+    case "sin-dato":
+      return null;
+  }
+}
+
+/** La versión CORTA para la columna "90% en" del modo pedido. */
+export function textoNoventaCorto(n: LineaNoventa): string {
+  switch (n.tipo) {
+    case "vendido":
+      return textoMeses(n.meses);
+    case "en-curso": {
+      if (n.parte <= 0) return "va 0%";
+      const pct = Math.round(n.parte * 100);
+      return pct < 1 ? "va <1%" : `va el ${pct}%`;
+    }
+    case "agregado":
+      return n.van < 0 ? `devueltas ${fmtNum(-n.van)}` : `van ${fmtNum(n.van)} de ${fmtNum(n.llegaron)}`;
+    case "sin-dato":
+      return "—";
+  }
+}
+
+/** "vendo 28 u por mes" — el dato chiquito del final. `null` = sin ventas en
+ *  la ventana (no se dice "vendo 0"). */
+export function textoVendoPorMes(porMes: number | null): string | null {
+  if (porMes == null || !(porMes > 0)) return null;
+  const n = Math.round(porMes);
+  return n < 1 ? "vendo menos de 1 u por mes" : `vendo ${fmtNum(n)} u por mes`;
+}
+
+/** La línea secundaria completa, tal como se lee bajo los tres grandes.
+ *  Pantalla y verificación comparan contra ESTO — una sola definición. */
+export function textoLineaNoventa(n: LineaNoventa, porMes: number | null): string | null {
+  const partes = [textoNoventa(n), textoVendoPorMes(porMes)].filter((t): t is string => t != null);
+  return partes.length ? partes.join(" · ") : null;
+}
+
+// ─── La VISTA de las barras: ancladas a la llegada ───────────────────────────
+//
+// 🔴 CON UNA SOLA COMPRA las barras arrancan EL MES QUE LLEGÓ la mercancía, no
+// "los últimos 12 meses", y debajo corre el ACUMULADO: compré 120, ¿en cuánto
+// se me van? — contestado mes a mes (mockup aprobado). CON VARIAS compras se
+// quedan los últimos 12 meses y cada llegada se marca con ▲ bajo su mes.
+//
+// El mes EN CURSO sigue sin dibujarse (regla de la casa); el "van vendidas" del
+// subtítulo sí lo incluye, porque es un acumulado y no un promedio.
+
+export interface VistaBarras {
+  modo: "desde-llegada" | "ultimos-12";
+  barras: MesBarra[];
+  /** Acumulado de ventas netas desde la llegada, una cifra por barra.
+   *  Solo en modo desde-llegada. */
+  acumulado: number[] | null;
+  /** La compra que ancla la vista (solo desde-llegada). */
+  llegada: Compra | null;
+  /** true = la compra lleva más de 12 meses: se muestran los PRIMEROS 12. */
+  recortada: boolean;
+  /** Vendidas desde la llegada (mes en curso incluido). Solo desde-llegada. */
+  vanVendidas: number | null;
+  /** Llegadas dentro de la ventana (solo ultimos-12), por mes, la más vieja
+   *  primero. `cantidades` = las unidades de cada llegada de ese mes. */
+  llegadas: { mes: string; cantidades: number[] }[];
+}
+
+export function vistaDeBarras(
+  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana" | "serie">,
+  hoyMes: string,
+): VistaBarras {
+  const todas = art.compras ?? [];
+  const fuera = art.comprasFueraDeVentana ?? 0;
+  const serie = art.serie ?? [];
+  const porMes = new Map(serie.map((s) => [s.mes, s]));
+
+  const unica = todas.length === 1 && fuera === 0;
+  if (unica) {
+    const compra = todas[0];
+    const mesLlegada = compra.fecha.slice(0, 7);
+    const ultimoCompleto = restarMeses(hoyMes, 1);
+    const span = mesLlegada <= ultimoCompleto ? diffMeses(ultimoCompleto, mesLlegada) + 1 : 0;
+    if (span >= 1) {
+      const n = Math.min(span, MESES_VENTANA);
+      const barras: MesBarra[] = [];
+      const acumulado: number[] = [];
+      let acum = 0;
+      for (let i = 0; i < n; i += 1) {
+        const mes = restarMeses(mesLlegada, -i);
+        const fila = porMes.get(mes);
+        acum += fila?.unidades ?? 0;
+        barras.push({
+          mes,
+          unidades: fila?.unidades ?? 0,
+          venta: fila?.venta ?? 0,
+          fuerte: MESES_FUERTES.includes(Number(mes.slice(5, 7))),
+          // Desde que llegó, la mercancía ESTÁ en la calle: un mes sin ventas
+          // acá es un cero de verdad, no un "antes de empezar".
+          antesDeEmpezar: false,
+        });
+        acumulado.push(acum);
+      }
+      const vanVendidas = serie
+        .filter((m) => m.mes >= mesLlegada && m.mes <= hoyMes)
+        .reduce((s, m) => s + m.unidades, 0);
+      return {
+        modo: "desde-llegada",
+        barras,
+        acumulado,
+        llegada: compra,
+        recortada: span > MESES_VENTANA,
+        vanVendidas,
+        llegadas: [],
+      };
+    }
+    // Llegó en el mes en curso: todavía no hay ningún mes completo que anclar.
+  }
+
+  const barras = barrasDeVentana(serie, hoyMes);
+  const meses = new Set(barras.map((b) => b.mes));
+  const llegadasPorMes = new Map<string, number[]>();
+  // `todas` viene la más NUEVA primero; la leyenda va de la más vieja a la más
+  // nueva, como se leen las barras.
+  for (const c of [...todas].reverse()) {
+    const mes = c.fecha.slice(0, 7);
+    if (!meses.has(mes)) continue;
+    llegadasPorMes.set(mes, [...(llegadasPorMes.get(mes) ?? []), c.unidades]);
+  }
+  return {
+    modo: "ultimos-12",
+    barras,
+    acumulado: null,
+    llegada: null,
+    recortada: false,
+    vanVendidas: null,
+    llegadas: [...llegadasPorMes.entries()]
+      .map(([mes, cantidades]) => ({ mes, cantidades }))
+      .sort((a, b) => a.mes.localeCompare(b.mes)),
+  };
+}
+
+/** "Desde que llegó · 23 oct 2025 · 120 u" — el título del modo anclado. */
+export function tituloDesdeLlegada(c: Compra): string {
+  return `Desde que llegó · ${fmtFechaCorta(c.fecha)} · ${fmtNum(c.unidades)} u`;
+}
+
+/** "10 meses en bodega · van vendidas 96 de 120" (+ el aviso del recorte). */
+export function subDesdeLlegada(v: VistaBarras, hoyMes: string): string | null {
+  if (v.modo !== "desde-llegada" || !v.llegada) return null;
+  const meses = diffMeses(hoyMes, v.llegada.fecha.slice(0, 7));
+  const partes = [
+    `${textoMeses(meses)} en bodega`,
+    `van vendidas ${fmtNum(v.vanVendidas ?? 0)} de ${fmtNum(v.llegada.unidades)}`,
+  ];
+  if (v.recortada) partes.push("se muestran los primeros 12 meses");
+  return partes.join(" · ");
+}
+
+/** "▲ oct: llegaron 60 u · ▲▲ feb: llegaron 120 y 180 u" — la leyenda de las
+ *  llegadas marcadas. `null` = ninguna llegada cae en la ventana. */
+export function leyendaLlegadas(llegadas: VistaBarras["llegadas"]): string | null {
+  if (!llegadas.length) return null;
+  return llegadas
+    .map(
+      (l) =>
+        `${"▲".repeat(Math.min(l.cantidades.length, 3))} ${fmtMesCorto(l.mes)}: llegaron ${l.cantidades
+          .map((c) => fmtNum(c))
+          .join(" y ")} u`,
+    )
+    .join(" · ");
+}
+
 // ─── El margen REAL ──────────────────────────────────────────────────────────
 
 /**
@@ -385,24 +736,29 @@ export function textoRestantes(n: number): string | null {
   return n === 1 ? "y 1 compra más" : `y ${n} compras más`;
 }
 
-// ─── La fila de plata: UNA sola línea ────────────────────────────────────────
+// ─── La fila de plata: UNA sola línea, agrupada con lógica ───────────────────
 //
 // 🩸 EL MISMO NÚMERO APARECÍA TRES VECES. La tarjeta tenía dos filas: una decía
 // "Vendí a · me costó · margen" y la de abajo repetía "CIF de hoy" (el mismo
 // "me costó") y "FOB" (que Switch manda IGUAL al CIF en el 93% de las líneas).
 // O sea que en `NB2570001` el $16.56 se leía TRES veces seguidas. Daniel: *"me
-// gusta pero no se siente simple, facil"*. Ahora es UNA fila:
+// gusta pero no se siente simple, facil"*. Ahora es UNA fila, y desde el
+// 12-ago-2026 va AGRUPADA — Daniel: *"precio prom y precio lista porque estan
+// separado"*:
 //
-//   Precio prom $26.92 · Costo CIF $16.56 · Costo FOB $15.05 · margen 39% · lista $27.00
+//   Precio prom $26.92 · lista $27.00 | Costo CIF $16.56 · FOB $15.05 | margen 39%
 //
-// 🔴 EL COSTO FOB ES UNA CUENTA NUESTRA, NO UN DATO DE SWITCH. Daniel lo pidió
-// así, textual: *"pon costo fob (calcula fob/1.1)"*. El FOB que manda Switch
-// llega igual al CIF en 93 de cada 100 líneas por un error de carga conocido, o
-// sea que no distingue nada; el calculado por lo menos significa siempre lo
-// mismo. Por eso se ROTULA como calculado — un número que parece traído y no lo
-// es sería peor que no tenerlo. Se reusa `fobEstimado()` de `referencia-info`,
-// que ya es la ÚNICA definición de esta división en el repo (CIF ÷ 1,10, nunca
-// CIF × 0,9: no es la inversa y da otro número).
+// Los precios juntos (¿estoy descontando?), los costos juntos (¿cuánto me
+// cuesta?), el margen al final.
+//
+// 🔴 EL COSTO FOB SIGUE SIENDO UNA CUENTA NUESTRA, NO UN DATO DE SWITCH. Daniel
+// lo pidió así, textual: *"pon costo fob (calcula fob/1.1)"*. El FOB que manda
+// Switch llega igual al CIF en 93 de cada 100 líneas por un error de carga
+// conocido, o sea que no distingue nada. La palabra "(calculado)" SE FUE del
+// rótulo —Daniel: *"la palabra calculado esta de mas"*— y la explicación de que
+// es CIF ÷ 1,10 vive en el ⓘ de la fila. Se reusa `fobEstimado()` de
+// `referencia-info`, que ya es la ÚNICA definición de esta división en el repo
+// (CIF ÷ 1,10, nunca CIF × 0,9: no es la inversa y da otro número).
 
 /** El costo de la compra ANTERIOR, y para qué lado se movió. */
 export interface CambioDeCosto {
@@ -435,9 +791,16 @@ export function cambioDeCosto(cif: number | null, cifAnterior: number | null): C
 // ─── La ficha completa ───────────────────────────────────────────────────────
 
 export interface FichaArticulo {
+  /** Compré · Vendí · Me quedan — lo que va en grande. */
+  grandes: TresGrandes;
+  /** La línea del 90%: en cuánto se vende una compra. */
+  noventa: LineaNoventa;
+  /** La vista de las barras: anclada a la llegada o últimos 12 meses. */
+  vista: VistaBarras;
   barras: MesBarra[];
   promedio: Promedio;
-  /** Meses que alcanza el stock. `null` = no se puede decir. */
+  /** Meses que alcanza el stock al promedio general. Ya no es una caja: queda
+   *  para el Excel. `null` = no se puede decir. */
   alcance: number | null;
   margen: MargenReal;
   temporada: Temporada;
@@ -475,6 +838,9 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   const cif = ultima?.costos.cif ?? null;
 
   return {
+    grandes: tresGrandes(art),
+    noventa: medirNoventa(art, hoyMes),
+    vista: vistaDeBarras(art, hoyMes),
     barras,
     promedio,
     alcance: mesesDeStock(art.existencia, promedio.porMes),

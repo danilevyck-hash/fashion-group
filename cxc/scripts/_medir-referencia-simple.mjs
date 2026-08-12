@@ -2,10 +2,10 @@
 // mide los 3 anchos de la casa: cuánto ARRASTRA la página, cuánto se RECORTA,
 // si algún blanco táctil baja de 44 px y si algún texto baja de 12 px.
 //
-// 🔴 La primera caja es "Compras" (fecha y cantidad, CRUDAS): 4 líneas y una
-// línea gris "y N compras más" que NO se despliega. Y la plata es UNA sola fila
-// —Precio prom · Costo CIF · Costo FOB (calculado) · margen · lista—, que es la
-// que puede envolver mal a 390 px: el script la lee y la imprime.
+// 🔴 La ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí · Me quedan),
+// la línea del 90%, las barras (ancladas a la llegada o últimos 12 con ▲) y la
+// fila de plata AGRUPADA — Precio prom · lista | Costo CIF · FOB | margen — que
+// es la que puede envolver mal a 390 px: el script la lee y la imprime.
 //
 //   BASE=http://localhost:3000 CODIGO=NB2570001 node scripts/_medir-referencia-simple.mjs
 //
@@ -92,8 +92,12 @@ for (const ancho of ANCHOS) {
       const leer = (rot) => {
         const dt = [...document.querySelectorAll("dt")].find((d) => d.textContent?.trim() === rot);
         const dd = dt?.nextElementSibling;
-        return dt ? `${rot}: ${dd?.textContent?.trim()} — ${dd?.nextElementSibling?.textContent?.trim() ?? ""}` : null;
+        return dt ? `${rot}: ${dd?.textContent?.trim()} — ${(dd?.nextElementSibling?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 90)}` : null;
       };
+      // La línea del 90% (la p entre los tres grandes y las barras).
+      const linea90 = [...document.querySelectorAll("p")]
+        .map((x) => (x.textContent ?? "").replace(/\s+/g, " ").trim())
+        .find((t) => /^(El 90% se vendió|En .*va |En .*no se ha vendido|Desde .* llegaron|vendo .* por mes)/.test(t)) ?? null;
       // 🔴 LA FILA DE PLATA, tal como se lee. Es UNA sola y es la más larga de
       // la tarjeta: a 390 px tiene que envolver sin empujar nada de lado.
       const marca = [...document.querySelectorAll("span")].find(
@@ -112,7 +116,8 @@ for (const ancho of ANCHOS) {
         chicos,
         textos,
         recortados,
-        tres: [leer("Compras"), leer("Vendo por mes"), leer("Me queda para")].filter(Boolean),
+        tres: [leer("Compré"), leer("Vendí"), leer("Me quedan")].filter(Boolean),
+        linea90,
         plata,
         // Las líneas de la fila de plata: si envuelve, crece hacia ABAJO. Más de
         // una línea a 390 px es normal; lo que no puede es arrastrar.
@@ -124,6 +129,10 @@ for (const ancho of ANCHOS) {
           "todavía no se acaba",
           "van 0",
           "Esta:",
+          // 🔴 Podados el 12-ago: las cajas grandes del ritmo y "(calculado)".
+          "Vendo por mes",
+          "Me queda para",
+          "(calculado)",
           // 🔴 Y los textos podados el 11-ago (noche): el número repetido y los
           // dos pies de página.
           "CIF de hoy",
@@ -162,6 +171,7 @@ for (const ancho of ANCHOS) {
     if (m.recortados.length) console.log("   recortados:", JSON.stringify(m.recortados));
     if (m.atribucion.length) console.log("   🔴 ATRIBUCIÓN DE VUELTA:", JSON.stringify(m.atribucion));
     for (const t of m.tres) console.log(`   ${t}`);
+    if (m.linea90) console.log(`   ${m.linea90}`);
     if (m.temporada) console.log(`   ${m.temporada}`);
     if (m.plata) console.log(`   ${m.plata}   [${m.plataAlto} px de alto]`);
 

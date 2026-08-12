@@ -170,19 +170,23 @@ describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisió
     // Daniel pidió el suyo —*"pon costo fob (calcula fob/1.1)"*— porque el de
     // Switch llega IGUAL al CIF en el 93% de las líneas y no distinguía nada.
     // Un `costos.fob` en la vista sería el número viejo de vuelta.
-    const vista = fs.readFileSync(
-      path.resolve(process.cwd(), "src/components/ventas/ReferenciaView.tsx"),
-      "utf8",
-    );
+    // La fila de plata vive en ReferenciaTarjeta.tsx desde el 12-ago-2026 (el
+    // modo pedido reusa el cuerpo); se barren las TRES piezas de la vista.
+    const vista = ["ReferenciaTarjeta.tsx", "ReferenciaView.tsx", "ReferenciaTablaPedido.tsx"]
+      .map((f) => fs.readFileSync(path.resolve(process.cwd(), "src/components/ventas", f), "utf8"))
+      .join("\n");
     const codigo = vista
       .split("\n")
       .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"))
       .join("\n");
     expect(codigo).not.toContain("costos.fob");
     expect(codigo).not.toContain("fobOrigen");
-    // Y el que sí muestra sale de la ficha, rotulado como cuenta.
+    // Y el que sí muestra sale de la ficha. 🔴 El rótulo es "FOB" a secas desde
+    // el 12-ago-2026 — Daniel: *"la palabra calculado esta de mas"*. La cuenta
+    // (CIF ÷ 1,10) la explica el ⓘ, no el rótulo.
     expect(codigo).toContain("fobCalculado");
-    expect(codigo).toContain("Costo FOB (calculado)");
+    expect(codigo).toContain('k="FOB"');
+    expect(codigo).not.toContain("(calculado)");
   });
 
   it("🔴 el Costo FOB de la ficha REUSA `fobEstimado` — una sola división en el repo", () => {

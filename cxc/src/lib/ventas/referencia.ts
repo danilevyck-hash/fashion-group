@@ -247,3 +247,24 @@ export function parsearListaCodigos(texto: string): { codigos: string[]; descart
     descartados: Math.max(0, unicos.length - MAX_CODIGOS_MULTI),
   };
 }
+
+/**
+ * Ordena los artículos EN EL ORDEN EN QUE SE PEGARON los códigos (modo pedido):
+ * Daniel lee la tabla con su Excel al lado y el orden de su lista es el mapa.
+ *
+ * Un artículo cuyo código no está en la lista (no debería pasar: la búsqueda
+ * múltiple es exacta) va al final, por código — nunca se pierde. El MISMO
+ * código en dos empresas queda junto, desempatado por empresa para que el
+ * orden sea determinista. El Excel recibe esta misma lista.
+ */
+export function ordenarComoPegado<T extends { codigo: string; empresa: string }>(
+  articulos: readonly T[],
+  codigos: readonly string[],
+): T[] {
+  const pos = new Map(codigos.map((c, i) => [c.toUpperCase(), i]));
+  return [...articulos].sort((a, b) => {
+    const pa = pos.get(a.codigo.toUpperCase()) ?? codigos.length;
+    const pb = pos.get(b.codigo.toUpperCase()) ?? codigos.length;
+    return pa - pb || a.codigo.localeCompare(b.codigo) || a.empresa.localeCompare(b.empresa);
+  });
+}
