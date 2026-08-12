@@ -42,8 +42,9 @@
 //
 // El candado de todo esto es `src/__tests__/lib/asistencia-pestanas.test.ts`.
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import AppHeader from "@/components/AppHeader";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import ReporteTab from "./ReporteTab";
 import PlanillaTab from "./PlanillaTab";
 import ConfiguracionTab from "./ConfiguracionTab";
@@ -65,7 +66,22 @@ const TABS = [
 type Tab = (typeof TABS)[number][0];
 
 export default function AsistenciaClient() {
-  const [tab, setTab] = useState<Tab>("planilla");
+  // useUrlState usa useSearchParams → necesita un límite de Suspense propio
+  // (mismo patrón que marketing/page.tsx y productos/cargar/page.tsx).
+  return (
+    <Suspense>
+      <AsistenciaInner />
+    </Suspense>
+  );
+}
+
+function AsistenciaInner() {
+  // La pestaña vive en la URL (?tab=reporte) → refresh y compartir-link
+  // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
+  // navegador no cicla por pestañas (convención del sistema). Un valor
+  // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
+  const [tabRaw, setTab] = useUrlState<Tab>("tab", "planilla");
+  const tab: Tab = TABS.some(([k]) => k === tabRaw) ? tabRaw : "planilla";
   const [ayuda, setAyuda] = useState(false);
 
   return (

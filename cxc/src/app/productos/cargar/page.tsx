@@ -2,6 +2,7 @@
 
 import { Suspense, useRef, useState } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import DepuradorDispatcher from "./DepuradorDispatcher";
@@ -106,7 +107,12 @@ export default function CargarProductosPage() {
 
 function CargarInner() {
   const { authChecked, role } = useAuth({ moduleKey: "cargar", allowedRoles: ["admin", "secretaria"] });
-  const [tab, setTab] = useState<Tab>("depurador");
+  // La pestaña vive en la URL (?tab=historial) → refresh y compartir-link
+  // conservan la vista. Tab del MISMO nivel → replace (default): el Atrás del
+  // navegador no cicla por pestañas (convención del sistema). Un valor
+  // desconocido en la URL cae en la pestaña por defecto, nunca en blanco.
+  const [tabRaw, setTab] = useUrlState<Tab>("tab", "depurador");
+  const tab: Tab = PESTANAS.some((p) => p.id === tabRaw) ? tabRaw : "depurador";
   const [formulasScope, setFormulasScope] = useState<FormulasScope>("depurador");
   const [refreshKey, setRefreshKey] = useState(0);
 

@@ -126,7 +126,11 @@ function AdminDashboardInner() {
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
   // dos vistas disjuntas (switch_estadocuenta_aging / _boston), así que no hay
   // ninguna pantalla donde los saldos del grupo y los de Boston puedan sumarse.
-  const [tab, setTab] = useState<"grupo" | "boston">("grupo");
+  // Vive en la URL (?tab=boston) para que refresh y compartir-link conserven la
+  // vista. Tab del MISMO nivel → replace (default de useUrlState): el Atrás del
+  // navegador no cicla por pestañas, sale de la página (convención del sistema).
+  const [tabRaw, setTab] = useUrlState<"grupo" | "boston">("tab", "grupo");
+  const tab = tabRaw === "boston" ? "boston" : "grupo";
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
   // riskFilter vive en la URL (?risk=) → compartible y sobrevive refresh.
   const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
