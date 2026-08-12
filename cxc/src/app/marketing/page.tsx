@@ -118,7 +118,13 @@ function MarketingPage() {
         if (nextProyecto) params.set("proyecto", nextProyecto);
       }
       const qs = params.toString();
-      router.replace(qs ? `/marketing?${qs}` : "/marketing");
+      // PUSH, no replace: cada nivel (marca, proyecto, reportes/impulsadoras)
+      // es "otra página" y deja su entrada en el historial → el botón Atrás
+      // del navegador deshace UN nivel (espejo del breadcrumb), en vez de
+      // saltarse /marketing entero y caer en el Inicio. 🩸 Con replace, tocar
+      // el bloque de Tommy PISABA la entrada /marketing y Atrás iba a "/".
+      // Es el mismo patrón del módulo de referencia (ReclamosClient).
+      router.push(qs ? `/marketing?${qs}` : "/marketing");
     },
     [proyectoParam, vistaParam, bloqueParam, router],
   );

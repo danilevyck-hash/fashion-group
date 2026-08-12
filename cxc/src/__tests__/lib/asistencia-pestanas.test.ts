@@ -52,7 +52,9 @@ describe("las 4 pestañas y su orden", () => {
   });
 
   it("abre en Planilla — es a lo que viene la contable", () => {
-    expect(src).toMatch(/useState<Tab>\("planilla"\)/);
+    // Desde el 12-ago-2026 la pestaña vive en la URL (?tab=) para que el
+    // refresh no la pierda; el DEFAULT sigue siendo Planilla.
+    expect(src).toMatch(/useUrlState<Tab>\("tab", "planilla"\)/);
   });
 
   it("Horarios y Feriados YA NO son pestañas de primer nivel", () => {
