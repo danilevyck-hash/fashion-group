@@ -22,6 +22,17 @@
 //                 en general"*. Medido antes del cambio: las 17 facturas con
 //                 proyecto null de producción son TODAS pagos de impulsadora —
 //                 0 facturas libres sin cliente, 0 entregas sin cliente.
+//                 🔴 Y DE LA LISTA (12-ago-2026, misma noche). Daniel: *"donde
+//                 dice cliente, me deja pasar sin que amarre un cliente de mi
+//                 lista de fashion group? no te tengo que decir cada cosita,
+//                 eso es obvio across todo el sistema"*. El campo es el
+//                 selector CERRADO de la casa (`ClientePicker`, el de Guías y
+//                 Cheques) SIN la salida "Otro": texto tipeado que no matchea
+//                 NO enciende Continuar, y la pantalla dice el camino — el
+//                 cliente que falta se da de alta EN SWITCH (los clientes
+//                 nacen allá; el directorio se sincroniza de ahí). El
+//                 typeahead libre (`ClienteTypeahead`) quedó solo en
+//                 EditarProyectoModal, que edita proyectos históricos.
 //   Marca       → UNA por gasto. Nada de repartos 50/50. Si el modal se abre
 //                 desde la página de una marca, viene PRESELECCIONADA
 //                 (`marcaInicial`) y se enseña como renglón fijo con "Cambiar"
@@ -52,7 +63,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ToastSystem";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
-import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
+import ClientePicker from "@/components/ClientePicker";
 import { FacturaForm } from "@/components/marketing";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import RegistrarPagoModal from "./RegistrarPagoModal";
@@ -141,16 +152,6 @@ function ordenarMarcas(marcas: MkMarca[]): MkMarca[] {
     if (ia !== ib) return ia - ib;
     return a.nombre.localeCompare(b.nombre, "es");
   });
-}
-
-/** Para parear el cliente escrito a mano con el proyecto que ya existe. */
-function norm(s: string): string {
-  return String(s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }
 
 export default function RegistrarGastoModal({
@@ -242,36 +243,42 @@ export default function RegistrarGastoModal({
   }, [camino]);
 
   /**
-   * El proyecto del cliente, buscado o creado.
+   * El proyecto del cliente, buscado o creado — SIEMPRE con su D-XXX.
    *
-   * 🔴 SIN CLIENTE NO SE CREA NADA: devuelve `null` y el gasto se guarda con
-   * `proyecto_id = null`. Inventarle un proyecto "General" a un pago de
-   * impulsadora sería volver a meter el paso que Daniel mandó sacar.
+   * 🔴 SIN CÓDIGO DEL DIRECTORIO NO SE CREA NADA (12-ago-2026). El cliente
+   * llega ELEGIDO de la lista (el `ClientePicker` de este modal no tiene
+   * "Otro" y Continuar no se enciende sin código), así que un proyecto nuevo
+   * nace SIEMPRE con `tienda_codigo`. El guard de acá es la segunda cerradura:
+   * si algún camino futuro llegara sin código, se corta con el mismo mensaje
+   * que dice la pantalla, no se crea un proyecto suelto.
    *
-   * ⚠️ Los duplicados de cliente que hoy existen (D-87 y D-25 aparecen dos veces
-   * cada uno) NO se muestran aparte: el pareo va PRIMERO por código del
-   * directorio, así que los dos gastos de D-87 caen en el mismo proyecto y se
-   * ven fusionados. El texto libre solo se usa cuando no hay código.
+   * ⚠️ Los `mk_proyectos` HISTÓRICOS sin código NO se tocan ni se parean: el
+   * pareo va SOLO por código (igual que antes cuando se elegía del
+   * autocomplete). Los duplicados de cliente que hoy existen (D-87 y D-25
+   * aparecen dos veces cada uno) tampoco se muestran aparte: los dos gastos de
+   * D-87 caen en el mismo proyecto y se ven fusionados.
    *
    * Se busca entre TODOS los proyectos vivos, sin mirar estado: "Cerrar
    * proyecto" se retiró (11-ago-2026) y el proyecto es solo el contenedor del
    * cliente. Filtrar por estado acá crearía un proyecto DUPLICADO para un
    * cliente cuyo proyecto quedó en un estado legacy.
    */
-  const resolverProyecto = useCallback(async (): Promise<ProyectoFila | null> => {
+  const resolverProyecto = useCallback(async (): Promise<ProyectoFila> => {
     const nombre = cliente.trim();
-    if (!nombre) return null;
+    const codigo = clienteCodigo.trim();
+    if (!nombre || !codigo) {
+      throw new Error(
+        "Elige un cliente de la lista — si no está, hay que darlo de alta en Switch.",
+      );
+    }
 
     const res = await fetch("/api/marketing/proyectos", {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("No se pudo buscar el proyecto del cliente.");
     const lista = (await res.json()) as ProyectoFila[];
-    const codigo = clienteCodigo.trim();
-    const yaExiste = (Array.isArray(lista) ? lista : []).find((p) =>
-      codigo
-        ? (p.tienda_codigo ?? "") === codigo
-        : norm(p.tienda) === norm(nombre),
+    const yaExiste = (Array.isArray(lista) ? lista : []).find(
+      (p) => (p.tienda_codigo ?? "") === codigo,
     );
     if (yaExiste) return yaExiste;
 
@@ -280,7 +287,7 @@ export default function RegistrarGastoModal({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tienda: nombre,
-        tiendaCodigo: codigo || null,
+        tiendaCodigo: codigo,
         // El nombre del proyecto es solo una etiqueta: el del cliente.
         nombre,
       }),
@@ -479,7 +486,9 @@ export default function RegistrarGastoModal({
     );
   }
 
-  // Cliente OBLIGATORIO en Factura y Mueble (Daniel: *"dejalo obligatorio"*).
+  // Cliente OBLIGATORIO en Factura y Mueble (Daniel: *"dejalo obligatorio"*),
+  // y ELEGIDO de la lista: lo que enciende Continuar es el CÓDIGO D-XXX, no el
+  // texto. Tipear sin elegir no llena nada — el picker solo escribe al elegir.
   // "Gasto de la marca" es el camino sin cliente: impulsadora exige a quién
   // se le paga; "otro gasto" exige la marca.
   const puedeContinuar =
@@ -487,7 +496,7 @@ export default function RegistrarGastoModal({
       ? subGasto === "impulsadora"
         ? !!impulsadoraSel
         : subGasto === "otro" && !!marcaId
-      : !!camino && !!marcaId && cliente.trim() !== "" && !resolviendo;
+      : !!camino && !!marcaId && clienteCodigo.trim() !== "" && !resolviendo;
 
   // ---- El bloque de MARCA, uno solo para todos los caminos que la piden ----
   // Con marca de contexto (`marcaInicial`) se enseña como renglón fijo:
@@ -701,23 +710,21 @@ export default function RegistrarGastoModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Cliente<span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <ClienteTypeahead
+                    <ClientePicker
                       value={cliente}
                       codigo={clienteCodigo}
-                      onSelect={(nombre, codigo) => {
+                      onChange={(nombre, codigo) => {
                         setCliente(nombre);
                         setClienteCodigo(codigo);
                       }}
-                      onFreeText={(texto) => {
-                        setCliente(texto);
-                        setClienteCodigo("");
-                      }}
+                      permitirOtro={false}
                       placeholder="Busca la tienda…"
                       /* text-base en móvil: con 14 px Safari hace zoom. */
                       inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      La tienda a la que va el gasto. Si es para la marca en
+                      Elige la tienda de la lista — si no está, hay que darla
+                      de alta en Switch. Si el gasto es para la marca en
                       general (vallas, eventos), usa &ldquo;Gasto de la
                       marca&rdquo;.
                     </p>

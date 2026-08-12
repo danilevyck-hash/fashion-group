@@ -439,20 +439,24 @@ describe("barrido estático", () => {
 
   it("el gasto SIN cliente no inventa un proyecto", () => {
     // `mk_proyectos` se conserva por debajo como contenedor y los 22 proyectos
-    // actuales no se tocan — lo que se fue es el PASO. Sin cliente el gasto va
-    // con `proyecto_id = null`, como ya viven los pagos de impulsadora.
+    // actuales no se tocan — lo que se fue es el PASO. El único camino sin
+    // cliente es "Gasto de la marca", que va con `proyecto_id = null` directo,
+    // sin tocar la red — como ya viven los pagos de impulsadora.
     const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
-    expect(src).toMatch(/if \(!nombre\) return null;/);
+    expect(src).toMatch(/if \(camino === "marca"\) \{\s*\n\s*setProyecto\(null\);/);
     expect(src).toMatch(/proyectoId: proyecto\?\.id \?\? null/);
-    // Con cliente: se busca el proyecto del cliente y solo si no hay se crea.
-    // Desde el 11-ago-2026 se busca entre TODOS los vivos, sin `?estado=`:
-    // "Cerrar proyecto" se retiró y filtrar por estado crearía un proyecto
-    // duplicado para un cliente cuyo proyecto quedó en un estado legacy.
+    // Con cliente (12-ago-2026: SIEMPRE elegido de la lista, con su D-XXX —
+    // sin código no se crea nada): se busca el proyecto del cliente y solo si
+    // no hay se crea. Desde el 11-ago-2026 se busca entre TODOS los vivos, sin
+    // `?estado=`: "Cerrar proyecto" se retiró y filtrar por estado crearía un
+    // proyecto duplicado para un cliente cuyo proyecto quedó en estado legacy.
+    expect(src).toMatch(/if \(!nombre \|\| !codigo\) \{/);
     expect(src).toContain('fetch("/api/marketing/proyectos"');
     expect(src).not.toContain("estado=abierto");
-    // El pareo va PRIMERO por código del directorio — así los clientes
-    // duplicados (D-87, D-25) caen en el mismo proyecto y se ven fusionados.
-    expect(src).toMatch(/codigo\s*\n?\s*\? \(p\.tienda_codigo \?\? ""\) === codigo/);
+    // El pareo va por código del directorio — así los clientes duplicados
+    // (D-87, D-25) caen en el mismo proyecto y se ven fusionados. Los
+    // históricos sin código NO se parean ni se tocan.
+    expect(src).toMatch(/\(p\.tienda_codigo \?\? ""\) === codigo/);
   });
 
   it("UNA marca por gasto — nada de repartos en la puerta", () => {

@@ -7,6 +7,13 @@
  *      impulsadora que ahi es para la marca en general"*. Medido antes del
  *      cambio: las 17 facturas con proyecto null de producción eran TODAS
  *      pagos de impulsadora — obligatorio no rompe nada.
+ *   1b. 🔴 Y DE LA LISTA (misma noche). Daniel: *"donde dice cliente, me deja
+ *      pasar sin que amarre un cliente de mi lista de fashion group?"*. El
+ *      candado tiene tres caras y las tres están acá: (a) texto libre NO
+ *      enciende Continuar — solo el cliente ELEGIDO, con su D-XXX; (b) el
+ *      proyecto nuevo nace CON `tiendaCodigo`; (c) texto libre no crea
+ *      proyecto (no hay POST) y la pantalla dice el camino: darlo de alta en
+ *      Switch. La salida "Otro" del picker de Guías acá NO existe.
  *   2. El tercer camino es "GASTO DE LA MARCA" con dos sub-opciones:
  *      Impulsadora (el flujo de siempre, intacto) y Otro gasto (vallas,
  *      eventos, catálogos), que guarda con `proyecto_id = null` — SIN
@@ -26,6 +33,7 @@ import {
 } from "@testing-library/react";
 import { ToastProvider } from "@/components/ToastSystem";
 import RegistrarGastoModal from "@/app/marketing/components/RegistrarGastoModal";
+import { invalidarDirectorioClientes } from "@/lib/hooks/useBusquedaClientes";
 import type { MkMarca } from "@/lib/marketing/types";
 
 // El pago de impulsadora es SU propio modal y no se toca en este cambio: se
@@ -42,8 +50,14 @@ const MARCAS: MkMarca[] = [
   { id: "m-kl", codigo: "KL", nombre: "Karl Lagerfeld" } as MkMarca,
 ];
 
+/** El directorio del grupo (clientes_master, códigos D-XXX) que ve el picker. */
+const DIRECTORIO = [
+  { codigo: "D-30", nombre: "City Moda Chorrera" },
+  { codigo: "D-24", nombre: "City Mall David" },
+];
+
 /** fetch de mentira ruteado por URL — nada sale a la red. */
-function instalarFetch() {
+function instalarFetch(opts: { proyectos?: unknown[] } = {}) {
   const llamadas: Array<{ url: string; init?: RequestInit }> = [];
   const fn = vi.fn(async (input: unknown, init?: RequestInit) => {
     const url = String(input);
@@ -71,7 +85,7 @@ function instalarFetch() {
       if (init?.method === "POST") {
         return json({ id: "p-nuevo", tienda: "Tienda X", nombre: "Tienda X" });
       }
-      return json([]);
+      return json(opts.proyectos ?? []);
     }
     if (/\/api\/marketing\/facturas\/[^/]+\/marcas/.test(url)) {
       return json({ ok: true });
@@ -80,7 +94,7 @@ function instalarFetch() {
       return json({ id: "f-nueva" });
     }
     if (url.includes("/api/clientes")) {
-      return json({ clientes: [], total: 0 });
+      return json({ clientes: DIRECTORIO, total: DIRECTORIO.length });
     }
     return json({});
   });
@@ -107,9 +121,33 @@ function abrir(props: { marcaInicial?: MkMarca | null } = {}) {
 const botonContinuar = () =>
   screen.getByRole("button", { name: /Continuar|Abriendo/ }) as HTMLButtonElement;
 
+const campoCliente = () =>
+  screen.getByPlaceholderText("Busca la tienda…") as HTMLInputElement;
+
+/** Teclea en el picker y espera a que la lista (o el "no está") responda. */
+async function buscarCliente(texto: string) {
+  fireEvent.focus(campoCliente());
+  fireEvent.change(campoCliente(), { target: { value: texto } });
+  await waitFor(() =>
+    expect(
+      document.querySelector('[data-desplegable="cliente"]'),
+    ).not.toBeNull(),
+  );
+}
+
+/** El camino feliz: elegir un cliente DE LA LISTA (queda con su D-XXX). */
+async function elegirCliente(nombre = "City Moda Chorrera") {
+  await buscarCliente(nombre.slice(0, 4));
+  await waitFor(() => expect(screen.getByText(nombre)).toBeTruthy());
+  fireEvent.mouseDown(screen.getByText(nombre));
+}
+
 let arnes: ReturnType<typeof instalarFetch>;
 
 beforeEach(() => {
+  // El directorio se cachea a nivel de MÓDULO: sin esto, el primer test le
+  // dejaría su lista a todos los demás aunque re-stubeen fetch.
+  invalidarDirectorioClientes();
   arnes = instalarFetch();
 });
 afterEach(() => {
@@ -117,21 +155,100 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("cliente OBLIGATORIO en Factura y Mueble", () => {
+describe("cliente OBLIGATORIO y DE LA LISTA en Factura y Mueble", () => {
   it.each(["factura", "mueble"] as const)(
-    "camino %s: sin cliente NO se puede continuar, ni con la marca puesta",
-    (camino) => {
+    "camino %s: sin cliente NO se continúa; texto libre TAMPOCO; elegido de la lista SÍ",
+    async (camino) => {
       abrir();
       fireEvent.click(document.querySelector(`[data-camino="${camino}"]`)!);
       // La marca sola no alcanza.
       fireEvent.click(document.querySelector('[data-marca="TH"]')!);
       expect(botonContinuar().disabled).toBe(true);
-      // Con cliente (texto libre cuenta: se guarda sin vincular) se abre.
-      const input = screen.getByPlaceholderText("Busca la tienda…");
-      fireEvent.change(input, { target: { value: "Almacén Jordania" } });
+      // 🔴 Texto libre que no está en la lista NO enciende Continuar, y la
+      // pantalla dice el camino: darlo de alta en Switch.
+      await buscarCliente("Almacén Jordania");
+      await waitFor(() =>
+        expect(
+          screen.getByText(/No está en el directorio — hay que darlo de alta en Switch/),
+        ).toBeTruthy(),
+      );
+      expect(botonContinuar().disabled).toBe(true);
+      // Elegido de la lista (con su D-XXX) sí se abre.
+      await elegirCliente();
       expect(botonContinuar().disabled).toBe(false);
     },
   );
+
+  it('acá NO existe la salida "Otro" del picker de Guías', async () => {
+    abrir();
+    fireEvent.click(document.querySelector('[data-camino="factura"]')!);
+    await buscarCliente("Cliente inventado");
+    expect(screen.queryByText(/Otro — guardar/)).toBeNull();
+    expect(
+      screen.getByText(/Solo clientes de la lista — si no está, hay que darlo de alta/),
+    ).toBeTruthy();
+  });
+
+  it("el proyecto nuevo nace CON el código del cliente (tiendaCodigo)", async () => {
+    abrir();
+    fireEvent.click(document.querySelector('[data-camino="factura"]')!);
+    fireEvent.click(document.querySelector('[data-marca="TH"]')!);
+    await elegirCliente();
+    fireEvent.click(botonContinuar());
+    await waitFor(() => {
+      const post = arnes.llamadas.find(
+        (c) =>
+          c.url.includes("/api/marketing/proyectos") &&
+          c.init?.method === "POST",
+      );
+      expect(post).toBeTruthy();
+      const body = JSON.parse(String(post!.init!.body));
+      // 🔴 EL CANDADO: nunca un proyecto nuevo sin su D-XXX.
+      expect(body.tiendaCodigo).toBe("D-30");
+      expect(body.tienda).toBe("City Moda Chorrera");
+    });
+  });
+
+  it("si el cliente YA tiene proyecto (por código), se reusa sin crear otro", async () => {
+    arnes = instalarFetch({
+      proyectos: [
+        { id: "p-viejo", tienda: "City Moda", nombre: "City Moda", tienda_codigo: "D-30" },
+        // Un histórico SIN código con el mismo nombre NO se parea ni se toca.
+        { id: "p-legacy", tienda: "City Moda Chorrera", nombre: "City Moda Chorrera", tienda_codigo: null },
+      ],
+    });
+    abrir();
+    fireEvent.click(document.querySelector('[data-camino="factura"]')!);
+    fireEvent.click(document.querySelector('[data-marca="TH"]')!);
+    await elegirCliente();
+    fireEvent.click(botonContinuar());
+    // Se abre el formulario de factura sobre el proyecto existente…
+    await waitFor(() => expect(screen.getByLabelText(/Nº factura/)).toBeTruthy());
+    // …sin crear ninguno nuevo.
+    expect(
+      arnes.llamadas.some(
+        (c) =>
+          c.url.includes("/api/marketing/proyectos") &&
+          c.init?.method === "POST",
+      ),
+    ).toBe(false);
+  });
+
+  it("texto libre NO crea proyecto: escribir y no elegir no toca la red de proyectos", async () => {
+    abrir();
+    fireEvent.click(document.querySelector('[data-camino="factura"]')!);
+    fireEvent.click(document.querySelector('[data-marca="TH"]')!);
+    await buscarCliente("Tienda Fantasma");
+    // Continuar sigue apagado, así que no hay forma de disparar el POST.
+    expect(botonContinuar().disabled).toBe(true);
+    expect(
+      arnes.llamadas.some(
+        (c) =>
+          c.url.includes("/api/marketing/proyectos") &&
+          c.init?.method === "POST",
+      ),
+    ).toBe(false);
+  });
 
   it("el label del cliente ya no dice (opcional) ni invita a dejarlo en blanco", () => {
     abrir();
@@ -144,6 +261,40 @@ describe("cliente OBLIGATORIO en Factura y Mueble", () => {
     expect(screen.getByText("Foto").parentElement?.textContent).toContain(
       "opcional",
     );
+  });
+});
+
+describe("candado estático: el cliente amarra al directorio, no hay vuelta al texto libre", () => {
+  // El riesgo que un test de render no ve: que alguien "arregle" un reclamo
+  // futuro devolviendo el typeahead libre o aflojando la puerta a `cliente`
+  // (el texto) en vez de `clienteCodigo` (el D-XXX). Se lee el fuente.
+  const fuente = () => {
+    const { readFileSync } = require("fs") as typeof import("fs");
+    const { join } = require("path") as typeof import("path");
+    return readFileSync(
+      join(process.cwd(), "src/app/marketing/components/RegistrarGastoModal.tsx"),
+      "utf8",
+    );
+  };
+
+  it("el picker va SIN la salida Otro (permitirOtro={false})", () => {
+    expect(fuente()).toContain("permitirOtro={false}");
+  });
+
+  it("Continuar se enciende con el CÓDIGO, no con el texto", () => {
+    expect(fuente()).toContain('clienteCodigo.trim() !== ""');
+  });
+
+  it("el typeahead libre no vuelve a este modal", () => {
+    // El nombre aparece en el comentario que cuenta la historia; lo vedado es
+    // IMPORTARLO o volver a cablear su prop de texto libre.
+    expect(fuente()).not.toMatch(/import\s+ClienteTypeahead/);
+    expect(fuente()).not.toContain("onFreeText");
+  });
+
+  it("el proyecto nuevo lleva el código sí o sí (nada de `|| null`)", () => {
+    expect(fuente()).toContain("tiendaCodigo: codigo");
+    expect(fuente()).not.toContain("tiendaCodigo: codigo || null");
   });
 });
 
@@ -234,7 +385,7 @@ describe('"Gasto de la marca" — las dos sub-opciones', () => {
 });
 
 describe("la marca se pregunta UNA vez (marcaInicial)", () => {
-  it("entrando por una marca: renglón fijo con Cambiar, sin selector", () => {
+  it("entrando por una marca: renglón fijo con Cambiar, sin selector", async () => {
     abrir({ marcaInicial: MARCAS[1] });
     fireEvent.click(document.querySelector('[data-camino="factura"]')!);
     // El renglón fijo dice la marca; el grid de marcas no se dibuja.
@@ -245,9 +396,7 @@ describe("la marca se pregunta UNA vez (marcaInicial)", () => {
     fireEvent.click(cambiar[cambiar.length - 1]);
     expect(document.querySelector('[data-marca="TH"]')).not.toBeNull();
     // Y la marca del contexto sigue elegida hasta que se toque otra.
-    fireEvent.change(screen.getByPlaceholderText("Busca la tienda…"), {
-      target: { value: "Tienda Real" },
-    });
+    await elegirCliente();
     expect(botonContinuar().disabled).toBe(false);
   });
 
