@@ -1,4 +1,4 @@
-// SOLO LECTURA de la pantalla. Abre /ventas?tab=referencia, busca un código y
+// SOLO LECTURA de la pantalla. Abre /referencia, busca un código y
 // mide los 3 anchos de la casa: cuánto ARRASTRA la página, cuánto se RECORTA,
 // si algún blanco táctil baja de 44 px y si algún texto baja de 12 px.
 //
@@ -46,7 +46,7 @@ for (const ancho of ANCHOS) {
   });
   const page = await ctx.newPage();
 
-  await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/referencia`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
 
   const input = page.locator('input[aria-label="Buscar referencia"]').first();

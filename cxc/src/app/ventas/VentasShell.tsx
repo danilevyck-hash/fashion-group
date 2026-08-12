@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact, Package, Percent, ScanSearch } from "lucide-react";
+import { Download, TrendingUp, Contact, Package, Percent } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
@@ -39,10 +39,6 @@ const ProductosView = dynamic(
 );
 const UtilidadView = dynamic(
   () => import("@/components/ventas/UtilidadView").then((m) => m.UtilidadView),
-  { ssr: false, loading: () => <TabSkeleton /> },
-);
-const ReferenciaView = dynamic(
-  () => import("@/components/ventas/ReferenciaView").then((m) => m.ReferenciaView),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 
@@ -105,7 +101,14 @@ export function VentasShell({
   // Tab activo en la URL (?tab=resumen|clientes) para que refresh, back/forward
   // y compartir-link mantengan dónde estaba el usuario. Multifashion se separó
   // a su propio módulo (/multifashion); Ventas queda con Resumen + Clientes.
-  const [tab, setTab] = useUrlState("tab", "resumen");
+  //
+  // Un ?tab= desconocido cae en la pestaña por defecto, NUNCA en blanco (misma
+  // convención que /admin, /asistencia y el Depurador): Radix no dibuja nada si
+  // el `value` no tiene trigger, así que sin este filtro un enlace viejo dejaba
+  // la pantalla vacía. `?tab=referencia` además se redirige a /referencia en
+  // next.config.js — esto es la red de abajo, no el camino principal.
+  const [tabRaw, setTab] = useUrlState("tab", "resumen");
+  const tab = TABS.some((t) => t === tabRaw) ? tabRaw : "resumen";
 
   // Bundle del Resumen cacheado por SWR, keyed por el año → cada año cachea por
   // separado y volver a un año ya visto pinta al instante (sin re-fetch). El
@@ -219,7 +222,7 @@ export function VentasShell({
           </Select>
           {/* Excel global = export del Resumen. En el tab Productos se oculta
               porque ese tab trae su propio export (por empresa + período). */}
-          {tab !== "productos" && tab !== "utilidad" && tab !== "referencia" && (
+          {tab !== "productos" && tab !== "utilidad" && (
             /* iPhone: medía 79×32. size="sm" fija h-8; el min-h-[44px] gana
                sobre `height` en CSS (min-height siempre manda) sin tocar el
                tamaño de letra ni el padding horizontal. */
@@ -236,12 +239,20 @@ export function VentasShell({
             que hasta el Resumen —que ya pasó a tarjetas y su tabla mide 0—
             seguía arrastrando acá. Sin `overflow-x-auto` y con menos relleno
             lateral en celular (px-4 → px-2.5, que devuelve 48 px) entran las
-            cuatro sin arrastrar. Desde `sm` vuelve el relleno de siempre.
-            Con la 5ª pestaña (Referencia) el celular volvió a quedarse corto:
-            los iconos (decorativos) se esconden bajo `sm`, el relleno baja a
-            px-2 y la letra a 13px (≥12, dentro de la regla). Los TEXTOS no
-            cambiaron y desde `sm` todo vuelve a como estaba. Medido a 390:
-            las cinco entran sin arrastrar. */}
+            cuatro sin arrastrar. Ningún texto cambió; desde `sm` vuelve el
+            relleno de siempre.
+            La 5ª pestaña (Referencia) se fue a su propio módulo (/referencia,
+            12-ago-2026) y de su apretujamiento se revirtió LO QUE SE PUDO, que
+            no es todo — medido a 390 px con las cuatro, no supuesto:
+              · la letra vuelve a text-sm y el relleno a px-2.5 (eran 13 px y
+                px-2): las cuatro suman 315 px + 32 de relleno = 347 ≤ 390 → 0
+                de arrastre, con 43 px de aire.
+              · 🔴 el ICONO SIGUE ESCONDIDO bajo `sm`, y no es un olvido: con
+                icono las cuatro miden 395 px y la tira arrastra 6. El icono
+                cuesta 20 px por pestaña (80 en total) y ningún relleno los
+                devuelve — ni px-1.5, que solo recupera 32 y encima aprieta. Es
+                decorativo (el texto dice lo mismo), así que a 390 se va él.
+            Desde `sm` no cambió nada: icono, px-4 y todo como siempre. */}
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 rounded-none border-b border-gray-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger value="resumen" className={TAB_TRIGGER_CLASS}>
             <TrendingUp className="hidden h-3.5 w-3.5 sm:block" /> Resumen
@@ -254,9 +265,6 @@ export function VentasShell({
           </TabsTrigger>
           <TabsTrigger value="utilidad" className={TAB_TRIGGER_CLASS}>
             <Percent className="hidden h-3.5 w-3.5 sm:block" /> Utilidad
-          </TabsTrigger>
-          <TabsTrigger value="referencia" className={TAB_TRIGGER_CLASS}>
-            <ScanSearch className="hidden h-3.5 w-3.5 sm:block" /> Referencia
           </TabsTrigger>
         </TabsList>
 
@@ -297,11 +305,6 @@ export function VentasShell({
               al cambiar año para resetear search/sort. */}
           <UtilidadView key={selectedYear} selectedYear={selectedYear} />
         </TabsContent>
-        <TabsContent value="referencia" className="mt-5">
-          {/* Ventas por referencia (6 empresas FG, sin Boston/ACS). No depende
-              del año global: sus períodos son 3/6/12 meses o temporada. */}
-          <ReferenciaView />
-        </TabsContent>
       </Tabs>
     </main>
     </PullToRefresh>
@@ -339,7 +342,12 @@ function ErrorState({
 
 const MES_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-// Clase compartida de las 5 pestañas. En celular: sin icono, px-2 y 13px para
-// que las cinco entren en 390 sin arrastre; desde `sm` vuelve el look original.
+// Las pestañas de Ventas, en el orden en que se ven. Es la lista contra la que
+// se valida el ?tab= de la URL: lo que no esté acá cae en "resumen".
+const TABS = ["resumen", "clientes", "productos", "utilidad"] as const;
+
+// Clase compartida de las 4 pestañas. En celular el relleno lateral baja a
+// px-2.5 (devuelve 48 px y las cuatro entran en 390 sin arrastrar); desde `sm`
+// vuelve el de siempre. El icono se ve en todos los anchos.
 const TAB_TRIGGER_CLASS =
-  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 py-3 text-[13px] text-gray-500 sm:px-4 sm:text-sm data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-3 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";

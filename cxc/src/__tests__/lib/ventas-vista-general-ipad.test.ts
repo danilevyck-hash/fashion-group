@@ -202,10 +202,17 @@ describe("la tira de pestañas de Ventas deja de arrastrarse (54 px en los 4 tab
     expect(linea).not.toContain("overflow-x-auto");
   });
 
-  it("las 4 pestañas siguen ahí con su nombre completo", () => {
+  it("las 4 pestañas siguen ahí con su nombre completo, y son SOLO cuatro", () => {
     for (const t of ["Resumen", "Clientes", "Productos", "Utilidad"]) {
       expect(shell).toContain(`> ${t}\n`);
     }
+    // Referencia fue la 5ª entre el 9 y el 12-ago-2026 y volvió a arrastrar el
+    // celular (por eso se escondían los iconos y la letra bajaba a 13 px). Se
+    // mudó a su propio módulo, /referencia; el inventario completo de la tira y
+    // el redirect del enlace viejo viven en ventas-tab-referencia-fuera.test.ts.
+    const tira = shell.slice(shell.indexOf("<TabsList"), shell.indexOf("</TabsList>"));
+    expect(tira.match(/<TabsTrigger /g)?.length ?? 0).toBe(4);
+    expect(tira).not.toContain("Referencia");
   });
 });
 

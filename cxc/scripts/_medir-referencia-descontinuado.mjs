@@ -31,7 +31,7 @@ for (const codigo of CODIGOS) {
     await ctx.addInitScript(() => { sessionStorage.setItem("cxc_role", "admin"); sessionStorage.setItem("fg_is_owner", "1"); });
     const page = await ctx.newPage();
 
-    await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/referencia`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(7000);
     await page.fill('input[placeholder*="Código"]', codigo);
     await page.click('button[type="submit"]');

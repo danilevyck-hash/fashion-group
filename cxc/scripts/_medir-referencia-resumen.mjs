@@ -124,7 +124,7 @@ for (const codigo of CODIGOS) {
       sessionStorage.setItem("fg_is_owner", "1");
     });
     const page = await ctx.newPage();
-    await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/referencia`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(2500);
 
     // Se envía con Enter, NO clickeando "Buscar": el encabezado global tiene su

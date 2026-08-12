@@ -75,9 +75,11 @@ export const ALL_MODULES: AppModule[] = [
   { key: "vista-general", label: "Vista General",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
   { key: "ventas",        label: "Ventas",             href: "/ventas",           icon: TrendingUp,       roles: ["admin"],                                     group: "ventas-clientes" },
   // Referencia con ruta propia (12-ago-2026). Daniel: *"habilita referencia
-  // para los vendedores y bodega"*. Es la MISMA vista del tab de Ventas
-  // (admin la conserva ahí también); vendedor/bodega entran por acá y NO ven
-  // el margen (*"quita margen, lo demas dejalo"* — gate en el API).
+  // para los vendedores y bodega"*. Nació como 5ª pestaña de /ventas y ESTA es
+  // ahora la única puerta: la pestaña se retiró el mismo día (*"dejar solo la
+  // del menú y quitar la pestaña de Ventas"*) y `/ventas?tab=referencia`
+  // redirige acá. Vendedor/bodega NO ven el margen (*"quita margen, lo demas
+  // dejalo"* — gate en /api/ventas/referencia, no en la vista).
   { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
   { key: "cxc",           label: "Cuentas por Cobrar", href: "/admin",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },

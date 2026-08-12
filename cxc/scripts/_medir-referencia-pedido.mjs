@@ -1,4 +1,4 @@
-// SOLO LECTURA del MODO PEDIDO de /ventas?tab=referencia. Pega VARIOS códigos,
+// SOLO LECTURA del MODO PEDIDO de /referencia. Pega VARIOS códigos,
 // verifica que salga la TABLA (no tarjetas), abre una fila y mide los anchos de
 // la casa: arrastre de PÁGINA, recortes, blancos táctiles y textos chicos.
 //
@@ -39,7 +39,7 @@ for (const ancho of ANCHOS) {
   });
   const page = await ctx.newPage();
 
-  await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/referencia`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
 
   const input = page.locator('input[aria-label="Buscar referencia"]').first();

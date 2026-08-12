@@ -1,4 +1,4 @@
-// SOLO LECTURA: abre /ventas?tab=referencia contra el build de producción y
+// SOLO LECTURA: abre /referencia contra el build de producción y
 // lee TAL CUAL las tarjetas de los casos que Daniel señaló — los 4 KPIs
 // (Compré · Vendí · Stock · Meses), la línea del ritmo/90% y la fila de plata.
 //
@@ -24,7 +24,7 @@ await ctx.addInitScript(() => {
   sessionStorage.setItem("fg_is_owner", "1");
 });
 const page = await ctx.newPage();
-await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "domcontentloaded" });
+await page.goto(`${BASE}/referencia`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(6000);
 
 for (const caso of CASOS) {
