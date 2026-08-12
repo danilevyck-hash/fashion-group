@@ -35,6 +35,7 @@ import { formatearFecha } from "./normalizar";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
   agregarPorBloques,
+  crearClasificadorPeriodos,
   type PeriodoRow,
   type SelloRow,
 } from "./resumen-bloques";
@@ -100,6 +101,13 @@ export interface ReportePeriodo {
   entregas: ReporteLineaEntrega[];
   porCliente: ReporteFilaCliente[];
   porMarca: Array<{ marca: string; total: number }>;
+  /**
+   * true = este Excel NO salió de un reporte congelado: se calculó HOY sobre
+   * los documentos sellados a un período cerrado cuyo `reporte` quedó NULL
+   * (el caso real: "mid 2026", que la migración #475 insertó cerrado sin
+   * pasar por el cierre). El Excel lo declara en su subtítulo.
+   */
+  calculadoEnVivo?: boolean;
 }
 
 /** Ids de los documentos que entraron en el reporte, para poder sellarlos. */
@@ -291,15 +299,62 @@ export function marcasDelPeriodo(key: string): string[] {
 export function armarReportePeriodo(
   datos: DatosPeriodos,
   periodo: { id: string; proveedor_key: string; nombre: string },
+  /**
+   * Modo "cerrado en vivo" (12-ago-2026): para un período YA CERRADO cuyo
+   * `reporte` quedó NULL (el caso real: "mid 2026", insertado cerrado por la
+   * migración #475 sin pasar por el cierre). Cambian TRES cosas y nada más:
+   *  - `soloSelladosAEste`: entran ÚNICAMENTE los documentos cuyo sello apunta
+   *    a ESTE período (el clasificador único decide). "Sin sello" acá NO entra:
+   *    eso es el período abierto de hoy, no el archivo.
+   *  - `marca`: acota el reporte a UNA marca del período conjunto legacy
+   *    ('pvh' junta TH+CK+KL) — el chip de Calvin baja SOLO lo de Calvin.
+   *  - Los totales salen de `agregarPorBloques().cerrados` (la MISMA cifra que
+   *    el chip muestra), no del bloque abierto.
+   */
+  opciones?: { soloSelladosAEste?: boolean; marca?: string },
 ): { reporte: ReportePeriodo; documentos: DocumentosDelReporte } {
   const prov = String(periodo.proveedor_key);
+  const soloSellados = opciones?.soloSelladosAEste === true;
+  const marcaPedida = opciones?.marca;
   // Normalmente UNA marca. Un período viejo por proveedor ('pvh') junta tres:
   // sin esto, cerrar un período heredado generaría un reporte VACÍO.
-  const marcasDelReporte = new Set(marcasDelPeriodo(prov));
+  const marcasDelReporte = new Set(
+    marcaPedida ? [marcaPedida] : marcasDelPeriodo(prov),
+  );
   const resumen = agregar(datos);
-  const bloquesDelReporte = resumen.bloques.filter((b) => marcasDelReporte.has(b.key));
-  const bloque =
-    bloquesDelReporte.length === 1
+  // Totales de cabecera — SIEMPRE de `agregarPorBloques`, nunca sumando acá.
+  // En modo cerrado-en-vivo salen de `cerrados` (la cifra del chip); en el
+  // cierre normal, del bloque abierto de la(s) marca(s).
+  const cerradosDelPeriodo = soloSellados
+    ? resumen.cerrados.filter(
+        (c) =>
+          String(c.id ?? "") === String(periodo.id) &&
+          marcasDelReporte.has(c.bloqueKey),
+      )
+    : [];
+  const bloquesDelReporte = soloSellados
+    ? []
+    : resumen.bloques.filter((b) => marcasDelReporte.has(b.key));
+  const bloque = soloSellados
+    ? cerradosDelPeriodo.length > 0
+      ? {
+          facturas: {
+            count: cerradosDelPeriodo.reduce((s, c) => s + c.facturas.count, 0),
+            total: round2(
+              cerradosDelPeriodo.reduce((s, c) => s + c.facturas.total, 0),
+            ),
+          },
+          muebles: {
+            count: cerradosDelPeriodo.reduce((s, c) => s + c.muebles.count, 0),
+            total: round2(
+              cerradosDelPeriodo.reduce((s, c) => s + c.muebles.total, 0),
+            ),
+          },
+          total: round2(cerradosDelPeriodo.reduce((s, c) => s + c.total, 0)),
+          proyectos: 0, // se completa abajo con los proyectos de las líneas
+        }
+      : undefined
+    : bloquesDelReporte.length === 1
       ? bloquesDelReporte[0]
       : bloquesDelReporte.length > 1
         ? {
@@ -347,11 +402,24 @@ export function armarReportePeriodo(
    * preguntar solo por 'TH' metería las 59 facturas ya reportadas en el
    * reporte nuevo — o sea, se le volvería a cobrar a la marca lo mismo.
    */
+  // El clasificador ÚNICO — el mismo de las tarjetas del inicio y de la
+  // lista de proyectos. En modo cerrado-en-vivo ÉL decide la membresía.
+  const clasificador = crearClasificadorPeriodos(datos.periodos, datos.sellos);
+
   const entraEnEstePeriodo = (
     tipo: "factura" | "entrega",
     docId: string,
     marcaKey: string,
   ): boolean => {
+    if (soloSellados) {
+      // Período CERRADO: entra solo lo que el clasificador atribuye a ESTE
+      // período. Un sello a un período ABIERTO (incluido el fantasma
+      // `pvh · abierto`) y un documento sin sello son "gasto de ahora" — NO
+      // entran en el archivo. Un documento con sello duplicado se clasifica
+      // UNA vez (la primera clave manda), así que no se duplica el monto.
+      const cer = clasificador.cerradoPara(tipo, docId, marcaKey, false);
+      return !!cer && cer.id !== null && String(cer.id) === String(periodo.id);
+    }
     for (const clave of clavesDeSello(marcaKey).length > 0
       ? clavesDeSello(marcaKey)
       : [prov]) {
@@ -474,10 +542,13 @@ export function armarReportePeriodo(
   const reporte: ReportePeriodo = {
     version: 1,
     proveedorKey: prov,
-    proveedorNombre: nombreDeBloque(prov, datos.marcas),
+    // Con `marca` el papel es de ESA marca (el chip de Calvin dice Calvin,
+    // aunque el período conjunto legacy se llame 'pvh' por dentro).
+    proveedorNombre: nombreDeBloque(marcaPedida ?? prov, datos.marcas),
     periodoId: String(periodo.id),
     periodoNombre: String(periodo.nombre),
     generadoEn: new Date().toISOString(),
+    ...(soloSellados ? { calculadoEnVivo: true } : {}),
     totales: {
       facturas: {
         count: bloque?.facturas.count ?? lineasFactura.length,
@@ -535,9 +606,15 @@ export function esReportePeriodo(x: unknown): x is ReportePeriodo {
 
 export function excelDeReporte(reporte: ReportePeriodo): Buffer {
   const titulo = `FASHION GROUP — ${reporte.proveedorNombre}`;
-  const subtitulo = `${reporte.periodoNombre} · cerrado el ${formatearFecha(
-    reporte.generadoEn.slice(0, 10),
-  )}`;
+  // El Excel DICE de dónde salió: congelado al cerrar, o calculado hoy (el
+  // período se cerró sin reporte guardado — no se le miente a quien lo lee).
+  const subtitulo = reporte.calculadoEnVivo
+    ? `${reporte.periodoNombre} · calculado el ${formatearFecha(
+        reporte.generadoEn.slice(0, 10),
+      )} (este período se cerró sin reporte guardado)`
+    : `${reporte.periodoNombre} · cerrado el ${formatearFecha(
+        reporte.generadoEn.slice(0, 10),
+      )}`;
 
   // Hoja 1 — Resumen por cliente.
   const colsResumen: ReportColumn[] = [

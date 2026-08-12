@@ -220,39 +220,39 @@ export function claveCliente(p: ProyectoResumenBloque): string {
   return (p.tienda ?? "").trim().toLowerCase().replace(/\s+/g, " ") || "(sin cliente)";
 }
 
-export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
-  const periodos = inp.periodos ?? [];
-  const sellos = inp.sellos ?? [];
-  const adjuntos = inp.adjuntos ?? [];
+/**
+ * El CLASIFICADOR de períodos: ¿este documento, para esta marca, pertenece a
+ * un período CERRADO o al abierto?
+ *
+ * 🔴 FUENTE ÚNICA. Lo usan `agregarPorBloques` (las tarjetas del inicio) y
+ * `proyectos-lista` (la lista partida en "Período actual" / "Ya reportado",
+ * 12-ago-2026). Si cada consumidor escribiera su propia versión, la tarjeta
+ * podría decir "abierto" y la lista "reportado" sobre el MISMO documento.
+ *
+ * 🔑 Tolera el estado SUCIO de los sellos de hoy sin depender de él:
+ *  - Un sello a un período ABIERTO —incluido el fantasma `pvh · abierto` que
+ *    hoy llevan 16 de los 17 pagos de impulsadora— se lee como "gasto de
+ *    ahora" (`null`). Cuando Daniel repare esos sellos hacia TH/CK abiertos,
+ *    la respuesta es LA MISMA: sigue siendo un período abierto.
+ *  - Un documento con sello DUPLICADO (el caso real: la entrega de Nova Lux,
+ *    sellada a CK abierto Y a pvh abierto) se clasifica UNA vez: la primera
+ *    clave que aparezca manda, y el monto no se toca acá — clasificar no suma.
+ */
+export function crearClasificadorPeriodos(
+  periodos: ReadonlyArray<PeriodoRow>,
+  sellos: ReadonlyArray<SelloRow>,
+): {
+  conPeriodos: boolean;
+  abiertoDeMarca: (k: string) => PeriodoRow | null;
+  cerradoPara: (
+    tipo: "factura" | "entrega",
+    docId: string,
+    marcaKey: string,
+    legacyFallback: boolean,
+  ) => PeriodoRow | { id: null; nombre: string } | null;
+} {
   const conPeriodos = periodos.length > 0;
 
-  const bloquePorMarca = indiceBloquePorMarcaId(inp.marcas);
-  const empresaDeMarca = new Map<string, string | null>(
-    inp.marcas.map((m) => [String(m.id), m.empresa_codigo ?? null]),
-  );
-
-  const proyById = new Map(inp.proyectos.map((p) => [String(p.id), p]));
-  const proyectosVivos = new Set(proyById.keys());
-  const esMf = (pid: string | null | undefined) =>
-    !!pid && inp.proyectosMultifashion.has(String(pid));
-
-  // --- Adjuntos: los dos papeles, cada uno con su set ---
-  const facturaConComprobante = new Set<string>();
-  const facturaConFotoInstalacion = new Set<string>();
-  const proyectoConFoto = new Set<string>();
-  for (const a of adjuntos) {
-    const tipo = String(a.tipo ?? "");
-    const fid = a.factura_id ? String(a.factura_id) : "";
-    const pid = a.proyecto_id ? String(a.proyecto_id) : "";
-    if (fid && esComprobanteDePago(tipo)) facturaConComprobante.add(fid);
-    if (fid && esFotoDeInstalacion(tipo)) facturaConFotoInstalacion.add(fid);
-    // Las 60 fotos que ya existen cuelgan del PROYECTO (o sea del cliente) y NO
-    // se migran: se siguen leyendo, y un gasto cuyo cliente ya tiene fotos no
-    // dispara el aviso.
-    if (pid && tipo === "foto_proyecto") proyectoConFoto.add(pid);
-  }
-
-  // --- Períodos ---
   const periodoById = new Map(periodos.map((p) => [String(p.id), p]));
   const abiertoPorClave = new Map<string, PeriodoRow>();
   for (const p of periodos) {
@@ -317,6 +317,43 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     }
     return null;
   };
+
+  return { conPeriodos, abiertoDeMarca, cerradoPara };
+}
+
+export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
+  const periodos = inp.periodos ?? [];
+  const sellos = inp.sellos ?? [];
+  const adjuntos = inp.adjuntos ?? [];
+  // El clasificador es la FUENTE ÚNICA (ver `crearClasificadorPeriodos`).
+  const { conPeriodos, abiertoDeMarca, cerradoPara } =
+    crearClasificadorPeriodos(periodos, sellos);
+
+  const bloquePorMarca = indiceBloquePorMarcaId(inp.marcas);
+  const empresaDeMarca = new Map<string, string | null>(
+    inp.marcas.map((m) => [String(m.id), m.empresa_codigo ?? null]),
+  );
+
+  const proyById = new Map(inp.proyectos.map((p) => [String(p.id), p]));
+  const proyectosVivos = new Set(proyById.keys());
+  const esMf = (pid: string | null | undefined) =>
+    !!pid && inp.proyectosMultifashion.has(String(pid));
+
+  // --- Adjuntos: los dos papeles, cada uno con su set ---
+  const facturaConComprobante = new Set<string>();
+  const facturaConFotoInstalacion = new Set<string>();
+  const proyectoConFoto = new Set<string>();
+  for (const a of adjuntos) {
+    const tipo = String(a.tipo ?? "");
+    const fid = a.factura_id ? String(a.factura_id) : "";
+    const pid = a.proyecto_id ? String(a.proyecto_id) : "";
+    if (fid && esComprobanteDePago(tipo)) facturaConComprobante.add(fid);
+    if (fid && esFotoDeInstalacion(tipo)) facturaConFotoInstalacion.add(fid);
+    // Las 60 fotos que ya existen cuelgan del PROYECTO (o sea del cliente) y NO
+    // se migran: se siguen leyendo, y un gasto cuyo cliente ya tiene fotos no
+    // dispara el aviso.
+    if (pid && tipo === "foto_proyecto") proyectoConFoto.add(pid);
+  }
 
   // --- Acumuladores ---
   const bloques = new Map<string, BloqueResumen>();

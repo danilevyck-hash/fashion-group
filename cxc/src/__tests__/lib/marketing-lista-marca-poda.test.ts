@@ -119,14 +119,17 @@ describe("la fila de proyecto quedó podada (y la vista usa el módulo puro)", (
     expect(src).not.toContain("Este proyecto tiene entregas de muebles");
   });
 
-  it("los enlaces de arriba se fueron; el cuadre de Impulsadoras se queda", () => {
+  it("los enlaces de arriba se fueron; el cuadre vive en la fila General", () => {
     // Sin puertas de navegación en la cabecera: eso vive en el inicio.
     expect(limpio).not.toMatch(/onOpenReportes|onOpenInventario/);
-    // La línea de cuadre al pie NO es un enlace de navegación: es el dato de
-    // impulsadoras de ESTA marca, y sin ella el detalle visible no suma igual
-    // que el bloque del inicio.
-    expect(src).toMatch(/impulsadoraTotal > 0/);
-    expect(src).toMatch(/onClick=\{onOpenImpulsadoras\}/);
+    // El cuadre con el bloque del inicio lo lleva la fila "General"
+    // (12-ago-2026): impulsadoras Y gastos sin cliente de la marca, con su
+    // detalle. Reemplazó a la línea "Impulsadoras · esta marca", que solo
+    // sumaba impulsadoras y navegaba a otra pantalla. Su candado completo
+    // vive en marketing-lista-por-periodo.test.ts.
+    expect(limpio).not.toMatch(/impulsadoraTotal|onOpenImpulsadoras/);
+    expect(src).toMatch(/setVerGeneral\(true\)/);
+    expect(src).toContain("impulsadoras y gastos sin cliente");
     // La única acción de la cabecera sigue siendo registrar gasto.
     expect(src).toContain("+ Registrar gasto");
   });

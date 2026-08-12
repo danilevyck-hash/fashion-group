@@ -182,13 +182,11 @@ function MarketingPage() {
           </div>
         ) : bloqueParam ? (
           <ProyectosHomeView
-            marcas={marcas}
             bloque={bloqueParam}
             bucketLabel={bloqueLabel ?? ""}
             onBack={() => navegar({ bloque: null, proyecto: null })}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
             onRegistrarGasto={() => setRegistrandoGasto(true)}
-            onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             refreshKey={refreshKey}
           />
         ) : (

@@ -230,12 +230,18 @@ export default function InicioMarketing({
   // El reporte de un período cerrado. Se baja por fetch y no por un enlace
   // directo: si el servidor contesta un error, un <a> navegaría fuera de la app
   // y le mostraría a la secretaria un JSON en pantalla.
+  //
+  // `marca` acota el período conjunto legacy ('pvh' junta TH+CK+KL): el chip
+  // de Calvin · mid 2026 baja SOLO lo de Calvin. Sin marca (el cierre normal,
+  // que ya es por marca) el reporte sale entero.
   const descargarReporte = useCallback(
-    async (periodoId: string, etiqueta: string) => {
+    async (periodoId: string, etiqueta: string, marca?: string) => {
       try {
-        const res = await fetch(`/api/marketing/periodos/${periodoId}/reporte`, {
-          cache: "no-store",
-        });
+        const qs = marca ? `?marca=${encodeURIComponent(marca)}` : "";
+        const res = await fetch(
+          `/api/marketing/periodos/${periodoId}/reporte${qs}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) {
           toast("No se pudo bajar el reporte. Intenta de nuevo en unos segundos.", "error");
           return;
@@ -563,7 +569,9 @@ export default function InicioMarketing({
                       {c.id ? (
                         <button
                           type="button"
-                          onClick={() => descargarReporte(c.id as string, etiqueta)}
+                          onClick={() =>
+                            descargarReporte(c.id as string, etiqueta, c.bloqueKey)
+                          }
                           title="Bajar el Excel de este período"
                           className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition"
                         >
