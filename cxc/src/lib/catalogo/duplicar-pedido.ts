@@ -1,10 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// "Duplicar y corregir" — handler COMPARTIDO Reebok/Joybees.
+// "Duplicar y corregir" — handler COMPARTIDO Reebok/Joybees/Tommy.
 //
 // Un pedido ya enviado a Switch no se puede editar (ver switch-lock.ts). Este
 // handler lo clona (cliente + items + comentario + cliente/vendedor Switch)
 // como pedido NUEVO en estado borrador, editable, con reemplaza_a apuntando al
 // original. El original NO se borra: queda visible y marcado "Reemplazado por".
+//
+// El body puede traer `client_name` (el mini-modal de Duplicar lo manda): si el
+// nombre CAMBIÓ respecto del original, el clon sale con el nombre nuevo y SIN
+// `cliente_switch_id` — copiarlo a ciegas mandaría el pedido a Switch bajo el
+// cliente VIEJO. Con el nombre igual (o sin body) se copia como siempre.
 //
 // Si ya existe un reemplazo activo del mismo original, devuelve ESE en vez de
 // crear otro (yaExistia=true) — evita duplicados por doble click o dos users.
@@ -18,13 +23,17 @@ import { requireRole } from "@/lib/requireRole";
 import { getSession } from "@/lib/require-auth";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { getEnvioActivo } from "@/lib/catalogo/switch-lock";
-import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
-import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
-import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 
 const DUP_ROLES = ["admin", "secretaria", "vendedor"];
-// Mismo fallback que el resto del flujo Reebok: nunca inflar a footwear=12.
-const FALLBACK_CATEGORY = "apparel";
+
+/** ¿El nombre pedido es OTRO cliente? Espacios y mayúsculas no cuentan como
+ *  cambio (retipear "juan" por "Juan" es la misma persona). */
+export function nombreClienteCambio(nuevo: string | null, original: string | null): boolean {
+  const n = (nuevo ?? "").trim();
+  const o = (original ?? "").trim();
+  return n !== "" && n.toLowerCase() !== o.toLowerCase();
+}
 
 interface ItemRow {
   product_id: string;
@@ -56,6 +65,10 @@ export async function handleDuplicarPedido(
   const session = getSession(req);
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
+
+  // Body opcional {client_name}: el POST histórico va sin body (→ {}).
+  const body = (await req.json().catch(() => ({}))) as { client_name?: unknown };
+  const nombrePedido = typeof body.client_name === "string" ? body.client_name : null;
 
   // ── DDL disponible? (probe barato de la columna reemplaza_a) ──
   const probe = await db.from(cfg.ordersTable).select("id, reemplaza_a").eq("id", orderId).maybeSingle();
@@ -93,7 +106,7 @@ export async function handleDuplicarPedido(
 
   // ── Pedido original (cliente + items). cliente/vendedor_switch_id pueden no
   //    existir aún (DDL 20260705120000 pendiente) → reintento sin ellas. ──
-  const itemCols = `product_id, sku, name, image_url, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`;
+  const itemCols = `product_id, sku, name, image_url, quantity, unit_price${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
   let original: OriginalRow | null = null;
   for (const withIds of [true, false]) {
     const cols = `id, order_number, client_name, vendor_name, client_email, comment${withIds ? ", cliente_switch_id, vendedor_switch_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
@@ -120,28 +133,34 @@ export async function handleDuplicarPedido(
     return NextResponse.json({ error: "El pedido no tiene productos para duplicar" }, { status: 400 });
   }
 
-  // ── Total con la fórmula de cada marca (bulto por categoría en Reebok) ──
-  let total = 0;
-  if (marca === "reebok") {
-    const categoryMap = await fetchReebokCategoryMap(original.items.map((i) => i.product_id));
-    total = calculateReebokOrderTotal(
-      original.items.map((i) => ({
-        quantity: i.quantity || 1,
-        unit_price: Number(i.unit_price) || 0,
-        category: categoryMap.get(i.product_id) || FALLBACK_CATEGORY,
-      })),
-    );
-  } else {
-    total = calculateJoybeesOrderTotal(
-      original.items.map((i) => ({ quantity: i.quantity || 1, unit_price: Number(i.unit_price) || 0 })),
-    );
-  }
+  // ── Total con el `calcTotal` de la marca (mismo criterio que el PUT del
+  //    pedido): categoría vía cfg.categoryLookup (Reebok, bulto 6/12) y piezas
+  //    por bulto del ESTILO (Tommy, bulto_pzas 8/12). Antes Tommy caía en la
+  //    fórmula de Joybees (12 fijo) y el total guardado salía inflado. ──
+  const idsOriginal = original.items.map((i) => i.product_id);
+  const categoryMap = cfg.categoryLookup
+    ? await cfg.categoryLookup(idsOriginal)
+    : new Map<string, string>();
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, idsOriginal);
+  const total = cfg.calcTotal(
+    original.items.map((i) => ({
+      quantity: i.quantity || 1,
+      unit_price: Number(i.unit_price) || 0,
+      category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined,
+      bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+    })),
+  );
+
+  // ── ¿Cambió el cliente? Con nombre nuevo el clon NO hereda cliente_switch_id:
+  //    iría a Switch bajo el cliente viejo. Se re-elige en el detalle. ──
+  const clienteCambio = nombreClienteCambio(nombrePedido, original.client_name);
+  const clientNameClon = clienteCambio ? nombrePedido!.trim() : original.client_name || "Sin nombre";
 
   // ── Creación atómica vía RPC de la marca (numera PED-### sin race). El
   //    dedupe real es el chequeo de reemplazo activo de arriba; el token
   //    lleva sufijo para no chocar con reemplazos borrados y re-duplicados. ──
   const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {
-    p_client_name: original.client_name || "Sin nombre",
+    p_client_name: clientNameClon,
     p_vendor_name: original.vendor_name || session?.userName || null,
     p_client_email: original.client_email || null,
     p_total: total,
@@ -153,7 +172,7 @@ export async function handleDuplicarPedido(
       image_url: i.image_url || null,
       quantity: i.quantity || 1,
       unit_price: Number(i.unit_price) || 0,
-      ...(marca === "reebok" ? { is_preorder: i.is_preorder === true } : {}),
+      ...(cfg.itemsHasPreorder ? { is_preorder: i.is_preorder === true } : {}),
     })),
   });
   if (rpcErr || !created) {
@@ -161,10 +180,13 @@ export async function handleDuplicarPedido(
   }
   const { order_id, order_number } = created as { order_id: string; order_number: string };
 
-  // ── Trazabilidad + comentario + cliente/vendedor Switch del original ──
+  // ── Trazabilidad + comentario + cliente/vendedor Switch del original.
+  //    Con el nombre CAMBIADO, cliente_switch_id NO viaja (queda null → se
+  //    re-elige en el detalle, default Contado). El vendedor sí se copia:
+  //    cambiar de cliente no cambia quién vende. ──
   const update: Record<string, unknown> = { reemplaza_a: orderId };
   if (original.comment) update.comment = original.comment;
-  if (original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
+  if (!clienteCambio && original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
   if (original.vendedor_switch_id != null) update.vendedor_switch_id = original.vendedor_switch_id;
   let upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
   if (upErr && /cliente_switch_id|vendedor_switch_id/i.test(upErr.message)) {

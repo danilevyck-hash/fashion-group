@@ -147,8 +147,6 @@ export interface MarcaTheme {
   cartKeySession: string | null;
   publicCartKey: string;
   publicClientNameKey: string;
-  /** QUIRK Joybees: la página del pedido interno trackea el borrador activo. */
-  draftIdKey: string | null;
   checkoutTokenKey: string;
 
   // ── Reglas de negocio client-side ──
@@ -505,7 +503,6 @@ const REEBOK: MarcaTheme = {
   cartKeySession: "reebok_cart",
   publicCartKey: "reebok_public_cart",
   publicClientNameKey: "reebok_public_client_name",
-  draftIdKey: null,
   checkoutTokenKey: "reebok_checkout_token",
 
   bulto: (c) => reebokBulto(c || "apparel"),
@@ -830,7 +827,6 @@ const JOYBEES: MarcaTheme = {
   cartKeySession: null,
   publicCartKey: "joybees_public_cart",
   publicClientNameKey: "joybees_public_client_name",
-  draftIdKey: "joybees_draft_id",
   checkoutTokenKey: "joybees_checkout_token",
 
   bulto: () => joybeesBulto(),
@@ -1149,7 +1145,6 @@ const TOMMY: MarcaTheme = {
   cartKeySession: null,
   publicCartKey: "tommy_public_cart",
   publicClientNameKey: "tommy_public_client_name",
-  draftIdKey: "tommy_draft_id",
   checkoutTokenKey: "tommy_checkout_token",
 
   bulto: (c, bultoPzas) => tommyBulto(c, bultoPzas),

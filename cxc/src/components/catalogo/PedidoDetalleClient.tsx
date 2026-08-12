@@ -11,6 +11,8 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
+import AgregarProductosModal, { type ProductoAgregable } from "@/components/catalogo/AgregarProductosModal";
+import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -97,6 +99,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [reemplazadoPor, setReemplazadoPor] = useState<{ id: string; order_number: string } | null>(null);
   const [pedidoOriginal, setPedidoOriginal] = useState<{ id: string; order_number: string; switch_numero: string | null } | null>(null);
   const [duplicando, setDuplicando] = useState(false);
+  const [showDupModal, setShowDupModal] = useState(false);
+  // ── Buscador "Agregar productos" (líneas nuevas vía PATCH /item) ──
+  const [showAgregarModal, setShowAgregarModal] = useState(false);
   const switchLockRef = useRef(false);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -135,8 +140,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         setOrder(d); setItems(sortItems((d[theme.itemsField] as OrderItem[]) || [])); setClientName(d.client_name || "");
         setReemplazadoPor(d.reemplazado_por || null); setPedidoOriginal(d.original || null);
         if (d.client_email) setClientEmail(d.client_email);
-        // Track active draft so catalog can add to it (quirk Joybees)
-        if (theme.draftIdKey && d.status === "borrador") sessionStorage.setItem(theme.draftIdKey, id);
         // Estado del envío a Switch (admin/secretaria/vendedor — el vendedor
         // también necesita ver el candado post-envío; otros roles se ignoran)
         if (["admin", "secretaria", "vendedor"].includes(r)) {
@@ -296,10 +299,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       return;
     }
 
-    // 2. Clear active draft so catalog starts fresh (quirk Joybees)
-    if (theme.draftIdKey) sessionStorage.removeItem(theme.draftIdKey);
-
-    // 3. Try to send email (non-blocking — order is already confirmed)
+    // 2. Try to send email (non-blocking — order is already confirmed)
     try {
       const emailRes = await fetch(`${theme.api}/send-order`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -426,12 +426,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // ── DUPLICAR Y CORREGIR (pedido bloqueado por envío a Switch) ──
   // Clona el pedido como borrador NUEVO editable (reemplaza_a = este) y navega.
-  async function duplicarPedido() {
+  // `nombre` viene del mini-modal: si difiere del original, el server crea el
+  // clon con el nombre nuevo y SIN cliente_switch_id (se re-elige en el clon).
+  async function duplicarPedido(nombre: string) {
     setDuplicando(true);
     try {
-      const res = await fetch(`${theme.api}/orders/${id}/duplicar`, { method: "POST" });
+      const res = await fetch(`${theme.api}/orders/${id}/duplicar`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_name: nombre }),
+      });
       const d = await res.json();
       if (res.ok && d.ok) {
+        setShowDupModal(false);
         showToast(d.yaExistia ? `Ya existe ${d.order_number} — te llevo a ese pedido` : `Pedido duplicado: ${d.order_number}`);
         router.push(`/catalogo/${marca}/pedido/${d.id}`);
       } else {
@@ -441,6 +447,55 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       showToast("Error de conexion. Intenta de nuevo.");
     }
     setDuplicando(false);
+  }
+
+  // ── AGREGAR PRODUCTO (línea nueva o +1 bulto) vía PATCH /item ──
+  // El endpoint respeta el candado Switch (409 → el pedido ya está en el ERP).
+  // Éxito → se refleja en el estado local; el auto-save de siempre persiste el
+  // resto de la edición como hasta ahora.
+  async function agregarProducto(p: ProductoAgregable): Promise<boolean> {
+    const existente = items.find((i) => i.product_id === p.id);
+    const quantity = (existente?.quantity || 0) + 1;
+    // Precio: si la línea ya existe se respeta su precio (pudo editarse a
+    // mano); línea nueva sale con el precio del catálogo.
+    const unitPrice = existente ? existente.unit_price : Number(p.price) || 0;
+    try {
+      const res = await fetch(`${theme.api}/orders/${id}/item`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: p.id, sku: p.sku || "", name: p.name, image_url: p.image_url || "",
+          quantity, unit_price: unitPrice,
+          ...(theme.features.preorder ? { is_preorder: p.badge === "proximamente" } : {}),
+        }),
+      });
+      if (res.status === 409) {
+        setShowAgregarModal(false);
+        showToast("Este pedido ya está en Switch — no se puede editar aquí.");
+        load();
+        return false;
+      }
+      if (!res.ok) {
+        showToast("No se pudo agregar el producto. Intenta de nuevo.");
+        return false;
+      }
+      setItems((prev) => {
+        const yaEsta = prev.some((i) => i.product_id === p.id);
+        const nuevos = yaEsta
+          ? prev.map((i) => (i.product_id === p.id ? { ...i, quantity } : i))
+          : [...prev, {
+              product_id: p.id, sku: p.sku || "", name: p.name, image_url: p.image_url || "",
+              quantity, unit_price: unitPrice,
+              category: p.category || undefined, bulto_pzas: p.bulto_pzas ?? undefined,
+              ...(theme.features.preorder ? { is_preorder: p.badge === "proximamente" } : {}),
+            } as OrderItem];
+        return sortItems(nuevos);
+      });
+      showToast(existente ? `${p.sku || p.name}: ahora ${quantity} bultos` : "Producto agregado al pedido");
+      return true;
+    } catch {
+      showToast("No se pudo agregar el producto. Revisa tu conexion.");
+      return false;
+    }
   }
 
   async function deleteOrder() {
@@ -581,11 +636,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Add more products */}
+          {/* Add more products — abre el buscador inline (agrega líneas a ESTE
+              pedido); antes era un link al catálogo, que mete al carrito y el
+              checkout crea un pedido NUEVO. */}
           {canEdit && (
-            <Link href={theme.catalogoHref} className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition">
+            <button onClick={() => setShowAgregarModal(true)}
+              className="text-xs bg-gray-100 text-gray-600 px-3 py-2.5 rounded-full hover:bg-gray-200 transition min-h-[44px]">
               + Agregar productos
-            </Link>
+            </button>
           )}
         </div>
       </div>
@@ -607,7 +665,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             </p>
           ) : isEditorRole ? (
             <div className="mt-3">
-              <button onClick={duplicarPedido} disabled={duplicando}
+              <button onClick={() => setShowDupModal(true)} disabled={duplicando}
                 className="bg-black text-white text-sm font-medium px-4 py-2.5 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
                 {duplicando ? "Duplicando..." : "Duplicar y corregir"}
               </button>
@@ -727,7 +785,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         </div>
       ) : (
         <div className="py-12 text-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg mb-4">
-          No hay productos. <Link href={theme.catalogoHref} className="text-black underline">Agregar desde el catalogo</Link>
+          {canEdit ? (
+            <>No hay productos. <button onClick={() => setShowAgregarModal(true)} className="text-black underline min-h-[44px]">Agregar productos</button></>
+          ) : (
+            <>No hay productos.</>
+          )}
         </div>
       )}
 
@@ -993,6 +1055,28 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             </button>
           </div>
         </ModalOverlay>
+      )}
+
+      {/* Buscador para agregar líneas al pedido (solo borradores editables) */}
+      {showAgregarModal && canEdit && (
+        <AgregarProductosModal
+          theme={theme}
+          enPedido={new Map(items.map((i) => [i.product_id, i.quantity || 0]))}
+          onAgregar={agregarProducto}
+          onClose={() => setShowAgregarModal(false)}
+        />
+      )}
+
+      {/* Mini-modal de "Duplicar y corregir": nombre pre-llenado y editable */}
+      {showDupModal && (
+        <DuplicarPedidoModal
+          orderNumber={order.order_number}
+          nombreInicial={clientName}
+          duplicando={duplicando}
+          avisoClienteSwitch
+          onConfirm={duplicarPedido}
+          onCancel={() => setShowDupModal(false)}
+        />
       )}
 
       <Toast message={toast} />
