@@ -42,12 +42,17 @@ const PREVIEW_LIMPIO = {
   warnings: [], avisos: [], totalPiezas: 24, totalEstimado: 396,
 };
 
+const CREADO = { ok: true, numeroInterno: "16-000000999", pedidoSwitchId: 999, verificado: true, warnings: [] };
+
 interface Escenario {
   status?: string;
   items?: Record<string, unknown>[];
-  /** Respuesta del dry-run: por defecto, limpio. */
-  dry?: { ok: boolean; status: number; body: Record<string, unknown> };
-  /** Respuesta del POST real. */
+  /**
+   * Respuesta del toque (`auto:true`): el servidor pre-valida y CREA en el
+   * mismo viaje. Por defecto, pedido creado.
+   */
+  auto?: { ok: boolean; status: number; body: Record<string, unknown> };
+  /** Respuesta del POST de creación directa (body `{}`) — el "Enviar igual". */
   real?: { ok: boolean; status: number; body: Record<string, unknown> };
   permiso?: Record<string, unknown>;
 }
@@ -55,8 +60,8 @@ interface Escenario {
 /** Stub de `fetch` que registra cada llamada. Devuelve el registro. */
 function stubApi(e: Escenario = {}) {
   const llamadas: { url: string; method: string; body: string | null }[] = [];
-  const dry = e.dry ?? { ok: true, status: 200, body: { preview: PREVIEW_LIMPIO } };
-  const real = e.real ?? { ok: true, status: 200, body: { ok: true, numeroInterno: "16-000000999", pedidoSwitchId: 999, verificado: true, warnings: [] } };
+  const auto = e.auto ?? { ok: true, status: 200, body: CREADO };
+  const real = e.real ?? { ok: true, status: 200, body: CREADO };
 
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method || "GET").toUpperCase();
@@ -66,8 +71,8 @@ function stubApi(e: Escenario = {}) {
 
     if (url.includes("/enviar-switch") && method === "GET") return j(true, 200, { envio: null });
     if (url.includes("/enviar-switch") && method === "POST") {
-      const esDry = !!body && body.includes('"dry":true');
-      const r = esDry ? dry : real;
+      const esAuto = !!body && body.includes('"auto":true');
+      const r = esAuto ? auto : real;
       return j(r.ok, r.status, r.body);
     }
     if (url.includes("/permiso-precio")) return j(true, 200, e.permiso ?? { permiso: true, verificado: true, mensaje: null });
@@ -87,10 +92,14 @@ function stubApi(e: Escenario = {}) {
   return llamadas;
 }
 
-const postsReales = (l: { url: string; method: string; body: string | null }[]) =>
-  l.filter((c) => c.url.includes("/enviar-switch") && c.method === "POST" && !(c.body || "").includes('"dry":true'));
-const dryRuns = (l: { url: string; method: string; body: string | null }[]) =>
-  l.filter((c) => c.url.includes("/enviar-switch") && c.method === "POST" && (c.body || "").includes('"dry":true'));
+type Llamada = { url: string; method: string; body: string | null };
+
+/** TODOS los POST que pueden llegar a crear el pedido. */
+const postsEnvio = (l: Llamada[]) => l.filter((c) => c.url.includes("/enviar-switch") && c.method === "POST");
+/** El toque único: pre-valida y crea en UN viaje. */
+const toquesAuto = (l: Llamada[]) => postsEnvio(l).filter((c) => (c.body || "").includes('"auto":true'));
+/** Creación DIRECTA, sin pre-validar (el "Enviar igual" del modal). */
+const creacionesDirectas = (l: Llamada[]) => postsEnvio(l).filter((c) => !(c.body || "").includes('"auto":true'));
 
 async function montar() {
   render(<PedidoDetalleClient marca="reebok" />);
@@ -119,10 +128,13 @@ describe("un solo toque", () => {
     const btn = await montar();
     await act(async () => { fireEvent.click(btn); });
 
-    await waitFor(() => expect(postsReales(llamadas)).toHaveLength(1));
-    // El orden es el que exige el servidor: confirmar → dry-run → POST real.
+    await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
+    // Confirmar (el PUT lo exige el servidor) y DESPUÉS un solo viaje a Switch.
     expect(llamadas.some((c) => c.method === "PUT" && (c.body || "").includes('"status":"confirmado"'))).toBe(true);
-    expect(dryRuns(llamadas)).toHaveLength(1);
+    // ⏱️ UN SOLO POST: antes eran dos (dry + real) y cada uno volvía a cruzar
+    // todos los SKU contra Switch. Ese segundo viaje es lo que se eliminó.
+    expect(postsEnvio(llamadas)).toHaveLength(1);
+    expect(creacionesDirectas(llamadas)).toHaveLength(0);
     // Y NO se abrió ninguna pantalla intermedia.
     expect(screen.queryByRole("button", { name: "Crear pedido en Switch" })).toBeNull();
     await screen.findByText(/pedido creado en Switch: 16-000000999/i);
@@ -142,21 +154,21 @@ describe("un solo toque", () => {
     const llamadas = stubApi();
     const base = global.fetch as unknown as (u: string, i?: RequestInit) => Promise<unknown>;
     vi.stubGlobal("fetch", async (u: string, i?: RequestInit) => {
-      if (u.includes("/enviar-switch") && (i?.method || "") === "POST" && (i?.body as string).includes("dry")) await espera;
+      if (u.includes("/enviar-switch") && (i?.method || "") === "POST" && (i?.body as string).includes("auto")) await espera;
       return base(u, i);
     });
     const btn = await montar();
     fireEvent.click(btn);
     await screen.findByText(/Revisando el pedido contra Switch/);
     await act(async () => { soltar(null); });
-    await waitFor(() => expect(postsReales(llamadas)).toHaveLength(1));
+    await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
   });
 
   it("un pedido YA confirmado no se vuelve a confirmar: va directo a Switch", async () => {
     const llamadas = stubApi({ status: "confirmado" });
     const btn = await montar();
     await act(async () => { fireEvent.click(btn); });
-    await waitFor(() => expect(postsReales(llamadas)).toHaveLength(1));
+    await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
     expect(llamadas.filter((c) => c.method === "PUT" && (c.body || "").includes("confirmado"))).toHaveLength(0);
   });
 });
@@ -166,7 +178,7 @@ describe("un solo toque", () => {
 describe("se detiene y muestra el problema", () => {
   it("🔴 error de pre-validación: NO escribe en el ERP y enseña qué pasó", async () => {
     const llamadas = stubApi({
-      dry: { ok: false, status: 422, body: {
+      auto: { ok: false, status: 422, body: {
         error: "El pedido no pasa la pre-validación",
         errores: ["SKU SKU-1 no existe en Switch (active_shoes)"],
         warnings: [], avisos: [], lineas: [],
@@ -177,13 +189,17 @@ describe("se detiene y muestra el problema", () => {
 
     await screen.findByText("No se puede enviar a Switch");
     expect(screen.getByText("SKU SKU-1 no existe en Switch (active_shoes)")).toBeTruthy();
-    expect(postsReales(llamadas)).toHaveLength(0); // ← lo que más importa
+    // 🔴 LO QUE MÁS IMPORTA: no sale NINGÚN segundo POST a crear el pedido.
+    // Que el 422 tampoco haya escrito nada del lado del servidor lo fija
+    // `switch-envio-paralelo.test.ts`, que corre el motor de verdad.
+    expect(creacionesDirectas(llamadas)).toHaveLength(0);
+    expect(postsEnvio(llamadas)).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Entendido" })).toBeTruthy();
   });
 
   it("con el permiso 0001 NEGADO se detiene con el texto de siempre", async () => {
     const llamadas = stubApi({
-      dry: { ok: false, status: 422, body: {
+      auto: { ok: false, status: 422, body: {
         errores: ["El usuario de Switch no tiene permiso para cambiar precios (proceso 0001) — pedirlo al administrador de Switch o usar el precio de lista"],
         warnings: [], avisos: [], lineas: [],
       } },
@@ -191,12 +207,12 @@ describe("se detiene y muestra el problema", () => {
     const btn = await montar();
     await act(async () => { fireEvent.click(btn); });
     await screen.findByText(/no tiene permiso para cambiar precios \(proceso 0001\)/);
-    expect(postsReales(llamadas)).toHaveLength(0);
+    expect(creacionesDirectas(llamadas)).toHaveLength(0);
   });
 
   it("las líneas que SÍ cruzaron se ven debajo del problema (sin volver a consultar)", async () => {
     stubApi({
-      dry: { ok: false, status: 422, body: {
+      auto: { ok: false, status: 422, body: {
         errores: ["SKU SKU-2 tiene precio 0 en Switch — corregirlo en el panel antes de enviar"],
         warnings: [], avisos: [],
         lineas: PREVIEW_LIMPIO.lineas,
@@ -215,12 +231,12 @@ describe("se detiene y muestra el problema", () => {
 
   it("un problema que NO es 422 (preventa, Switch caído) también detiene y se lee entero", async () => {
     const llamadas = stubApi({
-      dry: { ok: false, status: 400, body: { error: "El pedido tiene 2 producto(s) en preventa — no se pueden enviar a Switch (sin inventario todavía)" } },
+      auto: { ok: false, status: 400, body: { error: "El pedido tiene 2 producto(s) en preventa — no se pueden enviar a Switch (sin inventario todavía)" } },
     });
     const btn = await montar();
     await act(async () => { fireEvent.click(btn); });
     await screen.findByText(/2 producto\(s\) en preventa/);
-    expect(postsReales(llamadas)).toHaveLength(0);
+    expect(creacionesDirectas(llamadas)).toHaveLength(0);
   });
 });
 
@@ -235,8 +251,8 @@ describe("🔴 doble toque NO duplica el pedido", () => {
       fireEvent.click(btn);
       fireEvent.click(btn);
     });
-    await waitFor(() => expect(postsReales(llamadas)).toHaveLength(1));
-    expect(dryRuns(llamadas)).toHaveLength(1);
+    await waitFor(() => expect(toquesAuto(llamadas)).toHaveLength(1));
+    expect(postsEnvio(llamadas)).toHaveLength(1);
   });
 
   it("el botón queda deshabilitado mientras corre", async () => {
@@ -245,7 +261,7 @@ describe("🔴 doble toque NO duplica el pedido", () => {
     stubApi();
     const base = global.fetch as unknown as (u: string, i?: RequestInit) => Promise<unknown>;
     vi.stubGlobal("fetch", async (u: string, i?: RequestInit) => {
-      if (u.includes("/enviar-switch") && (i?.method || "") === "POST" && (i?.body as string).includes("dry")) await espera;
+      if (u.includes("/enviar-switch") && (i?.method || "") === "POST" && (i?.body as string).includes("auto")) await espera;
       return base(u, i);
     });
     const btn = await montar();
@@ -256,12 +272,29 @@ describe("🔴 doble toque NO duplica el pedido", () => {
 
   it("y si el server igual recibe dos, su 409 se muestra (el candado manda)", async () => {
     const llamadas = stubApi({
-      real: { ok: false, status: 409, body: { error: "Este pedido ya fue enviado a Switch (16-000000999)" } },
+      auto: { ok: false, status: 409, body: { error: "Este pedido ya fue enviado a Switch (16-000000999)" } },
     });
     const btn = await montar();
     await act(async () => { fireEvent.click(btn); });
     await screen.findByText("Este pedido ya fue enviado a Switch (16-000000999)");
-    expect(postsReales(llamadas)).toHaveLength(1);
+    expect(postsEnvio(llamadas)).toHaveLength(1);
+  });
+
+  it("🔴 si el servidor se DETIENE por un aviso bloqueante, el pedido no se creó y hay que decidir", async () => {
+    // El toque manda `auto:true`; el servidor devuelve `preview` = "hay algo
+    // que decidir". Recién el botón del modal manda la creación DIRECTA.
+    const llamadas = stubApi({
+      auto: { ok: true, status: 200, body: { preview: { ...PREVIEW_LIMPIO, avisos: [{ codigo: "precio_distinto", texto: "SKU SKU-1: precio del pedido $15.00 ≠ lista Switch $16.50 — se enviará el del pedido" }] } } },
+    });
+    const btn = await montar();
+    await act(async () => { fireEvent.click(btn); });
+
+    await screen.findByText("Revisa esto antes de enviar");
+    expect(creacionesDirectas(llamadas)).toHaveLength(0); // ← todavía NO se creó
+    // …y el botón del modal sí lo crea, sin volver a pre-validar.
+    const seguir = screen.getByRole("button", { name: "Crear pedido en Switch" });
+    await act(async () => { fireEvent.click(seguir); });
+    await waitFor(() => expect(creacionesDirectas(llamadas)).toHaveLength(1));
   });
 });
 
