@@ -17,6 +17,7 @@
 import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import {
@@ -641,6 +642,18 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     </div>
   );
 
+  // "Pedidos" — a la MISMA altura que Compartir (12-ago-2026). Los dos son
+  // acciones del catálogo; tenerlos en dos filas distintas era el pedido de
+  // Daniel. Mismo gate de rol que tenía en la navbar (gestores; bodega y el
+  // 'cliente' legacy de Reebok no lo ven) y `role` ya vive en esta pantalla.
+  //
+  // NO se esconde en modo pedido: es la salida a la lista, no compite con
+  // "Listo, volver al pedido" (que vive en la barra pegajosa de arriba).
+  const puedeVerPedidos = role === "admin" || role === "vendedor" || role === "secretaria";
+  const pedidosBtn = puedeVerPedidos ? (
+    <Link href={theme.pedidosHref} className={theme.vendorShare.pedidosBtn}>Pedidos</Link>
+  ) : null;
+
   return (
     <div className={theme.grid.pageBg}>
       <div className="max-w-7xl mx-auto px-4 py-6">
@@ -654,10 +667,14 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           />
         )}
         {theme.vendorShare.enHeader ? (
-          /* Layout heredado Joybees: header + [Ver pedido | Compartir] arriba */
-          <div className="flex items-start justify-between">
+          /* Layout heredado Joybees: header + [Ver pedido | Pedidos | Compartir].
+             `flex-wrap` + `justify-end`: a 390 px el logo de Tommy es ancho y
+             tres botones no entran en la misma línea — el grupo baja ENTERO a
+             la línea de abajo en vez de aplastarse (que es lo que hacía antes
+             de que hubiera un botón más). Los dos siguen a la misma altura. */
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <CatalogoHeader marca={marca} variant="vendor" />
-            <div className="flex items-center gap-2">
+            <div data-medir="acciones-catalogo" className="flex flex-wrap items-center justify-end gap-2 ml-auto">
               {!modo.activo && cartCount > 0 && (
                 <button onClick={goCheckout} className={theme.vendorShare.verPedidoBtn!}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -666,6 +683,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
                   Ver pedido
                 </button>
               )}
+              {pedidosBtn}
               {shareMenu}
             </div>
           </div>
@@ -701,7 +719,15 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           {/* "Actualizar ahora" del catálogo (solo con sesión admin/secretaria/
               vendedor — el catálogo público jamás lo ve). */}
           <CatalogoSyncNow catalogo={marca} onSuccess={loadProducts} />
-          {!theme.vendorShare.enHeader && filteredCount > 0 && shareMenu}
+          {/* Reebok: Compartir vive acá, así que "Pedidos" viene con él. Ojo,
+              Compartir se esconde sin resultados y "Pedidos" NO: llegar a la
+              lista de pedidos no depende de que el filtro tenga productos. */}
+          {!theme.vendorShare.enHeader && (
+            <div data-medir="acciones-catalogo" className="flex flex-wrap items-center justify-end gap-2 ml-auto">
+              {pedidosBtn}
+              {filteredCount > 0 && shareMenu}
+            </div>
+          )}
         </div>
 
         {/* ── Grid ── */}

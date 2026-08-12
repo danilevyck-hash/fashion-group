@@ -2,7 +2,8 @@
 
 // Checkout ÚNICO de los catálogos (Reebok y Joybees) — mockup aprobado:
 // carrito → esta pantalla → confirmación. Items editables, cliente del
-// directorio Switch (default Contado), vendedor AUTOMÁTICO por login, total y
+// directorio Switch (default Contado), vendedor con el del login PUESTO por
+// defecto y cambiable (12-ago-2026 — antes era automático y sin salida), total y
 // UN botón "Enviar a Switch". SIN validación de stock aquí
 // (decisión de Daniel 5-jul: el stock del sync <24h basta; flujo rápido).
 // El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y NUNCA
@@ -16,6 +17,8 @@ import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
 import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
+import VendedorSwitchPicker from "@/components/catalogo/VendedorSwitchPicker";
+import { nombreDeVendedor } from "@/lib/catalogo/vendedor-switch";
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -69,6 +72,10 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
   const [clienteQuery, setClienteQuery] = useState("");
   const [vendedor, setVendedor] = useState<{ id: number; nombre: string | null } | null | undefined>(undefined);
+  // El que mapea tu login: es el DEFAULT y el que se rotula "tu vendedor".
+  // Se guarda aparte de `vendedor` para poder decir cuándo se cambió.
+  const [vendedorDelLogin, setVendedorDelLogin] = useState<{ id: number; nombre: string | null } | null>(null);
+  const [vendedorPickerOpen, setVendedorPickerOpen] = useState(false);
   const [sending, setSending] = useState(false);
   // Línea con el precio en edición (tap sobre el precio → input numérico).
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
@@ -87,13 +94,13 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     guardarCarrito(cfg.cartKey, next);
   }, [cfg.cartKey]);
 
-  // ── Vendedor automático por login ──
+  // ── Vendedor: el del login viene PUESTO (default), cambiarlo es opcional ──
   useEffect(() => {
     const empresa = theme.empresaKey;
     fetch(`/api/catalogo/mi-vendedor?empresa=${empresa}`)
       .then((r) => (r.ok ? r.json() : { vendedor: null }))
-      .then((d) => setVendedor(d.vendedor ?? null))
-      .catch(() => setVendedor(null));
+      .then((d) => { setVendedor(d.vendedor ?? null); setVendedorDelLogin(d.vendedor ?? null); })
+      .catch(() => { setVendedor(null); setVendedorDelLogin(null); });
   }, [marca]);
 
   // ── Directorio de clientes (al abrir el selector) ──
@@ -147,7 +154,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       const res = await fetch("/api/catalogo/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ marca, cliente: { id: cliente.id, nombre: cliente.nombre }, items: cart, idempotency_key: token }),
+        // `vendedor_id`: el elegido en pantalla. El server igual lo valida
+        // contra Switch y, si no viene, cae al mapeo del login como siempre.
+        body: JSON.stringify({ marca, cliente: { id: cliente.id, nombre: cliente.nombre }, vendedor_id: vendedor?.id ?? null, items: cart, idempotency_key: token }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -309,17 +318,49 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
             )}
           </section>
 
-          {/* Vendedor automático */}
-          <section className="rounded-lg border border-gray-200 bg-white p-4">
-            <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Vendedor</div>
-            {vendedor === undefined ? (
-              <div className="mt-0.5 text-sm text-gray-400">Cargando…</div>
-            ) : vendedor === null ? (
-              <p className="mt-1 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                No tienes vendedor de Switch asignado — pídele al admin asignarlo en Sistema → Usuarios.
+          {/* Vendedor — viene puesto el de tu login y se puede cambiar
+              (12-ago-2026). 🔴 De este nombre depende la COMISIÓN, por eso se
+              ve siempre, con o sin selector abierto. */}
+          <section data-medir="vendedor-checkout" className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Vendedor</div>
+                {vendedor === undefined ? (
+                  <div className="mt-0.5 text-sm text-gray-400">Cargando…</div>
+                ) : vendedor === null ? (
+                  <div className="mt-0.5 text-sm text-gray-500">Sin vendedor — elígelo abajo</div>
+                ) : (
+                  <div className="mt-0.5 text-sm font-medium">
+                    {nombreDeVendedor(vendedor)}
+                    {vendedor.id === vendedorDelLogin?.id && (
+                      <span className="text-xs text-gray-400"> · tu vendedor</span>
+                    )}
+                  </div>
+                )}
+                <div className="mt-0.5 text-xs text-gray-400">La venta se le acredita a esta persona.</div>
+              </div>
+              <button onClick={() => setVendedorPickerOpen((v) => !v)} className="rounded-md border border-gray-200 px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-300 transition">
+                {vendedorPickerOpen ? "Cerrar" : "Cambiar"}
+              </button>
+            </div>
+            {/* Sin mapeo el checkout respondía 422 y no había salida. Ahora se
+                puede elegir uno — y el aviso al admin SE CONSERVA, porque el
+                mapeo sigue siendo lo que corresponde arreglar. */}
+            {vendedor === null && (
+              <p className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                No tienes vendedor de Switch asignado — elige uno para este pedido, o pídele al admin asignarlo en Sistema → Usuarios.
               </p>
-            ) : (
-              <div className="mt-0.5 text-sm font-medium">{vendedor.nombre || `Vendedor ${vendedor.id}`} <span className="text-xs text-gray-400">· automático por tu usuario</span></div>
+            )}
+            {(vendedorPickerOpen || vendedor === null) && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <VendedorSwitchPicker
+                  empresa={theme.empresaKey}
+                  directorioLabel={theme.switchDirectorioLabel}
+                  valor={vendedor ?? null}
+                  onElegir={(v) => { setVendedor(v); setVendedorPickerOpen(false); }}
+                  disabled={sending}
+                />
+              </div>
             )}
           </section>
 

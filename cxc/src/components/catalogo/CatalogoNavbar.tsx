@@ -1,7 +1,18 @@
 "use client";
 
-// Navbar del catálogo con sesión, parametrizado por MARCA_THEME: link a
-// Inicio, marca, y acceso secundario "Pedidos" para roles gestores.
+// Navbar del catálogo con sesión, parametrizado por MARCA_THEME: link a Inicio
+// y marca.
+//
+// 🩸 "PEDIDOS" YA NO VIVE ACÁ (12-ago-2026). Daniel: *"cambia el boton de
+// pedido a la altura de compartir"*, en las 4 marcas. Estaba arriba del todo,
+// en la barra de la app, mientras "Compartir" —la otra acción del catálogo—
+// vivía más abajo, en la fila del logo. Ahora los dos están juntos, en
+// `CatalogoVendedorPage` (ver `theme.vendorShare.pedidosBtn`).
+//
+// ⚠️ Consecuencia buscada: la navbar envuelve TODAS las sub-rutas del catálogo
+// (/pedidos, /pedido/[id], /checkout…), así que "Pedidos" pasa a verse solo en
+// la pantalla del catálogo. Desde el detalle se sigue volviendo con "← Volver a
+// Pedidos", que es el camino que ya existía.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -15,7 +26,6 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
     setRole(sessionStorage.getItem("cxc_role") || "");
   }, []);
 
-  const isManager = role === "admin" || role === "vendedor" || role === "secretaria";
   // QUIRK Reebok heredado: "← Inicio" solo con rol de sistema (≠ 'cliente').
   const showInicio = theme.features.navInicioRequiereRol ? !!role && role !== "cliente" : true;
 
@@ -33,12 +43,6 @@ export default function CatalogoNavbar({ marca }: { marca: MarcaUiKey }) {
           <Link href={theme.catalogoHref} className="flex-shrink-0">
             {theme.logos.navbar()}
           </Link>
-        )}
-        <div className="flex-1" />
-        {/* El pedido se arma en el carrito → "Ver pedido" → checkout. Aquí solo
-            queda "Pedidos" como acceso secundario a la lista (no crea nada). */}
-        {isManager && (
-          <Link href={theme.pedidosHref} className={theme.navbar.pedidosLink}>Pedidos</Link>
         )}
       </div>
     </nav>

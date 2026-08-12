@@ -68,8 +68,13 @@ describe("🔴 nadie vuelve a escribir la lista a mano", () => {
   ];
 
   it("las dos rutas importan la fuente única", () => {
+    // Se mira QUÉ se importa y DE DÓNDE, no el literal exacto del import: la
+    // ruta de vendedores también trae MARCAS_CONFIG (para derivar sus roles) y
+    // un test pegado a la línea entera se rompería por eso sin que nada esté mal.
     for (const r of RUTAS) {
-      expect(leer(r), r).toContain('import { EMPRESAS_CATALOGO } from "@/lib/catalogo/marcas"');
+      expect(leer(r), r).toMatch(
+        /import \{[^}]*\bEMPRESAS_CATALOGO\b[^}]*\} from "@\/lib\/catalogo\/marcas"/,
+      );
     }
   });
 
