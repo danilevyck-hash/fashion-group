@@ -1,10 +1,15 @@
 // ============================================================================
 // POST /api/marketing/zip-marca
-//   body: { marcaCodigo: "TH"|"CK"|"KL"|"RBK"|"J", periodoId?: string }
+//   body: { marcaCodigo: "TH"|"CK"|"KL"|"RBK"|"J"|"multifashion", periodoId?: string }
 //
 // UN ZIP por request, el de UNA marca. Con `periodoId` sale ese período (esté
 // cerrado o abierto); sin él, el período ABIERTO de la marca — que es el botón
 // "bajar una sola marca cuando quiera, sin cerrar nada".
+//
+// `multifashion` también baja por acá — Daniel, textual (12-ago-2026):
+// *"descargas por marca te basta y multifashion es una marca"*. Es tienda
+// propia: sin períodos, todos sus gastos, mismo formato de archivo. (El export
+// global `/api/marketing/export-zip` se retiró ese mismo día.)
 //
 // Ver `lib/marketing/zip-marca.ts` para la regla que sostiene todo esto: la
 // plata se congela, los papeles no.

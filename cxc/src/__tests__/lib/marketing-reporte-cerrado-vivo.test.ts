@@ -42,7 +42,6 @@ vi.hoisted(() => {
 import {
   armarReportePeriodo,
   agregar,
-  excelDeReporte,
   type DatosPeriodos,
 } from "@/lib/marketing/periodos-reporte";
 
@@ -135,13 +134,16 @@ describe("el reporte en vivo de un período cerrado", () => {
   });
 
   it("el Excel DECLARA que fue calculado hoy", () => {
-    const { reporte } = armarReportePeriodo(datos(), MID, { soloSelladosAEste: true });
-    const buffer = excelDeReporte(reporte);
-    // El subtítulo viaja como sharedString dentro del xlsx; alcanza con que
-    // el texto exista en el archivo (el arnés de excel ya se usa así).
-    expect(buffer.length).toBeGreaterThan(0);
-    const fuente = leer("lib/marketing/periodos-reporte.ts");
+    // El Excel del período ahora sale de zip-marca (buildExcelDeMarca, el
+    // MISMO workbook que va dentro del ZIP); la declaración vive en su
+    // subtítulo. El comportamiento completo se prueba en
+    // marketing-zip-marca.test.ts, que arma el archivo de verdad.
+    const fuente = leer("lib/marketing/zip-marca.ts");
     expect(fuente).toContain("se cerró sin reporte guardado");
+    // Y el generador viejo de 3 hojas genéricas no puede volver a
+    // periodos-reporte: el Excel de un período tiene UN solo generador.
+    const reporteLib = leer("lib/marketing/periodos-reporte.ts");
+    expect(reporteLib).not.toContain("export function excelDeReporte");
   });
 
   it("el camino del CIERRE no cambió: sin opciones, lo sin sello SÍ entra", () => {
@@ -161,9 +163,12 @@ describe("la ruta y el chip", () => {
   const ruta = leer("app/api/marketing/periodos/[id]/reporte/route.ts");
   const inicio = leer("app/marketing/components/InicioMarketing.tsx");
 
-  it("un congelado se sirve TAL CUAL (nunca se recalcula) y el vivo solo si está cerrado", () => {
-    expect(ruta).toContain("esReportePeriodo(fila.reporte)");
-    expect(ruta).toContain("soloSelladosAEste: true");
+  it("la ruta genera el MISMO Excel que el ZIP (buildExcelDeMarca), sin un segundo generador", () => {
+    // La garantía "un congelado nunca se recalcula" vive en zip-marca
+    // (`congelarEnFilas`, candado en marketing-zip-marca.test.ts): los montos
+    // salen del jsonb tal cual. La ruta solo elige marca y sirve el archivo.
+    expect(ruta).toContain("buildExcelDeMarca({ marcaCodigo: marca, periodoId: params.id })");
+    expect(ruta).not.toContain("excelDeReporte");
     // El período abierto sigue contestando 409: su reporte nace al cerrarlo.
     expect(ruta).toContain("todavía está abierto");
   });
@@ -173,11 +178,15 @@ describe("la ruta y el chip", () => {
     expect(ruta).toContain("esMarcaCodigo(marcaRaw)");
   });
 
+  it("sin marca, el período conjunto legacy no mezcla reportes: se pide la marca", () => {
+    expect(ruta).toContain("junta varias marcas");
+  });
+
   it("el chip de un período cerrado pide SU marca", () => {
     expect(inicio).toMatch(/descargarReporte\(c\.id as string, etiqueta, c\.bloqueKey\)/);
   });
 
   it("un reporte vacío no se manda (mismo criterio que MARCA_SIN_GASTO del ZIP)", () => {
-    expect(ruta).toContain("no hay reporte que bajar");
+    expect(ruta).toContain("MARCA_SIN_GASTO: 404");
   });
 });

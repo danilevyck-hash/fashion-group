@@ -31,8 +31,10 @@ const zip = readFileSync(path.join(process.cwd(), "src/lib/marketing/zip-export.
 describe("la columna 'Otras marcas' aparece SOLA cuando hace falta", () => {
   it("la decisión es GLOBAL, una sola vez para todo el libro", () => {
     // Si se decidiera por cliente, el Resumen podría traerla y la hoja de un
-    // cliente no: dos vistas del mismo dato diciendo cosas distintas.
-    expect(zip).toContain("const mostrarOtras = clientes.some(");
+    // cliente no: dos vistas del mismo dato diciendo cosas distintas. (Y en el
+    // Excel de UNA marca —`sinColumnasDeMarca`— nunca aplica: sin columnas de
+    // marca no hay dónde dibujarla.)
+    expect(zip).toContain("const mostrarOtras = conMarcas && clientes.some(");
     expect(zip.match(/const mostrarOtras =/g) ?? []).toHaveLength(1);
   });
 
@@ -42,10 +44,13 @@ describe("la columna 'Otras marcas' aparece SOLA cuando hace falta", () => {
     expect((zip.match(/mostrarOtras \? \[s\.otras\]/g) ?? []).length).toBe(3);
   });
 
-  it("los índices de columna se corren con ella", () => {
-    expect(zip).toContain("const C_RES_SUBTOTAL = mostrarOtras ? 7 : 6;");
-    expect(zip).toContain("const C_SUBTOTAL = mostrarOtras ? 9 : 8;");
-    expect(zip).toContain("const C_LINK = mostrarOtras ? 10 : 9;");
+  it("los índices de columna se DERIVAN del encabezado (se corren solos)", () => {
+    // Con "Otras marcas" el encabezado crece y los índices la siguen; sin
+    // columnas de marca, encogen. Derivarlos del arreglo es lo que hace
+    // imposible que un modo se desalinee.
+    expect(zip).toContain("const C_RES_SUBTOTAL = headRes.length - 1;");
+    expect(zip).toContain("const C_LINK = headG.length - 1;");
+    expect(zip).toContain("const C_SUBTOTAL = headG.length - 2;");
   });
 
   it("pero el CÁLCULO sigue vivo: es la red que hace cuadrar el subtotal", () => {

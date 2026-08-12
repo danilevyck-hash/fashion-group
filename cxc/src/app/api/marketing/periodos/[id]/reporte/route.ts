@@ -3,14 +3,12 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esTablaAusente } from "@/lib/marketing/periodos-io";
 import { esMarcaCodigo } from "@/lib/marketing/bloques";
+import { XLSX_MIME } from "@/lib/excel-export";
 import {
-  XLSX_MIME,
-  armarReportePeriodo,
-  cargarDatosPeriodos,
-  esReportePeriodo,
-  excelDeReporte,
-  type ReportePeriodo,
-} from "@/lib/marketing/periodos-reporte";
+  ErrorZipMarca,
+  buildExcelDeMarca,
+  type CodigoErrorZipMarca,
+} from "@/lib/marketing/zip-marca";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,23 +22,38 @@ function nombreArchivo(proveedor: string, periodo: string): string {
   return `marketing-${limpio(proveedor)}-${limpio(periodo)}.xlsx`;
 }
 
+/** Qué código HTTP le corresponde a cada negativa del constructor. */
+const HTTP_POR_CODIGO: Record<CodigoErrorZipMarca, number> = {
+  MARCA_DESCONOCIDA: 400,
+  SIN_TABLAS_DE_PERIODO: 409,
+  PERIODO_NO_ENCONTRADO: 404,
+  PERIODO_DE_OTRA_MARCA: 400,
+  SIN_PERIODO_ABIERTO: 404,
+  MARCA_SIN_GASTO: 404,
+};
+
 // GET /api/marketing/periodos/[id]/reporte?marca=CK
 //
-// El Excel del reporte GUARDADO. 🔴 Se lee de `mk_periodos.reporte` tal como
-// quedó al cerrar y NO se recalcula nunca: es el papel que el proveedor ya
-// tiene en la mano, y tiene que salir idéntico hoy, mañana y el año que viene.
+// El Excel de un período — EL MISMO `resumen_gastos.xlsx` que va dentro del
+// ZIP de la marca (`lib/marketing/zip-marca.ts`), sin armar el ZIP: hoja
+// Resumen + una hoja por cliente con sus gastos e hyperlinks a cada
+// comprobante y foto, y los gastos sin cliente en la hoja "General". Daniel,
+// textual (12-ago-2026): *"quiero el modo anterior, solo quitando las columnas
+// de las marcas ya que hoy en dia se descarga por marca"*.
 //
-// 🩸 EXCEPCIÓN (12-ago-2026, el bug del toast rojo): un período puede estar
-// CERRADO con `reporte` NULL — el caso real es "mid 2026", que la migración
-// #475 insertó cerrado sin pasar por el cierre. Antes esto respondía 409
-// ("no tiene reporte guardado") y el chip del inicio fallaba SIEMPRE. Ahora se
-// calcula EN VIVO sobre los documentos sellados a ese período — el mismo
-// camino que el ZIP ya tenía — y el Excel lo declara en su subtítulo. Los
-// totales salen de `agregarPorBloques().cerrados`: la MISMA cifra del chip.
+// 🔴 LA PLATA SE CONGELA, LOS PAPELES NO — la regla vive en zip-marca:
+//   · Período cerrado CON reporte congelado → los montos salen del jsonb tal
+//     cual quedaron al cerrar (fuenteMontos: "congelado"); los links y fotos
+//     se leen en vivo.
+//   · Período cerrado SIN reporte congelado (el caso real "mid 2026") → se
+//     calcula en vivo sobre los documentos sellados a ese período y el
+//     subtítulo del Excel LO DECLARA.
 //
 // `?marca=` acota el período conjunto legacy ('pvh' junta TH+CK+KL): el chip
-// de Calvin · mid 2026 baja SOLO lo de Calvin ($17.842,14). Solo aplica al
-// camino en vivo — un reporte congelado se sirve tal cual, siempre.
+// de Calvin · mid 2026 baja SOLO lo de Calvin. Sin `?marca=`, la marca se
+// deriva de la clave del período (los cierres nuevos son por marca); si el
+// período es el conjunto viejo y no se dijo la marca, se pide con 400 en vez
+// de mezclar los reportes de tres encargados.
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -53,12 +66,12 @@ export async function GET(
   const marcaRaw = (
     new URL(req.url).searchParams.get("marca") ?? ""
   ).trim().toUpperCase();
-  const marca = esMarcaCodigo(marcaRaw) ? marcaRaw : undefined;
+  const marcaPedida = esMarcaCodigo(marcaRaw) ? marcaRaw : undefined;
 
   try {
     const { data, error } = await supabaseServer
       .from("mk_periodos")
-      .select("id, proveedor_key, nombre, estado, reporte")
+      .select("id, proveedor_key, nombre, estado")
       .eq("id", params.id)
       .maybeSingle();
 
@@ -83,15 +96,11 @@ export async function GET(
       proveedor_key: string;
       nombre: string;
       estado: string;
-      reporte: unknown;
     };
 
-    let reporte: ReportePeriodo;
-    if (esReportePeriodo(fila.reporte)) {
-      // El congelado manda, tal cual quedó. `?marca=` no lo toca: recortarlo
-      // sería recalcular un papel que ya se mandó.
-      reporte = fila.reporte;
-    } else if (fila.estado === "abierto") {
+    if (fila.estado === "abierto") {
+      // El período abierto sigue contestando 409: su reporte nace al cerrarlo
+      // (el ZIP de la tarjeta sí baja lo abierto, con este mismo Excel dentro).
       return NextResponse.json(
         {
           error:
@@ -99,45 +108,42 @@ export async function GET(
         },
         { status: 409 },
       );
-    } else {
-      // Cerrado SIN reporte congelado → calcular en vivo (ver el encabezado).
-      const datos = await cargarDatosPeriodos();
-      const armado = armarReportePeriodo(
-        datos,
-        {
-          id: String(fila.id),
-          proveedor_key: String(fila.proveedor_key),
-          nombre: String(fila.nombre),
-        },
-        { soloSelladosAEste: true, marca },
-      );
-      reporte = armado.reporte;
-      if (
-        reporte.totales.total === 0 &&
-        reporte.facturas.length === 0 &&
-        reporte.entregas.length === 0
-      ) {
-        // Igual que el ZIP (MARCA_SIN_GASTO): un Excel vacío no se manda.
-        return NextResponse.json(
-          {
-            error: `${reporte.proveedorNombre} no tiene gastos en "${fila.nombre}", así que no hay reporte que bajar.`,
-          },
-          { status: 404 },
-        );
-      }
     }
 
-    const buffer = excelDeReporte(reporte);
-    const filename = nombreArchivo(reporte.proveedorNombre, fila.nombre);
-    return new NextResponse(buffer as unknown as BodyInit, {
+    // La marca: la pedida, o la propia clave del período (cierres por marca).
+    const claveComoMarca = fila.proveedor_key.trim().toUpperCase();
+    const marca = marcaPedida ?? (esMarcaCodigo(claveComoMarca) ? claveComoMarca : undefined);
+    if (!marca) {
+      return NextResponse.json(
+        {
+          error:
+            "Este período junta varias marcas. Baja el Excel desde la tarjeta de la marca que necesitas.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const result = await buildExcelDeMarca({ marcaCodigo: marca, periodoId: params.id });
+    const filename = nombreArchivo(result.marcaNombre, result.periodoNombre);
+    return new NextResponse(result.buffer as unknown as BodyInit, {
       status: 200,
       headers: {
         "Content-Type": XLSX_MIME,
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store",
+        "X-Fuente-Montos": result.fuenteMontos,
+        "X-Total": String(result.total),
       },
     });
   } catch (err) {
+    if (err instanceof ErrorZipMarca) {
+      // Igual que el ZIP (MARCA_SIN_GASTO): un Excel vacío no se manda —
+      // no hay reporte que bajar.
+      return NextResponse.json(
+        { error: err.message },
+        { status: HTTP_POR_CODIGO[err.codigo] ?? 400 },
+      );
+    }
     const msg = err instanceof Error ? err.message : "Error interno";
     console.error("GET /api/marketing/periodos/[id]/reporte:", msg);
     return NextResponse.json(

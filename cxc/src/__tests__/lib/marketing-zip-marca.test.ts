@@ -135,7 +135,9 @@ vi.mock("@/lib/marketing/pdf-entrega-mueble", () => ({
 }));
 
 import {
+  buildExcelDeMarca,
   buildZipDeMarca,
+  buildZipMultifashion,
   contentDisposition,
   ErrorZipMarca,
 } from "@/lib/marketing/zip-marca";
@@ -273,11 +275,20 @@ async function rutas(buffer: Buffer): Promise<string[]> {
     .filter((n) => !z.files[n].dir)
     .sort();
 }
-async function hojaResumen(buffer: Buffer): Promise<string[][]> {
+async function xlsxDelZip(buffer: Buffer): Promise<Buffer> {
   const z = await JSZip.loadAsync(buffer);
-  const xlsx = await z.file("resumen_gastos.xlsx")!.async("nodebuffer");
+  return z.file("resumen_gastos.xlsx")!.async("nodebuffer");
+}
+function hojaResumenDeXlsx(xlsx: Buffer): string[][] {
   const wb = XLSX.read(xlsx, { type: "buffer" });
   return XLSX.utils.sheet_to_json<string[]>(wb.Sheets.Resumen, { header: 1, raw: true });
+}
+async function hojaResumen(buffer: Buffer): Promise<string[][]> {
+  return hojaResumenDeXlsx(await xlsxDelZip(buffer));
+}
+/** La fila del encabezado de la tabla (el título y el subtítulo van arriba). */
+function encabezado(filas: string[][]): string[] {
+  return filas.find((f) => String(f[0] ?? "") === "Cliente")!;
 }
 
 beforeEach(sembrar);
@@ -400,11 +411,122 @@ describe("ZIP por marca — General: los gastos SIN cliente", () => {
   it("la columna de dinero dice lo que muestra, y el total es el de ESA marca", async () => {
     const r = await buildZipDeMarca({ marcaCodigo: "TH" });
     const filas = await hojaResumen(r.buffer);
-    expect(filas[0]).toContain("Total");
+    const head = encabezado(filas);
+    expect(head).toContain("Total");
     // El encabezado del ZIP global no puede filtrarse acá: los montos llevan ITBMS.
-    expect(filas[0]).not.toContain("Subtotal (sin ITBMS)");
+    expect(head).not.toContain("Subtotal (sin ITBMS)");
     const total = filas.find((f) => String(f[0] ?? "") === "TOTAL");
     expect(Number(total![total!.length - 1])).toBe(90);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// El FORMATO del Excel de la descarga (12-ago-2026). Daniel, textual: *"quiero
+// el modo anterior, solo quitando las columnas de las marcas ya que hoy en dia
+// se descarga por marca"* — hoja Resumen + una hoja por cliente con
+// hyperlinks, SIN las columnas de marca, con el período en el subtítulo.
+// ────────────────────────────────────────────────────────────────────────────
+describe("el Excel de la descarga — formato viejo, sin columnas de marca", () => {
+  it("título y subtítulo dicen la marca y el período; sin columnas de marca", async () => {
+    const r = await buildZipDeMarca({ marcaCodigo: "TH" });
+    const filas = await hojaResumen(r.buffer);
+    expect(String(filas[0][0])).toBe("FASHION GROUP — Tommy Hilfiger");
+    expect(String(filas[1][0])).toContain("Período 2026");
+    expect(String(filas[1][0])).toContain("período abierto");
+    const head = encabezado(filas);
+    // La marca va en el título, no en columnas: cada archivo ya es de UNA.
+    expect(head).toEqual(["Cliente", "# Gastos", "# Fotos", "Total"]);
+    expect(head).not.toContain("Marcas");
+    expect(head).not.toContain("Calvin Klein");
+    expect(head).not.toContain("Tommy Hilfiger");
+  });
+
+  it("🔴 el botón Excel baja EL MISMO workbook que va dentro del ZIP", async () => {
+    const zip = await buildZipDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const excel = await buildExcelDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    // Misma hoja Resumen, fila por fila — si difirieran, el mismo período
+    // diría dos números según el botón que se toque.
+    expect(hojaResumenDeXlsx(excel.buffer)).toEqual(await hojaResumen(zip.buffer));
+    expect(excel.total).toBe(zip.total);
+    expect(excel.fuenteMontos).toBe(zip.fuenteMontos);
+    expect(excel.periodoNombre).toBe("mid 2026");
+  });
+
+  it("la hoja del cliente conserva el hyperlink al comprobante", async () => {
+    const excel = await buildExcelDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const wb = XLSX.read(excel.buffer, { type: "buffer" });
+    const ws = wb.Sheets["City Mall David"] as Record<
+      string,
+      { l?: { Target?: string } } | unknown
+    >;
+    const targets = Object.keys(ws)
+      .filter((k) => !k.startsWith("!"))
+      .map((k) => (ws[k] as { l?: { Target?: string } }).l?.Target)
+      .filter(Boolean);
+    expect(targets).toContain("https://firmado/fact/f1.pdf");
+  });
+
+  it("cerrado SIN reporte congelado: el subtítulo LO DECLARA", async () => {
+    const excel = await buildExcelDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    const filas = hojaResumenDeXlsx(excel.buffer);
+    expect(String(filas[1][0])).toContain("se cerró sin reporte guardado");
+    expect(excel.fuenteMontos).toBe("en_vivo");
+  });
+
+  it("con reporte CONGELADO el Excel del botón respeta la plata congelada", async () => {
+    tablas.mk_periodos.find((p) => p.id === P_CERRADO)!.reporte = {
+      version: 1,
+      facturas: [
+        linea("2026-03-04", "A-1", "letrero", "Tommy Hilfiger", 111, "D-24", "City Mall David"),
+      ],
+      entregas: [],
+    };
+    const excel = await buildExcelDeMarca({ marcaCodigo: "TH", periodoId: P_CERRADO });
+    expect(excel.fuenteMontos).toBe("congelado");
+    expect(excel.total).toBe(111);
+    const filas = hojaResumenDeXlsx(excel.buffer);
+    expect(String(filas[1][0])).toContain("cerrado");
+    expect(String(filas[1][0])).not.toContain("sin reporte guardado");
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// MULTIFASHION — *"descargas por marca te basta y multifashion es una marca"*.
+// Tienda propia: sin período, todos sus gastos, el mismo formato de archivo.
+// ────────────────────────────────────────────────────────────────────────────
+describe("el ZIP de Multifashion", () => {
+  it("baja por la misma puerta (marcaCodigo 'multifashion'), sin período", async () => {
+    const r = await buildZipDeMarca({ marcaCodigo: "multifashion" });
+    expect(r.marcaCodigo).toBe("multifashion");
+    expect(r.marcaNombre).toBe("Multifashion");
+    expect(r.periodoEstado).toBe("sin_periodo");
+    expect(r.periodoId).toBe("");
+    expect(r.fuenteMontos).toBe("en_vivo");
+    // El archivo se fecha, porque no hay período que lo nombre.
+    expect(r.filename.startsWith("Multifashion · ")).toBe(true);
+    // Su gasto completo (los $999 que NUNCA pueden entrar en el ZIP de Tommy).
+    expect(r.total).toBe(999);
+  });
+
+  it("trae SOLO lo de Multifashion, con la estructura de siempre", async () => {
+    const r = await buildZipMultifashion();
+    const paths = await rutas(r.buffer);
+    expect(paths).toContain("resumen_gastos.xlsx");
+    expect(paths.some((p) => p.startsWith("Multifashion Holdings/facturas/"))).toBe(true);
+    // Ni un gasto del grupo de marcas.
+    expect(paths.some((p) => /letrero|vitrina|evento|impulsadora/.test(p))).toBe(false);
+    const filas = await hojaResumen(r.buffer);
+    expect(String(filas[0][0])).toBe("FASHION GROUP — Multifashion");
+    expect(encabezado(filas)).toEqual(["Cliente", "# Gastos", "# Fotos", "Total"]);
+    const total = filas.find((f) => String(f[0] ?? "") === "TOTAL")!;
+    expect(Number(total[total.length - 1])).toBe(999);
+  });
+
+  it("sin gastos vivos no genera archivo (misma regla que una marca)", async () => {
+    tablas.mk_facturas.find((f) => f.id === "f5")!.anulado_en = "2026-08-01T00:00:00Z";
+    await expect(buildZipMultifashion()).rejects.toMatchObject({
+      codigo: "MARCA_SIN_GASTO",
+    });
   });
 });
 

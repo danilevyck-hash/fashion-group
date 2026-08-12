@@ -57,13 +57,15 @@ import JSZip from "jszip";
 import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
+  MULTIFASHION_KEY,
   clavesDeSello,
   esMarcaCodigo,
   nombreDeBloque,
   nombreZipDeMarca,
   type MarcaCodigo,
 } from "./bloques";
-import { esMultifashion } from "./multifashion";
+import { esMultifashion, MULTIFASHION_LABEL } from "./multifashion";
+import { formatearFecha } from "./normalizar";
 import { etiquetaPeriodoCorta, periodoEfectivo } from "./periodo";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import { cargarComprobantes } from "./entrega-comprobante";
@@ -208,6 +210,7 @@ export interface PeriodoDeMarca {
   proveedor_key: string;
   nombre: string;
   estado: string;
+  cerrado_en?: string | null;
   reporte?: unknown;
 }
 interface SelloFila {
@@ -358,10 +361,12 @@ export type FuenteMontos = "congelado" | "en_vivo";
 
 export interface ZipMarcaResult {
   buffer: Buffer;
-  /** `<Marca> · <Período>.zip` */
+  /** `<Marca> · <Período>.zip` (`Multifashion · <fecha>.zip` sin período). */
   filename: string;
-  marcaCodigo: MarcaCodigo;
+  /** Código de marca, o `multifashion` (tienda propia, sin período). */
+  marcaCodigo: MarcaCodigo | typeof MULTIFASHION_KEY;
   marcaNombre: string;
+  /** Vacíos para Multifashion: no tiene períodos y `periodoEstado` lo dice. */
   periodoId: string;
   periodoNombre: string;
   periodoEstado: string;
@@ -422,7 +427,87 @@ function carpetaDeCliente(
 // Construcción
 // ----------------------------------------------------------------------------
 
+/**
+ * El ZIP de una descarga: una MARCA (con su período) o Multifashion (tienda
+ * propia, sin período — Daniel, textual: *"descargas por marca te basta y
+ * multifashion es una marca"*).
+ */
 export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaResult> {
+  return armarZipDescarga(await prepararDescarga(op));
+}
+
+/** El ZIP de Multifashion: todos sus gastos, sin concepto de período. */
+export async function buildZipMultifashion(): Promise<ZipMarcaResult> {
+  return armarZipDescarga(await prepararDescargaMultifashion());
+}
+
+export interface ExcelDescargaResult {
+  buffer: Buffer;
+  marcaNombre: string;
+  periodoId: string;
+  periodoNombre: string;
+  periodoEstado: string;
+  fuenteMontos: FuenteMontos;
+  total: number;
+  gastos: number;
+  lineasSinMarca: number;
+}
+
+/**
+ * El EXCEL de un período (el botón "Excel" del inicio), SIN armar el ZIP.
+ *
+ * 🔴 Es el MISMO `resumen_gastos.xlsx` que va dentro del ZIP — misma
+ * preparación, mismo workbook, mismos links firmados. Si el botón Excel y el
+ * ZIP dijeran números distintos sobre el mismo período, Daniel no sabría a
+ * cuál creerle. Lo único que se saltea acá es bajar los archivos.
+ */
+export async function buildExcelDeMarca(op: ZipMarcaOpciones): Promise<ExcelDescargaResult> {
+  const prep = await prepararDescarga(op);
+  return {
+    buffer: armarWorkbookDescarga(prep),
+    marcaNombre: prep.marcaNombre,
+    periodoId: prep.periodo ? String(prep.periodo.id) : "",
+    periodoNombre: prep.periodo ? txt(prep.periodo.nombre) : "",
+    periodoEstado: prep.periodo ? txt(prep.periodo.estado) : "sin_periodo",
+    fuenteMontos: prep.usarCongelado ? "congelado" : "en_vivo",
+    total: prep.total,
+    gastos: prep.gastos.length,
+    lineasSinMarca: prep.lineasSinMarca,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Preparación compartida (ZIP y Excel dicen SIEMPRE el mismo número)
+// ----------------------------------------------------------------------------
+
+/**
+ * Todo lo que una descarga necesita tener resuelto: el período, los gastos con
+ * su monto (congelado o en vivo), los links firmados y las fotos por carpeta.
+ */
+interface PrepDescarga {
+  codigo: MarcaCodigo | typeof MULTIFASHION_KEY;
+  marcaNombre: string;
+  /** `null` = Multifashion: tienda propia, sin períodos. */
+  periodo: PeriodoDeMarca | null;
+  usarCongelado: boolean;
+  lineasSinMarca: number;
+  gastos: GastoDeMarca[];
+  total: number;
+  comprobantesPorFactura: Map<string, AdjuntoFila[]>;
+  fotosPorCarpeta: Map<string, AdjuntoFila[]>;
+  urlFirmada: Map<string, string>;
+  comprobantesEntrega: Awaited<ReturnType<typeof cargarComprobantes>>;
+  linkPorGasto: Map<string, string>;
+}
+
+async function prepararDescarga(op: ZipMarcaOpciones): Promise<PrepDescarga> {
+  if (txt(op.marcaCodigo).toLowerCase() === MULTIFASHION_KEY) {
+    return prepararDescargaMultifashion();
+  }
+  return prepararDescargaDeMarca(op);
+}
+
+async function prepararDescargaDeMarca(op: ZipMarcaOpciones): Promise<PrepDescarga> {
   const marcaCodigo = txt(op.marcaCodigo).toUpperCase();
   if (!esMarcaCodigo(marcaCodigo)) {
     throw new ErrorZipMarca(
@@ -440,7 +525,7 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
     await Promise.all([
       supabaseServer
         .from("mk_periodos")
-        .select("id, proveedor_key, nombre, estado, reporte"),
+        .select("id, proveedor_key, nombre, estado, cerrado_en, reporte"),
       supabaseServer
         .from("mk_periodo_documentos")
         .select("periodo_id, proveedor_key, tipo, documento_id"),
@@ -608,12 +693,6 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
   const usarCongelado =
     txt(periodo.estado) === "cerrado" && tieneReporteCongelado(periodo.reporte);
 
-  const periodoTrabajadoDe = (f: FacturaFila | undefined): string => {
-    if (!f) return "";
-    const per = periodoEfectivo(f);
-    return per ? etiquetaPeriodoCorta(per) : "";
-  };
-
   let gastos: GastoDeMarca[];
   if (usarCongelado) {
     gastos = congelarEnFilas(congeladas, {
@@ -670,29 +749,228 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
     );
   }
 
-  // 7. Los PAPELES, en vivo desde Storage.
-  const facturaIdsDelZip = new Set(
-    gastos.filter((g) => g.tipo === "factura" && g.documentoId).map((g) => g.documentoId!),
+  // 7. Los PAPELES, en vivo desde Storage: links firmados y fotos por carpeta.
+  const comprobantesPorFactura = armarComprobantesPorFactura(adjuntos);
+  const fotosPorCarpeta = armarFotosPorCarpeta(gastos, adjuntos, {
+    proyectoDeFactura: (fid) => {
+      const f = facturaById.get(fid);
+      return f?.proyecto_id ? String(f.proyecto_id) : null;
+    },
+    proyectoDeEntrega: (eid) => {
+      const e = entregas.find((x) => String(x.id) === eid);
+      return e?.proyecto_id ? String(e.proyecto_id) : null;
+    },
+  });
+  const urlFirmada = await firmarLote(
+    pathsParaFirmar(gastos, comprobantesPorFactura, fotosPorCarpeta),
   );
-  const entregaIdsDelZip = gastos
-    .filter((g) => g.tipo === "entrega" && g.documentoId)
-    .map((g) => g.documentoId!);
+  const comprobantesEntrega = await cargarComprobantes(
+    gastos.filter((g) => g.tipo === "entrega" && g.documentoId).map((g) => g.documentoId!),
+  );
+  const linkPorGasto = asignarLinksYNumeros(gastos, {
+    comprobantesPorFactura,
+    comprobantesEntrega,
+    urlFirmada,
+  });
 
-  // Comprobante = pdf_factura o foto_factura. Lo lleva TODO gasto, impulsadoras
-  // incluidas: *"pero impulsadora tambien necesita comprobante, pero no foto.
-  // aunq el comprobante sea una foto."*
-  const comprobantesPorFactura = new Map<string, AdjuntoFila[]>();
-  // Foto de INSTALACIÓN del gasto (tipo nuevo). Un gasto sin cliente —un
-  // evento, una tanda de catálogos— también puede tener las suyas, y salen en
-  // General/fotos/ igual que las de cualquier cliente.
+  return {
+    codigo: marca,
+    marcaNombre,
+    periodo,
+    usarCongelado,
+    lineasSinMarca: usarCongelado ? lineasSinMarca : 0,
+    gastos,
+    total,
+    comprobantesPorFactura,
+    fotosPorCarpeta,
+    urlFirmada,
+    comprobantesEntrega,
+    linkPorGasto,
+  };
+}
+
+/**
+ * Multifashion: tienda PROPIA. Todos los gastos de sus proyectos, sin concepto
+ * de período (no se le reporta a nadie) y con el TOTAL COMPLETO de cada
+ * documento — su gasto no se reparte con ninguna contraparte, que es el mismo
+ * número que suma su tarjeta en el inicio (`resumen-bloques` suma `f.total`
+ * entero). La regla de pertenencia es la de `lib/marketing/multifashion.ts`.
+ */
+async function prepararDescargaMultifashion(): Promise<PrepDescarga> {
+  const [factRes, proyRes, entRes, adjRes] = await Promise.all([
+    supabaseServer
+      .from("mk_facturas")
+      .select(
+        "id, proyecto_id, numero_factura, fecha_factura, proveedor, concepto, subtotal, total, impulsadora_id, impulsadora_mes, periodo_desde, periodo_hasta, anulado_en",
+      ),
+    supabaseServer
+      .from("mk_proyectos")
+      .select("id, nombre, tienda, tienda_codigo, anulado_en"),
+    supabaseServer
+      .from("mk_entregas_muebles")
+      .select(
+        "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at",
+      ),
+    supabaseServer
+      .from("mk_adjuntos")
+      .select("id, tipo, factura_id, proyecto_id, url, nombre_original")
+      .in("tipo", ["pdf_factura", "foto_factura", "foto_proyecto", "foto_instalacion"]),
+  ]);
+  if (factRes.error) throw new Error(`facturas: ${factRes.error.message}`);
+  if (proyRes.error) throw new Error(`proyectos: ${proyRes.error.message}`);
+  if (entRes.error) throw new Error(`entregas: ${entRes.error.message}`);
+  if (adjRes.error) throw new Error(`adjuntos: ${adjRes.error.message}`);
+
+  const facturas = (factRes.data ?? []) as FacturaFila[];
+  const proyectos = (proyRes.data ?? []) as ProyectoFila[];
+  const entregas = (entRes.data ?? []) as EntregaFila[];
+  const adjuntos = (adjRes.data ?? []) as AdjuntoFila[];
+
+  // SOLO los proyectos Multifashion vivos. Un gasto sin proyecto (los pagos de
+  // impulsadora) nunca es Multifashion: sin proyecto no hay tienda que mirar.
+  const proyectosMf = proyectos.filter((p) => !p.anulado_en && esMultifashion(p));
+  const proyectoById = new Map(proyectosMf.map((p) => [String(p.id), p]));
+  const facturaById = new Map(facturas.map((f) => [String(f.id), f]));
+  const nombrePorCodigo = await leerNombresDeCliente(proyectosMf);
+
+  const gastos: GastoDeMarca[] = [];
+  for (const f of facturas) {
+    if (f.anulado_en) continue;
+    const pid = f.proyecto_id ? String(f.proyecto_id) : null;
+    const p = pid ? proyectoById.get(pid) : undefined;
+    if (!p) continue; // no es Multifashion (o su proyecto está en papelera)
+    gastos.push({
+      tipo: "factura",
+      documentoId: String(f.id),
+      fecha: txt(f.fecha_factura).slice(0, 10),
+      numero: txt(f.numero_factura),
+      concepto: txt(f.concepto),
+      proveedor: txt(f.proveedor),
+      periodoTrabajado: periodoTrabajadoDe(f),
+      carpeta: carpetaDeCliente(p.tienda_codigo ?? null, p.tienda ?? null, nombrePorCodigo),
+      clienteCodigo: p.tienda_codigo ?? null,
+      monto: round2(num(f.total)),
+    });
+  }
+  for (const e of entregas) {
+    const pid = e.proyecto_id ? String(e.proyecto_id) : null;
+    const p = pid ? proyectoById.get(pid) : undefined;
+    if (!p) continue;
+    gastos.push({
+      tipo: "entrega",
+      documentoId: String(e.id),
+      fecha: txt(e.created_at).slice(0, 10),
+      numero: "",
+      concepto: txt(e.notas) || "Entrega de muebles",
+      proveedor: "Mobiliario",
+      periodoTrabajado: "",
+      carpeta: carpetaDeCliente(p.tienda_codigo ?? null, p.tienda ?? null, nombrePorCodigo),
+      clienteCodigo: p.tienda_codigo ?? null,
+      monto: round2(num(e.total)),
+    });
+  }
+  gastos.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+  const total = round2(gastos.reduce((s, g) => s + g.monto, 0));
+
+  if (gastos.length === 0 || total === 0) {
+    throw new ErrorZipMarca(
+      "MARCA_SIN_GASTO",
+      "Multifashion no tiene gastos registrados, así que no hay archivo que bajar.",
+    );
+  }
+
+  const comprobantesPorFactura = armarComprobantesPorFactura(adjuntos);
+  const fotosPorCarpeta = armarFotosPorCarpeta(gastos, adjuntos, {
+    proyectoDeFactura: (fid) => {
+      const f = facturaById.get(fid);
+      return f?.proyecto_id ? String(f.proyecto_id) : null;
+    },
+    proyectoDeEntrega: (eid) => {
+      const e = entregas.find((x) => String(x.id) === eid);
+      return e?.proyecto_id ? String(e.proyecto_id) : null;
+    },
+  });
+  const urlFirmada = await firmarLote(
+    pathsParaFirmar(gastos, comprobantesPorFactura, fotosPorCarpeta),
+  );
+  const comprobantesEntrega = await cargarComprobantes(
+    gastos.filter((g) => g.tipo === "entrega" && g.documentoId).map((g) => g.documentoId!),
+  );
+  const linkPorGasto = asignarLinksYNumeros(gastos, {
+    comprobantesPorFactura,
+    comprobantesEntrega,
+    urlFirmada,
+  });
+
+  return {
+    codigo: MULTIFASHION_KEY,
+    marcaNombre: MULTIFASHION_LABEL,
+    periodo: null,
+    usarCongelado: false,
+    lineasSinMarca: 0,
+    gastos,
+    total,
+    comprobantesPorFactura,
+    fotosPorCarpeta,
+    urlFirmada,
+    comprobantesEntrega,
+    linkPorGasto,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Piezas compartidas de la preparación
+// ----------------------------------------------------------------------------
+
+/** Período trabajado (quincenas de impulsadora). "" si no aplica. */
+function periodoTrabajadoDe(f: FacturaFila | undefined): string {
+  if (!f) return "";
+  const per = periodoEfectivo(f);
+  return per ? etiquetaPeriodoCorta(per) : "";
+}
+
+/** Hoy en día-calendario de Panamá (UTC-5 fijo, sin horario de verano). */
+function hoyPanamaISO(): string {
+  return new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * Comprobante = pdf_factura o foto_factura. Lo lleva TODO gasto, impulsadoras
+ * incluidas: *"pero impulsadora tambien necesita comprobante, pero no foto.
+ * aunq el comprobante sea una foto."*
+ */
+function armarComprobantesPorFactura(
+  adjuntos: ReadonlyArray<AdjuntoFila>,
+): Map<string, AdjuntoFila[]> {
+  const out = new Map<string, AdjuntoFila[]>();
+  for (const a of adjuntos) {
+    if ((a.tipo === "pdf_factura" || a.tipo === "foto_factura") && a.factura_id) {
+      const arr = out.get(String(a.factura_id)) ?? [];
+      arr.push(a);
+      out.set(String(a.factura_id), arr);
+    }
+  }
+  return out;
+}
+
+/**
+ * Fotos por carpeta: las de INSTALACIÓN del gasto (`foto_instalacion`, cuelga
+ * de la factura — un evento sin cliente tiene fotos igual y salen en
+ * General/fotos/) + las del proyecto (`foto_proyecto`). Dedup por id — dos
+ * gastos del mismo proyecto comparten fotos.
+ */
+function armarFotosPorCarpeta(
+  gastos: ReadonlyArray<GastoDeMarca>,
+  adjuntos: ReadonlyArray<AdjuntoFila>,
+  ctx: {
+    proyectoDeFactura: (facturaId: string) => string | null;
+    proyectoDeEntrega: (entregaId: string) => string | null;
+  },
+): Map<string, AdjuntoFila[]> {
   const fotosPorFactura = new Map<string, AdjuntoFila[]>();
   const fotosPorProyecto = new Map<string, AdjuntoFila[]>();
   for (const a of adjuntos) {
-    if ((a.tipo === "pdf_factura" || a.tipo === "foto_factura") && a.factura_id) {
-      const arr = comprobantesPorFactura.get(String(a.factura_id)) ?? [];
-      arr.push(a);
-      comprobantesPorFactura.set(String(a.factura_id), arr);
-    } else if (a.tipo === "foto_instalacion" && a.factura_id) {
+    if (a.tipo === "foto_instalacion" && a.factura_id) {
       const arr = fotosPorFactura.get(String(a.factura_id)) ?? [];
       arr.push(a);
       fotosPorFactura.set(String(a.factura_id), arr);
@@ -703,41 +981,137 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
     }
   }
 
-  // Fotos por carpeta: las de instalación del gasto + las del proyecto al que
-  // pertenece. Dedup por id — dos gastos del mismo proyecto comparten fotos.
-  const fotosPorCarpeta = new Map<string, AdjuntoFila[]>();
-  const fotosVistas = new Set<string>();
+  const out = new Map<string, AdjuntoFila[]>();
+  const vistas = new Set<string>();
   const anotarFoto = (carpeta: string, a: AdjuntoFila) => {
     const k = `${carpeta}::${a.id}`;
-    if (fotosVistas.has(k)) return;
-    fotosVistas.add(k);
-    const arr = fotosPorCarpeta.get(carpeta) ?? [];
+    if (vistas.has(k)) return;
+    vistas.add(k);
+    const arr = out.get(carpeta) ?? [];
     arr.push(a);
-    fotosPorCarpeta.set(carpeta, arr);
+    out.set(carpeta, arr);
   };
   for (const g of gastos) {
-    if (g.tipo === "factura" && g.documentoId) {
+    if (!g.documentoId) continue;
+    if (g.tipo === "factura") {
       for (const a of fotosPorFactura.get(g.documentoId) ?? []) anotarFoto(g.carpeta, a);
-      const f = facturaById.get(g.documentoId);
-      const pid = f?.proyecto_id ? String(f.proyecto_id) : null;
+      const pid = ctx.proyectoDeFactura(g.documentoId);
       if (pid) for (const a of fotosPorProyecto.get(pid) ?? []) anotarFoto(g.carpeta, a);
-    }
-    if (g.tipo === "entrega" && g.documentoId) {
-      const e = entregas.find((x) => String(x.id) === g.documentoId);
-      const pid = e?.proyecto_id ? String(e.proyecto_id) : null;
+    } else {
+      const pid = ctx.proyectoDeEntrega(g.documentoId);
       if (pid) for (const a of fotosPorProyecto.get(pid) ?? []) anotarFoto(g.carpeta, a);
     }
   }
+  return out;
+}
 
-  // Firmar en lote (una llamada) todo lo que va con link en el Excel.
-  const pathsAFirmar: string[] = [];
-  for (const fid of facturaIdsDelZip) {
-    for (const c of comprobantesPorFactura.get(fid) ?? []) pathsAFirmar.push(c.url);
+/** Todo lo que va con link en el Excel, para firmarlo en UNA llamada. */
+function pathsParaFirmar(
+  gastos: ReadonlyArray<GastoDeMarca>,
+  comprobantesPorFactura: ReadonlyMap<string, AdjuntoFila[]>,
+  fotosPorCarpeta: ReadonlyMap<string, AdjuntoFila[]>,
+): string[] {
+  const paths: string[] = [];
+  for (const g of gastos) {
+    if (g.tipo !== "factura" || !g.documentoId) continue;
+    for (const c of comprobantesPorFactura.get(g.documentoId) ?? []) paths.push(c.url);
   }
-  for (const arr of fotosPorCarpeta.values()) for (const a of arr) pathsAFirmar.push(a.url);
-  const urlFirmada = await firmarLote(Array.from(new Set(pathsAFirmar)));
+  for (const arr of fotosPorCarpeta.values()) for (const a of arr) paths.push(a.url);
+  return Array.from(new Set(paths));
+}
 
-  const comprobantesEntrega = await cargarComprobantes(entregaIdsDelZip);
+/**
+ * Links y números de comprobante de cada gasto — SIN bajar un solo archivo.
+ * Por eso el Excel del botón y el del ZIP llevan los MISMOS links: los dos
+ * salen de acá. A las entregas les pone su número (`ME-0007`) — antes lo hacía
+ * el armado del ZIP y el Excel suelto habría salido sin número.
+ */
+function asignarLinksYNumeros(
+  gastos: GastoDeMarca[],
+  ctx: {
+    comprobantesPorFactura: ReadonlyMap<string, AdjuntoFila[]>;
+    comprobantesEntrega: PrepDescarga["comprobantesEntrega"];
+    urlFirmada: ReadonlyMap<string, string>;
+  },
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const g of gastos) {
+    if (!g.documentoId) continue; // línea congelada sin papel vivo: sin link
+    if (g.tipo === "factura") {
+      const primero = (ctx.comprobantesPorFactura.get(g.documentoId) ?? [])[0];
+      const firmado = primero ? ctx.urlFirmada.get(primero.url) : undefined;
+      if (firmado) out.set(claveGasto(g), firmado);
+    } else {
+      const datos = ctx.comprobantesEntrega.get(g.documentoId);
+      if (!datos) continue;
+      // El "N° de factura" de una entrega es el del comprobante que generamos.
+      g.numero = numeroComprobante(datos);
+      try {
+        out.set(
+          claveGasto(g),
+          `${GALERIA_BASE}/api/marketing/entregas-pdf/${encodeURIComponent(g.documentoId)}?t=${signEntregaToken(g.documentoId)}`,
+        );
+      } catch {
+        // Sin SESSION_SECRET no se firma: la fila queda sin link, con su PDF.
+      }
+    }
+  }
+  return out;
+}
+
+// ----------------------------------------------------------------------------
+// El Excel y el ZIP, desde la MISMA preparación
+// ----------------------------------------------------------------------------
+
+/**
+ * Subtítulo del Excel: de qué período es y de dónde salieron los montos.
+ * El camino "cerrado sin reporte congelado" LO DECLARA — no se le miente a
+ * quien lee el archivo.
+ */
+function subtituloDescarga(prep: PrepDescarga): string {
+  const hoy = formatearFecha(hoyPanamaISO());
+  if (!prep.periodo) return `Gastos al ${hoy}`; // Multifashion, sin período
+  const nombre = txt(prep.periodo.nombre);
+  if (txt(prep.periodo.estado) !== "cerrado") {
+    return `${nombre} · período abierto — gastos al ${hoy}`;
+  }
+  if (prep.usarCongelado) {
+    const f = prep.periodo.cerrado_en ? formatearFecha(prep.periodo.cerrado_en) : "";
+    return f ? `${nombre} · cerrado el ${f}` : `${nombre} · cerrado`;
+  }
+  return `${nombre} · calculado el ${hoy} (este período se cerró sin reporte guardado)`;
+}
+
+/**
+ * El `resumen_gastos.xlsx` de la descarga — MISMO constructor que el ZIP
+ * global, SIN columnas de marca (cada archivo ya es de UNA sola) y con el
+ * título/subtítulo del período. No hay un segundo Excel.
+ */
+function armarWorkbookDescarga(prep: PrepDescarga): Buffer {
+  const clientes = armarClientes(prep.gastos, {
+    linkPorGasto: prep.linkPorGasto,
+    fotosPorCarpeta: prep.fotosPorCarpeta,
+    urlFirmada: prep.urlFirmada,
+    marcaCodigo: prep.codigo,
+    marcaNombre: prep.marcaNombre,
+  });
+  const wb = buildResumenGastosWorkbook(clientes, {
+    etiquetaMonto: COL_TOTAL_MARCA,
+    sinColumnasDeMarca: true,
+    titulo: `FASHION GROUP — ${prep.marcaNombre}`,
+    subtitulo: subtituloDescarga(prep),
+  });
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+async function armarZipDescarga(prep: PrepDescarga): Promise<ZipMarcaResult> {
+  const {
+    gastos,
+    marcaNombre,
+    comprobantesPorFactura,
+    comprobantesEntrega,
+    fotosPorCarpeta,
+  } = prep;
 
   // 8. Armado del ZIP.
   const zip = new JSZip();
@@ -757,17 +1131,12 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
 
   // 8a. Comprobantes de factura. El nombre lleva LA MARCA, que es lo que hace
   //     que dos ZIP distintos abiertos en la misma carpeta no se pisen.
-  const linkPorGasto = new Map<string, string>();
+  //     (Los links del Excel ya vienen resueltos en la preparación.)
   await mapLimit(
     gastos.filter((g) => g.tipo === "factura" && g.documentoId),
     CONCURRENCY,
     async (g) => {
       const comps = comprobantesPorFactura.get(g.documentoId!) ?? [];
-      const primero = comps[0];
-      if (primero) {
-        const firmado = urlFirmada.get(primero.url);
-        if (firmado) linkPorGasto.set(claveGasto(g), firmado);
-      }
       if (comps.length === 0) return;
       const usados = setDe(usadosPorCarpeta, `${g.carpeta}/facturas`);
       const base = sanitizeName(
@@ -812,15 +1181,9 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
       );
       zip.file(`${g.carpeta}/facturas/${nombre}.pdf`, buf);
       pdfsIncluidos++;
-      try {
-        linkPorGasto.set(
-          claveGasto(g),
-          `${GALERIA_BASE}/api/marketing/entregas-pdf/${encodeURIComponent(g.documentoId)}?t=${signEntregaToken(g.documentoId)}`,
-        );
-      } catch {
-        // Sin SESSION_SECRET no se firma: la fila queda sin link, con su PDF.
-      }
-      g.numero = numeroComprobante(datos);
+      // El link del Excel y el número del comprobante ya vienen puestos por la
+      // preparación (`asignarLinksYNumeros`) — el mismo par que usa el botón
+      // Excel, para que ZIP y Excel no puedan decir cosas distintas.
     } catch {
       pdfsOmitidos++; // un comprobante que falle no tumba el ZIP entero
     }
@@ -845,16 +1208,8 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
     });
   }
 
-  // 9. El Excel — MISMO constructor que el ZIP global. No hay un segundo Excel.
-  const clientes = armarClientes(gastos, {
-    linkPorGasto,
-    fotosPorCarpeta,
-    urlFirmada,
-    marcaCodigo: marca,
-    marcaNombre,
-  });
-  const wb = buildResumenGastosWorkbook(clientes, { etiquetaMonto: COL_TOTAL_MARCA });
-  zip.file("resumen_gastos.xlsx", XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer);
+  // 9. El Excel — el MISMO workbook que baja el botón "Excel". No hay dos.
+  zip.file("resumen_gastos.xlsx", armarWorkbookDescarga(prep));
 
   const buffer = await zip.generateAsync({
     type: "nodebuffer",
@@ -872,14 +1227,18 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
 
   return {
     buffer,
-    filename: nombreZipDeMarca(marcaNombre, periodo.nombre),
-    marcaCodigo: marca,
+    filename: nombreZipDeMarca(
+      marcaNombre,
+      // Sin período (Multifashion) el archivo se fecha: "Multifashion · 12 ago 2026.zip".
+      prep.periodo ? prep.periodo.nombre : formatearFecha(hoyPanamaISO()),
+    ),
+    marcaCodigo: prep.codigo,
     marcaNombre,
-    periodoId: periodo.id,
-    periodoNombre: periodo.nombre,
-    periodoEstado: txt(periodo.estado),
-    fuenteMontos: usarCongelado ? "congelado" : "en_vivo",
-    total,
+    periodoId: prep.periodo ? String(prep.periodo.id) : "",
+    periodoNombre: prep.periodo ? txt(prep.periodo.nombre) : "",
+    periodoEstado: prep.periodo ? txt(prep.periodo.estado) : "sin_periodo",
+    fuenteMontos: prep.usarCongelado ? "congelado" : "en_vivo",
+    total: prep.total,
     gastos: gastos.length,
     facturas: gastos.filter((g) => g.tipo === "factura").length,
     entregas: gastos.filter((g) => g.tipo === "entrega").length,
@@ -888,7 +1247,7 @@ export async function buildZipDeMarca(op: ZipMarcaOpciones): Promise<ZipMarcaRes
     pdfsIncluidos,
     pdfsOmitidos,
     carpetas,
-    lineasSinMarca: usarCongelado ? lineasSinMarca : 0,
+    lineasSinMarca: prep.lineasSinMarca,
   };
 }
 
@@ -1050,7 +1409,7 @@ function armarClientes(
     linkPorGasto: ReadonlyMap<string, string>;
     fotosPorCarpeta: ReadonlyMap<string, AdjuntoFila[]>;
     urlFirmada: ReadonlyMap<string, string>;
-    marcaCodigo: MarcaCodigo;
+    marcaCodigo: MarcaCodigo | typeof MULTIFASHION_KEY;
     marcaNombre: string;
   },
 ): ClienteResumenXlsx[] {
