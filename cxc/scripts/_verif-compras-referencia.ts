@@ -5,8 +5,9 @@
 //
 // Uso: DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-compras-referencia.ts [CODIGO...]
 //
-// 🔴 Imprime la ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí · Me
-// quedan), la lista de compras, la LÍNEA DE VENTA (tiempo de venta + % real —
+// 🔴 Imprime la ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí ·
+// Stock — de la ÚLTIMA LLEGADA cuando la bodega quedó en 0 y volvió a llegar
+// mercancía, con el histórico en chico debajo), la lista de compras, la LÍNEA DE VENTA (tiempo de venta + % real —
 // la regla del 90% se fue del módulo entero) y sus celdas VENDIDO · MESES del
 // modo pedido, la vista de barras (anclada a la llegada o últimos 12 con ▲) y
 // la fila de plata agrupada. Sin atribución por compra: eso no se sabe.
@@ -23,6 +24,7 @@ import {
   pieGrandeMeses,
   subDesdeLlegada,
   textoCompra,
+  textoHistoricoTotal,
   textoLineaVenta,
   textoMesesCelda,
   textoAvanceCorto,
@@ -105,10 +107,12 @@ async function main() {
       }
 
       // ── LOS TRES GRANDES, exactamente como se leen ──
+      // 🔴 Con 2+ llegadas sobre bodega en 0, Compré y Vendí son de la ÚLTIMA
+      // (Stock NO: es la existencia real). El histórico va abajo, en chico.
       const g = f.grandes;
-      const pieVendi = textoParteVendida(g.parteVendida) ?? "—";
+      const pieVendi = textoParteVendida(g.parteVendida, g.deLlegada) ?? "—";
       console.log(
-        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"} (${pieGrandeMeses(f.ritmo)})`,
+        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"} (${pieGrandeMeses(f.ritmo)})${g.deLlegada ? "   ← de la ÚLTIMA LLEGADA" : ""}`,
       );
 
       // ── El pie de Compré (la lista aprobada) ──
@@ -119,6 +123,8 @@ async function main() {
         const restantes = textoRestantes(f.compras.restantes);
         if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
       }
+      const historico = textoHistoricoTotal(f.grandes.historico);
+      if (historico) console.log(`     ${historico}   (gris — el histórico completo)`);
 
       // ── LAS TANDAS del motor (episodios entre ceros de bodega) ──
       const medida = medirTandas(art, HOY_MES);

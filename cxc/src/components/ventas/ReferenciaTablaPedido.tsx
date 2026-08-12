@@ -24,6 +24,12 @@
 //
 // 🔴 "Quedan 0" va en ROJO: es la fila que decide una compra.
 //
+// 🔴 COMPRÉ · VENDÍ · VENDIDO · MESES son de la ÚLTIMA LLEGADA cuando la bodega
+// quedó en 0 y volvió a llegar mercancía — las MISMAS cifras que la ficha que se
+// abre al tocar la fila (salen de `armarFicha`, no del cuadre crudo). STOCK es
+// siempre la existencia real de bodega. Con una sola llegada en toda la historia
+// no cambia nada: esa llegada ES el histórico.
+//
 // 🔴 VENDIDO · MESES reemplazan a "90% en" (12-ago-2026). Daniel: "va el 29%"
 // no decía cuánto tiempo llevaba. Las DOS celdas salen de UNA función
 // (`medirVendidoMeses`, la misma del Excel): VENDIDO es SIEMPRE el % real
@@ -68,6 +74,13 @@ interface FilaPedido {
   art: ArticuloCompras;
   clave: string;
   color: string | null;
+  /** 🔴 De LOS GRANDES de la ficha, no del cuadre crudo: con varias llegadas
+   *  sobre bodega en 0 son los de la ÚLTIMA, igual que la tarjeta que se abre
+   *  al tocar la fila. */
+  compre: string;
+  vendi: string;
+  /** La existencia REAL de bodega (nunca recortada a una llegada). */
+  stock: number | null;
   vendido: string;
   meses: string;
   /** `false` = agotado (tiempo cerrado): negro. `true` = en curso: gris. */
@@ -86,6 +99,9 @@ function armarFila(art: ArticuloCompras, hoyMes: string): FilaPedido {
     art,
     clave: `${art.empresa}·${art.codigo}`,
     color: colorDe(art.codigo),
+    compre: f.grandes.comprado != null ? fmtInt(f.grandes.comprado) : "—",
+    vendi: fmtInt(f.grandes.vendido),
+    stock: f.grandes.quedan,
     vendido: textoVendidoCelda(vm),
     meses: textoMesesCelda(vm),
     enCurso: !vm.terminado,
@@ -186,8 +202,7 @@ function FilaTabla({
   mostrarMargen: boolean;
   onToggle: () => void;
 }) {
-  const g = f.art.cuadre;
-  const quedan = f.art.existencia;
+  const quedan = f.stock;
   return (
     <tr
       onClick={onToggle}
@@ -201,10 +216,8 @@ function FilaTabla({
           {f.color ? ` · ${f.color}` : ""} · {etiquetaEmpresa(f.art.empresa)}
         </span>
       </td>
-      <td className="px-3 py-2.5 text-right tabular-nums">
-        {f.art.sinCompraRegistrada ? "—" : fmtInt(g.comprado)}
-      </td>
-      <td className="px-3 py-2.5 text-right tabular-nums">{fmtInt(g.vendido)}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums">{f.compre}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums">{f.vendi}</td>
       <td
         className={`px-3 py-2.5 text-right text-[15px] font-semibold tabular-nums ${
           quedan === 0 ? "text-red-700" : "text-gray-900"

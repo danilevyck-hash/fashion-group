@@ -537,26 +537,55 @@ const RESP_TANDAS: ComprasApiResp = {
 };
 
 describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () => {
-  it("🔴 el caso de la captura (4G5004G001): la frase con los tres números y la historia gris debajo — sin la palabra 'tanda'", async () => {
+  it("🔴 el caso de la captura (4G5004G001): la frase y la historia gris debajo — sin la palabra 'tanda'", async () => {
     await buscar(RESP_TANDAS, "4G5004G001");
     // La frase protagonista, con el "vendo por mes" de dato chiquito al final
     // (61 vendidas ÷ 7 meses CON mercancía = 8.7 — los meses sin stock no
     // dividen).
     expect(
-      screen.getAllByText("Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u · vendo 8.7 u por mes")
-        .length,
+      screen.getAllByText("Llegaron 36 u en mar 2026 · vendo 8.7 u por mes").length,
     ).toBeGreaterThan(0);
     // La historia, en gris, debajo.
     expect(screen.getAllByText("La anterior (oct 2025): 36 u — se vendió toda en 2 meses").length).toBeGreaterThan(0);
     // El KPI grande: Meses = 5, de la última llegada — no los 10 de "me lo
     // suma y me lo aplaza".
     expect(screen.getAllByText("de venta · desde mar 2026").length).toBeGreaterThan(0);
-    // Los tres grandes siguen siendo históricos.
-    expect(screen.getAllByText("el 85% de lo comprado").length).toBeGreaterThan(0);
     // Y la palabra "tanda" no existe en pantalla.
     expect(document.body.textContent ?? "").not.toMatch(/[Tt]anda/);
   });
+
+  it("🔴 LOS GRANDES son de la ÚLTIMA LLEGADA y la ficha entera dice lo MISMO — *'que sea coherente'*", async () => {
+    await buscar(RESP_TANDAS, "4G5004G001");
+    const grandes = grandesDeLaFicha();
+    // Daniel: *"mira que sigue diciendo compre 72 cuando enverdad son 36"*.
+    expect(grandes).toEqual({ Compré: "36u", Vendí: "25u", Stock: "12u", Meses: "5" });
+    expect(screen.getAllByText("el 69% de esa llegada").length).toBeGreaterThan(0);
+    // El histórico NO se pierde: queda en chico, bajo la lista de compras.
+    expect(screen.getAllByText("72 u en total · 61 vendidas").length).toBeGreaterThan(0);
+    // 🩸 UNA sola cifra por concepto: el grande Stock (12, la existencia real)
+    // y el par Vendí/Meses. De la frase se fueron el "me quedan 11 u" y el
+    // "va el 69% en 5 meses" — los dos ya estaban arriba.
+    expect(document.body.textContent ?? "").not.toContain("me quedan");
+    expect(document.body.textContent ?? "").not.toContain("va el 69% en 5 meses");
+    // Y la unidad que sobra (12 en bodega contra 36 − 25 = 11) la explica el
+    // aviso de siempre, bien escrito en singular.
+    expect(
+      screen.getAllByText("Hay 1 unidad en bodega que no sale de ninguna compra registrada.").length,
+    ).toBeGreaterThan(0);
+    expect(document.body.textContent ?? "").not.toContain("el 85% de lo comprado");
+  });
 });
+
+/** Los cuatro grandes tal como se leen: rótulo → valor. */
+function grandesDeLaFicha(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rotulo of ["Compré", "Vendí", "Stock", "Meses"]) {
+    const dt = screen.getAllByText(rotulo)[0];
+    const dd = dt.parentElement?.querySelector("dd");
+    out[rotulo] = (dd?.textContent ?? "").replace(/\s+/g, "");
+  }
+  return out;
+}
 
 // ── La fila de plata: UNA sola, cada número una sola vez ─────────────────────
 
