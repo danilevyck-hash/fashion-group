@@ -11,7 +11,6 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
-import { sendTelegramAlert } from "@/lib/telegram";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio } from "@/lib/alertas/canal";
 
@@ -174,7 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
         cliente: client_name,
         total,
         numero: order_number,
-        resumen: { referencias: resumenPed.referencias, piezas: resumenPed.piezas },
+        resumen: { referencias: resumenPed.referencias, bultos: resumenPed.bultos, piezas: resumenPed.piezas },
       }),
     );
   }

@@ -12,7 +12,7 @@ import {
 } from "@/lib/catalogo/confirmar-pedido";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
-import { sendTelegramAlert, shortError } from "@/lib/telegram";
+import { shortError } from "@/lib/telegram";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
@@ -333,11 +333,16 @@ async function handleConfirmar(
         if (!ya) {
           await enviarNegocio(
             avisoPedidoDelLink({
+              emoji: cfg.telegramEmoji,
               label: cfg.label,
               cliente: pedido.cliente_nombre,
               total,
               numero,
-              resumen: { referencias: resumenLink.referencias, piezas: resumenLink.piezas },
+              resumen: {
+                referencias: resumenLink.referencias,
+                bultos: resumenLink.bultos,
+                piezas: resumenLink.piezas,
+              },
             }),
           );
         }
