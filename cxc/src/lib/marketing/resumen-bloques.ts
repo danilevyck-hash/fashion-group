@@ -118,6 +118,44 @@ export interface PeriodoCerradoResumen {
   total: number;
 }
 
+/** Clave de la sección del período ABIERTO en el detalle por período. */
+export const SECCION_ABIERTO = "abierto";
+
+/**
+ * Clave estable de la sección de un período: `"abierto"` para el abierto
+ * (`null`), el id para un cerrado con fila propia, y `legacy::<nombre>` para
+ * el archivo legacy ("Gastos Tommy y Calvin"), que no tiene fila.
+ */
+export function claveDeSeccion(
+  per: { id: string | null; nombre: string } | null,
+): string {
+  if (per === null) return SECCION_ABIERTO;
+  return per.id ? String(per.id) : `legacy::${per.nombre}`;
+}
+
+/**
+ * Una línea del detalle por proyecto·período que emite `agregarPorBloques`.
+ *
+ * 🔴 SE ACUMULA EN LAS MISMAS LÍNEAS QUE ARMAN LOS TOTALES — el mismo `monto`
+ * que entra en `bloque.total` o en `cerrados[].total` entra acá, documento por
+ * documento. Por eso, por construcción, la suma del detalle de una sección da
+ * el total de esa sección: no hay una segunda cuenta que pueda divergir.
+ *
+ * `proyectoId === null` = gasto sin cliente (impulsadoras y sueltos): es la
+ * fila "General" de la lista de la marca.
+ */
+export interface DetalleProyectoPeriodo {
+  bloqueKey: string;
+  /** Clave de sección (ver `claveDeSeccion`). */
+  seccion: string;
+  proyectoId: string | null;
+  monto: number;
+  /** Cuántas facturas de ESTE período aportaron al monto. */
+  facturas: number;
+  /** Cuántas entregas de muebles de ESTE período aportaron al monto. */
+  entregas: number;
+}
+
 export interface FilaPorCliente {
   cliente: string;
   clienteCodigo: string | null;
@@ -129,6 +167,12 @@ export interface FilaPorCliente {
 export interface ResumenBloques {
   bloques: BloqueResumen[];
   cerrados: PeriodoCerradoResumen[];
+  /**
+   * Detalle por proyecto·período (12-ago-2026): la lista de una marca lo usa
+   * para decir cuánto gastó cada proyecto EN cada período. Sale de la MISMA
+   * pasada que arma `bloques` y `cerrados` — nunca de una segunda cuenta.
+   */
+  detalle: DetalleProyectoPeriodo[];
   /** Cabecera: lo gastado hoy (períodos abiertos), proyectos y clientes vivos. */
   resumen: { total: number; proyectos: number; clientes: number };
   porCliente: FilaPorCliente[];
@@ -440,6 +484,31 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     b.sinFoto += 1;
   };
 
+  // --- Detalle por proyecto·período: se anota EXACTAMENTE el mismo monto que
+  // entra en el total del bloque o del cerrado, en la misma línea. Es lo que
+  // permite que la lista de la marca muestre "cuánto reportó cada proyecto en
+  // cada período" cuadrando al centavo con las tarjetas — por construcción.
+  const detalleAcc = new Map<string, DetalleProyectoPeriodo>();
+  const anotarDetalle = (
+    k: string,
+    per: { id: string | null; nombre: string } | null,
+    pid: string | null | undefined,
+    tipo: "factura" | "entrega",
+    monto: number,
+  ) => {
+    const proyectoId = pid ? String(pid) : null;
+    const seccion = claveDeSeccion(per);
+    const llave = `${k}::${seccion}::${proyectoId ?? "(general)"}`;
+    let d = detalleAcc.get(llave);
+    if (!d) {
+      d = { bloqueKey: k, seccion, proyectoId, monto: 0, facturas: 0, entregas: 0 };
+      detalleAcc.set(llave, d);
+    }
+    d.monto += monto;
+    if (tipo === "factura") d.facturas += 1;
+    else d.entregas += 1;
+  };
+
   const anotarCerrado = (
     per: PeriodoRow | { id: null; nombre: string },
     marcaKey: string,
@@ -503,6 +572,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       sumar(b.facturas, num(f.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(f.total));
+      anotarDetalle(MULTIFASHION_KEY, null, pid, "factura", num(f.total));
       anotarPendientes(MULTIFASHION_KEY, f);
       const sumPctMf = rows.reduce((s, x) => s + num(x.porcentaje), 0) || 1;
       for (const r of rows) {
@@ -530,6 +600,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       const cer = cerradoPara("factura", fid, k, periodoLegacyDeFactura(f, false));
       if (cer) {
         anotarCerrado(cer, k, "factura", monto);
+        anotarDetalle(k, cer, pid, "factura", monto);
         continue;
       }
       // `porMarca` solo cuenta lo ABIERTO, igual que el titular: un desglose
@@ -538,6 +609,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       const b = bloque(k);
       sumar(b.facturas, monto);
       anotarCliente(pid, k, monto);
+      anotarDetalle(k, null, pid, "factura", monto);
       anotarPendientes(k, f);
     }
   }
@@ -555,6 +627,7 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       sumar(b.muebles, num(e.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(e.total));
+      anotarDetalle(MULTIFASHION_KEY, null, pid, "entrega", num(e.total));
       for (const mid of marcasDeEntrega(e)) {
         porMarca[mid] =
           (porMarca[mid] ?? 0) + porcionEntregaParaMarca(e, mid, empresaDeMarca.get(mid));
@@ -575,12 +648,14 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       const cer = cerradoPara("entrega", eid, k, false);
       if (cer) {
         anotarCerrado(cer, k, "entrega", monto);
+        anotarDetalle(k, cer, pid, "entrega", monto);
         continue;
       }
       porMarca[mid] = (porMarca[mid] ?? 0) + monto;
       const b = bloque(k);
       sumar(b.muebles, monto);
       anotarCliente(pid, k, monto);
+      anotarDetalle(k, null, pid, "entrega", monto);
     }
   }
 
@@ -629,9 +704,15 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   const porMarcaRedondeado: Record<string, number> = {};
   for (const [k, v] of Object.entries(porMarca)) porMarcaRedondeado[k] = round2(v);
 
+  const detalle = [...detalleAcc.values()].map((d) => ({
+    ...d,
+    monto: round2(d.monto),
+  }));
+
   return {
     bloques: listaBloques,
     cerrados,
+    detalle,
     resumen: {
       total: round2(listaBloques.reduce((s, b) => s + b.total, 0)),
       proyectos: proyectosVivos.size,

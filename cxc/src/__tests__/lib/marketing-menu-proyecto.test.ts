@@ -29,7 +29,9 @@ function leer(rel: string): string {
   return readFileSync(path.join(RAIZ, rel), "utf8");
 }
 
-const VISTA = "app/marketing/components/ProyectosHomeView.tsx";
+// La lista de la marca vive en el NIVEL 3 (el detalle del período) desde el
+// rediseño de tres niveles del 12-ago-2026.
+const VISTA = "app/marketing/components/DetallePeriodoView.tsx";
 const MODAL_GASTO = "app/marketing/components/RegistrarGastoModal.tsx";
 const BULK = "app/api/marketing/facturas/bulk/route.ts";
 const MUTATIONS = "lib/marketing/mutations.ts";
