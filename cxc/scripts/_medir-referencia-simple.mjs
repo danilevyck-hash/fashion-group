@@ -2,7 +2,8 @@
 // mide los 3 anchos de la casa: cuánto ARRASTRA la página, cuánto se RECORTA,
 // si algún blanco táctil baja de 44 px y si algún texto baja de 12 px.
 //
-// 🔴 La ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí · Me quedan),
+// 🔴 La ficha del 12-ago-2026 (tarde): los CUATRO GRANDES (Compré · Vendí ·
+// Stock · Meses),
 // la línea del 90%, las barras (ancladas a la llegada o últimos 12 con ▲) y la
 // fila de plata AGRUPADA — Precio prom · lista | Costo CIF · FOB | margen — que
 // es la que puede envolver mal a 390 px: el script la lee y la imprime.
@@ -116,7 +117,7 @@ for (const ancho of ANCHOS) {
         chicos,
         textos,
         recortados,
-        tres: [leer("Compré"), leer("Vendí"), leer("Me quedan")].filter(Boolean),
+        tres: [leer("Compré"), leer("Vendí"), leer("Stock"), leer("Meses")].filter(Boolean),
         linea90,
         plata,
         // Las líneas de la fila de plata: si envuelve, crece hacia ABAJO. Más de

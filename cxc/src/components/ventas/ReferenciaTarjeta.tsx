@@ -9,9 +9,10 @@
 // es importante… me queda 2 meses de venta / vendo 11u mes es lo que mas llama
 // la atencion y no es lo mas importante ya que un mes puedo vender mucho y
 // otros meses no, vendo b2b al por mayor no retail"*. La tarjeta quedó así:
-//   1. LOS TRES GRANDES: **Compré · Vendí · Me quedan** (unidades, en grande).
+//   1. LOS CUATRO GRANDES: **Compré · Vendí · Stock · Meses** (en grande).
 //      Compré trae debajo la lista de compras aprobada (4 fechas + "y N más");
-//      Vendí dice qué % de lo comprado es; Me quedan es `existencia` de Switch.
+//      Vendí dice qué % de lo comprado es; Stock es `existencia` de Switch;
+//      Meses es el tiempo de venta desde la llegada (el ancla del 90%).
 //      ⚠️ NO SE FUERZA EL CUADRE entre los tres: los avisos de descuadre que ya
 //      existen explican los huecos (ajuste, venta sin compra, robo).
 //   2. LA LÍNEA DEL 90% — *"creo que es mas importante saber en cuanto meses se

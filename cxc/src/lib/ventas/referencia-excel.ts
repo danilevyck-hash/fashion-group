@@ -22,8 +22,8 @@
 // 🩸 Y ANTES SE HABÍA IDO "DESC.". Daniel, textual: *"no sirve"*. Lo que sí
 // sirve para su decisión es el PRECIO REAL y el MARGEN.
 //
-// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (12-ago-2026): los tres
-// grandes primero — `Compré` · `Vendí` · `En bodega` (= Me quedan) — y la fila
+// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (12-ago-2026): los cuatro
+// grandes primero — `Compré` · `Vendí` · `Stock` · `Meses de venta` — y la fila
 // de plata en el MISMO orden agrupado de la tarjeta: `Precio prom` · `Lista` ·
 // `Costo CIF` · `CIF anterior (solo si cambió)` · `Costo FOB` · `Margen`.
 //   · **Compré** es la suma de TODAS las compras registradas (también las de
