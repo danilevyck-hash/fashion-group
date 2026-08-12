@@ -52,30 +52,30 @@ const ANCHOS = [
  * medir una pantalla vacía da 0 px de arrastre y no prueba nada.
  */
 const PANTALLAS = [
-  { id: "grupo-ventas", url: "/g/ventas-clientes", nombre: "Ventas y clientes", espera: "main, div.max-w-5xl" },
-  { id: "grupo-operacion", url: "/g/operacion", nombre: "Operación", espera: "main, div.max-w-5xl" },
-  { id: "grupo-admin", url: "/g/administracion", nombre: "Administración", espera: "main, div.max-w-5xl" },
-  { id: "ventas", url: "/ventas", nombre: "Ventas", espera: "main" },
-  { id: "vista-general", url: "/vista-general", nombre: "Vista General", espera: "div.max-w-5xl" },
-  { id: "referencia", url: "/referencia", nombre: "Referencia", espera: "main" },
-  { id: "multifashion", url: "/multifashion", nombre: "Multifashion", espera: "main" },
-  { id: "cxc", url: "/admin", nombre: "Cuentas por Cobrar", espera: "main, header" },
-  { id: "clientes", url: "/clientes", nombre: "Clientes", espera: "main" },
-  { id: "proveedores", url: "/proveedores", nombre: "Proveedores", espera: "main" },
-  { id: "data-health", url: "/admin/data-health", nombre: "Data Health", espera: "div.max-w-6xl" },
-  { id: "guias", url: "/guias", nombre: "Guías de Despacho", espera: "div.max-w-6xl" },
-  { id: "guia-nueva", url: "/guias/nueva", nombre: "Nueva guía", espera: "div.max-w-6xl" },
-  { id: "reclamos", url: "/reclamos", nombre: "Reclamos", espera: "div.max-w-6xl" },
-  { id: "reclamo-nuevo", url: "/reclamos?view=form", nombre: "Nuevo Reclamo", espera: "div.max-w-6xl" },
-  { id: "depurador", url: "/productos/cargar", nombre: "Depurador", espera: "div.max-w-5xl" },
-  { id: "facturas-tienda", url: "/productos/cargar?tab=facturas", nombre: "Facturas Tienda", espera: "div.max-w-5xl" },
-  { id: "asistencia", url: "/asistencia", nombre: "Asistencia", espera: "div.max-w-6xl" },
-  { id: "cheques", url: "/cheques", nombre: "Cheques", espera: "div.max-w-6xl" },
-  { id: "caja", url: "/caja", nombre: "Caja Menuda", espera: "div.max-w-6xl" },
-  { id: "prestamos", url: "/prestamos", nombre: "Préstamos", espera: "div.max-w-6xl" },
-  { id: "marketing", url: "/marketing", nombre: "Marketing", espera: "main, div" },
-  { id: "gastos", url: "/gastos-contabilidad", nombre: "Gastos", espera: "main" },
-  { id: "saldos-banco", url: "/saldos-banco", nombre: "Saldos de Banco", espera: "main" },
+  { id: "grupo-ventas", url: "/g/ventas-clientes", nombre: "Ventas y clientes", espera: "div.sticky.top-0" },
+  { id: "grupo-operacion", url: "/g/operacion", nombre: "Operación", espera: "div.sticky.top-0" },
+  { id: "grupo-admin", url: "/g/administracion", nombre: "Administración", espera: "div.sticky.top-0" },
+  { id: "ventas", url: "/ventas", nombre: "Ventas", espera: "div.sticky.top-0" },
+  { id: "vista-general", url: "/vista-general", nombre: "Vista General", espera: "div.sticky.top-0" },
+  { id: "referencia", url: "/referencia", nombre: "Referencia", espera: "div.sticky.top-0" },
+  { id: "multifashion", url: "/multifashion", nombre: "Multifashion", espera: "div.sticky.top-0" },
+  { id: "cxc", url: "/admin", nombre: "Cuentas por Cobrar", espera: "div.sticky.top-0" },
+  { id: "clientes", url: "/clientes", nombre: "Clientes", espera: "div.sticky.top-0" },
+  { id: "proveedores", url: "/proveedores", nombre: "Proveedores", espera: "div.sticky.top-0" },
+  { id: "data-health", url: "/admin/data-health", nombre: "Data Health", espera: "div.sticky.top-0" },
+  { id: "guias", url: "/guias", nombre: "Guías de Despacho", espera: "div.sticky.top-0" },
+  { id: "guia-nueva", url: "/guias/nueva", nombre: "Nueva guía", espera: "div.sticky.top-0" },
+  { id: "reclamos", url: "/reclamos", nombre: "Reclamos", espera: "div.sticky.top-0" },
+  { id: "reclamo-nuevo", url: "/reclamos?view=form", nombre: "Nuevo Reclamo", espera: "nav" },
+  { id: "depurador", url: "/productos/cargar", nombre: "Depurador", espera: "div.sticky.top-0" },
+  { id: "facturas-tienda", url: "/productos/cargar?tab=facturas", nombre: "Facturas Tienda", espera: "div.sticky.top-0" },
+  { id: "asistencia", url: "/asistencia", nombre: "Asistencia", espera: "div.sticky.top-0" },
+  { id: "cheques", url: "/cheques", nombre: "Cheques", espera: "div.sticky.top-0" },
+  { id: "caja", url: "/caja", nombre: "Caja Menuda", espera: "div.sticky.top-0" },
+  { id: "prestamos", url: "/prestamos", nombre: "Préstamos", espera: "div.sticky.top-0" },
+  { id: "marketing", url: "/marketing", nombre: "Marketing", espera: "div.sticky.top-0" },
+  { id: "gastos", url: "/gastos-contabilidad", nombre: "Gastos", espera: "div.sticky.top-0" },
+  { id: "saldos-banco", url: "/saldos-banco", nombre: "Saldos de Banco", espera: "div.sticky.top-0" },
 ];
 
 function cookieDeSesion() {
@@ -105,6 +105,17 @@ const MEDIR = (nombre) => {
   const arrastre = Math.max(0, doc.scrollWidth - window.innerWidth);
   const raiz = document.querySelector("main") ?? document.body;
 
+  // 🩸 El `sr-only` es, por definición, una caja de 1×1 con `overflow:hidden`
+  // y el texto adentro — o sea, el detector de RECORTES lo cuenta como recorte
+  // en TODAS las pantallas. Es un falso positivo del medidor, no un defecto de
+  // la página: un lector de pantalla lee el nodo entero, no su caja. Se
+  // reconoce por la firma del utilitario (clip + 1×1), no por la clase, para
+  // que también atrape al `sr-only` que venga de otro lado.
+  const esSrOnly = (el, r, cs) =>
+    (r.width <= 2 && r.height <= 2) ||
+    cs.clip === "rect(0px, 0px, 0px, 0px)" ||
+    String(el.className).split(/\s+/).includes("sr-only");
+
   const recortados = [];
   const tactiles = [];
   const textosChicos = [];
@@ -112,6 +123,7 @@ const MEDIR = (nombre) => {
     const r = el.getBoundingClientRect();
     if (r.width === 0 || r.height === 0) continue;
     const cs = getComputedStyle(el);
+    if (esSrOnly(el, r, cs)) continue;
     const ox = cs.overflowX;
     if ((ox === "hidden" || ox === "clip") && el.scrollWidth - el.clientWidth > 4) {
       recortados.push({
@@ -130,35 +142,42 @@ const MEDIR = (nombre) => {
     }
     if (el.children.length === 0 && (el.textContent ?? "").trim()) {
       const fs = parseFloat(cs.fontSize);
-      // El sr-only mide 1px a propósito y no lo lee nadie con los ojos.
-      const esSrOnly = r.width <= 2 && r.height <= 2;
-      if (fs < 12 && !esSrOnly) textosChicos.push({ fs, txt: (el.textContent ?? "").trim().slice(0, 30) });
+      if (fs < 12) textosChicos.push({ fs, txt: (el.textContent ?? "").trim().slice(0, 30) });
     }
   }
 
-  // ── SUBIDA: la Y del primer elemento de contenido VISIBLE ────────────────
-  // Se busca el primer nodo con texto o con caja propia dentro del contenedor
-  // de la página (saltando el AppHeader, que no cambió). Es el número que
-  // Daniel pidió: cuánto sube la primera pantalla.
+  // ── SUBIDA: dónde empieza lo que se VE ───────────────────────────────────
+  // 🩸 Acá se midió mal la primera vez: tomar "el primer elemento en orden del
+  // DOM" devuelve el <div> contenedor, que arranca en el mismo Y con título y
+  // sin título — daba 0 px de ganancia en las 23. Lo que hay que medir es el
+  // primer PÍXEL PINTADO: el `top` más chico entre las hojas visibles (las que
+  // pintan texto o son un control), salteando la barra pegajosa —que no
+  // cambió— y el sr-only.
   const barra = document.querySelector("div.sticky.top-0");
   const yBarra = barra ? barra.getBoundingClientRect().bottom : 0;
   let primerContenido = null;
-  const candidatos = raiz.querySelectorAll("h1, h2, p, button, a[href], input, table, svg, span, div");
-  for (const el of candidatos) {
+  for (const el of raiz.querySelectorAll("*")) {
     const r = el.getBoundingClientRect();
-    if (r.width < 8 || r.height < 8) continue;           // sr-only y píxeles sueltos fuera
-    if (r.top < yBarra - 1) continue;                     // lo que vive DENTRO de la barra
+    if (r.width < 4 || r.height < 4) continue;
+    const cs = getComputedStyle(el);
+    if (esSrOnly(el, r, cs)) continue;
+    if (cs.visibility === "hidden" || cs.opacity === "0") continue;
+    if (r.top < yBarra - 1) continue;
     if (el.closest("div.sticky.top-0")) continue;
-    const txt = (el.textContent ?? "").trim();
-    if (!txt && el.tagName !== "SVG" && el.tagName !== "INPUT") continue;
-    primerContenido = {
-      tag: el.tagName,
-      clase: String(el.className).slice(0, 60),
-      y: Math.round(r.top * 10) / 10,
-      desdeLaBarra: Math.round((r.top - yBarra) * 10) / 10,
-      txt: txt.replace(/\s+/g, " ").slice(0, 60),
-    };
-    break;
+    // Solo hojas: un contenedor "empieza" donde empieza su primer hijo, así
+    // que medirlo no dice nada sobre lo que el ojo ve.
+    const pintaTexto = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    const esControl = el.matches("input, select, textarea, svg, img");
+    if (!pintaTexto && !esControl) continue;
+    if (!primerContenido || r.top < primerContenido.y) {
+      primerContenido = {
+        tag: el.tagName,
+        clase: String(el.className).slice(0, 60),
+        y: Math.round(r.top * 10) / 10,
+        desdeLaBarra: Math.round((r.top - yBarra) * 10) / 10,
+        txt: (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 45),
+      };
+    }
   }
 
   // ── IDENTIFICACIÓN: ¿el nombre sigue visible sin el título grande? ───────
@@ -181,8 +200,21 @@ const MEDIR = (nombre) => {
   // Un breadcrumb PROPIO de la pantalla (Reclamos › Nuevo Reclamo lo tiene, y
   // se ve en todos los anchos: no es el del AppHeader).
   let migaPropia = null;
-  const nav = raiz.querySelector("nav");
-  if (visible(nav)) migaPropia = (nav.textContent ?? "").replace(/\s+/g, " ").trim();
+  for (const nav of raiz.querySelectorAll("nav")) {
+    if (visible(nav)) { migaPropia = (nav.textContent ?? "").replace(/\s+/g, " ").trim(); break; }
+  }
+  // Y la PESTAÑA activa: en el Depurador el nombre de la pantalla no lo dice
+  // ni la barra ni la miga (las dos dicen el módulo), lo dice el selector de
+  // pestañas — que se ve en los cuatro anchos. Cuenta como identificación.
+  let enPestana = null;
+  const dicen = (s) => !!s && s.toLowerCase().includes(nombre.toLowerCase());
+  for (const el of raiz.querySelectorAll("button, [role=tab], a[href]")) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top > 260) continue; // solo la zona de arriba, donde uno se ubica
+    const t = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (dicen(t)) { enPestana = t; break; }
+  }
 
   // ── El h1: uno solo, y no se ve ──────────────────────────────────────────
   const h1s = [...document.querySelectorAll("h1")].map((h) => {
@@ -195,7 +227,6 @@ const MEDIR = (nombre) => {
     };
   });
 
-  const dice = (s) => !!s && s.toLowerCase().includes(nombre.toLowerCase());
   return {
     arrastre,
     innerW: window.innerWidth,
@@ -207,7 +238,11 @@ const MEDIR = (nombre) => {
       enLaBarra,
       enLaMiga,
       migaPropia,
-      loDice: dice(enLaBarra) || dice(enLaMiga) || dice(migaPropia),
+      enPestana,
+      // 🔴 La regla del pedido: si la pantalla no dice su nombre en la barra,
+      // ni en la miga, ni en su propio breadcrumb/pestaña, su título NO se
+      // podía quitar. Esto lo verifica ancho por ancho.
+      loDice: dicen(enLaBarra) || dicen(enLaMiga) || dicen(migaPropia) || dicen(enPestana),
     },
     h1s,
   };
@@ -233,17 +268,33 @@ for (const a of ANCHOS) {
   resultados[a.nombre] = {};
 
   for (const p of PANTALLAS) {
-    try {
-      await page.goto(`${BASE}${p.url}`, { waitUntil: "networkidle", timeout: 120_000 });
-      await page.waitForSelector(p.espera, { timeout: 45_000 });
-      await page.waitForTimeout(900);
-      const m = await page.evaluate(MEDIR, p.nombre);
-      resultados[a.nombre][p.id] = m;
-      if (CAPTURAR.has(p.id) && (a.w === 390 || a.w === 1440)) {
-        await page.screenshot({ path: `${OUT}/${p.id}-${a.w}.png`, fullPage: false });
+    // `networkidle` se cuelga en las pantallas que dejan un fetch largo (o un
+    // poll) abierto: la primera corrida perdió media docena de mediciones por
+    // eso. Se navega con `domcontentloaded` —que siempre llega— y la prueba de
+    // que la pantalla CARGÓ la da el selector, no la red. Un reintento cubre
+    // el timeout suelto por contención de los dos servidores a la vez.
+    let m = null;
+    for (let intento = 1; intento <= 2 && !m; intento++) {
+      try {
+        await page.goto(`${BASE}${p.url}`, { waitUntil: "domcontentloaded", timeout: 120_000 });
+        await page.waitForSelector(p.espera, { timeout: 60_000 });
+        // El contenido llega por fetch después de hidratar: se espera a que la
+        // altura del documento se quede quieta dos veces seguidas.
+        let previa = -1;
+        for (let i = 0; i < 25; i++) {
+          await page.waitForTimeout(400);
+          const h = await page.evaluate(() => document.documentElement.scrollHeight);
+          if (h === previa && i > 2) break;
+          previa = h;
+        }
+        m = await page.evaluate(MEDIR, p.nombre);
+      } catch (e) {
+        if (intento === 2) m = { error: String(e).slice(0, 200) };
       }
-    } catch (e) {
-      resultados[a.nombre][p.id] = { error: String(e).slice(0, 200) };
+    }
+    resultados[a.nombre][p.id] = m;
+    if (CAPTURAR.has(p.id) && (a.w === 390 || a.w === 1440) && !m?.error) {
+      await page.screenshot({ path: `${OUT}/${p.id}-${a.w}.png`, fullPage: false });
     }
   }
 }
