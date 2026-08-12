@@ -7,7 +7,8 @@
 //   · "variantes" (Joybees): sin inventario por talla; el selector son las
 //     VARIANTES de género del mismo modelo (groupByModel), cada una con su
 //     propio SKU/stock.
-// El carrito es el mismo del grid (keys históricas por marca).
+// El carrito es el mismo del grid: misma clave, y vive en la SESIÓN de la
+// pestaña (lib/catalogo/carrito.ts).
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -16,6 +17,7 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { supabase, type Product, type InventoryItem } from "@/components/reebok/supabase";
 import { groupByModel, type GroupedProduct, type JoybeesProduct } from "./groupByModel";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import { leerCarrito, guardarCarrito } from "@/lib/catalogo/carrito";
 import VisorFoto from "./VisorFoto";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
@@ -53,20 +55,13 @@ function DetallePorTallas({ marca }: { marca: MarcaUiKey }) {
 
   const availableSizes = inventory.filter(i => i.quantity > 0);
 
-  // Read cart from sessionStorage (same keys as the grid page)
+  // Carrito de la SESIÓN, la misma clave del grid (lib/catalogo/carrito).
   function getCart(): CartItem[] {
-    try {
-      const saved = theme.cartKeySession ? sessionStorage.getItem(theme.cartKeySession) : null;
-      if (saved) return JSON.parse(saved);
-    } catch { /* */ }
-    return [];
+    return leerCarrito<CartItem>(theme.cartKey);
   }
 
   function saveCart(cart: CartItem[]) {
-    if (theme.cartKeySession) sessionStorage.setItem(theme.cartKeySession, JSON.stringify(cart));
-    try {
-      localStorage.setItem(theme.cartKeyLocal, JSON.stringify(cart));
-    } catch { /* */ }
+    guardarCarrito(theme.cartKey, cart);
   }
 
   const handleAdd = () => {
@@ -211,17 +206,13 @@ function DetallePorVariantes({ marca }: { marca: MarcaUiKey }) {
   const variantesConPrecioDistinto =
     new Set(availableVariants.map(v => v.product.price)).size > 1;
 
-  // Carrito compartido con la página del catálogo (misma key localStorage)
+  // Carrito compartido con la página del catálogo (misma clave, misma sesión)
   function getCart(): CartItem[] {
-    try {
-      const saved = localStorage.getItem(theme.cartKeyLocal);
-      if (saved) return JSON.parse(saved);
-    } catch { /* */ }
-    return [];
+    return leerCarrito<CartItem>(theme.cartKey);
   }
 
   function saveCart(cart: CartItem[]) {
-    try { localStorage.setItem(theme.cartKeyLocal, JSON.stringify(cart)); } catch { /* */ }
+    guardarCarrito(theme.cartKey, cart);
   }
 
   const handleAdd = () => {

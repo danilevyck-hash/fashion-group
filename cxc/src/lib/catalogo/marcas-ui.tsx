@@ -153,9 +153,15 @@ export interface MarcaTheme {
   pedidoPublicoBase: string;
 
   // ── Storage keys (idénticas a las históricas — carritos vivos migran solos) ──
-  cartKeyLocal: string;
-  /** Reebok también persiste el carrito en sessionStorage; Joybees no. */
-  cartKeySession: string | null;
+  /**
+   * Carrito del catálogo con sesión. Vive en `sessionStorage` (ver
+   * `lib/catalogo/carrito.ts`): sobrevive navegar y refrescar dentro de la
+   * pestaña y muere al cerrarla. La clave es la MISMA de siempre, así que el
+   * carrito guardado en localStorage por el esquema viejo se lee una última vez
+   * y se limpia.
+   */
+  cartKey: string;
+  /** Carrito del catálogo PÚBLICO — misma regla de vida (sesión). */
   publicCartKey: string;
   publicClientNameKey: string;
   checkoutTokenKey: string;
@@ -510,8 +516,7 @@ const REEBOK: MarcaTheme = {
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/reebok",
   pedidoPublicoBase: "/pedido-reebok",
 
-  cartKeyLocal: "reebok_cart",
-  cartKeySession: "reebok_cart",
+  cartKey: "reebok_cart",
   publicCartKey: "reebok_public_cart",
   publicClientNameKey: "reebok_public_client_name",
   checkoutTokenKey: "reebok_checkout_token",
@@ -835,8 +840,7 @@ const JOYBEES: MarcaTheme = {
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/joybees",
   pedidoPublicoBase: "/pedido-joybees",
 
-  cartKeyLocal: "joybees_cart",
-  cartKeySession: null,
+  cartKey: "joybees_cart",
   publicCartKey: "joybees_public_cart",
   publicClientNameKey: "joybees_public_client_name",
   checkoutTokenKey: "joybees_checkout_token",
@@ -1150,8 +1154,7 @@ const TOMMY: MarcaTheme = {
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/tommy",
   pedidoPublicoBase: "/pedido-tommy",
 
-  cartKeyLocal: "tommy_cart",
-  cartKeySession: null,
+  cartKey: "tommy_cart",
   publicCartKey: "tommy_public_cart",
   publicClientNameKey: "tommy_public_client_name",
   checkoutTokenKey: "tommy_checkout_token",
@@ -1502,8 +1505,7 @@ const CALVIN: MarcaTheme = {
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/calvin",
   pedidoPublicoBase: "/pedido-calvin",
 
-  cartKeyLocal: "calvin_cart",
-  cartKeySession: null,
+  cartKey: "calvin_cart",
   publicCartKey: "calvin_public_cart",
   publicClientNameKey: "calvin_public_client_name",
   checkoutTokenKey: "calvin_checkout_token",

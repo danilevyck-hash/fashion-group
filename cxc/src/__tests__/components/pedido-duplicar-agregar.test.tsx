@@ -10,20 +10,16 @@
 //    cliente"). El nombre del pedido nuevo ES el del cliente elegido.
 //    Lo usan el Duplicar de la lista y "Duplicar y corregir" del pedido
 //    bloqueado por Switch.
-//  · AgregarProductosModal — buscador de productos de la marca que agrega
-//    líneas al pedido vía el PATCH /item existente (candado Switch intacto).
-//
 // Además, candados estáticos: el draftIdKey muerto no puede volver, y el
-// "+ Agregar productos" del detalle tiene que abrir el buscador (no irse al
-// catálogo, donde "Agregar al pedido" mete al CARRITO y crea un pedido NUEVO).
+// "+ Agregar productos" del detalle lleva al CATÁLOGO en modo pedido
+// (`?agregarA=<id>`) — el buscador inline que lo tapó se retiró el 12-ago-2026,
+// ver src/__tests__/lib/catalogo-modo-pedido.test.ts.
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { readFileSync } from "fs";
 import path from "path";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
-import AgregarProductosModal, { type ProductoAgregable } from "@/components/catalogo/AgregarProductosModal";
-import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/catalogo/reebok/pedido/x",
@@ -196,99 +192,6 @@ describe("DuplicarPedidoModal", () => {
   });
 });
 
-// ── AgregarProductosModal ─────────────────────────────────────────────────────
-
-const PRODUCTOS: ProductoAgregable[] = [
-  { id: "p1", sku: "RBK-001", name: "Classic Leather", price: 20, image_url: null, category: "footwear" },
-  { id: "p2", sku: "RBK-002", name: "Tee Logo", price: 8, image_url: null, category: "apparel" },
-];
-
-function stubProductos(productos: unknown = PRODUCTOS) {
-  const fetchMock = vi.fn(async () => ({ ok: true, json: async () => productos }));
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
-}
-
-describe("AgregarProductosModal", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("carga los productos ACTIVOS de la marca y los busca por nombre o código", async () => {
-    const fetchMock = stubProductos();
-    render(
-      <AgregarProductosModal
-        theme={getMarcaTheme("reebok")!}
-        enPedido={new Map()}
-        onAgregar={async () => true}
-        onClose={() => {}}
-      />,
-    );
-    // Lee el catálogo interno de la marca, solo lo vendible.
-    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/catalogo/reebok/products?active=true");
-    await waitFor(() => expect(screen.getByText("Classic Leather")).toBeTruthy());
-    expect(screen.getByText("Tee Logo")).toBeTruthy();
-
-    // Búsqueda por código (case-insensitive) deja solo el que corresponde.
-    fireEvent.change(screen.getByPlaceholderText("Buscar por nombre o código..."), {
-      target: { value: "rbk-002" },
-    });
-    expect(screen.queryByText("Classic Leather")).toBeNull();
-    expect(screen.getByText("Tee Logo")).toBeTruthy();
-
-    // Sin coincidencias lo dice en simple.
-    fireEvent.change(screen.getByPlaceholderText("Buscar por nombre o código..."), {
-      target: { value: "zzz" },
-    });
-    expect(screen.getByText("No encontramos productos con ese nombre o código.")).toBeTruthy();
-  });
-
-  it("tocar Agregar entrega el producto al padre (que hace el PATCH /item)", async () => {
-    stubProductos();
-    const onAgregar = vi.fn(async () => true);
-    render(
-      <AgregarProductosModal
-        theme={getMarcaTheme("reebok")!}
-        enPedido={new Map()}
-        onAgregar={onAgregar}
-        onClose={() => {}}
-      />,
-    );
-    await waitFor(() => expect(screen.getByText("Classic Leather")).toBeTruthy());
-    fireEvent.click(screen.getAllByRole("button", { name: "Agregar" })[0]);
-    await waitFor(() => expect(onAgregar).toHaveBeenCalledTimes(1));
-    expect((onAgregar.mock.calls[0] as unknown[])[0]).toMatchObject({ id: "p1", sku: "RBK-001" });
-  });
-
-  it("un producto que YA está en el pedido dice cuántos bultos lleva y ofrece +1", async () => {
-    stubProductos();
-    render(
-      <AgregarProductosModal
-        theme={getMarcaTheme("reebok")!}
-        enPedido={new Map([["p1", 3]])}
-        onAgregar={async () => true}
-        onClose={() => {}}
-      />,
-    );
-    await waitFor(() => expect(screen.getByText("Classic Leather")).toBeTruthy());
-    expect(screen.getByText(/en el pedido: 3/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "+1 bulto" })).toBeTruthy();
-  });
-
-  it("si el catálogo no carga lo dice, no deja la lista en blanco", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, json: async () => ({}) })));
-    render(
-      <AgregarProductosModal
-        theme={getMarcaTheme("reebok")!}
-        enPedido={new Map()}
-        onAgregar={async () => true}
-        onClose={() => {}}
-      />,
-    );
-    await waitFor(() =>
-      expect(screen.getByText("No se pudo cargar el catálogo. Cierra y vuelve a intentar.")).toBeTruthy(),
-    );
-  });
-});
-
 // ── Candados estáticos sobre el detalle del pedido ────────────────────────────
 
 const SRC = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
@@ -299,12 +202,12 @@ describe("candados estáticos", () => {
     expect(SRC("src/lib/catalogo/marcas-ui.tsx")).not.toContain("draftIdKey");
   });
 
-  it("'+ Agregar productos' abre el buscador inline y agrega vía PATCH /item (no navega al catálogo)", () => {
+  it("'+ Agregar productos' lleva al catálogo en modo pedido (una sola forma de agregar)", () => {
     const src = SRC("src/components/catalogo/PedidoDetalleClient.tsx");
-    expect(src).toContain("AgregarProductosModal");
-    expect(src).toContain("setShowAgregarModal(true)");
-    expect(src).toContain("/item");
-    // El header ya no puede tener el Link viejo al catálogo para agregar.
+    expect(src).toContain("hrefCatalogoAgregando(theme.catalogoHref, id)");
+    // El buscador inline que tapó el problema se retiró.
+    expect(src).not.toContain("AgregarProductosModal");
+    // Y el link crudo al catálogo (que metía al CARRITO) tampoco vuelve.
     expect(src).not.toMatch(/Link href=\{theme\.catalogoHref\}[^>]*>\s*\+ Agregar productos/);
   });
 

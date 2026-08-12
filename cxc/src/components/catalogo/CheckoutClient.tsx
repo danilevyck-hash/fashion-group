@@ -5,8 +5,8 @@
 // directorio Switch (default Contado), vendedor AUTOMÁTICO por login, total y
 // UN botón "Confirmar y enviar a Switch". SIN validación de stock aquí
 // (decisión de Daniel 5-jul: el stock del sync <24h basta; flujo rápido).
-// El carrito vive en localStorage y NUNCA se limpia antes de que el pedido
-// quede guardado en DB.
+// El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y NUNCA
+// se limpia antes de que el pedido quede guardado en DB.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
@@ -15,6 +15,7 @@ import Link from "next/link";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { fmt } from "@/lib/format";
 import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
+import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -35,9 +36,8 @@ interface BrandCfg {
   label: string;
   catalogHref: string;
   confirmBase: string;
-  /** storage keys que contienen el carrito (se leen en orden, se escriben todas) */
-  cartLocal: string;
-  cartSession: string | null;
+  /** clave del carrito (vive en la SESIÓN de la pestaña — ver lib/catalogo/carrito) */
+  cartKey: string;
   bulto: (category?: string | null, bultoPzas?: number | null) => number;
   accent: string;
 }
@@ -47,8 +47,7 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
     label: theme.labelUpper,
     catalogHref: theme.catalogoHref,
     confirmBase: theme.confirmacionBase,
-    cartLocal: theme.cartKeyLocal,
-    cartSession: theme.cartKeySession,
+    cartKey: theme.cartKey,
     bulto: theme.bulto,
     accent: theme.checkoutAccent,
   };
@@ -77,23 +76,16 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const [error, setError] = useState<string | null>(null);
   const [erroresDetalle, setErroresDetalle] = useState<string[]>([]);
 
-  // ── Carrito desde storage ──
+  // ── Carrito desde la sesión de la pestaña ──
   useEffect(() => {
-    try {
-      const raw = (cfg.cartSession ? sessionStorage.getItem(cfg.cartSession) : null) || localStorage.getItem(cfg.cartLocal);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setCart(Array.isArray(parsed) ? parsed : []);
-    } catch { setCart([]); }
+    setCart(leerCarrito<CheckoutCartItem>(cfg.cartKey));
     setLoaded(true);
-  }, [cfg.cartLocal, cfg.cartSession]);
+  }, [cfg.cartKey]);
 
   const persistCart = useCallback((next: CheckoutCartItem[]) => {
     setCart(next);
-    try {
-      localStorage.setItem(cfg.cartLocal, JSON.stringify(next));
-      if (cfg.cartSession) sessionStorage.setItem(cfg.cartSession, JSON.stringify(next));
-    } catch { /* */ }
-  }, [cfg.cartLocal, cfg.cartSession]);
+    guardarCarrito(cfg.cartKey, next);
+  }, [cfg.cartKey]);
 
   // ── Vendedor automático por login ──
   useEffect(() => {
@@ -164,11 +156,8 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
         return; // carrito intacto
       }
       // Pedido guardado en DB (con o sin Switch ok) → limpiar carrito y token.
-      try {
-        localStorage.removeItem(cfg.cartLocal);
-        if (cfg.cartSession) sessionStorage.removeItem(cfg.cartSession);
-        sessionStorage.removeItem(`${marca}_checkout_token`);
-      } catch { /* */ }
+      limpiarCarrito(cfg.cartKey);
+      try { sessionStorage.removeItem(`${marca}_checkout_token`); } catch { /* */ }
       router.push(`${cfg.confirmBase}/${data.order_id}`);
     } catch {
       setError("Sin conexión — el carrito sigue guardado, intenta de nuevo.");
