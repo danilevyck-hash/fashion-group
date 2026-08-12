@@ -1049,7 +1049,7 @@ describe("el Excel de Referencia", () => {
     expect(fila[enc.indexOf("Meses")]).toBe(6);
   });
 
-  it('🔴 lo que no se puede afirmar queda VACÍO: sin compra con fecha → las dos celdas; vendido>comprado (TERMO) → solo "Vendido"', async () => {
+  it('🔴 el VACÍO es solo para lo indivisible (sin compra con fecha); vendido>comprado baja su % igual que la pantalla', async () => {
     const sinCompra = armarArticulo(
       {
         empresa: "vistana",
@@ -1063,9 +1063,11 @@ describe("el Excel de Referencia", () => {
       },
       HOY,
     );
-    // El caso TERMO: se vendió MÁS de lo comprado (faltan compras EN Switch).
-    // Un "150%" sería mentira; el tiempo de venta SÍ se sabe: agotado, del
-    // ancla (extendida hasta la compra más vieja con fecha) a su última venta.
+    // 🩸 El caso TERMO: se vendió MÁS de lo comprado (faltan compras EN
+    // Switch). El 150% BAJA, igual que en pantalla — la planilla no puede
+    // decir una cosa y la ficha otra (el bug de 44D202G110). El tiempo de
+    // venta también se sabe: agotado, del ancla (extendida hasta la compra más
+    // vieja con fecha) a su última venta.
     const termo = armarArticulo(
       {
         empresa: "active_shoes",
@@ -1092,7 +1094,7 @@ describe("el Excel de Referencia", () => {
     // La celda vacía ES el dato (misma convención que "CIF anterior").
     expect(filaSin[enc.indexOf("Vendido")] || null).toBeNull();
     expect(filaSin[enc.indexOf("Meses")] || null).toBeNull();
-    expect(filaTermo[enc.indexOf("Vendido")] || null).toBeNull();
+    expect(filaTermo[enc.indexOf("Vendido")]).toBeCloseTo(150 / 100, 10);
     // Ancla extendida jul-2024 → última venta nov-2025, inclusive = 17. El
     // reloj NO sigue corriendo hasta hoy (eso daría 25).
     expect(filaTermo[enc.indexOf("Meses")]).toBe(17);
