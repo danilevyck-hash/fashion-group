@@ -35,8 +35,9 @@ import ReportesTabs from "./components/ReportesTabs";
 import ImpulsadorasView from "./components/ImpulsadorasView";
 import RegistrarGastoModal from "./components/RegistrarGastoModal";
 
-// `historial` se removió de la UI; el archivo del componente queda en disco
-// (HistorialView.tsx) por si se reactiva, pero ya no se rutea.
+// `historial` se removió de la UI y su componente (HistorialView.tsx) se borró
+// el 11-ago-2026 junto con "Cerrar proyecto": el estado del proyecto dejó de
+// existir como concepto visible, así que no hay historial que dibujar.
 type VistaExtra = "reportes" | "impulsadoras" | null;
 
 /** Bloques que dibuja el inicio y que "Ver proyectos" puede abrir. */

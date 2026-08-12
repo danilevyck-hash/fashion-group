@@ -32,7 +32,9 @@ const read = (...p: string[]) => readFileSync(join(src, ...p), "utf8");
 
 const depurador = read("app", "productos", "cargar", "page.tsx");
 const prestamos = read("app", "prestamos", "PrestamosClient.tsx");
-const nuevoProyecto = read("app", "marketing", "components", "NuevoProyectoModal.tsx");
+// NuevoProyectoModal se borró el 11-ago-2026: el paso de crear proyecto se
+// retiró (el proyecto se autocrea desde "Registrar gasto"), así que su modal
+// quedó sin caller y su chequeo de ✕ se fue con él.
 const empresaSelector = read("app", "reclamos", "components", "EmpresaSelector.tsx");
 // Se mudó con su módulo: los saldos de banco salieron de "Gastos de Empresa"
 // (11-ago-2026). El componente es el MISMO archivo, no una copia.
@@ -70,11 +72,6 @@ describe("Modales · en iPhone no hay Escape, así que necesitan ✕", () => {
     expect(bloque).toMatch(/w-11 h-11/);
   });
 
-  it('Marketing · "Nuevo proyecto" ya no cierra con texto suelto (era 13.2×20)', () => {
-    expect(nuevoProyecto).not.toMatch(/className="text-gray-500 hover:text-black text-xl leading-none"/);
-    expect(nuevoProyecto).toMatch(/aria-label="Cerrar"/);
-    expect(nuevoProyecto).toMatch(/w-11 h-11/);
-  });
 });
 
 describe("Targets de 44px", () => {

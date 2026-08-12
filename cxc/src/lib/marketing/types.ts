@@ -15,11 +15,11 @@ export const EMPRESA_CODIGOS = [
 
 export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 
-// Estados de la UI: solo abierto / cerrado.
-// 'cerrado' es el valor nuevo (CHECK ampliado). Los proyectos legacy en
-// 'enviado'/'cobrado' siguen en DB y se LEEN como 'cerrado' vía
-// normalizarEstadoProyecto() (nunca se reescriben). Al cerrar desde la UI se
-// escribe 'cerrado'; al reabrir, 'abierto'.
+// Estado de LECTURA del proyecto. 🔴 YA NO SE ESCRIBE desde ningún lado:
+// "Cerrar proyecto" se retiró el 11-ago-2026 (era cosmético y confundía al
+// lado de "Cerrar período"). La columna sigue en DB con sus valores legacy
+// ('cerrado'/'enviado'/'cobrado' se LEEN como 'cerrado' vía
+// normalizarEstadoProyecto), pero el módulo trata todo proyecto vivo igual.
 export type EstadoProyecto = "abierto" | "cerrado";
 
 // Estado de pago a nivel FACTURA (registro de gastos). Reemplaza en la UI al
@@ -186,14 +186,6 @@ export interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
 }
 
 
-export interface ProyectoResumen extends MkProyecto {
-  marcas: MarcaConPorcentaje[];
-  total_facturado: number;
-  total_cobrable_marca: number; // monto cobrable a la marca filtrada (si aplica)
-  conteo_facturas: number;
-  conteo_fotos: number;
-}
-
 export interface AnuladoItem {
   tipo: "proyecto" | "factura";
   id: string;
@@ -232,7 +224,6 @@ export interface UpdateProyectoInput {
   nombre?: string | null;
   fecha_inicio?: string; // "YYYY-MM-DD"
   notas?: string | null;
-  estado?: EstadoProyecto;
 }
 
 export interface CreateFacturaInput {

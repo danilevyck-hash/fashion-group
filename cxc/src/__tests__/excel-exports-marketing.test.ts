@@ -333,7 +333,9 @@ describe("exportarExcelReporte (reportes)", () => {
     expect(cell(ws, "B4").v).toBe(200);
   });
 
-  it("por proyecto: mismas 6 columnas y gasto numérico", async () => {
+  it("por proyecto: 5 columnas (sin Estado) y gasto numérico", async () => {
+    // La columna "Estado" se retiró el 11-ago-2026 junto con "Cerrar
+    // proyecto": sin escritor del estado solo podía decir "Abierto".
     const blob = exportarExcelReporte("proyecto", [
       {
         proyecto: {
@@ -341,7 +343,6 @@ describe("exportarExcelReporte (reportes)", () => {
           nombre: "Remodelación",
           tienda: "Tienda Centro",
           fecha_inicio: "2026-04-01",
-          estado: "abierto",
         },
         marcas: [{ nombre: "Tommy Hilfiger" }],
         gastoTotal: 350.5,
@@ -349,10 +350,15 @@ describe("exportarExcelReporte (reportes)", () => {
     ]);
     const ws = (await readBlob(blob)).Sheets["Por proyecto"];
     expect(cell(ws, "A3").v).toBe("Proyecto");
-    expect(cell(ws, "F3").v).toBe("Gasto real");
+    expect(cell(ws, "E3").v).toBe("Gasto real");
     expect(cell(ws, "A4").v).toBe("Remodelación");
-    expect(cell(ws, "E4").v).toBe("Tommy Hilfiger");
-    expect(cell(ws, "F4").t).toBe("n");
-    expect(cell(ws, "F4").v).toBe(350.5);
+    expect(cell(ws, "D4").v).toBe("Tommy Hilfiger");
+    expect(cell(ws, "E4").t).toBe("n");
+    expect(cell(ws, "E4").v).toBe(350.5);
+    // Ninguna celda del encabezado dice "Estado".
+    for (const col of ["A", "B", "C", "D", "E", "F"]) {
+      const c = ws[`${col}3`];
+      if (c) expect(c.v).not.toBe("Estado");
+    }
   });
 });

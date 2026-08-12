@@ -423,8 +423,12 @@ describe("barrido estático", () => {
     const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
     expect(src).toMatch(/if \(!nombre\) return null;/);
     expect(src).toMatch(/proyectoId: proyecto\?\.id \?\? null/);
-    // Con cliente: se busca el proyecto vivo y solo si no hay se crea.
-    expect(src).toContain("/api/marketing/proyectos?estado=abierto");
+    // Con cliente: se busca el proyecto del cliente y solo si no hay se crea.
+    // Desde el 11-ago-2026 se busca entre TODOS los vivos, sin `?estado=`:
+    // "Cerrar proyecto" se retiró y filtrar por estado crearía un proyecto
+    // duplicado para un cliente cuyo proyecto quedó en un estado legacy.
+    expect(src).toContain('fetch("/api/marketing/proyectos"');
+    expect(src).not.toContain("estado=abierto");
     // El pareo va PRIMERO por código del directorio — así los clientes
     // duplicados (D-87, D-25) caen en el mismo proyecto y se ven fusionados.
     expect(src).toMatch(/codigo\s*\n?\s*\? \(p\.tienda_codigo \?\? ""\) === codigo/);

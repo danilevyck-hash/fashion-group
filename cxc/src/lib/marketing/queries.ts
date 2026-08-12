@@ -12,10 +12,8 @@ import type {
   MkAdjunto,
   MkProyectoMarca,
   ProyectoConMarcas,
-  ProyectoResumen,
   FacturaConAdjuntos,
   AnuladoItem,
-  EstadoProyecto,
   MarcaConPorcentaje,
 } from "./types";
 
@@ -125,131 +123,6 @@ export async function getMarcaByCodigo(codigo: string): Promise<MkMarca | null> 
 // ----------------------------------------------------------------------------
 // Proyectos
 // ----------------------------------------------------------------------------
-interface FiltrosProyectos {
-  estado?: EstadoProyecto;
-  anio?: number;
-}
-
-/**
- * Devuelve proyectos asociados a una marca (por código), con resumen:
- * - marcas asociadas + % de reparto
- * - total facturado del proyecto
- * - total cobrable a esa marca específica (% aplicado)
- * - conteos de facturas y fotos
- */
-export async function getProyectosByMarca(
-  marcaCodigo: string,
-  filtros: FiltrosProyectos = {}
-): Promise<ProyectoResumen[]> {
-  const marca = await getMarcaByCodigo(marcaCodigo);
-  if (!marca) return [];
-
-  // 1) IDs de proyectos que incluyen esta marca
-  const { data: pmRows, error: pmError } = await supabaseServer
-    .from("mk_proyecto_marcas")
-    .select("proyecto_id, porcentaje")
-    .eq("marca_id", marca.id);
-  if (pmError) throw new Error(`getProyectosByMarca[pm]: ${pmError.message}`);
-  const proyectoIds = (pmRows ?? []).map((r) => String((r as Record<string, unknown>).proyecto_id));
-  if (proyectoIds.length === 0) return [];
-
-  // 2) Cargar proyectos vigentes
-  let pq = supabaseServer
-    .from("mk_proyectos")
-    .select("*")
-    .in("id", proyectoIds)
-    .is("anulado_en", null)
-    .order("fecha_inicio", { ascending: false });
-  // 'cerrado' incluye los legacy enviado/cobrado (se leen como cerrado).
-  if (filtros.estado === "abierto") {
-    pq = pq.eq("estado", "abierto");
-  } else if (filtros.estado === "cerrado") {
-    pq = pq.in("estado", ["cerrado", "enviado", "cobrado"]);
-  }
-  if (filtros.anio) {
-    const ini = `${filtros.anio}-01-01`;
-    const fin = `${filtros.anio}-12-31`;
-    pq = pq.gte("fecha_inicio", ini).lte("fecha_inicio", fin);
-  }
-  const { data: proyectosData, error: proyectosError } = await pq;
-  if (proyectosError) throw new Error(`getProyectosByMarca[proyectos]: ${proyectosError.message}`);
-  const proyectos = (proyectosData ?? []).map((r) => mapProyecto(r as Record<string, unknown>));
-  if (proyectos.length === 0) return [];
-
-  const idsVigentes = proyectos.map((p) => p.id);
-
-  // 3) Cargar todas las marcas de cada proyecto (para mostrar split completo)
-  const { data: pmAllData, error: pmAllError } = await supabaseServer
-    .from("mk_proyecto_marcas")
-    .select("*, marca:mk_marcas(*)")
-    .in("proyecto_id", idsVigentes);
-  if (pmAllError) throw new Error(`getProyectosByMarca[pmAll]: ${pmAllError.message}`);
-
-  const marcasByProyecto = new Map<string, MarcaConPorcentaje[]>();
-  for (const row of pmAllData ?? []) {
-    const r = row as Record<string, unknown>;
-    const pid = String(r.proyecto_id);
-    const marcaRow = r.marca as Record<string, unknown> | null;
-    if (!marcaRow) continue;
-    const item: MarcaConPorcentaje = {
-      marca: mapMarca(marcaRow),
-      porcentaje: Number(r.porcentaje ?? 0),
-    };
-    const arr = marcasByProyecto.get(pid) ?? [];
-    arr.push(item);
-    marcasByProyecto.set(pid, arr);
-  }
-
-  // 4) Facturas vigentes por proyecto
-  const { data: facturasData, error: facturasError } = await supabaseServer
-    .from("mk_facturas")
-    .select("proyecto_id, total")
-    .in("proyecto_id", idsVigentes)
-    .is("anulado_en", null);
-  if (facturasError) throw new Error(`getProyectosByMarca[facturas]: ${facturasError.message}`);
-
-  const totalFactByProyecto = new Map<string, { total: number; conteo: number }>();
-  for (const row of facturasData ?? []) {
-    const r = row as Record<string, unknown>;
-    const pid = String(r.proyecto_id);
-    const tot = Number(r.total ?? 0);
-    const prev = totalFactByProyecto.get(pid) ?? { total: 0, conteo: 0 };
-    totalFactByProyecto.set(pid, { total: prev.total + tot, conteo: prev.conteo + 1 });
-  }
-
-  // 5) Conteo de fotos de proyecto
-  const { data: fotosData, error: fotosError } = await supabaseServer
-    .from("mk_adjuntos")
-    .select("proyecto_id")
-    .in("proyecto_id", idsVigentes)
-    .eq("tipo", "foto_proyecto");
-  if (fotosError) throw new Error(`getProyectosByMarca[fotos]: ${fotosError.message}`);
-
-  const fotosByProyecto = new Map<string, number>();
-  for (const row of fotosData ?? []) {
-    const r = row as Record<string, unknown>;
-    const pid = String(r.proyecto_id);
-    fotosByProyecto.set(pid, (fotosByProyecto.get(pid) ?? 0) + 1);
-  }
-
-  // 6) Componer resumen
-  return proyectos.map((p) => {
-    const marcas = marcasByProyecto.get(p.id) ?? [];
-    const fact = totalFactByProyecto.get(p.id) ?? { total: 0, conteo: 0 };
-    const fotos = fotosByProyecto.get(p.id) ?? 0;
-    const pctMarca = marcas.find((m) => m.marca.id === marca.id)?.porcentaje ?? 0;
-    const cobrable = Number(((fact.total * pctMarca) / 100).toFixed(2));
-    return {
-      ...p,
-      marcas,
-      total_facturado: Number(fact.total.toFixed(2)),
-      total_cobrable_marca: cobrable,
-      conteo_facturas: fact.conteo,
-      conteo_fotos: fotos,
-    };
-  });
-}
-
 export async function getProyectoById(id: string): Promise<ProyectoConMarcas | null> {
   const { data, error } = await supabaseServer
     .from("mk_proyectos")

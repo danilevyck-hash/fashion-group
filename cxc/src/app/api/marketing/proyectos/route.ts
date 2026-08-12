@@ -18,28 +18,24 @@ interface ProyectoListItem extends MkProyecto {
   conteo_fotos: number;
 }
 
-// GET /api/marketing/proyectos?estado=abierto&marca_id=xxx
+// GET /api/marketing/proyectos?marca_id=xxx
+// Devuelve TODOS los proyectos vivos (no anulados). El filtro `?estado=` se
+// retiró el 11-ago-2026 junto con "Cerrar proyecto": el proyecto es solo el
+// contenedor por cliente y su estado dejó de importar. Un cliente viejo que
+// mande `?estado=` recibe la lista completa igual.
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
     const { searchParams } = new URL(req.url);
-    const estadoParam = searchParams.get("estado");
     const marcaIdParam = searchParams.get("marca_id");
 
-    let pq = supabaseServer
+    const pq = supabaseServer
       .from("mk_proyectos")
       .select("*")
       .is("anulado_en", null)
       .order("fecha_inicio", { ascending: false });
-
-    // Modelo abierto/cerrado: 'cerrado' incluye los legacy enviado/cobrado.
-    if (estadoParam === "abierto") {
-      pq = pq.eq("estado", "abierto");
-    } else if (estadoParam === "cerrado") {
-      pq = pq.in("estado", ["cerrado", "enviado", "cobrado"]);
-    }
 
     const { data: proyectosData, error: proyectosError } = await pq;
     if (proyectosError) throw new Error(proyectosError.message);

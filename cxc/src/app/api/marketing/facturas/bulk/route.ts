@@ -5,7 +5,6 @@ import {
   createFactura,
 } from "@/lib/marketing/mutations";
 import { setMarcasDeFactura } from "@/lib/marketing/factura-marcas";
-import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import { logActivity } from "@/lib/log-activity";
 import { supabaseServer } from "@/lib/supabase-server";
 
@@ -132,10 +131,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Validar que el proyecto exista, no esté anulado y permita facturas (no cobrado).
+  // Validar que el proyecto exista y no esté anulado. El estado del proyecto
+  // NO se mira: "Cerrar proyecto" se retiró (11-ago-2026) y lo que congela
+  // plata es el PERÍODO cerrado (sellos de mk_periodo_documentos), no el
+  // proyecto. Antes acá se rechazaban facturas sobre proyecto 'cerrado' — el
+  // camino de a una (POST /facturas) nunca tuvo ese guard, y la asimetría
+  // habría bloqueado el gasto de un cliente con proyecto en estado legacy.
   const { data: proy, error: proyErr } = await supabaseServer
     .from("mk_proyectos")
-    .select("id, estado, anulado_en")
+    .select("id, anulado_en")
     .eq("id", proyectoId)
     .maybeSingle();
   if (proyErr) {
@@ -147,16 +151,10 @@ export async function POST(req: NextRequest) {
   if (!proy) {
     return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   }
-  const proyRow = proy as { estado: string; anulado_en: string | null };
+  const proyRow = proy as { anulado_en: string | null };
   if (proyRow.anulado_en) {
     return NextResponse.json(
       { error: "El proyecto está anulado" },
-      { status: 400 },
-    );
-  }
-  if (normalizarEstadoProyecto(proyRow.estado) === "cerrado") {
-    return NextResponse.json(
-      { error: "No se pueden agregar facturas a un proyecto cerrado" },
       { status: 400 },
     );
   }

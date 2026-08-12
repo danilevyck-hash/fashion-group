@@ -119,8 +119,9 @@ describe("🩸 el 'cómo se guarda el cliente' de Marketing es UNO, no dos copia
   // Estaba escrito palabra por palabra en el formulario de nuevo proyecto y en
   // el modal de editar. Dos copias de la misma frase se separan sola la primera
   // vez que alguien corrige una.
+  // ProyectoForm.tsx se borró el 11-ago-2026 (su único caller era el modal de
+  // "Nuevo proyecto", retirado cuando el proyecto pasó a autocrearse).
   const CONSUMIDORES = [
-    "components/marketing/ProyectoForm.tsx",
     "app/marketing/components/EditarProyectoModal.tsx",
   ];
 

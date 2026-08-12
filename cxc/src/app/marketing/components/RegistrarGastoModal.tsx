@@ -204,12 +204,17 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
    * cada uno) NO se muestran aparte: el pareo va PRIMERO por código del
    * directorio, así que los dos gastos de D-87 caen en el mismo proyecto y se
    * ven fusionados. El texto libre solo se usa cuando no hay código.
+   *
+   * Se busca entre TODOS los proyectos vivos, sin mirar estado: "Cerrar
+   * proyecto" se retiró (11-ago-2026) y el proyecto es solo el contenedor del
+   * cliente. Filtrar por estado acá crearía un proyecto DUPLICADO para un
+   * cliente cuyo proyecto quedó en un estado legacy.
    */
   const resolverProyecto = useCallback(async (): Promise<ProyectoFila | null> => {
     const nombre = cliente.trim();
     if (!nombre) return null;
 
-    const res = await fetch("/api/marketing/proyectos?estado=abierto", {
+    const res = await fetch("/api/marketing/proyectos", {
       cache: "no-store",
     });
     if (!res.ok) throw new Error("No se pudo buscar el proyecto del cliente.");
