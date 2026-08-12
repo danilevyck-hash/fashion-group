@@ -5,16 +5,25 @@
 // página + requireRole en el API; esta vista es solo la cara).
 //
 // 🔴 LA ESPECIFICACIÓN ES UNA FRASE DE DANIEL, y la pantalla no muestra nada más:
-//   *"cuánto tiempo demoré en vender mi compra, cuánto por mes, para cuántos
-//    meses me queda el stock actual"*
-// Tres números grandes por artículo (color), las barras de los 12 meses
-// completos con oct·nov·dic resaltados, el precio real de venta con su margen, y
-// la fila de costos. Se usa PARA HACER PEDIDO: mira, decide y escribe la
-// cantidad en su Excel.
+//   *"yo lo que quiero ver en cuanto tiempo se me mueve el articulo, para saber
+//    si con el stock actual que tengo debo de comprar mas, menos o no comprar.
+//    pero no quiero que decidas tu, lo decido yo con la data que me extraigas"*
+// Tres cajas por artículo (color) — Compras · Vendo por mes · Me queda para —,
+// las barras de los 12 meses completos con oct·nov·dic resaltados, el precio
+// real de venta con su margen, y la fila de costos. Se usa PARA HACER PEDIDO:
+// mira, decide y escribe la cantidad en su Excel.
 //
-// 🩸 LO QUE SE FUE EN ESTA PODA, Y POR QUÉ NO VUELVE:
-//   · La tabla con UNA FILA POR COMPRA. *"la ultima me basta"* — las viejas
-//     quedan detrás de "Ver las N compras anteriores".
+// 🩸 LA PRIMERA CAJA DEJÓ DE INTERPRETAR (11-ago-2026). Decía *"Mi última
+// compra · todavía no se acaba · llegó 180 el 19 feb · van 0"*, y ese "van 0"
+// venía de repartir las ventas entre las compras. Cuando llega mercancía SOBRE
+// stock que todavía no se acaba, ese reparto es INVENTADO —nadie marcó las
+// cajas— y en `NB2570001`, el artículo que Daniel más mira, la caja terminaba
+// diciendo literalmente **"van 0 de 180"** mientras el artículo vendía 28 u/mes.
+// Ahora dice FECHA y CANTIDAD, la más reciente arriba, y él saca la conclusión.
+// La línea "Esta: … · Anterior: …" se fue por lo mismo.
+//
+// 🩸 LO QUE SE FUE ANTES, Y POR QUÉ NO VUELVE:
+//   · La tabla con UNA FILA POR COMPRA. *"la ultima me basta"*.
 //   · La línea "En bodega 345 u · Ya se acabaron 2 compras…".
 //   · La columna DESC. (descuento). Textual: *"no sirve"*.
 //   · Y de antes: "Se te acaba en ~46 meses", "compra ~138 unidades", los
@@ -36,24 +45,19 @@ import { Ayuda } from "@/components/shared/Ayuda";
 import { Download, Search } from "lucide-react";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import { colorDe, modeloDe, MAX_CODIGOS_MULTI } from "@/lib/ventas/referencia";
-import type { ArticuloCompras, CompraMedida, ComprasApiResp } from "@/lib/ventas/compras";
+import type { ArticuloCompras, Compra, ComprasApiResp } from "@/lib/ventas/compras";
 import {
   armarFicha,
-  fmtFechaCorta,
   fmtMesCorto,
-  resumirCompra,
+  textoCompra,
+  textoMeses,
   textoSinMargen,
   MESES_VENTANA,
   type FichaArticulo,
+  type ListaCompras,
   type MesBarra,
 } from "@/lib/ventas/resumen-articulo";
-import {
-  exportComprasToExcel,
-  mesesDeCompra,
-  textoMeses,
-  textoOrigenFob,
-  textoSeVendio,
-} from "@/lib/ventas/referencia-excel";
+import { exportComprasToExcel, textoOrigenFob } from "@/lib/ventas/referencia-excel";
 import { fmtFrescura } from "@/lib/ventas/referencia-info";
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
@@ -246,7 +250,6 @@ function TituloModelo({ modelo, arts }: { modelo: string; arts: ArticuloCompras[
 
 function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string }) {
   // 🔴 Hooks ANTES de cualquier return condicional (regla de React de la casa).
-  const [verViejas, setVerViejas] = useState(false);
   const ficha = useMemo(() => armarFicha(art, hoyMes), [art, hoyMes]);
 
   const color = colorDe(art.codigo);
@@ -263,10 +266,6 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
 
       <TresNumeros art={art} ficha={ficha} />
 
-      {ficha.comparacion && (
-        <p className="border-b border-gray-100 px-3.5 py-2 text-xs text-gray-600">{ficha.comparacion}</p>
-      )}
-
       <MesAMes ficha={ficha} />
 
       <MargenLinea ficha={ficha} />
@@ -275,34 +274,21 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
 
       <Avisos art={art} />
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 px-3.5 py-2">
-        {frescura && (
+      {frescura && (
+        <div className="border-t border-gray-100 px-3.5 py-2">
           <p className="text-xs text-gray-500">Lo que queda en bodega es de Switch, al {frescura}.</p>
-        )}
-        {ficha.viejas.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setVerViejas((v) => !v)}
-            className="min-h-[44px] text-xs font-medium text-gray-900 underline underline-offset-2 hover:text-gray-600"
-          >
-            {verViejas
-              ? "Ocultar las compras anteriores"
-              : `Ver ${ficha.viejas.length === 1 ? "la compra anterior" : `las ${ficha.viejas.length} compras anteriores`}`}
-          </button>
-        )}
-      </div>
-
-      {verViejas && ficha.viejas.length > 0 && <ComprasViejas compras={ficha.viejas} />}
+        </div>
+      )}
     </section>
   );
 }
 
-// ─── Los tres números ────────────────────────────────────────────────────────
+// ─── Las tres cajas ──────────────────────────────────────────────────────────
 //
-// 🔴 "Mi última compra" es SIEMPRE la última, aunque no se haya acabado —
-// decisión A de Daniel. Si todavía le queda mercancía dice "todavía no se
-// acaba · van 54 de 180"; NO se cae a la última compra agotada, que hablaría de
-// mercancía que ya no está mientras la que se acaba de traer no dice nada.
+// 🔴 LA PRIMERA CAJA NO CONCLUYE NADA: fecha y cantidad, la más reciente
+// arriba. Antes decía "Mi última compra: todavía no se acaba · van 0 de 180",
+// que salía de repartirle ventas a una llegada concreta — algo que NO se sabe
+// cuando la mercancía llega sobre stock que todavía no se acaba.
 
 function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
   if (!ficha.ultima) {
@@ -317,8 +303,7 @@ function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticul
                 // castellano y encima suena a error de la pantalla.
                 `Tiene ${unidades(-art.cuadre.vendido)} devueltas y ninguna venta, y`
               : "No registra ventas, y"}{" "}
-          no aparece en los ingresos de mercancía, así que no se puede decir cuándo llegó ni en cuánto tiempo se
-          vendió.
+          no aparece en los ingresos de mercancía, así que no se puede decir cuándo llegó ni cuánto llegó.
         </p>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <Numero
@@ -336,10 +321,9 @@ function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticul
     );
   }
 
-  const u = resumirCompra(ficha.ultima);
   return (
     <dl className="grid gap-3 px-3.5 py-3.5 sm:grid-cols-3">
-      <Numero rotulo="Mi última compra" valor={u.titular} pie={u.detalle} />
+      <CajaCompras lista={ficha.compras} />
       <Numero
         rotulo="Vendo por mes"
         valor={ficha.promedio.porMes != null ? `${fmtInt(Math.round(ficha.promedio.porMes))} u` : "no vendió"}
@@ -357,6 +341,54 @@ function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticul
         }
       />
     </dl>
+  );
+}
+
+/**
+ * La caja de Compras: `19 feb 2026 · 180 u`, una por línea.
+ *
+ * 🔴 CERO INTERPRETACIÓN. No dice cuánto tardó, ni cuántas van, ni si se acabó:
+ * nada de eso se sabe por compra. Las que no entran en las primeras cuatro se
+ * despliegan acá mismo — el enlace "Ver las N compras anteriores" que vivía al
+ * pie de la tarjeta se INTEGRÓ, porque tener el resto de la lista a dos lugares
+ * distintos de la caja que la enseña no ayudaba a nadie.
+ */
+function CajaCompras({ lista }: { lista: ListaCompras }) {
+  const [verTodas, setVerTodas] = useState(false);
+  const mostradas = verTodas ? [...lista.visibles, ...lista.ocultas] : lista.visibles;
+
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-gray-600">Compras</dt>
+      <dd className="mt-0.5">
+        <ul className="text-sm leading-6 text-gray-900 tabular-nums">
+          {mostradas.map((c) => (
+            <li key={`${c.fecha}·${c.documento}`}>{textoCompra(c)}</li>
+          ))}
+        </ul>
+        {lista.ocultas.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setVerTodas((v) => !v)}
+            className="-my-2.5 min-h-[44px] text-xs font-medium text-gray-900 underline underline-offset-2 hover:text-gray-600"
+          >
+            {verTodas
+              ? "Ver menos"
+              : lista.ocultas.length === 1
+                ? "Ver 1 compra más"
+                : `Ver las otras ${lista.ocultas.length} compras`}
+          </button>
+        )}
+        {/* Las de más de 3 años NO vienen en la respuesta: se dicen, no se
+            despliegan. El aviso de que igual cuentan para la bodega va abajo. */}
+        {lista.masViejas > 0 && (
+          <p className="text-xs text-gray-600">
+            y {lista.masViejas} más de hace años
+          </p>
+        )}
+        {lista.unica && <p className="text-xs text-gray-600">única compra</p>}
+      </dd>
+    </div>
   );
 }
 
@@ -536,7 +568,7 @@ function Costo({ k, v }: { k: string; v: React.ReactNode }) {
 /** El FOB va con su procedencia: en el 93% de las líneas Switch lo manda IGUAL
  *  al CIF y eso es un error de carga conocido. NO se corrige ni se estima —
  *  Daniel quiere saber a cuál creerle, así que se marca. */
-function Fob({ c }: { c: CompraMedida }) {
+function Fob({ c }: { c: Compra }) {
   const { fob, fobOrigen } = c.costos;
   if (fob == null) return <>—</>;
   return (
@@ -551,26 +583,6 @@ function Fob({ c }: { c: CompraMedida }) {
         </Ayuda>
       )}
     </span>
-  );
-}
-
-// ─── Las compras anteriores, detrás del enlace ───────────────────────────────
-
-function ComprasViejas({ compras }: { compras: CompraMedida[] }) {
-  return (
-    <ul className="divide-y divide-gray-100 border-t border-gray-100">
-      {compras.map((c) => (
-        <li key={`${c.fecha}·${c.documento}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-3.5 py-2">
-          <span className="text-sm text-gray-900">{fmtFechaCorta(c.fecha)}</span>
-          <span className="text-sm tabular-nums text-gray-900">{fmtInt(c.unidades)} u</span>
-          <span className="text-sm text-gray-700">{textoSeVendio(c)}</span>
-          <span className="ml-auto text-xs tabular-nums text-gray-600">
-            CIF {fmtMoney(c.costos.cif)}
-            {mesesDeCompra(c) != null && c.quedan > 0 && ` · quedan ${fmtInt(c.quedan)}`}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -600,22 +612,23 @@ function Avisos({ art }: { art: ArticuloCompras }) {
     }
   }
   if (art.comprasFueraDeVentana > 0) {
+    // 🔴 Se conserva el límite de 3 años Y se dice que las viejas igual cuentan:
+    // si no, el total de bodega no cerraría contra las compras que se ven y la
+    // pantalla parecería equivocada.
     avisos.push(
-      `Hay ${art.comprasFueraDeVentana} ${art.comprasFueraDeVentana === 1 ? "compra más vieja" : "compras más viejas"} de 3 años que no se muestran (sí cuentan para el reparto).`,
+      `Hay ${art.comprasFueraDeVentana} ${art.comprasFueraDeVentana === 1 ? "compra más vieja" : "compras más viejas"} de 3 años que no se muestran — lo que trajeron sí cuenta para lo que hay en bodega.`,
     );
   }
   // 🔴 EL AJUSTE DE INVENTARIO SE QUEDA EN PANTALLA. Daniel: *"si hay menos es
   // porq robaron"* — es plata que se fue, no metodología, y no se esconde
-  // detrás de un ⓘ. Antes iba renglón por renglón en la tabla; ahora que la
-  // tabla no está, va una vez por artículo, sumado.
-  if (art.cuadre.ajusteConfiable) {
-    const perdido = art.compras.reduce((s, c) => s + Math.max(0, c.noVendidoNiEnBodega), 0);
-    const llegaron = art.compras.reduce((s, c) => s + c.unidades, 0);
-    if (perdido > 0) {
-      avisos.push(
-        `De las ${fmtInt(llegaron)} unidades que llegaron, ${fmtInt(perdido)} ${perdido === 1 ? "se perdió" : "se perdieron"} en ajuste de inventario.`,
-      );
-    }
+  // detrás de un ⓘ. Va una vez por artículo, sumado: sale del CUADRE del
+  // artículo entero (comprado − vendido − existencia), no de repartirle
+  // faltantes a cada compra, que era la atribución que se eliminó.
+  const perdido = art.cuadre.ajusteConfiable ? (art.cuadre.residuo ?? 0) : 0;
+  if (perdido > 0) {
+    avisos.push(
+      `De las ${fmtInt(art.cuadre.comprado)} unidades que llegaron, ${fmtInt(perdido)} ${perdido === 1 ? "se perdió" : "se perdieron"} en ajuste de inventario.`,
+    );
   }
 
   if (!avisos.length) return null;
