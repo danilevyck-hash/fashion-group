@@ -7,6 +7,8 @@ import {
   getAdjuntosByProyecto,
 } from "@/lib/marketing/queries";
 import { listEntregasByProyecto } from "@/lib/marketing/inventario";
+import { cargarComprobantes } from "@/lib/marketing/entrega-comprobante";
+import type { EntregaMueblePdfData } from "@/lib/marketing/pdf-entrega-mueble";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
 import type {
   EntregaConItems,
@@ -128,6 +130,18 @@ export async function GET(
       .filter((x): x is MkMarca => !!x)
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
+    // Datos del COMPROBANTE de cada entrega de mobiliario (el mismo módulo que
+    // usan el ZIP global y el ZIP por marca — entrega-comprobante.ts). El PDF
+    // se dibuja en el navegador (generar-zip.ts) con estos datos; acá solo
+    // viajan en JSON, fotos incluidas como data URLs. Sin esto el ZIP del
+    // proyecto salía SIN el papel de las entregas (bug reportado el 12-ago-2026
+    // con el proyecto "Apertura": 2 entregas en el Excel y cero PDFs).
+    const comprobantesEntrega: Record<string, EntregaMueblePdfData> = {};
+    if (entregas.length > 0) {
+      const mapa = await cargarComprobantes(entregas.map((e) => e.id));
+      for (const [entregaId, datos] of mapa) comprobantesEntrega[entregaId] = datos;
+    }
+
     return NextResponse.json({
       proyecto,
       facturas,
@@ -135,6 +149,7 @@ export async function GET(
       fotosProyecto: fotosFirmadas,
       marcasInvolucradas,
       entregas: entregas as EntregaConItems[],
+      comprobantesEntrega,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error interno";
