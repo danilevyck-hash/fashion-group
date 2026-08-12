@@ -11,7 +11,7 @@
  * proveedor, ni en los reportes de CXC. Cero errores en logs, cero señal.
  *
  * El test de `logos-marca.test.ts` valida los PNG de las marcas; este valida que
- * los cinco (marcas + Fashion Group) SE PUEDEN DIBUJAR, que es lo que importa.
+ * todos (marcas + Fashion Group) SE PUEDEN DIBUJAR, que es lo que importa.
  */
 import { describe, it, expect } from "vitest";
 import { jsPDF } from "jspdf";
@@ -19,6 +19,7 @@ import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BASE64, TOMMY_LOGO_BLANCO_BASE64 } from "@/lib/tommy-logo";
 import { JOYBEES_LOGO_BASE64, JOYBEES_LOGO_BLANCO_BASE64 } from "@/lib/joybees-logo";
+import { CALVIN_LOGO_BASE64, CALVIN_LOGO_BLANCO_BASE64 } from "@/lib/calvin-logo";
 
 const LOGOS: [string, string, "JPEG" | "PNG"][] = [
   ["Fashion Group", FG_LOGO_BASE64, "JPEG"],
@@ -27,6 +28,8 @@ const LOGOS: [string, string, "JPEG" | "PNG"][] = [
   ["Tommy blanco", TOMMY_LOGO_BLANCO_BASE64, "PNG"],
   ["Joybees", JOYBEES_LOGO_BASE64, "PNG"],
   ["Joybees blanco", JOYBEES_LOGO_BLANCO_BASE64, "PNG"],
+  ["Calvin", CALVIN_LOGO_BASE64, "PNG"],
+  ["Calvin blanco", CALVIN_LOGO_BLANCO_BASE64, "PNG"],
 ];
 
 describe("logos embebibles en PDF", () => {

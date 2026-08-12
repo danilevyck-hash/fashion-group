@@ -1483,9 +1483,9 @@ const TOMMY: MarcaTheme = {
 // ── CALVIN KLEIN ─────────────────────────────────────────────────────────────
 // Paleta: blanco/negro minimalista — la identidad de la marca (negro #1A1A1A
 // sobre página casi blanca #FAFAFA, sin color de acento: el "acento" es el
-// negro pleno). Wordmark tipográfico "CALVIN KLEIN" como placeholder aprobado
-// (public/calvin/calvin-wordmark*.png, generado de texto limpio — Daniel manda
-// el arte oficial después, igual que el de Tommy; NO bloquear por esto).
+// negro pleno). Wordmark OFICIAL "Calvin Klein" (public/calvin/
+// calvin-wordmark*.png, derivado del master que mandó Daniel el 12-ago-2026
+// con scripts/_generar-logo-calvin.mjs).
 // Grid PLANA, admin estilo batch, sin pre-orden ni saleFilter — espejo
 // funcional de Tommy: mismo flujo de fotos B2B Dash de PVH, bulto 8/12 por
 // producto (default 12), name editable (nombre_manual). Chips de categoría =
@@ -1576,7 +1576,7 @@ const CALVIN: MarcaTheme = {
       </div>
     ),
     // Wordmark blanco directo sobre la banda negra: a diferencia de Tommy y
-    // Reebok acá NO hace falta placa blanca — el placeholder tiene versión
+    // Reebok acá NO hace falta placa blanca — el logo oficial tiene versión
     // blanca monocroma y el fondo de la banda es el negro de la marca.
     pedidoPublico: () => (
       <div className="shrink-0">

@@ -136,9 +136,9 @@ const THEMES: Record<"reebok" | "joybees" | "tommy" | "calvin", BrandTheme> = {
     bandText: WHITE,
     bandCount: [200, 200, 200],
     drawLogo: (doc, x, y, big) => {
-      // Wordmark tipográfico oscuro sobre página clara. Aspecto ~11.7:1.
+      // Wordmark oficial negro sobre página clara. Aspecto ~6.43:1.
       if (CALVIN_LOGO_BASE64) {
-        try { doc.addImage(CALVIN_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 48 : 36, big ? 4.1 : 3.1); } catch { /* */ }
+        try { doc.addImage(CALVIN_LOGO_BASE64, "PNG", x, y + (big ? 0 : 0.5), big ? 36 : 27, big ? 5.6 : 4.2); } catch { /* */ }
       }
     },
   },
