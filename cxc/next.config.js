@@ -49,6 +49,22 @@ const nextConfig = {
       { source: "/g/plata-entra", destination: "/home", permanent: false },
       { source: "/g/plata-sale", destination: "/home", permanent: false },
       { source: "/g/productos", destination: "/home", permanent: false },
+      // Referencia dejó de ser la 5ª pestaña de Ventas (12-ago-2026): vive en su
+      // propio módulo, /referencia, con la MISMA vista. Un enlace guardado de
+      // `/ventas?tab=referencia` habría caído en una pestaña que ya no existe
+      // (Radix no dibuja nada si el value no tiene trigger) → se manda a la
+      // pantalla viva. `has` matchea SOLO ese valor de `tab`: /ventas y sus
+      // otras cuatro pestañas siguen intactas.
+      // (Next arrastra la query al destino — se llega a `/referencia?tab=
+      // referencia` — y no hay forma de soltarla desde acá; probado con
+      // `destination: "/referencia?"` y con grupo nombrado. Es INERTE: esa
+      // pantalla no lee `tab`.)
+      {
+        source: "/ventas",
+        has: [{ type: "query", key: "tab", value: "referencia" }],
+        destination: "/referencia",
+        permanent: false,
+      },
     ];
   },
   experimental: {

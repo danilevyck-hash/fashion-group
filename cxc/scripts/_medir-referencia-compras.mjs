@@ -111,7 +111,7 @@ for (const caso of CASOS) {
       sessionStorage.setItem("fg_is_owner", "1");
     });
     const page = await ctx.newPage();
-    await page.goto(`${BASE}/ventas?tab=referencia`, { waitUntil: "networkidle" });
+    await page.goto(`${BASE}/referencia`, { waitUntil: "networkidle" });
     await page.fill('input[aria-label="Buscar referencia"]', caso.q);
     await page.click('button[type="submit"]');
     await page.waitForResponse((r) => r.url().includes("/api/ventas/referencia?"), { timeout: 30000 }).catch(() => {});

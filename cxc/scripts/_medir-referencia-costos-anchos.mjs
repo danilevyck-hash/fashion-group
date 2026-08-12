@@ -65,7 +65,7 @@ for (const ancho of ANCHOS) {
     await route.fulfill({ response: resp, json });
   });
 
-  await page.goto(BASE + "/ventas?tab=referencia", { waitUntil: "domcontentloaded" });
+  await page.goto(BASE + "/referencia", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(6000);
   await page.locator('form input[placeholder*="Código"]').fill("31KAE22003");
   await page.locator("form").getByRole("button", { name: "Buscar" }).first().click();

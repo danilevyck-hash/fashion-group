@@ -100,7 +100,7 @@ for (const ancho of ANCHOS) {
     sessionStorage.setItem("fg_is_owner", "1");
   });
   const page = await ctx.newPage();
-  await page.goto(BASE + "/ventas?tab=referencia", { waitUntil: "domcontentloaded" });
+  await page.goto(BASE + "/referencia", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(6000);
 
   // Estado 1 — una referencia con historia real (agotado + colores)
