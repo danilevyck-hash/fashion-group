@@ -94,27 +94,34 @@ for (const ancho of ANCHOS) {
         }
       }
 
-      // Orden de las filas (para verificar el orden pegado) y la fila del 90%.
+      // Orden de las filas (para verificar el orden pegado) y las columnas:
+      // desde el 12-ago-2026 la tabla dice VENDIDO · MESES, nunca "90% en".
       const orden = [...document.querySelectorAll("tbody td:first-child span:first-child")].map(
         (s) => s.textContent?.trim() ?? "",
       );
+      const encabezados = [...document.querySelectorAll("thead th")].map((th) => th.textContent?.trim() ?? "");
       const detalle = document.querySelector("dl") ? "detalle abierto (tres grandes montados)" : null;
 
-      return { arrastre, hayTabla, hayTarjetasSueltas, filas, chicos, textos, recortados, orden, detalle };
+      return { arrastre, hayTabla, hayTarjetasSueltas, filas, chicos, textos, recortados, orden, encabezados, detalle };
     });
 
+    const columnasOk =
+      m.encabezados.includes("Vendido") && m.encabezados.includes("Meses") && !m.encabezados.includes("90% en");
     const ok =
       m.arrastre === 0 &&
       m.hayTabla &&
+      columnasOk &&
       m.chicos.length === 0 &&
       m.textos.length === 0 &&
       m.recortados.length === 0;
     if (!ok) malas += 1;
     console.log(
       `${ok ? "🟢" : "🔴"} ${ancho} px · ${estado} · arrastre PÁGINA ${m.arrastre} px · tabla=${m.hayTabla} · ` +
-        `${m.filas} filas · blancos <44: ${m.chicos.length} · textos <12: ${m.textos.length} · recortados: ${m.recortados.length}`,
+        `columnas VENDIDO·MESES=${columnasOk} · ${m.filas} filas · blancos <44: ${m.chicos.length} · ` +
+        `textos <12: ${m.textos.length} · recortados: ${m.recortados.length}`,
     );
     if (estado === "cerrada") console.log(`   orden: ${m.orden.join(" · ")}`);
+    if (estado === "cerrada") console.log(`   encabezados: ${m.encabezados.filter(Boolean).join(" · ")}`);
     if (m.detalle) console.log(`   ${m.detalle}`);
     if (m.chicos.length) console.log("   chicos:", JSON.stringify(m.chicos));
     if (m.textos.length) console.log("   textos:", JSON.stringify(m.textos));

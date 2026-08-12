@@ -9,7 +9,7 @@
 // PEGÓ — para leerla con su Excel al lado. Un código solo sigue mostrando la
 // tarjeta completa; la pantalla decide sola por lo que pegó.
 //
-//   Código · Compré · Vendí · Quedan · 90% en · Margen · Últ. compra
+//   Código · Compré · Vendí · Stock · Vendido · Meses · Margen · Últ. compra
 //
 // 🔴 TOCAR UNA FILA ABRE EL DETALLE AHÍ MISMO, sin navegar y sin perder el
 // orden de la lista. El detalle es el CUERPO REAL de la tarjeta
@@ -23,14 +23,25 @@
 // desalineadas.
 //
 // 🔴 "Quedan 0" va en ROJO: es la fila que decide una compra.
-// La columna "90% en" usa la MISMA métrica de la tarjeta (`medirNoventa`), en
-// su versión corta: "16 meses" / "va el 80%" / "van 258 de 360".
+//
+// 🔴 VENDIDO · MESES reemplazan a "90% en" (12-ago-2026). Daniel: "va el 29%"
+// no decía cuánto tiempo llevaba. Las DOS celdas salen de UNA función
+// (`medirVendidoMeses`, la misma del Excel): terminado (cruzó el 90%) queda
+// CONGELADO en 90% y los meses del cruce, en negro; vivo muestra el % actual
+// (Vendí÷Compré) y los meses calendario desde la llegada, en gris; lo que no
+// se puede afirmar dice "—". Acá no se calcula nada — solo se pinta.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Fragment, useMemo, useState } from "react";
 import { colorDe } from "@/lib/ventas/referencia";
 import type { ArticuloCompras } from "@/lib/ventas/compras";
-import { armarFicha, fmtMesAnio, textoNoventaCorto } from "@/lib/ventas/resumen-articulo";
+import {
+  armarFicha,
+  fmtMesAnio,
+  medirVendidoMeses,
+  textoMesesCelda,
+  textoVendidoCelda,
+} from "@/lib/ventas/resumen-articulo";
 import { CuerpoArticulo, etiquetaEmpresa, fmtInt, fmtPct } from "./ReferenciaTarjeta";
 
 /** Anchos FIJOS por columna: los segmentos de tabla alrededor del detalle
@@ -44,7 +55,8 @@ function colsPedido(mostrarMargen: boolean): { titulo: string; px: number; derec
     { titulo: "Compré", px: 72, derecha: true },
     { titulo: "Vendí", px: 72, derecha: true },
     { titulo: "Stock", px: 72, derecha: true },
-    { titulo: "90% en", px: 118, derecha: true },
+    { titulo: "Vendido", px: 84, derecha: true },
+    { titulo: "Meses", px: 64, derecha: true },
     ...(mostrarMargen ? [{ titulo: "Margen", px: 66, derecha: true }] : []),
     { titulo: "Últ. compra", px: 92, derecha: true },
     { titulo: "", px: 36 },
@@ -55,7 +67,10 @@ interface FilaPedido {
   art: ArticuloCompras;
   clave: string;
   color: string | null;
-  noventaCorto: string;
+  vendido: string;
+  meses: string;
+  /** `false` = terminado (cruzó el 90%): negro. `true` = en curso: gris. */
+  enCurso: boolean;
   margen: string;
   ultCompra: string;
 }
@@ -65,11 +80,14 @@ function armarFila(art: ArticuloCompras, hoyMes: string): FilaPedido {
   // nuevo, solo se abrevia. Si la fila dijera otra cosa que el detalle que se
   // abre debajo, la tabla se desmentiría a sí misma.
   const f = armarFicha(art, hoyMes);
+  const vm = medirVendidoMeses(f);
   return {
     art,
     clave: `${art.empresa}·${art.codigo}`,
     color: colorDe(art.codigo),
-    noventaCorto: textoNoventaCorto(f.noventa),
+    vendido: textoVendidoCelda(vm),
+    meses: textoMesesCelda(vm),
+    enCurso: !vm.terminado,
     margen: fmtPct(f.margen.margen),
     ultCompra: f.ultima ? fmtMesAnio(f.ultima.fecha.slice(0, 7)) : "—",
   };
@@ -193,7 +211,21 @@ function FilaTabla({
       >
         {quedan != null ? fmtInt(quedan) : "—"}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{f.noventaCorto}</td>
+      {/* Terminado va en NEGRO (dato cerrado); vivo en GRIS (en curso). */}
+      <td
+        className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${
+          f.enCurso ? "text-gray-500" : "text-gray-900"
+        }`}
+      >
+        {f.vendido}
+      </td>
+      <td
+        className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${
+          f.enCurso ? "text-gray-500" : "text-gray-900"
+        }`}
+      >
+        {f.meses}
+      </td>
       {mostrarMargen && <td className="px-3 py-2.5 text-right tabular-nums">{f.margen}</td>}
       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">{f.ultCompra}</td>
       <td className="px-3 py-2.5 text-right text-gray-500" aria-hidden="true">

@@ -18,12 +18,15 @@ import {
   centavos,
   fmtFechaCorta,
   leyendaLlegadas,
+  medirVendidoMeses,
   subDesdeLlegada,
   textoCompra,
   textoLineaNoventa,
+  textoMesesCelda,
   textoNoventaCorto,
   textoParteVendida,
   textoRestantes,
+  textoVendidoCelda,
   tituloDesdeLlegada,
 } from "../src/lib/ventas/resumen-articulo";
 
@@ -112,9 +115,18 @@ async function main() {
         if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
       }
 
-      // ── LA LÍNEA DEL 90% (y su versión corta del modo pedido) ──
+      // ── LA LÍNEA DEL 90% de la ficha (que NO cambió) ──
       const linea = textoLineaNoventa(f.noventa, f.ritmo);
-      console.log(`   90%: ${linea ?? "(sin línea)"}   [tabla: ${textoNoventaCorto(f.noventa)}]`);
+      console.log(`   90%: ${linea ?? "(sin línea)"}   [90% corto: ${textoNoventaCorto(f.noventa)}]`);
+
+      // ── VENDIDO · MESES — las dos celdas del modo pedido (12-ago-2026),
+      //    medidas con LA MISMA función que la tabla y el Excel ──
+      const vm = medirVendidoMeses(f);
+      console.log(
+        `   tabla pedido: VENDIDO ${textoVendidoCelda(vm)} · MESES ${textoMesesCelda(vm)} · ${
+          vm.terminado ? "TERMINADO (congelado en el cruce, negro)" : "en curso (gris)"
+        }`,
+      );
 
       // ── La vista de barras ──
       const vb = f.vista;

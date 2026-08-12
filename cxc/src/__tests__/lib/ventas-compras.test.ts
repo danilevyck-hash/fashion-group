@@ -942,7 +942,6 @@ describe("el Excel de Referencia", () => {
       "Meses en venderse",
       "Anterior: meses",
       "U. vendidas",
-      "Meses",
       "Queda",
       "Meses en que vendió",
       "Salió a",
@@ -959,5 +958,111 @@ describe("el Excel de Referencia", () => {
     for (const h of [...hoja1, ...hoja2]) {
       expect(PROHIBIDAS, `la columna "${h}" volvió`).not.toContain(h);
     }
+    // "Meses" existe en la hoja 1 desde el 12-ago-2026 (meses CALENDARIO, de
+    // `medirVendidoMeses` — no atribuye nada). En la hoja 2 sigue PROHIBIDA:
+    // ahí era "cuánto tardó ESTA compra", que es exactamente el FIFO que se fue.
+    expect(hoja2).not.toContain("Meses");
+  });
+
+  // ── VENDIDO · MESES — el Excel espejo del modo pedido (12-ago-2026) ────────
+  //
+  // Daniel: la columna "90% en" no se entendía ("va el 29%" no dice cuánto
+  // tiempo lleva). Las dos columnas nuevas salen de `medirVendidoMeses`, LA
+  // MISMA función que pinta la tabla del modo pedido.
+
+  it('🔴 la hoja 1 cambió "90% en" por "Vendido" · "Meses", una al lado de la otra', async () => {
+    const { encabezado } = await leerHoja("Referencia");
+    expect(encabezado).not.toContain("90% en");
+    expect(encabezado).toContain("Vendido");
+    expect(encabezado).toContain("Meses");
+    expect(encabezado.indexOf("Meses")).toBe(encabezado.indexOf("Vendido") + 1);
+  });
+
+  it("🔴 Vendido/Meses del Excel = las celdas de la tabla: vivo trae el % actual (Vendí÷Compré) y los meses del ancla", async () => {
+    // ART(): 2 compras (240 + 180), 216 vendidas → vivo. Vendido = 216/420;
+    // Meses = ancla del agregado (feb-2026 → ago-2026 = 6). El MISMO número
+    // que "Meses de venta" (los dos salen de la misma ancla de la ficha).
+    const { cuerpo } = await leerHoja("Referencia");
+    expect(cuerpo[0]["Vendido"]).toBeCloseTo(216 / 420, 10);
+    expect(cuerpo[0]["Meses"]).toBe(6);
+    expect(cuerpo[0]["Meses"]).toBe(cuerpo[0]["Meses de venta"]);
+  });
+
+  it("🔴 terminado (cruzó el 90%): el Excel congela 0,9 y los meses del CRUCE, no los de bodega", async () => {
+    // Única compra nov-2023 (280 u); el 90% se cruzó en abr-2024 (5 meses).
+    // Al corte 2026-08 lleva 33 meses en bodega — la celda dice 5 igual.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "40HM265032",
+        descripcion: "Men-Brief",
+        ingresos: [ingreso({ codigo_articulo: "40HM265032", fecha: "2023-11-28", n_interno: "A", cantidad: 280 })],
+        ventas: [
+          v("2024-01-06", "FA", 70, 1120),
+          v("2024-02-06", "FA", 70, 1120),
+          v("2024-03-06", "FA", 70, 1120),
+          v("2024-04-06", "FA", 66, 1056),
+        ],
+        existencia: 4,
+        precioEtiqueta: 16,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const XLSX = await import("xlsx-js-style");
+    const mod = await import("@/lib/ventas/referencia-excel");
+    const ws = await mod.buildReferenciaSheet([art], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const enc = filas.find((f) => f.includes("Referencia")) as string[];
+    const fila = filas[filas.indexOf(enc) + 1];
+    expect(fila[enc.indexOf("Vendido")]).toBe(0.9);
+    expect(fila[enc.indexOf("Meses")]).toBe(5);
+  });
+
+  it('🔴 lo que no se puede afirmar queda VACÍO: sin compra con fecha → las dos celdas; vendido>comprado (TERMO) → solo "Vendido"', async () => {
+    const sinCompra = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "RETENCION",
+        descripcion: "RETENCION",
+        ingresos: [],
+        ventas: [v("2026-05-06", "FA", 40, 400)],
+        existencia: null,
+        precioEtiqueta: null,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    // El caso TERMO: se vendió MÁS de lo comprado (faltan compras EN Switch).
+    // Un "150%" sería mentira; los meses desde el ancla (extendida hasta la
+    // compra más vieja con fecha) SÍ se saben.
+    const termo = armarArticulo(
+      {
+        empresa: "active_shoes",
+        codigo: "TERMO",
+        descripcion: "TERMO",
+        ingresos: [
+          ingreso({ codigo_articulo: "TERMO", fecha: "2024-07-01", n_interno: "A", cantidad: 60 }),
+          ingreso({ codigo_articulo: "TERMO", fecha: "2025-10-01", n_interno: "B", cantidad: 40 }),
+        ],
+        ventas: [v("2025-11-06", "FA", 150, 1500)],
+        existencia: 0,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const XLSX = await import("xlsx-js-style");
+    const mod = await import("@/lib/ventas/referencia-excel");
+    const ws = await mod.buildReferenciaSheet([sinCompra, termo], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: null }) as unknown[][];
+    const enc = filas.find((f) => f.includes("Referencia")) as string[];
+    const filaSin = filas[filas.indexOf(enc) + 1];
+    const filaTermo = filas[filas.indexOf(enc) + 2];
+    // La celda vacía ES el dato (misma convención que "CIF anterior").
+    expect(filaSin[enc.indexOf("Vendido")] || null).toBeNull();
+    expect(filaSin[enc.indexOf("Meses")] || null).toBeNull();
+    expect(filaTermo[enc.indexOf("Vendido")] || null).toBeNull();
+    expect(filaTermo[enc.indexOf("Meses")]).toBe(25); // ancla extendida jul-2024 → ago-2026
   });
 });
