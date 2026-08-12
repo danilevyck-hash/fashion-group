@@ -6,9 +6,10 @@
 // Uso: DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-compras-referencia.ts [CODIGO...]
 //
 // 🔴 Imprime la ficha del 12-ago-2026: los TRES GRANDES (Compré · Vendí · Me
-// quedan), la lista de compras, la LÍNEA DEL 90% (y su versión corta del modo
-// pedido), la vista de barras (anclada a la llegada o últimos 12 con ▲) y la
-// fila de plata agrupada. Sin atribución por compra: eso no se sabe.
+// quedan), la lista de compras, la LÍNEA DE VENTA (tiempo de venta + % real —
+// la regla del 90% se fue del módulo entero) y sus celdas VENDIDO · MESES del
+// modo pedido, la vista de barras (anclada a la llegada o últimos 12 con ▲) y
+// la fila de plata agrupada. Sin atribución por compra: eso no se sabe.
 
 import { createClient } from "@supabase/supabase-js";
 import { armarArticulo, type FilaIngreso } from "../src/lib/ventas/compras";
@@ -21,9 +22,9 @@ import {
   medirVendidoMeses,
   subDesdeLlegada,
   textoCompra,
-  textoLineaNoventa,
+  textoLineaVenta,
   textoMesesCelda,
-  textoNoventaCorto,
+  textoAvanceCorto,
   textoParteVendida,
   textoRestantes,
   textoVendidoCelda,
@@ -36,7 +37,7 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 const CODIGOS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
+  : ["4G5004G030", "CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
 
 const HOY = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const HOY_MES = HOY.slice(0, 7);
@@ -115,16 +116,16 @@ async function main() {
         if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
       }
 
-      // ── LA LÍNEA DEL 90% de la ficha (que NO cambió) ──
-      const linea = textoLineaNoventa(f.noventa, f.ritmo);
-      console.log(`   90%: ${linea ?? "(sin línea)"}   [90% corto: ${textoNoventaCorto(f.noventa)}]`);
+      // ── LA LÍNEA DE VENTA de la ficha ──
+      const linea = textoLineaVenta(f.avance, f.ritmo);
+      console.log(`   línea: ${linea ?? "(sin línea)"}   [corto: ${textoAvanceCorto(f.avance)}]`);
 
       // ── VENDIDO · MESES — las dos celdas del modo pedido (12-ago-2026),
       //    medidas con LA MISMA función que la tabla y el Excel ──
       const vm = medirVendidoMeses(f);
       console.log(
         `   tabla pedido: VENDIDO ${textoVendidoCelda(vm)} · MESES ${textoMesesCelda(vm)} · ${
-          vm.terminado ? "TERMINADO (congelado en el cruce, negro)" : "en curso (gris)"
+          vm.terminado ? "AGOTADO (cerrado en la última venta, negro)" : "en curso (gris)"
         }`,
       );
 

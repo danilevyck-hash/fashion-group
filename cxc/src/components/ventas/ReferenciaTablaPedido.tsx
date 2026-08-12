@@ -26,10 +26,11 @@
 //
 // 🔴 VENDIDO · MESES reemplazan a "90% en" (12-ago-2026). Daniel: "va el 29%"
 // no decía cuánto tiempo llevaba. Las DOS celdas salen de UNA función
-// (`medirVendidoMeses`, la misma del Excel): terminado (cruzó el 90%) queda
-// CONGELADO en 90% y los meses del cruce, en negro; vivo muestra el % actual
-// (Vendí÷Compré) y los meses calendario desde la llegada, en gris; lo que no
-// se puede afirmar dice "—". Acá no se calcula nada — solo se pinta.
+// (`medirVendidoMeses`, la misma del Excel): VENDIDO es SIEMPRE el % real
+// (Vendí÷Compré — Daniel cazó el "90%" congelado: *"como stock 0 y vendido
+// 90%?"*); MESES es el tiempo de venta — hasta la última venta si está AGOTADO
+// (cerrado ahí, negro) o desde la llegada hasta hoy si sigue vivo (gris); lo
+// que no se puede afirmar dice "—". Acá no se calcula nada — solo se pinta.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Fragment, useMemo, useState } from "react";
@@ -69,7 +70,7 @@ interface FilaPedido {
   color: string | null;
   vendido: string;
   meses: string;
-  /** `false` = terminado (cruzó el 90%): negro. `true` = en curso: gris. */
+  /** `false` = agotado (tiempo cerrado): negro. `true` = en curso: gris. */
   enCurso: boolean;
   margen: string;
   ultCompra: string;
@@ -211,7 +212,7 @@ function FilaTabla({
       >
         {quedan != null ? fmtInt(quedan) : "—"}
       </td>
-      {/* Terminado va en NEGRO (dato cerrado); vivo en GRIS (en curso). */}
+      {/* Agotado va en NEGRO (tiempo cerrado); vivo en GRIS (en curso). */}
       <td
         className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${
           f.enCurso ? "text-gray-500" : "text-gray-900"

@@ -769,37 +769,29 @@ describe("el Excel de Referencia", () => {
     return { encabezado, cuerpo: cuerpo.map(porNombre) };
   }
 
-  // 🔴 LA HOJA 1 ES LA PANTALLA: una fila por ARTÍCULO. Daniel baja este archivo
-  // para escribir en él la cantidad que va a pedir — si trajera solo la materia
-  // prima tendría que rehacer la cuenta afuera.
-  it("la hoja 1 refleja la ficha: los cuatro grandes, las compras crudas y el ritmo", async () => {
+  // 🔴 LA HOJA 1 SON 13 COLUMNAS: LO ESENCIAL, APROBADO POR DANIEL. Sobre la
+  // hoja de 39 columnas dijo, textual: *"mucha info, quiero lo escencial"*
+  // (12-ago-2026), y después pidió sumar la Lista. El candado es el encabezado
+  // EXACTO — ni una columna más, ni una menos.
+  const TRECE = [
+    "Referencia",
+    "Descripción",
+    "Compré",
+    "Vendí",
+    "Stock",
+    "Vendido",
+    "Meses",
+    "Última compra",
+    "Precio prom",
+    "Lista",
+    "Costo CIF",
+    "Margen",
+    "Nota",
+  ];
+
+  it("🔴 la hoja 1 tiene EXACTAMENTE las 13 columnas esenciales, en su orden", async () => {
     const { encabezado, cuerpo } = await leerHoja("Referencia");
-    for (const col of [
-      // 🔴 Los cuatro grandes de la pantalla, primero. "Stock" es la palabra
-      // de Daniel (*"¿por qué 'me quedan' en vez de stock?"*) y "Meses de
-      // venta" es el cuarto KPI (*"compre, vendi, stock, meses"*).
-      "Compré",
-      "Vendí",
-      "Stock",
-      "Meses de venta",
-      "Última compra: llegó",
-      "Última compra: cuánto",
-      "Compras (últimos 3 años)",
-      "Compras de más de 3 años",
-      "Vendo por mes",
-      "Me queda para (meses)",
-      // 🔴 Los MISMOS rótulos que la fila de plata de la pantalla.
-      "Precio prom",
-      "Costo CIF",
-      "CIF anterior (solo si cambió)",
-      "Costo FOB",
-      "Margen",
-      "Lista",
-    ]) {
-      expect(encabezado, `falta la columna "${col}"`).toContain(col);
-    }
-    // El rótulo viejo no puede quedar a medias en ninguna hoja.
-    expect(encabezado).not.toContain("En bodega");
+    expect(encabezado).toEqual(TRECE);
     expect(cuerpo).toHaveLength(1); // un artículo = una fila
     expect(cuerpo[0]["Referencia"]).toBe("NB2570001");
     // 🔴 Compré = TODAS las compras (240 + 180) y Vendí = el neto histórico.
@@ -809,30 +801,49 @@ describe("el Excel de Referencia", () => {
     expect(cuerpo[0]["Vendí"]).toBe(216);
     expect(cuerpo[0]["Stock"]).toBe(204);
     // La ÚLTIMA compra es la del 19-feb-2026, no la más vieja.
-    expect(cuerpo[0]["Última compra: llegó"]).toBe("2026-02-19");
-    expect(cuerpo[0]["Última compra: cuánto"]).toBe(180);
-    expect(cuerpo[0]["Anterior: llegó"]).toBe("2025-04-01");
-    expect(cuerpo[0]["Compras (últimos 3 años)"]).toBe(2);
-    expect(cuerpo[0]["Compras de más de 3 años"]).toBe(0);
+    expect(cuerpo[0]["Última compra"]).toBe("2026-02-19");
+    expect(cuerpo[0]["Precio prom"]).toBe(10);
+    // La Lista de la ficha: el precio de lista de la última compra.
+    expect(cuerpo[0]["Lista"]).toBe(10);
+    expect(cuerpo[0]["Costo CIF"]).toBe(5);
+    expect(cuerpo[0]["Margen"]).toBe(0.5);
   });
 
-  it("🔴 el orden de precios y costos sigue al de la pantalla: precios juntos, costos juntos, margen al final", async () => {
+  it("🩸 lo que se FUE de la hoja 1 no vuelve (Daniel: 'quiero lo escencial')", async () => {
     const { encabezado } = await leerHoja("Referencia");
-    const pos = (h: string) => encabezado.indexOf(h);
-    // Precio prom · Lista | Costo CIF · CIF anterior · Costo FOB | Margen
-    expect(pos("Precio prom")).toBeGreaterThan(-1);
-    expect(pos("Lista")).toBe(pos("Precio prom") + 1);
-    expect(pos("Costo CIF")).toBe(pos("Lista") + 1);
-    expect(pos("CIF anterior (solo si cambió)")).toBe(pos("Costo CIF") + 1);
-    expect(pos("Costo FOB")).toBe(pos("CIF anterior (solo si cambió)") + 1);
-    expect(pos("Margen")).toBe(pos("Costo FOB") + 1);
-    // Y los cuatro grandes van juntos, en el orden de la pantalla.
-    expect(pos("Vendí")).toBe(pos("Compré") + 1);
-    expect(pos("Stock")).toBe(pos("Vendí") + 1);
-    expect(pos("Meses de venta")).toBe(pos("Stock") + 1);
+    for (const col of [
+      "Empresa",
+      "Meses de venta",
+      "Última compra: llegó",
+      "Última compra: cuánto",
+      "Anterior: llegó",
+      "Anterior: cuánto",
+      "Compras (últimos 3 años)",
+      "Compras de más de 3 años",
+      "Vendo por mes",
+      "Me queda para (meses)",
+      "CIF anterior (solo si cambió)",
+      "Costo FOB",
+      "Costo FOB (calculado)",
+      "Si no hay margen, por qué",
+      "Oct-nov-dic (u)",
+      "Oct-nov-dic (% del año)",
+      "FOB de dónde",
+      "En bodega",
+      "90% en",
+    ]) {
+      expect(encabezado, `la columna "${col}" volvió a la hoja 1`).not.toContain(col);
+    }
+    // Y los 12 meses en columnas también se fueron — ninguna celda del
+    // encabezado es un "jul 2026".
+    for (const h of encabezado) {
+      expect(h, `volvió una columna de mes: "${h}"`).not.toMatch(
+        /^(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) \d{4}$/,
+      );
+    }
   });
 
-  it("🔴 sin margen (vendedor/bodega): la columna Margen y su 'por qué' NO bajan; todo lo demás sí", async () => {
+  it("🔴 sin margen (vendedor/bodega): la columna Margen NO baja; las otras 12 sí, sin correrse", async () => {
     // Daniel: *"quita margen, lo demas dejalo"*. Esconderlo solo en pantalla
     // y dejarlo bajar en el Excel sería teatro.
     const XLSX = await import("xlsx-js-style");
@@ -841,53 +852,25 @@ describe("el Excel de Referencia", () => {
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
     const encabezado = filas.find((f) => f.includes("Referencia")) as string[];
     const cuerpo = filas.slice(filas.indexOf(encabezado) + 1);
-    expect(encabezado).not.toContain("Margen");
-    expect(encabezado).not.toContain("Si no hay margen, por qué");
-    // Lo demás se queda: costos, precios y la señal del CIF anterior.
-    for (const col of ["Precio prom", "Lista", "Costo CIF", "CIF anterior (solo si cambió)", "Costo FOB", "Nota"]) {
-      expect(encabezado, `falta la columna "${col}"`).toContain(col);
-    }
-    // Y la fila no queda CORRIDA: quitar dos columnas del medio sin quitar sus
-    // celdas dejaría la temporada bajo el encabezado del margen. El precio de
-    // lista tiene que caer bajo "Lista", igual que con margen.
+    expect(encabezado).toEqual(TRECE.filter((c) => c !== "Margen"));
+    // Y la fila no queda CORRIDA: quitar la columna del medio sin quitar su
+    // celda dejaría la Nota bajo el encabezado del margen.
     const fila = Object.fromEntries(encabezado.map((h, i) => [h, cuerpo[0][i]]));
-    expect(fila["Lista"]).toBe(10);
-    expect(fila["Oct-nov-dic (u)"]).toBe(216); // las 216 de nov-2025, en su columna
+    expect(fila["Costo CIF"]).toBe(5);
+    expect(fila["Nota"] ?? "").toBe("");
   });
 
-  it("🔴 el Costo FOB de la hoja 1 es calculado (CIF ÷ 1,10), no el de Switch — y el encabezado ya no dice '(calculado)'", async () => {
-    const { encabezado, cuerpo } = await leerHoja("Referencia");
-    expect(cuerpo[0]["Costo CIF"]).toBe(5);
-    expect(cuerpo[0]["Costo FOB"]).toBe(4.55); // 5 ÷ 1,1
-    // El FOB que manda Switch para esta línea es 4 — si se copiara ése, la
-    // planilla diría otra cosa que la pantalla.
-    expect(cuerpo[0]["Costo FOB"]).not.toBe(4);
-    // 🔴 Daniel: *"la palabra calculado esta de mas"*. El subtítulo de la hoja
-    // sigue diciendo de dónde sale; el encabezado ya no.
-    expect(encabezado).not.toContain("Costo FOB (calculado)");
-    // Y la columna del origen del FOB se fue de esta hoja: ya no hay dos
-    // procedencias que distinguir, hay una cuenta.
-    expect(encabezado).not.toContain("FOB de dónde");
-  });
-
-  it("🔴 'CIF anterior' queda VACÍA cuando el costo no cambió — vacío ES el dato", async () => {
-    // Las dos compras del fixture costaron lo mismo ($5).
-    const { cuerpo } = await leerHoja("Referencia");
-    expect(cuerpo[0]["CIF anterior (solo si cambió)"] ?? "").toBe("");
-  });
-
-  it("🔴 …y se llena cuando SÍ cambió", async () => {
+  it('🔴 "Si no hay margen, por qué" se FUSIONÓ en la Nota — solo cuando el margen baja', async () => {
+    // Compra sin una sola venta → motivo "sin-ventas". Antes era una columna
+    // aparte; ahora vive en la Nota (Daniel: *"quiero lo escencial"*).
     const art = armarArticulo(
       {
         empresa: "vistana",
-        codigo: "NB2570001",
-        descripcion: "Men-Boxer Brief",
-        ingresos: [
-          ingreso({ codigo_articulo: "NB2570001", fecha: "2025-04-01", n_interno: "A", cantidad: 240, costo_cif: 4.2 }),
-          ingreso({ codigo_articulo: "NB2570001", fecha: "2026-02-19", n_interno: "E", cantidad: 180, costo_cif: 5 }),
-        ],
-        ventas: [v("2025-11-06", "FA", 216, 2160)],
-        existencia: 204,
+        codigo: "4F5036G001",
+        descripcion: "Men-Short",
+        ingresos: [ingreso({ codigo_articulo: "4F5036G001", fecha: "2026-04-20", n_interno: "A", cantidad: 36 })],
+        ventas: [],
+        existencia: 36,
         precioEtiqueta: 10,
         catalogoSyncedAt: null,
       },
@@ -895,19 +878,20 @@ describe("el Excel de Referencia", () => {
     );
     const XLSX = await import("xlsx-js-style");
     const mod = await import("@/lib/ventas/referencia-excel");
-    const ws = await mod.buildReferenciaSheet([art], "2026-08");
-    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
-    const enc = filas.find((f) => f.includes("Referencia")) as string[];
-    const fila = filas[filas.indexOf(enc) + 1];
-    expect(fila[enc.indexOf("CIF anterior (solo si cambió)")]).toBe(4.2);
-  });
 
-  it("la hoja 1 trae los 12 meses COMPLETOS en columnas, sin el mes en curso", async () => {
-    const { encabezado } = await leerHoja("Referencia");
-    // Corte 2026-08 → la ventana termina en jul 2026 y arranca en ago 2025.
-    expect(encabezado).toContain("jul 2026");
-    expect(encabezado).toContain("ago 2025");
-    expect(encabezado).not.toContain("ago 2026"); // 🔴 el mes en curso NUNCA
+    const conMargen = await mod.buildReferenciaSheet([art], "2026-08");
+    const filas1 = XLSX.utils.sheet_to_json(conMargen, { header: 1, blankrows: false }) as unknown[][];
+    const enc1 = filas1.find((f) => f.includes("Referencia")) as string[];
+    const fila1 = filas1[filas1.indexOf(enc1) + 1];
+    expect(String(fila1[enc1.indexOf("Nota")])).toContain("No se puede calcular el margen");
+
+    // Sin margen visible (vendedor/bodega) tampoco se explica su ausencia:
+    // sería hablar de una columna que esa hoja no tiene.
+    const sinMargen = await mod.buildReferenciaSheet([art], "2026-08", { margen: false });
+    const filas2 = XLSX.utils.sheet_to_json(sinMargen, { header: 1, blankrows: false, defval: "" }) as unknown[][];
+    const enc2 = filas2.find((f) => f.includes("Referencia")) as string[];
+    const fila2 = filas2[filas2.indexOf(enc2) + 1];
+    expect(String(fila2[enc2.indexOf("Nota")])).not.toContain("margen");
   });
 
   it("la hoja 2 baja UNA FILA POR COMPRA con fecha, cantidad y costos", async () => {
@@ -979,18 +963,19 @@ describe("el Excel de Referencia", () => {
   });
 
   it("🔴 Vendido/Meses del Excel = las celdas de la tabla: vivo trae el % actual (Vendí÷Compré) y los meses del ancla", async () => {
-    // ART(): 2 compras (240 + 180), 216 vendidas → vivo. Vendido = 216/420;
-    // Meses = ancla del agregado (feb-2026 → ago-2026 = 6). El MISMO número
-    // que "Meses de venta" (los dos salen de la misma ancla de la ficha).
+    // ART(): 2 compras (240 + 180), 216 vendidas, stock 204 → VIVO. Vendido =
+    // 216/420; Meses = ancla del agregado (feb-2026 → ago-2026 = 6) — la misma
+    // ancla de la ficha, no una segunda cuenta.
     const { cuerpo } = await leerHoja("Referencia");
     expect(cuerpo[0]["Vendido"]).toBeCloseTo(216 / 420, 10);
     expect(cuerpo[0]["Meses"]).toBe(6);
-    expect(cuerpo[0]["Meses"]).toBe(cuerpo[0]["Meses de venta"]);
   });
 
-  it("🔴 terminado (cruzó el 90%): el Excel congela 0,9 y los meses del CRUCE, no los de bodega", async () => {
-    // Única compra nov-2023 (280 u); el 90% se cruzó en abr-2024 (5 meses).
-    // Al corte 2026-08 lleva 33 meses en bodega — la celda dice 5 igual.
+  it("🔴 AGOTADO: el Excel baja el % REAL y los meses hasta la ÚLTIMA VENTA, no los de bodega", async () => {
+    // Única compra nov-2023 (280 u); vendió 276 entre ene y abr 2024; stock 0.
+    // Al corte 2026-08 lleva 33 meses de calendario — la celda dice 6 (nov-2023
+    // → abr-2024, inclusive). Y Vendido dice lo REAL (276/280 → 99%), no un
+    // "90%" congelado — Daniel: *"como stock 0 y vendido 90%?"*.
     const art = armarArticulo(
       {
         empresa: "vistana",
@@ -1003,7 +988,7 @@ describe("el Excel de Referencia", () => {
           v("2024-03-06", "FA", 70, 1120),
           v("2024-04-06", "FA", 66, 1056),
         ],
-        existencia: 4,
+        existencia: 0,
         precioEtiqueta: 16,
         catalogoSyncedAt: null,
       },
@@ -1015,8 +1000,8 @@ describe("el Excel de Referencia", () => {
     const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
     const enc = filas.find((f) => f.includes("Referencia")) as string[];
     const fila = filas[filas.indexOf(enc) + 1];
-    expect(fila[enc.indexOf("Vendido")]).toBe(0.9);
-    expect(fila[enc.indexOf("Meses")]).toBe(5);
+    expect(fila[enc.indexOf("Vendido")]).toBeCloseTo(276 / 280, 10);
+    expect(fila[enc.indexOf("Meses")]).toBe(6);
   });
 
   it('🔴 lo que no se puede afirmar queda VACÍO: sin compra con fecha → las dos celdas; vendido>comprado (TERMO) → solo "Vendido"', async () => {
@@ -1034,8 +1019,8 @@ describe("el Excel de Referencia", () => {
       HOY,
     );
     // El caso TERMO: se vendió MÁS de lo comprado (faltan compras EN Switch).
-    // Un "150%" sería mentira; los meses desde el ancla (extendida hasta la
-    // compra más vieja con fecha) SÍ se saben.
+    // Un "150%" sería mentira; el tiempo de venta SÍ se sabe: agotado, del
+    // ancla (extendida hasta la compra más vieja con fecha) a su última venta.
     const termo = armarArticulo(
       {
         empresa: "active_shoes",
@@ -1063,6 +1048,8 @@ describe("el Excel de Referencia", () => {
     expect(filaSin[enc.indexOf("Vendido")] || null).toBeNull();
     expect(filaSin[enc.indexOf("Meses")] || null).toBeNull();
     expect(filaTermo[enc.indexOf("Vendido")] || null).toBeNull();
-    expect(filaTermo[enc.indexOf("Meses")]).toBe(25); // ancla extendida jul-2024 → ago-2026
+    // Ancla extendida jul-2024 → última venta nov-2025, inclusive = 17. El
+    // reloj NO sigue corriendo hasta hoy (eso daría 25).
+    expect(filaTermo[enc.indexOf("Meses")]).toBe(17);
   });
 });

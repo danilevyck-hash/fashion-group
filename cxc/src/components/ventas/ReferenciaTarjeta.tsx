@@ -15,10 +15,12 @@
 //      Meses es el tiempo de venta desde la llegada (el ancla del 90%).
 //      ⚠️ NO SE FUERZA EL CUADRE entre los tres: los avisos de descuadre que ya
 //      existen explican los huecos (ajuste, venta sin compra, robo).
-//   2. LA LÍNEA DEL 90% — *"creo que es mas importante saber en cuanto meses se
-//      vendio digamos que el 80%? 90%?"*: "El 90% se vendió en 16 meses" / "En
-//      10 meses va el 80% de la compra" / el agregado rotulado cuando hay
-//      varias compras. El "vendo N u por mes" quedó de dato chiquito al final.
+//   2. LA LÍNEA DE VENTA — cuánto tiempo de venta y qué % va (la regla del 90%
+//      SE FUE del módulo entero el 12-ago-2026 — Daniel: *"debe de ser cuanto
+//      tiempo de venta tiene y % de la venta, asi en todo el modulo"*): "Se
+//      vendió todo en 2 meses" (agotado) / "En 10 meses va el 80% de la
+//      compra" (única viva) / el agregado rotulado cuando hay varias vivas.
+//      El "vendo N u por mes" quedó de dato chiquito al final.
 //   3. Las barras ANCLADAS A LA LLEGADA cuando hay una sola compra (con el
 //      acumulado en verde debajo: compré 120, ¿en cuánto se me van?), o los
 //      últimos 12 meses con cada llegada marcada con ▲ cuando hay varias.
@@ -60,7 +62,7 @@ import {
   pieGrandeMeses,
   subDesdeLlegada,
   textoCompra,
-  textoLineaNoventa,
+  textoLineaVenta,
   textoParteVendida,
   textoRestantes,
   textoSinMargen,
@@ -162,7 +164,7 @@ export function CuerpoArticulo({
   return (
     <>
       <CuatroGrandes art={art} ficha={ficha} />
-      <LineaNoventa ficha={ficha} />
+      <LineaVenta ficha={ficha} />
       <MesAMes ficha={ficha} hoyMes={hoyMes} />
       <FilaPlata art={art} ficha={ficha} mostrarMargen={mostrarMargen} />
       <Avisos art={art} />
@@ -279,15 +281,14 @@ function pieDeVendido(art: ArticuloCompras, parte: number | null): string {
   return "neto, con devoluciones restadas";
 }
 
-// ─── La línea del 90% ────────────────────────────────────────────────────────
+// ─── La línea de venta ───────────────────────────────────────────────────────
 //
-// 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA (12-ago-2026). Daniel:
-// *"creo que es mas importante saber en cuanto meses se vendio digamos que el
-// 80%? 90%? siento que es mas util que unidades por mes"*. El texto entero sale
-// del módulo puro (`textoLineaNoventa`) — acá no se arma ni media frase.
+// 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA (12-ago-2026): cuánto
+// tiempo de venta tiene y qué % va. El texto entero sale del módulo puro
+// (`textoLineaVenta`) — acá no se arma ni media frase.
 
-function LineaNoventa({ ficha }: { ficha: FichaArticulo }) {
-  const texto = textoLineaNoventa(ficha.noventa, ficha.ritmo);
+function LineaVenta({ ficha }: { ficha: FichaArticulo }) {
+  const texto = textoLineaVenta(ficha.avance, ficha.ritmo);
   if (!texto) return null;
   return <p className="border-t border-gray-100 px-3.5 py-2.5 text-sm text-gray-700">{texto}</p>;
 }
