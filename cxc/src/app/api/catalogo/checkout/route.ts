@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/catalogo/checkout — Confirmar y enviar a Switch en UN paso.
+// POST /api/catalogo/checkout — Enviar a Switch en UN paso.
 // Body: { marca, cliente: {id, nombre}, items: CartItem[], idempotency_key }.
 //
 // Flujo: (1) crea el pedido en DB vía el RPC idempotente de la marca y lo marca

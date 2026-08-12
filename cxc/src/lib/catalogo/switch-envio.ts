@@ -26,6 +26,13 @@ import {
   SwitchApiError,
   type SwitchPedidoLineaInput,
 } from "@/lib/switch-api/client";
+import { type AvisoEnvio, textosDeAvisos } from "./switch-prevalidacion";
+import {
+  PROCESO_CAMBIO_PRECIO,
+  TEXTO_PERMISO_NO_VERIFICADO,
+  TEXTO_SIN_PERMISO_PRECIO,
+  permisoCambiarPrecio,
+} from "./permiso-precio";
 
 const DESCUENTO_LINEA = "0.00";
 
@@ -83,8 +90,11 @@ export type EnvioResult =
   | { kind: "preorders"; count: number }
   | { kind: "ya_enviado"; detalle: string }
   | { kind: "switch_caido"; error: string }
-  | { kind: "prevalidacion"; errores: string[]; warnings: string[] }
-  | { kind: "preview"; preview: { cliente: string; vendedor: string; lineas: EnvioLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number } }
+  // `lineas` viaja también acá: la pantalla de problema muestra los errores
+  // ARRIBA y debajo las líneas que sí cruzaron, para poder ver el pedido entero
+  // sin volver a consultar Switch.
+  | { kind: "prevalidacion"; errores: string[]; warnings: string[]; avisos: AvisoEnvio[]; lineas: EnvioLinea[] }
+  | { kind: "preview"; preview: { cliente: string; vendedor: string; lineas: EnvioLinea[]; warnings: string[]; avisos: AvisoEnvio[]; totalPiezas: number; totalEstimado: number } }
   | { kind: "carrera" }
   | { kind: "rechazado"; error: string; warnings: string[] }
   | { kind: "ambiguo"; error: string }
@@ -109,7 +119,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   // ── Pre-validación VIVA contra Switch: sku → artículo (precio + codigoBarraId) ──
   const client = createSwitchClient(p.empresaKey);
   const lineas: EnvioLinea[] = [];
-  const warnings: string[] = [];
+  // Los avisos llevan CÓDIGO: la severidad la decide `switch-prevalidacion`, no
+  // el texto (ver la cabecera de ese módulo). `warnings` se deriva de acá para
+  // no tener dos listas que se puedan separar.
+  const avisos: AvisoEnvio[] = [];
   const errores: string[] = [];
 
   // Una sola resolución para todo el pedido — categoría, piezas por bulto,
@@ -153,9 +166,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     const precioCatalogo = Number(item.unit_price) || 0;
     if (Math.abs(precioSwitch - precioCatalogo) >= 0.01) {
       // Precio editable (5-jul): se envía el del PEDIDO, no el de lista.
-      warnings.push(
-        `SKU ${sku}: precio del pedido $${precioCatalogo.toFixed(2)} ≠ lista Switch $${precioSwitch.toFixed(2)} — se enviará el del pedido`,
-      );
+      avisos.push({
+        codigo: "precio_distinto",
+        texto: `SKU ${sku}: precio del pedido $${precioCatalogo.toFixed(2)} ≠ lista Switch $${precioSwitch.toFixed(2)} — se enviará el del pedido`,
+      });
     }
 
     // Advertir si el artículo tiene varias variantes talla/color en Switch: el
@@ -164,12 +178,13 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       const tc = await client.apiarticulosTallaColor({ articuloId: articulo.id });
       const variantes = new Set((tc.tallacolor || []).map((v) => v.codigoBarraId));
       if (variantes.size > 1) {
-        warnings.push(
-          `SKU ${sku}: tiene ${variantes.size} variantes talla/color en Switch — se enviará el código de barra principal (id ${articulo.codigoBarraId})`,
-        );
+        avisos.push({
+          codigo: "variantes_talla_color",
+          texto: `SKU ${sku}: tiene ${variantes.size} variantes talla/color en Switch — se enviará el código de barra principal (id ${articulo.codigoBarraId})`,
+        });
       }
     } catch {
-      warnings.push(`SKU ${sku}: no se pudo verificar tallas/colores en Switch`);
+      avisos.push({ codigo: "tallas_no_verificadas", texto: `SKU ${sku}: no se pudo verificar tallas/colores en Switch` });
     }
 
     // Las piezas YA vienen calculadas: acá no se multiplica nada (ver
@@ -187,25 +202,35 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     });
   }
 
-  if (errores.length) return { kind: "prevalidacion", errores, warnings };
+  if (errores.length) {
+    return { kind: "prevalidacion", errores, warnings: textosDeAvisos(avisos), avisos, lineas };
+  }
 
   // ¿Hay precios editados (≠ lista)? La doc exige verificar el permiso 0001
   // antes de un cambio de precio (pág 11). Si el usuario API no lo tiene →
   // error claro ANTES de intentar; si la verificación misma falla, seguimos
   // (terminar decide) con warning.
+  //
+  // La consulta pasa por `permisoCambiarPrecio`, el MISMO caché que usa la
+  // pantalla al editar: preguntarlo mientras se edita y otra vez al enviar
+  // cuesta UNA sola sesión de Switch dentro de la ventana (sesión única por
+  // empresa). El "no" nunca se cachea — ver la cabecera de permiso-precio.ts.
   const hayPrecioEditado = lineas.some((l) => Math.abs(l.precioSwitch - l.precioCatalogo) >= 0.01);
   if (hayPrecioEditado) {
-    try {
-      const permiso = await client.verificarPermiso("0001");
-      if (!permiso) {
-        return {
-          kind: "prevalidacion",
-          errores: ["El usuario de Switch no tiene permiso para cambiar precios (proceso 0001) — pedirlo al administrador de Switch o usar el precio de lista"],
-          warnings,
-        };
-      }
-    } catch {
-      warnings.push("No se pudo verificar el permiso de cambio de precio (0001) — se intenta el envío igual");
+    const permiso = await permisoCambiarPrecio(p.empresaKey, () =>
+      client.verificarPermiso(PROCESO_CAMBIO_PRECIO),
+    );
+    if (!permiso.permiso) {
+      return {
+        kind: "prevalidacion",
+        errores: [TEXTO_SIN_PERMISO_PRECIO],
+        warnings: textosDeAvisos(avisos),
+        avisos,
+        lineas,
+      };
+    }
+    if (!permiso.verificado) {
+      avisos.push({ codigo: "permiso_no_verificado", texto: TEXTO_PERMISO_NO_VERIFICADO });
     }
   }
 
@@ -226,7 +251,8 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
         cliente: `${p.clienteNombre || "Cliente"} (id ${p.clienteId})`,
         vendedor: `${p.vendedorNombre || "Vendedor"} (id ${p.vendedorId})`,
         lineas,
-        warnings,
+        warnings: textosDeAvisos(avisos),
+        avisos,
         totalPiezas: lineas.reduce((s, l) => s + l.piezas, 0),
         totalEstimado,
       },
@@ -268,7 +294,7 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       const detalle = hayPrecioEditado
         ? `Switch rechazó el cambio de precio: ${e.message}`
         : `Switch rechazó el pedido: ${e.message}`;
-      return { kind: "rechazado", error: detalle, warnings };
+      return { kind: "rechazado", error: detalle, warnings: textosDeAvisos(avisos) };
     }
     // Timeout / fallo de red: NO sabemos si el pedido se creó. Queda 'enviado'
     // sin número → bloquea reintentos; resolver a mano contra el panel Switch.
@@ -322,5 +348,5 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     }),
   );
 
-  return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings };
+  return { kind: "ok", numeroInterno, pedidoSwitchId, verificado, warnings: textosDeAvisos(avisos) };
 }

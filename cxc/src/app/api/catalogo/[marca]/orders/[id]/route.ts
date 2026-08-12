@@ -10,7 +10,7 @@
 // reemplazo de items atómico vía RPC. DELETE: soft-delete visual.
 
 import { NextRequest, NextResponse } from "next/server";
-import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
+import { leerCategoriaYBulto, leerPreciosLista } from "@/lib/catalogo/bulto-productos";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { getEnvioActivo, switchLockResponse, fetchReemplazoInfo } from "@/lib/catalogo/switch-lock";
@@ -100,10 +100,14 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
     cfg.productsTable,
     items.map((i) => i.product_id),
   );
+  // Precio de LISTA del catálogo, para el aviso inline "≠ lista" mientras se
+  // edita el precio de una línea. No cambia ningún total: es solo referencia.
+  const precioListaByProduct = await leerPreciosLista(db as never, cfg.productsTable, items.map((i) => i.product_id));
   const enrichedItems = items.map((i) => ({
     ...i,
     category: categoryByProduct.get(i.product_id) || cfg.fallbackCategory || undefined,
     bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+    precio_lista: precioListaByProduct.get(i.product_id) ?? null,
   }));
   let itemsOut: Record<string, unknown>[] = enrichedItems as unknown as Record<string, unknown>[];
   const recalcTotal = cfg.calcTotal(

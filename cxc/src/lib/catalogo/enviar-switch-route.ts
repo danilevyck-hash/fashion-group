@@ -182,7 +182,12 @@ export function envioResultToResponse(r: EnvioResult): NextResponse {
     case "switch_caido":
       return NextResponse.json({ error: r.error }, { status: 502 });
     case "prevalidacion":
-      return NextResponse.json({ error: "El pedido no pasa la pre-validación", errores: r.errores, warnings: r.warnings }, { status: 422 });
+      // `avisos` (con código) y `lineas` viajan para que la pantalla de
+      // problema pueda mostrar los errores arriba y el pedido resuelto abajo.
+      return NextResponse.json(
+        { error: "El pedido no pasa la pre-validación", errores: r.errores, warnings: r.warnings, avisos: r.avisos, lineas: r.lineas },
+        { status: 422 },
+      );
     case "preview":
       return NextResponse.json({ preview: r.preview });
     case "rechazado":

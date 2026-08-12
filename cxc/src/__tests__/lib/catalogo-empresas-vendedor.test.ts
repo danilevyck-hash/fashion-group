@@ -2,7 +2,7 @@
 // La lista de empresas con catálogo se DERIVA de las marcas, nunca se escribe.
 //
 // 🩸 EL BUG (6-ago-2026). Daniel armó un pedido de Tommy de $1.584,00 y el botón
-// "Confirmar y enviar a Switch" estaba apagado con el aviso *"No tienes vendedor
+// "Enviar a Switch" estaba apagado con el aviso *"No tienes vendedor
 // de Switch asignado — pídele al admin asignarlo en Sistema → Usuarios"*. Fue a
 // Usuarios y ahí SOLO estaban Reebok y Joybees: no había forma de asignárselo.
 //

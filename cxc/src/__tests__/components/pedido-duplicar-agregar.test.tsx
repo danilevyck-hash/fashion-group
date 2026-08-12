@@ -279,16 +279,20 @@ describe("candados estáticos", () => {
     expect(src).toMatch(/autoSaveTimer\.current = setTimeout/);
   });
 
-  it("UN botón encadena confirmar + enviar, y el correo interno es opcional", () => {
+  it("UN botón encadena confirmar + revisar + enviar, y el correo interno es opcional", () => {
     const src = SRC("src/components/catalogo/PedidoDetalleClient.tsx");
-    expect(src).toContain("Confirmar y enviar a Switch");
-    // El encadenado vive en el FRONT: PUT status confirmado → preview.
-    expect(src).toMatch(/status: "confirmado"[\s\S]{0,900}await previewSwitch\(\)/);
+    // 12-ago-2026: el botón dice "Enviar a Switch" a secas y hace el camino
+    // COMPLETO — el modal de preview dejó de ser un paso obligatorio.
+    expect(src).toContain('"Enviar a Switch"');
+    expect(src).not.toContain("Confirmar y enviar a Switch");
+    expect(src).toMatch(/status: "confirmado"[\s\S]{0,2000}JSON\.stringify\(\{ dry: true \}\)/);
+    expect(src).toMatch(/JSON\.stringify\(\{ dry: true \}\)[\s\S]{0,3000}await crearEnSwitch\(\)/);
     // send-order YA NO cuelga de confirmar: es su propio botón.
     expect(src).toContain("Avisar por correo a Fashion Group");
     expect(src).toMatch(/async function avisarPorCorreo\(\)/);
     expect(src).not.toMatch(/async function confirmOrder\(\)/);
-    // El POST real a Switch sigue detrás del modal de revisión de siempre.
+    // "Crear pedido en Switch" sobrevive SOLO como salida de la pantalla de
+    // problema (cuando hay un aviso bloqueante que decidir), no como paso.
     expect(src).toContain("Crear pedido en Switch");
   });
 
