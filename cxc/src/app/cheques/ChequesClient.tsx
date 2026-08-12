@@ -644,10 +644,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     <div>
       <AppHeader module="Cheques" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-light tracking-tight">Cheques</h1>
-        </div>
+      {/* Sin título grande: "Cheques" ya lo dicen la barra sticky (celular) y
+          el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
+          encabezado, y la fila pasa a `justify-end` para que Exportar y Nuevo
+          Cheque no se corran a la izquierda al quedar solos. */}
+      <div className="flex items-center justify-end mb-5">
+        <h1 className="sr-only">Cheques</h1>
         <div className="flex flex-wrap items-center gap-3">
           {/* min-h-[44px] + inline-flex: medían 35 y 41 px de alto en iPhone,
               por debajo del mínimo táctil de 44. El ancho ya sobraba. */}

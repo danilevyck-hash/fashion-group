@@ -519,12 +519,12 @@ export default function DepuradorClient({ onDownloaded, injectedFile, onReset }:
         />
       )}
 
-      {/* Masthead compacto */}
-      <div className="mb-4 border-b border-stone-300 pb-2.5">
-        <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
-          Depurador de Productos
-        </h1>
-      </div>
+      {/* Sin masthead: "Depurador" ya lo dicen la barra sticky (celular), el
+          breadcrumb (escritorio) Y el selector de pestañas de arriba, que en
+          los tres anchos muestra en cuál estás. Queda sr-only para no dejar la
+          pantalla sin encabezado. La línea divisoria se fue con el título: era
+          el subrayado del masthead, no una separación de contenido. */}
+      <h1 className="sr-only">Depurador de Productos</h1>
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
       {catalogoCargando && (

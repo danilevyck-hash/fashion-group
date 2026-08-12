@@ -177,7 +177,114 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · 'Este es el detalle' con la tabla justo debajo (cliente)", texto: "Este es el detalle" },
   { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · 'A continuación el detalle:' con la tabla justo debajo (equipo)", texto: "A continuación el detalle" },
   { archivo: "lib/catalogo/order-email.ts", que: "Pedidos · pie 'generado automáticamente' al equipo, que no recibe pedidos de otro lado", texto: "generado automáticamente desde fashiongr.com" },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // EL NOMBRE DE LA PANTALLA, TRES VECES — 23 pantallas (12-ago-2026)
+  //
+  // Daniel ya había tomado esta decisión DOS veces y las dos quedaron escritas
+  // en el código: Comisiones ("repetirlo costaba 44px de la primera pantalla del
+  // iPhone") y el CXC de escritorio ("Sin título grande (pedido de Daniel)"). El
+  // propio AppHeader lleva anotado el diagnóstico —"nombre 3×: chip + breadcrumb
+  // + h1"— y en su momento le quitó el chip de escritorio y se olvidó del h1.
+  // Acá se termina el trabajo en las 23 pantallas que faltaban.
+  //
+  // 🔴 EL h1 NO SE BORRA: pasa a `sr-only`, el patrón que estrenó el hub de
+  // catálogos (#502). Podar ruido visual no es motivo para dejar un documento
+  // sin encabezado. Por eso el candado NO puede ser `not.toContain("Clientes")`
+  // —el nombre SIGUE en el archivo, y debe seguir— sino el marcado del título
+  // GRANDE: la clase de tamaño pegada al texto. Si alguien devuelve el h1
+  // visible, vuelve esa clase y el build se pone rojo.
+  //
+  // ⚠️ Guías › Nueva/Editar guía NO entró: su h1 dice "Nueva"/"Editar", y en
+  // celular no hay breadcrumb, así que quitarlo borraba la única señal de si se
+  // está creando o corrigiendo. Ver el comentario en GuiaForm.tsx.
+  { archivo: "components/GroupPage.tsx", que: "Grupos · h1 grande con el nombre del grupo que ya dicen barra y breadcrumb", texto: 'text-2xl font-semibold text-gray-900">{meta.title}' },
+  { archivo: "app/ventas/VentasShell.tsx", que: "Ventas · h1 grande 'Ventas'", texto: 'md:text-4xl"> Ventas' },
+  { archivo: "app/vista-general/page.tsx", que: "Vista General · h1 grande 'Vista General'", texto: "sm:text-3xl" },
+  { archivo: "app/referencia/ReferenciaClient.tsx", que: "Referencia · h1 grande 'Referencia'", texto: 'text-gray-900">Referencia' },
+  { archivo: "app/multifashion/MultifashionShell.tsx", que: "Multifashion · h1 grande 'Multifashion'", texto: 'md:text-4xl"> Multifashion' },
+  { archivo: "app/admin/components/PanelCxcMobile.tsx", que: "CXC celular · h1 grande 'Cuentas por Cobrar' (el de escritorio ya se había ido)", texto: "text-[22px] font-medium leading-tight" },
+  { archivo: "app/clientes/ClientesListClient.tsx", que: "Clientes · h1 grande 'Clientes'", texto: 'tracking-tight">Clientes' },
+  { archivo: "app/proveedores/ProveedoresListClient.tsx", que: "Proveedores · h1 grande 'Proveedores'", texto: 'tracking-tight">Proveedores' },
+  { archivo: "app/admin/data-health/page.tsx", que: "Data Health · h1 grande 'Data Health'", texto: 'text-2xl font-semibold text-gray-900">Data Health' },
+  { archivo: "app/guias/components/GuiasList.tsx", que: "Guías · h1 grande 'Guías de Despacho'", texto: 'tracking-tight">Guías de Despacho' },
+  { archivo: "app/reclamos/components/EmpresaSelector.tsx", que: "Reclamos · h1 grande 'Reclamos'", texto: 'tracking-tight">Reclamos' },
+  { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · h1 grande 'Nuevo Reclamo' (su breadcrumb propio ya lo dice en todos los anchos)", texto: 'text-[21px] font-medium tracking-tight">Nuevo Reclamo' },
+  { archivo: "app/productos/cargar/DepuradorClient.tsx", que: "Depurador · masthead 'Depurador de Productos'", texto: "font-serif text-xl font-semibold tracking-tight text-stone-900" },
+  { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", que: "Facturas Tienda · masthead 'Facturas Tienda' (la pestaña ya lo dice)", texto: "font-serif text-xl font-semibold tracking-tight text-stone-900" },
+  { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · h1 grande 'Asistencia'", texto: 'text-xl font-semibold text-gray-900">Asistencia' },
+  { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el módulo iba en minúscula y ahora es lo único que nombra la pantalla", texto: 'module="asistencia"' },
+  { archivo: "app/cheques/ChequesClient.tsx", que: "Cheques · h1 grande 'Cheques'", texto: 'tracking-tight">Cheques' },
+  { archivo: "app/caja/components/PeriodoList.tsx", que: "Caja Menuda · h1 grande 'Caja Menuda' (38 px de alto)", texto: "clamp(28px, 4vw, 38px)" },
+  { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · h1 grande 'Marketing'", texto: 'text-xl font-semibold text-gray-900">Marketing' },
+  { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", que: "Gastos · h1 grande 'Gastos'", texto: 'text-xl font-semibold tracking-tight text-gray-900' },
+  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", que: "Saldos de Banco · h1 grande 'Saldos de Banco'", texto: 'text-gray-900">Saldos de Banco' },
 ];
+
+// El lado simétrico, y el que de verdad importa: sacar el título GRANDE no
+// puede dejar la página muda para un lector de pantalla. Cada una conserva
+// EXACTAMENTE un h1, ahora `sr-only`. Préstamos entra acá aunque nunca tuvo
+// título grande: tampoco tenía h1, y el sr-only cerró ese hueco.
+const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
+  { archivo: "components/GroupPage.tsx", nombre: "{meta.title}" },
+  { archivo: "app/ventas/VentasShell.tsx", nombre: "Ventas" },
+  { archivo: "app/vista-general/page.tsx", nombre: "Vista General" },
+  { archivo: "app/referencia/ReferenciaClient.tsx", nombre: "Referencia" },
+  { archivo: "app/multifashion/MultifashionShell.tsx", nombre: "Multifashion" },
+  { archivo: "app/admin/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
+  { archivo: "app/clientes/ClientesListClient.tsx", nombre: "Clientes" },
+  { archivo: "app/proveedores/ProveedoresListClient.tsx", nombre: "Proveedores" },
+  { archivo: "app/admin/data-health/page.tsx", nombre: "Data Health" },
+  { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de Despacho" },
+  { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },
+  { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo Reclamo" },
+  { archivo: "app/productos/cargar/DepuradorClient.tsx", nombre: "Depurador de Productos" },
+  { archivo: "app/productos/cargar/FacturasTiendaClient.tsx", nombre: "Facturas Tienda" },
+  { archivo: "app/asistencia/AsistenciaClient.tsx", nombre: "Asistencia" },
+  { archivo: "app/cheques/ChequesClient.tsx", nombre: "Cheques" },
+  { archivo: "app/caja/components/PeriodoList.tsx", nombre: "Caja Menuda" },
+  { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
+  { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },
+  { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", nombre: "Gastos" },
+  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", nombre: "Saldos de Banco" },
+];
+
+describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
+  for (const { archivo, nombre } of ENCABEZADO_SR_ONLY) {
+    it(`${archivo}: conserva UN h1, y es \`sr-only\` con "${nombre}"`, () => {
+      const fuente = plano(leer(archivo));
+      expect(fuente, "la pantalla se quedó sin ningún h1").toContain(
+        `<h1 className="sr-only">${nombre}</h1>`,
+      );
+      const h1s = fuente.match(/<h1\b/g) || [];
+      expect(h1s.length, "más de un h1: el encabezado deja de ser uno solo").toBe(1);
+    });
+  }
+
+  it("una fila que se queda sin título no puede seguir en `justify-between`", () => {
+    // El riesgo real de esta poda no era el título: eran los botones que
+    // vivían en la MISMA fila (`flex justify-between`). Al quedar solos,
+    // `between` los manda al borde IZQUIERDO — se ven colgando. Estas seis
+    // filas quedaron con un único hijo visible y tienen que decir `end`.
+    const filasQueQuedaronConUnSoloBoton = [
+      "app/clientes/ClientesListClient.tsx",
+      "app/proveedores/ProveedoresListClient.tsx",
+      "app/admin/data-health/page.tsx",
+      "app/guias/components/GuiasList.tsx",
+      "app/reclamos/components/EmpresaSelector.tsx",
+      "app/cheques/ChequesClient.tsx",
+      "app/marketing/components/InicioMarketing.tsx",
+    ];
+    for (const archivo of filasQueQuedaronConUnSoloBoton) {
+      const fuente = plano(leer(archivo));
+      // La fila del título es la que lleva el h1 sr-only pegado adelante.
+      const fila = fuente.match(/<div className="([^"]*flex[^"]*)"[^>]*>\s*<h1 className="sr-only">/);
+      expect(fila, `no se encontró la fila del título en ${archivo}`).not.toBeNull();
+      expect(fila![1], `${archivo}: la fila quedó con un solo botón y sigue en justify-between`)
+        .not.toContain("justify-between");
+    }
+  });
+});
 
 // El chip "Oferta" pegado al precio se podó, pero la palabra SIGUE en el archivo
 // (el badge sobre la foto). Un `not.toContain` no sirve: lo que hay que fijar es

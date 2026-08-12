@@ -86,11 +86,18 @@ function AsistenciaInner() {
 
   return (
     <>
-      <AppHeader module="asistencia" />
+      {/* El módulo iba en minúscula ("asistencia") y eso se veía: la barra
+          sticky y el breadcrumb son ahora lo ÚNICO que nombra la pantalla, así
+          que dicen el label real del módulo (`lib/modules.ts`: "Asistencia"). */}
+      <AppHeader module="Asistencia" />
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <h1 className="text-xl font-semibold text-gray-900">Asistencia</h1>
+        {/* Sin título grande: "Asistencia" ya lo dicen la barra sticky
+            (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
+            la página sin encabezado; el `mt-4` de las pestañas se fue con él
+            para que no quede un hueco suelto bajo el `py-6`. */}
+        <h1 className="sr-only">Asistencia</h1>
 
-        <div className="mt-4 flex items-end gap-2 border-b border-gray-200">
+        <div className="flex items-end gap-2 border-b border-gray-200">
           {/* El arrastre lateral vive SOLO en las pestañas: si el «?» quedara
               adentro, en el iPhone habría que arrastrar para encontrar la ayuda. */}
           <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto">

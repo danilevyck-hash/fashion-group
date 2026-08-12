@@ -197,8 +197,13 @@ export default function InicioMarketing({
       {/* ------------------------------------------------------------------ */}
       {/* Cabecera: el título y la ÚNICA acción principal del módulo.         */}
       {/* ------------------------------------------------------------------ */}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
+      {/* Sin título grande: "Marketing" ya lo dicen la barra sticky (celular) y
+          el breadcrumb (escritorio). Queda sr-only para no dejar la página sin
+          encabezado, y la fila pasa a `justify-end` para que "Registrar gasto"
+          —la única acción principal— no se corra a la izquierda al quedar
+          sola. */}
+      <div className="flex items-center justify-end gap-4">
+        <h1 className="sr-only">Marketing</h1>
         <button
           type="button"
           onClick={onRegistrarGasto}

@@ -195,10 +195,12 @@ export function VentasShell({
           en producción. */}
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
-            Ventas
-          </h1>
-          <p className="mt-1 text-xs text-gray-500">
+          {/* Sin título grande: "Ventas" ya lo dicen la barra sticky (celular)
+              y el breadcrumb (escritorio). Queda sr-only para no dejar la
+              página sin encabezado. El subtítulo se QUEDA: dice qué universo y
+              qué meses se están mirando, que no está en ningún otro lado. */}
+          <h1 className="sr-only">Ventas</h1>
+          <p className="text-xs text-gray-500">
             8 empresas · {mesesLabel}
           </p>
         </div>

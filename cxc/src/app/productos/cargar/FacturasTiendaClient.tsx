@@ -388,12 +388,11 @@ export default function FacturasTiendaClient({ onDownloaded }: FacturasTiendaCli
         />
       )}
 
-      {/* Masthead */}
-      <div className="mb-4 border-b border-stone-300 pb-2.5">
-        <h1 className="font-serif text-xl font-semibold tracking-tight text-stone-900">
-          Facturas Tienda
-        </h1>
-      </div>
+      {/* Sin masthead: "Facturas Tienda" ya lo dice el selector de pestañas de
+          arriba, que en los tres anchos muestra en cuál estás (desplegable
+          hasta lg, fila desde lg), y el módulo lo dicen la barra sticky y el
+          breadcrumb. Queda sr-only para no dejar la pantalla sin encabezado. */}
+      <h1 className="sr-only">Facturas Tienda</h1>
 
       {/* Estado del catálogo de descripciones (bloquea procesar/descargar) */}
       {catalogoCargando && (

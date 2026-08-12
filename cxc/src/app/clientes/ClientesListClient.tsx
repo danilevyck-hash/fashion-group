@@ -154,10 +154,12 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
       <AppHeader module="Clientes" />
       <PullToRefresh onRefresh={onRefresh}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
-          </div>
+        {/* Sin título grande: "Clientes" ya lo dicen la barra sticky (celular)
+            y el breadcrumb (escritorio). Queda sr-only para no dejar la página
+            sin encabezado, y la fila pasa a `justify-end` — con `between` y un
+            solo hijo, el botón se habría corrido al borde izquierdo. */}
+        <div className="mb-6 flex flex-wrap items-start justify-end gap-3">
+          <h1 className="sr-only">Clientes</h1>
           {/* "Actualizar ahora" (admin/secretaria) — refresca clientes_master
               desde el espejo de Switch (solo DB, no toca Switch). */}
           <SyncNowButton

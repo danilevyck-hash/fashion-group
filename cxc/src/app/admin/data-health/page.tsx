@@ -169,12 +169,14 @@ export default function DataHealthPage() {
       <AppHeader module="Data Health" />
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header con resumen + botón */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-          <div>
-            {/* Sin subtítulo: cada check ya muestra su "Último check" en la
-                lista de abajo, y el mapa de 30 días ya muestra las corridas. */}
-            <h1 className="text-2xl font-semibold text-gray-900">Data Health</h1>
-          </div>
+        {/* Sin subtítulo: cada check ya muestra su "Último check" en la lista
+            de abajo, y el mapa de 30 días ya muestra las corridas. Y sin título
+            grande: "Data Health" ya lo dicen la barra sticky (celular) y el
+            breadcrumb (escritorio). Queda sr-only para no dejar la página sin
+            encabezado, y la fila pasa a `justify-end` para que el botón no se
+            corra a la izquierda al quedar solo. */}
+        <div className="flex flex-wrap items-start justify-end gap-4 mb-6">
+          <h1 className="sr-only">Data Health</h1>
           <button
             onClick={runChecksNow}
             disabled={running}

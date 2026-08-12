@@ -48,9 +48,11 @@ export default function GroupPage({ group }: GroupPageProps) {
     <div className="min-h-screen bg-white">
       <AppHeader module={meta.title} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">{meta.title}</h1>
-        </div>
+        {/* Sin título grande: el nombre del grupo ya lo dicen la barra sticky
+            (celular) y el breadcrumb "Inicio › Grupo" (escritorio) — repetirlo
+            acá era el nombre 3×, el mismo defecto que el AppHeader ya había
+            recortado. Queda sr-only para no dejar la página sin encabezado. */}
+        <h1 className="sr-only">{meta.title}</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {modules.map((mod) => {
