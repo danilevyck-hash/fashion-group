@@ -241,8 +241,12 @@ describe("barrido estático — la cadena servidor → navegador no se puede cor
 
   it("la ruta datos-zip sigue cargando y mandando comprobantesEntrega", () => {
     const src = leer("src/app/api/marketing/proyectos/[id]/datos-zip/route.ts");
-    expect(src).toContain("cargarComprobantes");
-    expect(src).toContain("comprobantesEntrega");
+    // La LLAMADA, no el import: el import sobrevive a que alguien borre la
+    // carga y este candado tiene que cazar exactamente eso.
+    expect(src).toMatch(/await cargarComprobantes\(/);
+    // Y lo cargado tiene que LLENAR el mapa que viaja al navegador.
+    expect(src).toMatch(/comprobantesEntrega\[[a-zA-Z]+\]\s*=/);
+    expect(src).toMatch(/comprobantesEntrega,/);
   });
 
   it("generar-zip dibuja el comprobante SIN bultos (el papel de la marca)", () => {
