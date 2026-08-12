@@ -4,14 +4,16 @@
 // 🔑 EL MODELO, en palabras de Daniel: *"ellos facturan a mi bajo compañia
 // diferentes. una por marca. cada marca tiene su encargado"*. O sea que Tommy,
 // Calvin y Karl NO son tres marcas de un proveedor: son tres EMPRESAS, cada una
-// con su encargado y su reporte. Lo único que comparten es el dueño, y eso se
-// nota en una sola cosa — que él las cierra el mismo día.
+// con su encargado y su reporte. Cada una se cierra SOLA, con su propio botón —
+// Daniel, textual (11-ago-2026): *"que sea por separado mejor no?"*. El atajo
+// "Cerrar las tres" se retiró ese mismo día.
 //
 // 🩸 EL "PROVEEDOR" SE FUE, y no es un rename: era un concepto de más. Existía
-// solo para agrupar el cierre, y el cierre agrupado se resuelve con un botón
-// ("Cerrar las tres") sin necesidad de una entidad intermedia que se metía en
-// la pantalla, en el reporte y en el nombre del ZIP. Lo que queda de él es
-// `GRUPOS_CIERRE`, que dice UNA cosa y solo esa: estas marcas se cierran juntas.
+// solo para agrupar el cierre, y el cierre agrupado ya no existe. Lo ÚNICO que
+// queda de él es `CLAVE_LEGACY_POR_MARCA` (abajo): el mapeo HISTÓRICO con el
+// que se escribieron los sellos viejos — 'pvh' para TH/CK/KL — y que sostiene
+// el período cerrado "mid 2026" con sus $62.381,57 ya reportados. Eso NO es un
+// grupo de cierre: es cómo se llama la marca en las filas que ya existen.
 //
 // 🔴 EL MAPA VA POR CÓDIGO, NUNCA POR NOMBRE. `mk_marcas.codigo` es único en la
 // base (UNIQUE desde `marketing.sql`) y no lo edita nadie desde la pantalla; el
@@ -52,15 +54,6 @@ export const SIN_BLOQUE = "sin_bloque" as const;
 /** Cualquiera de los bloques que dibuja el inicio. */
 export type BloqueKey = MarcaCodigo | typeof MULTIFASHION_KEY | typeof SIN_BLOQUE;
 
-/**
- * Clave de un grupo de cierre conjunto.
- *
- * `'pvh'` es la clave HISTÓRICA del dueño de Tommy, Calvin y Karl, y se
- * conserva porque es la que ya está escrita en la fila del período cerrado.
- * No se muestra nunca en pantalla — para eso está `etiqueta`.
- */
-export type GrupoCierreKey = "pvh";
-
 export interface MarcaBloque {
   key: MarcaCodigo;
   /**
@@ -69,42 +62,22 @@ export interface MarcaBloque {
    * con ella. Esto es el respaldo para cuando el catálogo no llegó.
    */
   nombreFallback: string;
-  /** Con quién se cierra junta. `null` = se cierra sola. */
-  grupoCierre: GrupoCierreKey | null;
 }
 
 /**
  * Las marcas del módulo, en el orden en que se dibujan.
  *
- * El orden es fijo: primero las tres que cierran juntas (en el orden en que
- * Daniel las nombra), después las que cierran solas. Que un bloque salte de
- * lugar porque este mes gastó menos hace que la pantalla se lea distinta cada
- * vez, y acá se entra a buscar una marca por su nombre, no por su tamaño.
+ * El orden es fijo: el de siempre (el orden en que Daniel las nombra). Que un
+ * bloque salte de lugar porque este mes gastó menos hace que la pantalla se lea
+ * distinta cada vez, y acá se entra a buscar una marca por su nombre, no por su
+ * tamaño. Cada marca se cierra SOLA — no existe ningún cierre conjunto.
  */
 export const MARCAS_BLOQUE: readonly MarcaBloque[] = [
-  { key: "TH", nombreFallback: "Tommy Hilfiger", grupoCierre: "pvh" },
-  { key: "CK", nombreFallback: "Calvin Klein", grupoCierre: "pvh" },
-  { key: "KL", nombreFallback: "Karl Lagerfeld", grupoCierre: "pvh" },
-  { key: "RBK", nombreFallback: "Reebok", grupoCierre: null },
-  { key: "J", nombreFallback: "Joybees", grupoCierre: null },
-] as const;
-
-export interface GrupoCierre {
-  key: GrupoCierreKey;
-  /** Lo que se lee en el botón. NUNCA el nombre del dueño. */
-  etiqueta: string;
-  marcas: readonly MarcaCodigo[];
-}
-
-/**
- * Los cierres conjuntos.
- *
- * 🔑 Es lo ÚNICO que queda del viejo "proveedor", y dice una sola cosa: estas
- * marcas se cierran el mismo día. No agrupa montos, no agrupa reportes y no
- * aparece en el nombre de ningún archivo — cada marca sigue teniendo su ZIP.
- */
-export const GRUPOS_CIERRE: readonly GrupoCierre[] = [
-  { key: "pvh", etiqueta: "Tommy · Calvin · Karl", marcas: ["TH", "CK", "KL"] },
+  { key: "TH", nombreFallback: "Tommy Hilfiger" },
+  { key: "CK", nombreFallback: "Calvin Klein" },
+  { key: "KL", nombreFallback: "Karl Lagerfeld" },
+  { key: "RBK", nombreFallback: "Reebok" },
+  { key: "J", nombreFallback: "Joybees" },
 ] as const;
 
 const MARCA_POR_CODIGO: ReadonlyMap<string, MarcaCodigo> = new Map(
@@ -180,34 +153,19 @@ export function nombreDeBloque(
   return marcaBloquePorKey(codigo)?.nombreFallback ?? codigo;
 }
 
-/** El grupo de cierre de una marca, o `null` si cierra sola. */
-export function grupoCierreDeMarca(key: string): GrupoCierre | null {
-  const m = marcaBloquePorKey(key);
-  if (!m || !m.grupoCierre) return null;
-  return GRUPOS_CIERRE.find((g) => g.key === m.grupoCierre) ?? null;
-}
-
-export function grupoCierrePorKey(key: string): GrupoCierre | null {
-  return GRUPOS_CIERRE.find((g) => g.key === String(key ?? "").trim()) ?? null;
-}
-
-/**
- * ¿Esta marca es la PRIMERA de su grupo de cierre?
- *
- * Sirve para dibujar el botón "Cerrar las tres" una sola vez, encima del
- * bloque de arriba, en vez de repetirlo en los tres.
- */
-export function esCabezaDeGrupo(key: string): boolean {
-  const g = grupoCierreDeMarca(key);
-  return !!g && g.marcas[0] === String(key ?? "").trim().toUpperCase();
-}
-
 // ----------------------------------------------------------------------------
 // Compatibilidad con el sello viejo (por PROVEEDOR)
+//
+// 🔴 ESTO NO ES UN GRUPO DE CIERRE Y NO SE TOCA. El cierre conjunto ("Cerrar
+// las tres") se retiró el 11-ago-2026; este mapeo es OTRA cosa: la clave con la
+// que ya están escritas las filas históricas. La fila "mid 2026" de
+// `mk_periodos` guarda `proveedor_key = 'pvh'` con $62.381,57 ya reportados
+// (59 facturas: Tommy $44.539,43 + Calvin $17.842,14). Quitarle el 'pvh' a
+// TH/CK/KL movería esa plata al período actual en pantalla.
 // ----------------------------------------------------------------------------
 
 /**
- * La clave con la que se sellaron los documentos ANTES de este cambio.
+ * La clave con la que se sellaron los documentos ANTES del cambio por marca.
  *
  * 🔴 ESTO ES LO QUE HACE QUE LA PANTALLA FUNCIONE SIN LA DDL, y no es un
  * adorno: los 121 sellos que ya existen dicen `'pvh'`, `'reebok'` o

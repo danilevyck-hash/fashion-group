@@ -21,7 +21,10 @@
 //     DOS chips —Tommy y Calvin— que sumen 62.381,57 exacto, y el nombre sale
 //     del BLOQUE, no de `periodo.proveedor_key` (que dice 'pvh').
 //  4. CERRAR UNA MARCA NO TOCA A OTRA. Es la promesa central del modelo y la
-//     más fácil de romper sin que se note.
+//     más fácil de romper sin que se note. Y desde el 11-ago-2026 (Daniel:
+//     *"que sea por separado mejor no?"*) el cierre conjunto NO EXISTE: cada
+//     marca cierra sola, pero el mapeo HISTÓRICO 'pvh' de TH/CK/KL se queda —
+//     es lo que sostiene la fila cerrada "mid 2026" y el fallback legacy.
 //  5. LOS DOS PAPELES DEL GASTO SON DISTINTOS. Comprobante lo lleva TODO gasto
 //     (impulsadoras incluidas); la foto de instalación solo se espera de los
 //     gastos CON cliente. Confundirlos es el aviso que suena para siempre.
@@ -32,13 +35,11 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  GRUPOS_CIERRE,
   MARCAS_BLOQUE,
   SIN_BLOQUE,
   bloqueDeCodigo,
+  claveLegacyDeMarca,
   clavesDeSello,
-  esCabezaDeGrupo,
-  grupoCierreDeMarca,
   indiceBloquePorMarcaId,
   nombreDeBloque,
 } from "@/lib/marketing/bloques";
@@ -129,27 +130,27 @@ describe("el mapa marca → bloque es EXACTO, y cada marca es su propio bloque",
     expect(bloqueDe(r, "KL").nombre).toBe("Karl L. 2027");
   });
 
-  it("Tommy, Calvin y Karl comparten GRUPO DE CIERRE, y el botón se dibuja una vez", () => {
-    expect(grupoCierreDeMarca("TH")!.key).toBe("pvh");
-    expect(grupoCierreDeMarca("CK")!.key).toBe("pvh");
-    expect(grupoCierreDeMarca("KL")!.key).toBe("pvh");
-    expect(grupoCierreDeMarca("RBK")).toBeNull();
-    expect(grupoCierreDeMarca("J")).toBeNull();
-    expect(esCabezaDeGrupo("TH")).toBe(true);
-    expect(esCabezaDeGrupo("CK")).toBe(false);
-    expect(esCabezaDeGrupo("KL")).toBe(false);
+  it("🔴 el mapeo HISTÓRICO se queda: TH/CK/KL siguen resolviendo a 'pvh'", () => {
+    // El cierre conjunto se retiró, pero esto es OTRA cosa: la clave con la
+    // que ya están escritos los sellos y la fila cerrada "mid 2026"
+    // ($62.381,57 ya reportados). Quitarla movería esa plata en pantalla.
+    expect(claveLegacyDeMarca("TH")).toBe("pvh");
+    expect(claveLegacyDeMarca("CK")).toBe("pvh");
+    expect(claveLegacyDeMarca("KL")).toBe("pvh");
+    expect(claveLegacyDeMarca("RBK")).toBe("reebok");
+    expect(claveLegacyDeMarca("J")).toBe("joybees");
+    expect(claveLegacyDeMarca("OTR")).toBeNull();
   });
 
-  it("el bloque publica su grupo, su etiqueta y si es la cabeza", () => {
+  it("el bloque ya NO publica ningún campo de grupo de cierre", () => {
+    // Daniel (11-ago-2026): *"que sea por separado mejor no?"* — cada marca
+    // cierra sola. Que el payload vuelva a traer el grupo es el primer paso
+    // para que alguien redibuje la cabecera.
     const r = correr({});
-    const th = bloqueDe(r, "TH");
-    expect(th.grupoCierre).toBe("pvh");
-    expect(th.grupoEtiqueta).toBe("Tommy · Calvin · Karl");
-    expect(th.esCabezaDeGrupo).toBe(true);
-    const j = bloqueDe(r, "J");
-    expect(j.grupoCierre).toBeNull();
-    expect(j.grupoEtiqueta).toBeNull();
-    expect(j.esCabezaDeGrupo).toBe(false);
+    const th = bloqueDe(r, "TH") as unknown as Record<string, unknown>;
+    expect("grupoCierre" in th).toBe(false);
+    expect("grupoEtiqueta" in th).toBe(false);
+    expect("esCabezaDeGrupo" in th).toBe(false);
   });
 });
 
@@ -583,7 +584,7 @@ describe("4 — cerrar una marca NO toca a otra", () => {
     expect(bloqueDe(r, "RBK").proyectos).toBe(1);
   });
 
-  it("cerrar Tommy no se lleva a Calvin, aunque compartan grupo de cierre", () => {
+  it("cerrar Tommy no se lleva a Calvin, aunque compartan la clave vieja 'pvh'", () => {
     const r = correr({
       proyectos: PROY,
       periodos,
@@ -841,8 +842,6 @@ describe("7 — Multifashion sin período, y la marca sin bloque no se esconde",
     });
     const mf = bloqueDe(r, "multifashion");
     expect(mf.periodoAbierto).toBeNull();
-    expect(mf.grupoCierre).toBeNull();
-    expect(mf.esCabezaDeGrupo).toBe(false);
     // aunque la factura sea de Tommy, la plata NO se le reporta a Tommy
     expect(bloqueDe(r, "TH").facturas.total).toBe(0);
     expect(mf.facturas.total).toBe(100);
@@ -858,7 +857,6 @@ describe("7 — Multifashion sin período, y la marca sin bloque no se esconde",
     expect(sb).toBeTruthy();
     expect(sb.total).toBe(333);
     expect(sb.periodoAbierto).toBeNull();
-    expect(sb.grupoCierre).toBeNull();
     expect(sb.nombre).toBe("Sin marca asignada");
     // 🔴 y NO se la regala a ninguna marca
     for (const m of MARCAS_BLOQUE) expect(bloqueDe(r, m.key).total).toBe(0);
@@ -931,10 +929,38 @@ describe("barrido estático — una sola fuente de verdad", () => {
     expect(sql).toMatch(/62381\.57/);
   });
 
-  it("las 5 marcas están declaradas, y solo TH/CK/KL cierran juntas", () => {
+  it("las 5 marcas están declaradas, y TODAS cierran solas — no hay grupos de cierre", () => {
     expect(MARCAS_BLOQUE.map((m) => m.key)).toEqual(["TH", "CK", "KL", "RBK", "J"]);
-    expect(GRUPOS_CIERRE).toHaveLength(1);
-    expect(GRUPOS_CIERRE[0].marcas).toEqual(["TH", "CK", "KL"]);
+    // Daniel (11-ago-2026): *"que sea por separado mejor no?"* — el concepto de
+    // grupo de cierre no puede volver al módulo. Lo único que se conserva es el
+    // mapeo legacy 'pvh' (CLAVE_LEGACY), que es histórico, no un grupo.
+    const src = leer("src/lib/marketing/bloques.ts");
+    expect(src).not.toMatch(/GRUPOS_CIERRE/);
+    expect(src).not.toMatch(/esCabezaDeGrupo/);
+    expect(src).not.toMatch(/grupoCierreDeMarca|grupoCierrePorKey/);
+    expect(src).toMatch(/CLAVE_LEGACY_POR_MARCA/);
+  });
+
+  it("⛔ el atajo de cierre conjunto no existe: ni cabecera, ni botón, ni ruta", () => {
+    // Los comentarios SÍ pueden nombrarlo — explicar por qué se fue es lo que
+    // evita que alguien lo reponga sin querer.
+    const sinComentarios = (src: string) =>
+      src
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+        .join("\n");
+    const inicio = sinComentarios(leer("src/app/marketing/components/InicioMarketing.tsx"));
+    expect(inicio).not.toMatch(/Cerrar las tres/);
+    expect(inicio).not.toMatch(/se cierran juntas/);
+    expect(inicio).not.toMatch(/cerrandoGrupo|hermanosDeGrupo/);
+    const modal = sinComentarios(leer("src/app/marketing/components/CerrarPeriodoModal.tsx"));
+    expect(modal).not.toMatch(/cerrar-grupo/);
+    expect(modal).not.toMatch(/Cerrar las tres/);
+    expect(
+      fs.existsSync(
+        path.join(raiz, "src/app/api/marketing/periodos/cerrar-grupo/route.ts"),
+      ),
+    ).toBe(false);
   });
 
   it("el nombre de un bucket no se confunde con el de una marca", () => {

@@ -23,9 +23,9 @@ const uuidRegex =
 // un proyecto con Tommy y Reebok, al cerrar Tommy, conserva su parte de Reebok
 // viva y se le puede seguir cargando gasto.
 //
-// La operación entera vive en `../../cerrar.ts` — la MISMA que usa "Cerrar las
-// tres". Dos copias del cierre serían dos reportes distintos según qué botón se
-// apretó.
+// La operación entera vive en `../../cerrar.ts`. Cada marca se cierra SOLA con
+// este botón — el cierre en grupo se retiró el 11-ago-2026 (Daniel: *"que sea
+// por separado mejor no?"*).
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },

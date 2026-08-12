@@ -339,24 +339,30 @@ describe("barrido estático", () => {
     expect(src).not.toMatch(/["'](?:TH|CK|KL|RBK)["']\s*:/);
   });
 
-  it('"Cerrar las tres" se dibuja UNA sola vez, en la cabeza del grupo', () => {
-    // 🩸 Repetir el atajo en Tommy, Calvin y Karl serían tres botones que hacen
-    // exactamente lo mismo, uno debajo del otro — que es justo el ruido que el
-    // rediseño vino a sacar. `esCabezaDeGrupo()` dice cuál lo lleva.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toContain("esCabezaDeGrupo");
-    expect(src).toContain("Cerrar las tres");
-    // El botón vive DENTRO de la condición de cabeza de grupo.
-    expect(src).toMatch(/cabeza && etiquetaGrupo && datos\.conPeriodos/);
-    // Y la etiqueta NUNCA se escribe a mano: es la del módulo puro.
-    expect(src).toContain("grupoCierreDeMarca");
+  it("⛔ el cierre conjunto NO existe: cada marca cierra sola con su botón", () => {
+    // Daniel, textual (11-ago-2026): *"que sea por separado mejor no?"*. La
+    // cabecera "Tommy · Calvin · Karl se cierran juntas" y el atajo "Cerrar
+    // las tres" se retiraron; que vuelvan a asomarse sería revivir un camino
+    // que el negocio ya descartó.
+    // Los COMENTARIOS sí pueden nombrarlo: explicar por qué se fue es
+    // justamente lo que evita que alguien lo reponga sin querer.
+    const sinComentarios = (src: string) =>
+      src
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+        .join("\n");
+    const src = sinComentarios(leer("app/marketing/components/InicioMarketing.tsx"));
+    expect(src).not.toMatch(/Cerrar las tres/);
+    expect(src).not.toMatch(/se cierran juntas/);
+    expect(src).not.toMatch(/esCabezaDeGrupo|grupoCierreDeMarca/);
     expect(src).not.toMatch(/PVH/);
-  });
+    // El botón de cerrar de CADA marca sigue vivo.
+    expect(src).toMatch(/setCerrando\(b\)/);
 
-  it("el cierre en grupo llama a cerrar-grupo, no a tres cierres sueltos", () => {
-    const src = leer("app/marketing/components/CerrarPeriodoModal.tsx");
-    expect(src).toContain("/api/marketing/periodos/cerrar-grupo");
-    expect(src).toMatch(/grupo: grupo\.key, nombreSiguiente/);
+    // Y el modal solo conoce el cierre de UNA marca.
+    const modal = sinComentarios(leer("app/marketing/components/CerrarPeriodoModal.tsx"));
+    expect(modal).not.toMatch(/cerrar-grupo/);
+    expect(modal).toContain("/cerrar");
   });
 
   it("el aviso de lo que falta son DOS papeles, y con 0 y 0 no se dibuja", () => {
@@ -375,10 +381,11 @@ describe("barrido estático", () => {
     expect(inicio).toMatch(/b\.sinComprobante \?\? 0/);
     expect(inicio).toMatch(/b\.sinFoto \?\? 0/);
 
-    // Y el modal de cierre avisa ANTES de confirmar, sumando lo ya contado.
+    // Y el modal de cierre avisa ANTES de confirmar, con lo ya contado por
+    // bloque — nunca recontando.
     const modal = leer("app/marketing/components/CerrarPeriodoModal.tsx");
-    expect(modal).toMatch(/sinComprobante \+= b\.sinComprobante \?\? 0/);
-    expect(modal).toMatch(/sinFoto \+= b\.sinFoto \?\? 0/);
+    expect(modal).toMatch(/sinComprobante: bloque\.sinComprobante \?\? 0/);
+    expect(modal).toMatch(/sinFoto: bloque\.sinFoto \?\? 0/);
     expect(modal).toContain("Antes de cerrar, fíjate");
     // Puede cerrar igual: el botón no se apaga por tener pendientes.
     expect(modal).toMatch(

@@ -6,13 +6,12 @@
 // 🔑 EL MODELO, en palabras de Daniel: *"ellos facturan a mi bajo compañia
 // diferentes. una por marca. cada marca tiene su encargado"*. El agrupador
 // "proveedor" desapareció de la pantalla: no era un rename, era un concepto de
-// más. Existía solo para cerrar Tommy, Calvin y Karl el mismo día, y eso se
-// resuelve con UN botón ("Cerrar las tres") en vez de con una entidad
-// intermedia que se metía en la pantalla, en el reporte y en el nombre del ZIP.
+// más que se metía en la pantalla, en el reporte y en el nombre del ZIP.
 //
-// 🔴 EL BOTÓN DEL GRUPO SE DIBUJA UNA SOLA VEZ, encima del primer bloque del
-// grupo — `esCabezaDeGrupo()` dice cuál es. Repetirlo en los tres sería tres
-// botones que hacen exactamente lo mismo, uno debajo del otro.
+// 🔴 CADA MARCA SE CIERRA SOLA, con su propio botón "Cerrar". El atajo de
+// cierre conjunto ("Cerrar las tres") se retiró el 11-ago-2026 — Daniel,
+// textual: *"que sea por separado mejor no?"*. No volver a dibujar ninguna
+// cabecera de grupo ni ningún camino que cierre varias marcas de un clic.
 //
 // 🔴 NO HAY TECHO NI PRESUPUESTO. *"simplemente reportas lo que gastaste"*. Acá
 // no se dibuja ninguna barra de avance ni "cuánto queda".
@@ -22,9 +21,8 @@
 // pantalla" sería tener dos verdades sobre la misma plata — la forma exacta en
 // que este repo ya se quemó dos veces con los signos de las notas de crédito.
 //
-// ⚠️ DEGRADA LIMPIO. El grupo de cierre y el orden de los bloques se derivan
-// del módulo PURO `lib/marketing/bloques.ts` cuando el API todavía no los
-// manda, y los contadores de pendientes ausentes se leen como 0 (que es
+// ⚠️ DEGRADA LIMPIO. El orden de los bloques se deriva del módulo PURO
+// `lib/marketing/bloques.ts`, y los contadores de pendientes ausentes se leen como 0 (que es
 // "no sé de ninguno", y se dibuja igual que "no hay ninguno": nada). Sin la
 // migración de períodos (`conPeriodos: false`) la pantalla se dibuja IGUAL,
 // sin píldora y sin botón de cerrar. NO es un error y no se muestra como tal.
@@ -38,8 +36,6 @@ import {
   MARCAS_BLOQUE,
   MULTIFASHION_KEY,
   SIN_BLOQUE,
-  esCabezaDeGrupo,
-  grupoCierreDeMarca,
   nombreDeBloque,
 } from "@/lib/marketing/bloques";
 import PorClienteModal from "./PorClienteModal";
@@ -54,11 +50,6 @@ export interface MontoInicio {
 export interface BloqueResumen {
   key: string;
   nombre: string;
-  /** Con quién se cierra junto. `null` = se cierra solo. */
-  grupoCierre?: string | null;
-  /** Lo que se lee en el botón del grupo. NUNCA el nombre del dueño. */
-  grupoEtiqueta?: string | null;
-  esCabezaDeGrupo?: boolean;
   periodoAbierto: { id: string | null; nombre: string } | null;
   facturas: MontoInicio;
   muebles: MontoInicio;
@@ -206,7 +197,6 @@ export default function InicioMarketing({
   const [verPorCliente, setVerPorCliente] = useState(false);
   const [verPorMarca, setVerPorMarca] = useState(false);
   const [cerrando, setCerrando] = useState<BloqueResumen | null>(null);
-  const [cerrandoGrupo, setCerrandoGrupo] = useState<BloqueResumen | null>(null);
   const [bajando, setBajando] = useState<string | null>(null);
   const [recargar, setRecargar] = useState(0);
 
@@ -313,18 +303,6 @@ export default function InicioMarketing({
   const mobiliario = datos?.mobiliario;
   const impulsadoras = datos?.impulsadoras;
 
-  /** Los otros bloques del mismo grupo, para el aviso del cierre conjunto. */
-  const hermanosDeGrupo = useCallback(
-    (b: BloqueResumen): BloqueResumen[] => {
-      const g = b.grupoCierre ?? grupoCierreDeMarca(b.key)?.key ?? null;
-      if (!g) return [];
-      return bloques.filter(
-        (x) => (x.grupoCierre ?? grupoCierreDeMarca(x.key)?.key ?? null) === g,
-      );
-    },
-    [bloques],
-  );
-
   return (
     <div className="space-y-5">
       {/* ------------------------------------------------------------------ */}
@@ -417,35 +395,10 @@ export default function InicioMarketing({
               const puedeCerrar =
                 !sinReporte && datos.conPeriodos && !sinGasto && !!b.periodoAbierto?.id;
               const nombre = b.nombre || nombreDeBloque(b.key, datos.marcas);
-              // El grupo se deriva del módulo puro cuando el API no lo manda:
-              // así el atajo sigue existiendo aunque el contrato llegue viejo.
-              const grupo = grupoCierreDeMarca(b.key);
-              const cabeza =
-                b.esCabezaDeGrupo != null ? b.esCabezaDeGrupo : esCabezaDeGrupo(b.key);
-              const etiquetaGrupo = b.grupoEtiqueta ?? grupo?.etiqueta ?? null;
               const zipClave = `${b.key}:abierto`;
 
               return (
                 <div key={b.key}>
-                  {/* CABECERA DEL GRUPO — se dibuja UNA sola vez, encima del
-                      primer bloque del grupo. Explica por qué esos tres van
-                      juntos y lleva el atajo, en vez de repetir el mismo botón
-                      tres veces. */}
-                  {cabeza && etiquetaGrupo && datos.conPeriodos && (
-                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gray-50 px-4 sm:px-5 py-2">
-                      <span className="text-xs text-gray-500">
-                        {etiquetaGrupo} se cierran juntas
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCerrandoGrupo(b)}
-                        className="text-sm text-teal-700 hover:text-teal-900 font-medium transition min-h-[44px] -my-2 inline-flex items-center"
-                      >
-                        Cerrar las tres
-                      </button>
-                    </div>
-                  )}
-
                   <div className="p-4 sm:p-5">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
@@ -650,26 +603,6 @@ export default function InicioMarketing({
           onCerrado={async (periodoId, etiqueta) => {
             setCerrando(null);
             await descargarReporte(periodoId, etiqueta);
-            setRecargar((n) => n + 1);
-          }}
-        />
-      )}
-
-      {cerrandoGrupo && (
-        <CerrarPeriodoModal
-          bloque={cerrandoGrupo}
-          periodoId={cerrandoGrupo.periodoAbierto?.id ?? null}
-          grupo={{
-            key: cerrandoGrupo.grupoCierre ?? grupoCierreDeMarca(cerrandoGrupo.key)?.key ?? "",
-            etiqueta:
-              cerrandoGrupo.grupoEtiqueta ??
-              grupoCierreDeMarca(cerrandoGrupo.key)?.etiqueta ??
-              "",
-            bloques: hermanosDeGrupo(cerrandoGrupo),
-          }}
-          onClose={() => setCerrandoGrupo(null)}
-          onCerrado={() => {
-            setCerrandoGrupo(null);
             setRecargar((n) => n + 1);
           }}
         />
