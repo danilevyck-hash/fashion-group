@@ -209,7 +209,10 @@ async function resolverPantallas(page) {
     {
       id: "referencia", url: "/referencia",
       prohibidos: ["pegá tu lista: cuánto llegó"],
-      seQuedan: ["Referencia", "códigos juntos"],
+      // "Referencia" NO se busca acá: desde #510 el h1 es `sr-only` y el nombre
+      // de la pantalla vive en la barra sticky y el breadcrumb, que están
+      // FUERA de <main>. Lo que tiene que seguir viéndose es el buscador.
+      seQuedan: ["códigos juntos"],
     },
     ...(periodoId
       ? [
