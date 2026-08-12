@@ -33,6 +33,8 @@ import {
   MESES_VENTANA,
   armarFicha,
   barrasDeVentana,
+  cambioDeCosto,
+  centavos,
   listaDeCompras,
   margenReal,
   mesesDeStock,
@@ -40,6 +42,7 @@ import {
   promedioMensual,
   temporadaFuerte,
   textoCompra,
+  textoRestantes,
   textoSinMargen,
   ultimosMesesCompletos,
 } from "@/lib/ventas/resumen-articulo";
@@ -200,11 +203,29 @@ describe("NB2570001 — los tres números contra producción", () => {
       "21 oct 2025 · 60 u",
       "9 abr 2025 · 240 u",
     ]);
-    // La 5ª que entra en los 3 años queda a un toque; las 2 de +3 años solo se
-    // cuentan, porque no vienen en la respuesta.
-    expect(l.ocultas.map(textoCompra)).toEqual(["1 abr 2025 · 240 u"]);
-    expect(l.masViejas).toBe(2);
+    // 🔴 UNA sola línea gris con TODO lo que no se ve: la 5ª de los 3 años + las
+    // 2 de más de 3 años. No se despliega y no se separa en dos renglones — esa
+    // separación (payload sí / payload no) es NUESTRA, no de Daniel.
+    expect(l.restantes).toBe(3);
+    expect(textoRestantes(l.restantes)).toBe("y 3 compras más");
     expect(l.unica).toBe(false);
+  });
+
+  it("🔴 el costo NO cambió entre las dos últimas compras: no se muestra nada", () => {
+    // Las dos son de $16.555. Repetirlo al lado del costo de hoy sería el mismo
+    // relleno que la columna fija que se eliminó.
+    expect(f().cambioCosto).toBeNull();
+  });
+
+  it("🔴 el Costo FOB es CALCULADO — CIF ÷ 1,10, no el que manda Switch", () => {
+    const ficha = f();
+    expect(ficha.fobCalculado!).toBeCloseTo(15.05, 2); // 16,555 ÷ 1,1
+    // El FOB de Switch llega IGUAL al CIF (el error de carga del 93%): si se
+    // mostrara ése, la fila diría $16.56 dos veces.
+    expect(ficha.ultima!.costos.fob).toBeCloseTo(16.555, 3);
+    expect(ficha.fobCalculado!).not.toBeCloseTo(ficha.ultima!.costos.cif!, 2);
+    // Y NUNCA CIF × 0,9, que no es la inversa: daría 14,90.
+    expect(ficha.fobCalculado!).not.toBeCloseTo(16.555 * 0.9, 2);
   });
 
   it("🩸 NO dice 'van 0 de 180' — ese número salía de repartirle ventas a una compra", () => {
@@ -273,13 +294,18 @@ describe("QD3958033 — el artículo NUEVO, que es donde el promedio se rompía"
   it("una sola compra se muestra sola, y la caja LO DICE: 'única compra'", () => {
     const l = f().compras;
     expect(l.visibles.map(textoCompra)).toEqual(["26 dic 2025 · 180 u"]);
-    expect(l.ocultas).toHaveLength(0);
-    expect(l.masViejas).toBe(0);
+    expect(l.restantes).toBe(0);
+    expect(textoRestantes(l.restantes)).toBeNull(); // "y 0 compras más" sería ruido
     expect(l.unica).toBe(true);
   });
 
   it("sin compra anterior no hay CIF anterior que mostrar — se omite, no se rellena", () => {
     expect(f().anterior).toBeNull();
+    expect(f().cambioCosto).toBeNull();
+  });
+
+  it("su Costo FOB calculado son $4.06 (4,466 ÷ 1,10)", () => {
+    expect(f().fobCalculado!).toBeCloseTo(4.06, 2);
   });
 
   it("todavía no pasó por su temporada fuerte, y la pantalla lo puede decir", () => {
@@ -439,24 +465,36 @@ describe("bordes", () => {
     expect(ficha.margen.motivo).toBe("sin-ventas");
   });
 
-  it("la caja muestra 4 compras y el resto queda a UN toque — nada se pierde", () => {
+  it("la caja muestra 4 compras y las demás se CUENTAN en una sola línea", () => {
     expect(COMPRAS_VISIBLES).toBe(4);
     const l = listaDeCompras(NB2570001());
     expect(l.visibles).toHaveLength(COMPRAS_VISIBLES);
-    // Las 5 de los últimos 3 años están TODAS en la respuesta: desplegarlas no
-    // pide nada a la red. Las 2 de +3 años solo se cuentan.
-    expect(l.visibles.length + l.ocultas.length).toBe(5);
-    expect(l.masViejas).toBe(2);
+    // 5 dentro de los 3 años (1 fuera de las visibles) + 2 de más de 3 años.
+    expect(l.restantes).toBe(3);
   });
 
-  it("con 4 compras o menos no hay nada que desplegar", () => {
-    const l = listaDeCompras(QD3958033());
-    expect(l.ocultas).toHaveLength(0);
+  it("🔴 la lista NO expone las compras escondidas: no hay nada que desplegar", () => {
+    // Si `ListaCompras` volviera a traer el arreglo, volvería el botón — y con
+    // él los dos renglones que Daniel pidió juntar en uno.
+    const l = listaDeCompras(NB2570001());
+    expect(l).not.toHaveProperty("ocultas");
+    expect(Object.keys(l).sort()).toEqual(["restantes", "unica", "visibles"]);
+  });
+
+  it("con 4 compras o menos no queda nada que contar", () => {
+    expect(listaDeCompras(QD3958033()).restantes).toBe(0);
   });
 
   it("sin ninguna compra la caja queda vacía, sin inventar una llegada", () => {
     const l = listaDeCompras({ compras: [], comprasFueraDeVentana: 0 });
-    expect(l).toEqual({ visibles: [], ocultas: [], masViejas: 0, unica: false });
+    expect(l).toEqual({ visibles: [], restantes: 0, unica: false });
+  });
+
+  it("'y 1 compra más' va en singular", () => {
+    expect(textoRestantes(1)).toBe("y 1 compra más");
+    expect(textoRestantes(2)).toBe("y 2 compras más");
+    expect(textoRestantes(0)).toBeNull();
+    expect(textoRestantes(-1)).toBeNull();
   });
 
   it("una respuesta vieja cacheada (sin `compras`) degrada, no revienta", () => {
@@ -469,5 +507,66 @@ describe("bordes", () => {
 
   it("temporadaFuerte no divide entre cero", () => {
     expect(temporadaFuerte(barrasDeVentana([], HOY_MES)).parte).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL CIF ANTERIOR: SOLO CUANDO CAMBIÓ
+//
+// Era una columna fija que repetía el mismo número en casi todos los artículos.
+// Ahora es la SEÑAL de que te subieron el costo, y si no cambió no ocupa lugar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("centavos — el Excel redondea IGUAL que la pantalla", () => {
+  it("🩸 el CIF real de NB2570001 (16,555) da $16.56, no $16.55", () => {
+    // `toFixed(2)` mira el binario (16,554999…) y devuelve 16.55, mientras la
+    // pantalla muestra $16.56. Con eso el Excel decía un centavo menos que la
+    // ficha del MISMO artículo.
+    expect(centavos(16.555)).toBe(16.56);
+    expect(Number((16.555).toFixed(2))).toBe(16.55); // la mutación que esto caza
+  });
+
+  it("coincide con lo que se ve, dígito por dígito", () => {
+    for (const x of [16.555, 4.466, 26.9203, 15.05, 27, 0.005, 1234.567]) {
+      expect(centavos(x)!.toFixed(2)).toBe(
+        x.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, ""),
+      );
+    }
+  });
+
+  it("sin número no inventa un cero", () => {
+    expect(centavos(null)).toBeNull();
+    expect(centavos(undefined)).toBeNull();
+    expect(centavos(Number.NaN)).toBeNull();
+  });
+});
+
+describe("cambioDeCosto", () => {
+  it("mismo costo = NADA que mostrar", () => {
+    expect(cambioDeCosto(16.555, 16.555)).toBeNull();
+  });
+
+  it("subió: lo dice y para qué lado", () => {
+    expect(cambioDeCosto(16.56, 14.2)).toEqual({ anterior: 14.2, subio: true });
+  });
+
+  it("bajó: también se muestra — es la misma señal al revés", () => {
+    expect(cambioDeCosto(14.2, 16.56)).toEqual({ anterior: 16.56, subio: false });
+  });
+
+  it("🩸 se compara a la precisión que se MUESTRA: media milésima no es un cambio", () => {
+    // Los costos son promedios PONDERADOS de varias líneas, así que dos compras
+    // "iguales" pueden diferir en la milésima. Anunciar "(antes $16.56)" al lado
+    // de "$16.56" sería una señal que no señala nada.
+    expect(cambioDeCosto(16.5551, 16.5559)).toBeNull(); // los dos se ven $16.56
+    // Un centavo entero SÍ es un cambio y se dice.
+    expect(cambioDeCosto(16.56, 16.55)).toEqual({ anterior: 16.55, subio: true });
+  });
+
+  it("sin compra anterior (o sin costo) no hay nada que comparar", () => {
+    expect(cambioDeCosto(16.555, null)).toBeNull();
+    expect(cambioDeCosto(null, 16.555)).toBeNull();
+    expect(cambioDeCosto(null, null)).toBeNull();
+    expect(cambioDeCosto(Number.NaN, 16.555)).toBeNull();
   });
 });

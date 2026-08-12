@@ -2,9 +2,10 @@
 // mide los 3 anchos de la casa: cuánto ARRASTRA la página, cuánto se RECORTA,
 // si algún blanco táctil baja de 44 px y si algún texto baja de 12 px.
 //
-// 🔴 La primera caja es "Compras" (fecha y cantidad, CRUDAS). El estado
-// "abierto" despliega las compras que no entran en las 4 visibles — la caja
-// crece HACIA ABAJO, que es lo único que puede regalar sin ensanchar nada.
+// 🔴 La primera caja es "Compras" (fecha y cantidad, CRUDAS): 4 líneas y una
+// línea gris "y N compras más" que NO se despliega. Y la plata es UNA sola fila
+// —Precio prom · Costo CIF · Costo FOB (calculado) · margen · lista—, que es la
+// que puede envolver mal a 390 px: el script la lee y la imprime.
 //
 //   BASE=http://localhost:3000 CODIGO=NB2570001 node scripts/_medir-referencia-simple.mjs
 //
@@ -26,9 +27,6 @@ const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
 // Los 3 anchos de la casa; ANCHOS=390,834,1024,1440 agrega el iPad acostado,
 // donde la barra lateral deja ~766 px útiles.
 const ANCHOS = (process.env.ANCHOS ?? "390,834,1440").split(",").map(Number);
-/** Abrir también el resto de las compras, para medir el estado desplegado. */
-const ABRIR_VIEJAS = process.env.ABRIR_VIEJAS !== "0";
-const RE_DESPLEGAR = /^(Ver 1 compra más|Ver las otras \d+ compras)$/;
 
 mkdirSync(SALIDA, { recursive: true });
 const nav = await chromium.launch();
@@ -56,21 +54,8 @@ for (const ancho of ANCHOS) {
   await page.locator('button:has-text("Buscar")').first().click();
   await page.waitForTimeout(7000);
 
-  for (const estado of ABRIR_VIEJAS ? ["cerrado", "abierto"] : ["cerrado"]) {
-    if (estado === "abierto") {
-      const abrio = await page.evaluate((fuente) => {
-        const re = new RegExp(fuente);
-        const b = [...document.querySelectorAll("button")].find((x) => re.test((x.textContent || "").trim()));
-        if (!b) return false;
-        b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-        return true;
-      }, RE_DESPLEGAR.source);
-      await page.waitForTimeout(1200);
-      if (!abrio) {
-        console.log(`  ${ancho} · abierto: no hay más compras que desplegar — se omite`);
-        continue;
-      }
-    }
+  {
+    const estado = "único";
 
     const m = await page.evaluate(() => {
       const de = document.documentElement;
@@ -109,9 +94,17 @@ for (const ancho of ANCHOS) {
         const dd = dt?.nextElementSibling;
         return dt ? `${rot}: ${dd?.textContent?.trim()} — ${dd?.nextElementSibling?.textContent?.trim() ?? ""}` : null;
       };
-      const margen = [...document.querySelectorAll("div")]
-        .map((d) => d.textContent?.trim() ?? "")
-        .find((t) => /^Vendí a \$/.test(t) || /^No se puede calcular el margen/.test(t));
+      // 🔴 LA FILA DE PLATA, tal como se lee. Es UNA sola y es la más larga de
+      // la tarjeta: a 390 px tiene que envolver sin empujar nada de lado.
+      const marca = [...document.querySelectorAll("span")].find(
+        (s) => (s.textContent || "").trim().startsWith("Precio prom "),
+      );
+      const filaPlata = marca?.closest("div.flex");
+      const plata = filaPlata
+        ? (filaPlata.textContent || "").replace(/De dónde salen estos números.*$/s, "").replace(/\s+/g, " ").trim()
+        : ([...document.querySelectorAll("p")]
+            .map((p) => p.textContent?.trim() ?? "")
+            .find((t) => /^No se puede calcular el margen/.test(t)) ?? null);
 
       return {
         arrastre,
@@ -120,10 +113,27 @@ for (const ancho of ANCHOS) {
         textos,
         recortados,
         tres: [leer("Compras"), leer("Vendo por mes"), leer("Me queda para")].filter(Boolean),
-        margen: margen ? margen.split("De dónde salen")[0].trim() : null,
-        // 🔴 Nada de esto puede aparecer: son los textos de la atribución que se
-        // eliminó. Si el script los encuentra, la caja volvió a interpretar.
-        atribucion: ["Mi última compra", "todavía no se acaba", "van 0", "Esta:"].filter((t) =>
+        plata,
+        // Las líneas de la fila de plata: si envuelve, crece hacia ABAJO. Más de
+        // una línea a 390 px es normal; lo que no puede es arrastrar.
+        plataAlto: filaPlata ? Math.round(filaPlata.getBoundingClientRect().height) : 0,
+        // 🔴 Nada de esto puede aparecer: la atribución que se eliminó y los
+        // rótulos que repetían el mismo número.
+        atribucion: [
+          "Mi última compra",
+          "todavía no se acaba",
+          "van 0",
+          "Esta:",
+          // 🔴 Y los textos podados el 11-ago (noche): el número repetido y los
+          // dos pies de página.
+          "CIF de hoy",
+          "CIF de la compra anterior",
+          "Vendí a",
+          "me costó",
+          "Lo que queda en bodega es de Switch",
+          "compras más viejas de 3 años",
+          "más de hace años",
+        ].filter((t) =>
           (document.body.textContent ?? "").includes(t),
         ),
         temporada: [...document.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").find((t) => /^(Oct · nov · dic|Todavía no ha pasado|No vendió nada)/.test(t)) ?? null,
@@ -151,11 +161,9 @@ for (const ancho of ANCHOS) {
     if (m.textos.length) console.log("   textos:", JSON.stringify(m.textos));
     if (m.recortados.length) console.log("   recortados:", JSON.stringify(m.recortados));
     if (m.atribucion.length) console.log("   🔴 ATRIBUCIÓN DE VUELTA:", JSON.stringify(m.atribucion));
-    if (estado === "cerrado") {
-      for (const t of m.tres) console.log(`   ${t}`);
-      if (m.temporada) console.log(`   ${m.temporada}`);
-      if (m.margen) console.log(`   ${m.margen}`);
-    }
+    for (const t of m.tres) console.log(`   ${t}`);
+    if (m.temporada) console.log(`   ${m.temporada}`);
+    if (m.plata) console.log(`   ${m.plata}   [${m.plataAlto} px de alto]`);
 
     await page.screenshot({ path: `${SALIDA}/${CODIGO}-${ancho}-${estado}.png`, fullPage: true });
   }

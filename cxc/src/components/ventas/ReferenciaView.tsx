@@ -9,9 +9,21 @@
 //    si con el stock actual que tengo debo de comprar mas, menos o no comprar.
 //    pero no quiero que decidas tu, lo decido yo con la data que me extraigas"*
 // Tres cajas por artículo (color) — Compras · Vendo por mes · Me queda para —,
-// las barras de los 12 meses completos con oct·nov·dic resaltados, el precio
-// real de venta con su margen, y la fila de costos. Se usa PARA HACER PEDIDO:
-// mira, decide y escribe la cantidad en su Excel.
+// las barras de los 12 meses completos con oct·nov·dic resaltados, y UNA fila de
+// plata. Se usa PARA HACER PEDIDO: mira, decide y escribe la cantidad en su
+// Excel.
+//
+// 🩸 LA PLATA ERA DOS FILAS Y EL MISMO NÚMERO SALÍA TRES VECES (11-ago-2026, de
+// noche). "me costó", "CIF de hoy" y "FOB" decían los tres $16.56 en el artículo
+// que Daniel más mira — el FOB porque Switch lo manda IGUAL al CIF en el 93% de
+// las líneas. Daniel: *"me gusta pero no se siente simple, facil"*. Quedó una
+// sola fila, el FOB pasó a ser CALCULADO (CIF ÷ 1,10, su fórmula) y rotulado
+// como tal, y el CIF de la compra anterior aparece SOLO cuando cambió.
+//
+// 🩸 Y SE FUERON LOS DOS PIES DE PÁGINA: "Hay N compras más viejas de 3 años…"
+// (la caja de Compras ya dice "y N compras más", y el total de bodega no sale de
+// las compras sino de `existencia` de Switch) y "Lo que queda en bodega es de
+// Switch, al …" (una hora que no cambia ninguna decisión).
 //
 // 🩸 LA PRIMERA CAJA DEJÓ DE INTERPRETAR (11-ago-2026). Decía *"Mi última
 // compra · todavía no se acaba · llegó 180 el 19 feb · van 0"*, y ese "van 0"
@@ -39,26 +51,26 @@
 // compras y referencia) — acá no se suma, no se divide y no se firma nada.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { Download, Search } from "lucide-react";
 import { fetchJsonWithRetry, describeFetchError } from "@/lib/fetch-retry";
 import { colorDe, modeloDe, MAX_CODIGOS_MULTI } from "@/lib/ventas/referencia";
-import type { ArticuloCompras, Compra, ComprasApiResp } from "@/lib/ventas/compras";
+import type { ArticuloCompras, ComprasApiResp } from "@/lib/ventas/compras";
 import {
   armarFicha,
   fmtMesCorto,
   textoCompra,
   textoMeses,
+  textoRestantes,
   textoSinMargen,
   MESES_VENTANA,
   type FichaArticulo,
   type ListaCompras,
   type MesBarra,
 } from "@/lib/ventas/resumen-articulo";
-import { exportComprasToExcel, textoOrigenFob } from "@/lib/ventas/referencia-excel";
-import { fmtFrescura } from "@/lib/ventas/referencia-info";
+import { exportComprasToExcel } from "@/lib/ventas/referencia-excel";
 
 // ─── Formato ─────────────────────────────────────────────────────────────────
 
@@ -253,7 +265,6 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
   const ficha = useMemo(() => armarFicha(art, hoyMes), [art, hoyMes]);
 
   const color = colorDe(art.codigo);
-  const frescura = art.catalogoSyncedAt ? fmtFrescura(art.catalogoSyncedAt) : null;
 
   return (
     <section className="rounded-xl border border-gray-200 bg-white">
@@ -268,17 +279,9 @@ function TarjetaArticulo({ art, hoyMes }: { art: ArticuloCompras; hoyMes: string
 
       <MesAMes ficha={ficha} />
 
-      <MargenLinea ficha={ficha} />
-
-      <FilaCostos art={art} ficha={ficha} />
+      <FilaPlata art={art} ficha={ficha} />
 
       <Avisos art={art} />
-
-      {frescura && (
-        <div className="border-t border-gray-100 px-3.5 py-2">
-          <p className="text-xs text-gray-500">Lo que queda en bodega es de Switch, al {frescura}.</p>
-        </div>
-      )}
     </section>
   );
 }
@@ -345,47 +348,30 @@ function TresNumeros({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticul
 }
 
 /**
- * La caja de Compras: `19 feb 2026 · 180 u`, una por línea.
+ * La caja de Compras: `19 feb 2026 · 180 u`, una por línea. Cuatro.
  *
  * 🔴 CERO INTERPRETACIÓN. No dice cuánto tardó, ni cuántas van, ni si se acabó:
- * nada de eso se sabe por compra. Las que no entran en las primeras cuatro se
- * despliegan acá mismo — el enlace "Ver las N compras anteriores" que vivía al
- * pie de la tarjeta se INTEGRÓ, porque tener el resto de la lista a dos lugares
- * distintos de la caja que la enseña no ayudaba a nadie.
+ * nada de eso se sabe por compra.
+ *
+ * 🔴 Y NO SE DESPLIEGA. Antes había un botón "Ver las otras N compras" y, debajo,
+ * un texto "y 2 más de hace años" — dos renglones para la misma idea, separados
+ * por un detalle NUESTRO (unas venían en el payload y otras no). Ahora es UNA
+ * línea gris: `y 3 compras más`. Daniel eligió ver cuatro; el resto es contexto,
+ * no algo para abrir.
  */
 function CajaCompras({ lista }: { lista: ListaCompras }) {
-  const [verTodas, setVerTodas] = useState(false);
-  const mostradas = verTodas ? [...lista.visibles, ...lista.ocultas] : lista.visibles;
+  const restantes = textoRestantes(lista.restantes);
 
   return (
     <div className="min-w-0">
       <dt className="text-xs text-gray-600">Compras</dt>
       <dd className="mt-0.5">
         <ul className="text-sm leading-6 text-gray-900 tabular-nums">
-          {mostradas.map((c) => (
+          {lista.visibles.map((c) => (
             <li key={`${c.fecha}·${c.documento}`}>{textoCompra(c)}</li>
           ))}
         </ul>
-        {lista.ocultas.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setVerTodas((v) => !v)}
-            className="-my-2.5 min-h-[44px] text-xs font-medium text-gray-900 underline underline-offset-2 hover:text-gray-600"
-          >
-            {verTodas
-              ? "Ver menos"
-              : lista.ocultas.length === 1
-                ? "Ver 1 compra más"
-                : `Ver las otras ${lista.ocultas.length} compras`}
-          </button>
-        )}
-        {/* Las de más de 3 años NO vienen en la respuesta: se dicen, no se
-            despliegan. El aviso de que igual cuentan para la bodega va abajo. */}
-        {lista.masViejas > 0 && (
-          <p className="text-xs text-gray-600">
-            y {lista.masViejas} más de hace años
-          </p>
-        )}
+        {restantes && <p className="text-xs text-gray-600">{restantes}</p>}
         {lista.unica && <p className="text-xs text-gray-600">única compra</p>}
       </dd>
     </div>
@@ -485,103 +471,111 @@ function Barra({ b, pico }: { b: MesBarra; pico: number }) {
   );
 }
 
-// ─── Precio real y margen ────────────────────────────────────────────────────
+// ─── La fila de plata: UNA sola ──────────────────────────────────────────────
 //
-// 🔴 ESTA LÍNEA ES LA MITAD DE LA DECISIÓN. Daniel no compra si *"vendi a margen
-// bajo o negativo"*. El precio de LISTA (que está abajo, en los costos) NO es a
-// lo que vendió: los descuentos se lo comen. Acá va lo que salió DE VERDAD.
+// 🔴 ES LA MITAD DE LA DECISIÓN. Daniel no compra si *"vendi a margen bajo o
+// negativo"*. El precio de LISTA no es a lo que vendió: los descuentos se lo
+// comen. Acá va lo que salió DE VERDAD, y todo en un renglón:
+//
+//   Precio prom $26.92 · Costo CIF $16.56 · Costo FOB $15.05 · margen 39% · lista $27.00
+//
+// 🩸 ERAN DOS FILAS Y REPETÍAN EL MISMO NÚMERO TRES VECES: "me costó", "CIF de
+// hoy" y "FOB" decían $16.56 los tres (el FOB porque Switch lo manda igual al
+// CIF en el 93% de las líneas). Daniel: *"me gusta pero no se siente simple,
+// facil"*. El "CIF de hoy" se fue por duplicado; el FOB pasó a ser CALCULADO
+// (CIF ÷ 1,10, su fórmula) y ROTULADO como tal; el "CIF de la compra anterior",
+// que era una columna fija repitiendo casi siempre el mismo número, aparece
+// pegado al costo SOLO cuando cambió — que es cuando dice algo.
 
-function MargenLinea({ ficha }: { ficha: FichaArticulo }) {
+function FilaPlata({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
   const m = ficha.margen;
+  const lista = ficha.ultima?.costos.lista ?? art.precioEtiqueta;
+  const cambio = ficha.cambioCosto;
 
-  if (m.motivo) {
-    return (
-      <div className="border-t border-gray-100 bg-gray-50 px-3.5 py-2.5">
-        <p className="text-sm text-gray-700">{textoSinMargen(m.motivo, ficha.promedio.meses)}</p>
-        {m.precioReal != null && (
-          <p className="mt-0.5 text-xs text-gray-600">Vendí a {fmtMoney(m.precioReal)} en promedio.</p>
-        )}
-      </div>
+  const partes: React.ReactNode[] = [];
+  if (m.precioReal != null) partes.push(<Plata key="prom" k="Precio prom" v={fmtMoney(m.precioReal)} />);
+  if (m.costo != null) {
+    partes.push(
+      <Plata
+        key="cif"
+        k="Costo CIF"
+        v={fmtMoney(m.costo)}
+        extra={
+          cambio && (
+            // 🔴 La señal de que te subieron el costo. Sin cambio no va nada.
+            // El espacio va en el TEXTO (no solo en el margen) para que la fila
+            // se lea igual copiada que en pantalla.
+            <span className={`font-semibold ${cambio.subio ? "text-red-700" : "text-emerald-700"}`}>
+              {" "}
+              (antes {fmtMoney(cambio.anterior)} {cambio.subio ? "↑" : "↓"})
+            </span>
+          )
+        }
+      />,
     );
   }
+  if (ficha.fobCalculado != null) {
+    partes.push(<Plata key="fob" k="Costo FOB (calculado)" v={fmtMoney(ficha.fobCalculado)} />);
+  }
+  if (m.margen != null) {
+    partes.push(
+      <Plata key="margen" k="margen" v={fmtPct(m.margen)} rojo={m.margen < 0} />,
+    );
+  }
+  if (lista != null) partes.push(<Plata key="lista" k="lista" v={fmtMoney(lista)} />);
+
+  if (!partes.length && !m.motivo) return null;
 
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-gray-100 bg-gray-50 px-3.5 py-2.5 text-sm">
-      <span className="text-gray-700">
-        Vendí a <span className="font-semibold tabular-nums text-gray-900">{fmtMoney(m.precioReal)}</span>
-      </span>
-      <span className="text-gray-400">·</span>
-      <span className="text-gray-700">
-        me costó <span className="font-semibold tabular-nums text-gray-900">{fmtMoney(m.costo)}</span>
-      </span>
-      <span className="text-gray-400">·</span>
-      <span className="text-gray-700">
-        margen{" "}
-        <span
-          className={`font-semibold tabular-nums ${(m.margen ?? 0) < 0 ? "text-red-700" : "text-gray-900"}`}
-        >
-          {fmtPct(m.margen)}
-        </span>
-      </span>
-      <Ayuda titulo="De dónde salen estos dos números">
-        <b>Vendí a</b> es la venta real dividida entre las unidades reales de los últimos {ficha.promedio.meses}{" "}
-        {ficha.promedio.meses === 1 ? "mes completo" : "meses completos"} — con los descuentos ya adentro y las
-        devoluciones (notas de crédito) ya restadas. El precio de lista de abajo no es a lo que vendiste.
-        <br />
-        <br />
-        <b>El margen se calcula contra el CIF</b> de tu última compra, que es lo que costó de verdad poner la pieza
-        en bodega (mercancía + flete + seguro). No se usa el FOB: en 93 de cada 100 líneas Switch lo manda igual al
-        CIF por un error de carga, así que un margen sobre FOB sería el mismo número en unos artículos y otro
-        distinto en otros.
-      </Ayuda>
-    </div>
-  );
-}
-
-// ─── La fila de costos ───────────────────────────────────────────────────────
-
-function FilaCostos({ art, ficha }: { art: ArticuloCompras; ficha: FichaArticulo }) {
-  const u = ficha.ultima;
-  const lista = u?.costos.lista ?? art.precioEtiqueta;
-  if (!u && lista == null) return null;
-
-  return (
-    <dl className="flex flex-wrap gap-x-6 gap-y-2 border-t border-gray-100 px-3.5 py-2.5">
-      {u && <Costo k="CIF de hoy" v={fmtMoney(u.costos.cif)} />}
-      {/* Sin compra anterior la celda se OMITE — un guion mudo no dice nada. */}
-      {ficha.anterior && <Costo k="CIF de la compra anterior" v={fmtMoney(ficha.anterior.costos.cif)} />}
-      {u && <Costo k="FOB" v={<Fob c={u} />} />}
-      {lista != null && <Costo k="Precio de lista" v={fmtMoney(lista)} />}
-    </dl>
-  );
-}
-
-function Costo({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs text-gray-600">{k}</dt>
-      <dd className="text-sm font-medium tabular-nums text-gray-900">{v}</dd>
-    </div>
-  );
-}
-
-/** El FOB va con su procedencia: en el 93% de las líneas Switch lo manda IGUAL
- *  al CIF y eso es un error de carga conocido. NO se corrige ni se estima —
- *  Daniel quiere saber a cuál creerle, así que se marca. */
-function Fob({ c }: { c: Compra }) {
-  const { fob, fobOrigen } = c.costos;
-  if (fob == null) return <>—</>;
-  return (
-    <span className={fobOrigen === "real" ? "" : "text-gray-500"}>
-      {fmtMoney(fob)}
-      {fobOrigen === "estimado" && <span className="ml-1 text-xs">est.</span>}
-      {fobOrigen === "igual-al-cif" && (
-        <Ayuda titulo="Este FOB no es confiable">
-          Switch lo mandó IGUAL al costo CIF, y eso es un error de carga conocido — pasa en el 93% de las líneas. Se
-          muestra tal cual, sin corregirlo ni estimarlo. Cuando el FOB es distinto del CIF, sí viene de Switch y se
-          puede creer. Por eso el margen se calcula contra el CIF.
+    <div className="border-t border-gray-100 bg-gray-50 px-3.5 py-2.5">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
+        {partes.map((p, i) => (
+          <Fragment key={i}>
+            {i > 0 && <span className="text-gray-400"> · </span>}
+            {p}
+          </Fragment>
+        ))}
+        <Ayuda titulo="De dónde salen estos números">
+          <b>Precio prom</b> es la venta real dividida entre las unidades reales de los últimos{" "}
+          {ficha.promedio.meses} {ficha.promedio.meses === 1 ? "mes completo" : "meses completos"} — con los
+          descuentos ya adentro y las devoluciones (notas de crédito) ya restadas. El precio de lista no es a lo
+          que vendiste.
+          <br />
+          <br />
+          <b>El margen se calcula contra el Costo CIF</b> de tu última compra, que es lo que costó de verdad poner
+          la pieza en bodega (mercancía + flete + seguro).
+          <br />
+          <br />
+          <b>El Costo FOB es una cuenta, no un dato traído:</b> Costo CIF ÷ 1,10. El FOB que manda Switch llega
+          igual al CIF en 93 de cada 100 líneas por un error de carga conocido, así que no distingue nada.
+          <br />
+          <br />
+          Cuando la última compra costó distinto que la anterior, al lado del Costo CIF aparece{" "}
+          <b>(antes $…)</b>. Si no cambió, no se muestra nada.
         </Ayuda>
+      </div>
+      {m.motivo && (
+        <p className="mt-1 text-sm text-gray-700">{textoSinMargen(m.motivo, ficha.promedio.meses)}</p>
       )}
+    </div>
+  );
+}
+
+function Plata({
+  k,
+  v,
+  extra,
+  rojo,
+}: {
+  k: string;
+  v: string;
+  extra?: React.ReactNode;
+  rojo?: boolean;
+}) {
+  return (
+    <span className="text-gray-700">
+      {k} <span className={`font-semibold tabular-nums ${rojo ? "text-red-700" : "text-gray-900"}`}>{v}</span>
+      {extra}
     </span>
   );
 }
@@ -611,14 +605,12 @@ function Avisos({ art }: { art: ArticuloCompras }) {
       avisos.push(`Hay ${unidades(art.stockSinRespaldo)} en bodega que no salen de ninguna compra registrada.`);
     }
   }
-  if (art.comprasFueraDeVentana > 0) {
-    // 🔴 Se conserva el límite de 3 años Y se dice que las viejas igual cuentan:
-    // si no, el total de bodega no cerraría contra las compras que se ven y la
-    // pantalla parecería equivocada.
-    avisos.push(
-      `Hay ${art.comprasFueraDeVentana} ${art.comprasFueraDeVentana === 1 ? "compra más vieja" : "compras más viejas"} de 3 años que no se muestran — lo que trajeron sí cuenta para lo que hay en bodega.`,
-    );
-  }
+  // 🩸 ACÁ VIVÍA "Hay N compras más viejas de 3 años que no se muestran — lo que
+  // trajeron sí cuenta para lo que hay en bodega". Se fue el 11-ago-2026 porque
+  // la caja de Compras YA lo dice con "y N compras más", y porque el total de
+  // bodega NO depende de las compras que se ven: sale de `existencia` del
+  // catálogo de Switch, medido tal cual. Explicar una cuenta que la pantalla no
+  // hace era una nota al pie que nadie necesitaba.
   // 🔴 EL AJUSTE DE INVENTARIO SE QUEDA EN PANTALLA. Daniel: *"si hay menos es
   // porq robaron"* — es plata que se fue, no metodología, y no se esconde
   // detrás de un ⓘ. Va una vez por artículo, sumado: sale del CUADRE del
@@ -675,4 +667,4 @@ function Coincidencias({
 }
 
 // Reexport para que el texto tenga una sola definición.
-export { textoMeses, textoOrigenFob };
+export { textoMeses };

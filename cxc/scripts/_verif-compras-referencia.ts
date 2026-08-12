@@ -12,7 +12,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { armarArticulo, type FilaIngreso } from "../src/lib/ventas/compras";
 import { REFERENCIA_EMPRESA_KEYS } from "../src/lib/ventas/referencia";
-import { armarFicha, textoCompra, textoMeses } from "../src/lib/ventas/resumen-articulo";
+import { armarFicha, centavos, textoCompra, textoMeses, textoRestantes } from "../src/lib/ventas/resumen-articulo";
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
@@ -25,7 +25,12 @@ const CODIGOS = process.argv.slice(2).length
 const HOY = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const HOY_MES = HOY.slice(0, 7);
 
-const money = (n: number | null | undefined) => (n == null ? "—" : `$${n.toFixed(2)}`);
+// 🔴 El MISMO redondeo que la pantalla (`centavos`): `toFixed(2)` mostraba
+// $16.55 donde la ficha dice $16.56 — el CIF real de NB2570001 es 16,555.
+const money = (n: number | null | undefined) => {
+  const c = centavos(n);
+  return c == null ? "—" : `$${c.toFixed(2)}`;
+};
 
 async function main() {
   console.log(`hoy (Panamá) = ${HOY}\n`);
@@ -81,13 +86,8 @@ async function main() {
       // ── LA CAJA DE COMPRAS, exactamente como se dibuja ──
       console.log("   Compras");
       for (const c of f.compras.visibles) console.log(`     ${textoCompra(c)}`);
-      if (f.compras.ocultas.length) {
-        console.log(
-          `     [botón] ${f.compras.ocultas.length === 1 ? "Ver 1 compra más" : `Ver las otras ${f.compras.ocultas.length} compras`}`,
-        );
-        for (const c of f.compras.ocultas) console.log(`       · ${textoCompra(c)}`);
-      }
-      if (f.compras.masViejas) console.log(`     y ${f.compras.masViejas} más de hace años`);
+      const restantes = textoRestantes(f.compras.restantes);
+      if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
       if (f.compras.unica) console.log("     única compra");
 
       // ── Las otras dos cajas ──
@@ -96,16 +96,22 @@ async function main() {
       const alcance = f.alcance === 0 ? "nada" : f.alcance == null ? "—" : textoMeses(f.alcance);
       console.log(`   Me queda para: ${alcance} · ${art.existencia ?? "—"} en bodega`);
 
-      // ── Costo y margen ──
+      // ── LA FILA DE PLATA, exactamente como se lee en pantalla ──
       const m = f.margen;
-      console.log(
-        m.motivo
-          ? `   Margen: NO se puede (${m.motivo}) · vendí a ${money(m.precioReal)}`
-          : `   Vendí a ${money(m.precioReal)} · me costó ${money(m.costo)} · margen ${(m.margen! * 100).toFixed(0)}%`,
-      );
-      console.log(
-        `   CIF anterior ${money(f.anterior?.costos.cif)} · lista ${money(f.ultima?.costos.lista ?? art.precioEtiqueta)}`,
-      );
+      const lista = f.ultima?.costos.lista ?? art.precioEtiqueta;
+      const partes: string[] = [];
+      if (m.precioReal != null) partes.push(`Precio prom ${money(m.precioReal)}`);
+      if (m.costo != null) {
+        const c = f.cambioCosto;
+        partes.push(
+          `Costo CIF ${money(m.costo)}${c ? ` (antes ${money(c.anterior)} ${c.subio ? "↑" : "↓"})` : ""}`,
+        );
+      }
+      if (f.fobCalculado != null) partes.push(`Costo FOB (calculado) ${money(f.fobCalculado)}`);
+      if (m.margen != null) partes.push(`margen ${(m.margen * 100).toFixed(0)}%`);
+      if (lista != null) partes.push(`lista ${money(lista)}`);
+      console.log(`   ${partes.join(" · ")}`);
+      if (m.motivo) console.log(`   (sin margen: ${m.motivo})`);
 
       // ── Avisos ──
       console.log(
