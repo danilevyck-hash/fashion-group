@@ -2,15 +2,17 @@
 // SOLO LECTURA — corre el agregador REAL (`resumen-bloques.ts`) contra las filas
 // de PRODUCCIÓN y compara ANTES vs DESPUÉS del corte por marca.
 //
-// "ANTES" son dos cosas, no una:
-//   (a) `agregarResumenInicio` — el módulo que dibuja la pantalla de HOY y que
-//       este cambio NO tocó. Es la referencia viva.
-//   (b) las 6 cifras de control medidas el 11-ago-2026, escritas a mano acá.
+// Las dos referencias:
+//   (a) `agregarResumenInicio` — el módulo que dibujaba la pantalla vieja (sin
+//       períodos). Sigue siendo la referencia de "cuánto tiene cada marca en
+//       total": los sellos mueven plata de cajón, nunca la crean ni la borran.
+//   (b) las cifras de control re-medidas el 12-ago-2026 (tras el movimiento de
+//       lo ya reportado — ver el comentario de CONTROL), escritas a mano acá.
 //
-// "DESPUÉS" también son dos, y tienen que dar IDÉNTICO:
-//   (1) con los sellos tal como están hoy en la base (todos con la clave VIEJA
-//       por proveedor, porque la migración por marca la corre Daniel a mano).
-//   (2) sin ninguna tabla de período (fallback `grupo_legacy`).
+// ⚠️ Desde el 12-ago-2026, "con sellos" y "sin tablas" ya NO dan idéntico por
+// marca — y es correcto que no den: los sellos mueven gasto no-legacy al
+// cerrado, cosa que el fallback `grupo_legacy` no puede saber. Lo que SÍ tiene
+// que dar idéntico en los dos modos es el GLOBAL (ver CUADRE 3).
 //
 // ⚠️ NUNCA ESCRIBE. Solo `select`. Y hace POCAS consultas: la base se satura.
 //
@@ -43,20 +45,42 @@ async function todo<T>(t: string, sel: string): Promise<T[]> {
   return (data ?? []) as T[];
 }
 
-// --- Las cifras de control, medidas contra producción el 11-ago-2026 --------
+// --- Las cifras de control, re-medidas contra producción el 12-ago-2026 -----
+//
+// ⚠️ ACTUALIZADAS por el MOVIMIENTO del 12-ago-2026 (aprobado por Daniel, ver
+// `scripts/_mover-reportado-mid2026.ts`): todo el gasto que él YA había
+// reportado a las marcas por fuera del sistema se selló al período CERRADO
+// "mid 2026" ('pvh') — la factura Kheridinne de TH ($9.000), las 10 entregas
+// de TH ($40.565) y las 10 de CK ($28.620). Abierto quedó SOLO lo nuevo: los
+// 17 pagos de impulsadora (TH $8.800 · CK $4.800) y la entrega de Nova Lux
+// (CK $1.040).
+//
+// 🔴 JOYBEES NO SE CIERRA — Daniel, textual: "cuando te dije cerrarlo?". Su
+// única entrega ($1.540) sigue en su período ABIERTO. (Ese día se le había
+// creado un cerrado por error de interpretación; se revirtió el mismo día con
+// `_revertir-cierre-joybees.ts` y quedó como estaba.)
+//
+// 🔑 POR QUÉ EL GLOBAL NO CAMBIÓ NI UN CENTAVO: no se creó ni se borró ningún
+// documento — solo cambió el CAJÓN (el sello de período). Por eso
+// abiertos+cerrados sigue dando $164.808,20 exacto, el titular de abiertos
+// bajó exactamente lo que los cerrados subieron, y el total por marca
+// (abierto+cerrado) quedó idéntico marca por marca.
 const CONTROL = {
-  abiertoGrupoPvh: 92825.0, // TH + CK + KL, período abierto
-  cerradoMid2026: 62381.57, // "mid 2026", 59 facturas
-  cerradoFacturas: 59,
-  joybees: 1540.0,
+  abiertoGrupoPvh: 14640.0, // TH $8.800 + CK $5.840 + KL $0, períodos abiertos
+  cerradoMid2026: 140566.57, // TH 94.104,43 + CK 46.462,14 — SOLO esos dos chips
+  cerradoFacturas: 60, // 59 legacy + Kheridinne (TH $9.000) movida el 12-ago
+  legacy: { count: 59, total: 62381.57 }, // el archivo original, INTACTO
+  joybees: 1540.0, // ABIERTO — Joybees no se cierra
   multifashion: 8061.63,
-  totalTitular: 102426.63,
+  totalTitular: 24241.63, // TH 8.800 + CK 5.840 + J 1.540 + Multifashion 8.061,63
   mobiliario: 71765.0,
+  globalAbiertosMasCerrados: 164808.2, // el número que el movimiento NO movió
   porMarcaAbiertoMasCerrado: {
     TH: 102904.43,
     CK: 52302.14,
     KL: 0,
     RBK: 0,
+    J: 1540.0,
   } as Record<string, number>,
 };
 
@@ -165,7 +189,7 @@ async function main() {
     );
   }
 
-  console.log("\n═══ CUADRE 1 — las 6 cifras de control del 11-ago-2026 ═══");
+  console.log("\n═══ CUADRE 1 — las cifras de control del 12-ago-2026 ═══");
   const th = bl(conSellos, "TH")!;
   const ck = bl(conSellos, "CK")!;
   const kl = bl(conSellos, "KL")!;
@@ -174,21 +198,28 @@ async function main() {
   const mf = bl(conSellos, "multifashion")!;
 
   cmp(
-    "abierto TH+CK+KL = 92.825,00",
+    "abierto TH+CK+KL = 14.640,00",
     th.total + ck.total + kl.total,
     CONTROL.abiertoGrupoPvh,
   );
   const cerradoTotal = conSellos.cerrados.reduce((s, c) => s + c.total, 0);
-  cmp("cerrado «mid 2026» = 62.381,57", cerradoTotal, CONTROL.cerradoMid2026);
+  cmp("cerrados «mid 2026» = 140.566,57", cerradoTotal, CONTROL.cerradoMid2026);
   cmpN(
-    "cerrado: 59 facturas (suma de las marcas)",
+    "cerrado: 60 facturas (suma de las marcas)",
     conSellos.cerrados.reduce((s, c) => s + c.facturas.count, 0),
     CONTROL.cerradoFacturas,
   );
-  cmp("Joybees = 1.540,00", j.total, CONTROL.joybees);
+  cmp("Joybees ABIERTO = 1.540,00 (no se cierra)", j.total, CONTROL.joybees);
   cmp("Reebok = 0,00", rbk.total, 0);
   cmp("Multifashion = 8.061,63", mf.total, CONTROL.multifashion);
-  cmp("TITULAR = 102.426,63", conSellos.resumen.total, CONTROL.totalTitular);
+  cmp("TITULAR (abiertos) = 24.241,63", conSellos.resumen.total, CONTROL.totalTitular);
+  // El número que el movimiento del 12-ago NO podía mover: la plata solo
+  // cambió de cajón, así que abiertos + cerrados da lo mismo que antes.
+  cmp(
+    "GLOBAL abiertos+cerrados = 164.808,20",
+    conSellos.resumen.total + cerradoTotal,
+    CONTROL.globalAbiertosMasCerrados,
+  );
 
   const mobiliario = entregas.reduce(
     (s, e) =>
@@ -205,24 +236,8 @@ async function main() {
     cmp(`${b.nombre} (abierto+cerrado)`, b.total + cerradoDe(codigo), esperado);
   }
 
-  console.log("\n═══ CUADRE 3 — DESPUÉS = DESPUÉS sin la DDL (degradación) ═══");
-  for (const m of MARCAS_BLOQUE) {
-    const a = bl(conSellos, m.key)!;
-    const b = bl(sinTablas, m.key)!;
-    cmp(`${m.nombreFallback}: con sellos vs sin tablas`, a.total, b.total);
-  }
-  cmp(
-    "titular: con sellos vs sin tablas",
-    conSellos.resumen.total,
-    sinTablas.resumen.total,
-  );
-  cmp(
-    "cerrado: con sellos vs sin tablas",
-    cerradoTotal,
-    sinTablas.cerrados.reduce((s, c) => s + c.total, 0),
-  );
-
-  console.log("\n═══ CUADRE 4 — contra la pantalla de HOY (agregarResumenInicio) ═══");
+  // hoyPorBloque = lo que la vieja pantalla (sin períodos) atribuye a cada
+  // marca: facturas no-legacy + muebles. Lo usan los cuadres 3 y 4.
   const idx = indiceBloquePorMarcaId(marcas);
   const hoyPorBloque = new Map<string, number>();
   for (const [mid, b] of Object.entries(hoy.porMarca)) {
@@ -233,15 +248,53 @@ async function main() {
     const k = idx.get(mid)!;
     hoyPorBloque.set(k, (hoyPorBloque.get(k) ?? 0) + b.total);
   }
+
+  // ⚠️ CUADRE 3 CAMBIÓ DE SIGNIFICADO el 12-ago-2026. Antes exigía
+  // "con sellos == sin tablas": era cierto solo mientras los sellos calcaban
+  // a `grupo_legacy`. El movimiento del 12-ago selló A PROPÓSITO documentos
+  // no-legacy al cerrado, así que la degradación sin tablas ya NO puede dar
+  // lo mismo — sin tablas, todo lo no-legacy se lee como "abierto" (la
+  // pantalla vieja) y el único cerrado es el archivo legacy. Eso es lo que
+  // se verifica ahora. El GLOBAL sí tiene que dar idéntico en los dos modos:
+  // ninguna tabla de períodos crea ni borra plata.
+  console.log("\n═══ CUADRE 3 — degradación sin la DDL (semántica post-12-ago) ═══");
   for (const m of MARCAS_BLOQUE) {
+    const b = bl(sinTablas, m.key)!;
     cmp(
-      `${m.nombreFallback}: nuevo vs pantalla de hoy`,
-      bl(conSellos, m.key)!.total,
+      `${m.nombreFallback}: sin tablas = pantalla de hoy`,
+      b.total,
       hoyPorBloque.get(m.key) ?? 0,
     );
   }
+  cmp(
+    "cerrado sin tablas = archivo legacy (62.381,57)",
+    sinTablas.cerrados.reduce((s, c) => s + c.total, 0),
+    CONTROL.legacy.total,
+  );
+  cmp(
+    "GLOBAL: con sellos = sin tablas",
+    conSellos.resumen.total + cerradoTotal,
+    sinTablas.resumen.total + sinTablas.cerrados.reduce((s, c) => s + c.total, 0),
+  );
+
+  console.log("\n═══ CUADRE 4 — contra la pantalla de HOY (agregarResumenInicio) ═══");
+  // Por marca ya no se puede exigir "abierto == pantalla de hoy" (los sellos
+  // movieron gasto no-legacy al cerrado). La identidad que SÍ tiene que dar:
+  // lo de la marca ENTRE abierto y cerrado == pantalla de hoy + su parte del
+  // archivo legacy. La parte legacy por marca no la expone `hoy` (es un solo
+  // bucket), así que se verifica la suma de todas las marcas.
+  const cerradoDeMarca = (k: string) =>
+    conSellos.cerrados.filter((c) => c.bloqueKey === k).reduce((s, c) => s + c.total, 0);
+  const marcasAbiertoMasCerrado = MARCAS_BLOQUE.reduce(
+    (s, m) => s + bl(conSellos, m.key)!.total + cerradoDeMarca(m.key),
+    0,
+  );
+  const hoyMarcasMasLegacy =
+    [...hoyPorBloque.values()].reduce((s, v) => s + v, 0) + hoy.legacy.total;
+  cmp("Σ marcas (abierto+cerrado) = hoy + legacy", marcasAbiertoMasCerrado, hoyMarcasMasLegacy);
   cmp("Multifashion: nuevo vs hoy", mf.total, hoy.multifashion.total + hoy.multifashion.muebles);
-  cmp("cerrado: nuevo vs «legacy» de hoy", cerradoTotal, hoy.legacy.total);
+  cmp("archivo legacy intacto = 62.381,57", hoy.legacy.total, CONTROL.legacy.total);
+  cmpN("archivo legacy intacto: 59 facturas", hoy.legacy.count, CONTROL.legacy.count);
 
   console.log("\n═══ CUADRE 5 — las dos desagregaciones suman el titular ═══");
   cmp(
