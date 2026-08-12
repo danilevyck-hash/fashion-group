@@ -22,6 +22,18 @@ interface Props {
   // arranca con ese mes COMPLETO cargado: pagar el mes entero es 0 clics y
   // pagar una quincena es 1 (los atajos de abajo).
   mesInicial: string;
+  /**
+   * Foto que ya eligió la puerta de "Registrar gasto".
+   *
+   * 🔴 LA FOTO NO SE LIMITA POR TIPO DE GASTO. Daniel, textual: *"te dije que
+   * no limites subir fotos de impulsadora porque si hago un evento y quiero
+   * subir fotos del evento me lo va a limitar, todo el modulo tiene que tener
+   * sentido"*. Un pago de impulsadora puede llevar foto igual que cualquier
+   * otro gasto. Lo único que distingue a las impulsadoras es el AVISO del
+   * cierre ("N gastos sin foto"), que no las cuenta — pero eso silencia un
+   * aviso, no apaga un botón.
+   */
+  fotoOpcional?: File | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -35,7 +47,13 @@ interface ComprobanteSubido {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, onSaved }: Props) {
+export default function RegistrarPagoModal({
+  impulsadora,
+  mesInicial,
+  fotoOpcional,
+  onClose,
+  onSaved,
+}: Props) {
   const { toast } = useToast();
   useBodyScrollLock(true);
   // Período trabajado: dos fechas "YYYY-MM-DD". Arranca en el mes completo.
@@ -107,6 +125,28 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
     if (!puedeGuardar || !comprobante) return;
     setGuardando(true);
     try {
+      // La foto (si la hay) se sube ANTES del pago: así el único paso que puede
+      // fallar a medias es el que no mueve plata. Si falla, se avisa y el pago
+      // se guarda igual — perder el pago por una foto sería el peor canje.
+      let foto: { path: string; nombreOriginal: string; sizeBytes: number } | null =
+        null;
+      if (fotoOpcional) {
+        try {
+          const { uploadUrl, path } = await pedirUploadUrl({
+            file: fotoOpcional,
+            impulsadoraId: impulsadora.id,
+          });
+          await subirArchivoAStorage(uploadUrl, fotoOpcional);
+          foto = {
+            path,
+            nombreOriginal: fotoOpcional.name,
+            sizeBytes: fotoOpcional.size,
+          };
+        } catch {
+          toast("La foto no subió. El pago se guarda igual.", "warning");
+        }
+      }
+
       const res = await fetch(`/api/marketing/impulsadoras/${impulsadora.id}/pagos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +154,7 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
           desde,
           hasta,
           monto: montoNum,
+          ...(foto ? { foto } : {}),
           comprobante: {
             path: comprobante.path,
             tipo: comprobante.tipo,
@@ -126,7 +167,21 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudo registrar el pago");
       }
-      toast("Pago registrado", "success");
+      // El pago entró seguro. La foto es aparte y puede NO haber entrado
+      // (pre-DDL la base todavía no acepta `foto_instalacion`): si el server
+      // dice que no la guardó, se AVISA — una foto perdida en silencio deja a
+      // Daniel creyendo que el papel está cuando no está.
+      const data = (await res.json().catch(() => null)) as {
+        fotoGuardada?: boolean | null;
+      } | null;
+      if (foto && data?.fotoGuardada === false) {
+        toast(
+          "Pago registrado, pero la foto no se pudo guardar. Volvé a subirla desde el gasto.",
+          "warning",
+        );
+      } else {
+        toast("Pago registrado", "success");
+      }
       onSaved();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error al guardar", "error");
@@ -152,14 +207,15 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center animate-[fadeIn_150ms_ease-out]">
+    /* Sin slide-up y centrado en todos los anchos: regla de la casa. */
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
         ref={panelRef}
-        className="relative bg-white w-full sm:max-w-lg sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
+        className="relative bg-white w-full sm:max-w-lg rounded-lg max-h-[90vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-100 pl-6 pr-2 py-2.5 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-gray-900">
             Registrar pago — {impulsadora.nombre}
           </h2>
@@ -167,9 +223,12 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
             type="button"
             onClick={onClose}
             disabled={guardando || subiendo}
-            className="text-gray-500 hover:text-black text-xl leading-none"
+            aria-label="Cerrar"
+            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-md text-gray-500 hover:text-black active:scale-[0.97] transition disabled:opacity-40"
           >
-            ×
+            <span aria-hidden="true" className="text-xl leading-none">
+              &times;
+            </span>
           </button>
         </div>
 
@@ -305,12 +364,20 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={subiendo}
-                className="w-full rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition disabled:opacity-50"
+                className="w-full rounded-md border border-dashed border-gray-300 px-3 min-h-[44px] py-3 text-sm text-gray-600 hover:border-gray-500 hover:text-black transition disabled:opacity-50"
               >
                 {subiendo ? "Subiendo…" : "Subir comprobante"}
               </button>
             )}
           </div>
+
+          {fotoOpcional && (
+            <div className="text-sm text-gray-600">
+              Foto lista:{" "}
+              <span className="text-gray-900">{fotoOpcional.name}</span> — se
+              sube con el pago.
+            </div>
+          )}
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 py-4 flex items-center justify-end gap-3">
@@ -318,7 +385,7 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
             type="button"
             onClick={onClose}
             disabled={guardando || subiendo}
-            className="text-sm text-gray-600 hover:text-black transition"
+            className="px-3 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm text-gray-600 hover:text-black transition disabled:opacity-40"
           >
             Cancelar
           </button>
@@ -326,7 +393,7 @@ export default function RegistrarPagoModal({ impulsadora, mesInicial, onClose, o
             type="button"
             onClick={guardar}
             disabled={!puedeGuardar}
-            className="rounded-md bg-black text-white px-4 py-2 text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="rounded-md bg-black text-white px-4 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? "Guardando…" : "Guardar pago"}
           </button>

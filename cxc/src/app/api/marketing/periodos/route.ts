@@ -7,7 +7,7 @@ import {
   cargarDatosPeriodos,
   esReportePeriodo,
 } from "@/lib/marketing/periodos-reporte";
-import { PROVEEDORES } from "@/lib/marketing/proveedores";
+import { nombreDeBloque } from "@/lib/marketing/bloques";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,13 +15,13 @@ export const fetchCache = "force-no-store";
 
 // GET /api/marketing/periodos
 //
-// Los períodos de todos los proveedores, abiertos y cerrados, con su total.
+// Los períodos de todas las marcas, abiertos y cerrados, con su total.
 //
 // 🔑 De dónde sale cada total:
-//   · período ABIERTO  → del agregador (`agregarPorProveedor`), o sea lo mismo
+//   · período ABIERTO  → del agregador (`agregarPorBloques`), o sea lo mismo
 //     que muestra el inicio. Es plata que todavía se está juntando.
 //   · período CERRADO  → del REPORTE GUARDADO. No se recalcula: el número que
-//     figura acá tiene que ser el mismo que dice el papel que el proveedor ya
+//     figura acá tiene que ser el mismo que dice el papel que la marca ya
 //     tiene en la mano.
 //
 // 🔴 Sin la migración corrida no hay períodos. La pantalla lo tiene que poder
@@ -45,12 +45,17 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const perRes = await supabaseServer
-      .from("mk_periodos")
-      .select(
-        "id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por, reporte",
-      )
-      .order("abierto_en", { ascending: false });
+    const [perRes, marcasRes] = await Promise.all([
+      supabaseServer
+        .from("mk_periodos")
+        .select(
+          "id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por, reporte",
+        )
+        .order("abierto_en", { ascending: false }),
+      // El catálogo MANDA sobre la constante: si Daniel renombra una marca, el
+      // período se renombra con ella.
+      supabaseServer.from("mk_marcas").select("id, nombre, codigo"),
+    ]);
 
     if (perRes.error) {
       if (esTablaAusente(perRes.error)) {
@@ -67,6 +72,11 @@ export async function GET(req: NextRequest) {
     }
 
     const filas = (perRes.data ?? []) as PeriodoConReporte[];
+    const marcas = (marcasRes.error ? [] : (marcasRes.data ?? [])) as Array<{
+      id: string;
+      nombre: string | null;
+      codigo: string | null;
+    }>;
 
     // Solo se agrega si hay algún período abierto que mostrar: para una lista
     // de puros cerrados, leer todas las facturas del módulo sería trabajo al
@@ -77,16 +87,20 @@ export async function GET(req: NextRequest) {
       : [];
 
     const periodos = filas.map((p) => {
-      const nombreProv =
-        PROVEEDORES.find((x) => x.key === p.proveedor_key)?.nombre ??
-        p.proveedor_key;
+      // ⚠️ `proveedor_key` guarda el CÓDIGO DE MARCA desde el 11-ago-2026. Las
+      // filas históricas conservan 'pvh' —ese cierre fue conjunto de verdad— y
+      // `nombreDeBloque` devuelve la clave tal cual en vez de inventarle marca.
+      const marcaCodigo = String(p.proveedor_key);
+      const marcaNombre = nombreDeBloque(marcaCodigo, marcas);
 
       if (p.estado === "abierto") {
-        const b = bloques.find((x) => x.key === p.proveedor_key);
+        const b = bloques.find((x) => x.key === marcaCodigo);
         return {
           id: String(p.id),
-          proveedorKey: String(p.proveedor_key),
-          proveedorNombre: nombreProv,
+          proveedorKey: marcaCodigo,
+          proveedorNombre: marcaNombre,
+          marcaCodigo,
+          marcaNombre,
           nombre: String(p.nombre),
           estado: "abierto" as const,
           abiertoEn: p.abierto_en ?? null,
@@ -105,8 +119,10 @@ export async function GET(req: NextRequest) {
       const rep = esReportePeriodo(p.reporte) ? p.reporte : null;
       return {
         id: String(p.id),
-        proveedorKey: String(p.proveedor_key),
-        proveedorNombre: nombreProv,
+        proveedorKey: marcaCodigo,
+        proveedorNombre: marcaNombre,
+        marcaCodigo,
+        marcaNombre,
         nombre: String(p.nombre),
         estado: "cerrado" as const,
         abiertoEn: p.abierto_en ?? null,

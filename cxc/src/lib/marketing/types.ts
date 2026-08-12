@@ -236,7 +236,9 @@ export interface UpdateProyectoInput {
 }
 
 export interface CreateFacturaInput {
-  proyectoId: string;
+  // OPCIONAL desde "Registrar gasto": null/ausente = gasto sin cliente
+  // (evento, catálogo, material general). Sale bajo "General" en el reporte.
+  proyectoId?: string | null;
   numeroFactura: string;
   fechaFactura: string;
   proveedor: string;
@@ -299,6 +301,13 @@ export interface RegistrarPagoImpulsadoraInput {
   hasta: string; // "YYYY-MM-DD" inclusive
   monto: number; // total del pago (editable; default = monto_mensual)
   comprobante: ComprobanteInput;
+  /**
+   * Foto OPCIONAL del pago (un evento, una activación). Daniel: *"no limites
+   * subir fotos de impulsadora porque si hago un evento y quiero subir fotos
+   * del evento me lo va a limitar"*. Es un `foto_instalacion` sobre la factura
+   * — distinta del comprobante, que es obligatorio y va aparte.
+   */
+  foto?: { path: string; nombreOriginal?: string; sizeBytes?: number } | null;
 }
 
 // Marca del split con nombre/código resueltos, para la UI.

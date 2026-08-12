@@ -1,22 +1,29 @@
 // ============================================================================
-// Marketing — el lado de ESCRITURA de los períodos por proveedor.
+// Marketing — el lado de ESCRITURA de los períodos por MARCA.
 //
-// 🔴 UN DOCUMENTO SE SELLA CON EL PERÍODO QUE SU PROVEEDOR TENÍA ABIERTO
-// CUANDO SE REGISTRÓ, **no** con la fecha del documento.
+// 🔴 UN DOCUMENTO SE SELLA CON EL PERÍODO QUE SU MARCA TENÍA ABIERTO CUANDO SE
+// REGISTRÓ, **no** con la fecha del documento.
 //
-// Por qué, y esto ya está decidido: un período cerrado ya se le reportó al
-// proveedor, y ese reporte se guardó tal como salió. Meterle una factura
-// después haría que el papel que el proveedor tiene en la mano deje de
-// coincidir con lo que dice el sistema — y el que queda mal no es el sistema,
-// es quien mandó el reporte. Una factura vieja que llega tarde entra en el
-// período ABIERTO y se reporta en el próximo corte. Nada se pierde: se
-// reporta después, no se pierde nunca.
+// Por qué, y esto ya está decidido: un período cerrado ya se le reportó a la
+// marca, y ese reporte se guardó tal como salió. Meterle una factura después
+// haría que el papel que el encargado tiene en la mano deje de coincidir con
+// lo que dice el sistema — y el que queda mal no es el sistema, es quien mandó
+// el reporte. Una factura vieja que llega tarde entra en el período ABIERTO y
+// se reporta en el próximo corte. Nada se pierde: se reporta después.
 //
-// 🔴 DEGRADACIÓN OBLIGATORIA. `mk_periodos` / `mk_periodo_documentos` las crea
-// la migración 20260811160000, que Daniel corre A MANO. Mientras no existan,
-// TODO lo de acá es un no-op silencioso: **sellar no puede hacer fallar el
-// guardado de una factura ni de una entrega**. Hasta que la DDL corra, la app
-// funciona exactamente igual que hoy (el inicio cae al fallback `grupo_legacy`).
+// 🔴 DEGRADACIÓN OBLIGATORIA, Y ACÁ TIENE DOS CAPAS.
+//
+//  1. Sin las TABLAS (`mk_periodos` / `mk_periodo_documentos`), todo esto es un
+//     no-op silencioso: **sellar no puede hacer fallar el guardado de una
+//     factura ni de una entrega**.
+//  2. Con las tablas pero SIN la migración por marca (20260811180000, que
+//     Daniel corre A MANO), los períodos abiertos que existen son los VIEJOS
+//     por proveedor ('pvh', 'reebok', 'joybees'). Por eso el período de una
+//     marca se busca con `clavesDeSello()`: primero su código, después la clave
+//     vieja — y **se sella con la clave que efectivamente se encontró**. Así,
+//     antes de la migración, Tommy y Calvin siguen cayendo en el mismo sello
+//     'pvh' que hoy (comportamiento idéntico), y después de la migración cada
+//     una cae en el suyo sin que nadie tenga que acordarse de apagar nada.
 //
 // 🩸 SELLAR NUNCA ES FATAL, ni siquiera con las tablas ya creadas. Si el sello
 // falla se loguea con `console.error` y el documento se guarda igual. Un sello
@@ -26,7 +33,27 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { SIN_PROVEEDOR, proveedorDeCodigo, type BloqueKey } from "./proveedores";
+import {
+  SIN_BLOQUE,
+  bloqueDeCodigo,
+  clavesDeSello,
+  esMarcaCodigo,
+  type BloqueKey,
+} from "./bloques";
+
+/**
+ * Claves con las que buscar el período de un bloque, en orden de prioridad.
+ *
+ * Para una marca: su código y después la clave vieja por proveedor. Para
+ * cualquier otra cosa (una clave vieja pasada a mano, como en el cierre de un
+ * período heredado): esa misma clave y nada más — nunca se inventa una.
+ */
+function clavesDeBusqueda(key: string): string[] {
+  const k = String(key ?? "").trim();
+  if (!k || k === SIN_BLOQUE) return [];
+  const claves = clavesDeSello(k);
+  return claves.length > 0 ? claves : [k];
+}
 
 /** Los dos tipos de documento que se sellan. Igual que el CHECK de la tabla. */
 export type TipoDocumentoPeriodo = "factura" | "entrega";
@@ -91,29 +118,38 @@ function avisar(donde: string, detalle: unknown): void {
 // ----------------------------------------------------------------------------
 
 /**
- * El período ABIERTO de un proveedor, o `null`.
+ * El período ABIERTO de una marca, o `null`.
+ *
+ * Busca por el código de marca y, si no hay, por la clave vieja del proveedor
+ * (ver la degradación del encabezado).
  *
  * `null` significa las tres cosas que se tratan igual: no existe la tabla, no
- * hay período abierto para ese proveedor, o no se pudo leer. En los tres casos
- * el que llama no tiene a dónde sellar y sigue de largo.
+ * hay período abierto para esa marca, o no se pudo leer. En los tres casos el
+ * que llama no tiene a dónde sellar y sigue de largo.
  */
 export async function periodoAbiertoDe(
-  proveedorKey: string,
+  marcaKey: string,
 ): Promise<PeriodoFila | null> {
-  const key = String(proveedorKey ?? "").trim();
-  if (!key || key === SIN_PROVEEDOR) return null;
+  const claves = clavesDeBusqueda(marcaKey);
+  if (claves.length === 0) return null;
   try {
     const { data, error } = await supabaseServer
       .from("mk_periodos")
       .select("id, proveedor_key, nombre, estado, abierto_en, cerrado_en, cerrado_por")
-      .eq("proveedor_key", key)
       .eq("estado", "abierto")
-      .maybeSingle();
+      .in("proveedor_key", claves);
     if (error) {
       if (!esTablaAusente(error)) avisar("periodoAbiertoDe", error.message);
       return null;
     }
-    return (data as PeriodoFila | null) ?? null;
+    const filas = (data ?? []) as PeriodoFila[];
+    // El ORDEN manda, no el que devuelva PostgREST primero: el código de marca
+    // le gana a la clave vieja. Después de la migración pueden convivir las dos.
+    for (const clave of claves) {
+      const p = filas.find((f) => String(f.proveedor_key) === clave);
+      if (p) return p;
+    }
+    return null;
   } catch (err) {
     if (!esFaltaDeTablas(err)) avisar("periodoAbiertoDe", err);
     return null;
@@ -121,12 +157,12 @@ export async function periodoAbiertoDe(
 }
 
 /**
- * `marca_id → proveedor` para un puñado de marcas.
+ * `marca_id → bloque` para un puñado de marcas.
  *
- * El mapa va por CÓDIGO (`mk_marcas.codigo`), que es la regla de
- * `proveedores.ts` — nunca por nombre, que sí se edita.
+ * El mapa va por CÓDIGO (`mk_marcas.codigo`), que es la regla de `bloques.ts`
+ * — nunca por nombre, que sí se edita.
  */
-export async function proveedorPorMarcaId(
+export async function bloquePorMarcaId(
   marcaIds: ReadonlyArray<string>,
 ): Promise<Map<string, BloqueKey>> {
   const out = new Map<string, BloqueKey>();
@@ -138,36 +174,42 @@ export async function proveedorPorMarcaId(
       .select("id, codigo")
       .in("id", ids);
     if (error) {
-      avisar("proveedorPorMarcaId", error.message);
+      avisar("bloquePorMarcaId", error.message);
       return out;
     }
     for (const r of (data ?? []) as Array<{ id: string; codigo: string | null }>) {
-      out.set(String(r.id), proveedorDeCodigo(r.codigo));
+      out.set(String(r.id), bloqueDeCodigo(r.codigo));
     }
     return out;
   } catch (err) {
-    avisar("proveedorPorMarcaId", err);
+    avisar("bloquePorMarcaId", err);
     return out;
   }
 }
 
 /**
- * Proveedores (claves únicas) a los que le pertenecen estas marcas.
+ * Marcas (códigos únicos) a las que le pertenecen estos `marca_id`.
  *
- * 🩸 `SIN_PROVEEDOR` se descarta: una marca sin proveedor decidido no tiene
- * período al que sellar, y meterla en uno cualquiera mandaría plata en un
- * reporte a un proveedor que no la pidió.
+ * 🩸 `SIN_BLOQUE` se descarta: una marca sin bloque no tiene período al que
+ * sellar, y meterla en uno cualquiera mandaría plata en un reporte a una
+ * empresa que no la pidió.
  */
-export async function proveedoresDeMarcaIds(
+export async function marcasDeMarcaIds(
   marcaIds: ReadonlyArray<string>,
 ): Promise<string[]> {
-  const mapa = await proveedorPorMarcaId(marcaIds);
+  const mapa = await bloquePorMarcaId(marcaIds);
   const keys = new Set<string>();
   for (const k of mapa.values()) {
-    if (k && k !== SIN_PROVEEDOR) keys.add(String(k));
+    if (k && esMarcaCodigo(k)) keys.add(String(k));
   }
   return Array.from(keys);
 }
+
+/**
+ * Nombre viejo de `marcasDeMarcaIds`, para los llamadores que todavía dicen
+ * "proveedor". Devuelve códigos de MARCA — el sellado los traduce solo.
+ */
+export const proveedoresDeMarcaIds = marcasDeMarcaIds;
 
 // ----------------------------------------------------------------------------
 // Sellado
@@ -176,15 +218,23 @@ export async function proveedoresDeMarcaIds(
 export interface SellarDocumentoInput {
   tipo: TipoDocumentoPeriodo;
   documentoId: string;
-  /** Claves de proveedor. Se ignoran las vacías y `sin_proveedor`. */
-  proveedorKeys: ReadonlyArray<string>;
+  /** Códigos de marca. Se ignoran los vacíos y `sin_bloque`. */
+  marcaKeys?: ReadonlyArray<string>;
+  /** Nombre viejo de `marcaKeys`. Acepta códigos de marca o claves viejas. */
+  proveedorKeys?: ReadonlyArray<string>;
 }
 
 /**
- * Ata un documento al período ABIERTO de cada uno de sus proveedores.
+ * Ata un documento al período ABIERTO de cada una de sus marcas.
  *
- * Un sello por proveedor: si una factura es de Tommy (PVH) y de Reebok, se
- * escriben DOS filas, porque PVH y Reebok se cierran en momentos distintos.
+ * Un sello por MARCA: si una factura es de Tommy y de Reebok, se escriben DOS
+ * filas, porque cada marca se cierra por su cuenta.
+ *
+ * 🔴 Con la migración por marca SIN correr, Tommy y Calvin resuelven las dos a
+ * la clave vieja 'pvh' y el sello queda UNO solo — exactamente como hoy. Se
+ * guarda la clave que se ENCONTRÓ, no la que se pidió: escribir 'TH' apuntando
+ * al período de 'pvh' dejaría un sello que `clavesDeSello` sí leería, pero que
+ * describe algo que no ocurrió.
  *
  * Idempotente por construcción: `ON CONFLICT DO NOTHING` sobre
  * (tipo, documento_id, proveedor_key). Volver a sellar un documento ya sellado
@@ -199,31 +249,55 @@ export async function sellarDocumento(input: SellarDocumentoInput): Promise<void
     if (!documentoId) return;
     const keys = Array.from(
       new Set(
-        (input.proveedorKeys ?? [])
+        (input.marcaKeys ?? input.proveedorKeys ?? [])
           .map((k) => String(k ?? "").trim())
-          .filter((k) => k.length > 0 && k !== SIN_PROVEEDOR),
+          .filter((k) => k.length > 0 && k !== SIN_BLOQUE),
       ),
     );
     if (keys.length === 0) return;
+
+    // Todas las claves posibles de todas las marcas, en UNA consulta.
+    const claves = Array.from(
+      new Set(keys.flatMap((k) => clavesDeBusqueda(k))),
+    );
+    if (claves.length === 0) return;
 
     const { data, error } = await supabaseServer
       .from("mk_periodos")
       .select("id, proveedor_key")
       .eq("estado", "abierto")
-      .in("proveedor_key", keys);
+      .in("proveedor_key", claves);
     if (error) {
       if (!esTablaAusente(error)) avisar("sellarDocumento[periodos]", error.message);
       return;
     }
 
-    const filas = ((data ?? []) as Array<{ id: string; proveedor_key: string }>).map(
-      (p) => ({
-        periodo_id: String(p.id),
-        proveedor_key: String(p.proveedor_key),
-        tipo: input.tipo,
-        documento_id: documentoId,
-      }),
+    const abiertoPorClave = new Map(
+      ((data ?? []) as Array<{ id: string; proveedor_key: string }>).map((p) => [
+        String(p.proveedor_key),
+        String(p.id),
+      ]),
     );
+
+    // Una fila por clave ENCONTRADA. El `Map` dedupe: pre-migración, TH y CK
+    // caen las dos en 'pvh' y eso es UN solo sello, igual que hoy.
+    const porClave = new Map<string, string>();
+    for (const k of keys) {
+      for (const clave of clavesDeBusqueda(k)) {
+        const periodoId = abiertoPorClave.get(clave);
+        if (periodoId) {
+          porClave.set(clave, periodoId);
+          break;
+        }
+      }
+    }
+
+    const filas = Array.from(porClave, ([proveedor_key, periodo_id]) => ({
+      periodo_id,
+      proveedor_key,
+      tipo: input.tipo,
+      documento_id: documentoId,
+    }));
     if (filas.length === 0) return;
 
     const { error: upErr } = await supabaseServer
@@ -242,8 +316,8 @@ export async function sellarDocumento(input: SellarDocumentoInput): Promise<void
 }
 
 /**
- * Atajo para los dos caminos que saben las MARCAS de un documento y no sus
- * proveedores. Nunca lanza.
+ * Atajo para los caminos que tienen los `marca_id` de un documento y no sus
+ * códigos. Nunca lanza.
  */
 export async function sellarDocumentoPorMarcas(
   tipo: TipoDocumentoPeriodo,
@@ -252,9 +326,9 @@ export async function sellarDocumentoPorMarcas(
 ): Promise<void> {
   try {
     if (!documentoId || marcaIds.length === 0) return;
-    const proveedorKeys = await proveedoresDeMarcaIds(marcaIds);
-    if (proveedorKeys.length === 0) return;
-    await sellarDocumento({ tipo, documentoId, proveedorKeys });
+    const marcaKeys = await marcasDeMarcaIds(marcaIds);
+    if (marcaKeys.length === 0) return;
+    await sellarDocumento({ tipo, documentoId, marcaKeys });
   } catch (err) {
     avisar("sellarDocumentoPorMarcas", err);
   }

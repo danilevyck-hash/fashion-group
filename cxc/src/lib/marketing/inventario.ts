@@ -900,6 +900,14 @@ export async function createEntrega(
     .select("*")
     .single();
   if (entErr || !entRow) {
+    // Pre-DDL: si la columna sigue NOT NULL (la migración 20260811180000 la
+    // relaja), una entrega sin cliente rebota acá. Degradar limpio, no
+    // escupirle un error de Postgres a la secretaria.
+    if (!proyectoId && /not-null|null value/i.test(entErr?.message ?? "")) {
+      throw new Error(
+        "Para registrar una entrega sin cliente falta correr la actualización de la base de datos. Mientras tanto, elegí un cliente.",
+      );
+    }
     throw new Error(`createEntrega[entrega]: ${entErr?.message ?? "sin datos"}`);
   }
   const entrega = mapEntrega(entRow as Record<string, unknown>);

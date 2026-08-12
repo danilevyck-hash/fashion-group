@@ -43,7 +43,12 @@ import {
 
 interface Props {
   open: boolean;
-  proyectoId: string;
+  /**
+   * `null` = entrega sin cliente. Desde "Registrar gasto" un gasto puede no
+   * tener proyecto —Daniel sacó ese paso— y la fila se guarda con
+   * `proyecto_id = null`, igual que ya viven los pagos de impulsadora.
+   */
+  proyectoId: string | null;
   proyectoNombre: string;
   marcasProyecto: MarcaConPorcentaje[];
   productos: MkInventarioProducto[];
@@ -554,7 +559,7 @@ export default function EntregaForm({
       const method = initial ? "PATCH" : "POST";
       const body = initial
         ? { items, marcas, notas: nombre.trim() || null }
-        : { proyectoId, items, marcas, notas: nombre.trim() || null };
+        : { proyectoId: proyectoId ?? null, items, marcas, notas: nombre.trim() || null };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -603,11 +608,12 @@ export default function EntregaForm({
 
   // ---- Render ----
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    /* Sin slide-up y centrado en todos los anchos: regla de la casa. */
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4">
       <div className="absolute inset-0 bg-black/40" {...backdrop} />
       <div
         ref={panelRef}
-        className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-2xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[95vh] overflow-y-auto"
+        className="relative bg-white rounded-lg max-w-2xl w-full border border-gray-200 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">

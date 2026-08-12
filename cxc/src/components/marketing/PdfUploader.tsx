@@ -256,7 +256,7 @@ export function PdfUploader({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
+        className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition"
       >
         Elegir archivo
       </button>

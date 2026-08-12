@@ -48,6 +48,9 @@ export async function POST(
       hasta: body.hasta,
       monto: Number(body.monto),
       comprobante: body.comprobante,
+      // Foto OPCIONAL del pago (evento/activación) — distinta del comprobante.
+      // `fotoGuardada` en la respuesta le dice a la pantalla si entró o no.
+      foto: body.foto ?? null,
     });
     logActivity(
       auth.role,

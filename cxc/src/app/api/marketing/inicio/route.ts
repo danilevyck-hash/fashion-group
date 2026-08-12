@@ -3,10 +3,11 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
 import {
-  agregarPorProveedor,
+  agregarPorBloques,
+  type AdjuntoResumen,
   type PeriodoRow,
   type SelloRow,
-} from "@/lib/marketing/resumen-proveedores";
+} from "@/lib/marketing/resumen-bloques";
 import { esTablaAusente } from "@/lib/marketing/periodos-io";
 
 export const dynamic = "force-dynamic";
@@ -15,17 +16,19 @@ export const fetchCache = "force-no-store";
 
 // GET /api/marketing/inicio
 //
-// TODO lo que dibuja el inicio de Marketing, agrupado por PROVEEDOR y acotado
-// por PERÍODO. La cuenta vive en el módulo PURO `resumen-proveedores.ts`; acá
-// solo se lee la base y se arma el JSON.
+// TODO lo que dibuja el inicio de Marketing, agrupado por MARCA y acotado por
+// PERÍODO. La cuenta vive en el módulo PURO `resumen-bloques.ts`; acá solo se
+// lee la base y se arma el JSON.
 //
-// 🔴 DEGRADA LIMPIO SIN LA DDL. `mk_periodos` / `mk_periodo_documentos` las crea
-// `20260811160000_marketing_periodos_por_proveedor.sql`, que corre Daniel a
-// mano. Si todavía no existen, PostgREST responde 42P01 y acá se trata como
-// "no hay períodos": el agregador cae al fallback `grupo_legacy` y la pantalla
-// muestra EXACTAMENTE los mismos números que hoy, sin período ni botón de
-// cerrar. Un error que NO sea "esa tabla no existe" sí se propaga: esconderlo
-// dejaría la pantalla mostrando el archivo de PVH como si fuera gasto abierto.
+// 🔴 DEGRADA LIMPIO SIN LA DDL, en las dos capas. Si `mk_periodos` /
+// `mk_periodo_documentos` no existen, PostgREST responde 42P01 y acá se trata
+// como "no hay períodos": el agregador cae al fallback `grupo_legacy`. Y si
+// existen pero la migración POR MARCA (20260811180000) todavía no corrió, los
+// sellos dicen 'pvh'/'reebok'/'joybees' y el agregador los reconoce igual
+// (`clavesDeSello`). En los dos casos la pantalla muestra EXACTAMENTE los
+// mismos números. Un error que NO sea "esa tabla no existe" sí se propaga:
+// esconderlo dejaría la pantalla mostrando el archivo ya reportado como si
+// fuera gasto abierto.
 
 // `esTablaAusente` vive en `lib/marketing/periodos-io.ts` — fuente ÚNICA, la
 // misma que usa el lado de escritura. Dos copias del criterio es una que se
@@ -37,8 +40,17 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const [facturasRes, fmRes, proyRes, marcasRes, entregasRes, impRes, perRes, selloRes] =
-      await Promise.all([
+    const [
+      facturasRes,
+      fmRes,
+      proyRes,
+      marcasRes,
+      entregasRes,
+      impRes,
+      adjRes,
+      perRes,
+      selloRes,
+    ] = await Promise.all([
         supabaseServer
           .from("mk_facturas")
           .select("id, proyecto_id, total, grupo_legacy, impulsadora_id")
@@ -53,6 +65,9 @@ export async function GET(req: NextRequest) {
           .from("mk_entregas_muebles")
           .select("id, proyecto_id, total, total_por_marca, total_por_empresa_interna"),
         supabaseServer.from("mk_impulsadoras").select("id, monto_mensual, activa"),
+        // Comprobantes y fotos: alimentan los dos AVISOS del bloque. Si esta
+        // lectura falla, los avisos salen en cero y la plata se dibuja igual.
+        supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
         supabaseServer
           .from("mk_periodos")
           .select("id, proveedor_key, nombre, estado, cerrado_en"),
@@ -84,7 +99,7 @@ export async function GET(req: NextRequest) {
       proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
     );
 
-    const resumen = agregarPorProveedor({
+    const resumen = agregarPorBloques({
       facturas: (facturasRes.data ?? []) as never,
       facturaMarcas: (fmRes.data ?? []) as never,
       entregas: (entregasRes.data ?? []) as never,
@@ -93,6 +108,7 @@ export async function GET(req: NextRequest) {
       proyectosMultifashion,
       periodos: (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[],
       sellos: (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[],
+      adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoResumen[],
     });
 
     const entregas = (entregasRes.data ?? []) as Array<{

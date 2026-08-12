@@ -1,33 +1,32 @@
 // ============================================================================
-// Marketing — el inicio, agrupado por PROVEEDOR y acotado por PERÍODO.
+// Marketing — el inicio, agrupado por MARCA y acotado por PERÍODO.
 //
-// 🔑 QUÉ ES UN PERÍODO. Daniel, textual: es *"lo que ya le reportaste a ese
-// proveedor"*. Al cerrarlo se congela (no entran más documentos), se genera el
-// reporte con SOLO la parte de ese proveedor, y se abre uno nuevo en cero con
-// el nombre que él escriba. **Los proyectos NO se cierran**: lo que se congela
-// es la parte de ESE proveedor dentro de cada proyecto. Un proyecto con Tommy y
-// Reebok al cerrar PVH conserva su parte de Reebok viva y editable.
+// 🔑 LA MARCA ES LA UNIDAD. Daniel, textual: *"ellos facturan a mi bajo
+// compañia diferentes. una por marca. cada marca tiene su encargado"*. Cada
+// bloque es una marca, con su período, su cierre y su ZIP. Lo único agrupado
+// que queda es el BOTÓN "Cerrar las tres" — tres cierres seguidos, no un cierre
+// conjunto. El mapa marca → bloque vive en `bloques.ts` y acá se IMPORTA.
 //
 // 🔴 NO HAY TECHO NI PRESUPUESTO. *"simplemente reportas lo que gastaste"*. Acá
 // no se calcula "cuánto queda", ni "cuánto sobra", ni un % de avance: el módulo
-// SUMA lo gastado y punto. Cualquier cosa que se parezca a un presupuesto es una
-// idea que Daniel descartó explícitamente.
+// SUMA lo gastado y punto.
 //
 // 🩸 LA MATEMÁTICA NO SE REESCRIBE. El reparto de una factura entre sus marcas
 // (por porcentaje) y la porción de una entrega de muebles que le toca a una
 // marca viven en `resumen-inicio.ts` y se IMPORTAN. Escribir acá una segunda
 // versión sería la forma exacta en que este repo ya se quemó dos veces con los
 // signos de las notas de crédito: dos archivos que dicen cosas distintas sobre
-// la misma plata, y nadie se entera hasta que un proveedor reclama.
+// la misma plata, y nadie se entera hasta que una marca reclama.
 //
-// 🔴 DEGRADACIÓN SIN LA DDL. `mk_periodos` / `mk_periodo_documentos` las crea una
-// migración que Daniel corre A MANO. Mientras no exista, `sellos` llega vacío y
-// `periodos` también, y el módulo cae a `periodoLegacyDeFactura()`: las facturas
-// con `grupo_legacy` (fuera de Multifashion) van al período CERRADO "Gastos
-// Tommy y Calvin" de PVH y todo lo demás al abierto. Ese fallback reproduce
-// EXACTAMENTE los números de hoy — es la misma partición que hace la pantalla
-// actual — así que la migración no puede mover un centavo: solo cambia de dónde
-// sale la respuesta.
+// 🔴 DEGRADACIÓN SIN LA DDL, Y ES LO QUE SOSTIENE LOS NÚMEROS. La migración
+// `20260811180000` la corre Daniel A MANO. Mientras no corra, los 121 sellos
+// que existen dicen `'pvh'` / `'reebok'` / `'joybees'`, o sea la clave VIEJA por
+// proveedor. Por eso el sello de una marca se busca con `clavesDeSello()`:
+// primero el código de marca, después la clave vieja. Si solo se preguntara por
+// `'TH'`, los 59 documentos del período CERRADO no se encontrarían, se leerían
+// como "del período actual" y **Tommy mostraría $102.904,43 en vez de sus
+// $58.365,00 abiertos**. O sea: la plata se movería en pantalla por no haber
+// corrido una migración.
 //
 // Módulo PURO. Sin base, sin I/O.
 // ============================================================================
@@ -40,20 +39,24 @@ import {
   type FacturaResumen,
 } from "./resumen-inicio";
 import {
+  MARCAS_BLOQUE,
   MULTIFASHION_KEY,
-  PROVEEDORES,
-  SIN_PROVEEDOR,
-  indiceProveedorPorMarcaId,
+  SIN_BLOQUE,
+  clavesDeSello,
+  esCabezaDeGrupo,
+  grupoCierreDeMarca,
+  indiceBloquePorMarcaId,
+  nombreDeBloque,
   type BloqueKey,
-  type MarcaParaProveedor,
-  type ProveedorKey,
-} from "./proveedores";
+  type MarcaParaBloque,
+} from "./bloques";
 
-/** Nombre del primer período cerrado de PVH: el archivo que ya existía. */
+/** Nombre del primer período cerrado: el archivo que ya existía. */
 export const PERIODO_LEGACY_NOMBRE = "Gastos Tommy y Calvin";
 
 export interface PeriodoRow {
   id: string;
+  /** ⚠️ La columna conserva el nombre viejo y guarda el CÓDIGO DE MARCA. */
   proveedor_key: string;
   nombre: string;
   estado: string;
@@ -63,15 +66,23 @@ export interface PeriodoRow {
 /** Fila de `mk_periodo_documentos`. */
 export interface SelloRow {
   periodo_id: string;
+  /** Código de marca, o la clave vieja por proveedor en los 121 sellos viejos. */
   proveedor_key: string;
   tipo: "factura" | "entrega";
   documento_id: string;
 }
 
-export interface ProyectoResumenProv {
+export interface ProyectoResumenBloque {
   id: string;
   tienda?: string | null;
   tienda_codigo?: string | null;
+}
+
+/** Fila de `mk_adjuntos`, solo lo que hace falta para los dos avisos. */
+export interface AdjuntoResumen {
+  tipo: string;
+  factura_id?: string | null;
+  proyecto_id?: string | null;
 }
 
 export interface Monto {
@@ -79,23 +90,33 @@ export interface Monto {
   total: number;
 }
 
-export interface BloqueProveedor {
-  key: BloqueKey;
+export interface BloqueResumen {
+  key: string;
+  /** Del catálogo (`mk_marcas.nombre`), con la constante como respaldo. */
   nombre: string;
-  /** Marcas que entran en el reporte. Vacío en Multifashion y sin proveedor. */
-  marcas: string[];
-  /** `null` = este bloque no se le reporta a nadie (Multifashion / sin decidir). */
+  /** `'pvh'` para TH/CK/KL, `null` para el resto. */
+  grupoCierre: string | null;
+  /** "Tommy · Calvin · Karl". Lo que se lee en el botón de cerrar las tres. */
+  grupoEtiqueta: string | null;
+  /** true solo en la PRIMERA marca del grupo: el botón se dibuja una vez. */
+  esCabezaDeGrupo: boolean;
+  /** `null` = este bloque no se le reporta a nadie (Multifashion / sin marca). */
   periodoAbierto: { id: string | null; nombre: string } | null;
   facturas: Monto;
   muebles: Monto;
   total: number;
   proyectos: number;
+  /** Gastos del período ABIERTO sin comprobante de pago. */
+  sinComprobante: number;
+  /** Gastos del período ABIERTO CON CLIENTE y sin foto de instalación. */
+  sinFoto: number;
 }
 
-export interface PeriodoCerrado {
+export interface PeriodoCerradoResumen {
   id: string | null;
-  proveedorKey: string;
-  proveedorNombre: string;
+  /** Código de marca. */
+  bloqueKey: string;
+  bloqueNombre: string;
   nombre: string;
   cerradoEn: string | null;
   facturas: Monto;
@@ -106,14 +127,14 @@ export interface PeriodoCerrado {
 export interface FilaPorCliente {
   cliente: string;
   clienteCodigo: string | null;
-  /** Monto por bloque (solo períodos ABIERTOS). */
+  /** Monto por bloque (solo períodos ABIERTOS). Clave = código de marca. */
   porBloque: Record<string, number>;
   total: number;
 }
 
-export interface ResumenProveedores {
-  bloques: BloqueProveedor[];
-  cerrados: PeriodoCerrado[];
+export interface ResumenBloques {
+  bloques: BloqueResumen[];
+  cerrados: PeriodoCerradoResumen[];
   /** Cabecera: lo gastado hoy (períodos abiertos), proyectos y clientes vivos. */
   resumen: { total: number; proyectos: number; clientes: number };
   porCliente: FilaPorCliente[];
@@ -123,20 +144,53 @@ export interface ResumenProveedores {
   conPeriodos: boolean;
 }
 
-export interface EntradaProveedores {
+export interface EntradaBloques {
   /** Facturas NO anuladas. */
   facturas: ReadonlyArray<FacturaResumen>;
   facturaMarcas: ReadonlyArray<FacturaMarcaResumen>;
   /** Entregas de muebles con su id (hace falta para el sello). */
   entregas: ReadonlyArray<EntregaResumen & { id: string }>;
-  marcas: ReadonlyArray<MarcaParaProveedor & { nombre?: string | null; empresa_codigo?: string | null }>;
-  proyectos: ReadonlyArray<ProyectoResumenProv>;
+  marcas: ReadonlyArray<MarcaParaBloque & { empresa_codigo?: string | null }>;
+  proyectos: ReadonlyArray<ProyectoResumenBloque>;
   /** Ids de proyectos que son Multifashion. */
   proyectosMultifashion: ReadonlySet<string>;
   /** Filas de `mk_periodos`. Vacío = la DDL no corrió. */
   periodos?: ReadonlyArray<PeriodoRow>;
   /** Filas de `mk_periodo_documentos`. Vacío = la DDL no corrió. */
   sellos?: ReadonlyArray<SelloRow>;
+  /** Filas de `mk_adjuntos`. Vacío = los dos avisos salen en cero. */
+  adjuntos?: ReadonlyArray<AdjuntoResumen>;
+}
+
+// ----------------------------------------------------------------------------
+// LOS DOS PAPELES DEL GASTO — y son distintos
+//
+// Daniel, textual: *"pero impulsadora tambien necesita comprobante, pero no
+// foto. aunq el comprobante sea una foto."*
+//
+//  · COMPROBANTE del pago  → lo lleva TODO gasto, impulsadoras incluidas.
+//  · FOTO DE INSTALACIÓN   → el letrero puesto, el mueble armado. Llega DESPUÉS
+//    y solo tiene sentido cuando el gasto es de un CLIENTE.
+//
+// 🔴 Sin banderas por tipo de gasto. Daniel: *"no todas pero que el modulo no se
+// limite a alguna si y algunas no, mantenlo simple"* → el criterio de la foto es
+// "tiene cliente o no" (`proyecto_id`), y nada más. Los 17 pagos de impulsadora
+// tienen `proyecto_id = NULL`, así que quedan fuera del aviso solos.
+// ----------------------------------------------------------------------------
+
+/** ¿Este adjunto es el COMPROBANTE del pago? */
+export function esComprobanteDePago(tipo: string): boolean {
+  return tipo === "pdf_factura" || tipo === "foto_factura";
+}
+
+/**
+ * ¿Este adjunto es la FOTO DE INSTALACIÓN del gasto?
+ *
+ * `foto_instalacion` es el tipo NUEVO (lo habilita la migración). Cuelga de la
+ * FACTURA, que es lo que permite decir "este gasto no tiene foto".
+ */
+export function esFotoDeInstalacion(tipo: string): boolean {
+  return tipo === "foto_instalacion";
 }
 
 function num(x: unknown): number {
@@ -166,23 +220,21 @@ export function periodoLegacyDeFactura(
 }
 
 /** Identidad del cliente de un proyecto: el código manda, el texto es respaldo. */
-export function claveCliente(p: ProyectoResumenProv): string {
+export function claveCliente(p: ProyectoResumenBloque): string {
   const cod = (p.tienda_codigo ?? "").trim().toUpperCase();
   if (cod) return cod;
   return (p.tienda ?? "").trim().toLowerCase().replace(/\s+/g, " ") || "(sin cliente)";
 }
 
-export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores {
+export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
   const periodos = inp.periodos ?? [];
   const sellos = inp.sellos ?? [];
+  const adjuntos = inp.adjuntos ?? [];
   const conPeriodos = periodos.length > 0;
 
-  const bloquePorMarca = indiceProveedorPorMarcaId(inp.marcas);
+  const bloquePorMarca = indiceBloquePorMarcaId(inp.marcas);
   const empresaDeMarca = new Map<string, string | null>(
     inp.marcas.map((m) => [String(m.id), m.empresa_codigo ?? null]),
-  );
-  const nombreDeMarca = new Map<string, string>(
-    inp.marcas.map((m) => [String(m.id), String(m.nombre ?? "")]),
   );
 
   const proyById = new Map(inp.proyectos.map((p) => [String(p.id), p]));
@@ -190,90 +242,135 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
   const esMf = (pid: string | null | undefined) =>
     !!pid && inp.proyectosMultifashion.has(String(pid));
 
+  // --- Adjuntos: los dos papeles, cada uno con su set ---
+  const facturaConComprobante = new Set<string>();
+  const facturaConFotoInstalacion = new Set<string>();
+  const proyectoConFoto = new Set<string>();
+  for (const a of adjuntos) {
+    const tipo = String(a.tipo ?? "");
+    const fid = a.factura_id ? String(a.factura_id) : "";
+    const pid = a.proyecto_id ? String(a.proyecto_id) : "";
+    if (fid && esComprobanteDePago(tipo)) facturaConComprobante.add(fid);
+    if (fid && esFotoDeInstalacion(tipo)) facturaConFotoInstalacion.add(fid);
+    // Las 60 fotos que ya existen cuelgan del PROYECTO (o sea del cliente) y NO
+    // se migran: se siguen leyendo, y un gasto cuyo cliente ya tiene fotos no
+    // dispara el aviso.
+    if (pid && tipo === "foto_proyecto") proyectoConFoto.add(pid);
+  }
+
   // --- Períodos ---
   const periodoById = new Map(periodos.map((p) => [String(p.id), p]));
-  const abiertoDe = new Map<string, PeriodoRow>();
+  const abiertoPorClave = new Map<string, PeriodoRow>();
   for (const p of periodos) {
-    if (p.estado === "abierto") abiertoDe.set(String(p.proveedor_key), p);
+    if (p.estado === "abierto") abiertoPorClave.set(String(p.proveedor_key), p);
   }
-  // `${tipo}::${documento_id}::${proveedor_key}` → periodo_id
+  /**
+   * El período ABIERTO de una marca: primero por su código, después por la
+   * clave vieja. Sin esto, antes de la migración ningún bloque tendría período
+   * y la pantalla perdería el nombre que Daniel ya viene viendo.
+   */
+  const abiertoDeMarca = (k: string): PeriodoRow | null => {
+    for (const clave of clavesDeSello(k)) {
+      const p = abiertoPorClave.get(clave);
+      if (p) return p;
+    }
+    return null;
+  };
+
+  // `${tipo}::${documento_id}::${clave}` → periodo_id
   const selloDe = new Map<string, string>();
   for (const s of sellos) {
-    selloDe.set(`${s.tipo}::${String(s.documento_id)}::${String(s.proveedor_key)}`, String(s.periodo_id));
+    selloDe.set(
+      `${s.tipo}::${String(s.documento_id)}::${String(s.proveedor_key)}`,
+      String(s.periodo_id),
+    );
   }
 
   /**
-   * ¿A qué período va este documento para este proveedor? `null` = el abierto.
+   * ¿A qué período va este documento para esta marca? `null` = el abierto.
    * Devuelve la fila del período CERRADO cuando corresponde.
+   *
+   * 🔴 Pregunta por las DOS claves (código de marca y clave vieja). Ver el
+   * encabezado del archivo: preguntar solo por el código movería $44.539,43 de
+   * Tommy del archivo al período actual.
    */
   const cerradoPara = (
     tipo: "factura" | "entrega",
     docId: string,
-    prov: string,
+    marcaKey: string,
     legacyFallback: boolean,
-  ): PeriodoRow | { id: null; nombre: string; proveedor_key: string } | null => {
+  ): PeriodoRow | { id: null; nombre: string } | null => {
     if (conPeriodos) {
-      const pid = selloDe.get(`${tipo}::${docId}::${prov}`);
-      if (!pid) return null; // sin sello → el abierto (documento nuevo)
-      const p = periodoById.get(pid);
-      if (!p || p.estado !== "cerrado") return null;
-      return p;
+      for (const clave of clavesDeSello(marcaKey)) {
+        const pid = selloDe.get(`${tipo}::${docId}::${clave}`);
+        if (!pid) continue;
+        const p = periodoById.get(pid);
+        if (!p) continue;
+        // Un sello a un período ABIERTO es "gasto de ahora": el primero que
+        // aparezca manda, sea por código o por la clave vieja.
+        if (p.estado !== "cerrado") return null;
+        return p;
+      }
+      return null; // sin sello → el abierto (documento nuevo)
     }
-    // Sin DDL: solo PVH tiene archivo, y solo por `grupo_legacy`.
-    if (legacyFallback && prov === "pvh") {
-      return { id: null, nombre: PERIODO_LEGACY_NOMBRE, proveedor_key: "pvh" };
+    // Sin DDL de períodos: solo las marcas de PVH tienen archivo, y solo por
+    // `grupo_legacy` — que es la partición que hace la pantalla de hoy.
+    if (legacyFallback && grupoCierreDeMarca(marcaKey)?.key === "pvh") {
+      return { id: null, nombre: PERIODO_LEGACY_NOMBRE };
     }
     return null;
   };
 
   // --- Acumuladores ---
-  const bloques = new Map<BloqueKey, BloqueProveedor>();
-  const proyectosDeBloque = new Map<BloqueKey, Set<string>>();
-  const cerradosAcc = new Map<string, PeriodoCerrado>();
+  const bloques = new Map<string, BloqueResumen>();
+  const proyectosDeBloque = new Map<string, Set<string>>();
+  const cerradosAcc = new Map<string, PeriodoCerradoResumen>();
   const porMarca: Record<string, number> = {};
   const clientes = new Map<string, FilaPorCliente>();
+  // Facturas del período ABIERTO por bloque — distintas, para no contar dos
+  // veces una factura repartida entre dos marcas DENTRO del mismo bloque.
+  const facturasAbiertasDeBloque = new Map<string, Set<string>>();
 
-  const nombreBloque = (k: BloqueKey): string => {
-    if (k === MULTIFASHION_KEY) return "Multifashion";
-    if (k === SIN_PROVEEDOR) return "Sin proveedor asignado";
-    return PROVEEDORES.find((p) => p.key === k)?.nombre ?? k;
-  };
-
-  const bloque = (k: BloqueKey): BloqueProveedor => {
+  const bloque = (k: string): BloqueResumen => {
     let b = bloques.get(k);
     if (!b) {
-      const ab = abiertoDe.get(k);
+      const esBucket = k === MULTIFASHION_KEY || k === SIN_BLOQUE;
+      const ab = esBucket ? null : abiertoDeMarca(k);
+      const grupo = grupoCierreDeMarca(k);
       b = {
         key: k,
-        nombre: nombreBloque(k),
-        marcas: [],
-        periodoAbierto:
-          k === MULTIFASHION_KEY || k === SIN_PROVEEDOR
-            ? null
-            : { id: ab ? String(ab.id) : null, nombre: ab ? ab.nombre : "Período actual" },
+        nombre: nombreDeBloque(k, inp.marcas),
+        grupoCierre: grupo?.key ?? null,
+        grupoEtiqueta: grupo?.etiqueta ?? null,
+        esCabezaDeGrupo: esCabezaDeGrupo(k),
+        periodoAbierto: esBucket
+          ? null
+          : { id: ab ? String(ab.id) : null, nombre: ab ? ab.nombre : "Período actual" },
         facturas: { count: 0, total: 0 },
         muebles: { count: 0, total: 0 },
         total: 0,
         proyectos: 0,
+        sinComprobante: 0,
+        sinFoto: 0,
       };
       bloques.set(k, b);
     }
     return b;
   };
 
-  const anotarProyecto = (k: BloqueKey, pid: string | null | undefined) => {
+  const anotarProyecto = (k: string, pid: string | null | undefined) => {
     if (!pid || !proyectosVivos.has(String(pid))) return;
     const s = proyectosDeBloque.get(k) ?? new Set<string>();
     s.add(String(pid));
     proyectosDeBloque.set(k, s);
   };
 
-  const anotarCliente = (pid: string | null | undefined, k: BloqueKey, monto: number) => {
+  const anotarCliente = (pid: string | null | undefined, k: string, monto: number) => {
     const p = pid ? proyById.get(String(pid)) : null;
     // 🩸 Un gasto SIN proyecto (los pagos de impulsadora, `proyecto_id` NULL)
     // no tiene cliente, pero SÍ es plata del bloque: si se descartara, la
     // columna de la tabla sumaría menos que el bloque de arriba y la pantalla
-    // se contradiría. Medido el 11-ago-2026: son $13.600,00 de PVH.
+    // se contradiría. Medido el 11-ago-2026: son $13.600,00.
     const key = p ? claveCliente(p) : "(sin proyecto)";
     let fila = clientes.get(key);
     if (!fila) {
@@ -289,19 +386,49 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
     fila.total += monto;
   };
 
+  /**
+   * Anota una factura del período ABIERTO para los dos avisos.
+   *
+   * ⚠️ Las ENTREGAS de mobiliario NO pasan por acá: su comprobante se GENERA
+   * (`pdf-entrega-mueble.ts`), así que siempre existe y contarlas como "sin
+   * comprobante" sería un aviso que nadie puede apagar.
+   */
+  const anotarPendientes = (k: string, f: FacturaResumen) => {
+    const fid = String(f.id);
+    const yaContada = facturasAbiertasDeBloque.get(k) ?? new Set<string>();
+    if (yaContada.has(fid)) return;
+    yaContada.add(fid);
+    facturasAbiertasDeBloque.set(k, yaContada);
+
+    const b = bloque(k);
+    if (!facturaConComprobante.has(fid)) b.sinComprobante += 1;
+
+    const pid = f.proyecto_id ? String(f.proyecto_id) : null;
+    if (!pid) return; // sin cliente no hay instalación que fotografiar
+    if (facturaConFotoInstalacion.has(fid)) return;
+    if (proyectoConFoto.has(pid)) return;
+    b.sinFoto += 1;
+  };
+
   const anotarCerrado = (
-    per: PeriodoRow | { id: null; nombre: string; proveedor_key: string },
-    prov: string,
+    per: PeriodoRow | { id: null; nombre: string },
+    marcaKey: string,
     tipo: "factura" | "entrega",
     monto: number,
   ) => {
-    const llave = per.id ? String(per.id) : `${prov}::${per.nombre}`;
+    // 🔴 La llave lleva la MARCA. Acumular solo por `periodo.id` metería las 59
+    // facturas de "mid 2026" en UNA sola entrada y la pantalla no podría decir
+    // cuánto le tocó a Tommy y cuánto a Calvin — que es justamente lo que este
+    // cambio vino a partir.
+    const llave = `${per.id ? String(per.id) : per.nombre}::${marcaKey}`;
     let c = cerradosAcc.get(llave);
     if (!c) {
       c = {
         id: per.id ? String(per.id) : null,
-        proveedorKey: prov,
-        proveedorNombre: nombreBloque(prov as BloqueKey),
+        bloqueKey: marcaKey,
+        // 🩸 El nombre sale del BLOQUE, no de `periodo.proveedor_key` — esa
+        // columna dice 'pvh' en la fila del cierre conjunto de verdad.
+        bloqueNombre: nombreDeBloque(marcaKey, inp.marcas),
         nombre: per.nombre,
         cerradoEn: "cerrado_en" in per ? (per.cerrado_en ?? null) : null,
         facturas: { count: 0, total: 0 },
@@ -314,10 +441,10 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
     c.total += monto;
   };
 
-  // Los bloques existen aunque no tengan un centavo: un proveedor al que no le
+  // Los bloques existen aunque no tengan un centavo: una marca a la que no le
   // gastaste nada este período sigue siendo alguien a quien le reportás, y el
   // mockup lo muestra ("Todavía no hay gasto en este período").
-  for (const p of PROVEEDORES) bloque(p.key);
+  for (const m of MARCAS_BLOQUE) bloque(m.key);
   bloque(MULTIFASHION_KEY);
 
   // ---------------------------------------------------------------- FACTURAS
@@ -346,6 +473,7 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
       sumar(b.facturas, num(f.total));
       anotarProyecto(MULTIFASHION_KEY, pid);
       anotarCliente(pid, MULTIFASHION_KEY, num(f.total));
+      anotarPendientes(MULTIFASHION_KEY, f);
       const sumPctMf = rows.reduce((s, x) => s + num(x.porcentaje), 0) || 1;
       for (const r of rows) {
         const mid = String(r.marca_id);
@@ -354,21 +482,19 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
       continue;
     }
 
-    if (rows.length === 0) continue; // sin marca no hay proveedor a quien reportar
+    if (rows.length === 0) continue; // sin marca no hay bloque a quien reportar
     const sumPct = rows.reduce((s, x) => s + num(x.porcentaje), 0) || 1;
 
     for (const r of rows) {
       const mid = String(r.marca_id);
-      const k = bloquePorMarca.get(mid) ?? SIN_PROVEEDOR;
+      const k = bloquePorMarca.get(mid) ?? SIN_BLOQUE;
       const monto = num(f.total) * (num(r.porcentaje) / sumPct);
 
       // 🔑 El proyecto se anota SIEMPRE, esté el documento en el período
       // abierto o en uno cerrado. "Proyectos" es lo que va a listar
-      // "Ver proyectos", y ahí tienen que estar TODOS los del proveedor: a un
+      // "Ver proyectos", y ahí tienen que estar TODOS los de la marca: a un
       // proyecto que hoy solo tiene facturas ya reportadas se le pueden seguir
-      // cargando gastos nuevos. Es la misma regla que ya sostiene
-      // `resumen-inicio.ts`: la tarjeta no puede prometer un número que la
-      // lista no enseña.
+      // cargando gastos nuevos.
       anotarProyecto(k, pid);
 
       const cer = cerradoPara("factura", fid, k, periodoLegacyDeFactura(f, false));
@@ -381,8 +507,8 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
       porMarca[mid] = (porMarca[mid] ?? 0) + monto;
       const b = bloque(k);
       sumar(b.facturas, monto);
-      anotarProyecto(k, pid);
       anotarCliente(pid, k, monto);
+      anotarPendientes(k, f);
     }
   }
 
@@ -407,7 +533,7 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
     }
 
     for (const mid of marcasDeEntrega(e)) {
-      const k = bloquePorMarca.get(mid) ?? SIN_PROVEEDOR;
+      const k = bloquePorMarca.get(mid) ?? SIN_BLOQUE;
       const monto = porcionEntregaParaMarca(e, mid, empresaDeMarca.get(mid));
       if (monto <= 0) continue;
 
@@ -429,26 +555,23 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
   }
 
   // ---------------------------------------------------------------- CIERRE
-  const listaBloques: BloqueProveedor[] = [];
-  const orden: BloqueKey[] = [
-    ...PROVEEDORES.map((p) => p.key as BloqueKey),
+  const listaBloques: BloqueResumen[] = [];
+  const orden: string[] = [
+    ...MARCAS_BLOQUE.map((m) => m.key as string),
     MULTIFASHION_KEY,
-    SIN_PROVEEDOR,
+    SIN_BLOQUE,
   ];
   for (const k of orden) {
     const b = bloques.get(k);
     if (!b) continue;
-    // El bucket "sin proveedor" solo se dibuja si tiene algo adentro: mostrar
-    // un bloque vacío pidiendo una decisión que no cambia nada sería ruido.
-    if (k === SIN_PROVEEDOR && b.facturas.count === 0 && b.muebles.count === 0) continue;
+    // El bucket "sin marca asignada" solo se dibuja si tiene algo adentro:
+    // mostrar un bloque vacío pidiendo una decisión que no cambia nada sería
+    // ruido.
+    if (k === SIN_BLOQUE && b.facturas.count === 0 && b.muebles.count === 0) continue;
     b.facturas.total = round2(b.facturas.total);
     b.muebles.total = round2(b.muebles.total);
     b.total = round2(b.facturas.total + b.muebles.total);
     b.proyectos = proyectosDeBloque.get(k)?.size ?? 0;
-    b.marcas = inp.marcas
-      .filter((m) => (bloquePorMarca.get(String(m.id)) ?? SIN_PROVEEDOR) === k)
-      .map((m) => String(m.nombre ?? "").trim())
-      .filter(Boolean);
     listaBloques.push(b);
   }
 
@@ -459,7 +582,11 @@ export function agregarPorProveedor(inp: EntradaProveedores): ResumenProveedores
       muebles: { ...c.muebles, total: round2(c.muebles.total) },
       total: round2(c.total),
     }))
-    .sort((a, b) => (b.cerradoEn ?? "").localeCompare(a.cerradoEn ?? ""));
+    .sort(
+      (a, b) =>
+        (b.cerradoEn ?? "").localeCompare(a.cerradoEn ?? "") ||
+        a.bloqueNombre.localeCompare(b.bloqueNombre),
+    );
 
   const porClienteLista = [...clientes.values()]
     .map((f) => {

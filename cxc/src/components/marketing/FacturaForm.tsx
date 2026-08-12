@@ -107,10 +107,23 @@ function normalizarPorcentajes(
 }
 
 interface FacturaFormProps {
-  proyecto: ProyectoConMarcas;
+  /**
+   * Solo se usan `id` (para el chequeo de duplicados) y `marcas` (para la marca
+   * inicial). El tipo es un `Pick` a propósito: desde "Registrar gasto" un
+   * gasto puede no tener proyecto —Daniel sacó ese paso— y ahí se pasa
+   * `{ id: "", marcas: [] }`. Los callers viejos siguen pasando el proyecto
+   * entero y encajan igual.
+   */
+  proyecto: Pick<ProyectoConMarcas, "id" | "marcas">;
   marcasCatalogo: MkMarca[];
   initial?: Partial<MkFactura>;
   initialMarcas?: MarcaPorcentajeInput[];
+  /**
+   * La marca ya la eligió la puerta de "Registrar gasto": UNA por gasto, nada
+   * de repartos. Con esto puesto el selector de marcas no se dibuja — enseñar
+   * un control que no cambia nada es peor que no enseñarlo.
+   */
+  marcaFija?: MkMarca | null;
   onSubmit: (data: FacturaFormValues, pdfFile?: File) => Promise<void>;
   onCancel?: () => void;
   onUploadPdfForIA?: (file: File) => Promise<string | null>;
@@ -162,6 +175,7 @@ export function FacturaForm({
   marcasCatalogo,
   initial,
   initialMarcas,
+  marcaFija,
   onSubmit,
   onCancel,
   onUploadPdfForIA,
@@ -215,6 +229,8 @@ export function FacturaForm({
     [marcasCatalogo],
   );
   const marcasIniciales: MarcaSelFactura[] = useMemo(() => {
+    // La marca fija manda sobre todo lo demás: la eligió la puerta.
+    if (marcaFija) return [{ marcaId: marcaFija.id, porcentajeStr: "100" }];
     if (initialMarcas && initialMarcas.length > 0) {
       return normalizarPorcentajes(
         initialMarcas.map((m) => ({
@@ -227,7 +243,7 @@ export function FacturaForm({
       return [{ marcaId: proyecto.marcas[0].marca.id, porcentajeStr: "100" }];
     }
     return [];
-  }, [initialMarcas, proyecto.marcas]);
+  }, [marcaFija, initialMarcas, proyecto.marcas]);
 
   const [marcasSel, setMarcasSel] = useState<MarcaSelFactura[]>(
     () => marcasIniciales,
@@ -483,7 +499,7 @@ export function FacturaForm({
                 value={numeroFactura}
                 onChange={(e) => setNumeroFactura(e.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
               />
             </div>
             <div>
@@ -499,7 +515,7 @@ export function FacturaForm({
                 value={fechaFactura}
                 onChange={(e) => setFechaFactura(e.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
               />
             </div>
           </div>
@@ -514,7 +530,7 @@ export function FacturaForm({
               value={proveedor}
               onChange={(e) => setProveedor(e.target.value)}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
             />
           </div>
 
@@ -528,7 +544,7 @@ export function FacturaForm({
               value={concepto}
               onChange={(e) => setConcepto(e.target.value)}
               required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
             />
           </div>
 
@@ -548,7 +564,7 @@ export function FacturaForm({
                 value={subtotalStr}
                 onChange={(e) => setSubtotalStr(e.target.value)}
                 required
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm tabular-nums focus:border-black focus:outline-none"
               />
             </div>
             <div>
@@ -562,7 +578,7 @@ export function FacturaForm({
                 role="radiogroup"
                 aria-labelledby="factura-itbms-label"
                 aria-disabled={tieneImportacion}
-                className={`flex rounded-md border border-gray-300 overflow-hidden ${
+                className={`flex flex-wrap rounded-md border border-gray-300 ${
                   tieneImportacion ? "opacity-50" : ""
                 }`}
               >
@@ -572,7 +588,7 @@ export function FacturaForm({
                   aria-checked={itbmsOption === "0"}
                   disabled={tieneImportacion}
                   onClick={() => setItbmsOption("0")}
-                  className={`flex-1 px-3 py-2 text-sm transition ${
+                  className={`flex-1 px-3 min-h-[44px] text-sm transition ${
                     itbmsOption === "0"
                       ? "bg-black text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -586,7 +602,7 @@ export function FacturaForm({
                   aria-checked={itbmsOption === "7"}
                   disabled={tieneImportacion}
                   onClick={() => setItbmsOption("7")}
-                  className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
+                  className={`flex-1 px-3 min-h-[44px] text-sm transition border-l border-gray-300 ${
                     itbmsOption === "7"
                       ? "bg-black text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
@@ -614,7 +630,7 @@ export function FacturaForm({
                 value={formatearMonto(total)}
                 readOnly
                 tabIndex={-1}
-                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm tabular-nums text-gray-700"
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 min-h-[44px] text-base sm:text-sm tabular-nums text-gray-700"
               />
               <div className="text-xs text-gray-400 mt-1">
                 {tieneImportacion
@@ -626,12 +642,15 @@ export function FacturaForm({
 
           {/* Zona libre */}
           <div className="rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
               <input
                 type="checkbox"
                 checked={tieneImportacion}
                 onChange={(e) => setTieneImportacion(e.target.checked)}
-                className="accent-black w-4 h-4"
+                /* El cuadradito se ve de 16 px pero el blanco táctil son los
+                   44 px de alto de la etiqueta: `h-11` con `w-4` da el área sin
+                   dibujar un cuadrado gigante. */
+                className="accent-black w-4 h-11"
               />
               <span className="text-sm text-gray-800">
                 Compra en zona libre ({PORCENTAJE_IMPORTACION_ZONA_LIBRE}%)
@@ -710,11 +729,25 @@ export function FacturaForm({
 
       <PasoInstruccion
         numero={3}
-        titulo="Marca y estado del gasto"
-        descripcion="Elige la marca del gasto y si ya está pagado."
+        titulo={marcaFija ? "Estado del gasto" : "Marca y estado del gasto"}
+        descripcion={
+          marcaFija
+            ? "Marca el gasto si ya está pagado."
+            : "Elige la marca del gasto y si ya está pagado."
+        }
         completado={marcasValidas}
       >
         <div className="space-y-3">
+          {/* La marca ya la eligió la puerta de "Registrar gasto": se enseña,
+              no se vuelve a preguntar. */}
+          {marcaFija ? (
+            <div>
+              <span className="block text-sm text-gray-600 mb-1">Marca</span>
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 min-h-[44px] flex items-center text-sm text-gray-800">
+                {marcaFija.nombre}
+              </div>
+            </div>
+          ) : (
           <div>
             <label className="block text-sm text-gray-600 mb-1">
               Marca(s)<span className="text-red-500 ml-0.5">*</span>
@@ -733,7 +766,7 @@ export function FacturaForm({
                         key={m.id}
                         type="button"
                         onClick={() => toggleMarca(m.id)}
-                        className={`text-left rounded-md border-2 px-3 py-2 text-sm transition ${
+                        className={`text-left rounded-md border-2 px-3 py-2 min-h-[44px] text-sm transition ${
                           sel
                             ? "border-black bg-gray-50 font-medium"
                             : "border-gray-200 hover:border-gray-400"
@@ -766,7 +799,7 @@ export function FacturaForm({
                             inputMode="decimal"
                             value={m.porcentajeStr}
                             onChange={(e) => setMarcaPct(m.marcaId, e.target.value)}
-                            className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-right tabular-nums focus:border-black focus:outline-none"
+                            className="w-20 rounded-md border border-gray-300 px-2 py-1.5 min-h-[44px] text-base sm:text-sm text-right tabular-nums focus:border-black focus:outline-none"
                           />
                           <span className="text-sm text-gray-500">%</span>
                         </div>
@@ -791,6 +824,7 @@ export function FacturaForm({
               </>
             )}
           </div>
+          )}
 
           <div>
             <span
@@ -802,14 +836,14 @@ export function FacturaForm({
             <div
               role="radiogroup"
               aria-labelledby="factura-estado-label"
-              className="flex rounded-md border border-gray-300 overflow-hidden sm:max-w-xs"
+              className="flex flex-wrap rounded-md border border-gray-300 sm:max-w-xs"
             >
               <button
                 type="button"
                 role="radio"
                 aria-checked={estadoPago === "creado"}
                 onClick={() => setEstadoPago("creado")}
-                className={`flex-1 px-3 py-2 text-sm transition ${
+                className={`flex-1 px-3 min-h-[44px] text-sm transition ${
                   estadoPago === "creado"
                     ? "bg-gray-600 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
@@ -822,7 +856,7 @@ export function FacturaForm({
                 role="radio"
                 aria-checked={estadoPago === "pagado"}
                 onClick={() => setEstadoPago("pagado")}
-                className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
+                className={`flex-1 px-3 min-h-[44px] text-sm transition border-l border-gray-300 ${
                   estadoPago === "pagado"
                     ? "bg-green-600 text-white"
                     : "bg-white text-gray-700 hover:bg-gray-50"
@@ -846,7 +880,7 @@ export function FacturaForm({
             type="button"
             onClick={onCancel}
             disabled={enviando}
-            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 min-h-[44px] inline-flex items-center justify-center text-sm hover:bg-gray-50 disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -854,7 +888,7 @@ export function FacturaForm({
         <button
           type="submit"
           disabled={!puedeGuardar}
-          className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition disabled:opacity-50"
+          className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition disabled:opacity-50"
         >
           {enviando ? "Guardando…" : "Guardar factura"}
         </button>

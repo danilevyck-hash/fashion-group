@@ -54,7 +54,7 @@ import { signEntregaToken } from "./gallery-token";
 const BUCKET = "marketing";
 const MAX_DIM = 1600; // px — lado mayor de la foto tras redimensionar
 const JPEG_QUALITY = 70;
-const CONCURRENCY = 4; // descargas/compresiones simultáneas
+export const CONCURRENCY = 4; // descargas/compresiones simultáneas
 const LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año
 // Base para los links de galería del Excel (la galería re-firma fotos al abrir).
 const GALERIA_BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fashiongr.com";
@@ -94,7 +94,7 @@ export interface ExportResult {
 
 /** Limpia un texto para carpeta/archivo: conserva espacios y acentos, quita
  *  solo los caracteres peligrosos para rutas. */
-function sanitizeName(s: string | null | undefined, fallback: string): string {
+export function sanitizeName(s: string | null | undefined, fallback: string): string {
   const clean = (s || "")
     .trim()
     .replace(/[/\\:*?"<>|]+/g, "-")
@@ -103,13 +103,13 @@ function sanitizeName(s: string | null | undefined, fallback: string): string {
   return clean || fallback;
 }
 
-function truncar(s: string, max: number): string {
+export function truncar(s: string, max: number): string {
   const t = (s || "").trim();
   return t.length > max ? `${t.slice(0, max).trim()}…` : t;
 }
 
 /** Garantiza un nombre único dentro de un Set (sufijo -2, -3, …). */
-function unico(nombre: string, usados: Set<string>): string {
+export function unico(nombre: string, usados: Set<string>): string {
   let candidato = nombre;
   let n = 2;
   while (usados.has(candidato.toLowerCase())) {
@@ -120,7 +120,7 @@ function unico(nombre: string, usados: Set<string>): string {
 }
 
 /** Pool de concurrencia simple. */
-async function mapLimit<T, R>(
+export async function mapLimit<T, R>(
   items: ReadonlyArray<T>,
   limit: number,
   fn: (item: T, index: number) => Promise<R>,
@@ -140,7 +140,7 @@ async function mapLimit<T, R>(
 }
 
 /** Descarga un adjunto del Storage (o vía fetch si ya es URL absoluta). */
-async function descargar(url: string): Promise<Buffer | null> {
+export async function descargar(url: string): Promise<Buffer | null> {
   try {
     if (esPathStorage(url)) {
       const { data, error } = await supabaseServer.storage
@@ -158,7 +158,7 @@ async function descargar(url: string): Promise<Buffer | null> {
 }
 
 /** Comprime una foto a JPEG (~1600px, q70), respetando orientación EXIF. */
-async function comprimirFoto(input: Buffer): Promise<Buffer | null> {
+export async function comprimirFoto(input: Buffer): Promise<Buffer | null> {
   try {
     return await sharp(input)
       .rotate()
@@ -172,7 +172,7 @@ async function comprimirFoto(input: Buffer): Promise<Buffer | null> {
 
 /** Firma en lote (1 año). Devuelve mapa path→signedUrl. Los paths que ya son
  *  URL absoluta se mapean a sí mismos. */
-async function firmarLote(paths: ReadonlyArray<string>): Promise<Map<string, string>> {
+export async function firmarLote(paths: ReadonlyArray<string>): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const storagePaths: string[] = [];
   for (const p of paths) {
@@ -889,9 +889,25 @@ const splitDeGastos = (gastos: ReadonlyArray<GastoXlsx>): SplitMarcas =>
 // *"dame subtotal solamente, no total"*. La columna "Total" (con ITBMS) se quitó
 // del Resumen y del detalle, y el GRAN TOTAL suma subtotales. No reponerla.
 
+export interface OpcionesResumenGastos {
+  /**
+   * Encabezado de la ÚLTIMA columna de dinero.
+   *
+   * Default: `COL_SUBTOTAL` ("Subtotal (sin ITBMS)") — el ZIP global no cambia
+   * ni un carácter. Existe solo para el ZIP POR MARCA, donde la cifra que se le
+   * reporta al encargado es el TOTAL congelado del período (el mismo `total`
+   * de la factura que ya viajó en el reporte), no el subtotal. Un encabezado
+   * que dijera "sin ITBMS" sobre una columna con ITBMS sería una planilla de
+   * plata mintiendo en su propio título — ver lib/marketing/zip-marca.ts.
+   */
+  etiquetaMonto?: string;
+}
+
 export function buildResumenGastosWorkbook(
   clientes: ReadonlyArray<ClienteResumenXlsx>,
+  opciones: OpcionesResumenGastos = {},
 ): XLSX.WorkBook {
+  const etiquetaMonto = opciones.etiquetaMonto || COL_SUBTOTAL;
   const wb = XLSX.utils.book_new();
 
   // ── 🩸 "Otras marcas" APARECE SOLA CUANDO HAY ALGO QUE MOSTRAR ───────────
@@ -949,7 +965,7 @@ export function buildResumenGastosWorkbook(
     COL_CALVIN,
     COL_TOMMY,
     ...(mostrarOtras ? [COL_OTRAS] : []),
-    COL_SUBTOTAL,
+    etiquetaMonto,
   ];
   const C_RES_CK = 4;
   /** Última columna de dinero (= Subtotal): todo lo de CK..acá va en $. */
@@ -1136,7 +1152,7 @@ export function buildResumenGastosWorkbook(
     COL_CALVIN,
     COL_TOMMY,
     ...(mostrarOtras ? [COL_OTRAS] : []),
-    COL_SUBTOTAL,
+    etiquetaMonto,
     "Comprobante",
   ];
   // Índices con nombre: hay ~10 lugares que dependían del número crudo.

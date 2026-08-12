@@ -23,8 +23,8 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { tituloCase, normalizarTexto } from "./normalizar";
 import { getMarcas } from "./queries";
 import { mesActualISO, mesAnteriorISO } from "./meses";
-import { proveedorPorMarcaId, sellarDocumento } from "./periodos-io";
-import { SIN_PROVEEDOR } from "./proveedores";
+import { bloquePorMarcaId, sellarDocumento } from "./periodos-io";
+import { esMarcaCodigo } from "./bloques";
 import {
   coberturaDelMes,
   etiquetaPeriodo,
@@ -399,7 +399,7 @@ function repartirMonto(
 export async function registrarPagoImpulsadora(
   impulsadoraId: string,
   input: RegistrarPagoImpulsadoraInput,
-): Promise<{ facturasCreadas: number }> {
+): Promise<{ facturasCreadas: number; fotoGuardada: boolean | null }> {
   if (!impulsadoraId) throw new Error("impulsadoraId requerido");
 
   // Comprobante obligatorio (validación dura server-side).
@@ -540,24 +540,57 @@ export async function registrarPagoImpulsadora(
   }
 
   // El pago de una impulsadora es una factura por marca, así que se sella igual
-  // que cualquier otro gasto: con el período que ese proveedor tenía ABIERTO
+  // que cualquier otro gasto: con el período que esa MARCA tenía ABIERTO
   // hoy, no con el mes trabajado. Una quincena de junio cargada en agosto entra
   // en el período abierto y se reporta en el próximo corte.
   //
   // Nunca es fatal: si el sello falla, el pago ya está guardado y el gasto se
   // ve como del período actual — que es el default correcto.
-  const provPorMarca = await proveedorPorMarcaId(paraSellar.map((s) => s.marcaId));
+  const bloqueDeMarca = await bloquePorMarcaId(paraSellar.map((s) => s.marcaId));
   for (const s of paraSellar) {
-    const key = provPorMarca.get(s.marcaId);
-    if (!key || key === SIN_PROVEEDOR) continue;
+    const key = bloqueDeMarca.get(s.marcaId);
+    if (!key || !esMarcaCodigo(key)) continue;
     await sellarDocumento({
       tipo: "factura",
       documentoId: s.facturaId,
-      proveedorKeys: [key],
+      marcaKeys: [key],
     });
   }
 
-  return { facturasCreadas: creadas.length };
+  // Foto OPCIONAL del pago (un evento, una activación). Se cuelga de CADA
+  // factura creada: un pago repartido en 2 marcas son 2 facturas, y el ZIP de
+  // cada marca tiene que traer la foto — el encargado de una no ve la de la
+  // otra.
+  //
+  // 🩸 NUNCA es fatal, y por dos razones distintas:
+  //   1. El pago YA está guardado; tumbar el request por la foto le diría a la
+  //      secretaria "no se guardó" sobre un pago que sí se guardó.
+  //   2. Pre-DDL, `mk_adjuntos` todavía no acepta `foto_instalacion` (el CHECK
+  //      viejo la rechaza). El pago sale igual, y `fotoGuardada: false` le da
+  //      a la pantalla la manera de DECIRLO — una foto que se pierde en
+  //      silencio es peor que una que avisa que no entró.
+  // `fotoGuardada: null` = no venía foto (no hay nada que reportar).
+  let fotoGuardada: boolean | null = null;
+  const fotoPath = normalizarTexto(input.foto?.path ?? "");
+  if (fotoPath) {
+    const filas = creadas.map((facturaId) => ({
+      proyecto_id: null,
+      factura_id: facturaId,
+      tipo: "foto_instalacion",
+      url: fotoPath,
+      nombre_original: input.foto?.nombreOriginal
+        ? normalizarTexto(input.foto.nombreOriginal)
+        : null,
+      size_bytes: input.foto?.sizeBytes ?? null,
+    }));
+    const { error: fotoErr } = await supabaseServer.from("mk_adjuntos").insert(filas);
+    fotoGuardada = !fotoErr;
+    if (fotoErr) {
+      console.error(`registrarPagoImpulsadora[foto]: ${fotoErr.message}`);
+    }
+  }
+
+  return { facturasCreadas: creadas.length, fotoGuardada };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

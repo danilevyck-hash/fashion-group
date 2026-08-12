@@ -278,10 +278,22 @@ export async function updateProyectoMarcas(
 // `actualizarRepartoProyecto`, que son los DOS únicos lugares que la escriben.
 // Una factura que nunca recibe marca tampoco entra en ningún reporte, así que
 // no queda nada suelto.
+/**
+ * Mensaje para cuando la base todavía tiene el CHECK viejo
+ * (`mk_facturas_origen_check`: proyecto O impulsadora, nunca los dos NULL).
+ * La migración 20260811180000 lo quita; hasta que Daniel la corra, un gasto
+ * sin cliente rebota en la base y ESTE texto es lo que ve la secretaria —
+ * no un error de Postgres.
+ */
+export const MSG_SIN_CLIENTE_SIN_DDL =
+  "Para registrar un gasto sin cliente falta correr la actualización de la base de datos. Mientras tanto, elegí un cliente.";
+
 export async function createFactura(
   input: CreateFacturaInput
 ): Promise<MkFactura> {
-  if (!input.proyectoId) throw new Error("proyectoId requerido");
+  // `proyectoId` OPCIONAL desde el rediseño "Registrar gasto": un gasto sin
+  // cliente (evento, catálogo, material general) se guarda con proyecto NULL
+  // y sale en el reporte de su marca bajo "General".
   const numero = normalizarTexto(input.numeroFactura);
   assertNoVacio(numero, "numeroFactura");
   const proveedor = tituloCase(input.proveedor);
@@ -312,7 +324,7 @@ export async function createFactura(
   const estadoPago = input.estadoPago === "pagado" ? "pagado" : "creado";
 
   const payload = {
-    proyecto_id: input.proyectoId,
+    proyecto_id: input.proyectoId ?? null,
     numero_factura: numero,
     fecha_factura: fecha,
     proveedor,
@@ -330,6 +342,11 @@ export async function createFactura(
     .select("*")
     .single();
   if (error || !data) {
+    // Pre-DDL: el CHECK viejo rechaza proyecto e impulsadora los dos en NULL.
+    // La pantalla tiene que degradar limpio ANTES de que corra la migración.
+    if (!input.proyectoId && /mk_facturas_origen_check/i.test(error?.message ?? "")) {
+      throw new Error(MSG_SIN_CLIENTE_SIN_DDL);
+    }
     throw new Error(`createFactura: ${error?.message ?? "sin datos"}`);
   }
   return data as MkFactura;

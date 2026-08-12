@@ -9,10 +9,10 @@ import {
 } from "@/lib/marketing/resumen-inicio";
 import {
   MULTIFASHION_KEY,
-  SIN_PROVEEDOR,
-  esProveedorKey,
-  indiceProveedorPorMarcaId,
-} from "@/lib/marketing/proveedores";
+  SIN_BLOQUE,
+  esMarcaCodigo,
+  indiceBloquePorMarcaId,
+} from "@/lib/marketing/bloques";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,8 +20,10 @@ export const fetchCache = "force-no-store";
 
 // GET /api/marketing/proyectos-lista
 //   ?filtro_estado=activos|todos|abierto|por_cobrar|enviado|cobrado
-//   ?proveedor=pvh|reebok|joybees|multifashion|sin_proveedor
-//                     → solo proyectos del bloque del inicio (modelo nuevo)
+//   ?bloque=TH|CK|KL|RBK|J|multifashion|sin_bloque
+//                     → solo proyectos del bloque del inicio (una MARCA por
+//                       bloque). `?proveedor=` se sigue aceptando como nombre
+//                       viejo del mismo parámetro.
 //   ?marca_id=<uuid>  → solo proyectos con ≥1 factura de esa marca
 //   ?busqueda=<str>   → match en nombre o tienda del proyecto (ILIKE),
 //                       y también en sus facturas: número de factura,
@@ -50,15 +52,24 @@ export async function GET(req: NextRequest) {
   // factura legacy (bucket "Tommy y Calvin"); grupo=marca + marca_id → solo
   // proyectos con ≥1 factura NO-legacy de esa marca. Sin grupo = sin filtro (compat).
   const grupo = (url.searchParams.get("grupo") ?? "").toLowerCase();
-  // Bloque del inicio (modelo por PROVEEDOR): pvh | reebok | joybees |
-  // multifashion | sin_proveedor. Lista blanca explícita — un valor
-  // desconocido cae a null (sin filtro) en vez de colarse hasta la partición.
-  const proveedorRaw = (url.searchParams.get("proveedor") ?? "").toLowerCase();
-  const proveedor =
-    esProveedorKey(proveedorRaw) ||
-    proveedorRaw === MULTIFASHION_KEY ||
-    proveedorRaw === SIN_PROVEEDOR
-      ? proveedorRaw
+  // Bloque del inicio (modelo por MARCA): TH | CK | KL | RBK | J |
+  // multifashion | sin_bloque. Lista blanca explícita — un valor desconocido
+  // cae a null (sin filtro) en vez de colarse hasta la partición.
+  //
+  // ⚠️ El código de marca va en MAYÚSCULAS y los dos buckets en minúsculas, así
+  // que no se puede bajar todo a minúsculas de entrada: `th` tiene que
+  // encontrar a Tommy igual, porque el parámetro lo escribe una persona.
+  const bloqueRaw = (
+    url.searchParams.get("bloque") ??
+    url.searchParams.get("proveedor") ??
+    ""
+  ).trim();
+  const bloqueUp = bloqueRaw.toUpperCase();
+  const bloqueLow = bloqueRaw.toLowerCase();
+  const bloque = esMarcaCodigo(bloqueUp)
+    ? bloqueUp
+    : bloqueLow === MULTIFASHION_KEY || bloqueLow === SIN_BLOQUE
+      ? bloqueLow
       : null;
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
@@ -362,27 +373,27 @@ export async function GET(req: NextRequest) {
     //   sin grupo     → filtro marca_id sobre TODAS las facturas (compat previa).
     // Proyectos sin facturas de ese bucket quedan fuera (un proyecto vacío no
     // pertenece a ninguna marca todavía).
-    // Índice marca_id → bloque. Fuente ÚNICA: lib/marketing/proveedores.ts —
-    // el mismo mapa que usa el resumen del inicio, así que la lista enseña
+    // Índice marca_id → bloque. Fuente ÚNICA: lib/marketing/bloques.ts — el
+    // mismo mapa que usa el resumen del inicio, así que la lista enseña
     // exactamente los proyectos que el bloque contó.
-    const bloquePorMarca = indiceProveedorPorMarcaId(marcas);
+    const bloquePorMarca = indiceBloquePorMarcaId(marcas);
 
-    const passProveedor = (pid: string): boolean => {
+    const passBloque = (pid: string): boolean => {
       // Multifashion es del PROYECTO (tienda propia), no de la marca.
-      if (proveedor === MULTIFASHION_KEY) return proyectosMf.has(pid);
+      if (bloque === MULTIFASHION_KEY) return proyectosMf.has(pid);
       if (proyectosMf.has(pid)) return false;
       // marcasByProy junta las marcas de las facturas (legacy incluidas) y las
-      // de las entregas de muebles, igual que `agregarPorProveedor`.
+      // de las entregas de muebles, igual que `agregarPorBloques`.
       const set = marcasByProy.get(pid);
       if (!set) return false;
       for (const mid of set) {
-        if ((bloquePorMarca.get(mid) ?? SIN_PROVEEDOR) === proveedor) return true;
+        if ((bloquePorMarca.get(mid) ?? SIN_BLOQUE) === bloque) return true;
       }
       return false;
     };
 
     const passBucket = (pid: string): boolean => {
-      if (proveedor) return passProveedor(pid);
+      if (bloque) return passBloque(pid);
       // Multifashion es un bucket INDEPENDIENTE: entra solo con
       // grupo=multifashion y queda fuera de legacy y de las marcas.
       if (grupo === "multifashion") return proyectosMf.has(pid);
@@ -414,10 +425,10 @@ export async function GET(req: NextRequest) {
     const esVistaJoybees = filtroEstado === "joybees";
     const passTipo = (pid: string): boolean => {
       // 🩸 El split interno/externo es del tab Joybees legacy y NO aplica al
-      // modelo por proveedor: un bloque tiene que enseñar TODOS sus proyectos.
-      // Si se aplicara, "Ver proyectos" de un proveedor con marcas internas
-      // devolvería una lista vacía mientras su bloque muestra plata.
-      if (proveedor) return true;
+      // modelo por marca: un bloque tiene que enseñar TODOS sus proyectos. Si
+      // se aplicara, "Ver proyectos" de una marca interna devolvería una lista
+      // vacía mientras su bloque muestra plata.
+      if (bloque) return true;
       const interno = proyectoEsInterno(pid);
       return esVistaJoybees ? interno : !interno;
     };

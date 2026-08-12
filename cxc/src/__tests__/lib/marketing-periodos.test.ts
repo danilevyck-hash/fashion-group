@@ -1,5 +1,12 @@
 // ============================================================================
-// CANDADO — períodos por proveedor: sellado al REGISTRAR y cierre por proveedor
+// CANDADO — períodos por MARCA: sellado al REGISTRAR y cierre por marca
+//
+// 🔴 Este archivo corre con la base COMO ESTÁ HOY: los períodos abiertos son
+// los VIEJOS por proveedor ('pvh', 'reebok'), porque la migración por marca la
+// corre Daniel A MANO. O sea que además de probar el cierre, prueba la
+// DEGRADACIÓN: Tommy y Calvin resuelven las dos a 'pvh' y comparten sello,
+// exactamente como hoy. La dirección contraria —con la migración ya corrida—
+// vive en el último describe.
 //
 // Lo que defiende, punto por punto:
 //   1. Una factura registrada HOY va al período ABIERTO aunque su
@@ -7,13 +14,13 @@
 //      REGISTRÓ, no por la fecha del papel — si fuera por la fecha, una
 //      factura atrasada se metería en un período ya reportado y el papel que
 //      el proveedor tiene en la mano dejaría de coincidir con el sistema.
-//   2. Cerrar PVH NO toca la parte de Reebok del mismo proyecto. Los proyectos
-//      no se cierran; se cierra la parte de UN proveedor.
+//   2. Cerrar Tommy NO toca la parte de Reebok del mismo proyecto. Los
+//      proyectos no se cierran; se cierra la parte de UNA marca.
 //   3. SIN las tablas de período (la migración la corre Daniel a mano) sellar
 //      es un no-op silencioso y guardar una factura sigue funcionando igual.
-//   4. Cerrar deja exactamente UN período abierto para ese proveedor. Ni dos
-//      (el documento nuevo no sabría en cuál entrar) ni cero (el proveedor se
-//      quedaría sin dónde registrar).
+//   4. Cerrar deja exactamente UN período abierto para esa marca. Ni dos (el
+//      documento nuevo no sabría en cuál entrar) ni cero (la marca se quedaría
+//      sin dónde registrar).
 //   5. El reporte guardado NO cambia si después cambian los datos.
 //
 // Corre contra un doble EN MEMORIA de PostgREST: las funciones y los ROUTES
@@ -240,6 +247,7 @@ import {
 } from "@/lib/marketing/periodos-reporte";
 import { periodoAbiertoDe, sellarDocumento } from "@/lib/marketing/periodos-io";
 import { POST as cerrarPeriodoRoute } from "@/app/api/marketing/periodos/[id]/cerrar/route";
+import { POST as cerrarGrupoRoute } from "@/app/api/marketing/periodos/cerrar-grupo/route";
 import { PATCH as renombrarRoute } from "@/app/api/marketing/periodos/[id]/route";
 import { GET as reporteRoute } from "@/app/api/marketing/periodos/[id]/reporte/route";
 
@@ -380,7 +388,7 @@ describe("el sello se pone al REGISTRAR, no por la fecha del documento", () => {
     expect(sellos[0].tipo).toBe("factura");
   });
 
-  it("una factura de dos proveedores recibe UN sello por proveedor", async () => {
+  it("una factura de dos bloques distintos recibe UN sello por bloque", async () => {
     const facturaId = await registrarFactura({
       numero: "F-002",
       fecha: "2026-08-11",
@@ -395,7 +403,7 @@ describe("el sello se pone al REGISTRAR, no por la fecha del documento", () => {
     ).toBe(PER_RBK_ABIERTO);
   });
 
-  it("Tommy y Calvin son el MISMO proveedor: un solo sello", async () => {
+  it("SIN la migración por marca, Tommy y Calvin comparten el sello viejo 'pvh'", async () => {
     const facturaId = await registrarFactura({
       numero: "F-003",
       fecha: "2026-08-11",
@@ -405,7 +413,7 @@ describe("el sello se pone al REGISTRAR, no por la fecha del documento", () => {
     expect(sellosDe(facturaId)).toHaveLength(1);
   });
 
-  it("una marca SIN proveedor decidido no se sella con nadie", async () => {
+  it("una marca SIN bloque decidido no se sella con nadie", async () => {
     const facturaId = await registrarFactura({
       numero: "F-004",
       fecha: "2026-08-11",
@@ -497,8 +505,8 @@ describe("cerrar un período", () => {
     await registrarFactura({ numero: "F-RBK", fecha: "2026-08-02", total: 700, marcaIds: [MARCA_RBK] });
 
     const antes = agregar(await cargarDatosPeriodos());
-    expect(antes.bloques.find((b) => b.key === "pvh")!.total).toBe(1000);
-    expect(antes.bloques.find((b) => b.key === "reebok")!.total).toBe(700);
+    expect(antes.bloques.find((b) => b.key === "TH")!.total).toBe(1000);
+    expect(antes.bloques.find((b) => b.key === "RBK")!.total).toBe(700);
 
     const res = await cerrarPeriodoRoute(req({ nombreSiguiente: "Temporada 2" }), {
       params: { id: PER_PVH_ABIERTO },
@@ -506,9 +514,9 @@ describe("cerrar un período", () => {
     expect(res.status).toBe(200);
 
     const despues = agregar(await cargarDatosPeriodos());
-    // PVH quedó en cero (su gasto pasó al archivo) y Reebok NO se movió.
-    expect(despues.bloques.find((b) => b.key === "pvh")!.total).toBe(0);
-    expect(despues.bloques.find((b) => b.key === "reebok")!.total).toBe(700);
+    // Tommy quedó en cero (su gasto pasó al archivo) y Reebok NO se movió.
+    expect(despues.bloques.find((b) => b.key === "TH")!.total).toBe(0);
+    expect(despues.bloques.find((b) => b.key === "RBK")!.total).toBe(700);
     expect(despues.cerrados.find((c) => c.id === PER_PVH_ABIERTO)!.total).toBe(1000);
     // El período de Reebok sigue siendo el mismo, abierto.
     const rbk = estado.tablas.mk_periodos.find((p) => p.id === PER_RBK_ABIERTO)!;
@@ -646,7 +654,7 @@ describe("el reporte guardado no se recalcula nunca", () => {
     expect(sellosDe(tardia)[0].periodo_id).toBe(nuevo.id);
 
     const resumen = agregar(await cargarDatosPeriodos());
-    expect(resumen.bloques.find((b) => b.key === "pvh")!.total).toBe(400);
+    expect(resumen.bloques.find((b) => b.key === "TH")!.total).toBe(400);
     expect(resumen.cerrados.find((c) => c.id === PER_PVH_ABIERTO)!.total).toBe(1000);
   });
 
@@ -701,5 +709,222 @@ describe("renombrar", () => {
       params: { id: PER_PVH_ABIERTO },
     });
     expect(res.status).toBe(400);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// CON LA MIGRACIÓN POR MARCA YA CORRIDA
+//
+// 🔴 La otra dirección de la degradación. Acá cada marca tiene SU período, así
+// que el sello se escribe con el CÓDIGO y "Cerrar las tres" hace tres cierres
+// seguidos — no un cierre conjunto. Es el estado en el que va a quedar la base
+// cuando Daniel corra `20260811180000_marketing_periodos_por_marca.sql`.
+// ────────────────────────────────────────────────────────────────────────────
+const PER_TH = "11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const PER_CK = "22222222-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const PER_KL = "33333333-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const PER_RBK = "44444444-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+/** Deja SOLO períodos por marca: la base después de la migración. */
+function migrarAPeriodosPorMarca(): void {
+  estado.tablas.mk_periodos = [
+    { id: PER_TH, proveedor_key: "TH", nombre: "Período 2026", estado: "abierto", abierto_en: "2026-07-01T00:00:00Z", cerrado_en: null, cerrado_por: null, reporte: null },
+    { id: PER_CK, proveedor_key: "CK", nombre: "Período 2026", estado: "abierto", abierto_en: "2026-07-01T00:00:00Z", cerrado_en: null, cerrado_por: null, reporte: null },
+    { id: PER_KL, proveedor_key: "KL", nombre: "Período 2026", estado: "abierto", abierto_en: "2026-07-01T00:00:00Z", cerrado_en: null, cerrado_por: null, reporte: null },
+    { id: PER_RBK, proveedor_key: "RBK", nombre: "Temporada 1", estado: "abierto", abierto_en: "2026-07-01T00:00:00Z", cerrado_en: null, cerrado_por: null, reporte: null },
+  ];
+  estado.tablas.mk_periodo_documentos = [];
+}
+
+describe("con la migración por marca corrida, el sello va por CÓDIGO", () => {
+  beforeEach(() => {
+    migrarAPeriodosPorMarca();
+  });
+
+  it("Tommy y Calvin reciben UN sello CADA UNA, con su propio código", async () => {
+    const facturaId = await registrarFactura({
+      numero: "F-M1",
+      fecha: "2026-08-11",
+      total: 800,
+      marcaIds: [MARCA_TH, MARCA_CK],
+    });
+    const sellos = sellosDe(facturaId);
+    expect(sellos.map((s) => s.proveedor_key).sort()).toEqual(["CK", "TH"]);
+    expect(sellos.find((s) => s.proveedor_key === "TH")!.periodo_id).toBe(PER_TH);
+    expect(sellos.find((s) => s.proveedor_key === "CK")!.periodo_id).toBe(PER_CK);
+  });
+
+  it("cerrar Tommy deja a Calvin intacta, aunque cierren el mismo día", async () => {
+    await registrarFactura({ numero: "F-TH", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
+    await registrarFactura({ numero: "F-CK", fecha: "2026-08-02", total: 600, marcaIds: [MARCA_CK] });
+
+    const res = await cerrarPeriodoRoute(req({ nombreSiguiente: "Temporada 2" }), {
+      params: { id: PER_TH },
+    });
+    expect(res.status).toBe(200);
+
+    const despues = agregar(await cargarDatosPeriodos());
+    expect(despues.bloques.find((b) => b.key === "TH")!.total).toBe(0);
+    expect(despues.bloques.find((b) => b.key === "CK")!.total).toBe(600);
+    expect(estado.tablas.mk_periodos.find((p) => p.id === PER_CK)!.estado).toBe("abierto");
+  });
+
+  it("el cierre devuelve el ZIP de la marca, para poder bajarlo", async () => {
+    await registrarFactura({ numero: "F-TH", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
+    const res = await cerrarPeriodoRoute(req({ nombreSiguiente: "Temporada 2" }), {
+      params: { id: PER_TH },
+    });
+    const body = (await res.json()) as {
+      zip: { marcaCodigo: string; marcaNombre: string; periodoId: string; periodoNombre: string };
+      cerrado: { marcaCodigo: string; marcaNombre: string };
+    };
+    expect(body.zip).toEqual({
+      marcaCodigo: "TH",
+      marcaNombre: "Tommy Hilfiger",
+      periodoId: PER_TH,
+      periodoNombre: "Período 2026",
+    });
+    expect(body.cerrado.marcaNombre).toBe("Tommy Hilfiger");
+  });
+
+  it("el reporte de Tommy NO lleva la plata de Calvin", async () => {
+    await registrarFactura({ numero: "F-TH", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
+    await registrarFactura({ numero: "F-CK", fecha: "2026-08-02", total: 600, marcaIds: [MARCA_CK] });
+
+    const datos = await cargarDatosPeriodos();
+    const { reporte } = armarReportePeriodo(datos, {
+      id: PER_TH,
+      proveedor_key: "TH",
+      nombre: "Período 2026",
+    });
+    expect(reporte.totales.total).toBe(1000);
+    expect(reporte.facturas.map((f) => f.numero)).toEqual(["F-TH"]);
+    expect(reporte.proveedorNombre).toBe("Tommy Hilfiger");
+  });
+});
+
+describe("«Cerrar las tres» son TRES cierres seguidos", () => {
+  beforeEach(() => {
+    migrarAPeriodosPorMarca();
+  });
+
+  it("cierra Tommy y Calvin, NO crea un período vacío para Karl, y no toca Reebok", async () => {
+    await registrarFactura({ numero: "F-TH", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
+    await registrarFactura({ numero: "F-CK", fecha: "2026-08-02", total: 600, marcaIds: [MARCA_CK] });
+    await registrarFactura({ numero: "F-RBK", fecha: "2026-08-03", total: 700, marcaIds: [MARCA_RBK] });
+
+    const res = await cerrarGrupoRoute(
+      req({ grupo: "pvh", nombreSiguiente: "Temporada 2" }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      ok: boolean;
+      cerradas: number;
+      cierres: Array<{
+        marcaCodigo: string;
+        marcaNombre: string;
+        total: number;
+        cerrado: boolean;
+        motivo?: string;
+        zip?: { marcaCodigo: string };
+      }>;
+    };
+
+    expect(body.ok).toBe(true);
+    expect(body.cerradas).toBe(2);
+    expect(body.cierres.map((c) => c.marcaCodigo)).toEqual(["TH", "CK", "KL"]);
+
+    const th = body.cierres.find((c) => c.marcaCodigo === "TH")!;
+    const ck = body.cierres.find((c) => c.marcaCodigo === "CK")!;
+    const kl = body.cierres.find((c) => c.marcaCodigo === "KL")!;
+    expect(th.cerrado).toBe(true);
+    expect(th.total).toBe(1000);
+    expect(th.zip!.marcaCodigo).toBe("TH");
+    expect(ck.cerrado).toBe(true);
+    expect(ck.total).toBe(600);
+    expect(ck.zip!.marcaCodigo).toBe("CK");
+    // 🩸 Karl no tiene gasto: NO se le inventa un cierre vacío.
+    expect(kl.cerrado).toBe(false);
+    expect(kl.motivo).toMatch(/no tiene gasto/i);
+
+    // Dos cierres de verdad, cada uno con SU reporte.
+    const cerrados = estado.tablas.mk_periodos.filter((p) => p.estado === "cerrado");
+    expect(cerrados.map((p) => p.proveedor_key).sort()).toEqual(["CK", "TH"]);
+    for (const p of cerrados) expect(p.reporte).toBeTruthy();
+    // El de Karl sigue abierto y es el MISMO de antes (no se abrió otro).
+    expect(estado.tablas.mk_periodos.find((p) => p.id === PER_KL)!.estado).toBe("abierto");
+    // Reebok, que no es del grupo, ni se tocó.
+    expect(estado.tablas.mk_periodos.find((p) => p.id === PER_RBK)!.estado).toBe("abierto");
+    expect(agregar(await cargarDatosPeriodos()).bloques.find((b) => b.key === "RBK")!.total).toBe(700);
+
+    // Y cada marca quedó con exactamente UN período abierto.
+    for (const codigo of ["TH", "CK", "KL"]) {
+      const abiertos = estado.tablas.mk_periodos.filter(
+        (p) => p.proveedor_key === codigo && p.estado === "abierto",
+      );
+      expect(abiertos).toHaveLength(1);
+    }
+  });
+
+  it("si una falla a mitad, la ya cerrada QUEDA cerrada y se informa cuál falló", async () => {
+    await registrarFactura({ numero: "F-TH", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
+    await registrarFactura({ numero: "F-CK", fecha: "2026-08-02", total: 600, marcaIds: [MARCA_CK] });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let cerradosVistos = 0;
+    const insertOriginal = estado.insertRoto;
+    // El primer cierre pasa; al abrir el período siguiente de Calvin, revienta.
+    const espia = vi.spyOn(estado.tablas.mk_periodos, "push");
+    espia.mockImplementation(function (this: unknown, ...filas: unknown[]) {
+      cerradosVistos += 1;
+      if (cerradosVistos > 1) throw new Error("boom");
+      return Array.prototype.push.apply(estado.tablas.mk_periodos, filas as never[]);
+    } as never);
+
+    const res = await cerrarGrupoRoute(
+      req({ grupo: "pvh", nombreSiguiente: "Temporada 2" }),
+    );
+    espia.mockRestore();
+    estado.insertRoto = insertOriginal;
+
+    const body = (await res.json()) as {
+      ok: boolean;
+      cerradas: number;
+      error?: string;
+      cierres: Array<{ marcaCodigo: string; cerrado: boolean; motivo?: string }>;
+    };
+    expect(body.ok).toBe(false);
+    expect(body.cerradas).toBe(1);
+    expect(body.error).toMatch(/Calvin Klein/);
+    // Tommy quedó cerrado: su reporte ya se generó y no se deshace.
+    expect(
+      estado.tablas.mk_periodos.find((p) => p.id === PER_TH)!.estado,
+    ).toBe("cerrado");
+    // Y Karl ni se intentó.
+    const kl = body.cierres.find((c) => c.marcaCodigo === "KL")!;
+    expect(kl.cerrado).toBe(false);
+    expect(kl.motivo).toMatch(/no se intentó/i);
+  });
+
+  it("un grupo que no existe se rechaza sin tocar nada", async () => {
+    const res = await cerrarGrupoRoute(req({ grupo: "inventado", nombreSiguiente: "X" }));
+    expect(res.status).toBe(400);
+    expect(estado.tablas.mk_periodos.every((p) => p.estado === "abierto")).toBe(true);
+  });
+
+  it("exige el nombre del próximo período", async () => {
+    const res = await cerrarGrupoRoute(req({ grupo: "pvh", nombreSiguiente: "  " }));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/cómo se va a llamar/i);
+  });
+
+  it("sin las tablas de período responde 409 en español, nunca 500", async () => {
+    estado.hayTablasPeriodo = false;
+    const res = await cerrarGrupoRoute(req({ grupo: "pvh", nombreSiguiente: "X" }));
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/actualización en la base de datos/i);
+    expect(body.error).not.toMatch(/mk_periodo|42P01|relation/i);
   });
 });
