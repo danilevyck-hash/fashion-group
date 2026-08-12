@@ -40,6 +40,19 @@
 //     "Piezas" para que nadie las confunda. Sin bultos anotados la celda va
 //     en blanco, NUNCA en 0 (ver ./piezas-bultos.ts).
 //
+// ── SON DOS PAPELES, PERO UN SOLO GENERADOR (12-ago-2026) ────────────────────
+//   Daniel, textual: *"lo de los bultos no es para el comprobante que le mando
+//   a la marca, sino para el envio del producto al cliente, son dos cosas
+//   distintas"*. El MISMO dibujo sirve para los dos, con un flag:
+//     · `incluirBultos: true` (default) → **NOTA DE ENTREGA**: el papel que
+//       viaja con la mercancía al cliente. Lleva la columna Bultos, que es lo
+//       que cuenta quien recibe los paquetes.
+//     · `incluirBultos: false` → **COMPROBANTE DE ENTREGA**: el que va a la
+//       marca dentro del ZIP del período. A la marca le interesa la plata,
+//       no en cuántas cajas viajó — sale SIN la columna Bultos.
+//   🔴 Sigue habiendo UN generador, deliberado: dos módulos serían dos papeles
+//   que divergen. El flag solo agrega/quita la columna y ajusta el título.
+//
 // ⚠️ OJO CON EL LOGO: `addImage` va envuelto en try/catch, así que si el base64
 // estuviera mal el logo desaparecería SIN error (fue el bug del 26-jul-2026, a
 // la cadena le faltaba un `=`). El candado del base64 es
@@ -180,8 +193,21 @@ function campo(
   doc.text(lineas.slice(0, 2), x, y + 7);
 }
 
+export interface OpcionesPapelEntrega {
+  /**
+   * `true` (default) → NOTA DE ENTREGA, con columna Bultos (el papel del
+   * envío al cliente). `false` → COMPROBANTE DE ENTREGA, sin Bultos (el que
+   * va a la marca en el ZIP). Ver el encabezado del archivo.
+   */
+  incluirBultos?: boolean;
+}
+
 /** Construye el documento (sin escribirlo) — así el test puede inspeccionarlo. */
-export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
+export function buildComprobanteEntregaDoc(
+  d: EntregaMueblePdfData,
+  opciones: OpcionesPapelEntrega = {},
+): jsPDF {
+  const incluirBultos = opciones.incluirBultos !== false;
   const doc = new jsPDF({ unit: "mm", format: "letter" });
 
   // ── Banda: de quién es (logo), qué es (título), cuál es y de cuándo ───────
@@ -198,7 +224,12 @@ export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setCharSpace(0.4);
-  doc.text("COMPROBANTE DE ENTREGA", titleX, 16);
+  // El título dice cuál de los dos papeles es — mismo dibujo, dos destinos.
+  doc.text(
+    incluirBultos ? "NOTA DE ENTREGA" : "COMPROBANTE DE ENTREGA",
+    titleX,
+    16,
+  );
   doc.setCharSpace(0);
 
   doc.setFontSize(12.5);
@@ -239,26 +270,39 @@ export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
   // que mostrar — un comprobante sin fotos queda idéntico al de antes.
   const hayFotos = d.items.some((i) => !!i.fotoDataUrl);
 
+  // La columna Bultos solo existe en la nota de envío (`incluirBultos`).
+  // Piezas y precios son idénticos en los dos papeles: es la misma entrega.
+  const filaDe = (i: EntregaMuebleItemPdf): string[] => [
+    "",
+    i.articulo || "—",
+    String(i.cantidad ?? 0),
+    ...(incluirBultos ? [textoBultos(i.bultos)] : []),
+    `$${fmt(i.precioUnitario)}`,
+    `$${fmt((Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0))}`,
+  ];
+
   autoTable(doc, {
     startY: 71,
     margin: { left: MARGIN, right: MARGIN },
-    head: [["", "Artículo", "Piezas", "Bultos", "Precio unitario", "Importe"]],
+    head: [
+      [
+        "",
+        "Artículo",
+        "Piezas",
+        ...(incluirBultos ? ["Bultos"] : []),
+        "Precio unitario",
+        "Importe",
+      ],
+    ],
     body:
       d.items.length > 0
-        ? d.items.map((i) => [
-            "",
-            i.articulo || "—",
-            String(i.cantidad ?? 0),
-            textoBultos(i.bultos),
-            `$${fmt(i.precioUnitario)}`,
-            `$${fmt((Number(i.cantidad) || 0) * (Number(i.precioUnitario) || 0))}`,
-          ])
+        ? d.items.map(filaDe)
         : [
             [
               "",
               "Sin detalle de artículos registrado",
               "—",
-              "",
+              ...(incluirBultos ? [""] : []),
               "—",
               `$${fmt(d.total)}`,
             ],
@@ -278,9 +322,16 @@ export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
         minCellHeight: hayFotos ? FOTO_MM + 4 : 0,
       },
       2: { halign: "center", cellWidth: 18 },
-      3: { halign: "center", cellWidth: 18 },
-      4: { halign: "right", cellWidth: 30 },
-      5: { halign: "right", cellWidth: 30 },
+      ...(incluirBultos
+        ? {
+            3: { halign: "center" as const, cellWidth: 18 },
+            4: { halign: "right" as const, cellWidth: 30 },
+            5: { halign: "right" as const, cellWidth: 30 },
+          }
+        : {
+            3: { halign: "right" as const, cellWidth: 30 },
+            4: { halign: "right" as const, cellWidth: 30 },
+          }),
     },
     didDrawCell: (data) => {
       if (data.section !== "body" || data.column.index !== 0) return;
@@ -332,8 +383,11 @@ export function buildComprobanteEntregaDoc(d: EntregaMueblePdfData): jsPDF {
   return doc;
 }
 
-/** Comprobante listo para servir o para meter en el ZIP. */
-export function buildComprobanteEntregaPdf(d: EntregaMueblePdfData): Buffer {
-  const doc = buildComprobanteEntregaDoc(d);
+/** Papel listo para servir o para meter en el ZIP. */
+export function buildComprobanteEntregaPdf(
+  d: EntregaMueblePdfData,
+  opciones: OpcionesPapelEntrega = {},
+): Buffer {
+  const doc = buildComprobanteEntregaDoc(d, opciones);
   return Buffer.from(doc.output("arraybuffer"));
 }

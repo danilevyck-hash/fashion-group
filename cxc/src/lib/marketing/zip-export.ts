@@ -589,7 +589,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     const baseDir = rutaCliente.get(e.proyecto_id)!;
     const usados = getSet(usadosGastoPorCliente, baseDir);
     try {
-      const buf = buildComprobanteEntregaPdf(datos);
+      // SIN bultos: el comprobante del ZIP es para la marca — los bultos son
+      // del envío al cliente (la nota de NotaEntregaAcciones / entregas-pdf).
+      const buf = buildComprobanteEntregaPdf(datos, { incluirBultos: false });
       const nombreUnico = unico(
         sanitizeName(nombreArchivoComprobante(datos), "Entrega de mobiliario"),
         usados,

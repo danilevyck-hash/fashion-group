@@ -79,6 +79,15 @@ function PeriodoPage({
 
   const marca = datos?.marca ?? null;
   const secciones = datos?.secciones ?? null;
+
+  // La marca de ESTA página, resuelta contra el catálogo: "Registrar gasto"
+  // la recibe preseleccionada y no la vuelve a preguntar. Los buckets
+  // (multifashion / sin-marca) no están en el catálogo → null → el modal
+  // pregunta como siempre.
+  const marcaInicialModal =
+    marcas.find(
+      (m) => (m.codigo ?? "").trim().toUpperCase() === (marca?.key ?? ""),
+    ) ?? null;
   const seccion = secciones ? seccionPorSlug(secciones, periodoSlug) : null;
   // Con UN solo período el nivel 2 redirige acá: volver tiene que ir al
   // inicio, no rebotar contra el redirect.
@@ -165,6 +174,7 @@ function PeriodoPage({
       {registrandoGasto && (
         <RegistrarGastoModal
           marcas={marcas}
+          marcaInicial={marcaInicialModal}
           onClose={() => setRegistrandoGasto(false)}
           onSaved={() => {
             setRegistrandoGasto(false);

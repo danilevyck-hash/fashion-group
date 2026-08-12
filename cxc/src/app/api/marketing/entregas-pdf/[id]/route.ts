@@ -46,7 +46,9 @@ export async function GET(
     if (!datos) {
       return NextResponse.json({ error: "Entrega no encontrada" }, { status: 404 });
     }
-    const pdf = buildComprobanteEntregaPdf(datos);
+    // CON bultos: esta ruta sirve la nota de ENVÍO (la que acompaña la
+    // mercancía). El comprobante para la marca sale del ZIP, sin bultos.
+    const pdf = buildComprobanteEntregaPdf(datos, { incluirBultos: true });
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",

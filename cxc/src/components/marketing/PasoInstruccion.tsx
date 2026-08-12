@@ -40,13 +40,12 @@ export function PasoInstruccion({
     ? "bg-emerald-500 text-white"
     : "bg-gray-100 text-gray-700";
 
-  const tituloClase = completado
-    ? "line-through text-gray-400"
-    : "text-gray-900";
+  // 🔴 NUNCA line-through: el check verde ya dice "completado". Tachar el
+  // título se lee como "esto se eliminó" — y un paso que NACE completado
+  // (marca ya elegida en la puerta) nacía tachado (pedido de Daniel, 12-ago).
+  const tituloClase = completado ? "text-gray-500" : "text-gray-900";
 
-  const descClase = completado
-    ? "line-through text-gray-400"
-    : "text-gray-600";
+  const descClase = completado ? "text-gray-400" : "text-gray-600";
 
   const disabled = Boolean(accion?.disabled);
   const wrapperClase = `border border-gray-200 rounded-lg p-4 ${

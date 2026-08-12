@@ -79,7 +79,11 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
     setCompartiendo(true);
     try {
       // Sin `await` entre el clic y `compartirArchivo`: el blob se arma acá.
-      const blob = buildComprobanteEntregaDoc(datos).output("blob");
+      // CON bultos: esta es la nota de ENVÍO, el papel que viaja con la
+      // mercancía (el comprobante para la marca sale del ZIP, sin bultos).
+      const blob = buildComprobanteEntregaDoc(datos, {
+        incluirBultos: true,
+      }).output("blob");
       const archivo = new File([blob], nombreArchivo(datos), {
         type: "application/pdf",
       });
@@ -100,7 +104,7 @@ export default function NotaEntregaAcciones({ entregaId }: Props) {
   const imprimir = () => {
     if (!datos) return;
     try {
-      const doc = buildComprobanteEntregaDoc(datos);
+      const doc = buildComprobanteEntregaDoc(datos, { incluirBultos: true });
       // `autoPrint` deja el PDF pidiendo el diálogo de impresión al abrirse.
       doc.autoPrint();
       const url = doc.output("bloburl") as unknown as string;

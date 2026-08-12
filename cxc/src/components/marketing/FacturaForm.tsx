@@ -203,9 +203,13 @@ export function FacturaForm({
   const [tieneImportacion, setTieneImportacion] = useState<boolean>(
     Boolean(initial?.tiene_importacion),
   );
-  const [estadoPago, setEstadoPago] = useState<EstadoPagoFactura>(
-    initial?.estado_pago === "pagado" ? "pagado" : "creado",
-  );
+  // El toggle Creado|Pagado se ELIMINÓ del formulario (Daniel, 12-ago-2026:
+  // "si quitalo"). El valor se conserva en el payload para no romper a los
+  // llamadores: una factura nueva nace "creado" (el default de la columna) y
+  // al EDITAR se respeta lo que la fila ya tiene — sin esto, editar un pago
+  // de impulsadora (que nace "pagado") lo devolvería a "creado" en silencio.
+  const estadoPago: EstadoPagoFactura =
+    initial?.estado_pago === "pagado" ? "pagado" : "creado";
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
@@ -727,27 +731,18 @@ export function FacturaForm({
         </div>
       )}
 
+      {/* Con `marcaFija` el paso 3 DESAPARECE ENTERO: la marca ya la eligió la
+          puerta de "Registrar gasto" (y el resumen de arriba la enseña), y el
+          toggle Creado|Pagado se ELIMINÓ del formulario — Daniel, 12-ago-2026,
+          textual: "si quitalo". El estado viaja igual en el payload (ver
+          `estadoPago` arriba). */}
+      {!marcaFija && (
       <PasoInstruccion
         numero={3}
-        titulo={marcaFija ? "Estado del gasto" : "Marca y estado del gasto"}
-        descripcion={
-          marcaFija
-            ? "Marca el gasto si ya está pagado."
-            : "Elige la marca del gasto y si ya está pagado."
-        }
+        titulo="Marca del gasto"
+        descripcion="Elige la marca (o marcas) del gasto."
         completado={marcasValidas}
       >
-        <div className="space-y-3">
-          {/* La marca ya la eligió la puerta de "Registrar gasto": se enseña,
-              no se vuelve a preguntar. */}
-          {marcaFija ? (
-            <div>
-              <span className="block text-sm text-gray-600 mb-1">Marca</span>
-              <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 min-h-[44px] flex items-center text-sm text-gray-800">
-                {marcaFija.nombre}
-              </div>
-            </div>
-          ) : (
           <div>
             <label className="block text-sm text-gray-600 mb-1">
               Marca(s)<span className="text-red-500 ml-0.5">*</span>
@@ -824,50 +819,8 @@ export function FacturaForm({
               </>
             )}
           </div>
-          )}
-
-          <div>
-            <span
-              id="factura-estado-label"
-              className="block text-sm text-gray-600 mb-1"
-            >
-              Estado
-            </span>
-            <div
-              role="radiogroup"
-              aria-labelledby="factura-estado-label"
-              className="flex flex-wrap rounded-md border border-gray-300 sm:max-w-xs"
-            >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={estadoPago === "creado"}
-                onClick={() => setEstadoPago("creado")}
-                className={`flex-1 px-3 min-h-[44px] text-sm transition ${
-                  estadoPago === "creado"
-                    ? "bg-gray-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Creado
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={estadoPago === "pagado"}
-                onClick={() => setEstadoPago("pagado")}
-                className={`flex-1 px-3 min-h-[44px] text-sm transition border-l border-gray-300 ${
-                  estadoPago === "pagado"
-                    ? "bg-green-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Pagado
-              </button>
-            </div>
-          </div>
-        </div>
       </PasoInstruccion>
+      )}
 
       <div className="flex items-center gap-2 justify-end">
         {checkingDup && (

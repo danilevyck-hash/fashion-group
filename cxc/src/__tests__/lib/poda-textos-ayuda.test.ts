@@ -75,7 +75,10 @@ const EN_UN_AYUDA: Array<[string, string]> = [
   ["app/productos/cargar/CurvasView.tsx", "Sube el Excel crudo de Fashion Shoes"],
 
   // ── Marketing ────────────────────────────────────────────────────────────
-  ["components/marketing/EntregaForm.tsx", "los accesorios se llenan según la curva sugerida"],
+  // El ⓘ "Cómo se llena el kit" de EntregaForm se fue el 12-ago-2026 CON la
+  // funcionalidad que explicaba (Daniel mandó quitar el autorrelleno por
+  // curva): no es una poda de texto, es una función eliminada. El candado
+  // inverso —que la curva no VUELVA— vive abajo en este mismo archivo.
   ["components/marketing/AyudaClienteVinculado.tsx", "Elige del directorio para vincular"],
   ["app/marketing/components/FotosSection.tsx", "Respaldo visual que se adjunta a la cobranza a la marca"],
 
@@ -154,6 +157,27 @@ describe("🩸 el aviso de saldo negativo de Caja es UNO, no dos copias", () => 
     const fuente = aplanar(leer(archivo));
     expect(fuente).toContain("<AvisoSaldoNegativo");
     expect(fuente).not.toContain("¿Continuar con saldo negativo?");
+  });
+});
+
+describe("⛔ el autorrelleno del kit de EntregaForm NO vuelve (12-ago-2026)", () => {
+  // Daniel mandó quitar la curva: los inputs de accesorios son 100% MANUALES.
+  // El riesgo inverso al del resto del archivo: acá lo que no puede volver es
+  // la FUNCIONALIDAD — un autofill que mete cantidades que nadie escribió.
+  it("ni la curva, ni el 'Sugerido:', ni el recálculo reaparecen", () => {
+    const src = leer("components/marketing/EntregaForm.tsx");
+    // Solo el CÓDIGO: los comentarios cuentan la historia y nombran la curva.
+    const codigo = src
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+      .replace(/[^\n"']\/\/[^\n]*$/gm, "");
+    expect(codigo).not.toMatch(/\bCURVA\b/);
+    expect(codigo).not.toMatch(/curva/i);
+    expect(codigo).not.toContain("Sugerido:");
+    expect(codigo).not.toContain("sugeridoDe");
+    expect(codigo).not.toContain("Recalcular accesorios");
+    expect(codigo).not.toContain("tocadoManual");
+    expect(codigo).not.toContain("Cómo se llena el kit");
   });
 });
 

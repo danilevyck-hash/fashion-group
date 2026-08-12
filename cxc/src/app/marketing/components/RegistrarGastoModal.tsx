@@ -14,13 +14,26 @@
 // busca solo por el cliente y, si no existe, se crea con el nombre del cliente.
 // El agrupamiento por cliente lo hace el sistema, no el usuario.
 //
-// ORDEN DE LA PUERTA — el del mockup aprobado:
-//   Qué es      → Factura · Mueble · Impulsadora
-//   Cliente     → OPCIONAL. Daniel: *"si, como pagarle a una impulsadora todo
-//                 el mes"*, y también catálogos, eventos, material general.
-//                 Sin cliente el gasto va con `proyecto_id = null`.
-//   Marca       → UNA por gasto. Nada de repartos 50/50.
+// ORDEN DE LA PUERTA — actualizado el 12-ago-2026 con la aprobación de Daniel:
+//   Qué es      → Factura · Mueble · Gasto de la marca
+//   Cliente     → OBLIGATORIO en Factura y Mueble. Daniel, textual: *"dejalo
+//                 obligatorio, para gastos como vallas, o algun otro evento
+//                 que vaya en el tab de impulsadora que ahi es para la marca
+//                 en general"*. Medido antes del cambio: las 17 facturas con
+//                 proyecto null de producción son TODAS pagos de impulsadora —
+//                 0 facturas libres sin cliente, 0 entregas sin cliente.
+//   Marca       → UNA por gasto. Nada de repartos 50/50. Si el modal se abre
+//                 desde la página de una marca, viene PRESELECCIONADA
+//                 (`marcaInicial`) y se enseña como renglón fijo con "Cambiar"
+//                 — no se pregunta dos veces.
 //   Foto        → OPCIONAL, y puede llegar después.
+//
+// "GASTO DE LA MARCA" tiene DOS sub-opciones:
+//   · Impulsadora → el flujo de SIEMPRE, intacto (RegistrarPagoModal,
+//     anti-solape, split, comprobante obligatorio — nada de eso se tocó).
+//   · Otro gasto  → vallas, eventos, catálogos: el formulario de factura con
+//     `proyecto_id = null` y la marca elegida. El backend ya lo soportaba;
+//     esos gastos caen en la carpeta General/ del ZIP como siempre.
 // El "Cuánto" y el COMPROBANTE los pide el formulario de cada camino, que es el
 // que ya existía y no se reescribió.
 //
@@ -55,11 +68,20 @@ import type {
   MkProyecto,
 } from "@/lib/marketing/types";
 
-type Camino = "factura" | "mueble" | "impulsadora";
+type Camino = "factura" | "mueble" | "marca";
+/** Sub-opción de "Gasto de la marca". */
+type SubGasto = "impulsadora" | "otro";
 type Paso = "tipo" | "datos" | "form";
 
 interface Props {
   marcas: MkMarca[];
+  /**
+   * La marca de la página desde la que se abrió el modal (nivel 2/3 de
+   * Marketing). Con esto puesto, la marca se enseña como renglón fijo con
+   * "Cambiar" en vez de volver a preguntarla. Desde /marketing (la portada)
+   * no hay marca de contexto y se pregunta como siempre.
+   */
+  marcaInicial?: MkMarca | null;
   onClose: () => void;
   /** Se llama cuando el gasto quedó guardado, para refrescar el inicio. */
   onSaved: () => void;
@@ -76,17 +98,34 @@ const CAMINOS: ReadonlyArray<{
   {
     key: "factura",
     titulo: "Factura",
-    ayuda: "Una factura de un proveedor: letreros, catálogos, material, eventos.",
+    ayuda: "Una factura de un proveedor para una tienda: letreros, material, remodelación.",
   },
   {
     key: "mueble",
     titulo: "Mueble",
-    ayuda: "Una entrega de mobiliario. Descuenta el inventario en piezas.",
+    ayuda: "Una entrega de mobiliario a una tienda. Descuenta el inventario en piezas.",
   },
+  {
+    key: "marca",
+    titulo: "Gasto de la marca",
+    ayuda: "Impulsadoras, vallas, eventos, catálogos — para la marca en general, sin tienda.",
+  },
+];
+
+const SUB_GASTOS: ReadonlyArray<{
+  key: SubGasto;
+  titulo: string;
+  ayuda: string;
+}> = [
   {
     key: "impulsadora",
     titulo: "Impulsadora",
     ayuda: "El pago de una impulsadora por el período que trabajó.",
+  },
+  {
+    key: "otro",
+    titulo: "Otro gasto",
+    ayuda: "Vallas, eventos, catálogos, material general de la marca.",
   },
 ];
 
@@ -114,15 +153,23 @@ function norm(s: string): string {
     .trim();
 }
 
-export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props) {
+export default function RegistrarGastoModal({
+  marcas,
+  marcaInicial = null,
+  onClose,
+  onSaved,
+}: Props) {
   const { toast } = useToast();
 
   const [paso, setPaso] = useState<Paso>("tipo");
   const [camino, setCamino] = useState<Camino | null>(null);
+  const [subGasto, setSubGasto] = useState<SubGasto | null>(null);
 
   const [cliente, setCliente] = useState("");
   const [clienteCodigo, setClienteCodigo] = useState("");
-  const [marcaId, setMarcaId] = useState("");
+  // Con marca de contexto arranca preseleccionada; "Cambiar" abre el selector.
+  const [marcaId, setMarcaId] = useState(marcaInicial?.id ?? "");
+  const [cambiandoMarca, setCambiandoMarca] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
   const fotoRef = useRef<HTMLInputElement>(null);
 
@@ -155,7 +202,8 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
   // Las impulsadoras se piden solo cuando hacen falta: el camino más usado
   // (factura) no tiene por qué pagar una lectura que no mira.
   useEffect(() => {
-    if (camino !== "impulsadora" || impulsadoras !== null) return;
+    if (camino !== "marca" || subGasto !== "impulsadora" || impulsadoras !== null)
+      return;
     let cancelado = false;
     (async () => {
       try {
@@ -170,7 +218,7 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
     return () => {
       cancelado = true;
     };
-  }, [camino, impulsadoras]);
+  }, [camino, subGasto, impulsadoras]);
 
   // Ídem el inventario: solo para el camino de muebles.
   useEffect(() => {
@@ -292,6 +340,14 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
 
   const continuar = async () => {
     if (resolviendo) return;
+    // "Gasto de la marca" NUNCA lleva cliente: el gasto va con
+    // `proyecto_id = null` directo, sin tocar la red. Es el único camino que
+    // queda sin cliente — en Factura y Mueble ahora es obligatorio.
+    if (camino === "marca") {
+      setProyecto(null);
+      setPaso("form");
+      return;
+    }
     setResolviendo(true);
     try {
       const p = await resolverProyecto();
@@ -404,7 +460,14 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
   }
 
   // ---- El pago de IMPULSADORA también trae su propio modal ----
-  if (paso === "form" && camino === "impulsadora" && impulsadoraSel) {
+  // (Es la sub-opción "Impulsadora" de "Gasto de la marca": el flujo de
+  // siempre, INTACTO — anti-solape, split y comprobante viven allá adentro.)
+  if (
+    paso === "form" &&
+    camino === "marca" &&
+    subGasto === "impulsadora" &&
+    impulsadoraSel
+  ) {
     return (
       <RegistrarPagoModal
         impulsadora={impulsadoraSel}
@@ -416,10 +479,68 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
     );
   }
 
+  // Cliente OBLIGATORIO en Factura y Mueble (Daniel: *"dejalo obligatorio"*).
+  // "Gasto de la marca" es el camino sin cliente: impulsadora exige a quién
+  // se le paga; "otro gasto" exige la marca.
   const puedeContinuar =
-    camino === "impulsadora"
-      ? !!impulsadoraSel
-      : !!camino && !!marcaId && !resolviendo;
+    camino === "marca"
+      ? subGasto === "impulsadora"
+        ? !!impulsadoraSel
+        : subGasto === "otro" && !!marcaId
+      : !!camino && !!marcaId && cliente.trim() !== "" && !resolviendo;
+
+  // ---- El bloque de MARCA, uno solo para todos los caminos que la piden ----
+  // Con marca de contexto (`marcaInicial`) se enseña como renglón fijo:
+  // "Marca: Karl Lagerfeld · Cambiar" — no se pregunta dos veces (pedido de
+  // Daniel, 12-ago-2026). "Cambiar" reabre el selector de siempre.
+  const marcaFijadaVisible = !!marcaInicial && !cambiandoMarca && !!marcaElegida;
+  const bloqueMarca = (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Marca<span className="text-red-500 ml-0.5">*</span>
+      </label>
+      {marcaFijadaVisible ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 min-h-[44px] py-2">
+          <span className="text-sm text-gray-900 font-medium truncate">
+            {marcaElegida!.nombre}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCambiandoMarca(true)}
+            className="shrink-0 text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
+          >
+            Cambiar
+          </button>
+        </div>
+      ) : marcasOrdenadas.length === 0 ? (
+        <p className="text-sm text-gray-500">No hay marcas configuradas.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {marcasOrdenadas.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                data-marca={m.codigo}
+                onClick={() => setMarcaId(m.id)}
+                className={`text-left rounded-md border-2 px-3 py-2 min-h-[44px] text-sm transition ${
+                  marcaId === m.id
+                    ? "border-black bg-gray-50 font-medium"
+                    : "border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                <span className="block truncate">{m.nombre}</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Una sola marca por gasto. Si hay que repartirlo, se registra un
+            gasto por marca.
+          </p>
+        </>
+      )}
+    </div>
+  );
 
   return createPortal(
     <div
@@ -475,7 +596,8 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
         )}
 
         {/* ---------------------------------------------------------------- */}
-        {/* PASO 2 — de quién es. Cliente OPCIONAL, UNA marca, foto opcional.  */}
+        {/* PASO 2 — de quién es. Cliente OBLIGATORIO (factura/mueble), UNA    */}
+        {/* marca, foto opcional. "Gasto de la marca" pide su sub-opción.      */}
         {/* ---------------------------------------------------------------- */}
         {paso === "datos" && camino && (
           <>
@@ -490,6 +612,7 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
                   onClick={() => {
                     setPaso("tipo");
                     setCamino(null);
+                    setSubGasto(null);
                     setImpulsadoraSel(null);
                   }}
                   className="text-sm text-teal-700 hover:text-teal-900 transition min-h-[44px] -my-2 inline-flex items-center"
@@ -498,51 +621,85 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
                 </button>
               </div>
 
-              {camino === "impulsadora" ? (
-                <div>
-                  <div className="text-sm font-medium text-gray-700 mb-1">
-                    ¿A quién le pagas?
-                  </div>
-                  {impulsadoras === null ? (
-                    <div className="h-11 rounded-md bg-gray-100 animate-pulse" />
-                  ) : impulsadoras.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      Todavía no hay impulsadoras cargadas. Agrégalas desde
-                      Impulsadoras.
-                    </p>
-                  ) : (
+              {camino === "marca" ? (
+                <>
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-1">
+                      ¿Qué tipo de gasto es?
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {impulsadoras.map((i) => (
+                      {SUB_GASTOS.map((s) => (
                         <button
-                          key={i.id}
+                          key={s.key}
                           type="button"
-                          data-impulsadora={i.id}
-                          onClick={() => setImpulsadoraSel(i)}
+                          data-subgasto={s.key}
+                          onClick={() => {
+                            setSubGasto(s.key);
+                            if (s.key !== "impulsadora") setImpulsadoraSel(null);
+                          }}
                           className={`text-left rounded-md border-2 px-3 py-2 min-h-[44px] text-sm transition ${
-                            impulsadoraSel?.id === i.id
+                            subGasto === s.key
                               ? "border-black bg-gray-50 font-medium"
                               : "border-gray-200 hover:border-gray-400"
                           }`}
                         >
-                          <span className="block truncate">{i.nombre}</span>
+                          <span className="block font-medium">{s.titulo}</span>
                           <span className="block text-xs text-gray-500">
-                            {i.marcas.map((m) => m.marca.nombre).join(" · ")}
+                            {s.ayuda}
                           </span>
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {subGasto === "impulsadora" && (
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-1">
+                        ¿A quién le pagas?
+                      </div>
+                      {impulsadoras === null ? (
+                        <div className="h-11 rounded-md bg-gray-100 animate-pulse" />
+                      ) : impulsadoras.length === 0 ? (
+                        <p className="text-sm text-gray-500">
+                          Todavía no hay impulsadoras cargadas. Agrégalas desde
+                          Impulsadoras.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {impulsadoras.map((i) => (
+                            <button
+                              key={i.id}
+                              type="button"
+                              data-impulsadora={i.id}
+                              onClick={() => setImpulsadoraSel(i)}
+                              className={`text-left rounded-md border-2 px-3 py-2 min-h-[44px] text-sm transition ${
+                                impulsadoraSel?.id === i.id
+                                  ? "border-black bg-gray-50 font-medium"
+                                  : "border-gray-200 hover:border-gray-400"
+                              }`}
+                            >
+                              <span className="block truncate">{i.nombre}</span>
+                              <span className="block text-xs text-gray-500">
+                                {i.marcas.map((m) => m.marca.nombre).join(" · ")}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        La marca sale del reparto que ya tiene configurado esa
+                        impulsadora.
+                      </p>
+                    </div>
                   )}
-                  <p className="text-xs text-gray-500 mt-2">
-                    La marca sale del reparto que ya tiene configurado esa
-                    impulsadora.
-                  </p>
-                </div>
+
+                  {subGasto === "otro" && bloqueMarca}
+                </>
               ) : (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cliente{" "}
-                      <span className="font-normal text-gray-400">(opcional)</span>
+                      Cliente<span className="text-red-500 ml-0.5">*</span>
                     </label>
                     <ClienteTypeahead
                       value={cliente}
@@ -555,48 +712,18 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
                         setCliente(texto);
                         setClienteCodigo("");
                       }}
-                      placeholder="Busca la tienda… o déjalo en blanco"
+                      placeholder="Busca la tienda…"
                       /* text-base en móvil: con 14 px Safari hace zoom. */
                       inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Déjalo en blanco si el gasto no es de una tienda —
-                      catálogos, un evento, material general.
+                      La tienda a la que va el gasto. Si es para la marca en
+                      general (vallas, eventos), usa &ldquo;Gasto de la
+                      marca&rdquo;.
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Marca<span className="text-red-500 ml-0.5">*</span>
-                    </label>
-                    {marcasOrdenadas.length === 0 ? (
-                      <p className="text-sm text-gray-500">
-                        No hay marcas configuradas.
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {marcasOrdenadas.map((m) => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            data-marca={m.codigo}
-                            onClick={() => setMarcaId(m.id)}
-                            className={`text-left rounded-md border-2 px-3 py-2 min-h-[44px] text-sm transition ${
-                              marcaId === m.id
-                                ? "border-black bg-gray-50 font-medium"
-                                : "border-gray-200 hover:border-gray-400"
-                            }`}
-                          >
-                            <span className="block truncate">{m.nombre}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Una sola marca por gasto. Si hay que repartirlo, se
-                      registra un gasto por marca.
-                    </p>
-                  </div>
+                  {bloqueMarca}
                 </>
               )}
 
@@ -660,17 +787,22 @@ export default function RegistrarGastoModal({ marcas, onClose, onSaved }: Props)
         )}
 
         {/* ---------------------------------------------------------------- */}
-        {/* PASO 3 — el formulario de la FACTURA, el que ya existía.          */}
+        {/* PASO 3 — el formulario de la FACTURA, el que ya existía. Lo usan   */}
+        {/* dos caminos: Factura (con cliente) y "Gasto de la marca › Otro     */}
+        {/* gasto" (proyecto_id = null — cae en General/ del ZIP, como los     */}
+        {/* pagos de impulsadora de siempre).                                  */}
         {/* ---------------------------------------------------------------- */}
-        {paso === "form" && camino === "factura" && (
+        {paso === "form" &&
+          (camino === "factura" ||
+            (camino === "marca" && subGasto === "otro")) && (
           <div className="p-5 space-y-4">
             <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-              {cliente.trim() ? (
+              {camino === "marca" ? (
+                <>Gasto de la marca — no se agrupa en ninguna tienda</>
+              ) : (
                 <>
                   Cliente <span className="font-medium">{cliente.trim()}</span>
                 </>
-              ) : (
-                <>Sin cliente — el gasto no se agrupa en ninguna tienda</>
               )}
               {marcaElegida && (
                 <>

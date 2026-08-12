@@ -59,15 +59,14 @@ export function FacturaCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {!anulada && (
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
-                factura.estado_pago === "pagado"
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : "bg-gray-100 text-gray-600 border-gray-300"
-              }`}
-            >
-              {factura.estado_pago === "pagado" ? "Pagado" : "Creado"}
+          {/* El toggle Creado|Pagado se retiró del formulario (Daniel, 12-ago:
+              "si quitalo"): toda factura nueva nace "creado", así que un badge
+              gris "Creado" en todas sería ruido. El verde "Pagado" SE QUEDA —
+              lo escriben los pagos de impulsadora (impulsadoras.ts) y las
+              filas históricas. */}
+          {!anulada && factura.estado_pago === "pagado" && (
+            <span className="text-xs px-1.5 py-0.5 rounded border font-medium bg-green-50 text-green-700 border-green-200">
+              Pagado
             </span>
           )}
           {factura.tiene_importacion && !anulada && (
