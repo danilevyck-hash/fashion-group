@@ -214,6 +214,10 @@ const PROHIBIDOS = [
   "El 90% se vendió",
   "en vender el 90%",
   "(bajó por devoluciones)",
+  // 🩸 12-ago-2026 (tandas): la palabra "tanda" NO existe en pantalla — la
+  // redacción aprobada por Daniel habla de la LLEGADA y del movimiento real.
+  "Tanda ",
+  "tandas anteriores",
 ];
 
 async function buscar(resp: ComprasApiResp, codigo: string) {
@@ -482,6 +486,75 @@ describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
   it("el aviso del ajuste QUEDA en pantalla — es plata que se fue, no metodología", async () => {
     await buscarUnaReferencia();
     expect(screen.getAllByText(/1 se perdió en ajuste/).length).toBeGreaterThan(0);
+  });
+});
+
+// ── La frase de la ÚLTIMA llegada (la bodega tocó 0 y volvió a llegar) ───────
+//
+// El caso de la captura de Daniel (4G5004G001): 36 u en oct-2025 vendidas
+// TODAS en 2 meses, bodega en 0 dic-mar, y 36 más en mar-2026. La ficha vieja
+// decía "Meses: 10 · de venta, desde oct 2025" — *"me lo suma y me lo
+// aplaza"*. La redacción aprobada: la frase del movimiento real, SIN la
+// palabra "tanda".
+
+const RESP_TANDAS: ComprasApiResp = {
+  ...REFERENCIA_RESP,
+  articulos: [
+    {
+      ...REFERENCIA_RESP.articulos[0],
+      codigo: "4G5004G001",
+      descripcion: "Men-Tee",
+      compras: [
+        ["2026-03-29", "C", 36],
+        ["2025-10-05", "A", 30],
+        ["2025-10-05", "B", 6],
+      ].map(([fecha, doc, unidades]) => ({
+        empresa: "vistana",
+        codigo: "4G5004G001",
+        fecha: fecha as string,
+        documento: doc as string,
+        proveedor: "PROV",
+        articulo: "Men-Tee",
+        unidades: unidades as number,
+        costos: { cif: 4, fob: 4, fobOrigen: "igual-al-cif" as const, lista: 10 },
+      })),
+      serie: [
+        { mes: "2025-10", unidades: 12, venta: 120 },
+        { mes: "2025-11", unidades: 24, venta: 240 },
+        { mes: "2026-04", unidades: 6, venta: 60 },
+        { mes: "2026-05", unidades: 18, venta: 180 },
+        { mes: "2026-06", unidades: 1, venta: 10 },
+      ],
+      comprasFueraDeVentana: 0,
+      cuadre: { comprado: 72, vendido: 61, existencia: 12, residuo: -1, ajusteConfiable: false },
+      stockSinRespaldo: 1,
+      vendidoAntes: 0,
+      vendidoDeMas: 0,
+      existencia: 12,
+      precioEtiqueta: 10,
+    },
+  ],
+};
+
+describe("Referencia · la frase de la última llegada (la bodega tocó 0)", () => {
+  it("🔴 el caso de la captura (4G5004G001): la frase con los tres números y la historia gris debajo — sin la palabra 'tanda'", async () => {
+    await buscar(RESP_TANDAS, "4G5004G001");
+    // La frase protagonista, con el "vendo por mes" de dato chiquito al final
+    // (61 vendidas ÷ 7 meses CON mercancía = 8.7 — los meses sin stock no
+    // dividen).
+    expect(
+      screen.getAllByText("Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u · vendo 8.7 u por mes")
+        .length,
+    ).toBeGreaterThan(0);
+    // La historia, en gris, debajo.
+    expect(screen.getAllByText("La anterior (oct 2025): 36 u — se vendió toda en 2 meses").length).toBeGreaterThan(0);
+    // El KPI grande: Meses = 5, de la última llegada — no los 10 de "me lo
+    // suma y me lo aplaza".
+    expect(screen.getAllByText("de venta · desde mar 2026").length).toBeGreaterThan(0);
+    // Los tres grandes siguen siendo históricos.
+    expect(screen.getAllByText("el 85% de lo comprado").length).toBeGreaterThan(0);
+    // Y la palabra "tanda" no existe en pantalla.
+    expect(document.body.textContent ?? "").not.toMatch(/[Tt]anda/);
   });
 });
 

@@ -608,12 +608,17 @@ describe("la línea de venta", () => {
     expect(textoAvanceCorto(n)).not.toContain("de 20");
   });
 
-  it("⚠️ EL BORDE: una compra que llegó DESPUÉS de la última venta no corre el reloj", () => {
-    // 100 u en ene-2026, se vendieron 99 entre feb y mar, y en JUNIO llegaron
-    // 10 más que se perdieron/ajustaron (stock 0). El tiempo de venta es de lo
-    // que SE VENDIÓ: cierra en mar (ene→mar = 3 meses), aunque la última
-    // compra sea posterior. El % es el real (99 de 110) y los avisos explican
-    // el resto.
+  it("⚠️ EL BORDE, medido con TANDAS (12-ago-2026): la compra que llegó sobre bodega en 0 abre SU episodio y el reloj viejo queda cerrado", () => {
+    // 100 u en ene-2026, se vendieron 99 entre feb y mar (quedó 1 de ruido), y
+    // en JUNIO llegaron 10 más que se perdieron/ajustaron (stock 0).
+    //
+    // 🔴 ANTES de las tandas este caso decía "agotado en 3 meses" mirando el
+    // artículo entero. Con la regla de Daniel (*"si llego a 0 y llego
+    // mercancia… me debe de mostrar la ultima"*) la llegada de junio cayó
+    // sobre bodega en 0 (el 1 restante es el ruido de ±2 que el umbral
+    // tolera) → abre SU episodio: la de enero queda CERRADA en su última
+    // venta (ene→mar = 3 meses, en la historia) y la actual corre con van 0.
+    // El aviso del ajuste explica las 10 que se perdieron.
     const art = armarArticulo(
       {
         empresa: "vistana",
@@ -631,8 +636,34 @@ describe("la línea de venta", () => {
       HOY,
     );
     const f = armarFicha(art, HOY_MES);
-    expect(f.avance).toEqual({ tipo: "agotado", meses: 3, desdeMes: "2026-01", parte: 0.9 });
-    expect(textoAvance(f.avance)).toBe("Se vendió el 90% en 3 meses");
+    expect(f.tandas).toHaveLength(2);
+    // La vieja: cerrada en su última venta, inclusive — el reloj NO corre.
+    expect(f.tandas![0]).toMatchObject({ desdeMes: "2026-01", llegaron: 100, vendidas: 99, cerrada: true, meses: 3 });
+    // La actual: llegó en jun y no vendió nada — viva (no se puede "agotar"
+    // una llegada que nunca vendió), con el reloj corriendo desde jun.
+    expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-06", llegaron: 10, vendidas: 0, cerrada: false, meses: 2 });
+    expect(f.avance).toEqual({ tipo: "en-curso", meses: 2, parte: 0 });
+    // Y con la compra tardía llegando sobre STOCK VIVO de verdad, el borde de
+    // siempre sigue igual: una sola tanda, el reloj cierra en la última venta.
+    const conStockVivo = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "BORDE002",
+        descripcion: "BORDE",
+        ingresos: [
+          ing("2026-01-10", 100, { codigo_articulo: "BORDE002", n_interno: "A" }),
+          ing("2026-06-10", 10, { codigo_articulo: "BORDE002", n_interno: "B" }),
+        ],
+        ventas: [v("2026-02-15", "FA", 80, 800), v("2026-03-15", "FA", 4, 40)],
+        existencia: 0,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const f2 = armarFicha(conStockVivo, HOY_MES);
+    expect(f2.tandas).toBeNull(); // saldo 16 al llegar junio: se SUMA, no abre
+    expect(f2.avance).toEqual({ tipo: "agotado", meses: 3, desdeMes: "2026-01", parte: 84 / 110 });
   });
 
   it("compra única viva SIN historia rara: QD3958033 va por el 30% a los 8 meses", () => {
@@ -1365,5 +1396,303 @@ describe("cambioDeCosto", () => {
     expect(cambioDeCosto(null, 16.555)).toBeNull();
     expect(cambioDeCosto(null, null)).toBeNull();
     expect(cambioDeCosto(Number.NaN, 16.555)).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 TANDAS — episodios entre CEROS de bodega (12-ago-2026)
+//
+// El caso de la captura de Daniel (4G5004G001): compró 36 en oct-2025 (30 + 6
+// el MISMO día), vendió TODO en oct-nov (bodega en 0), estuvo dic-mar sin
+// mercancía y en mar-2026 llegaron 36 más. La ficha decía "Meses: 10" y
+// "Vendo 6.1 u por mes". Daniel, textual: *"no me hace sentido que me dice 10
+// meses de venta… pero me lo suma y me lo aplaza"*, y la regla es suya: *"si
+// llego a 0 y llego mercancia, cual es la logica q me muestre 10 meses? me
+// debe de mostrar la ultima (y mira q hubo dos el mismo dia (se tienen que
+// sumar))"*. En pantalla la palabra "tanda" NO existe: se habla de la LLEGADA.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import {
+  fraseLlegadaActual,
+  fraseLlegadaAnterior,
+  medirTandas,
+  textoLlegadaAnterior,
+  umbralTandaCero,
+} from "@/lib/ventas/resumen-articulo";
+
+/** 4G5004G001 tal como está en producción (la captura): 2 compras el MISMO día
+ *  + 1 sobre bodega en 0, y 1 unidad de ruido contra el stock de Switch (12 en
+ *  bodega contra 11 del timeline). */
+function G4G5004G001() {
+  return armarArticulo(
+    {
+      empresa: "vistana",
+      codigo: "4G5004G001",
+      descripcion: "Men-Tee",
+      ingresos: [
+        ing("2025-10-05", 30, { codigo_articulo: "4G5004G001", n_interno: "A", precio: 10, costo_cif: 4, costo_fob: 4 }),
+        ing("2025-10-05", 6, { codigo_articulo: "4G5004G001", n_interno: "B", precio: 10, costo_cif: 4, costo_fob: 4 }),
+        ing("2026-03-29", 36, { codigo_articulo: "4G5004G001", n_interno: "C", precio: 10, costo_cif: 4, costo_fob: 4 }),
+      ],
+      ventas: [
+        v("2025-10-20", "FA", 12, 120),
+        v("2025-11-20", "FA", 24, 240),
+        v("2026-04-15", "FA", 6, 60),
+        v("2026-05-15", "FA", 18, 180),
+        v("2026-06-15", "FA", 1, 10),
+      ],
+      existencia: 12,
+      precioEtiqueta: 10,
+      catalogoSyncedAt: null,
+    },
+    HOY,
+  );
+}
+
+describe("TANDAS — el caso de la captura (4G5004G001)", () => {
+  it("🔴 dos tandas: la de oct-2025 CERRADA en 2 meses y la de mar-2026 VIVA con van 25", () => {
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![0]).toEqual({
+      desdeMes: "2025-10",
+      llegaron: 36,
+      vendidas: 36,
+      ultimaVentaMes: "2025-11",
+      cerrada: true,
+      meses: 2, // oct → nov, INCLUSIVE — como cuenta Daniel
+    });
+    expect(f.tandas![1]).toEqual({
+      desdeMes: "2026-03",
+      llegaron: 36,
+      vendidas: 25,
+      ultimaVentaMes: "2026-06",
+      cerrada: false,
+      meses: 5, // mar → ago (hoy), transcurridos: el reloj corre
+    });
+  });
+
+  it("🔴 las dos compras del MISMO día se SUMAN en una sola tanda — Daniel: '(se tienen que sumar)'", () => {
+    // Si el mismo día abriera tanda nueva, acá habría 3 tandas y la primera
+    // tendría 30 en vez de 36.
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![0].llegaron).toBe(36);
+  });
+
+  it("🔴 MESES del KPI = los de la tanda ACTUAL (5), NUNCA los 10 de 'me lo suma y me lo aplaza'", () => {
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    expect(f.ritmo.meses).toBe(5);
+    expect(f.ritmo.meses).not.toBe(10); // la mutación que esto caza
+    expect(valorGrandeMeses(f.ritmo)).toBe("5");
+    expect(pieGrandeMeses(f.ritmo)).toBe("de venta · desde mar 2026");
+  });
+
+  it("🔴 VENDIDO · MESES (tabla del pedido y Excel) = de la tanda actual: 69% · 5, viva (gris)", () => {
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    const vm = medirVendidoMeses(f);
+    expect(vm).toEqual({ parte: 25 / 36, meses: 5, terminado: false });
+    expect(textoVendidoCelda(vm)).toBe("69%");
+    expect(textoMesesCelda(vm)).toBe("5");
+  });
+
+  it("🔴 'Vendo X u por mes' EXCLUYE los meses sin mercancía: 61 ÷ 7 = 8.7, no 61 ÷ 10 = 6.1", () => {
+    // Meses CON stock: oct-nov (tanda 1, cerrada) + mar→jul (viva, sin el mes
+    // en curso) = 7. Los 3 meses de bodega vacía (dic-feb) no dividen.
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    expect(f.ritmo.porMes!).toBeCloseTo(61 / 7, 4);
+    expect(f.ritmo.porMes!).not.toBeCloseTo(6.1, 1); // la cuenta vieja
+    expect(textoVendoPorMes(f.ritmo.porMes)).toBe("Vendo 8.7 u por mes");
+  });
+
+  it("🔴 la FRASE aprobada por Daniel, con los tres números en su orden — y sin la palabra 'tanda'", () => {
+    const f = armarFicha(G4G5004G001(), HOY_MES);
+    expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
+      "Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u · vendo 8.7 u por mes",
+    );
+    // La historia, en gris, debajo.
+    expect(textoLlegadaAnterior(f.tandas)).toBe("La anterior (oct 2025): 36 u — se vendió toda en 2 meses");
+    // "me quedan 11" es lo que queda DE ESA llegada (36 − 25); el stock de
+    // Switch dice 12 y esa unidad la explica el aviso de siempre — el cuadre
+    // NO se fuerza.
+    expect(armarFicha(G4G5004G001(), HOY_MES).grandes.quedan).toBe(12);
+    // La palabra "tanda" no puede salir en ningún texto de pantalla.
+    for (const t of [
+      textoLineaVenta(f.avance, f.ritmo, f.tandas)!,
+      textoLlegadaAnterior(f.tandas)!,
+      pieGrandeMeses(f.ritmo),
+    ]) {
+      expect(t.toLowerCase()).not.toContain("tanda");
+    }
+  });
+
+  it("los tres grandes NO cambian: Compré 72 · Vendí 61 · Stock 12, históricos", () => {
+    const g = armarFicha(G4G5004G001(), HOY_MES).grandes;
+    expect(g).toMatchObject({ comprado: 72, vendido: 61, quedan: 12 });
+    expect(textoParteVendida(g.parteVendida)).toBe("el 85% de lo comprado");
+  });
+});
+
+describe("TANDAS — cuándo abre, cuándo suma, cuándo no se puede afirmar", () => {
+  const mini = (
+    ingresos: FilaIngreso[],
+    ventas: { fecha: string; tipo: string; cantidad_total: number; venta_total: number }[],
+    existencia: number | null,
+  ) =>
+    armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "T1",
+        descripcion: "T",
+        ingresos,
+        ventas,
+        existencia,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+
+  it("🔴 una compra sobre STOCK VIVO se SUMA (no abre tanda): una sola tanda → todo como siempre", () => {
+    const art = mini(
+      [ing("2026-01-10", 100, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-04-10", 50, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-02-15", "FA", 40, 400)],
+      110,
+    );
+    const m = medirTandas(art, HOY_MES);
+    expect(m!.tandas).toHaveLength(1);
+    expect(m!.tandas[0].llegaron).toBe(150);
+    // Y la ficha se comporta EXACTAMENTE como antes (agregado de siempre).
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toBeNull();
+    expect(f.avance).toEqual({ tipo: "agregado", desdeMes: "2026-01", llegaron: 150, van: 40 });
+  });
+
+  it("🔴 una compra sobre BODEGA EN 0 abre tanda nueva", () => {
+    const art = mini(
+      [ing("2026-01-10", 24, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-04-10", 24, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-02-15", "FA", 24, 240)],
+      24,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![0]).toMatchObject({ desdeMes: "2026-01", llegaron: 24, vendidas: 24, cerrada: true, meses: 2 });
+    expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", llegaron: 24, vendidas: 0, cerrada: false, meses: 4 });
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026 → va el 0% en 4 meses → me quedan 24 u");
+  });
+
+  it("⚠️ el umbral del 'quedó en 0' tolera la cola de ruido (±2) en tandas de tamaño real…", () => {
+    // 36 llegadas, 34 vendidas: quedan 2 = ruido de ajuste. La compra de mayo
+    // SÍ abre tanda — es el caso "1 en bodega que no sale de ninguna compra".
+    expect(umbralTandaCero(36)).toBe(2);
+    const art = mini(
+      [ing("2026-01-10", 36, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-05-10", 36, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-02-15", "FA", 34, 340)],
+      38,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![0].cerrada).toBe(true);
+    // La historia lo dice honesto: se vendió el 94%, no "toda".
+    expect(fraseLlegadaAnterior(f.tandas![0])).toBe("La anterior (ene 2026): 36 u — se vendió el 94% en 2 meses");
+  });
+
+  it("⚠️ …y en una tanda CHICA exige el 0 exacto: 2 de 8 no es una bodega en cero", () => {
+    expect(umbralTandaCero(8)).toBe(0);
+    const art = mini(
+      [ing("2026-01-10", 8, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-05-10", 8, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-02-15", "FA", 6, 60)],
+      10,
+    );
+    const m = medirTandas(art, HOY_MES);
+    expect(m!.tandas).toHaveLength(1); // la de mayo se SUMA: quedaba el 25%
+    expect(armarFicha(art, HOY_MES).tandas).toBeNull();
+  });
+
+  it("🔴 el timeline NO afirmable cae al comportamiento de siempre: TERMO (vendió de más), fuera de ventana, sin compras", () => {
+    // TERMO: vendió 150 de 100 llegadas → el saldo en −50 haría "ceros" falsos.
+    const termo = mini(
+      [ing("2024-07-01", 60, { codigo_articulo: "T1", n_interno: "A" }), ing("2025-10-01", 40, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2025-11-06", "FA", 150, 1500)],
+      0,
+    );
+    expect(termo.vendidoDeMas).toBe(50);
+    expect(medirTandas(termo, HOY_MES)).toBeNull();
+    // NB2570001 tiene 2 compras de MÁS de 3 años: sus fechas no viajan, el
+    // saldo arrancaría mentiroso → null, y la ficha queda EXACTA a la de antes.
+    expect(medirTandas(NB2570001(), HOY_MES)).toBeNull();
+    const f = armarFicha(NB2570001(), HOY_MES);
+    expect(f.tandas).toBeNull();
+    expect(f.avance).toEqual({ tipo: "agregado", desdeMes: "2025-10", llegaron: 360, van: 295 });
+    // Sin compra registrada tampoco hay timeline.
+    expect(
+      medirTandas(
+        { compras: [], comprasFueraDeVentana: 0, serie: [], sinCompraRegistrada: true, vendidoAntes: 0, vendidoDeMas: 0 },
+        HOY_MES,
+      ),
+    ).toBeNull();
+    // Ventas ANTERIORES a la primera compra: mismo veto.
+    const antes = mini(
+      [ing("2026-03-10", 50, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-06-10", 50, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-01-15", "FA", 10, 100), v("2026-04-15", "FA", 50, 500)],
+      40,
+    );
+    expect(antes.vendidoAntes).toBe(10);
+    expect(medirTandas(antes, HOY_MES)).toBeNull();
+  });
+
+  it("🔴 UNA sola tanda = comportamiento IDÉNTICO al actual (regresión sobre los fixtures de siempre)", () => {
+    // 4G5004G030 (la captura anterior): 2 compras el mismo día, agotado.
+    const f30 = armarFicha(G4G5004G030(), HOY_MES);
+    expect(f30.tandas).toBeNull();
+    expect(medirTandas(G4G5004G030(), HOY_MES)!.tandas).toHaveLength(1);
+    expect(medirVendidoMeses(f30)).toEqual({ parte: 1, meses: 2, terminado: true });
+    // QD3958033 (única compra viva): sin cambios.
+    const fqd = armarFicha(QD3958033(), HOY_MES);
+    expect(fqd.tandas).toBeNull();
+    expect(fqd.avance).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3 });
+    expect(textoLineaVenta(fqd.avance, fqd.ritmo, fqd.tandas)).toBe(
+      "Vendo 6.8 u por mes · En 8 meses va el 30% de la compra",
+    );
+  });
+
+  it("con 3+ tandas la historia detalla SOLO la anterior y cuenta el resto en gris", () => {
+    const art = mini(
+      [
+        ing("2025-01-10", 24, { codigo_articulo: "T1", n_interno: "A" }),
+        ing("2025-06-10", 24, { codigo_articulo: "T1", n_interno: "B" }),
+        ing("2026-01-10", 24, { codigo_articulo: "T1", n_interno: "C" }),
+      ],
+      [v("2025-02-15", "FA", 24, 240), v("2025-07-15", "FA", 24, 240), v("2026-02-15", "FA", 12, 120)],
+      12,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toHaveLength(3);
+    expect(textoLlegadaAnterior(f.tandas)).toBe(
+      "La anterior (jun 2025): 24 u — se vendió toda en 2 meses · y 1 llegada anterior",
+    );
+    expect(textoLineaVenta(f.avance, f.ritmo, f.tandas)).toBe(
+      // 60 vendidas ÷ 11 meses CON stock (2 + 2 + 7) = 5.5
+      "Llegaron 24 u en ene 2026 → va el 50% en 7 meses → me quedan 12 u · vendo 5.5 u por mes",
+    );
+  });
+
+  it("🔴 la tanda actual AGOTADA cierra el reloj en su última venta y lo dice en negro", () => {
+    // Dos episodios y el segundo también se agotó: llegó abr, vendió todo en
+    // abr-may, stock 0. Meses = 2 (abr→may, inclusive), cerrado — aunque al
+    // corte (ago) hayan pasado 4.
+    const art = mini(
+      [ing("2026-01-10", 24, { codigo_articulo: "T1", n_interno: "A" }), ing("2026-04-10", 24, { codigo_articulo: "T1", n_interno: "B" })],
+      [v("2026-02-15", "FA", 24, 240), v("2026-04-20", "FA", 12, 120), v("2026-05-20", "FA", 12, 120)],
+      0,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.tandas).toHaveLength(2);
+    expect(f.tandas![1]).toMatchObject({ desdeMes: "2026-04", cerrada: true, meses: 2 });
+    const vm = medirVendidoMeses(f);
+    expect(vm).toEqual({ parte: 1, meses: 2, terminado: true });
+    expect(fraseLlegadaActual(f.tandas![1])).toBe("Llegaron 24 u en abr 2026 → se vendió toda en 2 meses");
+    // Sin "me quedan": la bodega quedó en 0, no hay nada que contar.
+    expect(fraseLlegadaActual(f.tandas![1])).not.toContain("me quedan");
+    expect(pieGrandeMeses(f.ritmo)).toBe("en venderse");
   });
 });

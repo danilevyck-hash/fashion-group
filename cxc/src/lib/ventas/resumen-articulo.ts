@@ -276,6 +276,237 @@ export function textoParteVendida(parte: number | null): string | null {
   return `el ${pct}% de lo comprado`;
 }
 
+// ─── TANDAS: episodios entre CEROS de bodega ─────────────────────────────────
+//
+// 🔴 EL CASO QUE LAS EXIGIÓ (4G5004G001, captura de Daniel, 12-ago-2026):
+// compró 36 u en oct-2025 (30 + 6 el MISMO día), las vendió TODAS en oct y nov
+// (bodega en 0), estuvo dic-mar SIN mercancía, y en mar-2026 llegaron 36 más.
+// La ficha decía "Meses: 10 · de venta, desde oct 2025" y "Vendo 6.1 u por
+// mes". Daniel, textual: *"no me hace sentido que me dice 10 meses de venta,
+// entonces pense no comprar porque yo compro para 3 o 4 meses. pero me lo suma
+// y me lo aplaza"*, y la regla la fijó él: *"si llego a 0 y llego mercancia,
+// cual es la logica q me muestre 10 meses? me debe de mostrar la ultima (y mira
+// q hubo dos el mismo dia (se tienen que sumar))"*.
+//
+// Una TANDA = lo que pasa entre "la bodega quedó en 0" y "volvió a quedar en
+// 0". Compras que llegan cuando HAY stock vivo (o el mismo día/mes) se SUMAN a
+// la tanda abierta; una compra que llega con la bodega en 0 ABRE tanda nueva.
+//
+// 🔴 ESTO NO ES EL FIFO PROHIBIDO. El FIFO repartía ventas ENTRE compras con
+// stock vivo encima — inventado, nadie marcó las cajas. Acá el corte es un
+// HECHO agregado: si el stock tocó 0 antes de la siguiente compra, todo lo
+// vendido hasta ahí salió de lo que había llegado hasta ahí — no hay nada que
+// atribuir. DENTRO de una tanda todo sigue siendo agregado.
+//
+// Granularidad MENSUAL, como todo el módulo: el timeline es el neto acumulado
+// compras − ventas por mes, con los datos que la ficha ya tiene (compras con
+// fecha + ventas mensuales). Al mes, "llegó el mismo día" y "llegó el mismo
+// mes con stock vivo" son indistinguibles y los dos SUMAN — que es la regla.
+//
+// ⚠️ CUÁNDO SE PUEDE AFIRMAR EL TIMELINE (si no, todo queda como siempre):
+//   · sin compras de MÁS DE 3 AÑOS (no viajan sus fechas: el saldo arrancaría
+//     mentiroso y los "ceros" serían ficción),
+//   · sin ventas ANTERIORES a la primera compra (misma razón),
+//   · sin "vendidas de más" que pasen del ruido (TERMO vendió 1.648 de 796:
+//     con el saldo en −852 cada compra "abriría tanda" sobre un cero falso).
+// El RUIDO tolerado son ±2 unidades (ajustes tipo "1 en bodega que no sale de
+// ninguna compra") — medido en el barrido de vistana del 12-ago-2026: subir la
+// tolerancia de 0 a 2 en el CIERRE solo mueve un puñado de códigos, y exigir 0
+// exacto en el guard de vendidoDeMas dejaría fuera artículos con 1 u de ajuste.
+//
+// ⚠️ "QUEDÓ EN 0" = saldo del timeline ≤ min(2, 10% de lo llegado de la tanda).
+// El 10% protege a las tandas chicas: una de 8 u con 2 en bodega NO está en
+// cero (le queda el 25%); una de 36 con 2 sí (94% vendido, la cola no cuenta).
+//
+// 🔴 CON UNA SOLA TANDA NO CAMBIA NADA: el artículo que nunca tocó 0 se mide
+// exactamente como siempre (ancla extendida, agotado en la última venta, etc.).
+// Solo con 2+ tandas la tanda ACTUAL pasa a mandar en MESES y VENDIDO.
+
+export interface Tanda {
+  /** El mes de la llegada que la abrió (YYYY-MM). */
+  desdeMes: string;
+  /** Unidades llegadas dentro de la tanda (todas sus compras, sumadas). */
+  llegaron: number;
+  /** Unidades NETAS vendidas mientras la tanda estuvo abierta (el mes en curso
+   *  incluido: es un acumulado, no un promedio). */
+  vendidas: number;
+  /** Último mes con venta neta > 0 dentro de la tanda. */
+  ultimaVentaMes: string | null;
+  /** `true` = la bodega quedó en 0 (llegó otra tanda después, o el artículo
+   *  está agotado según Switch). El reloj quedó CERRADO en su última venta. */
+  cerrada: boolean;
+  /** Cerrada: meses INCLUSIVE desde la apertura hasta la última venta (oct →
+   *  nov = 2, como cuenta Daniel). Viva: meses TRANSCURRIDOS hasta hoy. */
+  meses: number;
+}
+
+export interface MedidaTandas {
+  /** La más vieja primero. La última es la tanda ACTUAL. */
+  tandas: Tanda[];
+  /** Σ vendidas de todas las tandas — el numerador del "vendo por mes". */
+  vendidas: number;
+  /** Meses CON mercancía en bodega, sin el mes en curso — el divisor del
+   *  "vendo por mes": los meses sin stock no venden porque no hay qué vender,
+   *  y dejarlos dividir diluye el ritmo (el "6.1 u por mes" de la captura). */
+  mesesConStock: number;
+}
+
+/** Ruido de ajustes que se tolera al afirmar el timeline (±2 unidades). */
+export const TANDA_RUIDO_MAX = 2;
+
+/** "Quedó en 0" = saldo ≤ este umbral. min(2, 10% de lo llegado): tolera la
+ *  cola de 1-2 unidades de ajuste en tandas de tamaño real y exige el 0 exacto
+ *  en tandas chicas, donde 2 unidades son un cuarto de la mercancía. */
+export function umbralTandaCero(llegaron: number): number {
+  return Math.max(0, Math.min(TANDA_RUIDO_MAX, Math.floor(llegaron * 0.1)));
+}
+
+/**
+ * Parte las compras y ventas del artículo en TANDAS (episodios entre ceros).
+ *
+ * Devuelve `null` cuando el timeline NO se puede afirmar (ver el encabezado):
+ * ahí la ficha se comporta exactamente como siempre. Con 0 ó 1 tandas devuelve
+ * la medida igual — el que llama decide que solo 2+ cambian algo.
+ */
+export function medirTandas(
+  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana" | "serie" | "sinCompraRegistrada"> &
+    Partial<Pick<ArticuloCompras, "vendidoAntes" | "vendidoDeMas" | "existencia">>,
+  hoyMes: string,
+  // Solo para MEDIR la sensibilidad del criterio en los diagnósticos
+  // (scripts/_diag-tandas-referencia.ts). La pantalla usa SIEMPRE el default.
+  umbralDe: (llegaron: number) => number = umbralTandaCero,
+): MedidaTandas | null {
+  const compras = art.compras ?? [];
+  const serie = art.serie ?? [];
+  if (art.sinCompraRegistrada || compras.length === 0) return null;
+  if ((art.comprasFueraDeVentana ?? 0) > 0) return null;
+  // Una respuesta vieja cacheada sin el cotejo no puede afirmar el timeline.
+  if (art.vendidoAntes == null || art.vendidoDeMas == null) return null;
+  if (art.vendidoAntes > 0) return null;
+  if (Math.abs(art.vendidoDeMas) > TANDA_RUIDO_MAX) return null;
+
+  const llegadasPorMes = new Map<string, number>();
+  for (const c of compras) {
+    const m = c.fecha.slice(0, 7);
+    if (m > hoyMes) continue;
+    llegadasPorMes.set(m, (llegadasPorMes.get(m) ?? 0) + c.unidades);
+  }
+  const ventasPorMes = new Map(serie.filter((s) => s.mes <= hoyMes).map((s) => [s.mes, s.unidades]));
+  const meses = [...llegadasPorMes.keys()];
+  if (!meses.length) return null;
+  const primerMes = meses.reduce((a, b) => (a < b ? a : b));
+
+  interface Acc {
+    desdeMes: string;
+    llegaron: number;
+    vendidas: number;
+    ultimaVentaMes: string | null;
+  }
+  const acc: Acc[] = [];
+  let abierta: Acc | null = null;
+  let saldo = 0; // el neto acumulado al CIERRE del mes anterior
+
+  for (let m = primerMes; m <= hoyMes; m = restarMeses(m, -1)) {
+    const lleg = llegadasPorMes.get(m) ?? 0;
+    // Una compra abre tanda SOLO si la bodega ya estaba en 0 al cierre del mes
+    // anterior. Con stock vivo (o el mismo mes) se SUMA a la tanda abierta.
+    if (lleg > 0 && (abierta == null || saldo <= umbralDe(abierta.llegaron))) {
+      abierta = { desdeMes: m, llegaron: 0, vendidas: 0, ultimaVentaMes: null };
+      acc.push(abierta);
+    }
+    if (lleg > 0 && abierta) abierta.llegaron += lleg;
+    const vta = ventasPorMes.get(m) ?? 0;
+    if (abierta) {
+      abierta.vendidas += vta;
+      if (vta > 0) abierta.ultimaVentaMes = m;
+    }
+    saldo += lleg - vta;
+  }
+
+  const tandas: Tanda[] = acc.map((t, i) => {
+    const esUltima = i === acc.length - 1;
+    // Las tandas viejas están cerradas POR CONSTRUCCIÓN (la siguiente abrió
+    // porque el saldo tocó 0). La actual cierra solo si Switch dice bodega 0 —
+    // la misma foto que usa el agotado de siempre.
+    const cerrada = !esUltima || (art.existencia === 0 && t.vendidas > 0 && t.ultimaVentaMes != null);
+    const meses =
+      cerrada && t.ultimaVentaMes != null
+        ? Math.max(1, diffMeses(t.ultimaVentaMes, t.desdeMes) + 1)
+        : cerrada
+          ? 1
+          : diffMeses(hoyMes, t.desdeMes);
+    return { ...t, cerrada, meses };
+  });
+
+  return {
+    tandas,
+    vendidas: tandas.reduce((s, t) => s + t.vendidas, 0),
+    mesesConStock: tandas.reduce((s, t) => s + (t.cerrada ? t.meses : diffMeses(hoyMes, t.desdeMes)), 0),
+  };
+}
+
+/** El % de UNA tanda: vendidas ÷ llegaron, topeado en 100 (dentro de una tanda
+ *  afirmable el exceso es el ruido de ±2 que el guard ya acotó). `null` = no
+ *  hay porcentaje honesto (sin llegadas, o vendidas negativas). */
+export function parteDeTanda(t: Pick<Tanda, "llegaron" | "vendidas">): number | null {
+  if (!(t.llegaron > 0) || t.vendidas < 0) return null;
+  return Math.min(1, t.vendidas / t.llegaron);
+}
+
+// 🔴 EN PANTALLA LA PALABRA "TANDA" NO EXISTE (redacción aprobada por Daniel,
+// 12-ago-2026): se habla de la LLEGADA y del movimiento real. La frase
+// protagonista de la ficha es sobre la ÚLTIMA llegada, con los tres números en
+// este orden:
+//
+//   Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u
+//
+// Viva: "va el X% en Y meses" (en curso, gris). Agotada: "se vendió toda en Y
+// meses" (cerrada, negro) — sin el "me quedan": la bodega quedó en 0.
+// ⚠️ "me quedan" es lo que queda DE ESA llegada (llegaron − vendidas); si
+// difiere del stock total por ajustes, los avisos de descuadre explican — el
+// cuadre NO se fuerza, como siempre.
+
+/** "Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u" —
+ *  la frase de la ÚLTIMA llegada, tal como se lee en la ficha. */
+export function fraseLlegadaActual(t: Tanda): string {
+  const cabeza = `Llegaron ${fmtNum(t.llegaron)} u en ${fmtMesAnio(t.desdeMes)}`;
+  const cuando = textoMeses(t.meses);
+  if (t.cerrada) {
+    const parte = parteDeTanda(t);
+    const pct = parte == null ? null : Math.round(parte * 100);
+    return pct != null && pct < 100
+      ? `${cabeza} → se vendió el ${pct}% en ${cuando}`
+      : `${cabeza} → se vendió toda en ${cuando}`;
+  }
+  if (t.vendidas < 0) return `${cabeza} → van devueltas ${fmtNum(-t.vendidas)}`;
+  const parte = parteDeTanda(t) ?? 0;
+  const quedan = Math.max(0, t.llegaron - t.vendidas);
+  return `${cabeza} → va el ${Math.round(parte * 100)}% en ${cuando} → me quedan ${fmtNum(quedan)} u`;
+}
+
+/** "La anterior (oct 2025): 36 u — se vendió toda en 2 meses" — la historia,
+ *  en gris, debajo de la frase. */
+export function fraseLlegadaAnterior(t: Tanda): string {
+  const parte = parteDeTanda(t);
+  const pct = parte == null ? null : Math.round(parte * 100);
+  const cuando = textoMeses(t.meses);
+  const cierre =
+    pct != null && pct < 100 ? `se vendió el ${pct}% en ${cuando}` : `se vendió toda en ${cuando}`;
+  return `La anterior (${fmtMesAnio(t.desdeMes)}): ${fmtNum(t.llegaron)} u — ${cierre}`;
+}
+
+/** La línea gris completa de la historia: la llegada ANTERIOR + cuántas más
+ *  hubo. `null` = no hay historia que contar (0 ó 1 llegadas). Con 3+ solo se
+ *  detalla la anterior — el detalle de llegadas de hace años no decide la
+ *  compra de hoy. */
+export function textoLlegadaAnterior(tandas: readonly Tanda[] | null): string | null {
+  if (!tandas || tandas.length < 2) return null;
+  const base = fraseLlegadaAnterior(tandas[tandas.length - 2]);
+  const n = tandas.length - 2;
+  if (n <= 0) return base;
+  return `${base} · y ${n} ${n === 1 ? "llegada anterior" : "llegadas anteriores"}`;
+}
+
 // ─── LA LÍNEA DE VENTA: cuánto tiempo de venta y qué % va ────────────────────
 //
 // 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA (12-ago-2026). Y LA REGLA
@@ -346,7 +577,20 @@ export function medirAvance(
     // sin ellos no se puede afirmar el agotado y la línea cae a la forma viva.
     Partial<Pick<ArticuloCompras, "cuadre" | "existencia">>,
   hoyMes: string,
+  // 🔴 Con 2+ TANDAS la que manda es la ACTUAL (12-ago-2026, la regla de
+  // Daniel: *"si llego a 0 y llego mercancia… me debe de mostrar la ultima"*).
+  // El ancla es la llegada que la abrió y el % es DE LA TANDA — afirmable,
+  // porque el cero de bodega separa lo de antes de lo de ahora sin atribuir
+  // nada. Con `null` (una sola tanda, o timeline no afirmable) NADA cambia.
+  tandas: MedidaTandas | null = null,
 ): LineaAvance {
+  const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
+  if (actual) {
+    if (actual.cerrada) {
+      return { tipo: "agotado", meses: actual.meses, desdeMes: actual.desdeMes, parte: parteDeTanda(actual) };
+    }
+    return { tipo: "en-curso", meses: actual.meses, parte: parteDeTanda(actual) ?? 0 };
+  }
   const todas = art.compras ?? [];
   const fuera = art.comprasFueraDeVentana ?? 0;
   const serie = art.serie ?? [];
@@ -522,8 +766,17 @@ export interface VendidoMeses {
 }
 
 export function medirVendidoMeses(
-  f: Pick<FichaArticulo, "grandes" | "avance" | "ritmo">,
+  f: Pick<FichaArticulo, "grandes" | "avance" | "ritmo"> & Partial<Pick<FichaArticulo, "tandas">>,
 ): VendidoMeses {
+  // 🔴 Con 2+ TANDAS las dos celdas son DE LA TANDA ACTUAL (la regla de
+  // Daniel, 12-ago-2026): VENDIDO = vendido_en_tanda ÷ comprado_en_tanda
+  // (100% si se agotó) y MESES = el tiempo de ESA tanda — cerrado en su última
+  // venta si la bodega quedó en 0, corriendo si sigue viva. Una sola función
+  // para ficha, tabla del modo pedido y Excel, como siempre.
+  const actual = f.tandas && f.tandas.length >= 2 ? f.tandas[f.tandas.length - 1] : null;
+  if (actual) {
+    return { parte: parteDeTanda(actual), meses: actual.meses, terminado: actual.cerrada };
+  }
   const { comprado, vendido } = f.grandes;
   // 🔴 El % es SIEMPRE el real (Vendí ÷ Compré) — Daniel: *"como stock 0 y
   // vendido 90%?"*. Un vendido negativo ("el −5% de lo comprado") o mayor que
@@ -577,8 +830,9 @@ export interface RitmoVenta {
   meses: number | null;
   /** Unidades netas por mes sobre esos meses. `null` = no se puede decir. */
   porMes: number | null;
-  /** `agotado` = stock 0: el tiempo quedó CERRADO en la última venta. */
-  base: "agotado" | "unica-viva" | "agregado" | "ventana-12" | null;
+  /** `agotado` = stock 0: el tiempo quedó CERRADO en la última venta.
+   *  `tanda-viva` = 2+ tandas y la actual sigue viva: el reloj es EL DE ELLA. */
+  base: "agotado" | "unica-viva" | "agregado" | "ventana-12" | "tanda-viva" | null;
   /** El mes del ancla (llegada o inicio del agregado). */
   desdeMes: string | null;
 }
@@ -588,7 +842,22 @@ export function medirRitmo(
   hoyMes: string,
   avance: LineaAvance,
   promedio: Promedio,
+  tandas: MedidaTandas | null = null,
 ): RitmoVenta {
+  // 🔴 Con 2+ TANDAS: los MESES son los de la tanda ACTUAL, y el "vendo por
+  // mes" EXCLUYE los meses sin mercancía (además del mes en curso, como
+  // siempre) — el caso de la captura: 61 vendidas ÷ 7 meses CON stock = 8.7,
+  // no 61 ÷ 10 = 6.1 "sumando y aplazando" los meses de bodega vacía. Es el
+  // MISMO timeline de tandas, no una segunda cuenta.
+  const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
+  if (actual && tandas) {
+    return {
+      meses: actual.meses,
+      porMes: tandas.vendidas > 0 && tandas.mesesConStock > 0 ? tandas.vendidas / tandas.mesesConStock : null,
+      base: actual.cerrada ? "agotado" : "tanda-viva",
+      desdeMes: actual.desdeMes,
+    };
+  }
   const serie = art.serie ?? [];
   const vanDesde = (mes: string) =>
     serie.filter((m) => m.mes >= mes && m.mes <= hoyMes).reduce((s, m) => s + m.unidades, 0);
@@ -656,12 +925,25 @@ export function textoVendoPorMes(porMes: number | null): string | null {
  *  "Vendo 3.6 u por mes · En 5 meses va el 50% de la compra" / "Vendo 18 u por
  *  mes · Se vendió todo en 2 meses". Pantalla y verificación comparan contra
  *  ESTO — una sola definición. */
-export function textoLineaVenta(n: LineaAvance, ritmo: RitmoVenta): string | null {
+export function textoLineaVenta(
+  n: LineaAvance,
+  ritmo: RitmoVenta,
+  tandas: readonly Tanda[] | null = null,
+): string | null {
   const vendo = textoVendoPorMes(ritmo.porMes);
   // Cuando el ritmo NO sale de la llegada (sin compra registrada), se dice de
   // dónde sale — un número con otra base sin rotular sería una mentirita.
   const vendoRotulado =
     vendo && ritmo.base === "ventana-12" ? `${vendo} (promedio de los últimos 12 meses)` : vendo;
+  // 🔴 Con 2+ llegadas sobre bodega en 0, la protagonista es la FRASE de la
+  // ÚLTIMA llegada ("Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me
+  // quedan 11 u") y el "vendo N u por mes" queda de dato chiquito al final.
+  // La historia (la anterior + cuántas más) va en OTRA línea, gris
+  // (`textoLlegadaAnterior`) — acá no entra.
+  if (tandas && tandas.length >= 2) {
+    const frase = fraseLlegadaActual(tandas[tandas.length - 1]);
+    return vendo ? `${frase} · ${vendo.charAt(0).toLowerCase()}${vendo.slice(1)}` : frase;
+  }
   const partes = [vendoRotulado, textoAvance(n)].filter((t): t is string => t != null);
   return partes.length ? partes.join(" · ") : null;
 }
@@ -679,6 +961,11 @@ export function pieGrandeMeses(r: RitmoVenta): string {
       return "en venderse";
     case "unica-viva":
       return "de venta";
+    case "tanda-viva":
+      // La bodega tocó 0 en el medio: el reloj es el de la ÚLTIMA llegada
+      // sobre bodega vacía, y el pie dice desde cuándo corre (redacción
+      // aprobada por Daniel — la palabra "tanda" no existe en pantalla).
+      return r.desdeMes ? `de venta · desde ${fmtMesAnio(r.desdeMes)}` : "de venta";
     case "agregado":
       return r.desdeMes ? `de venta, desde ${fmtMesAnio(r.desdeMes)}` : "de venta";
     default:
@@ -1073,6 +1360,10 @@ export interface FichaArticulo {
   /** El CIF anterior, solo si difiere del de hoy. `null` = no cambió (o no hay
    *  compra anterior) y no se muestra nada. */
   cambioCosto: CambioDeCosto | null;
+  /** Las TANDAS (episodios entre ceros de bodega), la más vieja primero.
+   *  `null` = una sola tanda o timeline no afirmable: TODO como siempre.
+   *  Con 2+, `avance`/`ritmo`/VENDIDO·MESES ya vienen medidos sobre la ACTUAL. */
+  tandas: Tanda[] | null;
 }
 
 /**
@@ -1092,13 +1383,18 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   const ultima = todas[0] ?? null;
   const anterior = todas[1] ?? null;
   const cif = ultima?.costos.cif ?? null;
-  const avance = medirAvance(art, hoyMes);
-  const ritmo = medirRitmo(art, hoyMes, avance, promedio);
+  // Las tandas solo mandan cuando hay 2+ y el timeline es afirmable; con una
+  // sola (o `null`) medirAvance/medirRitmo se comportan EXACTAMENTE como antes.
+  const medidaTandas = medirTandas(art, hoyMes);
+  const tandasActivas = medidaTandas && medidaTandas.tandas.length >= 2 ? medidaTandas : null;
+  const avance = medirAvance(art, hoyMes, tandasActivas);
+  const ritmo = medirRitmo(art, hoyMes, avance, promedio, tandasActivas);
 
   return {
     grandes: tresGrandes(art),
     avance,
     ritmo,
+    tandas: tandasActivas ? tandasActivas.tandas : null,
     vista: vistaDeBarras(art, hoyMes),
     barras,
     promedio,
