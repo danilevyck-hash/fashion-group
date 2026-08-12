@@ -36,6 +36,10 @@ import type {
 interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
   marcas?: MarcaConPorcentaje[];
 }
+import {
+  lineaContextoMarca,
+  totalesPorMarcaDeProyecto,
+} from "@/lib/marketing/contexto-marca";
 import FacturasSection from "./FacturasSection";
 import FotosSection from "./FotosSection";
 import EntregasSection from "./EntregasSection";
@@ -44,9 +48,30 @@ import type { EntregaConItems } from "@/lib/marketing/types";
 
 type Tab = "facturas" | "fotos";
 
+// Columnas de la cabecera de totales según cuántas celdas haya (3 base +
+// Entregas + Importación). Literales completos — el purge de Tailwind no ve
+// clases armadas por concatenación. Con 5 celdas, a 390 px van 3+2 en dos
+// filas (cinco montos en una sola línea no entran sin recortar).
+const GRID_TOTALES: Record<number, string> = {
+  3: "grid-cols-3",
+  4: "grid-cols-4",
+  5: "grid-cols-3 sm:grid-cols-5",
+};
+
 interface Props {
   proyectoId: string;
-  marca?: MkMarca; // compat opcional
+  /**
+   * La marca desde cuyo período se abrió el overlay. Con ella (y el período)
+   * se dibuja la línea de contexto: "En Calvin Klein · Período 2026: $2,600 —
+   * este proyecto también tiene $2,470 de Tommy Hilfiger". Daniel quiere
+   * seguir viendo AMBAS marcas en el proyecto — el contexto explica el salto
+   * de número entre la tarjeta tocada y el total del overlay, no lo esconde.
+   */
+  marca?: MkMarca;
+  /** Nombre del período desde el que se abrió (ej. "Período 2026"). */
+  periodoNombre?: string | null;
+  /** Monto del proyecto en esa marca/período — el del agregador (la tarjeta). */
+  montoEnPeriodo?: number | null;
   onClose: () => void;
   onChange: () => void;
   onNombreProyecto?: (nombre: string) => void;
@@ -54,6 +79,9 @@ interface Props {
 
 export default function ProyectoOverlay({
   proyectoId,
+  marca,
+  periodoNombre,
+  montoEnPeriodo,
   onClose,
   onChange,
   onNombreProyecto,
@@ -205,6 +233,36 @@ export default function ProyectoOverlay({
     return [...out.entries()].map(([id, nombre]) => ({ id, nombre }));
   }, [proyecto, facturas, entregas, marcasCatalogo]);
 
+  // Contexto de marca: solo cuando el overlay se abrió desde el período de
+  // una marca Y el proyecto tiene plata de OTRAS marcas. Los montos ya están
+  // acá (facturas con su reparto + total_por_marca de las entregas) — no se
+  // recalcula nada contra la base. Ver lib/marketing/contexto-marca.ts.
+  const lineaContexto = useMemo(() => {
+    if (!marca) return null;
+    const nombres = new Map<string, string>(
+      marcasCatalogo.map((m) => [String(m.id), m.nombre]),
+    );
+    for (const m of marcasDelProyecto) {
+      if (!nombres.has(m.id)) nombres.set(m.id, m.nombre);
+    }
+    return lineaContextoMarca({
+      marcaId: String(marca.id),
+      marcaNombre: marca.nombre,
+      periodoNombre,
+      montoEnPeriodo,
+      totales: totalesPorMarcaDeProyecto(facturas, entregas),
+      nombres,
+    });
+  }, [
+    marca,
+    periodoNombre,
+    montoEnPeriodo,
+    facturas,
+    entregas,
+    marcasCatalogo,
+    marcasDelProyecto,
+  ]);
+
   if (loading || !proyecto) {
     return (
       <ModalOverlay backdropClassName="bg-black/30" onBackdropClick={onClose}>
@@ -294,6 +352,18 @@ export default function ProyectoOverlay({
         </div>
 
         <div className="p-6 space-y-5">
+          {/* Contexto de la marca desde la que se abrió: explica por qué el
+              total del proyecto (ambas marcas) no coincide con la tarjeta
+              tocada (una sola marca en un período). */}
+          {lineaContexto && (
+            <div
+              data-contexto-marca
+              className="rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-[13px] text-gray-800"
+            >
+              {lineaContexto}
+            </div>
+          )}
+
           {/* Datos del proyecto */}
           <div className="rounded-lg border border-gray-200 p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
@@ -376,7 +446,11 @@ export default function ProyectoOverlay({
 
             <div
               className={`grid ${
-                totales.tieneAlgunaZonaLibre ? "grid-cols-4" : "grid-cols-3"
+                GRID_TOTALES[
+                  3 +
+                    (totales.conteoEntregas > 0 ? 1 : 0) +
+                    (totales.tieneAlgunaZonaLibre ? 1 : 0)
+                ]
               } gap-3 mt-4 pt-3 border-t border-gray-100`}
             >
               <div>
@@ -395,6 +469,20 @@ export default function ProyectoOverlay({
                   {formatearMonto(totales.subtotal)}
                 </div>
               </div>
+              {/* Entregas de muebles: sin esta celda, COSTO TOTAL no cierra a
+                  la vista (total = facturas + entregas). Solo aparece cuando
+                  hay entregas — con 0 sería ruido. */}
+              {totales.conteoEntregas > 0 && (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-gray-400">
+                    Entregas
+                  </div>
+                  <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
+                    {totales.conteoEntregas} ·{" "}
+                    {formatearMonto(totales.totalEntregas)}
+                  </div>
+                </div>
+              )}
               {totales.tieneAlgunaZonaLibre && (
                 <div>
                   <div

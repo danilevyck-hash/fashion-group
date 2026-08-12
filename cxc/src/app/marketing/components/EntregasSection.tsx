@@ -141,6 +141,13 @@ export default function EntregasSection({
         <div className="grid grid-cols-1 gap-2">
           {entregas.map((e) => {
             const expandida = expandedId === e.id;
+            // Solo las marcas con plata: una clave en $0 en total_por_marca
+            // significa "esta marca no llevó nada" y un chip en $0.00 se lee
+            // como si le tocara algo. Mismo criterio que el sellado de
+            // períodos (inventario.ts filtra monto > 0).
+            const repartos = Object.entries(e.total_por_marca ?? {}).filter(
+              ([, monto]) => Number(monto ?? 0) > 0,
+            );
             return (
               <div
                 key={e.id}
@@ -163,12 +170,12 @@ export default function EntregasSection({
                       {e.notas?.trim() || "Entrega de muebles"}
                     </div>
                     <div className="flex flex-wrap items-center gap-1 mt-1">
-                      {Object.entries(e.total_por_marca ?? {}).length === 0 ? (
+                      {repartos.length === 0 ? (
                         <span className="text-xs text-gray-500">
                           Sin reparto
                         </span>
                       ) : (
-                        Object.entries(e.total_por_marca ?? {}).map(
+                        repartos.map(
                           ([marcaId, monto]) => {
                             const marca = marcaById.get(marcaId);
                             if (!marca) return null;

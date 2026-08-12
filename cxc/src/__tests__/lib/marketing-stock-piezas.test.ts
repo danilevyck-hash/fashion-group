@@ -524,3 +524,66 @@ describe("sin la migración 20260808160000 corrida", () => {
     expect(ps[0].foto_url).toBeNull();
   });
 });
+
+// ── BORRAR una entrega limpia sus sellos de período ─────────────────────────
+//
+// El sello (mk_periodo_documentos) ata la entrega a un período. Si la entrega
+// se borra DE VERDAD y el sello queda, apunta a nada — pasó en producción el
+// 12-ago-2026 (entrega de prueba fb4e8342, sello KL huérfano, borrado a mano
+// con respaldo). `deleteEntrega` ahora limpia SOLO los sellos de ESA entrega.
+
+describe("BORRAR una entrega limpia sus sellos de período", () => {
+  function sembrarSellos(entregaId: string) {
+    estado.tablas.mk_periodo_documentos = [
+      {
+        id: "sello-mio",
+        periodo_id: "per-1",
+        proveedor_key: "CK",
+        tipo: "entrega",
+        documento_id: entregaId,
+      },
+      {
+        id: "sello-otra-entrega",
+        periodo_id: "per-1",
+        proveedor_key: "TH",
+        tipo: "entrega",
+        documento_id: "e-ajena",
+      },
+      {
+        id: "sello-factura",
+        periodo_id: "per-1",
+        proveedor_key: "CK",
+        tipo: "factura",
+        documento_id: "f-1",
+      },
+    ];
+  }
+  const sellos = () =>
+    (estado.tablas.mk_periodo_documentos ?? []).map((s) => String(s.id));
+
+  it("se van los sellos de ESA entrega; los ajenos y los de facturas quedan", async () => {
+    const e = await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 10 }],
+    });
+    sembrarSellos(e.id);
+    await deleteEntrega(e.id);
+    expect(sellos()).toEqual(["sello-otra-entrega", "sello-factura"]);
+    // Y el stock volvió igual que siempre: la limpieza no cambió el borrado.
+    expect(stock(PROD_NORTE)).toBe(200);
+  });
+
+  it("borrar dos veces sigue siendo no-op (los sellos ya no están)", async () => {
+    const e = await createEntrega({
+      proyectoId: PROYECTO,
+      marcas,
+      items: [{ productoId: PROD_NORTE, cantidad: 10 }],
+    });
+    sembrarSellos(e.id);
+    await deleteEntrega(e.id);
+    await deleteEntrega(e.id);
+    expect(sellos()).toEqual(["sello-otra-entrega", "sello-factura"]);
+    expect(stock(PROD_NORTE)).toBe(200);
+  });
+});

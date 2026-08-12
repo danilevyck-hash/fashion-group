@@ -163,6 +163,17 @@ function PeriodoPage({
             {proyectoParam && (
               <ProyectoOverlay
                 proyectoId={proyectoParam}
+                // El contexto de la marca/período desde el que se abrió: la
+                // línea "En Calvin Klein · Período 2026: $X — este proyecto
+                // también tiene $Y de Tommy Hilfiger". El monto es EL DEL
+                // AGREGADOR (seccion.proyectos, la misma cifra de la tarjeta
+                // tocada) — acá no se calcula nada.
+                marca={marcaInicialModal ?? undefined}
+                periodoNombre={seccion.nombre}
+                montoEnPeriodo={
+                  seccion.proyectos.find((p) => p.id === proyectoParam)
+                    ?.monto ?? null
+                }
                 onClose={() => router.push(rutaPeriodo)}
                 onChange={() => setRefreshKey((k) => k + 1)}
               />

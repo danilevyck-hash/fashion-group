@@ -47,7 +47,14 @@ async function todo<T>(t: string, sel: string): Promise<T[]> {
 
 // --- Las cifras de control, re-medidas contra producción el 12-ago-2026 -----
 //
-// ⚠️ ACTUALIZADAS por el MOVIMIENTO del 12-ago-2026 (aprobado por Daniel, ver
+// ⚠️ RE-MEDIDAS el 12-ago-2026 POR LA TARDE, tras los movimientos REALES de
+// Daniel en Apertura · Nova Lux: entrega #24 NUEVA de $2.470 (TH) + entrega
+// #22 EDITADA de $1.040 → $2.600 (CK). Los dos van al período ABIERTO, así
+// que el delta (+$4.030) mueve abiertos/titular/mobiliario/global y el
+// por-marca abierto+cerrado de TH (+2.470) y CK (+1.560). Los CERRADOS no se
+// tocaron: mid 2026 sigue en $140.566,57 y el legacy intacto.
+//
+// ⚠️ ACTUALIZADAS ANTES por el MOVIMIENTO del 12-ago-2026 (aprobado por Daniel, ver
 // `scripts/_mover-reportado-mid2026.ts`): todo el gasto que él YA había
 // reportado a las marcas por fuera del sistema se selló al período CERRADO
 // "mid 2026" ('pvh') — la factura Kheridinne de TH ($9.000), las 10 entregas
@@ -66,18 +73,20 @@ async function todo<T>(t: string, sel: string): Promise<T[]> {
 // bajó exactamente lo que los cerrados subieron, y el total por marca
 // (abierto+cerrado) quedó idéntico marca por marca.
 const CONTROL = {
-  abiertoGrupoPvh: 14640.0, // TH $8.800 + CK $5.840 + KL $0, períodos abiertos
+  // TH $11.270 (fact 8.800 + mueble 2.470) + CK $7.400 (fact 4.800 + mueble
+  // 2.600) + KL $0, períodos abiertos.
+  abiertoGrupoPvh: 18670.0,
   cerradoMid2026: 140566.57, // TH 94.104,43 + CK 46.462,14 — SOLO esos dos chips
   cerradoFacturas: 60, // 59 legacy + Kheridinne (TH $9.000) movida el 12-ago
   legacy: { count: 59, total: 62381.57 }, // el archivo original, INTACTO
   joybees: 1540.0, // ABIERTO — Joybees no se cierra
   multifashion: 8061.63,
-  totalTitular: 24241.63, // TH 8.800 + CK 5.840 + J 1.540 + Multifashion 8.061,63
-  mobiliario: 71765.0,
-  globalAbiertosMasCerrados: 164808.2, // el número que el movimiento NO movió
+  totalTitular: 28271.63, // TH 11.270 + CK 7.400 + J 1.540 + Multifashion 8.061,63
+  mobiliario: 75795.0, // 71.765 + entrega #24 ($2.470) + edición #22 (+$1.560)
+  globalAbiertosMasCerrados: 168838.2, // 164.808,20 + $4.030 de gasto NUEVO
   porMarcaAbiertoMasCerrado: {
-    TH: 102904.43,
-    CK: 52302.14,
+    TH: 105374.43, // 102.904,43 + 2.470 (entrega #24)
+    CK: 53862.14, // 52.302,14 + 1.560 (edición de la #22)
     KL: 0,
     RBK: 0,
     J: 1540.0,
@@ -198,7 +207,7 @@ async function main() {
   const mf = bl(conSellos, "multifashion")!;
 
   cmp(
-    "abierto TH+CK+KL = 14.640,00",
+    "abierto TH+CK+KL = 18.670,00",
     th.total + ck.total + kl.total,
     CONTROL.abiertoGrupoPvh,
   );
@@ -212,11 +221,11 @@ async function main() {
   cmp("Joybees ABIERTO = 1.540,00 (no se cierra)", j.total, CONTROL.joybees);
   cmp("Reebok = 0,00", rbk.total, 0);
   cmp("Multifashion = 8.061,63", mf.total, CONTROL.multifashion);
-  cmp("TITULAR (abiertos) = 24.241,63", conSellos.resumen.total, CONTROL.totalTitular);
+  cmp("TITULAR (abiertos) = 28.271,63", conSellos.resumen.total, CONTROL.totalTitular);
   // El número que el movimiento del 12-ago NO podía mover: la plata solo
   // cambió de cajón, así que abiertos + cerrados da lo mismo que antes.
   cmp(
-    "GLOBAL abiertos+cerrados = 164.808,20",
+    "GLOBAL abiertos+cerrados = 168.838,20",
     conSellos.resumen.total + cerradoTotal,
     CONTROL.globalAbiertosMasCerrados,
   );
@@ -226,7 +235,7 @@ async function main() {
       s + (e.proyecto_id && proyectosVivos.has(String(e.proyecto_id)) ? Number(e.total ?? 0) : 0),
     0,
   );
-  cmp("mobiliario = 71.765,00", mobiliario, CONTROL.mobiliario);
+  cmp("mobiliario = 75.795,00", mobiliario, CONTROL.mobiliario);
 
   console.log("\n═══ CUADRE 2 — por marca, ABIERTO + CERRADO ═══");
   const cerradoDe = (k: string) =>

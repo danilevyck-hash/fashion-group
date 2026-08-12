@@ -334,6 +334,40 @@ export async function sellarDocumentoPorMarcas(
   }
 }
 
+/**
+ * Borra los sellos de UN documento — para cuando el documento se borra DE
+ * VERDAD (hard delete, como `deleteEntrega`). Un sello que apunta a un
+ * documento inexistente no mueve plata (el agregador no encuentra el doc),
+ * pero es basura que ya produjo un huérfano real en producción (12-ago-2026:
+ * la entrega de prueba fb4e8342 se borró y su sello KL quedó apuntando a
+ * nada).
+ *
+ * 🩸 NUNCA lanza, igual que sellar: el documento ya se borró y el stock ya se
+ * devolvió — un tropiezo acá no puede deshacer eso ni dejar la operación a
+ * medias. Sin la DDL de períodos, no-op limpio.
+ *
+ * ⚠️ NO usar para anulaciones (soft delete de facturas): ahí el documento
+ * sigue existiendo y su sello dice a qué período se reportó.
+ */
+export async function borrarSellosDeDocumento(
+  tipo: TipoDocumentoPeriodo,
+  documentoId: string,
+): Promise<void> {
+  try {
+    if (!documentoId) return;
+    const { error } = await supabaseServer
+      .from("mk_periodo_documentos")
+      .delete()
+      .eq("tipo", tipo)
+      .eq("documento_id", documentoId);
+    if (error && !esTablaAusente(error)) {
+      avisar("borrarSellosDeDocumento", error.message);
+    }
+  } catch (err) {
+    if (!esFaltaDeTablas(err)) avisar("borrarSellosDeDocumento", err);
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Escritura de períodos (renombrar / cerrar / abrir)
 //
