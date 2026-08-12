@@ -103,7 +103,10 @@ describe("correo al equipo — no se tocó", () => {
     const html = buildOrderEmailHtml(base);
     expect(html).toContain("Estimado equipo Fashion Group");
     expect(html).toContain("Se ha recibido un nuevo pedido del catálogo Tommy Hilfiger");
-    expect(html).toContain("generado automáticamente");
+    // El pie "generado automáticamente desde fashiongr.com" se PODÓ (12-ago-2026):
+    // al equipo los pedidos no le llegan de ningún otro lado. El pie del correo
+    // al CLIENTE sí se queda (lo fija el bloque de arriba de este archivo).
+    expect(html).not.toContain("generado automáticamente");
     expect(html).not.toContain("¿Qué sigue?");
   });
 

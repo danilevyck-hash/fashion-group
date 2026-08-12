@@ -215,11 +215,12 @@ export default function CatalogoProductCard({
                 <span className={product.badge === "oferta" ? "text-xl font-bold tabular-nums text-[#E4002B]" : t.priceNormal}>
                   {product.price ? fmtPrecio(product.price) : "Consultar"}
                 </span>
-                {product.badge === "oferta" && (
-                  <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                    Oferta
-                  </span>
-                )}
+                {/* El chip "Oferta" al lado del precio se PODÓ (12-ago-2026):
+                    era la TERCERA vez que la misma card decía lo mismo — el
+                    badge rojo sobre la foto (arriba, y se dibuja aunque la foto
+                    no cargue) y el precio, que ya se pone rojo y más grande
+                    cuando el producto está en oferta. El badge y el color se
+                    quedan: son los que informan. */}
               </div>
               {product.price != null && (
                 /* Solo "Bulto de N": el precio del bulto se quitó (Daniel,

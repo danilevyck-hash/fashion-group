@@ -562,8 +562,8 @@ const REEBOK: MarcaTheme = {
     // diferencia del SVG de Tommy. Verificado abriendo el archivo (2560×726, un
     // único trazo rojo). Por eso la palabra se escribe aparte, con la misma
     // tipografía que tenía el header antes de que existiera el PNG: sin ella el
-    // catálogo público quedaba con el símbolo y "Catalogo Panama" debajo, sin
-    // ninguna palabra de la marca (decisión de Daniel, 26-jul-2026).
+    // catálogo público quedaba con el símbolo solo, sin ninguna palabra de la
+    // marca (decisión de Daniel, 26-jul-2026).
     header: () => (
       <div className="flex items-center gap-2.5 shrink-0">
         {/* alt="" a propósito: el nombre accesible lo da el <h1> de al lado. Con
@@ -573,9 +573,9 @@ const REEBOK: MarcaTheme = {
           <h1 className="text-lg font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
             Reebok
           </h1>
-          <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-1">
-            Catálogo Panamá
-          </p>
+          {/* El subtítulo "Catálogo Panamá" se PODÓ (Daniel, 12-ago-2026): ya
+              estás EN el catálogo y todo el negocio es Panamá — no decía nada.
+              Vale para las 4 marcas; candado en poda-textos-cxc-multifashion. */}
         </div>
       </div>
     ),
@@ -597,7 +597,8 @@ const REEBOK: MarcaTheme = {
             Reebok
           </span>
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
+        {/* El "Panamá" suelto bajo el logo se PODÓ junto con "Catálogo Panamá"
+            (12-ago-2026): misma palabra obvia, mismo motivo. */}
       </div>
     ),
   },
@@ -888,10 +889,8 @@ const JOYBEES: MarcaTheme = {
     // no hace falta escribir "JOYBEES" al lado (se vería dos veces).
     header: () => (
       <div className="shrink-0">
+        {/* Sin subtítulo "Catálogo Panamá" — podado en las 4 marcas (12-ago-2026). */}
         <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-8 w-auto shrink-0" />
-        <p className="text-xs text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-1.5">
-          Catálogo Panamá
-        </p>
       </div>
     ),
     admin: () => (
@@ -907,7 +906,6 @@ const JOYBEES: MarcaTheme = {
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
           <img src="/joybees/joybees-logo.png" alt="Joybees" className="h-6 w-auto shrink-0" />
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },
@@ -1204,18 +1202,15 @@ const TOMMY: MarcaTheme = {
   logos: {
     // Navbar SIN logo: la navbar de Tommy queda solo con "← Inicio". La
     // identidad (bandera + wordmark TOMMY HILFIGER) vive ENTERA en el header
-    // grande de abajo ("CATALOGO PANAMA"). Antes la bandera estaba en los dos
-    // lugares y se veía el mismo logo repetido en la misma pantalla
-    // (Daniel, 25-jul-2026).
+    // grande de abajo. Antes la bandera estaba en los dos lugares y se veía el
+    // mismo logo repetido en la misma pantalla (Daniel, 25-jul-2026).
     navbar: null,
     header: () => (
       <div className="flex items-center gap-2.5 shrink-0">
         <img src="/tommy/tommy-flag.png" alt="" className="w-9 h-6 object-contain shrink-0" />
         <div className="shrink-0">
-          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-4 w-auto shrink-0" />
-          <p className="text-xs text-[#152342]/40 uppercase tracking-[0.25em] leading-none mt-1">
-            Catálogo Panamá
-          </p>
+          {/* Sin subtítulo "Catálogo Panamá" — podado en las 4 marcas (12-ago-2026). */}
+          <img src="/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" className="h-4 w-auto shrink-0" />
         </div>
       </div>
     ),
@@ -1224,16 +1219,15 @@ const TOMMY: MarcaTheme = {
         <img src="/tommy/tommy-flag.png" alt="Tommy" className="w-7 h-5 object-contain" />
       </div>
     ),
-    // Logo REAL sobre placa blanca. El wordmark del SVG es casi negro
-    // (#231F20) y la banda del header del pedido público es navy: sin la placa
-    // el logo desaparecería. Antes decía "TOMMY HILFIGER" en texto — es el
-    // lugar que Daniel vio en el link público (25-jul-2026).
+    // Logo REAL sobre placa blanca. El wordmark oficial es navy (#00154D) y la
+    // banda del header del pedido público es navy también: sin la placa el logo
+    // desaparecería. Antes decía "TOMMY HILFIGER" en texto — es el lugar que
+    // Daniel vio en el link público (25-jul-2026).
     pedidoPublico: () => (
       <div className="shrink-0">
         <h1 className="inline-flex items-center rounded-lg bg-white px-2.5 py-2">
-          <img src="/tommy/tommy-horizontal.svg" alt="TOMMY HILFIGER" className="h-3 w-auto shrink-0" />
+          <img src="/tommy/tommy-horizontal.png" alt="TOMMY HILFIGER" className="h-3 w-auto shrink-0" />
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },
@@ -1564,10 +1558,8 @@ const CALVIN: MarcaTheme = {
     navbar: null,
     header: () => (
       <div className="shrink-0">
+        {/* Sin subtítulo "Catálogo Panamá" — podado en las 4 marcas (12-ago-2026). */}
         <img src="/calvin/calvin-wordmark.png" alt="CALVIN KLEIN" className="h-4 w-auto shrink-0" />
-        <p className="text-xs text-[#1A1A1A]/40 uppercase tracking-[0.25em] leading-none mt-1">
-          Catálogo Panamá
-        </p>
       </div>
     ),
     admin: () => (
@@ -1583,7 +1575,6 @@ const CALVIN: MarcaTheme = {
         <h1 className="inline-flex items-center py-1.5">
           <img src="/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" className="h-3.5 w-auto shrink-0" />
         </h1>
-        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
       </div>
     ),
   },

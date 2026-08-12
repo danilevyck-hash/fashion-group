@@ -229,9 +229,14 @@ describe("textos del catálogo público", () => {
     expect(FILTROS).toMatch(/filteredCount === 1 \? "producto" : "productos"/);
   });
 
-  it("el header dice CATÁLOGO PANAMÁ en las 3 marcas", () => {
+  it("el header ya NO dice CATÁLOGO PANAMÁ en ninguna marca (poda 12-ago-2026)", () => {
+    // Daniel: "quítame las palabras obvias" — ya estás EN el catálogo y todo el
+    // negocio es Panamá. Antes este test fijaba que el subtítulo EXISTIERA en
+    // todas las marcas; ahora fija lo contrario. El candado completo (incluido
+    // el "Panamá" suelto del pedido público) vive en
+    // poda-textos-cxc-multifashion.test.ts.
     const ui = sinComentarios(src("src/lib/catalogo/marcas-ui.tsx"));
     expect(ui).not.toContain("Catalogo Panama");
-    expect((ui.match(/Catálogo Panamá/g) || []).length).toBe(MARCAS.length);
+    expect(ui).not.toContain("Catálogo Panamá");
   });
 });

@@ -35,9 +35,13 @@ describe("correo de pedido — español", () => {
 
   it("lleva las tildes correctas", () => {
     expect(html).toContain("del catálogo Reebok");
-    expect(html).toContain("A continuación el detalle");
-    expect(html).toContain("generado automáticamente");
     expect(html).toContain("aún no tienen stock");
+    // "A continuación el detalle" y el pie "generado automáticamente" se PODARON
+    // (12-ago-2026) — la tabla está justo debajo y el equipo no recibe pedidos de
+    // ningún otro lado. Sus tildes ya no se pueden verificar acá porque los
+    // textos no existen; el candado de que no vuelvan vive en
+    // lib/poda-textos-cxc-multifashion.test.ts.
+    expect(html).toContain("Total: 3 bultos (36 piezas)");
   });
 
   it("no quedó ninguna palabra sin tilde de las que estaban mal", () => {

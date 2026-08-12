@@ -7,7 +7,7 @@
 // El carrito vive en storage (keys históricas por marca) y el pedido nace en
 // el CHECKOUT (rediseño 5-jul) — cero llamadas en vivo a Switch desde aquí.
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -28,6 +28,7 @@ import {
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
 import { precioTexto } from "@/lib/catalogo/precio";
+import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -236,6 +237,45 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (o.value) { catOrder[o.value] = i; catLabel[o.value] = o.label; }
   });
 
+  // ── Píldoras de género/categoría DERIVADAS de lo que hay ──────────────────
+  // Una opción sin ni un producto detrás no se dibuja (Daniel, 12-ago-2026:
+  // "veo filtro de boots, pero no veo ninguna con boots") y vuelve sola el día
+  // que entre el primero, por el cron o por "Actualizar ahora". El ORDEN y las
+  // etiquetas los sigue mandando el tema; los datos solo deciden la presencia.
+  //
+  // 🔑 Se calcula sobre el catálogo COMPLETO, nunca sobre `filtered`: atado a
+  // los otros filtros, las píldoras aparecerían y desaparecerían mientras se
+  // usa la pantalla, y elegir un género dejaría la categoría en una sola opción.
+  const gruposParaGenero = useMemo(
+    () => (agrupado ? groupByModel(products as JoybeesProduct[]) : []),
+    [agrupado, products],
+  );
+  const generoOptions = useMemo(
+    () => opcionesConDatos({
+      opciones: theme.filtros.genderOptions,
+      valorElegido: gender,
+      hayProductos: products.length > 0,
+      // Cada marca pregunta COMO FILTRA: Joybees agrupa por modelo y su género
+      // es la sección del grupo; las demás lo miran producto a producto con
+      // `theme.genero.match`. Escribir acá una tercera regla propia sería la
+      // deriva que el módulo de temas existe para evitar — y una píldora que
+      // aparece pero no filtra nada es peor que una que sobra.
+      tieneAlguno: agrupado
+        ? (v) => gruposParaGenero.some(g => getDisplaySection(g) === v)
+        : (v) => products.some(p => theme.genero.match(p.gender, v)),
+    }),
+    [theme, gender, products, agrupado, gruposParaGenero],
+  );
+  const categoryOptions = useMemo(
+    () => opcionesConDatos({
+      opciones: theme.filtros.categoryOptions,
+      valorElegido: category,
+      hayProductos: products.length > 0,
+      tieneAlguno: (v) => products.some(p => p.category === v),
+    }),
+    [theme, category, products],
+  );
+
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
@@ -371,7 +411,11 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         if (saleFilter === "nuevo") filterDesc.push("Nuevo");
         if (search) filterDesc.push(`“${search}”`);
       }
-      const subtitle = filterDesc.length > 0 ? filterDesc.join("  ·  ") : "Todos los productos";
+      // Sin filtros el subtítulo va VACÍO (poda, 12-ago-2026): decía "Todos los
+      // productos" sobre un PDF que ya anuncia "{n} productos" en la portada —
+      // no distinguía nada de nada. Con filtros puestos sí informa ("HOMBRE ·
+      // CALZADO"), y ahí se conserva tal cual.
+      const subtitle = filterDesc.length > 0 ? filterDesc.join("  ·  ") : "";
 
       let pdfSections: { label: string; items: { name: string; sku: string; color?: string | null; price: number | null; image_url: string | null; badge: string | null }[] }[];
       if (agrupado) {
@@ -617,6 +661,8 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onSortByChange={setSortBy}
           filteredCount={filteredCount}
           onClearAll={handleClearAll}
+          genderOptions={generoOptions}
+          categoryOptions={categoryOptions}
         />
 
         {/* ── Sync + Share/Download row ── */}

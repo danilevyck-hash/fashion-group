@@ -191,7 +191,11 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
-          <p className="text-sm text-gray-500">{cfg.label} · revisa, elige cliente y envía a Switch</p>
+          {/* Antes seguía "· revisa, elige cliente y envía a Switch": narraba los
+              tres bloques que la propia pantalla tiene a la vista (los items, el
+              selector de cliente y el botón "Confirmar y enviar a Switch").
+              Queda la marca, que sí dice de qué catálogo es este pedido. */}
+          <p className="text-sm text-gray-500">{cfg.label}</p>
         </div>
         <Link href={cfg.catalogHref} className="text-sm text-gray-500 hover:text-black transition">← Catálogo</Link>
       </div>

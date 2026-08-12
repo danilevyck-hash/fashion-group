@@ -5,7 +5,7 @@
 // que el grid vendedor. Confirmar pedido: crea el pedido público en el server
 // (precios validados server-side), lo confirma y navega a /pedido-<marca>/[id].
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
@@ -26,6 +26,7 @@ import {
   type GroupedProduct, type JoybeesProduct,
 } from "./groupByModel";
 import { precioTexto } from "@/lib/catalogo/precio";
+import { opcionesConDatos } from "@/lib/catalogo/filtros-derivados";
 
 // Fotos que se piden YA (eager + fetchpriority=high) al abrir el catálogo: las
 // del primer viewport. A 1440px el grid es de 5 columnas → 10 cards visibles;
@@ -217,6 +218,45 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   theme.filtros.categoryOptions.forEach((o, i) => {
     if (o.value) { catOrder[o.value] = i; catLabel[o.value] = o.label; }
   });
+
+  // ── Píldoras de género/categoría DERIVADAS de lo que hay ──────────────────
+  // Una opción sin ni un producto detrás no se dibuja (Daniel, 12-ago-2026:
+  // "veo filtro de boots, pero no veo ninguna con boots") y vuelve sola el día
+  // que entre el primero, por el cron o por "Actualizar ahora". El ORDEN y las
+  // etiquetas los sigue mandando el tema; los datos solo deciden la presencia.
+  //
+  // 🔑 Se calcula sobre el catálogo COMPLETO, nunca sobre `filtered`: atado a
+  // los otros filtros, las píldoras aparecerían y desaparecerían mientras se
+  // usa la pantalla, y elegir un género dejaría la categoría en una sola opción.
+  const gruposParaGenero = useMemo(
+    () => (agrupado ? groupByModel(products as JoybeesProduct[]) : []),
+    [agrupado, products],
+  );
+  const generoOptions = useMemo(
+    () => opcionesConDatos({
+      opciones: theme.filtros.genderOptions,
+      valorElegido: gender,
+      hayProductos: products.length > 0,
+      // Cada marca pregunta COMO FILTRA: Joybees agrupa por modelo y su género
+      // es la sección del grupo; las demás lo miran producto a producto con
+      // `theme.genero.match`. Escribir acá una tercera regla propia sería la
+      // deriva que el módulo de temas existe para evitar — y una píldora que
+      // aparece pero no filtra nada es peor que una que sobra.
+      tieneAlguno: agrupado
+        ? (v) => gruposParaGenero.some(g => getDisplaySection(g) === v)
+        : (v) => products.some(p => theme.genero.match(p.gender, v)),
+    }),
+    [theme, gender, products, agrupado, gruposParaGenero],
+  );
+  const categoryOptions = useMemo(
+    () => opcionesConDatos({
+      opciones: theme.filtros.categoryOptions,
+      valorElegido: category,
+      hayProductos: products.length > 0,
+      tieneAlguno: (v) => products.some(p => p.category === v),
+    }),
+    [theme, category, products],
+  );
 
   const filtered = agrupado ? [] : products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
@@ -561,6 +601,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onSortByChange={setSortBy}
           filteredCount={filteredCount}
           onClearAll={handleClearAll}
+          genderOptions={generoOptions}
+          categoryOptions={categoryOptions}
         />
 
         {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}

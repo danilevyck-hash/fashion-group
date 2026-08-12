@@ -16,7 +16,12 @@ import {
   JOYBEES_LOGO_WIDTH,
   JOYBEES_LOGO_HEIGHT,
 } from "@/lib/joybees-logo";
-import { TOMMY_LOGO_BASE64, TOMMY_LOGO_BLANCO_BASE64 } from "@/lib/tommy-logo";
+import {
+  TOMMY_LOGO_BASE64,
+  TOMMY_LOGO_BLANCO_BASE64,
+  TOMMY_LOGO_WIDTH,
+  TOMMY_LOGO_HEIGHT,
+} from "@/lib/tommy-logo";
 import {
   CALVIN_LOGO_BASE64,
   CALVIN_LOGO_BLANCO_BASE64,
@@ -94,6 +99,30 @@ describe("logos de marca — base64 para jsPDF", () => {
     }
   });
 
+  it("los dos logos Tommy tienen canal alfa (nada de fondo blanco)", () => {
+    for (const dataUrl of [TOMMY_LOGO_BASE64, TOMMY_LOGO_BLANCO_BASE64]) {
+      const png = readPng(decodeDataUrl(dataUrl));
+      const conAlfa = png.colorType === 6 || png.colorType === 4 || (png.colorType === 3 && png.hasTrns);
+      expect(conAlfa, `colorType ${png.colorType} sin transparencia`).toBe(true);
+    }
+  });
+
+  /**
+   * 🩸 Tommy era la ÚNICA marca sin este chequeo, y por eso nadie vio que sus
+   * constantes decían 55 x 3.8 ("aspecto ~14.6:1") mientras el PNG embebido
+   * medía 17.72. jsPDF ESTIRA la imagen a la caja que se le da, así que el
+   * wordmark salía ~21% más alto de lo que corresponde en TODOS los PDF de
+   * pedido — sin error, sin log, sin nadie enterándose.
+   */
+  it("TOMMY_LOGO_WIDTH/HEIGHT respetan la proporción real del PNG", () => {
+    const png = readPng(decodeDataUrl(TOMMY_LOGO_BASE64));
+    const aspectoReal = png.width / png.height;
+    const aspectoMm = TOMMY_LOGO_WIDTH / TOMMY_LOGO_HEIGHT;
+    // Relativo, no absoluto: con aspectos de 17:1 un margen fijo de 0.15 sería
+    // 10× más estricto que el que se le pide a Joybees (6:1). 2% de la medida.
+    expect(Math.abs(aspectoReal - aspectoMm) / aspectoReal).toBeLessThan(0.02);
+  });
+
   it("CALVIN_LOGO_WIDTH/HEIGHT respetan la proporción real del PNG", () => {
     const png = readPng(decodeDataUrl(CALVIN_LOGO_BASE64));
     const aspectoReal = png.width / png.height;
@@ -135,6 +164,35 @@ describe("logos de marca — PNG hosteados para correos", () => {
       const rel = u.replace("https://fashiongr.com/", "public/");
       expect(fs.existsSync(path.join(ROOT, rel)), `falta ${rel}`).toBe(true);
     }
+  });
+
+  /**
+   * El PNG hosteado (correos, header) y el base64 embebido (PDF) salen del MISMO
+   * generador, así que tienen que ser el MISMO archivo byte a byte. El riesgo
+   * real es humano: regenerar los assets y olvidarse de pegar el base64 nuevo en
+   * el .ts — y entonces el correo enseña un logo y el PDF adjunto otro, sin que
+   * nada falle. Se verifica en las dos marcas cuyos assets se generan así.
+   */
+  it("el PNG hosteado y el base64 del PDF son el MISMO archivo (Tommy y Calvin)", () => {
+    const pares: [string, string, string][] = [
+      ["Tommy", "public/tommy/tommy-horizontal.png", TOMMY_LOGO_BASE64],
+      ["Tommy blanco", "public/tommy/tommy-horizontal-blanco.png", TOMMY_LOGO_BLANCO_BASE64],
+      ["Calvin", "public/calvin/calvin-wordmark.png", CALVIN_LOGO_BASE64],
+      ["Calvin blanco", "public/calvin/calvin-wordmark-blanco.png", CALVIN_LOGO_BLANCO_BASE64],
+    ];
+    for (const [nombre, rel, dataUrl] of pares) {
+      const enDisco = fs.readFileSync(path.join(ROOT, rel));
+      expect(decodeDataUrl(dataUrl).equals(enDisco), `${nombre}: el .ts y ${rel} no coinciden`).toBe(true);
+    }
+  });
+
+  it("no quedó ningún SVG de Tommy: el master de la marca es la única fuente", () => {
+    // El wordmark salía de un trazado (public/tommy/tommy-horizontal.svg) que
+    // NO era el arte oficial — aspecto 17.64 contra 17.31 y otro interletrado.
+    // Se eliminó en el mismo PR que integró el master (12-ago-2026).
+    expect(fs.existsSync(path.join(ROOT, "public/tommy/tommy-horizontal.svg"))).toBe(false);
+    const ui = fs.readFileSync(path.join(ROOT, "src/lib/catalogo/marcas-ui.tsx"), "utf8");
+    expect(ui).not.toContain("tommy-horizontal.svg");
   });
 
   it("el catálogo público de Joybees usa el logo real, no el emoji", () => {

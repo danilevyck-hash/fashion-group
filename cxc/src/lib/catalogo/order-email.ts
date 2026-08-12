@@ -131,10 +131,14 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
     </div>
     ${tabla(sectionItems.map(renderRow).join(""))}`;
 
-  const sectionsHtml = itemsHasPreorder
-    ? hasPreorders
-      ? `${renderSection("Pedido", regularItems, tableHeadBg)}${renderSection("Pre-orden", preorderItems, "#d97706")}`
-      : `${renderSection("Detalle", regularItems, tableHeadBg)}`
+  // Con pre-órdenes hay DOS tablas y los rótulos "Pedido"/"Pre-orden" son lo
+  // único que las distingue: se quedan. Sin pre-órdenes hay UNA sola tabla, y
+  // el chip que decía "Detalle" encima se podó (12-ago-2026) — rotulaba lo
+  // único que había. Ese caso pasa a la misma tabla pelada que ya usaban las
+  // marcas sin pre-orden, así que además dejan de existir dos correos distintos
+  // para el mismo pedido.
+  const sectionsHtml = hasPreorders
+    ? `${renderSection("Pedido", regularItems, tableHeadBg)}${renderSection("Pre-orden", preorderItems, "#d97706")}`
     : tabla(items.map(renderRow).join(""));
 
   // ── Textos por audiencia ──────────────────────────────────────────────────
@@ -147,11 +151,11 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
 
   const introHtml = esCliente
     ? `<p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
-          ${saludoCliente}Recibimos tu pedido del catálogo ${escapeHtml(marcaLabel)}. Este es el detalle — también te lo adjuntamos en PDF.
+          ${saludoCliente}Recibimos tu pedido del catálogo ${escapeHtml(marcaLabel)}. También te lo adjuntamos en PDF.
         </p>`
     : `<p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
           Estimado equipo Fashion Group,<br>
-          Se ha recibido un nuevo pedido del catálogo ${escapeHtml(marcaLabel)}. A continuación el detalle:
+          Se ha recibido un nuevo pedido del catálogo ${escapeHtml(marcaLabel)}.
         </p>`;
 
   const preordenHtml = !hasPreorders
@@ -172,9 +176,12 @@ export function buildOrderEmailHtml(opts: OrderEmailOpts): string {
     ? `<p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
           Fashion Group · Panamá · pedidos@fashiongr.com
         </p>`
-    : `<p style="color:#999;font-size:11px;margin:16px 0 0;border-top:1px solid #eee;padding-top:12px">
-          Este pedido fue generado automáticamente desde fashiongr.com
-        </p>`;
+    : /* El pie del correo INTERNO decía "Este pedido fue generado
+         automáticamente desde fashiongr.com". Se podó (12-ago-2026): al equipo
+         los pedidos no le llegan de ningún otro lado. El pie del correo al
+         CLIENTE se queda: ahí sí hace falta decir quién escribe y a dónde
+         responder. */
+      "";
 
   const body = `
     <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">

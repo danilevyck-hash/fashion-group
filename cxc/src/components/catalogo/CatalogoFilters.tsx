@@ -63,6 +63,7 @@ import { useRef, useState } from "react";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS, type PrecioRango } from "@/lib/catalogo/filtros-extra";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
 
 export type SaleFilter = "" | "oferta" | "nuevo" | "proximamente";
 
@@ -178,6 +179,11 @@ interface CatalogoFiltersProps {
   onSortByChange: (v: string) => void;
   filteredCount: number;
   onClearAll: () => void;
+  /** Opciones YA derivadas de los productos (ver lib/catalogo/filtros-derivados).
+   *  Sin ellas se usan las de `MARCA_THEME` tal cual — que es también el
+   *  fail-open: quien no las calcule ve exactamente lo de antes. */
+  genderOptions?: OpcionFiltro[];
+  categoryOptions?: OpcionFiltro[];
 }
 
 export default function CatalogoFilters({
@@ -190,10 +196,17 @@ export default function CatalogoFilters({
   precioRango = "", onPrecioRangoChange,
   sortBy, onSortByChange,
   filteredCount, onClearAll,
+  genderOptions, categoryOptions,
 }: CatalogoFiltersProps) {
   const theme = getMarcaTheme(marca)!;
   const f = theme.filtros;
-  const conCategorias = theme.features.categoryChips;
+  // Las píldoras se DERIVAN de los productos: una opción sin ni un producto
+  // detrás no se dibuja, y vuelve sola el día que entre el primero (Daniel,
+  // 12-ago-2026 — "veo filtro de boots, pero no veo ninguna con boots").
+  const generoOpts = genderOptions ?? f.genderOptions;
+  const categoriaOpts = categoryOptions ?? f.categoryOptions;
+  const conGenero = grupoTieneOpciones(generoOpts);
+  const conCategorias = theme.features.categoryChips && grupoTieneOpciones(categoriaOpts);
   const conSale = theme.features.saleFilter && !!onSaleFilterChange;
   const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
   const conPrecio = theme.features.filtroPrecio && !!onPrecioRangoChange;
@@ -247,20 +260,22 @@ export default function CatalogoFilters({
           </button>
         )}
 
-        <FiltroDesplegable
-          etiqueta="Género"
-          valor={gender}
-          opciones={f.genderOptions}
-          onChange={onGenderChange}
-          chipActive={f.chipActive}
-          chipInactive={f.chipInactive}
-        />
+        {conGenero && (
+          <FiltroDesplegable
+            etiqueta="Género"
+            valor={gender}
+            opciones={generoOpts}
+            onChange={onGenderChange}
+            chipActive={f.chipActive}
+            chipInactive={f.chipInactive}
+          />
+        )}
 
         {conCategorias && (
           <FiltroDesplegable
             etiqueta="Categoría"
             valor={category}
-            opciones={f.categoryOptions}
+            opciones={categoriaOpts}
             onChange={onCategoryChange}
             chipActive={f.chipActive}
             chipInactive={f.chipInactive}
@@ -317,9 +332,10 @@ export default function CatalogoFilters({
         )}
 
         {/* Gender chips */}
+        {conGenero && (
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={f.chipLabel}>Género</span>
-          {f.genderOptions.map(opt => (
+          {generoOpts.map(opt => (
             <button
               key={opt.value}
               onClick={() => onGenderChange(gender === opt.value ? "" : opt.value)}
@@ -331,6 +347,7 @@ export default function CatalogoFilters({
             </button>
           ))}
         </div>
+        )}
 
         {conCategorias && (
           <>
@@ -339,7 +356,7 @@ export default function CatalogoFilters({
             {/* Category chips */}
             <div className="flex items-center gap-1.5 shrink-0">
               <span className={f.chipLabel}>Categoría</span>
-              {f.categoryOptions.map(opt => (
+              {categoriaOpts.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}

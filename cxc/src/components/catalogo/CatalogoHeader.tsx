@@ -1,6 +1,7 @@
 "use client";
 
-// Header del catálogo (logo + "Catalogo Panama"), parametrizado por MARCA_THEME.
+// Header del catálogo (el logo de la marca), parametrizado por MARCA_THEME.
+// El subtítulo "Catálogo Panamá" que iba bajo el logo se podó (12-ago-2026).
 
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
