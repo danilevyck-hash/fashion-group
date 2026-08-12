@@ -4,8 +4,45 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { getMarcaConfig } from "@/lib/catalogo/marcas";
+import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { getEnvioActivo, switchLockResponse } from "@/lib/catalogo/switch-lock";
+import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
+
+/**
+ * Re-escribe `<marca>_orders.total` desde los items que quedaron en la base,
+ * con el MISMO criterio del PUT (categoría de la marca + piezas por bulto del
+ * estilo). Sin esto, agregar una línea acá dejaba la columna con el total
+ * VIEJO hasta que el autoguardado mandara un PUT — y con el botón "Guardar"
+ * retirado, ese PUT ya no depende de que nadie lo toque.
+ *
+ * Es best-effort a propósito: el item YA se guardó y todo lo que se muestra
+ * (detalle, lista, PDF, correo, Switch) recalcula el total desde los items. Si
+ * esto falla, la columna queda vieja como antes — nunca se pierde el item.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recalcularTotal(cfg: MarcaConfig, db: any, orderId: string): Promise<void> {
+  const { data: filas, error } = await db
+    .from(cfg.itemsRelation)
+    .select("product_id, quantity, unit_price")
+    .eq("order_id", orderId);
+  if (error || !filas) return;
+  const items = filas as { product_id: string; quantity: number; unit_price: number }[];
+  const ids = items.map((i) => i.product_id);
+  const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(ids) : new Map<string, string>();
+  const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, ids);
+  const total = cfg.calcTotal(
+    items.map((i) => ({
+      quantity: i.quantity || 1,
+      unit_price: Number(i.unit_price) || 0,
+      category: categoryMap.get(i.product_id) || cfg.fallbackCategory || undefined,
+      bulto_pzas: bultoPzasByProduct.get(i.product_id) ?? null,
+    })),
+  );
+  await db
+    .from(cfg.ordersTable)
+    .update({ total, updated_at: new Date().toISOString() })
+    .eq("id", orderId);
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: { marca: string; id: string } }) {
   const cfg = getMarcaConfig(params.marca);
@@ -35,6 +72,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
         ...(cfg.itemsHasPreorder ? { is_preorder: is_preorder === true } : {}),
       }, { onConflict: "order_id,product_id" });
     if (error) return NextResponse.json({ error: "Error al guardar" }, { status: 500 });
+  }
+
+  try {
+    await recalcularTotal(cfg, db, params.id);
+  } catch {
+    /* el item ya se guardó; la columna `total` queda vieja como antes */
   }
 
   return NextResponse.json({ ok: true });

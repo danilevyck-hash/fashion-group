@@ -10,6 +10,7 @@ import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal, EmptyState } from "@/components/ui";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
+import type { ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string | null; status: string; total: number; item_count: number; created_at: string; }
@@ -64,9 +65,9 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   }
 
   // Duplica copiando los items del original y creando un pedido NUEVO con el
-  // nombre elegido en el mini-modal. Este camino (POST /orders) nunca copia
-  // cliente_switch_id, así que cambiar el nombre acá no arrastra nada de Switch.
-  async function duplicateOrder(order: Order, clientName: string) {
+  // nombre y el CLIENTE DE SWITCH elegidos en el mini-modal. Nada se hereda del
+  // original: el cliente es siempre una elección explícita (`null` = Contado).
+  async function duplicateOrder(order: Order, clientName: string, cliente: ClienteSwitchOpcion) {
     setDuplicating(true);
     try {
       const res = await fetch(`${theme.api}/orders/${order.id}`);
@@ -77,7 +78,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       }));
       const createRes = await fetch(`${theme.api}/orders`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: clientName, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),
+        body: JSON.stringify({ client_name: clientName, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items, cliente_switch_id: cliente.id }),
       });
       if (createRes.ok) {
         const newOrder = await createRes.json();
@@ -200,8 +201,10 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
         <DuplicarPedidoModal
           orderNumber={dupTarget.order_number}
           nombreInicial={dupTarget.client_name}
+          api={theme.api}
+          directorioLabel={theme.switchDirectorioLabel}
           duplicando={duplicating}
-          onConfirm={(nombre) => duplicateOrder(dupTarget, nombre)}
+          onConfirm={(nombre, cliente) => duplicateOrder(dupTarget, nombre, cliente)}
           onCancel={() => setDupTarget(null)}
         />
       )}

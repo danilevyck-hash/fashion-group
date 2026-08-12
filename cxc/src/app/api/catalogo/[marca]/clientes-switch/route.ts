@@ -6,15 +6,16 @@
 //                     (<orders>.cliente_switch_id; null = Contado).
 //
 // Los clientes se crean SOLO desde el panel de Switch — aquí no hay alta.
-// Gated por rol admin/secretaria.
+//
+// ROLES (12-ago-2026): los que ARMAN pedidos de la marca (`cfg.createRoles` sin
+// el 'cliente' legacy), no solo admin+secretaria. Con el selector cerrado al
+// vendedor, todo lo que él armaba se iba a Contado. Ver `clienteSwitchRoles`.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
-
-export const dynamic = "force-dynamic";
-
-const ROLES = ["admin", "secretaria"];
+import { clienteSwitchRoles } from "@/lib/catalogo/roles";
+import { errorClienteNoExiste, parsearClienteSwitchId, resolverClienteSwitch } from "@/lib/catalogo/cliente-switch";
 
 function esColumnaAusente(err: { message?: string | null } | null): boolean {
   return /cliente_switch_id|column/i.test(err?.message ?? "");
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ROLES);
+  const auth = requireRole(req, clienteSwitchRoles(cfg.createRoles));
   if (auth instanceof NextResponse) return auth;
 
   const supabaseServer = await cfg.mainDb();
@@ -85,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ROLES);
+  const auth = requireRole(req, clienteSwitchRoles(cfg.createRoles));
   if (auth instanceof NextResponse) return auth;
 
   let body: { orderId?: unknown; clienteSwitchId?: unknown };
@@ -97,32 +98,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { marca: str
   const orderId = typeof body.orderId === "string" ? body.orderId : "";
   if (!orderId) return NextResponse.json({ error: "Falta orderId" }, { status: 400 });
 
-  const supabaseServer = await cfg.mainDb();
   const db = await cfg.db();
 
-  // clienteSwitchId: number = cliente real, null = volver a Contado (default).
-  let clienteSwitchId: number | null = null;
+  // clienteSwitchId: number = cliente real, null = Contado (mostrador).
+  const parsed = parsearClienteSwitchId(body.clienteSwitchId);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const clienteSwitchId = parsed.id;
   let nombre: string | null = null;
   let codigo: string | null = null;
-  if (body.clienteSwitchId != null) {
-    clienteSwitchId = Number(body.clienteSwitchId);
-    if (!Number.isFinite(clienteSwitchId) || clienteSwitchId <= 0) {
-      return NextResponse.json({ error: "clienteSwitchId inválido" }, { status: 400 });
-    }
-    const { data: cli } = await supabaseServer
-      .from("switch_clientes")
-      .select("codigo, nombre")
-      .eq("empresa_key", cfg.empresaKey)
-      .eq("cliente_switch_id", clienteSwitchId)
-      .maybeSingle();
-    if (!cli) {
-      return NextResponse.json(
-        { error: `Ese cliente no existe en el directorio Switch de ${cfg.switchDirectorioLabel}` },
-        { status: 404 },
-      );
-    }
-    nombre = cli.nombre ?? null;
-    codigo = cli.codigo ?? null;
+  if (clienteSwitchId != null) {
+    const cli = await resolverClienteSwitch(cfg, clienteSwitchId);
+    if (!cli) return NextResponse.json({ error: errorClienteNoExiste(cfg) }, { status: 404 });
+    nombre = cli.nombre;
+    codigo = cli.codigo;
   }
 
   // No cambiar el cliente de un pedido con envío no-fallido: el pedido YA vive
