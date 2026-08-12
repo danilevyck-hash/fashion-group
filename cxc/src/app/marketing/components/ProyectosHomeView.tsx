@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
-import { indiceProveedorPorMarcaId } from "@/lib/marketing/proveedores";
+import { indiceBloquePorMarcaId } from "@/lib/marketing/bloques";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
@@ -56,16 +56,17 @@ interface ProyectoListItem {
 interface Props {
   marcas: MkMarca[];
   onOpenProyecto: (id: string) => void;
-  onNuevoProyecto: () => void;
+  onRegistrarGasto: () => void;
   onOpenReportes: () => void;
   onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
   /**
-   * Bloque del inicio del que se entró: `pvh` | `reebok` | `joybees` |
-   * `multifashion` | `sin_proveedor`. La lista queda acotada a sus proyectos.
+   * Bloque del inicio del que se entró: el CÓDIGO de la marca (`TH` | `CK` |
+   * `KL` | `RBK` | `J`) o `multifashion` | `sin_bloque`. La lista queda acotada
+   * a sus proyectos.
    */
-  proveedor?: string;
+  bloque?: string;
   bucketLabel?: string;
   onBack?: () => void;
 }
@@ -86,12 +87,12 @@ function inicial(s: string): string {
 export default function ProyectosHomeView({
   marcas,
   onOpenProyecto,
-  onNuevoProyecto,
+  onRegistrarGasto,
   onOpenReportes,
   onOpenImpulsadoras,
   onOpenInventario,
   refreshKey,
-  proveedor,
+  bloque,
   bucketLabel,
   onBack,
 }: Props) {
@@ -121,14 +122,14 @@ export default function ProyectosHomeView({
     { id: string; nombre: string } | null
   >(null);
   const [deshaciendo, setDeshaciendo] = useState(false);
-  // Total de impulsadoras de ESTE proveedor. Se muestra como línea aparte para
+  // Total de impulsadoras de ESTA marca. Se muestra como línea aparte para
   // que el detalle visible cuadre con el bloque del inicio, ya que los pagos de
   // impulsadora son gastos sueltos (no aparecen como proyectos en la lista).
   const [impulsadoraTotal, setImpulsadoraTotal] = useState(0);
 
-  // marca_id → bloque. Fuente única: lib/marketing/proveedores.ts.
+  // marca_id → bloque. Fuente única: lib/marketing/bloques.ts.
   const bloquePorMarca = useMemo(
-    () => indiceProveedorPorMarcaId(marcas),
+    () => indiceBloquePorMarcaId(marcas),
     [marcas],
   );
 
@@ -153,8 +154,13 @@ export default function ProyectosHomeView({
       const qs = new URLSearchParams();
       qs.set("filtro_estado", filtroEstado);
       // Bloque del inicio. Sin bloque, cae al dropdown de marca (compat).
-      if (proveedor) {
-        qs.set("proveedor", proveedor);
+      // Se manda con las DOS claves a propósito: `bloque` es la nueva y
+      // `proveedor` la que la ruta entiende hoy. Un parámetro de más que el
+      // servidor ignora no rompe nada; que la lista se vacíe el día del
+      // despliegue, sí.
+      if (bloque) {
+        qs.set("bloque", bloque);
+        qs.set("proveedor", bloque);
       } else if (marcaIdFiltro) {
         qs.set("marca_id", marcaIdFiltro);
       }
@@ -170,17 +176,15 @@ export default function ProyectosHomeView({
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado, marcaIdFiltro, proveedor, busquedaDebounced]);
+  }, [filtroEstado, marcaIdFiltro, bloque, busquedaDebounced]);
 
   useEffect(() => {
     cargar();
   }, [cargar, refreshKey]);
 
-  // Total de impulsadoras del proveedor (para la línea de cuadre). Se suma lo
-  // de TODAS sus marcas: un pago repartido entre Tommy y Calvin es un solo
-  // gasto de PVH.
+  // Total de impulsadoras de la marca (para la línea de cuadre).
   useEffect(() => {
-    if (!proveedor || proveedor === "multifashion") {
+    if (!bloque || bloque === "multifashion") {
       setImpulsadoraTotal(0);
       return;
     }
@@ -195,7 +199,7 @@ export default function ProyectosHomeView({
         if (cancelado) return;
         let suma = 0;
         for (const [mid, v] of Object.entries(data.impulsadoraPorMarca ?? {})) {
-          if (bloquePorMarca.get(String(mid)) === proveedor) suma += v?.total ?? 0;
+          if (bloquePorMarca.get(String(mid)) === bloque) suma += v?.total ?? 0;
         }
         setImpulsadoraTotal(Number(suma.toFixed(2)));
       } catch {
@@ -205,7 +209,7 @@ export default function ProyectosHomeView({
     return () => {
       cancelado = true;
     };
-  }, [proveedor, bloquePorMarca, refreshKey]);
+  }, [bloque, bloquePorMarca, refreshKey]);
 
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
@@ -310,7 +314,7 @@ export default function ProyectosHomeView({
           </h1>
           {enBucket && (
             <p className="text-xs text-gray-500 mt-0.5">
-              Proyectos con gasto de este proveedor
+              Proyectos con gasto de esta marca
             </p>
           )}
         </div>
@@ -342,10 +346,10 @@ export default function ProyectosHomeView({
           </button>
           <button
             type="button"
-            onClick={onNuevoProyecto}
+            onClick={onRegistrarGasto}
             className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
           >
-            + Nuevo proyecto
+            + Registrar gasto
           </button>
         </div>
       </div>
@@ -415,7 +419,7 @@ export default function ProyectosHomeView({
             {busquedaDebounced
               ? "No hay proyectos que coincidan con el filtro."
               : enBucket
-                ? "Todavía no hay gasto de este proveedor. Crea un proyecto y registra su primera factura."
+                ? "Todavía no hay gasto de esta marca. Registra el primero."
                 : marcaIdFiltro
                   ? "No hay proyectos que coincidan con el filtro."
                   : "No hay proyectos todavía."}
@@ -423,10 +427,10 @@ export default function ProyectosHomeView({
           {!busquedaDebounced && !marcaIdFiltro && (
             <button
               type="button"
-              onClick={onNuevoProyecto}
-              className="text-sm text-fuchsia-600 hover:text-fuchsia-800 mt-2"
+              onClick={onRegistrarGasto}
+              className="text-sm text-fuchsia-600 hover:text-fuchsia-800 min-h-[44px] inline-flex items-center mt-2"
             >
-              Crear el primero
+              Registrar el primero
             </button>
           )}
         </div>
@@ -637,7 +641,7 @@ export default function ProyectosHomeView({
         </div>
       )}
 
-      {/* Línea de cuadre: los pagos de impulsadora de este proveedor son
+      {/* Línea de cuadre: los pagos de impulsadora de esta marca son
           gastos sueltos (no proyectos) → se muestran aparte para que el
           detalle visible sume igual que el total del bloque del inicio. */}
       {enBucket && impulsadoraTotal > 0 && (
@@ -647,7 +651,7 @@ export default function ProyectosHomeView({
           className="w-full flex items-center justify-between rounded-[10px] border border-[#e5e5e5] bg-white px-[18px] py-3 hover:border-gray-400 transition text-left"
         >
           <span className="text-sm text-gray-700">
-            Impulsadoras <span className="text-gray-400">· este proveedor</span>
+            Impulsadoras <span className="text-gray-400">· esta marca</span>
           </span>
           <span className="text-sm font-medium tabular-nums text-gray-900">
             {formatearMonto(impulsadoraTotal)} ›

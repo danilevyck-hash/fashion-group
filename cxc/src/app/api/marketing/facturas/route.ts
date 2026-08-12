@@ -15,9 +15,11 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   try {
     const body = (await req.json()) as CreateFacturaBody;
+    // `proyectoId` es OPCIONAL: un gasto sin cliente (evento, catálogo,
+    // material general) se guarda con proyecto NULL — decisión de Daniel en el
+    // rediseño "Registrar gasto". La marca se asigna aparte, como siempre.
     if (
-      !body?.proyectoId ||
-      !body.numeroFactura ||
+      !body?.numeroFactura ||
       !body.fechaFactura ||
       !body.proveedor ||
       !body.concepto ||

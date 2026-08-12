@@ -1,17 +1,21 @@
 "use client";
 
 // ============================================================================
-// "Por cliente" — cuánto costó cada tienda, sumando TODOS los proveedores.
+// "Por cliente" — cuánto costó cada tienda, sumando TODAS las marcas.
 //
-// 🔴 ESTE CUADRO NO SE LE REPORTA A NADIE, y la pantalla lo dice. Un proveedor
-// solo recibe SU columna; esta tabla cruza todas y existe para que Daniel sepa
+// 🔴 ESTE CUADRO NO SE LE REPORTA A NADIE, y la pantalla lo dice. Cada marca
+// solo recibe SU columna; esta tabla las cruza y existe para que Daniel sepa
 // cuánto le costó cada tienda en total. Sin esa línea, alguien podría mandarle
-// a PVH un papel con las cifras de Reebok adentro.
+// a Tommy un papel con las cifras de Reebok adentro.
 //
 // 🩸 LA FILA "Impulsadoras y gastos sueltos" NO SE ESCONDE. Son gastos sin
-// proyecto (medido el 11-ago-2026: $13.600,00) y si se filtraran, la columna
-// de un proveedor sumaría MENOS que su bloque de arriba: la pantalla se
-// contradiría a sí misma.
+// cliente (medido el 11-ago-2026: $13.600,00) y si se filtraran, la columna de
+// una marca sumaría MENOS que su bloque de arriba: la pantalla se contradiría
+// a sí misma.
+//
+// ⚠️ LOS CLIENTES DUPLICADOS VIENEN YA FUSIONADOS. D-87 y D-25 existen dos
+// veces cada uno en el directorio; el agrupamiento por cliente lo hace el
+// servidor y acá se dibuja lo que llega, sin volver a partirlo en dos filas.
 //
 // No se hace ninguna cuenta acá salvo el total de cada columna, que se saca
 // sumando LO QUE SE ESTÁ MOSTRANDO — así el pie no puede decir algo distinto
@@ -23,10 +27,10 @@ import { createPortal } from "react-dom";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { useBackdropDismiss, useEscapeClose } from "@/lib/hooks/useModalDismiss";
-import type { BloqueInicio, FilaClienteInicio } from "./InicioMarketing";
+import type { BloqueResumen, FilaClienteInicio } from "./InicioMarketing";
 
 interface Props {
-  bloques: BloqueInicio[];
+  bloques: BloqueResumen[];
   filas: FilaClienteInicio[];
   onClose: () => void;
 }
@@ -80,8 +84,8 @@ export default function PorClienteModal({ bloques, filas, onClose }: Props) {
 
         <div className="px-5 pt-4">
           <p className="text-xs text-gray-500">
-            Cuánto te costó cada tienda en total, sumando todos los proveedores.
-            Esto es solo para verlo tú — no se le reporta a ningún proveedor.
+            Cuánto te costó cada tienda en total, sumando todas las marcas.
+            Esto es solo para verlo tú — no se le reporta a ninguna marca.
           </p>
         </div>
 

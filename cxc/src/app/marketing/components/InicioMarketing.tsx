@@ -1,34 +1,47 @@
 "use client";
 
 // ============================================================================
-// Inicio de Marketing — UN BLOQUE POR PROVEEDOR.
+// Inicio de Marketing — UN BLOQUE POR MARCA.
 //
-// 🔑 EL MODELO, en palabras de Daniel: *"le reportas ese gasto al proveedor"*,
-// *"cada proveedor solo su parte"*, *"calvin y tommy y karl son de la misma
-// compañia, asi que esas las cierro juntas. reebok es de otro proveedor, eso lo
-// cierro en otro momento"*. La marca dejó de ser la unidad del módulo: lo que
-// se mira, se suma y se cierra es el PROVEEDOR.
+// 🔑 EL MODELO, en palabras de Daniel: *"ellos facturan a mi bajo compañia
+// diferentes. una por marca. cada marca tiene su encargado"*. El agrupador
+// "proveedor" desapareció de la pantalla: no era un rename, era un concepto de
+// más. Existía solo para cerrar Tommy, Calvin y Karl el mismo día, y eso se
+// resuelve con UN botón ("Cerrar las tres") en vez de con una entidad
+// intermedia que se metía en la pantalla, en el reporte y en el nombre del ZIP.
+//
+// 🔴 EL BOTÓN DEL GRUPO SE DIBUJA UNA SOLA VEZ, encima del primer bloque del
+// grupo — `esCabezaDeGrupo()` dice cuál es. Repetirlo en los tres sería tres
+// botones que hacen exactamente lo mismo, uno debajo del otro.
 //
 // 🔴 NO HAY TECHO NI PRESUPUESTO. *"simplemente reportas lo que gastaste"*. Acá
-// no se dibuja ninguna barra de avance ni "cuánto queda": nada que se parezca a
-// un presupuesto, que es una idea que Daniel descartó explícitamente.
+// no se dibuja ninguna barra de avance ni "cuánto queda".
 //
 // 🩸 NO SE HACE NINGUNA CUENTA EN ESTE ARCHIVO. Todos los montos vienen ya
-// sumados de `GET /api/marketing/inicio` (que a su vez delega en el módulo puro
-// `lib/marketing/resumen-proveedores.ts`). Sumar acá "para redondear la
+// sumados de `GET /api/marketing/inicio`. Sumar acá "para redondear la
 // pantalla" sería tener dos verdades sobre la misma plata — la forma exacta en
 // que este repo ya se quemó dos veces con los signos de las notas de crédito.
 //
-// ⚠️ SIN LA MIGRACIÓN DE PERÍODOS (`conPeriodos: false`) la pantalla se dibuja
-// IGUAL, pero sin la píldora del período y sin el botón de cerrar. NO es un
-// error y no se le muestra al usuario como tal: los números son exactamente los
-// mismos, solo que todavía no hay a qué período atarlos.
+// ⚠️ DEGRADA LIMPIO. El grupo de cierre y el orden de los bloques se derivan
+// del módulo PURO `lib/marketing/bloques.ts` cuando el API todavía no los
+// manda, y los contadores de pendientes ausentes se leen como 0 (que es
+// "no sé de ninguno", y se dibuja igual que "no hay ninguno": nada). Sin la
+// migración de períodos (`conPeriodos: false`) la pantalla se dibuja IGUAL,
+// sin píldora y sin botón de cerrar. NO es un error y no se muestra como tal.
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { saveAs } from "file-saver";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  MARCAS_BLOQUE,
+  MULTIFASHION_KEY,
+  SIN_BLOQUE,
+  esCabezaDeGrupo,
+  grupoCierreDeMarca,
+  nombreDeBloque,
+} from "@/lib/marketing/bloques";
 import PorClienteModal from "./PorClienteModal";
 import PorMarcaModal from "./PorMarcaModal";
 import CerrarPeriodoModal from "./CerrarPeriodoModal";
@@ -38,21 +51,29 @@ export interface MontoInicio {
   total: number;
 }
 
-export interface BloqueInicio {
+export interface BloqueResumen {
   key: string;
   nombre: string;
-  marcas: string[];
+  /** Con quién se cierra junto. `null` = se cierra solo. */
+  grupoCierre?: string | null;
+  /** Lo que se lee en el botón del grupo. NUNCA el nombre del dueño. */
+  grupoEtiqueta?: string | null;
+  esCabezaDeGrupo?: boolean;
   periodoAbierto: { id: string | null; nombre: string } | null;
   facturas: MontoInicio;
   muebles: MontoInicio;
   total: number;
   proyectos: number;
+  /** Gastos sin el papel que respalda la plata. Los lleva TODO gasto. */
+  sinComprobante?: number;
+  /** Gastos sin foto de instalación. Solo los que tienen cliente. */
+  sinFoto?: number;
 }
 
-export interface PeriodoCerradoInicio {
+export interface PeriodoCerradoResumen {
   id: string | null;
-  proveedorKey: string;
-  proveedorNombre: string;
+  bloqueKey: string;
+  bloqueNombre: string;
   nombre: string;
   cerradoEn: string | null;
   facturas: MontoInicio;
@@ -74,8 +95,8 @@ export interface MarcaInicio {
 }
 
 export interface DatosInicio {
-  bloques: BloqueInicio[];
-  cerrados: PeriodoCerradoInicio[];
+  bloques: BloqueResumen[];
+  cerrados: PeriodoCerradoResumen[];
   resumen: { total: number; proyectos: number; clientes: number };
   porCliente: FilaClienteInicio[];
   porMarca: Record<string, number>;
@@ -87,24 +108,41 @@ export interface DatosInicio {
 
 interface Props {
   /** Abre la lista de proyectos de ese bloque ("Ver proyectos"). */
-  onSelectProveedor: (key: string) => void;
-  onNuevoProyecto: () => void;
+  onSelectBloque: (key: string) => void;
+  /** La única puerta para meter plata: el modal de "Registrar gasto". */
+  onRegistrarGasto: () => void;
   onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
 }
 
 /** Bloques que NO se le reportan a nadie: sin período y sin botón de cerrar. */
-const SIN_REPORTE = new Set(["multifashion", "sin_proveedor"]);
+const SIN_REPORTE = new Set<string>([MULTIFASHION_KEY, SIN_BLOQUE]);
+
+/** Orden canónico de los bloques: el del módulo puro, y lo demás al final. */
+const ORDEN_BLOQUE = new Map<string, number>(
+  MARCAS_BLOQUE.map((m, i) => [m.key, i] as const),
+);
+
+function ordenDe(key: string): number {
+  const i = ORDEN_BLOQUE.get(String(key ?? "").trim().toUpperCase());
+  if (i !== undefined) return i;
+  if (key === MULTIFASHION_KEY) return 90;
+  if (key === SIN_BLOQUE) return 91;
+  return 80;
+}
 
 function plural(n: number, uno: string, varios: string): string {
   return `${n} ${n === 1 ? uno : varios}`;
 }
 
 /** Nombre de archivo seguro a partir del título del período. */
-function nombreArchivo(etiqueta: string): string {
-  const limpio = etiqueta.replace(/[^\p{L}\p{N} .-]+/gu, " ").replace(/\s+/g, " ").trim();
-  return `${limpio || "Reporte"}.xlsx`;
+function nombreArchivo(etiqueta: string, ext: string): string {
+  const limpio = etiqueta
+    .replace(/[^\p{L}\p{N} .-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${limpio || "Reporte"}.${ext}`;
 }
 
 /** Cifra de un bloque: etiqueta chica arriba, número grande abajo. */
@@ -117,9 +155,47 @@ function Cifra({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   );
 }
 
+/**
+ * Lo que falta en este bloque, en UNA línea.
+ *
+ * 🔴 SON DOS PAPELES DISTINTOS y no se mezclan. El COMPROBANTE respalda la
+ * plata y lo lleva todo gasto, impulsadoras incluidas — Daniel, textual:
+ * *"pero impulsadora tambien necesita comprobante, pero no foto. aunq el
+ * comprobante sea una foto"*. La FOTO es la de instalación (el letrero puesto,
+ * el mueble armado) y solo tiene sentido en un gasto con cliente.
+ *
+ * El comprobante va en ámbar porque es lo serio; la foto, en gris. La jerarquía
+ * va por color, no por tamaño ni por orden.
+ *
+ * Con los dos en cero NO se dibuja nada: un aviso que dice "todo bien" es ruido.
+ */
+export function LoQueFalta({
+  sinComprobante,
+  sinFoto,
+}: {
+  sinComprobante: number;
+  sinFoto: number;
+}) {
+  if (sinComprobante <= 0 && sinFoto <= 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      {sinComprobante > 0 && (
+        <span className="text-amber-800">
+          {plural(sinComprobante, "gasto", "gastos")} sin comprobante
+        </span>
+      )}
+      {sinFoto > 0 && (
+        <span className="text-gray-500">
+          {plural(sinFoto, "gasto", "gastos")} sin foto
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function InicioMarketing({
-  onSelectProveedor,
-  onNuevoProyecto,
+  onSelectBloque,
+  onRegistrarGasto,
   onOpenImpulsadoras,
   onOpenInventario,
   refreshKey,
@@ -129,7 +205,9 @@ export default function InicioMarketing({
   const [loading, setLoading] = useState(true);
   const [verPorCliente, setVerPorCliente] = useState(false);
   const [verPorMarca, setVerPorMarca] = useState(false);
-  const [cerrando, setCerrando] = useState<BloqueInicio | null>(null);
+  const [cerrando, setCerrando] = useState<BloqueResumen | null>(null);
+  const [cerrandoGrupo, setCerrandoGrupo] = useState<BloqueResumen | null>(null);
+  const [bajando, setBajando] = useState<string | null>(null);
   const [recargar, setRecargar] = useState(0);
 
   useEffect(() => {
@@ -168,7 +246,7 @@ export default function InicioMarketing({
         const blob = await res.blob();
         const cd = res.headers.get("Content-Disposition") ?? "";
         const m = /filename\*?=(?:UTF-8'')?"?([^"';]+)"?/i.exec(cd);
-        saveAs(blob, m?.[1] ? decodeURIComponent(m[1]) : nombreArchivo(etiqueta));
+        saveAs(blob, m?.[1] ? decodeURIComponent(m[1]) : nombreArchivo(etiqueta, "xlsx"));
         toast("Reporte listo — revisa tu carpeta de descargas.", "success");
       } catch {
         toast("No se pudo bajar el reporte. Verifica tu conexión.", "error");
@@ -177,23 +255,91 @@ export default function InicioMarketing({
     [toast],
   );
 
-  const bloques = useMemo(() => datos?.bloques ?? [], [datos]);
+  /**
+   * El ZIP de UNA marca.
+   *
+   * 🔴 SE BAJA DE A UNO Y A PROPÓSITO. Nada de disparar varias descargas
+   * seguidas: Safari en iPhone bloquea la segunda y la tercera, así que un
+   * "bajar todos" se vería como que el sistema perdió archivos. Los botones
+   * QUEDAN en pantalla para siempre — un período cerrado se puede volver a
+   * bajar las veces que haga falta.
+   *
+   * Sin `periodoId` baja lo que hay abierto hoy, que es el pedido de Daniel:
+   * *"si me llegan a pedir que lo quieren por marca? o algun dia me piden solo
+   * reporte de una marca?"*.
+   */
+  const bajarZipMarca = useCallback(
+    async (marcaCodigo: string, etiqueta: string, periodoId?: string | null) => {
+      const clave = `${marcaCodigo}:${periodoId ?? "abierto"}`;
+      setBajando(clave);
+      try {
+        const res = await fetch("/api/marketing/zip-marca", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            periodoId ? { marcaCodigo, periodoId } : { marcaCodigo },
+          ),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => null);
+          toast(
+            err?.error ?? "No se pudo armar el ZIP. Intenta de nuevo en unos segundos.",
+            "error",
+          );
+          return;
+        }
+        const blob = await res.blob();
+        const cd = res.headers.get("Content-Disposition") ?? "";
+        const m = /filename\*?=(?:UTF-8'')?"?([^"';]+)"?/i.exec(cd);
+        saveAs(blob, m?.[1] ? decodeURIComponent(m[1]) : nombreArchivo(etiqueta, "zip"));
+        toast("ZIP listo — revisa tu carpeta de descargas.", "success");
+      } catch {
+        toast("No se pudo armar el ZIP. Verifica tu conexión.", "error");
+      } finally {
+        setBajando(null);
+      }
+    },
+    [toast],
+  );
+
+  // Los bloques, en el orden canónico del módulo puro. Que un bloque salte de
+  // lugar porque este mes gastó menos hace que la pantalla se lea distinta cada
+  // vez, y acá se entra a buscar una marca por su nombre, no por su tamaño.
+  const bloques = useMemo(() => {
+    const lista = datos?.bloques ?? [];
+    return [...lista].sort((a, b) => ordenDe(a.key) - ordenDe(b.key));
+  }, [datos]);
+
   const mobiliario = datos?.mobiliario;
   const impulsadoras = datos?.impulsadoras;
+
+  /** Los otros bloques del mismo grupo, para el aviso del cierre conjunto. */
+  const hermanosDeGrupo = useCallback(
+    (b: BloqueResumen): BloqueResumen[] => {
+      const g = b.grupoCierre ?? grupoCierreDeMarca(b.key)?.key ?? null;
+      if (!g) return [];
+      return bloques.filter(
+        (x) => (x.grupoCierre ?? grupoCierreDeMarca(x.key)?.key ?? null) === g,
+      );
+    },
+    [bloques],
+  );
 
   return (
     <div className="space-y-5">
       {/* ------------------------------------------------------------------ */}
-      {/* Cabecera: el título y la única acción principal del módulo.         */}
+      {/* Cabecera: el título y la ÚNICA acción principal del módulo.         */}
+      {/* El proyecto dejó de ser un paso — Daniel: "¿alguna vez creas un     */}
+      {/* proyecto antes de tener un gasto?" → "no".                          */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
         <button
           type="button"
-          onClick={onNuevoProyecto}
+          onClick={onRegistrarGasto}
           className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
         >
-          + Nuevo proyecto
+          + Registrar gasto
         </button>
       </div>
 
@@ -233,10 +379,10 @@ export default function InicioMarketing({
               </div>
               <div>
                 <div className="text-2xl sm:text-[28px] font-semibold text-gray-900 tabular-nums leading-none">
-                  {datos.resumen.proyectos}
+                  {datos.resumen.clientes}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  proyectos · {plural(datos.resumen.clientes, "cliente", "clientes")}
+                  {datos.resumen.clientes === 1 ? "cliente" : "clientes"}
                 </div>
               </div>
               <div className="flex items-center gap-4 sm:ml-auto -my-1">
@@ -259,8 +405,8 @@ export default function InicioMarketing({
           </section>
 
           {/* -------------------------------------------------------------- */}
-          {/* UN BLOQUE POR PROVEEDOR — cada uno es alguien a quien le rendís */}
-          {/* cuentas, o vos mismo en Multifashion.                          */}
+          {/* UN BLOQUE POR MARCA — cada marca es una compañía con su         */}
+          {/* encargado y su reporte.                                        */}
           {/* -------------------------------------------------------------- */}
           <section className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-200">
             {bloques.map((b) => {
@@ -270,75 +416,121 @@ export default function InicioMarketing({
                 !sinReporte && datos.conPeriodos ? b.periodoAbierto : null;
               const puedeCerrar =
                 !sinReporte && datos.conPeriodos && !sinGasto && !!b.periodoAbierto?.id;
+              const nombre = b.nombre || nombreDeBloque(b.key, datos.marcas);
+              // El grupo se deriva del módulo puro cuando el API no lo manda:
+              // así el atajo sigue existiendo aunque el contrato llegue viejo.
+              const grupo = grupoCierreDeMarca(b.key);
+              const cabeza =
+                b.esCabezaDeGrupo != null ? b.esCabezaDeGrupo : esCabezaDeGrupo(b.key);
+              const etiquetaGrupo = b.grupoEtiqueta ?? grupo?.etiqueta ?? null;
+              const zipClave = `${b.key}:abierto`;
 
               return (
-                <div key={b.key} className="p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="text-base font-semibold text-gray-900">
-                        {b.nombre}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {b.key === "multifashion"
-                          ? "Tienda propia · no se le reporta a nadie"
-                          : b.key === "sin_proveedor"
-                            ? "Falta decidir a qué compañía se le reporta este gasto"
-                            : b.marcas.join(" · ") || "Sin marcas asignadas"}
-                      </div>
-                    </div>
-                    {periodo && (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 whitespace-nowrap">
-                        <span className="uppercase tracking-wider opacity-80">
-                          Período
-                        </span>
-                        {periodo.nombre}
+                <div key={b.key}>
+                  {/* CABECERA DEL GRUPO — se dibuja UNA sola vez, encima del
+                      primer bloque del grupo. Explica por qué esos tres van
+                      juntos y lleva el atajo, en vez de repetir el mismo botón
+                      tres veces. */}
+                  {cabeza && etiquetaGrupo && datos.conPeriodos && (
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-gray-50 px-4 sm:px-5 py-2">
+                      <span className="text-xs text-gray-500">
+                        {etiquetaGrupo} se cierran juntas
                       </span>
-                    )}
-                  </div>
-
-                  {sinGasto ? (
-                    <p className="text-sm text-gray-500 italic mt-3">
-                      Todavía no hay gasto en este período.
-                    </p>
-                  ) : (
-                    <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3">
-                      <Cifra etiqueta="Proyectos" valor={String(b.proyectos)} />
-                      {b.facturas.count > 0 && (
-                        <Cifra
-                          etiqueta="Facturas"
-                          valor={formatearMonto(b.facturas.total)}
-                        />
-                      )}
-                      {b.muebles.count > 0 && (
-                        <Cifra
-                          etiqueta="Mobiliario"
-                          valor={formatearMonto(b.muebles.total)}
-                        />
-                      )}
-                      <Cifra
-                        etiqueta={sinReporte ? "Gasto" : "Total a reportar"}
-                        valor={formatearMonto(b.total)}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setCerrandoGrupo(b)}
+                        className="text-sm text-teal-700 hover:text-teal-900 font-medium transition min-h-[44px] -my-2 inline-flex items-center"
+                      >
+                        Cerrar las tres
+                      </button>
                     </div>
                   )}
 
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onSelectProveedor(b.key)}
-                      className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 active:scale-[0.97] transition"
-                    >
-                      Ver proyectos
-                    </button>
-                    {puedeCerrar && (
+                  <div className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="text-base font-semibold text-gray-900">
+                          {nombre}
+                        </div>
+                        {sinReporte && (
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {b.key === MULTIFASHION_KEY
+                              ? "Tienda propia · sin período"
+                              : "Falta decidir a qué marca se le reporta este gasto"}
+                          </div>
+                        )}
+                      </div>
+                      {periodo && (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-teal-600 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 whitespace-nowrap">
+                          <span className="uppercase tracking-wider opacity-80">
+                            Período
+                          </span>
+                          {periodo.nombre}
+                        </span>
+                      )}
+                    </div>
+
+                    {sinGasto ? (
+                      <p className="text-sm text-gray-500 italic mt-3">
+                        Todavía no hay gasto en este período.
+                      </p>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-3">
+                        <Cifra etiqueta="Proyectos" valor={String(b.proyectos)} />
+                        {b.facturas.count > 0 && (
+                          <Cifra
+                            etiqueta="Facturas"
+                            valor={formatearMonto(b.facturas.total)}
+                          />
+                        )}
+                        {b.muebles.count > 0 && (
+                          <Cifra
+                            etiqueta="Mobiliario"
+                            valor={formatearMonto(b.muebles.total)}
+                          />
+                        )}
+                        <Cifra
+                          etiqueta={sinReporte ? "Gasto" : "Total a reportar"}
+                          valor={formatearMonto(b.total)}
+                        />
+                      </div>
+                    )}
+
+                    <LoQueFalta
+                      sinComprobante={b.sinComprobante ?? 0}
+                      sinFoto={b.sinFoto ?? 0}
+                    />
+
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setCerrando(b)}
-                        className="rounded-md border border-teal-600 bg-teal-50 px-3 min-h-[44px] inline-flex items-center justify-center text-sm font-semibold text-teal-800 hover:bg-teal-100 active:scale-[0.97] transition"
+                        onClick={() => onSelectBloque(b.key)}
+                        className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 active:scale-[0.97] transition"
                       >
-                        Cerrar período y bajar reporte
+                        Ver proyectos
                       </button>
-                    )}
+                      {puedeCerrar && (
+                        <button
+                          type="button"
+                          onClick={() => setCerrando(b)}
+                          className="rounded-md border border-teal-600 bg-teal-50 px-3 min-h-[44px] inline-flex items-center justify-center text-sm font-semibold text-teal-800 hover:bg-teal-100 active:scale-[0.97] transition"
+                        >
+                          Cerrar
+                        </button>
+                      )}
+                      {!sinReporte && !sinGasto && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            bajarZipMarca(b.key, `${nombre} · ${periodo?.nombre ?? "actual"}`)
+                          }
+                          disabled={bajando === zipClave}
+                          className="rounded-md border border-gray-300 bg-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm text-gray-800 hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40"
+                        >
+                          {bajando === zipClave ? "Armando…" : "Bajar ZIP"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -380,37 +572,55 @@ export default function InicioMarketing({
           </section>
 
           {/* -------------------------------------------------------------- */}
-          {/* Períodos cerrados — el archivo, al pie y tenue.                 */}
+          {/* Períodos cerrados — el archivo, al pie y tenue. Cada uno lleva  */}
+          {/* su ZIP, y queda ahí para siempre: se vuelve a bajar cuando se   */}
+          {/* necesite, de a uno.                                            */}
           {/* -------------------------------------------------------------- */}
           {datos.cerrados.length > 0 && (
-            <section className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="text-xs text-gray-500">Períodos cerrados</span>
-              {datos.cerrados.map((c, i) => {
-                const etiqueta = `${c.proveedorNombre} · ${c.nombre} · ${formatearMonto(c.total)}`;
-                if (!c.id) {
-                  // Fallback sin migración: el período existe como agrupación,
-                  // pero todavía no tiene fila propia de la que bajar reporte.
+            <section className="space-y-2">
+              <div className="text-xs text-gray-500">Períodos cerrados</div>
+              <div className="flex flex-wrap gap-2">
+                {datos.cerrados.map((c, i) => {
+                  const etiqueta = `${c.bloqueNombre} · ${c.nombre} · ${formatearMonto(c.total)}`;
+                  const zipClave = `${c.bloqueKey}:${c.id ?? "abierto"}`;
                   return (
-                    <span
-                      key={`${c.proveedorKey}-${c.nombre}-${i}`}
-                      className="rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-500"
+                    <div
+                      key={c.id ?? `${c.bloqueKey}-${c.nombre}-${i}`}
+                      className="inline-flex items-stretch rounded-md border border-gray-200 overflow-hidden"
                     >
-                      {etiqueta}
-                    </span>
+                      {c.id ? (
+                        <button
+                          type="button"
+                          onClick={() => descargarReporte(c.id as string, etiqueta)}
+                          title="Bajar el Excel de este período"
+                          className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition"
+                        >
+                          {etiqueta}
+                        </button>
+                      ) : (
+                        // Fallback sin migración: el período existe como
+                        // agrupación, pero todavía no tiene fila propia.
+                        <span className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500">
+                          {etiqueta}
+                        </span>
+                      )}
+                      {c.id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            bajarZipMarca(c.bloqueKey, etiqueta, c.id)
+                          }
+                          title={`Bajar el ZIP de ${c.bloqueNombre}`}
+                          disabled={bajando === zipClave}
+                          className="border-l border-gray-200 px-3 min-h-[44px] inline-flex items-center text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-40"
+                        >
+                          {bajando === zipClave ? "Armando…" : "ZIP"}
+                        </button>
+                      )}
+                    </div>
                   );
-                }
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => descargarReporte(c.id as string, etiqueta)}
-                    title="Bajar el reporte de este período"
-                    className="rounded-md border border-gray-200 px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition"
-                  >
-                    {etiqueta}
-                  </button>
-                );
-              })}
+                })}
+              </div>
             </section>
           )}
         </>
@@ -440,6 +650,26 @@ export default function InicioMarketing({
           onCerrado={async (periodoId, etiqueta) => {
             setCerrando(null);
             await descargarReporte(periodoId, etiqueta);
+            setRecargar((n) => n + 1);
+          }}
+        />
+      )}
+
+      {cerrandoGrupo && (
+        <CerrarPeriodoModal
+          bloque={cerrandoGrupo}
+          periodoId={cerrandoGrupo.periodoAbierto?.id ?? null}
+          grupo={{
+            key: cerrandoGrupo.grupoCierre ?? grupoCierreDeMarca(cerrandoGrupo.key)?.key ?? "",
+            etiqueta:
+              cerrandoGrupo.grupoEtiqueta ??
+              grupoCierreDeMarca(cerrandoGrupo.key)?.etiqueta ??
+              "",
+            bloques: hermanosDeGrupo(cerrandoGrupo),
+          }}
+          onClose={() => setCerrandoGrupo(null)}
+          onCerrado={() => {
+            setCerrandoGrupo(null);
             setRecargar((n) => n + 1);
           }}
         />

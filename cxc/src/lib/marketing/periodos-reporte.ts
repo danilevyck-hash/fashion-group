@@ -1,17 +1,23 @@
 // ============================================================================
-// Marketing — el REPORTE de un período, tal como se le manda al proveedor.
+// Marketing — el REPORTE de un período, tal como se le manda a la MARCA.
 //
 // 🔑 SE GUARDA UNA VEZ Y NO SE RECALCULA NUNCA. Al cerrar un período, el
 // reporte se congela en `mk_periodos.reporte` (jsonb) y de ahí sale el Excel
 // para siempre. Si mañana cambia una regla de reparto, el papel que el
-// proveedor ya tiene en la mano NO puede cambiar solo.
+// encargado de la marca ya tiene en la mano NO puede cambiar solo.
 //
-// 🩸 LOS TOTALES NO SE VUELVEN A CALCULAR ACÁ. Salen de `agregarPorProveedor`,
+// 🩸 LOS TOTALES NO SE VUELVEN A CALCULAR ACÁ. Salen de `agregarPorBloques`,
 // el mismo módulo puro que dibuja el inicio. Escribir una segunda cuenta es la
 // forma exacta en que este repo ya se quemó con los signos de las notas de
 // crédito: dos archivos diciendo cosas distintas sobre la misma plata, y nadie
-// se entera hasta que un proveedor reclama. Lo único que se arma acá es el
+// se entera hasta que una marca reclama. Lo único que se arma acá es el
 // DETALLE (qué documentos entran), con el mismo reparto por porción.
+//
+// 🔴 `proveedorKey` / `proveedorNombre` CONSERVAN EL NOMBRE dentro del jsonb y
+// ahora guardan el CÓDIGO Y EL NOMBRE DE LA MARCA. Renombrarlos rompería la
+// lectura del reporte de "mid 2026" que ya está guardado —y que dice 'pvh'
+// porque ese cierre fue conjunto de verdad—, o sea que el Excel congelado
+// dejaría de salir. Es la misma decisión que la columna `proveedor_key`.
 // ============================================================================
 
 import XLSX from "xlsx-js-style";
@@ -28,11 +34,17 @@ import { esMultifashion } from "@/lib/marketing/multifashion";
 import { formatearFecha } from "./normalizar";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
-  agregarPorProveedor,
+  agregarPorBloques,
   type PeriodoRow,
   type SelloRow,
-} from "./resumen-proveedores";
-import { PROVEEDORES, SIN_PROVEEDOR, indiceProveedorPorMarcaId } from "./proveedores";
+} from "./resumen-bloques";
+import {
+  MARCAS_BLOQUE,
+  SIN_BLOQUE,
+  clavesDeSello,
+  indiceBloquePorMarcaId,
+  nombreDeBloque,
+} from "./bloques";
 import { esTablaAusente } from "./periodos-io";
 
 // ----------------------------------------------------------------------------
@@ -141,12 +153,20 @@ interface MarcaFila {
   empresa_codigo: string | null;
 }
 
+export interface AdjuntoFila {
+  tipo: string;
+  factura_id: string | null;
+  proyecto_id: string | null;
+}
+
 export interface DatosPeriodos {
   facturas: FacturaFila[];
   facturaMarcas: Array<{ factura_id: string; marca_id: string; porcentaje: number | null }>;
   proyectos: ProyectoFila[];
   marcas: MarcaFila[];
   entregas: EntregaFila[];
+  /** Comprobantes y fotos. Vacío = los dos avisos del bloque salen en cero. */
+  adjuntos: AdjuntoFila[];
   periodos: PeriodoRow[];
   sellos: SelloRow[];
   /** false = la migración de períodos todavía no corrió. */
@@ -160,7 +180,7 @@ export interface DatosPeriodos {
  * `periodos` y `sellos` llegan vacíos y `hayTablas` va en false.
  */
 export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
-  const [factRes, fmRes, proyRes, marcasRes, entRes, perRes, selloRes] =
+  const [factRes, fmRes, proyRes, marcasRes, entRes, adjRes, perRes, selloRes] =
     await Promise.all([
       supabaseServer
         .from("mk_facturas")
@@ -179,6 +199,7 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
         .select(
           "id, proyecto_id, total, total_por_marca, total_por_empresa_interna, notas, created_at",
         ),
+      supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
       supabaseServer
         .from("mk_periodos")
         .select("id, proveedor_key, nombre, estado, cerrado_en"),
@@ -192,6 +213,9 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
   if (proyRes.error) throw new Error(`proyectos: ${proyRes.error.message}`);
   if (marcasRes.error) throw new Error(`marcas: ${marcasRes.error.message}`);
   if (entRes.error) throw new Error(`entregas: ${entRes.error.message}`);
+  // Los adjuntos solo alimentan los dos AVISOS (sin comprobante / sin foto). Si
+  // fallan, el módulo tiene que seguir diciendo la plata: un aviso ausente es
+  // molesto, una pantalla en blanco es peor.
   if (perRes.error && !esTablaAusente(perRes.error)) {
     throw new Error(`periodos: ${perRes.error.message}`);
   }
@@ -205,6 +229,7 @@ export async function cargarDatosPeriodos(): Promise<DatosPeriodos> {
     proyectos: (proyRes.data ?? []) as ProyectoFila[],
     marcas: (marcasRes.data ?? []) as MarcaFila[],
     entregas: (entRes.data ?? []) as EntregaFila[],
+    adjuntos: (adjRes.error ? [] : (adjRes.data ?? [])) as AdjuntoFila[],
     periodos: (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[],
     sellos: (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[],
     hayTablas: !perRes.error && !selloRes.error,
@@ -216,7 +241,7 @@ export function agregar(datos: DatosPeriodos) {
   const proyectosMultifashion = new Set(
     datos.proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
   );
-  return agregarPorProveedor({
+  return agregarPorBloques({
     facturas: datos.facturas as never,
     facturaMarcas: datos.facturaMarcas as never,
     entregas: datos.entregas as never,
@@ -225,37 +250,73 @@ export function agregar(datos: DatosPeriodos) {
     proyectosMultifashion,
     periodos: datos.periodos,
     sellos: datos.sellos,
+    adjuntos: datos.adjuntos,
   });
+}
+
+/**
+ * Qué MARCAS entran en el reporte de un período, por su clave.
+ *
+ * Normalmente una: la clave ES el código de marca. La excepción es un período
+ * VIEJO por proveedor —los que existen hasta que Daniel corra la migración—,
+ * donde 'pvh' junta Tommy, Calvin y Karl. Sin esto, cerrar un período heredado
+ * generaría un reporte VACÍO: ninguna marca coincidiría con la clave 'pvh' y
+ * el papel saldría en cero.
+ */
+export function marcasDelPeriodo(key: string): string[] {
+  const k = String(key ?? "").trim();
+  if (!k) return [];
+  return MARCAS_BLOQUE.filter((m) => clavesDeSello(m.key).includes(k)).map(
+    (m) => m.key as string,
+  );
 }
 
 // ----------------------------------------------------------------------------
 // Armado del reporte
 // ----------------------------------------------------------------------------
 
-function nombreProveedor(key: string): string {
-  return PROVEEDORES.find((p) => p.key === key)?.nombre ?? key;
-}
+
 
 /**
- * Arma el reporte del período ABIERTO de un proveedor: SOLO su parte.
+ * Arma el reporte del período ABIERTO de una MARCA: SOLO su parte.
  *
  * 🔑 Qué entra: los documentos cuyo sello apunta a este período, más los que
  * todavía no tienen sello — porque "sin sello" significa "del período actual",
  * que es el default correcto y el mismo que usa la pantalla.
  *
- * 🔴 Los totales de cabecera salen de `agregarPorProveedor`, no de sumar las
- * líneas. Las líneas son el detalle; el número que se le reporta al proveedor
- * es el mismo que el dueño vio en pantalla antes de apretar "cerrar".
+ * 🔴 Los totales de cabecera salen de `agregarPorBloques`, no de sumar las
+ * líneas. Las líneas son el detalle; el número que se le reporta a la marca es
+ * el mismo que el dueño vio en pantalla antes de apretar "cerrar".
  */
 export function armarReportePeriodo(
   datos: DatosPeriodos,
   periodo: { id: string; proveedor_key: string; nombre: string },
 ): { reporte: ReportePeriodo; documentos: DocumentosDelReporte } {
   const prov = String(periodo.proveedor_key);
+  // Normalmente UNA marca. Un período viejo por proveedor ('pvh') junta tres:
+  // sin esto, cerrar un período heredado generaría un reporte VACÍO.
+  const marcasDelReporte = new Set(marcasDelPeriodo(prov));
   const resumen = agregar(datos);
-  const bloque = resumen.bloques.find((b) => b.key === prov);
+  const bloquesDelReporte = resumen.bloques.filter((b) => marcasDelReporte.has(b.key));
+  const bloque =
+    bloquesDelReporte.length === 1
+      ? bloquesDelReporte[0]
+      : bloquesDelReporte.length > 1
+        ? {
+            facturas: {
+              count: bloquesDelReporte.reduce((s, b) => s + b.facturas.count, 0),
+              total: round2(bloquesDelReporte.reduce((s, b) => s + b.facturas.total, 0)),
+            },
+            muebles: {
+              count: bloquesDelReporte.reduce((s, b) => s + b.muebles.count, 0),
+              total: round2(bloquesDelReporte.reduce((s, b) => s + b.muebles.total, 0)),
+            },
+            total: round2(bloquesDelReporte.reduce((s, b) => s + b.total, 0)),
+            proyectos: 0, // se completa abajo con los proyectos de las líneas
+          }
+        : undefined;
 
-  const bloquePorMarca = indiceProveedorPorMarcaId(datos.marcas);
+  const bloquePorMarca = indiceBloquePorMarcaId(datos.marcas);
   const nombrePorMarca = new Map(
     datos.marcas.map((m) => [String(m.id), String(m.nombre ?? "")]),
   );
@@ -278,12 +339,28 @@ export function armarReportePeriodo(
       String(s.periodo_id),
     );
   }
-  /** ¿Este documento entra en el período que se está cerrando? */
-  const entraEnEstePeriodo = (tipo: "factura" | "entrega", docId: string): boolean => {
-    const pid = selloDe.get(`${tipo}::${docId}::${prov}`);
-    if (!pid) return true; // sin sello = período actual
-    if (pid === periodo.id) return true;
-    return estadoPeriodo.get(pid) !== "cerrado";
+  /**
+   * ¿Este documento entra en el período que se está cerrando, para esta marca?
+   *
+   * 🔴 Pregunta por las DOS claves (código de marca y clave vieja), igual que
+   * el inicio: sin la migración corrida, los sellos del archivo dicen 'pvh' y
+   * preguntar solo por 'TH' metería las 59 facturas ya reportadas en el
+   * reporte nuevo — o sea, se le volvería a cobrar a la marca lo mismo.
+   */
+  const entraEnEstePeriodo = (
+    tipo: "factura" | "entrega",
+    docId: string,
+    marcaKey: string,
+  ): boolean => {
+    for (const clave of clavesDeSello(marcaKey).length > 0
+      ? clavesDeSello(marcaKey)
+      : [prov]) {
+      const pid = selloDe.get(`${tipo}::${docId}::${clave}`);
+      if (!pid) continue;
+      if (pid === periodo.id) return true;
+      return estadoPeriodo.get(pid) !== "cerrado";
+    }
+    return true; // sin sello = período actual
   };
 
   const datosDeProyecto = (pid: string | null) => {
@@ -308,17 +385,19 @@ export function armarReportePeriodo(
 
   const lineasFactura: ReporteLineaFactura[] = [];
   const idsFactura = new Set<string>();
+  const proyectosDelReporte = new Set<string>();
   for (const f of datos.facturas) {
     const fid = String(f.id);
     const pid = f.proyecto_id ? String(f.proyecto_id) : null;
     if (pid && esMf.has(pid)) continue; // Multifashion no se le reporta a nadie
     const rows = rowsByFactura.get(fid) ?? [];
     if (rows.length === 0) continue;
-    if (!entraEnEstePeriodo("factura", fid)) continue;
     const sumPct = rows.reduce((s, r) => s + r.porcentaje, 0) || 1;
     for (const r of rows) {
-      const k = bloquePorMarca.get(r.marca_id) ?? SIN_PROVEEDOR;
-      if (k !== prov) continue;
+      const k = bloquePorMarca.get(r.marca_id) ?? SIN_BLOQUE;
+      if (!marcasDelReporte.has(k)) continue;
+      if (!entraEnEstePeriodo("factura", fid, k)) continue;
+      if (pid) proyectosDelReporte.add(pid);
       const ctx = datosDeProyecto(pid);
       lineasFactura.push({
         numero: String(f.numero_factura ?? ""),
@@ -343,12 +422,13 @@ export function armarReportePeriodo(
     // Igual que el inicio: una entrega sin proyecto vivo no se atribuye.
     if (!pid || !proyById.has(pid) || esMf.has(pid)) continue;
     const eid = String(e.id);
-    if (!entraEnEstePeriodo("entrega", eid)) continue;
     for (const mid of marcasDeEntrega(e as never)) {
-      const k = bloquePorMarca.get(mid) ?? SIN_PROVEEDOR;
-      if (k !== prov) continue;
+      const k = bloquePorMarca.get(mid) ?? SIN_BLOQUE;
+      if (!marcasDelReporte.has(k)) continue;
+      if (!entraEnEstePeriodo("entrega", eid, k)) continue;
       const monto = porcionEntregaParaMarca(e as never, mid, empresaPorMarca.get(mid));
       if (monto <= 0) continue;
+      proyectosDelReporte.add(pid);
       const ctx = datosDeProyecto(pid);
       lineasEntrega.push({
         fecha: String(e.created_at ?? "").slice(0, 10),
@@ -394,7 +474,7 @@ export function armarReportePeriodo(
   const reporte: ReportePeriodo = {
     version: 1,
     proveedorKey: prov,
-    proveedorNombre: nombreProveedor(prov),
+    proveedorNombre: nombreDeBloque(prov, datos.marcas),
     periodoId: String(periodo.id),
     periodoNombre: String(periodo.nombre),
     generadoEn: new Date().toISOString(),
@@ -412,7 +492,14 @@ export function armarReportePeriodo(
         round2(
           [...lineasFactura, ...lineasEntrega].reduce((s, l) => s + l.monto, 0),
         ),
-      proyectos: bloque?.proyectos ?? 0,
+      // Con UNA marca es el número del bloque (incluye los proyectos cuyo
+      // gasto ya se reportó). Con un período viejo de tres marcas, sumar los
+      // tres bloques contaría dos veces un proyecto compartido: ahí se cuentan
+      // los proyectos que de verdad entraron en el reporte.
+      proyectos:
+        bloquesDelReporte.length === 1
+          ? (bloque?.proyectos ?? 0)
+          : proyectosDelReporte.size,
     },
     facturas: lineasFactura.sort((a, b) => a.fecha.localeCompare(b.fecha)),
     entregas: lineasEntrega.sort((a, b) => a.fecha.localeCompare(b.fecha)),
