@@ -95,6 +95,15 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
   const esBucket = !!datos && !datos.particion && !!marca;
   const saltando = !!secciones && secciones.length === 1;
 
+  // La marca de ESTA página, resuelta contra el catálogo, para que "Registrar
+  // gasto" no la vuelva a preguntar (renglón fijo con "Cambiar"). `marca.key`
+  // es el código (TH, CK…); los buckets (multifashion / sin-marca) no están en
+  // el catálogo → null → el modal pregunta como siempre.
+  const marcaInicialModal =
+    marcas.find(
+      (m) => (m.codigo ?? "").trim().toUpperCase() === (marca?.key ?? ""),
+    ) ?? null;
+
   // Sección sintetizada para los buckets sin período (Multifashion / sin
   // marca): SU detalle con su gasto histórico. Los números vienen del
   // agregador (bloque_resumen); acá no se suma nada.
@@ -257,6 +266,7 @@ function MarcaPage({ marcaSlug }: { marcaSlug: string }) {
       {registrandoGasto && (
         <RegistrarGastoModal
           marcas={marcas}
+          marcaInicial={marcaInicialModal}
           onClose={() => setRegistrandoGasto(false)}
           onSaved={() => {
             setRegistrandoGasto(false);

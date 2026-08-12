@@ -319,6 +319,81 @@ describe("nota de entrega — PIEZAS y BULTOS en columnas separadas", () => {
     expect(crudo(buf)).not.toMatch(/\(0\)\s*Tj/);
   });
 
+  // ── SON DOS PAPELES (12-ago-2026). Daniel, textual: *"lo de los bultos no
+  //    es para el comprobante que le mando a la marca, sino para el envio del
+  //    producto al cliente, son dos cosas distintas"*. UN generador, un flag:
+  //    `incluirBultos: true` (default) = NOTA DE ENTREGA (envío al cliente);
+  //    `false` = COMPROBANTE DE ENTREGA (el del ZIP que va a la marca). ──────
+  it("la NOTA de envío (default) lleva Bultos y se titula NOTA DE ENTREGA", () => {
+    const buf = buildComprobanteEntregaPdf(conFotoYBultos);
+    expect(contiene(buf, "Bultos")).toBe(true);
+    expect(contiene(buf, "NOTA DE ENTREGA")).toBe(true);
+    expect(contiene(buf, "COMPROBANTE DE ENTREGA")).toBe(false);
+  });
+
+  it("el COMPROBANTE para la marca (incluirBultos:false) sale SIN Bultos", () => {
+    const buf = buildComprobanteEntregaPdf(conFotoYBultos, {
+      incluirBultos: false,
+    });
+    expect(contiene(buf, "Bultos")).toBe(false);
+    expect(contiene(buf, "COMPROBANTE DE ENTREGA")).toBe(true);
+    // Y el dato de los bultos (5) tampoco se filtra por otra celda.
+    expect(crudo(buf)).not.toMatch(/\(5\)\s*Tj/);
+  });
+
+  it("sin Bultos, las piezas y la plata quedan INTACTAS (misma entrega)", () => {
+    const buf = buildComprobanteEntregaPdf(conFotoYBultos, {
+      incluirBultos: false,
+    });
+    expect(contiene(buf, "Piezas")).toBe(true);
+    expect(contiene(buf, "Norte colgador")).toBe(true);
+    expect(contiene(buf, "150")).toBe(true);
+    expect(contiene(buf, "14,630.00")).toBe(true);
+  });
+
+  it("sin detalle de artículos, el comprobante sin bultos tampoco se rompe", () => {
+    const buf = buildComprobanteEntregaPdf(
+      { ...datos, items: [] },
+      { incluirBultos: false },
+    );
+    expect(contiene(buf, "Sin detalle de art")).toBe(true);
+    expect(contiene(buf, "14,630.00")).toBe(true);
+    expect(contiene(buf, "Bultos")).toBe(false);
+  });
+
+  it("los ZIP (marca y global) piden el papel SIN bultos; la nota, CON", () => {
+    // Candado estático: el flag correcto en cada llamador. Si un ZIP volviera
+    // al default (con bultos), el papel que va a la marca cambiaría solo.
+    const fs = require("node:fs") as typeof import("node:fs");
+    const path = require("node:path") as typeof import("node:path");
+    const raiz = path.join(__dirname, "..", "..");
+    const zipMarca = fs.readFileSync(
+      path.join(raiz, "lib/marketing/zip-marca.ts"),
+      "utf8",
+    );
+    const zipExport = fs.readFileSync(
+      path.join(raiz, "lib/marketing/zip-export.ts"),
+      "utf8",
+    );
+    const nota = fs.readFileSync(
+      path.join(raiz, "components/marketing/NotaEntregaAcciones.tsx"),
+      "utf8",
+    );
+    const rutaPdf = fs.readFileSync(
+      path.join(raiz, "app/api/marketing/entregas-pdf/[id]/route.ts"),
+      "utf8",
+    );
+    expect(zipMarca).toMatch(
+      /buildComprobanteEntregaPdf\(datos,\s*\{\s*incluirBultos:\s*false\s*\}\)/,
+    );
+    expect(zipExport).toMatch(
+      /buildComprobanteEntregaPdf\(datos,\s*\{\s*incluirBultos:\s*false\s*\}\)/,
+    );
+    expect(nota).toMatch(/incluirBultos:\s*true/);
+    expect(nota).not.toMatch(/incluirBultos:\s*false/);
+    expect(rutaPdf).toMatch(/incluirBultos:\s*true/);
+  });
+
   it("cada número cae DEBAJO de su columna (piezas antes que bultos)", () => {
     // Sin esto, intercambiar las dos columnas pasaría en verde: los mismos
     // encabezados y los mismos números, en el orden equivocado. Se mide la

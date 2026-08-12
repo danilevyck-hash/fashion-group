@@ -473,10 +473,15 @@ describe("barrido estático", () => {
     // botón.
     const src = leer("app/marketing/components/RegistrarGastoModal.tsx");
     // El bloque de la foto está FUERA del if/else que separa los caminos.
+    // (Desde el 12-ago-2026 el tercer camino se llama "Gasto de la marca",
+    // key "marca", con Impulsadora y Otro gasto adentro — la foto sigue viva
+    // en TODOS, con o sin cliente.)
     const bloqueFoto = src.indexOf("Subir foto");
-    const finCondicional = src.indexOf("camino === \"impulsadora\" ? (");
+    const finCondicional = src.indexOf('camino === "marca" ? (');
+    expect(finCondicional).toBeGreaterThan(0);
     expect(bloqueFoto).toBeGreaterThan(finCondicional);
-    expect(src).not.toMatch(/camino !== "impulsadora"[\s\S]{0,120}foto/i);
+    expect(src).not.toMatch(/camino !== "(marca|impulsadora)"[\s\S]{0,120}foto/i);
+    expect(src).not.toMatch(/subGasto !== "(otro|impulsadora)"[\s\S]{0,120}setFoto/i);
     // Y el pago de impulsadora la recibe y la sube.
     const pago = leer("app/marketing/components/RegistrarPagoModal.tsx");
     expect(pago).toContain("fotoOpcional");

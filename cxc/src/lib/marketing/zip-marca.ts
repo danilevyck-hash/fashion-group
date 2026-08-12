@@ -1171,7 +1171,10 @@ async function armarZipDescarga(prep: PrepDescarga): Promise<ZipMarcaResult> {
     }
     const usados = setDe(usadosPorCarpeta, `${g.carpeta}/facturas`);
     try {
-      const buf = buildComprobanteEntregaPdf(datos);
+      // SIN bultos: este papel va a la MARCA, no viaja con la mercancía.
+      // Daniel: *"lo de los bultos no es para el comprobante que le mando a la
+      // marca, sino para el envio del producto al cliente"*.
+      const buf = buildComprobanteEntregaPdf(datos, { incluirBultos: false });
       const nombre = unico(
         sanitizeName(
           `${nombreArchivoComprobante(datos)} · ${marcaNombre}`,

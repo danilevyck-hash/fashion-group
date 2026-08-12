@@ -8,10 +8,16 @@
 //
 // Flow:
 //   1) Nombre de la entrega (opcional) + marca(s) con %.
-//   2) Input destacado "Cantidad de paneles" (driver del kit).
-//   3) Bloque "Accesorios": tablas, conjunto, norte, barra. Al escribir paneles
-//      se autorrellenan según la curva sugerida (3/3/1/3). Editables a mano.
+//   2) Input destacado "Cantidad de paneles".
+//   3) Bloque "Accesorios": tablas, conjunto, norte, barra. 100% MANUALES.
+//      ⛔ El AUTORRELLENO por curva (3/3/1/3) SE ELIMINÓ (Daniel, 12-ago-2026)
+//      y no debe volver: los kits reales no siguen la curva y el autofill
+//      metía cantidades que nadie escribió. Candado en
+//      src/__tests__/lib/poda-textos-ayuda.test.ts (sección EntregaForm).
 //   4) Resumen en vivo: total $ + desglose por marca (al 100%, por %).
+//   5) Al GUARDAR una entrega nueva: pantalla de éxito con la NOTA DE ENVÍO
+//      (Compartir / Imprimir) — Daniel: *"me tiene que dar una entrega de
+//      envío de eso, para saber que se fue"*.
 //
 // 🔴 CADA RENGLÓN LLEVA DOS NÚMEROS: **PIEZAS** y **BULTOS**.
 //   Las piezas son la mercancía y son lo ÚNICO que descuenta el inventario.
@@ -34,7 +40,7 @@ import type {
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
-import { Ayuda } from "@/components/shared/Ayuda";
+import NotaEntregaAcciones from "@/components/marketing/NotaEntregaAcciones";
 import {
   bultosParaInput,
   normalizarBultos,
@@ -56,15 +62,6 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
 }
-
-// ---- Curva del KIT: paneles es el driver. ----
-const CURVA: Record<string, number> = {
-  paneles: 1,
-  tablas: 3,
-  conjunto: 3,
-  norte: 1,
-  barra: 3,
-};
 
 type Categoria = "paneles" | "tablas" | "conjunto" | "norte" | "barra" | "otros";
 
@@ -111,6 +108,41 @@ function repartirParejo(ids: ReadonlyArray<string>): MarcaSel[] {
       i === n - 1 ? round2(100 - base * (n - 1)) : base,
     ),
   }));
+}
+
+/**
+ * La marca INICIAL de una entrega nueva sale de las marcas que trae el caller
+ * (`marcasProyecto`): viniendo de "Registrar gasto" la marca ya se eligió en
+ * la puerta y preguntarla de nuevo era preguntar dos veces (pedido de Daniel,
+ * 12-ago-2026). El multi-select se conserva: esto solo PRESELECCIONA — quien
+ * entra por otro camino, o quiere cambiarla, toca las marcas como siempre.
+ * Los % se normalizan a 100 (la validación del form lo exige).
+ */
+function marcasInicialesDesdeProyecto(
+  marcasProyecto: ReadonlyArray<MarcaConPorcentaje>,
+): MarcaSel[] {
+  const uniq: MarcaConPorcentaje[] = [];
+  const vistos = new Set<string>();
+  for (const m of marcasProyecto) {
+    if (!m.marca?.id || vistos.has(m.marca.id)) continue;
+    vistos.add(m.marca.id);
+    uniq.push(m);
+  }
+  if (uniq.length === 0) return [];
+  if (uniq.length === 1) {
+    return [{ marcaId: uniq[0].marca.id, porcentajeStr: "100" }];
+  }
+  const sum = uniq.reduce((s, m) => s + (Number(m.porcentaje) || 0), 0);
+  if (!(sum > 0)) return repartirParejo(uniq.map((m) => m.marca.id));
+  let acum = 0;
+  return uniq.map((m, i) => {
+    const pct =
+      i === uniq.length - 1
+        ? round2(100 - acum)
+        : round2(((Number(m.porcentaje) || 0) / sum) * 100);
+    acum = round2(acum + pct);
+    return { marcaId: m.marca.id, porcentajeStr: String(pct) };
+  });
 }
 
 export default function EntregaForm({
@@ -172,14 +204,6 @@ export default function EntregaForm({
     barra: "",
     otros: "",
   });
-  const [tocadoManual, setTocadoManual] = useState<Record<Categoria, boolean>>({
-    paneles: false,
-    tablas: false,
-    conjunto: false,
-    norte: false,
-    barra: false,
-    otros: false,
-  });
   // BULTOS por categoría y por producto "otros". Vacío = no se anotó.
   const [bultosCat, setBultosCat] = useState<Record<Categoria, string>>({
     paneles: "",
@@ -192,6 +216,10 @@ export default function EntregaForm({
   const [otrosCant, setOtrosCant] = useState<Record<string, string>>({});
   const [otrosBultos, setOtrosBultos] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
+  // Entrega NUEVA ya guardada → pantalla de éxito con la nota de envío.
+  // Daniel: *"me tiene que dar una entrega de envío de eso, para saber que
+  // se fue"*. Solo aplica al crear; editar sigue cerrando con su toast.
+  const [guardadaId, setGuardadaId] = useState<string | null>(null);
   // La "foto" de los campos para el cierre por clic fuera solo puede tomarse
   // DESPUÉS de hidratar el form; si no, la hidratación se vería como si el
   // usuario hubiera escrito y el modal nunca cerraría.
@@ -279,14 +307,6 @@ export default function EntregaForm({
         barra: cantsByCat.barra > 0 ? String(cantsByCat.barra) : "",
         otros: "",
       });
-      setTocadoManual({
-        paneles: false,
-        tablas: true,
-        conjunto: true,
-        norte: true,
-        barra: true,
-        otros: true,
-      });
       setBultosCat({
         paneles: bultosParaInput(bultosByCat.paneles),
         tablas: bultosParaInput(bultosByCat.tablas),
@@ -299,7 +319,9 @@ export default function EntregaForm({
       setOtrosBultos(otrosB);
     } else {
       setNombre("");
-      setMarcasSel([]);
+      // Entrega NUEVA: la marca se HEREDA del caller (viniendo de "Registrar
+      // gasto" ya se eligió en la puerta — no se pregunta dos veces).
+      setMarcasSel(marcasInicialesDesdeProyecto(marcasProyecto));
       setPanelesStr("");
       setAccesorios({
         paneles: "",
@@ -308,14 +330,6 @@ export default function EntregaForm({
         norte: "",
         barra: "",
         otros: "",
-      });
-      setTocadoManual({
-        paneles: false,
-        tablas: false,
-        conjunto: false,
-        norte: false,
-        barra: false,
-        otros: false,
       });
       setBultosCat({
         paneles: "",
@@ -328,25 +342,19 @@ export default function EntregaForm({
       setOtrosCant({});
       setOtrosBultos({});
     }
+    setGuardadaId(null);
     setHidratado(true);
+    // ⚠️ `marcasProyecto` queda FUERA de las deps a propósito: los callers la
+    // arman inline (`[{ marca, porcentaje: 100 }]`), así que es una referencia
+    // nueva en cada render — meterla acá re-hidrataría el formulario en cada
+    // render y pisaría lo que el usuario está escribiendo. Solo se usa al
+    // (re)abrir, que es cuando este efecto corre por `open`/`initial`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial, productos]);
 
-  // ---- Auto-fill al cambiar paneles ----
-  useEffect(() => {
-    const n = trunc(Number(panelesStr));
-    setAccesorios((prev) => {
-      const next = { ...prev, paneles: panelesStr };
-      if (!tocadoManual.tablas) next.tablas = n > 0 ? String(n * CURVA.tablas) : "";
-      if (!tocadoManual.conjunto)
-        next.conjunto = n > 0 ? String(n * CURVA.conjunto) : "";
-      if (!tocadoManual.norte)
-        next.norte = n > 0 ? String(n * CURVA.norte) : "";
-      if (!tocadoManual.barra)
-        next.barra = n > 0 ? String(n * CURVA.barra) : "";
-      return next;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelesStr]);
+  // Con la entrega ya guardada, CUALQUIER salida (Cerrar, Escape, Listo) tiene
+  // que avisarle al caller que hubo cambios — si no, la lista no se refresca.
+  const cerrarModal = guardadaId ? onSaved : onClose;
 
   // ---- Cierre por clic fuera + Escape ----
   // El form es largo (nombre, marcas, paneles, accesorios): solo cierra si el
@@ -355,7 +363,7 @@ export default function EntregaForm({
   // los valores ya hidratados. Antes del return condicional (reglas de hooks).
   const { panelRef, backdrop } = useFormModalDismiss(
     open && hidratado,
-    onClose,
+    cerrarModal,
     !guardando,
   );
 
@@ -436,55 +444,25 @@ export default function EntregaForm({
   }, [marcasSel, totalEntrega, sumPctSel]);
 
   // ---- Handlers ----
+  // ⛔ SIN AUTORRELLENO: cada campo es lo que la persona escribió, nada más.
   const setAccesorio = (cat: Categoria, value: string) => {
     const clean = value.replace(/[^0-9]/g, "");
     setAccesorios((prev) => ({ ...prev, [cat]: clean }));
-    if (cat !== "paneles") {
-      setTocadoManual((prev) => ({ ...prev, [cat]: true }));
-    }
   };
 
+  // Paneles vive en su propio input destacado, pero sus PIEZAS cuentan igual
+  // que las de cualquier accesorio: se espejan en `accesorios.paneles`, que es
+  // lo que lee el resumen y lo que se guarda.
   const setPaneles = (value: string) => {
-    setPanelesStr(value.replace(/[^0-9]/g, ""));
+    const clean = value.replace(/[^0-9]/g, "");
+    setPanelesStr(clean);
+    setAccesorios((prev) => ({ ...prev, paneles: clean }));
   };
 
   // Bultos: sólo dígitos. Dejarlo vacío es válido y significa "no se anotó".
   // 🔴 No dispara NINGÚN autorrelleno de piezas: no hay conversión.
   const setBultos = (cat: Categoria, value: string) => {
     setBultosCat((prev) => ({ ...prev, [cat]: value.replace(/[^0-9]/g, "") }));
-  };
-
-  const recalcularCurva = () => {
-    const n = trunc(Number(panelesStr));
-    if (n <= 0) return;
-    setAccesorios({
-      paneles: String(n),
-      tablas: String(n * CURVA.tablas),
-      conjunto: String(n * CURVA.conjunto),
-      norte: String(n * CURVA.norte),
-      barra: String(n * CURVA.barra),
-      otros: "",
-    });
-    setTocadoManual({
-      paneles: false,
-      tablas: false,
-      conjunto: false,
-      norte: false,
-      barra: false,
-      otros: false,
-    });
-  };
-
-  const hayManualEditado = useMemo(() => {
-    return (["tablas", "conjunto", "norte", "barra"] as Categoria[]).some(
-      (c) => tocadoManual[c],
-    );
-  }, [tocadoManual]);
-
-  const sugeridoDe = (cat: Categoria): number => {
-    const n = trunc(Number(panelesStr));
-    if (n <= 0) return 0;
-    return n * (CURVA[cat] ?? 0);
   };
 
   // Marca toggle: agrega/quita y reparte el % parejo entre las seleccionadas.
@@ -569,8 +547,24 @@ export default function EntregaForm({
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudo guardar la entrega");
       }
-      toast(initial ? "Entrega actualizada" : "Entrega registrada", "success");
-      onSaved();
+      if (initial) {
+        toast("Entrega actualizada", "success");
+        onSaved();
+      } else {
+        // Entrega NUEVA: en vez de cerrar, la pantalla de éxito ofrece la
+        // nota de envío (Compartir / Imprimir) ahí mismo. El POST devuelve la
+        // entrega creada; sin id no hay nota que ofrecer y se cierra como
+        // antes — la plata ya quedó guardada, eso nunca se pierde.
+        const creada = (await res.json().catch(() => null)) as
+          | { id?: string }
+          | null;
+        if (creada?.id) {
+          setGuardadaId(String(creada.id));
+        } else {
+          toast("Entrega registrada", "success");
+          onSaved();
+        }
+      }
     } catch (err) {
       toast(err instanceof Error ? err.message : "Error", "error");
     } finally {
@@ -619,13 +613,17 @@ export default function EntregaForm({
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">
-              {initial ? "Editar entrega" : "Nueva entrega de muebles"}
+              {guardadaId
+                ? "Entrega registrada"
+                : initial
+                  ? "Editar entrega"
+                  : "Nueva entrega de muebles"}
             </h3>
             <p className="text-xs text-gray-500 truncate">{proyectoNombre}</p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={cerrarModal}
             disabled={guardando}
             className="text-sm text-gray-500 hover:text-black transition disabled:opacity-50 min-h-[44px] px-1"
           >
@@ -633,6 +631,54 @@ export default function EntregaForm({
           </button>
         </div>
 
+        {guardadaId ? (
+          /* ---- ÉXITO: la nota de envío, alcanzable EN EL MOMENTO ----
+             Daniel: *"me tiene que dar una entrega de envío de eso, para
+             saber que se fue"*. Antes: toast y se cerraba — la nota de una
+             entrega sin proyecto quedaba inalcanzable. Los botones son el
+             MISMO componente de la ficha (NotaEntregaAcciones). */
+          <div className="p-6 space-y-5">
+            <div className="flex flex-col items-center text-center gap-2 py-2">
+              <div
+                className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <div className="text-base font-semibold text-gray-900">
+                Entrega registrada
+              </div>
+              <p className="text-sm text-gray-600 max-w-sm">
+                El inventario ya se descontó. Comparte o imprime la nota de
+                envío — es el papel que viaja con la mercancía, para que quede
+                constancia de que se fue.
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <NotaEntregaAcciones entregaId={guardadaId} />
+            </div>
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={onSaved}
+                className="rounded-md bg-gray-900 text-white px-4 min-h-[44px] text-sm font-medium active:scale-[0.97] transition"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="p-6 space-y-6">
           {productos.length === 0 ? (
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
@@ -744,26 +790,16 @@ export default function EntregaForm({
                 )}
               </section>
 
-              {/* Paso 2: Paneles destacado */}
+              {/* Paso 2: Paneles destacado. ⛔ Sin curva, sin autorrelleno:
+                  el ⓘ "Cómo se llena el kit" se fue CON la funcionalidad que
+                  explicaba (Daniel, 12-ago-2026) — no es una poda de texto. */}
               <section className="space-y-2">
-                <div className="flex items-center gap-1">
-                  <label
-                    htmlFor="entrega-paneles"
-                    className="block text-base font-semibold text-gray-900"
-                  >
-                    Cantidad de paneles
-                  </label>
-                  {/* La curva del kit se aprende una vez → ⓘ. Los accesorios
-                      se siguen viendo llenos abajo, así que el efecto no se
-                      esconde: lo que se esconde es la explicación. */}
-                  <Ayuda titulo="Cómo se llena el kit" className="-my-2">
-                    <p>
-                      Los paneles definen el kit. Cuando escribas la cantidad, los accesorios se
-                      llenan según la curva sugerida (×3 tablas, ×3 conjunto, ×1 colgador, ×3 barra).
-                      Podés ajustarlos a mano.
-                    </p>
-                  </Ayuda>
-                </div>
+                <label
+                  htmlFor="entrega-paneles"
+                  className="block text-base font-semibold text-gray-900"
+                >
+                  Cantidad de paneles
+                </label>
                 {/* Piezas (grande, es el driver del kit) + bultos (chico, es
                     sólo cómo viajó). El bulto NUNCA modifica las piezas. */}
                 <div className="flex items-end gap-2">
@@ -798,15 +834,6 @@ export default function EntregaForm({
                     <div className="text-xs text-gray-400 mt-0.5">Bultos</div>
                   </div>
                 </div>
-                {hayManualEditado && panelesOk && (
-                  <button
-                    type="button"
-                    onClick={recalcularCurva}
-                    className="text-xs text-gray-600 hover:text-black underline"
-                  >
-                    Recalcular accesorios según curva
-                  </button>
-                )}
               </section>
 
               {/* Paso 3: Accesorios */}
@@ -819,10 +846,6 @@ export default function EntregaForm({
                     (cat) => {
                       const prod = productoDe(cat);
                       const value = accesorios[cat] ?? "";
-                      const sugerido = sugeridoDe(cat);
-                      const valActual = trunc(Number(value));
-                      const muestraSugerido =
-                        panelesOk && sugerido > 0 && valActual !== sugerido;
                       return (
                         <div key={cat}>
                           <label className="block text-sm text-gray-700 mb-1">
@@ -865,11 +888,6 @@ export default function EntregaForm({
                               Bultos
                             </span>
                           </div>
-                          {muestraSugerido && (
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              Sugerido: {sugerido}
-                            </div>
-                          )}
                           {prod && (
                             <div className="text-xs text-gray-400 mt-0.5">
                               Stock disponible: {prod.stock_total}
@@ -1045,6 +1063,7 @@ export default function EntregaForm({
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
