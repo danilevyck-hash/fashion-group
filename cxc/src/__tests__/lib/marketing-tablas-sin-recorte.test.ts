@@ -35,7 +35,13 @@ import path from "path";
 
 const RAIZ = path.join(__dirname, "..", "..");
 
-const ANULADOS = path.join(RAIZ, "app/marketing/components/AnuladosLista.tsx");
+// ⚠️ "Anulados" ERA la otra tabla vigilada acá. La pantalla se retiró en
+// ago-2026 con el rediseño por proveedor (`AnuladosLista.tsx` borrado), así que
+// no queda nada que medir: sus tests se fueron con ella. Las facturas anuladas
+// NO se perdieron — se ven y se restauran desde el detalle de su proyecto
+// (`FacturasSection`), en una lista de tarjetas SIN tabla, o sea sin la clase de
+// recorte que este archivo existe para prevenir. Las rutas `papelera/*` siguen
+// vivas. Si algún día vuelve una tabla de anulados, vuelve también a esta lista.
 const MOBILIARIO = path.join(RAIZ, "app/marketing/mobiliario/page.tsx");
 
 function leer(p: string): string {
@@ -61,10 +67,7 @@ function contenedoresDeCadaTabla(src: string): string[][] {
 }
 
 describe("Marketing — las tablas no pueden recortar", () => {
-  const archivos: Array<[string, string]> = [
-    ["Anulados", ANULADOS],
-    ["Mobiliario", MOBILIARIO],
-  ];
+  const archivos: Array<[string, string]> = [["Mobiliario", MOBILIARIO]];
 
   for (const [nombre, ruta] of archivos) {
     it(`${nombre}: cada tabla tiene un scroller propio antes del overflow-hidden`, () => {
@@ -119,42 +122,6 @@ describe("Marketing — las tablas no pueden recortar", () => {
     });
   }
 
-  it("Anulados: Restaurar y Eliminar existen en los dos layouts", () => {
-    const src = leer(ANULADOS);
-    // Un solo componente los dibuja, y se usa dos veces (tarjeta y tabla).
-    expect(src).toContain('data-fg-accion="restaurar"');
-    expect(src).toContain('data-fg-accion="eliminar"');
-    expect(
-      (src.match(/<AccionesAnulado/g) ?? []).length,
-      "Restaurar/Eliminar tienen que dibujarse en la tarjeta Y en la tabla.",
-    ).toBe(2);
-  });
-
-  it("Anulados: la casilla de selección tiene área táctil de 44px", () => {
-    const src = leer(ANULADOS);
-    // Las casillas se dibujan SOLO por CasillaSeleccion, que garantiza el 44.
-    const inputsCheckbox = (src.match(/type="checkbox"/g) ?? []).length;
-    expect(
-      inputsCheckbox,
-      "Hay una casilla fuera de CasillaSeleccion: volvería a medir 14×14px.",
-    ).toBe(1);
-    expect(src).toMatch(/min-h-\[44px\] min-w-\[44px\]/);
-  });
-
-  it("Anulados: las columnas de texto tienen cota para poder truncar", () => {
-    const src = leer(ANULADOS);
-    // Sin `max-w-0`, `truncate` no trunca nada dentro de una tabla de layout
-    // automático y la tabla creció hasta 1119px contra 1104px útiles: el
-    // escritorio TAMBIÉN recortaba 16px. Son 4: th+td de Registro y de Motivo.
-    expect(
-      (src.match(/max-w-0/g) ?? []).length,
-      "Registro/Motivo perdieron su cota: la tabla vuelve a crecer y el escritorio recorta.",
-    ).toBeGreaterThanOrEqual(4);
-    expect(
-      src.includes("px-[18px]"),
-      "Volvió el padding px-[18px]: son 36px por columna, 180px de más en la tabla.",
-    ).toBe(false);
-  });
 });
 
 /** Cuántos bloques de tabla tiene el archivo. */

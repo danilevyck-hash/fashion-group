@@ -45,6 +45,7 @@ import {
   sumaUnidadesPorProducto,
 } from "@/lib/inventario-calc";
 import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
+import { sellarDocumentoPorMarcas } from "./periodos-io";
 import { firmarPath } from "./storage";
 import type {
   CreateEntregaInput,
@@ -928,6 +929,19 @@ export async function createEntrega(
   }
   await ajustarStock(stockDelta);
 
+  // 4) Sellar la entrega con el período ABIERTO de cada proveedor al que le
+  // toca plata. Las marcas son las claves de `total_por_marca` con monto
+  // POSITIVO: una clave en 0 significa "esta marca no llevó nada", y sellarla
+  // ataría la entrega a un proveedor al que no le corresponde un centavo.
+  // Nunca es fatal — la entrega ya está guardada y el stock ya se movió.
+  await sellarDocumentoPorMarcas(
+    "entrega",
+    entrega.id,
+    Object.entries(totalPorMarca)
+      .filter(([, monto]) => Number(monto) > 0)
+      .map(([marcaId]) => marcaId),
+  );
+
   return {
     ...entrega,
     items: (itemRows ?? []).map((r) => mapItem(r as Record<string, unknown>)),
@@ -1040,6 +1054,17 @@ export async function updateEntrega(
     if (d !== 0) delta.set(pid, d);
   }
   await ajustarStock(delta);
+
+  // 4) Sellar. Si al editar la entrega le cambió la marca a un proveedor
+  // nuevo, ahora es gasto suyo y hay que atarla a SU período abierto. El sello
+  // viejo no se toca: lo ya reportado sigue reportado. Nunca es fatal.
+  await sellarDocumentoPorMarcas(
+    "entrega",
+    id,
+    Object.entries(totalPorMarca)
+      .filter(([, monto]) => Number(monto) > 0)
+      .map(([marcaId]) => marcaId),
+  );
 
   // Reload entrega completa
   const { data: entRow, error: rE } = await supabaseServer

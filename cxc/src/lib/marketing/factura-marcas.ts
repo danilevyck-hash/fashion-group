@@ -13,6 +13,7 @@
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { sellarDocumentoPorMarcas } from "./periodos-io";
 import type { MarcaConPorcentaje, MkMarca, TipoMarca } from "./types";
 
 // Legacy: se mantiene para importaciones antiguas. El valor real se decide
@@ -168,6 +169,24 @@ export async function setMarcasDeFactura(
   if (insError) {
     throw new Error(`setMarcasDeFactura[insert]: ${insError.message}`);
   }
+
+  // 🔑 ACÁ es donde de verdad se sabe a qué proveedor pertenece la factura: la
+  // marca vive en `mk_factura_marcas`, no en `mk_facturas`. Por eso el sello se
+  // pone acá y no al crearla — al crearla todavía no tiene marca.
+  //
+  // Si la factura CAMBIA de marca y con eso gana un proveedor nuevo, se sella
+  // también para ESE proveedor: es un gasto que antes no le tocaba y ahora sí.
+  // El sello viejo no se toca — un documento ya reportado a PVH sigue en el
+  // período de PVH que se reportó, aunque hoy además sea de Reebok.
+  //
+  // 🩸 Sellar NUNCA es fatal: `sellarDocumentoPorMarcas` no lanza. Una factura
+  // sin sello se ve como gasto del período actual (el default correcto); una
+  // factura que no se puede guardar es un problema de verdad.
+  await sellarDocumentoPorMarcas(
+    "factura",
+    facturaId,
+    marcas.map((m) => m.marcaId),
+  );
 }
 
 /**

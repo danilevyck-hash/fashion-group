@@ -290,27 +290,47 @@ describe("barrido estático", () => {
     expect(src).toContain("agregarResumenInicio");
   });
 
-  it("la tarjeta NO suma facturas + muebles en un solo monto", () => {
+  it("el bloque del proveedor NO funde facturas y muebles en un solo monto", () => {
     // Los muebles eran $71.765 que no se contaban en ninguna tarjeta; fundirlos
-    // en el mismo `$` triplicaba el número que Daniel ya conoce.
-    const src = leer("app/marketing/components/MarcaSelector.tsx");
+    // en el mismo `$` sin decirlo triplicaba el número que Daniel ya conoce.
+    // Ahora hay un "Total a reportar" —que es lo que se le manda al
+    // proveedor— pero las dos líneas que lo componen se siguen viendo.
+    const src = leer("app/marketing/components/InicioMarketing.tsx");
+    expect(src).toContain('etiqueta="Facturas"');
+    expect(src).toContain('etiqueta="Mobiliario"');
+    // Y el total NO se calcula acá: viene ya sumado del módulo puro.
     expect(src).not.toMatch(/facturas\.total\s*\+\s*muebles\.total/);
     expect(src).not.toMatch(/muebles\.total\s*\+\s*facturas\.total/);
-    // Las dos líneas existen por separado.
-    expect(src).toContain('etiqueta="Facturas"');
-    expect(src).toContain('etiqueta="Muebles"');
+    expect(src).toMatch(/formatearMonto\(b\.total\)/);
   });
 
-  it("los dos buckets viejos siguen accesibles desde el inicio", () => {
-    // "No se borra nada": Gastos Tommy y Calvin + Multifashion bajaron a
-    // enlace, pero siguen abriendo su pantalla.
-    const src = leer("app/marketing/components/MarcaSelector.tsx");
-    // Se exige el CABLE, no la palabra: `onSelectLegacyX` contiene
-    // "onSelectLegacy" y dejaría pasar un enlace que ya no abre nada.
-    expect(src).toMatch(/onClick=\{onSelectLegacy\}/);
-    expect(src).toMatch(/onClick=\{onSelectMultifashion\}/);
-    expect(src).toContain("Gastos Tommy y Calvin");
-    expect(src).toContain("Multifashion");
+  it("Multifashion es UN BLOQUE MÁS, y no se le reporta a nadie", () => {
+    // Antes era un caso especial con su propio enlace suelto. Ahora es un
+    // bloque igual que los demás, pero SIN período y SIN botón de cerrar:
+    // es tienda propia, no hay proveedor a quien mandarle nada.
+    const src = leer("app/marketing/components/InicioMarketing.tsx");
+    expect(src).toContain("Tienda propia · no se le reporta a nadie");
+    expect(src).toMatch(/SIN_REPORTE\s*=\s*new Set\(\["multifashion", "sin_proveedor"\]\)/);
+    expect(src).toMatch(/const sinReporte = SIN_REPORTE\.has\(b\.key\)/);
+    // El período y el botón de cerrar dependen de NO ser uno de esos bloques.
+    expect(src).toMatch(/!sinReporte && datos\.conPeriodos/);
+  });
+
+  it("sin la migración de períodos NO se dibuja píldora ni botón de cerrar", () => {
+    // `conPeriodos: false` significa que las tablas todavía no existen. No es
+    // un error y no se le muestra al usuario como tal: los números son los
+    // mismos, pero no hay período al que atarlos ni nada que cerrar.
+    const src = leer("app/marketing/components/InicioMarketing.tsx");
+    expect(src).toMatch(/const periodo =\s*\n?\s*!sinReporte && datos\.conPeriodos \? b\.periodoAbierto : null;/);
+    expect(src).toMatch(/const puedeCerrar =\s*\n?\s*!sinReporte && datos\.conPeriodos && !sinGasto && !!b\.periodoAbierto\?\.id;/);
+  });
+
+  it("un bloque sin gasto no ofrece cerrar un período vacío", () => {
+    const src = leer("app/marketing/components/InicioMarketing.tsx");
+    expect(src).toContain("Todavía no hay gasto en este período.");
+    expect(src).toMatch(
+      /const sinGasto = b\.facturas\.count === 0 && b\.muebles\.count === 0;/,
+    );
   });
 
   it("la ficha del proyecto deriva sus marcas de los DOCUMENTOS", () => {
@@ -325,8 +345,19 @@ describe("barrido estático", () => {
   });
 
   it("Mobiliario e Impulsadoras se abren desde el inicio", () => {
-    const src = leer("app/marketing/components/MarcaSelector.tsx");
+    const src = leer("app/marketing/components/InicioMarketing.tsx");
     expect(src).toMatch(/onClick=\{onOpenInventario\}/);
     expect(src).toMatch(/onClick=\{onOpenImpulsadoras\}/);
+  });
+
+  it("proyectos-lista NO escribe un segundo mapa de marca → proveedor", () => {
+    // El reparto vive en UN solo lugar (`lib/marketing/proveedores.ts`). Dos
+    // copias es exactamente cómo un bloque termina diciendo "15 proyectos" y
+    // su lista enseñando 12 — o peor, mandándole a PVH una marca de Reebok.
+    const src = leer("app/api/marketing/proyectos-lista/route.ts");
+    expect(src).toContain('from "@/lib/marketing/proveedores"');
+    expect(src).toContain("indiceProveedorPorMarcaId");
+    // Nada de códigos de marca escritos a mano en la ruta.
+    expect(src).not.toMatch(/["'](?:TH|CK|KL|RBK)["']\s*:/);
   });
 });

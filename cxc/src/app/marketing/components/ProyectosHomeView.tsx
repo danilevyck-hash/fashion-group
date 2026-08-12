@@ -1,13 +1,14 @@
 "use client";
 
-// Fase 3: home de Marketing es una lista de proyectos directa (sin grid
-// de marcas). Filtros: búsqueda por texto, pill de estado (Activos default),
-// y dropdown de marca. Marcas se derivan de mk_factura_marcas.
+// Lista de proyectos de UN PROVEEDOR (el bloque que se tocó en el inicio).
+// El proveedor es a quien se le reporta el gasto; la marca dejó de ser la
+// unidad del módulo. El reparto marca → proveedor vive en UN solo lugar
+// (`lib/marketing/proveedores.ts`) y acá se IMPORTA, nunca se reescribe.
 
-import { useCallback, useEffect, useState } from "react";
-import { saveAs } from "file-saver";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
+import { indiceProveedorPorMarcaId } from "@/lib/marketing/proveedores";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
@@ -56,17 +57,16 @@ interface Props {
   marcas: MkMarca[];
   onOpenProyecto: (id: string) => void;
   onNuevoProyecto: () => void;
-  onOpenAnulados: () => void;
   onOpenReportes: () => void;
   onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
-  // Modo bucket (rediseño por marca): al entrar desde una card. El filtro de
-  // marca queda FIJO por el bucket y se oculta el dropdown.
-  grupo?: "legacy" | "marca" | "multifashion";
-  marcaIdFijo?: string;
+  /**
+   * Bloque del inicio del que se entró: `pvh` | `reebok` | `joybees` |
+   * `multifashion` | `sin_proveedor`. La lista queda acotada a sus proyectos.
+   */
+  proveedor?: string;
   bucketLabel?: string;
-  bucketEsLegacy?: boolean;
   onBack?: () => void;
 }
 
@@ -87,15 +87,12 @@ export default function ProyectosHomeView({
   marcas,
   onOpenProyecto,
   onNuevoProyecto,
-  onOpenAnulados,
   onOpenReportes,
   onOpenImpulsadoras,
   onOpenInventario,
   refreshKey,
-  grupo,
-  marcaIdFijo,
+  proveedor,
   bucketLabel,
-  bucketEsLegacy,
   onBack,
 }: Props) {
   const { toast } = useToast();
@@ -114,12 +111,26 @@ export default function ProyectosHomeView({
   >(null);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
-  const [exportando, setExportando] = useState(false);
-  // Total de impulsadoras de ESTA marca (solo en modo bucket por marca). Se
-  // muestra como línea aparte para que el detalle visible cuadre con la card,
-  // ya que los pagos de impulsadora son gastos sueltos (no aparecen como
-  // proyectos en la lista).
+  // 🩸 ANULAR ERA UNA PUERTA DE UNA SOLA MANO. La pantalla "Anulados" era el
+  // ÚNICO lugar desde donde se podía restaurar un proyecto, y se retiró: sin
+  // esto, anular por error dejaría el proyecto fuera de Marketing para siempre
+  // (la API `papelera/restaurar` sigue viva, pero nadie llega a ella desde la
+  // app). El aviso se queda hasta que la persona lo cierre — nada de 5
+  // segundos: el error se descubre al mirar la lista y ver que falta.
+  const [deshacerAnular, setDeshacerAnular] = useState<
+    { id: string; nombre: string } | null
+  >(null);
+  const [deshaciendo, setDeshaciendo] = useState(false);
+  // Total de impulsadoras de ESTE proveedor. Se muestra como línea aparte para
+  // que el detalle visible cuadre con el bloque del inicio, ya que los pagos de
+  // impulsadora son gastos sueltos (no aparecen como proyectos en la lista).
   const [impulsadoraTotal, setImpulsadoraTotal] = useState(0);
+
+  // marca_id → bloque. Fuente única: lib/marketing/proveedores.ts.
+  const bloquePorMarca = useMemo(
+    () => indiceProveedorPorMarcaId(marcas),
+    [marcas],
+  );
 
   // Clic fuera + Escape para el modal de anular. Como lleva un motivo escrito,
   // si el usuario ya tipeó algo NO cierra (se sale con Cancelar).
@@ -129,46 +140,6 @@ export default function ProyectosHomeView({
     cerrarAnular,
     !anulando,
   );
-
-  // Exporta los gastos visibles (respeta búsqueda + marca; sin filtro baja todo)
-  // a un ZIP: carpeta por cliente → proyecto → fotos + gasto, con Excel resumen.
-  const exportarZip = useCallback(async () => {
-    if (exportando) return;
-    setExportando(true);
-    try {
-      const res = await fetch("/api/marketing/export-zip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          busqueda: busquedaDebounced || undefined,
-          marca_id: marcaIdFijo || marcaIdFiltro || null,
-          grupo: grupo || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const msg =
-          res.status === 404
-            ? "No hay gastos para exportar con el filtro actual."
-            : "No se pudo generar el ZIP. Intenta de nuevo en unos segundos.";
-        toast(msg, "error");
-        return;
-      }
-      const blob = await res.blob();
-      const fecha = new Date().toISOString().slice(0, 10);
-      saveAs(blob, `Gastos-Marketing-${fecha}.zip`);
-      const omit = Number(res.headers.get("X-Fotos-Omitidas") || 0);
-      toast(
-        omit > 0
-          ? `ZIP listo — revisa tus descargas (${omit} foto(s) no se pudieron incluir).`
-          : "ZIP listo — revisa tu carpeta de descargas.",
-        "success",
-      );
-    } catch {
-      toast("No se pudo generar el ZIP. Verifica tu conexión.", "error");
-    } finally {
-      setExportando(false);
-    }
-  }, [exportando, busquedaDebounced, marcaIdFiltro, marcaIdFijo, grupo, toast]);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -181,12 +152,9 @@ export default function ProyectosHomeView({
     try {
       const qs = new URLSearchParams();
       qs.set("filtro_estado", filtroEstado);
-      // Bucket fijo (rediseño): legacy o marca. Sin bucket, cae al dropdown legacy-compat.
-      if (grupo === "legacy" || grupo === "multifashion") {
-        qs.set("grupo", grupo);
-      } else if (marcaIdFijo) {
-        qs.set("grupo", "marca");
-        qs.set("marca_id", marcaIdFijo);
+      // Bloque del inicio. Sin bloque, cae al dropdown de marca (compat).
+      if (proveedor) {
+        qs.set("proveedor", proveedor);
       } else if (marcaIdFiltro) {
         qs.set("marca_id", marcaIdFiltro);
       }
@@ -202,15 +170,17 @@ export default function ProyectosHomeView({
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado, marcaIdFiltro, marcaIdFijo, grupo, busquedaDebounced]);
+  }, [filtroEstado, marcaIdFiltro, proveedor, busquedaDebounced]);
 
   useEffect(() => {
     cargar();
   }, [cargar, refreshKey]);
 
-  // Total de impulsadoras de la marca del bucket (para la línea de cuadre).
+  // Total de impulsadoras del proveedor (para la línea de cuadre). Se suma lo
+  // de TODAS sus marcas: un pago repartido entre Tommy y Calvin es un solo
+  // gasto de PVH.
   useEffect(() => {
-    if (grupo !== "marca" || !marcaIdFijo) {
+    if (!proveedor || proveedor === "multifashion") {
       setImpulsadoraTotal(0);
       return;
     }
@@ -222,9 +192,12 @@ export default function ProyectosHomeView({
         const data = (await res.json()) as {
           impulsadoraPorMarca?: Record<string, { count: number; total: number }>;
         };
-        if (!cancelado) {
-          setImpulsadoraTotal(data.impulsadoraPorMarca?.[marcaIdFijo]?.total ?? 0);
+        if (cancelado) return;
+        let suma = 0;
+        for (const [mid, v] of Object.entries(data.impulsadoraPorMarca ?? {})) {
+          if (bloquePorMarca.get(String(mid)) === proveedor) suma += v?.total ?? 0;
         }
+        setImpulsadoraTotal(Number(suma.toFixed(2)));
       } catch {
         // Silencioso: la línea de impulsadoras es informativa, no bloquea la lista.
       }
@@ -232,7 +205,7 @@ export default function ProyectosHomeView({
     return () => {
       cancelado = true;
     };
-  }, [grupo, marcaIdFijo, refreshKey]);
+  }, [proveedor, bloquePorMarca, refreshKey]);
 
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
@@ -251,6 +224,7 @@ export default function ProyectosHomeView({
         throw new Error(err?.error ?? "No se pudo anular");
       }
       toast("Proyecto anulado", "success");
+      setDeshacerAnular({ id: anularPendiente.id, nombre: anularPendiente.nombre });
       setAnularPendiente(null);
       setAnularMotivo("");
       cargar();
@@ -258,6 +232,32 @@ export default function ProyectosHomeView({
       toast(err instanceof Error ? err.message : "Error al anular", "error");
     } finally {
       setAnulando(false);
+    }
+  };
+
+  const ejecutarDeshacerAnular = async () => {
+    if (!deshacerAnular) return;
+    setDeshaciendo(true);
+    try {
+      const res = await fetch("/api/marketing/papelera/restaurar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "proyecto", id: deshacerAnular.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo devolver el proyecto");
+      }
+      toast("Listo, el proyecto volvió", "success");
+      setDeshacerAnular(null);
+      cargar();
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "No se pudo devolver el proyecto",
+        "error",
+      );
+    } finally {
+      setDeshaciendo(false);
     }
   };
 
@@ -299,7 +299,7 @@ export default function ProyectosHomeView({
           /* Volver era texto suelto (~20 px de alto); -my-1 para no separar de la lista. */
           className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
         >
-          ← Marcas
+          ← Marketing
         </button>
       )}
       {/* Header */}
@@ -308,15 +308,14 @@ export default function ProyectosHomeView({
           <h1 className="text-xl font-semibold text-gray-900">
             {enBucket ? bucketLabel || "Marketing" : "Marketing"}
           </h1>
-          {bucketEsLegacy && (
-            <p className="text-sm text-gray-500 mt-0.5">
-              Archivo congelado (Tommy + Calvin) · solo lectura
+          {enBucket && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              Proyectos con gasto de este proveedor
             </p>
           )}
         </div>
-        {/* Misma barra que MarcaSelector: eran textos sueltos de 18-21 px de
-            alto. 44 px de área táctil en cada uno; -my-1 evita que la fila
-            empuje el título al crecer. */}
+        {/* Eran textos sueltos de 18-21 px de alto. 44 px de área táctil en
+            cada uno; -my-1 evita que la fila empuje el título al crecer. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
           <button
             type="button"
@@ -341,34 +340,40 @@ export default function ProyectosHomeView({
           >
             Impulsadoras
           </button>
-          <span className="text-gray-300">·</span>
           <button
             type="button"
-            onClick={onOpenAnulados}
-            className="text-xs text-gray-400 hover:text-gray-700 transition min-h-[44px] inline-flex items-center"
+            onClick={onNuevoProyecto}
+            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
           >
-            Anulados
+            + Nuevo proyecto
           </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={exportarZip}
-            disabled={exportando}
-            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] inline-flex items-center"
-          >
-            {exportando ? "Generando ZIP…" : "Exportar"}
-          </button>
-          {!bucketEsLegacy && (
-            <button
-              type="button"
-              onClick={onNuevoProyecto}
-              className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
-            >
-              + Nuevo proyecto
-            </button>
-          )}
         </div>
       </div>
+
+      {/* La vuelta atrás de anular. Ver el comentario del state. */}
+      {deshacerAnular && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-sm text-amber-900">
+            Anulaste &ldquo;{deshacerAnular.nombre}&rdquo;. Ya no aparece en Marketing.
+          </span>
+          <button
+            type="button"
+            onClick={ejecutarDeshacerAnular}
+            disabled={deshaciendo}
+            className="text-sm font-semibold text-amber-900 underline min-h-[44px] inline-flex items-center disabled:opacity-50"
+          >
+            {deshaciendo ? "Devolviendo…" : "Deshacer"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeshacerAnular(null)}
+            className="text-sm text-amber-800 min-h-[44px] min-w-[44px] inline-flex items-center justify-center ml-auto"
+            aria-label="Cerrar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Filtros: búsqueda (+ dropdown de marca solo fuera del modo bucket) */}
       <div className={`grid grid-cols-1 gap-2 ${enBucket ? "" : "sm:grid-cols-[1fr_200px]"}`}>
@@ -409,15 +414,13 @@ export default function ProyectosHomeView({
           <div className="text-sm text-gray-600 mb-1">
             {busquedaDebounced
               ? "No hay proyectos que coincidan con el filtro."
-              : bucketEsLegacy
-                ? "No hay gastos en el archivo Tommy y Calvin."
-                : enBucket
-                  ? "Aún no hay gastos de esta marca. Crea un proyecto y registra su primera factura."
-                  : marcaIdFiltro
-                    ? "No hay proyectos que coincidan con el filtro."
-                    : "No hay proyectos todavía."}
+              : enBucket
+                ? "Todavía no hay gasto de este proveedor. Crea un proyecto y registra su primera factura."
+                : marcaIdFiltro
+                  ? "No hay proyectos que coincidan con el filtro."
+                  : "No hay proyectos todavía."}
           </div>
-          {!busquedaDebounced && !marcaIdFiltro && !bucketEsLegacy && (
+          {!busquedaDebounced && !marcaIdFiltro && (
             <button
               type="button"
               onClick={onNuevoProyecto}
@@ -430,10 +433,9 @@ export default function ProyectosHomeView({
       ) : (
         /* El div interno es el SCROLLER: sin él, el `overflow-hidden` del
            borde redondeado recorta la tabla sin salida (medido 11-ago-2026:
-           176 px a 390 y 147 px a 834, idénticos en el bucket "Gastos Tommy y
-           Calvin", o sea PRE-EXISTENTES). Mismo arreglo que ya llevaba
-           AnuladosLista. Se vuelve visible ahora porque las tarjetas de marca
-           por fin abren una lista con proyectos adentro. */
+           176 px a 390 y 147 px a 834, o sea PRE-EXISTENTES). Se vuelve
+           visible desde que los bloques del inicio abren una lista con
+           proyectos adentro. */
         <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -635,17 +637,17 @@ export default function ProyectosHomeView({
         </div>
       )}
 
-      {/* Línea de cuadre: los pagos de impulsadora de esta marca son gastos
-          sueltos (no proyectos) → se muestran aparte para que el detalle
-          visible sume igual que el total de la card. */}
-      {enBucket && grupo === "marca" && marcaIdFijo && impulsadoraTotal > 0 && (
+      {/* Línea de cuadre: los pagos de impulsadora de este proveedor son
+          gastos sueltos (no proyectos) → se muestran aparte para que el
+          detalle visible sume igual que el total del bloque del inicio. */}
+      {enBucket && impulsadoraTotal > 0 && (
         <button
           type="button"
           onClick={onOpenImpulsadoras}
           className="w-full flex items-center justify-between rounded-[10px] border border-[#e5e5e5] bg-white px-[18px] py-3 hover:border-gray-400 transition text-left"
         >
           <span className="text-sm text-gray-700">
-            Impulsadoras <span className="text-gray-400">· esta marca</span>
+            Impulsadoras <span className="text-gray-400">· este proveedor</span>
           </span>
           <span className="text-sm font-medium tabular-nums text-gray-900">
             {formatearMonto(impulsadoraTotal)} ›
@@ -663,8 +665,10 @@ export default function ProyectosHomeView({
           >
             <h3 className="text-base font-semibold mb-1">Anular proyecto</h3>
             <p className="text-sm text-gray-500 mb-4">
-              Vas a anular &ldquo;{anularPendiente.nombre}&rdquo;. Podrás
-              restaurarlo desde Anulados.
+              Vas a anular &ldquo;{anularPendiente.nombre}&rdquo;. Deja de
+              aparecer en Marketing y su gasto no se le reporta a nadie. Si te
+              equivocás, podés devolverlo enseguida desde el aviso que queda en
+              la lista.
             </p>
             <label
               htmlFor="mk-motivo-anular-card"

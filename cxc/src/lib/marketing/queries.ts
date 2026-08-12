@@ -357,6 +357,57 @@ export async function getFacturasByProyecto(
   }));
 }
 
+/**
+ * Facturas ANULADAS de un proyecto (con sus adjuntos).
+ *
+ * 🩸 Existe porque la pantalla de "Anulados" se retiró (ago-2026) y sin esto
+ * las 14 facturas anuladas que viven dentro de proyectos VIVOS ($12.004,20
+ * medidos el 11-ago-2026) quedaban INALCANZABLES: `getFacturasByProyecto`
+ * filtra `anulado_en IS NULL`, así que el detalle del proyecto nunca las vio,
+ * y la única puerta para volver a mostrarlas era esa pantalla.
+ *
+ * 🔴 VA APARTE, NO MEZCLADA CON LAS VIGENTES. Todo lo que suma plata en el
+ * módulo (el gasto del proyecto, el bloque del proveedor, el reporte que se le
+ * manda) sale de las vigentes; devolverlas juntas haría que el primer lugar que
+ * se olvidara de filtrar contara una factura anulada como gasto real.
+ */
+export async function getFacturasAnuladasByProyecto(
+  proyectoId: string,
+): Promise<FacturaConAdjuntos[]> {
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("*")
+    .eq("proyecto_id", proyectoId)
+    .not("anulado_en", "is", null)
+    .order("anulado_en", { ascending: false });
+  if (error) throw new Error(`getFacturasAnuladasByProyecto: ${error.message}`);
+  const facturas = (data ?? []).map((r) => mapFactura(r as Record<string, unknown>));
+  if (facturas.length === 0) return [];
+
+  const ids = facturas.map((f) => f.id);
+  const { data: adjData, error: adjError } = await supabaseServer
+    .from("mk_adjuntos")
+    .select("*")
+    .in("factura_id", ids);
+  if (adjError) {
+    throw new Error(`getFacturasAnuladasByProyecto[adj]: ${adjError.message}`);
+  }
+
+  const adjByFactura = new Map<string, MkAdjunto[]>();
+  for (const row of adjData ?? []) {
+    const a = mapAdjunto(row as Record<string, unknown>);
+    if (!a.factura_id) continue;
+    const arr = adjByFactura.get(a.factura_id) ?? [];
+    arr.push(a);
+    adjByFactura.set(a.factura_id, arr);
+  }
+
+  return facturas.map((f) => ({
+    ...f,
+    adjuntos: adjByFactura.get(f.id) ?? [],
+  }));
+}
+
 export async function getFacturaById(id: string): Promise<FacturaConAdjuntos | null> {
   const { data, error } = await supabaseServer
     .from("mk_facturas")

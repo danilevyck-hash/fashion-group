@@ -12,6 +12,7 @@ import {
   normalizarTexto,
 } from "./normalizar";
 import { esPathStorage } from "./storage";
+import { sellarDocumento, proveedoresDeMarcaIds } from "./periodos-io";
 import type {
   MkProyecto,
   MkFactura,
@@ -268,6 +269,15 @@ export async function updateProyectoMarcas(
 // ----------------------------------------------------------------------------
 // Facturas
 // ----------------------------------------------------------------------------
+//
+// 🔑 EL SELLO DE PERÍODO NO SE PONE ACÁ, y no es un olvido. Una factura recién
+// creada TODAVÍA NO TIENE MARCA (`mk_factura_marcas` se escribe después, con
+// `setMarcasDeFactura`), y sin marca no hay proveedor a quien reportarle el
+// gasto ni período al que atarla. El sello se pone en el instante en que la
+// marca se conoce — o sea en `setMarcasDeFactura` y en
+// `actualizarRepartoProyecto`, que son los DOS únicos lugares que la escriben.
+// Una factura que nunca recibe marca tampoco entra en ningún reporte, así que
+// no queda nada suelto.
 export async function createFactura(
   input: CreateFacturaInput
 ): Promise<MkFactura> {
@@ -719,6 +729,23 @@ export async function actualizarRepartoProyecto(
         throw new Error(
           `actualizarRepartoProyecto[insert factura_marcas]: ${insFmErr.message}`,
         );
+      }
+
+      // Este camino cambia la marca de TODAS las facturas vigentes del
+      // proyecto de un saque, así que es el mismo caso que `setMarcasDeFactura`
+      // pero en bulk: si el reparto nuevo suma un proveedor, esas facturas son
+      // gasto suyo desde ahora y hay que sellarlas para él. Los proveedores se
+      // resuelven UNA vez (todas las facturas comparten las mismas marcas).
+      // Nunca es fatal: `sellarDocumento` no lanza.
+      const proveedorKeys = await proveedoresDeMarcaIds(marcaIds);
+      if (proveedorKeys.length > 0) {
+        for (const facturaId of facturaIds) {
+          await sellarDocumento({
+            tipo: "factura",
+            documentoId: facturaId,
+            proveedorKeys,
+          });
+        }
       }
     }
   }

@@ -7,6 +7,12 @@ import {
   marcasDeEntrega,
   porcionEntregaParaMarca,
 } from "@/lib/marketing/resumen-inicio";
+import {
+  MULTIFASHION_KEY,
+  SIN_PROVEEDOR,
+  esProveedorKey,
+  indiceProveedorPorMarcaId,
+} from "@/lib/marketing/proveedores";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,6 +20,8 @@ export const fetchCache = "force-no-store";
 
 // GET /api/marketing/proyectos-lista
 //   ?filtro_estado=activos|todos|abierto|por_cobrar|enviado|cobrado
+//   ?proveedor=pvh|reebok|joybees|multifashion|sin_proveedor
+//                     → solo proyectos del bloque del inicio (modelo nuevo)
 //   ?marca_id=<uuid>  → solo proyectos con ≥1 factura de esa marca
 //   ?busqueda=<str>   → match en nombre o tienda del proyecto (ILIKE),
 //                       y también en sus facturas: número de factura,
@@ -42,6 +50,16 @@ export async function GET(req: NextRequest) {
   // factura legacy (bucket "Tommy y Calvin"); grupo=marca + marca_id → solo
   // proyectos con ≥1 factura NO-legacy de esa marca. Sin grupo = sin filtro (compat).
   const grupo = (url.searchParams.get("grupo") ?? "").toLowerCase();
+  // Bloque del inicio (modelo por PROVEEDOR): pvh | reebok | joybees |
+  // multifashion | sin_proveedor. Lista blanca explícita — un valor
+  // desconocido cae a null (sin filtro) en vez de colarse hasta la partición.
+  const proveedorRaw = (url.searchParams.get("proveedor") ?? "").toLowerCase();
+  const proveedor =
+    esProveedorKey(proveedorRaw) ||
+    proveedorRaw === MULTIFASHION_KEY ||
+    proveedorRaw === SIN_PROVEEDOR
+      ? proveedorRaw
+      : null;
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
   // Escape ILIKE wildcards una sola vez (reutilizado en facturas y proyectos).
@@ -344,7 +362,27 @@ export async function GET(req: NextRequest) {
     //   sin grupo     → filtro marca_id sobre TODAS las facturas (compat previa).
     // Proyectos sin facturas de ese bucket quedan fuera (un proyecto vacío no
     // pertenece a ninguna marca todavía).
+    // Índice marca_id → bloque. Fuente ÚNICA: lib/marketing/proveedores.ts —
+    // el mismo mapa que usa el resumen del inicio, así que la lista enseña
+    // exactamente los proyectos que el bloque contó.
+    const bloquePorMarca = indiceProveedorPorMarcaId(marcas);
+
+    const passProveedor = (pid: string): boolean => {
+      // Multifashion es del PROYECTO (tienda propia), no de la marca.
+      if (proveedor === MULTIFASHION_KEY) return proyectosMf.has(pid);
+      if (proyectosMf.has(pid)) return false;
+      // marcasByProy junta las marcas de las facturas (legacy incluidas) y las
+      // de las entregas de muebles, igual que `agregarPorProveedor`.
+      const set = marcasByProy.get(pid);
+      if (!set) return false;
+      for (const mid of set) {
+        if ((bloquePorMarca.get(mid) ?? SIN_PROVEEDOR) === proveedor) return true;
+      }
+      return false;
+    };
+
     const passBucket = (pid: string): boolean => {
+      if (proveedor) return passProveedor(pid);
       // Multifashion es un bucket INDEPENDIENTE: entra solo con
       // grupo=multifashion y queda fuera de legacy y de las marcas.
       if (grupo === "multifashion") return proyectosMf.has(pid);
@@ -375,6 +413,11 @@ export async function GET(req: NextRequest) {
 
     const esVistaJoybees = filtroEstado === "joybees";
     const passTipo = (pid: string): boolean => {
+      // 🩸 El split interno/externo es del tab Joybees legacy y NO aplica al
+      // modelo por proveedor: un bloque tiene que enseñar TODOS sus proyectos.
+      // Si se aplicara, "Ver proyectos" de un proveedor con marcas internas
+      // devolvería una lista vacía mientras su bloque muestra plata.
+      if (proveedor) return true;
       const interno = proyectoEsInterno(pid);
       return esVistaJoybees ? interno : !interno;
     };
