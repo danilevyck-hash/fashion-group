@@ -45,7 +45,10 @@ import {
   sumaUnidadesPorProducto,
 } from "@/lib/inventario-calc";
 import { normalizarBultos, normalizarPiezas, piezasParaStock } from "./piezas-bultos";
-import { sellarDocumentoPorMarcas } from "./periodos-io";
+import {
+  borrarSellosDeDocumento,
+  sellarDocumentoPorMarcas,
+} from "./periodos-io";
 import { firmarPath } from "./storage";
 import type {
   CreateEntregaInput,
@@ -1122,6 +1125,11 @@ export async function deleteEntrega(id: string): Promise<void> {
   const delta = new Map<string, number>();
   for (const [pid, n] of sumaPrev) delta.set(pid, -n);
   await ajustarStock(delta);
+
+  // La entrega ya no existe: sus sellos de período apuntarían a nada (pasó de
+  // verdad el 12-ago-2026 con una entrega de prueba). Nunca es fatal — la
+  // entrega ya se borró y el stock ya volvió.
+  await borrarSellosDeDocumento("entrega", id);
 }
 
 /**
