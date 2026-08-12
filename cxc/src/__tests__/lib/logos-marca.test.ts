@@ -17,6 +17,12 @@ import {
   JOYBEES_LOGO_HEIGHT,
 } from "@/lib/joybees-logo";
 import { TOMMY_LOGO_BASE64, TOMMY_LOGO_BLANCO_BASE64 } from "@/lib/tommy-logo";
+import {
+  CALVIN_LOGO_BASE64,
+  CALVIN_LOGO_BLANCO_BASE64,
+  CALVIN_LOGO_WIDTH,
+  CALVIN_LOGO_HEIGHT,
+} from "@/lib/calvin-logo";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
 
 const ROOT = process.cwd();
@@ -46,6 +52,8 @@ const BASE64_LOGOS: Array<[string, string]> = [
   ["JOYBEES_LOGO_BLANCO_BASE64", JOYBEES_LOGO_BLANCO_BASE64],
   ["TOMMY_LOGO_BASE64", TOMMY_LOGO_BASE64],
   ["TOMMY_LOGO_BLANCO_BASE64", TOMMY_LOGO_BLANCO_BASE64],
+  ["CALVIN_LOGO_BASE64", CALVIN_LOGO_BASE64],
+  ["CALVIN_LOGO_BLANCO_BASE64", CALVIN_LOGO_BLANCO_BASE64],
   ["REEBOK_LOGO_BASE64", REEBOK_LOGO_BASE64],
 ];
 
@@ -77,6 +85,21 @@ describe("logos de marca — base64 para jsPDF", () => {
     const aspectoMm = JOYBEES_LOGO_WIDTH / JOYBEES_LOGO_HEIGHT;
     expect(Math.abs(aspectoReal - aspectoMm)).toBeLessThan(0.15);
   });
+
+  it("los dos logos Calvin tienen canal alfa (nada de fondo blanco)", () => {
+    for (const dataUrl of [CALVIN_LOGO_BASE64, CALVIN_LOGO_BLANCO_BASE64]) {
+      const png = readPng(decodeDataUrl(dataUrl));
+      const conAlfa = png.colorType === 6 || png.colorType === 4 || (png.colorType === 3 && png.hasTrns);
+      expect(conAlfa, `colorType ${png.colorType} sin transparencia`).toBe(true);
+    }
+  });
+
+  it("CALVIN_LOGO_WIDTH/HEIGHT respetan la proporción real del PNG", () => {
+    const png = readPng(decodeDataUrl(CALVIN_LOGO_BASE64));
+    const aspectoReal = png.width / png.height;
+    const aspectoMm = CALVIN_LOGO_WIDTH / CALVIN_LOGO_HEIGHT;
+    expect(Math.abs(aspectoReal - aspectoMm)).toBeLessThan(0.15);
+  });
 });
 
 describe("logos de marca — PNG hosteados para correos", () => {
@@ -85,6 +108,8 @@ describe("logos de marca — PNG hosteados para correos", () => {
     "public/joybees/joybees-logo-blanco.png",
     "public/tommy/tommy-horizontal.png",
     "public/tommy/tommy-horizontal-blanco.png",
+    "public/calvin/calvin-wordmark.png",
+    "public/calvin/calvin-wordmark-blanco.png",
     "public/reebok/reebok-logo.png",
   ];
 
@@ -102,6 +127,7 @@ describe("logos de marca — PNG hosteados para correos", () => {
     expect(urls).toContain("https://fashiongr.com/reebok/reebok-logo.png");
     expect(urls).toContain("https://fashiongr.com/joybees/joybees-logo-blanco.png");
     expect(urls).toContain("https://fashiongr.com/tommy/tommy-horizontal-blanco.png");
+    expect(urls).toContain("https://fashiongr.com/calvin/calvin-wordmark-blanco.png");
     for (const u of urls) {
       expect(u.endsWith(".png") || u.endsWith(".jpg"), `${u} no es un raster`).toBe(true);
       // El archivo tiene que existir en public/, si no el correo sale con la

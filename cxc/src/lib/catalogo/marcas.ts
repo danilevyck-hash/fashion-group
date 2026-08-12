@@ -560,13 +560,13 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       from: "Calvin Klein Panama <pedidos@fashiongr.com>",
       headerHtml: (orderNumber, clientName, fechaLabel) => `
       <div style="background:#000000;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="160" height="14" style="display:block;margin-bottom:8px" />
+        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="128" height="20" style="display:block;margin-bottom:8px" />
         <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>`,
       headerClienteHtml: (orderNumber, fechaLabel) => `
       <div style="background:#000000;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
-        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="160" height="14" style="display:block;margin-bottom:8px" />
+        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="128" height="20" style="display:block;margin-bottom:8px" />
         <h2 style="margin:6px 0 0;font-size:18px">Gracias por tu pedido</h2>
         <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
       </div>`,

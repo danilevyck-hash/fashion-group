@@ -57,7 +57,7 @@ const MARCAS = [
   {
     marca: "calvin",
     // Blanco/negro minimalista: fondo negro, sin color de acento (el blob va
-    // en blanco tenue). Wordmark tipográfico placeholder (ver calvin-logo.ts).
+    // en blanco tenue). Wordmark oficial (ver calvin-logo.ts).
     fondo: "#0A0A0A",
     acento: "#FFFFFF",
     texto: "#FFFFFF",
