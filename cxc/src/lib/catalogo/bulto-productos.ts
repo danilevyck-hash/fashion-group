@@ -66,3 +66,43 @@ export async function leerCategoriaYBulto(
     bultoPzasByProduct: new Map(filas.map((p) => [String(p.id), p.bulto_pzas ?? null])),
   };
 }
+
+/**
+ * PRECIO DE LISTA del catálogo por producto (`<marca>_products.price`).
+ *
+ * 🩸 Para qué: la pantalla del pedido avisa INLINE cuando el precio editado a
+ * mano difiere del de lista (`15 ← lista $16.50`). Daniel lo pidió mirando la
+ * tabla mientras editaba: *"porque lo cazaria en ese modal y no antes? en esta
+ * foto la hubiese cazado no?"*. El precio de lista YA está en la base local
+ * —el catálogo se alimenta de Switch— así que el aviso NO cuesta una llamada
+ * al ERP: es una lectura más de la misma tabla que ya se consulta.
+ *
+ * Va aparte de `leerCategoriaYBulto` a propósito: esa función existe para que
+ * nadie pida la categoría sin las piezas (ver la cabecera), y el precio no
+ * forma parte de ese par. Mezclarlos obligaría a tocar su cadena de fallbacks,
+ * que es el camino del dinero.
+ *
+ * FAIL-OPEN: cualquier error devuelve un mapa vacío → no se muestra el aviso.
+ * Un precio de lista que no se pudo leer no puede inventar una diferencia.
+ */
+export async function leerPreciosLista(
+  db: DbLike,
+  productsTable: string,
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const ids = [...new Set(productIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  try {
+    const { data, error } = await db.from(productsTable).select("id, price").in("id", ids);
+    if (error || !data) return new Map();
+    const filas = data as Array<{ id: string; price: number | string | null }>;
+    const out = new Map<string, number>();
+    for (const f of filas) {
+      const n = Number(f.price);
+      if (Number.isFinite(n) && n > 0) out.set(String(f.id), n);
+    }
+    return out;
+  } catch {
+    return new Map();
+  }
+}

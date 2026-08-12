@@ -49,6 +49,9 @@ const CORE_MARCA = [
   "pedidos-publicos/[short_id]",
   "pedidos-publicos/[short_id]/convertir",
   "pedidos-unificado",
+  // Permiso 0001 de Switch (cambiar precio) — se consulta al EDITAR el precio,
+  // no al final del envío (toque único, 12-ago-2026). Solo lectura.
+  "permiso-precio",
   "products",
   // Selector de foto por variantes + subida del ZIP del banco B2B (25-jul-2026).
   "products/variantes",

@@ -11,7 +11,7 @@
 // encendió el catálogo de Tommy nadie se acordó de agregar la tercera. El
 // resultado no era un selector incompleto: era que **ningún pedido de Tommy
 // podía salir a Switch**. Daniel lo vio con un pedido de $1.584,00 armado y el
-// botón "Confirmar y enviar a Switch" apagado, diciendo "No tienes vendedor de
+// botón "Enviar a Switch" apagado, diciendo "No tienes vendedor de
 // Switch asignado" — sin forma de asignarlo, porque Tommy no estaba en esta
 // lista.
 //

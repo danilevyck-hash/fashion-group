@@ -55,6 +55,12 @@ beforeAll(() => {
   process.env.SESSION_SECRET = TEST_SECRET;
 });
 
+/** Forma completa del preview (el contrato ganó `avisos` con el toque único). */
+const PREVIEW_VACIO = {
+  cliente: "C (id 1)", vendedor: "V (id 2)", lineas: [], warnings: [], avisos: [],
+  totalPiezas: 0, totalEstimado: 0,
+};
+
 const OID = "33333333-3333-4333-8333-333333333333";
 const P1 = "11111111-1111-4111-8111-111111111111";
 
@@ -271,17 +277,21 @@ describe("envioResultToResponse — mapeo EnvioResult → HTTP (tabla completa)"
       (j) => expect(j.error).toBe("Switch no responde"),
     ],
     [
-      { kind: "prevalidacion", errores: ["e1"], warnings: ["w1"] } as EnvioResult,
+      { kind: "prevalidacion", errores: ["e1"], warnings: ["w1"], avisos: [], lineas: [] } as EnvioResult,
       422,
       (j) => {
         expect(j.errores).toEqual(["e1"]);
         expect(j.warnings).toEqual(["w1"]);
+        // `avisos` (con código) y `lineas` viajan para la pantalla de problema
+        // del toque único: el error arriba y lo que sí cruzó, debajo.
+        expect(j.avisos).toEqual([]);
+        expect(j.lineas).toEqual([]);
       },
     ],
     [
-      { kind: "preview", preview: { x: 1 } } as EnvioResult,
+      { kind: "preview", preview: PREVIEW_VACIO } as EnvioResult,
       200,
-      (j) => expect(j.preview).toEqual({ x: 1 }),
+      (j) => expect(j.preview).toEqual(PREVIEW_VACIO),
     ],
     [
       { kind: "rechazado", error: "rechazo", warnings: [] } as EnvioResult,

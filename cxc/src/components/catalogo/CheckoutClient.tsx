@@ -3,7 +3,7 @@
 // Checkout ÚNICO de los catálogos (Reebok y Joybees) — mockup aprobado:
 // carrito → esta pantalla → confirmación. Items editables, cliente del
 // directorio Switch (default Contado), vendedor AUTOMÁTICO por login, total y
-// UN botón "Confirmar y enviar a Switch". SIN validación de stock aquí
+// UN botón "Enviar a Switch". SIN validación de stock aquí
 // (decisión de Daniel 5-jul: el stock del sync <24h basta; flujo rápido).
 // El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y NUNCA
 // se limpia antes de que el pedido quede guardado en DB.
@@ -130,7 +130,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
     if (v > 0) persistCart(cart.map((i) => (i.product_id === productId ? { ...i, unit_price: v } : i)));
   };
 
-  // ── Confirmar y enviar ──
+  // ── Enviar a Switch ──
   async function confirmar() {
     if (!puedeConfirmar) return;
     setSending(true);
@@ -182,7 +182,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
           <h1 className="text-xl font-semibold tracking-tight">Confirmar pedido</h1>
           {/* Antes seguía "· revisa, elige cliente y envía a Switch": narraba los
               tres bloques que la propia pantalla tiene a la vista (los items, el
-              selector de cliente y el botón "Confirmar y enviar a Switch").
+              selector de cliente y el botón "Enviar a Switch").
               Queda la marca, que sí dice de qué catálogo es este pedido. */}
           <p className="text-sm text-gray-500">{cfg.label}</p>
         </div>
@@ -352,7 +352,7 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                 disabled={!puedeConfirmar}
                 className="rounded-md bg-black px-5 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40"
               >
-                {sending ? "Enviando…" : "Confirmar y enviar a Switch"}
+                {sending ? "Enviando…" : "Enviar a Switch"}
               </button>
             </div>
           </section>

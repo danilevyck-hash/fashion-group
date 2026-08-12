@@ -615,7 +615,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
  * se encendió el catálogo de Tommy nadie tocó ninguno de los tres, y el efecto
  * no fue un selector incompleto: **ningún pedido de Tommy podía salir a
  * Switch**. Daniel lo vio con un pedido de $1.584,00 armado, el botón
- * "Confirmar y enviar a Switch" apagado y el aviso "No tienes vendedor de
+ * "Enviar a Switch" apagado y el aviso "No tienes vendedor de
  * Switch asignado" — sin forma de asignarlo, porque Tommy no estaba en las
  * listas. Switch sí tenía sus vendedores todo el tiempo (REINALDO ESPINOSA y
  * DEFAULT, verificado en vivo).

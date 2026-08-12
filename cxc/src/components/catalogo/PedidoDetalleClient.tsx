@@ -18,8 +18,13 @@ import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
+import { avisosBloqueantes, hayQueDetenerse, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
+import { fmtPrecio } from "@/lib/catalogo/precio";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
+  /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
+   *  Switch). Sirve SOLO para el aviso inline "≠ lista" al editar. */
+  precio_lista?: number | null;
   /** Foto del stock al confirmar el pedido del link (piezas que HABÍA en ese
    *  momento). undefined = pedido presencial o DDL 20260725130000 pendiente. */
   disponible_pzas?: number; bulto_pzas?: number; }
@@ -27,7 +32,16 @@ interface Order { id: string; order_number: string; client_name: string; client_
 interface DirClient { nombre: string; empresa: string; }
 interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
 interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
-interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number; }
+interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; avisos?: AvisoEnvio[]; totalPiezas: number; totalEstimado: number; }
+/** Lo que se enseña cuando el toque SE DETIENE: qué pasó, y el pedido resuelto
+ *  debajo para poder mirarlo sin volver a consultar Switch. */
+interface SwitchProblema {
+  errores: string[];
+  avisos: AvisoEnvio[];
+  lineas: SwitchPreviewLinea[];
+  /** ¿Se puede crear igual? (avisos bloqueantes sí; errores no.) */
+  puedeSeguir: boolean;
+}
 
 function fmtDateTime(iso: string): string {
   const d = new Date(iso);
@@ -80,11 +94,19 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
   // ── Envío a Switch (ERP) ──
   const [switchEnvio, setSwitchEnvio] = useState<SwitchEnvio | null>(null);
-  const [switchPreview, setSwitchPreview] = useState<SwitchPreview | null>(null);
-  const [switchErrores, setSwitchErrores] = useState<string[] | null>(null);
+  const [switchProblema, setSwitchProblema] = useState<SwitchProblema | null>(null);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
-  const [switchLoading, setSwitchLoading] = useState(false);
   const [switchSending, setSwitchSending] = useState(false);
+  /** Qué está pasando MIENTRAS corre el toque único (la pre-validación viva
+   *  contra Switch tarda: maxDuration=300). */
+  const [pasoSwitch, setPasoSwitch] = useState<string | null>(null);
+  /** Permiso 0001 de la empresa (cambiar precio). null = todavía no se preguntó. */
+  const [permisoPrecio, setPermisoPrecio] = useState<{ permiso: boolean; verificado: boolean; mensaje: string | null } | null>(null);
+  /** Un solo envío por toque, aunque el botón se toque dos veces muy rápido.
+   *  Es la primera de las CUATRO capas: acá, el `disabled` del botón, el índice
+   *  parcial de la tabla de envíos y el 409 del server. El candado de verdad es
+   *  el del servidor y NO se toca. */
+  const enviandoRef = useRef(false);
   // ── Cliente Switch del pedido (cliente real en vez de Contado) ──
   const [clienteSwitch, setClienteSwitch] = useState<{ id: number; nombre: string | null; codigo: string | null } | null>(null);
   const [showClienteModal, setShowClienteModal] = useState(false);
@@ -117,6 +139,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   useEscapeClose(showClienteModal, () => setShowClienteModal(false), !clienteGuardando);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
+
+  const isEditorRole = ["admin", "secretaria", "vendedor"].includes(role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -182,6 +206,49 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // (La búsqueda de clientes Switch vive en ClienteSwitchPicker — la MISMA
   // pieza que usa el modal de Duplicar; dos buscadores se separan solos.)
+
+  // ── PRECIO ≠ LISTA: el aviso se adelanta al momento de EDITAR (12-ago-2026) ──
+  //
+  // Daniel, con captura de la tabla mientras editaba precios: *"porque lo
+  // cazaria en ese modal y no antes? en esta foto la hubiese cazado no?"*.
+  //
+  // La diferencia contra el precio de lista se ve INLINE y sin llamar a Switch:
+  // `<marca>_products.price` ya está en la base local (el catálogo se alimenta
+  // de Switch), y viaja con cada item como `precio_lista`.
+  const hayPrecioEditado = items.some(
+    (i) => typeof i.precio_lista === "number" && i.precio_lista > 0 &&
+      Math.abs(Number(i.unit_price || 0) - i.precio_lista) >= 0.01,
+  );
+
+  // El permiso 0001 SÍ hay que preguntárselo a Switch, y se pregunta en cuanto
+  // aparece el primer precio editado — no al final, cuando el pedido ya está
+  // armado.
+  //
+  // ⚠️ Abre sesión en Switch (SESIÓN ÚNICA POR EMPRESA): por eso se dispara
+  // solo cuando hay un precio editado de verdad, con debounce (nunca en bucle
+  // mientras se teclea) y UNA vez por sesión de navegador y marca. El servidor
+  // cachea además la respuesta y la comparte con el envío, así que preguntar
+  // acá NO agrega una sesión al total.
+  useEffect(() => {
+    if (!hayPrecioEditado || !isEditorRole || permisoPrecio) return;
+    const clave = `fg_permiso_precio_${marca}`;
+    try {
+      const guardado = sessionStorage.getItem(clave);
+      if (guardado) { setPermisoPrecio(JSON.parse(guardado)); return; }
+    } catch { /* sessionStorage no disponible: se consulta igual */ }
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${theme.api}/permiso-precio`);
+        if (!r.ok) return; // fail-open: sin respuesta no se dice nada
+        const d = await r.json();
+        const valor = { permiso: d.permiso !== false, verificado: d.verificado === true, mensaje: d.mensaje ?? null };
+        setPermisoPrecio(valor);
+        try { sessionStorage.setItem(clave, JSON.stringify(valor)); } catch { /* */ }
+      } catch { /* fail-open: no se bloquea nada por no poder preguntar */ }
+    }, 800);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hayPrecioEditado, isEditorRole, permisoPrecio]);
 
   // Mantener refs sincronizados con el ultimo estado.
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -280,48 +347,132 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [autoSaveStatus]);
 
-  // ── CONFIRMAR Y ENVIAR A SWITCH — UN SOLO BOTÓN (12-ago-2026) ──
+  // ── ENVIAR A SWITCH — UN SOLO TOQUE (12-ago-2026) ──
   //
-  // El camino viejo eran 3 pasos separados (Confirmar → Enviar a Switch →
-  // Crear pedido en Switch) y el correo interno salía SIEMPRE metido dentro de
-  // "Confirmar". Ahora es una sola acción encadenada en el FRONT: PUT
-  // status:"confirmado" → preview (dry-run) → el modal de siempre con "Crear
-  // pedido en Switch".
+  // Daniel: *"porque doble? se puede hacer en un solo paso?"* y, tras entender
+  // qué revisaba el modal de preview, *"nos podemos ahorrar un paso"*. Él mismo
+  // cazó por qué el modal se sentía redundante: *"si esta en el catalogo obvio
+  // estan en switch no? porque me saldria dos precios distintos si esta siendo
+  // alimentado por switch"*.
   //
-  // 🔴 CERO CAMBIOS DE SERVIDOR: `enviar-switch` sigue exigiendo
-  // status==='confirmado' y el candado at-most-once no se toca. Por eso el PUT
-  // va PRIMERO y, si falla, no se consulta nada.
+  // El toque hace el camino COMPLETO: PUT status:"confirmado" → pre-validación
+  // VIVA (dry-run, cero escrituras — resuelve sku→codigoBarraId y es necesaria
+  // de todos modos para armar el payload) → y si todo está limpio, CREA el
+  // pedido sin parar a preguntar.
   //
-  // El correo interno pasó a ser OPCIONAL ("Avisar por correo"): Daniel
-  // confirmó que es solo suyo y que nadie lo usa como lista de trabajo.
-  async function confirmarYEnviar() {
+  // 🔴 Solo se detiene cuando hay algo que decidir (`hayQueDetenerse`): un SKU
+  // que no cruza, precio 0 en Switch, el permiso 0001 negado, cualquier
+  // `errores[]`. Ahí sí se ve la pantalla de detalle, con el problema arriba.
+  //
+  // 🔴 CERO CAMBIOS EN EL CANDADO at-most-once del servidor: el registro del
+  // intento ANTES del POST, el índice parcial y el 409 de las 3 capas siguen
+  // exactamente igual. El PUT va PRIMERO porque `enviar-switch` sigue exigiendo
+  // status==='confirmado'.
+  async function enviarASwitch() {
+    if (enviandoRef.current) return; // doble toque: el segundo no hace nada
+    enviandoRef.current = true;
     setConfirming(true);
-
-    // 1. Confirmar (el envío a Switch lo exige). Si ya está confirmado se salta.
-    if (!isConfirmed) {
-      try {
-        const confirmRes = await fetch(`${theme.api}/orders/${id}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
-        });
-        if (!confirmRes.ok) {
-          showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
-          setConfirming(false);
-          return;
+    setSwitchProblema(null);
+    try {
+      // 1. Confirmar (el envío lo exige). Si ya está confirmado se salta.
+      if (!isConfirmed) {
+        setPasoSwitch("Confirmando el pedido...");
+        try {
+          const confirmRes = await fetch(`${theme.api}/orders/${id}`, {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
+          });
+          if (!confirmRes.ok) { showToast("No se pudo confirmar el pedido. Intenta de nuevo."); return; }
+        } catch {
+          showToast("No se pudo confirmar el pedido. Revisa tu conexion."); return;
         }
+        setJustConfirmed(true);
+      }
+
+      // 2. Pre-validación viva contra Switch (dry-run, cero escrituras).
+      setPasoSwitch("Revisando el pedido contra Switch...");
+      let pre: { ok: boolean; status: number; d: Record<string, unknown> };
+      try {
+        const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dry: true }),
+        });
+        pre = { ok: res.ok, status: res.status, d: await res.json() };
       } catch {
-        showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
-        setConfirming(false);
+        showToast("No se pudo consultar Switch. Revisa tu conexion."); return;
+      }
+
+      const preview = pre.d.preview as SwitchPreview | undefined;
+      if (!pre.ok || !preview) {
+        // 422 = pre-validación con errores; cualquier otro fallo (preventa,
+        // Switch caído, ya enviado) también DETIENE y se muestra con su texto:
+        // un problema que impide crear el pedido no puede irse en un toast de
+        // 3 segundos.
+        setSwitchProblema({
+          errores: (pre.d.errores as string[] | undefined) ?? [String(pre.d.error || "No se pudo consultar Switch. Intenta de nuevo.")],
+          avisos: (pre.d.avisos as AvisoEnvio[] | undefined) ?? [],
+          lineas: (pre.d.lineas as SwitchPreviewLinea[] | undefined) ?? [],
+          puedeSeguir: false,
+        });
+        setShowSwitchModal(true);
         return;
       }
-      setJustConfirmed(true);
-    }
 
-    // 2. Dry-run contra Switch → abre el modal de revisión (cero escrituras).
-    //    Desde ahí "Crear pedido en Switch" hace el POST real.
-    await previewSwitch();
-    setConfirming(false);
-    load();
+      // 3. ¿Algo que decidir? Solo entonces se para.
+      const avisos = preview.avisos ?? [];
+      if (hayQueDetenerse({ errores: [], avisos })) {
+        setSwitchProblema({ errores: [], avisos: avisosBloqueantes(avisos), lineas: preview.lineas, puedeSeguir: true });
+        setShowSwitchModal(true);
+        return;
+      }
+
+      // 4. Todo limpio → se crea el pedido REAL, sin preguntar.
+      setPasoSwitch("Creando el pedido en Switch...");
+      await crearEnSwitch();
+    } finally {
+      enviandoRef.current = false;
+      setConfirming(false);
+      setPasoSwitch(null);
+      load();
+    }
+  }
+
+  // El POST real. Un solo envío por pedido (el candado vive en el server).
+  async function crearEnSwitch() {
+    setSwitchSending(true);
+    try {
+      const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
+        setShowSwitchModal(false); setSwitchProblema(null);
+        showToast(`Listo — pedido creado en Switch: ${d.numeroInterno}`);
+      } else if (d.ambiguo) {
+        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error });
+        setShowSwitchModal(false); setSwitchProblema(null);
+        showToast("Switch no respondio — revisa el panel antes de reintentar.");
+      } else {
+        setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+        setSwitchProblema({
+          errores: [String(d.error || "Switch rechazo el pedido.")],
+          avisos: [], lineas: [], puedeSeguir: false,
+        });
+        setShowSwitchModal(true);
+      }
+    } catch {
+      // Se perdio la respuesta: el server pudo haber completado el envio.
+      // Refrescar el estado real desde la DB en vez de asumir.
+      setShowSwitchModal(false); setSwitchProblema(null);
+      try {
+        const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
+        if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
+      } catch { /* sin red */ }
+      showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
+    }
+    setSwitchSending(false);
   }
 
   // Correo interno, APARTE y opcional.
@@ -352,65 +503,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     setSaving(false);
     showToast("Pedido en modo edicion");
     load();
-  }
-
-  // ── ENVIAR A SWITCH (ERP) ──
-  // Paso 1: dry-run — resuelve sku→codigoBarraId y precio VIVOS contra Switch
-  // y muestra el resumen + advertencias en un modal. Cero escrituras.
-  async function previewSwitch() {
-    setSwitchLoading(true); setSwitchErrores(null); setSwitchPreview(null);
-    try {
-      const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dry: true }),
-      });
-      const d = await res.json();
-      if (res.ok && d.preview) {
-        setSwitchPreview(d.preview); setShowSwitchModal(true);
-      } else if (res.status === 422 && d.errores) {
-        setSwitchErrores(d.errores); setShowSwitchModal(true);
-      } else {
-        showToast(d.error || "No se pudo consultar Switch. Intenta de nuevo.");
-      }
-    } catch {
-      showToast("No se pudo consultar Switch. Revisa tu conexion.");
-    }
-    setSwitchLoading(false);
-  }
-
-  // Paso 2: el POST real. Un solo envío por pedido (candado en el server).
-  async function confirmSwitch() {
-    setSwitchSending(true);
-    try {
-      const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const d = await res.json();
-      if (res.ok && d.ok) {
-        setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
-        setShowSwitchModal(false);
-        showToast(`Pedido creado en Switch: ${d.numeroInterno}`);
-      } else if (d.ambiguo) {
-        setSwitchEnvio({ estado: "enviado", pedido_switch_id: null, numero_interno: null, error_detalle: d.error });
-        setShowSwitchModal(false);
-        showToast("Switch no respondio — revisa el panel antes de reintentar.");
-      } else {
-        setShowSwitchModal(false);
-        setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
-        showToast(d.error || "Switch rechazo el pedido.");
-      }
-    } catch {
-      // Se perdio la respuesta: el server pudo haber completado el envio.
-      // Refrescar el estado real desde la DB en vez de asumir.
-      setShowSwitchModal(false);
-      try {
-        const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
-        if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
-      } catch { /* sin red */ }
-      showToast("Error de conexion — revisa el estado del envio antes de reintentar.");
-    }
-    setSwitchSending(false);
   }
 
   // ── CLIENTE SWITCH ──
@@ -481,6 +573,13 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     router.push(theme.pedidosHref);
   }
 
+  /** Precio de lista del catálogo SOLO si difiere del que tiene la línea. */
+  function precioDeLista(item: OrderItem): number | null {
+    const lista = typeof item.precio_lista === "number" ? item.precio_lista : null;
+    if (lista === null || !(lista > 0)) return null;
+    return Math.abs(Number(item.unit_price || 0) - lista) >= 0.01 ? lista : null;
+  }
+
   function updateItem(idx: number, field: string, value: number) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
   }
@@ -544,7 +643,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     setSendingToClient(false);
   }
 
-  const isEditorRole = ["admin", "secretaria", "vendedor"].includes(role);
   // El candado post-envío a Switch deja TODO el contenido de solo lectura.
   const canEdit = isEditorRole && !switchLock;
   const canDelete = ["admin", "secretaria"].includes(role);
@@ -685,7 +783,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal">Producto</th>
                 <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-16">Bultos</th>
                 <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-14">Pzas</th>
-                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-16">Precio</th>
+                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-24">Precio</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
               </tr>
@@ -722,13 +820,21 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     )}
                   </td>
                   <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{linea(item).piezas}</td>
-                  <td className="py-2 text-right">
+                  <td className="py-2 text-right align-top">
                     {canEdit ? (
                       <input type="number" step={1} min={0} value={item.unit_price}
                         onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className="w-14 text-right border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
                     ) : (
                       <span className="tabular-nums">${fmt(item.unit_price)}</span>
+                    )}
+                    {/* El precio de lista, ahí mismo y sin bloquear: editar el
+                        precio es una función legítima. Solo se dice cuando
+                        DIFIERE — repetirlo cuando coincide sería ruido. */}
+                    {precioDeLista(item) !== null && (
+                      <div className="text-xs text-amber-600 tabular-nums whitespace-nowrap mt-0.5">
+                        ← lista {fmtPrecio(precioDeLista(item)!)}
+                      </div>
                     )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-sm">${fmt(linea(item).subtotal)}</td>
@@ -837,16 +943,42 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
                   <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
                 )}
-                {/* UN SOLO BOTÓN: confirma y consulta Switch de una. El POST
-                    real sigue detrás del modal de revisión de siempre. */}
-                <button onClick={confirmarYEnviar} disabled={confirming || switchLoading || !items.length}
+
+                {/* Permiso 0001 NEGADO: se dice ACÁ, con el pedido todavía
+                    editable, no al final. El botón NO se apaga — el pedido se
+                    puede enviar con los precios de lista. */}
+                {hayPrecioEditado && permisoPrecio && !permisoPrecio.permiso && permisoPrecio.mensaje && (
+                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
+                    <p className="text-xs text-red-700">{permisoPrecio.mensaje}</p>
+                  </div>
+                )}
+
+                {/* Recordatorio anti-duplicado ANTES del toque: este pedido
+                    reemplaza a uno que YA está en Switch. Vivía adentro del
+                    modal de preview; con un solo toque ese modal ya no aparece
+                    en el caso normal, así que el aviso se habría perdido. */}
+                {pedidoOriginal?.switch_numero && (
+                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-3">
+                    <p className="text-xs text-red-700 font-medium">
+                      Este pedido reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en el panel de Switch para no duplicar.
+                    </p>
+                  </div>
+                )}
+
+                {/* UN SOLO TOQUE: confirma, revisa contra Switch y crea el
+                    pedido. Solo se detiene si hay algo que decidir. */}
+                <button onClick={enviarASwitch} disabled={confirming || !items.length}
                   className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition disabled:opacity-40">
-                  {confirming || switchLoading
-                    ? "Consultando Switch..."
+                  {confirming
+                    ? (pasoSwitch ?? "Enviando a Switch...")
                     : switchEnvio?.estado === "error"
                       ? "Reintentar envío a Switch"
-                      : "Confirmar y enviar a Switch"}
+                      : "Enviar a Switch"}
                 </button>
+                {/* El aviso va ANTES del toque, no en un modal después. */}
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Crea el pedido de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
+                </p>
               </div>
             )
           )}
@@ -922,29 +1054,36 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         loading={deletingOrder}
       />
 
-      {/* Modal de envio a Switch: resumen del dry-run + advertencias, o los
-          errores de pre-validacion si el pedido no cruza con el ERP. */}
-      {showSwitchModal && (
+      {/* PANTALLA DE PROBLEMA — solo aparece cuando el toque SE DETUVO.
+          En el camino normal (todo limpio) el pedido se crea sin este modal:
+          Daniel *"nos podemos ahorrar un paso"*. Lo que se ve acá es lo que
+          hay que decidir ARRIBA, y debajo el pedido resuelto para poder
+          mirarlo sin volver a consultar Switch. */}
+      {showSwitchModal && switchProblema && (
         <ModalOverlay onBackdropClick={() => { if (!switchSending) setShowSwitchModal(false); }}>
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {switchErrores ? (
+            <h3 className="text-base font-medium mb-2">
+              {switchProblema.puedeSeguir ? "Revisa esto antes de enviar" : "No se puede enviar a Switch"}
+            </h3>
+
+            {switchProblema.errores.length > 0 && (
+              <ul className="text-sm text-red-600 space-y-1.5 mb-4 list-disc pl-4">
+                {switchProblema.errores.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            )}
+            {switchProblema.avisos.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                {switchProblema.avisos.map((a, i) => (
+                  <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {a.texto}</p>
+                ))}
+              </div>
+            )}
+
+            {/* Las líneas que SÍ cruzaron con Switch, debajo del problema. */}
+            {switchProblema.lineas.length > 0 && (
               <>
-                <h3 className="text-base font-medium mb-2">No se puede enviar a Switch</h3>
-                <ul className="text-sm text-red-600 space-y-1.5 mb-5 list-disc pl-4">
-                  {switchErrores.map((e, i) => <li key={i}>{e}</li>)}
-                </ul>
-                <button onClick={() => setShowSwitchModal(false)}
-                  className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]">
-                  Entendido
-                </button>
-              </>
-            ) : switchPreview ? (
-              <>
-                <h3 className="text-base font-medium mb-1">Crear pedido en Switch</h3>
-                <p className="text-xs text-gray-500 mb-3">
-                  Cliente: <span className="text-gray-700">{switchPreview.cliente}</span> · Vendedor: <span className="text-gray-700">{switchPreview.vendedor}</span> · Sin descuento
-                </p>
-                <table className="w-full text-xs mb-3">
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Lo que sí cruzó con Switch</p>
+                <table className="w-full text-xs mb-4">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-400">
                       <th className="py-1.5 text-left font-normal">SKU</th>
@@ -953,7 +1092,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {switchPreview.lineas.map((l, i) => (
+                    {switchProblema.lineas.map((l, i) => (
                       <tr key={i} className="border-b border-gray-50">
                         <td className="py-1.5">
                           <span className="font-mono">{l.sku}</span>
@@ -965,41 +1104,26 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-between text-sm mb-3">
-                  <span className="text-gray-500">{switchPreview.totalPiezas} piezas</span>
-                  <span className="font-medium tabular-nums">${fmt(switchPreview.totalEstimado)}</span>
-                </div>
-                {switchPreview.warnings.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
-                    {switchPreview.warnings.map((w, i) => (
-                      <p key={i} className="text-xs text-amber-700 py-0.5">⚠ {w}</p>
-                    ))}
-                  </div>
-                )}
-                {/* Recordatorio anti-duplicado: este pedido reemplaza a uno que
-                    YA está en Switch — hay que borrar el viejo en el panel. */}
-                {pedidoOriginal?.switch_numero && (
-                  <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 mb-4">
-                    <p className="text-xs text-red-700 font-medium">
-                      Este pedido reemplaza al {pedidoOriginal.order_number}. Borra el pedido #{pedidoOriginal.switch_numero} en el panel de Switch para no duplicar.
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mb-4">
-                  Esto crea un pedido REAL en el ERP ({theme.empresaKey}). Si algo sale mal, se borra manualmente desde el panel de Switch.
-                </p>
-                <div className="flex gap-3">
-                  <button onClick={confirmSwitch} disabled={switchSending}
-                    className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
-                    {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
-                  </button>
-                  <button onClick={() => setShowSwitchModal(false)} disabled={switchSending}
-                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
-                    Cancelar
-                  </button>
-                </div>
               </>
-            ) : null}
+            )}
+
+            {switchProblema.puedeSeguir ? (
+              <div className="flex gap-3">
+                <button onClick={crearEnSwitch} disabled={switchSending}
+                  className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+                  {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
+                </button>
+                <button onClick={() => setShowSwitchModal(false)} disabled={switchSending}
+                  className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setShowSwitchModal(false)}
+                className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]">
+                Entendido
+              </button>
+            )}
           </div>
         </ModalOverlay>
       )}
