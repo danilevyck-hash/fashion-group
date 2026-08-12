@@ -2,6 +2,12 @@
 // (12-ago-2026): cliente obligatorio, "Gasto de la marca" con sub-opciones,
 // marca preseleccionada, y la pantalla de éxito de la entrega con su nota.
 //
+// 12-ago-2026 (noche): el cliente pasó a ser SOLO de la lista (ClientePicker
+// sin "Otro"). El script ahora ELIGE un cliente del desplegable en vez de
+// tipear texto libre, mide el paso 2 con el PICKER ABIERTO (la lista flota en
+// <body>, así que se mide junto con el modal) y verifica que el texto libre
+// NO encienda Continuar.
+//
 // SOLO LECTURA CONTRA LA BASE. Toda ESCRITURA se INTERCEPTA en el navegador
 // (page.route) y se contesta con un doble — el POST de proyectos, el POST de
 // la entrega y los datos de la nota nunca llegan a producción. Es el mismo
@@ -38,15 +44,20 @@ const TAMANOS = [
 const MEDIR = (raiz) => `(() => {
   const doc = document.documentElement;
   const arrastrePagina = doc.scrollWidth - doc.clientWidth;
-  const root = document.querySelector(${JSON.stringify(raiz)});
-  if (!root) return { falta: ${JSON.stringify(raiz)} };
+  const roots = [...document.querySelectorAll(${JSON.stringify(raiz)})];
+  if (roots.length === 0) return { falta: ${JSON.stringify(raiz)} };
   const recortados = [], chicos = [], textosChicos = [];
-  for (const el of root.querySelectorAll("*")) {
+  const todos = roots.flatMap((r) => [...r.querySelectorAll("*")]);
+  for (const el of todos) {
     const r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) continue;
     const cs = getComputedStyle(el);
+    // El sr-only de ClientePicker mide 1 px a propósito (texto solo para
+    // lectores de pantalla): contarlo como recorte sería ruido — el mismo
+    // criterio de scripts/_medir-guias-sugerencias-anchos.mjs.
+    const esSrOnly = (el.className || "").toString().includes("sr-only");
     const desborde = el.scrollWidth - el.clientWidth;
-    if (desborde > 1 && cs.overflowX === "hidden") {
+    if (desborde > 1 && cs.overflowX === "hidden" && !esSrOnly) {
       recortados.push({
         tag: el.tagName.toLowerCase(),
         clase: (el.className || "").toString().slice(0, 60),
@@ -77,6 +88,9 @@ const MEDIR = (raiz) => `(() => {
 
 // Los dos z del sistema: el modal de gasto (z-50) y el de entrega (z-[60]).
 const MODAL = "div.fixed.inset-0.z-50 > div.relative, div.fixed.inset-0.z-\\[60\\] > div.relative";
+// El paso 2 con la lista de clientes abierta: la lista flota en <body>
+// (DesplegableFlotante), así que se mide como segunda raíz junto al modal.
+const MODAL_Y_PICKER = `${MODAL}, [data-desplegable="cliente"]`;
 
 const ok = (m) =>
   m.falta
@@ -147,8 +161,8 @@ const NOTA_FAKE = {
       if (!t.captura) return;
       await page.screenshot({ path: path.join(SALIDA, `${nombre}-${t.nombre}.png`), fullPage: true });
     };
-    const medir = async (clave, nombre) => {
-      caso[clave] = await page.evaluate(MEDIR(MODAL));
+    const medir = async (clave, nombre, raiz = MODAL) => {
+      caso[clave] = await page.evaluate(MEDIR(raiz));
       await foto(nombre);
     };
     const abrirModal = async () => {
@@ -158,8 +172,13 @@ const NOTA_FAKE = {
       await page.getByRole("button", { name: /Registrar gasto/ }).first().click();
       await page.waitForTimeout(450);
     };
-    const escribirCliente = async () => {
-      await page.locator('input[placeholder="Busca la tienda…"]').fill("Tienda de prueba");
+    // El cliente se ELIGE de la lista (D-XXX) — el texto libre ya no pasa.
+    const elegirCliente = async () => {
+      const input = page.locator('input[placeholder="Busca la tienda…"]');
+      await input.click();
+      await input.fill("city");
+      await page.waitForSelector('[data-desplegable="cliente"] button', { timeout: 15000 });
+      await page.locator('[data-desplegable="cliente"] button').first().dispatchEvent("mousedown");
       await page.waitForTimeout(350);
     };
     const continuar = async () => {
@@ -182,7 +201,33 @@ const NOTA_FAKE = {
       .getByRole("button", { name: /Continuar/ })
       .first()
       .isEnabled();
-    await escribirCliente();
+    // 🔴 Texto libre que no matchea: Continuar sigue APAGADO y la lista dice
+    // el camino (darlo de alta en Switch). Se mide con el picker abierto.
+    {
+      const input = page.locator('input[placeholder="Busca la tienda…"]');
+      await input.click();
+      await input.fill("tienda que no existe zz");
+      await page.waitForSelector('[data-desplegable="cliente"]', { timeout: 15000 });
+      await page.waitForTimeout(400);
+      caso.continuarConTextoLibre = await page
+        .getByRole("button", { name: /Continuar/ })
+        .first()
+        .isEnabled();
+      caso.avisoAltaEnSwitch = await page.evaluate(
+        `document.querySelector('[data-desplegable="cliente"]')?.textContent.includes("darlo de alta en Switch") ?? false`,
+      );
+      caso.sinSalidaOtro = await page.evaluate(
+        `!(document.querySelector('[data-desplegable="cliente"]')?.textContent.includes("Otro — guardar") ?? false)`,
+      );
+    }
+    // El picker ABIERTO con resultados reales, medido modal + lista juntos.
+    {
+      const input = page.locator('input[placeholder="Busca la tienda…"]');
+      await input.fill("city");
+      await page.waitForSelector('[data-desplegable="cliente"] button', { timeout: 15000 });
+      await medir("facturaPickerAbierto", "factura-picker", MODAL_Y_PICKER);
+    }
+    await elegirCliente();
     await continuar();
     await medir("facturaForm", "factura-form");
 
@@ -190,7 +235,7 @@ const NOTA_FAKE = {
     await abrirModal();
     await page.click('[data-camino="mueble"]');
     await page.waitForTimeout(450);
-    await escribirCliente();
+    await elegirCliente();
     await continuar();
     await medir("muebleForm", "mueble-form");
     // La marca viene heredada (Calvin ya marcada): solo falta el kit.
@@ -230,6 +275,11 @@ const NOTA_FAKE = {
         }
       }
     }
+    // Los booleanos del candado de cliente también cuentan como falla.
+    if (caso.continuarSinCliente) fallas++;
+    if (caso.continuarConTextoLibre) fallas++;
+    if (caso.avisoAltaEnSwitch === false) fallas++;
+    if (caso.sinSalidaOtro === false) fallas++;
     informe[t.nombre] = caso;
     console.log(`\n═══ ${t.nombre}px ═══`);
     for (const [k, v] of Object.entries(caso)) {

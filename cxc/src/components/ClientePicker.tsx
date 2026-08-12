@@ -1,6 +1,8 @@
 "use client";
 
-// Selector CERRADO de cliente. COMPARTIDO: lo usan Guías y Cheques.
+// Selector CERRADO de cliente. COMPARTIDO: lo usan Guías, Cheques y el
+// "Registrar gasto" de Marketing (este último SIN la salida "Otro", ver
+// `permitirOtro` abajo).
 //
 // Vivía en `app/guias/components/`. Se movió a `src/components/` en jul-2026,
 // cuando Cheques pidió "que el cliente sea como en Guías": el componente ya era
@@ -83,6 +85,21 @@ interface ClientePickerProps {
    * aparecería como "Otro". Ahí se apaga y el campo es, simplemente, el nombre.
    */
   mostrarVinculo?: boolean;
+  /**
+   * false = SIN la salida "Otro": acá el cliente SOLO puede salir de la lista.
+   *
+   * Lo pidió Daniel para Marketing › Registrar gasto (12-ago-2026), textual:
+   * *"donde dice cliente, me deja pasar sin que amarre un cliente de mi lista
+   * de fashion group?"*. La regla que fijó: un campo de cliente amarra SIEMPRE
+   * al directorio (D-XXX), nunca texto libre. Con esto apagado, el pie de la
+   * lista dice el camino — el cliente que falta se da de alta EN SWITCH (los
+   * clientes nacen allá; el directorio se sincroniza de ahí).
+   *
+   * Default true: Guías y Cheques quedan EXACTAMENTE como estaban.
+   */
+  permitirOtro?: boolean;
+  /** Texto del campo vacío. Default: el de siempre ("Buscar cliente…"). */
+  placeholder?: string;
   hasError?: boolean;
   inputClassName?: string;
   id?: string;
@@ -144,6 +161,8 @@ export default function ClientePicker({
   onChange,
   topClientes,
   mostrarVinculo = true,
+  permitirOtro = true,
+  placeholder: placeholderVacio = "Buscar cliente…",
   hasError = false,
   inputClassName = "",
   id,
@@ -213,7 +232,7 @@ export default function ClientePicker({
             if (primero) elegir(primero.nombre, primero.codigo);
           }
         }}
-        placeholder={value ? value : "Buscar cliente…"}
+        placeholder={value ? value : placeholderVacio}
         className={`${inputClassName} ${vinculado ? "pr-14" : aMano ? "pr-12" : ""}`}
       />
 
@@ -254,7 +273,9 @@ export default function ClientePicker({
 
           {q.length >= 2 && !cargando && hits.length === 0 && (
             <div className="px-3 py-2 text-xs text-gray-500">
-              No está en el directorio.
+              {permitirOtro
+                ? "No está en el directorio."
+                : "No está en el directorio — hay que darlo de alta en Switch."}
             </div>
           )}
 
@@ -275,9 +296,16 @@ export default function ClientePicker({
             </>
           )}
 
-          {/* La salida de emergencia, SIEMPRE visible y siempre explícita. */}
+          {/* La salida de emergencia, SIEMPRE visible y siempre explícita —
+              salvo donde el cliente amarra sí o sí (`permitirOtro=false`):
+              ahí no hay "Otro" y el pie dice el camino. */}
           <div className="border-t border-gray-100">
-            {q ? (
+            {!permitirOtro ? (
+              <div className="px-3 py-2 text-xs text-gray-400">
+                Solo clientes de la lista — si no está, hay que darlo de alta
+                en Switch.
+              </div>
+            ) : q ? (
               <Opcion destacada onElegir={() => elegir(q, "")}>
                 <span className="truncate">
                   Otro — guardar &ldquo;{q}&rdquo; a mano
