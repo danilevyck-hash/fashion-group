@@ -101,10 +101,12 @@ describe("la severidad va por CÓDIGO, no por texto", () => {
     // Ni un solo `warnings.push(` suelto: todos los avisos pasan por `avisos`
     // con su `codigo`, que TypeScript obliga a declarar en el union.
     expect(src).not.toMatch(/warnings\.push\(/);
-    for (const m of src.matchAll(/avisos\.push\(\{\s*codigo:\s*"([a-z_]+)"/g)) {
+    // `avisosItem` es la lista por línea (la resolución va en paralelo y cada
+    // una junta lo suyo antes de volcarse EN ORDEN); vale lo mismo.
+    for (const m of src.matchAll(/avisos(?:Item)?\.push\(\{\s*codigo:\s*"([a-z_]+)"/g)) {
       expect(Object.keys(WARNING_SEVERIDAD)).toContain(m[1]);
     }
-    expect([...src.matchAll(/avisos\.push\(/g)].length).toBeGreaterThanOrEqual(4);
+    expect([...src.matchAll(/avisos(?:Item)?\.push\(\{/g)].length).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -136,12 +138,30 @@ describe("🔴 candado at-most-once del envío — INTACTO", () => {
     expect(route).toMatch(/case "carrera":[\s\S]{0,200}status: 409/);
   });
 
-  it("la pantalla NO manda el POST real sin haber hecho antes la pre-validación", () => {
+  it("🔴 la pre-validación NO se puede saltear: la decide el SERVIDOR", () => {
+    // ⏱️ CAMBIO 12-ago-2026 (un solo viaje). Antes la pantalla mandaba un
+    // `dry:true`, miraba el resultado y RECIÉN ahí mandaba el POST real — o sea
+    // que el pedido se cruzaba con Switch DOS veces (medido: ~95 s con 30
+    // líneas). Ahora manda `auto:true` y el motor pre-valida y crea en la misma
+    // llamada, deteniéndose solo si `hayQueDetenerse` dice que sí.
+    //
+    // La garantía es la MISMA y encima más fuerte: antes vivía en el navegador
+    // (un cliente hecho a mano podía saltearla), ahora vive en el servidor,
+    // ANTES de cualquier escritura. Lo que se escribe o no se escribe está
+    // fijado por `switch-envio-paralelo.test.ts`, que corre el motor de verdad.
     const ui = SRC("src/components/catalogo/PedidoDetalleClient.tsx");
-    const dry = ui.indexOf('JSON.stringify({ dry: true })');
-    const real = ui.indexOf("await crearEnSwitch();");
-    expect(dry).toBeGreaterThan(-1);
-    expect(real).toBeGreaterThan(dry);
+    expect(ui).toContain("await crearEnSwitch(true);");
+    expect(ui).toContain('JSON.stringify(auto ? { auto: true } : {})');
+
+    const motor = SRC("src/lib/catalogo/switch-envio.ts");
+    // El corte por `auto` va ANTES del registro del intento y del POST.
+    const corte = motor.indexOf("p.auto && hayQueDetenerse(");
+    const insert = motor.indexOf('.insert({ order_id: p.orderId, estado: "pendiente"');
+    expect(corte).toBeGreaterThan(-1);
+    expect(insert).toBeGreaterThan(corte);
+    // …y los errores de pre-validación siguen cortando antes que todo.
+    expect(motor.indexOf('return { kind: "prevalidacion"')).toBeLessThan(corte);
+
     // Y una capa más: el ref que come el segundo toque.
     expect(ui).toContain("if (enviandoRef.current) return;");
   });

@@ -87,10 +87,15 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
 
+  // dry:true  = solo pre-validar (preview, cero escrituras)
+  // auto:true = pre-validar y crear EN EL MISMO VIAJE si no hay nada que
+  //             decidir (toque único). Body vacío = crear directo.
   let dry = false;
+  let auto = false;
   try {
     const body = await req.json();
     dry = body?.dry === true;
+    auto = body?.auto === true;
   } catch { /* body vacío = envío real */ }
 
   const order = await fetchOrder(marca, orderId);
@@ -163,6 +168,7 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     vendedorId,
     vendedorNombre,
     dry,
+    auto,
   });
 
   return envioResultToResponse(result);

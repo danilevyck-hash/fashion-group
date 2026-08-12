@@ -285,8 +285,11 @@ describe("candados estáticos", () => {
     // COMPLETO — el modal de preview dejó de ser un paso obligatorio.
     expect(src).toContain('"Enviar a Switch"');
     expect(src).not.toContain("Confirmar y enviar a Switch");
-    expect(src).toMatch(/status: "confirmado"[\s\S]{0,2000}JSON\.stringify\(\{ dry: true \}\)/);
-    expect(src).toMatch(/JSON\.stringify\(\{ dry: true \}\)[\s\S]{0,3000}await crearEnSwitch\(\)/);
+    // ⏱️ 12-ago-2026 (un solo viaje): la pre-validación y la creación viajan
+    // juntas (`auto:true`) en vez de un `dry:true` + un POST real que volvía a
+    // cruzar TODOS los SKU contra Switch. Primero confirmar, después el toque.
+    expect(src).toMatch(/status: "confirmado"[\s\S]{0,2000}await crearEnSwitch\(true\)/);
+    expect(src).toContain("JSON.stringify(auto ? { auto: true } : {})");
     // send-order YA NO cuelga de confirmar: es su propio botón.
     expect(src).toContain("Avisar por correo a Fashion Group");
     expect(src).toMatch(/async function avisarPorCorreo\(\)/);

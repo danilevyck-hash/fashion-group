@@ -20,7 +20,7 @@ import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
-import { avisosBloqueantes, hayQueDetenerse, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
+import { avisosBloqueantes, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
@@ -379,13 +379,21 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // alimentado por switch"*.
   //
   // El toque hace el camino COMPLETO: PUT status:"confirmado" → pre-validación
-  // VIVA (dry-run, cero escrituras — resuelve sku→codigoBarraId y es necesaria
-  // de todos modos para armar el payload) → y si todo está limpio, CREA el
-  // pedido sin parar a preguntar.
+  // VIVA + creación, y si todo está limpio el pedido se crea sin parar a
+  // preguntar.
   //
-  // 🔴 Solo se detiene cuando hay algo que decidir (`hayQueDetenerse`): un SKU
-  // que no cruza, precio 0 en Switch, el permiso 0001 negado, cualquier
-  // `errores[]`. Ahí sí se ve la pantalla de detalle, con el problema arriba.
+  // ⏱️ UN SOLO VIAJE AL SERVIDOR (12-ago-2026). Antes eran DOS POST: uno
+  // `dry:true` para pre-validar y otro para crear — y cada uno resolvía TODOS
+  // los SKU contra Switch, o sea que el pedido se cruzaba DOS VECES (medido:
+  // 30 líneas = ~95 s). Ahora va un solo `auto:true` y la decisión de
+  // detenerse la toma el SERVIDOR, con la MISMA función pura de siempre
+  // (`hayQueDetenerse`, en `switch-prevalidacion`). Qué detiene el envío no
+  // cambió; dejó de costar el doble. Y ponerla del lado del servidor la vuelve
+  // imposible de saltear desde el navegador.
+  //
+  // 🔴 Solo se detiene cuando hay algo que decidir: un SKU que no cruza, precio
+  // 0 en Switch, el permiso 0001 negado, cualquier `errores[]`. Ahí sí se ve la
+  // pantalla de detalle, con el problema arriba — y el pedido NO se creó.
   //
   // 🔴 CERO CAMBIOS EN EL CANDADO at-most-once del servidor: el registro del
   // intento ANTES del POST, el índice parcial y el 409 de las 3 capas siguen
@@ -412,46 +420,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         setJustConfirmed(true);
       }
 
-      // 2. Pre-validación viva contra Switch (dry-run, cero escrituras).
+      // 2. Pre-validación viva contra Switch + creación, en UN solo viaje.
       setPasoSwitch("Revisando el pedido contra Switch...");
-      let pre: { ok: boolean; status: number; d: Record<string, unknown> };
-      try {
-        const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dry: true }),
-        });
-        pre = { ok: res.ok, status: res.status, d: await res.json() };
-      } catch {
-        showToast("No se pudo consultar Switch. Revisa tu conexion."); return;
-      }
-
-      const preview = pre.d.preview as SwitchPreview | undefined;
-      if (!pre.ok || !preview) {
-        // 422 = pre-validación con errores; cualquier otro fallo (preventa,
-        // Switch caído, ya enviado) también DETIENE y se muestra con su texto:
-        // un problema que impide crear el pedido no puede irse en un toast de
-        // 3 segundos.
-        setSwitchProblema({
-          errores: (pre.d.errores as string[] | undefined) ?? [String(pre.d.error || "No se pudo consultar Switch. Intenta de nuevo.")],
-          avisos: (pre.d.avisos as AvisoEnvio[] | undefined) ?? [],
-          lineas: (pre.d.lineas as SwitchPreviewLinea[] | undefined) ?? [],
-          puedeSeguir: false,
-        });
-        setShowSwitchModal(true);
-        return;
-      }
-
-      // 3. ¿Algo que decidir? Solo entonces se para.
-      const avisos = preview.avisos ?? [];
-      if (hayQueDetenerse({ errores: [], avisos })) {
-        setSwitchProblema({ errores: [], avisos: avisosBloqueantes(avisos), lineas: preview.lineas, puedeSeguir: true });
-        setShowSwitchModal(true);
-        return;
-      }
-
-      // 4. Todo limpio → se crea el pedido REAL, sin preguntar.
-      setPasoSwitch("Creando el pedido en Switch...");
-      await crearEnSwitch();
+      await crearEnSwitch(true);
     } finally {
       enviandoRef.current = false;
       setConfirming(false);
@@ -461,15 +432,30 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   }
 
   // El POST real. Un solo envío por pedido (el candado vive en el server).
-  async function crearEnSwitch() {
+  //
+  // `auto` = el toque único: el servidor pre-valida y crea en la misma llamada,
+  // y solo se detiene si hay algo que decidir (devuelve `preview`). Sin `auto`
+  // —el botón "Enviar igual" del modal— crea directo, como siempre.
+  async function crearEnSwitch(auto = false) {
     setSwitchSending(true);
     try {
       const res = await fetch(`${theme.api}/orders/${id}/enviar-switch`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(auto ? { auto: true } : {}),
       });
       const d = await res.json();
-      if (res.ok && d.ok) {
+      // El servidor se detuvo porque hay algo que decidir: NADA se escribió en
+      // el ERP y el usuario ve el problema con las líneas que sí cruzaron.
+      const preview = d.preview as SwitchPreview | undefined;
+      if (res.ok && preview) {
+        setSwitchProblema({
+          errores: [],
+          avisos: avisosBloqueantes(preview.avisos ?? []),
+          lineas: preview.lineas,
+          puedeSeguir: true,
+        });
+        setShowSwitchModal(true);
+      } else if (res.ok && d.ok) {
         setSwitchEnvio({ estado: d.verificado ? "verificado" : "enviado", pedido_switch_id: d.pedidoSwitchId, numero_interno: d.numeroInterno, error_detalle: null });
         setShowSwitchModal(false); setSwitchProblema(null);
         showToast(`Listo — pedido creado en Switch: ${d.numeroInterno}`);
@@ -478,10 +464,19 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         setShowSwitchModal(false); setSwitchProblema(null);
         showToast("Switch no respondio — revisa el panel antes de reintentar.");
       } else {
-        setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+        // 422 = pre-validación con errores: el pedido NO se creó y no hay
+        // ningún envío que marcar como fallido. Cualquier otro fallo (preventa,
+        // Switch caído, ya enviado, rechazo del ERP) también DETIENE y se
+        // muestra entero: un problema que impide crear el pedido no puede irse
+        // en un toast de 3 segundos.
+        if (res.status !== 422) {
+          setSwitchEnvio({ estado: "error", pedido_switch_id: null, numero_interno: null, error_detalle: d.error || null });
+        }
         setSwitchProblema({
-          errores: [String(d.error || "Switch rechazo el pedido.")],
-          avisos: [], lineas: [], puedeSeguir: false,
+          errores: (d.errores as string[] | undefined) ?? [String(d.error || "Switch rechazo el pedido.")],
+          avisos: (d.avisos as AvisoEnvio[] | undefined) ?? [],
+          lineas: (d.lineas as SwitchPreviewLinea[] | undefined) ?? [],
+          puedeSeguir: false,
         });
         setShowSwitchModal(true);
       }
@@ -1189,7 +1184,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
             {switchProblema.puedeSeguir ? (
               <div className="flex gap-3">
-                <button onClick={crearEnSwitch} disabled={switchSending}
+                {/* Sin `auto`: acá el usuario YA vio el aviso y decidió seguir.
+                    ⚠️ `onClick={crearEnSwitch}` a secas le pasaría el evento del
+                    clic como primer argumento — y un evento es truthy, o sea que
+                    volvería a pre-validar y se quedaría trabado en el mismo modal. */}
+                <button onClick={() => crearEnSwitch()} disabled={switchSending}
                   className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
                   {switchSending ? "Enviando a Switch..." : "Crear pedido en Switch"}
                 </button>

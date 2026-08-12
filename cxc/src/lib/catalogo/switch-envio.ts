@@ -14,6 +14,31 @@
 // NO hace logout — el route caller cierra la sesión en su finally
 // (logoutAllSwitchSessions), para no cortar la sesión entre pre-validación y
 // envío.
+//
+// ⏱️ POR QUÉ LA RESOLUCIÓN VA EN PARALELO (12-ago-2026). Daniel, con el TOM-015
+// en "Revisando el pedido contra Switch…": *"este proceso demora mas que al
+// hacer el pedido desde 0, porque?"*. Cada línea cuesta DOS llamadas a Switch
+// (`/apiarticulos/lista?filtro=SKU` + `/apiarticulos/tallacolor`) y salían de a
+// una, en fila india: medido contra producción, 30 líneas = **49,5 s**, y el
+// camino del detalle las pedía DOS VECES (dry-run y POST real) → ~95 s. Ahora
+// se resuelven de a `SKU_CONCURRENCIA` con `enParalelo`, el MISMO helper y la
+// MISMA concurrencia que el sync de catálogos (que bajó de 471 s a 114 s con
+// 478 llamadas), y el camino del detalle hace UN solo viaje (ver `auto`).
+//
+// Medido de punta a punta con el código real (`scripts/_medir-envio-switch.ts`,
+// dry-run contra producción, medianas):
+//
+//   líneas │ en serie │ en paralelo ×4 │ camino del detalle (antes → ahora)
+//   ───────┼──────────┼────────────────┼───────────────────────────────────
+//      3   │  3,7 s   │     1,8 s      │  ~7 s  →  ~2 s
+//     10   │ 13,6 s   │     2,8 s      │ ~27 s  →  ~3 s
+//     30   │ 49,5 s   │     7,8 s      │ ~99 s  →  ~8 s
+//
+// ⚠️ **NO se puede bajar el NÚMERO de llamadas, y está probado contra la API
+// real** (`scripts/_probe-envio-alternativas.ts`): `/apiarticulos/lista` NO
+// acepta varios códigos en un `filtro` —se probaron `,` `, ` ` ` `|` `;` y los
+// cinco devuelven CERO artículos—, y bajarse el catálogo entero cuesta más que
+// las 2 llamadas por línea. Lo que se bajó es el tiempo de pared.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -26,7 +51,8 @@ import {
   SwitchApiError,
   type SwitchPedidoLineaInput,
 } from "@/lib/switch-api/client";
-import { type AvisoEnvio, textosDeAvisos } from "./switch-prevalidacion";
+import { enParalelo } from "@/lib/switch-api/en-paralelo";
+import { type AvisoEnvio, hayQueDetenerse, textosDeAvisos } from "./switch-prevalidacion";
 import {
   PROCESO_CAMBIO_PRECIO,
   TEXTO_PERMISO_NO_VERIFICADO,
@@ -35,6 +61,31 @@ import {
 } from "./permiso-precio";
 
 const DESCUENTO_LINEA = "0.00";
+
+/**
+ * Cuántas líneas se resuelven contra Switch a la vez.
+ *
+ * 🔴 4 es el número YA PROBADO en este repo (`STOCK_CONCURRENCIA` del sync de
+ * catálogos, medido: 471 s → 114 s con 478 llamadas). **No subirlo sin medir.**
+ * La concurrencia solo es segura porque `client.ts` deduplica los logins en
+ * vuelo (`loginEnVuelo`): Switch admite UNA sesión por empresa y N logins
+ * simultáneos se matarían el token entre sí (code 0006).
+ */
+const SKU_CONCURRENCIA = 4;
+
+/**
+ * Switch se cayó resolviendo una línea. Se lanza para que `enParalelo` aborte
+ * la tanda entera (su primer error se propaga) y el motor devuelva
+ * `switch_caido`, igual que hacía el `return` temprano del bucle serial.
+ */
+class SwitchCaidoError extends Error {}
+
+/** Lo que produce UNA línea: su error o su línea resuelta, más sus avisos. */
+interface ResolucionLinea {
+  avisos: AvisoEnvio[];
+  error?: string;
+  linea?: EnvioLinea;
+}
 
 export interface EnvioItem {
   product_id: string;
@@ -73,7 +124,20 @@ export interface EnvioParams {
   clienteNombre?: string | null;
   vendedorId: number;
   vendedorNombre?: string | null;
+  /** Solo pre-validar: devuelve el `preview` y NO escribe nada. */
   dry?: boolean;
+  /**
+   * TOQUE ÚNICO (#509, un viaje solo desde 12-ago-2026): pre-valida y, si NO
+   * hay nada que decidir (`hayQueDetenerse`), CREA el pedido en la misma
+   * llamada. Si hay algo que decidir se detiene y devuelve `preview` /
+   * `prevalidacion`, sin tocar Switch ni la tabla de envíos.
+   *
+   * 🔴 La regla de "¿hay algo que decidir?" es la MISMA función pura que usaba
+   * la pantalla (`switch-prevalidacion`), no una copia: mover la decisión al
+   * servidor evita el segundo viaje —que volvía a resolver TODOS los SKU
+   * contra Switch— sin cambiar qué detiene el envío.
+   */
+  auto?: boolean;
 }
 
 export interface EnvioLinea {
@@ -135,11 +199,14 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
     }).map((l) => [l.product_id, l]),
   );
 
-  for (const item of p.items) {
+  // Una línea a la vez, sin tocar nada de afuera: devuelve lo suyo y el bucle
+  // de abajo lo vuelca EN ORDEN. Los errores por línea siguen ACUMULÁNDOSE —
+  // un SKU que no cruza no tumba a los demás.
+  const resolverItem = async (item: EnvioItem): Promise<ResolucionLinea> => {
+    const avisosItem: AvisoEnvio[] = [];
     const sku = (item.sku || "").trim();
     if (!sku) {
-      errores.push(`"${item.name || item.product_id}" no tiene SKU — no se puede cruzar con Switch`);
-      continue;
+      return { avisos: avisosItem, error: `"${item.name || item.product_id}" no tiene SKU — no se puede cruzar con Switch` };
     }
     let articulo;
     try {
@@ -147,26 +214,25 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       articulo = (res.articulos || []).find((a) => a.codigo === sku);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return { kind: "switch_caido", error: `No se pudo consultar Switch (${msg}). Intenta de nuevo en unos minutos.` };
+      // Aborta la tanda entera (enParalelo propaga el primer error), igual que
+      // el `return` temprano del bucle serial.
+      throw new SwitchCaidoError(`No se pudo consultar Switch (${msg}). Intenta de nuevo en unos minutos.`);
     }
     if (!articulo) {
-      errores.push(`SKU ${sku} no existe en Switch (${p.empresaKey})`);
-      continue;
+      return { avisos: avisosItem, error: `SKU ${sku} no existe en Switch (${p.empresaKey})` };
     }
     if (articulo.codigoBarraId == null) {
-      errores.push(`SKU ${sku} no tiene código de barra en Switch — agregarlo en el panel antes de enviar`);
-      continue;
+      return { avisos: avisosItem, error: `SKU ${sku} no tiene código de barra en Switch — agregarlo en el panel antes de enviar` };
     }
 
     const precioSwitch = parseFloat(articulo.precio || "0");
     if (!(precioSwitch > 0)) {
-      errores.push(`SKU ${sku} tiene precio 0 en Switch — corregirlo en el panel antes de enviar`);
-      continue;
+      return { avisos: avisosItem, error: `SKU ${sku} tiene precio 0 en Switch — corregirlo en el panel antes de enviar` };
     }
     const precioCatalogo = Number(item.unit_price) || 0;
     if (Math.abs(precioSwitch - precioCatalogo) >= 0.01) {
       // Precio editable (5-jul): se envía el del PEDIDO, no el de lista.
-      avisos.push({
+      avisosItem.push({
         codigo: "precio_distinto",
         texto: `SKU ${sku}: precio del pedido $${precioCatalogo.toFixed(2)} ≠ lista Switch $${precioSwitch.toFixed(2)} — se enviará el del pedido`,
       });
@@ -178,28 +244,46 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
       const tc = await client.apiarticulosTallaColor({ articuloId: articulo.id });
       const variantes = new Set((tc.tallacolor || []).map((v) => v.codigoBarraId));
       if (variantes.size > 1) {
-        avisos.push({
+        avisosItem.push({
           codigo: "variantes_talla_color",
           texto: `SKU ${sku}: tiene ${variantes.size} variantes talla/color en Switch — se enviará el código de barra principal (id ${articulo.codigoBarraId})`,
         });
       }
     } catch {
-      avisos.push({ codigo: "tallas_no_verificadas", texto: `SKU ${sku}: no se pudo verificar tallas/colores en Switch` });
+      avisosItem.push({ codigo: "tallas_no_verificadas", texto: `SKU ${sku}: no se pudo verificar tallas/colores en Switch` });
     }
 
     // Las piezas YA vienen calculadas: acá no se multiplica nada (ver
     // `lineas-pedido.ts` — la multiplicación vive en un solo lugar del sistema).
     const resuelta = lineasResueltas.get(item.product_id);
     const piezas = resuelta?.piezas ?? 0;
-    lineas.push({
-      sku,
-      descripcionSwitch: articulo.descripcion || item.name || sku,
-      bultos: item.quantity || 0,
-      piezas,
-      precioCatalogo,
-      precioSwitch,
-      codigoBarraId: articulo.codigoBarraId,
-    });
+    return {
+      avisos: avisosItem,
+      linea: {
+        sku,
+        descripcionSwitch: articulo.descripcion || item.name || sku,
+        bultos: item.quantity || 0,
+        piezas,
+        precioCatalogo,
+        precioSwitch,
+        codigoBarraId: articulo.codigoBarraId,
+      },
+    };
+  };
+
+  let resoluciones: ResolucionLinea[];
+  try {
+    // `enParalelo` devuelve EN EL ORDEN DE ENTRADA (es su primer candado), así
+    // que el pedido conserva el orden de sus líneas.
+    resoluciones = await enParalelo(p.items, SKU_CONCURRENCIA, resolverItem);
+  } catch (e) {
+    if (e instanceof SwitchCaidoError) return { kind: "switch_caido", error: e.message };
+    throw e;
+  }
+  for (const r of resoluciones) {
+    avisos.push(...r.avisos);
+    if (r.error) errores.push(r.error);
+    else if (r.linea) lineas.push(r.linea);
   }
 
   if (errores.length) {
@@ -244,7 +328,10 @@ export async function enviarPedidoSwitch(p: EnvioParams): Promise<EnvioResult> {
   }));
   const totalEstimado = lineas.reduce((s, l) => s + l.piezas * l.precioCatalogo, 0);
 
-  if (p.dry) {
+  // `dry` = solo mirar. `auto` = seguir de largo SALVO que haya algo que
+  // decidir; la regla es la MISMA función pura que usaba la pantalla, así que
+  // qué detiene el envío no cambió — solo dejó de costar un viaje extra.
+  if (p.dry || (p.auto && hayQueDetenerse({ errores: [], avisos }))) {
     return {
       kind: "preview",
       preview: {
