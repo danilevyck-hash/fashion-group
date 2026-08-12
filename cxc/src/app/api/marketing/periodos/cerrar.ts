@@ -1,11 +1,10 @@
 // ============================================================================
 // Marketing — CERRAR UN PERÍODO, la operación, una sola vez.
 //
-// 🔑 Vive acá y no dentro del route porque hay DOS puertas que hacen exactamente
-// lo mismo: cerrar UNA marca (`[id]/cerrar`) y cerrar las TRES de un grupo
-// (`cerrar-grupo`, que llama a ésta tres veces seguidas). Daniel, textual:
-// *"cada marca tiene su encargado"* — el botón "Cerrar las tres" es una
-// comodidad de calendario, **no** un cierre conjunto.
+// 🔑 La única puerta es `[id]/cerrar`: cada marca se cierra SOLA. El cierre en
+// grupo (`cerrar-grupo`, "Cerrar las tres") se retiró el 11-ago-2026 — Daniel,
+// textual: *"que sea por separado mejor no?"*. La operación sigue viviendo acá
+// y no dentro del route para que cualquier puerta futura reuse EL MISMO cierre.
 //
 // 🩸 Si la lógica se duplicara, el día que cambie una regla del cierre habría
 // dos cierres distintos según qué botón se apretó, y el reporte de Calvin no
@@ -24,7 +23,6 @@ import {
 import {
   armarReportePeriodo,
   cargarDatosPeriodos,
-  type DatosPeriodos,
 } from "@/lib/marketing/periodos-reporte";
 import { nombreDeBloque } from "@/lib/marketing/bloques";
 
@@ -82,16 +80,11 @@ export class ErrorDeCierre extends Error {
  * no de dejar CERO — y cero abiertos deja a la marca sin dónde registrar el
  * próximo gasto, que es peor que no haber cerrado. Por eso, si el paso 5 falla,
  * el 4 se revierte; y al final se verifica que quedó exactamente uno.
- *
- * `datos` se puede pasar ya cargado (lo hace el cierre de grupo, que además lo
- * RECARGA entre marca y marca: el cierre anterior movió sellos y leer una foto
- * vieja le metería a Calvin los documentos que Tommy acaba de reportar).
  */
 export async function cerrarPeriodoDeMarca(args: {
   periodoId: string;
   nombreSiguiente: string;
   cerradoPor: string;
-  datos?: DatosPeriodos;
 }): Promise<ResultadoCierre> {
   const { periodoId, nombreSiguiente, cerradoPor } = args;
 
@@ -103,7 +96,7 @@ export async function cerrarPeriodoDeMarca(args: {
   }
 
   // ---- 2. Reporte ---------------------------------------------------------
-  const datos = args.datos ?? (await cargarDatosPeriodos());
+  const datos = await cargarDatosPeriodos();
   if (!datos.hayTablas) throw new ErrorDeCierre(409, MSG_SIN_TABLAS);
 
   const marcaCodigo = String(periodo.proveedor_key);

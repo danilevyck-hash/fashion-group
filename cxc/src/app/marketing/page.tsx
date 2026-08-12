@@ -2,8 +2,9 @@
 
 // Marketing se organiza por MARCA. Daniel, textual: *"ellos facturan a mi bajo
 // compañia diferentes. una por marca. cada marca tiene su encargado"*. El
-// agrupador "proveedor" desapareció de la pantalla; lo único que queda de él es
-// que Tommy, Calvin y Karl se cierran el mismo día ("Cerrar las tres").
+// agrupador "proveedor" desapareció de la pantalla, y cada marca se cierra
+// SOLA — el atajo "Cerrar las tres" se retiró el 11-ago-2026 (Daniel: *"que
+// sea por separado mejor no?"*).
 //
 // URL patterns:
 //   /marketing                        → inicio (un bloque por marca)

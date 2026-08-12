@@ -3,9 +3,10 @@
 //
 // 🔑 LA MARCA ES LA UNIDAD. Daniel, textual: *"ellos facturan a mi bajo
 // compañia diferentes. una por marca. cada marca tiene su encargado"*. Cada
-// bloque es una marca, con su período, su cierre y su ZIP. Lo único agrupado
-// que queda es el BOTÓN "Cerrar las tres" — tres cierres seguidos, no un cierre
-// conjunto. El mapa marca → bloque vive en `bloques.ts` y acá se IMPORTA.
+// bloque es una marca, con su período, su cierre y su ZIP. Cada una se cierra
+// SOLA — el atajo "Cerrar las tres" se retiró el 11-ago-2026 (Daniel: *"que sea
+// por separado mejor no?"*). El mapa marca → bloque vive en `bloques.ts` y acá
+// se IMPORTA.
 //
 // 🔴 NO HAY TECHO NI PRESUPUESTO. *"simplemente reportas lo que gastaste"*. Acá
 // no se calcula "cuánto queda", ni "cuánto sobra", ni un % de avance: el módulo
@@ -42,9 +43,8 @@ import {
   MARCAS_BLOQUE,
   MULTIFASHION_KEY,
   SIN_BLOQUE,
+  claveLegacyDeMarca,
   clavesDeSello,
-  esCabezaDeGrupo,
-  grupoCierreDeMarca,
   indiceBloquePorMarcaId,
   nombreDeBloque,
   type BloqueKey,
@@ -94,12 +94,6 @@ export interface BloqueResumen {
   key: string;
   /** Del catálogo (`mk_marcas.nombre`), con la constante como respaldo. */
   nombre: string;
-  /** `'pvh'` para TH/CK/KL, `null` para el resto. */
-  grupoCierre: string | null;
-  /** "Tommy · Calvin · Karl". Lo que se lee en el botón de cerrar las tres. */
-  grupoEtiqueta: string | null;
-  /** true solo en la PRIMERA marca del grupo: el botón se dibuja una vez. */
-  esCabezaDeGrupo: boolean;
   /** `null` = este bloque no se le reporta a nadie (Multifashion / sin marca). */
   periodoAbierto: { id: string | null; nombre: string } | null;
   facturas: Monto;
@@ -313,9 +307,12 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
       }
       return null; // sin sello → el abierto (documento nuevo)
     }
-    // Sin DDL de períodos: solo las marcas de PVH tienen archivo, y solo por
-    // `grupo_legacy` — que es la partición que hace la pantalla de hoy.
-    if (legacyFallback && grupoCierreDeMarca(marcaKey)?.key === "pvh") {
+    // Sin DDL de períodos: solo las marcas cuya clave HISTÓRICA es 'pvh'
+    // (TH/CK/KL) tienen archivo, y solo por `grupo_legacy` — que es la
+    // partición que hace la pantalla de hoy. 🔴 Esto es el mapeo LEGACY de
+    // `bloques.ts`, no un grupo de cierre: el cierre conjunto ya no existe,
+    // pero el archivo "Gastos Tommy y Calvin" sigue siendo de esas marcas.
+    if (legacyFallback && claveLegacyDeMarca(marcaKey) === "pvh") {
       return { id: null, nombre: PERIODO_LEGACY_NOMBRE };
     }
     return null;
@@ -336,13 +333,9 @@ export function agregarPorBloques(inp: EntradaBloques): ResumenBloques {
     if (!b) {
       const esBucket = k === MULTIFASHION_KEY || k === SIN_BLOQUE;
       const ab = esBucket ? null : abiertoDeMarca(k);
-      const grupo = grupoCierreDeMarca(k);
       b = {
         key: k,
         nombre: nombreDeBloque(k, inp.marcas),
-        grupoCierre: grupo?.key ?? null,
-        grupoEtiqueta: grupo?.etiqueta ?? null,
-        esCabezaDeGrupo: esCabezaDeGrupo(k),
         periodoAbierto: esBucket
           ? null
           : { id: ab ? String(ab.id) : null, nombre: ab ? ab.nombre : "Período actual" },
