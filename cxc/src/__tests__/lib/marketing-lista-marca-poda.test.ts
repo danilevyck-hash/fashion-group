@@ -44,7 +44,9 @@ function sinComentarios(src: string): string {
     .join("\n");
 }
 
-const VISTA = "app/marketing/components/ProyectosHomeView.tsx";
+// La lista de la marca vive en el NIVEL 3 (el detalle del período) desde el
+// rediseño de tres niveles del 12-ago-2026.
+const VISTA = "app/marketing/components/DetallePeriodoView.tsx";
 
 describe("contadoresDeProyecto — solo se dicen los que no son cero", () => {
   it("todos con valor: los tres, con el separador de siempre", () => {
@@ -111,7 +113,7 @@ describe("la fila de proyecto quedó podada (y la vista usa el módulo puro)", (
   it("la etiqueta del tipo de gasto (Apertura/Remodelacion) no vuelve a la fila", () => {
     expect(limpio).not.toMatch(/subtituloTipo/);
     // El título sigue anclado al cliente, con el nombre solo de fallback.
-    expect(src).toMatch(/p\.tienda \|\| p\.nombre/);
+    expect(src).toMatch(/item\.tienda \|\| item\.nombre/);
   });
 
   it('el chip "Muebles" no vuelve (redundante con "N entregas")', () => {
@@ -129,7 +131,12 @@ describe("la fila de proyecto quedó podada (y la vista usa el módulo puro)", (
     // vive en marketing-lista-por-periodo.test.ts.
     expect(limpio).not.toMatch(/impulsadoraTotal|onOpenImpulsadoras/);
     expect(src).toMatch(/setVerGeneral\(true\)/);
-    expect(src).toContain("impulsadoras y gastos sin cliente");
+    // El subtítulo de la fila General sale del módulo puro (descripcionGeneral),
+    // que es donde vive el texto "impulsadoras y gastos sin cliente".
+    expect(src).toContain("descripcionGeneral");
+    expect(leer("lib/marketing/lista-por-periodo.ts")).toContain(
+      "impulsadoras y gastos sin cliente",
+    );
     // La única acción de la cabecera sigue siendo registrar gasto.
     expect(src).toContain("+ Registrar gasto");
   });

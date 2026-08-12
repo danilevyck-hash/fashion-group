@@ -11,20 +11,26 @@ import {
   SIN_BLOQUE,
   esMarcaCodigo,
   indiceBloquePorMarcaId,
+  nombreDeBloque,
 } from "@/lib/marketing/bloques";
+import { bloqueDeSlug, slugDeMarca } from "@/lib/marketing/slugs";
 import {
+  agregarPorBloques,
   crearClasificadorPeriodos,
   periodoLegacyDeFactura,
+  type AdjuntoResumen,
   type PeriodoRow,
   type SelloRow,
 } from "@/lib/marketing/resumen-bloques";
 import { esTablaAusente } from "@/lib/marketing/periodos-io";
 import {
+  SECCION_ABIERTO,
   armarGastoGeneral,
+  armarSecciones,
+  claveDeSeccion,
   descripcionDeGastoSuelto,
-  seccionDeProyecto,
+  type GastoGeneral,
   type GastoGeneralItem,
-  type PeriodoCerradoRef,
 } from "@/lib/marketing/lista-por-periodo";
 
 export const dynamic = "force-dynamic";
@@ -32,37 +38,41 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 // GET /api/marketing/proyectos-lista
-//   ?bloque=TH|CK|KL|RBK|J|multifashion|sin_bloque
-//                     → solo proyectos del bloque del inicio (una MARCA por
-//                       bloque). `?proveedor=` se sigue aceptando como nombre
-//                       viejo del mismo parámetro.
+//   ?bloque=<código | slug del nombre | multifashion | sin-marca>
+//                     → solo proyectos de ese bloque (una MARCA por bloque).
+//                       Acepta el CÓDIGO (`TH`, `ck`) y el slug del NOMBRE
+//                       (`calvin-klein`) — es el mismo segmento `[marca]` de
+//                       la URL de tres niveles. `?proveedor=` se sigue
+//                       aceptando como nombre viejo del mismo parámetro.
 //   ?marca_id=<uuid>  → solo proyectos con ≥1 factura de esa marca
-//   ?busqueda=<str>   → match en nombre o tienda del proyecto (ILIKE),
-//                       y también en sus facturas: número de factura,
-//                       concepto/nota, o monto exacto. El número tolera
-//                       ceros a la izquierda porque usa "contains"
-//                       (ej. "64327" encuentra "0000064327").
+//   ?busqueda=<str>   → match en nombre o tienda del proyecto, y también en
+//                       sus facturas: número de factura, concepto/nota, o
+//                       monto exacto (sin distinguir mayúsculas).
 //
-// Respuesta: { proyectos: ProyectoListItem[], general, particion }
+// Respuesta: { proyectos, general, particion, bloque_resumen, secciones }
 //
-// 🔴 PARTIDA POR PERÍODO (12-ago-2026). Daniel: *"esta mezclado en el cierre
-// anterior… no quiero friccion, quiero orden simple"*. Con `?bloque=<marca>`
-// cada proyecto trae `seccion` ("actual" | "cerrado"), el período cerrado
-// bajo el que se lista y `tambien_reporto_en` (proyecto del actual con
-// historia). La SECCIÓN la decide el clasificador ÚNICO de resumen-bloques
-// (sello a período CERRADO = reportado; sello a un ABIERTO —incluido el
-// fantasma `pvh · abierto` de hoy— = actual, así que la pantalla queda bien
-// antes y después de reparar esos sellos). `general` son los gastos SIN
-// cliente de la marca (impulsadoras incluidas): su marca sale de
-// mk_factura_marcas, NUNCA de la clave del sello.
+// 🔴 UNA SECCIÓN POR PERÍODO (12-ago-2026). Daniel: *"quiero que dentro de
+// cada marca aparezca 'periodo uno' periodo dos, y dentro de cada periodo la
+// info… que este ordenado"*. Con `?bloque=<marca>` la respuesta trae
+// `secciones`: el período ABIERTO primero (con su total y `puedeCerrar`) y
+// los CERRADOS después, cada uno con su total, sus proyectos CON EL MONTO DE
+// ESE PERÍODO y su fila General (impulsadoras y gastos sin cliente).
+//
+// 🩸 LOS TOTALES Y LOS MONTOS SALEN DE `agregarPorBloques` — el MISMO módulo
+// puro que dibuja las tarjetas del inicio, corrido sobre los MISMOS insumos
+// que `/api/marketing/inicio`. Por eso el total de cada sección cuadra al
+// centavo con el chip de esa marca en el inicio: es literalmente el mismo
+// número. Acá no se suma nada a mano.
+//
+// 🔴 LA BÚSQUEDA NO CAMBIA LOS TOTALES. `?busqueda=` filtra qué proyectos se
+// listan (en JS, sobre los mismos datos ya leídos), pero el agregador corre
+// SIEMPRE sobre todo: el encabezado de una sección dice cuánto tiene el
+// período, no cuánto suma el filtro.
 //
 // 🔴 EL ESTADO DEL PROYECTO DEJÓ DE EXISTIR COMO FILTRO (11-ago-2026).
 // "Cerrar proyecto" se retiró de la UI: era cosmético y confundía al lado de
 // "Cerrar período". La lista devuelve SIEMPRE todos los proyectos vivos (no
-// anulados). `?filtro_estado=` se ignora si un cliente viejo lo manda. Los
-// valores legacy 'enviado'/'cobrado'/'cerrado' que pudieran quedar en la
-// columna se leen igual que 'abierto': el proyecto es solo la agrupación por
-// cliente, y lo que congela plata es el PERÍODO cerrado.
+// anulados). `?filtro_estado=` se ignora si un cliente viejo lo manda.
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -74,93 +84,76 @@ export async function GET(req: NextRequest) {
   // factura legacy (bucket "Tommy y Calvin"); grupo=marca + marca_id → solo
   // proyectos con ≥1 factura NO-legacy de esa marca. Sin grupo = sin filtro (compat).
   const grupo = (url.searchParams.get("grupo") ?? "").toLowerCase();
-  // Bloque del inicio (modelo por MARCA): TH | CK | KL | RBK | J |
-  // multifashion | sin_bloque. Lista blanca explícita — un valor desconocido
-  // cae a null (sin filtro) en vez de colarse hasta la partición.
-  //
-  // ⚠️ El código de marca va en MAYÚSCULAS y los dos buckets en minúsculas, así
-  // que no se puede bajar todo a minúsculas de entrada: `th` tiene que
-  // encontrar a Tommy igual, porque el parámetro lo escribe una persona.
+  // Bloque del inicio (modelo por MARCA). Se resuelve DESPUÉS de leer el
+  // catálogo, porque el segmento acepta el slug del NOMBRE (`calvin-klein`)
+  // además del código — ver lib/marketing/slugs.ts. Un valor desconocido cae
+  // a null (sin filtro) en vez de colarse hasta la partición.
   const bloqueRaw = (
     url.searchParams.get("bloque") ??
     url.searchParams.get("proveedor") ??
     ""
   ).trim();
-  const bloqueUp = bloqueRaw.toUpperCase();
-  const bloqueLow = bloqueRaw.toLowerCase();
-  const bloque = esMarcaCodigo(bloqueUp)
-    ? bloqueUp
-    : bloqueLow === MULTIFASHION_KEY || bloqueLow === SIN_BLOQUE
-      ? bloqueLow
-      : null;
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
-  // Escape ILIKE wildcards una sola vez (reutilizado en facturas y proyectos).
-  const esc = busqueda.replace(/[%_]/g, (m) => `\\${m}`);
-
   try {
-    // 0. Pre-búsqueda en facturas: si hay texto, encontrar los proyectos cuyas
-    //    facturas (no anuladas) matchean por número, concepto/nota o monto
-    //    exacto. Devuelve la lista de proyecto_id para sumarla al filtro OR
-    //    de proyectos más abajo. Solo lectura, no toca data ni cálculos.
-    let proyectoIdsPorFactura: string[] = [];
-    if (busqueda.length > 0) {
-      const orFacturas = [
-        `numero_factura.ilike.%${esc}%`,
-        `concepto.ilike.%${esc}%`,
-      ];
-      // Monto exacto: solo si el término es un número válido (admite comas de
-      // miles). "150.50" → total.eq.150.5. No rompe si no es número.
-      const montoNum = Number(busqueda.replace(/,/g, ""));
-      if (busqueda.replace(/,/g, "").trim() !== "" && Number.isFinite(montoNum)) {
-        orFacturas.push(`total.eq.${montoNum}`);
-      }
-      const factSearchRes = await supabaseServer
-        .from("mk_facturas")
-        .select("proyecto_id")
-        .is("anulado_en", null)
-        .or(orFacturas.join(","));
-      if (factSearchRes.error) {
-        throw new Error(`facturas-busqueda: ${factSearchRes.error.message}`);
-      }
-      proyectoIdsPorFactura = Array.from(
-        new Set(
-          ((factSearchRes.data ?? []) as Array<{ proyecto_id: string }>).map(
-            (r) => String(r.proyecto_id),
-          ),
-        ),
-      );
-    }
-
-    // 1. Cargar marcas (catálogo completo para nombres, colores y tipo)
-    const [marcasRes, proyectosRes] = await Promise.all([
+    // 1. TODO en un batch, SIN filtrar por la búsqueda: el agregador necesita
+    //    los mismos insumos que /api/marketing/inicio para que los totales de
+    //    las secciones sean los MISMOS números de las tarjetas. La búsqueda se
+    //    aplica después, en JS, solo a qué proyectos se listan.
+    const [
+      marcasRes,
+      proyectosRes,
+      facturasRes,
+      fmRes,
+      entregasRes,
+      adjRes,
+      perRes,
+      selloRes,
+    ] = await Promise.all([
+      supabaseServer.from("mk_marcas").select("*"),
       supabaseServer
-        .from("mk_marcas")
-        .select("*"),
-      (() => {
-        let q = supabaseServer
-          .from("mk_proyectos")
-          // tienda_codigo entra para poder reconocer los proyectos de
-          // Multifashion (bucket independiente) — ver lib/marketing/multifashion.
-          .select("id, nombre, tienda, tienda_codigo, created_at, anulado_en")
-          .is("anulado_en", null);
-        if (busqueda.length > 0) {
-          const orProyecto = [
-            `nombre.ilike.%${esc}%`,
-            `tienda.ilike.%${esc}%`,
-          ];
-          // Proyectos cuyas facturas matchearon (número, concepto o monto).
-          if (proyectoIdsPorFactura.length > 0) {
-            orProyecto.push(`id.in.(${proyectoIdsPorFactura.join(",")})`);
-          }
-          q = q.or(orProyecto.join(","));
-        }
-        return q.order("created_at", { ascending: false });
-      })(),
+        .from("mk_proyectos")
+        // tienda_codigo entra para poder reconocer los proyectos de
+        // Multifashion (bucket independiente) — ver lib/marketing/multifashion.
+        .select("id, nombre, tienda, tienda_codigo, created_at, anulado_en")
+        .is("anulado_en", null)
+        .order("created_at", { ascending: false }),
+      // TODAS las facturas vivas — las de proyecto y las sueltas (proyecto_id
+      // null) en UNA lectura: las dos alimentan al agregador, y las columnas
+      // extra son las que la fila General necesita para describir el gasto.
+      supabaseServer
+        .from("mk_facturas")
+        .select(
+          "id, proyecto_id, total, grupo_legacy, impulsadora_id, concepto, proveedor, numero_factura, fecha_factura, created_at",
+        )
+        .is("anulado_en", null),
+      supabaseServer
+        .from("mk_factura_marcas")
+        .select("factura_id, marca_id, porcentaje"),
+      supabaseServer
+        .from("mk_entregas_muebles")
+        .select("id, proyecto_id, total, total_por_marca, total_por_empresa_interna"),
+      supabaseServer.from("mk_adjuntos").select("tipo, factura_id, proyecto_id"),
+      supabaseServer
+        .from("mk_periodos")
+        .select("id, proveedor_key, nombre, estado, cerrado_en"),
+      supabaseServer
+        .from("mk_periodo_documentos")
+        .select("periodo_id, proveedor_key, tipo, documento_id"),
     ]);
 
     if (marcasRes.error) throw new Error(`marcas: ${marcasRes.error.message}`);
     if (proyectosRes.error) throw new Error(`proyectos: ${proyectosRes.error.message}`);
+    if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
+    if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
+    if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
+    if (adjRes.error) throw new Error(`adjuntos: ${adjRes.error.message}`);
+    if (perRes.error && !esTablaAusente(perRes.error)) {
+      throw new Error(`periodos: ${perRes.error.message}`);
+    }
+    if (selloRes.error && !esTablaAusente(selloRes.error)) {
+      throw new Error(`periodo_documentos: ${selloRes.error.message}`);
+    }
 
     const marcas = ((marcasRes.data ?? []) as Array<Record<string, unknown>>)
       .map((m) => {
@@ -177,6 +170,9 @@ export async function GET(req: NextRequest) {
       });
     const marcaById = new Map(marcas.map((m) => [String(m.id), m]));
 
+    // El bloque pedido: código, slug del nombre, o uno de los dos buckets.
+    const bloque = bloqueRaw ? bloqueDeSlug(bloqueRaw, marcas) : null;
+
     const proyectos = (proyectosRes.data ?? []) as Array<{
       id: string;
       nombre: string | null;
@@ -188,83 +184,66 @@ export async function GET(req: NextRequest) {
     const proyectosMf = new Set(
       proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
     );
+    const vivos = new Set(proyectos.map((p) => String(p.id)));
 
-    // ⚠️ Sin early-return con 0 proyectos: una marca puede no tener ningún
-    // proyecto y AUN ASÍ tener gastos sueltos (impulsadoras) para la fila
-    // General. `.in("proyecto_id", [])` devuelve vacío sin error.
-    const proyectoIds = proyectos.map((p) => String(p.id));
+    const periodos = (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[];
+    const sellos = (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[];
+    const adjuntos = (adjRes.data ?? []) as Array<{
+      tipo: string;
+      factura_id: string | null;
+      proyecto_id: string | null;
+    }>;
 
-    // 2. Cargar facturas + adjuntos + marcas-de-factura + entregas en batch.
-    //    Los períodos y sellos alimentan la partición actual/reportado; los
-    //    gastos SIN cliente (proyecto_id null) alimentan la fila "General".
-    //    Igual que /api/marketing/inicio: sin la DDL de períodos (42P01) la
-    //    lista degrada limpio al fallback legacy — nunca es fatal.
-    const [
-      facturasRes,
-      adjFotosRes,
-      fmRes,
-      entregasRes,
-      sueltasRes,
-      perRes,
-      selloRes,
-    ] = await Promise.all([
-      supabaseServer
-        .from("mk_facturas")
-        .select("id, proyecto_id, total, anulado_en, grupo_legacy")
-        .in("proyecto_id", proyectoIds)
-        .is("anulado_en", null),
-      supabaseServer
-        .from("mk_adjuntos")
-        .select("proyecto_id")
-        .in("proyecto_id", proyectoIds)
-        .eq("tipo", "foto_proyecto"),
-      supabaseServer
-        .from("mk_factura_marcas")
-        .select("factura_id, marca_id, porcentaje"),
-      supabaseServer
-        .from("mk_entregas_muebles")
-        .select("id, proyecto_id, total, total_por_marca, total_por_empresa_interna")
-        .in("proyecto_id", proyectoIds)
-        .not("proyecto_id", "is", null),
-      supabaseServer
-        .from("mk_facturas")
-        .select(
-          "id, total, concepto, proveedor, numero_factura, fecha_factura, created_at, impulsadora_id, grupo_legacy",
-        )
-        .is("proyecto_id", null)
-        .is("anulado_en", null),
-      supabaseServer
-        .from("mk_periodos")
-        .select("id, proveedor_key, nombre, estado, cerrado_en"),
-      supabaseServer
-        .from("mk_periodo_documentos")
-        .select("periodo_id, proveedor_key, tipo, documento_id"),
-    ]);
+    const facturasTodas = (facturasRes.data ?? []) as Array<{
+      id: string;
+      proyecto_id: string | null;
+      total: number | null;
+      grupo_legacy: boolean | null;
+      impulsadora_id: string | null;
+      concepto: string | null;
+      proveedor: string | null;
+      numero_factura: string | null;
+      fecha_factura: string | null;
+      created_at: string | null;
+    }>;
+    // Con proyecto VIVO (para conteos y tooltips) y sueltas (fila General).
+    const facturas = facturasTodas.filter(
+      (f) => f.proyecto_id && vivos.has(String(f.proyecto_id)),
+    );
+    const sueltas = facturasTodas.filter((f) => !f.proyecto_id);
 
-    if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
-    if (adjFotosRes.error) throw new Error(`adjuntos: ${adjFotosRes.error.message}`);
-    if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
-    if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
-    if (sueltasRes.error) throw new Error(`gastos-sueltos: ${sueltasRes.error.message}`);
-    if (perRes.error && !esTablaAusente(perRes.error)) {
-      throw new Error(`periodos: ${perRes.error.message}`);
-    }
-    if (selloRes.error && !esTablaAusente(selloRes.error)) {
-      throw new Error(`periodo_documentos: ${selloRes.error.message}`);
-    }
-
-    // El clasificador ÚNICO de períodos (el mismo de las tarjetas del inicio).
-    const clasificador = crearClasificadorPeriodos(
-      (perRes.error ? [] : (perRes.data ?? [])) as PeriodoRow[],
-      (selloRes.error ? [] : (selloRes.data ?? [])) as SelloRow[],
+    const entregas = (entregasRes.data ?? []) as Array<{
+      id: string;
+      proyecto_id: string | null;
+      total: number | null;
+      total_por_marca: Record<string, number> | null;
+      total_por_empresa_interna: Record<string, number> | null;
+    }>;
+    const entregasVivas = entregas.filter(
+      (e) => e.proyecto_id && vivos.has(String(e.proyecto_id)),
     );
 
-    const facturas = (facturasRes.data ?? []) as Array<{
-      id: string;
-      proyecto_id: string;
-      total: number;
-      grupo_legacy?: boolean;
-    }>;
+    // ------------------------------------------------------------------
+    // EL AGREGADOR ÚNICO — los mismos insumos que /api/marketing/inicio.
+    // De acá salen los totales de las secciones (bloques + cerrados) y el
+    // detalle por proyecto·período. Nada se vuelve a sumar en esta ruta.
+    // ------------------------------------------------------------------
+    const resumen = agregarPorBloques({
+      facturas: facturasTodas as never,
+      facturaMarcas: (fmRes.data ?? []) as never,
+      entregas: entregas as never,
+      marcas: marcas as never,
+      proyectos,
+      proyectosMultifashion: proyectosMf,
+      periodos,
+      sellos,
+      adjuntos: adjuntos as AdjuntoResumen[],
+    });
+
+    // El clasificador ÚNICO de períodos (el mismo que usa el agregador): acá
+    // solo decide EN QUÉ PERÍODO va cada gasto suelto de la fila General.
+    const clasificador = crearClasificadorPeriodos(periodos, sellos);
+
     // Legacy por factura y por proyecto (para el filtro de cards por marca).
     const legacyByFactura = new Map<string, boolean>();
     const hasLegacyByProy = new Set<string>();
@@ -281,8 +260,9 @@ export async function GET(req: NextRequest) {
     // Índice: factura_id → { proyecto_id, total }
     const facturaIndex = new Map<string, { proyectoId: string; total: number }>();
     // Gasto BRUTO por proyecto = Σ factura.total (con ITBMS) + Σ entrega.total.
-    // Es "lo que se pagó de verdad", SIN ponderar por co-op (distinto del
-    // cobrable a marcas que vive en cobrableFactByProyMarca).
+    // Es "lo que se pagó de verdad", SIN ponderar por co-op. Alimenta la
+    // columna "Gastado" del modo PLANO (multifashion / sin bloque); en las
+    // secciones por período la columna es el monto DEL período (agregador).
     const grossByProy = new Map<string, number>();
     for (const f of facturas) {
       const pid = String(f.proyecto_id);
@@ -299,7 +279,8 @@ export async function GET(req: NextRequest) {
 
     // Conteo de fotos por proyecto
     const fotosCountByProy = new Map<string, number>();
-    for (const a of (adjFotosRes.data ?? []) as Array<{ proyecto_id: string }>) {
+    for (const a of adjuntos) {
+      if (a.tipo !== "foto_proyecto" || !a.proyecto_id) continue;
       const pid = String(a.proyecto_id);
       fotosCountByProy.set(pid, (fotosCountByProy.get(pid) ?? 0) + 1);
     }
@@ -347,15 +328,8 @@ export async function GET(req: NextRequest) {
     // Porción real de cada marca = total_por_marca + total_por_empresa_interna
     // del empresa_codigo pareja (el "otro 50%" que antes absorbía FG ahora se
     // atribuye al gasto de esa marca). Sin co-op.
-    const entregas = (entregasRes.data ?? []) as Array<{
-      id: string;
-      proyecto_id: string;
-      total: number | null;
-      total_por_marca: Record<string, number> | null;
-      total_por_empresa_interna: Record<string, number> | null;
-    }>;
     const entregasCountByProy = new Map<string, number>();
-    for (const e of entregas) {
+    for (const e of entregasVivas) {
       const pid = String(e.proyecto_id);
       entregasCountByProy.set(pid, (entregasCountByProy.get(pid) ?? 0) + 1);
       // Bruto: el total completo de la entrega.
@@ -390,89 +364,16 @@ export async function GET(req: NextRequest) {
     // exactamente los proyectos que el bloque contó.
     const bloquePorMarca = indiceBloquePorMarcaId(marcas);
 
-    // ------------------------------------------------------------------
-    // PARTICIÓN POR PERÍODO (solo con ?bloque= de MARCA). Documento por
-    // documento, el clasificador único dice si su gasto para ESTA marca ya
-    // se reportó (sello a período CERRADO) o es de ahora (sello a un abierto
-    // — el fantasma `pvh · abierto` incluido — o sin sello). El proyecto se
-    // ubica después con `seccionDeProyecto`.
-    // ------------------------------------------------------------------
     const bloqueEsMarca = bloque !== null && esMarcaCodigo(bloque);
-    const docsActualByProy = new Map<string, number>();
-    const cerradosByProy = new Map<string, PeriodoCerradoRef[]>();
-    const anotarClasificacion = (
-      pid: string,
-      cer: ReturnType<typeof clasificador.cerradoPara>,
-    ) => {
-      if (cer) {
-        const arr = cerradosByProy.get(pid) ?? [];
-        arr.push({
-          id: cer.id ? String(cer.id) : null,
-          nombre: cer.nombre,
-          cerradoEn: "cerrado_en" in cer ? (cer.cerrado_en ?? null) : null,
-        });
-        cerradosByProy.set(pid, arr);
-      } else {
-        docsActualByProy.set(pid, (docsActualByProy.get(pid) ?? 0) + 1);
-      }
-    };
-    if (bloqueEsMarca) {
-      for (const [fid, rows] of fmByFactura) {
-        const pid = facturaIndex.get(fid)!.proyectoId;
-        if (proyectosMf.has(pid)) continue;
-        const esDelBloque = rows.some(
-          (r) => (bloquePorMarca.get(r.mid) ?? SIN_BLOQUE) === bloque,
-        );
-        if (!esDelBloque) continue;
-        anotarClasificacion(
-          pid,
-          clasificador.cerradoPara(
-            "factura",
-            fid,
-            bloque,
-            periodoLegacyDeFactura(
-              { grupo_legacy: legacyByFactura.get(fid) } as never,
-              false,
-            ),
-          ),
-        );
-      }
-      for (const e of entregas) {
-        const pid = String(e.proyecto_id);
-        if (proyectosMf.has(pid)) continue;
-        const esDelBloque = marcasDeEntrega(e).some(
-          (mid) =>
-            (bloquePorMarca.get(mid) ?? SIN_BLOQUE) === bloque &&
-            porcionEntregaParaMarca(e, mid, marcaById.get(mid)?.empresa_codigo) > 0,
-        );
-        if (!esDelBloque) continue;
-        // Una entrega se clasifica UNA vez por bloque, aunque reparta entre
-        // dos marcas del mismo bloque (no pasa hoy: el bloque ES una marca).
-        anotarClasificacion(
-          pid,
-          clasificador.cerradoPara("entrega", String(e.id), bloque, false),
-        );
-      }
-    }
 
     // ------------------------------------------------------------------
-    // La fila "GENERAL": impulsadoras y gastos SIN cliente de esta marca.
-    // La marca sale de mk_factura_marcas (la marca REAL del gasto), NUNCA de
-    // la clave del sello; el sello solo excluye lo ya reportado (cerrado).
+    // La fila "GENERAL" de cada período: impulsadoras y gastos SIN cliente
+    // de esta marca. La marca sale de mk_factura_marcas (la marca REAL del
+    // gasto), NUNCA de la clave del sello; el sello (vía el clasificador
+    // único) solo decide EN QUÉ PERÍODO va cada gasto.
     // ------------------------------------------------------------------
-    let general: ReturnType<typeof armarGastoGeneral> | null = null;
+    const generales = new Map<string, GastoGeneral>();
     if (bloqueEsMarca) {
-      const sueltas = (sueltasRes.data ?? []) as Array<{
-        id: string;
-        total: number | null;
-        concepto: string | null;
-        proveedor: string | null;
-        numero_factura: string | null;
-        fecha_factura: string | null;
-        created_at: string | null;
-        impulsadora_id: string | null;
-        grupo_legacy: boolean | null;
-      }>;
       const fmBySuelta = new Map<string, Array<{ mid: string; pct: number }>>();
       const sueltaIds = new Set(sueltas.map((s) => String(s.id)));
       for (const r of fm) {
@@ -482,7 +383,7 @@ export async function GET(req: NextRequest) {
         arr.push({ mid: String(r.marca_id), pct: Number(r.porcentaje ?? 0) });
         fmBySuelta.set(fid, arr);
       }
-      const items: GastoGeneralItem[] = [];
+      const itemsPorSeccion = new Map<string, GastoGeneralItem[]>();
       for (const f of sueltas) {
         const fid = String(f.id);
         const rows = fmBySuelta.get(fid) ?? [];
@@ -497,9 +398,10 @@ export async function GET(req: NextRequest) {
           bloque,
           periodoLegacyDeFactura({ grupo_legacy: f.grupo_legacy } as never, false),
         );
-        if (cer) continue; // ya reportado en un período cerrado
+        const clave = claveDeSeccion(cer);
         const esImpulsadora = !!f.impulsadora_id;
-        items.push({
+        const arr = itemsPorSeccion.get(clave) ?? [];
+        arr.push({
           id: fid,
           fecha: f.fecha_factura ?? f.created_at ?? null,
           descripcion: descripcionDeGastoSuelto({ ...f, esImpulsadora }),
@@ -508,12 +410,66 @@ export async function GET(req: NextRequest) {
           ),
           esImpulsadora,
         });
+        itemsPorSeccion.set(clave, arr);
       }
-      general = armarGastoGeneral(items);
+      for (const [clave, items] of itemsPorSeccion) {
+        generales.set(clave, armarGastoGeneral(items));
+      }
     }
 
+    // ------------------------------------------------------------------
+    // LAS SECCIONES — una por período, el abierto primero. Los totales son
+    // los del agregador (los mismos chips del inicio) y los montos por
+    // proyecto vienen de `resumen.detalle` (la misma pasada que los sumó).
+    // ------------------------------------------------------------------
+    const bloqueResumen = bloqueEsMarca
+      ? (resumen.bloques.find((b) => b.key === bloque) ?? null)
+      : null;
+    const secciones = bloqueEsMarca
+      ? armarSecciones({
+          bloqueKey: bloque,
+          bloque: bloqueResumen,
+          cerrados: resumen.cerrados,
+          detalle: resumen.detalle,
+          generales,
+          conPeriodos: resumen.conPeriodos,
+          ordenProyectos: proyectos.map((p) => String(p.id)),
+        })
+      : null;
+
+    // ------------------------------------------------------------------
+    // BÚSQUEDA — en JS, sobre lo ya leído (mismo criterio que el ILIKE de
+    // antes: sin distinguir mayúsculas; monto exacto si el término es un
+    // número). Filtra qué proyectos se listan; los totales NO cambian.
+    // ------------------------------------------------------------------
+    const term = busqueda.toLowerCase();
+    const montoNum = Number(busqueda.replace(/,/g, ""));
+    const buscaMonto =
+      busqueda.length > 0 &&
+      busqueda.replace(/,/g, "").trim() !== "" &&
+      Number.isFinite(montoNum);
+    const matchTexto = (s: string | null | undefined) =>
+      !!s && s.toLowerCase().includes(term);
+    const proyConFacturaMatch = new Set<string>();
+    if (term) {
+      for (const f of facturas) {
+        if (
+          matchTexto(f.numero_factura) ||
+          matchTexto(f.concepto) ||
+          (buscaMonto && Number(f.total ?? 0) === montoNum)
+        ) {
+          proyConFacturaMatch.add(String(f.proyecto_id));
+        }
+      }
+    }
+    const pasaBusqueda = (p: { id: string; nombre: string | null; tienda: string }) =>
+      !term ||
+      matchTexto(p.nombre) ||
+      matchTexto(p.tienda) ||
+      proyConFacturaMatch.has(String(p.id));
+
     // Desglose SUM(factura.total × %) desde mk_factura_marcas. Alimenta el
-    // tooltip de desglose por marca de la columna "Gastado".
+    // tooltip de desglose por marca de la columna "Gastado" del modo plano.
     function desgloseDeProy(
       pid: string,
     ): { total: number; desglose: Array<{ marcaId: string; monto: number }> } {
@@ -593,6 +549,7 @@ export async function GET(req: NextRequest) {
     const resultado = proyectos
       .filter((p) => passBucket(String(p.id)))
       .filter((p) => passTipo(String(p.id)))
+      .filter((p) => pasaBusqueda(p))
       .map((p) => {
         const pid = String(p.id);
         const marcasSet = marcasByProy.get(pid) ?? new Set<string>();
@@ -619,14 +576,6 @@ export async function GET(req: NextRequest) {
             monto: d.monto,
           };
         });
-        // Sección por período (módulo puro lista-por-periodo). Sin bloque de
-        // marca todo va como "actual" y la UI dibuja plano, como siempre.
-        const sec = bloqueEsMarca
-          ? seccionDeProyecto(
-              docsActualByProy.get(pid) ?? 0,
-              cerradosByProy.get(pid) ?? [],
-            )
-          : { seccion: "actual" as const, periodo: null, tambienEn: [] };
         return {
           id: pid,
           nombre: p.nombre,
@@ -638,25 +587,39 @@ export async function GET(req: NextRequest) {
           entregas_count: entregasCountByProy.get(pid) ?? 0,
           marcas: marcasArr,
           // Gasto BRUTO real (Σ factura.total con ITBMS + entregas), sin co-op.
-          // Es el número grande que se muestra en la columna "Gastado".
+          // Es la columna "Gastado" del modo PLANO; en las secciones por
+          // período la fila muestra el monto DEL período (secciones[].proyectos).
           gasto_real: Number((grossByProy.get(pid) ?? 0).toFixed(2)),
           // Desglose de gasto por marca. Alimenta SOLO el tooltip de la
-          // columna "Gastado". El split por_cobrar/cobrado que dependía del
-          // estado del proyecto se retiró con el estado (11-ago-2026).
+          // columna "Gastado" del modo plano.
           por_cobrar_total: desg.total,
           por_cobrar_por_marca: desgloseConNombres,
-          seccion: sec.seccion,
-          periodo_cerrado: sec.periodo
-            ? { id: sec.periodo.id, nombre: sec.periodo.nombre, cerrado_en: sec.periodo.cerradoEn }
-            : null,
-          tambien_reporto_en: sec.tambienEn,
         };
       });
 
     return jsonNoStore({
       proyectos: resultado,
-      general,
+      // Compat: el General del período ABIERTO, para un cliente viejo.
+      general: generales.get(SECCION_ABIERTO) ?? null,
       particion: bloqueEsMarca,
+      // La identidad del bloque pedido, para el título y los links de las
+      // páginas de nivel 2 y 3 (el slug es el del nombre — ver slugs.ts).
+      marca: bloque
+        ? {
+            key: bloque,
+            nombre: nombreDeBloque(bloque, marcas),
+            slug: slugDeMarca(bloque, marcas),
+          }
+        : null,
+      // El bloque del agregador para la marca: alimenta el modal de cierre
+      // (facturas/muebles/total + los avisos sin comprobante / sin foto) y el
+      // detalle de los buckets sin período (multifashion / sin marca).
+      bloque_resumen: bloqueEsMarca
+        ? bloqueResumen
+        : bloque
+          ? (resumen.bloques.find((b) => b.key === bloque) ?? null)
+          : null,
+      secciones,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error interno";

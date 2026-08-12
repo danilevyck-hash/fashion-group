@@ -161,7 +161,9 @@ describe("el reporte en vivo de un período cerrado", () => {
 
 describe("la ruta y el chip", () => {
   const ruta = leer("app/api/marketing/periodos/[id]/reporte/route.ts");
-  const inicio = leer("app/marketing/components/InicioMarketing.tsx");
+  // El botón Excel de un período cerrado vive en el NIVEL 3 desde el
+  // rediseño de tres niveles (12-ago-2026).
+  const detalle = leer("app/marketing/components/DetallePeriodoView.tsx");
 
   it("la ruta genera el MISMO Excel que el ZIP (buildExcelDeMarca), sin un segundo generador", () => {
     // La garantía "un congelado nunca se recalcula" vive en zip-marca
@@ -182,8 +184,14 @@ describe("la ruta y el chip", () => {
     expect(ruta).toContain("junta varias marcas");
   });
 
-  it("el chip de un período cerrado pide SU marca", () => {
-    expect(inicio).toMatch(/descargarReporte\(c\.id as string, etiqueta, c\.bloqueKey\)/);
+  it("el Excel de un período cerrado pide SU marca", () => {
+    // Sin la marca, el período conjunto legacy ('pvh' junta TH+CK+KL)
+    // mezclaría los reportes: el botón de Calvin baja SOLO lo de Calvin.
+    expect(detalle).toMatch(
+      /descargarReporte\(seccion\.id as string, etiqueta, marca\.key\)/,
+    );
+    // Y el cierre baja el recién cerrado con la marca también.
+    expect(detalle).toMatch(/descargarReporte\(periodoId, etiquetaCierre, marca\.key\)/);
   });
 
   it("un reporte vacío no se manda (mismo criterio que MARCA_SIN_GASTO del ZIP)", () => {

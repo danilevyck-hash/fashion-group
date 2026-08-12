@@ -290,18 +290,20 @@ describe("barrido estático", () => {
     expect(src).toContain("agregarResumenInicio");
   });
 
-  it("el bloque de la marca NO funde facturas y muebles en un solo monto", () => {
+  it("el período NO funde facturas y muebles en un solo monto", () => {
     // Los muebles eran $71.765 que no se contaban en ninguna tarjeta; fundirlos
     // en el mismo `$` sin decirlo triplicaba el número que Daniel ya conoce.
-    // Ahora hay un "Total a reportar" —que es lo que se le manda al encargado
-    // de la marca— pero las dos líneas que lo componen se siguen viendo.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toContain('etiqueta="Facturas"');
-    expect(src).toContain('etiqueta="Mobiliario"');
-    // Y el total NO se calcula acá: viene ya sumado del módulo puro.
+    // Con los tres niveles, el desglose vive en el NIVEL 3 (el detalle del
+    // período dice "Facturas $x · Mobiliario $y" cuando hay de los dos) y en
+    // el modal de cierre — las dos líneas que componen el total se siguen
+    // viendo.
+    const src = leer("app/marketing/components/DetallePeriodoView.tsx");
+    expect(src).toMatch(/Facturas \{formatearMonto\(seccion\.montos\.facturas\)\}/);
+    expect(src).toMatch(/formatearMonto\(seccion\.montos\.muebles\)/);
+    // Y el total NO se calcula acá: viene ya sumado del agregador único.
     expect(src).not.toMatch(/facturas\.total\s*\+\s*muebles\.total/);
-    expect(src).not.toMatch(/muebles\.total\s*\+\s*facturas\.total/);
-    expect(src).toMatch(/formatearMonto\(b\.total\)/);
+    expect(src).not.toMatch(/montos\.facturas\s*\+\s*montos\.muebles/);
+    expect(src).toMatch(/formatearMonto\(seccion\.total\)/);
   });
 
   it("Multifashion es UN BLOQUE MÁS, y no se le reporta a nadie", () => {
@@ -314,8 +316,9 @@ describe("barrido estático", () => {
       /SIN_REPORTE\s*=\s*new Set<string>\(\[MULTIFASHION_KEY, SIN_BLOQUE\]\)/,
     );
     expect(src).toMatch(/const sinReporte = SIN_REPORTE\.has\(b\.key\)/);
-    // El período y el botón de cerrar dependen de NO ser uno de esos bloques.
-    expect(src).toMatch(/!sinReporte && datos\.conPeriodos/);
+    // Un bucket sin reporte no cuenta un "período abierto" que no tiene: el
+    // contador de períodos de su fila arranca en cero.
+    expect(src).toMatch(/sinReporte \? 0 : 1/);
   });
 
   it("EL BLOQUE ES LA MARCA — el proveedor no se dibuja en ningún lado", () => {
@@ -356,8 +359,14 @@ describe("barrido estático", () => {
     expect(src).not.toMatch(/se cierran juntas/);
     expect(src).not.toMatch(/esCabezaDeGrupo|grupoCierreDeMarca/);
     expect(src).not.toMatch(/PVH/);
-    // El botón de cerrar de CADA marca sigue vivo.
-    expect(src).toMatch(/setCerrando\(b\)/);
+    // El botón de cerrar de CADA marca sigue vivo — ahora en el NIVEL 3 (la
+    // página del período abierto), y solo cuando la sección puede cerrarse.
+    const detalle = sinComentarios(
+      leer("app/marketing/components/DetallePeriodoView.tsx"),
+    );
+    expect(detalle).toMatch(/seccion\.puedeCerrar/);
+    expect(detalle).toMatch(/setCerrando\(true\)/);
+    expect(detalle).not.toMatch(/Cerrar las tres/);
 
     // Y el modal solo conoce el cierre de UNA marca.
     const modal = sinComentarios(leer("app/marketing/components/CerrarPeriodoModal.tsx"));
@@ -370,16 +379,18 @@ describe("barrido estático", () => {
     // no foto. aunq el comprobante sea una foto"*. Son dos cosas distintas y
     // confundirlas manda un reporte sin respaldo o pide una foto que nunca
     // existió. Y un aviso que dice "todo bien" es ruido: con los dos en cero no
-    // se dibuja NADA.
-    const inicio = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(inicio).toMatch(
+    // se dibuja NADA. El aviso vive en el NIVEL 3 (el detalle del período
+    // abierto) desde el rediseño de tres niveles.
+    const aviso = leer("app/marketing/components/LoQueFalta.tsx");
+    expect(aviso).toMatch(
       /if \(sinComprobante <= 0 && sinFoto <= 0\) return null;/,
     );
-    expect(inicio).toContain("sin comprobante");
-    expect(inicio).toContain("sin foto");
+    expect(aviso).toContain("sin comprobante");
+    expect(aviso).toContain("sin foto");
     // Los contadores VIENEN del API; no se recuentan en la pantalla.
-    expect(inicio).toMatch(/b\.sinComprobante \?\? 0/);
-    expect(inicio).toMatch(/b\.sinFoto \?\? 0/);
+    const detalleAviso = leer("app/marketing/components/DetallePeriodoView.tsx");
+    expect(detalleAviso).toMatch(/bloqueResumen\.sinComprobante \?\? 0/);
+    expect(detalleAviso).toMatch(/bloqueResumen\.sinFoto \?\? 0/);
 
     // Y el modal de cierre avisa ANTES de confirmar, con lo ya contado por
     // bloque — nunca recontando.
@@ -396,13 +407,23 @@ describe("barrido estático", () => {
   it("los ZIP se bajan DE A UNO — nada de descargas múltiples", () => {
     // Safari en iPhone bloquea la segunda y la tercera descarga de una ráfaga,
     // así que un "bajar todos" se vería como que el sistema perdió archivos.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
+    // La descarga vive en UN hook (useDescargasPeriodo) que comparten el
+    // nivel 2 y el nivel 3 — no en fetchs propios de cada pantalla.
+    const src = leer("app/marketing/components/useDescargasPeriodo.ts");
     expect(src).toContain("/api/marketing/zip-marca");
     // Un solo fetch por clic: ni bucles ni Promise.all sobre el endpoint.
     expect(src).not.toMatch(/Promise\.all[\s\S]{0,200}zip-marca/);
     expect(src).not.toMatch(/for \([\s\S]{0,200}zip-marca/);
     // Sin periodoId = la marca hoy; con periodoId = un período ya cerrado.
     expect(src).toMatch(/periodoId \? \{ marcaCodigo, periodoId \} : \{ marcaCodigo \}/);
+    // Y las pantallas usan ESTE hook — ninguna arma el ZIP por su cuenta.
+    for (const f of [
+      "app/marketing/[marca]/page.tsx",
+      "app/marketing/components/DetallePeriodoView.tsx",
+    ]) {
+      expect(leer(f)).toContain("useDescargasPeriodo");
+      expect(leer(f)).not.toContain("/api/marketing/zip-marca");
+    }
   });
 
   it("la puerta única reemplazó al paso de crear un proyecto", () => {
@@ -462,20 +483,25 @@ describe("barrido estático", () => {
     expect(pago).toMatch(/impulsadoraId: impulsadora\.id/);
   });
 
-  it("sin la migración de períodos NO se dibuja píldora ni botón de cerrar", () => {
+  it("sin la migración de períodos NO se ofrece cerrar", () => {
     // `conPeriodos: false` significa que las tablas todavía no existen. No es
     // un error y no se le muestra al usuario como tal: los números son los
-    // mismos, pero no hay período al que atarlos ni nada que cerrar.
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toMatch(/const periodo =\s*\n?\s*!sinReporte && datos\.conPeriodos \? b\.periodoAbierto : null;/);
-    expect(src).toMatch(/const puedeCerrar =\s*\n?\s*!sinReporte && datos\.conPeriodos && !sinGasto && !!b\.periodoAbierto\?\.id;/);
+    // mismos, pero no hay período con fila al que atarle un cierre. La regla
+    // vive en el módulo puro que arma las secciones (una sola vez).
+    const lib = leer("lib/marketing/lista-por-periodo.ts");
+    expect(lib).toMatch(
+      /puedeCerrar: i\.conPeriodos && !sinGasto && !!i\.bloque\.periodoAbierto\?\.id/,
+    );
   });
 
   it("un bloque sin gasto no ofrece cerrar un período vacío", () => {
-    const src = leer("app/marketing/components/InicioMarketing.tsx");
-    expect(src).toContain("Todavía no hay gasto en este período.");
-    expect(src).toMatch(
-      /const sinGasto = b\.facturas\.count === 0 && b\.muebles\.count === 0;/,
+    const lib = leer("lib/marketing/lista-por-periodo.ts");
+    expect(lib).toMatch(
+      /const sinGasto =\s*\n?\s*i\.bloque\.facturas\.count === 0 && i\.bloque\.muebles\.count === 0;/,
+    );
+    // Y el detalle del período abierto vacío lo dice con palabras.
+    expect(leer("app/marketing/components/DetallePeriodoView.tsx")).toContain(
+      "Todavía no hay gasto en este período.",
     );
   });
 

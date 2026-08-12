@@ -1,50 +1,36 @@
 "use client";
 
-// Marketing se organiza por MARCA. Daniel, textual: *"ellos facturan a mi bajo
-// compañia diferentes. una por marca. cada marca tiene su encargado"*. El
-// agrupador "proveedor" desapareció de la pantalla, y cada marca se cierra
-// SOLA — el atajo "Cerrar las tres" se retiró el 11-ago-2026 (Daniel: *"que
-// sea por separado mejor no?"*).
+// Marketing se organiza por MARCA, en TRES NIVELES con URL propia
+// (12-ago-2026 — mockup aprobado por Daniel):
 //
-// URL patterns:
-//   /marketing                        → inicio (un bloque por marca)
-//   /marketing?bloque=TH              → lista de proyectos de esa marca
-//   /marketing?bloque=TH&proyecto=…   → + overlay del proyecto
+//   /marketing                        → nivel 1: las marcas (este archivo)
+//   /marketing/[marca]                → nivel 2: SUS períodos
+//   /marketing/[marca]/[periodo]      → nivel 3: el detalle del período
 //   /marketing?vista=reportes         → reportes (reemplaza el inicio)
 //   /marketing?vista=impulsadoras     → impulsadoras (reemplaza el inicio)
 //
-// Legacy: `?proveedor=` sigue entrando (era la clave vieja) y `?vista=papelera`
-// / `?vista=anulados` redirigen a /marketing — esa pantalla se retiró. Un
-// enlace viejo tiene que llegar a algún lado, no a un error.
+// Daniel, textual: *"quiero que dentro de cada marca aparezca 'periodo uno'
+// periodo dos, y dentro de cada periodo la info… que este ordenado"*.
+//
+// Legacy: `?bloque=` / `?proveedor=` eran la lista de la marca en esta misma
+// página — ahora REDIRIGEN a /marketing/[marca] (conservando ?proyecto=). Y
+// `?vista=papelera` / `?vista=anulados` siguen redirigiendo a /marketing.
+// Un enlace viejo tiene que llegar a algún lado, no a un error.
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
-import {
-  MULTIFASHION_KEY,
-  SIN_BLOQUE,
-  esMarcaCodigo,
-  nombreDeBloque,
-} from "@/lib/marketing/bloques";
+import { esBloqueKey } from "@/lib/marketing/bloques";
+import { slugDeMarca } from "@/lib/marketing/slugs";
 import InicioMarketing from "./components/InicioMarketing";
-import ProyectosHomeView from "./components/ProyectosHomeView";
 import ProyectoOverlay from "./components/ProyectoOverlay";
 import ReportesTabs from "./components/ReportesTabs";
 import ImpulsadorasView from "./components/ImpulsadorasView";
 import RegistrarGastoModal from "./components/RegistrarGastoModal";
 
-// `historial` se removió de la UI y su componente (HistorialView.tsx) se borró
-// el 11-ago-2026 junto con "Cerrar proyecto": el estado del proyecto dejó de
-// existir como concepto visible, así que no hay historial que dibujar.
 type VistaExtra = "reportes" | "impulsadoras" | null;
-
-/** Bloques que dibuja el inicio y que "Ver proyectos" puede abrir. */
-function esBloqueValido(k: string | null): boolean {
-  if (!k) return false;
-  return esMarcaCodigo(k) || k === MULTIFASHION_KEY || k === SIN_BLOQUE;
-}
 
 export default function MarketingPageWrapper() {
   return (
@@ -63,9 +49,9 @@ function MarketingPage() {
   });
 
   const proyectoParam = searchParams.get("proyecto");
-  // `proveedor` es la clave vieja: un enlace guardado sigue funcionando.
+  // `bloque`/`proveedor` son de la URL vieja (la lista vivía acá): redirigen.
   const bloqueRaw = searchParams.get("bloque") ?? searchParams.get("proveedor");
-  const bloqueParam = esBloqueValido(bloqueRaw) ? bloqueRaw : null;
+  const bloqueParam = esBloqueKey(bloqueRaw) ? bloqueRaw : null;
   const vistaRaw = searchParams.get("vista");
   const vistaParam: VistaExtra =
     vistaRaw === "reportes" || vistaRaw === "impulsadoras"
@@ -75,9 +61,6 @@ function MarketingPage() {
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
   const [registrandoGasto, setRegistrandoGasto] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [nombreProyectoActual, setNombreProyectoActual] = useState<string | null>(
-    null,
-  );
 
   useEffect(() => {
     let cancelado = false;
@@ -99,70 +82,47 @@ function MarketingPage() {
   }, []);
 
   const navegar = useCallback(
-    (next: {
-      proyecto?: string | null;
-      vista?: VistaExtra;
-      bloque?: string | null;
-    }) => {
+    (next: { vista?: VistaExtra }) => {
       const params = new URLSearchParams();
-      const nextProyecto =
-        next.proyecto === undefined ? proyectoParam : next.proyecto ?? null;
       const nextVista = next.vista === undefined ? vistaParam : next.vista;
-      const nextBloque =
-        next.bloque === undefined ? bloqueParam : next.bloque ?? null;
-      if (nextVista) {
-        // Reportes e Impulsadoras son globales: no arrastran marca ni proyecto.
-        params.set("vista", nextVista);
-      } else {
-        if (nextBloque) params.set("bloque", nextBloque);
-        if (nextProyecto) params.set("proyecto", nextProyecto);
-      }
+      // Reportes e Impulsadoras son globales: no arrastran marca ni proyecto.
+      if (nextVista) params.set("vista", nextVista);
       const qs = params.toString();
-      // PUSH, no replace: cada nivel (marca, proyecto, reportes/impulsadoras)
-      // es "otra página" y deja su entrada en el historial → el botón Atrás
-      // del navegador deshace UN nivel (espejo del breadcrumb), en vez de
-      // saltarse /marketing entero y caer en el Inicio. 🩸 Con replace, tocar
-      // el bloque de Tommy PISABA la entrada /marketing y Atrás iba a "/".
-      // Es el mismo patrón del módulo de referencia (ReclamosClient).
+      // PUSH, no replace: cada nivel es "otra página" y deja su entrada en el
+      // historial → el botón Atrás deshace UN nivel (espejo del breadcrumb).
+      // 🩸 Con replace, entrar a Reportes PISABA la entrada /marketing y Atrás
+      // caía en "/". Mismo patrón que el módulo de referencia (ReclamosClient).
       router.push(qs ? `/marketing?${qs}` : "/marketing");
     },
-    [proyectoParam, vistaParam, bloqueParam, router],
+    [vistaParam, router],
   );
 
   const refrescar = () => setRefreshKey((k) => k + 1);
 
+  // Enlaces viejos, UNA sola puerta de redirect: la pantalla de Anulados
+  // (papelera) ya no existe, y ?bloque= ahora es una página propia
+  // (/marketing/[marca], nivel 2). Se conserva ?proyecto= en el viaje.
   useEffect(() => {
-    if (!proyectoParam) setNombreProyectoActual(null);
-  }, [proyectoParam]);
-
-  // Enlaces viejos: la pantalla de Anulados ya no existe. Se manda al inicio
-  // en vez de dejar una URL que no dibuja nada.
-  useEffect(() => {
-    if (vistaRaw === "papelera" || vistaRaw === "anulados") {
-      router.replace("/marketing");
-    }
-  }, [vistaRaw, router]);
+    const destinoLegacy =
+      vistaRaw === "papelera" || vistaRaw === "anulados"
+        ? "/marketing"
+        : bloqueParam
+          ? `/marketing/${slugDeMarca(bloqueParam, marcas)}${
+              proyectoParam ? `?proyecto=${encodeURIComponent(proyectoParam)}` : ""
+            }`
+          : null;
+    if (destinoLegacy) router.replace(destinoLegacy);
+  }, [vistaRaw, bloqueParam, proyectoParam, marcas, router]);
 
   if (!authChecked) return null;
 
   const mostrandoVistaExtra = vistaParam !== null;
-  const bloqueLabel = bloqueParam ? nombreDeBloque(bloqueParam, marcas) : null;
 
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
   } else if (vistaParam === "impulsadoras") {
     breadcrumbs.push({ label: "Impulsadoras" });
-  } else if (proyectoParam && nombreProyectoActual) {
-    if (bloqueLabel) {
-      breadcrumbs.push({
-        label: bloqueLabel,
-        onClick: () => navegar({ proyecto: null }),
-      });
-    }
-    breadcrumbs.push({ label: nombreProyectoActual });
-  } else if (bloqueLabel) {
-    breadcrumbs.push({ label: bloqueLabel });
   }
 
   return (
@@ -186,18 +146,13 @@ function MarketingPage() {
               <ReportesTabs />
             )}
           </div>
-        ) : bloqueParam ? (
-          <ProyectosHomeView
-            bloque={bloqueParam}
-            bucketLabel={bloqueLabel ?? ""}
-            onBack={() => navegar({ bloque: null, proyecto: null })}
-            onOpenProyecto={(id) => navegar({ proyecto: id })}
-            onRegistrarGasto={() => setRegistrandoGasto(true)}
-            refreshKey={refreshKey}
-          />
         ) : (
           <InicioMarketing
-            onSelectBloque={(key) => navegar({ bloque: key })}
+            onSelectBloque={(key) =>
+              // Drill-down con push: el nivel 2 es otra página y Atrás vuelve
+              // acá (candado navegacion-atras-fluido).
+              router.push(`/marketing/${slugDeMarca(key, marcas)}`)
+            }
             onRegistrarGasto={() => setRegistrandoGasto(true)}
             onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
@@ -207,12 +162,13 @@ function MarketingPage() {
         )}
       </main>
 
-      {proyectoParam && !mostrandoVistaExtra && (
+      {/* Overlay de un enlace viejo /marketing?proyecto=<id> sin bloque: se
+          sigue abriendo acá para no dejar el enlace muerto. */}
+      {proyectoParam && !mostrandoVistaExtra && !bloqueParam && (
         <ProyectoOverlay
           proyectoId={proyectoParam}
-          onClose={() => navegar({ proyecto: null })}
+          onClose={() => router.push("/marketing")}
           onChange={refrescar}
-          onNombreProyecto={setNombreProyectoActual}
         />
       )}
 
