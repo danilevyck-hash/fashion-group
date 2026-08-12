@@ -105,8 +105,9 @@ export default function GuiaPage() {
 
             {/* Los envíos, siempre visibles: se despacha mirándolos. */}
             <div className="rounded-lg border border-gray-200 bg-white p-4">
+              {/* "de esta guía" se fue: se está DENTRO de la guía. */}
               <span className="text-xs uppercase tracking-wide text-gray-400 block mb-3">
-                Envíos de esta guía
+                Envíos
               </span>
               <ul className="divide-y divide-gray-100">
                 {items.map((item, idx) => (

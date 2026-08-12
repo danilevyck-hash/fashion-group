@@ -184,7 +184,9 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
 
             {/* Historial por empresa */}
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
-              <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Por empresa</h2>
+              {/* `sr-only`: la primera columna de la tabla de abajo se llama
+                  "Empresa". El encabezado sigue existiendo para un lector. */}
+              <h2 className="sr-only">Por empresa</h2>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">

@@ -262,21 +262,16 @@ function NuevoGastoPage() {
               className="px-6 py-5 sm:px-7 sm:py-5"
               style={{ borderBottom: "1px solid var(--caja-border-subtle)" }}
             >
-              <div className="caja-eyebrow mb-1.5">
-                Período Nº {periodo.numero} · Caja Menuda
-              </div>
+              {/* El "Período Nº N · Caja Menuda" se fue: se llega acá desde el
+                  período abierto, que ya lo dice en su encabezado. */}
               <h2
                 className="caja-display-sm"
                 style={{ fontSize: 24, margin: 0 }}
               >
                 Nuevo gasto
               </h2>
-              <p
-                className="text-sm mt-1.5"
-                style={{ color: "var(--caja-fg-muted)" }}
-              >
-                Registra un comprobante del fondo fijo. Los campos con * son obligatorios.
-              </p>
+              {/* La bajada se fue: el formulario ya marca con * los campos
+                  obligatorios y el botón dice qué se guarda. */}
             </div>
 
             <div className="px-6 py-7 sm:px-7 sm:py-7">

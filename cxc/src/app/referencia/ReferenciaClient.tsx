@@ -12,16 +12,15 @@ export default function ReferenciaClient() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader module="Referencia" />
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
-        <div className="mb-5">
-          {/* Sin título grande: "Referencia" ya lo dicen la barra sticky
-              (celular) y el breadcrumb (escritorio). Queda sr-only para no
-              dejar la página sin encabezado. La bajada se QUEDA: dice qué se
-              busca y qué devuelve, no repite el nombre. */}
-          <h1 className="sr-only">Referencia</h1>
-          <p className="text-sm text-gray-600">
-            Buscá un código o pegá tu lista: cuánto llegó, cuánto se vendió y qué hay en stock.
-          </p>
-        </div>
+        {/* Sin título grande (#510): "Referencia" ya lo dicen la barra sticky
+            (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
+            la página sin encabezado.
+            Y sin bajada: la caja del buscador ya dice "Podés pegar hasta N
+            códigos juntos" y la ficha enseña lo que llegó, lo vendido y lo que
+            hay en stock — narrarlo antes no le agrega nada a quien llega por
+            primera vez. Sin el `<div className="mb-5">` de antes: con el h1
+            invisible y sin bajada, ese contenedor era 20 px de hueco. */}
+        <h1 className="sr-only">Referencia</h1>
         <ReferenciaView />
       </main>
     </div>

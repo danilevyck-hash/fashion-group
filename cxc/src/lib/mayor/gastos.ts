@@ -107,8 +107,13 @@ export const ETIQUETA_ESTADO: Record<EstadoMes, string> = {
  */
 export function explicacionEstado(estado: EstadoMes, hastaMes: string | null): string {
   switch (estado) {
+    // 🔴 El mes CERRADO no explica nada: la etiqueta de al lado ya dice
+    // "Cerrado", y la frase salía 7 veces en la misma pantalla (una por
+    // empresa). Los otros tres estados SÍ informan y se quedan — "parcial"
+    // avisa que lo que se ve está incompleto, "sin_cerrar" dice hasta dónde
+    // llega la contabilidad y "sin_datos" que ni se trajo de Switch.
     case "cerrado":
-      return "La contadora ya cerró este mes.";
+      return "";
     case "parcial":
       return "Este mes tiene movimientos sueltos, pero la contadora todavía no lo cerró. Lo que se ve está incompleto.";
     case "sin_cerrar":

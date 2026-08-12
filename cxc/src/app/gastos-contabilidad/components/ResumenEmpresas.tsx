@@ -111,7 +111,9 @@ function Tarjeta({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => void
         </CeldaTarjeta>
       </div>
 
-      <p className="mt-3 text-sm text-gray-600">{fila.explicacion}</p>
+      {/* El mes cerrado devuelve "" (ya lo dice la etiqueta): sin el guard
+          quedaría un <p> vacío con su margen y un hueco en la tarjeta. */}
+      {fila.explicacion && <p className="mt-3 text-sm text-gray-600">{fila.explicacion}</p>}
 
       {empresa.avisos.length > 0 && (
         <div className="mt-2">
@@ -149,7 +151,9 @@ function FilaTabla({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => vo
           {/* max-w-sm y no más: en tabla, el ancho natural de esta explicación es
               lo que decide si las 4 columnas entran. Con `max-w-xl` la tabla
               pedía 94 px de arrastre justo a 1024. */}
-          <p className="mt-1 max-w-sm text-sm text-gray-600">{fila.explicacion}</p>
+          {fila.explicacion && (
+            <p className="mt-1 max-w-sm text-sm text-gray-600">{fila.explicacion}</p>
+          )}
         </td>
         <td className="px-3 py-3 text-right align-top">
           <Pendiente />

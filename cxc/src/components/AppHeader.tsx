@@ -157,8 +157,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
         <div className="fixed inset-0 z-50 sm:hidden">
           <div {...backdropDrawer} className="absolute inset-0 bg-black/40" />
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-            <div className="flex items-center justify-between px-5 h-14 border-b border-gray-200">
-              <span className="text-sm font-medium">Módulos</span>
+            {/* "Módulos" queda `sr-only`: el cajón se abre desde el botón de
+                menú y adentro está la lista de módulos, a la vista. */}
+            <div className="flex items-center justify-end px-5 h-14 border-b border-gray-200">
+              <span className="sr-only">Módulos</span>
               <button onClick={() => setDrawerOpen(false)} aria-label="Cerrar menú" className="min-w-[44px] min-h-[44px] flex items-center justify-center active:bg-gray-100 rounded-md transition-all">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>

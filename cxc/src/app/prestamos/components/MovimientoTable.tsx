@@ -54,8 +54,10 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEd
 
   return (
     <div className="mb-6">
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">Estado de Cuenta</h2>
+      {/* `sr-only`: es la única tabla de la ficha del empleado y sus columnas
+          ya dicen qué es. El encabezado queda para quien usa lector. */}
+      <div className="flex items-baseline justify-end mb-3">
+        <h2 className="sr-only">Estado de Cuenta</h2>
         {total > 0 && (
           <span className="text-xs text-gray-400 tabular-nums">{total} movimiento{total !== 1 ? "s" : ""}</span>
         )}

@@ -311,10 +311,10 @@ export default function PeriodoDetailHeader({
               sub={`${pctSpent.toFixed(1)}% del fondo`}
               dim
             />
+            {/* Sin `sub`: "Disponible" bajo el saldo no agregaba nada. */}
             <Kpi
               label="Saldo"
               value={saldo}
-              sub="Disponible"
               highlight={saldo >= 0}
             />
           </div>
@@ -337,10 +337,10 @@ export default function PeriodoDetailHeader({
               className="flex justify-between mt-2 text-xs caja-mono"
               style={{ color: "var(--caja-fg-muted)" }}
             >
+              {/* El "% gastado" del medio se fue: es EXACTAMENTE el mismo
+                  número que el KPI "Gastado" ya muestra arriba como
+                  "N% del fondo", a dos centímetros. */}
               <span>$0.00</span>
-              <span style={{ color: barColor, fontWeight: 500 }}>
-                {pctSpent.toFixed(1)}% gastado
-              </span>
               <span>${fmt(fondoInicial)}</span>
             </div>
           </div>

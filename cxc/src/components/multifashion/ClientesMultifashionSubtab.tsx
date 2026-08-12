@@ -312,8 +312,11 @@ export function ClientesMultifashionSubtab({ selectedYear, mes, ventanaAcotada =
           {/* Encabezado + filtro de período propio del tab. */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="font-display text-base font-semibold text-gray-950">Clientes · {periodoStr}</h3>
-              <p className="mt-0.5 text-xs text-gray-400">Mostrador anónimo va aparte</p>
+              {/* `sr-only`: la pestaña ya dice "Clientes" y el selector de la
+                  derecha enseña el período. El aviso del mostrador anónimo SÍ
+                  se queda: cambia cómo se lee el top. */}
+              <h3 className="sr-only">Clientes · {periodoStr}</h3>
+              <p className="text-xs text-gray-400">Mostrador anónimo va aparte</p>
             </div>
             <div className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-gray-50 p-0.5">
               {opcionesRango.map(opt => (

@@ -206,7 +206,10 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
 
       {/* Subtitle */}
       <div className={cn(loading && "opacity-60 transition-opacity")}>
-        <h3 className="font-display text-base font-semibold text-gray-950">Vendedoras · {chipLabel[chip]}</h3>
+        {/* `sr-only`: la pestaña dice "Vendedoras" y las píldoras de acá arriba
+            enseñan el período elegido. El encabezado sigue existiendo para
+            quien navega con lector de pantalla. */}
+        <h3 className="sr-only">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
           <p className="mt-0.5 text-xs text-gray-500">
             <span className="font-mono tabular-nums text-gray-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}

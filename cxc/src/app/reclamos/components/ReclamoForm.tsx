@@ -161,7 +161,8 @@ export default function ReclamoForm({
 
       {/* ── Step 1: Empresa (always visible) ── */}
       <div className="mb-10">
-        <div className="text-sm font-semibold text-gray-900 mb-4">Empresa</div>
+        {/* El rótulo "Empresa" se fue: abajo hay UN solo campo y su etiqueta ya
+            dice "Empresa *". Decirlo dos veces en cuatro centímetros no ayuda. */}
         <div className="max-w-xs">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Empresa *</label>

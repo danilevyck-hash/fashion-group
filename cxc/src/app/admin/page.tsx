@@ -508,9 +508,14 @@ function AdminDashboardInner() {
               {label}
             </button>
           ))}
-          <span className="ml-auto hidden md:block text-xs text-gray-400 pr-1">
-            {tab === "boston" ? "Confecciones Boston · se lleva aparte" : "6 empresas"}
-          </span>
+          {/* Solo la coletilla de Boston, que dice algo que la pestaña no dice.
+              La del grupo era "6 empresas" al lado de la pestaña activa
+              "Grupo · 6 empresas": el mismo texto dos veces en la misma línea. */}
+          {tab === "boston" && (
+            <span className="ml-auto hidden md:block text-xs text-gray-400 pr-1">
+              Confecciones Boston · se lleva aparte
+            </span>
+          )}
         </div>
       </div>
 
