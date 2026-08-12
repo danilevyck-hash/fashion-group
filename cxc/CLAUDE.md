@@ -590,6 +590,9 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > | 1 | **"Un dato que mirás está viejo"** | la **cartera** o las **ventas** llevan **+24 h** sin actualizarse | `src/lib/datos-frescos.ts` → `checkDatosViejos()` en switch-reconciliacion |
 > | 2 | **"Algo se rompió y no se arregló solo"** | **2 fallos seguidos** del mismo par `(empresa, sync_type)` | `alert-policy.ts` (PR #345) — **se reusa, NO se duplica** |
 > | 3 | **"La base está en problemas de verdad"** | **+80 % de memoria usada** (= <20 % disponible) | `db-recursos.ts` |
+> | 4 | **"El reloj de asistencia tiene un hueco que ya no entra solo"** | lo último traído del reloj quedó **más viejo que los 15 días** que el agente recupera solo (`VENTANA_RECUPERACION_DIAS`); UN aviso por episodio (candado `hueco_alertado_en`) + "ya se arregló" al cerrarse | `asistencia/agente.ts` → chequeo 2 del vigía `asistencia-vigia` |
+>
+> **La 4ª la pidió Daniel explícitamente el 12-ago-2026** — textual: *"ok lo corro pero si pasa mas de 15 dias que me llegue notificacion a telegram alertas para saber q hay q arreglarlo"*. La lista sigue siendo CERRADA: se sumó esta porque él la aprobó, no porque la política se haya aflojado. El umbral se DERIVA de la constante del agente (`DIAS_RECUPERACION_AGENTE` espejo de `VENTANA_RECUPERACION_DIAS_DEFAULT`, candado en `asistencia-vigia-hueco.test.ts`); DDL aditiva `20260812130000_asistencia_hueco_alertado.sql` (la corre Daniel a mano; sin ella el vigía degrada limpio y no avisa).
 >
 > **Las 24 h son de Daniel** (mi propuesta eran 12). Es más estricto que las 26 h del indicador `SyncStatus` de la app, y a propósito: esas 26 h se dimensionaron cuando los syncs corrían 1×/día bajo Hobby; hoy las ventas van 8×/día y la cartera 6-7×/día. Entre 24 h y 26 h hay una ventana donde la alerta suena y la pantalla todavía dice "al día" — se prefiere el aviso antes que después.
 >

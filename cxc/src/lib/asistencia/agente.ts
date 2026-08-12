@@ -56,6 +56,7 @@ const COLUMNAS_NUEVAS = [
   "fallos_seguidos",
   "alertado_en",
   "agente_version",
+  "hueco_alertado_en",
 ] as const;
 
 export function esColumnaFaltante(error: { code?: string; message?: string } | null): boolean {
@@ -87,6 +88,9 @@ export interface FilaDispositivo {
   fallos_seguidos?: number | null;
   alertado_en?: string | null;
   agente_version?: string | null;
+  /** Candado del aviso "hay un hueco que el programa ya no alcanza".
+   *  DDL: 20260812130000_asistencia_hueco_alertado.sql — sin correr, no viene. */
+  hueco_alertado_en?: string | null;
 }
 
 export type SaludAgente = "nunca" | "al_dia" | "callado" | "con_error";
@@ -302,6 +306,81 @@ export function vigiaDebeAlertar(
   return mins !== null && mins > horas * 60;
 }
 
+/* ── El hueco que el programa ya no alcanza ─────────────────────────────────
+ *
+ * 🔔 4ª ALERTA DE SISTEMA — LA PIDIÓ DANIEL EXPLÍCITAMENTE EL 12-AGO-2026,
+ * textual: "ok lo corro pero si pasa mas de 15 dias que me llegue notificacion
+ * a telegram alertas para saber q hay q arreglarlo". La lista de CLAUDE.md
+ * ("SOLO 3 ALERTAS DE SISTEMA", 30-jul-2026) es cerrada A PROPÓSITO y sigue
+ * vigente: esta se suma como la cuarta porque él la aprobó, no porque la
+ * política se haya aflojado. No agregar más sin su OK.
+ *
+ * EL CASO: el agente de la PC tiene ventana normal de 3 días y, al detectar un
+ * hueco, barre `VENTANA_RECUPERACION_DIAS` (15) días automáticamente. Un hueco
+ * MÁS VIEJO que eso ya no lo alcanza ninguna vuelta — no se arregla solo, y la
+ * única salida es que alguien amplíe la ventana en el `.env` de la PC de la
+ * oficina. Exactamente la regla de tres del canal SISTEMA: real, no se arregla
+ * solo, alguien tiene que hacer algo.
+ */
+
+/**
+ * Hasta cuántos días hacia atrás recupera SOLO el agente de la PC.
+ *
+ * 🔑 NO ES UN NÚMERO NUESTRO: es el espejo de `VENTANA_RECUPERACION_DIAS_DEFAULT`
+ * en `scripts/agente-reloj/config.mjs` (v1.1.0, la que está instalada en la
+ * oficina). Se repite acá porque el código de Next no puede importar los .mjs
+ * del agente sin arrastrarlos al bundle; la igualdad la sostiene el test
+ * `asistencia-vigia-hueco.test.ts`, que importa el archivo REAL del agente y
+ * compara — si alguien mueve uno solo de los dos, el build se pone rojo.
+ *
+ * ⚠️ Si algún día se amplía la ventana en el `.env` de la PC (VENTANA_
+ * RECUPERACION_DIAS=30, p.ej.), este espejo NO se entera: refleja el DEFAULT
+ * del programa, no el override local. Está bien así — el aviso peca de
+ * temprano, nunca de tarde.
+ */
+export const DIAS_RECUPERACION_AGENTE = 15;
+
+const MINUTOS_POR_DIA = 24 * 60;
+
+/**
+ * ¿Hay que avisar que quedó un hueco fuera del alcance del programa?
+ *
+ * Solo si (a) el reloj ya trajo algo alguna vez —sin fecha de "leído hasta" no
+ * hay hueco, hay un reloj recién puesto—, (b) lo último traído es MÁS viejo que
+ * la ventana de recuperación (o sea, esas marcaciones ya no entran solas), y
+ * (c) no se avisó ya de este mismo episodio (candado `hueco_alertado_en`,
+ * igual que `alertado_en` para el silencio: UN mensaje por episodio, no uno
+ * por pasada del cron).
+ */
+export function vigiaDebeAlertarHueco(
+  fila: FilaDispositivo | null,
+  ahoraMs: number,
+  dias: number = DIAS_RECUPERACION_AGENTE,
+): boolean {
+  if (!fila?.leido_hasta) return false; // reloj recién puesto: no es hueco
+  if (fila.hueco_alertado_en) return false; // ya se avisó de este episodio
+  const mins = minutosDesde(fila.leido_hasta, ahoraMs);
+  return mins !== null && mins > dias * MINUTOS_POR_DIA;
+}
+
+/**
+ * ¿El episodio se cerró y hay que mandar el "ya se arregló"?
+ *
+ * Solo si hubo alerta previa (`hueco_alertado_en` puesto) Y lo leído volvió a
+ * estar dentro de la ventana. Sin alerta previa no se manda nada (no hay a
+ * quién tranquilizar), y con la fecha ilegible tampoco: afirmar "ya entró"
+ * sin poder medirlo sería mentir.
+ */
+export function vigiaHuecoCerrado(
+  fila: FilaDispositivo | null,
+  ahoraMs: number,
+  dias: number = DIAS_RECUPERACION_AGENTE,
+): boolean {
+  if (!fila?.hueco_alertado_en) return false; // no hubo episodio abierto
+  const mins = minutosDesde(fila.leido_hasta, ahoraMs);
+  return mins !== null && mins <= dias * MINUTOS_POR_DIA;
+}
+
 /* ── Los textos de Telegram ─────────────────────────────────────────────── */
 
 /**
@@ -328,4 +407,24 @@ export function textoSilencio(dispositivo: string, minutos: number): string {
 
 export function textoRecuperado(dispositivo: string): string {
   return `Ya volvieron a entrar las marcaciones del reloj (${dispositivo}). No hay que hacer nada.`;
+}
+
+/**
+ * El hueco fuera de alcance. El número de días viene SIEMPRE de la constante
+ * compartida (nunca un 15 escrito a mano acá): si el agente cambia su ventana,
+ * este texto cambia con él.
+ */
+export function textoHuecoViejo(
+  dispositivo: string,
+  dias: number = DIAS_RECUPERACION_AGENTE,
+): string {
+  return [
+    `El reloj de asistencia tiene marcaciones de hace más de ${dias} días sin traer (${dispositivo}).`,
+    `Qué significa: el programa de la PC solo recupera hasta ${dias} días hacia atrás, así que esas marcaciones ya no van a entrar solas.`,
+    "Qué hacer: hay que ampliar la ventana de recuperación en la PC de la oficina — pedile los pasos a Claude.",
+  ].join("\n");
+}
+
+export function textoHuecoCerrado(dispositivo: string): string {
+  return `Ya entraron las marcaciones atrasadas del reloj (${dispositivo}). No hay que hacer nada.`;
 }
