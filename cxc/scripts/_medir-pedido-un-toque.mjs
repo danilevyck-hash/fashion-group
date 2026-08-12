@@ -94,7 +94,14 @@ for (const ancho of ANCHOS) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ permiso: true, verificado: true, mensaje: null }) });
     }
     if (url.includes("/enviar-switch") && req.method() === "POST") {
-      return route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify(PROBLEMA) });
+      // PREVIEW=1 devuelve un preview LIMPIO en vez del 422: es la forma de
+      // medir en `origin/main` la MISMA tabla de líneas que la rama enseña en
+      // su pantalla de problema (allá vive dentro del modal de preview).
+      return process.env.PREVIEW
+        ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ preview: {
+            cliente: "Contado (id 1)", vendedor: "Daniel (id 2)", lineas: PROBLEMA.lineas,
+            warnings: [], avisos: [], totalPiezas: 36, totalEstimado: 540 } }) })
+        : route.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify(PROBLEMA) });
     }
     if (req.method() !== "GET") {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, bloqueadoPorElMedidor: true }) });
@@ -103,7 +110,9 @@ for (const ancho of ANCHOS) {
   });
 
   await page.goto(`${BASE}/catalogo/${MARCA}/pedido/${PEDIDO}`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector('button:has-text("Enviar a Switch")', { timeout: 30000 });
+  // En `origin/main` el botón dice "Confirmar y enviar a Switch"; `has-text`
+  // es subcadena, así que el MISMO selector sirve para medir las dos ramas.
+  await page.waitForSelector('button:has-text("nviar a Switch")', { timeout: 30000 });
   await page.waitForTimeout(1500);
 
   // ── ESTADO 1: precio EDITADO → aviso inline "← lista $X" ──
@@ -114,8 +123,8 @@ for (const ancho of ANCHOS) {
   const m1 = await page.evaluate(medir);
 
   // ── ESTADO 2: pantalla de problema ──
-  await page.locator('button:has-text("Enviar a Switch")').first().click();
-  await page.waitForSelector("text=No se puede enviar a Switch", { timeout: 30000 });
+  await page.locator('button:has-text("nviar a Switch")').first().click();
+  await page.waitForSelector(process.env.PREVIEW ? "text=Crear pedido en Switch" : "text=No se puede enviar a Switch", { timeout: 30000 });
   await page.waitForTimeout(600);
   const m2 = await page.evaluate(medir);
 

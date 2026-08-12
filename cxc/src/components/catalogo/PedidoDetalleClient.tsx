@@ -783,7 +783,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal">Producto</th>
                 <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-16">Bultos</th>
                 <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-14">Pzas</th>
-                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-24">Precio</th>
+                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-16">Precio</th>
                 <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
               </tr>
@@ -832,7 +832,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                         precio es una función legítima. Solo se dice cuando
                         DIFIERE — repetirlo cuando coincide sería ruido. */}
                     {precioDeLista(item) !== null && (
-                      <div className="text-xs text-amber-600 tabular-nums whitespace-nowrap mt-0.5">
+                      <div className="text-xs text-amber-600 tabular-nums mt-0.5 leading-tight">
                         ← lista {fmtPrecio(precioDeLista(item)!)}
                       </div>
                     )}
