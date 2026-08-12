@@ -9,7 +9,15 @@
 // /tmp — nunca a la base.
 //
 // Lo que se verifica, y es el número que no se puede mover:
-//   Tommy + Calvin del período CERRADO "mid 2026" = $62.381,57
+//   Tommy + Calvin del período CERRADO "mid 2026" = $140.566,57
+//
+// ⚠️ ACTUALIZADO el 12-ago-2026: era $62.381,57 (las 59 facturas legacy).
+// El movimiento aprobado por Daniel (`_mover-reportado-mid2026.ts`) selló al
+// mismo cerrado el gasto que él YA había reportado por fuera: Kheridinne TH
+// $9.000 + 10 entregas TH $40.565 + 10 entregas CK $28.620. Nada se creó ni
+// se borró — la plata solo cambió de cajón, y el global del módulo quedó
+// idéntico ($164.808,20). Joybees NO se cierra (Daniel: "cuando te dije
+// cerrarlo?"): su entrega ($1.540) sigue en su período abierto.
 //
 // ⚠️ La base de Daniel se satura fácil. Este script hace UNA tanda de lecturas
 // por marca (7 consultas), no un barrido en bucle.
@@ -20,7 +28,8 @@ import { buildZipDeMarca, ErrorZipMarca } from "@/lib/marketing/zip-marca";
 import { MARCAS_BLOQUE } from "@/lib/marketing/bloques";
 
 const GUARDAR = process.argv.includes("--guardar");
-const ESPERADO_CERRADO = 62381.57;
+// TH $94.104,43 + CK $46.462,14 tras el movimiento del 12-ago-2026 (ver arriba).
+const ESPERADO_CERRADO = 140566.57;
 
 const money = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
