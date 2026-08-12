@@ -50,9 +50,14 @@ import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import { enviarSistema } from "@/lib/alertas/canal";
 import {
   HORAS_PARA_VIGIA,
+  DIAS_RECUPERACION_AGENTE,
   esColumnaFaltante,
   textoSilencio,
+  textoHuecoViejo,
+  textoHuecoCerrado,
   vigiaDebeAlertar,
+  vigiaDebeAlertarHueco,
+  vigiaHuecoCerrado,
   type FilaDispositivo,
 } from "@/lib/asistencia/agente";
 
@@ -115,9 +120,78 @@ export async function GET(req: NextRequest) {
     avisados.push(f.dispositivo);
   }
 
+  // ── Chequeo 2: el hueco que el programa ya no alcanza ──────────────────────
+  //
+  // 🔔 Lo pidió Daniel explícitamente el 12-ago-2026, textual: "ok lo corro
+  // pero si pasa mas de 15 dias que me llegue notificacion a telegram alertas
+  // para saber q hay q arreglarlo". Es la 4ª alerta de sistema (la lista
+  // cerrada de 3 de CLAUDE.md sigue vigente; esta se suma con su aprobación).
+  //
+  // El agente de la PC recupera solo hasta `DIAS_RECUPERACION_AGENTE` (15) días
+  // hacia atrás: si lo último traído quedó más viejo que eso, esas marcaciones
+  // ya NO entran solas y hay que ampliar la ventana en el .env de la PC.
+  //
+  // Mismo diseño que el chequeo de silencio: candado propio (`hueco_alertado_en`,
+  // UN mensaje por episodio y no por pasada), se marca ANTES de mandar, y si la
+  // columna no existe (DDL 20260812130000 sin correr) se degrada limpio sin
+  // avisar — un aviso diario sin candado se vuelve ruido en tres días. El "ya
+  // se arregló" sale una sola vez, solo si hubo alerta previa. Todo el bloque
+  // va en try/catch: un tropiezo acá NO puede romper el chequeo de silencio ni
+  // el heartbeat.
+  const huecosAvisados: string[] = [];
+  const huecosCerrados: string[] = [];
+  try {
+    for (const f of filas) {
+      if (vigiaDebeAlertarHueco(f, ahora)) {
+        const { error: errUpd } = await supabaseServer
+          .from("asistencia_dispositivos")
+          .update({
+            hueco_alertado_en: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("dispositivo", f.dispositivo);
+
+        if (errUpd) {
+          if (esColumnaFaltante(errUpd)) {
+            console.warn("[asistencia-vigia] falta la migración del hueco; no se avisa");
+            continue;
+          }
+          console.error("[asistencia-vigia] no se pudo marcar el hueco:", errUpd.message);
+          continue;
+        }
+
+        await enviarSistema(textoHuecoViejo(f.dispositivo, DIAS_RECUPERACION_AGENTE));
+        huecosAvisados.push(f.dispositivo);
+      } else if (vigiaHuecoCerrado(f, ahora)) {
+        // Se limpia la marca ANTES de mandar, por la misma razón de siempre:
+        // si Telegram falla, mejor perder el "ya se arregló" que repetirlo.
+        const { error: errUpd } = await supabaseServer
+          .from("asistencia_dispositivos")
+          .update({ hueco_alertado_en: null, updated_at: new Date().toISOString() })
+          .eq("dispositivo", f.dispositivo);
+
+        if (errUpd) {
+          console.error("[asistencia-vigia] no se pudo cerrar el hueco:", errUpd.message);
+          continue;
+        }
+
+        await enviarSistema(textoHuecoCerrado(f.dispositivo));
+        huecosCerrados.push(f.dispositivo);
+      }
+    }
+  } catch (e) {
+    console.error("[asistencia-vigia] chequeo de hueco falló (el resto sigue):", e);
+  }
+
   // Que el vigía tenga su propio vigía: si un día deja de correr, el tablero de
   // salud lo ve. Va al final y solo si se llegó hasta acá.
   await recordCronHeartbeat("asistencia-vigia");
 
-  return NextResponse.json({ ok: true, revisados: filas.length, avisados });
+  return NextResponse.json({
+    ok: true,
+    revisados: filas.length,
+    avisados,
+    huecosAvisados,
+    huecosCerrados,
+  });
 }
