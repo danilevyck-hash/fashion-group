@@ -13,6 +13,13 @@ import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio } from "@/lib/alertas/canal";
+import {
+  errorClienteNoExiste,
+  guardarClienteSwitchEnPedido,
+  parsearClienteSwitchId,
+  resolverClienteSwitch,
+  traeEleccionDeCliente,
+} from "@/lib/catalogo/cliente-switch";
 
 const VIEW_ROLES = ["admin", "secretaria", "vendedor"];
 
@@ -108,7 +115,8 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
-  const { client_name, vendor_name, client_email, items, idempotency_key } = await req.json();
+  const body = await req.json();
+  const { client_name, vendor_name, client_email, items, idempotency_key } = body;
   if (!client_name) return NextResponse.json({ error: "client_name required" }, { status: 400 });
   if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
 
@@ -129,6 +137,20 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   if (typedItems.some((i) => !(Number(i.unit_price) > 0))) {
     return NextResponse.json({ error: "El precio de cada producto debe ser mayor a cero" }, { status: 400 });
   }
+  // ── Cliente de Switch elegido al armar el pedido (12-ago-2026) ──
+  // Se valida ANTES de crear: un id de otra empresa no puede quedar guardado.
+  // Ausente = el POST histórico (no se toca la columna); `null` = Contado.
+  const eligioCliente = traeEleccionDeCliente(body);
+  let clienteSwitchId: number | null = null;
+  if (eligioCliente) {
+    const parsed = parsearClienteSwitchId(body.cliente_switch_id);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    clienteSwitchId = parsed.id;
+    if (clienteSwitchId != null && !(await resolverClienteSwitch(cfg, clienteSwitchId))) {
+      return NextResponse.json({ error: errorClienteNoExiste(cfg) }, { status: 404 });
+    }
+  }
+
   const dbPedido = await cfg.db();
   const resumenPed = await resumenDePedido(cfg, dbPedido as never, typedItems);
   const total = resumenPed.total;
@@ -159,6 +181,21 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const { order_id, order_number, already_created } = result as {
     order_id: string; order_number: string; already_created: boolean;
   };
+
+  // Cliente Switch elegido → se guarda en el pedido recién creado. Tolerante a
+  // la DDL 20260705120000 pendiente (sin la columna el pedido queda igual, y el
+  // envío a Switch cae a Contado como siempre). NO se toca en un retry
+  // idempotente: el pedido ya existe con el cliente que se eligió la 1ª vez.
+  if (eligioCliente && !already_created) {
+    try {
+      await guardarClienteSwitchEnPedido(db, cfg.ordersTable, order_id, clienteSwitchId);
+    } catch {
+      return NextResponse.json(
+        { error: `El pedido se creó como ${order_number} pero no se pudo guardar el cliente. Elígelo de nuevo en el pedido.`, id: order_id, order_number },
+        { status: 500 },
+      );
+    }
+  }
 
   // Telegram solo en creación real (un retry idempotente NO reenvía la alerta).
   // Este endpoint es SIEMPRE el camino del vendedor: la RPC de creación deja

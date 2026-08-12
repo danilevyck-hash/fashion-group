@@ -626,6 +626,20 @@ export const EMPRESAS_CATALOGO: ReadonlySet<string> = new Set(
   Object.values(MARCAS_CONFIG).map((m) => m.empresaKey),
 );
 
+/**
+ * marca → empresa Switch. DERIVADO: cubre TODAS las marcas por construcción.
+ *
+ * 🩸 12-ago-2026: `/api/catalogo/switch-clientes` tenía este mapa escrito a mano
+ * con reebok/joybees/tommy y cuando entró Calvin nadie lo tocó. Resultado
+ * medido: `?marca=calvin` respondía 400, la lista de clientes del checkout
+ * salía VACÍA y TODO pedido de Calvin se iba a Contado sin forma de elegir otro
+ * cliente. Es el mismo modo de fallo del vendedor de Tommy (ver arriba), y por
+ * eso vive acá y no en el route: la quinta marca aparece sola.
+ */
+export const EMPRESA_POR_MARCA: Record<string, string> = Object.fromEntries(
+  Object.values(MARCAS_CONFIG).map((m) => [m.marca, m.empresaKey]),
+);
+
 export function getMarcaConfig(marca: string | undefined | null): MarcaConfig | null {
   if (!marca) return null;
   return MARCAS_CONFIG[marca] ?? null;

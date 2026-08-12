@@ -13,6 +13,7 @@ import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import AgregarProductosModal, { type ProductoAgregable } from "@/components/catalogo/AgregarProductosModal";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
+import ClienteSwitchPicker, { type ClienteSwitchOpcion, nombreDeCliente } from "@/components/catalogo/ClienteSwitchPicker";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -25,7 +26,6 @@ interface OrderItem { id?: string; product_id: string; sku: string; name: string
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; created_at: string; updated_at?: string | null; [itemsField: string]: unknown; }
 interface DirClient { nombre: string; empresa: string; }
 interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
-interface ClienteSwitchRow { cliente_switch_id: number; codigo: string | null; nombre: string | null; }
 interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
 interface SwitchPreview { cliente: string; vendedor: string; lineas: SwitchPreviewLinea[]; warnings: string[]; totalPiezas: number; totalEstimado: number; }
 
@@ -34,10 +34,6 @@ function fmtDateTime(iso: string): string {
   const fecha = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
   const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit" });
   return `${fecha} ${hora}`;
-}
-
-function fmtTimeHMS(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
 export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
@@ -77,6 +73,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
@@ -91,9 +88,6 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // ── Cliente Switch del pedido (cliente real en vez de Contado) ──
   const [clienteSwitch, setClienteSwitch] = useState<{ id: number; nombre: string | null; codigo: string | null } | null>(null);
   const [showClienteModal, setShowClienteModal] = useState(false);
-  const [clienteQuery, setClienteQuery] = useState("");
-  const [clienteResults, setClienteResults] = useState<ClienteSwitchRow[]>([]);
-  const [clienteBuscando, setClienteBuscando] = useState(false);
   const [clienteGuardando, setClienteGuardando] = useState(false);
   // ── Candado post-envío a Switch + reemplazo (Duplicar y corregir) ──
   const [reemplazadoPor, setReemplazadoPor] = useState<{ id: string; order_number: string } | null>(null);
@@ -147,17 +141,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             const er = await fetch(`${theme.api}/orders/${id}/enviar-switch`);
             if (er.ok) { const ed = await er.json(); setSwitchEnvio(ed.envio || null); }
           } catch { /* no bloquea la carga del pedido */ }
-          // Cliente Switch asignado al pedido (null = Contado, el default) —
-          // solo admin/secretaria (el endpoint no permite vendedor)
-          if (["admin", "secretaria"].includes(r)) {
-            try {
-              const cr = await fetch(`${theme.api}/clientes-switch?orderId=${id}`);
-              if (cr.ok) {
-                const cd = await cr.json();
-                setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
-              }
-            } catch { /* no bloquea la carga del pedido */ }
-          }
+          // Cliente Switch asignado al pedido (null = Contado). Lo ve —y lo
+          // cambia— cualquiera que arme pedidos, VENDEDOR INCLUIDO: con el
+          // selector cerrado a admin/secretaria, todo lo del vendedor se iba a
+          // Contado sin forma de elegir. El endpoint ya abrió a esos roles.
+          try {
+            const cr = await fetch(`${theme.api}/clientes-switch?orderId=${id}`);
+            if (cr.ok) {
+              const cd = await cr.json();
+              setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+            }
+          } catch { /* no bloquea la carga del pedido */ }
         }
       } else router.push(theme.pedidosHref);
     } catch { router.push(theme.pedidosHref); }
@@ -185,21 +179,8 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // Búsqueda de clientes Switch (selector del modal, 300ms debounce). Corre
-  // solo con el modal abierto; query vacío lista los primeros.
-  useEffect(() => {
-    if (!showClienteModal) return;
-    const t = setTimeout(async () => {
-      setClienteBuscando(true);
-      try {
-        const r = await fetch(`${theme.api}/clientes-switch?q=${encodeURIComponent(clienteQuery)}`);
-        if (r.ok) { const d = await r.json(); setClienteResults(d.clientes || []); }
-      } catch { /* sin red: se queda la lista anterior */ }
-      setClienteBuscando(false);
-    }, 300);
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteQuery, showClienteModal]);
+  // (La búsqueda de clientes Switch vive en ClienteSwitchPicker — la MISMA
+  // pieza que usa el modal de Duplicar; dos buscadores se separan solos.)
 
   // Mantener refs sincronizados con el ultimo estado.
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -277,46 +258,63 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [autoSaveStatus]);
 
-  // ── CONFIRM ORDER (mark confirmed first, then send email) ──
-  async function confirmOrder() {
+  // ── CONFIRMAR Y ENVIAR A SWITCH — UN SOLO BOTÓN (12-ago-2026) ──
+  //
+  // El camino viejo eran 3 pasos separados (Confirmar → Enviar a Switch →
+  // Crear pedido en Switch) y el correo interno salía SIEMPRE metido dentro de
+  // "Confirmar". Ahora es una sola acción encadenada en el FRONT: PUT
+  // status:"confirmado" → preview (dry-run) → el modal de siempre con "Crear
+  // pedido en Switch".
+  //
+  // 🔴 CERO CAMBIOS DE SERVIDOR: `enviar-switch` sigue exigiendo
+  // status==='confirmado' y el candado at-most-once no se toca. Por eso el PUT
+  // va PRIMERO y, si falla, no se consulta nada.
+  //
+  // El correo interno pasó a ser OPCIONAL ("Avisar por correo"): Daniel
+  // confirmó que es solo suyo y que nadie lo usa como lista de trabajo.
+  async function confirmarYEnviar() {
     setConfirming(true);
-    showToast("Confirmando pedido...");
 
-    // 1. Mark as confirmado FIRST
-    try {
-      const confirmRes = await fetch(`${theme.api}/orders/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
-      });
-      if (!confirmRes.ok) {
+    // 1. Confirmar (el envío a Switch lo exige). Si ya está confirmado se salta.
+    if (!isConfirmed) {
+      try {
+        const confirmRes = await fetch(`${theme.api}/orders/${id}`, {
+          method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
+        });
+        if (!confirmRes.ok) {
+          showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
+          setConfirming(false);
+          return;
+        }
+      } catch {
         showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
         setConfirming(false);
         return;
       }
-    } catch {
-      showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
-      setConfirming(false);
-      return;
+      setJustConfirmed(true);
     }
 
-    // 2. Try to send email (non-blocking — order is already confirmed)
+    // 2. Dry-run contra Switch → abre el modal de revisión (cero escrituras).
+    //    Desde ahí "Crear pedido en Switch" hace el POST real.
+    await previewSwitch();
+    setConfirming(false);
+    load();
+  }
+
+  // Correo interno, APARTE y opcional.
+  async function avisarPorCorreo() {
+    setEnviandoAviso(true);
     try {
       const emailRes = await fetch(`${theme.api}/send-order`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: id }),
       });
-      if (!emailRes.ok) {
-        showToast("Pedido confirmado pero no se pudo enviar email");
-      } else {
-        showToast("Pedido confirmado. Se envio por email a Fashion Group.");
-      }
+      showToast(emailRes.ok ? "Aviso enviado por correo a Fashion Group." : "No se pudo enviar el correo. Intenta de nuevo.");
     } catch {
-      showToast("Pedido confirmado pero no se pudo enviar email");
+      showToast("No se pudo enviar el correo. Revisa tu conexion.");
     }
-
-    setConfirming(false);
-    setJustConfirmed(true);
-    load();
+    setEnviandoAviso(false);
   }
 
   // ── EDIT (revert to borrador) ──
@@ -397,24 +395,22 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // Los clientes nuevos se crean desde el panel de Switch — aquí solo se
   // busca y asigna un cliente existente (el sync llena switch_clientes).
   function abrirClienteModal() {
-    setClienteQuery("");
-    setClienteResults([]);
     setShowClienteModal(true);
   }
 
-  // Asigna (o quita, con null) el cliente Switch del pedido.
-  async function asignarClienteSwitch(c: ClienteSwitchRow | null) {
+  // Asigna (o quita, con Contado) el cliente Switch del pedido.
+  async function asignarClienteSwitch(c: ClienteSwitchOpcion) {
     setClienteGuardando(true);
     try {
       const res = await fetch(`${theme.api}/clientes-switch`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: id, clienteSwitchId: c ? c.cliente_switch_id : null }),
+        body: JSON.stringify({ orderId: id, clienteSwitchId: c.id }),
       });
       const d = await res.json();
       if (res.ok && d.ok) {
-        setClienteSwitch(c ? { id: c.cliente_switch_id, nombre: c.nombre, codigo: c.codigo } : null);
+        setClienteSwitch(c.id != null ? { id: c.id, nombre: c.nombre, codigo: c.codigo } : null);
         setShowClienteModal(false);
-        showToast(c ? `Cliente Switch: ${c.nombre || c.codigo}` : "Cliente Switch: Contado (mostrador)");
+        showToast(`Cliente Switch: ${nombreDeCliente(c)}`);
       } else {
         showToast(d.error || "No se pudo guardar el cliente. Intenta de nuevo.");
       }
@@ -426,14 +422,14 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // ── DUPLICAR Y CORREGIR (pedido bloqueado por envío a Switch) ──
   // Clona el pedido como borrador NUEVO editable (reemplaza_a = este) y navega.
-  // `nombre` viene del mini-modal: si difiere del original, el server crea el
-  // clon con el nombre nuevo y SIN cliente_switch_id (se re-elige en el clon).
-  async function duplicarPedido(nombre: string) {
+  // `nombre` y `cliente` vienen del mini-modal: el cliente de Switch es una
+  // ELECCIÓN explícita (nunca se hereda del original) y el server la persiste.
+  async function duplicarPedido(nombre: string, cliente: ClienteSwitchOpcion) {
     setDuplicando(true);
     try {
       const res = await fetch(`${theme.api}/orders/${id}/duplicar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: nombre }),
+        body: JSON.stringify({ client_name: nombre, cliente_switch_id: cliente.id }),
       });
       const d = await res.json();
       if (res.ok && d.ok) {
@@ -577,6 +573,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const canEdit = isEditorRole && !switchLock;
   const canDelete = ["admin", "secretaria"].includes(role);
   const isConfirmed = order?.status === "confirmado";
+  // El cliente solo se cambia mientras el pedido NO tenga un envío vivo en el
+  // ERP (el PATCH responde 409; acá no se ofrece un botón que va a fallar).
+  const puedeCambiarCliente = isEditorRole && (!switchEnvio || switchEnvio.estado === "error");
 
   // ── LOADING SKELETON ──
   if (loading || !order) return (
@@ -675,46 +674,30 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         </div>
       )}
 
-      {/* Save bar — prominent status + manual save */}
-      {canEdit && (
-        <div className="flex items-center justify-between gap-3 mb-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-          <div className="flex items-center gap-2 text-sm">
-            {autoSaveStatus === "saving" ? (
-              <>
-                <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                <span className="text-amber-600 font-medium">Guardando...</span>
-              </>
-            ) : autoSaveStatus === "error" ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span className="text-red-600 font-medium">No se pudo guardar — toca Guardar para reintentar</span>
-              </>
-            ) : autoSaveStatus === "dirty" ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span className="text-amber-600 font-medium">Cambios sin guardar</span>
-              </>
-            ) : autoSaveStatus === "saved" && lastSavedAt ? (
-              <>
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-emerald-600 font-medium">Guardado a las {fmtTimeHMS(lastSavedAt)}</span>
-              </>
-            ) : (
-              <>
-                <span className="w-2 h-2 rounded-full bg-gray-300" />
-                <span className="text-gray-400">Sin cambios pendientes</span>
-              </>
-            )}
-          </div>
+      {/* Señal de guardado — DISCRETA (12-ago-2026).
+          Daniel: *"quita el autoguardar"*, refiriéndose a que deje de pedir
+          atención: se fueron el botón "Guardar" y el letrero verde "Guardado a
+          las 15:26". 🔴 EL MECANISMO SE QUEDA, y no es opcional: "+ Agregar
+          productos" escribe DIRECTO en el servidor (PATCH /item) mientras las
+          cantidades y los precios viven en memoria — sin autoguardado quedaría
+          un estado mixto y el correo, el PDF y Switch leerían algo distinto de
+          lo que está en pantalla.
+          Lo único que sigue pidiendo acción es el FALLO, con su Reintentar. */}
+      {canEdit && autoSaveStatus === "error" ? (
+        <div className="flex items-center justify-between gap-3 mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm text-red-700 font-medium">No se pudo guardar tu cambio</span>
           <button
             onClick={() => performSave()}
-            disabled={autoSaveStatus === "saving"}
-            className="bg-black text-white text-sm font-medium px-5 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[40px]"
+            className="bg-black text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]"
           >
-            {autoSaveStatus === "saving" ? "Guardando..." : "Guardar"}
+            Reintentar
           </button>
         </div>
-      )}
+      ) : canEdit && (autoSaveStatus === "saving" || autoSaveStatus === "dirty") ? (
+        <p className="text-xs text-gray-400 mb-4">Guardando…</p>
+      ) : canEdit && autoSaveStatus === "saved" && lastSavedAt ? (
+        <p className="text-xs text-gray-400 mb-4">Guardado</p>
+      ) : null}
 
       {/* Items table */}
       {items.length > 0 ? (
@@ -799,38 +782,117 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         <span className="text-lg font-semibold tabular-nums">${fmt(totalMoney)}</span>
       </div>
 
-      {/* Actions — ONE primary button */}
-      {isConfirmed ? (
-        <div className="space-y-3">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center"
-            style={justConfirmed ? { animation: "confirmBannerPulse 0.8s ease-out" } : undefined}>
-            <div className="flex items-center justify-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 flex-shrink-0"
-                style={justConfirmed ? { animation: "confirmPulse 0.5s ease-out" } : undefined}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <span className="text-emerald-700 font-medium text-sm">Pedido confirmado</span>
+      {/* ── CLIENTE DE SWITCH — visible también en BORRADOR (12-ago-2026) ──
+          Antes vivía adentro de la rama `isConfirmed` y encima gated a
+          admin/secretaria: el vendedor armaba el pedido, lo confirmaba y recién
+          ahí alguien más podía ver a qué cliente iba. Ahora se ve —y se
+          cambia— desde el primer momento y por quien arma el pedido.
+          Con un envío activo a Switch NO se puede cambiar: el pedido YA vive en
+          el ERP con el cliente con que se envió (el server responde 409). */}
+      {isEditorRole && (
+        <div className="border border-gray-200 rounded-lg px-4 py-3 mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wide text-gray-400">Cliente de Switch</div>
+              <div className="text-sm text-gray-800 mt-0.5">
+                {nombreDeCliente(clienteSwitch)}
+                {clienteSwitch?.codigo && clienteSwitch.nombre ? (
+                  <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span>
+                ) : null}
+              </div>
             </div>
-            <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
-            {(editedAt || order.updated_at) && (
-              <span className={`text-xs block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
-                {editedAt
-                  ? `Editado despues de confirmar: ${fmtDateTime(editedAt)} — no se reenvio correo`
-                  : `Ultima edicion interna: ${fmtDateTime(order.updated_at!)}`}
-              </span>
+            {puedeCambiarCliente ? (
+              <button onClick={abrirClienteModal}
+                className="flex-shrink-0 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-400 transition">
+                Cambiar
+              </button>
+            ) : (
+              <span className="flex-shrink-0 text-xs text-gray-400">ya está en Switch</span>
             )}
           </div>
+        </div>
+      )}
 
-          {/* Share section — subtle, optional */}
+      {/* Actions — ONE primary button */}
+      {switchLock ? null : (
+        // Bajo candado de Switch la única acción protagonista es "Duplicar y
+        // corregir" (en el banner de arriba).
+        <div className="space-y-3">
+          {isConfirmed && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center"
+              style={justConfirmed ? { animation: "confirmBannerPulse 0.8s ease-out" } : undefined}>
+              <div className="flex items-center justify-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 flex-shrink-0"
+                  style={justConfirmed ? { animation: "confirmPulse 0.5s ease-out" } : undefined}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+                <span className="text-emerald-700 font-medium text-sm">Pedido confirmado</span>
+              </div>
+              {(editedAt || order.updated_at) && (
+                <span className={`text-xs block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
+                  {editedAt
+                    ? `Editado despues de confirmar: ${fmtDateTime(editedAt)}`
+                    : `Ultima edicion interna: ${fmtDateTime(order.updated_at!)}`}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* ERP Switch — el estado del envío, o EL botón. Escritura real en el
+              ERP: un envio no-fallido por pedido; el server tiene el candado. */}
+          {isEditorRole && (
+            switchEnvio && switchEnvio.estado === "verificado" ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Pedido creado en Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
+              </div>
+            ) : switchEnvio && switchEnvio.estado === "enviado" ? (
+              <div className="text-sm text-amber-700">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  {switchEnvio.numero_interno
+                    ? <>Enviado a Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
+                    : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
+                </div>
+                {switchEnvio.error_detalle && <p className="text-xs text-amber-600 mt-1">{switchEnvio.error_detalle}</p>}
+              </div>
+            ) : (
+              <div>
+                {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
+                  <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
+                )}
+                {/* UN SOLO BOTÓN: confirma y consulta Switch de una. El POST
+                    real sigue detrás del modal de revisión de siempre. */}
+                <button onClick={confirmarYEnviar} disabled={confirming || switchLoading || !items.length}
+                  className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition disabled:opacity-40">
+                  {confirming || switchLoading
+                    ? "Consultando Switch..."
+                    : switchEnvio?.estado === "error"
+                      ? "Reintentar envío a Switch"
+                      : "Confirmar y enviar a Switch"}
+                </button>
+              </div>
+            )
+          )}
+
+          {/* Compartir + aviso interno — secundarios, opcionales */}
           <div className="pt-3 border-t border-gray-100">
             <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">Compartir pedido</p>
             <div className="flex flex-col gap-2">
-              <button onClick={downloadPDF} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
+              <button onClick={downloadPDF} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Descargar PDF
               </button>
+              {/* El correo interno a Fashion Group ya NO sale solo al confirmar:
+                  Daniel confirmó que es solo suyo y nadie lo usa como lista de
+                  trabajo. Queda como botón aparte, cuando lo quiera. */}
+              <button onClick={avisarPorCorreo} disabled={enviandoAviso}
+                className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px] disabled:opacity-40">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                {enviandoAviso ? "Enviando aviso..." : "Avisar por correo a Fashion Group"}
+              </button>
               {!showEmailInput ? (
-                <button onClick={() => setShowEmailInput(true)} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
+                <button onClick={() => setShowEmailInput(true)} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2 min-h-[44px]">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                   Enviar por email al cliente
                 </button>
@@ -839,79 +901,27 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
                     placeholder="cliente@email.com" autoFocus
                     onKeyDown={e => e.key === "Enter" && sendToClient()}
-                    className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-black transition" />
+                    className="flex-1 border border-gray-200 rounded-md px-2.5 min-h-[44px] text-xs outline-none focus:border-black transition" />
                   <button onClick={sendToClient} disabled={sendingToClient}
-                    className="text-xs bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-40">
+                    className="text-xs bg-black text-white px-4 min-h-[44px] rounded-md hover:bg-gray-800 transition disabled:opacity-40">
                     {sendingToClient ? "Enviando..." : "Enviar"}
                   </button>
                   <button onClick={() => { setShowEmailInput(false); setClientEmail(""); }}
-                    className="text-xs text-gray-400 hover:text-black transition">x</button>
+                    className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-2">x</button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* ERP Switch — solo admin/secretaria. Escritura real en el ERP:
-              un envio no-fallido por pedido; el server tiene el candado. */}
-          {canDelete && (
-            <div className="pt-3 border-t border-gray-100">
-              <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">ERP Switch</p>
-              {switchEnvio && switchEnvio.estado === "verificado" ? (
-                <div className="flex items-center gap-2 text-sm text-emerald-700">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Pedido creado en Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> · verificado
-                </div>
-              ) : switchEnvio && switchEnvio.estado === "enviado" ? (
-                <div className="text-sm text-amber-700">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    {switchEnvio.numero_interno
-                      ? <>Enviado a Switch: <span className="font-mono">{switchEnvio.numero_interno}</span> (sin verificar)</>
-                      : "Envio en revision — confirma en el panel de Switch si el pedido se creo"}
-                  </div>
-                  {switchEnvio.error_detalle && <p className="text-xs text-amber-600 mt-1">{switchEnvio.error_detalle}</p>}
-                </div>
-              ) : (
-                <div>
-                  {switchEnvio?.estado === "error" && switchEnvio.error_detalle && (
-                    <p className="text-xs text-red-600 mb-2">Intento anterior fallo: {switchEnvio.error_detalle}</p>
-                  )}
-                  {/* Cliente Switch del pedido — solo editable ANTES del envío.
-                      Default: Contado (mostrador). */}
-                  <div className="flex items-center gap-2 text-sm mb-3">
-                    <span className="text-gray-500">Cliente Switch:</span>
-                    <span className="text-gray-800">
-                      {clienteSwitch ? (clienteSwitch.nombre || clienteSwitch.codigo || `id ${clienteSwitch.id}`) : "Contado (mostrador)"}
-                      {clienteSwitch?.codigo && clienteSwitch.nombre ? <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span> : null}
-                    </span>
-                    <button onClick={abrirClienteModal}
-                      className="text-xs text-gray-500 underline hover:text-black transition">
-                      Cambiar
-                    </button>
-                  </div>
-                  <button onClick={previewSwitch} disabled={switchLoading}
-                    className="border border-gray-300 text-black text-sm px-4 py-2 rounded-md hover:border-gray-500 active:scale-[0.97] transition disabled:opacity-40">
-                    {switchLoading ? "Consultando Switch..." : switchEnvio?.estado === "error" ? "Reintentar envio a Switch" : "Enviar a Switch"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {canEdit && (
+          {/* Volver a borrador: mientras no haya un envío VIVO en el ERP (un
+              intento fallido no cuenta — de ahí se sale editando y reenviando). */}
+          {isConfirmed && canEdit && (!switchEnvio || switchEnvio.estado === "error") && (
             <button onClick={editOrder} disabled={saving}
-              className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
-              Editar y re-enviar pedido
+              className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40 min-h-[44px]">
+              Volver a borrador para editar
             </button>
           )}
         </div>
-      ) : switchLock ? null : (
-        // Bajo candado de Switch NO se muestra "Confirmar pedido": la única
-        // acción protagonista es "Duplicar y corregir" (en el banner).
-        <button onClick={confirmOrder} disabled={confirming || !items.length}
-          className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
-          {confirming ? "Confirmando..." : "Confirmar pedido"}
-        </button>
       )}
 
       {/* Delete — discreto. Bajo candado de Switch el soft-delete es solo
@@ -1023,34 +1033,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       {showClienteModal && (
         <ModalOverlay onBackdropClick={() => { if (!clienteGuardando) setShowClienteModal(false); }}>
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-medium mb-1">Cliente Switch del pedido</h3>
-            <p className="text-xs text-gray-500 mb-3">El pedido se creara en Switch a nombre de este cliente. Si no eliges uno, va a Contado (mostrador).</p>
-            <input value={clienteQuery} onChange={e => setClienteQuery(e.target.value)}
-              placeholder="Buscar por nombre o codigo..."
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm outline-none focus:border-black transition mb-2" />
-            <div className="border border-gray-100 rounded-md divide-y divide-gray-50 mb-3 max-h-60 overflow-y-auto">
-              <button onClick={() => asignarClienteSwitch(null)} disabled={clienteGuardando}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
-                Contado (mostrador) <span className="text-xs text-gray-400">— default</span>
-              </button>
-              {clienteBuscando ? (
-                <div className="px-3 py-2 text-xs text-gray-400">Buscando...</div>
-              ) : clienteResults.length === 0 ? (
-                <div className="px-3 py-2 text-xs text-gray-400">
-                  {clienteQuery ? "Sin resultados — los clientes nuevos se crean desde el panel de Switch" : `Escribe para buscar clientes de ${theme.switchDirectorioLabel}`}
-                </div>
-              ) : (
-                clienteResults.map((c) => (
-                  <button key={c.cliente_switch_id} onClick={() => asignarClienteSwitch(c)} disabled={clienteGuardando}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition disabled:opacity-40">
-                    {c.nombre || `Cliente ${c.cliente_switch_id}`}
-                    {c.codigo && <span className="text-xs text-gray-400 font-mono ml-2">{c.codigo}</span>}
-                  </button>
-                ))
-              )}
-            </div>
+            <h3 className="text-base font-medium mb-1">Cliente de Switch del pedido</h3>
+            <p className="text-xs text-gray-500 mb-3">El pedido se creará en Switch a nombre de este cliente.</p>
+            <ClienteSwitchPicker
+              api={theme.api}
+              directorioLabel={theme.switchDirectorioLabel}
+              valor={clienteSwitch ? { id: clienteSwitch.id, nombre: clienteSwitch.nombre, codigo: clienteSwitch.codigo } : { id: null, nombre: null, codigo: null }}
+              onElegir={asignarClienteSwitch}
+              disabled={clienteGuardando}
+            />
             <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
-              className="w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
+              className="mt-3 w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
               Cerrar
             </button>
           </div>
@@ -1072,8 +1065,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         <DuplicarPedidoModal
           orderNumber={order.order_number}
           nombreInicial={clientName}
+          api={theme.api}
+          directorioLabel={theme.switchDirectorioLabel}
           duplicando={duplicando}
-          avisoClienteSwitch
           onConfirm={duplicarPedido}
           onCancel={() => setShowDupModal(false)}
         />

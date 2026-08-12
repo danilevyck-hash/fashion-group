@@ -37,3 +37,26 @@ export const CATALOGO_ADMIN_ROLES = ["admin", "secretaria"] as const;
 /** Copias mutables para las APIs que reciben `string[]`. */
 export const catalogoRoles = (): string[] => [...CATALOGO_ROLES];
 export const catalogoAdminRoles = (): string[] => [...CATALOGO_ADMIN_ROLES];
+
+/** QUIRK heredado: Reebok todavía lista 'cliente' en `createRoles`. NO es un
+ *  rol del sistema (`SYSTEM_ROLES` no lo tiene) y ningún usuario puede tenerlo,
+ *  pero mientras esté en la lista hay que nombrarlo para poder excluirlo. */
+export const ROL_LEGACY_CLIENTE = "cliente";
+
+/**
+ * Roles que pueden ELEGIR el cliente de Switch de un pedido (12-ago-2026).
+ *
+ * Daniel, textual: *"un vendedor TIENE que elegir un cliente de switch, todos
+ * siempre no solo vendedor"*. Antes el selector y su endpoint estaban gated a
+ * admin+secretaria, así que el vendedor —que es quien arma el pedido— no podía
+ * elegir y TODO se iba a Contado.
+ *
+ * La lista se DERIVA de quién puede armar pedidos (`cfg.createRoles`), para que
+ * abrir el pedido a un rol nuevo no deje el selector cerrado por olvido. Lo
+ * único que se saca es el 'cliente' legacy: ese camino existe para que un
+ * comprador arme su propio pedido, y darle el directorio ENTERO de clientes de
+ * la empresa sería una fuga — el pedido del link sigue yendo a Contado.
+ */
+export function clienteSwitchRoles(createRoles: readonly string[]): string[] {
+  return createRoles.filter((r) => r !== ROL_LEGACY_CLIENTE);
+}

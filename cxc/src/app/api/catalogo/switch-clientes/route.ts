@@ -1,23 +1,32 @@
-// GET /api/catalogo/switch-clientes?marca=reebok|joybees|tommy — directorio de
-// clientes de la instancia Switch de la marca, desde la tabla switch_clientes
-// (sincronizada a diario por el sync de estado de cuenta — NO toca la API de
-// Switch). Lo usa el selector de cliente del checkout; default = Contado (id 1).
+// GET /api/catalogo/switch-clientes?marca=<marca> — directorio de clientes de la
+// instancia Switch de la marca, desde la tabla switch_clientes (sincronizada a
+// diario por el sync de estado de cuenta — NO toca la API de Switch). Lo usa el
+// selector de cliente del checkout; Contado (id 1) es una opción más.
+//
+// 🩸 LA EMPRESA SE DERIVA DE `MARCAS_CONFIG`, NO SE ESCRIBE A MANO (12-ago-2026).
+// El mapa era un literal con reebok/joybees/tommy y cuando entró Calvin nadie lo
+// tocó: `?marca=calvin` respondía 400, la lista salía VACÍA y —como el checkout
+// sigue igual sin poder elegir— TODO pedido de Calvin se iba a Contado sin forma
+// de cambiarlo. Es el mismo modo de fallo que ya había pasado con el vendedor de
+// Tommy. Derivado, la quinta marca aparece sola y no puede repetirlo.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { EMPRESA_POR_MARCA, MARCAS_CONFIG } from "@/lib/catalogo/marcas";
+import { clienteSwitchRoles } from "@/lib/catalogo/roles";
 
 export const dynamic = "force-dynamic";
 
-const EMPRESA_POR_MARCA: Record<string, string> = {
-  reebok: "active_shoes",
-  joybees: "joystep",
-  tommy: "fashion_shoes",
-};
+/** Quien arma pedidos en CUALQUIER marca puede leer su directorio (el guard
+ *  fino, por marca, lo hace /api/catalogo/[marca]/clientes-switch). */
+const ROLES = clienteSwitchRoles(
+  Array.from(new Set(Object.values(MARCAS_CONFIG).flatMap((m) => m.createRoles))),
+);
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  const auth = requireRole(req, ROLES);
   if (auth instanceof NextResponse) return auth;
 
   const empresa = EMPRESA_POR_MARCA[req.nextUrl.searchParams.get("marca") || ""];

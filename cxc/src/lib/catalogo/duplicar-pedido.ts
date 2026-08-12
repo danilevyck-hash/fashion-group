@@ -11,6 +11,11 @@
 // `cliente_switch_id` — copiarlo a ciegas mandaría el pedido a Switch bajo el
 // cliente VIEJO. Con el nombre igual (o sin body) se copia como siempre.
 //
+// Desde el 12-ago-2026 el modal también manda `cliente_switch_id`: una ELECCIÓN
+// explícita (número = ese cliente, `null` = Contado). Cuando viene, MANDA sobre
+// las dos reglas de arriba — se elige, no se arrastra. La regla de no heredar a
+// ciegas se CONSERVA para el POST sin ese campo (el histórico).
+//
 // Si ya existe un reemplazo activo del mismo original, devuelve ESE en vez de
 // crear otro (yaExistia=true) — evita duplicados por doble click o dos users.
 //
@@ -24,6 +29,12 @@ import { getSession } from "@/lib/require-auth";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { getEnvioActivo } from "@/lib/catalogo/switch-lock";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
+import {
+  errorClienteNoExiste,
+  parsearClienteSwitchId,
+  resolverClienteSwitch,
+  traeEleccionDeCliente,
+} from "@/lib/catalogo/cliente-switch";
 
 const DUP_ROLES = ["admin", "secretaria", "vendedor"];
 
@@ -66,9 +77,26 @@ export async function handleDuplicarPedido(
   const cfg = MARCAS_CONFIG[marca];
   const db = await cfg.db();
 
-  // Body opcional {client_name}: el POST histórico va sin body (→ {}).
-  const body = (await req.json().catch(() => ({}))) as { client_name?: unknown };
+  // Body opcional {client_name, cliente_switch_id}: el POST histórico va sin
+  // body (→ {}).
+  const body = (await req.json().catch(() => ({}))) as {
+    client_name?: unknown;
+    cliente_switch_id?: unknown;
+  };
   const nombrePedido = typeof body.client_name === "string" ? body.client_name : null;
+
+  // Elección explícita del cliente de Switch. Se valida ANTES de crear el clon:
+  // un id de otra empresa no puede quedar guardado en el pedido.
+  const eligioCliente = traeEleccionDeCliente(body);
+  let clienteElegido: number | null = null;
+  if (eligioCliente) {
+    const parsed = parsearClienteSwitchId(body.cliente_switch_id);
+    if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+    clienteElegido = parsed.id;
+    if (clienteElegido != null && !(await resolverClienteSwitch(cfg, clienteElegido))) {
+      return NextResponse.json({ error: errorClienteNoExiste(cfg) }, { status: 404 });
+    }
+  }
 
   // ── DDL disponible? (probe barato de la columna reemplaza_a) ──
   const probe = await db.from(cfg.ordersTable).select("id, reemplaza_a").eq("id", orderId).maybeSingle();
@@ -180,13 +208,17 @@ export async function handleDuplicarPedido(
   }
   const { order_id, order_number } = created as { order_id: string; order_number: string };
 
-  // ── Trazabilidad + comentario + cliente/vendedor Switch del original.
-  //    Con el nombre CAMBIADO, cliente_switch_id NO viaja (queda null → se
-  //    re-elige en el detalle, default Contado). El vendedor sí se copia:
-  //    cambiar de cliente no cambia quién vende. ──
+  // ── Trazabilidad + comentario + cliente/vendedor Switch.
+  //    · Con elección explícita (el modal la manda SIEMPRE): manda la elección,
+  //      incluido `null` = Contado. Se elige, no se arrastra.
+  //    · Sin elección (POST histórico) se conserva la regla vieja: con el
+  //      nombre CAMBIADO el cliente NO se hereda (iría a Switch bajo el cliente
+  //      viejo) y queda null → se re-elige en el detalle.
+  //    El vendedor sí se copia siempre: cambiar de cliente no cambia quién vende. ──
   const update: Record<string, unknown> = { reemplaza_a: orderId };
   if (original.comment) update.comment = original.comment;
-  if (!clienteCambio && original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
+  if (eligioCliente) update.cliente_switch_id = clienteElegido;
+  else if (!clienteCambio && original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
   if (original.vendedor_switch_id != null) update.vendedor_switch_id = original.vendedor_switch_id;
   let upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
   if (upErr && /cliente_switch_id|vendedor_switch_id/i.test(upErr.message)) {
