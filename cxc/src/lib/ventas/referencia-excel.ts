@@ -131,6 +131,7 @@ export async function buildReferenciaSheet(
       `"Stock" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
       `"Vendido" es lo REAL: Vendí ÷ Compré · ` +
       `"Meses" es el tiempo de venta, en meses calendario desde la llegada: hasta la última venta si está agotado (la cola en bodega no cuenta), o hasta hoy si sigue vivo · ` +
+      `si la bodega quedó en 0 y volvió a llegar mercancía, "Vendido" y "Meses" son de la ÚLTIMA LLEGADA (la que llegó sobre bodega en 0), igual que en pantalla · ` +
       `vacío en Vendido/Meses = no se puede afirmar · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
       (conMargen ? `el margen se calcula contra el Costo CIF de la última compra · ` : ``) +

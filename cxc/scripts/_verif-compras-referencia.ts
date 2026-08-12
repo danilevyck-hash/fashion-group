@@ -20,11 +20,15 @@ import {
   fmtFechaCorta,
   leyendaLlegadas,
   medirVendidoMeses,
+  pieGrandeMeses,
   subDesdeLlegada,
   textoCompra,
   textoLineaVenta,
   textoMesesCelda,
   textoAvanceCorto,
+  fraseLlegadaActual,
+  textoLlegadaAnterior,
+  medirTandas,
   textoParteVendida,
   textoRestantes,
   textoVendidoCelda,
@@ -37,7 +41,7 @@ const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPAB
 
 const CODIGOS = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["4G5004G030", "CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
+  : ["4G5004G001", "4G5004G030", "CVM253CR02001", "NB2570001", "QD3958033", "40HM265032", "RETENCION"];
 
 const HOY = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
 const HOY_MES = HOY.slice(0, 7);
@@ -104,7 +108,7 @@ async function main() {
       const g = f.grandes;
       const pieVendi = textoParteVendida(g.parteVendida) ?? "—";
       console.log(
-        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"}`,
+        `   Compré ${g.comprado ?? "—"} u · Vendí ${g.vendido} u (${pieVendi}) · Stock ${g.quedan ?? "—"} u · Meses ${f.ritmo.meses ?? "—"} (${pieGrandeMeses(f.ritmo)})`,
       );
 
       // ── El pie de Compré (la lista aprobada) ──
@@ -116,8 +120,25 @@ async function main() {
         if (restantes) console.log(`     ${restantes}   (gris, sin enlace)`);
       }
 
+      // ── LAS TANDAS del motor (episodios entre ceros de bodega) ──
+      const medida = medirTandas(art, HOY_MES);
+      if (f.tandas) {
+        console.log(
+          `   tandas (${f.tandas.length}): ${f.tandas
+            .map((t) => `${t.desdeMes}: ${t.llegaron}u vendidas ${t.vendidas} · ${t.cerrada ? "CERRADA" : "viva"} · ${t.meses}m`)
+            .join("  |  ")}`,
+        );
+        console.log(`     frase: ${fraseLlegadaActual(f.tandas[f.tandas.length - 1])}`);
+        const ant = textoLlegadaAnterior(f.tandas);
+        if (ant) console.log(`     historia (gris): ${ant}`);
+      } else {
+        console.log(
+          `   tandas: ${medida == null ? "timeline NO afirmable (o sin compras) — comportamiento de siempre" : `${medida.tandas.length} — una sola: comportamiento de siempre`}`,
+        );
+      }
+
       // ── LA LÍNEA DE VENTA de la ficha ──
-      const linea = textoLineaVenta(f.avance, f.ritmo);
+      const linea = textoLineaVenta(f.avance, f.ritmo, f.tandas);
       console.log(`   línea: ${linea ?? "(sin línea)"}   [corto: ${textoAvanceCorto(f.avance)}]`);
 
       // ── VENDIDO · MESES — las dos celdas del modo pedido (12-ago-2026),

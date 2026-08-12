@@ -63,6 +63,7 @@ import {
   subDesdeLlegada,
   textoCompra,
   textoLineaVenta,
+  textoLlegadaAnterior,
   textoParteVendida,
   textoRestantes,
   textoSinMargen,
@@ -286,11 +287,28 @@ function pieDeVendido(art: ArticuloCompras, parte: number | null): string {
 // 🔴 REEMPLAZA AL "VENDO POR MES" COMO PROTAGONISTA (12-ago-2026): cuánto
 // tiempo de venta tiene y qué % va. El texto entero sale del módulo puro
 // (`textoLineaVenta`) — acá no se arma ni media frase.
+//
+// 🔴 Cuando la bodega quedó en 0 y VOLVIÓ a llegar mercancía (2+ llegadas
+// sobre bodega en 0), la protagonista es la frase de la ÚLTIMA llegada —
+// redacción aprobada por Daniel, sin la palabra "tanda":
+//
+//   Llegaron 36 u en mar 2026 → va el 69% en 5 meses → me quedan 11 u
+//
+// y debajo, en gris, la historia: "La anterior (oct 2025): 36 u — se vendió
+// toda en 2 meses" (+ "y N llegadas anteriores" si hubo más). Viva = gris (en
+// curso); agotada = negro (cerrada), como en la tabla del modo pedido.
 
 function LineaVenta({ ficha }: { ficha: FichaArticulo }) {
-  const texto = textoLineaVenta(ficha.avance, ficha.ritmo);
+  const texto = textoLineaVenta(ficha.avance, ficha.ritmo, ficha.tandas);
+  const anterior = textoLlegadaAnterior(ficha.tandas);
   if (!texto) return null;
-  return <p className="border-t border-gray-100 px-3.5 py-2.5 text-sm text-gray-700">{texto}</p>;
+  const cerrada = ficha.tandas != null && (ficha.tandas[ficha.tandas.length - 1]?.cerrada ?? false);
+  return (
+    <div className="border-t border-gray-100 px-3.5 py-2.5">
+      <p className={`text-sm ${cerrada ? "font-medium text-gray-900" : "text-gray-700"}`}>{texto}</p>
+      {anterior && <p className="mt-0.5 text-xs text-gray-500">{anterior}</p>}
+    </div>
+  );
 }
 
 // ─── Mes a mes ───────────────────────────────────────────────────────────────
