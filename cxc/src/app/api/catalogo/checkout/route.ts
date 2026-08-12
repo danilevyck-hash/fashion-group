@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/catalogo/checkout — Enviar a Switch en UN paso.
-// Body: { marca, cliente: {id, nombre}, items: CartItem[], idempotency_key }.
+// Body: { marca, cliente: {id, nombre}, vendedor_id?, items: CartItem[], idempotency_key }.
 //
 // Flujo: (1) crea el pedido en DB vía el RPC idempotente de la marca y lo marca
 // confirmado con cliente/vendedor de Switch guardados (Reintentar los usa);
@@ -8,11 +8,18 @@
 // pedido YA quedó guardado — la respuesta lo dice y la confirmación ofrece
 // Reintentar; el carrito solo se limpia en el cliente cuando (1) fue ok.
 //
-// Vendedor: AUTOMÁTICO por login (fg_user_switch_vendedor) — sin mapeo → 422
-// SIN_VENDEDOR (el checkout lo muestra y bloquea antes, esto es el cinturón).
+// Vendedor: el mapeado al login (fg_user_switch_vendedor) viene por DEFECTO, y
+// el body puede traer `vendedor_id` para cambiarlo (12-ago-2026). Sin ninguno
+// de los dos → 422 SIN_VENDEDOR, con el mismo texto de siempre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buscarVendedor,
+  errorVendedorNoExiste,
+  listarVendedores,
+  parsearVendedorSwitchId,
+} from "@/lib/catalogo/vendedor-switch";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
@@ -62,14 +69,45 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── Vendedor automático por login ──
+  // ── Vendedor: el del login por defecto, o el ELEGIDO en pantalla ──
+  //
+  // El default sigue siendo `fg_user_switch_vendedor` (lo que hacía hasta hoy).
+  // Lo nuevo es que el body puede traer `vendedor_id`: se valida contra la lista
+  // EN VIVO de Switch de ESTA empresa (los ids son por empresa — uno de otra
+  // empresa le acreditaría la venta, y la comisión, a otra persona).
   const { data: mapping } = await supabaseServer
     .from("fg_user_switch_vendedor")
     .select("vendedor_id, vendedor_nombre")
     .eq("user_id", auth.userId ?? "")
     .eq("empresa_key", cfg.empresaKey)
     .maybeSingle();
-  if (!mapping) {
+
+  let vendedorId: number | null = mapping?.vendedor_id ?? null;
+  let vendedorNombre: string | null = mapping?.vendedor_nombre ?? null;
+
+  const elegido = parsearVendedorSwitchId(body?.vendedor_id);
+  if (body?.vendedor_id != null) {
+    if (!elegido.ok) return NextResponse.json({ error: elegido.error }, { status: 400 });
+    if (elegido.id !== vendedorId) {
+      try {
+        const lista = await listarVendedores(cfg.empresaKey);
+        const v = buscarVendedor(lista.vendedores, elegido.id);
+        if (!v) return NextResponse.json({ error: errorVendedorNoExiste(cfg) }, { status: 404 });
+        vendedorId = v.id;
+        vendedorNombre = v.nombre;
+      } catch {
+        return NextResponse.json(
+          { error: "No se pudo leer la lista de vendedores de Switch. Intenta de nuevo en unos segundos." },
+          { status: 502 },
+        );
+      }
+    }
+  }
+
+  // Sin mapeo Y sin elección: es el 422 de siempre. El texto NO cambia — con
+  // el selector ya hay salida, pero pedirle el mapeo al admin sigue siendo lo
+  // que corresponde arreglar, y este es el único camino que queda sin ella.
+  if (vendedorId == null) {
     return NextResponse.json(
       { error: "No tienes vendedor de Switch asignado — pídele al admin asignarlo en Sistema → Usuarios", code: "SIN_VENDEDOR" },
       { status: 422 },
@@ -97,7 +135,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   // ── 1) Crear pedido en DB (RPC idempotente de la marca) ──
   const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: clienteNombre,
-    p_vendor_name: mapping.vendedor_nombre || auth.userName || null,
+    p_vendor_name: vendedorNombre || auth.userName || null,
     p_client_email: null,
     p_total: Math.round(total * 100) / 100,
     p_idempotency_key: idempotencyKey,
@@ -129,7 +167,7 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   // ESTE request igual usa los ids explícitos de abajo.
   const { error: updErr } = await db
     .from(cfg.ordersTable)
-    .update({ status: "confirmado", cliente_switch_id: clienteId, vendedor_switch_id: mapping.vendedor_id })
+    .update({ status: "confirmado", cliente_switch_id: clienteId, vendedor_switch_id: vendedorId })
     .eq("id", orderId);
   if (updErr) {
     console.error(`[checkout] update cliente/vendedor falló (${updErr.message}) — reintento solo status`);
@@ -151,8 +189,8 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
     bultoPzasByProduct,
     clienteId,
     clienteNombre,
-    vendedorId: mapping.vendedor_id,
-    vendedorNombre: mapping.vendedor_nombre,
+    vendedorId,
+    vendedorNombre,
   });
 
   const base = { ok: true as const, order_id: orderId, order_number: orderNumber };

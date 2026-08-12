@@ -13,6 +13,8 @@ import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, ModalOverlay, Toast } from "@/components/ui";
 import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import ClienteSwitchPicker, { type ClienteSwitchOpcion, nombreDeCliente } from "@/components/catalogo/ClienteSwitchPicker";
+import VendedorSwitchPicker, { type VendedorOpcion } from "@/components/catalogo/VendedorSwitchPicker";
+import { nombreDeVendedor } from "@/lib/catalogo/vendedor-switch";
 import { supabaseThumb } from "@/lib/image-thumb";
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
@@ -111,6 +113,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [clienteSwitch, setClienteSwitch] = useState<{ id: number; nombre: string | null; codigo: string | null } | null>(null);
   const [showClienteModal, setShowClienteModal] = useState(false);
   const [clienteGuardando, setClienteGuardando] = useState(false);
+  // ── Vendedor Switch del pedido (a nombre de quién sale, y de quién es la
+  //    comisión). A diferencia del cliente, viene con un default legítimo: el
+  //    que ya tiene el pedido (puesto por el login al crearlo). ──
+  const [vendedorSwitch, setVendedorSwitch] = useState<{ id: number; nombre: string | null; esFallback: boolean } | null>(null);
+  const [showVendedorModal, setShowVendedorModal] = useState(false);
+  const [vendedorGuardando, setVendedorGuardando] = useState(false);
   // ── Candado post-envío a Switch + reemplazo (Duplicar y corregir) ──
   const [reemplazadoPor, setReemplazadoPor] = useState<{ id: string; order_number: string } | null>(null);
   const [pedidoOriginal, setPedidoOriginal] = useState<{ id: string; order_number: string; switch_numero: string | null } | null>(null);
@@ -137,6 +145,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // `loading` (reglas de hooks).
   useEscapeClose(showSwitchModal, () => setShowSwitchModal(false), !switchSending);
   useEscapeClose(showClienteModal, () => setShowClienteModal(false), !clienteGuardando);
+  useEscapeClose(showVendedorModal, () => setShowVendedorModal(false), !vendedorGuardando);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
@@ -175,6 +184,20 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             if (cr.ok) {
               const cd = await cr.json();
               setClienteSwitch(cd.clienteSwitchId ? { id: cd.clienteSwitchId, nombre: cd.nombre || null, codigo: cd.codigo || null } : null);
+            }
+          } catch { /* no bloquea la carga del pedido */ }
+          // Vendedor Switch del pedido: a nombre de quién va a salir. Se muestra
+          // SIEMPRE (aunque no se pueda cambiar), porque de él depende la
+          // comisión y nadie debería enterarse después de mandarlo.
+          try {
+            const vr = await fetch(`${theme.api}/vendedores-switch?orderId=${id}`);
+            if (vr.ok) {
+              const vd = await vr.json();
+              setVendedorSwitch(
+                vd.vendedorSwitchId
+                  ? { id: vd.vendedorSwitchId, nombre: vd.nombre || null, esFallback: vd.esFallback === true }
+                  : null,
+              );
             }
           } catch { /* no bloquea la carga del pedido */ }
         }
@@ -534,6 +557,30 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     setClienteGuardando(false);
   }
 
+  // ── VENDEDOR SWITCH ──
+  // El pedido ya trae uno puesto (el del login que lo creó): esto solo lo cambia.
+  // 🔴 Cambia a quién se le acredita la venta y, con ella, la comisión.
+  async function asignarVendedorSwitch(v: VendedorOpcion) {
+    setVendedorGuardando(true);
+    try {
+      const res = await fetch(`${theme.api}/vendedores-switch`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id, vendedorSwitchId: v.id }),
+      });
+      const d = await res.json();
+      if (res.ok && d.ok) {
+        setVendedorSwitch({ id: v.id, nombre: d.nombre || v.nombre, esFallback: false });
+        setShowVendedorModal(false);
+        showToast(`Vendedor: ${nombreDeVendedor(v)}`);
+      } else {
+        showToast(d.error || "No se pudo guardar el vendedor. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("No se pudo guardar el vendedor. Revisa tu conexion.");
+    }
+    setVendedorGuardando(false);
+  }
+
   // ── DUPLICAR Y CORREGIR (pedido bloqueado por envío a Switch) ──
   // Clona el pedido como borrador NUEVO editable (reemplaza_a = este) y navega.
   // `nombre` y `cliente` vienen del mini-modal: el cliente de Switch es una
@@ -650,6 +697,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // El cliente solo se cambia mientras el pedido NO tenga un envío vivo en el
   // ERP (el PATCH responde 409; acá no se ofrece un botón que va a fallar).
   const puedeCambiarCliente = isEditorRole && (!switchEnvio || switchEnvio.estado === "error");
+  // Mismo criterio que el cliente: en Switch el pedido YA salió a nombre de
+  // alguien, y la comisión ya quedó donde quedó (el server responde 409).
+  const puedeCambiarVendedor = puedeCambiarCliente;
 
   // ── LOADING SKELETON ──
   if (loading || !order) return (
@@ -885,6 +935,36 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
             </div>
             {puedeCambiarCliente ? (
               <button onClick={abrirClienteModal}
+                className="flex-shrink-0 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-400 transition">
+                Cambiar
+              </button>
+            ) : (
+              <span className="flex-shrink-0 text-xs text-gray-400">ya está en Switch</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── VENDEDOR DE SWITCH (12-ago-2026) ──
+          Antes era automático por login y NO se veía en ningún lado: el pedido
+          salía a nombre de alguien y uno se enteraba después. Ahora se ve
+          siempre y se cambia mientras el pedido no esté en Switch.
+          🔴 De este nombre depende la COMISIÓN. */}
+      {isEditorRole && (
+        <div data-medir="vendedor-detalle" className="border border-gray-200 rounded-lg px-4 py-3 mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-wide text-gray-400">Vendedor</div>
+              <div className="text-sm text-gray-800 mt-0.5">
+                {nombreDeVendedor(vendedorSwitch)}
+                {vendedorSwitch?.esFallback && (
+                  <span className="text-gray-400 text-xs"> · por defecto de la marca</span>
+                )}
+              </div>
+              <div className="text-xs text-gray-400 mt-0.5">La venta se le acredita a esta persona.</div>
+            </div>
+            {puedeCambiarVendedor ? (
+              <button onClick={() => setShowVendedorModal(true)}
                 className="flex-shrink-0 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-400 transition">
                 Cambiar
               </button>
@@ -1143,6 +1223,28 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
               disabled={clienteGuardando}
             />
             <button onClick={() => setShowClienteModal(false)} disabled={clienteGuardando}
+              className="mt-3 w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
+              Cerrar
+            </button>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Modal de vendedor: la lista sale EN VIVO de Switch por la MISMA ruta
+          que alimenta Sistema → Usuarios, cacheada 15 min (sesión única). */}
+      {showVendedorModal && (
+        <ModalOverlay onBackdropClick={() => { if (!vendedorGuardando) setShowVendedorModal(false); }}>
+          <div data-medir="vendedor-modal" className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-medium mb-1">Vendedor del pedido</h3>
+            <p className="text-xs text-gray-500 mb-3">La venta —y su comisión— se le acredita a esta persona.</p>
+            <VendedorSwitchPicker
+              empresa={theme.empresaKey}
+              directorioLabel={theme.switchDirectorioLabel}
+              valor={vendedorSwitch}
+              onElegir={asignarVendedorSwitch}
+              disabled={vendedorGuardando}
+            />
+            <button onClick={() => setShowVendedorModal(false)} disabled={vendedorGuardando}
               className="mt-3 w-full border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-40 min-h-[44px]">
               Cerrar
             </button>

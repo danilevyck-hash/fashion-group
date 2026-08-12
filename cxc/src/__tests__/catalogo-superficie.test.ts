@@ -61,6 +61,9 @@ const CORE_MARCA = [
   "send-order",
   "sync-status",
   "upload",
+  // Vendedor del pedido (12-ago-2026): GET ?orderId= + PATCH. NO lista — la
+  // lista sale de /api/admin/switch-vendedores, la MISMA de Sistema → Usuarios.
+  "vendedores-switch",
 ].sort();
 
 // Rutas EXCLUSIVAS de una marca — siguen estáticas bajo su directorio (el

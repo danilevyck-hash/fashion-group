@@ -281,7 +281,6 @@ export interface MarcaTheme {
   navbar: {
     accentBar: string;
     inicioLink: string;
-    pedidosLink: string;
   };
   header: {
     fashionGroupBar: string;
@@ -383,6 +382,11 @@ export interface MarcaTheme {
     enHeader: boolean;
     verPedidoBtn: string | null;
     btn: string;
+    /** "Pedidos" — vive en la MISMA fila que Compartir desde el 12-ago-2026
+     *  (antes en la navbar, arriba del todo). Daniel: *"cambia el boton de
+     *  pedido a la altura de compartir"*, en las 4 marcas. Misma geometría que
+     *  `btn` para que los dos se lean como un par de acciones del catálogo. */
+    pedidosBtn: string;
     iconSize: number;
     panel: string;
     item: string;
@@ -611,7 +615,6 @@ const REEBOK: MarcaTheme = {
   navbar: {
     accentBar: "bg-[#E4002B]",
     inicioLink: "text-xs text-[#1A2656] hover:text-[#E4002B] transition flex-shrink-0 py-2",
-    pedidosLink: "text-sm text-[#1A2656] hover:text-[#E4002B] transition py-2 px-2 font-medium",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#E4002B] rounded-full",
@@ -717,6 +720,7 @@ const REEBOK: MarcaTheme = {
     enHeader: false,
     verPedidoBtn: null,
     btn: "text-xs border border-[#1A2656]/10 text-[#1A2656]/40 px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 hover:text-[#1A2656]/60 transition flex items-center gap-1.5 min-h-[44px]",
+    pedidosBtn: "text-xs border border-[#1A2656]/10 text-[#1A2656] px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 transition flex items-center gap-1.5 min-h-[44px] font-medium",
     iconSize: 12,
     panel: "absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 w-48 z-50",
     item: "w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2",
@@ -917,7 +921,6 @@ const JOYBEES: MarcaTheme = {
   navbar: {
     accentBar: "bg-[#FFE443]",
     inicioLink: "text-xs text-[#404041] hover:text-[#FFE443] transition flex-shrink-0 py-2",
-    pedidosLink: "text-sm text-[#404041] hover:text-black transition py-2 px-2 font-medium",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#FFE443] rounded-full",
@@ -1013,7 +1016,8 @@ const JOYBEES: MarcaTheme = {
   vendorShare: {
     enHeader: true,
     verPedidoBtn: "flex items-center gap-1.5 text-xs font-semibold text-[#404041] bg-[#FFE443] hover:bg-[#f5d90a] transition px-3 py-2 rounded-lg min-h-[44px]",
-    btn: "flex items-center gap-1.5 text-xs text-[#404041]/50 hover:text-[#404041] transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20",
+    btn: "flex items-center gap-1.5 text-xs text-[#404041]/50 hover:text-[#404041] transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20 min-h-[44px]",
+    pedidosBtn: "flex items-center gap-1.5 text-xs text-[#404041] hover:text-black transition px-3 py-2 rounded-lg border border-[#404041]/10 hover:border-[#404041]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 text-sm text-[#404041] hover:bg-gray-50 transition flex items-center gap-2",
@@ -1238,7 +1242,6 @@ const TOMMY: MarcaTheme = {
   navbar: {
     accentBar: "bg-[#AE0029]",
     inicioLink: "text-xs text-[#152342] hover:text-[#AE0029] transition flex-shrink-0 py-2",
-    pedidosLink: "text-sm text-[#152342] hover:text-[#AE0029] transition py-2 px-2 font-medium",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#AE0029] rounded-full",
@@ -1352,7 +1355,8 @@ const TOMMY: MarcaTheme = {
     enHeader: true,
     verPedidoBtn:
       "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#152342] hover:bg-[#0e1830] transition px-3 py-2 rounded-lg min-h-[44px]",
-    btn: "flex items-center gap-1.5 text-xs text-[#152342]/50 hover:text-[#152342] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20",
+    btn: "flex items-center gap-1.5 text-xs text-[#152342]/50 hover:text-[#152342] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20 min-h-[44px]",
+    pedidosBtn: "flex items-center gap-1.5 text-xs text-[#152342] hover:text-[#AE0029] transition px-3 py-2 rounded-lg border border-[#152342]/10 hover:border-[#152342]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 text-sm text-[#152342] hover:bg-gray-50 transition flex items-center gap-2",
@@ -1584,7 +1588,6 @@ const CALVIN: MarcaTheme = {
   navbar: {
     accentBar: "bg-[#1A1A1A]",
     inicioLink: "text-xs text-[#1A1A1A] hover:text-black transition flex-shrink-0 py-2",
-    pedidosLink: "text-sm text-[#1A1A1A] hover:text-black transition py-2 px-2 font-medium",
   },
   header: {
     fashionGroupBar: "w-1 h-4 bg-[#1A1A1A] rounded-full",
@@ -1698,7 +1701,8 @@ const CALVIN: MarcaTheme = {
     enHeader: true,
     verPedidoBtn:
       "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1A1A1A] hover:bg-black transition px-3 py-2 rounded-lg min-h-[44px]",
-    btn: "flex items-center gap-1.5 text-xs text-[#1A1A1A]/50 hover:text-[#1A1A1A] transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20",
+    btn: "flex items-center gap-1.5 text-xs text-[#1A1A1A]/50 hover:text-[#1A1A1A] transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20 min-h-[44px]",
+    pedidosBtn: "flex items-center gap-1.5 text-xs text-[#1A1A1A] hover:text-black transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20 min-h-[44px] font-medium",
     iconSize: 14,
     panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
     item: "w-full text-left px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-gray-50 transition flex items-center gap-2",
