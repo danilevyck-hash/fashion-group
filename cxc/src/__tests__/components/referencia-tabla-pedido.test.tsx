@@ -181,6 +181,28 @@ describe("modo pedido — la tabla", () => {
     const tabla = document.querySelector("tbody")!.closest("div");
     expect(tabla?.className).toContain("overflow-x-auto");
   });
+
+  it("🔴 margenVisible:false (vendedor/bodega): SIN columna Margen, y el detalle tampoco lo dibuja — lo demás queda", async () => {
+    // Daniel: *"quita margen, lo demas dejalo"*. El servidor decide y la vista
+    // obedece: ni la columna en la tabla ni el "margen X%" en la fila de plata.
+    const resp: ComprasApiResp = { ...RESP, margenVisible: false };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: PEGADO } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("CVM253CR02001");
+
+    expect(screen.queryByText("Margen")).toBeNull();
+    // Las demás columnas siguen enteras.
+    for (const col of ["Código", "Compré", "Vendí", "Stock", "90% en", "Últ. compra"]) {
+      expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
+    }
+    // Abrir el detalle: la fila de plata trae precios y costos, pero NO margen.
+    fireEvent.click(screen.getAllByText("AAA111001")[0].closest("tr")!);
+    expect(screen.getAllByText("Costo CIF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Precio prom").length).toBeGreaterThan(0);
+    expect(screen.queryByText("margen")).toBeNull();
+  });
 });
 
 describe("ordenarComoPegado (puro)", () => {
