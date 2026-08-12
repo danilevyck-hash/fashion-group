@@ -20,18 +20,8 @@
 // dejaría de salir. Es la misma decisión que la columna `proveedor_key`.
 // ============================================================================
 
-import XLSX from "xlsx-js-style";
-import {
-  MONEY_FMT,
-  XLSX_MIME,
-  buildReportSheet,
-  workbookFromSheets,
-  type ReportCell,
-  type ReportColumn,
-} from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
 import { esMultifashion } from "@/lib/marketing/multifashion";
-import { formatearFecha } from "./normalizar";
 import { marcasDeEntrega, porcionEntregaParaMarca } from "./resumen-inicio";
 import {
   agregarPorBloques,
@@ -590,7 +580,7 @@ export function armarReportePeriodo(
 }
 
 // ----------------------------------------------------------------------------
-// Excel del reporte GUARDADO — nunca recalcula nada
+// La forma del reporte guardado
 // ----------------------------------------------------------------------------
 
 /** `true` si el jsonb guardado tiene la forma de un reporte. */
@@ -604,124 +594,11 @@ export function esReportePeriodo(x: unknown): x is ReportePeriodo {
   );
 }
 
-export function excelDeReporte(reporte: ReportePeriodo): Buffer {
-  const titulo = `FASHION GROUP — ${reporte.proveedorNombre}`;
-  // El Excel DICE de dónde salió: congelado al cerrar, o calculado hoy (el
-  // período se cerró sin reporte guardado — no se le miente a quien lo lee).
-  const subtitulo = reporte.calculadoEnVivo
-    ? `${reporte.periodoNombre} · calculado el ${formatearFecha(
-        reporte.generadoEn.slice(0, 10),
-      )} (este período se cerró sin reporte guardado)`
-    : `${reporte.periodoNombre} · cerrado el ${formatearFecha(
-        reporte.generadoEn.slice(0, 10),
-      )}`;
-
-  // Hoja 1 — Resumen por cliente.
-  const colsResumen: ReportColumn[] = [
-    { header: "Cliente", wch: 30 },
-    { header: "Código", wch: 10 },
-    { header: "Facturas", wch: 14, align: "right", fmt: MONEY_FMT },
-    { header: "Muebles", wch: 14, align: "right", fmt: MONEY_FMT },
-    { header: "Total", wch: 14, align: "right", fmt: MONEY_FMT },
-  ];
-  const rowsResumen: ReportCell[][] = reporte.porCliente.map((c) => [
-    c.cliente,
-    c.clienteCodigo ?? "",
-    c.facturas,
-    c.muebles,
-    c.total,
-  ]);
-  const totalsResumen: ReportCell[] = [
-    "TOTAL",
-    "",
-    reporte.totales.facturas.total,
-    reporte.totales.muebles.total,
-    reporte.totales.total,
-  ];
-
-  // Hoja 2 — Facturas.
-  const colsFacturas: ReportColumn[] = [
-    { header: "Fecha", wch: 12 },
-    { header: "N° factura", wch: 16 },
-    { header: "Proveedor", wch: 24 },
-    { header: "Concepto", wch: 40 },
-    { header: "Cliente", wch: 24 },
-    { header: "Proyecto", wch: 24 },
-    { header: "Marca", wch: 18 },
-    { header: "Monto", wch: 14, align: "right", fmt: MONEY_FMT },
-  ];
-  const rowsFacturas: ReportCell[][] = reporte.facturas.map((f) => [
-    formatearFecha(f.fecha),
-    f.numero,
-    f.proveedor,
-    f.concepto,
-    f.cliente,
-    f.proyecto,
-    f.marca,
-    f.monto,
-  ]);
-
-  // Hoja 3 — Muebles entregados.
-  const colsEntregas: ReportColumn[] = [
-    { header: "Fecha", wch: 12 },
-    { header: "Cliente", wch: 24 },
-    { header: "Proyecto", wch: 24 },
-    { header: "Marca", wch: 18 },
-    { header: "Notas", wch: 30 },
-    { header: "Monto", wch: 14, align: "right", fmt: MONEY_FMT },
-  ];
-  const rowsEntregas: ReportCell[][] = reporte.entregas.map((e) => [
-    formatearFecha(e.fecha),
-    e.cliente,
-    e.proyecto,
-    e.marca,
-    e.notas ?? "",
-    e.monto,
-  ]);
-
-  const wb = workbookFromSheets([
-    {
-      name: "Resumen",
-      ws: buildReportSheet({
-        title: titulo,
-        subtitle: subtitulo,
-        columns: colsResumen,
-        rows: rowsResumen,
-        totals: totalsResumen,
-      }),
-    },
-    {
-      name: "Facturas",
-      ws: buildReportSheet({
-        title: titulo,
-        subtitle: `${reporte.periodoNombre} · facturas`,
-        columns: colsFacturas,
-        rows: rowsFacturas,
-        totals: [
-          "TOTAL",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          reporte.totales.facturas.total,
-        ],
-      }),
-    },
-    {
-      name: "Muebles",
-      ws: buildReportSheet({
-        title: titulo,
-        subtitle: `${reporte.periodoNombre} · muebles entregados`,
-        columns: colsEntregas,
-        rows: rowsEntregas,
-        totals: ["TOTAL", "", "", "", "", reporte.totales.muebles.total],
-      }),
-    },
-  ]);
-
-  return XLSX.write(wb, { bookType: "xlsx", type: "buffer" }) as Buffer;
-}
-
-export { XLSX_MIME };
+// ⛔ ACÁ NO HAY EXCEL. El generador de 3 hojas genéricas (Resumen / Facturas /
+// Muebles, sin hojas por cliente y sin links) se retiró el 12-ago-2026 —
+// Daniel, textual: *"MIRA CÓMO se descarga el excel, antes no era así"* y
+// *"quiero el modo anterior, solo quitando las columnas de las marcas"*. El
+// Excel de un período sale de `zip-marca.ts` → `buildExcelDeMarca`: el MISMO
+// `resumen_gastos.xlsx` que va dentro del ZIP (hoja Resumen + una hoja por
+// cliente con hyperlinks + hoja General para los gastos sin cliente). No
+// escribir acá un segundo generador.

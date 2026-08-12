@@ -901,6 +901,24 @@ export interface OpcionesResumenGastos {
    * plata mintiendo en su propio título — ver lib/marketing/zip-marca.ts.
    */
   etiquetaMonto?: string;
+  /**
+   * true = SIN las columnas de marca ("Marcas", Calvin, Tommy, Otras y la
+   * columna "Marca" del detalle). Es para las descargas de UNA marca — Daniel,
+   * textual (12-ago-2026): *"quiero el modo anterior, solo quitando las
+   * columnas de las marcas ya que hoy en dia se descarga por marca"*. Cada
+   * archivo ya es de una sola marca, así que el desglose por columnas era
+   * redundante: la marca va en el título y nada más. El ZIP GLOBAL (sin esta
+   * opción) no cambia ni un carácter.
+   */
+  sinColumnasDeMarca?: boolean;
+  /**
+   * Título y subtítulo arriba de la hoja Resumen ("FASHION GROUP — Tommy
+   * Hilfiger" / "mid 2026 · cerrado el 12 ago 2026"). Es lo que el formato
+   * nuevo hacía bien y se conserva: el archivo dice de qué marca y de qué
+   * período es, y si fue congelado al cerrar o calculado hoy.
+   */
+  titulo?: string;
+  subtitulo?: string;
 }
 
 export function buildResumenGastosWorkbook(
@@ -908,6 +926,8 @@ export function buildResumenGastosWorkbook(
   opciones: OpcionesResumenGastos = {},
 ): XLSX.WorkBook {
   const etiquetaMonto = opciones.etiquetaMonto || COL_SUBTOTAL;
+  /** false = descarga de UNA marca: sin columnas de marca (ver la opción). */
+  const conMarcas = !opciones.sinColumnasDeMarca;
   const wb = XLSX.utils.book_new();
 
   // ── 🩸 "Otras marcas" APARECE SOLA CUANDO HAY ALGO QUE MOSTRAR ───────────
@@ -926,7 +946,8 @@ export function buildResumenGastosWorkbook(
   // ⚠️ LA DECISIÓN ES GLOBAL, NO POR HOJA. Se mira TODO el export una sola vez:
   // si se decidiera por cliente, el Resumen podría traerla y la hoja de un
   // cliente no, y las dos vistas del mismo dato dirían cosas distintas.
-  const mostrarOtras = clientes.some((c) =>
+  // (Sin columnas de marca no hay dónde dibujarla: queda en false.)
+  const mostrarOtras = conMarcas && clientes.some((c) =>
     c.gastos.some((g) => splitMarcas(Number(g.subtotal) || 0, g.partes ?? []).otras > 0),
   );
 
@@ -957,29 +978,28 @@ export function buildResumenGastosWorkbook(
   // Columna "Marcas" = siglas de las marcas que toca cada cliente (facturas +
   // muebles), igual que los chips de la pantalla. Las columnas Calvin Klein /
   // Tommy Hilfiger / Otras marcas / Subtotal van SIN ITBMS (pedido de Daniel).
+  // Con `sinColumnasDeMarca` las columnas de marca se van y queda Cliente /
+  // # Gastos / # Fotos / monto.
   const headRes = [
     "Cliente",
-    "Marcas",
+    ...(conMarcas ? ["Marcas"] : []),
     "# Gastos",
     "# Fotos",
-    COL_CALVIN,
-    COL_TOMMY,
-    ...(mostrarOtras ? [COL_OTRAS] : []),
+    ...(conMarcas ? [COL_CALVIN, COL_TOMMY, ...(mostrarOtras ? [COL_OTRAS] : [])] : []),
     etiquetaMonto,
   ];
-  const C_RES_CK = 4;
-  /** Última columna de dinero (= Subtotal): todo lo de CK..acá va en $. */
-  const C_RES_SUBTOTAL = mostrarOtras ? 7 : 6;
+  /** Última columna de dinero (= Subtotal). */
+  const C_RES_SUBTOTAL = headRes.length - 1;
+  /** Primera columna de dinero: CK con marcas; el propio monto sin ellas. */
+  const C_RES_CK = conMarcas ? 4 : C_RES_SUBTOTAL;
   const filaDeCliente = (c: ClienteResumenXlsx): (string | number)[] => {
-    const s = splitDeGastos(c.gastos);
+    const s = conMarcas ? splitDeGastos(c.gastos) : null;
     return [
       c.nombre,
-      c.marcas,
+      ...(s ? [c.marcas] : []),
       c.gastos.length,
       c.fotos.length,
-      s.ck,
-      s.th,
-      ...(mostrarOtras ? [s.otras] : []),
+      ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
       sumSubtotales(c.gastos),
     ];
   };
@@ -995,15 +1015,13 @@ export function buildResumenGastosWorkbook(
     etiqueta: string,
   ): (string | number)[] => {
     const todos = lista.flatMap((c) => c.gastos);
-    const s = splitDeGastos(todos);
+    const s = conMarcas ? splitDeGastos(todos) : null;
     return [
       etiqueta,
-      "",
+      ...(s ? [""] : []),
       todos.length,
       lista.reduce((n, c) => n + c.fotos.length, 0),
-      s.ck,
-      s.th,
-      ...(mostrarOtras ? [s.otras] : []),
+      ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
       sumSubtotales(todos),
     ];
   };
@@ -1015,8 +1033,7 @@ export function buildResumenGastosWorkbook(
   const vacias = (n: number) => Array.from({ length: n }, () => "" as string | number);
   const filaMonto = (etiqueta: string, sub: number): (string | number)[] => [
     etiqueta,
-    ...vacias(3),
-    ...vacias(mostrarOtras ? 3 : 2),
+    ...vacias(C_RES_SUBTOTAL - 1),
     sub,
   ];
   const filasDesglose: (string | number)[][] = hayImpulsadoras
@@ -1052,7 +1069,20 @@ export function buildResumenGastosWorkbook(
       ]
     : [];
 
+  // Título/subtítulo arriba de la hoja (solo cuando se piden — el ZIP global
+  // sigue arrancando en el encabezado, como siempre).
+  const filasTitulo: (string | number)[][] = opciones.titulo
+    ? [
+        [opciones.titulo],
+        ...(opciones.subtitulo ? [[opciones.subtitulo]] : []),
+        [""],
+      ]
+    : [];
+  /** Fila del encabezado de la tabla del Resumen (0 sin título). */
+  const OFS = filasTitulo.length;
+
   const aoaRes = [
+    ...filasTitulo,
     headRes,
     ...delGrupo.map(filaDeCliente),
     ...filasDesglose,
@@ -1060,20 +1090,30 @@ export function buildResumenGastosWorkbook(
     ...filasMf,
   ];
   const wsR = XLSX.utils.aoa_to_sheet(aoaRes);
-  wsR["!cols"] = [
-    { wch: 32 },
-    { wch: 16 },
-    { wch: 9 },
-    { wch: 8 },
-    { wch: 15 },
-    { wch: 15 },
-    { wch: 14 },
-    { wch: 18 },
-  ];
-  wsR["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
+  wsR["!cols"] = conMarcas
+    ? [
+        { wch: 32 },
+        { wch: 16 },
+        { wch: 9 },
+        { wch: 8 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 14 },
+        { wch: 18 },
+      ]
+    : [{ wch: 32 }, { wch: 9 }, { wch: 8 }, { wch: 18 }];
+  wsR["!freeze"] = { xSplit: 0, ySplit: OFS + 1 } as unknown as Record<string, unknown>;
+  if (OFS > 0) {
+    styleCell(wsR, 0, 0, {
+      font: { name: "Calibri", sz: 13, bold: true, color: { rgb: CASA_PALETTE.pri } },
+    });
+    if (opciones.subtitulo) {
+      styleCell(wsR, 1, 0, { font: { name: "Calibri", sz: 10, color: { rgb: "666666" } } });
+    }
+  }
   // Índices de las filas especiales, para estilarlas sin adivinar.
-  const rTotalGrupo = 1 + delGrupo.length + filasDesglose.length;
-  const desgloseStart = 1 + delGrupo.length;
+  const rTotalGrupo = OFS + 1 + delGrupo.length + filasDesglose.length;
+  const desgloseStart = OFS + 1 + delGrupo.length;
   const desgloseEnd = desgloseStart + filasDesglose.length - 1;
   const rTituloMf = hayMultifashion ? rTotalGrupo + 2 : -1;
   const rTotalMf = hayMultifashion ? rTituloMf + 1 + deMultifashion.length : -1;
@@ -1082,16 +1122,16 @@ export function buildResumenGastosWorkbook(
     hayImpulsadoras && r >= desgloseStart && r <= desgloseEnd;
   const esBandaTotal = (r: number): boolean =>
     r === rTotalGrupo || r === rTotalMf || r === rGranTotal;
-  const esTextoCol = (c: number): boolean => c === 0 || c === 1; // Cliente, Marcas
+  const esTextoCol = (c: number): boolean => c === 0 || (conMarcas && c === 1); // Cliente, Marcas
   for (let c = 0; c < headRes.length; c++) {
-    styleCell(wsR, 0, c, {
+    styleCell(wsR, OFS, c, {
       font: headFont,
       fill: headFill,
       alignment: { horizontal: esTextoCol(c) ? "left" : "right", vertical: "center", wrapText: true },
       border: B,
     });
   }
-  for (let r = 1; r < aoaRes.length; r++) {
+  for (let r = OFS + 1; r < aoaRes.length; r++) {
     if (r === rTituloMf) {
       styleCell(wsR, r, 0, { font: { ...headFont, sz: 11 }, fill: sectionFill });
       for (let c = 1; c < headRes.length; c++) styleCell(wsR, r, c, { fill: sectionFill });
@@ -1147,19 +1187,18 @@ export function buildResumenGastosWorkbook(
     "Período",
     "Concepto",
     "Proveedor",
-    "Marca",
+    ...(conMarcas ? ["Marca"] : []),
     "N° Factura",
-    COL_CALVIN,
-    COL_TOMMY,
-    ...(mostrarOtras ? [COL_OTRAS] : []),
+    ...(conMarcas ? [COL_CALVIN, COL_TOMMY, ...(mostrarOtras ? [COL_OTRAS] : [])] : []),
     etiquetaMonto,
     "Comprobante",
   ];
   // Índices con nombre: hay ~10 lugares que dependían del número crudo.
   const C_CONCEPTO = 2;
-  const C_CK = 6;
-  const C_SUBTOTAL = mostrarOtras ? 9 : 8;
-  const C_LINK = mostrarOtras ? 10 : 9;
+  const C_LINK = headG.length - 1;
+  const C_SUBTOTAL = headG.length - 2;
+  /** Primera columna de dinero: CK con marcas; el propio monto sin ellas. */
+  const C_CK = conMarcas ? 6 : C_SUBTOTAL;
   /** Columnas de dinero de la hoja de detalle (todas van con formato moneda). */
   const esColMoneda = (c: number): boolean => c >= C_CK && c <= C_SUBTOTAL;
   for (const cli of clientes) {
@@ -1189,36 +1228,30 @@ export function buildResumenGastosWorkbook(
     aoa.push(headG);
     const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
     for (const g of cli.gastos) {
-      const s = splitMarcas(Number(g.subtotal) || 0, g.partes ?? []);
+      const s = conMarcas ? splitMarcas(Number(g.subtotal) || 0, g.partes ?? []) : null;
       aoa.push([
         g.fecha,
         g.periodo || "—",
         g.concepto,
         g.proveedor,
-        g.marca,
+        ...(s ? [g.marca] : []),
         g.numero || "—",
-        s.ck,
-        s.th,
-        ...(mostrarOtras ? [s.otras] : []),
+        ...(s ? [s.ck, s.th, ...(mostrarOtras ? [s.otras] : [])] : []),
         Number(g.subtotal) || 0,
         g.signed ? g.etiquetaLink || "Ver factura" : "—",
       ]);
     }
     const gastoEnd = gastoStart + cli.gastos.length - 1;
-    const totalesCli = splitDeGastos(cli.gastos);
+    const totalesCli = conMarcas ? splitDeGastos(cli.gastos) : null;
     aoa.push([
-      "",
-      "",
-      "",
-      "",
-      "",
+      ...vacias(C_CK - 1),
       // "Subtotal" a secas quedaría pegado a la columna "Subtotal (sin ITBMS)" y
       // se leería como su encabezado. Esta fila son los totales de TODAS las
       // columnas de dinero, así que dice eso.
       "TOTALES",
-      totalesCli.ck,
-      totalesCli.th,
-      ...(mostrarOtras ? [totalesCli.otras] : []),
+      ...(totalesCli
+        ? [totalesCli.ck, totalesCli.th, ...(mostrarOtras ? [totalesCli.otras] : [])]
+        : []),
       sumSubtotales(cli.gastos),
       "",
     ]);
@@ -1243,19 +1276,29 @@ export function buildResumenGastosWorkbook(
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [
-      { wch: 12 },
-      { wch: 16 },
-      { wch: 40 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 16 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 14 },
-      { wch: 18 },
-      { wch: 16 },
-    ];
+    ws["!cols"] = conMarcas
+      ? [
+          { wch: 12 },
+          { wch: 16 },
+          { wch: 40 },
+          { wch: 22 },
+          { wch: 22 },
+          { wch: 16 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 14 },
+          { wch: 18 },
+          { wch: 16 },
+        ]
+      : [
+          { wch: 12 },
+          { wch: 16 },
+          { wch: 40 },
+          { wch: 22 },
+          { wch: 16 },
+          { wch: 18 },
+          { wch: 16 },
+        ];
 
     // Links de gasto + SUM de cada columna de dinero en la fila Subtotal.
     cli.gastos.forEach((g, i) => {

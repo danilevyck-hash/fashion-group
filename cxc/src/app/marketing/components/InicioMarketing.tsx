@@ -21,6 +21,17 @@
 // pantalla" sería tener dos verdades sobre la misma plata — la forma exacta en
 // que este repo ya se quemó dos veces con los signos de las notas de crédito.
 //
+// 🔴 LOS PERÍODOS CERRADOS VIVEN DENTRO DE LA TARJETA DE SU MARCA (12-ago-2026).
+// Daniel, textual: *"veo el período cerrado solo como un botón para descargar,
+// no debería estar archivado dentro de un card como por ejemplo: tommy —
+// periodo 'nombre' (cerrado), periodo 'nombre' (abierto). así puedo descargar
+// por periodo"*. El abierto va arriba con todo lo de hoy; los cerrados debajo,
+// compactos, del más nuevo al más viejo, cada uno con su Excel y su ZIP. La
+// fila suelta "Períodos cerrados" del pie de la pantalla SE FUE — no volver a
+// dibujarla. El período conjunto legacy ("mid 2026", compartido por dentro) no
+// se duplica: aparece en la tarjeta de cada marca CON SU monto, que es como lo
+// parte el API.
+//
 // ⚠️ DEGRADA LIMPIO. El orden de los bloques se deriva del módulo PURO
 // `lib/marketing/bloques.ts`, y los contadores de pendientes ausentes se leen como 0 (que es
 // "no sé de ninguno", y se dibuja igual que "no hay ninguno": nada). Sin la
@@ -313,6 +324,20 @@ export default function InicioMarketing({
     return [...lista].sort((a, b) => ordenDe(a.key) - ordenDe(b.key));
   }, [datos]);
 
+  // Los períodos CERRADOS de cada marca, para listarlos dentro de su tarjeta.
+  // Vienen del API ya partidos por marca (el conjunto legacy "mid 2026"
+  // aparece en Tommy y en Calvin, cada uno con SU monto) y ya ordenados del
+  // más nuevo al más viejo. Acá solo se agrupan — no se suma nada.
+  const cerradosPorBloque = useMemo(() => {
+    const m = new Map<string, PeriodoCerradoResumen[]>();
+    for (const c of datos?.cerrados ?? []) {
+      const arr = m.get(c.bloqueKey) ?? [];
+      arr.push(c);
+      m.set(c.bloqueKey, arr);
+    }
+    return m;
+  }, [datos]);
+
   const mobiliario = datos?.mobiliario;
   const impulsadoras = datos?.impulsadoras;
 
@@ -409,6 +434,11 @@ export default function InicioMarketing({
                 !sinReporte && datos.conPeriodos && !sinGasto && !!b.periodoAbierto?.id;
               const nombre = b.nombre || nombreDeBloque(b.key, datos.marcas);
               const zipClave = `${b.key}:abierto`;
+              // Multifashion también baja su ZIP — Daniel: *"descargas por
+              // marca te basta y multifashion es una marca"*. Sigue sin
+              // período y sin cerrar (tienda propia, no se le reporta a nadie).
+              const conZip = (!sinReporte || b.key === MULTIFASHION_KEY) && !sinGasto;
+              const cerradosDelBloque = cerradosPorBloque.get(b.key) ?? [];
 
               return (
                 <div key={b.key}>
@@ -484,7 +514,7 @@ export default function InicioMarketing({
                           Cerrar
                         </button>
                       )}
-                      {!sinReporte && !sinGasto && (
+                      {conZip && (
                         <button
                           type="button"
                           onClick={() =>
@@ -497,6 +527,60 @@ export default function InicioMarketing({
                         </button>
                       )}
                     </div>
+
+                    {/* ----------------------------------------------------- */}
+                    {/* Los períodos CERRADOS de esta marca — compactos, uno  */}
+                    {/* por línea, del más nuevo al más viejo, cada uno con   */}
+                    {/* su Excel y su ZIP. Quedan acá para siempre: se pueden */}
+                    {/* volver a bajar cuando haga falta, de a uno.           */}
+                    {/* ----------------------------------------------------- */}
+                    {cerradosDelBloque.length > 0 && (
+                      <div className="mt-4 border-t border-gray-100 pt-3 space-y-1.5">
+                        {cerradosDelBloque.map((c, i) => {
+                          const etiqueta = `${c.bloqueNombre} · ${c.nombre} · ${formatearMonto(c.total)}`;
+                          const zipClaveCerrado = `${c.bloqueKey}:${c.id ?? "sin-id"}`;
+                          return (
+                            <div
+                              key={c.id ?? `${c.bloqueKey}-${c.nombre}-${i}`}
+                              className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                            >
+                              <div className="min-w-0 text-sm text-gray-700">
+                                {c.nombre}{" "}
+                                <span className="text-xs text-gray-400">(cerrado)</span>
+                              </div>
+                              <div className="text-sm font-medium text-gray-900 tabular-nums">
+                                {formatearMonto(c.total)}
+                              </div>
+                              {c.id && (
+                                <div className="ml-auto flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      bajarZipMarca(c.bloqueKey, etiqueta, c.id)
+                                    }
+                                    title={`Bajar el ZIP de ${c.bloqueNombre} · ${c.nombre}`}
+                                    disabled={bajando === zipClaveCerrado}
+                                    className="rounded-md border border-gray-200 bg-white px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs text-gray-600 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition disabled:opacity-40"
+                                  >
+                                    {bajando === zipClaveCerrado ? "Armando…" : "ZIP"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      descargarReporte(c.id as string, etiqueta, c.bloqueKey)
+                                    }
+                                    title="Bajar el Excel de este período"
+                                    className="rounded-md border border-gray-200 bg-white px-2.5 min-h-[44px] inline-flex items-center justify-center text-xs text-gray-600 hover:text-gray-900 hover:border-gray-400 active:scale-[0.97] transition"
+                                  >
+                                    Excel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -549,60 +633,9 @@ export default function InicioMarketing({
             </button>
           </section>
 
-          {/* -------------------------------------------------------------- */}
-          {/* Períodos cerrados — el archivo, al pie y tenue. Cada uno lleva  */}
-          {/* su ZIP, y queda ahí para siempre: se vuelve a bajar cuando se   */}
-          {/* necesite, de a uno.                                            */}
-          {/* -------------------------------------------------------------- */}
-          {datos.cerrados.length > 0 && (
-            <section className="space-y-2">
-              <div className="text-xs text-gray-500">Períodos cerrados</div>
-              <div className="flex flex-wrap gap-2">
-                {datos.cerrados.map((c, i) => {
-                  const etiqueta = `${c.bloqueNombre} · ${c.nombre} · ${formatearMonto(c.total)}`;
-                  const zipClave = `${c.bloqueKey}:${c.id ?? "abierto"}`;
-                  return (
-                    <div
-                      key={c.id ?? `${c.bloqueKey}-${c.nombre}-${i}`}
-                      className="inline-flex items-stretch rounded-md border border-gray-200 overflow-hidden"
-                    >
-                      {c.id ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            descargarReporte(c.id as string, etiqueta, c.bloqueKey)
-                          }
-                          title="Bajar el Excel de este período"
-                          className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition"
-                        >
-                          {etiqueta}
-                        </button>
-                      ) : (
-                        // Fallback sin migración: el período existe como
-                        // agrupación, pero todavía no tiene fila propia.
-                        <span className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500">
-                          {etiqueta}
-                        </span>
-                      )}
-                      {c.id && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            bajarZipMarca(c.bloqueKey, etiqueta, c.id)
-                          }
-                          title={`Bajar el ZIP de ${c.bloqueNombre}`}
-                          disabled={bajando === zipClave}
-                          className="border-l border-gray-200 px-3 min-h-[44px] inline-flex items-center text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-40"
-                        >
-                          {bajando === zipClave ? "Armando…" : "ZIP"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+          {/* La fila suelta "Períodos cerrados" del pie SE FUE (12-ago-2026):
+              cada período cerrado vive dentro de la tarjeta de su marca, con
+              su Excel y su ZIP. No volver a dibujar el archivo acá abajo. */}
         </>
       )}
 
@@ -629,7 +662,9 @@ export default function InicioMarketing({
           onClose={() => setCerrando(null)}
           onCerrado={async (periodoId, etiqueta) => {
             setCerrando(null);
-            await descargarReporte(periodoId, etiqueta);
+            // El recién cerrado se baja con SU marca — mismo camino que el
+            // botón Excel de la lista de cerrados de la tarjeta.
+            await descargarReporte(periodoId, etiqueta, cerrando.key);
             setRecargar((n) => n + 1);
           }}
         />

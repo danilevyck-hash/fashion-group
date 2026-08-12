@@ -364,6 +364,20 @@ function req(body?: unknown): NextRequest {
   });
 }
 
+/** GET del Excel con `?marca=`, como lo piden los botones de la tarjeta. */
+function reqConMarca(marca: string): NextRequest {
+  const cookie = signSession({
+    role: "admin",
+    userId: "u1",
+    userName: "Daniel",
+    sessionToken: "t1",
+  });
+  return new NextRequest(
+    `http://localhost/api/marketing/periodos?marca=${encodeURIComponent(marca)}`,
+    { headers: { cookie: `cxc_session=${cookie}` } },
+  );
+}
+
 beforeEach(() => {
   sembrar();
   vi.restoreAllMocks();
@@ -657,7 +671,7 @@ describe("el reporte guardado no se recalcula nunca", () => {
     expect(resumen.cerrados.find((c) => c.id === PER_PVH_ABIERTO)!.total).toBe(1000);
   });
 
-  it("el Excel sale del reporte guardado; un período abierto no tiene Excel", async () => {
+  it("el Excel respeta la plata guardada y se baja POR marca; un período abierto no tiene Excel", async () => {
     await registrarFactura({ numero: "F-1", fecha: "2026-08-01", total: 1000, marcaIds: [MARCA_TH] });
 
     const abierto = await reporteRoute(req(), { params: { id: PER_PVH_ABIERTO } });
@@ -670,9 +684,23 @@ describe("el reporte guardado no se recalcula nunca", () => {
       params: { id: PER_PVH_ABIERTO },
     });
 
-    const cerrado = await reporteRoute(req(), { params: { id: PER_PVH_ABIERTO } });
+    // El período conjunto legacy ('pvh') no se baja "entero": desde el
+    // 12-ago-2026 cada marca baja SU Excel (Daniel: *"descargas por marca te
+    // basta"*). Sin marca, la ruta lo dice en vez de mezclar tres reportes.
+    const sinMarca = await reporteRoute(req(), { params: { id: PER_PVH_ABIERTO } });
+    expect(sinMarca.status).toBe(400);
+    expect(((await sinMarca.json()) as { error: string }).error).toMatch(
+      /junta varias marcas/i,
+    );
+
+    const cerrado = await reporteRoute(reqConMarca("TH"), {
+      params: { id: PER_PVH_ABIERTO },
+    });
     expect(cerrado.status).toBe(200);
     expect(cerrado.headers.get("Content-Type")).toContain("spreadsheetml");
+    // 🔴 La plata sale del reporte CONGELADO al cerrar, la de ESA marca.
+    expect(cerrado.headers.get("X-Fuente-Montos")).toBe("congelado");
+    expect(cerrado.headers.get("X-Total")).toBe("1000");
     const buf = Buffer.from(await cerrado.arrayBuffer());
     expect(buf.length).toBeGreaterThan(1000);
     expect(buf.subarray(0, 2).toString("latin1")).toBe("PK"); // es un .xlsx real
