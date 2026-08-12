@@ -291,6 +291,59 @@ describe("modo pedido — la tabla", () => {
     expect(dds.slice(0, 4)).toEqual(["36u", "25u", "12u", "5"]);
   });
 
+  it('🩸 vendido > comprado (44D202G110): la celda dice 103%, NO "—", y coincide con la ficha de abajo', async () => {
+    // Daniel, con captura: *"PORQUE NO SALE PORCENTAJE?"*. La tabla decía
+    // "VENDIDO —" (la vieja regla de "no afirmable") mientras su propia ficha,
+    // tres centímetros más abajo, decía "el 103% de lo comprado". Este test es
+    // el que caza esa contradicción: lee la celda Y el pie de Vendí del
+    // detalle abierto, y exige el MISMO número.
+    const conDeMas = articulo("44D202G110", {
+      compras: [
+        {
+          empresa: "vistana",
+          codigo: "44D202G110",
+          fecha: "2025-10-28",
+          documento: "DOC-44D",
+          proveedor: "PROV",
+          articulo: "44D202G110",
+          unidades: 64,
+          costos: { cif: 17.6, fob: 17.6, fobOrigen: "igual-al-cif" as const, lista: 24 },
+        },
+      ],
+      serie: [
+        { mes: "2025-11", unidades: 32, venta: 704 },
+        { mes: "2025-12", unidades: 14, venta: 308 },
+        { mes: "2026-06", unidades: 20, venta: 440 },
+      ],
+      cuadre: { comprado: 64, vendido: 66, existencia: 0, residuo: -2, ajusteConfiable: false },
+      vendidoDeMas: 2,
+      existencia: 0,
+      precioEtiqueta: 24,
+    });
+    const resp: ComprasApiResp = { ...RESP, articulos: [articulo("AAA111001"), conDeMas] };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "44D202G110 AAA111001" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("44D202G110");
+
+    const fila = () => screen.getAllByText("44D202G110")[0].closest("tr")!;
+    const celdas = () => [...fila().querySelectorAll("td")].map((td) => td.textContent);
+    expect(celdas()[1]).toBe("64"); // Compré
+    expect(celdas()[2]).toBe("66"); // Vendí
+    expect(celdas()[4]).toBe("103%"); // Vendido — antes decía "—"
+    expect(celdas()[4]).not.toBe("—");
+
+    // Y la ficha que se abre al tocar dice EXACTAMENTE el mismo porcentaje,
+    // con el aviso de descuadre explicando las 2 unidades de más.
+    fireEvent.click(fila());
+    expect(screen.getAllByText("el 103% de lo comprado").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Se vendieron 2 unidades más de las que llegaron según los ingresos registrados.")
+        .length,
+    ).toBeGreaterThan(0);
+  });
+
   it("la tabla scrollea ELLA SOLA: las filas viven dentro de un overflow-x-auto", async () => {
     await buscarPegado();
     const tabla = document.querySelector("tbody")!.closest("div");

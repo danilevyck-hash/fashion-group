@@ -963,6 +963,97 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
     expect(textoVendidoCelda(vm)).toBe("69%");
   });
 
+  it('🩸 el caso de la captura (44D202G110): la tabla NO puede decir "—" mientras la ficha dice 103%', () => {
+    // Daniel, textual: *"PORQUE NO SALE PORCENTAJE?"*. Compré 64, vendí 66
+    // (2 de más), stock 0, una sola compra. La ficha decía "el 103% de lo
+    // comprado" y la tabla del modo pedido, tres centímetros más abajo,
+    // decía "VENDIDO —". El bug NO era el 103%: era la contradicción.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "44D202G110",
+        descripcion: "Women-T-Shirts S/S",
+        ingresos: [ing("2025-10-28", 64, { codigo_articulo: "44D202G110" })],
+        ventas: [
+          v("2025-10-30", "FA", 8, 176),
+          v("2025-11-15", "FA", 24, 528),
+          v("2025-12-15", "FA", 14, 308),
+          v("2026-06-15", "FA", 20, 440),
+        ],
+        existencia: 0,
+        precioEtiqueta: 24,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const f = armarFicha(art, HOY_MES);
+    expect(f.grandes).toMatchObject({ comprado: 64, vendido: 66, quedan: 0 });
+    // La ficha: el 103%, sin tope. El aviso de descuadre explica las 2 de más.
+    expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 103% de lo comprado");
+    expect(art.vendidoDeMas).toBe(2);
+    // Y la tabla dice EXACTAMENTE lo mismo.
+    const { vm, vendido } = celdas(art);
+    expect(vendido).toBe("103%");
+    expect(vendido).not.toBe("—");
+    expect(vm.parte).toBe(f.grandes.parteVendida); // el MISMO campo, no una copia
+  });
+
+  it("🔴 CANDADO DE COHERENCIA: la celda VENDIDO y el pie de Vendí nunca pueden discrepar", () => {
+    // El bug de 44D202G110 nació de DOS cuentas del mismo porcentaje. Este
+    // barrido recorre los fixtures de siempre —vivos, agotados, con
+    // devoluciones, sin compra, vendido de más y con 2 llegadas— y exige que
+    // el número de la tabla sea el MISMO que el de la ficha, siempre.
+    const casos: Parameters<typeof armarFicha>[0][] = [
+      NB2570001(),
+      QD3958033(),
+      G4G5004G030(),
+      G4G5004G001(),
+      armarArticulo(
+        {
+          empresa: "vistana",
+          codigo: "44D202G110",
+          descripcion: "Women-T-Shirts S/S",
+          ingresos: [ing("2025-10-28", 64, { codigo_articulo: "44D202G110" })],
+          ventas: [v("2025-11-15", "FA", 66, 1452)],
+          existencia: 0,
+          precioEtiqueta: 24,
+          catalogoSyncedAt: null,
+        },
+        HOY,
+      ),
+      armarArticulo(
+        {
+          empresa: "vistana",
+          codigo: "RETENCION",
+          descripcion: "RETENCION",
+          ingresos: [],
+          ventas: [v("2026-05-06", "FA", 40, 400)],
+          existencia: null,
+          precioEtiqueta: null,
+          catalogoSyncedAt: null,
+        },
+        HOY,
+      ),
+    ];
+    for (const art of casos) {
+      const f = armarFicha(art, HOY_MES);
+      const vm = medirVendidoMeses(f);
+      // Mismo campo → misma cifra por construcción. Si alguien vuelve a
+      // calcular el % acá adentro, esto se pone rojo.
+      expect(vm.parte, `${art.codigo}: el % de la tabla difiere del de la ficha`).toBe(
+        f.grandes.parteVendida,
+      );
+      const pie = textoParteVendida(f.grandes.parteVendida, f.grandes.deLlegada);
+      if (pie == null) {
+        expect(textoVendidoCelda(vm), `${art.codigo}: la tabla inventa un % que la ficha no dice`).toBe("—");
+      } else {
+        expect(pie, `${art.codigo}: "${pie}" contra "${textoVendidoCelda(vm)}"`).toContain(
+          textoVendidoCelda(vm),
+        );
+      }
+    }
+  });
+
   it("🔴 retrocedió por devoluciones (4D5077G001): vivo, con su % real en curso", () => {
     // Vendió todo en mayo y junio devolvió 18: el neto quedó en 18/36 = 50%
     // y hay 18 en bodega — VIVO, gris, sin congelar nada.
@@ -985,7 +1076,7 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
     expect(meses).toBe("5");
   });
 
-  it('🔴 lo indecidible dice "—", nunca se inventa: sin compra con fecha → las DOS celdas; vendido>comprado (TERMO) → solo VENDIDO', () => {
+  it('🔴 el "—" es SOLO para lo indivisible (sin compra con fecha); vendido>comprado dice su % igual que la ficha', () => {
     // Sin compra registrada (RETENCION): ni % ni ancla.
     const sinCompra = celdas(
       armarArticulo(
@@ -1006,9 +1097,13 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
     expect(sinCompra.vendido).toBe("—");
     expect(sinCompra.meses).toBe("—");
 
-    // Vendido > comprado (el caso TERMO: faltan compras EN Switch): un "150%"
-    // sería mentira, pero el TIEMPO de venta sí se sabe: agotado (stock 0),
-    // cerrado en su última venta — jul-2024 (ancla extendida) → nov-2025 = 17.
+    // 🩸 Vendido > comprado (el caso TERMO: faltan compras EN Switch) SÍ dice su
+    // %, y es el MISMO que muestra la ficha. Antes decía "—" mientras la ficha
+    // de al lado decía "el 150% de lo comprado" — la contradicción que Daniel
+    // cazó con 44D202G110: *"PORQUE NO SALE PORCENTAJE?"*. El 150% informa (se
+    // vendió todo y faltan compras por registrar) y el aviso de descuadre lo
+    // explica. El tiempo de venta también se sabe: agotado (stock 0), cerrado
+    // en su última venta — jul-2024 (ancla extendida) → nov-2025 = 17.
     const termo = celdas(
       armarArticulo(
         {
@@ -1027,8 +1122,8 @@ describe("VENDIDO · MESES (medirVendidoMeses)", () => {
         HOY,
       ),
     );
-    expect(termo.vm).toEqual({ parte: null, meses: 17, terminado: true });
-    expect(termo.vendido).toBe("—");
+    expect(termo.vm).toEqual({ parte: 150 / 100, meses: 17, terminado: true });
+    expect(termo.vendido).toBe("150%");
     expect(termo.meses).toBe("17");
   });
 

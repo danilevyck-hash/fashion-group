@@ -1173,7 +1173,7 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > 🩸 **EL RELOJ NO SE DETENÍA CON VARIAS COMPRAS, Y AL ARREGLARLO DANIEL SIMPLIFICÓ LA REGLA ENTERA.** El caso de su captura (`4G5004G030`, vistana): 2 compras el MISMO día (5-oct-2025: 30 + 6 = 36), vendió 12 en oct y 24 en nov — TODO, stock 0 — y la ficha decía *"Meses: 10 · de venta, desde oct 2025"*. Daniel: *"dice que vendi 36 en 10 meses, pero enverdad fueron en dos meses"*. En el camino cazó dos contradicciones más (*"como stock 0 y vendido 90%?"*) y cerró, textual: *"debe de ser cuanto tiempo de venta tiene y % de la venta, asi en todo el modulo… podemos no tener esa regla y entender la info?"* → **la regla del 90% (congelar en el cruce) se ELIMINÓ del módulo entero.**
 >
 > **UNA regla para ficha, tabla del modo pedido y Excel:**
-> - **VENDIDO = el % REAL**: `Vendí ÷ Compré` (los totales de los tres grandes). 100% si stock 0 y se vendió todo. No afirmable (TERMO: vendido > comprado, o negativo) = "—".
+> - **VENDIDO = el % REAL**: `Vendí ÷ Compré` (los totales de los tres grandes). 100% si stock 0 y se vendió todo. ⚠️ **SUPERADO esa misma noche**: "vendido > comprado" YA NO es "—" — se muestra el % igual (TERMO 207%), ver *"VENDIDO muestra el % real aunque pase de 100%"* más abajo. El "—" quedó solo para sin compras registradas o vendido negativo.
 > - **MESES = tiempo de venta**, meses CALENDARIO desde el ancla (la extendida de siempre): **AGOTADO (stock 0) → hasta el mes de su ÚLTIMA venta neta, CERRADO ahí** (la cola en bodega no infla el tiempo); **VIVO → hasta hoy**, corriendo. Negro = agotado, gris = vivo.
 > - ⚠️ **El conteo del agotado es INCLUSIVE** (oct → nov = **2** meses, como cuenta Daniel: *"fueron en dos meses"*); el vivo sigue contando meses TRANSCURRIDOS (oct-2025 → ago-2026 = 10). Al agotarse, el mes que cierra el episodio se suma.
 > - ⚠️ La última venta **SÍ puede ser el mes en curso** (es un hecho, no un promedio); los promedios siguen sin verlo. Y una compra que llegó DESPUÉS de la última venta NO corre el reloj (test del borde en `ventas-resumen-articulo.test.ts`).
@@ -1247,6 +1247,36 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > **Medido en el navegador contra el build de producción y datos de producción** (`_medir-referencia-simple.mjs` en 7 casos —incluido el modelo `40HM265` con 43 tarjetas— y `_medir-referencia-pedido.mjs` con la tabla cerrada y abierta): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos <44 px, 0 textos <12 px**. En la tabla se lee `4G5004G001 | 36 | 25 | 12 | 69% | 5` contra `4G5004G030 | 36 | 36 | 0 | 100% | 2`, y al abrir la primera la ficha dice los MISMOS cuatro números. El script de medición ahora **falla si aparece "me quedan" en pantalla**.
 >
 > Candados: `ventas-resumen-articulo.test.ts` (los grandes de la llegada, Stock = existencia real y ≠ llegaron − vendidas, el histórico visible, "no queda ninguna cifra rival de lo que me queda" y la regresión de **una sola llegada = idéntica**), `referencia-tabla-pedido.test.tsx` (renderiza la tabla real, lee las celdas y las compara contra la ficha que abre debajo) y `ventas-compras.test.ts` (la fila del Excel + la leyenda). Verificado por mutación: dejar los grandes en el histórico rompe 5, devolver el `me quedan` a la frase rompe 7, deducir Stock de la llegada rompe 5 y volver a repetir el % y los meses en la frase rompe 7.
+
+### Ventas › Referencia — VENDIDO muestra el % real aunque pase de 100% (12-ago-2026, noche)
+
+> 🩸 **DOS PANTALLAS DECÍAN COSAS DISTINTAS DEL MISMO ARTÍCULO, A TRES CENTÍMETROS DE DISTANCIA.** Daniel, con captura de `44D202G110` (vistana; compré 64, vendí 66, stock 0, una sola compra del 28-oct-2025): la tabla del modo pedido decía **`VENDIDO —`** y su propia ficha, justo debajo, decía **"el 103% de lo comprado"**. Textual: *"PORQUE NO SALE PORCENTAJE?"*.
+>
+> **El bug NO era el 103%: era la contradicción.** Y nació de lo de siempre — **DOS cuentas del mismo porcentaje**. `tresGrandes` lo calculaba sin tope (para la ficha) y `medirVendidoMeses` lo volvía a calcular con un guard `vendido <= comprado` (para la tabla y el Excel). Mientras nadie vendiera de más las dos coincidían; el día que pasó, se separaron.
+>
+> **EL ARREGLO, en dos partes:**
+> - 🔴 **UN SOLO CAMPO.** `medirVendidoMeses` ya no calcula nada: **LEE `f.grandes.parteVendida`**, el mismo número que muestra la ficha. Ahora la coincidencia es por construcción, no por parecido — el candado de mutación exige que volver a calcularlo acá ponga el build rojo.
+> - 🔴 **EL % SE MUESTRA AUNQUE PASE DE 100%.** Vender más de lo comprado no es "no calculable": es un **descuadre real** que el número INFORMA — dice *se vendió todo y además faltan compras por registrar*, que es justo lo que hay que ver. Esconderlo detrás de un "—" es peor. Lo explica el aviso de siempre, que ya existía y funciona: *"Se vendieron 2 unidades más de las que llegaron según los ingresos registrados"*.
+>
+> **El "—" queda SOLO para lo que de verdad no se puede dividir:** sin compras registradas con fecha (`RETENCION`), comprado 0, o **vendido negativo** (*"el −5% de lo comprado"* no es castellano). Esos tres siguen exactamente igual.
+>
+> ⚠️ **`TERMO` pasó de "—" a 207%** (vendió 1.648 de 796 compradas), y **es correcto**: su ficha ya decía "el 207% de lo comprado" desde siempre. El candado que fijaba `TERMO → "—"` se actualizó a la semántica nueva en los dos archivos (`ventas-resumen-articulo.test.ts` y el Excel en `ventas-compras.test.ts`) — era el candado el que estaba fijando el bug.
+>
+> **MESES no cambió, y su "—" sigue significando lo mismo:** solo aparece sin fecha de llegada utilizable. `44D202G110` da 9 (agotado, cerrado en su última venta) y `TERMO` 7.
+>
+> **Los tres dicen lo mismo (ficha · tabla · Excel), medido contra producción** (`scripts/_verif-compras-referencia.ts`, corre los MISMOS módulos puros):
+>
+> | Código | Ficha (pie de Vendí) | Tabla (VENDIDO · MESES) | Excel |
+> |---|---|---|---|
+> | `44D202G110` | el **103%** de lo comprado | **103% · 9** | 1,03 · 9 |
+> | `TERMO` | el **207%** de lo comprado | **207% · 7** | 2,07 · 7 |
+> | `RETENCION` | — | **— · —** | vacío · vacío |
+>
+> Y los patrón de siempre, **sin un carácter de diferencia**: `4G5004G001` 36·25 (69% de esa llegada)·12·5 · `4G5004G030` 36·36 (100%)·0·2 · `CVM253CR02001` 80%·10 · `NB2570001` 59%·10 · `QD3958033` 30%·8 · `40HM265032` 100%·23.
+>
+> **Verificado en el navegador contra el build de producción y datos de producción** (`_medir-referencia-pedido.mjs`, 12 filas reales): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 recortados, 0 blancos <44 px, 0 textos <12 px**, tabla cerrada y abierta. La celda más ancha posible sigue siendo de 4 caracteres (`207%` mide lo mismo que `100%`), así que **no se tocó ni un ancho**. Leída en pantalla, la fila dice `44D202G110 | 64 | 66 | 0 | 103% | 9` y al abrirla la ficha dice `el 103% de lo comprado` con su aviso de las 2 unidades.
+>
+> **Candado en la otra dirección** (el que caza ESTE bug, no el que lo fijaba): `ventas-resumen-articulo.test.ts` trae el fixture `44D202G110` EXACTO y un **barrido de coherencia** que recorre los fixtures de siempre —vivos, agotados, con devoluciones, sin compra, vendido de más y con 2 llegadas— y exige que `medirVendidoMeses().parte` sea **el mismo campo** que el pie de Vendí y que los textos no puedan discrepar. `referencia-tabla-pedido.test.tsx` renderiza la tabla real, lee la celda, abre la fila y compara contra el pie de la ficha. Verificado por mutación: devolver el guard `vendido <= comprado` rompe 4, volver a calcular el % dentro de `medirVendidoMeses` rompe 5 y topear el % en 100% rompe 4.
 
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows

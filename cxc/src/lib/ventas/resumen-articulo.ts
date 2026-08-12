@@ -295,9 +295,12 @@ export function tresGrandes(
   // misma degradación honesta que `serie ?? []`.
   const comprado = art.sinCompraRegistrada || art.cuadre == null ? null : art.cuadre.comprado;
   const vendido = art.cuadre?.vendido ?? 0;
-  // ⚠️ SIN TOPE en el histórico: vendido > comprado es un descuadre REAL (el
-  // caso TERMO) y "el 120% de lo comprado" es la verdad que hay que ver.
-  const parteDe = (c: number | null, v: number) => (c != null && c > 0 && v > 0 ? v / c : null);
+  // ⚠️ SIN TOPE: vendido > comprado es un descuadre REAL (`44D202G110` vendió
+  // 66 de 64, TERMO 1.648 de 796) y "el 103% de lo comprado" es la verdad que
+  // hay que ver — el aviso de abajo dice cuántas unidades faltan por registrar.
+  // `null` SOLO cuando de verdad no se puede dividir: sin compras, o vendido
+  // negativo ("el −5% de lo comprado" no es castellano).
+  const parteDe = (c: number | null, v: number) => (c != null && c > 0 && v >= 0 ? v / c : null);
   const actual = tandas && tandas.tandas.length >= 2 ? tandas.tandas[tandas.tandas.length - 1] : null;
   if (actual) {
     return {
@@ -813,12 +816,25 @@ export function textoAvanceCorto(n: LineaAvance): string {
 //     última venta cuentan el calendario real (y una venta de hoy sí mueve
 //     el %: Vendí es el neto histórico).
 //   · SIN DATO: la celda que no se puede afirmar dice "—", nunca se inventa.
-//     Sin compra con fecha → las dos en "—". Vendido > comprado (el caso TERMO:
-//     faltan compras EN Switch) o negativo → el % sería mentira, pero los meses
-//     de venta SÍ se saben y se dicen.
+//     Sin compra con fecha → las dos en "—".
 //
-// UNA función para pantalla y Excel: si cada una hiciera su cuenta, la tabla y
-// la planilla dirían dos cosas distintas de la misma fila.
+// 🩸 VENDIDO > 100% SE MUESTRA, NO SE ESCONDE (12-ago-2026). Antes el % se
+// callaba cuando `vendido > comprado`, y Daniel lo cazó con `44D202G110`
+// (compré 64, vendí 66): la TABLA decía **"VENDIDO —"** y tres centímetros más
+// abajo su propia ficha decía **"el 103% de lo comprado"**. Textual: *"PORQUE
+// NO SALE PORCENTAJE?"*. El bug no era el 103% — era que dos pantallas
+// dijeran cosas distintas del mismo artículo. Y el número INFORMA: dice *se
+// vendió todo y además faltan compras por registrar*, que es justo lo que hay
+// que ver. El descuadre lo explica el aviso de siempre (*"Se vendieron 2
+// unidades más de las que llegaron según los ingresos registrados"*), igual
+// que en la ficha. `TERMO` muestra **207%**, y está bien.
+//   El "—" queda solo para lo que de verdad no se puede dividir: sin compras
+//   registradas (`RETENCION`), comprado 0, o vendido negativo.
+//
+// 🔴 UNA función para pantalla y Excel, y —desde el arreglo— **un solo campo**:
+// el % se LEE de `grandes.parteVendida`, el mismo que muestra la ficha. Una
+// segunda cuenta acá es exactamente lo que se separó de la ficha y produjo la
+// contradicción.
 
 export interface VendidoMeses {
   /** La celda VENDIDO: el % REAL (Vendí ÷ Compré), como fracción 0-1.
@@ -840,21 +856,17 @@ export function medirVendidoMeses(
   // (100% si se agotó) y MESES = el tiempo de ESA tanda — cerrado en su última
   // venta si la bodega quedó en 0, corriendo si sigue viva. Una sola función
   // para ficha, tabla del modo pedido y Excel, como siempre.
+  // 🔴 EL % ES EL MISMO QUE EL DE LOS GRANDES, LEÍDO DEL MISMO CAMPO — no una
+  // segunda cuenta que pueda separarse. Es exactamente lo que pasó y lo que
+  // Daniel cazó (12-ago-2026, `44D202G110`): la tabla decía "VENDIDO —" y tres
+  // centímetros más abajo su ficha decía "el 103% de lo comprado".
+  const parte = f.grandes.parteVendida;
   const actual = f.tandas && f.tandas.length >= 2 ? f.tandas[f.tandas.length - 1] : null;
   if (actual) {
-    // Los mismos números que los grandes de la ficha (que desde el 12-ago-2026
-    // también son de la llegada): Compré/Vendí de arriba y este % dicen lo
-    // mismo, por construcción.
-    return { parte: parteDeTanda(actual), meses: actual.meses, terminado: actual.cerrada };
+    // Con 2+ llegadas los grandes YA son de la actual, así que `parteVendida`
+    // es el % de ESA llegada; los meses son los de su reloj.
+    return { parte, meses: actual.meses, terminado: actual.cerrada };
   }
-  const { comprado, vendido } = f.grandes;
-  // 🔴 El % es SIEMPRE el real (Vendí ÷ Compré) — Daniel: *"como stock 0 y
-  // vendido 90%?"*. Un vendido negativo ("el −5% de lo comprado") o mayor que
-  // lo comprado (TERMO) no es un % afirmable.
-  const parte =
-    comprado != null && comprado > 0 && vendido >= 0 && vendido <= comprado
-      ? vendido / comprado
-      : null;
   // Agotado: los MESES quedan cerrados en la última venta. `avance.meses` no
   // es "cuánto lleva en bodega" — la cola no cuenta.
   if (f.avance.tipo === "agotado") {
