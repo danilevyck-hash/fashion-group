@@ -40,8 +40,8 @@ describe("avisos de pedido: las 4 obligatorias en TODO evento y TODA marca", () 
     expect(t).toContain("$16,920");
   };
 
-  it("hay exactamente 3 marcas en el motor", () => {
-    expect(marcas.length).toBe(3);
+  it("hay exactamente 4 marcas en el motor", () => {
+    expect(marcas.length).toBe(4);
   });
 
   for (const cfg of marcas) {

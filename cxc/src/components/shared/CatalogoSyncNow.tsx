@@ -28,7 +28,7 @@ import { syncConEnganche } from "./syncNowClient";
 const ROLES_PERMITIDOS = ["admin", "secretaria", "vendedor"];
 
 interface CatalogoSyncNowProps {
-  catalogo: "reebok" | "joybees" | "tommy";
+  catalogo: "reebok" | "joybees" | "tommy" | "calvin";
   /** Reload de los productos de la vista tras un sync exitoso. */
   onSuccess?: () => void | Promise<void>;
   className?: string;
@@ -38,6 +38,7 @@ const MODULO_POR_CATALOGO = {
   reebok: "catalogo-reebok",
   joybees: "catalogo-joybees",
   tommy: "catalogo-tommy",
+  calvin: "catalogo-calvin",
 } as const;
 
 function relativo(iso: string | null): string {

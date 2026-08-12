@@ -39,6 +39,7 @@ export const SYNC_LOG_TYPES = [
   "catalogo_reebok",
   "catalogo_joybees",
   "catalogo_tommy",
+  "catalogo_calvin",
   "mayor",
 ] as const;
 

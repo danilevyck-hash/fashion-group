@@ -37,11 +37,18 @@ import {
   applyDbPrices as tommyApplyDbPrices,
 } from "@/lib/tommy-pedido-publico-validate";
 import { checkPedidoRateLimit as tommyCheckPedidoRateLimit } from "@/lib/tommy-pedido-rate-limit";
+import { getBultoSize as calvinBulto } from "@/lib/calvin-bulto";
+import { calculateCalvinOrderTotal } from "@/lib/calvin-order-total";
+import {
+  validatePedidoBody as calvinValidatePedidoBody,
+  applyDbPrices as calvinApplyDbPrices,
+} from "@/lib/calvin-pedido-publico-validate";
+import { checkPedidoRateLimit as calvinCheckPedidoRateLimit } from "@/lib/calvin-pedido-rate-limit";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { STORAGE_PREFIX } from "@/lib/catalogos/variantes-paths";
 import { catalogoAdminRoles } from "@/lib/catalogo/roles";
 
-export type MarcaKey = "reebok" | "joybees" | "tommy";
+export type MarcaKey = "reebok" | "joybees" | "tommy" | "calvin";
 
 /** Client Supabase resuelto de forma lazy (ver nota de cabecera). */
 export type LazyDb = () => Promise<SupabaseClient>;
@@ -86,6 +93,8 @@ const joybeesServerDb: LazyDb = async () =>
   (await import("@/lib/joybees-supabase-server")).joybeesServer;
 const tommyServerDb: LazyDb = async () =>
   (await import("@/lib/tommy-supabase-server")).tommyServer;
+const calvinServerDb: LazyDb = async () =>
+  (await import("@/lib/calvin-supabase-server")).calvinServer;
 const mainServerDb: LazyDb = async () =>
   (await import("@/lib/supabase-server")).supabaseServer;
 // GET /products de Reebok lee con el client ANON del catálogo (patrón original).
@@ -503,6 +512,93 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
       // Mismo caso que Joybees: `stock` = espejo de existencia; el catálogo
       // público decide con `disponibilidad`.
       db: tommyServerDb,
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,badge,bulto_pzas",
+      conInventario: false,
+    },
+    fallback: null,
+  },
+  // ── CALVIN KLEIN (empresa Switch vistana, artículos marcaId=8 CK FOOTWEAR) ──
+  // Cuarta marca sobre el motor generalizado — espejo EXACTO de Tommy (las dos
+  // son PVH y comparten flujo de fotos B2B Dash, bulto 8/12 marcado a mano con
+  // default 12, name editable con nombre_manual). ⚠️ El marcaId es POR EMPRESA:
+  // en vistana el 3 es CK Legwear, no Tommy — el filtro vive amarrado a
+  // vistana+8 en sync-catalogo-calvin.ts. Sin pre-orden (solo Reebok).
+  calvin: {
+    marca: "calvin",
+    label: "Calvin Klein",
+    empresaKey: "vistana",
+    ordersTable: "calvin_orders",
+    itemsRelation: "calvin_order_items",
+    enviosTable: "calvin_switch_envios",
+    productsTable: "calvin_products",
+    publicosTable: "calvin_pedidos_publicos",
+    unificadoView: "calvin_pedidos_unificado_vw",
+    createOrderRpc: "calvin_create_order",
+    replaceItemsRpc: "calvin_order_replace_items",
+    convertRpc: "convert_calvin_pedido_publico",
+    numeroPrefijo: "CKP",
+    cronName: "calvin-catalogo",
+    db: calvinServerDb,
+    mainDb: mainServerDb,
+    publicosDb: calvinServerDb,
+    publicosInsertClient,
+    bultoSize: (c, bultoPzas) => calvinBulto(c, bultoPzas),
+    calcTotal: calculateCalvinOrderTotal,
+    categoryLookup: null,
+    fallbackCategory: null,
+    pdfFallbackCategory: "footwear",
+    itemsHasPreorder: false,
+    ordersSelectExtra: "",
+    exportCols: "origen, cliente, vendor, items, created_at",
+    exportTitulo: "CALVIN KLEIN — Pedidos",
+    listaFiltraDeleted: true,
+    createRoles: ["admin", "secretaria", "vendedor"],
+    upload: { roles: catalogoAdminRoles(), storage: "main", pathPrefix: STORAGE_PREFIX.calvin },
+    telegramEmoji: "⚫",
+    switchDirectorioLabel: "Vistana International",
+    sendOrder: {
+      from: "Calvin Klein Panama <pedidos@fashiongr.com>",
+      headerHtml: (orderNumber, clientName, fechaLabel) => `
+      <div style="background:#000000;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="160" height="14" style="display:block;margin-bottom:8px" />
+        <h3 style="margin:6px 0 0;font-size:16px;font-weight:normal">Pedido ${orderNumber} — ${clientName}</h3>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
+      </div>`,
+      headerClienteHtml: (orderNumber, fechaLabel) => `
+      <div style="background:#000000;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" width="160" height="14" style="display:block;margin-bottom:8px" />
+        <h2 style="margin:6px 0 0;font-size:18px">Gracias por tu pedido</h2>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Pedido ${orderNumber} · ${fechaLabel}</p>
+      </div>`,
+      tableHeadBg: "#000000",
+    },
+    sortEmailItems: null,
+    pedidoPublico: {
+      validateBody: calvinValidatePedidoBody,
+      applyDbPrices: calvinApplyDbPrices as PedidoPublicoApplyPrices,
+      checkRateLimit: calvinCheckPedidoRateLimit,
+      priceCols: "id, price",
+    },
+    products: {
+      authStyle: "roles-modulo",
+      editVerb: "POST",
+      idField: "sku",
+      // Select explícito = TODAS las columnas reales de calvin_products (regla
+      // admin round-trip; el DDL 20260812150000 es la fuente).
+      cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,keep_visible,image_url,active,badge,nombre_manual,bulto_pzas,created_at",
+      // Igual que Tommy: los bultos vienen de 8 o de 12 según el estilo y NO
+      // hay fuente de la que deducirlo (ver `calvin-bulto.ts`) — se marcan a
+      // mano.
+      bultoEditable: true,
+      readDb: calvinServerDb,
+      writeDb: calvinServerDb,
+      hasDelete: false,
+      nombreEditable: true,
+    },
+    publicCatalog: {
+      // Mismo caso que Joybees/Tommy: `stock` = espejo de existencia; el
+      // catálogo público decide con `disponibilidad`.
+      db: calvinServerDb,
       cols: "id,sku,name,category,gender,price,stock,existencia,disponibilidad,image_url,active,badge,bulto_pzas",
       conInventario: false,
     },

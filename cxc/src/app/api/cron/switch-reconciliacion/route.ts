@@ -60,6 +60,7 @@ import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { syncCatalogoJoybees } from "@/lib/switch-api/sync-catalogo-joybees";
 import { syncCatalogoTommy } from "@/lib/switch-api/sync-catalogo-tommy";
+import { syncCatalogoCalvin } from "@/lib/switch-api/sync-catalogo-calvin";
 import { syncCatalogoReebok } from "@/lib/switch-api/sync-catalogo-reebok";
 import { avisarNuevosSinFoto } from "@/lib/catalogos/fotos-nuevos";
 import { runIntegrityCheck } from "@/lib/integrity-check-run";
@@ -571,6 +572,35 @@ const COLATERAL_CRONS: ColateralCron[] = [
       // la corrida que meta los productos, así que no puede quedarse muda
       // (best-effort, delta de estado — ver lib/catalogos/fotos-nuevos.ts).
       await avisarNuevosSinFoto("tommy");
+      const bad = r.empresas.filter((e) => e.error);
+      return {
+        ok: !r.hadError,
+        detail: !r.hadError
+          ? `${r.empresas.length} empresa(s), catálogo actualizado`
+          : `falló: ${bad.map((e) => `${e.empresaKey}: ${e.error}`).join("; ")}`,
+      };
+    },
+  },
+  {
+    // Catálogo Calvin Klein (vistana, marcaId 8). DOS slots diarios (12:50 y
+    // 16:40), mismas reglas que tommy-catalogo (hora mínima 13 en el mapa
+    // compartido, ciclo por CATALOGO_CRON_SLOTS_UTC). PRE-DDL (migración
+    // 20260812150000 pendiente): syncCatalogoCalvin se omite limpio SIN tocar
+    // Switch (ddlPendiente) → se reporta ok con detalle para NO alertar a
+    // diario por una migración que ya se sabe pendiente (el heartbeat sembrado
+    // se vuelve real apenas la DDL corra).
+    cronName: "calvin-catalogo",
+    label: "calvin-catalogo",
+    successSinceIso: cicloCatalogo("calvin-catalogo"), // ciclo 20:10h (12:50/16:40)
+    recover: async () => {
+      const r = await syncCatalogoCalvin();
+      if (r.ddlPendiente) {
+        return { ok: true, detail: "DDL 20260812150000 pendiente — sync omitido (sin tocar Switch)" };
+      }
+      // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
+      // la corrida que meta los productos, así que no puede quedarse muda
+      // (best-effort, delta de estado — ver lib/catalogos/fotos-nuevos.ts).
+      await avisarNuevosSinFoto("calvin");
       const bad = r.empresas.filter((e) => e.error);
       return {
         ok: !r.hadError,

@@ -17,11 +17,14 @@ import type { ReactNode } from "react";
 import { getBultoSize as reebokBulto } from "@/lib/reebok-bulto";
 import { getBultoSize as joybeesBulto } from "@/lib/joybees-bulto";
 import { getBultoSize as tommyBulto } from "@/lib/tommy-bulto";
+import { getBultoSize as calvinBulto } from "@/lib/calvin-bulto";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { calculateJoybeesOrderTotal } from "@/lib/joybees-order-total";
 import { calculateTommyOrderTotal } from "@/lib/tommy-order-total";
+import { calculateCalvinOrderTotal } from "@/lib/calvin-order-total";
 import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 import { TOMMY_CATEGORIA_LABEL, TOMMY_GENERO_LABEL } from "@/lib/tommy-nombres";
+import { CALVIN_CATEGORIA_LABEL, CALVIN_GENERO_LABEL } from "@/lib/calvin-nombres";
 import {
   matchesGenderFilter as reebokMatchesGenderFilter,
   genderGroupKey as reebokGenderGroupKey,
@@ -37,8 +40,16 @@ import {
   tommyGenderFilterLabel,
   TOMMY_PDF_GENDER_SECTIONS,
 } from "@/lib/tommy-gender";
+import {
+  matchesCalvinGenderFilter,
+  calvinGenderGroupKey,
+  calvinGenderGroupLabel,
+  calvinGenderGroupOrder,
+  calvinGenderFilterLabel,
+  CALVIN_PDF_GENDER_SECTIONS,
+} from "@/lib/calvin-gender";
 
-export type MarcaUiKey = "reebok" | "joybees" | "tommy";
+export type MarcaUiKey = "reebok" | "joybees" | "tommy" | "calvin";
 
 /** Producto tal como lo ve el ADMIN de catálogos (superset de las marcas). */
 export interface AdminProducto {
@@ -1469,6 +1480,357 @@ const TOMMY: MarcaTheme = {
   },
 };
 
+// ── CALVIN KLEIN ─────────────────────────────────────────────────────────────
+// Paleta: blanco/negro minimalista — la identidad de la marca (negro #1A1A1A
+// sobre página casi blanca #FAFAFA, sin color de acento: el "acento" es el
+// negro pleno). Wordmark tipográfico "CALVIN KLEIN" como placeholder aprobado
+// (public/calvin/calvin-wordmark*.png, generado de texto limpio — Daniel manda
+// el arte oficial después, igual que el de Tommy; NO bloquear por esto).
+// Grid PLANA, admin estilo batch, sin pre-orden ni saleFilter — espejo
+// funcional de Tommy: mismo flujo de fotos B2B Dash de PVH, bulto 8/12 por
+// producto (default 12), name editable (nombre_manual). Chips de categoría =
+// las categorías parseadas de Switch (calvin-nombres.ts, 13 valores medidos).
+// filtroBultos/filtroPrecio como Tommy: los precios CK con stock van de 15 a
+// 55 dólares (medido 12-ago-2026) y los tramos existentes los cortan bien.
+const CALVIN: MarcaTheme = {
+  marca: "calvin",
+  label: "Calvin Klein",
+  labelUpper: "CALVIN KLEIN",
+  empresaKey: "vistana",
+  switchDirectorioLabel: "Vistana International",
+
+  api: "/api/catalogo/calvin",
+  catalogoHref: "/catalogo/calvin",
+  pedidosHref: "/catalogo/calvin/pedidos",
+  checkoutHref: "/catalogo/calvin/checkout",
+  confirmacionBase: "/catalogo/calvin/confirmacion",
+  clientesHref: "/catalogo/calvin/clientes",
+  publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/calvin",
+  pedidoPublicoBase: "/pedido-calvin",
+
+  cartKeyLocal: "calvin_cart",
+  cartKeySession: null,
+  publicCartKey: "calvin_public_cart",
+  publicClientNameKey: "calvin_public_client_name",
+  checkoutTokenKey: "calvin_checkout_token",
+
+  bulto: (c, bultoPzas) => calvinBulto(c, bultoPzas),
+  calcTotal: calculateCalvinOrderTotal,
+  sortOrderItems: null,
+  pdfFallbackCategory: "footwear",
+  itemsField: "calvin_order_items",
+  genero: {
+    match: matchesCalvinGenderFilter,
+    groupKey: calvinGenderGroupKey,
+    groupLabel: calvinGenderGroupLabel,
+    groupOrder: calvinGenderGroupOrder,
+    filterLabel: calvinGenderFilterLabel,
+    pdfSections: CALVIN_PDF_GENDER_SECTIONS,
+  },
+
+  features: {
+    preorder: false,        // sin pre-orden (decisión Daniel, solo Reebok)
+    saleFilter: false,
+    agrupacionPorModelo: false, // grid PLANA
+    inventarioPorTalla: false,
+    categoryChips: true,    // categorías parseadas de la descripcion Switch
+    filtroBultos: true,     // "2 bultos o más" (paridad Tommy)
+    filtroPrecio: true,     // rango de precio por pieza (dispersión medida 15-55)
+    roleClienteGuard: false,
+    navInicioRequiereRol: false,
+  },
+
+  metaTitle: "Calvin Klein Panamá - Catálogo",
+  metaDescription: "Catálogo de calzado Calvin Klein Panamá.",
+  ogImage: "https://www.fashiongr.com/og/catalogo-calvin.png",
+
+  checkoutAccent: "#1A1A1A",
+
+  hub: {
+    card: "bg-[#0A0A0A] border-white/10",
+    name: "text-white",
+    tag: "text-white/50",
+    counter: "text-white/70",
+    blob: "bg-white/10",
+    primaryBtn: "bg-white text-[#0A0A0A] hover:bg-white/90",
+    outlineBtn: "border border-white/40 text-white hover:bg-white/10",
+    sinFoto: "text-white font-semibold underline decoration-white/40",
+  },
+
+  logos: {
+    // Navbar SIN logo (patrón Tommy): la identidad vive ENTERA en el header
+    // grande de abajo — el mismo wordmark dos veces en la misma pantalla es lo
+    // que Daniel hizo quitar en Tommy (25-jul-2026).
+    navbar: null,
+    header: () => (
+      <div className="shrink-0">
+        <img src="/calvin/calvin-wordmark.png" alt="CALVIN KLEIN" className="h-4 w-auto shrink-0" />
+        <p className="text-xs text-[#1A1A1A]/40 uppercase tracking-[0.25em] leading-none mt-1">
+          Catálogo Panamá
+        </p>
+      </div>
+    ),
+    admin: () => (
+      <div className="w-10 h-10 rounded-xl bg-[#0A0A0A] flex items-center justify-center">
+        <span className="text-white font-extrabold text-xs tracking-tight">CK</span>
+      </div>
+    ),
+    // Wordmark blanco directo sobre la banda negra: a diferencia de Tommy y
+    // Reebok acá NO hace falta placa blanca — el placeholder tiene versión
+    // blanca monocroma y el fondo de la banda es el negro de la marca.
+    pedidoPublico: () => (
+      <div className="shrink-0">
+        <h1 className="inline-flex items-center py-1.5">
+          <img src="/calvin/calvin-wordmark-blanco.png" alt="CALVIN KLEIN" className="h-3.5 w-auto shrink-0" />
+        </h1>
+        <p className="text-white/50 text-xs mt-1.5">Panamá</p>
+      </div>
+    ),
+  },
+
+  navbar: {
+    accentBar: "bg-[#1A1A1A]",
+    inicioLink: "text-xs text-[#1A1A1A] hover:text-black transition flex-shrink-0 py-2",
+    pedidosLink: "text-sm text-[#1A1A1A] hover:text-black transition py-2 px-2 font-medium",
+  },
+  header: {
+    fashionGroupBar: "w-1 h-4 bg-[#1A1A1A] rounded-full",
+    fashionGroupText: "text-xs font-medium uppercase tracking-wide text-[#1A1A1A]/30",
+  },
+  filtros: {
+    searchIcon: "absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1A1A1A]/30",
+    searchInput:
+      "w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-[#1A1A1A]/10 text-sm outline-none focus:border-[#1A1A1A]/30 focus:ring-2 focus:ring-[#1A1A1A]/5 transition placeholder:text-[#1A1A1A]/25",
+    searchClear:
+      "absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#1A1A1A]/40 hover:text-[#1A1A1A] transition",
+    searchPlaceholder: "Buscar por nombre o código...",
+    chipLabel: "text-xs font-semibold text-[#1A1A1A]/40 uppercase tracking-wide mr-0.5",
+    chipActive: "bg-[#1A1A1A] text-white shadow-sm",
+    chipInactive: "bg-white text-[#1A1A1A]/60 border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/25",
+    divider: "w-px h-5 bg-[#1A1A1A]/10 shrink-0",
+    clearAll: "text-xs text-[#1A1A1A]/40 hover:text-black transition min-h-[44px] px-2",
+    sortSelect:
+      "text-xs border border-[#1A1A1A]/10 rounded-lg px-2.5 py-1.5 outline-none focus:border-[#1A1A1A]/30 transition bg-white text-[#1A1A1A]/60 min-h-[44px]",
+    count: "text-xs text-[#1A1A1A]/30 tabular-nums",
+    // Calvin filtra por los CUATRO géneros de Switch (calvin-gender.ts), igual
+    // que Tommy: Boys y Girls son secciones distintas y las etiquetas son las
+    // de Switch, coherentes con el nombre del producto ("Women-Sandals") y con
+    // el encabezado de sección ("SANDALS — WOMEN").
+    genderOptions: [
+      { value: "", label: "Todos" },
+      { value: "women", label: "Women" },
+      { value: "men", label: "Men" },
+      { value: "boys", label: "Boys" },
+      { value: "girls", label: "Girls" },
+    ],
+    categoryOptions: [
+      { value: "", label: "Todos" },
+      { value: "sneakers", label: "Sneakers" },
+      { value: "flip_flops", label: "Flip Flops" },
+      { value: "sandals", label: "Sandals" },
+      { value: "shoes", label: "Shoes" },
+      { value: "slippers", label: "Slippers" },
+      { value: "boots", label: "Boots" },
+    ],
+  },
+  grid: {
+    pageBg: "min-h-screen bg-[#FAFAFA]",
+    sectionTitle: "text-xs font-bold uppercase tracking-wide text-[#1A1A1A]",
+    sectionRule: "flex-1 h-px bg-[#1A1A1A]/10",
+    sectionCount: "text-xs text-[#1A1A1A]/25 tabular-nums",
+    emptyIconWrap: "w-16 h-16 rounded-full bg-[#1A1A1A]/5 flex items-center justify-center mx-auto mb-4",
+    emptyIcon: (
+      <svg className="w-8 h-8 text-[#1A1A1A]/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+    emptyText: "text-[#1A1A1A]/40 text-sm font-medium",
+    emptyClear: "mt-3 text-sm text-[#1A1A1A] hover:text-black font-medium underline transition",
+    scrollTopBtn:
+      "fixed bottom-24 right-4 z-30 w-10 h-10 bg-white border border-[#1A1A1A]/10 rounded-full shadow-md flex items-center justify-center text-[#1A1A1A]/40 hover:text-[#1A1A1A] transition min-w-[44px] min-h-[44px]",
+  },
+  cart: {
+    tituloMini: "text-xs font-semibold text-[#1A1A1A]/50 uppercase tracking-wide",
+    itemName: "text-sm text-[#1A1A1A] truncate block font-medium",
+    itemMeta: "text-xs text-[#1A1A1A]/40",
+    qtyBtn:
+      "w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1A1A1A] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]",
+    qtyNum: "text-sm tabular-nums text-[#1A1A1A] w-6 text-center font-semibold",
+    lineTotal: "text-sm tabular-nums text-[#1A1A1A]/60 w-20 text-right font-medium",
+    totalText: "text-sm font-bold text-[#1A1A1A]",
+    vaciarBtn: "min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center text-xs text-gray-400 hover:text-black transition",
+    summaryBtn:
+      "flex items-center gap-2 px-3 py-3.5 rounded-xl bg-[#1A1A1A]/5 text-[#1A1A1A] text-sm tabular-nums shrink-0 hover:bg-[#1A1A1A]/10 transition min-h-[56px]",
+    summaryMeta: "text-xs text-[#1A1A1A]/50",
+    badge:
+      "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#1A1A1A] text-white text-xs font-bold flex items-center justify-center",
+    nameLabel: "block text-xs font-semibold uppercase tracking-wide text-[#1A1A1A]/50 mb-1",
+    nameInput:
+      "w-full rounded-lg border border-gray-200 bg-[#FAFAFA] px-3 py-2 min-h-[44px] text-base sm:text-sm text-[#1A1A1A] placeholder:text-[#1A1A1A]/30 focus:border-[#1A1A1A] focus:bg-white focus:outline-none transition",
+    actionPublic: "bg-[#1A1A1A] hover:bg-black",
+    actionVendor: "bg-[#1A1A1A] hover:bg-black",
+    checkIconAlways: true,
+    vendorArrow: false,
+  },
+  card: {
+    ring: "ring-2 ring-[#1A1A1A] scale-[1.02]",
+    checkBubble: "w-10 h-10 rounded-full bg-[#1A1A1A] flex items-center justify-center shadow-lg",
+    checkStroke: "white",
+    imageBg: "aspect-[4/3] bg-[#FAFAFA] relative overflow-hidden cursor-pointer",
+    imageFit: "w-full h-full object-contain",
+    placeholder: (
+      <div className="w-full h-full flex items-center justify-center text-gray-300">
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    ),
+    name: "text-sm font-semibold text-[#1A1A1A] leading-5 h-5 truncate",
+    skuPill: "text-xs bg-[#1A1A1A]/5 text-[#1A1A1A]/50 px-1.5 py-0.5 rounded font-medium tabular-nums",
+    priceNormal: "text-xl font-bold tabular-nums text-[#1A1A1A]",
+    priceMeta: "text-xs text-[#1A1A1A]/40",
+    bultoMeta: "text-xs text-[#1A1A1A]/50",
+    stock: {
+      strong: "text-[#1A1A1A]",
+      soft: "text-[#1A1A1A]/45",
+      agotado: "text-[#1A1A1A]/40",
+    },
+    addBtn: "bg-[#1A1A1A] text-white hover:bg-black active:scale-[0.97]",
+    qtyWrap: "flex items-center justify-between bg-[#1A1A1A]/5 rounded-lg px-1 border border-[#1A1A1A]/15",
+    qtyBtn: "text-[#1A1A1A] hover:bg-[#1A1A1A]/10",
+    qtyNum: "text-base font-bold text-[#1A1A1A] tabular-nums",
+    qtyUnit: "text-xs text-[#1A1A1A]/60 ml-1",
+  },
+  vendorShare: {
+    enHeader: true,
+    verPedidoBtn:
+      "flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1A1A1A] hover:bg-black transition px-3 py-2 rounded-lg min-h-[44px]",
+    btn: "flex items-center gap-1.5 text-xs text-[#1A1A1A]/50 hover:text-[#1A1A1A] transition px-3 py-2 rounded-lg border border-[#1A1A1A]/10 hover:border-[#1A1A1A]/20",
+    iconSize: 14,
+    panel: "absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-48 z-50",
+    item: "w-full text-left px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-gray-50 transition flex items-center gap-2",
+    copyLabel: "Copiar link público",
+    stickyActionColor: "bg-[#1A1A1A] hover:bg-black",
+  },
+  publico: { confirmingLabel: "Confirmando..." },
+  pedidoPublico: {
+    pageBg: "min-h-screen bg-[#FAFAFA]",
+    spinner: "w-8 h-8 border-2 border-[#1A1A1A] border-t-transparent rounded-full animate-spin",
+    itemImageBg: "w-14 h-14 rounded-lg bg-[#FAFAFA] flex-shrink-0 overflow-hidden",
+    totalValue: "text-white font-bold text-xl tabular-nums",
+    confirmBtn:
+      "w-full bg-[#1A1A1A] text-white text-base font-bold rounded-xl min-h-[52px] active:scale-[0.98] transition disabled:opacity-50",
+    headerBg: "bg-[#0A0A0A]",
+    sectionBg: "bg-[#0A0A0A]",
+    panelBorder: "border-[#1A1A1A]/10",
+    textStrong: "text-[#1A1A1A]",
+    textSoft: "text-[#1A1A1A]/40",
+    textHelp: "text-[#1A1A1A]/45",
+    textFaint: "text-[#1A1A1A]/25",
+    placeholderIcon: "text-[#1A1A1A]/20",
+    pdfBtn:
+      "flex items-center gap-2 px-6 py-3 bg-white border border-[#1A1A1A]/15 text-[#1A1A1A] rounded-lg font-medium text-sm hover:bg-[#1A1A1A]/5 active:scale-[0.97] transition disabled:opacity-50",
+  },
+  admin: {
+    titulo: "Administrar",
+    subtituloSync: (lastSync) =>
+      `Se llena solo desde Switch por existencia · tú solo subes fotos${
+        lastSync
+          ? ` · sincronizado ${new Date(lastSync).toLocaleString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          : ""
+      }`,
+    productsUrl: "/api/catalogo/calvin/products",
+    metrics: (visibles) => {
+      const sinFoto = visibles.filter((p) => !tieneFotoAdmin(p)).length;
+      return [
+        { label: "Productos", value: visibles.length },
+        { label: "Sin foto", value: sinFoto, highlight: sinFoto > 0 },
+        { label: "Sneakers", value: visibles.filter((p) => p.category === "sneakers").length },
+        { label: "Flip Flops", value: visibles.filter((p) => p.category === "flip_flops").length },
+        { label: "Sandalias", value: visibles.filter((p) => p.category === "sandals").length },
+      ];
+    },
+    excelSinFoto: async (sin) => {
+      // Imports dinámicos: xlsx-js-style no entra al bundle inicial de la página.
+      const { buildReportSheet, workbookFromSheets, downloadWorkbook, exportFilename, fmtFechaExcel, CALVIN_PALETTE } =
+        await import("@/lib/excel-export");
+      const { buildDashBusquedaSheets } = await import("@/lib/catalogos/dash-busqueda-excel");
+      const ws = buildReportSheet({
+        title: "CALVIN KLEIN — Productos sin foto",
+        subtitle: `${sin.length} producto${sin.length !== 1 ? "s" : ""} sin foto  ·  ${fmtFechaExcel(new Date().toISOString())}`,
+        columns: [
+          { header: "Código", wch: 18 },
+          { header: "Nombre", wch: 40 },
+          { header: "Categoría", wch: 14 },
+          { header: "Género", wch: 12 },
+          { header: "Stock", wch: 10, align: "right", fmt: "0" },
+        ],
+        rows: sin.map((p) => [
+          p.sku || "",
+          p.name || "",
+          CALVIN_CATEGORIA_LABEL[p.category || ""] ?? (p.category || ""),
+          CALVIN_GENERO_LABEL[p.gender || ""] ?? (p.gender || ""),
+          p.stock ?? "",
+        ]),
+        palette: CALVIN_PALETTE,
+      });
+      // La hoja de la plantilla del banco B2B va PRIMERA (ver dash-busqueda-excel
+      // — es multi-marca: el portal Dash de PVH es el mismo de Tommy).
+      const wb = workbookFromSheets([
+        ...buildDashBusquedaSheets(sin.map((p) => p.sku)),
+        { name: "Sin foto", ws },
+      ]);
+      downloadWorkbook(wb, exportFilename("calvin-sin-foto"));
+    },
+    fotoTabBadge: "inline",
+    syncModulo: "catalogo-calvin",
+    syncSubtext: "tarda ~2-3 min",
+    toastBg: "fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#1A1A1A] text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]",
+    tabActive: "bg-white text-[#1A1A1A] shadow-sm",
+    spinner: "w-8 h-8 border-2 border-[#1A1A1A] border-t-transparent rounded-full animate-spin",
+    metricValue: "text-[#1A1A1A]",
+    metricHighlightBox: "border-[#1A1A1A]/30 bg-[#1A1A1A]/5",
+    metricHighlightValue: "text-[#1A1A1A]",
+    productosStyle: "batch",
+    nombreEditable: true,
+    importarTab: false,
+    badgeEditable: false,
+    productEdit: { idField: "sku", verb: "POST" },
+    bultoEditable: true,
+    pedidos: {
+      linkBadge: "inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-[#1A1A1A]/10 text-[#1A1A1A]",
+      linkBadgeCheck: "w-3 h-3 text-emerald-600",
+      filterActive: "text-[#1A1A1A] border-[#1A1A1A]",
+      searchFocus: "w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1A1A1A]/30 transition",
+      deleteModal: "confirm-delete",
+      exportFilename: "Pedidos-Calvin",
+    },
+  },
+  producto: {
+    estilo: "variantes",
+    volverClass: "text-sm text-[#1A1A1A] hover:underline mb-6 inline-block",
+    imageWrap: "aspect-square bg-[#FAFAFA] border border-[#1A1A1A]/10 rounded-lg overflow-hidden",
+    price: "text-2xl font-bold text-[#1A1A1A] mb-4",
+    sizeActive: "bg-[#1A1A1A] text-white border-[#1A1A1A]",
+    sizeInactive: "border-gray-300 hover:border-[#1A1A1A]",
+    addBtn:
+      "w-full bg-[#1A1A1A] text-white py-3 rounded font-bold text-sm uppercase tracking-wide hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+    consultaWrap: "bg-[#FAFAFA] border border-[#1A1A1A]/10 p-4 rounded text-center",
+  },
+  pedido: {
+    qtyInputClass: "w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums",
+    suggDropdownClass: "absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-sm max-h-56 overflow-y-auto",
+    suggItemClass: "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition",
+    suggLimit: null,
+    clientNamePlaceholder: "Nombre del cliente",
+    nameRefEnContenedor: false,
+  },
+  clientes: {
+    nuevoBtn: "bg-[#1A1A1A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-black transition",
+    saveBtn: "flex-1 py-2 bg-[#1A1A1A] text-white rounded-full text-sm font-semibold hover:bg-black transition disabled:opacity-50",
+  },
+};
+
 // "hace X" relativo del subtítulo del admin Reebok (heredado tal cual).
 function relativo(iso: string | null): string {
   if (!iso) return "nunca";
@@ -1486,6 +1848,7 @@ export const MARCA_THEME: Record<string, MarcaTheme> = {
   reebok: REEBOK,
   joybees: JOYBEES,
   tommy: TOMMY,
+  calvin: CALVIN,
 };
 
 /** Marca del segmento dinámico [marca] → tema; null si no existe (→ 404). */
@@ -1495,4 +1858,4 @@ export function getMarcaTheme(marca: string | undefined | null): MarcaTheme | nu
 }
 
 /** Lista de marcas con catálogo (para generateStaticParams si hace falta). */
-export const MARCAS_UI: MarcaUiKey[] = ["reebok", "joybees", "tommy"];
+export const MARCAS_UI: MarcaUiKey[] = ["reebok", "joybees", "tommy", "calvin"];

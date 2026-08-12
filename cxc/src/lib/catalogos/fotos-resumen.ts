@@ -14,6 +14,7 @@
 
 import { MARCAS_CONFIG, type MarcaKey } from "@/lib/catalogo/marcas";
 import { tommyDdlPendiente } from "@/lib/switch-api/sync-catalogo-tommy";
+import { calvinDdlPendiente } from "@/lib/switch-api/sync-catalogo-calvin";
 import {
   buildResumenSemanalMsg,
   tieneFotoProducto,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/catalogos/fotos-faltantes";
 
 /** Orden fijo del resumen (el mismo del hub de catálogos). */
-const MARCAS_RESUMEN: MarcaKey[] = ["reebok", "joybees", "tommy"];
+const MARCAS_RESUMEN: MarcaKey[] = ["reebok", "joybees", "tommy", "calvin"];
 
 export interface FotosResumenResult {
   marcas: ResumenFotosMarca[];
@@ -59,8 +60,13 @@ async function codigosSinFotoDe(marca: MarcaKey): Promise<string[]> {
 export async function calcularFotosResumen(): Promise<FotosResumenResult> {
   const marcas: ResumenFotosMarca[] = [];
   for (const marca of MARCAS_RESUMEN) {
-    const label = MARCAS_CONFIG[marca].label === "Tommy Hilfiger" ? "Tommy" : MARCAS_CONFIG[marca].label;
+    const l = MARCAS_CONFIG[marca].label;
+    const label = l === "Tommy Hilfiger" ? "Tommy" : l === "Calvin Klein" ? "Calvin" : l;
     if (marca === "tommy" && (await tommyDdlPendiente())) {
+      marcas.push({ label, codigos: [], pendiente: true });
+      continue;
+    }
+    if (marca === "calvin" && (await calvinDdlPendiente())) {
       marcas.push({ label, codigos: [], pendiente: true });
       continue;
     }

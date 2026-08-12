@@ -117,11 +117,11 @@ describe("catálogos — guards de API, comportamiento real", () => {
 describe("catálogos — upload de fotos por marca", () => {
   const marcas = Object.keys(MARCAS_CONFIG);
 
-  it("las 3 marcas están configuradas", () => {
-    expect(marcas.sort()).toEqual(["joybees", "reebok", "tommy"]);
+  it("las 4 marcas están configuradas", () => {
+    expect(marcas.sort()).toEqual(["calvin", "joybees", "reebok", "tommy"]);
   });
 
-  for (const marca of ["reebok", "joybees", "tommy"]) {
+  for (const marca of ["reebok", "joybees", "tommy", "calvin"]) {
     it(`${marca}: upload.roles = admin + secretaria`, () => {
       expect(MARCAS_CONFIG[marca].upload.roles).toEqual(["admin", "secretaria"]);
     });

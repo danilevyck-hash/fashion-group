@@ -18,7 +18,7 @@ import {
 } from "./variantes-server";
 import { planHousekeeping, type ResumenHousekeeping } from "./variantes-housekeeping";
 
-const MARCAS: MarcaKey[] = ["reebok", "joybees", "tommy"];
+const MARCAS: MarcaKey[] = ["reebok", "joybees", "tommy", "calvin"];
 
 /** Borra las carpetas `_v/{sku}/` de SKUs que ya no existen en la tabla. */
 export async function limpiarVariantesRetiradas(): Promise<ResumenHousekeeping> {

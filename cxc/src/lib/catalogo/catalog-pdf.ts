@@ -11,6 +11,7 @@
 import { jsPDF } from "jspdf";
 import { REEBOK_LOGO_BASE64 } from "@/lib/reebok-logo";
 import { TOMMY_LOGO_BASE64 } from "@/lib/tommy-logo";
+import { CALVIN_LOGO_BASE64 } from "@/lib/calvin-logo";
 import { JOYBEES_LOGO_BASE64 } from "@/lib/joybees-logo";
 import { fmtPrecio } from "@/lib/catalogo/precio";
 
@@ -31,7 +32,7 @@ export interface CatalogPdfSection {
 export interface CatalogImage { data: string; w: number; h: number }
 
 export interface CatalogPdfOpts {
-  marca: "reebok" | "joybees" | "tommy";
+  marca: "reebok" | "joybees" | "tommy" | "calvin";
   sections: CatalogPdfSection[];
   /** Descripción de filtros activos (ej. "Hombre · Calzado") o "Todos los productos". */
   subtitle: string;
@@ -78,7 +79,9 @@ const JB_YELLOW: [number, number, number] = [255, 228, 67];
 const TH_NAVY: [number, number, number] = [21, 35, 66];
 const TH_RED: [number, number, number] = [174, 0, 41];
 
-const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
+const CK_BLACK: [number, number, number] = [26, 26, 26];
+
+const THEMES: Record<"reebok" | "joybees" | "tommy" | "calvin", BrandTheme> = {
   reebok: {
     primary: NAVY,
     accent: RED,
@@ -120,6 +123,22 @@ const THEMES: Record<"reebok" | "joybees" | "tommy", BrandTheme> = {
       // Wordmark oscuro (#102039) sobre página clara. Aspecto ~14.5:1.
       if (TOMMY_LOGO_BASE64) {
         try { doc.addImage(TOMMY_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 50 : 38, big ? 3.4 : 2.6); } catch { /* */ }
+      }
+    },
+  },
+  calvin: {
+    // Blanco/negro minimalista: sin color de acento — el negro ES el acento.
+    primary: CK_BLACK,
+    accent: CK_BLACK,
+    saleColor: CK_BLACK,
+    cellBg: [250, 250, 250],
+    bandFill: [10, 10, 10],
+    bandText: WHITE,
+    bandCount: [200, 200, 200],
+    drawLogo: (doc, x, y, big) => {
+      // Wordmark tipográfico oscuro sobre página clara. Aspecto ~11.7:1.
+      if (CALVIN_LOGO_BASE64) {
+        try { doc.addImage(CALVIN_LOGO_BASE64, "PNG", x, y + (big ? 1.5 : 1), big ? 48 : 36, big ? 4.1 : 3.1); } catch { /* */ }
       }
     },
   },

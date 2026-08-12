@@ -185,6 +185,7 @@ const joybeesRows = [{ sku: "J1", image_url: "https://x/j1.jpg" }];
 const reebokFake = fakeDb(reebokRows);
 const joybeesFake = fakeDb(joybeesRows);
 const tommyFake = fakeDb([]);
+const calvinFake = fakeDb([]);
 
 vi.mock("@/lib/catalogo/marcas", () => ({
   MARCAS_CONFIG: {
@@ -203,12 +204,22 @@ vi.mock("@/lib/catalogo/marcas", () => ({
       productsTable: "tommy_products",
       products: { writeDb: async () => tommyFake.client },
     },
+    calvin: {
+      label: "Calvin Klein",
+      productsTable: "calvin_products",
+      products: { writeDb: async () => calvinFake.client },
+    },
   },
 }));
 
 const tommyDdlPendienteMock = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
 vi.mock("@/lib/switch-api/sync-catalogo-tommy", () => ({
   tommyDdlPendiente: () => tommyDdlPendienteMock(),
+}));
+
+const calvinDdlPendienteMock = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+vi.mock("@/lib/switch-api/sync-catalogo-calvin", () => ({
+  calvinDdlPendiente: () => calvinDdlPendienteMock(),
 }));
 
 describe("calcularFotosResumen (agregación con clients mockeados)", () => {
@@ -220,10 +231,11 @@ describe("calcularFotosResumen (agregación con clients mockeados)", () => {
       { label: "Reebok", codigos: ["R1", "R3"] },
       { label: "Joybees", codigos: [] },
       { label: "Tommy", codigos: [], pendiente: true },
+      { label: "Calvin", codigos: [], pendiente: true },
     ]);
     expect(r.totalSinFoto).toBe(2);
     expect(r.mensaje).toBe(
-      "📷 Resumen semanal de fotos — Reebok: 2 sin foto · Joybees: 0 · Tommy: pendiente de activación\n\n" +
+      "📷 Resumen semanal de fotos — Reebok: 2 sin foto · Joybees: 0 · Tommy: pendiente de activación · Calvin: pendiente de activación\n\n" +
         "Reebok (2): R1, R3",
     );
 
@@ -234,8 +246,9 @@ describe("calcularFotosResumen (agregación con clients mockeados)", () => {
       ascending: false,
       nullsFirst: false,
     });
-    // Con la DDL de Tommy pendiente NO se consulta tommy_products.
+    // Con la DDL de Tommy/Calvin pendiente NO se consultan sus tablas.
     expect(tommyFake.spies.from).not.toHaveBeenCalled();
+    expect(calvinFake.spies.from).not.toHaveBeenCalled();
   });
 });
 

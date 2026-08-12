@@ -56,7 +56,7 @@ function idValido(item: BulkDeleteItemInput): boolean {
  * en Joybees ambos son joybeesServer.
  */
 export async function bulkDeletePedidos(opts: {
-  marca: "reebok" | "joybees" | "tommy";
+  marca: "reebok" | "joybees" | "tommy" | "calvin";
   ordersDb: SupabaseClient;
   publicosDb: SupabaseClient;
   ordersTable: string;

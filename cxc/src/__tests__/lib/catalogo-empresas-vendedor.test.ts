@@ -39,10 +39,15 @@ describe("🔴 toda marca encendida tiene su empresa habilitada", () => {
     expect(EMPRESAS_CATALOGO.has("joystep")).toBe(true);
   });
 
+  it("Calvin (vistana) entra derivado, sin tocar las listas a mano", () => {
+    expect(EMPRESAS_CATALOGO.has("vistana")).toBe(true);
+  });
+
   it("una empresa del grupo SIN catálogo no entra", () => {
     // La lista habilita llamadas a Switch y lectura de mapeos: que no se
-    // convierta en "todas las empresas" por comodidad.
-    for (const k of ["vistana", "fashion_wear", "american_classic", "confecciones_boston"]) {
+    // convierta en "todas las empresas" por comodidad. (vistana salió de esta
+    // lista al encender el catálogo Calvin Klein, ago-2026.)
+    for (const k of ["fashion_wear", "american_classic", "confecciones_boston"]) {
       expect(EMPRESAS_CATALOGO.has(k)).toBe(false);
     }
   });
