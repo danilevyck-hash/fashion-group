@@ -104,6 +104,12 @@ interface Props {
   onRegistrarGasto: () => void;
   onOpenImpulsadoras: () => void;
   onOpenInventario: () => void;
+  /**
+   * Reportes vive ACÁ desde la poda del 11-ago-2026: su enlace en la lista de
+   * marca se retiró y esta tarjeta es su única puerta. No quitarla sin darle
+   * otra.
+   */
+  onOpenReportes: () => void;
   refreshKey: number;
 }
 
@@ -189,6 +195,7 @@ export default function InicioMarketing({
   onRegistrarGasto,
   onOpenImpulsadoras,
   onOpenInventario,
+  onOpenReportes,
   refreshKey,
 }: Props) {
   const { toast } = useToast();
@@ -223,12 +230,18 @@ export default function InicioMarketing({
   // El reporte de un período cerrado. Se baja por fetch y no por un enlace
   // directo: si el servidor contesta un error, un <a> navegaría fuera de la app
   // y le mostraría a la secretaria un JSON en pantalla.
+  //
+  // `marca` acota el período conjunto legacy ('pvh' junta TH+CK+KL): el chip
+  // de Calvin · mid 2026 baja SOLO lo de Calvin. Sin marca (el cierre normal,
+  // que ya es por marca) el reporte sale entero.
   const descargarReporte = useCallback(
-    async (periodoId: string, etiqueta: string) => {
+    async (periodoId: string, etiqueta: string, marca?: string) => {
       try {
-        const res = await fetch(`/api/marketing/periodos/${periodoId}/reporte`, {
-          cache: "no-store",
-        });
+        const qs = marca ? `?marca=${encodeURIComponent(marca)}` : "";
+        const res = await fetch(
+          `/api/marketing/periodos/${periodoId}/reporte${qs}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) {
           toast("No se pudo bajar el reporte. Intenta de nuevo en unos segundos.", "error");
           return;
@@ -492,8 +505,10 @@ export default function InicioMarketing({
 
           {/* -------------------------------------------------------------- */}
           {/* Herramientas — se usan a diario y llevan su dato encima.        */}
+          {/* Reportes vive acá desde la poda del 11-ago-2026: es su ÚNICA    */}
+          {/* puerta (el enlace de la lista de marca se retiró).              */}
           {/* -------------------------------------------------------------- */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               type="button"
               onClick={onOpenInventario}
@@ -522,6 +537,16 @@ export default function InicioMarketing({
                   : "Pagos mensuales de las impulsadoras"}
               </div>
             </button>
+            <button
+              type="button"
+              onClick={onOpenReportes}
+              className="text-left rounded-lg border border-gray-200 bg-white p-4 min-h-[72px] hover:border-gray-400 active:scale-[0.99] transition"
+            >
+              <div className="font-semibold text-gray-900">Reportes</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Por marca, por tienda y por proyecto
+              </div>
+            </button>
           </section>
 
           {/* -------------------------------------------------------------- */}
@@ -544,7 +569,9 @@ export default function InicioMarketing({
                       {c.id ? (
                         <button
                           type="button"
-                          onClick={() => descargarReporte(c.id as string, etiqueta)}
+                          onClick={() =>
+                            descargarReporte(c.id as string, etiqueta, c.bloqueKey)
+                          }
                           title="Bajar el Excel de este período"
                           className="px-3 min-h-[44px] inline-flex items-center text-xs text-gray-500 hover:text-gray-900 hover:bg-gray-50 active:scale-[0.97] transition"
                         >

@@ -40,8 +40,10 @@ const RAIZ = path.join(__dirname, "..", "..");
 // no queda nada que medir: sus tests se fueron con ella. Las facturas anuladas
 // NO se perdieron — se ven y se restauran desde el detalle de su proyecto
 // (`FacturasSection`), en una lista de tarjetas SIN tabla, o sea sin la clase de
-// recorte que este archivo existe para prevenir. Las rutas `papelera/*` siguen
-// vivas. Si algún día vuelve una tabla de anulados, vuelve también a esta lista.
+// recorte que este archivo existe para prevenir. De las rutas `papelera/*` solo
+// queda viva `papelera/restaurar` (el Deshacer); el GET de papelera y
+// `papelera/limpieza` se retiraron el 11-ago-2026 con 0 llamadores. Si algún
+// día vuelve una tabla de anulados, vuelve también a esta lista.
 const MOBILIARIO = path.join(RAIZ, "app/marketing/mobiliario/page.tsx");
 
 function leer(p: string): string {

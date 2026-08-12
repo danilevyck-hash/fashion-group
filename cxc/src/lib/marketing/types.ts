@@ -186,14 +186,6 @@ export interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
 }
 
 
-export interface AnuladoItem {
-  tipo: "proyecto" | "factura";
-  id: string;
-  nombre: string;
-  anulado_en: string;
-  anulado_motivo: string | null;
-}
-
 // ----------------------------------------------------------------------------
 // Inputs DTO (para mutations)
 // ----------------------------------------------------------------------------

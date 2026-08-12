@@ -182,15 +182,11 @@ function MarketingPage() {
           </div>
         ) : bloqueParam ? (
           <ProyectosHomeView
-            marcas={marcas}
             bloque={bloqueParam}
             bucketLabel={bloqueLabel ?? ""}
             onBack={() => navegar({ bloque: null, proyecto: null })}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
             onRegistrarGasto={() => setRegistrandoGasto(true)}
-            onOpenReportes={() => navegar({ vista: "reportes" })}
-            onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
-            onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}
           />
         ) : (
@@ -199,6 +195,7 @@ function MarketingPage() {
             onRegistrarGasto={() => setRegistrandoGasto(true)}
             onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
+            onOpenReportes={() => navegar({ vista: "reportes" })}
             refreshKey={refreshKey}
           />
         )}

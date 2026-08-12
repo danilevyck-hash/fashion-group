@@ -141,3 +141,32 @@ export function formatearFecha(d: string | Date | null | undefined): string {
   // DATE puro (YYYY-MM-DD)
   return fmtDateShared(d);
 }
+
+// ----------------------------------------------------------------------------
+// Contadores de la fila de proyecto (lista de una marca).
+//
+// 🔴 SOLO SE DICEN LOS QUE NO SON CERO (aprobado por Daniel, 11-ago-2026):
+// "2 facturas · 1 entrega", nunca "0 fotos" — un contador en cero es ruido que
+// obliga a leer tres números para enterarse de uno. Con TODOS en cero la fila
+// lo dice con palabras ("Sin gastos todavía"): un subtítulo vacío se leería
+// como que a la fila le falta cargar algo.
+// ----------------------------------------------------------------------------
+export interface ContadoresProyecto {
+  facturas: number;
+  entregas: number;
+  fotos: number;
+}
+
+export function contadoresDeProyecto(c: ContadoresProyecto): string {
+  const partes: string[] = [];
+  if (c.facturas > 0) {
+    partes.push(`${c.facturas} ${c.facturas === 1 ? "factura" : "facturas"}`);
+  }
+  if (c.entregas > 0) {
+    partes.push(`${c.entregas} ${c.entregas === 1 ? "entrega" : "entregas"}`);
+  }
+  if (c.fotos > 0) {
+    partes.push(`${c.fotos} ${c.fotos === 1 ? "foto" : "fotos"}`);
+  }
+  return partes.length > 0 ? partes.join(" · ") : "Sin gastos todavía";
+}

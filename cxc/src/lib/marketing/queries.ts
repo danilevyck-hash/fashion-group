@@ -1,7 +1,6 @@
 // ============================================================================
 // Marketing module — queries (lectura contra Supabase)
 // Todas las queries filtran `anulado_en IS NULL` por default.
-// Para papelera: usar getAnulados().
 // ============================================================================
 import { supabaseServer } from "@/lib/supabase-server";
 import { normalizarEstadoProyecto } from "./normalizar";
@@ -13,7 +12,6 @@ import type {
   MkProyectoMarca,
   ProyectoConMarcas,
   FacturaConAdjuntos,
-  AnuladoItem,
   MarcaConPorcentaje,
 } from "./types";
 
@@ -317,58 +315,11 @@ export async function getAdjuntosByProyecto(
 }
 
 // ----------------------------------------------------------------------------
-// Papelera (anulados)
+// Papelera: getAnulados() se retiró el 11-ago-2026 con la ruta GET
+// /api/marketing/papelera (0 llamadores). Las facturas anuladas se ven y se
+// restauran desde el detalle de su proyecto (FacturasSection), y el Deshacer
+// del proyecto usa `papelera/restaurar`, que sigue viva.
 // ----------------------------------------------------------------------------
-export async function getAnulados(): Promise<AnuladoItem[]> {
-  const items: AnuladoItem[] = [];
-
-  const [{ data: proy, error: pErr }, { data: fact, error: fErr }] =
-    await Promise.all([
-      supabaseServer
-        .from("mk_proyectos")
-        .select("id, nombre, tienda, anulado_en, anulado_motivo")
-        .not("anulado_en", "is", null)
-        .order("anulado_en", { ascending: false }),
-      supabaseServer
-        .from("mk_facturas")
-        .select("id, numero_factura, proveedor, anulado_en, anulado_motivo")
-        .not("anulado_en", "is", null)
-        .order("anulado_en", { ascending: false }),
-    ]);
-  if (pErr) throw new Error(`getAnulados[proyectos]: ${pErr.message}`);
-  if (fErr) throw new Error(`getAnulados[facturas]: ${fErr.message}`);
-
-  for (const row of proy ?? []) {
-    const r = row as Record<string, unknown>;
-    // Cliente (tienda) primero como ancla; el tipo de gasto va después.
-    const tienda = String(r.tienda ?? "").trim();
-    const nombreProy = String(r.nombre ?? "").trim();
-    const nombre =
-      tienda && nombreProy && nombreProy !== tienda
-        ? `${tienda} — ${nombreProy}`
-        : tienda || nombreProy;
-    items.push({
-      tipo: "proyecto",
-      id: String(r.id),
-      nombre,
-      anulado_en: String(r.anulado_en ?? ""),
-      anulado_motivo: (r.anulado_motivo as string | null) ?? null,
-    });
-  }
-  for (const row of fact ?? []) {
-    const r = row as Record<string, unknown>;
-    const nombre = `${String(r.numero_factura ?? "")} — ${String(r.proveedor ?? "")}`.trim();
-    items.push({
-      tipo: "factura",
-      id: String(r.id),
-      nombre,
-      anulado_en: String(r.anulado_en ?? ""),
-      anulado_motivo: (r.anulado_motivo as string | null) ?? null,
-    });
-  }
-
-  return items.sort((a, b) => b.anulado_en.localeCompare(a.anulado_en));
-}
 
 // ----------------------------------------------------------------------------
 // Autocompletado (valores únicos de un campo)

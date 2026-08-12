@@ -14,11 +14,46 @@
 // La única acción destructiva de la fila es "Registrado por error — eliminar"
 // (la mecánica de anular de siempre: esconde el proyecto, sus gastos dejan de
 // contar, y el aviso con "Deshacer" queda hasta que la persona lo cierre).
+//
+// 🔴 PODA del 11-ago-2026 (los 7 sobrantes del PR #480, aprobados por Daniel).
+// NO vuelven a esta lista:
+//   - la columna MARCAS (chips C/T): las marcas del proyecto se ven en su ficha,
+//     y acá la lista YA está acotada a una marca — la columna repetía el título.
+//   - el subtítulo "Proyectos con gasto de esta marca" (decía lo que el título
+//     y el breadcrumb ya dicen).
+//   - la etiqueta Apertura/Remodelacion en la fila (p.nombre): queda en
+//     Editar/ficha como etiqueta opcional, no como ruido de la lista.
+//   - el chip "Muebles": redundante con el contador "N entregas".
+//   - los enlaces Mobiliario · Reportes · Impulsadoras de la cabecera: viven en
+//     el inicio de Marketing (Reportes ganó su tarjeta ahí en este mismo
+//     cambio).
+// Los contadores del subtítulo solo dicen los que NO son cero
+// (contadoresDeProyecto en lib/marketing/normalizar.ts).
+//
+// 🔴 PARTIDA POR PERÍODO (12-ago-2026). Daniel: *"esta mezclado en el cierre
+// anterior… no quiero friccion, quiero orden simple"*. La lista queda en DOS
+// secciones: PERÍODO ACTUAL arriba y YA REPORTADO · <período> abajo (una
+// subsección por período cerrado, del más nuevo al más viejo). La sección la
+// decide el SERVIDOR con el clasificador único (sello a período CERRADO =
+// reportado; sello a un abierto —el fantasma `pvh · abierto` incluido— o sin
+// sello = actual). Un proyecto con gasto en los dos lados va en el ACTUAL,
+// con la línea "También reportó en …" para no perder la historia.
+//
+// 🔴 LA FILA "GENERAL" (dentro del período actual) reemplazó a la línea de
+// cuadre "Impulsadoras · esta marca": muestra TODOS los gastos sin cliente de
+// la marca (impulsadoras incluidas), con total y conteo, y abre su detalle.
+// Su marca sale de mk_factura_marcas — NUNCA de la clave del sello.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MkMarca } from "@/lib/marketing/types";
-import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
-import { indiceBloquePorMarcaId } from "@/lib/marketing/bloques";
+import { useCallback, useEffect, useState } from "react";
+import {
+  contadoresDeProyecto,
+  formatearFecha,
+  formatearMonto,
+} from "@/lib/marketing/normalizar";
+import {
+  ordenarSubsecciones,
+  type PeriodoCerradoRef,
+} from "@/lib/marketing/lista-por-periodo";
 import { useToast } from "@/components/ToastSystem";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
@@ -49,15 +84,35 @@ interface ProyectoListItem {
     marca_nombre: string;
     monto: number;
   }>;
+  /** Partición por período (la calcula el servidor con el clasificador único). */
+  seccion?: "actual" | "cerrado";
+  periodo_cerrado?: { id: string | null; nombre: string; cerrado_en: string | null } | null;
+  tambien_reporto_en?: string[];
+}
+
+interface GastoGeneralItem {
+  id: string;
+  fecha: string | null;
+  descripcion: string;
+  monto: number;
+  esImpulsadora: boolean;
+}
+
+interface GastoGeneral {
+  count: number;
+  total: number;
+  items: GastoGeneralItem[];
+}
+
+interface RespuestaLista {
+  proyectos: ProyectoListItem[];
+  general: GastoGeneral | null;
+  particion: boolean;
 }
 
 interface Props {
-  marcas: MkMarca[];
   onOpenProyecto: (id: string) => void;
   onRegistrarGasto: () => void;
-  onOpenReportes: () => void;
-  onOpenImpulsadoras: () => void;
-  onOpenInventario: () => void;
   refreshKey: number;
   /**
    * Bloque del inicio del que se entró: el CÓDIGO de la marca (`TH` | `CK` |
@@ -70,26 +125,9 @@ interface Props {
   onBack: () => void;
 }
 
-
-function colorParaMarca(codigo: string): string {
-  if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
-  if (codigo === "CK") return "bg-gray-100 text-gray-800 border-gray-300";
-  if (codigo === "RBK") return "bg-blue-50 text-blue-700 border-blue-200";
-  if (codigo === "J") return "bg-emerald-50 text-emerald-700 border-emerald-200";
-  return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
-}
-
-function inicial(s: string): string {
-  return (s || "?").charAt(0).toUpperCase();
-}
-
 export default function ProyectosHomeView({
-  marcas,
   onOpenProyecto,
   onRegistrarGasto,
-  onOpenReportes,
-  onOpenImpulsadoras,
-  onOpenInventario,
   refreshKey,
   bloque,
   bucketLabel,
@@ -99,6 +137,9 @@ export default function ProyectosHomeView({
   const [busqueda, setBusqueda] = useState<string>("");
   const [busquedaDebounced, setBusquedaDebounced] = useState<string>("");
   const [proyectos, setProyectos] = useState<ProyectoListItem[]>([]);
+  const [general, setGeneral] = useState<GastoGeneral | null>(null);
+  const [particion, setParticion] = useState(false);
+  const [verGeneral, setVerGeneral] = useState(false);
   const [loading, setLoading] = useState(true);
   const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
   const [anularPendiente, setAnularPendiente] = useState<
@@ -116,16 +157,6 @@ export default function ProyectosHomeView({
     { id: string; nombre: string } | null
   >(null);
   const [deshaciendo, setDeshaciendo] = useState(false);
-  // Total de impulsadoras de ESTA marca. Se muestra como línea aparte para
-  // que el detalle visible cuadre con el bloque del inicio, ya que los pagos de
-  // impulsadora son gastos sueltos (no aparecen como proyectos en la lista).
-  const [impulsadoraTotal, setImpulsadoraTotal] = useState(0);
-
-  // marca_id → bloque. Fuente única: lib/marketing/bloques.ts.
-  const bloquePorMarca = useMemo(
-    () => indiceBloquePorMarcaId(marcas),
-    [marcas],
-  );
 
   // Clic fuera + Escape para el modal de anular. Como lleva un motivo escrito,
   // si el usuario ya tipeó algo NO cierra (se sale con Cancelar).
@@ -135,6 +166,10 @@ export default function ProyectosHomeView({
     cerrarAnular,
     !anulando,
   );
+
+  // Clic fuera + Escape para el detalle de "General" (solo lectura).
+  const cerrarGeneral = useCallback(() => setVerGeneral(false), []);
+  const generalDismiss = useFormModalDismiss(verGeneral, cerrarGeneral, true);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -152,10 +187,22 @@ export default function ProyectosHomeView({
         cache: "no-store",
       });
       if (!res.ok) throw new Error();
-      const data = (await res.json()) as ProyectoListItem[];
-      setProyectos(Array.isArray(data) ? data : []);
+      const data = (await res.json()) as RespuestaLista | ProyectoListItem[];
+      // Tolerancia al shape viejo (un array pelado) por si llega una
+      // respuesta cacheada de un deploy anterior: se dibuja plano.
+      if (Array.isArray(data)) {
+        setProyectos(data);
+        setGeneral(null);
+        setParticion(false);
+      } else {
+        setProyectos(Array.isArray(data.proyectos) ? data.proyectos : []);
+        setGeneral(data.general ?? null);
+        setParticion(data.particion === true);
+      }
     } catch {
       setProyectos([]);
+      setGeneral(null);
+      setParticion(false);
     } finally {
       setLoading(false);
     }
@@ -164,35 +211,6 @@ export default function ProyectosHomeView({
   useEffect(() => {
     cargar();
   }, [cargar, refreshKey]);
-
-  // Total de impulsadoras de la marca (para la línea de cuadre).
-  useEffect(() => {
-    if (!bloque || bloque === "multifashion") {
-      setImpulsadoraTotal(0);
-      return;
-    }
-    let cancelado = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/marketing/marca-resumen", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          impulsadoraPorMarca?: Record<string, { count: number; total: number }>;
-        };
-        if (cancelado) return;
-        let suma = 0;
-        for (const [mid, v] of Object.entries(data.impulsadoraPorMarca ?? {})) {
-          if (bloquePorMarca.get(String(mid)) === bloque) suma += v?.total ?? 0;
-        }
-        setImpulsadoraTotal(Number(suma.toFixed(2)));
-      } catch {
-        // Silencioso: la línea de impulsadoras es informativa, no bloquea la lista.
-      }
-    })();
-    return () => {
-      cancelado = true;
-    };
-  }, [bloque, bloquePorMarca, refreshKey]);
 
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
@@ -259,50 +277,20 @@ export default function ProyectosHomeView({
       >
         ← Marketing
       </button>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">
-            {bucketLabel || "Marketing"}
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Proyectos con gasto de esta marca
-          </p>
-        </div>
-        {/* Eran textos sueltos de 18-21 px de alto. 44 px de área táctil en
-            cada uno; -my-1 evita que la fila empuje el título al crecer. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0 -my-1">
-          <button
-            type="button"
-            onClick={onOpenInventario}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Mobiliario
-          </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={onOpenReportes}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Reportes
-          </button>
-          <span className="text-gray-300">·</span>
-          <button
-            type="button"
-            onClick={onOpenImpulsadoras}
-            className="text-gray-600 hover:text-black transition min-h-[44px] inline-flex items-center"
-          >
-            Impulsadoras
-          </button>
-          <button
-            type="button"
-            onClick={onRegistrarGasto}
-            className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
-          >
-            + Registrar gasto
-          </button>
-        </div>
+      {/* Header — el título y la ÚNICA acción. Los enlaces Mobiliario ·
+          Reportes · Impulsadoras se retiraron: viven en el inicio (poda del
+          11-ago-2026, ver el encabezado del archivo). */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold text-gray-900">
+          {bucketLabel || "Marketing"}
+        </h1>
+        <button
+          type="button"
+          onClick={onRegistrarGasto}
+          className="rounded-md bg-black text-white px-3 min-h-[44px] inline-flex items-center justify-center text-sm active:scale-[0.97] transition shrink-0"
+        >
+          + Registrar gasto
+        </button>
       </div>
 
       {/* La vuelta atrás de anular. Ver el comentario del state. */}
@@ -343,232 +331,276 @@ export default function ProyectosHomeView({
         />
       </div>
 
-      {/* Lista */}
+      {/* Lista, partida por período (ver el encabezado del archivo). */}
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-28 rounded-lg bg-gray-100 animate-pulse" />
           ))}
         </div>
-      ) : proyectos.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">
-          <div className="text-sm text-gray-600 mb-1">
-            {busquedaDebounced
-              ? "No hay proyectos que coincidan con el filtro."
-              : "Todavía no hay gasto de esta marca. Registra el primero."}
-          </div>
-          {!busquedaDebounced && (
-            <button
-              type="button"
-              onClick={onRegistrarGasto}
-              className="text-sm text-fuchsia-600 hover:text-fuchsia-800 min-h-[44px] inline-flex items-center mt-2"
-            >
-              Registrar el primero
-            </button>
-          )}
-        </div>
       ) : (
-        /* El div interno es el SCROLLER: sin él, el `overflow-hidden` del
-           borde redondeado recorta la tabla sin salida (medido 11-ago-2026:
-           176 px a 390 y 147 px a 834, o sea PRE-EXISTENTES). Se vuelve
-           visible desde que los bloques del inicio abren una lista con
-           proyectos adentro. */
-        <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-xs uppercase tracking-wide text-gray-500">
-                <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
-                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
-                  Marcas
-                </th>
-                <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
-                  Gastado
-                </th>
-                <th className="text-left font-medium px-[18px] py-2.5 w-[110px] hidden md:table-cell">
-                  Fecha
-                </th>
-                <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {proyectos.map((p) => {
-                // Cliente (tienda) es el ancla visual principal; el tipo de
-                // gasto (nombre) cae al subtítulo junto con los contadores.
-                // nombreVis se sigue usando como etiqueta canónica en
-                // confirmaciones, ARIA y menús — refleja lo que el usuario
-                // está viendo en la fila.
-                const tituloVis = p.tienda || p.nombre || "";
-                const subtituloTipo = p.nombre && p.nombre !== p.tienda ? p.nombre : "";
-                const nombreVis = tituloVis;
-                // Archivo plano: solo fecha de creación, sin label de transición.
-                const fechaIso = p.created_at;
+        (() => {
+          // La fila General no matchea una búsqueda de proyectos: se esconde
+          // mientras se filtra, igual que un proyecto que no coincide.
+          const mostrarGeneral =
+            particion && !busquedaDebounced && (general?.count ?? 0) > 0;
+          const actuales = proyectos.filter((p) => p.seccion !== "cerrado");
+          const reportados = proyectos.filter((p) => p.seccion === "cerrado");
 
-                // "Gastado" = lo que se pagó de verdad (Σ factura.total con
-                // ITBMS + entregas), SIN ponderar por co-op. El tooltip de
-                // abajo sí muestra el cobrable por marca (co-op). Fallback al
-                // cálculo viejo por si llega una respuesta cacheada sin gasto_real.
-                const totalGastado = p.gasto_real ?? (p.por_cobrar_total || 0);
-                const desgloseTooltip =
-                  p.por_cobrar_por_marca.length > 0
-                    ? p.por_cobrar_por_marca
-                        .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
-                        .join("\n")
-                    : undefined;
-
-                return (
-                  <tr
-                    key={p.id}
-                    onClick={() => onOpenProyecto(p.id)}
-                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+          if (proyectos.length === 0 && !mostrarGeneral) {
+            return (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center">
+                <div className="text-sm text-gray-600 mb-1">
+                  {busquedaDebounced
+                    ? "No hay proyectos que coincidan con el filtro."
+                    : "Todavía no hay gasto de esta marca. Registra el primero."}
+                </div>
+                {!busquedaDebounced && (
+                  <button
+                    type="button"
+                    onClick={onRegistrarGasto}
+                    className="text-sm text-fuchsia-600 hover:text-fuchsia-800 min-h-[44px] inline-flex items-center mt-2"
                   >
-                    {/* Proyecto */}
-                    <td className="px-[18px] py-3 align-middle">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-semibold text-gray-900 truncate">
-                          {tituloVis}
-                        </span>
-                        {(p.entregas_count ?? 0) > 0 && (
-                          <span
-                            title="Este proyecto tiene entregas de muebles"
-                            className="inline-flex items-center gap-1 shrink-0 bg-white border border-teal-300 text-teal-700 rounded-md px-2 py-0.5 text-xs"
-                          >
-                            <svg
-                              width="11"
-                              height="11"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M16.5 9.4l-9-5.19" />
-                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                              <path d="M3.27 6.96L12 12.01l8.73-5.05" />
-                              <path d="M12 22.08V12" />
-                            </svg>
-                            Muebles
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[12px] text-gray-500 truncate">
-                        {subtituloTipo ? `${subtituloTipo} · ` : ""}
-                        {p.facturas_count}{" "}
-                        {p.facturas_count === 1 ? "factura" : "facturas"}
-                        {(p.entregas_count ?? 0) > 0 && (
-                          <>
-                            {" · "}
-                            {p.entregas_count}{" "}
-                            {p.entregas_count === 1 ? "entrega" : "entregas"}
-                          </>
-                        )}
-                        {" · "}
-                        {p.fotos_count}{" "}
-                        {p.fotos_count === 1 ? "foto" : "fotos"}
-                      </div>
-                    </td>
-                    {/* Marcas */}
-                    <td className="px-[18px] py-3 align-middle hidden md:table-cell">
-                      {p.marcas.length === 0 ? (
-                        <span className="text-gray-300 text-xs">—</span>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {p.marcas.map((m) => (
-                            <span
-                              key={m.id}
-                              title={m.nombre}
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-xs font-bold ${colorParaMarca(m.codigo)}`}
-                            >
-                              {inicial(m.nombre)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    {/* Gastado */}
-                    <td
-                      className="px-[18px] py-3 align-middle text-right tabular-nums"
-                      title={desgloseTooltip}
-                    >
-                      {totalGastado === 0 ? (
-                        <span className="text-gray-300 text-xs">—</span>
-                      ) : (
-                        <span className="font-semibold text-gray-900">
-                          {formatearMonto(totalGastado)}
-                        </span>
-                      )}
-                    </td>
-                    {/* Fecha */}
-                    <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
-                      {formatearFecha(fechaIso)}
-                    </td>
-                    {/* Acciones: Editar (abre overlay), ZIP, y el "anular" de
-                        siempre con su nombre nuevo. "Cerrar proyecto" se retiró
-                        (ver el encabezado del archivo). */}
-                    <td
-                      className="px-[18px] py-3 align-middle"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-1.5">
-                        {!p.anulado_en && (
-                          <OverflowMenu
-                            items={[
-                              {
-                                label: "Editar",
-                                onClick: () => onOpenProyecto(p.id),
-                              },
-                              {
-                                label: "Descargar ZIP",
-                                onClick: () => descargarZip(p.id),
-                                disabled:
-                                  zipEstados[p.id]?.tipo === "trabajando" ||
-                                  zipEstados[p.id]?.tipo === "exito",
-                              },
-                              {
-                                label: "Registrado por error — eliminar",
-                                onClick: () => {
-                                  setAnularPendiente({
-                                    id: p.id,
-                                    nombre: nombreVis,
-                                  });
-                                  setAnularMotivo("");
-                                },
-                                destructive: true,
-                              },
-                            ]}
-                          />
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        </div>
-      )}
+                    Registrar el primero
+                  </button>
+                )}
+              </div>
+            );
+          }
 
-      {/* Línea de cuadre: los pagos de impulsadora de esta marca son
-          gastos sueltos (no proyectos) → se muestran aparte para que el
-          detalle visible sume igual que el total del bloque del inicio. */}
-      {impulsadoraTotal > 0 && (
-        <button
-          type="button"
-          onClick={onOpenImpulsadoras}
-          className="w-full flex items-center justify-between rounded-[10px] border border-[#e5e5e5] bg-white px-[18px] py-3 hover:border-gray-400 transition text-left"
-        >
-          <span className="text-sm text-gray-700">
-            Impulsadoras <span className="text-gray-400">· esta marca</span>
-          </span>
-          <span className="text-sm font-medium tabular-nums text-gray-900">
-            {formatearMonto(impulsadoraTotal)} ›
-          </span>
-        </button>
+          const filaDe = (p: ProyectoListItem) => {
+            // Cliente (tienda) es el ancla visual principal. El tipo de
+            // gasto (nombre: "Apertura", "Remodelacion") ya NO se dibuja
+            // en la fila — queda en Editar/ficha como etiqueta opcional.
+            // nombreVis se sigue usando como etiqueta canónica en
+            // confirmaciones, ARIA y menús — refleja lo que el usuario
+            // está viendo en la fila.
+            const tituloVis = p.tienda || p.nombre || "";
+            const nombreVis = tituloVis;
+            // Archivo plano: solo fecha de creación, sin label de transición.
+            const fechaIso = p.created_at;
+
+            // "Gastado" = lo que se pagó de verdad (Σ factura.total con
+            // ITBMS + entregas), SIN ponderar por co-op. El tooltip de
+            // abajo sí muestra el cobrable por marca (co-op). Fallback al
+            // cálculo viejo por si llega una respuesta cacheada sin gasto_real.
+            const totalGastado = p.gasto_real ?? (p.por_cobrar_total || 0);
+            const desgloseTooltip =
+              p.por_cobrar_por_marca.length > 0
+                ? p.por_cobrar_por_marca
+                    .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
+                    .join("\n")
+                : undefined;
+            // Proyecto del actual con gasto YA reportado en período(s)
+            // cerrado(s): la historia se dice en una línea propia, sin
+            // ensuciar el título ni los contadores.
+            const tambienEn = p.tambien_reporto_en ?? [];
+
+            return (
+              <tr
+                key={p.id}
+                onClick={() => onOpenProyecto(p.id)}
+                className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                {/* Proyecto */}
+                <td className="px-[18px] py-3 align-middle">
+                  <div className="font-semibold text-gray-900 truncate">
+                    {tituloVis}
+                  </div>
+                  <div className="text-[12px] text-gray-500 truncate">
+                    {contadoresDeProyecto({
+                      facturas: p.facturas_count,
+                      entregas: p.entregas_count ?? 0,
+                      fotos: p.fotos_count,
+                    })}
+                  </div>
+                  {tambienEn.length > 0 && (
+                    /* Sin `truncate` (ver la fila General): envuelve. */
+                    <div className="text-[12px] text-gray-400">
+                      También reportó en {tambienEn.join(" y ")}
+                    </div>
+                  )}
+                </td>
+                {/* Gastado */}
+                <td
+                  className="px-[18px] py-3 align-middle text-right tabular-nums"
+                  title={desgloseTooltip}
+                >
+                  {totalGastado === 0 ? (
+                    <span className="text-gray-300 text-xs">—</span>
+                  ) : (
+                    <span className="font-semibold text-gray-900">
+                      {formatearMonto(totalGastado)}
+                    </span>
+                  )}
+                </td>
+                {/* Fecha */}
+                <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
+                  {formatearFecha(fechaIso)}
+                </td>
+                {/* Acciones: Editar (abre overlay), ZIP, y el "anular" de
+                    siempre con su nombre nuevo. "Cerrar proyecto" se retiró
+                    (ver el encabezado del archivo). */}
+                <td
+                  className="px-[18px] py-3 align-middle"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    {!p.anulado_en && (
+                      <OverflowMenu
+                        items={[
+                          {
+                            label: "Editar",
+                            onClick: () => onOpenProyecto(p.id),
+                          },
+                          {
+                            label: "Descargar ZIP",
+                            onClick: () => descargarZip(p.id),
+                            disabled:
+                              zipEstados[p.id]?.tipo === "trabajando" ||
+                              zipEstados[p.id]?.tipo === "exito",
+                          },
+                          {
+                            label: "Registrado por error — eliminar",
+                            onClick: () => {
+                              setAnularPendiente({
+                                id: p.id,
+                                nombre: nombreVis,
+                              });
+                              setAnularMotivo("");
+                            },
+                            destructive: true,
+                          },
+                        ]}
+                      />
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          };
+
+          /* El div interno es el SCROLLER: sin él, el `overflow-hidden` del
+             borde redondeado recorta la tabla sin salida (medido 11-ago-2026:
+             176 px a 390 y 147 px a 834, o sea PRE-EXISTENTES). */
+          const tablaDe = (contenido: React.ReactNode) => (
+            <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr className="text-xs uppercase tracking-wide text-gray-500">
+                      <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
+                      <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
+                        Gastado
+                      </th>
+                      <th className="text-left font-medium px-[18px] py-2.5 w-[110px] hidden md:table-cell">
+                        Fecha
+                      </th>
+                      <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>{contenido}</tbody>
+                </table>
+              </div>
+            </div>
+          );
+
+          // La fila "General": impulsadoras y gastos sin cliente de la marca.
+          // Antes eran INVISIBLES acá (solo vivían en la herramienta
+          // Impulsadoras) — Daniel: *"las impulsadoras… no las veo en tommy
+          // ni nada"*. Abre el detalle; sin cliente ≠ invisible.
+          const filaGeneral =
+            mostrarGeneral && general ? (
+              <tr
+                key="__general"
+                onClick={() => setVerGeneral(true)}
+                className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+              >
+                <td className="px-[18px] py-3 align-middle">
+                  <div className="font-semibold text-gray-900">General</div>
+                  {/* Sin `truncate`: el nowrap le impone su ancho mínimo a la
+                      celda y a 390 px empuja la tabla al scroller. Envuelve. */}
+                  <div className="text-[12px] text-gray-500">
+                    {general.count} {general.count === 1 ? "gasto" : "gastos"} ·
+                    impulsadoras y gastos sin cliente
+                  </div>
+                </td>
+                <td className="px-[18px] py-3 align-middle text-right tabular-nums">
+                  <span className="font-semibold text-gray-900">
+                    {formatearMonto(general.total)}
+                  </span>
+                </td>
+                <td className="px-[18px] py-3 align-middle text-[12px] text-gray-400 hidden md:table-cell">
+                  —
+                </td>
+                <td className="px-[18px] py-3 align-middle text-right text-gray-400">
+                  ›
+                </td>
+              </tr>
+            ) : null;
+
+          // Subsecciones de "Ya reportado", del período más nuevo al más
+          // viejo (módulo puro lista-por-periodo).
+          const subsecciones = ordenarSubsecciones(
+            reportados.map(
+              (p): PeriodoCerradoRef => ({
+                id: p.periodo_cerrado?.id ?? null,
+                nombre: p.periodo_cerrado?.nombre ?? "",
+                cerradoEn: p.periodo_cerrado?.cerrado_en ?? null,
+              }),
+            ),
+          );
+
+          // Sin nada reportado y sin fila General, la partición no agrega
+          // información: la lista sale plana, como siempre.
+          if (!particion || (subsecciones.length === 0 && !filaGeneral)) {
+            return tablaDe(proyectos.map(filaDe));
+          }
+
+          const claveDe = (x: { id: string | null; nombre: string }) =>
+            x.id ?? `legacy::${x.nombre}`;
+
+          return (
+            <>
+              <div className="text-xs font-semibold text-gray-500 tracking-wider pt-1">
+                <span className="uppercase">Período actual</span>
+              </div>
+              {actuales.length > 0 || filaGeneral ? (
+                tablaDe(
+                  <>
+                    {filaGeneral}
+                    {actuales.map(filaDe)}
+                  </>,
+                )
+              ) : (
+                <div className="rounded-[10px] border border-[#e5e5e5] bg-white px-[18px] py-4 text-sm text-gray-500 italic">
+                  Todavía no hay gasto en este período.
+                </div>
+              )}
+              {subsecciones.map((per) => (
+                <div key={claveDe(per)} className="space-y-4">
+                  <div className="text-xs font-semibold text-gray-500 tracking-wider pt-1">
+                    <span className="uppercase">Ya reportado</span>
+                    <span className="text-gray-400"> · {per.nombre}</span>
+                  </div>
+                  {tablaDe(
+                    reportados
+                      .filter(
+                        (p) =>
+                          claveDe({
+                            id: p.periodo_cerrado?.id ?? null,
+                            nombre: p.periodo_cerrado?.nombre ?? "",
+                          }) === claveDe(per),
+                      )
+                      .map(filaDe),
+                  )}
+                </div>
+              ))}
+            </>
+          );
+        })()
       )}
 
       {anularPendiente && (
@@ -621,6 +653,66 @@ export default function ProyectosHomeView({
                 Cancelar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detalle de "General": los gastos sin cliente de esta marca, de a
+          uno. Solo lectura — editar un pago se sigue haciendo desde la
+          herramienta Impulsadoras del inicio. */}
+      {verGeneral && general && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" {...generalDismiss.backdrop} />
+          <div
+            ref={generalDismiss.panelRef}
+            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold mb-0.5">
+              General · {bucketLabel}
+            </h3>
+            <p className="text-sm text-gray-500 mb-3">
+              Impulsadoras y gastos sin cliente del período actual —{" "}
+              {general.count} {general.count === 1 ? "gasto" : "gastos"}.
+            </p>
+            <div className="max-h-[55vh] overflow-y-auto -mx-2 px-2">
+              <ul className="divide-y divide-gray-100">
+                {general.items.map((it) => (
+                  <li
+                    key={it.id}
+                    className="py-2.5 flex items-start justify-between gap-3"
+                  >
+                    {/* La descripción ENVUELVE, no se trunca: un modal puede
+                        crecer hacia abajo, y "Impulsadora Cindy — Diciembre"
+                        cortado a la mitad no le dice a nadie qué mes es. */}
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-900 break-words">
+                        {it.descripcion}
+                      </div>
+                      <div className="text-[12px] text-gray-500">
+                        {it.fecha ? formatearFecha(it.fecha) : "Sin fecha"}
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium tabular-nums text-gray-900 shrink-0">
+                      {formatearMonto(it.monto)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex items-center justify-between border-t border-gray-200 pt-3 mt-2">
+              <span className="text-sm font-semibold text-gray-900">Total</span>
+              <span className="text-sm font-semibold tabular-nums text-gray-900">
+                {formatearMonto(general.total)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVerGeneral(false)}
+              className="mt-4 w-full border border-gray-200 text-gray-700 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm hover:bg-gray-50 transition"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

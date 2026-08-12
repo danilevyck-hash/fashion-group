@@ -490,10 +490,17 @@ describe("barrido estático", () => {
     expect(src).toContain("no está duplicado");
   });
 
-  it("Mobiliario e Impulsadoras se abren desde el inicio", () => {
+  it("Mobiliario, Impulsadoras y Reportes se abren desde el inicio", () => {
+    // 🔴 Reportes: la tarjeta del inicio es su ÚNICA puerta desde la poda del
+    // 11-ago-2026 (el enlace de la lista de marca se retiró). Quitarla dejaría
+    // los reportes inalcanzables — no se quita sin darle otra puerta.
     const src = leer("app/marketing/components/InicioMarketing.tsx");
     expect(src).toMatch(/onClick=\{onOpenInventario\}/);
     expect(src).toMatch(/onClick=\{onOpenImpulsadoras\}/);
+    expect(src).toMatch(/onClick=\{onOpenReportes\}/);
+    // Y la página cablea esa puerta a la vista de reportes.
+    const page = leer("app/marketing/page.tsx");
+    expect(page).toMatch(/onOpenReportes=\{\(\) => navegar\(\{ vista: "reportes" \}\)\}/);
   });
 
   it("proyectos-lista NO escribe un segundo mapa de marca → bloque", () => {
