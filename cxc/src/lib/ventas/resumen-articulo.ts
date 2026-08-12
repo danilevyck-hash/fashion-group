@@ -32,6 +32,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { restarMeses } from "./referencia";
+import { fobEstimado } from "./referencia-info";
 import type { ArticuloCompras, Compra, MesVenta } from "./compras";
 
 /** Cuántos meses completos mira la pantalla. */
@@ -72,6 +73,31 @@ export function textoMeses(meses: number | null): string {
 
 function fmtNum(n: number): string {
   return Math.round(n).toLocaleString("en-US");
+}
+
+/**
+ * Redondeo a CENTAVOS, exactamente el que muestra la pantalla.
+ *
+ * 🩸 `toFixed(2)` y la pantalla NO coinciden en el borde del medio centavo, y
+ * el caso está en producción: el CIF de `NB2570001` es **16,555**. La pantalla
+ * (`toLocaleString`, o sea Intl) redondea sobre el DECIMAL y muestra **$16.56**;
+ * `(16.555).toFixed(2)` mira el binario —que en realidad es 16,554999…— y
+ * devuelve **16.55**. Con eso el Excel decía un centavo menos que la ficha del
+ * mismo artículo, y una planilla que no cuadra con la pantalla es exactamente
+ * la clase de detalle que le hace perder la confianza a las dos.
+ *
+ * Se usa el MISMO formateador que la pantalla y se lee el número de vuelta: la
+ * igualdad queda garantizada por construcción, no por parecido.
+ */
+const FMT_CENTAVOS = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  useGrouping: false,
+});
+
+export function centavos(n: number | null | undefined): number | null {
+  if (n == null || !Number.isFinite(n)) return null;
+  return Number(FMT_CENTAVOS.format(n));
 }
 
 /**
@@ -310,22 +336,26 @@ export function temporadaFuerte(barras: readonly MesBarra[]): Temporada {
 export const COMPRAS_VISIBLES = 4;
 
 export interface ListaCompras {
-  /** Las que se ven de entrada: hasta COMPRAS_VISIBLES, la más nueva primero. */
+  /** Las que se ven: hasta COMPRAS_VISIBLES, la más nueva primero. */
   visibles: Compra[];
-  /** Las demás DENTRO de la ventana de 3 años. Ya vienen en el payload, así que
-   *  desplegarlas no pide nada a la red. */
-  ocultas: Compra[];
-  /** Cuántas hay de MÁS de 3 años. Ésas no vienen en el payload —solo el
-   *  conteo—, así que se anuncian y no se pueden desplegar. */
-  masViejas: number;
+  /**
+   * Cuántas compras más hay, TODAS juntas: las que quedaron fuera de las
+   * visibles y las de más de 3 años.
+   *
+   * 🔴 UN SOLO NÚMERO, Y NO SE DESPLIEGA. Antes eran dos renglones distintos —un
+   * botón "Ver 1 compra más" y un texto "y 2 más de hace años"— porque las
+   * primeras venían en el payload y las segundas no. Esa diferencia es NUESTRA,
+   * no de Daniel: él ve cuatro fechas y quiere saber cuántas hay detrás. Se
+   * juntan en una línea gris, sin enlace.
+   */
+  restantes: number;
   /** `true` = en toda la historia registrada hay UNA sola compra. La caja lo
    *  dice ("única compra") en vez de dejar una línea suelta sin contexto. */
   unica: boolean;
 }
 
 /**
- * Parte las compras del artículo en lo que se ve, lo que se despliega y lo que
- * solo se cuenta.
+ * Parte las compras del artículo en lo que se ve y lo que solo se cuenta.
  *
  * `art.compras` ya viene con la MÁS NUEVA PRIMERO y recortada a 3 años por
  * `armarArticulo()`: acá no se reordena ni se vuelve a recortar por fecha.
@@ -338,8 +368,7 @@ export function listaDeCompras(
   const masViejas = art.comprasFueraDeVentana ?? 0;
   return {
     visibles: todas.slice(0, tope),
-    ocultas: todas.slice(tope),
-    masViejas,
+    restantes: Math.max(0, todas.length - tope) + masViejas,
     unica: todas.length === 1 && masViejas === 0,
   };
 }
@@ -347,6 +376,60 @@ export function listaDeCompras(
 /** "19 feb 2026 · 180 u" — una línea de la caja de Compras. */
 export function textoCompra(c: Compra): string {
   return `${fmtFechaCorta(c.fecha)} · ${fmtNum(c.unidades)} u`;
+}
+
+/** "y 3 compras más" — la línea gris del final. `null` = no hay ninguna más y
+ *  no se dibuja nada (una línea que dice "y 0" es ruido). */
+export function textoRestantes(n: number): string | null {
+  if (n <= 0) return null;
+  return n === 1 ? "y 1 compra más" : `y ${n} compras más`;
+}
+
+// ─── La fila de plata: UNA sola línea ────────────────────────────────────────
+//
+// 🩸 EL MISMO NÚMERO APARECÍA TRES VECES. La tarjeta tenía dos filas: una decía
+// "Vendí a · me costó · margen" y la de abajo repetía "CIF de hoy" (el mismo
+// "me costó") y "FOB" (que Switch manda IGUAL al CIF en el 93% de las líneas).
+// O sea que en `NB2570001` el $16.56 se leía TRES veces seguidas. Daniel: *"me
+// gusta pero no se siente simple, facil"*. Ahora es UNA fila:
+//
+//   Precio prom $26.92 · Costo CIF $16.56 · Costo FOB $15.05 · margen 39% · lista $27.00
+//
+// 🔴 EL COSTO FOB ES UNA CUENTA NUESTRA, NO UN DATO DE SWITCH. Daniel lo pidió
+// así, textual: *"pon costo fob (calcula fob/1.1)"*. El FOB que manda Switch
+// llega igual al CIF en 93 de cada 100 líneas por un error de carga conocido, o
+// sea que no distingue nada; el calculado por lo menos significa siempre lo
+// mismo. Por eso se ROTULA como calculado — un número que parece traído y no lo
+// es sería peor que no tenerlo. Se reusa `fobEstimado()` de `referencia-info`,
+// que ya es la ÚNICA definición de esta división en el repo (CIF ÷ 1,10, nunca
+// CIF × 0,9: no es la inversa y da otro número).
+
+/** El costo de la compra ANTERIOR, y para qué lado se movió. */
+export interface CambioDeCosto {
+  /** CIF de la compra anterior. */
+  anterior: number;
+  /** `true` = el costo de hoy es MAYOR que el de la compra anterior. */
+  subio: boolean;
+}
+
+/**
+ * El CIF anterior, SOLO si es distinto al de hoy.
+ *
+ * 🔴 SI NO CAMBIÓ, NO SE MUESTRA NADA. La columna fija "CIF de la compra
+ * anterior" repetía el mismo número en la enorme mayoría de los artículos —
+ * relleno. Lo que importa es la SEÑAL: te subieron el costo.
+ *
+ * ⚠️ Se compara a la precisión que se MUESTRA (centavos). Los costos son
+ * promedios ponderados de varias líneas, así que dos compras "iguales" pueden
+ * diferir en la milésima; anunciar "(antes $16.56)" al lado de "$16.56" sería
+ * una señal que no señala nada.
+ */
+export function cambioDeCosto(cif: number | null, cifAnterior: number | null): CambioDeCosto | null {
+  if (cif == null || cifAnterior == null) return null;
+  const a = centavos(cif);
+  const b = centavos(cifAnterior);
+  if (a == null || b == null || a === b) return null;
+  return { anterior: cifAnterior, subio: a > b };
 }
 
 // ─── La ficha completa ───────────────────────────────────────────────────────
@@ -364,8 +447,13 @@ export interface FichaArticulo {
    *  ⚠️ Se usa SOLO para el COSTO (el CIF contra el que se calcula el margen y
    *  la fila de costos). No se le atribuye ninguna venta. */
   ultima: Compra | null;
-  /** La inmediatamente anterior — solo para "CIF de la compra anterior". */
+  /** La inmediatamente anterior — solo para saber si el costo cambió. */
   anterior: Compra | null;
+  /** Costo FOB CALCULADO (CIF ÷ 1,10). No es el FOB de Switch. */
+  fobCalculado: number | null;
+  /** El CIF anterior, solo si difiere del de hoy. `null` = no cambió (o no hay
+   *  compra anterior) y no se muestra nada. */
+  cambioCosto: CambioDeCosto | null;
 }
 
 /**
@@ -384,15 +472,18 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   const todas = art.compras ?? [];
   const ultima = todas[0] ?? null;
   const anterior = todas[1] ?? null;
+  const cif = ultima?.costos.cif ?? null;
 
   return {
     barras,
     promedio,
     alcance: mesesDeStock(art.existencia, promedio.porMes),
-    margen: margenReal(promedio.venta, promedio.unidades, ultima?.costos.cif ?? null),
+    margen: margenReal(promedio.venta, promedio.unidades, cif),
     temporada: temporadaFuerte(barras),
     compras: listaDeCompras(art),
     ultima,
     anterior,
+    fobCalculado: fobEstimado(cif),
+    cambioCosto: cambioDeCosto(cif, anterior?.costos.cif ?? null),
   };
 }

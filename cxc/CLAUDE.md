@@ -1016,6 +1016,8 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 
 ### Ventas › Referencia — la primera caja deja de INTERPRETAR (11-ago-2026)
 
+> ⚠️ **ESTA SECCIÓN ES DE LA MAÑANA. Lo de la fila de costos, el botón "Ver las otras N compras" y los dos pies de página quedó SUPERADO esa misma noche** — ver *"UNA fila de plata, y el mismo número una sola vez"* más abajo. Todo lo demás (la caja de Compras cruda, el fin del reparto FIFO, el cotejo agregado) sigue vigente tal cual.
+
 > 🩸 **LA CAJA "Mi última compra" NO SERVÍA, Y NO ERA UN PROBLEMA DE REDACCIÓN.** Decía *"todavía no se acaba · llegó 180 el 19 feb · van 0"*, y ese "van 0" salía de un **reparto FIFO** que le asignaba ventas a cada llegada para poder contestar "¿cuánto tardó ESTA compra?". Eso solo se sostiene si la mercancía viene marcada por tanda, y **no viene**: cuando llega un contenedor SOBRE stock que todavía no se acaba, decir de qué compra salió una venta es **INVENTAR**. Y el caso real de Daniel es exactamente ése — `NB2570001` tiene tres compras recientes que bajo FIFO no habían vendido nada, así que la caja más visible de la pantalla anunciaba **"van 0 de 180"** mientras el artículo vendía **28 u/mes**. Cero información, en el peor lugar.
 >
 > Daniel, textual: *"si llego una compra mientras tenia stock, yo lo que quiero ver en cuanto tiempo se me mueve el articulo, para saber si con el stock actual que tengo debo de comprar mas, menos o no comprar. **pero no quiero que decidas tu, lo decido yo con la data que me extraigas**"*.
@@ -1070,6 +1072,52 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > **Contra producción, los dos artículos de Daniel** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-compras-referencia.ts`, solo lectura, corre los MISMOS módulos puros que la pantalla): `NB2570001` → 4 compras + 1 desplegable + 2 de hace años · 28 u/mes · 13 meses · vendí a $26.92 · margen 39%. `QD3958033` → única compra 26-dic-2025 180 u · 8 u/mes · 16 meses · $6.78 · 34%.
 >
 > Candados: `src/__tests__/lib/ventas-compras.test.ts` (53), `ventas-resumen-articulo.test.ts` (39) y `ventas-poda-textos.test.tsx` (26, **renderiza la pantalla de verdad y toca el botón de desplegar** — que la lista completa siga alcanzable de un toque no lo puede ver un test de función pura). Incluyen dos barridos estáticos: uno prohíbe que los símbolos del reparto (`repartirFifo`, `medirCompra`, `repartirExistencia`, `CompraMedida`, `UMBRAL_VENDIDO`) vuelvan a `compras.ts`, y otro que ninguna compra del payload traiga campos de atribución (`vendidas`, `quedan`, `meses`, `estado`, `precioVendido`…).
+
+### Ventas › Referencia — UNA fila de plata, y el mismo número una sola vez (11-ago-2026, noche)
+
+> Daniel, sobre la pantalla que se acababa de publicar: *"me gusta pero no se siente simple, facil"*. Los números estaban bien; el diagnóstico concreto era que **el mismo $16.56 aparecía TRES veces** en la misma tarjeta —en "me costó", en "CIF de hoy" y en "FOB"— porque Switch manda el FOB **igual al CIF en el 93% de las líneas** (error de carga conocido). Cinco bloques pasaron a tres.
+>
+> ```
+> ANTES                                        AHORA
+> Vendí a $26.92 · me costó $16.56 · margen 39%   Precio prom $26.92 · Costo CIF $16.56 ·
+> ┌──────────┬─────────────┬───────┬──────────┐   Costo FOB (calculado) $15.05 · margen 39% ·
+> │CIF de hoy│CIF anterior │  FOB  │  Lista   │   lista $27.00
+> │  $16.56  │   $16.56    │$16.56 │  $27.00  │
+> └──────────┴─────────────┴───────┴──────────┘
+> Hay 2 compras más viejas de 3 años que…          (los dos pies se fueron)
+> Lo que queda en bodega es de Switch, al…
+> ```
+>
+> 🔴 **EL COSTO FOB ES UNA CUENTA NUESTRA, Y SE ROTULA COMO TAL.** Daniel, textual: *"pon costo fob (calcula fob/1.1)"*. **NO se usa el FOB de Switch** — llega igual al CIF en 93 de cada 100 líneas, o sea que no distingue nada. El calculado por lo menos significa siempre lo mismo, y el rótulo dice **"(calculado)"**: un número que parece traído y no lo es sería peor que no tenerlo. **Se REUSA `fobEstimado()`** de `referencia-info.ts`, que ya era la única definición de esta división en el repo (CIF ÷ 1,10, **nunca** CIF × 0,9: no es la inversa y da otro número — Daniel mismo cazó esa diferencia en su día). Candado estático: `costos.fob` y `fobOrigen` **no pueden volver** a `ReferenciaView.tsx`.
+>
+> 🔴 **EL CIF ANTERIOR APARECE SOLO CUANDO CAMBIÓ**, pegado al costo: `Costo CIF $16.56 (antes $9.46 ↑)` en rojo si subió, en verde si bajó. Era una columna fija que repetía el mismo número en la mayoría de los artículos; ahora es **la señal de que te subieron el costo**, no un dato de relleno. Medido en producción (vistana, 6.250 códigos): **396 tienen el CIF cambiado entre sus dos últimas compras — 118 subieron y 278 bajaron**. Ejemplos reales: `NB3705906` $16.56 (antes $9.46 ↑) · `U2661946` $13.33 (antes $15.79 ↓).
+> - ⚠️ **Se compara a la precisión que se MUESTRA (centavos).** Los costos son promedios PONDERADOS de varias líneas: dos compras "iguales" pueden diferir en la milésima, y anunciar "(antes $16.56)" al lado de "$16.56" sería una señal que no señala nada.
+>
+> 🩸 **`toFixed(2)` y la pantalla NO coincidían, y el caso está en producción.** El CIF de `NB2570001` es **16,555**: la pantalla (Intl) redondea sobre el decimal y muestra **$16.56**, mientras `(16.555).toFixed(2)` mira el binario —que en realidad es 16,554999…— y da **16.55**. O sea que el Excel decía **un centavo menos que la ficha del mismo artículo**. Fuente única: **`centavos()`** en `resumen-articulo.ts`, que formatea con el MISMO formateador de la pantalla y lee el número de vuelta — la igualdad queda garantizada por construcción, no por parecido. La usan el Excel (las dos hojas) y el script de verificación. **Todo monto va a 2 decimales; las unidades siguen enteras.**
+>
+> **La caja de Compras: 4 líneas y UNA línea gris que no se despliega.** `y 3 compras más`, sin enlace. Antes eran DOS renglones —un botón "Ver las otras N compras" y un texto "y 2 más de hace años"— separados por un detalle NUESTRO (unas venían en el payload y otras no); Daniel ve cuatro fechas y lo que quiere saber es cuántas hay detrás. `ListaCompras` **ya no expone el arreglo escondido** (`{visibles, restantes, unica}`) — si lo expusiera volvería el botón, y con él los dos renglones.
+>
+> **LOS DOS PIES DE PÁGINA SE ELIMINARON:**
+> - *"Hay N compras más viejas de 3 años que no se muestran — lo que trajeron sí cuenta para lo que hay en bodega"*: la caja ya dice "y N compras más", y —lo que hacía falta verificar antes de borrarla— **el total de bodega NO sale de las compras que se ven**. Sale de `switch_articulo_info.existencia`, medido: `NB2570001` = **345**, tal cual en la base, mientras las 4 compras visibles suman 600 y el total comprado es 935. El número no cambia; se va la explicación de una cuenta que la pantalla no hace.
+> - *"Lo que queda en bodega es de Switch, al 10-ago, 11:30 pm"*: una hora que no cambia ninguna decisión. (`fmtFrescura` **sigue existiendo** y con su test — solo dejó de usarse acá.)
+>
+> #### El Excel
+>
+> **Hoja "Referencia"** — los MISMOS rótulos que la pantalla y en el mismo orden: `Precio prom` · `Costo CIF` · **`CIF anterior (solo si cambió)`** · `Costo FOB (calculado)` · `Margen` · `Lista`. Se fue **`FOB de dónde`** de esta hoja (ya no hay dos procedencias que distinguir: hay una cuenta).
+> - **La columna del CIF anterior SE QUEDA pero se llena solo cuando difiere** — decisión tomada: una columna que aparece y desaparece rompe cualquier planilla que apunte a ella, y **vacío ES el dato** ("no cambió"), igual que en pantalla. Está dicho en el subtítulo de la hoja.
+> - **Hoja "Compras": intacta, y conserva el FOB CRUDO de Switch con su `FOB de dónde`.** No es una contradicción: esa hoja es el registro tal como llegó, y ahí `"igual al CIF (revisar)"` es justamente el dato que hay que ver para corregirlo EN Switch. La cuenta de la ficha vive en la hoja 1. Lo único que cambió ahí son los 2 decimales.
+>
+> #### Medición
+>
+> **Los 3 anchos + el iPad acostado, en el navegador contra el build de producción y con datos de producción** (`BASE=… CODIGO=… node scripts/_medir-referencia-simple.mjs`, solo lectura): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px**, en los seis casos reales (`NB2570001`, `QD3958033` de una sola compra, `NB3705906` con el costo subido, `40HM265032` agotado, `RETENCION` sin compra registrada, y el modelo `40HM265` con **43 tarjetas** a la vez). La fila fusionada es más larga y **crece HACIA ABAJO**: 44 px de alto a 1440, 69 a 834/1024 y 94-119 a 390 (dos o tres líneas), sin empujar nada de lado. El script ahora **falla si encuentra en pantalla** `CIF de hoy`, `Vendí a`, `me costó`, `Lo que queda en bodega es de Switch` o `compras más viejas de 3 años`.
+>
+> **Contra producción, los dos artículos de Daniel** (`scripts/_verif-compras-referencia.ts`, solo lectura, corre los MISMOS módulos puros que la pantalla y ahora imprime la fila de plata tal como se lee):
+> ```
+> NB2570001  Precio prom $26.92 · Costo CIF $16.56 · Costo FOB (calculado) $15.05 · margen 39% · lista $27.00
+> QD3958033  Precio prom $6.78  · Costo CIF $4.47  · Costo FOB (calculado) $4.06  · margen 34% · lista $7.00
+> ```
+>
+> Candados: `ventas-resumen-articulo.test.ts` (58), `ventas-compras.test.ts` (59), `ventas-poda-textos.test.tsx` (31, **renderiza la pantalla y compara el renglón entero, carácter por carácter**) y `articulo-info.test.ts`. Verificado por mutación: mostrar el FOB de Switch rompe 3, escribir la división a mano rompe 1, volver a `toFixed(2)` en el Excel rompe 2, devolver el botón de desplegar rompe 2 y mostrar el CIF anterior cuando no cambió rompe 2.
 
 ### Directorio (April 10-11)
 - Chevron icons on expandable rows

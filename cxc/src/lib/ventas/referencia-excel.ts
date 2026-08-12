@@ -22,14 +22,30 @@
 // 🩸 Y ANTES SE HABÍA IDO "DESC.". Daniel, textual: *"no sirve"*. Lo que sí
 // sirve para su decisión es el PRECIO REAL y el MARGEN.
 //
-// 🔴 El FOB se muestra TAL CUAL viene, con su origen al lado. En el 93% de las
-// líneas Switch lo manda IGUAL al CIF: es un error de carga conocido del lado de
-// Daniel y NO se corrige ni se estima — la columna "FOB de dónde" es la que le
-// dice a cuál creerle. Fashion Shoes es la única donde se estima, y se dice.
+// 🔴 LA HOJA 1 SIGUE A LA PANTALLA, RÓTULO POR RÓTULO (11-ago-2026): `Precio
+// prom` · `Costo CIF` · `CIF anterior (solo si cambió)` · `Costo FOB
+// (calculado)` · `Margen` · `Lista`. Los tres cambios de fondo:
+//   · El **Costo FOB es CALCULADO** (CIF ÷ 1,10, con `fobEstimado()`), no el que
+//     manda Switch — que llega igual al CIF en el 93% de las líneas por un error
+//     de carga conocido. Por eso la columna "FOB de dónde" se fue de esta hoja:
+//     ya no hay dos procedencias que distinguir, hay una cuenta. El rótulo dice
+//     "(calculado)" — un número que parece traído y no lo es sería peor que no
+//     tenerlo.
+//   · El **CIF anterior solo se llena cuando DIFIERE** del de hoy. La columna se
+//     queda (una columna que aparece y desaparece rompe cualquier planilla que
+//     apunte a ella), pero vacía significa "no cambió", igual que en pantalla:
+//     el dato es la SEÑAL de que te subieron el costo, no un relleno.
+//   · **Todo monto va a 2 decimales**, también en la hoja "Compras".
+//
+// 🔴 La hoja 2 ("Compras") SÍ conserva el FOB CRUDO de Switch con su columna
+// "FOB de dónde", y no es una contradicción: esa hoja es el registro tal como
+// llegó, y ahí "igual al CIF (revisar)" es justamente el dato que hay que ver
+// para arreglarlo en Switch. La cuenta de la ficha vive en la hoja 1.
 
 import type { ArticuloCompras, Compra, OrigenFob } from "./compras";
 import {
   armarFicha,
+  centavos,
   fmtMesAnio,
   textoMeses,
   textoSinMargen,
@@ -69,8 +85,11 @@ export function aplanar(articulos: readonly ArticuloCompras[]): FilaCompraExcel[
 
 const n1 = (x: number | null | undefined): number | null =>
   x == null || !Number.isFinite(x) ? null : Number(x.toFixed(1));
-const n2 = (x: number | null | undefined): number | null =>
-  x == null || !Number.isFinite(x) ? null : Number(x.toFixed(2));
+/** 🔴 Todo MONTO va a 2 decimales, y con el MISMO redondeo que la pantalla
+ *  (`centavos`, que formatea con el formateador de la ficha y lee de vuelta).
+ *  Con `toFixed(2)` el CIF real $16,555 salía $16.55 en el Excel y $16.56 en la
+ *  ficha del mismo artículo. Las UNIDADES siguen enteras. */
+const n2 = centavos;
 const n4 = (x: number | null | undefined): number | null =>
   x == null || !Number.isFinite(x) ? null : Number(x.toFixed(4));
 
@@ -97,8 +116,10 @@ export async function buildReferenciaSheet(
     subtitle:
       `${articulos.length} referencias · corte ${hoyMes} · ` +
       `los ${MESES_VENTANA} meses son COMPLETOS (el mes en curso NO entra) · ` +
-      `"Vendí a" es la venta real ÷ unidades, con los descuentos adentro · ` +
-      `el margen se calcula contra el CIF de la última compra · ` +
+      `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
+      `el margen se calcula contra el Costo CIF de la última compra · ` +
+      `el Costo FOB es CALCULADO (Costo CIF ÷ 1,10), no el que manda Switch · ` +
+      `"CIF anterior" solo se llena cuando la compra anterior costó distinto; vacío = no cambió · ` +
       `NO se dice cuánto tardó cada compra en venderse: con stock encima eso no se sabe · ` +
       `las notas de crédito ya están restadas`,
     columns: [
@@ -117,16 +138,14 @@ export async function buildReferenciaSheet(
       { header: "Vendo por mes", wch: 13, align: "right", fmt: "#,##0.0" },
       { header: "Meses promediados", wch: 17, align: "right", fmt: "#,##0" },
       { header: "Me queda para (meses)", wch: 20, align: "right", fmt: "#,##0.0" },
-      // ── Precio real y margen: la mitad de la decisión ──
-      { header: "Vendí a", wch: 11, align: "right", fmt: MONEY_FMT },
-      { header: "Me costó (CIF)", wch: 13, align: "right", fmt: MONEY_FMT },
+      // ── La fila de plata de la pantalla, en el mismo orden ──
+      { header: "Precio prom", wch: 12, align: "right", fmt: MONEY_FMT },
+      { header: "Costo CIF", wch: 11, align: "right", fmt: MONEY_FMT },
+      { header: "CIF anterior (solo si cambió)", wch: 27, align: "right", fmt: MONEY_FMT },
+      { header: "Costo FOB (calculado)", wch: 20, align: "right", fmt: MONEY_FMT },
       { header: "Margen", wch: 9, align: "right", fmt: PCT_FMT },
+      { header: "Lista", wch: 11, align: "right", fmt: MONEY_FMT },
       { header: "Si no hay margen, por qué", wch: 46 },
-      // ── Costos ──
-      { header: "CIF compra anterior", wch: 18, align: "right", fmt: MONEY_FMT },
-      { header: "FOB", wch: 10, align: "right", fmt: MONEY_FMT },
-      { header: "FOB de dónde", wch: 22 },
-      { header: "Precio de lista", wch: 13, align: "right", fmt: MONEY_FMT },
       // ── Temporada ──
       { header: "Oct-nov-dic (u)", wch: 14, align: "right", fmt: "#,##0" },
       { header: "Oct-nov-dic (% del año)", wch: 21, align: "right", fmt: PCT_FMT },
@@ -158,12 +177,13 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo): (string | numbe
     n1(f.alcance),
     n2(m.precioReal),
     n2(m.costo),
+    // Vacío = el costo no cambió. La celda vacía ES el dato, igual que en
+    // pantalla: repetir el mismo número en cada fila era el relleno que se fue.
+    n2(f.cambioCosto?.anterior),
+    n2(f.fobCalculado),
     n4(m.margen),
-    m.motivo ? textoSinMargen(m.motivo, f.promedio.meses) : "",
-    n2(a?.costos.cif),
-    n2(u?.costos.fob),
-    u ? textoOrigenFob(u.costos.fobOrigen) : "—",
     n2(u?.costos.lista ?? art.precioEtiqueta),
+    m.motivo ? textoSinMargen(m.motivo, f.promedio.meses) : "",
     f.temporada.unidades,
     n4(f.temporada.parte),
     ...f.barras.map((b) => b.unidades),
@@ -208,6 +228,7 @@ export async function buildComprasSheet(
     subtitle:
       `${articulos.length} referencias · ${filas.length} compras · corte ${hoyMes} · ` +
       `fecha, cantidad y costos de cada ingreso de mercancía de los últimos 3 años · ` +
+      `acá el FOB es el CRUDO de Switch con su procedencia (en la hoja Referencia el Costo FOB es CALCULADO: CIF ÷ 1,10) · ` +
       `NO se atribuyen ventas a una compra: con stock encima, de qué llegada salió cada venta no se sabe`,
     columns: [
       { header: "Referencia", wch: 18 },
@@ -229,10 +250,13 @@ export async function buildComprasSheet(
         articulo.empresa || "—",
         compra.fecha,
         compra.unidades,
-        compra.costos.cif,
-        compra.costos.fob,
+        // 🔴 Dos decimales, como en pantalla. Los costos son promedios ponderados
+        // y traen más decimales: el formato los mostraba a 2 pero la celda
+        // guardaba 16,555, así que al tocarla aparecía otro número.
+        n2(compra.costos.cif),
+        n2(compra.costos.fob),
         textoOrigenFob(compra.costos.fobOrigen),
-        compra.costos.lista,
+        n2(compra.costos.lista),
         compra.proveedor || "—",
         compra.documento || "—",
       ]),

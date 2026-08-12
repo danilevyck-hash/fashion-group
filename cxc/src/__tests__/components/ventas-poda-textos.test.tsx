@@ -191,6 +191,16 @@ const PROHIBIDOS = [
   "Esta:",
   "Anterior:",
   "van 0",
+  // 🩸 Podados el 11-ago-2026 (noche): el mismo $16.56 salía TRES veces —
+  // "me costó", "CIF de hoy" y "FOB"— y había DOS pies de página que no
+  // cambiaban ninguna decisión.
+  "CIF de hoy",
+  "CIF de la compra anterior",
+  "Vendí a",
+  "me costó",
+  "Lo que queda en bodega es de Switch",
+  "compras más viejas de 3 años",
+  "más de hace años",
 ];
 
 async function buscar(resp: ComprasApiResp, codigo: string) {
@@ -203,18 +213,53 @@ async function buscar(resp: ComprasApiResp, codigo: string) {
 
 const buscarUnaReferencia = () => buscar(REFERENCIA_RESP, "40HM265032");
 
+/** La venta REAL de `NB2570001` (vistana, medida el 11-ago-2026): 331 unidades
+ *  por $8.910,60 en los 12 meses completos → precio prom $26.92 y margen 39%
+ *  contra un CIF de $16,555. La primera línea es de 2022 para que la ventana se
+ *  divida entre 12 (el artículo vende desde entonces). */
+const SERIE_NB2570001 = [
+  { mes: "2022-11", unidades: 14, venta: 336 },
+  { mes: "2025-09", unidades: 36, venta: 972 },
+  { mes: "2025-10", unidades: 36, venta: 972 },
+  { mes: "2025-11", unidades: 73, venta: 1965.6 },
+  { mes: "2025-12", unidades: 61, venta: 1647 },
+  { mes: "2026-01", unidades: 24, venta: 648 },
+  { mes: "2026-02", unidades: 12, venta: 324 },
+  { mes: "2026-03", unidades: 21, venta: 558 },
+  { mes: "2026-04", unidades: 26, venta: 708 },
+  { mes: "2026-05", unidades: 6, venta: 144 },
+  { mes: "2026-07", unidades: 36, venta: 972 },
+];
+
 /** El mismo artículo pero con 6 compras en la ventana y 3 de más de 3 años:
- *  ejerce el tope de la caja, el despliegue y el aviso de las viejas. */
+ *  ejerce el tope de la caja y la línea que cuenta el resto. */
 const RESP_MUCHAS_COMPRAS: ComprasApiResp = {
   ...REFERENCIA_RESP,
   articulos: [
     {
       ...REFERENCIA_RESP.articulos[0],
       codigo: "NB2570001",
+      descripcion: "Men-Boxer Brief",
       compras: COMPRAS_MUCHAS,
+      serie: SERIE_NB2570001,
       comprasFueraDeVentana: 3,
       existencia: 345,
+      precioEtiqueta: 27,
       cuadre: { comprado: 960, vendido: 615, existencia: 345, residuo: 0, ajusteConfiable: false },
+    },
+  ],
+};
+
+/** El MISMO artículo con el costo subido en la última compra: $16,555 hoy
+ *  contra $14,20 en la anterior. Es la señal que Daniel quiere ver. */
+const RESP_COSTO_SUBIO: ComprasApiResp = {
+  ...RESP_MUCHAS_COMPRAS,
+  articulos: [
+    {
+      ...RESP_MUCHAS_COMPRAS.articulos[0],
+      compras: COMPRAS_MUCHAS.map((c, i) =>
+        i === 0 ? c : { ...c, costos: { ...c.costos, cif: 14.2, fob: 14.2 } },
+      ),
     },
   ],
 };
@@ -233,34 +278,33 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
     }
   });
 
-  it("muestra 4 y el resto queda a UN toque — nada se pierde", async () => {
+  it("🔴 muestra 4 y las demás se cuentan en UNA línea gris, sin enlace", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    // La 5ª y la 6ª no se ven de entrada…
+    // La 5ª y la 6ª no se ven…
     expect(screen.queryByText("1 abr 2025 · 240 u")).toBeNull();
-    const boton = screen.getByRole("button", { name: "Ver las otras 2 compras" });
-    fireEvent.click(boton);
-    // …y aparecen enteras al tocar, sin ir a la red.
-    expect(screen.getAllByText("1 abr 2025 · 240 u").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("29 ago 2024 · 120 u").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Ver menos" })).toBeTruthy();
+    // …y se anuncian junto con las 3 de más de 3 años: 2 + 3 = 5.
+    expect(screen.getAllByText("y 5 compras más").length).toBeGreaterThan(0);
+    // 🔴 NO es un botón: el enlace de desplegar se fue. Daniel eligió ver 4.
+    expect(screen.queryByRole("button", { name: /compra/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ver menos" })).toBeNull();
   });
 
-  it("las de más de 3 años se ANUNCIAN, y se dice que igual cuentan para la bodega", async () => {
+  it("🩸 los DOS pies de página se fueron — ninguno cambiaba una decisión", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    expect(screen.getAllByText(/y 3 más de hace años/).length).toBeGreaterThan(0);
-    // 🔴 Sin este aviso, el total de bodega no cerraría contra las compras que
-    // se ven y la pantalla parecería equivocada.
-    expect(
-      screen.getAllByText(/3 compras más viejas de 3 años que no se muestran/).length,
-    ).toBeGreaterThan(0);
-    expect(screen.getAllByText(/sí cuenta para lo que hay en bodega/).length).toBeGreaterThan(0);
+    const pantalla = document.body.textContent ?? "";
+    expect(pantalla).not.toContain("compras más viejas de 3 años");
+    expect(pantalla).not.toContain("Lo que queda en bodega es de Switch");
+    // 🔴 Y el total de bodega NO cambió: sale de `existencia` de Switch, no de
+    // las compras que se ven. Era lo que el primer pie venía a explicar.
+    expect(screen.getAllByText(/345 en bodega/).length).toBeGreaterThan(0);
   });
 
-  it("una sola compra lo dice: 'única compra', sin botón de desplegar", async () => {
+  it("una sola compra lo dice: 'única compra', sin línea de restantes", async () => {
     await buscarUnaReferencia();
     expect(screen.getAllByText("28 nov 2023 · 280 u").length).toBeGreaterThan(0);
     expect(screen.getAllByText("única compra").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /Ver la[s]? .*compra/ })).toBeNull();
+    expect(screen.queryByText(/y \d+ compras? más/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /compra/i })).toBeNull();
   });
 
   it("🩸 NO dice cuánto tardó, ni cuántas van, ni si se acabó — eso no se sabe", async () => {
@@ -344,17 +388,65 @@ describe("Referencia · los otros dos números, sin veredictos ni promedios", ()
   });
 });
 
-describe("Referencia · el ⓘ del FOB que no es confiable", () => {
-  it("cerrado NO deja el motivo en pantalla — si lo dejara, no se podó nada", async () => {
-    await buscarUnaReferencia();
-    expect(screen.queryByText(/error de carga conocido/)).toBeNull();
+// ── La fila de plata: UNA sola, cada número una sola vez ─────────────────────
+
+/** El renglón entero, con los separadores colapsados a " · " para poder
+ *  compararlo tal como se LEE. */
+function filaDePlata(): string {
+  const marca = screen.getAllByText("Precio prom")[0];
+  const fila = marca.closest("div.flex") as HTMLElement;
+  return (fila.textContent ?? "")
+    .replace(/De dónde salen estos números.*$/s, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+describe("Referencia · la fila de plata", () => {
+  it("🔴 es UNA sola fila, y dice exactamente lo aprobado", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(filaDePlata()).toBe(
+      "Precio prom $26.92 · Costo CIF $16.56 · Costo FOB (calculado) $15.05 · margen 39% · lista $27.00",
+    );
   });
 
-  it("al tocarlo dice por qué ese FOB no se puede creer, y que NO se corrige", async () => {
-    await buscarUnaReferencia();
-    tocarAyuda("Este FOB no es confiable");
-    expect(screen.getByText(/Switch lo mandó IGUAL al costo CIF/)).toBeTruthy();
-    expect(screen.getByText(/sin corregirlo ni estimarlo/)).toBeTruthy();
+  it("🩸 el $16.56 aparece UNA vez — antes salía tres (me costó, CIF de hoy, FOB)", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    const veces = (document.body.textContent ?? "").split("$16.56").length - 1;
+    expect(veces).toBe(1);
+  });
+
+  it("🔴 el Costo FOB se ROTULA como calculado — no es el que manda Switch", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(screen.getAllByText("Costo FOB (calculado)").length).toBeGreaterThan(0);
+    // El FOB del payload llega igual al CIF (el error de carga del 93%). Si se
+    // mostrara ése, la fila diría $16.56 dos veces.
+    expect(RESP_MUCHAS_COMPRAS.articulos[0].compras[0].costos.fob).toBeCloseTo(16.555, 3);
+    expect(filaDePlata()).toContain("Costo FOB (calculado) $15.05");
+  });
+
+  it("🔴 si el CIF NO cambió, no se muestra ningún '(antes …)'", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(screen.queryByText(/\(antes/)).toBeNull();
+  });
+
+  it("🔴 si te SUBIERON el costo, la señal va pegada al Costo CIF", async () => {
+    await buscar(RESP_COSTO_SUBIO, "NB2570001");
+    expect(filaDePlata()).toContain("Costo CIF $16.56 (antes $14.20 ↑)");
+  });
+
+  it("todo monto va con DOS decimales", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    for (const m of (filaDePlata().match(/\$[\d,.]+/g) ?? [])) {
+      expect(m, `${m} no tiene 2 decimales`).toMatch(/^\$[\d,]+\.\d{2}$/);
+    }
+  });
+
+  it("el ⓘ cerrado no deja su texto en pantalla; al tocarlo dice de dónde sale cada número", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(screen.queryByText(/error de carga conocido/)).toBeNull();
+    tocarAyuda("De dónde salen estos números");
+    expect(screen.getByText(/Costo CIF ÷ 1,10/)).toBeTruthy();
+    expect(screen.getByText(/igual al CIF en 93 de cada 100 líneas/)).toBeTruthy();
   });
 });
 

@@ -164,26 +164,43 @@ describe("costos — el CIF es real, el FOB SOLO derivado y etiquetado (decisió
     expect(textoOrigenFob("igual-al-cif")).not.toMatch(/estimad/i);
   });
 
-  it("la vista pinta el FOB SOLO por el componente que lo etiqueta", () => {
+  it("🔴 la vista NO pinta el FOB de Switch: el que muestra es el CALCULADO", () => {
+    // ⚠️ Este candado cambió de forma el 11-ago-2026 (noche) y ahora exige MÁS.
+    // Antes el FOB de Switch se mostraba con su procedencia al lado (<Fob/>);
+    // Daniel pidió el suyo —*"pon costo fob (calcula fob/1.1)"*— porque el de
+    // Switch llega IGUAL al CIF en el 93% de las líneas y no distinguía nada.
+    // Un `costos.fob` en la vista sería el número viejo de vuelta.
     const vista = fs.readFileSync(
       path.resolve(process.cwd(), "src/components/ventas/ReferenciaView.tsx"),
       "utf8",
     );
-    // Un `costos.fob` suelto sería un FOB desnudo. El único lugar donde puede
-    // aparecer es adentro del componente <Fob/>.
-    const cuerpoFob = vista.slice(vista.indexOf("function Fob("));
-    const usos = [...vista.matchAll(/costos\.fob/g)];
-    for (const u of usos) {
-      expect(
-        cuerpoFob.includes(u[0]),
-        `"${u[0]}" aparece fuera del componente <Fob/> — sería un FOB sin procedencia`,
-      ).toBe(true);
-    }
-    // Y la vista tiene que USAR <Fob/>. ⚠️ Antes se exigían DOS usos porque la
-    // pantalla tenía dos caras (tabla en escritorio, tarjetas en celular). La
-    // poda del 11-ago-2026 dejó UNA sola fila de costos, que sirve a los tres
-    // anchos: exigir dos sería exigir la tabla de vuelta.
-    expect(vista.match(/<Fob c=\{[a-z]\} \/>/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
+    const codigo = vista
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"))
+      .join("\n");
+    expect(codigo).not.toContain("costos.fob");
+    expect(codigo).not.toContain("fobOrigen");
+    // Y el que sí muestra sale de la ficha, rotulado como cuenta.
+    expect(codigo).toContain("fobCalculado");
+    expect(codigo).toContain("Costo FOB (calculado)");
+  });
+
+  it("🔴 el Costo FOB de la ficha REUSA `fobEstimado` — una sola división en el repo", () => {
+    const fuente = fs.readFileSync(
+      path.resolve(process.cwd(), "src/lib/ventas/resumen-articulo.ts"),
+      "utf8",
+    );
+    // El encabezado CITA la fórmula de Daniel para explicarla: se mira el
+    // código, no los comentarios.
+    const ficha = fuente
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"))
+      .join("\n");
+    expect(ficha).toContain("fobEstimado");
+    // Nada de escribir la división a mano: sería una segunda definición, y la
+    // trampa conocida es multiplicar por 0,9 en vez de dividir entre 1,1.
+    expect(ficha).not.toMatch(/\/\s*1\.1\b/);
+    expect(ficha).not.toMatch(/\*\s*0\.9\b/);
   });
 });
 

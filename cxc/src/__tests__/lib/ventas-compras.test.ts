@@ -781,9 +781,13 @@ describe("el Excel de Referencia", () => {
       "Compras de más de 3 años",
       "Vendo por mes",
       "Me queda para (meses)",
-      "Vendí a",
-      "Me costó (CIF)",
+      // 🔴 Los MISMOS rótulos que la fila de plata de la pantalla.
+      "Precio prom",
+      "Costo CIF",
+      "CIF anterior (solo si cambió)",
+      "Costo FOB (calculado)",
       "Margen",
+      "Lista",
       "En bodega",
     ]) {
       expect(encabezado, `falta la columna "${col}"`).toContain(col);
@@ -797,6 +801,51 @@ describe("el Excel de Referencia", () => {
     expect(cuerpo[0]["Anterior: llegó"]).toBe("2025-04-01");
     expect(cuerpo[0]["Compras (últimos 3 años)"]).toBe(2);
     expect(cuerpo[0]["Compras de más de 3 años"]).toBe(0);
+  });
+
+  it("🔴 el Costo FOB de la hoja 1 es CALCULADO (CIF ÷ 1,10), no el de Switch", async () => {
+    const { cuerpo } = await leerHoja("Referencia");
+    expect(cuerpo[0]["Costo CIF"]).toBe(5);
+    expect(cuerpo[0]["Costo FOB (calculado)"]).toBe(4.55); // 5 ÷ 1,1
+    // El FOB que manda Switch para esta línea es 4 — si se copiara ése, la
+    // planilla diría otra cosa que la pantalla.
+    expect(cuerpo[0]["Costo FOB (calculado)"]).not.toBe(4);
+    // Y la columna del origen del FOB se fue de esta hoja: ya no hay dos
+    // procedencias que distinguir, hay una cuenta.
+    const { encabezado } = await leerHoja("Referencia");
+    expect(encabezado).not.toContain("FOB de dónde");
+  });
+
+  it("🔴 'CIF anterior' queda VACÍA cuando el costo no cambió — vacío ES el dato", async () => {
+    // Las dos compras del fixture costaron lo mismo ($5).
+    const { cuerpo } = await leerHoja("Referencia");
+    expect(cuerpo[0]["CIF anterior (solo si cambió)"] ?? "").toBe("");
+  });
+
+  it("🔴 …y se llena cuando SÍ cambió", async () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "NB2570001",
+        descripcion: "Men-Boxer Brief",
+        ingresos: [
+          ingreso({ codigo_articulo: "NB2570001", fecha: "2025-04-01", n_interno: "A", cantidad: 240, costo_cif: 4.2 }),
+          ingreso({ codigo_articulo: "NB2570001", fecha: "2026-02-19", n_interno: "E", cantidad: 180, costo_cif: 5 }),
+        ],
+        ventas: [v("2025-11-06", "FA", 216, 2160)],
+        existencia: 204,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const XLSX = await import("xlsx-js-style");
+    const mod = await import("@/lib/ventas/referencia-excel");
+    const ws = await mod.buildReferenciaSheet([art], "2026-08");
+    const filas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false }) as unknown[][];
+    const enc = filas.find((f) => f.includes("Referencia")) as string[];
+    const fila = filas[filas.indexOf(enc) + 1];
+    expect(fila[enc.indexOf("CIF anterior (solo si cambió)")]).toBe(4.2);
   });
 
   it("la hoja 1 trae los 12 meses COMPLETOS en columnas, sin el mes en curso", async () => {
@@ -846,6 +895,12 @@ describe("el Excel de Referencia", () => {
       "Compras anteriores",
       // Y la que ya se había ido antes: Daniel, textual, *"no sirve"*.
       "Desc.",
+      // 🩸 Y los rótulos que repetían el mismo número (11-ago-2026, noche).
+      "Vendí a",
+      "Me costó (CIF)",
+      "CIF compra anterior",
+      "CIF de hoy",
+      "Precio de lista",
     ];
     for (const h of [...hoja1, ...hoja2]) {
       expect(PROHIBIDAS, `la columna "${h}" volvió`).not.toContain(h);
