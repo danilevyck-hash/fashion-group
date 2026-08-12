@@ -9,6 +9,7 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal, EmptyState } from "@/components/ui";
+import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string | null; status: string; total: number; item_count: number; created_at: string; }
@@ -31,6 +32,10 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Duplicar con cliente editable: el botón abre el mini-modal (nombre
+  // pre-llenado); el POST /orders de siempre sale con el nombre elegido.
+  const [dupTarget, setDupTarget] = useState<Order | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
 
   const [role, setRole] = useState("");
 
@@ -58,25 +63,30 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
     load();
   }
 
-  async function duplicateOrder(order: Order) {
-    toast("Duplicando pedido...");
+  // Duplica copiando los items del original y creando un pedido NUEVO con el
+  // nombre elegido en el mini-modal. Este camino (POST /orders) nunca copia
+  // cliente_switch_id, así que cambiar el nombre acá no arrastra nada de Switch.
+  async function duplicateOrder(order: Order, clientName: string) {
+    setDuplicating(true);
     try {
       const res = await fetch(`${theme.api}/orders/${order.id}`);
-      if (!res.ok) { toast("Error al cargar pedido", "error"); return; }
+      if (!res.ok) { toast("Error al cargar pedido", "error"); setDuplicating(false); return; }
       const full = await res.json();
       const items = (full[theme.itemsField] || []).map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
         product_id: i.product_id, sku: i.sku, name: i.name, image_url: i.image_url, quantity: i.quantity, unit_price: i.unit_price,
       }));
       const createRes = await fetch(`${theme.api}/orders`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: order.client_name, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),
+        body: JSON.stringify({ client_name: clientName, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),
       });
       if (createRes.ok) {
         const newOrder = await createRes.json();
+        setDupTarget(null);
         toast("Pedido duplicado");
         router.push(`/catalogo/${marca}/pedido/${newOrder.id}`);
       } else { toast("Error al duplicar", "error"); }
     } catch { toast("Error al duplicar", "error"); }
+    setDuplicating(false);
   }
 
   // Date filtering
@@ -172,7 +182,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
               </div>
               <span className="text-sm font-semibold tabular-nums">${fmt(o.total)}</span>
               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                <button onClick={() => duplicateOrder(o)} className="text-xs text-gray-300 hover:text-blue-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Duplicar">
+                <button onClick={() => setDupTarget(o)} className="text-xs text-gray-300 hover:text-blue-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Duplicar">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
                 {canDelete && (
@@ -184,6 +194,16 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
             </div>
           ))}
         </div>
+      )}
+
+      {dupTarget && (
+        <DuplicarPedidoModal
+          orderNumber={dupTarget.order_number}
+          nombreInicial={dupTarget.client_name}
+          duplicando={duplicating}
+          onConfirm={(nombre) => duplicateOrder(dupTarget, nombre)}
+          onCancel={() => setDupTarget(null)}
+        />
       )}
 
       <ConfirmDeleteModal

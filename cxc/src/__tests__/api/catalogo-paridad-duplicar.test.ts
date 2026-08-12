@@ -5,8 +5,11 @@
 //   · 503 si la DDL de reemplaza_a no corrió; 404 pedido inexistente
 //   · 409 si el pedido NO está en Switch (se edita directo, no se duplica)
 //   · dedupe: reemplazo activo existente → lo devuelve (yaExistia=true) sin RPC
-//   · clon vía RPC {reebok,joybees}_create_order con total por marca y
+//   · clon vía RPC {reebok,joybees,tommy}_create_order con el calcTotal de la
+//     marca (Tommy: bulto_pzas del estilo — NO la fórmula de Joybees) y
 //     trazabilidad reemplaza_a en el update posterior
+//   · body {client_name}: nombre CAMBIADO → clon con nombre nuevo y SIN
+//     cliente_switch_id; nombre igual (espacios/mayúsculas) → se copia
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
@@ -19,6 +22,10 @@ vi.mock("@/lib/reebok-supabase-server", () => ({
 let joybeesDb: MockDb;
 vi.mock("@/lib/joybees-supabase-server", () => ({
   joybeesServer: { from: (t: string) => joybeesDb.from(t), rpc: (...a: unknown[]) => joybeesDb.rpc(...a) },
+}));
+let tommyDb: MockDb;
+vi.mock("@/lib/tommy-supabase-server", () => ({
+  tommyServer: { from: (t: string) => tommyDb.from(t), rpc: (...a: unknown[]) => tommyDb.rpc(...a) },
 }));
 
 let categoryMap = new Map<string, string>();
@@ -33,6 +40,7 @@ import { POST as duplicarPost } from "@/app/api/catalogo/[marca]/orders/[id]/dup
 type IdCtx = { params: { id: string } };
 const rDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "reebok", ...ctx.params } });
 const jDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "joybees", ...ctx.params } });
+const tDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "tommy", ...ctx.params } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {
@@ -47,8 +55,37 @@ beforeEach(() => {
   vi.clearAllMocks();
   reebokDb = makeDb();
   joybeesDb = makeDb();
+  tommyDb = makeDb();
   categoryMap = new Map();
 });
+
+/** Cola estándar de un original de Reebok bloqueado por Switch (probe DDL,
+ *  sin reemplazo, original con cliente_switch_id, update de trazabilidad). */
+function queueOriginalReebok() {
+  reebokDb.queue(
+    "reebok_orders",
+    { data: { id: OID, reemplaza_a: null } },
+    { data: null },
+    {
+      data: {
+        id: OID,
+        order_number: "PED-100",
+        client_name: "Cliente Original",
+        vendor_name: "Vend",
+        client_email: null,
+        comment: null,
+        cliente_switch_id: 7,
+        vendedor_switch_id: 2,
+        reebok_order_items: [
+          { product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 2, unit_price: 10, is_preorder: false },
+        ],
+      },
+    },
+    { data: null, error: null },
+  );
+  reebokDb.queue("reebok_switch_envios", { data: { estado: "enviado", numero_interno: "N1" } });
+  reebokDb.queueRpc({ data: { order_id: NEW_ID, order_number: "PED-202" } });
+}
 
 describe("POST /orders/[id]/duplicar", () => {
   it("401 sin sesión, 403 bodega — ambas marcas", async () => {
@@ -199,6 +236,96 @@ describe("POST /orders/[id]/duplicar", () => {
     expect(args.p_total).toBe(180); // 3×12×5
     const pItems = args.p_items as Array<Record<string, unknown>>;
     expect(pItems.every((i) => !("is_preorder" in i))).toBe(true);
+  });
+
+  it("tommy: total con el calcTotal de la marca (bulto_pzas 8 del estilo, no 12 fijo)", async () => {
+    tommyDb.queue(
+      "tommy_orders",
+      { data: { id: OID, reemplaza_a: null } },
+      { data: null },
+      {
+        data: {
+          id: OID,
+          order_number: "TOM-100",
+          client_name: "C",
+          vendor_name: null,
+          client_email: null,
+          comment: null,
+          cliente_switch_id: null,
+          vendedor_switch_id: null,
+          tommy_order_items: [
+            { product_id: P1, sku: "FM0FM05537YBS", name: "P", image_url: null, quantity: 2, unit_price: 10 },
+          ],
+        },
+      },
+      { data: null, error: null },
+    );
+    tommyDb.queue("tommy_switch_envios", { data: { estado: "enviado", numero_interno: "N3" } });
+    // El estilo está marcado en 8 piezas por bulto (el caso TOM-003).
+    tommyDb.queue("tommy_products", { data: [{ id: P1, category: null, bulto_pzas: 8 }] });
+    tommyDb.queueRpc({ data: { order_id: NEW_ID, order_number: "TOM-101" } });
+
+    const res = await tDuplicar(makeReq("/x", { method: "POST", role: "admin" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(200);
+    const [rpcName, args] = tommyDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(rpcName).toBe("tommy_create_order");
+    // 2 bultos × 8 pzas × $10 — la fórmula de Joybees (12 fijo) daría 240.
+    expect(args.p_total).toBe(160);
+    const pItems = args.p_items as Array<Record<string, unknown>>;
+    expect(pItems.every((i) => !("is_preorder" in i))).toBe(true);
+  });
+
+  it("nombre CAMBIADO en el body → clon con el nombre nuevo y SIN cliente_switch_id (vendedor sí viaja)", async () => {
+    queueOriginalReebok();
+    const res = await rDuplicar(
+      makeReq("/x", { method: "POST", role: "secretaria", body: { client_name: "Otro Cliente" } }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(200);
+
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_client_name).toBe("Otro Cliente");
+
+    const chains = reebokDb.chainsFor("reebok_orders");
+    const payload = chains[chains.length - 1]._calls.update[0][0] as Record<string, unknown>;
+    expect(payload.reemplaza_a).toBe(OID);
+    // El candado de este PR: con OTRO cliente, el id de Switch del viejo NO
+    // puede viajar — el pedido saldría a Switch bajo el cliente equivocado.
+    expect("cliente_switch_id" in payload).toBe(false);
+    expect(payload.vendedor_switch_id).toBe(2);
+  });
+
+  it("nombre IGUAL (espacios y mayúsculas no cuentan) → cliente_switch_id se copia como siempre", async () => {
+    queueOriginalReebok();
+    const res = await rDuplicar(
+      makeReq("/x", { method: "POST", role: "secretaria", body: { client_name: "  cliente original " } }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(200);
+
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_client_name).toBe("Cliente Original");
+
+    const chains = reebokDb.chainsFor("reebok_orders");
+    const payload = chains[chains.length - 1]._calls.update[0][0] as Record<string, unknown>;
+    expect(payload.cliente_switch_id).toBe(7);
+    expect(payload.vendedor_switch_id).toBe(2);
+  });
+
+  it("nombre vacío en el body → se trata como 'sin cambio' (nombre y cliente del original)", async () => {
+    queueOriginalReebok();
+    const res = await rDuplicar(
+      makeReq("/x", { method: "POST", role: "admin", body: { client_name: "   " } }),
+      { params: { id: OID } },
+    );
+    expect(res.status).toBe(200);
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_client_name).toBe("Cliente Original");
+    const chains = reebokDb.chainsFor("reebok_orders");
+    const payload = chains[chains.length - 1]._calls.update[0][0] as Record<string, unknown>;
+    expect(payload.cliente_switch_id).toBe(7);
   });
 
   it("400 si el original no tiene productos", async () => {
