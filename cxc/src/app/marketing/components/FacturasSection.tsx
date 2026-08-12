@@ -133,6 +133,61 @@ export default function FacturasSection({
     }
   }, [cargar, facturasIniciales]);
 
+  // 🩸 LAS ANULADAS VIVEN ACÁ AHORA. La pantalla de "Anulados" se retiró
+  // (ago-2026) y era la ÚNICA puerta para verlas y restaurarlas: el detalle del
+  // proyecto nunca las recibió (`getFacturasByProyecto` filtra
+  // `anulado_en IS NULL`), así que sin esto las 14 anuladas que viven dentro de
+  // proyectos vivos ($12.004,20 medidos el 11-ago-2026) quedaban inalcanzables.
+  //
+  // 🔴 VAN EN SU PROPIO ESTADO, NO MEZCLADAS con `facturas`. Todo lo que suma
+  // plata en el módulo lee las vigentes; meterlas en el mismo arreglo haría que
+  // el primer total que se olvidara de filtrar contara una anulada como gasto.
+  const [anuladas, setAnuladas] = useState<FacturaConAdjuntos[]>([]);
+  const [verAnuladas, setVerAnuladas] = useState(false);
+  const [restaurando, setRestaurando] = useState<string | null>(null);
+
+  const cargarAnuladas = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/marketing/proyectos/${proyecto.id}/facturas-anuladas`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as FacturaConAdjuntos[];
+      setAnuladas(Array.isArray(data) ? data : []);
+    } catch {
+      // Silencioso: es un bloque secundario, no puede tumbar el detalle.
+    }
+  }, [proyecto.id]);
+
+  useEffect(() => {
+    cargarAnuladas();
+  }, [cargarAnuladas]);
+
+  const restaurarFactura = async (id: string, numero: string) => {
+    if (restaurando) return;
+    setRestaurando(id);
+    try {
+      const res = await fetch("/api/marketing/papelera/restaurar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo: "factura", id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo restaurar la factura");
+      }
+      toast(`Factura ${numero} restaurada`, "success");
+      await cargarAnuladas();
+      await cargar();
+      onChange?.();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error al restaurar", "error");
+    } finally {
+      setRestaurando(null);
+    }
+  };
+
   // Cargar catálogo global de marcas (Fase 2)
   useEffect(() => {
     let cancelado = false;
@@ -387,6 +442,7 @@ export default function FacturasSection({
       setAnulando(null);
       setAnulandoMotivo("");
       await cargar();
+      await cargarAnuladas();
       onChange?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al anular";
@@ -472,9 +528,7 @@ export default function FacturasSection({
           <h2 className="text-base font-semibold text-gray-900">Facturas</h2>
           <p className="text-xs text-gray-500">
             {facturas.filter((f) => !f.anulado_en).length} vigentes
-            {facturas.some((f) => f.anulado_en)
-              ? ` · ${facturas.filter((f) => f.anulado_en).length} anuladas`
-              : ""}
+            {anuladas.length > 0 ? ` · ${anuladas.length} anuladas` : ""}
           </p>
         </div>
         {!showForm && !readonly && (
@@ -742,6 +796,61 @@ export default function FacturasSection({
         </div>
       )}
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Facturas anuladas — plegadas, tenues, y NO suman en ningún total.   */}
+      {/* Es el único lugar donde se pueden ver y restaurar desde que la      */}
+      {/* pantalla de "Anulados" se retiró.                                   */}
+      {/* ------------------------------------------------------------------ */}
+      {anuladas.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={() => setVerAnuladas((v) => !v)}
+            aria-expanded={verAnuladas}
+            className="w-full flex items-center justify-between gap-3 px-4 min-h-[44px] py-2 text-left"
+          >
+            <span className="text-sm text-gray-600">
+              {anuladas.length === 1
+                ? "1 factura anulada"
+                : `${anuladas.length} facturas anuladas`}
+              <span className="text-gray-400"> · no cuentan como gasto</span>
+            </span>
+            <span className="text-xs text-gray-500 shrink-0">
+              {verAnuladas ? "Ocultar" : "Ver"}
+            </span>
+          </button>
+
+          {verAnuladas && (
+            <div className="px-4 pb-4 space-y-2">
+              {anuladas.map((f) => (
+                <div key={f.id} className="relative">
+                  <FacturaCard factura={f} porcentajesMarcas={[]} />
+                  {f.anulado_motivo && (
+                    <p className="text-xs text-gray-500 mt-1 px-1">
+                      Motivo: {f.anulado_motivo}
+                    </p>
+                  )}
+                  {!readonly && (
+                    <div className="mt-1 px-1">
+                      <button
+                        type="button"
+                        onClick={() => restaurarFactura(f.id, f.numero_factura)}
+                        disabled={restaurando === f.id}
+                        className="text-xs text-gray-700 hover:text-black underline underline-offset-2 min-h-[44px] inline-flex items-center disabled:opacity-50"
+                      >
+                        {restaurando === f.id
+                          ? "Restaurando…"
+                          : "Restaurar esta factura"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {anulando && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" {...anularDismiss.backdrop} />
@@ -754,7 +863,8 @@ export default function FacturasSection({
               Anular factura {anulando.numero_factura}
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Se marcará como anulada. Podrás restaurarla desde Anulados.
+              Deja de contar como gasto. Queda guardada acá abajo, en
+              &ldquo;Facturas anuladas&rdquo;, por si hay que restaurarla.
             </p>
             <label
               htmlFor="motivo-anular"

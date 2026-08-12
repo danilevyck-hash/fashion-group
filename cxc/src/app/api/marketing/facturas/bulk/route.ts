@@ -187,6 +187,12 @@ export async function POST(req: NextRequest) {
       });
 
       // 2. Asignar marcas (regla 50/50 fija; el helper ignora porcentajes recibidos)
+      //
+      // 🔑 Acá también se SELLA el período: `setMarcasDeFactura` ata la factura
+      // al período abierto del proveedor de cada marca. Se deja en el helper y
+      // no se repite acá a propósito — un segundo sello no puede ser más
+      // correcto que el primero (es la misma función, con el mismo modo de
+      // fallar) y en una carga de 20 facturas serían 40 consultas de más.
       try {
         await setMarcasDeFactura(
           factura.id,

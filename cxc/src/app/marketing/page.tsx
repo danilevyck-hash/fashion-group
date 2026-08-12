@@ -1,14 +1,19 @@
 "use client";
 
-// Fase 3: el home es lista de proyectos (sin vista intermedia de marca).
-// URL patterns:
-//   /marketing                      → home (lista de proyectos)
-//   /marketing?proyecto=<uuid>      → home + overlay del proyecto
-//   /marketing?vista=anulados       → anulados (reemplaza home)
-//   /marketing?vista=reportes       → reportes (reemplaza home)
-//   /marketing?vista=historial      → historial (reemplaza home)
+// Marketing se organiza por PROVEEDOR, que es a quien se le reporta el gasto y
+// con quien se cierra un período. Daniel, textual: *"le reportas ese gasto al
+// proveedor"*, *"cada proveedor solo su parte"*.
 //
-// Legacy: /marketing?vista=papelera redirige a ?vista=anulados.
+// URL patterns:
+//   /marketing                        → inicio (bloques por proveedor)
+//   /marketing?proveedor=pvh          → lista de proyectos de ese proveedor
+//   /marketing?proyecto=<uuid>        → + overlay del proyecto
+//   /marketing?vista=reportes         → reportes (reemplaza el inicio)
+//   /marketing?vista=impulsadoras     → impulsadoras (reemplaza el inicio)
+//
+// Legacy: `?vista=papelera` y `?vista=anulados` redirigen a /marketing — la
+// pantalla de Anulados se retiró. Un enlace viejo tiene que llegar al inicio,
+// no a un error.
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,20 +21,33 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
 import {
-  MULTIFASHION_BUCKET,
-  MULTIFASHION_LABEL,
-} from "@/lib/marketing/multifashion";
+  MULTIFASHION_KEY,
+  SIN_PROVEEDOR,
+  esProveedorKey,
+  proveedorPorKey,
+} from "@/lib/marketing/proveedores";
+import InicioMarketing from "./components/InicioMarketing";
 import ProyectosHomeView from "./components/ProyectosHomeView";
-import MarcaSelector from "./components/MarcaSelector";
 import ProyectoOverlay from "./components/ProyectoOverlay";
-import AnuladosLista from "./components/AnuladosLista";
 import ReportesTabs from "./components/ReportesTabs";
 import ImpulsadorasView from "./components/ImpulsadorasView";
 import NuevoProyectoModal from "./components/NuevoProyectoModal";
 
 // `historial` se removió de la UI; el archivo del componente queda en disco
 // (HistorialView.tsx) por si se reactiva, pero ya no se rutea.
-type VistaExtra = "anulados" | "reportes" | "impulsadoras" | null;
+type VistaExtra = "reportes" | "impulsadoras" | null;
+
+/** Bloques que dibuja el inicio y que "Ver proyectos" puede abrir. */
+function esBloqueValido(k: string | null): boolean {
+  if (!k) return false;
+  return esProveedorKey(k) || k === MULTIFASHION_KEY || k === SIN_PROVEEDOR;
+}
+
+function nombreBloque(k: string): string {
+  if (k === MULTIFASHION_KEY) return "Multifashion";
+  if (k === SIN_PROVEEDOR) return "Sin proveedor asignado";
+  return proveedorPorKey(k)?.nombre ?? "Proveedor";
+}
 
 export default function MarketingPageWrapper() {
   return (
@@ -42,23 +60,19 @@ export default function MarketingPageWrapper() {
 function MarketingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authChecked, role } = useAuth({
+  const { authChecked } = useAuth({
     moduleKey: "marketing",
     allowedRoles: ["admin", "secretaria"],
   });
 
   const proyectoParam = searchParams.get("proyecto");
-  // Bucket de card: "legacy" (archivo Tommy/Calvin) o un marca_id (uuid). null = selector.
-  const marcaParam = searchParams.get("marca");
+  const proveedorRaw = searchParams.get("proveedor");
+  const proveedorParam = esBloqueValido(proveedorRaw) ? proveedorRaw : null;
   const vistaRaw = searchParams.get("vista");
-  // Compatibilidad: la vista legacy "papelera" se trata internamente como
-  // "anulados". Más abajo redirigimos la URL para que quede limpia.
   const vistaParam: VistaExtra =
-    vistaRaw === "papelera"
-      ? "anulados"
-      : vistaRaw === "anulados" || vistaRaw === "reportes" || vistaRaw === "impulsadoras"
-        ? (vistaRaw as VistaExtra)
-        : null;
+    vistaRaw === "reportes" || vistaRaw === "impulsadoras"
+      ? (vistaRaw as VistaExtra)
+      : null;
 
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
   const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
@@ -66,6 +80,7 @@ function MarketingPage() {
   const [nombreProyectoActual, setNombreProyectoActual] = useState<string | null>(
     null,
   );
+
   useEffect(() => {
     let cancelado = false;
     (async () => {
@@ -86,23 +101,28 @@ function MarketingPage() {
   }, []);
 
   const navegar = useCallback(
-    (next: { proyecto?: string | null; vista?: VistaExtra; marca?: string | null }) => {
+    (next: {
+      proyecto?: string | null;
+      vista?: VistaExtra;
+      proveedor?: string | null;
+    }) => {
       const params = new URLSearchParams();
       const nextProyecto =
         next.proyecto === undefined ? proyectoParam : next.proyecto ?? null;
       const nextVista = next.vista === undefined ? vistaParam : next.vista;
-      const nextMarca = next.marca === undefined ? marcaParam : next.marca ?? null;
+      const nextProveedor =
+        next.proveedor === undefined ? proveedorParam : next.proveedor ?? null;
       if (nextVista) {
-        // Anulados/Reportes son globales: no arrastran marca ni proyecto.
+        // Reportes e Impulsadoras son globales: no arrastran proveedor ni proyecto.
         params.set("vista", nextVista);
       } else {
-        if (nextMarca) params.set("marca", nextMarca);
+        if (nextProveedor) params.set("proveedor", nextProveedor);
         if (nextProyecto) params.set("proyecto", nextProyecto);
       }
       const qs = params.toString();
       router.replace(qs ? `/marketing?${qs}` : "/marketing");
     },
-    [proyectoParam, vistaParam, marcaParam, router],
+    [proyectoParam, vistaParam, proveedorParam, router],
   );
 
   const refrescar = () => setRefreshKey((k) => k + 1);
@@ -111,42 +131,34 @@ function MarketingPage() {
     if (!proyectoParam) setNombreProyectoActual(null);
   }, [proyectoParam]);
 
-  // Redirect URL legacy ?vista=papelera → ?vista=anulados.
+  // Enlaces viejos: la pantalla de Anulados ya no existe. Se manda al inicio
+  // en vez de dejar una URL que no dibuja nada.
   useEffect(() => {
-    if (vistaRaw === "papelera") {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("vista", "anulados");
-      router.replace(`/marketing?${params.toString()}`);
+    if (vistaRaw === "papelera" || vistaRaw === "anulados") {
+      router.replace("/marketing");
     }
-  }, [vistaRaw, searchParams, router]);
+  }, [vistaRaw, router]);
 
   if (!authChecked) return null;
 
-  const mostrandoVistaExtra =
-    vistaParam === "anulados" || vistaParam === "reportes" || vistaParam === "impulsadoras";
-
-  // Etiqueta del bucket activo (card seleccionada).
-  const bucketLabel =
-    marcaParam === "legacy"
-      ? "Gastos Tommy y Calvin"
-      : marcaParam === MULTIFASHION_BUCKET
-        ? MULTIFASHION_LABEL
-        : marcaParam
-          ? marcas.find((m) => m.id === marcaParam)?.nombre ?? "Marca"
-          : null;
+  const mostrandoVistaExtra = vistaParam !== null;
+  const bloqueLabel = proveedorParam ? nombreBloque(proveedorParam) : null;
 
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
-  if (vistaParam === "anulados") {
-    breadcrumbs.push({ label: "Anulados" });
-  } else if (vistaParam === "reportes") {
+  if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
   } else if (vistaParam === "impulsadoras") {
     breadcrumbs.push({ label: "Impulsadoras" });
   } else if (proyectoParam && nombreProyectoActual) {
-    if (bucketLabel) breadcrumbs.push({ label: bucketLabel, onClick: () => navegar({ proyecto: null }) });
+    if (bloqueLabel) {
+      breadcrumbs.push({
+        label: bloqueLabel,
+        onClick: () => navegar({ proyecto: null }),
+      });
+    }
     breadcrumbs.push({ label: nombreProyectoActual });
-  } else if (bucketLabel) {
-    breadcrumbs.push({ label: bucketLabel });
+  } else if (bloqueLabel) {
+    breadcrumbs.push({ label: bloqueLabel });
   }
 
   return (
@@ -162,51 +174,31 @@ function MarketingPage() {
                  con -my-1 para no separar el contenido de abajo. */
               className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
             >
-              ← Proyectos
+              ← Marketing
             </button>
-            {vistaParam === "anulados" ? (
-              <AnuladosLista esAdmin={role === "admin"} />
-            ) : vistaParam === "impulsadoras" ? (
+            {vistaParam === "impulsadoras" ? (
               <ImpulsadorasView marcas={marcas} />
             ) : (
               <ReportesTabs />
             )}
           </div>
-        ) : marcaParam ? (
+        ) : proveedorParam ? (
           <ProyectosHomeView
             marcas={marcas}
-            grupo={
-              marcaParam === "legacy"
-                ? "legacy"
-                : marcaParam === MULTIFASHION_BUCKET
-                  ? "multifashion"
-                  : "marca"
-            }
-            marcaIdFijo={
-              marcaParam === "legacy" || marcaParam === MULTIFASHION_BUCKET
-                ? undefined
-                : marcaParam
-            }
-            bucketLabel={bucketLabel ?? ""}
-            bucketEsLegacy={marcaParam === "legacy"}
-            onBack={() => navegar({ marca: null, proyecto: null })}
+            proveedor={proveedorParam}
+            bucketLabel={bloqueLabel ?? ""}
+            onBack={() => navegar({ proveedor: null, proyecto: null })}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
-            onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
             onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}
           />
         ) : (
-          <MarcaSelector
-            marcas={marcas}
-            onSelectMarca={(id) => navegar({ marca: id })}
-            onSelectLegacy={() => navegar({ marca: "legacy" })}
-            onSelectMultifashion={() => navegar({ marca: MULTIFASHION_BUCKET })}
+          <InicioMarketing
+            onSelectProveedor={(key) => navegar({ proveedor: key })}
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
-            onOpenAnulados={() => navegar({ vista: "anulados" })}
-            onOpenReportes={() => navegar({ vista: "reportes" })}
             onOpenImpulsadoras={() => navegar({ vista: "impulsadoras" })}
             onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}

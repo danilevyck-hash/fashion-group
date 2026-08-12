@@ -23,6 +23,8 @@ import { hoyPanama } from "@/lib/fecha-panama";
 import { tituloCase, normalizarTexto } from "./normalizar";
 import { getMarcas } from "./queries";
 import { mesActualISO, mesAnteriorISO } from "./meses";
+import { proveedorPorMarcaId, sellarDocumento } from "./periodos-io";
+import { SIN_PROVEEDOR } from "./proveedores";
 import {
   coberturaDelMes,
   etiquetaPeriodo,
@@ -471,6 +473,10 @@ export async function registrarPagoImpulsadora(
     : {};
 
   const creadas: string[] = [];
+  // Qué marca le tocó a cada factura creada, para sellarla al final. Se anota
+  // acá y NO se sella dentro del try: si una porción falla, el rollback borra
+  // las facturas y no queda ni un sello apuntando a algo que ya no existe.
+  const paraSellar: Array<{ facturaId: string; marcaId: string }> = [];
   try {
     for (const p of porciones) {
       const { data: facData, error: facErr } = await supabaseServer
@@ -508,6 +514,7 @@ export async function registrarPagoImpulsadora(
           empresa_pagadora_codigo: null,
         });
       if (fmErr) throw new Error(fmErr.message);
+      paraSellar.push({ facturaId, marcaId: p.marca_id });
 
       const { error: adjErr } = await supabaseServer
         .from("mk_adjuntos")
@@ -530,6 +537,24 @@ export async function registrarPagoImpulsadora(
     }
     const msg = err instanceof Error ? err.message : "error al guardar el pago";
     throw new Error(`registrarPago: ${msg}`);
+  }
+
+  // El pago de una impulsadora es una factura por marca, así que se sella igual
+  // que cualquier otro gasto: con el período que ese proveedor tenía ABIERTO
+  // hoy, no con el mes trabajado. Una quincena de junio cargada en agosto entra
+  // en el período abierto y se reporta en el próximo corte.
+  //
+  // Nunca es fatal: si el sello falla, el pago ya está guardado y el gasto se
+  // ve como del período actual — que es el default correcto.
+  const provPorMarca = await proveedorPorMarcaId(paraSellar.map((s) => s.marcaId));
+  for (const s of paraSellar) {
+    const key = provPorMarca.get(s.marcaId);
+    if (!key || key === SIN_PROVEEDOR) continue;
+    await sellarDocumento({
+      tipo: "factura",
+      documentoId: s.facturaId,
+      proveedorKeys: [key],
+    });
   }
 
   return { facturasCreadas: creadas.length };
