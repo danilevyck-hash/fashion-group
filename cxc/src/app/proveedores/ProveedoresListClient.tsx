@@ -182,10 +182,13 @@ function ProveedoresList() {
       <AppHeader module="Proveedores" />
       <PullToRefresh onRefresh={() => fetchList(empresa, q)}>
         <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
-            </div>
+          {/* Sin título grande: "Proveedores" ya lo dicen la barra sticky
+              (celular) y el breadcrumb (escritorio). Queda sr-only para no
+              dejar la página sin encabezado, y la fila pasa a `justify-end` —
+              con `between` y un solo hijo, el botón se habría corrido a la
+              izquierda. */}
+          <div className="mb-5 flex flex-wrap items-start justify-end gap-3">
+            <h1 className="sr-only">Proveedores</h1>
             {/* "Actualizar ahora" (admin/secretaria/contabilidad — contabilidad
                 es quien vive acá): un clic actualiza el CxP de las 7 empresas
                 en secuencia desde Switch. */}

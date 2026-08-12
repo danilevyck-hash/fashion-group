@@ -113,8 +113,13 @@ export default function ReclamoForm({
         <span className="text-gray-600 font-medium">Nuevo Reclamo</span>
       </nav>
       {draftBanner}
-      <div className="flex items-center justify-between mb-8 sm:mb-10">
-        <h1 className="text-[21px] font-medium tracking-tight">Nuevo Reclamo</h1>
+      {/* Sin título grande: "Nuevo Reclamo" ya lo dice el breadcrumb propio de
+          arriba ("Reclamos / Nuevo Reclamo"), que acá se ve en TODOS los anchos
+          — no es el breadcrumb de escritorio del AppHeader. Queda sr-only para
+          no dejar la página sin encabezado, y la fila pasa a `justify-end` para
+          que el paso 1-de-4 no se corra a la izquierda al quedar solo. */}
+      <div className="flex items-center justify-end mb-8 sm:mb-10">
+        <h1 className="sr-only">Nuevo Reclamo</h1>
         {!revealAll && (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">

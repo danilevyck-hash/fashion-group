@@ -411,6 +411,11 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
       <AppHeader module="Préstamos" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        {/* Esta pantalla nunca tuvo título grande —"Préstamos" ya lo dicen la
+            barra sticky (celular) y el breadcrumb (escritorio)— pero tampoco
+            tenía encabezado para lectores de pantalla. El sr-only cierra ese
+            hueco sin agregar un solo píxel. */}
+        <h1 className="sr-only">Préstamos</h1>
         {/* Resumen: 2 chips + acción de quincena masiva (confirmación con resumen) */}
         <div className="flex flex-wrap items-center gap-2 mb-5">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">

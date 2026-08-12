@@ -148,8 +148,12 @@ export default function GuiasList({
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <h1 className="text-xl font-light tracking-tight">Guías de Despacho</h1>
+        {/* Sin título grande: "Guías de Despacho" ya lo dicen la barra sticky
+            (celular) y el breadcrumb (escritorio). Queda sr-only para no dejar
+            la página sin encabezado, y la fila pasa a `justify-end` para que
+            los botones no se corran a la izquierda al quedar solos. */}
+        <div className="flex items-center justify-end mb-6 flex-wrap gap-4">
+          <h1 className="sr-only">Guías de Despacho</h1>
           <div className="flex items-center gap-2 flex-wrap">
             {selectionMode ? (
               <>

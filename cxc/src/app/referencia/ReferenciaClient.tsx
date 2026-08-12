@@ -13,8 +13,12 @@ export default function ReferenciaClient() {
       <AppHeader module="Referencia" />
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
         <div className="mb-5">
-          <h1 className="text-xl font-semibold tracking-tight text-gray-900">Referencia</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          {/* Sin título grande: "Referencia" ya lo dicen la barra sticky
+              (celular) y el breadcrumb (escritorio). Queda sr-only para no
+              dejar la página sin encabezado. La bajada se QUEDA: dice qué se
+              busca y qué devuelve, no repite el nombre. */}
+          <h1 className="sr-only">Referencia</h1>
+          <p className="text-sm text-gray-600">
             Buscá un código o pegá tu lista: cuánto llegó, cuánto se vendió y qué hay en stock.
           </p>
         </div>

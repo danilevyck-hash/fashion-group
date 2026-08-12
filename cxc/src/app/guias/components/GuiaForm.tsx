@@ -460,6 +460,18 @@ export default function GuiaForm({
         <SaveButton size="small" />
       </div>
 
+      {/* 🔴 ESTE TÍTULO SE QUEDA, y es la ÚNICA excepción de la poda de los 23
+          títulos repetidos (12-ago-2026). No dice el nombre de la pantalla:
+          dice si se está CREANDO o CORRIGIENDO, y eso no está en ningún otro
+          lado a 390 px. La miga de pan ("Nueva guía" / "GT-004") es
+          `hidden sm:flex` — en celular no existe—, y la barra pegajosa dice
+          "Guías de Despacho" en los dos casos. La barra propia del formulario
+          tampoco lo distingue: "← Guías · GT-###" sale igual en una guía nueva
+          (con el número que le tocará) que en una que se está editando.
+          Quitarlo habría dejado al usuario del iPhone sin saber cuál de las dos
+          cosas está haciendo — que es el caso que la regla 2 del pedido manda
+          respetar: si la pantalla no lo dice en la barra ni en la miga, su
+          título NO se quita. */}
       <h1 className="text-xl font-light tracking-tight mb-6">
         {editingId ? "Editar" : "Nueva"} Guía de Transporte
       </h1>

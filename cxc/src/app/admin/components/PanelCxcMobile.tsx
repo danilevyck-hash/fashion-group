@@ -234,14 +234,15 @@ function MobileHeader({
   return (
     <header className="flex items-start justify-between gap-3">
       <div>
-        <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-gray-900">
-          Cuentas por Cobrar
-        </h1>
+        {/* Sin título grande, igual que el CXC de escritorio (pedido de
+            Daniel): "Cuentas por Cobrar" ya lo dice la barra sticky, que en
+            celular es lo único que queda en pantalla al hacer scroll. Queda
+            sr-only para no dejar la página sin encabezado. */}
+        <h1 className="sr-only">Cuentas por Cobrar</h1>
         <SyncStatus
           tabla="estadocuenta"
           empresasEsperadas={CXC_GRUPO_EMPRESA_KEYS}
           empresaLabels={EMPRESA_KEY_TO_NAME}
-          className="mt-0.5"
         />
         {/* "Actualizar ahora" (admin/secretaria) — estadocuenta de la empresa
             del filtro; con "Todas" queda deshabilitado. */}

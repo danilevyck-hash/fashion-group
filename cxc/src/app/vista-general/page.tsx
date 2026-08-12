@@ -160,10 +160,12 @@ function VistaGeneralInner() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Encabezado + navegación de mes */}
         <div className="mb-8">
-          <h1 className="font-serif text-2xl sm:text-3xl tracking-tight text-stone-900">
-            Vista General
-          </h1>
-          <div className="flex items-center gap-1 mt-3 -ml-3">
+          {/* Sin título grande: "Vista General" ya lo dicen la barra sticky
+              (celular) y el breadcrumb (escritorio). Queda sr-only para no
+              dejar la página sin encabezado. El `mt-3` de la fila de mes se fue
+              con él: sin título arriba, era un hueco suelto bajo el `py-8`. */}
+          <h1 className="sr-only">Vista General</h1>
+          <div className="flex items-center gap-1 -ml-3">
             <button
               type="button"
               onClick={() => setMesUrl(sumarMeses(mes, -1))}

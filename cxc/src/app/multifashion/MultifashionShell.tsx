@@ -97,16 +97,17 @@ export function MultifashionShell({
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-gray-950 md:text-4xl">
-            Multifashion
-          </h1>
+          {/* Sin título grande: "Multifashion" ya lo dicen la barra sticky
+              (celular) y el breadcrumb (escritorio). Queda sr-only para no
+              dejar la página sin encabezado. */}
+          <h1 className="sr-only">Multifashion</h1>
           {/* Nombre comercial de la tienda + frescura del sync + "Actualizar
               ahora". Antes vivían en una card de identidad dentro del tab
               Resumen; acá se ven desde cualquier sub-tab y sin repetir el
               bloque. El nombre se conserva porque el módulo se llama
               Multifashion pero la tienda se conoce por su nombre comercial. */}
           {multi?.tienda && (
-            <p className="mt-1 text-sm font-medium text-gray-700">{multi.tienda}</p>
+            <p className="text-sm font-medium text-gray-700">{multi.tienda}</p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <SyncStatus

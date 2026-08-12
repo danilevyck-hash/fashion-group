@@ -101,10 +101,12 @@ function GastosContabilidadInner() {
         ) : (
           <>
             <div className="mb-4">
-              <h1 className="text-xl font-semibold tracking-tight text-gray-900">
-                Gastos
-              </h1>
-              <p className="mt-1 text-sm text-gray-600">
+              {/* Sin título grande: "Gastos" ya lo dicen la barra sticky
+                  (celular) y el breadcrumb (escritorio). Queda sr-only para no
+                  dejar la página sin encabezado. La bajada se QUEDA: dice de
+                  dónde sale el número (la contabilidad) y su corte mensual. */}
+              <h1 className="sr-only">Gastos</h1>
+              <p className="text-sm text-gray-600">
                 Lo que gastó cada empresa según la contabilidad, mes por mes.
               </p>
             </div>

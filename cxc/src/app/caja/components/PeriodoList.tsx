@@ -103,14 +103,13 @@ export default function PeriodoList({
     <div className="max-w-6xl mx-auto px-5 sm:px-9 py-8 sm:py-10">
       <div className="flex items-end justify-between gap-6 mb-7 sm:mb-10">
         <div className="max-w-xl">
-          <h1
-            className="caja-display"
-            style={{ fontSize: "clamp(28px, 4vw, 38px)", margin: 0 }}
-          >
-            Caja Menuda
-          </h1>
+          {/* Sin título grande: "Caja Menuda" ya lo dicen la barra sticky
+              (celular) y el breadcrumb (escritorio). Queda sr-only para no
+              dejar la página sin encabezado. La bajada se QUEDA: explica qué es
+              un período y cuándo crear uno, que no está en ningún otro lado. */}
+          <h1 className="sr-only">Caja Menuda</h1>
           <p
-            className="mt-2 text-sm"
+            className="text-sm"
             style={{ color: "var(--caja-fg-muted)", maxWidth: 520 }}
           >
             Cada período representa un ciclo del fondo fijo de gastos. Crea uno nuevo cuando se reponga el fondo.

@@ -105,10 +105,12 @@ export default function EmpresaSelector({
     <div>
       <AppHeader module="Reclamos" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
-          </div>
+        {/* Sin título grande: "Reclamos" ya lo dicen la barra sticky (celular)
+            y el breadcrumb (escritorio). Queda sr-only para no dejar la página
+            sin encabezado, y la fila pasa a `justify-end` para que "Nuevo
+            Reclamo" no se corra a la izquierda al quedar solo. */}
+        <div className="flex items-center justify-end mb-5">
+          <h1 className="sr-only">Reclamos</h1>
           <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 min-h-[44px] inline-flex items-center justify-center rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
         </div>
 
