@@ -2,6 +2,10 @@
 // mide los 3 anchos de la casa: cuánto ARRASTRA la página, cuánto se RECORTA,
 // si algún blanco táctil baja de 44 px y si algún texto baja de 12 px.
 //
+// 🔴 La primera caja es "Compras" (fecha y cantidad, CRUDAS). El estado
+// "abierto" despliega las compras que no entran en las 4 visibles — la caja
+// crece HACIA ABAJO, que es lo único que puede regalar sin ensanchar nada.
+//
 //   BASE=http://localhost:3000 CODIGO=NB2570001 node scripts/_medir-referencia-simple.mjs
 //
 // 🔴 NO ESCRIBE NADA. Solo teclea en el buscador y lee la pantalla.
@@ -19,9 +23,12 @@ const CODIGO = process.env.CODIGO ?? "NB2570001";
 const ETIQUETA = process.env.ETIQUETA ?? "rama";
 const SALIDA = `/tmp/referencia-${ETIQUETA}`;
 const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
-const ANCHOS = [390, 834, 1440];
-/** Abrir también "Ver las N compras anteriores" para medir el estado desplegado. */
+// Los 3 anchos de la casa; ANCHOS=390,834,1024,1440 agrega el iPad acostado,
+// donde la barra lateral deja ~766 px útiles.
+const ANCHOS = (process.env.ANCHOS ?? "390,834,1440").split(",").map(Number);
+/** Abrir también el resto de las compras, para medir el estado desplegado. */
 const ABRIR_VIEJAS = process.env.ABRIR_VIEJAS !== "0";
+const RE_DESPLEGAR = /^(Ver 1 compra más|Ver las otras \d+ compras)$/;
 
 mkdirSync(SALIDA, { recursive: true });
 const nav = await chromium.launch();
@@ -51,17 +58,16 @@ for (const ancho of ANCHOS) {
 
   for (const estado of ABRIR_VIEJAS ? ["cerrado", "abierto"] : ["cerrado"]) {
     if (estado === "abierto") {
-      const abrio = await page.evaluate(() => {
-        const b = [...document.querySelectorAll("button")].find((x) =>
-          /^Ver (la compra anterior|las \d+ compras anteriores)$/.test((x.textContent || "").trim()),
-        );
+      const abrio = await page.evaluate((fuente) => {
+        const re = new RegExp(fuente);
+        const b = [...document.querySelectorAll("button")].find((x) => re.test((x.textContent || "").trim()));
         if (!b) return false;
         b.dispatchEvent(new MouseEvent("click", { bubbles: true }));
         return true;
-      });
+      }, RE_DESPLEGAR.source);
       await page.waitForTimeout(1200);
       if (!abrio) {
-        console.log(`  ${ancho} · abierto: no hay compras anteriores que desplegar — se omite`);
+        console.log(`  ${ancho} · abierto: no hay más compras que desplegar — se omite`);
         continue;
       }
     }
@@ -113,9 +119,13 @@ for (const ancho of ANCHOS) {
         chicos,
         textos,
         recortados,
-        tres: [leer("Mi última compra"), leer("Vendo por mes"), leer("Me queda para")].filter(Boolean),
+        tres: [leer("Compras"), leer("Vendo por mes"), leer("Me queda para")].filter(Boolean),
         margen: margen ? margen.split("De dónde salen")[0].trim() : null,
-        comparacion: [...document.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").find((t) => t.startsWith("Esta:")) ?? null,
+        // 🔴 Nada de esto puede aparecer: son los textos de la atribución que se
+        // eliminó. Si el script los encuentra, la caja volvió a interpretar.
+        atribucion: ["Mi última compra", "todavía no se acaba", "van 0", "Esta:"].filter((t) =>
+          (document.body.textContent ?? "").includes(t),
+        ),
         temporada: [...document.querySelectorAll("p")].map((p) => p.textContent?.trim() ?? "").find((t) => /^(Oct · nov · dic|Todavía no ha pasado|No vendió nada)/.test(t)) ?? null,
       };
     });
@@ -126,7 +136,12 @@ for (const ancho of ANCHOS) {
       continue;
     }
 
-    const ok = m.arrastre === 0 && m.chicos.length === 0 && m.textos.length === 0 && m.recortados.length === 0;
+    const ok =
+      m.arrastre === 0 &&
+      m.chicos.length === 0 &&
+      m.textos.length === 0 &&
+      m.recortados.length === 0 &&
+      m.atribucion.length === 0;
     if (!ok) malas += 1;
     console.log(
       `${ok ? "🟢" : "🔴"} ${ancho} px · ${estado} · arrastre ${m.arrastre} px · ${m.tarjetas} tarjeta(s) · ` +
@@ -135,9 +150,9 @@ for (const ancho of ANCHOS) {
     if (m.chicos.length) console.log("   chicos:", JSON.stringify(m.chicos));
     if (m.textos.length) console.log("   textos:", JSON.stringify(m.textos));
     if (m.recortados.length) console.log("   recortados:", JSON.stringify(m.recortados));
+    if (m.atribucion.length) console.log("   🔴 ATRIBUCIÓN DE VUELTA:", JSON.stringify(m.atribucion));
     if (estado === "cerrado") {
       for (const t of m.tres) console.log(`   ${t}`);
-      if (m.comparacion) console.log(`   ${m.comparacion}`);
       if (m.temporada) console.log(`   ${m.temporada}`);
       if (m.margen) console.log(`   ${m.margen}`);
     }

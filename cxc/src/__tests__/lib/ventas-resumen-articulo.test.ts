@@ -1,12 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CANDADO de `src/lib/ventas/resumen-articulo.ts` — los TRES números del tab
+// CANDADO de `src/lib/ventas/resumen-articulo.ts` — las TRES cajas del tab
 // Ventas › Referencia y el MARGEN REAL.
 //
-// La especificación es una frase de Daniel, textual: *"cuánto tiempo demoré en
-// vender mi compra, cuánto por mes, para cuántos meses me queda el stock
-// actual"*. Los números de acá NO son inventados: son mediciones contra
-// producción del 11-ago-2026 (vistana). Si el cálculo no da ESTO, está mal el
-// código — no el test.
+// Lo que Daniel quiere saber, textual: *"yo lo que quiero ver en cuanto tiempo
+// se me mueve el articulo, para saber si con el stock actual que tengo debo de
+// comprar mas, menos o no comprar. pero no quiero que decidas tu, lo decido yo
+// con la data que me extraigas"*. De ahí las tres cajas: **Compras** (fecha y
+// cantidad, CRUDAS), **Vendo por mes** y **Me queda para**.
+//
+// 🩸 LA PRIMERA CAJA DEJÓ DE INTERPRETAR. Decía "Mi última compra · todavía no
+// se acaba · llegó 180 el 19 feb · van 0", y ese "van 0" salía de repartir las
+// ventas entre las compras. Ver los tests marcados 🩸 en NB2570001.
+//
+// Los números de acá NO son inventados: son mediciones contra producción del
+// 11-ago-2026 (vistana). Si el cálculo no da ESTO, está mal el código — no el
+// test.
 //
 //   NB2570001 · existencia 345 · CIF $16.555 · lista $27
 //     compras: 19-feb-2026 180u | 11-feb-2026 120u | 21-oct-2025 60u |
@@ -20,17 +28,18 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  COMPRAS_VISIBLES,
   MESES_FUERTES,
   MESES_VENTANA,
   armarFicha,
   barrasDeVentana,
-  lineaComparacion,
+  listaDeCompras,
   margenReal,
   mesesDeStock,
   primerMesConVenta,
   promedioMensual,
-  resumirCompra,
   temporadaFuerte,
+  textoCompra,
   textoSinMargen,
   ultimosMesesCompletos,
 } from "@/lib/ventas/resumen-articulo";
@@ -183,30 +192,45 @@ describe("NB2570001 — los tres números contra producción", () => {
     expect(f().alcance!).toBeCloseTo(12.51, 2);
   });
 
-  it("🔴 'Mi última compra' es la del 19-feb-2026 y TODAVÍA NO SE ACABA — no se cae a la agotada", () => {
+  it("🔴 la caja de Compras dice FECHA y CANTIDAD, la más reciente arriba", () => {
+    const l = f().compras;
+    expect(l.visibles.map(textoCompra)).toEqual([
+      "19 feb 2026 · 180 u",
+      "11 feb 2026 · 120 u",
+      "21 oct 2025 · 60 u",
+      "9 abr 2025 · 240 u",
+    ]);
+    // La 5ª que entra en los 3 años queda a un toque; las 2 de +3 años solo se
+    // cuentan, porque no vienen en la respuesta.
+    expect(l.ocultas.map(textoCompra)).toEqual(["1 abr 2025 · 240 u"]);
+    expect(l.masViejas).toBe(2);
+    expect(l.unica).toBe(false);
+  });
+
+  it("🩸 NO dice 'van 0 de 180' — ese número salía de repartirle ventas a una compra", () => {
+    // Ésta es LA razón del cambio: bajo FIFO las tres compras más recientes de
+    // este artículo no tenían ni una venta asignada, así que la caja anunciaba
+    // "todavía no se acaba · llegó 180 el 19 feb · van 0" mientras el artículo
+    // vendía 28 u/mes. Cero información, en el lugar más visible.
+    const texto = f().compras.visibles.map(textoCompra).join(" ");
+    expect(texto).not.toMatch(/van \d/);
+    expect(texto).not.toMatch(/no se acaba/);
+    expect(texto).not.toMatch(/mes/);
+  });
+
+  it("🩸 la línea 'Esta: … · Anterior: …' se fue: nacía del mismo reparto inventado", () => {
+    expect(f()).not.toHaveProperty("comparacion");
+    expect(f()).not.toHaveProperty("viejas");
+  });
+
+  it("`ultima` y `anterior` quedan SOLO para el costo, sin nada de sus ventas", () => {
     const ficha = f();
     expect(ficha.ultima!.fecha).toBe("2026-02-19");
-    const r = resumirCompra(ficha.ultima!);
-    expect(r.titular).toBe("todavía no se acaba");
-    expect(r.detalle).toBe("llegó 180 el 19 feb 2026 · van 0");
-    expect(r.viva).toBe(true);
-  });
-
-  it("🩸 con las DOS últimas compras vivas la comparación se OMITE — decía dos veces lo mismo", () => {
-    // Bajo FIFO, las de 11 y 19-feb-2026 todavía no vendieron nada: la línea
-    // habría dicho "Esta: todavía no se acaba · Anterior: todavía no se acaba".
-    expect(f().anterior!.fecha).toBe("2026-02-11");
-    expect(f().comparacion).toBeNull();
-  });
-
-  it("la comparación SÍ sale cuando hay tendencia que ver, y va en UNA sola línea", () => {
-    const art = NB2570001();
-    // Las dos de abril-2025 sí se acabaron: ésas son las que comparan.
-    const dosAgotadas = art.compras.filter((c) => c.estado === "medida");
-    expect(dosAgotadas.length).toBeGreaterThanOrEqual(2);
-    const linea = lineaComparacion(dosAgotadas[0], dosAgotadas[1])!;
-    expect(linea).toMatch(/^Esta: \d+ u en \d+ meses · Anterior: \d+ u en \d+ meses$/);
-    expect(linea.split("\n")).toHaveLength(1);
+    expect(ficha.anterior!.fecha).toBe("2026-02-11");
+    expect(ficha.ultima!.costos.cif).toBeCloseTo(16.555, 3);
+    for (const p of ["vendidas", "quedan", "meses", "estado", "precioVendido"]) {
+      expect(ficha.ultima).not.toHaveProperty(p);
+    }
   });
 
   it("oct · nov · dic salen marcados y pesan el 51% del año", () => {
@@ -246,17 +270,16 @@ describe("QD3958033 — el artículo NUEVO, que es donde el promedio se rompía"
     expect(mesesDeStock(126, 54 / 12)).toBeCloseTo(28, 0); // la mutación que esto caza
   });
 
-  it("su única compra dice EN QUÉ VA: 'llegó 180 el 26 dic 2025 · van 54'", () => {
-    const r = resumirCompra(f().ultima!);
-    expect(r.titular).toBe("todavía no se acaba");
-    expect(r.detalle).toBe("llegó 180 el 26 dic 2025 · van 54");
+  it("una sola compra se muestra sola, y la caja LO DICE: 'única compra'", () => {
+    const l = f().compras;
+    expect(l.visibles.map(textoCompra)).toEqual(["26 dic 2025 · 180 u"]);
+    expect(l.ocultas).toHaveLength(0);
+    expect(l.masViejas).toBe(0);
+    expect(l.unica).toBe(true);
   });
 
-  it("sin compra anterior la línea de comparación se OMITE — nada de guiones mudos", () => {
-    const ficha = f();
-    expect(ficha.anterior).toBeNull();
-    expect(ficha.comparacion).toBeNull();
-    expect(ficha.viejas).toHaveLength(0);
+  it("sin compra anterior no hay CIF anterior que mostrar — se omite, no se rellena", () => {
+    expect(f().anterior).toBeNull();
   });
 
   it("todavía no pasó por su temporada fuerte, y la pantalla lo puede decir", () => {
@@ -416,10 +439,32 @@ describe("bordes", () => {
     expect(ficha.margen.motivo).toBe("sin-ventas");
   });
 
-  it("lineaComparacion no arma nada si falta alguna de las dos compras", () => {
-    const f = armarFicha(NB2570001(), HOY_MES);
-    expect(lineaComparacion(f.ultima, null)).toBeNull();
-    expect(lineaComparacion(null, f.anterior)).toBeNull();
+  it("la caja muestra 4 compras y el resto queda a UN toque — nada se pierde", () => {
+    expect(COMPRAS_VISIBLES).toBe(4);
+    const l = listaDeCompras(NB2570001());
+    expect(l.visibles).toHaveLength(COMPRAS_VISIBLES);
+    // Las 5 de los últimos 3 años están TODAS en la respuesta: desplegarlas no
+    // pide nada a la red. Las 2 de +3 años solo se cuentan.
+    expect(l.visibles.length + l.ocultas.length).toBe(5);
+    expect(l.masViejas).toBe(2);
+  });
+
+  it("con 4 compras o menos no hay nada que desplegar", () => {
+    const l = listaDeCompras(QD3958033());
+    expect(l.ocultas).toHaveLength(0);
+  });
+
+  it("sin ninguna compra la caja queda vacía, sin inventar una llegada", () => {
+    const l = listaDeCompras({ compras: [], comprasFueraDeVentana: 0 });
+    expect(l).toEqual({ visibles: [], ocultas: [], masViejas: 0, unica: false });
+  });
+
+  it("una respuesta vieja cacheada (sin `compras`) degrada, no revienta", () => {
+    const art = { ...QD3958033(), compras: undefined } as unknown as ReturnType<typeof QD3958033>;
+    const ficha = armarFicha(art, HOY_MES);
+    expect(ficha.compras.visibles).toEqual([]);
+    expect(ficha.ultima).toBeNull();
+    expect(ficha.margen.motivo).toBe("sin-costo");
   });
 
   it("temporadaFuerte no divide entre cero", () => {

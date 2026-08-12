@@ -1,15 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// LA FICHA DE UN ARTÍCULO — las TRES respuestas del tab Ventas › Referencia.
+// LA FICHA DE UN ARTÍCULO — las TRES cajas del tab Ventas › Referencia.
 // Módulo PURO (sin red, sin DOM, sin "ahora").
 //
-// La especificación es una frase de Daniel, textual:
-//   *"cuánto tiempo demoré en vender mi compra, cuánto por mes, para cuántos
-//    meses me queda el stock actual"*
+// Lo que Daniel quiere saber para decidir si repone, textual:
+//   *"yo lo que quiero ver en cuanto tiempo se me mueve el articulo, para saber
+//    si con el stock actual que tengo debo de comprar mas, menos o no comprar.
+//    pero no quiero que decidas tu, lo decido yo con la data que me extraigas"*
 //
-// Eso, y nada más. Este archivo produce EXACTAMENTE esos tres números, las
-// barras de los 12 meses completos, el precio real de venta y el margen. La
-// PANTALLA y el EXCEL lo llaman a ÉL: si cada uno hiciera su cuenta tendríamos
-// dos verdades sobre la misma decisión de compra.
+// De ahí salen las tres cajas: **Compras** (fecha y cantidad, crudas), **Vendo
+// por mes** y **Me queda para**. Más las barras de los 12 meses completos, el
+// precio real de venta y el margen. La PANTALLA y el EXCEL lo llaman a ÉL: si
+// cada uno hiciera su cuenta tendríamos dos verdades sobre la misma decisión.
+//
+// 🔴 LA PRIMERA CAJA NO INTERPRETA NADA, y esa es la corrección de este PR. Ver
+// la nota larga sobre por qué se fue el reparto FIFO, más abajo.
 //
 // 🔴 NUNCA ENTRA EL MES EN CURSO. Medido el 10-ago-2026 en `40HM265001`: los
 // "últimos 3 meses" daban 18,3 u/mes con 10 días de agosto adentro y 34,3 con
@@ -28,7 +32,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { restarMeses } from "./referencia";
-import type { ArticuloCompras, CompraMedida, MesVenta } from "./compras";
+import type { ArticuloCompras, Compra, MesVenta } from "./compras";
 
 /** Cuántos meses completos mira la pantalla. */
 export const MESES_VENTANA = 12;
@@ -281,64 +285,68 @@ export function temporadaFuerte(barras: readonly MesBarra[]): Temporada {
   };
 }
 
-// ─── "Mi última compra" ──────────────────────────────────────────────────────
+// ─── La caja de COMPRAS ──────────────────────────────────────────────────────
+//
+// 🔴 FECHA Y CANTIDAD. NADA MÁS. Es la primera caja de la tarjeta y su trabajo
+// es NO opinar: la más reciente arriba, una línea por llegada.
+//
+// 🩸 LO QUE HABÍA ACÁ ERA "Mi última compra · todavía no se acaba · llegó 180 el
+// 19 feb · van 0". Ese "van 0" salía de repartir las ventas entre las compras
+// (FIFO), y cuando la mercancía llega sobre stock que todavía no se acaba ese
+// reparto es INVENTADO: nadie marcó las cajas. En el artículo que Daniel más
+// mira (`NB2570001`, tres compras recientes) la caja terminaba diciendo
+// literalmente "van 0 de 180" mientras el artículo vendía 28 u/mes — cero
+// información, y en el lugar más visible de la pantalla. Daniel: *"no quiero
+// que decidas tu, lo decido yo con la data que me extraigas"*.
+//
+// La línea "Esta: … · Anterior: …" se fue por lo mismo: nacía del mismo reparto.
 
-/**
- * 🔴 SIEMPRE ES LA ÚLTIMA COMPRA, aunque no se haya acabado — decisión A de
- * Daniel, textual y explícita. Caer a la última compra AGOTADA contestaría
- * sobre mercancía que ya no está mientras la que se acaba de traer no dice
- * nada, y es justo esa la que se está por reponer.
- */
-export interface ResumenCompra {
-  /** "240 u en 15 meses" | "todavía no se acaba" */
-  titular: string;
-  /** "llegó 9 abr 2025 · se acabó jul 2026" | "llegó 180 el 26 dic 2025 · van 54" */
-  detalle: string;
-  /** `true` = todavía queda mercancía de esta llegada. */
-  viva: boolean;
+/** Cuántas compras se ven sin desplegar nada.
+ *
+ *  Cuatro es lo que aprobó el mockup, y es lo que cabe sin empujar a los otros
+ *  dos números: la caja crece HACIA ABAJO y a 390 px las tres van una debajo de
+ *  otra. Lo que se está decidiendo es REPONER, y para eso pesan las últimas; el
+ *  resto sigue alcanzable de un toque. */
+export const COMPRAS_VISIBLES = 4;
+
+export interface ListaCompras {
+  /** Las que se ven de entrada: hasta COMPRAS_VISIBLES, la más nueva primero. */
+  visibles: Compra[];
+  /** Las demás DENTRO de la ventana de 3 años. Ya vienen en el payload, así que
+   *  desplegarlas no pide nada a la red. */
+  ocultas: Compra[];
+  /** Cuántas hay de MÁS de 3 años. Ésas no vienen en el payload —solo el
+   *  conteo—, así que se anuncian y no se pueden desplegar. */
+  masViejas: number;
+  /** `true` = en toda la historia registrada hay UNA sola compra. La caja lo
+   *  dice ("única compra") en vez de dejar una línea suelta sin contexto. */
+  unica: boolean;
 }
 
-export function resumirCompra(c: CompraMedida): ResumenCompra {
-  const llego = fmtFechaCorta(c.fecha);
-  if (c.estado === "viva" || c.estado === "sin-ventas") {
-    // Lo honesto es decir en qué va, no inventarle un plazo que no terminó.
-    return {
-      titular: "todavía no se acaba",
-      detalle: `llegó ${fmtNum(c.unidades)} el ${llego} · van ${fmtNum(c.vendidas)}`,
-      viva: true,
-    };
-  }
+/**
+ * Parte las compras del artículo en lo que se ve, lo que se despliega y lo que
+ * solo se cuenta.
+ *
+ * `art.compras` ya viene con la MÁS NUEVA PRIMERO y recortada a 3 años por
+ * `armarArticulo()`: acá no se reordena ni se vuelve a recortar por fecha.
+ */
+export function listaDeCompras(
+  art: Pick<ArticuloCompras, "compras" | "comprasFueraDeVentana">,
+  tope: number = COMPRAS_VISIBLES,
+): ListaCompras {
+  const todas = art.compras ?? [];
+  const masViejas = art.comprasFueraDeVentana ?? 0;
   return {
-    titular: `${fmtNum(c.unidades)} u en ${textoMeses(c.meses)}`,
-    detalle: c.fechaCorte
-      ? `llegó ${llego} · se acabó ${fmtMesAnio(c.fechaCorte.slice(0, 7))}`
-      : `llegó ${llego}`,
-    viva: false,
+    visibles: todas.slice(0, tope),
+    ocultas: todas.slice(tope),
+    masViejas,
+    unica: todas.length === 1 && masViejas === 0,
   };
 }
 
-/**
- * La línea de tendencia, en UNA sola línea:
- * `Esta: 240 u en 15 meses · Anterior: 240 u en 7 meses`.
- *
- * Devuelve `null` —y la línea se OMITE, no se rellena con guiones mudos— en dos
- * casos:
- *   · no hay compra anterior;
- *   · 🩸 NINGUNA de las dos se acabó todavía. Medido en `NB2570001`, cuyas dos
- *     últimas compras (11 y 19-feb-2026) siguen vivas bajo FIFO: la línea decía
- *     *"Esta: todavía no se acaba · Anterior: todavía no se acaba"*, o sea la
- *     misma frase dos veces y CERO señal de tendencia. Un renglón que no dice
- *     nada gasta la atención igual que uno que dice algo.
- */
-export function lineaComparacion(
-  ultima: CompraMedida | null,
-  anterior: CompraMedida | null,
-): string | null {
-  if (!ultima || !anterior) return null;
-  const a = resumirCompra(ultima);
-  const b = resumirCompra(anterior);
-  if (a.viva && b.viva) return null;
-  return `Esta: ${a.titular} · Anterior: ${b.titular}`;
+/** "19 feb 2026 · 180 u" — una línea de la caja de Compras. */
+export function textoCompra(c: Compra): string {
+  return `${fmtFechaCorta(c.fecha)} · ${fmtNum(c.unidades)} u`;
 }
 
 // ─── La ficha completa ───────────────────────────────────────────────────────
@@ -350,15 +358,14 @@ export interface FichaArticulo {
   alcance: number | null;
   margen: MargenReal;
   temporada: Temporada;
-  /** La compra más reciente. `null` = no hay ninguna registrada. */
-  ultima: CompraMedida | null;
-  /** La inmediatamente anterior. `null` = no hay. */
-  anterior: CompraMedida | null;
-  /** `Esta: … · Anterior: …`, o `null` si no hay anterior. */
-  comparacion: string | null;
-  /** Compras más viejas que la anterior — detrás de "Ver las N compras
-   *  anteriores". Daniel: *"la ultima me basta"*. */
-  viejas: CompraMedida[];
+  /** La caja de Compras: fecha y cantidad, sin una sola conclusión. */
+  compras: ListaCompras;
+  /** La compra más reciente. `null` = no hay ninguna registrada.
+   *  ⚠️ Se usa SOLO para el COSTO (el CIF contra el que se calcula el margen y
+   *  la fila de costos). No se le atribuye ninguna venta. */
+  ultima: Compra | null;
+  /** La inmediatamente anterior — solo para "CIF de la compra anterior". */
+  anterior: Compra | null;
 }
 
 /**
@@ -372,8 +379,11 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
   // una degradación honesta — reventar la pantalla entera no lo sería.
   const barras = barrasDeVentana(art.serie ?? [], hoyMes);
   const promedio = promedioMensual(barras);
-  const ultima = art.compras[0] ?? null;
-  const anterior = art.compras[1] ?? null;
+  // `compras ?? []` cubre lo mismo que `serie ?? []`: una respuesta vieja
+  // cacheada tras un deploy. Degradar es honesto; reventar la pantalla no.
+  const todas = art.compras ?? [];
+  const ultima = todas[0] ?? null;
+  const anterior = todas[1] ?? null;
 
   return {
     barras,
@@ -381,9 +391,8 @@ export function armarFicha(art: ArticuloCompras, hoyMes: string): FichaArticulo 
     alcance: mesesDeStock(art.existencia, promedio.porMes),
     margen: margenReal(promedio.venta, promedio.unidades, ultima?.costos.cif ?? null),
     temporada: temporadaFuerte(barras),
+    compras: listaDeCompras(art),
     ultima,
     anterior,
-    comparacion: lineaComparacion(ultima, anterior),
-    viejas: art.compras.slice(2),
   };
 }

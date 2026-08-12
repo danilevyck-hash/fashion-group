@@ -30,8 +30,7 @@ import { UtilidadView } from "@/components/ventas/UtilidadView";
 import { ComisionesConfigModal } from "@/components/ventas/ComisionesConfigModal";
 import { ComisionesConsolidadoView } from "@/components/ventas/ComisionesConsolidadoView";
 import { ComisionesDetalleModal } from "@/components/ventas/ComisionesDetalleModal";
-import { resumirArticulo } from "@/lib/ventas/compras";
-import type { ComprasApiResp, CompraMedida } from "@/lib/ventas/compras";
+import type { Compra, ComprasApiResp } from "@/lib/ventas/compras";
 import type { UtilidadClienteResponse } from "@/lib/ventas/utilidad-cliente";
 import type { ComisionDetalle } from "@/lib/ventas/comisionExcel";
 
@@ -101,7 +100,7 @@ function tocarAyuda(titulo: string) {
 // perdida en ajuste. (Los números salen medidos en `ventas-compras.test.ts`;
 // acá lo que se mira es la PANTALLA.)
 
-const COMPRA_40HM265032: CompraMedida = {
+const COMPRA_40HM265032: Compra = {
   empresa: "vistana",
   codigo: "40HM265032",
   fecha: "2023-11-28",
@@ -111,18 +110,28 @@ const COMPRA_40HM265032: CompraMedida = {
   unidades: 280,
   // FOB igual al CIF: el error de carga conocido, que se muestra tal cual.
   costos: { cif: 11.55, fob: 11.55, fobOrigen: "igual-al-cif", lista: 16 },
-  vendidas: 279,
-  quedan: 0,
-  noVendidoNiEnBodega: 1,
-  estado: "medida",
-  meses: 16.39,
-  fechaUmbral: "2025-04-10",
-  fechaCorte: "2025-04-10",
-  mesesTranscurridos: 32.62,
-  mesesConVenta: ["2024-01", "2024-02", "2024-03", "2024-04", "2025-04"],
-  precioVendido: 16,
-  descuento: 0,
 };
+
+/** Un artículo con SEIS compras dentro de la ventana: el caso que ejerce el
+ *  tope de la caja (4 visibles + el resto detrás de un toque) y el aviso de las
+ *  de más de 3 años. */
+const COMPRAS_MUCHAS: Compra[] = [
+  ["2026-02-19", 180],
+  ["2026-02-11", 120],
+  ["2025-10-21", 60],
+  ["2025-04-09", 240],
+  ["2025-04-01", 240],
+  ["2024-08-29", 120],
+].map(([fecha, unidades]) => ({
+  empresa: "vistana",
+  codigo: "NB2570001",
+  fecha: fecha as string,
+  documento: `DOC-${fecha}`,
+  proveedor: "American Designer Fashion",
+  articulo: "Men-Boxer Brief",
+  unidades: unidades as number,
+  costos: { cif: 16.555, fob: 16.555, fobOrigen: "igual-al-cif", lista: 27 },
+}));
 
 const REFERENCIA_RESP: ComprasApiResp = {
   hoyMes: "2026-08",
@@ -144,9 +153,6 @@ const REFERENCIA_RESP: ComprasApiResp = {
         { mes: "2025-04", unidades: 3, venta: 48 },
       ],
       comprasFueraDeVentana: 0,
-      // Derivado con la MISMA función que usa el servidor: un resumen escrito a
-      // mano acá podría contradecir al de producción sin que nadie se entere.
-      resumen: resumirArticulo([COMPRA_40HM265032], 0),
       cuadre: { comprado: 280, vendido: 279, existencia: 0, residuo: 1, ajusteConfiable: true },
       stockSinRespaldo: 0,
       vendidoAntes: 0,
@@ -172,33 +178,101 @@ const PROHIBIDOS = [
   "Descontinuado",
   "DESCONTINUADO",
   "u/mes",
-  // Podados el 11-ago-2026: la línea de resumen del artículo y la columna del
-  // descuento. Daniel: la última compra le basta, y el descuento *"no sirve"*.
+  // Podados el 11-ago-2026 (mañana): la línea de resumen del artículo y la
+  // columna del descuento. Daniel: la última compra le basta, y el descuento
+  // *"no sirve"*.
   "Ya se acabaron",
   "Ya se acabó",
   "Todavía no se ha acabado ninguna compra",
+  // 🩸 Podados el 11-ago-2026 (tarde): TODA la atribución de ventas a una
+  // compra concreta. Con stock encima, eso no se sabe — nadie marcó las cajas.
+  "Mi última compra",
+  "todavía no se acaba",
+  "Esta:",
+  "Anterior:",
+  "van 0",
 ];
 
-async function buscarUnaReferencia() {
-  rutas.push((u) => (u.includes("/api/ventas/referencia?q=") ? REFERENCIA_RESP : undefined));
+async function buscar(resp: ComprasApiResp, codigo: string) {
+  rutas.push((u) => (u.includes("/api/ventas/referencia?q=") ? resp : undefined));
   render(<ReferenciaView />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "40HM265032" } });
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: codigo } });
   fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
-  await screen.findAllByText("40HM265032");
+  await screen.findAllByText(codigo);
 }
 
-describe("Referencia · los TRES números, sin veredictos ni promedios", () => {
-  it("'Mi última compra' dice cuánto llegó y en cuánto tiempo se vendió", async () => {
-    await buscarUnaReferencia();
-    // 🩸 El número grande son las unidades que LLEGARON, y el pie dice cuándo
-    // llegó y cuándo se acabó. Es el formato del mockup aprobado
-    // ("240 u en 15 meses · llegó 9 abr 2025 · se acabó jul 2026"). En una
-    // compra que TODAVÍA no se acaba el titular lo dice y el pie muestra
-    // "van N" — o sea que lo vendido nunca queda invisible.
-    expect(screen.getAllByText("280 u en 16 meses").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/llegó 28 nov 2023 · se acabó abr 2025/).length).toBeGreaterThan(0);
+const buscarUnaReferencia = () => buscar(REFERENCIA_RESP, "40HM265032");
+
+/** El mismo artículo pero con 6 compras en la ventana y 3 de más de 3 años:
+ *  ejerce el tope de la caja, el despliegue y el aviso de las viejas. */
+const RESP_MUCHAS_COMPRAS: ComprasApiResp = {
+  ...REFERENCIA_RESP,
+  articulos: [
+    {
+      ...REFERENCIA_RESP.articulos[0],
+      codigo: "NB2570001",
+      compras: COMPRAS_MUCHAS,
+      comprasFueraDeVentana: 3,
+      existencia: 345,
+      cuadre: { comprado: 960, vendido: 615, existencia: 345, residuo: 0, ajusteConfiable: false },
+    },
+  ],
+};
+
+describe("Referencia · la caja de COMPRAS, cruda", () => {
+  it("🔴 dice FECHA y CANTIDAD, la más reciente arriba — y nada más", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(screen.getAllByText("Compras").length).toBeGreaterThan(0);
+    for (const linea of [
+      "19 feb 2026 · 180 u",
+      "11 feb 2026 · 120 u",
+      "21 oct 2025 · 60 u",
+      "9 abr 2025 · 240 u",
+    ]) {
+      expect(screen.getAllByText(linea).length, `falta la línea "${linea}"`).toBeGreaterThan(0);
+    }
   });
 
+  it("muestra 4 y el resto queda a UN toque — nada se pierde", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    // La 5ª y la 6ª no se ven de entrada…
+    expect(screen.queryByText("1 abr 2025 · 240 u")).toBeNull();
+    const boton = screen.getByRole("button", { name: "Ver las otras 2 compras" });
+    fireEvent.click(boton);
+    // …y aparecen enteras al tocar, sin ir a la red.
+    expect(screen.getAllByText("1 abr 2025 · 240 u").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("29 ago 2024 · 120 u").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Ver menos" })).toBeTruthy();
+  });
+
+  it("las de más de 3 años se ANUNCIAN, y se dice que igual cuentan para la bodega", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    expect(screen.getAllByText(/y 3 más de hace años/).length).toBeGreaterThan(0);
+    // 🔴 Sin este aviso, el total de bodega no cerraría contra las compras que
+    // se ven y la pantalla parecería equivocada.
+    expect(
+      screen.getAllByText(/3 compras más viejas de 3 años que no se muestran/).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText(/sí cuenta para lo que hay en bodega/).length).toBeGreaterThan(0);
+  });
+
+  it("una sola compra lo dice: 'única compra', sin botón de desplegar", async () => {
+    await buscarUnaReferencia();
+    expect(screen.getAllByText("28 nov 2023 · 280 u").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("única compra").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Ver la[s]? .*compra/ })).toBeNull();
+  });
+
+  it("🩸 NO dice cuánto tardó, ni cuántas van, ni si se acabó — eso no se sabe", async () => {
+    await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
+    const pantalla = document.body.textContent ?? "";
+    for (const t of ["Mi última compra", "todavía no se acaba", "van 0", "Esta:", "u en 16 meses"]) {
+      expect(pantalla, `"${t}" volvió a la pantalla`).not.toContain(t);
+    }
+  });
+});
+
+describe("Referencia · los otros dos números, sin veredictos ni promedios", () => {
   it("los otros dos números están, y el stock se sigue viendo", async () => {
     await buscarUnaReferencia();
     expect(screen.getAllByText("Vendo por mes").length).toBeGreaterThan(0);
@@ -221,6 +295,19 @@ describe("Referencia · los TRES números, sin veredictos ni promedios", () => {
     expect(document.querySelector('[data-vista="tarjetas"]')).toBeNull();
     // Y la columna DESC. (descuento) — textual: "no sirve".
     expect(document.body.textContent ?? "").not.toContain("Desc.");
+  });
+
+  it("🩸 la atribución tampoco está en el CÓDIGO: los símbolos del reparto ya no existen", async () => {
+    const compras = await import("node:fs/promises").then((fs) =>
+      fs.readFile("src/lib/ventas/compras.ts", "utf8"),
+    );
+    const codigo = compras
+      .split("\n")
+      .filter((l) => !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*"))
+      .join("\n");
+    for (const t of ["repartirFifo", "medirCompra", "repartirExistencia", "CompraMedida", "UMBRAL_VENDIDO"]) {
+      expect(codigo, `"${t}" volvió a compras.ts`).not.toContain(t);
+    }
   });
 
   it("🩸 los textos del diseño viejo NO están en pantalla — no se mudaron a un ⓘ, se fueron", async () => {

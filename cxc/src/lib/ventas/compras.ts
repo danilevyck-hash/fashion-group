@@ -2,16 +2,28 @@
 // COMPRAS REALES — el corazón del tab Ventas › Referencia. Módulo PURO.
 //
 // Responde LA pregunta de Daniel, en sus palabras: *"cuando me llego, cuanto me
-// lllego y en cuanto tiempo lo vendi, punto"*. Una fila por COMPRA. Sin
+// lllego"*. Fecha y cantidad, tal como están en `switch_ingresos_mercancia`. Sin
 // veredictos, sin recomendaciones, sin proyecciones.
 //
 // 🩸 LO QUE ESTE MÓDULO VINO A REEMPLAZAR MENTÍA. La versión anterior no tenía
 // los ingresos de mercancía, así que ADIVINABA "tandas" a partir de las ventas:
 // para `40HM265001` anunciaba "1.332 unidades en 1 tanda, 46 meses", que no
-// corresponde a ninguna compra real. Y `rangoDuracionTandas()` calculaba cuánto
-// duró LO DE ANTES y lo rotulaba "Se te acaba en ~46 meses" — con 89 unidades
-// vendiendo ~32/mes se acaba en 2,8. Acá NO se adivina ninguna compra: si un
-// artículo no tiene ingreso registrado, la fila lo DICE.
+// corresponde a ninguna compra real. Acá NO se adivina ninguna compra: si un
+// artículo no tiene ingreso registrado, la pantalla lo DICE.
+//
+// 🩸 Y TAMPOCO SE ADIVINA EN CUÁNTO TIEMPO SE VENDIÓ **UNA** COMPRA. Este
+// módulo tuvo un reparto FIFO que le asignaba ventas a cada llegada para poder
+// decir "esta tardó 15 meses". Se fue entero, y la razón es de negocio, no de
+// código: **cuando llega mercancía sobre stock que todavía no se acaba, nadie
+// marcó las cajas** — atribuirle ventas a una llegada concreta es INVENTAR.
+// Daniel, textual: *"si llego una compra mientras tenia stock, yo lo que quiero
+// ver en cuanto tiempo se me mueve el articulo… pero no quiero que decidas tu,
+// lo decido yo con la data que me extraigas"*. Peor todavía, en el artículo que
+// más le importa (`NB2570001`, tres compras recientes sin vender bajo FIFO) el
+// número resultante era **"van 0 de 180"**: cero información. Lo que se mide
+// ahora es el ARTÍCULO —cuánto vende por mes, para cuánto le queda— y las
+// compras se muestran CRUDAS. La aritmética del artículo vive en
+// `resumen-articulo.ts`.
 //
 // 🔴 LAS NC RESTAN. `tipo='NC'` viene con la cantidad en POSITIVO (magnitud);
 // el signo lo aplica `signoTipo()` de `referencia.ts` y NADIE MÁS. La firma del
@@ -24,27 +36,15 @@
 // muestra aparte y en chico — es plata que se va y él quiere verla.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { signoTipo, diffMeses, mesDeFecha } from "./referencia";
-
-/** Días de un mes promedio (365,25 ÷ 12). El "se vendió en N meses" se mide en
- *  DÍAS entre la fecha de la compra y el día en que se cruzó el 90%, y recién
- *  ahí se pasa a meses: contar meses calendario redondea de más. Verificado
- *  contra la reconstrucción a mano de `40HM265032` (28-nov-2023 → 10-abr-2025 =
- *  499 días = 16,39 meses, el 16,4 que Daniel ya tenía). */
-export const DIAS_POR_MES = 30.4375;
-
-/** El "se vendió en" se mide hasta acá, NO hasta el 100%. Daniel: *"5 no es
- *  nada, para mi es igual. si los ultimos 5 se vendieron 6 meses despues, no
- *  quiero que me digas vendi 60 en 10 meses, cuando la realidad el grosor fue
- *  en 4 meses"*. */
-export const UMBRAL_VENDIDO = 0.9;
+import { signoTipo, mesDeFecha } from "./referencia";
 
 /** % de importación para estimar el FOB donde Switch no lo desglosa. */
 export const PCT_IMPORTACION = 0.1;
 
-/** Tope de historia que se muestra. Daniel pidió 3 años. El reparto de ventas
- *  se calcula sobre TODAS las compras (si no, las ventas viejas se le cargarían
- *  a la primera compra visible); el recorte es solo de PANTALLA. */
+/** Tope de historia que se muestra. Daniel pidió 3 años. El cotejo contra las
+ *  ventas se hace sobre TODAS las compras (si no, las ventas viejas parecerían
+ *  no tener respaldo); el recorte es solo de PANTALLA, y las compras viejas
+ *  siguen contando para lo que hay en bodega — la pantalla lo dice. */
 export const ANIOS_HISTORIA = 3;
 
 // ─── Entrada ─────────────────────────────────────────────────────────────────
@@ -289,87 +289,85 @@ export function agruparCompras(filas: readonly FilaIngreso[]): Compra[] {
   return out.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.documento.localeCompare(b.documento));
 }
 
-// ─── Reparto FIFO ────────────────────────────────────────────────────────────
+// ─── Cotejo cronológico: ¿lo vendido sale de lo comprado? ────────────────────
 //
-// 🔴 POR QUÉ FIFO, Y QUÉ NO PUEDE HACER.
-// El 20,5% de los códigos tiene más de una compra (5.429 de 26.533, medido), así
-// que había que decidir cómo se reparten las ventas. FIFO —lo que entró primero
-// se vende primero— es la lectura natural de una bodega de ropa y la única que
-// contesta "¿cuánto tardó ESTA llegada?".
+// 🩸 ACÁ VIVÍA EL REPARTO FIFO, Y NO VUELVE. Repartía las ventas entre las
+// compras para poder decir "esta llegada tardó 15 meses". Eso solo se sostiene
+// si la mercancía viene marcada por tanda, y NO viene: cuando llega un
+// contenedor sobre stock que todavía no se acaba, decir de qué compra salió una
+// venta es inventar. Medido en `NB2570001`: sus tres compras más recientes
+// quedaban con "0 vendidas" mientras el artículo vendía 28 u/mes.
 //
-// Pero FIFO solo es honesto si lo vendido sale de lo comprado, y eso NO siempre
-// pasa. Medido sobre 400 códigos multi-compra: 9 tienen ventas ANTERIORES a su
-// primera compra registrada y 44 vendieron MÁS de lo que compraron. Esas ventas
-// no salieron de ninguna tanda que tengamos. En vez de empujarlas contra la
-// tanda más vieja —que le inventaría meses de duración— van a dos baldes con
-// nombre (`vendidoAntes`, `vendidoDeMas`) y la pantalla LO DICE. Un artículo así
-// muestra sus compras igual, con el aviso al lado.
+// Lo que SÍ se puede afirmar sin marcar cajas es agregado, y es lo único que
+// quedó: mirando el tiempo hacia adelante, ¿alcanza lo que había llegado hasta
+// ese día para explicar lo que se vendió? Medido sobre 400 códigos
+// multi-compra: 9 tienen ventas ANTERIORES a su primera compra registrada y 44
+// vendieron MÁS de lo que compraron. Esos dos huecos van a dos baldes con
+// nombre y la pantalla LO DICE, en vez de esconderlos.
 
-export interface RepartoFifo {
-  /** Por compra (mismo índice que el arreglo de compras): unidades asignadas. */
-  asignadas: number[];
-  /** Por compra: los días con venta que le tocaron, en orden. */
-  diasPorCompra: { fecha: string; unidades: number; venta: number }[][];
-  /** Unidades vendidas ANTES de la primera compra registrada. Si es > 0 falta
-   *  una compra anterior a lo que tenemos. */
+export interface Cotejo {
+  /** Unidades vendidas ANTES de que llegara la primera compra registrada. Si es
+   *  > 0, falta una compra anterior a lo que tenemos. */
   vendidoAntes: number;
-  /** Unidades vendidas de MÁS: no quedaba nada en ninguna tanda ya llegada. */
+  /** Unidades vendidas de MÁS: ese día ya no quedaba nada de lo que había
+   *  llegado. Puede ser NEGATIVO (devoluciones sobre nada consumido). */
   vendidoDeMas: number;
+  /** Unidades vendidas que SÍ salen de mercancía registrada. Lo que no está acá
+   *  está en uno de los dos baldes de arriba. */
+  respaldado: number;
 }
 
 /**
- * Reparte las ventas diarias entre las compras, en orden cronológico.
+ * Recorre los días de venta en orden y va sumando lo que fue LLEGANDO.
  *
- * Reglas, en este orden:
- *  1. Una venta del día D solo puede salir de una compra con fecha ≤ D — no se
- *     puede vender lo que todavía no llegó.
- *  2. Entre las candidatas, la más VIEJA primero (FIFO).
- *  3. Un día NETO negativo (más devoluciones que ventas) devuelve unidades a la
- *     compra más reciente que había consumido: es el espejo exacto de FIFO.
- *  4. Lo que no entra en ninguna compra se anota aparte y NO se reparte.
+ * Reglas:
+ *  1. Una venta del día D solo se puede explicar con compras de fecha ≤ D — no
+ *     se puede vender lo que todavía no llegó.
+ *  2. Lo que sobra va a `vendidoAntes` si todavía no había llegado NINGUNA
+ *     compra, y a `vendidoDeMas` si ya habían llegado y se agotaron.
+ *  3. Un día NETO negativo (más devoluciones que ventas) devuelve unidades a lo
+ *     respaldado; si no había nada que devolver, resta en `vendidoDeMas`.
+ *
+ * ⚠️ NO dice de QUÉ compra salió cada venta, y es a propósito: eso no se sabe.
+ * `compras` tiene que venir ordenada por fecha ascendente (`agruparCompras` ya
+ * la devuelve así).
  */
-export function repartirFifo(compras: readonly Compra[], dias: readonly VentaDia[]): RepartoFifo {
-  const asignadas = compras.map(() => 0);
-  const diasPorCompra: { fecha: string; unidades: number; venta: number }[][] = compras.map(() => []);
+export function cotejarVentasConCompras(
+  compras: readonly Compra[],
+  dias: readonly VentaDia[],
+): Cotejo {
+  let proxima = 0; // índice de la próxima compra por "llegar"
+  let llegado = 0; // unidades llegadas hasta el día que se está mirando
+  let respaldado = 0;
   let vendidoAntes = 0;
   let vendidoDeMas = 0;
 
   for (const d of dias) {
-    const precioUnit = d.unidades !== 0 ? d.venta / d.unidades : 0;
+    while (proxima < compras.length && compras[proxima].fecha <= d.fecha) {
+      llegado += compras[proxima].unidades;
+      proxima += 1;
+    }
 
-    if (d.unidades < 0) {
-      // Devolución: se le saca a la compra más nueva que tenga consumo.
-      let pendiente = -d.unidades;
-      for (let i = compras.length - 1; i >= 0 && pendiente > 0; i -= 1) {
-        if (asignadas[i] <= 0) continue;
-        const quita = Math.min(asignadas[i], pendiente);
-        asignadas[i] -= quita;
-        diasPorCompra[i].push({ fecha: d.fecha, unidades: -quita, venta: -quita * precioUnit });
-        pendiente -= quita;
+    if (d.unidades >= 0) {
+      const cabe = Math.min(d.unidades, Math.max(0, llegado - respaldado));
+      respaldado += cabe;
+      const sobra = d.unidades - cabe;
+      // "¿ya llegó alguna?" se pregunta por la CANTIDAD DE COMPRAS llegadas, no
+      // por las unidades: una compra de 0 unidades igual es una llegada.
+      if (sobra > 0) {
+        if (proxima > 0) vendidoDeMas += sobra;
+        else vendidoAntes += sobra;
       }
-      if (pendiente > 0) vendidoDeMas -= pendiente;
       continue;
     }
 
-    let pendiente = d.unidades;
-    for (let i = 0; i < compras.length && pendiente > 0; i += 1) {
-      if (compras[i].fecha > d.fecha) break; // ordenadas: de acá en adelante ninguna llegó
-      const libre = compras[i].unidades - asignadas[i];
-      if (libre <= 0) continue;
-      const toma = Math.min(libre, pendiente);
-      asignadas[i] += toma;
-      diasPorCompra[i].push({ fecha: d.fecha, unidades: toma, venta: toma * precioUnit });
-      pendiente -= toma;
-    }
-    if (pendiente > 0) {
-      // ¿No había NINGUNA compra llegada todavía, o se acabaron todas?
-      const hayLlegada = compras.some((c) => c.fecha <= d.fecha);
-      if (hayLlegada) vendidoDeMas += pendiente;
-      else vendidoAntes += pendiente;
-    }
+    const devuelve = Math.min(-d.unidades, Math.max(0, respaldado));
+    respaldado -= devuelve;
+    const sobra = -d.unidades - devuelve;
+    if (sobra > 0) vendidoDeMas -= sobra;
   }
 
-  return { asignadas, diasPorCompra, vendidoAntes, vendidoDeMas };
+  return { vendidoAntes, vendidoDeMas, respaldado };
 }
 
 // ─── Ajuste de inventario ────────────────────────────────────────────────────
@@ -421,13 +419,13 @@ export function cuadrar(
   comprado: number,
   vendido: number,
   existencia: number | null,
-  reparto: Pick<RepartoFifo, "vendidoAntes" | "vendidoDeMas">,
+  cotejo: Pick<Cotejo, "vendidoAntes" | "vendidoDeMas">,
 ): Cuadre {
   if (existencia == null) {
     return { comprado, vendido, existencia, residuo: null, ajusteConfiable: false };
   }
   const residuo = comprado - vendido - existencia;
-  const cierra = reparto.vendidoAntes === 0 && reparto.vendidoDeMas === 0;
+  const cierra = cotejo.vendidoAntes === 0 && cotejo.vendidoDeMas === 0;
   return {
     comprado,
     vendido,
@@ -437,351 +435,6 @@ export function cuadrar(
   };
 }
 
-// ─── Medición de una compra ──────────────────────────────────────────────────
-
-export type EstadoCompra =
-  /** Llegó al 90% vendido: el número de meses es real. */
-  | "medida"
-  /** Todavía queda mercancía de esta llegada. */
-  | "viva"
-  /** Se cerró sin llegar al 90% porque el resto se perdió en un ajuste. */
-  | "cerrada-sin-90"
-  /** No vendió NADA todavía. */
-  | "sin-ventas";
-
-export interface CompraMedida extends Compra {
-  /** Unidades de esta compra que se vendieron (reparto FIFO). */
-  vendidas: number;
-  /** Lo que todavía está en la bodega de esta llegada. Suma = existencia real. */
-  quedan: number;
-  /** Unidades de esta llegada que no se vendieron y tampoco están en bodega.
-   *  ⚠️ Solo se puede LLAMAR "perdidas en ajuste" cuando
-   *  `cuadre.ajusteConfiable`; si no, es un residuo sin explicación y la
-   *  pantalla no dice nada. */
-  noVendidoNiEnBodega: number;
-  estado: EstadoCompra;
-  /** Meses hasta el 90% vendido. `null` si no llegó (tanda viva o sin ventas). */
-  meses: number | null;
-  /** El día exacto en que se cruzó el 90% — la prueba del número de arriba. */
-  fechaUmbral: string | null;
-  /** El día en que esta llegada dejó de venderse: el del 90%, o el de su última
-   *  venta cuando se cerró por ajuste sin llegar al 90%. `null` = todavía no
-   *  terminó. Es la punta derecha de su ventana de venta. */
-  fechaCorte: string | null;
-  /** Meses que esta llegada lleva en la casa (desde que llegó hasta hoy). Es lo
-   *  que se muestra en una tanda VIVA: "54 u en 7 meses" = hace 7 meses que
-   *  llegó y van 54 vendidas. No es un promedio ni un ritmo — es el tiempo que
-   *  Daniel lleva con esa mercancía encima. */
-  mesesTranscurridos: number;
-  /** Meses YYYY-MM en los que esta llegada vendió, ordenados. */
-  mesesConVenta: string[];
-  /** Venta neta asignada ÷ unidades vendidas — a cuánto salió DE VERDAD. */
-  precioVendido: number | null;
-  /** (lista − vendido) ÷ lista. `null` si falta alguno de los dos. */
-  descuento: number | null;
-}
-
-/**
- * Mide UNA compra contra los días de venta que le tocaron.
- *
- * 🔴 El "se vendió en N meses" se mide en DÍAS y recién después se pasa a
- * meses. Contar meses calendario da 17 donde la realidad es 16,4 — y 16,4 es
- * el número que Daniel ya tenía reconstruido a mano.
- */
-export function medirCompra(
-  compra: Compra,
-  diasAsignados: readonly { fecha: string; unidades: number; venta: number }[],
-  quedan: number,
-  noVendidoNiEnBodega: number,
-  hoy: string,
-): CompraMedida {
-  const vendidas = diasAsignados.reduce((s, d) => s + d.unidades, 0);
-  const ventaTotal = diasAsignados.reduce((s, d) => s + d.venta, 0);
-
-  const objetivo = compra.unidades * UMBRAL_VENDIDO;
-  let acum = 0;
-  let fechaUmbral: string | null = null;
-  for (const d of diasAsignados) {
-    acum += d.unidades;
-    if (fechaUmbral == null && acum >= objetivo && compra.unidades > 0) {
-      fechaUmbral = d.fecha;
-      break;
-    }
-  }
-
-  const mesesConVenta = [
-    ...new Set(diasAsignados.filter((d) => d.unidades > 0).map((d) => mesDeFecha(d.fecha))),
-  ].sort();
-
-  let estado: EstadoCompra;
-  if (fechaUmbral != null) estado = "medida";
-  else if (quedan > 0) estado = "viva";
-  else if (vendidas <= 0) estado = "sin-ventas";
-  else estado = "cerrada-sin-90";
-
-  // Para la que se cerró por ajuste sin llegar al 90%, el número honesto es
-  // hasta su ÚLTIMA venta: es lo que efectivamente tardó en irse.
-  const fechaCorte =
-    fechaUmbral ??
-    (estado === "cerrada-sin-90"
-      ? [...diasAsignados].filter((d) => d.unidades > 0).map((d) => d.fecha).sort().pop() ?? null
-      : null);
-
-  const meses = fechaCorte != null ? diasEntre(compra.fecha, fechaCorte) / DIAS_POR_MES : null;
-
-  const precioVendido = vendidas > 0 ? ventaTotal / vendidas : null;
-  const lista = compra.costos.lista;
-  const descuento =
-    precioVendido != null && lista != null && lista > 0 ? (lista - precioVendido) / lista : null;
-
-  return {
-    ...compra,
-    vendidas,
-    quedan,
-    noVendidoNiEnBodega,
-    estado,
-    meses,
-    fechaUmbral,
-    fechaCorte,
-    mesesTranscurridos: diasEntre(compra.fecha, hoy) / DIAS_POR_MES,
-    mesesConVenta,
-    precioVendido,
-    descuento,
-  };
-}
-
-/** Días entre dos fechas YYYY-MM-DD. Panamá es UTC-5 FIJO y las dos puntas
- *  están en el mismo huso, así que la resta en UTC es exacta. */
-export function diasEntre(desde: string, hasta: string): number {
-  const a = Date.parse(`${desde}T00:00:00Z`);
-  const b = Date.parse(`${hasta}T00:00:00Z`);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
-  return Math.max(0, Math.round((b - a) / 86_400_000));
-}
-
-// ─── El ajuste, repartido entre las compras ──────────────────────────────────
-
-/**
- * Reparte la EXISTENCIA REAL entre las compras — la columna "QUEDA" nunca es un
- * número deducido, es el stock de Switch repartido.
- *
- * Va de la compra más NUEVA a la más vieja: lo que hoy está en la bodega es lo
- * último que llegó (el espejo de FIFO, que se lleva primero lo más viejo).
- * Cada compra no puede sostener más de lo que le sobró sin vender.
- *
- * Garantía: `Σ quedan = existencia` (si alcanza la capacidad), y lo que no
- * alcanza queda en `sinRespaldo` — stock que no sale de ninguna compra
- * registrada, que se AVISA en vez de repartirse a la fuerza.
- *
- * Sin existencia (artículo fuera del catálogo) se devuelve el sobrante del
- * reparto como mejor estimación, marcado por el llamador.
- */
-export function repartirExistencia(
-  compras: readonly Compra[],
-  asignadas: readonly number[],
-  existencia: number | null,
-): { quedan: number[]; noVendidoNiEnBodega: number[]; sinRespaldo: number } {
-  const capacidad = compras.map((c, i) => Math.max(0, c.unidades - asignadas[i]));
-  if (existencia == null) {
-    return { quedan: capacidad, noVendidoNiEnBodega: compras.map(() => 0), sinRespaldo: 0 };
-  }
-
-  const quedan = compras.map(() => 0);
-  let pendiente = Math.max(0, existencia);
-  for (let i = compras.length - 1; i >= 0 && pendiente > 0; i -= 1) {
-    const toma = Math.min(capacidad[i], pendiente);
-    quedan[i] = toma;
-    pendiente -= toma;
-  }
-  return {
-    quedan,
-    noVendidoNiEnBodega: capacidad.map((c, i) => c - quedan[i]),
-    sinRespaldo: pendiente,
-  };
-}
-
-// ─── Resumen del artículo ────────────────────────────────────────────────────
-//
-// Daniel: *"quiero que me diga en cuantos meses se vendio. y total que tengo en
-// inv. es info util que necesito ver no?"*. La tabla ya contesta las dos cosas
-// COMPRA POR COMPRA; lo que faltaba era el número del artículo entero, para no
-// tener que sumar 180 + 120 + 45 de cabeza.
-//
-// 🩸 EL PROMEDIO SIMPLE MIENTE, Y ACÁ ESTÁ MEDIDO POR QUÉ.
-// En `NB2570001` (Vistana) las dos compras agotadas tardaron 7,20 y 15,21 meses.
-// "Promedio: 11 meses" no describe NINGUNA de las dos. Y el 15,21 no significa
-// que 240 unidades tarden 15 meses: esa tanda llegó el 9-abr-2025, OCHO DÍAS
-// después de otra de 240, y se pasó medio año esperando en bodega a que se
-// acabara la de adelante (lo que entra primero se vende primero). Las mismas
-// 480 unidades, compradas de una sola vez, habrían dado UN número.
-//
-// Formas que se descartaron, cada una con la medición que la tumbó (300 códigos
-// reales muestreados, scripts/_diag-formas-resumen.ts):
-//   · PROMEDIO SIMPLE — no describe ningún lote. Descartado por pedido explícito.
-//   · RANGO ("se vende en 7 a 15 meses") — PROPAGA el artefacto de la cola: hace
-//     creer que un lote de 240 puede tardar 15 meses cuando solo, tardó 7. Y en
-//     el catálogo real los rangos salen inservibles de anchos: 0,6–19,3 en
-//     `FM0FM048210GQ`, 0,2–6,9 en `CKFHA12F100`, 0,0–3,0 en `AM0AM13836BDS`.
-//   · ÚLTIMA COMPRA AGOTADA — es una lotería: en `CKFHA12F100` la última es la
-//     MÁS RÁPIDA (0,2 meses) y en `FM0FM048210GQ` la MÁS LENTA (19,3). En
-//     `NB2570001` justo cae en la tanda encolada, o sea la peor representante.
-//   · RITMO (u/mes) — se dispara con ventanas cortas: `3629` (Vistana) da 14.899
-//     u/mes y `100230410` 196,7. Un número así no se puede mostrar.
-//
-// LO QUE QUEDÓ: las compras agotadas se miran como UN BLOQUE — cuántas unidades
-// fueron y cuánto duró vendiéndolas. La duración es la UNIÓN de las ventanas
-// [llegada → día en que se acabó] de cada tanda:
-//   · si dos tandas se solapan (el caso de la cola) la unión NO las suma dos
-//     veces — `NB2570001` da 15,5 meses, no 7,2 + 15,2 = 22,4;
-//   · si entre dos tandas hubo un hueco SIN mercancía, ese hueco no cuenta: no
-//     se puede vender lo que no está, y cargarlo haría parecer lento a un
-//     artículo que solo estuvo agotado.
-// El resultado se dice con las unidades AL LADO ("480 u en 15 meses"), nunca
-// dividido: la división es la que produce los 14.899 u/mes, y con las unidades
-// a la vista Daniel escala solo, sin que el módulo opine.
-//
-// 🔴 NADA DE ESTO PUEDE MOVERSE CON EL MES EN CURSO. Las dos puntas de cada
-// ventana son hechos PASADOS (el día que llegó y el día que se acabó), no "hoy",
-// y las tandas VIVAS no entran. Vender hoy no cambia el resumen. Hay un test.
-
-export interface ResumenArticulo {
-  /** Lo que hay en bodega del artículo completo, sumando TODAS sus compras —
-   *  también las de más de 3 años que la tabla no muestra. */
-  enBodega: number | null;
-  /** `true` = `enBodega` es la existencia de Switch, la fuente de verdad del
-   *  stock. `false` = Switch no tiene el código en el catálogo y el número se
-   *  dedujo de compras − ventas; la pantalla lo dice. */
-  bodegaDeSwitch: boolean;
-  /** Unidades en bodega que las filas VISIBLES no explican (compras viejas
-   *  ocultas con stock, o stock sin respaldo). Se avisa en vez de esconderlo:
-   *  si no, el total y la suma de la columna "QUEDA" se contradicen a la vista. */
-  bodegaFueraDeLasFilas: number;
-  /** Cuántas de las compras visibles ya se acabaron. */
-  comprasAgotadas: number;
-  /** Unidades que trajeron esas compras. MISMA base que la columna "CUÁNTO",
-   *  para que el resumen y las filas midan con la misma vara. */
-  unidadesAgotadas: number;
-  /** Meses que duró venderlas, como unión de sus ventanas. `null` = ninguna se
-   *  ha acabado todavía, y entonces NO hay número que dar. */
-  mesesAgotadas: number | null;
-}
-
-/**
- * Unión (en meses) de las ventanas [llegada → día en que se acabó] de las
- * compras ya agotadas. Los tramos que se pisan se cuentan UNA vez; los huecos
- * entre tramos no se cuentan.
- */
-export function mesesVendiendo(agotadas: readonly CompraMedida[]): number | null {
-  const tramos = agotadas
-    .filter((c) => c.fechaCorte != null)
-    .map((c) => ({ a: c.fecha, b: c.fechaCorte as string }))
-    .sort((x, y) => x.a.localeCompare(y.a) || x.b.localeCompare(y.b));
-  if (!tramos.length) return null;
-
-  let dias = 0;
-  let a = tramos[0].a;
-  let b = tramos[0].b;
-  for (const t of tramos.slice(1)) {
-    if (t.a <= b) {
-      if (t.b > b) b = t.b; // se solapan → se estira el mismo tramo
-    } else {
-      dias += diasEntre(a, b); // hueco sin mercancía → se cierra y se abre otro
-      a = t.a;
-      b = t.b;
-    }
-  }
-  dias += diasEntre(a, b);
-  return dias / DIAS_POR_MES;
-}
-
-/** ¿Esta compra ya se acabó? Es la que tiene fecha de corte: llegó al 90% o se
- *  cerró por ajuste. Una tanda VIVA no se puede medir — todavía no terminó. */
-export function estaAgotada(c: CompraMedida): boolean {
-  return c.fechaCorte != null;
-}
-
-/**
- * El resumen de UN artículo. `visibles` son las compras que la tabla muestra
- * (misma vara que las filas); `enBodega` sale de la existencia de Switch,
- * que YA incluye lo que sostienen las compras viejas ocultas.
- */
-export function resumirArticulo(
-  visibles: readonly CompraMedida[],
-  existencia: number | null,
-): ResumenArticulo {
-  const agotadas = visibles.filter(estaAgotada);
-  const quedanVisibles = visibles.reduce((s, c) => s + c.quedan, 0);
-
-  // Sin existencia de Switch el único número posible es el que ya muestran las
-  // filas. Se devuelve marcado, y la pantalla NO lo presenta como stock real.
-  const enBodega = existencia ?? quedanVisibles;
-
-  return {
-    enBodega,
-    bodegaDeSwitch: existencia != null,
-    bodegaFueraDeLasFilas: existencia != null ? existencia - quedanVisibles : 0,
-    comprasAgotadas: agotadas.length,
-    unidadesAgotadas: agotadas.reduce((s, c) => s + c.unidades, 0),
-    mesesAgotadas: mesesVendiendo(agotadas),
-  };
-}
-
-// ─── Texto de los meses en que vendió ────────────────────────────────────────
-
-const MESES_CORTO = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-
-export function nombreMes(mes: string): string {
-  const m = Number(mes.slice(5, 7));
-  return MESES_CORTO[m - 1] ?? mes;
-}
-
-/**
- * "2024: ene→abr, ago→dic · 2025: ene, mar→may · 2026: ago (en curso)".
- *
- * Meses CONSECUTIVOS se juntan con flecha; un mes suelto va solo. Agrupado por
- * año porque sin el año no se sabe si "ene" fue hace 3 meses o hace 3 años.
- *
- * ⚠️ El mes en curso se ROTULA. No cuenta para ningún promedio —este módulo no
- * tiene promedios, por diseño— pero verlo igual que un mes cerrado hace creer
- * que se vendió un mes entero cuando pueden ser 3 días.
- */
-export function textoMesesVendidos(meses: readonly string[], hoyMes: string): string {
-  if (!meses.length) return "";
-  const porAnio = new Map<string, number[]>();
-  for (const m of [...meses].sort()) {
-    const anio = m.slice(0, 4);
-    const arr = porAnio.get(anio) ?? [];
-    arr.push(Number(m.slice(5, 7)));
-    porAnio.set(anio, arr);
-  }
-
-  const partes: string[] = [];
-  for (const [anio, ms] of porAnio) {
-    const tramos: string[] = [];
-    let ini = ms[0];
-    let fin = ms[0];
-    for (const m of ms.slice(1)) {
-      if (m === fin + 1) {
-        fin = m;
-        continue;
-      }
-      tramos.push(tramo(ini, fin));
-      ini = m;
-      fin = m;
-    }
-    tramos.push(tramo(ini, fin));
-    const enCurso = `${anio}-${String(ms[ms.length - 1]).padStart(2, "0")}` === hoyMes;
-    partes.push(`${anio}: ${tramos.join(", ")}${enCurso ? " (en curso)" : ""}`);
-  }
-  return partes.join(" · ");
-}
-
-function tramo(ini: number, fin: number): string {
-  const a = MESES_CORTO[ini - 1];
-  const b = MESES_CORTO[fin - 1];
-  return ini === fin ? a : `${a}→${b}`;
-}
-
 // ─── El armado completo, de punta a punta ────────────────────────────────────
 
 export interface ArticuloCompras {
@@ -789,19 +442,19 @@ export interface ArticuloCompras {
   codigo: string;
   /** Nombre comercial del catálogo si lo hay; si no, el del ingreso o el diario. */
   descripcion: string;
-  /** Compras dentro de la ventana de historia, la más nueva PRIMERO. */
-  compras: CompraMedida[];
+  /** Compras CRUDAS dentro de la ventana de historia, la más nueva PRIMERO.
+   *  Fecha y cantidad tal como llegaron — sin una sola venta atribuida. */
+  compras: Compra[];
   /** Venta NETA mes a mes, TODA su historia, ascendente. De acá salen las
    *  barras de los 12 meses completos, el "vendo por mes" y el precio real
    *  (`@/lib/ventas/resumen-articulo`). Va la historia entera y no solo los 12
    *  meses porque hace falta saber CUÁNDO empezó a venderse: un artículo que
    *  llegó en diciembre no se promedia entre 12. */
   serie: MesVenta[];
-  /** Compras que existen pero quedaron fuera de la ventana de 3 años. */
+  /** Compras que existen pero quedaron fuera de la ventana de 3 años. NO vienen
+   *  en `compras` (solo se sabe cuántas son) y SÍ cuentan para lo que hay en
+   *  bodega — la pantalla lo dice en vez de dejar que el total no cierre. */
   comprasFueraDeVentana: number;
-  /** El artículo COMPLETO en una línea: cuánto hay en bodega y cuánto tardó en
-   *  venderse lo que ya se acabó. Va arriba de la tabla. */
-  resumen: ResumenArticulo;
   cuadre: Cuadre;
   /** Stock en bodega que no sale de ninguna compra registrada. Se avisa. */
   stockSinRespaldo: number;
@@ -834,49 +487,42 @@ export function desdeDeVentana(hoy: string): string {
 }
 
 /**
- * Arma la respuesta de un artículo: agrupa compras, reparte ventas, cuadra
- * contra la existencia y mide cada llegada.
+ * Arma la respuesta de un artículo: agrupa las compras, coteja lo vendido
+ * contra lo que fue llegando y cuadra contra la existencia de Switch.
+ *
+ * 🔴 NO mide ninguna compra por separado. La única aritmética que sobrevive es
+ * de ARTÍCULO, y `hoy` solo se usa para saber dónde cortar los 3 años.
  */
 export function armarArticulo(e: EntradaArticulo, hoy: string): ArticuloCompras {
   const todasLasCompras = agruparCompras(e.ingresos);
   const dias = ventasNetasPorDia(e.ventas);
-  const reparto = repartirFifo(todasLasCompras, dias);
+  const cotejo = cotejarVentasConCompras(todasLasCompras, dias);
 
   const comprado = todasLasCompras.reduce((s, c) => s + c.unidades, 0);
   const vendido = dias.reduce((s, d) => s + d.unidades, 0);
-  const cuadre = cuadrar(comprado, vendido, e.existencia, reparto);
-  const { quedan, noVendidoNiEnBodega, sinRespaldo } = repartirExistencia(
-    todasLasCompras,
-    reparto.asignadas,
-    e.existencia,
-  );
+  const cuadre = cuadrar(comprado, vendido, e.existencia, cotejo);
+
+  // Stock que ninguna compra registrada explica. Lo que las compras PUEDEN
+  // sostener es lo que llegó menos lo que salió de ellas; si Switch dice que
+  // hay más, esa diferencia se AVISA en vez de esconderse.
+  const sinRespaldo =
+    e.existencia == null ? 0 : Math.max(0, e.existencia - (comprado - cotejo.respaldado));
 
   const desde = desdeDeVentana(hoy);
-  const medidas: CompraMedida[] = [];
-  let fuera = 0;
-  todasLasCompras.forEach((c, i) => {
-    if (c.fecha < desde) {
-      fuera += 1;
-      return;
-    }
-    medidas.push(medirCompra(c, reparto.diasPorCompra[i], quedan[i], noVendidoNiEnBodega[i], hoy));
-  });
-
-  // La más NUEVA primero: es la que se está decidiendo comprar otra vez.
-  const visibles = medidas.reverse();
+  const dentro = todasLasCompras.filter((c) => c.fecha >= desde);
 
   return {
     empresa: e.empresa,
     codigo: e.codigo,
     descripcion: e.descripcion,
-    compras: visibles,
+    // La más NUEVA primero: es la que se está decidiendo comprar otra vez.
+    compras: [...dentro].reverse(),
     serie: ventasPorMes(dias),
-    comprasFueraDeVentana: fuera,
-    resumen: resumirArticulo(visibles, e.existencia),
+    comprasFueraDeVentana: todasLasCompras.length - dentro.length,
     cuadre,
     stockSinRespaldo: sinRespaldo,
-    vendidoAntes: reparto.vendidoAntes,
-    vendidoDeMas: reparto.vendidoDeMas,
+    vendidoAntes: cotejo.vendidoAntes,
+    vendidoDeMas: cotejo.vendidoDeMas,
     sinCompraRegistrada: todasLasCompras.length === 0,
     existencia: e.existencia,
     precioEtiqueta: e.precioEtiqueta,
