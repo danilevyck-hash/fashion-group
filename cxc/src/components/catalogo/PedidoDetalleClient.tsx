@@ -94,6 +94,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   const [pedidoOriginal, setPedidoOriginal] = useState<{ id: string; order_number: string; switch_numero: string | null } | null>(null);
   const [duplicando, setDuplicando] = useState(false);
   const [showDupModal, setShowDupModal] = useState(false);
+  // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
+  // un fallo silencioso se sentiría como "no pasó nada".
+  const [dupError, setDupError] = useState<string | null>(null);
   // ── Buscador "Agregar productos" (líneas nuevas vía PATCH /item) ──
   const [showAgregarModal, setShowAgregarModal] = useState(false);
   const switchLockRef = useRef(false);
@@ -426,6 +429,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // ELECCIÓN explícita (nunca se hereda del original) y el server la persiste.
   async function duplicarPedido(nombre: string, cliente: ClienteSwitchOpcion) {
     setDuplicando(true);
+    setDupError(null);
     try {
       const res = await fetch(`${theme.api}/orders/${id}/duplicar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -438,9 +442,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         router.push(`/catalogo/${marca}/pedido/${d.id}`);
       } else {
         showToast(d.error || "No se pudo duplicar el pedido. Intenta de nuevo.");
+        setDupError(d.error || "No se pudo duplicar el pedido. Intenta de nuevo.");
       }
     } catch {
       showToast("Error de conexion. Intenta de nuevo.");
+      setDupError("Error de conexion. Intenta de nuevo.");
     }
     setDuplicando(false);
   }
@@ -1060,16 +1066,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
         />
       )}
 
-      {/* Mini-modal de "Duplicar y corregir": nombre pre-llenado y editable */}
+      {/* Mini-modal de "Duplicar y corregir": una sola decisión y un solo toque
+          — tocar el cliente de Switch duplica (el nombre sale de ahí). */}
       {showDupModal && (
         <DuplicarPedidoModal
           orderNumber={order.order_number}
-          nombreInicial={clientName}
           api={theme.api}
           directorioLabel={theme.switchDirectorioLabel}
           duplicando={duplicando}
-          onConfirm={duplicarPedido}
-          onCancel={() => setShowDupModal(false)}
+          error={dupError}
+          onElegir={duplicarPedido}
+          onCancel={() => { setShowDupModal(false); setDupError(null); }}
         />
       )}
 

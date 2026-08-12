@@ -1,10 +1,13 @@
-// Duplicar con cliente editable + agregar artículos a un pedido existente
+// Duplicar eligiendo el cliente + agregar artículos a un pedido existente
 // (pedido de Daniel, 12-ago-2026). Se renderizan los modales REALES:
 //
-//  · DuplicarPedidoModal — mini-modal con el nombre pre-llenado y editable
-//    ("¿Para quién es el pedido nuevo?") y el SELECTOR DE CLIENTE DE SWITCH,
-//    que es OBLIGATORIO: sin elegir no se puede duplicar (Daniel, 12-ago-2026:
-//    *"un vendedor TIENE que elegir un cliente de switch, todos siempre"*).
+//  · DuplicarPedidoModal — UNA sola decisión: "¿Para quién es el pedido
+//    nuevo?" con el SELECTOR DE CLIENTE DE SWITCH, que es OBLIGATORIO: sin
+//    elegir no se puede duplicar (Daniel: *"un vendedor TIENE que elegir un
+//    cliente de switch, todos siempre"*). 🩸 El campo de NOMBRE LIBRE se fue:
+//    preguntaba lo mismo que el selector y lo contradecía (venía pre-llenado
+//    con el cliente del pedido VIEJO mientras el botón decía "Elige el
+//    cliente"). El nombre del pedido nuevo ES el del cliente elegido.
 //    Lo usan el Duplicar de la lista y "Duplicar y corregir" del pedido
 //    bloqueado por Switch.
 //  · AgregarProductosModal — buscador de productos de la marca que agrega
@@ -56,100 +59,123 @@ function renderDup(props: Partial<React.ComponentProps<typeof DuplicarPedidoModa
   return render(
     <DuplicarPedidoModal
       orderNumber="PED-100"
-      nombreInicial="Cliente Original"
       api="/api/catalogo/reebok"
       directorioLabel="Active Shoes"
       duplicando={false}
-      onConfirm={() => {}}
+      onElegir={() => {}}
       onCancel={() => {}}
       {...props}
     />,
   );
 }
 
+/** Los botones que ofrece la ventana, tal como se leen. */
+function botonesDelModal(): string[] {
+  return screen.getAllByRole("button").map((b) => (b.textContent || "").trim());
+}
+
 describe("DuplicarPedidoModal", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("pre-llena el nombre del original y pregunta para quién es el pedido nuevo", () => {
+  it("🔴 pregunta UNA sola cosa: ni campo de nombre libre ni botón de confirmar", async () => {
     stubClientes();
     renderDup();
     expect(screen.getByText("Duplicar pedido PED-100")).toBeTruthy();
     expect(screen.getByText("¿Para quién es el pedido nuevo?")).toBeTruthy();
-    expect((screen.getByPlaceholderText("Nombre del cliente") as HTMLInputElement).value).toBe(
-      "Cliente Original",
+    // El buscador del selector es el ÚNICO campo, y es un `search`; un campo de
+    // texto suelto sería el "Nombre que sale en el pedido" volviendo.
+    expect(screen.queryAllByRole("textbox")).toEqual([]);
+    expect(screen.getAllByRole("searchbox").length).toBe(1);
+    expect(screen.queryByText(/Nombre que sale en el pedido/)).toBeNull();
+    // 🔴 Y NINGÚN segundo toque: no hay "Duplicar" ni "Elige el cliente".
+    await screen.findByText("Sporting Shoes");
+    expect(botonesDelModal()).toEqual([
+      "Contado (mostrador)",
+      "Sporting ShoesD-42",
+      "City Mall DavidD-77",
+      "Cancelar",
+    ]);
+  });
+
+  it("🔴 TOCAR el cliente duplica en el acto (un solo toque)", async () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
+    fireEvent.click(await screen.findByText("Sporting Shoes"));
+    // Sin tocar nada más: el padre ya está duplicando.
+    expect(onElegir).toHaveBeenCalledTimes(1);
+    expect(onElegir).toHaveBeenCalledWith("Sporting Shoes", { id: 42, nombre: "Sporting Shoes", codigo: "D-42" });
+  });
+
+  it("Contado es una OPCIÓN de un toque, no un default silencioso", () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
+    // Abrir la ventana no duplica nada: hay que TOCAR.
+    expect(onElegir).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
+    expect(onElegir).toHaveBeenCalledWith("Contado (mostrador)", { id: null, nombre: "Contado (mostrador)", codigo: null });
+  });
+
+  it("buscar NO es elegir: escribir en el buscador no duplica nada", async () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Sporting" } });
+    await waitFor(() => expect(screen.getByText("Sporting Shoes")).toBeTruthy());
+    expect(onElegir).not.toHaveBeenCalled();
+  });
+
+  it("mientras duplica lo dice EN la fila tocada y no acepta un segundo toque", async () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    const { rerender } = renderDup({ onElegir });
+    fireEvent.click(await screen.findByText("Sporting Shoes"));
+    rerender(
+      <DuplicarPedidoModal
+        orderNumber="PED-100"
+        api="/api/catalogo/reebok"
+        directorioLabel="Active Shoes"
+        duplicando
+        onElegir={onElegir}
+        onCancel={() => {}}
+      />,
     );
-  });
-
-  it("🔴 NO se puede duplicar sin elegir cliente de Switch — ni siquiera con el nombre puesto", () => {
-    stubClientes();
-    const onConfirm = vi.fn();
-    renderDup({ onConfirm });
-    const btn = screen.getByRole("button", { name: "Elige el cliente" }) as HTMLButtonElement;
-    expect(btn.disabled).toBe(true);
-    fireEvent.click(btn);
-    expect(onConfirm).not.toHaveBeenCalled();
-    // Escribir el nombre libre no habilita nada: el cliente es OTRA cosa.
-    fireEvent.change(screen.getByPlaceholderText("Nombre del cliente"), { target: { value: "Quien sea" } });
-    expect((screen.getByRole("button", { name: "Elige el cliente" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(onConfirm).not.toHaveBeenCalled();
-  });
-
-  it("Contado es una OPCIÓN de un toque, no un default silencioso", async () => {
-    stubClientes();
-    const onConfirm = vi.fn();
-    renderDup({ onConfirm });
+    const fila = screen.getByRole("button", { name: /Sporting Shoes/ }) as HTMLButtonElement;
+    expect(fila.textContent).toContain("Duplicando...");
+    expect(fila.disabled).toBe(true);
+    fireEvent.click(fila);
     fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Duplicar" }));
-    expect(onConfirm).toHaveBeenCalledWith("Cliente Original", { id: null, nombre: "Contado (mostrador)", codigo: null });
+    expect(onElegir).toHaveBeenCalledTimes(1);
   });
 
-  it("elegir un cliente del directorio rellena el nombre y lo entrega junto al id", async () => {
+  it("si el duplicado falla lo dice DENTRO de la ventana (no solo en un toast)", async () => {
     stubClientes();
-    const onConfirm = vi.fn();
-    renderDup({ onConfirm });
-    fireEvent.click(await screen.findByText("Sporting Shoes"));
-    expect((screen.getByPlaceholderText("Nombre del cliente") as HTMLInputElement).value).toBe("Sporting Shoes");
-    fireEvent.click(screen.getByRole("button", { name: "Duplicar" }));
-    expect(onConfirm).toHaveBeenCalledWith("Sporting Shoes", { id: 42, nombre: "Sporting Shoes", codigo: "D-42" });
+    renderDup({ error: "No se pudo duplicar el pedido. Intenta de nuevo." });
+    expect(screen.getByText("No se pudo duplicar el pedido. Intenta de nuevo.")).toBeTruthy();
+    // Y se puede volver a intentar: las opciones siguen tocables.
+    expect((screen.getByRole("button", { name: "Contado (mostrador)" }) as HTMLButtonElement).disabled).toBe(false);
+    await screen.findByText("Sporting Shoes");
   });
 
-  it("editar el nombre después de elegir cliente entrega el nombre NUEVO con el MISMO cliente", async () => {
-    stubClientes();
-    const onConfirm = vi.fn();
-    renderDup({ onConfirm });
-    fireEvent.click(await screen.findByText("Sporting Shoes"));
-    fireEvent.change(screen.getByPlaceholderText("Nombre del cliente"), {
-      target: { value: "  Sporting Shoes N4  " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Duplicar" }));
-    expect(onConfirm).toHaveBeenCalledWith("Sporting Shoes N4", { id: 42, nombre: "Sporting Shoes", codigo: "D-42" });
-  });
-
-  it("nombre vacío cae al original (el cliente elegido no se pierde)", async () => {
-    stubClientes();
-    const onConfirm = vi.fn();
-    renderDup({ onConfirm });
-    fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
-    fireEvent.change(screen.getByPlaceholderText("Nombre del cliente"), { target: { value: "   " } });
-    fireEvent.click(await screen.findByRole("button", { name: "Duplicar" }));
-    expect(onConfirm).toHaveBeenCalledWith("Cliente Original", { id: null, nombre: "Contado (mostrador)", codigo: null });
-  });
-
-  it("Cancelar cancela sin duplicar; mientras duplica, todo queda deshabilitado", () => {
+  it("Cancelar cierra sin duplicar", () => {
     stubClientes();
     const onCancel = vi.fn();
-    const onConfirm = vi.fn();
-    const { unmount } = renderDup({ onConfirm, onCancel });
+    const onElegir = vi.fn();
+    renderDup({ onElegir, onCancel });
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(onCancel).toHaveBeenCalled();
-    expect(onConfirm).not.toHaveBeenCalled();
-    unmount();
+    expect(onElegir).not.toHaveBeenCalled();
+  });
 
-    renderDup({ duplicando: true, onConfirm, onCancel });
-    const btn = screen.getByRole("button", { name: "Duplicando..." }) as HTMLButtonElement;
+  it("mientras duplica, Cancelar queda deshabilitado", () => {
+    stubClientes();
+    const onCancel = vi.fn();
+    renderDup({ duplicando: true, onCancel });
+    const btn = screen.getByRole("button", { name: "Cancelar" }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     fireEvent.click(btn);
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it("busca en el directorio de LA MARCA (no en uno global)", async () => {
@@ -282,13 +308,47 @@ describe("candados estáticos", () => {
     expect(src).not.toMatch(/Link href=\{theme\.catalogoHref\}[^>]*>\s*\+ Agregar productos/);
   });
 
-  it("los dos caminos de Duplicar pasan por el mini-modal con el nombre editable", () => {
+  it("los dos caminos de Duplicar pasan por el MISMO mini-modal", () => {
     expect(SRC("src/components/catalogo/PedidosListClient.tsx")).toContain("DuplicarPedidoModal");
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toContain("DuplicarPedidoModal");
     // El POST de "Duplicar y corregir" manda el nombre elegido en el body.
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toMatch(
       /orders\/\$\{id\}\/duplicar[\s\S]{0,200}client_name/,
     );
+  });
+
+  it("🔴 el campo de nombre libre NO puede volver al modal de duplicar", () => {
+    const modal = SRC("src/components/catalogo/DuplicarPedidoModal.tsx");
+    // Ni el campo, ni su etiqueta, ni el nombre del pedido viejo como semilla.
+    expect(modal).not.toMatch(/<input/);
+    expect(modal).not.toContain("Nombre que sale en el pedido");
+    expect(modal).not.toContain("nombreInicial");
+    expect(modal).not.toMatch(/setNombre|useState\(nombre/);
+    // El nombre del pedido nuevo se DERIVA del cliente elegido, con la misma
+    // función que dibuja el texto en pantalla (una sola fuente).
+    expect(modal).toMatch(/onElegir\(nombreDeCliente\(c\), c\)/);
+    // Y ningún padre le pasa el nombre del pedido viejo.
+    for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
+      expect(SRC(`src/components/catalogo/${p}.tsx`)).not.toContain("nombreInicial");
+    }
+  });
+
+  it("🔴 el SEGUNDO toque tampoco puede volver: tocar el cliente ES duplicar", () => {
+    const modal = SRC("src/components/catalogo/DuplicarPedidoModal.tsx");
+    // Nada de botón de confirmar ni de su estado apagado.
+    expect(modal).not.toContain("Elige el cliente");
+    expect(modal).not.toMatch(/function confirmar/);
+    // Un solo <button> en toda la ventana, y es Cancelar: el segundo toque no
+    // puede volver escondido detrás de otro nombre.
+    expect((modal.match(/<button/g) || []).length).toBe(1);
+    // El disparo cuelga del onElegir del selector, que es el toque de la fila.
+    expect(modal).toMatch(/onElegir=\{elegir\}/);
+    // Los dos padres reciben la elección por onElegir (no por un confirmar).
+    for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
+      const src = SRC(`src/components/catalogo/${p}.tsx`);
+      expect(src).toMatch(/onElegir=\{/);
+      expect(src).not.toMatch(/onConfirm=\{[^}]*[Dd]uplic/);
+    }
   });
 
   it("los DOS caminos mandan el cliente de Switch elegido al servidor", () => {

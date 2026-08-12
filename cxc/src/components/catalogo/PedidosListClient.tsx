@@ -33,10 +33,13 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
-  // Duplicar con cliente editable: el botón abre el mini-modal (nombre
-  // pre-llenado); el POST /orders de siempre sale con el nombre elegido.
+  // Duplicar: el botón abre el mini-modal y TOCAR el cliente duplica — el POST
+  // /orders de siempre sale con ese cliente y su nombre.
   const [dupTarget, setDupTarget] = useState<Order | null>(null);
   const [duplicating, setDuplicating] = useState(false);
+  // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
+  // un fallo silencioso se sentiría como "no pasó nada".
+  const [dupError, setDupError] = useState<string | null>(null);
 
   const [role, setRole] = useState("");
 
@@ -64,14 +67,20 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
     load();
   }
 
-  // Duplica copiando los items del original y creando un pedido NUEVO con el
-  // nombre y el CLIENTE DE SWITCH elegidos en el mini-modal. Nada se hereda del
+  // Duplica copiando los items del original y creando un pedido NUEVO a nombre
+  // del CLIENTE DE SWITCH que se tocó en el mini-modal. Nada se hereda del
   // original: el cliente es siempre una elección explícita (`null` = Contado).
   async function duplicateOrder(order: Order, clientName: string, cliente: ClienteSwitchOpcion) {
     setDuplicating(true);
+    setDupError(null);
     try {
       const res = await fetch(`${theme.api}/orders/${order.id}`);
-      if (!res.ok) { toast("Error al cargar pedido", "error"); setDuplicating(false); return; }
+      if (!res.ok) {
+        toast("Error al cargar pedido", "error");
+        setDupError("No se pudo leer el pedido original. Intenta de nuevo.");
+        setDuplicating(false);
+        return;
+      }
       const full = await res.json();
       const items = (full[theme.itemsField] || []).map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
         product_id: i.product_id, sku: i.sku, name: i.name, image_url: i.image_url, quantity: i.quantity, unit_price: i.unit_price,
@@ -85,8 +94,14 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
         setDupTarget(null);
         toast("Pedido duplicado");
         router.push(`/catalogo/${marca}/pedido/${newOrder.id}`);
-      } else { toast("Error al duplicar", "error"); }
-    } catch { toast("Error al duplicar", "error"); }
+      } else {
+        toast("Error al duplicar", "error");
+        setDupError("No se pudo duplicar el pedido. Intenta de nuevo.");
+      }
+    } catch {
+      toast("Error al duplicar", "error");
+      setDupError("Error de conexion. Intenta de nuevo.");
+    }
     setDuplicating(false);
   }
 
@@ -200,12 +215,12 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       {dupTarget && (
         <DuplicarPedidoModal
           orderNumber={dupTarget.order_number}
-          nombreInicial={dupTarget.client_name}
           api={theme.api}
           directorioLabel={theme.switchDirectorioLabel}
           duplicando={duplicating}
-          onConfirm={(nombre, cliente) => duplicateOrder(dupTarget, nombre, cliente)}
-          onCancel={() => setDupTarget(null)}
+          error={dupError}
+          onElegir={(nombre, cliente) => duplicateOrder(dupTarget, nombre, cliente)}
+          onCancel={() => { setDupTarget(null); setDupError(null); }}
         />
       )}
 

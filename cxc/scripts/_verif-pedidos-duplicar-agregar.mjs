@@ -5,9 +5,12 @@
 // CLICK-THROUGH REAL (marca joybees — su lista filtra deleted, así los pedidos
 // de prueba desaparecen con el soft delete del final):
 //   1. Se crea un pedido de PRUEBA por la API (nombre "PRUEBA T143 — BORRAR").
-//   2. Duplicar desde la lista CAMBIANDO el nombre → el nuevo sale con el
-//      nombre nuevo.
-//   3. Duplicar desde la lista SIN cambiar el nombre → mismo nombre.
+//   2. Duplicar desde la lista: el modal abre SIN campo de nombre libre y SIN
+//      botón de confirmar (solo Cancelar). TOCAR un cliente del directorio
+//      duplica en el acto: el pedido nuevo queda con ESE nombre y ESE
+//      cliente_switch_id.
+//   3. Duplicar tocando "Contado (mostrador)" → el pedido nuevo queda a nombre
+//      de "Contado (mostrador)" y con cliente_switch_id null.
 //   4. "+ Agregar productos" en el detalle → buscar por código → Agregar →
 //      la línea queda EN LA BASE (GET /orders/[id] la trae).
 //   5. PATCH /item contra un pedido REAL bloqueado por Switch → 409 y CERO
@@ -15,9 +18,10 @@
 //   6. Soft delete de los 3 pedidos de prueba al final + verificación de que
 //      la lista vuelve a su conteo original.
 //
-// MEDICIÓN 390 · 834 · 1440 (gotchas de la casa: cookie + sessionStorage.
+// MEDICIÓN 390 · 834 · 1024 · 1440 (gotchas de la casa: cookie + sessionStorage.
 // cxc_role + delete Navigator.prototype.serviceWorker):
-//   · lista con el mini-modal de Duplicar abierto
+//   · lista con el mini-modal de Duplicar abierto: sin tocar nada y con el
+//     toque en curso (la fila con su "Duplicando...")
 //   · detalle con el buscador "Agregar productos" abierto
 //   → 0 arrastre, 0 recortes, táctiles ≥44 px, textos ≥12 px en los modales.
 //
@@ -36,11 +40,11 @@ const API = `${BASE}/api/catalogo/${MARCA}`;
 mkdirSync(OUT, { recursive: true });
 
 const NOMBRE_PRUEBA = "PRUEBA T143 — BORRAR";
-const NOMBRE_DUP = "PRUEBA T143 DUP — BORRAR";
 
 const ANCHOS = [
   { nombre: "iPhone", w: 390, h: 844 },
   { nombre: "iPad", w: 834, h: 1112 },
+  { nombre: "iPad acostado", w: 1024, h: 768 },
   { nombre: "Escritorio", w: 1440, h: 900 },
 ];
 
@@ -191,34 +195,55 @@ await page.setViewportSize({ width: 1440, height: 900 });
 // medición a medias.
 try {
 
-console.log("\n== 1. Duplicar desde la lista CAMBIANDO el nombre ==");
+console.log("\n== 1. Duplicar eligiendo un CLIENTE del directorio ==");
 await page.goto(`${BASE}/catalogo/${MARCA}/pedidos`, { waitUntil: "networkidle", timeout: 120_000 });
 await page.waitForSelector(`text=${NOMBRE_PRUEBA}`, { timeout: 60_000 });
 const fila = page.locator("div.border", { hasText: NOMBRE_PRUEBA }).first();
 await fila.locator('button[title="Duplicar"]').click();
 await page.waitForSelector("text=¿Para quién es el pedido nuevo?", { timeout: 10_000 });
-const inputDup = page.locator('input[placeholder="Nombre del cliente"]');
-ok((await inputDup.inputValue()) === NOMBRE_PRUEBA, "el mini-modal pre-llena el nombre del original");
-await inputDup.fill(NOMBRE_DUP);
-await page.locator("button", { hasText: /^Duplicar$/ }).click();
+
+// 🔴 UNA sola decisión y UN solo toque: ni campo de nombre libre ni botón de
+// confirmar. La ventana solo ofrece clientes + Cancelar.
+const modal = page.locator("div.bg-white").filter({ hasText: "¿Para quién es el pedido nuevo?" }).first();
+const camposTexto = await modal.locator("input:not([type=search])").count();
+ok(camposTexto === 0, "el modal NO tiene campo de nombre libre (una sola decisión)");
+ok((await modal.locator("button", { hasText: /^(Duplicar|Elige el cliente)$/ }).count()) === 0,
+  "el modal NO tiene botón de confirmar (tocar el cliente ES duplicar)");
+
+// Un cliente REAL del directorio de la marca (el primero de la lista).
+await page.waitForTimeout(800); // debounce del selector + fetch
+const primerCliente = modal.locator("button", { hasNotText: /^(Contado \(mostrador\)|Cancelar)$/ });
+// El botón trae el nombre + un <span> con el código: se lee SOLO el nombre
+// (el mismo texto que el modal usa para el pedido nuevo).
+const nombreCliente = await primerCliente.first().evaluate((el) => (el.childNodes[0]?.textContent || "").trim());
+await primerCliente.first().click();
+// UN toque y ya navega al pedido nuevo — sin confirmar nada más.
 await page.waitForURL(/\/pedido\//, { timeout: 30_000 });
 const idDup = page.url().split("/pedido/")[1];
 idsDeLimpiar.push(idDup);
 await page.waitForSelector("input, span", { timeout: 30_000 });
 const dupServ = await api(`/orders/${idDup}`);
-ok(dupServ.json?.client_name === NOMBRE_DUP, `el duplicado quedó a nombre de "${dupServ.json?.client_name}"`);
+ok(dupServ.json?.client_name === nombreCliente,
+  `el duplicado quedó a nombre del cliente ELEGIDO ("${dupServ.json?.client_name}"), no del pedido viejo`);
+// El cliente de Switch guardado se lee por su endpoint (el GET del pedido no
+// trae la columna).
+const cliDup = await api(`/clientes-switch?orderId=${idDup}`);
+ok(cliDup.json?.clienteSwitchId != null && cliDup.json?.nombre === nombreCliente,
+  `y con el cliente_switch_id del elegido (${cliDup.json?.clienteSwitchId} · ${cliDup.json?.nombre})`);
 
-console.log("\n== 2. Duplicar SIN cambiar el nombre ==");
+console.log("\n== 2. Duplicar eligiendo Contado (mostrador) ==");
 await page.goto(`${BASE}/catalogo/${MARCA}/pedidos`, { waitUntil: "networkidle", timeout: 120_000 });
-await page.waitForSelector(`text=${NOMBRE_DUP}`, { timeout: 60_000 });
-await page.locator("div.border", { hasText: NOMBRE_DUP }).first().locator('button[title="Duplicar"]').click();
+await page.waitForSelector(`text=${NOMBRE_PRUEBA}`, { timeout: 60_000 });
+await page.locator("div.border", { hasText: NOMBRE_PRUEBA }).first().locator('button[title="Duplicar"]').click();
 await page.waitForSelector("text=¿Para quién es el pedido nuevo?", { timeout: 10_000 });
-await page.locator("button", { hasText: /^Duplicar$/ }).click();
+await page.locator("button", { hasText: /^Contado \(mostrador\)$/ }).click();
 await page.waitForURL(/\/pedido\//, { timeout: 30_000 });
 const idDup2 = page.url().split("/pedido/")[1];
 idsDeLimpiar.push(idDup2);
 const dup2Serv = await api(`/orders/${idDup2}`);
-ok(dup2Serv.json?.client_name === NOMBRE_DUP, "sin tocar el nombre, el duplicado conserva el del original");
+const cliDup2 = await api(`/clientes-switch?orderId=${idDup2}`);
+ok(dup2Serv.json?.client_name === "Contado (mostrador)" && !cliDup2.json?.clienteSwitchId,
+  `Contado queda a nombre de "${dup2Serv.json?.client_name}" y sin cliente_switch_id`);
 
 console.log("\n== 3. Agregar un artículo desde el detalle (borrador) ==");
 await page.goto(`${BASE}/catalogo/${MARCA}/pedido/${idPrueba}`, { waitUntil: "networkidle", timeout: 120_000 });
@@ -266,8 +291,11 @@ if (!lockeado) {
   if (await btnDup.count()) {
     await btnDup.click();
     await page.waitForSelector("text=¿Para quién es el pedido nuevo?", { timeout: 10_000 });
-    const aviso = await page.locator("text=cliente de Switch se vuelve a elegir").count();
-    ok(aviso > 0, "el mini-modal del pedido bloqueado avisa que el cliente Switch se re-elige");
+    // Mismo modal que la lista: se vuelve a ELEGIR el cliente, sin default.
+    const modalBloq = page.locator("div.bg-white").filter({ hasText: "¿Para quién es el pedido nuevo?" }).first();
+    ok((await modalBloq.locator("button", { hasText: /^(Duplicar|Elige el cliente)$/ }).count()) === 0
+      && (await modalBloq.locator("input:not([type=search])").count()) === 0,
+      "el mini-modal del pedido bloqueado es el MISMO: sin nombre libre y sin botón de confirmar");
     await page.locator("button", { hasText: /^Cancelar$/ }).click();
     ok(true, "Cancelar cierra sin duplicar");
   } else {
@@ -289,10 +317,30 @@ for (const a of ANCHOS) {
   await page.waitForSelector(`text=${NOMBRE_PRUEBA}`, { timeout: 60_000 });
   await page.locator("div.border", { hasText: NOMBRE_PRUEBA }).first().locator('button[title="Duplicar"]').click();
   await page.waitForSelector("text=¿Para quién es el pedido nuevo?", { timeout: 10_000 });
+  // Se mide con el DIRECTORIO YA CARGADO: la lista de clientes es la parte más
+  // alta de la ventana; medirla en "Buscando..." sería medir otra pantalla.
+  await page.waitForSelector("text=Buscando...", { state: "detached", timeout: 15_000 });
   await page.evaluate(MARCAR_MODAL);
   const dup = await page.evaluate(MEDIR);
   await page.screenshot({ path: `${OUT}/dup-modal-${a.w}.png` });
-  await page.keyboard.press("Escape");
+
+  // El estado MIENTRAS duplica (la fila tocada dice "Duplicando..." y todo
+  // queda apagado): se congela interceptando el POST que crea el pedido.
+  // ⚠️ El POST se ABORTA (no se crea ningún pedido de más): así se ve el estado
+  // "Duplicando..." y, después, el error DENTRO de la ventana.
+  await page.route("**/orders", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await new Promise((r) => setTimeout(r, 3_000));
+    await route.abort();
+  });
+  await page.locator("button", { hasText: /^Contado \(mostrador\)$/ }).click();
+  await page.waitForSelector("text=Duplicando...", { timeout: 5_000 });
+  await page.evaluate(MARCAR_MODAL);
+  const dupElegido = await page.evaluate(MEDIR);
+  await page.screenshot({ path: `${OUT}/dup-modal-duplicando-${a.w}.png` });
+  await page.waitForSelector("text=Error de conexion. Intenta de nuevo.", { timeout: 15_000 });
+  ok(true, `${a.nombre} ${a.w} — si el duplicado falla, el error se ve DENTRO de la ventana`);
+  await page.unroute("**/orders");
 
   // Detalle + buscador de productos
   await page.goto(`${BASE}/catalogo/${MARCA}/pedido/${idPrueba}`, { waitUntil: "networkidle", timeout: 120_000 });
@@ -304,10 +352,11 @@ for (const a of ANCHOS) {
   const agregar = await page.evaluate(MEDIR);
   await page.screenshot({ path: `${OUT}/agregar-modal-${a.w}.png` });
 
-  medidas[a.nombre] = { ancho: a.w, dup, agregar };
+  medidas[a.nombre] = { ancho: a.w, dup, dupElegido, agregar };
   const resumen = (m) =>
     `arrastre ${m.arrastre}px · recortes ${m.recortados.length} · táctiles<44 ${m.tactiles.length} · textos<12 ${m.textosChicos.length}`;
-  ok(dup.arrastre === 0 && dup.tactiles.length === 0, `${a.nombre} ${a.w} — modal Duplicar: ${resumen(dup)}`);
+  ok(dup.arrastre === 0 && dup.tactiles.length === 0, `${a.nombre} ${a.w} — modal Duplicar (sin elegir): ${resumen(dup)}`);
+  ok(dupElegido.arrastre === 0 && dupElegido.tactiles.length === 0, `${a.nombre} ${a.w} — modal Duplicar (duplicando): ${resumen(dupElegido)}`);
   ok(agregar.arrastre === 0 && agregar.tactiles.length === 0, `${a.nombre} ${a.w} — modal Agregar: ${resumen(agregar)}`);
   if (dup.recortados.length || agregar.recortados.length) {
     console.log("   recortes:", JSON.stringify({ dup: dup.recortados, agregar: agregar.recortados }));

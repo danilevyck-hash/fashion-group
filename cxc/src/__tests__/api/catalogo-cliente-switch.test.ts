@@ -327,6 +327,21 @@ describe("POST /duplicar — cliente_switch_id explícito", () => {
     expect(updateDeTraza(reebokDb)).toMatchObject({ cliente_switch_id: 42 });
   });
 
+  it("el pedido nuevo nace con el NOMBRE del cliente elegido (no con el del viejo)", async () => {
+    // Desde el 12-ago-2026 el modal no tiene campo de texto libre: manda el par
+    // (nombre del cliente elegido, su id). El original se llama "Original" y el
+    // clon tiene que quedar a nombre de "Otro", que es a quien se le eligió.
+    mainDb.queue("switch_clientes", { data: { codigo: "D-77", nombre: "Otro" } });
+    colaDuplicar(reebokDb, 42);
+    const res = await dup({ client_name: "Otro", cliente_switch_id: 77 });
+    expect(res.status).toBe(200);
+    expect(reebokDb.rpc).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ p_client_name: "Otro" }),
+    );
+    expect(updateDeTraza(reebokDb)).toMatchObject({ cliente_switch_id: 77 });
+  });
+
   it("un id de otra empresa se rechaza antes de clonar nada", async () => {
     mainDb.queue("switch_clientes", { data: null });
     colaDuplicar(reebokDb, 42);
