@@ -38,6 +38,7 @@ import {
   listaDeCompras,
   margenReal,
   medirRitmo,
+  medirVendidoMeses,
   mesesDeStock,
   leyendaLlegadas,
   medirNoventa,
@@ -53,7 +54,9 @@ import {
   textoNoventaCorto,
   textoParteVendida,
   textoRestantes,
+  textoMesesCelda,
   textoSinMargen,
+  textoVendidoCelda,
   textoVendoPorMes,
   tituloDesdeLlegada,
   tresGrandes,
@@ -676,6 +679,260 @@ describe("la línea del 90%", () => {
     expect(textoNoventa({ tipo: "agregado", desdeMes: "2026-02", llegaron: 100, van: -5 })).toBe(
       "Desde feb 2026 llegaron 100 u · van devueltas 5",
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 VENDIDO · MESES — las dos celdas del modo pedido (12-ago-2026)
+//
+// Daniel: la columna "90% en" no se entendía ("va el 29%" no dice cuánto
+// tiempo lleva). La reemplazan DOS columnas que salen de UNA función
+// (`medirVendidoMeses`) — la tabla y el Excel llaman LA MISMA. Los casos con
+// código son las filas de la captura de Daniel: si el cálculo no da ESTO,
+// está mal el código, no el test.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("VENDIDO · MESES (medirVendidoMeses)", () => {
+  /** Arma un artículo mínimo y devuelve las dos celdas ya medidas. */
+  const celdas = (art: Parameters<typeof armarFicha>[0]) => {
+    const f = armarFicha(art, HOY_MES);
+    const vm = medirVendidoMeses(f);
+    return { vm, vendido: textoVendidoCelda(vm), meses: textoMesesCelda(vm) };
+  };
+
+  it("🔴 la fila de la captura (4F5003G001): 48 compradas · 14 vendidas → 29% · 8, VIVO (gris)", () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4F5003G001",
+        descripcion: "Men-Polo",
+        ingresos: [ing("2025-12-10", 48, { codigo_articulo: "4F5003G001" })],
+        ventas: [v("2026-02-15", "FA", 8, 160), v("2026-05-15", "FA", 6, 120)],
+        existencia: 34,
+        precioEtiqueta: 20,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const { vm, vendido, meses } = celdas(art);
+    // VENDIDO = Vendí ÷ Compré (los TOTALES de los tres grandes): 14/48 = 29%.
+    // MESES = calendario desde la llegada: dic-2025 → ago-2026 = 8.
+    expect(vm).toEqual({ parte: 14 / 48, meses: 8, terminado: false });
+    expect(vendido).toBe("29%");
+    expect(meses).toBe("8");
+  });
+
+  it("🔴 TERMINADO se CONGELA en el cruce (4K5026G102: 24/24/0 → 90% · 2) aunque lleve meses más en bodega", () => {
+    // Única compra ene-2026 (24 u); el 90% (21,6) se cruza en mar-2026 con 24
+    // acumuladas. Al corte ago-2026 lleva 7 meses en bodega — la celda dice 2:
+    // la cola no cuenta (regla vieja de Daniel).
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4K5026G102",
+        descripcion: "Men-Tee",
+        ingresos: [ing("2026-01-10", 24, { codigo_articulo: "4K5026G102" })],
+        ventas: [v("2026-02-15", "FA", 12, 240), v("2026-03-15", "FA", 12, 240)],
+        existencia: 0,
+        precioEtiqueta: 20,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const { vm, vendido, meses } = celdas(art);
+    expect(vm).toEqual({ parte: 0.9, meses: 2, terminado: true });
+    // 🔴 CONGELADO: dice 90% (no "100%") y 2 (no los 7 de bodega).
+    expect(vendido).toBe("90%");
+    expect(meses).toBe("2");
+  });
+
+  it("🔴 SIN VENTAS va como vivo (4F5036G001: 36/0/36 → 0% · 4) — el 0% es un dato, no un hueco", () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4F5036G001",
+        descripcion: "Men-Short",
+        ingresos: [ing("2026-04-20", 36, { codigo_articulo: "4F5036G001" })],
+        ventas: [],
+        existencia: 36,
+        precioEtiqueta: 20,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const { vm, vendido, meses } = celdas(art);
+    expect(vm).toEqual({ parte: 0, meses: 4, terminado: false });
+    expect(vendido).toBe("0%");
+    expect(meses).toBe("4");
+  });
+
+  it("🔴 el caso vivo de producción (CVM253CR02001: 120/96/24) → 80% · 10", () => {
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "CVM253CR02001",
+        descripcion: "Men-Socks Sport",
+        ingresos: [
+          ing("2025-10-23", 120, { codigo_articulo: "CVM253CR02001", precio: 13.5, costo_fob: 8.47, costo_cif: 8.47 }),
+        ],
+        ventas: [
+          v("2025-11-15", "FA", 12, 162),
+          v("2025-12-15", "FA", 24, 324),
+          v("2026-03-15", "FA", 36, 486),
+          v("2026-05-15", "FA", 24, 324),
+        ],
+        existencia: 24,
+        precioEtiqueta: 13.5,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const { vm, vendido, meses } = celdas(art);
+    expect(vm).toEqual({ parte: 0.8, meses: 10, terminado: false });
+    expect(vendido).toBe("80%");
+    expect(meses).toBe("10");
+  });
+
+  it("🔴 el mes en curso queda FUERA de los promedios, pero mueve el % y los MESES cuentan el calendario real", () => {
+    // Compra dic-2025 (48 u); la ÚNICA venta es de agosto (el mes en curso).
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4F5003G001",
+        descripcion: "Men-Polo",
+        ingresos: [ing("2025-12-10", 48, { codigo_articulo: "4F5003G001" })],
+        ventas: [v("2026-08-05", "FA", 12, 240)],
+        existencia: 36,
+        precioEtiqueta: 20,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const f = armarFicha(art, HOY_MES);
+    // Las barras y el promedio NO ven agosto (regla de la casa)…
+    expect(promedioMensual(f.barras).unidades).toBe(0);
+    // …pero VENDIDO es el neto histórico (12/48 = 25%) y MESES el calendario
+    // real (dic-2025 → ago-2026 = 8): la venta de hoy no se esconde.
+    const vm = medirVendidoMeses(f);
+    expect(vm).toEqual({ parte: 0.25, meses: 8, terminado: false });
+  });
+
+  it("🔴 con VARIAS compras los MESES usan el ancla EXTENDIDA de la ficha (NB3705906) — no una segunda cuenta", () => {
+    // 120 u de jul-2024 vivas + refuerzo de 20 en sep-2025; vendidas 97.
+    // Anclado en sep-2025 diría 11 meses; el ancla extendida dice jul-2024 → 25.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "NB3705906",
+        descripcion: "Men-Trunk",
+        ingresos: [
+          ing("2024-07-16", 120, { codigo_articulo: "NB3705906" }),
+          ing("2025-09-15", 20, { codigo_articulo: "NB3705906" }),
+        ],
+        ventas: [
+          v("2024-09-15", "FA", 30, 810),
+          v("2025-03-15", "FA", 31, 837),
+          v("2025-11-15", "FA", 20, 540),
+          v("2026-02-15", "FA", 16, 432),
+        ],
+        existencia: 43,
+        precioEtiqueta: 27,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const f = armarFicha(art, HOY_MES);
+    const vm = medirVendidoMeses(f);
+    expect(f.ritmo.desdeMes).toBe("2024-07"); // el ancla extendida
+    expect(vm.meses).toBe(f.ritmo.meses); // LA MISMA, no una segunda
+    expect(vm).toEqual({ parte: 97 / 140, meses: 25, terminado: false });
+    expect(textoVendidoCelda(vm)).toBe("69%");
+  });
+
+  it("🔴 retrocedió por devoluciones (4D5077G001): NO se congela — dice el estado real en curso", () => {
+    // Cruzó el 90% en mayo y junio devolvió: el neto quedó en 18/36 = 50%.
+    const art = armarArticulo(
+      {
+        empresa: "vistana",
+        codigo: "4D5077G001",
+        descripcion: "Men-Cap",
+        ingresos: [ing("2026-03-29", 36, { codigo_articulo: "4D5077G001" })],
+        ventas: [v("2026-05-10", "FA", 36, 360), v("2026-06-10", "NC", 18, 180)],
+        existencia: 18,
+        precioEtiqueta: 10,
+        catalogoSyncedAt: null,
+      },
+      HOY,
+    );
+    const { vm, vendido, meses } = celdas(art);
+    expect(vm).toEqual({ parte: 0.5, meses: 5, terminado: false });
+    expect(vendido).toBe("50%");
+    expect(meses).toBe("5");
+  });
+
+  it('🔴 lo indecidible dice "—", nunca se inventa: sin compra con fecha → las DOS celdas; vendido>comprado (TERMO) → solo VENDIDO', () => {
+    // Sin compra registrada (RETENCION): ni % ni ancla.
+    const sinCompra = celdas(
+      armarArticulo(
+        {
+          empresa: "vistana",
+          codigo: "RETENCION",
+          descripcion: "RETENCION",
+          ingresos: [],
+          ventas: [v("2026-05-06", "FA", 40, 400)],
+          existencia: null,
+          precioEtiqueta: null,
+          catalogoSyncedAt: null,
+        },
+        HOY,
+      ),
+    );
+    expect(sinCompra.vm).toEqual({ parte: null, meses: null, terminado: false });
+    expect(sinCompra.vendido).toBe("—");
+    expect(sinCompra.meses).toBe("—");
+
+    // Vendido > comprado (el caso TERMO: faltan compras EN Switch): un "150%"
+    // sería mentira, pero los meses desde el ancla SÍ se saben y se dicen.
+    const termo = celdas(
+      armarArticulo(
+        {
+          empresa: "active_shoes",
+          codigo: "TERMO",
+          descripcion: "TERMO",
+          ingresos: [
+            ing("2024-07-01", 60, { codigo_articulo: "TERMO", empresa_key: "active_shoes" }),
+            ing("2025-10-01", 40, { codigo_articulo: "TERMO", empresa_key: "active_shoes" }),
+          ],
+          ventas: [v("2025-11-06", "FA", 150, 1500)],
+          existencia: 0,
+          precioEtiqueta: 10,
+          catalogoSyncedAt: null,
+        },
+        HOY,
+      ),
+    );
+    expect(termo.vm).toEqual({ parte: null, meses: 25, terminado: false });
+    expect(termo.vendido).toBe("—");
+    expect(termo.meses).toBe("25");
+  });
+
+  it("un vendido NEGATIVO (más devoluciones que ventas) tampoco es un % afirmable", () => {
+    const vm = medirVendidoMeses({
+      grandes: { comprado: 100, vendido: -5, quedan: 100, parteVendida: null },
+      noventa: { tipo: "en-curso", meses: 3, parte: -0.05 },
+      ritmo: { meses: 3, porMes: null, base: "unica-viva", desdeMes: "2026-05" },
+    });
+    expect(vm).toEqual({ parte: null, meses: 3, terminado: false });
+    expect(textoVendidoCelda(vm)).toBe("—");
+  });
+
+  it("los textos redondean a ENTERO y el borde no promete de más", () => {
+    expect(textoVendidoCelda({ parte: 14 / 48, meses: 8, terminado: false })).toBe("29%");
+    expect(textoVendidoCelda({ parte: 0.9, meses: 2, terminado: true })).toBe("90%");
+    expect(textoVendidoCelda({ parte: 0.004, meses: 1, terminado: false })).toBe("0%");
+    expect(textoVendidoCelda({ parte: 1, meses: 4, terminado: false })).toBe("100%");
+    expect(textoMesesCelda({ parte: 0.5, meses: 0, terminado: false })).toBe("0");
+    expect(textoMesesCelda({ parte: null, meses: null, terminado: false })).toBe("—");
   });
 });
 

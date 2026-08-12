@@ -51,8 +51,8 @@ import {
   armarFicha,
   centavos,
   fmtMesAnio,
+  medirVendidoMeses,
   textoMeses,
-  textoNoventaCorto,
   textoSinMargen,
   MESES_VENTANA,
   type FichaArticulo,
@@ -129,7 +129,9 @@ export async function buildReferenciaSheet(
       `los ${MESES_VENTANA} meses son COMPLETOS (el mes en curso NO entra) · ` +
       `"Compré" son TODAS las compras registradas y "Vendí" el neto histórico con las NC restadas · ` +
       `"Stock" es la existencia de Switch, NUNCA deducida — si no cuadra con Compré − Vendí, la Nota lo explica · ` +
-      `"90% en" dice en cuántos meses se vendió el 90% de la compra (la cola no cuenta) · ` +
+      `"Vendido" es la parte de lo comprado que ya se vendió — congelada en 90% cuando la compra cruzó el 90% (la cola no cuenta) · ` +
+      `"Meses" son meses CALENDARIO: los que tardó en cruzarse el 90% si terminó, o los que lleva desde la llegada si sigue viva · ` +
+      `vacío en "Vendido"/"Meses" = no se puede afirmar (sin compra con fecha, o vendido mayor que comprado) · ` +
       `"Meses de venta" y "Vendo por mes" cuentan DESDE QUE LLEGÓ la mercancía (la misma ancla del 90%) · ` +
       `"Precio prom" es la venta real ÷ unidades, con los descuentos adentro · ` +
       (conMargen ? `el margen se calcula contra el Costo CIF de la última compra · ` : ``) +
@@ -154,11 +156,13 @@ export async function buildReferenciaSheet(
       { header: "Compras (últimos 3 años)", wch: 22, align: "right", fmt: "#,##0" },
       { header: "Compras de más de 3 años", wch: 23, align: "right", fmt: "#,##0" },
       // ── El ritmo ──
-      // 🔴 "90% en" es la MISMA métrica de la pantalla y del modo pedido
-      // (`textoNoventaCorto`): "16 meses" = el 90% de la compra única se vendió
-      // en eso; "va el 80%" = compra viva; "van 258 de 360" = varias compras,
-      // agregado desde la primera llegada de los últimos 12 meses.
-      { header: "90% en", wch: 16 },
+      // 🔴 "Vendido" · "Meses" son LAS MISMAS dos celdas del modo pedido
+      // (`medirVendidoMeses`, una sola función para pantalla y Excel):
+      // terminado (cruzó el 90% sostenido) = 0,9 congelado + los meses del
+      // cruce; vivo = Vendí÷Compré + meses calendario desde la llegada.
+      // Vacío = no se puede afirmar (sin compra con fecha, o vendido>comprado).
+      { header: "Vendido", wch: 9, align: "right", fmt: "0%" },
+      { header: "Meses", wch: 8, align: "right", fmt: "#,##0" },
       { header: "Vendo por mes", wch: 13, align: "right", fmt: "#,##0.0" },
       { header: "Me queda para (meses)", wch: 20, align: "right", fmt: "#,##0.0" },
       // ── La fila de plata, en el mismo orden agrupado de la pantalla ──
@@ -188,6 +192,7 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo, conMargen: boole
   const u = f.ultima;
   const a = f.anterior;
   const m = f.margen;
+  const vm = medirVendidoMeses(f);
   return [
     art.codigo,
     art.descripcion || "—",
@@ -203,7 +208,9 @@ function filaReferencia(art: ArticuloCompras, f: FichaArticulo, conMargen: boole
     a?.unidades ?? null,
     art.compras.length,
     art.comprasFueraDeVentana,
-    textoNoventaCorto(f.noventa),
+    // Vacío = no se puede afirmar, igual que el "—" de la pantalla.
+    vm.parte,
+    vm.meses,
     n1(f.ritmo.porMes),
     n1(f.alcance),
     n2(m.precioReal),

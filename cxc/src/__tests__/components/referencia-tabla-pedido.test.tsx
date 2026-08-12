@@ -72,7 +72,11 @@ function articulo(codigo: string, over: Partial<ArticuloCompras> = {}): Articulo
 }
 
 /** La respuesta llega ORDENADA ALFABÉTICAMENTE (así la manda el route) — la
- *  vista es la que tiene que reordenarla como se pegó. */
+ *  vista es la que tiene que reordenarla como se pegó.
+ *
+ *  ZZZ999001 es el TERMINADO de la captura de Daniel (24/24/0 → 90% · 2, acá
+ *  con 120 u): cruzó el 90% en dic-2025, a los 2 meses de la llegada — al
+ *  corte 2026-08 lleva 10 meses en bodega y la celda tiene que decir 2 igual. */
 const RESP: ComprasApiResp = {
   hoyMes: "2026-08",
   hoy: "2026-08-12",
@@ -81,6 +85,10 @@ const RESP: ComprasApiResp = {
     articulo("CVM253CR02001"),
     articulo("ZZZ999001", {
       existencia: 0,
+      serie: [
+        { mes: "2025-11", unidades: 60, venta: 810 },
+        { mes: "2025-12", unidades: 60, venta: 810 },
+      ],
       cuadre: { comprado: 120, vendido: 120, existencia: 0, residuo: 0, ajusteConfiable: false },
     }),
   ],
@@ -112,13 +120,61 @@ afterEach(() => {
 describe("modo pedido — la tabla", () => {
   it("🔴 varios códigos pegados → TABLA (una fila por color), no tarjetas apiladas", async () => {
     await buscarPegado();
-    // Las columnas del mockup aprobado.
-    for (const col of ["Código", "Compré", "Vendí", "Stock", "90% en", "Margen", "Últ. compra"]) {
+    // Las columnas del mockup aprobado (12-ago-2026): VENDIDO · MESES en vez
+    // de "90% en" — Daniel: "va el 29%" no decía cuánto tiempo llevaba.
+    for (const col of ["Código", "Compré", "Vendí", "Stock", "Vendido", "Meses", "Margen", "Últ. compra"]) {
       expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
     }
+    expect(screen.queryByText("90% en")).toBeNull();
     // Sin detalle abierto, los grandes de la tarjeta no están montados ("en
     // bodega" es el pie del Stock grande y solo existe en el cuerpo).
     expect(screen.queryByText("en bodega")).toBeNull();
+  });
+
+  it("🔴 TERMINADO se congela en 90% y los meses del CRUCE, en negro; el VIVO dice su % actual y sus meses, en gris", async () => {
+    await buscarPegado();
+    const celdasDe = (codigo: string) => {
+      const fila = screen.getAllByText(codigo)[0].closest("tr")!;
+      const tds = [...fila.querySelectorAll("td")];
+      return { vendido: tds[4], meses: tds[5] };
+    };
+    // ZZZ999001 cruzó el 90% en 2 meses. Lleva 10 en bodega: la celda dice 2
+    // igual (la cola no cuenta) y va en NEGRO — dato cerrado.
+    const term = celdasDe("ZZZ999001");
+    expect(term.vendido.textContent).toBe("90%");
+    expect(term.meses.textContent).toBe("2");
+    expect(term.vendido.className).toContain("text-gray-900");
+    expect(term.meses.className).toContain("text-gray-900");
+    // AAA111001 sigue vivo: 96/120 = 80% a los 10 meses de la llegada, en GRIS.
+    const vivo = celdasDe("AAA111001");
+    expect(vivo.vendido.textContent).toBe("80%");
+    expect(vivo.meses.textContent).toBe("10");
+    expect(vivo.vendido.className).toContain("text-gray-500");
+    expect(vivo.meses.className).toContain("text-gray-500");
+  });
+
+  it('🔴 lo que no se puede afirmar dice "—": sin compra con fecha → las dos celdas', async () => {
+    const resp: ComprasApiResp = {
+      ...RESP,
+      articulos: [
+        articulo("AAA111001"),
+        articulo("RETENCION", {
+          compras: [],
+          sinCompraRegistrada: true,
+          existencia: null,
+          cuadre: { comprado: null, vendido: 40, existencia: null, residuo: null, ajusteConfiable: false },
+        }),
+      ],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => resp }) as unknown as Response));
+    render(<ReferenciaView />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "RETENCION AAA111001" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /Buscar/ })[0]);
+    await screen.findAllByText("RETENCION");
+    const fila = screen.getAllByText("RETENCION")[0].closest("tr")!;
+    const tds = [...fila.querySelectorAll("td")];
+    expect(tds[4].textContent).toBe("—"); // Vendido
+    expect(tds[5].textContent).toBe("—"); // Meses
   });
 
   it("🔴 las filas van EN EL ORDEN EN QUE SE PEGARON, no en el alfabético del route", async () => {
@@ -194,7 +250,7 @@ describe("modo pedido — la tabla", () => {
 
     expect(screen.queryByText("Margen")).toBeNull();
     // Las demás columnas siguen enteras.
-    for (const col of ["Código", "Compré", "Vendí", "Stock", "90% en", "Últ. compra"]) {
+    for (const col of ["Código", "Compré", "Vendí", "Stock", "Vendido", "Meses", "Últ. compra"]) {
       expect(screen.getAllByText(col).length, `falta la columna "${col}"`).toBeGreaterThan(0);
     }
     // Abrir el detalle: la fila de plata trae precios y costos, pero NO margen.

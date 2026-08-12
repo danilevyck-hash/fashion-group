@@ -425,7 +425,9 @@ export function textoNoventa(n: LineaNoventa): string | null {
   }
 }
 
-/** La versión CORTA para la columna "90% en" del modo pedido. */
+/** La versión CORTA de la línea del 90% — la usaba la columna "90% en" del
+ *  modo pedido (reemplazada por VENDIDO · MESES el 12-ago-2026) y la sigue
+ *  usando la verificación contra producción. */
 export function textoNoventaCorto(n: LineaNoventa): string {
   switch (n.tipo) {
     case "vendido":
@@ -440,6 +442,77 @@ export function textoNoventaCorto(n: LineaNoventa): string {
     case "sin-dato":
       return "—";
   }
+}
+
+// ─── VENDIDO · MESES: las dos celdas del modo pedido ─────────────────────────
+//
+// 🔴 REEMPLAZAN A LA COLUMNA "90% en" (12-ago-2026). Daniel, sobre la tabla del
+// modo pedido: "va el 29%" no dice CUÁNTO TIEMPO lleva — y sin el tiempo el %
+// no alcanza para decidir una compra. Ahora son dos columnas:
+//
+//   CÓDIGO       COMPRÉ VENDÍ STOCK  VENDIDO  MESES
+//   4F5003G001     48    14    34      29%      8     ← vivo (gris)
+//   4K5026G102     24    24     0      90%      2     ← terminado (negro)
+//
+//   · TERMINADO (el acumulado neto cruzó el 90% y se sostiene): VENDIDO = 90%
+//     y MESES = los meses calendario en que se cruzó — CONGELADOS ahí (regla
+//     vieja de Daniel: la cola no cuenta). Es EXACTAMENTE el caso "vendido" de
+//     `medirNoventa`, sin una segunda medición.
+//   · VIVO (no cruzó — con ventas, sin ventas, o retrocedido por devoluciones):
+//     VENDIDO = Vendí ÷ Compré (LOS TOTALES de los tres grandes, redondeado a
+//     entero al mostrar) y MESES = meses calendario desde la llegada — la MISMA
+//     ancla de la ficha (`medirRitmo`): la única compra, o el ancla EXTENDIDA
+//     con varias. El mes en curso sigue fuera de todo promedio, pero los meses
+//     TRANSCURRIDOS cuentan el calendario real (y una venta de hoy sí mueve
+//     el %: Vendí es el neto histórico).
+//   · SIN DATO: la celda que no se puede afirmar dice "—", nunca se inventa.
+//     Sin compra con fecha → las dos en "—". Vendido > comprado (el caso TERMO:
+//     faltan compras EN Switch) → el % sería mentira, pero los meses desde la
+//     llegada SÍ se saben y se dicen.
+//
+// UNA función para pantalla y Excel: si cada una hiciera su cuenta, la tabla y
+// la planilla dirían dos cosas distintas de la misma fila.
+
+export interface VendidoMeses {
+  /** La celda VENDIDO, como fracción 0-1 (0,9 CONGELADO si terminó).
+   *  `null` = "—": no hay porcentaje honesto que afirmar. */
+  parte: number | null;
+  /** La celda MESES (meses calendario, enteros). `null` = "—": sin fecha. */
+  meses: number | null;
+  /** `true` = cruzó el 90% sostenido: congelado, va en negro.
+   *  `false` = en curso, va en gris. */
+  terminado: boolean;
+}
+
+export function medirVendidoMeses(
+  f: Pick<FichaArticulo, "grandes" | "noventa" | "ritmo">,
+): VendidoMeses {
+  // Cruzó el 90% y se sostiene: se congela ahí. `noventa.meses` es el mes del
+  // cruce, no "cuánto lleva en bodega" — la cola no cuenta.
+  if (f.noventa.tipo === "vendido") {
+    return { parte: PARTE_NOVENTA, meses: f.noventa.meses, terminado: true };
+  }
+  const { comprado, vendido } = f.grandes;
+  // El % vivo sale de los TOTALES (Vendí ÷ Compré). Un vendido negativo ("el
+  // −5% de lo comprado") o mayor que lo comprado (TERMO) no es un % afirmable.
+  const parte =
+    comprado != null && comprado > 0 && vendido >= 0 && vendido <= comprado
+      ? vendido / comprado
+      : null;
+  // `ritmo.meses` ya es la ancla de la ficha: llegada de la única compra, o el
+  // ancla EXTENDIDA del agregado. No se inventa una segunda.
+  return { parte, meses: f.ritmo.meses, terminado: false };
+}
+
+/** "29%" / "0%" / "90%" / "—" — el texto de la celda VENDIDO. */
+export function textoVendidoCelda(v: VendidoMeses): string {
+  if (v.parte == null) return "—";
+  return `${Math.round(v.parte * 100)}%`;
+}
+
+/** "8" / "0" / "—" — el texto de la celda MESES. */
+export function textoMesesCelda(v: VendidoMeses): string {
+  return v.meses == null ? "—" : fmtNum(v.meses);
 }
 
 // ─── El RITMO: unidades por mes DESDE QUE LLEGÓ la mercancía ─────────────────
