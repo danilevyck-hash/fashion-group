@@ -92,8 +92,7 @@ export async function PATCH(
       patch.tiendaCodigo !== undefined ||
       patch.nombre !== undefined ||
       patch.fecha_inicio !== undefined ||
-      patch.notas !== undefined ||
-      patch.estado !== undefined;
+      patch.notas !== undefined;
 
     if (tieneCamposBase) {
       const u = await updateProyecto(params.id, patch);

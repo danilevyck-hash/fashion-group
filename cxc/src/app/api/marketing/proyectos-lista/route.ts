@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import { esMultifashion } from "@/lib/marketing/multifashion";
 import {
   marcasDeEntrega,
@@ -19,7 +18,6 @@ export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
 // GET /api/marketing/proyectos-lista
-//   ?filtro_estado=activos|todos|abierto|por_cobrar|enviado|cobrado
 //   ?bloque=TH|CK|KL|RBK|J|multifashion|sin_bloque
 //                     → solo proyectos del bloque del inicio (una MARCA por
 //                       bloque). `?proveedor=` se sigue aceptando como nombre
@@ -32,21 +30,20 @@ export const fetchCache = "force-no-store";
 //                       (ej. "64327" encuentra "0000064327").
 //
 // Respuesta: Array<ProyectoListItem>
-// Calcula por_cobrar usando mk_factura_marcas + cobranzas.
-// Por cobrar = facturas de proyecto 'abierto' (sin cobranza generada)
-//              + cobranzas en 'por_cobrar' o 'enviada' (monto ya fijado).
-// No incluye estados 'cobrado'/'cobrada' ni anulados.
-
-// Modelo abierto / cerrado. Activos = abierto. Historial/cerrado incluye los
-// legacy enviado/cobrado (se leen como cerrado, nunca se reescriben).
-const CERRADO_DB = ["cerrado", "enviado", "cobrado"] as const;
+//
+// 🔴 EL ESTADO DEL PROYECTO DEJÓ DE EXISTIR COMO FILTRO (11-ago-2026).
+// "Cerrar proyecto" se retiró de la UI: era cosmético y confundía al lado de
+// "Cerrar período". La lista devuelve SIEMPRE todos los proyectos vivos (no
+// anulados). `?filtro_estado=` se ignora si un cliente viejo lo manda. Los
+// valores legacy 'enviado'/'cobrado'/'cerrado' que pudieran quedar en la
+// columna se leen igual que 'abierto': el proyecto es solo la agrupación por
+// cliente, y lo que congela plata es el PERÍODO cerrado.
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(req.url);
-  const filtroEstado = (url.searchParams.get("filtro_estado") ?? "activos").toLowerCase();
   const marcaIdFiltro = url.searchParams.get("marca_id");
   // Bucket de cards por marca (rediseño): grupo=legacy → solo proyectos con ≥1
   // factura legacy (bucket "Tommy y Calvin"); grupo=marca + marca_id → solo
@@ -120,19 +117,8 @@ export async function GET(req: NextRequest) {
           .from("mk_proyectos")
           // tienda_codigo entra para poder reconocer los proyectos de
           // Multifashion (bucket independiente) — ver lib/marketing/multifashion.
-          .select(
-            "id, nombre, tienda, tienda_codigo, estado, created_at, anulado_en, fecha_enviado, fecha_cobrado",
-          )
+          .select("id, nombre, tienda, tienda_codigo, created_at, anulado_en")
           .is("anulado_en", null);
-        if (filtroEstado === "activos" || filtroEstado === "joybees") {
-          // Tab Joybees comparte el universo de activos (abierto).
-          // El filtro interno/externo se aplica después vía passTipo().
-          q = q.eq("estado", "abierto");
-        } else if (filtroEstado === "historial" || filtroEstado === "cerrado") {
-          q = q.in("estado", CERRADO_DB as unknown as string[]);
-        } else if (filtroEstado === "abierto") {
-          q = q.eq("estado", "abierto");
-        }
         if (busqueda.length > 0) {
           const orProyecto = [
             `nombre.ilike.%${esc}%`,
@@ -144,16 +130,7 @@ export async function GET(req: NextRequest) {
           }
           q = q.or(orProyecto.join(","));
         }
-        // Historial ordena por fecha_cobrado DESC (lo más reciente arriba).
-        // Resto del módulo ordena por created_at DESC.
-        if (filtroEstado === "historial") {
-          q = q
-            .order("fecha_cobrado", { ascending: false, nullsFirst: false })
-            .order("created_at", { ascending: false });
-        } else {
-          q = q.order("created_at", { ascending: false });
-        }
-        return q;
+        return q.order("created_at", { ascending: false });
       })(),
     ]);
 
@@ -180,11 +157,8 @@ export async function GET(req: NextRequest) {
       nombre: string | null;
       tienda: string;
       tienda_codigo: string | null;
-      estado: string;
       created_at: string;
       anulado_en: string | null;
-      fecha_enviado: string | null;
-      fecha_cobrado: string | null;
     }>;
     const proyectosMf = new Set(
       proyectos.filter((p) => esMultifashion(p)).map((p) => String(p.id)),
@@ -347,10 +321,8 @@ export async function GET(req: NextRequest) {
       cobrableFactByProyMarca.set(pid, inner);
     }
 
-    // Desglose SUM(factura.total × %) desde mk_factura_marcas, sin filtrar
-    // por estado. Lo usamos para dos cosas distintas:
-    //   - por_cobrar_*: pendiente de cobrar (proyectos NO cobrados).
-    //   - cobrado_*: monto ya cobrado (proyectos en estado 'cobrado').
+    // Desglose SUM(factura.total × %) desde mk_factura_marcas. Alimenta el
+    // tooltip de desglose por marca de la columna "Gastado".
     function desgloseDeProy(
       pid: string,
     ): { total: number; desglose: Array<{ marcaId: string; monto: number }> } {
@@ -422,15 +394,14 @@ export async function GET(req: NextRequest) {
       return true;
     }
 
-    const esVistaJoybees = filtroEstado === "joybees";
     const passTipo = (pid: string): boolean => {
-      // 🩸 El split interno/externo es del tab Joybees legacy y NO aplica al
-      // modelo por marca: un bloque tiene que enseñar TODOS sus proyectos. Si
-      // se aplicara, "Ver proyectos" de una marca interna devolvería una lista
-      // vacía mientras su bloque muestra plata.
+      // 🩸 El split interno/externo es del modelo viejo (tab Joybees) y NO
+      // aplica al modelo por marca: un bloque tiene que enseñar TODOS sus
+      // proyectos. Si se aplicara, "Ver proyectos" de una marca interna
+      // devolvería una lista vacía mientras su bloque muestra plata. Sin
+      // bloque (compat) se conserva el default de siempre: solo externos.
       if (bloque) return true;
-      const interno = proyectoEsInterno(pid);
-      return esVistaJoybees ? interno : !interno;
+      return !proyectoEsInterno(pid);
     };
 
     const resultado = proyectos
@@ -462,17 +433,12 @@ export async function GET(req: NextRequest) {
             monto: d.monto,
           };
         });
-        const esCerrado = normalizarEstadoProyecto(p.estado) === "cerrado";
-
         return {
           id: pid,
           nombre: p.nombre,
           tienda: p.tienda,
-          estado: normalizarEstadoProyecto(p.estado),
           created_at: p.created_at,
           anulado_en: p.anulado_en,
-          fecha_enviado: p.fecha_enviado,
-          fecha_cobrado: p.fecha_cobrado,
           facturas_count: facturasCountByProy.get(pid) ?? 0,
           fotos_count: fotosCountByProy.get(pid) ?? 0,
           entregas_count: entregasCountByProy.get(pid) ?? 0,
@@ -480,12 +446,11 @@ export async function GET(req: NextRequest) {
           // Gasto BRUTO real (Σ factura.total con ITBMS + entregas), sin co-op.
           // Es el número grande que se muestra en la columna "Gastado".
           gasto_real: Number((grossByProy.get(pid) ?? 0).toFixed(2)),
-          // Abiertos: desglose de gasto por marca; cerrados: van al otro bucket.
-          // Alimenta SOLO el tooltip de desglose por marca (gasto puro).
-          por_cobrar_total: esCerrado ? 0 : desg.total,
-          por_cobrar_por_marca: esCerrado ? [] : desgloseConNombres,
-          cobrado_total: esCerrado ? desg.total : 0,
-          cobrado_por_marca: esCerrado ? desgloseConNombres : [],
+          // Desglose de gasto por marca. Alimenta SOLO el tooltip de la
+          // columna "Gastado". El split por_cobrar/cobrado que dependía del
+          // estado del proyecto se retiró con el estado (11-ago-2026).
+          por_cobrar_total: desg.total,
+          por_cobrar_por_marca: desgloseConNombres,
         };
       });
 

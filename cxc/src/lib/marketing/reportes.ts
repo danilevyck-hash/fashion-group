@@ -13,14 +13,10 @@ import {
   type ReportColumn,
 } from "@/lib/excel-export";
 import { supabaseServer } from "@/lib/supabase-server";
-import {
-  formatearFecha,
-  normalizarEstadoProyecto,
-  etiquetaEstadoProyecto,
-} from "./normalizar";
+import { formatearFecha } from "./normalizar";
 import { getMarcas } from "./queries";
 import { getEntregaTotalByProyectoBatch } from "./inventario";
-import type { MkMarca, EstadoProyecto } from "./types";
+import type { MkMarca } from "./types";
 
 // ----------------------------------------------------------------------------
 // Tipos de output
@@ -44,7 +40,6 @@ export interface ReporteProyectoItem {
     nombre: string | null;
     tienda: string;
     fecha_inicio: string;
-    estado: EstadoProyecto;
   };
   marcas: Array<{ nombre: string }>;
   gastoTotal: number;
@@ -54,7 +49,6 @@ export interface FiltrosReporteProyecto {
   anio?: number;
   marcaId?: string;
   tienda?: string;
-  estado?: EstadoProyecto;
 }
 
 // ----------------------------------------------------------------------------
@@ -75,7 +69,6 @@ interface ProyectoMin {
   tienda: string;
   tienda_codigo: string | null;
   fecha_inicio: string;
-  estado: EstadoProyecto;
 }
 
 interface ProyMarcaMin {
@@ -95,7 +88,7 @@ async function cargarProyectosVigentes(
 ): Promise<ProyectoMin[]> {
   let q = supabaseServer
     .from("mk_proyectos")
-    .select("id, nombre, tienda, tienda_codigo, fecha_inicio, estado")
+    .select("id, nombre, tienda, tienda_codigo, fecha_inicio")
     .is("anulado_en", null);
   const rango = anioRange(anio);
   if (rango) q = q.gte("fecha_inicio", rango.ini).lte("fecha_inicio", rango.fin);
@@ -109,7 +102,6 @@ async function cargarProyectosVigentes(
       tienda: String(x.tienda ?? ""),
       tienda_codigo: (x.tienda_codigo as string | null) ?? null,
       fecha_inicio: String(x.fecha_inicio ?? ""),
-      estado: normalizarEstadoProyecto(x.estado),
     };
   });
 }
@@ -358,9 +350,6 @@ export async function reportePorProyecto(
   ]);
 
   let proyectos = proyectosRaw;
-  if (filtros.estado) {
-    proyectos = proyectos.filter((p) => p.estado === filtros.estado);
-  }
   if (filtros.tienda) {
     const t = filtros.tienda.toLocaleLowerCase("es");
     proyectos = proyectos.filter((p) => p.tienda.toLocaleLowerCase("es") === t);
@@ -496,11 +485,12 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
     }
     hoja = "Por proyecto";
     title = "FASHION GROUP — Marketing por Proyecto";
+    // La columna "Estado" se retiró el 11-ago-2026 junto con "Cerrar
+    // proyecto": sin escritor, solo podía decir "Abierto" para siempre.
     columns = [
       { header: "Proyecto", wch: 28 },
       { header: "Tienda", wch: 20 },
       { header: "Fecha inicio", wch: 14 },
-      { header: "Estado", wch: 14 },
       { header: "Marcas", wch: 30 },
       { header: "Gasto real", wch: 14, align: "right", fmt: MONEY_FMT },
     ];
@@ -508,7 +498,6 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       item.proyecto.nombre ?? item.proyecto.tienda,
       item.proyecto.tienda,
       formatearFecha(item.proyecto.fecha_inicio),
-      etiquetaEstadoProyecto(item.proyecto.estado),
       item.marcas.map((m) => m.nombre).join(", "),
       item.gastoTotal,
     ]);

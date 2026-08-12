@@ -1,9 +1,19 @@
 "use client";
 
-// Lista de proyectos de UN PROVEEDOR (el bloque que se tocó en el inicio).
-// El proveedor es a quien se le reporta el gasto; la marca dejó de ser la
-// unidad del módulo. El reparto marca → proveedor vive en UN solo lugar
-// (`lib/marketing/proveedores.ts`) y acá se IMPORTA, nunca se reescribe.
+// Lista de proyectos de UNA MARCA (el bloque que se tocó en el inicio).
+// La MARCA es la unidad del módulo desde el rediseño de ago-2026: período,
+// cierre y ZIP van por marca, y el proyecto es solo la agrupación por cliente
+// (se autocrea al registrar un gasto).
+//
+// 🔴 EL PROYECTO YA NO TIENE ESTADO VISIBLE. "Cerrar proyecto" se retiró el
+// 11-ago-2026: era un estado cosmético que al lado de "Cerrar período"
+// confundía — dos "cerrar" distintos en la misma pantalla. Lo que congela
+// plata es el PERÍODO cerrado, nunca el proyecto. No volver a dibujar un
+// badge/filtro/acción de estado de proyecto acá.
+//
+// La única acción destructiva de la fila es "Registrado por error — eliminar"
+// (la mecánica de anular de siempre: esconde el proyecto, sus gastos dejan de
+// contar, y el aviso con "Deshacer" queda hasta que la persona lo cierre).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
@@ -14,18 +24,12 @@ import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import { useFormModalDismiss } from "@/lib/hooks/useModalDismiss";
 
-// Solo usado para inicializar el estado fijo; ya no hay UI de filtro por estado.
-type FiltroEstado = "todos";
-
 interface ProyectoListItem {
   id: string;
   nombre: string | null;
   tienda: string;
-  estado: string;
   created_at: string;
   anulado_en: string | null;
-  fecha_enviado: string | null;
-  fecha_cobrado: string | null;
   facturas_count: number;
   fotos_count: number;
   entregas_count?: number;
@@ -39,14 +43,8 @@ interface ProyectoListItem {
   // por co-op. Es el número de la columna "Gastado".
   gasto_real?: number;
   por_cobrar_total: number;
-  por_cobrar_por_marca: Array<{
-    marca_id: string;
-    marca_nombre: string;
-    monto: number;
-  }>;
   // Cobrable co-op por marca (alimenta SOLO el tooltip de desglose).
-  cobrado_total?: number;
-  cobrado_por_marca?: Array<{
+  por_cobrar_por_marca: Array<{
     marca_id: string;
     marca_nombre: string;
     monto: number;
@@ -64,11 +62,12 @@ interface Props {
   /**
    * Bloque del inicio del que se entró: el CÓDIGO de la marca (`TH` | `CK` |
    * `KL` | `RBK` | `J`) o `multifashion` | `sin_bloque`. La lista queda acotada
-   * a sus proyectos.
+   * a sus proyectos. Esta vista SIEMPRE se abre desde un bloque del inicio —
+   * el modo "todas las marcas" con dropdown era del modelo viejo y se retiró.
    */
-  bloque?: string;
-  bucketLabel?: string;
-  onBack?: () => void;
+  bloque: string;
+  bucketLabel: string;
+  onBack: () => void;
 }
 
 
@@ -97,11 +96,6 @@ export default function ProyectosHomeView({
   onBack,
 }: Props) {
   const { toast } = useToast();
-  const enBucket = !!onBack; // renderizado desde una card (Nivel 2)
-  // Archivo plano: ya no hay filtros por estado en la UI. Forzamos "todos"
-  // para que la query backend devuelva la lista completa sin condicionar.
-  const [filtroEstado] = useState<FiltroEstado>("todos");
-  const [marcaIdFiltro, setMarcaIdFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState<string>("");
   const [busquedaDebounced, setBusquedaDebounced] = useState<string>("");
   const [proyectos, setProyectos] = useState<ProyectoListItem[]>([]);
@@ -112,12 +106,12 @@ export default function ProyectosHomeView({
   >(null);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
-  // 🩸 ANULAR ERA UNA PUERTA DE UNA SOLA MANO. La pantalla "Anulados" era el
+  // 🩸 ELIMINAR ERA UNA PUERTA DE UNA SOLA MANO. La pantalla "Anulados" era el
   // ÚNICO lugar desde donde se podía restaurar un proyecto, y se retiró: sin
-  // esto, anular por error dejaría el proyecto fuera de Marketing para siempre
-  // (la API `papelera/restaurar` sigue viva, pero nadie llega a ella desde la
-  // app). El aviso se queda hasta que la persona lo cierre — nada de 5
-  // segundos: el error se descubre al mirar la lista y ver que falta.
+  // esto, eliminar por error dejaría el proyecto fuera de Marketing para
+  // siempre (la API `papelera/restaurar` sigue viva, pero nadie llega a ella
+  // desde la app). El aviso se queda hasta que la persona lo cierre — nada de
+  // 5 segundos: el error se descubre al mirar la lista y ver que falta.
   const [deshacerAnular, setDeshacerAnular] = useState<
     { id: string; nombre: string } | null
   >(null);
@@ -152,18 +146,7 @@ export default function ProyectosHomeView({
     setLoading(true);
     try {
       const qs = new URLSearchParams();
-      qs.set("filtro_estado", filtroEstado);
-      // Bloque del inicio. Sin bloque, cae al dropdown de marca (compat).
-      // Se manda con las DOS claves a propósito: `bloque` es la nueva y
-      // `proveedor` la que la ruta entiende hoy. Un parámetro de más que el
-      // servidor ignora no rompe nada; que la lista se vacíe el día del
-      // despliegue, sí.
-      if (bloque) {
-        qs.set("bloque", bloque);
-        qs.set("proveedor", bloque);
-      } else if (marcaIdFiltro) {
-        qs.set("marca_id", marcaIdFiltro);
-      }
+      qs.set("bloque", bloque);
       if (busquedaDebounced) qs.set("busqueda", busquedaDebounced);
       const res = await fetch(`/api/marketing/proyectos-lista?${qs.toString()}`, {
         cache: "no-store",
@@ -176,7 +159,7 @@ export default function ProyectosHomeView({
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado, marcaIdFiltro, bloque, busquedaDebounced]);
+  }, [bloque, busquedaDebounced]);
 
   useEffect(() => {
     cargar();
@@ -225,15 +208,15 @@ export default function ProyectosHomeView({
       );
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo anular");
+        throw new Error(err?.error ?? "No se pudo eliminar");
       }
-      toast("Proyecto anulado", "success");
+      toast("Proyecto eliminado", "success");
       setDeshacerAnular({ id: anularPendiente.id, nombre: anularPendiente.nombre });
       setAnularPendiente(null);
       setAnularMotivo("");
       cargar();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Error al anular", "error");
+      toast(err instanceof Error ? err.message : "Error al eliminar", "error");
     } finally {
       setAnulando(false);
     }
@@ -265,58 +248,26 @@ export default function ProyectosHomeView({
     }
   };
 
-  const cambiarEstado = async (
-    id: string,
-    accion: "cerrar" | "reabrir",
-    nombre: string,
-  ) => {
-    try {
-      const res = await fetch(`/api/marketing/proyectos/${id}/${accion}`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo actualizar");
-      }
-      toast(
-        accion === "cerrar"
-          ? `"${nombre}" se cerró`
-          : `"${nombre}" se reabrió`,
-        "success",
-      );
-      cargar();
-    } catch (err) {
-      toast(
-        err instanceof Error ? err.message : "Error al cambiar estado",
-        "error",
-      );
-    }
-  };
-
   return (
     <div className="space-y-4">
-      {/* Back a las cards de marca (modo bucket) */}
-      {enBucket && (
-        <button
-          type="button"
-          onClick={onBack}
-          /* Volver era texto suelto (~20 px de alto); -my-1 para no separar de la lista. */
-          className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
-        >
-          ← Marketing
-        </button>
-      )}
+      {/* Back a las cards de marca */}
+      <button
+        type="button"
+        onClick={onBack}
+        /* Volver era texto suelto (~20 px de alto); -my-1 para no separar de la lista. */
+        className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1 min-h-[44px] -my-1"
+      >
+        ← Marketing
+      </button>
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">
-            {enBucket ? bucketLabel || "Marketing" : "Marketing"}
+            {bucketLabel || "Marketing"}
           </h1>
-          {enBucket && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              Proyectos con gasto de esta marca
-            </p>
-          )}
+          <p className="text-xs text-gray-500 mt-0.5">
+            Proyectos con gasto de esta marca
+          </p>
         </div>
         {/* Eran textos sueltos de 18-21 px de alto. 44 px de área táctil en
             cada uno; -my-1 evita que la fila empuje el título al crecer. */}
@@ -358,7 +309,7 @@ export default function ProyectosHomeView({
       {deshacerAnular && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-sm text-amber-900">
-            Anulaste &ldquo;{deshacerAnular.nombre}&rdquo;. Ya no aparece en Marketing.
+            Eliminaste &ldquo;{deshacerAnular.nombre}&rdquo;. Ya no aparece en Marketing.
           </span>
           <button
             type="button"
@@ -379,8 +330,8 @@ export default function ProyectosHomeView({
         </div>
       )}
 
-      {/* Filtros: búsqueda (+ dropdown de marca solo fuera del modo bucket) */}
-      <div className={`grid grid-cols-1 gap-2 ${enBucket ? "" : "sm:grid-cols-[1fr_200px]"}`}>
+      {/* Búsqueda */}
+      <div className="grid grid-cols-1 gap-2">
         {/* text-base en mobile: con text-sm (14px) Safari hace zoom al enfocar
             el campo y descuadra la página. min-h-[44px] para el toque. */}
         <input
@@ -390,20 +341,6 @@ export default function ProyectosHomeView({
           placeholder="Buscar por proyecto, tienda o N° de factura…"
           className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm focus:border-black focus:outline-none"
         />
-        {!enBucket && (
-          <select
-            value={marcaIdFiltro}
-            onChange={(e) => setMarcaIdFiltro(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] text-base sm:text-sm bg-white focus:border-black focus:outline-none"
-          >
-            <option value="">Todas las marcas</option>
-            {marcas.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombre}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       {/* Lista */}
@@ -418,13 +355,9 @@ export default function ProyectosHomeView({
           <div className="text-sm text-gray-600 mb-1">
             {busquedaDebounced
               ? "No hay proyectos que coincidan con el filtro."
-              : enBucket
-                ? "Todavía no hay gasto de esta marca. Registra el primero."
-                : marcaIdFiltro
-                  ? "No hay proyectos que coincidan con el filtro."
-                  : "No hay proyectos todavía."}
+              : "Todavía no hay gasto de esta marca. Registra el primero."}
           </div>
-          {!busquedaDebounced && !marcaIdFiltro && (
+          {!busquedaDebounced && (
             <button
               type="button"
               onClick={onRegistrarGasto}
@@ -477,17 +410,13 @@ export default function ProyectosHomeView({
                 // ITBMS + entregas), SIN ponderar por co-op. El tooltip de
                 // abajo sí muestra el cobrable por marca (co-op). Fallback al
                 // cálculo viejo por si llega una respuesta cacheada sin gasto_real.
-                const totalGastado =
-                  p.gasto_real ?? ((p.por_cobrar_total || 0) + (p.cobrado_total || 0));
-                const desgloseFuente =
+                const totalGastado = p.gasto_real ?? (p.por_cobrar_total || 0);
+                const desgloseTooltip =
                   p.por_cobrar_por_marca.length > 0
                     ? p.por_cobrar_por_marca
-                    : p.cobrado_por_marca;
-                const desgloseTooltip = desgloseFuente && desgloseFuente.length > 0
-                  ? desgloseFuente
-                      .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
-                      .join("\n")
-                  : undefined;
+                        .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
+                        .join("\n")
+                    : undefined;
 
                 return (
                   <tr
@@ -523,14 +452,6 @@ export default function ProyectosHomeView({
                               <path d="M12 22.08V12" />
                             </svg>
                             Muebles
-                          </span>
-                        )}
-                        {p.estado === "cerrado" && (
-                          <span
-                            title="Proyecto cerrado"
-                            className="inline-flex items-center shrink-0 bg-gray-100 border border-gray-300 text-gray-600 rounded-md px-2 py-0.5 text-xs"
-                          >
-                            Cerrado
                           </span>
                         )}
                       </div>
@@ -585,7 +506,9 @@ export default function ProyectosHomeView({
                     <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
                       {formatearFecha(fechaIso)}
                     </td>
-                    {/* Acciones — archivo plano: Editar (abre overlay), ZIP, Anular */}
+                    {/* Acciones: Editar (abre overlay), ZIP, y el "anular" de
+                        siempre con su nombre nuevo. "Cerrar proyecto" se retiró
+                        (ver el encabezado del archivo). */}
                     <td
                       className="px-[18px] py-3 align-middle"
                       onClick={(e) => e.stopPropagation()}
@@ -605,19 +528,8 @@ export default function ProyectosHomeView({
                                   zipEstados[p.id]?.tipo === "trabajando" ||
                                   zipEstados[p.id]?.tipo === "exito",
                               },
-                              p.estado === "cerrado"
-                                ? {
-                                    label: "Reabrir proyecto",
-                                    onClick: () =>
-                                      cambiarEstado(p.id, "reabrir", nombreVis),
-                                  }
-                                : {
-                                    label: "Cerrar proyecto",
-                                    onClick: () =>
-                                      cambiarEstado(p.id, "cerrar", nombreVis),
-                                  },
                               {
-                                label: "Anular proyecto",
+                                label: "Registrado por error — eliminar",
                                 onClick: () => {
                                   setAnularPendiente({
                                     id: p.id,
@@ -644,7 +556,7 @@ export default function ProyectosHomeView({
       {/* Línea de cuadre: los pagos de impulsadora de esta marca son
           gastos sueltos (no proyectos) → se muestran aparte para que el
           detalle visible sume igual que el total del bloque del inicio. */}
-      {enBucket && impulsadoraTotal > 0 && (
+      {impulsadoraTotal > 0 && (
         <button
           type="button"
           onClick={onOpenImpulsadoras}
@@ -667,9 +579,11 @@ export default function ProyectosHomeView({
             className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold mb-1">Anular proyecto</h3>
+            <h3 className="text-base font-semibold mb-1">
+              Registrado por error — eliminar
+            </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Vas a anular &ldquo;{anularPendiente.nombre}&rdquo;. Deja de
+              Vas a eliminar &ldquo;{anularPendiente.nombre}&rdquo;. Deja de
               aparecer en Marketing y su gasto no se le reporta a nadie. Si te
               equivocás, podés devolverlo enseguida desde el aviso que queda en
               la lista.
@@ -685,7 +599,7 @@ export default function ProyectosHomeView({
               rows={3}
               value={anularMotivo}
               onChange={(e) => setAnularMotivo(e.target.value)}
-              placeholder="Explica por qué se anula"
+              placeholder="Explica qué pasó"
               /* text-base en mobile para que Safari no haga zoom al enfocar. */
               className="w-full rounded-md border border-gray-300 px-3 py-2 text-base sm:text-sm focus:border-black focus:outline-none mb-4"
             />
@@ -696,7 +610,7 @@ export default function ProyectosHomeView({
                 disabled={anulando || anularMotivo.trim().length === 0}
                 className="flex-1 px-4 min-h-[44px] inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
               >
-                {anulando ? "Anulando…" : "Anular proyecto"}
+                {anulando ? "Eliminando…" : "Eliminar"}
               </button>
               <button
                 type="button"

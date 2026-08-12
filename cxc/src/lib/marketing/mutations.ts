@@ -140,9 +140,8 @@ export async function updateProyecto(
         : null;
     payload.tienda_codigo = c;
   }
-  if (input.estado !== undefined) {
-    payload.estado = input.estado;
-  }
+  // `estado` ya no se acepta: el estado del proyecto se retiró de la UI
+  // (11-ago-2026) y no queda ningún escritor legítimo.
   if (input.fecha_inicio !== undefined) {
     const f = normalizarTexto(input.fecha_inicio);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) {
@@ -216,31 +215,10 @@ export async function restaurarProyecto(id: string): Promise<void> {
   }
 }
 
-// Transiciones de estado (modelo actual: abierto ⇄ cerrado).
-// 'cerrado' es el valor nuevo. Los proyectos legacy en 'enviado'/'cobrado' se
-// leen como 'cerrado' (normalizarEstadoProyecto) y NUNCA se reescriben aquí.
-// Las fechas legacy (fecha_enviado/fecha_cobrado) se conservan en datos: no se
-// tocan ni al cerrar ni al reabrir.
-
-export async function cerrarProyecto(id: string): Promise<void> {
-  if (!id) throw new Error("id requerido");
-  const { error } = await supabaseServer
-    .from("mk_proyectos")
-    .update({ estado: "cerrado" })
-    .eq("id", id);
-  if (error) throw new Error(`cerrarProyecto: ${error.message}`);
-}
-
-// Reabrir: cualquier estado → abierto. No limpia fechas legacy (se conservan).
-export async function reabrirProyecto(id: string): Promise<"abierto"> {
-  if (!id) throw new Error("id requerido");
-  const { error } = await supabaseServer
-    .from("mk_proyectos")
-    .update({ estado: "abierto" })
-    .eq("id", id);
-  if (error) throw new Error(`reabrirProyecto: ${error.message}`);
-  return "abierto";
-}
+// El estado del proyecto dejó de escribirse (11-ago-2026): "Cerrar proyecto"
+// se retiró de la UI y con él cerrarProyecto/reabrirProyecto. Los valores
+// legacy que pudieran quedar en la columna ('cerrado'/'enviado'/'cobrado') se
+// leen vía normalizarEstadoProyecto y nunca se reescriben.
 
 export async function updateProyectoMarcas(
   proyectoId: string,

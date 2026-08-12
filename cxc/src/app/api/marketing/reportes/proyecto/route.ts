@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { reportePorProyecto } from "@/lib/marketing/reportes";
 import type { FiltrosReporteProyecto } from "@/lib/marketing/reportes";
-import type { EstadoProyecto } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
 
-const ESTADOS: ReadonlyArray<EstadoProyecto> = ["abierto", "cerrado"];
-
+// El filtro `?estado=` se retiró el 11-ago-2026 junto con "Cerrar proyecto":
+// la pantalla de reportes nunca lo mandaba y el estado dejó de existir como
+// concepto visible del proyecto.
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
@@ -16,7 +16,6 @@ export async function GET(req: NextRequest) {
   const anioStr = searchParams.get("anio");
   const marcaId = searchParams.get("marca_id") ?? undefined;
   const tienda = searchParams.get("tienda") ?? undefined;
-  const estadoStr = searchParams.get("estado") ?? undefined;
 
   const filtros: FiltrosReporteProyecto = {};
   if (anioStr) {
@@ -28,12 +27,6 @@ export async function GET(req: NextRequest) {
   }
   if (marcaId) filtros.marcaId = marcaId;
   if (tienda) filtros.tienda = tienda;
-  if (estadoStr) {
-    if (!ESTADOS.includes(estadoStr as EstadoProyecto)) {
-      return NextResponse.json({ error: "estado inválido" }, { status: 400 });
-    }
-    filtros.estado = estadoStr as EstadoProyecto;
-  }
 
   try {
     const items = await reportePorProyecto(filtros);

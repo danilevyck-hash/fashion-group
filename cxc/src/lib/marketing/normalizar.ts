@@ -11,18 +11,15 @@ import type { EstadoProyecto } from "./types";
  *   - 'enviado'|'cobrado'  → 'cerrado'   (legacy, nunca se reescriben)
  *   - 'cerrado'            → 'cerrado'
  *   - null/desconocido     → 'abierto'   (default seguro)
- * Las escrituras solo emiten 'abierto' o 'cerrado'.
+ * 🔴 Desde el 11-ago-2026 NADIE escribe el estado ("Cerrar proyecto" se
+ * retiró de la UI): esto queda solo para leer sin sorpresas los valores
+ * legacy que sigan en la columna.
  */
 export function normalizarEstadoProyecto(raw: unknown): EstadoProyecto {
   const v = String(raw ?? "abierto");
   return v === "enviado" || v === "cobrado" || v === "cerrado"
     ? "cerrado"
     : "abierto";
-}
-
-/** Etiqueta humana del estado para display/Excel. */
-export function etiquetaEstadoProyecto(raw: unknown): string {
-  return normalizarEstadoProyecto(raw) === "cerrado" ? "Cerrado" : "Abierto";
 }
 
 /**
