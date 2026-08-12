@@ -323,17 +323,18 @@ describe("Referencia · la caja de COMPRAS, cruda", () => {
   });
 });
 
-// ── Los TRES GRANDES: Compré · Vendí · Me quedan ─────────────────────────────
+// ── Los CUATRO GRANDES: Compré · Vendí · Stock · Meses ──────────────────────
 //
 // 🔴 Daniel (12-ago-2026): *"el numero importante estan chiquito. cuanto compre
-// es importante, cuanto vendi en total es importante"*. Y el ritmo bajó a UNA
-// línea: *"me queda 2 meses de venta / vendo 11u mes es lo que mas llama la
-// atencion y no es lo mas importante… vendo b2b al por mayor no retail"*.
+// es importante, cuanto vendi en total es importante"*; después: *"¿por qué 'me
+// quedan' en vez de stock?"* y *"que me diga cuanto tiempo lleva alado de los 3
+// kpi. deberia de ser: compre, vendi, stock, meses (de venta) y abajo u/mes"*.
+// El u/mes vive en la línea secundaria, calculado DESDE LA LLEGADA.
 
-describe("Referencia · los tres grandes y la línea de ritmo", () => {
-  it("🔴 Compré · Vendí · Me quedan están en grande, con sus subtítulos", async () => {
+describe("Referencia · los cuatro grandes y la línea de ritmo", () => {
+  it("🔴 Compré · Vendí · Stock · Meses están en grande, con sus subtítulos", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
-    for (const rotulo of ["Compré", "Vendí", "Me quedan"]) {
+    for (const rotulo of ["Compré", "Vendí", "Stock", "Meses"]) {
       expect(screen.getAllByText(rotulo).length, `falta el rótulo "${rotulo}"`).toBeGreaterThan(0);
     }
     // Los números del fixture: comprado 960 · vendido 615 · existencia 345.
@@ -342,29 +343,36 @@ describe("Referencia · los tres grandes y la línea de ritmo", () => {
     expect(screen.getAllByText("345").length).toBeGreaterThan(0);
     // Vendí dice qué parte de lo comprado es: 615 ÷ 960 = 64%.
     expect(screen.getAllByText("el 64% de lo comprado").length).toBeGreaterThan(0);
-    // Me quedan viene de Switch y lo dice sin ceremonia.
+    // Stock viene de Switch y lo dice sin ceremonia.
     expect(screen.getAllByText("en bodega").length).toBeGreaterThan(0);
+    // Y el cuarto grande: 10 meses desde el ancla del agregado (oct-2025).
+    expect(screen.getAllByText("de venta, desde oct 2025").length).toBeGreaterThan(0);
+    // El rótulo viejo no puede quedar en pantalla.
+    expect(screen.queryByText("Me quedan")).toBeNull();
   });
 
   it("🔴 la línea del 90%: con varias compras es el AGREGADO rotulado + el dato chiquito", async () => {
     await buscar(RESP_MUCHAS_COMPRAS, "NB2570001");
     // 6 compras en 3 años + 3 más viejas → nada de "va el X% de la compra":
     // agregado desde la primera llegada de los últimos 12 meses (oct-2025),
-    // 60 + 120 + 180 = 360 llegadas y 295 vendidas desde entonces.
+    // 60 + 120 + 180 = 360 llegadas y 295 vendidas desde entonces. El ritmo va
+    // PRIMERO y usa la MISMA ancla: 295 ÷ 10 meses = 29,5 → "30".
     expect(
-      screen.getAllByText("Desde oct 2025 llegaron 360 u · van vendidas 295 · vendo 28 u por mes").length,
+      screen.getAllByText("Vendo 30 u por mes · Desde oct 2025 llegaron 360 u · van vendidas 295").length,
     ).toBeGreaterThan(0);
   });
 
-  it("🔴 compra única ya vendida: 'El 90% se vendió en N meses', sin 'vendo 0 por mes'", async () => {
+  it("🔴 compra única ya vendida: 'El 90% se vendió en N meses' con el ritmo de MIENTRAS se vendía", async () => {
     // El fixture de 40HM265032: 280 u en nov-2023, el 90% (252) se cruza en
-    // abr-2024 = 5 meses. Sin ventas en los últimos 12 meses no hay tail.
+    // abr-2024 = 5 meses con 276 acumuladas → 276 ÷ 5 = 55,2 u/mes.
     await buscarUnaReferencia();
-    expect(screen.getAllByText("El 90% se vendió en 5 meses").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/vendo 0/)).toBeNull();
+    expect(screen.getAllByText("Vendo 55 u por mes · El 90% se vendió en 5 meses").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/[Vv]endo 0/)).toBeNull();
+    // El cuarto grande dice cuánto TARDÓ, no cuánto lleva en bodega.
+    expect(screen.getAllByText("en vender el 90%").length).toBeGreaterThan(0);
   });
 
-  it("el artículo agotado muestra Me quedan 0 — el 0 se dice claro, no desaparece", async () => {
+  it("el artículo agotado muestra Stock 0 — el 0 se dice claro, no desaparece", async () => {
     await buscarUnaReferencia();
     // El fixture: comprado 280 · vendido 279 · 0 en bodega.
     expect(screen.getAllByText("280").length).toBeGreaterThan(0);

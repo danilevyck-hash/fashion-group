@@ -35,6 +35,7 @@ import {
   Coins,
   Building2,
   LayoutDashboard,
+  ScanSearch,
   type LucideIcon,
 } from "lucide-react";
 import { asistenciaRoles } from "@/lib/asistencia/roles";
@@ -73,6 +74,11 @@ export const ALL_MODULES: AppModule[] = [
   // Ventas y clientes
   { key: "vista-general", label: "Vista General",      href: "/vista-general",    icon: LayoutDashboard,  roles: ["admin"],                                     group: "ventas-clientes" },
   { key: "ventas",        label: "Ventas",             href: "/ventas",           icon: TrendingUp,       roles: ["admin"],                                     group: "ventas-clientes" },
+  // Referencia con ruta propia (12-ago-2026). Daniel: *"habilita referencia
+  // para los vendedores y bodega"*. Es la MISMA vista del tab de Ventas
+  // (admin la conserva ahí también); vendedor/bodega entran por acá y NO ven
+  // el margen (*"quita margen, lo demas dejalo"* — gate en el API).
+  { key: "referencia",    label: "Referencia",         href: "/referencia",       icon: ScanSearch,       roles: ["admin", "vendedor", "bodega"],               group: "ventas-clientes" },
   { key: "cxc",           label: "Cuentas por Cobrar", href: "/admin",            icon: CircleDollarSign, roles: ["admin", "vendedor"],                         group: "ventas-clientes" },
   { key: "multifashion",  label: "Multifashion",       href: "/multifashion",     icon: ShoppingBag,      roles: ["admin", "gerente_acs"],                      group: "ventas-clientes" },
   { key: "directorio",    label: "Clientes",           href: "/clientes",         icon: Contact,          roles: ["admin", "secretaria", "vendedor"],           group: "ventas-clientes" },
@@ -153,14 +159,29 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
   // que hace que retirar el módulo NO le apague el menú a quien carga los
   // saldos. Se quita cuando la DDL esté corrida y verificada.
   "saldos-banco": "gastos-empresa",
+  // Referencia para vendedor/bodega (12-ago-2026): mientras la DDL
+  // 20260812120000 no corra, la ficha se enciende para quien ya tiene
+  // `catalogos` — que es el módulo que TODOS los roles destino tienen. El
+  // candado de a QUIÉN alcanza la herencia es el `roles[]` del módulo (ver
+  // `fgModulesIncluye`): secretaria también tiene catalogos y NO debe ver una
+  // ficha que la página le rebota.
+  "referencia": "catalogos",
 };
 
-/** ¿La lista de módulos guardada le da acceso a esta key? Directo, o heredado
- *  del módulo del que ésta se mudó. */
-function fgModulesIncluye(fgModules: string[], key: string): boolean {
-  if (fgModules.includes(key)) return true;
-  const heredaDe = MODULO_HEREDA_PERMISO_DE[key];
-  return heredaDe ? fgModules.includes(heredaDe) : false;
+/** ¿La lista de módulos guardada le da acceso a este módulo? Directo, o
+ *  heredado del módulo del que éste salió.
+ *
+ *  🔴 LA HERENCIA ES VISIBILIDAD PRESTADA Y SOLO VALE PARA ROLES QUE EL MÓDULO
+ *  DECLARA en su `roles[]`. El permiso DIRECTO (la key en fg_modules) sigue
+ *  mandando sin mirar roles — es lo que un admin asignó a mano. Sin este
+ *  recorte, "referencia hereda de catalogos" le pintaría la ficha a secretaria
+ *  (que tiene catalogos), y una ficha que la página rebota es peor que
+ *  ninguna. Para `saldos-banco` no cambia nada: contabilidad está en su
+ *  `roles[]`. */
+function fgModulesIncluye(fgModules: string[], modulo: AppModule, role: string): boolean {
+  if (fgModules.includes(modulo.key)) return true;
+  const heredaDe = MODULO_HEREDA_PERMISO_DE[modulo.key];
+  return heredaDe ? fgModules.includes(heredaDe) && modulo.roles.includes(role) : false;
 }
 
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),
@@ -168,7 +189,7 @@ function fgModulesIncluye(fgModules: string[], key: string): boolean {
 export function getVisibleModules(role: string, fgModules?: string[] | null): AppModule[] {
   if (role === "admin") return ALL_MODULES;
   if (fgModules && fgModules.length > 0) {
-    return ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m.key));
+    return ALL_MODULES.filter(m => fgModulesIncluye(fgModules, m, role));
   }
   return ALL_MODULES.filter(m => m.roles.includes(role));
 }

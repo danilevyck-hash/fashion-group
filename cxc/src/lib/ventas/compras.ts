@@ -546,4 +546,8 @@ export interface ComprasApiResp {
    *  dice en vez de mostrar todo como "sin compra registrada". */
   comprasDisponibles: boolean;
   infoDisponible: boolean;
+  /** `false` = el rol (vendedor/bodega) NO ve el margen — Daniel: *"quita
+   *  margen, lo demas dejalo"*. La vista no lo calcula ni lo dibuja, y el
+   *  Excel no baja su columna. Ausente (respuesta vieja cacheada) = visible. */
+  margenVisible?: boolean;
 }

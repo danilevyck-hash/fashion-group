@@ -37,11 +37,14 @@ import {
   centavos,
   listaDeCompras,
   margenReal,
+  medirRitmo,
   mesesDeStock,
   leyendaLlegadas,
   medirNoventa,
+  pieGrandeMeses,
   primerMesConVenta,
   promedioMensual,
+  valorGrandeMeses,
   subDesdeLlegada,
   temporadaFuerte,
   textoCompra,
@@ -202,8 +205,10 @@ describe("NB2570001 — los tres números contra producción", () => {
     expect(p.porMes!).toBeCloseTo(27.58, 2);
   });
 
-  it("con 345 en bodega le queda para 12,5 meses", () => {
-    expect(f().alcance!).toBeCloseTo(12.51, 2);
+  it("con 345 en bodega le queda para 11,7 meses (al ritmo desde el ancla, 29,5 u/mes)", () => {
+    // El alcance usa el MISMO ritmo que la pantalla declara (desde oct-2025),
+    // no el promedio de la ventana de 12 — dos bases serían dos verdades.
+    expect(f().alcance!).toBeCloseTo(345 / 29.5, 2);
   });
 
   it("🔴 la caja de Compras dice FECHA y CANTIDAD, la más reciente arriba", () => {
@@ -297,8 +302,8 @@ describe("QD3958033 — el artículo NUEVO, que es donde el promedio se rompía"
     expect(p.porMes!).not.toBeCloseTo(54 / 12, 2);
   });
 
-  it("con 126 en bodega le queda para 16,3 meses (entre 12 daría 28)", () => {
-    expect(f().alcance!).toBeCloseTo(16.33, 2);
+  it("con 126 en bodega le queda para 18,7 meses (al ritmo desde la llegada; entre 12 daría 28)", () => {
+    expect(f().alcance!).toBeCloseTo(126 / 6.75, 2);
     expect(mesesDeStock(126, 54 / 12)).toBeCloseTo(28, 0); // la mutación que esto caza
   });
 
@@ -443,9 +448,13 @@ describe("la línea del 90%", () => {
     const f = armarFicha(art, HOY_MES);
     expect(f.grandes).toMatchObject({ comprado: 120, vendido: 96, quedan: 24 });
     expect(textoParteVendida(f.grandes.parteVendida)).toBe("el 80% de lo comprado");
-    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 10, parte: 0.8 });
-    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
-      "En 10 meses va el 80% de la compra · vendo 11 u por mes",
+    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 10, parte: 0.8, retrocedio: false });
+    // 🔴 El ritmo va PRIMERO y sale DESDE LA LLEGADA (Daniel: *"¿cuántas
+    // unidades vendo al mes desde que llegó?"*): 96 vendidas ÷ 10 meses en
+    // bodega = 9.6 — no el promedio de la ventana de 12 meses (11).
+    expect(f.ritmo).toEqual({ meses: 10, porMes: 9.6, base: "unica-viva", desdeMes: "2025-10" });
+    expect(textoLineaNoventa(f.noventa, f.ritmo)).toBe(
+      "Vendo 9.6 u por mes · En 10 meses va el 80% de la compra",
     );
     expect(textoNoventaCorto(f.noventa)).toBe("va el 80%");
   });
@@ -477,38 +486,56 @@ describe("la línea del 90%", () => {
       },
       HOY_MES,
     );
-    expect(n).toEqual({ tipo: "vendido", meses: 5 }); // nov-2023 → abr-2024
+    expect(n).toEqual({ tipo: "vendido", meses: 5, alCruce: 276 }); // nov-2023 → abr-2024
     expect(textoNoventa(n)).toBe("El 90% se vendió en 5 meses");
     expect(textoNoventaCorto(n)).toBe("5 meses");
   });
 
-  it("🔴 las NC RESTAN también acá: una devolución puede des-cruzar la meta, pero el PRIMER cruce manda", () => {
+  it("🔴 EL 90% SOLO SE AFIRMA SI EL NETO SE SOSTIENE — el caso real 4D5077G001 (12-ago-2026)", () => {
+    // Llegó 36 u el 29-mar-2026; mayo vendió +36 (cruzó el 90%) y junio
+    // devolvió −18: el neto quedó en el 50%. Decir "El 90% se vendió en 2
+    // meses" es una verdad a medias con la que Daniel COMPRA — la línea dice
+    // el estado real en curso, marcado con la devolución.
     const base = {
       compras: [
         {
           empresa: "vistana",
-          codigo: "X",
-          fecha: "2026-01-10",
+          codigo: "4D5077G001",
+          fecha: "2026-03-29",
           documento: "D",
           proveedor: null,
           articulo: null,
-          unidades: 100,
+          unidades: 36,
           costos: { cif: 5, fob: null, fobOrigen: "sin-dato" as const, lista: 10 },
         },
       ],
       comprasFueraDeVentana: 0,
       sinCompraRegistrada: false,
     };
-    // Cruza en feb (95 ≥ 90) aunque marzo devuelva 20.
     const n = medirNoventa(
       { ...base, serie: [
-        { mes: "2026-01", unidades: 50, venta: 500 },
-        { mes: "2026-02", unidades: 45, venta: 450 },
-        { mes: "2026-03", unidades: -20, venta: -200 },
+        { mes: "2026-05", unidades: 36, venta: 360 },
+        { mes: "2026-06", unidades: -18, venta: -180 },
       ] },
       HOY_MES,
     );
-    expect(n).toEqual({ tipo: "vendido", meses: 1 });
+    expect(n).toEqual({ tipo: "en-curso", meses: 5, parte: 0.5, retrocedio: true });
+    expect(textoNoventa(n)).toBe("En 5 meses va el 50% de la compra (bajó por devoluciones)");
+    // La versión corta sigue diciendo el estado, sin la nota (la devolución se
+    // ve en las barras al abrir la fila).
+    expect(textoNoventaCorto(n)).toBe("va el 50%");
+
+    // Y si después de la devolución el neto VUELVE a cruzar y se sostiene, el
+    // cruce que vale es el que nunca volvió a bajar (jul-2026 → 4 meses).
+    const n2 = medirNoventa(
+      { ...base, serie: [
+        { mes: "2026-05", unidades: 36, venta: 360 },
+        { mes: "2026-06", unidades: -18, venta: -180 },
+        { mes: "2026-07", unidades: 16, venta: 160 },
+      ] },
+      HOY_MES,
+    );
+    expect(n2).toEqual({ tipo: "vendido", meses: 4, alCruce: 34 });
   });
 
   it("🔴 con VARIAS compras NO se atribuye por tanda: agregado rotulado, anclado en la primera llegada de la ventana", () => {
@@ -517,8 +544,10 @@ describe("la línea del 90%", () => {
     // desde oct-2025 = 295 (mes en curso incluido: es un acumulado).
     const f = armarFicha(NB2570001(), HOY_MES);
     expect(f.noventa).toEqual({ tipo: "agregado", desdeMes: "2025-10", llegaron: 360, van: 295 });
-    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
-      "Desde oct 2025 llegaron 360 u · van vendidas 295 · vendo 28 u por mes",
+    // El ritmo usa LA MISMA ancla del agregado: 295 ÷ 10 meses = 29,5 → "30".
+    expect(f.ritmo).toEqual({ meses: 10, porMes: 29.5, base: "agregado", desdeMes: "2025-10" });
+    expect(textoLineaNoventa(f.noventa, f.ritmo)).toBe(
+      "Vendo 30 u por mes · Desde oct 2025 llegaron 360 u · van vendidas 295",
     );
     expect(textoNoventaCorto(f.noventa)).toBe("van 295 de 360");
   });
@@ -559,23 +588,35 @@ describe("la línea del 90%", () => {
 
   it("compra única viva SIN historia rara: QD3958033 va por el 30% a los 8 meses", () => {
     const f = armarFicha(QD3958033(), HOY_MES);
-    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3 });
-    expect(textoLineaNoventa(f.noventa, f.promedio.porMes)).toBe(
-      "En 8 meses va el 30% de la compra · vendo 8 u por mes",
+    expect(f.noventa).toEqual({ tipo: "en-curso", meses: 8, parte: 0.3, retrocedio: false });
+    // Ritmo desde la llegada (dic-2025): 54 ÷ 8 = 6,75 → "6.8", NO el promedio
+    // de su vida en la ventana (7,7).
+    expect(f.ritmo).toEqual({ meses: 8, porMes: 6.75, base: "unica-viva", desdeMes: "2025-12" });
+    expect(textoLineaNoventa(f.noventa, f.ritmo)).toBe(
+      "Vendo 6.8 u por mes · En 8 meses va el 30% de la compra",
     );
   });
 
-  it("🔴 sin compra registrada no se inventa: queda solo el dato chiquito (o nada)", () => {
-    const n = medirNoventa(
-      { compras: [], comprasFueraDeVentana: 0, serie: [{ mes: "2026-05", unidades: 40, venta: 400 }], sinCompraRegistrada: true },
-      HOY_MES,
-    );
+  it("🔴 sin compra registrada no se inventa: el ritmo cae al promedio de 12 meses, DICIÉNDOLO", () => {
+    const art = {
+      compras: [],
+      comprasFueraDeVentana: 0,
+      serie: [{ mes: "2026-05", unidades: 40, venta: 400 }],
+      sinCompraRegistrada: true,
+    };
+    const n = medirNoventa(art, HOY_MES);
     expect(n).toEqual({ tipo: "sin-dato" });
     expect(textoNoventa(n)).toBeNull();
     expect(textoNoventaCorto(n)).toBe("—");
-    // Con ventas, el tail solo; sin ventas, la línea entera desaparece.
-    expect(textoLineaNoventa(n, 13.3)).toBe("vendo 13 u por mes");
-    expect(textoLineaNoventa(n, null)).toBeNull();
+    // Sin llegada no hay ancla: el ritmo usa la ventana de 12 y lo ROTULA.
+    const r = medirRitmo(art, HOY_MES, n, promedioMensual(barrasDeVentana(art.serie, HOY_MES)));
+    expect(r.base).toBe("ventana-12");
+    expect(r.meses).toBeNull();
+    // 40 u en su único mes vivo, promediadas entre sus 3 meses de vida en la
+    // ventana (may→jul) = 13,3 → "13".
+    expect(textoLineaNoventa(n, r)).toBe("Vendo 13 u por mes (promedio de los últimos 12 meses)");
+    // Sin ventas, la línea entera desaparece.
+    expect(textoLineaNoventa(n, { meses: null, porMes: null, base: null, desdeMes: null })).toBeNull();
   });
 
   it("🔴 nada de '∞' ni '0 meses': los bordes hablan castellano", () => {
@@ -589,8 +630,46 @@ describe("la línea del 90%", () => {
     expect(textoNoventa({ tipo: "en-curso", meses: 4, parte: 0.004 })).toBe(
       "En 4 meses va menos del 1% de la compra",
     );
-    expect(textoVendoPorMes(0)).toBeNull(); // "vendo 0 u por mes" no se dice
-    expect(textoVendoPorMes(0.3)).toBe("vendo menos de 1 u por mes");
+    expect(textoVendoPorMes(0)).toBeNull(); // "Vendo 0 u por mes" no se dice
+    // 🔴 El redondeo de Daniel: 1 decimal por debajo de 10, entero de ahí para
+    // arriba — 3.6 y 9.6 son la diferencia entre comprar y no comprar.
+    expect(textoVendoPorMes(0.3)).toBe("Vendo 0.3 u por mes");
+    expect(textoVendoPorMes(3.6)).toBe("Vendo 3.6 u por mes");
+    expect(textoVendoPorMes(9.6)).toBe("Vendo 9.6 u por mes");
+    expect(textoVendoPorMes(4)).toBe("Vendo 4 u por mes");
+    expect(textoVendoPorMes(28.4)).toBe("Vendo 28 u por mes");
+    expect(textoVendoPorMes(0.01)).toBe("Vendo menos de 0.1 u por mes");
+  });
+
+  it("🔴 el CUARTO grande es MESES, con su pie por forma", () => {
+    // Daniel: *"que me diga cuanto tiempo lleva alado de los 3 kpi. deberia de
+    // ser: compre, vendi, stock, meses (de venta) y abajo u/mes"*.
+    expect(valorGrandeMeses({ meses: 5, porMes: 3.6, base: "unica-viva", desdeMes: "2026-03" })).toBe("5");
+    expect(pieGrandeMeses({ meses: 5, porMes: 3.6, base: "unica-viva", desdeMes: "2026-03" })).toBe("de venta");
+    expect(pieGrandeMeses({ meses: 5, porMes: 50, base: "unica-vendida", desdeMes: "2023-11" })).toBe(
+      "en vender el 90%",
+    );
+    expect(pieGrandeMeses({ meses: 10, porMes: 29.5, base: "agregado", desdeMes: "2025-10" })).toBe(
+      "de venta, desde oct 2025",
+    );
+    expect(valorGrandeMeses({ meses: null, porMes: 3, base: "ventana-12", desdeMes: null })).toBe("—");
+    expect(pieGrandeMeses({ meses: null, porMes: 3, base: "ventana-12", desdeMes: null })).toBe(
+      "sin fecha de llegada",
+    );
+  });
+
+  it("🔴 compra única YA VENDIDA: el ritmo es el de MIENTRAS se vendía, no diluido por los meses de después", () => {
+    // 280 u, el 90% cruzó a los 5 meses con 276 acumuladas → 276 ÷ 5 = 55,2.
+    // Dividir entre los meses en bodega (que siguen corriendo después del
+    // agote) daría un ritmo cada vez más chico para el mismo artículo.
+    const n = { tipo: "vendido", meses: 5, alCruce: 276 } as const;
+    const r = medirRitmo(
+      { compras: [{ fecha: "2023-11-28" }] as never, serie: [] },
+      HOY_MES,
+      n,
+      { porMes: null, unidades: 0, venta: 0, meses: 12, desdeQueEmpezo: false },
+    );
+    expect(r).toEqual({ meses: 5, porMes: 55.2, base: "unica-vendida", desdeMes: "2023-11" });
   });
 
   it("van vendidas NEGATIVAS (devoluciones netas desde el ancla) se dicen como lo que son", () => {
