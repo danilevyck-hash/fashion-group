@@ -186,7 +186,8 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
     ? `Año ${selectedYear}`
     : (is12mView ? "Clientes: últimos 12 meses" : `Clientes: con compras en ${selectedYear}`);
   // El período NO se repite en el contador de clientes (limpieza jul-2026): el
-  // chip "Vista: …" de al lado ya lo dice y además es clicable para cambiarlo.
+  // chip de al lado ya lo dice y además es clicable para cambiarlo. El prefijo
+  // "Vista:" del propio chip se podó en ago-2026 — el valor ya se lee solo.
   const vistaChipTitle = isClosedYear
     ? `Vista anual: clientes con compras en ${selectedYear} y delta vs ${selectedYear - 1}.`
     : (is12mView
@@ -366,7 +367,8 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 className={cn("rounded-md px-2 py-0.5 text-xs font-medium", vistaChipTone)}
                 title={vistaChipTitle}
               >
-                Vista: {vistaChipLong}
+                {/* Sin el prefijo "Vista:": el valor ya se lee solo. */}
+                {vistaChipLong}
               </span>
             ) : (
               <button
@@ -377,7 +379,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 className={cn("inline-flex min-h-[44px] items-center rounded-md px-2.5 text-xs font-medium transition active:scale-[0.97]", vistaChipTone)}
                 title={vistaChipTitle}
               >
-                Vista: {vistaChipLong} ⇄
+                {vistaChipLong} ⇄
               </button>
             )}
           </div>
@@ -731,10 +733,9 @@ function ClienteRow({
                 collisionPadding={8}
                 className="min-w-[240px] border-0 bg-gray-950 p-3 text-white shadow-lg"
               >
-                <div className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                  Desglose por empresa
-                </div>
-                <div className="mt-2 space-y-1">
+                {/* Sin rótulo: el globo se abre desde "N empresas" y adentro
+                    hay exactamente eso, cada empresa con su monto. */}
+                <div className="space-y-1">
                   {(c.empresas_breakdown ?? []).map(b => (
                     <div key={b.empresaKey} className="flex justify-between gap-4 text-xs">
                       <span className="text-gray-300">{b.empresaNombre}</span>

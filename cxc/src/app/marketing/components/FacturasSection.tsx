@@ -685,11 +685,10 @@ export default function FacturasSection({
         </div>
       ) : facturas.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center">
+          {/* La segunda línea se fue: el botón de agregar factura está a la
+              vista, arriba, y el vacío ya se explicó en la primera. */}
           <div className="text-sm text-gray-600">
             Todavía no hay facturas en este proyecto.
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            Agrega la primera factura para registrar el gasto.
           </div>
         </div>
       ) : (

@@ -28,14 +28,17 @@ export default function SaldosBancoClient() {
       <AppHeader module="Saldos de Banco" />
       <main className="max-w-xl mx-auto px-4 py-6 pb-[env(safe-area-inset-bottom)]">
         <div className="mb-5">
-          {/* Sin título grande: "Saldos de Banco" ya lo dicen la barra sticky
-              (celular) y el breadcrumb (escritorio). Queda sr-only para no
-              dejar la página sin encabezado. La bajada se QUEDA: es la que ata
-              este número con la "Disponibilidad" de Vista General. */}
+          {/* Sin título grande (#510): "Saldos de Banco" ya lo dicen la barra
+              sticky (celular) y el breadcrumb (escritorio). Queda sr-only para
+              no dejar la página sin encabezado.
+              De la bajada se fue la PRIMERA mitad ("Lo que hay en el banco de
+              cada empresa"): la pantalla se llama así y abajo hay una fila por
+              empresa con su monto. La SEGUNDA se queda — amarra este módulo con
+              la "Disponibilidad" de Vista General, que es lo único de esta
+              frase que la pantalla no enseña sola. */}
           <h1 className="sr-only">Saldos de Banco</h1>
           <p className="text-sm text-gray-600">
-            Lo que hay en el banco de cada empresa. Es lo que la Vista General muestra como
-            &ldquo;Disponibilidad&rdquo;.
+            Es lo que la Vista General muestra como &ldquo;Disponibilidad&rdquo;.
           </p>
         </div>
 

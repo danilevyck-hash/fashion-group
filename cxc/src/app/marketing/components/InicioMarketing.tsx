@@ -237,10 +237,11 @@ export default function InicioMarketing({
           {/* RESUMEN — lo gastado hoy, y las dos maneras de mirarlo.         */}
           {/* -------------------------------------------------------------- */}
           <section className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
-            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-              Resumen
-            </div>
-            <div className="mt-2 flex flex-wrap items-end gap-x-8 gap-y-4">
+            {/* `sr-only`: cada cifra de abajo lleva su propio pie ("gastado en
+                el período actual", "clientes"…). El rótulo "Resumen" no decía
+                nada que no estuviera ya en la tarjeta. */}
+            <h2 className="sr-only">Resumen</h2>
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
               <div>
                 <div className="text-2xl sm:text-[28px] font-semibold text-gray-900 tabular-nums leading-none">
                   {formatearMonto(datos.resumen.total)}

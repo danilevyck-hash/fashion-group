@@ -464,8 +464,11 @@ export default function ReclamoDetail({
           autor de cada movimiento. */}
 
       {/* Totals — en edición se recalculan en vivo desde los ítems editados */}
-      <div className="flex items-center justify-between mb-2 mt-6">
-        <div className="text-sm font-semibold text-gray-700">Totales</div>
+      {/* "Totales" queda `sr-only`: las tarjetas de abajo se llaman Subtotal,
+          Imp. importación, ITBMS y Total — el rótulo no agregaba nada a la
+          vista, pero la sección seguiría sin encabezado para un lector. */}
+      <div className="flex items-center justify-end mb-2 mt-6">
+        <h2 className="sr-only">Totales</h2>
         {editMode && <span className="text-xs text-gray-400">Actualizando en vivo</span>}
       </div>
       <div className={`grid grid-cols-2 ${totalsTax.hasItbms ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 sm:gap-4 mb-8`}>

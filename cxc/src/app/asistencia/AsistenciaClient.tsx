@@ -134,8 +134,10 @@ function AsistenciaInner() {
         <div className="mt-5">
           {ayuda ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-gray-900">Cómo funciona</h2>
+              {/* El "Cómo funciona" DEL MEDIO se fue: el botón "?" que abre
+                  esto ya lo dice, y el contenido arranca con "Cómo funciona la
+                  marcación". Era la misma frase tres veces en la pantalla. */}
+              <div className="flex items-center justify-end gap-3">
                 <button type="button" onClick={() => setAyuda(false)}
                   className="min-h-[44px] rounded-md border border-gray-300 px-3 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]">
                   Cerrar

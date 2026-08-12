@@ -219,7 +219,84 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · h1 grande 'Marketing'", texto: 'text-xl font-semibold text-gray-900">Marketing' },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", que: "Gastos · h1 grande 'Gastos'", texto: 'text-xl font-semibold tracking-tight text-gray-900' },
   { archivo: "app/saldos-banco/SaldosBancoClient.tsx", que: "Saldos de Banco · h1 grande 'Saldos de Banco'", texto: 'text-gray-900">Saldos de Banco' },
+
+  // Poda de PALABRAS OBVIAS en todo el sistema (12-ago-2026, aprobada por
+  // Daniel). La vara: quitarlo no le quita información a una secretaria, un
+  // bodeguero o un vendedor que llega por primera vez. Lo que se fue repetía
+  // dónde estás, narraba lo que ya se está viendo, señalaba el único botón de
+  // la pantalla, o decía DOS VECES el mismo número.
+  //
+  // 🔴 Lo que NO entró en esta poda, y por qué (que nadie lo "termine" después):
+  //   · Gastos: "parcial", "sin cerrar" y "sin datos" SÍ informan — solo se fue
+  //     la del mes CERRADO, que duplicaba su propia etiqueta 7 veces.
+  //   · Referencia: la línea de ADENTRO del buscador ("Podés pegar hasta N
+  //     códigos juntos") se queda; se fue la bajada del encabezado.
+  //   · Multifashion: "Mostrador anónimo va aparte" se queda (cambia cómo se
+  //     lee el top).
+  //   · Ventas › Clientes: "Clientes: últimos 12 meses" NO se toca — está
+  //     redactado a propósito; se fue solo el prefijo "Vista:".
+  //   · Saldos de Banco: la segunda mitad se queda (amarra con Vista General).
+  //   · Asistencia: el botón que abre la ayuda y el "Cómo funciona la
+  //     marcación" de adentro se quedan; se fue el del MEDIO.
+  { archivo: "lib/mayor/gastos.ts", que: "Gastos · el mes cerrado ya lo dice su etiqueta (salía 7 veces)", texto: "La contadora ya cerró este mes." },
+  { archivo: "app/referencia/ReferenciaClient.tsx", que: "Referencia · la bajada narraba la ficha que está debajo", texto: "pegá tu lista: cuánto llegó" },
+  { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · el % ya está arriba como '% del fondo'", texto: "% gastado" },
+  { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · 'Disponible' bajo el saldo", texto: 'sub="Disponible"' },
+  { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · el período del que se viene, repetido en el formulario", texto: "Período Nº" },
+  { archivo: "app/caja/[periodoId]/nuevo/page.tsx", que: "Caja · instructivo del formulario con los * ya a la vista", texto: "Los campos con * son obligatorios" },
+  { archivo: "app/admin/page.tsx", que: "CXC · '6 empresas' al lado de la pestaña 'Grupo · 6 empresas'", texto: ': "6 empresas"' },
+  { archivo: "app/clientes/[codigo]/ClienteDetail.tsx", que: "Clientes · coletilla del encabezado (abajo dice 'Última sincronización')", texto: "Datos fiscales · sincronizados de Switch" },
+  { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · el prefijo 'Vista:' del chip", texto: "Vista: {vistaChipLong}" },
+  { archivo: "components/ventas/ClientesView.tsx", que: "Ventas › Clientes · rótulo del globo que se abre desde 'N empresas'", texto: "Desglose por empresa" },
+  { archivo: "app/guias/[id]/page.tsx", que: "Guías · 'de esta guía' estando DENTRO de la guía", texto: "Envíos de esta guía" },
+  { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · rótulo sobre un único campo que ya se llama 'Empresa *'", texto: ">Empresa</div>" },
+  { archivo: "app/asistencia/AsistenciaClient.tsx", que: "Asistencia · el 'Cómo funciona' DEL MEDIO (el botón y el contenido se quedan)", texto: ">Cómo funciona</h2>" },
+  { archivo: "components/marketing/FacturaForm.tsx", que: "Marketing · la bajada del paso 3 repetía su propio título", texto: "Elige la marca (o marcas) del gasto." },
+  { archivo: "app/marketing/components/FacturasSection.tsx", que: "Marketing · señalaba el botón de agregar, que está a la vista", texto: "Agrega la primera factura" },
+  { archivo: "app/error.tsx", que: "Toda la app · señalaba el botón Recargar, que está justo debajo", texto: "Recarga la página para continuar." },
+  { archivo: "app/global-error.tsx", que: "Toda la app · lo mismo en el error de raíz", texto: "Recarga la página para continuar." },
+  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", que: "Saldos de Banco · la PRIMERA mitad (la segunda amarra con Vista General y se queda)", texto: "Lo que hay en el banco de cada empresa" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2-bis. Lo que se fue DE LA VISTA pero NO del documento — patrón del PR #502
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 🔴 Estos nueve rótulos no se podían borrar y ya: eran el ÚNICO encabezado de
+// su sección. Para el ojo sobran (la tabla de abajo se llama igual, o la
+// pestaña de arriba ya lo dijo); para quien navega con lector de pantalla, sin
+// ellos la sección se queda sin nombre. Van `sr-only`.
+//
+// Un `not.toContain` no sirve acá —el texto SIGUE en el archivo, que es
+// justamente el punto—, así que lo que se fija es lo contrario: que la palabra
+// viva dentro de un elemento con `sr-only`. Borrarla del todo pone esto rojo
+// (accesibilidad), y devolverla a un `<h2>` visible también (vuelve el ruido).
+
+const SE_FUE_DE_LA_VISTA: { archivo: string; que: string; texto: string }[] = [
+  { archivo: "app/caja/components/GastoTable.tsx", que: "Caja · 'Gastos' sobre la única tabla de la pantalla", texto: "Gastos" },
+  { archivo: "app/reclamos/components/ReclamoDetail.tsx", que: "Reclamos · 'Totales' sobre las tarjetas Subtotal/ITBMS/Total", texto: "Totales" },
+  { archivo: "app/proveedores/[key]/ProveedorDetail.tsx", que: "Proveedores · 'Por empresa' sobre una tabla cuya 1ª columna es Empresa", texto: "Por empresa" },
+  { archivo: "app/prestamos/components/MovimientoTable.tsx", que: "Préstamos · 'Estado de Cuenta' sobre la única tabla", texto: "Estado de Cuenta" },
+  { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · el rótulo 'Resumen' sobre cifras que ya traen su pie", texto: "Resumen" },
+  { archivo: "components/AppHeader.tsx", que: "Toda la app · 'Módulos' en el cajón del celular, que enseña los módulos", texto: "Módulos" },
+  { archivo: "components/NotificationCenter.tsx", que: "Toda la app · 'Notificaciones' en el panel de la campanita", texto: "Notificaciones" },
+  { archivo: "components/multifashion/VendedorasSubtab.tsx", que: "Multifashion · 'Vendedoras · <período>' bajo la pestaña Vendedoras", texto: "Vendedoras · {chipLabel[chip]}" },
+  { archivo: "components/multifashion/ClientesMultifashionSubtab.tsx", que: "Multifashion · 'Clientes · <período>' bajo la pestaña Clientes", texto: "Clientes · {periodoStr}" },
+];
+
+describe("lo que se fue DE LA VISTA sigue teniendo nombre para un lector", () => {
+  for (const { archivo, que, texto } of SE_FUE_DE_LA_VISTA) {
+    it(`${que} — vive en un elemento sr-only de ${archivo}`, () => {
+      const fuente = plano(leer(archivo));
+      // El elemento entero, de su `<` a su `>` de cierre, con el texto adentro.
+      const enSrOnly = [...fuente.matchAll(/<(\w+)[^<>]*\bsr-only\b[^<>]*>([\s\S]*?)<\/\1>/g)].some(
+        (m) => m[2].includes(plano(texto)),
+      );
+      expect(enSrOnly, `"${texto}" ya no está dentro de un sr-only de ${archivo}`).toBe(true);
+    });
+  }
+});
+
 
 // El lado simétrico, y el que de verdad importa: sacar el título GRANDE no
 // puede dejar la página muda para un lector de pantalla. Cada una conserva

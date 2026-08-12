@@ -196,7 +196,10 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* Datos fiscales (read-only) */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
-          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos fiscales · sincronizados de Switch</h2>
+          {/* "· sincronizados de Switch" se fue: cuatro renglones más abajo
+              está "Última sincronización: {fecha}", que dice lo mismo y además
+              cuándo. La misma poda ya se hizo en Proveedores. */}
+          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos fiscales</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
             <Field label="RUC"          value={cliente.identificacion} />
             <Field label="DV"           value={cliente.dv}              tabularNums />

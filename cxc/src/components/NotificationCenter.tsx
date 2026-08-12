@@ -126,8 +126,10 @@ export default function NotificationCenter() {
         className="bg-white rounded-lg border border-gray-200 shadow-lg"
       >
         <>
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Notificaciones</span>
+          {/* El rótulo queda `sr-only`: el panel se abre desde la campanita y
+              lo que hay adentro son las notificaciones. */}
+          <div className="flex items-center justify-end px-4 py-2.5 border-b border-gray-100">
+            <span className="sr-only">Notificaciones</span>
             {notifications.length > 0 && (
               <button
                 onClick={() => { clearNotifications(); setOpen(false) }}

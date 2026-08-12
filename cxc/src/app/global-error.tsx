@@ -24,8 +24,9 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
             <p style={{ fontSize: 14, color: "#6b7280" }}>Actualizando la aplicación…</p>
           ) : (
             <div style={{ textAlign: "center", maxWidth: 340 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 8 }}>Algo salió mal</h2>
-              <p style={{ fontSize: 14, color: "#4b5563", marginBottom: 20 }}>Recarga la página para continuar.</p>
+              {/* Sin la línea "Recarga la página para continuar.": el botón de
+                  abajo ya lo dice. Igual que en app/error.tsx. */}
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: "#111827", marginBottom: 20 }}>Algo salió mal</h2>
               <button
                 onClick={() => window.location.reload()}
                 style={{

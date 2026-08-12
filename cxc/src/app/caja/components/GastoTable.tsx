@@ -180,12 +180,10 @@ export default function GastoTable({
     <div className="mb-10 mt-8">
       <div className="flex items-end justify-between mb-3.5 gap-4">
         <div>
-          <h2
-            className="caja-display-sm"
-            style={{ fontSize: 22, color: "var(--caja-fg-strong)", margin: 0 }}
-          >
-            Gastos
-          </h2>
+          {/* El rótulo "Gastos" sobre la única tabla de la pantalla queda
+              `sr-only`: no aporta nada a la vista, pero la sección seguiría sin
+              encabezado para quien navega con lector de pantalla. */}
+          <h2 className="sr-only">Gastos</h2>
           <p
             className="text-xs mt-1"
             style={{ color: "var(--caja-fg-muted)" }}

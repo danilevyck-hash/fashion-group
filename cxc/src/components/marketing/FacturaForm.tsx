@@ -736,11 +736,12 @@ export function FacturaForm({
           toggle Creado|Pagado se ELIMINÓ del formulario — Daniel, 12-ago-2026,
           textual: "si quitalo". El estado viaja igual en el payload (ver
           `estadoPago` arriba). */}
+      {/* Sin `descripcion`: el título ya dice "Marca del gasto" y abajo está el
+          campo "Marca(s) *" con los botones a la vista. */}
       {!marcaFija && (
       <PasoInstruccion
         numero={3}
         titulo="Marca del gasto"
-        descripcion="Elige la marca (o marcas) del gasto."
         completado={marcasValidas}
       >
           <div>

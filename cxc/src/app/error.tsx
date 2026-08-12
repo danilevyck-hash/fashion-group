@@ -29,8 +29,9 @@ export default function Error({ error }: { error: Error & { digest?: string }; r
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="text-center max-w-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Algo salió mal</h2>
-        <p className="text-sm text-gray-600 mb-5">Recarga la página para continuar.</p>
+        {/* "Recarga la página para continuar." se fue: el botón Recargar está
+            justo debajo y dice exactamente eso. */}
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">Algo salió mal</h2>
         <button
           onClick={() => window.location.reload()}
           className="bg-black text-white text-sm font-medium px-6 py-2.5 rounded-md active:scale-[0.97] transition-all"

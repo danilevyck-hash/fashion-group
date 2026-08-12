@@ -108,7 +108,8 @@ export default function DetalleEmpresa({ empresa, onVolver }: Props) {
         <EstadoMesTag estado={r.estado} />
       </div>
 
-      <p className="mb-3 text-sm text-gray-600">{explicacion}</p>
+      {/* Vacía en el mes cerrado: la etiqueta de estado ya lo dice. */}
+      {explicacion && <p className="mb-3 text-sm text-gray-600">{explicacion}</p>}
 
       {empresa.avisos.length > 0 && (
         <div className="mb-4">
