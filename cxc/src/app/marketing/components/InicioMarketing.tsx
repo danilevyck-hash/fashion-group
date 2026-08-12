@@ -391,7 +391,7 @@ export default function InicioMarketing({
                 <div className="text-2xl sm:text-[28px] font-semibold text-gray-900 tabular-nums leading-none">
                   {formatearMonto(datos.resumen.total)}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">gastado en total</div>
+                <div className="text-xs text-gray-500 mt-1">gastado en el período actual</div>
               </div>
               <div>
                 <div className="text-2xl sm:text-[28px] font-semibold text-gray-900 tabular-nums leading-none">
