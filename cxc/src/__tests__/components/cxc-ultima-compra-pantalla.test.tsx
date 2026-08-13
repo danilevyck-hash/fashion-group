@@ -20,6 +20,10 @@ import type { Company } from "@/lib/companies";
 // prueba acá y en jsdom solo agregan ruido.
 vi.mock("@/components/shared/SyncStatus", () => ({ default: () => null }));
 vi.mock("@/components/shared/SyncNowButton", () => ({ default: () => null }));
+// `useAdminData` importa VENDOR_MAP de lib/vendors, que arrastra el cliente de
+// Supabase del SERVIDOR y revienta al cargarse sin las env vars. Acá se prueba
+// el join del hook, no el mapa de vendedores.
+vi.mock("@/lib/vendors", () => ({ VENDOR_MAP: {} }));
 
 import ContactPanel from "@/app/admin/components/ContactPanel";
 import PanelCxcMobile from "@/app/admin/components/PanelCxcMobile";
