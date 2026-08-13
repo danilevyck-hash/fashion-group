@@ -8,12 +8,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
+import CorregirMarcacionModal, { type MarcaParaCorregir } from "./CorregirMarcacionModal";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
@@ -46,6 +47,12 @@ export default function ReporteTab() {
   const [abierta, setAbierta] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Correcciones: cuántas hay en el rango, si se pueden hacer (la migración
+  // puede no haber corrido) y cuál se está tocando.
+  const [correcciones, setCorrecciones] = useState({ correcciones: 0, dias: 0, agregadas: 0 });
+  const [puedeCorregir, setPuedeCorregir] = useState(false);
+  const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
+  const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -58,6 +65,9 @@ export default function ReporteTab() {
       setPersonas(data.personas ?? []);
       setSinHorario(data.sinHorario ?? 0);
       setReglas(data.reglas ?? null);
+      setCorrecciones(data.correcciones ?? { correcciones: 0, dias: 0, agregadas: 0 });
+      setPuedeCorregir(Boolean(data.correccionesDisponible));
+      setAvisoCorreccion(data.avisoCorrecciones ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
@@ -142,6 +152,27 @@ export default function ReporteTab() {
         </p>
       )}
 
+      {/* 🔴 QUE NADIE LEA UN TOTAL SIN ENTERARSE DE QUE HAY HORAS TOCADAS A
+          MANO. Va arriba de la tabla, no escondido en el detalle de una
+          persona: el número de abajo ya viene calculado con estas horas. */}
+      {correcciones.correcciones > 0 && (
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
+          <b>{correcciones.correcciones}</b>{" "}
+          {correcciones.correcciones === 1 ? "hora corregida a mano" : "horas corregidas a mano"} en{" "}
+          <b>{correcciones.dias}</b> {correcciones.dias === 1 ? "día" : "días"}
+          {correcciones.agregadas > 0 && (
+            <> — {correcciones.agregadas} {correcciones.agregadas === 1 ? "es una marcación agregada" : "son marcaciones agregadas"}</>
+          )}
+          . Los números de abajo ya cuentan con eso. Abre a la persona para ver qué se cambió y por qué.
+        </p>
+      )}
+
+      {/* Sin la migración corrida la pantalla NO ofrece corregir, y lo dice: un
+          botón que siempre falla es peor que no tenerlo. */}
+      {avisoCorreccion && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">{avisoCorreccion}</p>
+      )}
+
       {cargando && <p className="py-8 text-center text-sm text-gray-400">Cargando…</p>}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {!cargando && !error && personas?.length === 0 && (
@@ -171,7 +202,9 @@ export default function ReporteTab() {
             <tbody>
               {personas.map((p) => (
                 <FilaPersona key={p.codigo} p={p} abierta={abierta === p.codigo}
-                  onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)} />
+                  onToggle={() => setAbierta(abierta === p.codigo ? null : p.codigo)}
+                  puedeCorregir={puedeCorregir}
+                  onCorregir={setCorrigiendo} />
               ))}
             </tbody>
             <tfoot>
@@ -200,16 +233,33 @@ export default function ReporteTab() {
             tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
             {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
             <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
-            Estos números se cambian en <b>Configuración</b>.
+            Estos números se cambian en <b>Configuración</b>.{" "}
+            <b>Corregir una hora</b> no borra lo que marcó el reloj: la corrección va encima,
+            con quién la puso y por qué, y se puede deshacer.
           </p>
         </Ayuda>
       </div>
+
+      {corrigiendo && (
+        <CorregirMarcacionModal
+          marca={corrigiendo}
+          onCerrar={() => setCorrigiendo(null)}
+          onGuardado={() => void cargar()}
+        />
+      )}
     </div>
   );
 }
 
-function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boolean; onToggle: () => void }) {
+function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
+  p: PersonaReporte;
+  abierta: boolean;
+  onToggle: () => void;
+  puedeCorregir: boolean;
+  onCorregir: (m: MarcaParaCorregir) => void;
+}) {
   const r = p.resumen;
+  const persona = etiquetaPersona(p.codigo, p.nombre);
   return (
     <>
       <tr onClick={onToggle} className="cursor-pointer border-b border-gray-100 transition hover:bg-gray-50">
@@ -217,11 +267,18 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
             Sin nombre configurado se muestra el código —nunca un blanco— y se
             dice qué falta, porque un número suelto no se le reclama a nadie. */}
         <td className="px-3 py-2.5 text-gray-900">
-          {etiquetaPersona(p.codigo, p.nombre)}
+          {persona}
           {p.nombre ? (
             <span className="ml-1.5 text-xs text-gray-400">{p.codigo}</span>
           ) : (
             <span className="ml-1.5 text-xs text-amber-700">falta configurar</span>
+          )}
+          {/* 🔴 Se ve SIN abrir nada: los minutos de esta fila ya salen de una
+              hora que alguien escribió a mano. */}
+          {r.diasCorregidos > 0 && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-blue-50 px-1.5 py-0.5 text-xs font-semibold text-blue-700">
+              {r.diasCorregidos} {r.diasCorregidos === 1 ? "día corregido" : "días corregidos"}
+            </span>
           )}
         </td>
         <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>
@@ -267,30 +324,8 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
               </tr></thead>
               <tbody>
                 {p.dias.map((d) => (
-                  <tr key={d.fecha} className={`border-b border-gray-100 last:border-0 ${d.revisar ? "bg-amber-50/60" : ""}`}>
-                    <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
-                    {d.marcas.length ? (
-                      <>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{d.marcas[0] ?? "—"}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{d.marcas.length >= 4 ? d.marcas[1] : "—"}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{d.marcas.length >= 4 ? d.marcas[2] : "—"}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{d.marcas.length > 1 ? d.marcas[d.marcas.length - 1] : "—"}</td>
-                        <td className="px-2 py-1.5 text-right">{d.tardeMin
-                          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(d.tardeMin)}</span>
-                          : <span className="text-gray-300">—</span>}</td>
-                        <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
-                        <td className="px-2 py-1.5 text-right text-gray-600">{n(d.extraMin)}</td>
-                        <td className="px-2 py-1.5">{d.revisar &&
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>}</td>
-                      </>
-                    ) : (
-                      <td colSpan={8} className="px-2 py-1.5 text-gray-500">
-                        {d.feriado ? <>Feriado — {d.feriado}</>
-                          : d.justificado ? <>Ausencia justificada — {d.justificado}</>
-                          : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
-                      </td>
-                    )}
-                  </tr>
+                  <FilaDia key={d.fecha} d={d} codigo={p.codigo} persona={persona}
+                    puedeCorregir={puedeCorregir} onCorregir={onCorregir} />
                 ))}
               </tbody>
             </table>
@@ -299,4 +334,147 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
       )}
     </>
   );
+}
+
+/**
+ * Un día del detalle.
+ *
+ * 🔴 ACÁ SE VE LA CORRECCIÓN Y ACÁ SE PONE. Cada hora es tocable: al tocarla se
+ * abre la ventana con la hora del RELOJ arriba (que no se puede borrar) y la
+ * corrección debajo. Debajo de la fila, una línea por corrección dice qué se
+ * cambió, por qué, quién y cuándo — sin abrir nada más.
+ */
+function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
+  d: DiaReporte;
+  codigo: string;
+  persona: string;
+  puedeCorregir: boolean;
+  onCorregir: (m: MarcaParaCorregir) => void;
+}) {
+  /** La corrección que produjo la marca de esa posición, si la hay. */
+  const correccionDe = (idx: number) =>
+    d.correcciones.find((c) => c.hora === d.marcas[idx]) ?? null;
+
+  function abrir(idx: number) {
+    const c = correccionDe(idx);
+    onCorregir({
+      marcacionId: d.marcasIds[idx] ?? null,
+      codigo,
+      persona,
+      fecha: d.fecha,
+      relojHora: c ? c.relojHora : (d.marcas[idx] ?? null),
+      correccionId: c?.id ?? null,
+      correccionMotivo: c?.motivo ?? null,
+      correccionPor: c?.creadaPor ?? null,
+      correccionEn: c?.creadaEn ?? null,
+    });
+  }
+
+  function agregar() {
+    onCorregir({
+      marcacionId: null,
+      codigo,
+      persona,
+      fecha: d.fecha,
+      relojHora: null,
+    });
+  }
+
+  /** Una celda de hora. Tocable solo si se puede corregir. */
+  function Hora({ idx, mostrar, tenue }: { idx: number; mostrar: boolean; tenue?: boolean }) {
+    if (!mostrar) return <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">—</td>;
+    const hora = d.marcas[idx];
+    const c = correccionDe(idx);
+    const clase = `tabular-nums ${tenue ? "text-gray-500" : ""}`;
+    return (
+      <td className="px-2 py-1.5 text-right">
+        {puedeCorregir ? (
+          <button
+            type="button"
+            onClick={() => abrir(idx)}
+            title="Corregir esta hora"
+            className={`min-h-[44px] rounded px-1 ${clase} ${c ? "font-semibold text-blue-700 underline decoration-blue-300 underline-offset-2" : "underline decoration-dotted decoration-gray-300 underline-offset-2 hover:decoration-black"}`}
+          >
+            {hora}
+          </button>
+        ) : (
+          <span className={`${clase} ${c ? "font-semibold text-blue-700" : ""}`}>{hora}</span>
+        )}
+      </td>
+    );
+  }
+
+  const ultima = d.marcas.length - 1;
+
+  return (
+    <>
+      <tr className={`border-b border-gray-100 ${d.revisar ? "bg-amber-50/60" : ""} ${d.correcciones.length ? "bg-blue-50/40" : ""}`}>
+        <td className="whitespace-nowrap px-2 py-1.5 text-gray-700">{fechaCorta(d.fecha)}</td>
+        {d.marcas.length ? (
+          <>
+            <Hora idx={0} mostrar={d.marcas.length > 0} />
+            <Hora idx={1} mostrar={d.marcas.length >= 4} tenue />
+            <Hora idx={2} mostrar={d.marcas.length >= 4} tenue />
+            <Hora idx={ultima} mostrar={d.marcas.length > 1} />
+            <td className="px-2 py-1.5 text-right">{d.tardeMin
+              ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(d.tardeMin)}</span>
+              : <span className="text-gray-300">—</span>}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
+            <td className="px-2 py-1.5 text-right text-gray-600">{n(d.extraMin)}</td>
+            <td className="whitespace-nowrap px-2 py-1.5">
+              {d.revisar && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>
+              )}
+              {/* Agregar la marca que falta. Es el caso más común de todos: quien
+                  olvidó marcar no tiene nada que corregir. */}
+              {puedeCorregir && (
+                <button type="button" onClick={agregar}
+                  className="ml-1.5 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+                  Agregar hora
+                </button>
+              )}
+            </td>
+          </>
+        ) : (
+          <td colSpan={8} className="px-2 py-1.5 text-gray-500">
+            {d.feriado ? <>Feriado — {d.feriado}</>
+              : d.justificado ? <>Ausencia justificada — {d.justificado}</>
+              : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
+            {puedeCorregir && !d.feriado && (
+              <button type="button" onClick={agregar}
+                className="ml-2 min-h-[44px] rounded px-1 text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition hover:text-black">
+                Agregar marcación
+              </button>
+            )}
+          </td>
+        )}
+      </tr>
+
+      {/* 🔴 LO QUE DIJO EL RELOJ Y LO QUE SE CORRIGIÓ, LAS DOS COSAS. Sin esto
+          la fila de arriba mostraría una hora escrita a mano como si el reloj
+          la hubiera registrado. */}
+      {d.correcciones.map((c) => (
+        <tr key={c.id} className="border-b border-gray-100 bg-blue-50/40">
+          <td></td>
+          <td colSpan={8} className="px-2 pb-1.5 text-[12px] text-blue-900">
+            {c.agregada ? (
+              <>Marcación <b>agregada</b>: <b className="tabular-nums">{c.hora}</b> — el reloj no registró nada</>
+            ) : (
+              <>Reloj <span className="tabular-nums line-through decoration-blue-300">{c.relojHora}</span>{" "}
+                → <b className="tabular-nums">{c.hora}</b></>
+            )}
+            {" · "}“{c.motivo}” · {c.creadaPor}{c.creadaEn ? ` · ${fechaCortaISO(c.creadaEn)}` : ""}
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/** Un instante ISO → "13 ago", en hora de Panamá. */
+function fechaCortaISO(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "";
+  const d = new Date(t - 5 * 3600_000);
+  return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]}`;
 }

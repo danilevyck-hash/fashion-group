@@ -870,6 +870,73 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > **La distinción del servicio profesional ya existía en la contabilidad:** a Daniel y a David se les paga por **SERVICIOS PROFESIONALES (6.02.01)**, otra cuenta que **SALARIOS POR PAGAR (2.01.05.01)**. Va en el ⓘ de la ficha, donde la contable reconoce los números de cuenta.
 
+
+## 🔴 Asistencia — LA MARCACIÓN DEL RELOJ NUNCA SE BORRA NI SE EDITA (13-ago-2026)
+
+> Daniel, textual: *"en asistencia- reporte, quiero poder editar el registro de marcacion en caso de caso especial, se puede? o enrreda mucho?"*. Y a las dos preguntas del diseño: **"1. todos pueden corregir. 2. si"** (la razón es obligatoria).
+>
+> ### 🔴 LA REGLA QUE NO SE NEGOCIA
+>
+> `asistencia_marcaciones` **es lo que dijo el reloj, y es la única prueba de a qué hora entró una persona — o sea que define un pago.** Un UPDATE ahí destruye esa prueba para siempre y no hay de dónde recuperarla (el reloj tiene memoria limitada y los eventos viejos se le caen). **Por eso la marcación queda INTACTA y la corrección va ENCIMA**, en `asistencia_correcciones`. La corrección manda para el cálculo; en pantalla se ven las dos:
+>
+> ```
+> mié 5 ago   08:00:00   12:00:23   12:31:07   17:04:12   Revisar
+>             Reloj 08:47:12 → 08:00 · "se le dañó el carro, avisó" · Daniel · 13 ago
+> ```
+>
+> Es el MISMO patrón que Guías (el texto que escribió bodega se conserva; encima va `guia_items.cliente_codigo`) y que `mk_proyectos.tienda` + `tienda_codigo`. **No es un patrón nuevo.**
+>
+> ### El caso que Daniel no nombró y es el más común: la marcación que NO existe
+>
+> Quien **olvidó marcar** no tiene registro que corregir. **Medido en producción el 13-ago-2026** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-marcaciones-incompletas.ts`, solo lectura) sobre las **3.894 marcaciones cargadas** (1-jul → 13-ago, 38 personas, 1.020 días-persona):
+>
+> | Marcas en el día | Días-persona | % |
+> |---|---:|---:|
+> | 1 (entrada sin salida) | 12 | 1,2% |
+> | 2 (sin almuerzo) | 69 | 6,8% |
+> | 3 (falta una) | 85 | 8,3% |
+> | **4 (completo)** | **789** | **77,4%** |
+> | 5-7 (de más) | 65 | 6,4% |
+>
+> 🔴 **231 de 1.020 días están mal marcados (22,6%)**, **97 con número IMPAR de marcas** (falta una) y **12 con una sola**. Más **24 días hábiles sin NINGUNA marca y sin justificación**. **No es un caso raro: es pan de todos los días**, y por eso se puede **AGREGAR** una marcación faltante con el mismo motivo obligatorio y la misma firma.
+>
+> ⚠️ **La marcación agregada NUNCA se escribe dentro de `asistencia_marcaciones`** — se mezclaría con lo que dijo el reloj y se perdería la separación que es todo el punto. Va en `asistencia_correcciones` con `marcacion_id = NULL`, y en pantalla dice *"Marcación **agregada** — el reloj no registró nada"*. En el motor se distingue porque `DiaReporte.marcasIds[i]` viene en `null`.
+>
+> ### Dónde entra al cálculo
+>
+> `aplicarCorrecciones` (módulo PURO, `src/lib/asistencia/correcciones.ts`) devuelve una **COPIA** de la lista de marcaciones con las horas corregidas, y **las DOS rutas la aplican ANTES de llamar al motor**: `/api/asistencia/reporte` y `/api/asistencia/planilla`. 🔴 **Si la corrección no llegara al pago, no serviría para nada**: la pantalla diría una cosa y la planilla pagaría otra.
+> - **`DiaReporte.correcciones` y `resumen.diasCorregidos` son INFORMATIVOS y no entran en ninguna cuenta** — las horas ya vienen aplicadas. Hay un test que le pasa al motor un mapa lleno de correcciones absurdas y exige que ni un minuto se mueva.
+> - 🔑 **Una corrección NO puede mover una marcación de DÍA.** Para la forma «pisar una hora», el día sale de la MARCACIÓN (`diaPanama(ocurrio_en)`), nunca del campo `fecha` de la corrección: mover horas de un día a otro es mover plata de una quincena a otra sin que nada lo avise. Y la ruta tampoco se cree la persona ni el día que manda el navegador: los lee de la marcación.
+> - **Deshacer NO borra**: `anulada_en` + `anulada_por`. La fila queda y el cálculo vuelve a la hora del reloj. Un botón que no se puede deshacer sobre un dato de pago es una trampa; y deshacer sin dejar rastro es peor que no haber corregido.
+>
+> ### Quién puede, y la firma
+>
+> **TODOS los roles de Asistencia** (`asistenciaRoles()` = admin, secretaria, contabilidad). Decisión explícita de Daniel. **Por eso mismo la FIRMA no es opcional**: sale de la sesión (`auth.userName`), nunca del cuerpo del pedido — sin ella, "todos pueden" se vuelve "nadie sabe quién fue". El **motivo es obligatorio** en las tres capas: el botón se apaga y dice qué falta, la ruta rechaza con 400, y el CHECK de la base exige `btrim(motivo) <> ''` (⚠️ `NOT NULL` a secas deja pasar `""` y `"   "`, que es justo lo que teclea quien quiere saltarse el campo).
+>
+> ### Se ve SIN abrir nada
+>
+> Arriba de la tabla: *"**1** hora corregida a mano en **1** día. Los números de abajo ya cuentan con eso."* · chip azul **«N días corregidos»** en la fila de la persona · la línea con las dos horas dentro del detalle. Y también en el **Excel** (columna «Corregido a mano» en Detalle con la hora del reloj, la corregida, el motivo y quién; «Días corregidos a mano» en Resumen) y en el **PDF que se firma** (columna «Días correg.» + pie de página). No hay forma de leer un total sin enterarse de que hay una hora tocada a mano.
+>
+> ### 🔴 EL CANDADO PRINCIPAL, verificado por mutación
+>
+> `src/__tests__/lib/asistencia-correcciones.test.ts` (42 casos). **BARRIDO ESTÁTICO sobre todo `src/`, sin listas de archivos que se queden viejas**: ningún `.from("asistencia_marcaciones")` puede encadenar `.update(`, `.delete(` ni `.upsert(`. ⚠️ El barrido **borra los comentarios primero** — un candado que se cumple a sí mismo con su propia explicación da permiso para romper (este repo ya se quemó con eso, ver la nota de `revalidateOnFocus`). La ÚNICA forma de upsert admitida es la del INGEST con `ignoreDuplicates: true`, que **nunca pisa una fila**: es lo que hace idempotente el repaso nocturno del reloj. Otro barrido recorre TODAS las migraciones y prohíbe `DROP TABLE` / `TRUNCATE` / `DELETE FROM` sobre la tabla. Y hay **test de CONDUCTA**: llama a la ruta REAL con supabase mockeado y mira qué se escribió de verdad.
+> - **Verificado por mutación, 13 de 13 cazadas:** escribir un UPDATE (1) o un DELETE (1) sobre las marcaciones · aflojar el motivo obligatorio (4) · que la planilla NO aplique las correcciones (1) · que el reporte no las aplique (1) · que el select pierda el `id` (1) · que una corrección pueda mover el día (1) · que `aplicarCorrecciones` mute el original (2) · que deshacer borre en vez de anular (1) · que la firma salga del cuerpo (1) · que la ruta se crea la persona/día del cuerpo (1) · la llave con CASCADE en vez de RESTRICT (1) · el motivo sin su CHECK (1).
+>
+> ### 🔴 SIN CORRECCIÓN NO SE MOVIÓ UN CENTAVO — medido contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-correcciones-no-mueven-nada.ts` (solo lectura) corre el motor **VIEJO** —sacado de `origin/main` AL EJECUTAR, no una copia versionada que envejece— y el NUEVO sobre los MISMOS datos. **4 quincenas × 3 empresas: 150 líneas, 3.992 cifras, 🟢 0 diferencias** (netos idénticos: Boston $4.282,31 / $4.596,04 / $4.465,79 · Vistana $2.177,55 / $2.488,80 / $1.677,11 · Fashion Wear $1.745,05 / $1.544,90 / $1.249,86).
+> - **Candado de dinero, con una tardanza REAL de producción:** ALEJANDRA CAMAÑO, 1-jul, marcó 08:15 → corregida a 08:00 → tardanza **15,75 → 0,00 min**, neto **$251,94 → $252,64**. **Personas ajenas movidas: 0.** Deshacerla devuelve **620 cifras idénticas** y el neto exacto a $251,94.
+>
+> ### ⚠️ DDL ADITIVA PENDIENTE — la corre Daniel A MANO, y la app funciona ANTES
+>
+> `supabase/migrations/20260813150000_asistencia_correcciones.sql`. Patrón `cols-opcionales`: **sin la tabla, la pantalla NO ofrece corregir y lo dice** (*"Pídele a Daniel que corra el archivo…"*), y el cálculo es el de siempre. **Verificado contra producción con la DDL SIN correr** (`scripts/_verif-correcciones-sin-ddl.ts` + el navegador): el reporte carga sus 48 personas, **0 botones de corregir**, el aviso a la vista, y la detección de «falta la tabla» es ESTRECHA — 6/6 casos (permiso denegado, timeout, red caída y «otra tabla no existe» se PROPAGAN, no se leen como migración faltante).
+> - 🩸 **Gotcha de verificación:** el primer probe usaba `select(…, { head: true })` y decía **«EXISTE»** sobre una tabla que no estaba creada — con `head` PostgREST puede contestar sin cuerpo y el error se pierde. Un script de verificación que miente es peor que no tenerlo.
+>
+> ### Los 3 anchos (+ el iPad acostado)
+>
+> `BASE=… node scripts/_medir-correcciones-anchos.mjs` (solo lectura), en **5 estados** — reporte cerrado, detalle abierto, ventana de corregir, de deshacer y de agregar: **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px NUEVOS** en los 20 casos. El único recorte es el `H1.sr-only` y los textos de 10,5/10/11 px son las etiquetas de columna y el chip «Revisar» que el módulo ya tenía — **medidos IDÉNTICOS con y sin correcciones**, o sea que este cambio no agregó ni un texto chico (la primera versión sí: el chip y los «Agregar hora» salieron a 11 px y se subieron a 12). Modal con el patrón de la casa: `createPortal` + `inset-0` + `useBodyScrollLock`, **sin `autoFocus`**.
+> - 🩸 **La tabla no existe todavía en producción, así que la medición INTERCEPTA la respuesta de `/api/asistencia/reporte`** y le inyecta UNA corrección con la forma exacta que va a tener. Los datos siguen siendo los de producción y el componente medido es el REAL; no se toca la base ni se aprieta ningún botón que guarde. Sin eso no habría nada que medir y el script pasaría en verde sin haber mirado nada — por eso **falla** si no encuentra el aviso, el chip, la línea con la hora del reloj o el botón de guardar apagado.
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`

@@ -14,10 +14,15 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
   SALIDA_DEFAULT,
-  type Marcacion,
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
+import {
+  aplicarCorrecciones,
+  contarCorrecciones,
+  type MarcacionConId,
+} from "@/lib/asistencia/correcciones";
+import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import {
   leerReglas,
   leerPersonas,
@@ -125,13 +130,14 @@ export async function GET(req: NextRequest) {
     // Paginado y verificado contra el COUNT: PostgREST corta en 1.000 filas EN
     // SILENCIO y una quincena de 37 personas con 4 marcas diarias pasa de ahí.
     // Una planilla con las marcaciones recortadas sin avisar se paga igual.
-    const marcaciones = await leerTodoPaginado<Marcacion>(
+    const marcaciones = await leerTodoPaginado<MarcacionConId>(
       "asistencia_marcaciones (planilla)",
       (pedirCount, from, to) =>
         supabaseServer
           .from("asistencia_marcaciones")
           .select(
-            "empleado_codigo, empleado_nombre, ocurrio_en",
+            // 🔑 El `id` ata cada corrección a SU marcación.
+            "id, empleado_codigo, empleado_nombre, ocurrio_en",
             pedirCount ? { count: "exact" } : {},
           )
           .gte("ocurrio_en", instante(q.desde, false))
@@ -141,9 +147,14 @@ export async function GET(req: NextRequest) {
           .range(from, to),
     );
 
-    const [{ reglas }, personasDb, manualesLeidos, hRes, jRes, fRes] = await Promise.all([
+    const [{ reglas }, personasDb, correcciones, manualesLeidos, hRes, jRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
+      // 🔴 ACÁ ES DONDE LA CORRECCIÓN LLEGA AL PAGO. Si no llegara, corregir una
+      // hora no serviría para nada: la pantalla diría una cosa y la planilla
+      // pagaría otra. Sin la tabla corrida devuelve CERO correcciones, o sea la
+      // misma planilla de siempre, hasta el centavo.
+      leerCorrecciones(q.desde, q.hasta),
       // ⚠️ En un rango libre NO hay montos manuales: se guardan por quincena y
       // repartir un ISR por días sería inventar plata. Se avisa en la respuesta.
       q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
@@ -207,8 +218,12 @@ export async function GET(req: NextRequest) {
     // 🩸 `incluirNoHabiles` es lo que hace visible el domingo trabajado. Sin
     // esto, las horas del domingo 26-jul (5 personas, medido) no existirían
     // para el cálculo y nadie las echaría de menos.
+    // 🔴 LAS HORAS CORREGIDAS ENTRAN AL CÁLCULO ACÁ, y `asistencia_marcaciones`
+    // no se toca: `aplicarCorrecciones` devuelve una COPIA.
+    const efectivas = aplicarCorrecciones(marcaciones, correcciones.correcciones);
+
     const personas = armarReporte({
-      marcaciones,
+      marcaciones: efectivas.marcaciones,
       horarios,
       justificaciones: (jRes.data ?? []) as Justificacion[],
       feriados: new Map((fRes.data ?? []).map((f) => [String(f.fecha), String(f.nombre)])),
@@ -217,6 +232,8 @@ export async function GET(req: NextRequest) {
       reglas,
       nombres,
       incluirNoHabiles: true,
+      // Solo para mostrar: las horas corregidas ya están adentro de arriba.
+      correccionesPorDia: efectivas.porDia,
     });
 
     // Cuánto dura el día de cada quien. Es lo que vale una ausencia.
@@ -303,6 +320,10 @@ export async function GET(req: NextRequest) {
         rangoLibre: !q.esQuincena,
         factorBase: q.factorBase,
         diasCalendario: q.diasCalendario,
+        // 🔴 Cuántas horas de esta planilla se tocaron a mano. No hay forma de
+        // mirar este cuadro sin que el número esté a la vista: se corrige EN EL
+        // REPORTE, así que quien paga podría no haber sido quien corrigió.
+        correcciones: contarCorrecciones(efectivas.porDia),
       },
       marcaciones: marcaciones.length,
     });
