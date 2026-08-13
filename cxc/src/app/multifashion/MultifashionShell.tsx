@@ -11,8 +11,9 @@
 // fg_modules de sessionStorage y un load frío podía rebotarla a /home, que la
 // re-redirige aquí (loop).
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
+import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import { PullToRefresh } from "@/components/ui";
@@ -66,19 +67,34 @@ export function MultifashionShell({
   // Resumen la usa para re-pedir el detalle del mes (mismos year/mes).
   const [syncTick, setSyncTick] = useState(0);
 
+  // Lo que ya armó el server component, SOLO para el año inicial.
+  const delServidor = useMemo<Multifashion | undefined>(
+    () => (selectedYear === initialYear ? (initialMulti ?? undefined) : undefined),
+    [selectedYear, initialYear, initialMulti],
+  );
+
   // Overview por año vía SWR (clave null hasta authChecked → respeta el gate
-  // admin-only). fallbackData = el SSR SOLO para el año inicial; los demás años
-  // se piden bajo demanda. Cambiar el selector solo cambia la key (sin fetch
-  // manual): SWR sirve caché si ya se vio ese año y revalida en background.
+  // admin-only). El dato del SSR es el del año inicial; los demás años se piden
+  // bajo demanda. Cambiar el selector solo cambia la key (sin fetch manual):
+  // SWR sirve caché si ya se vio ese año y revalida en background.
+  //
+  // 🔑 `opcionesDelServidor` evita re-pedir `/api/multifashion/overview` (618 ms
+  // medidos) apenas llega el HTML que el servidor acaba de armar con ESE MISMO
+  // dato. Ojo con la key `null` de `authChecked`: mientras la key es null SWR ni
+  // siquiera monta el efecto, así que al activarse sigue siendo "primer montaje"
+  // y la opción que apaga la revalidación inicial aplica igual.
   const { data: multi, error, isLoading, mutate } = useSWR<Multifashion>(
     authChecked ? ["multifashion-overview", selectedYear] : null,
     () => fetchOverview(selectedYear),
     {
       dedupingInterval: 5 * 60_000,
       revalidateOnFocus: false,
-      fallbackData: selectedYear === initialYear ? (initialMulti ?? undefined) : undefined,
+      ...opcionesDelServidor(delServidor),
     },
   );
+
+  // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
+  useSembrarDelServidor(mutate, delServidor);
 
   // Deshabilita el selector mientras carga un año sin dato en caché.
   const loading = isLoading && !multi;

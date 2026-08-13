@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import useSWR from "swr";
+import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -110,29 +111,47 @@ export function VentasShell({
   const [tabRaw, setTab] = useUrlState("tab", "resumen");
   const tab = TABS.some((t) => t === tabRaw) ? tabRaw : "resumen";
 
+  // Lo que ya armó el server component, para el año inicial. Memoizado porque
+  // su REFERENCIA es la señal de "el servidor mandó datos nuevos" que usa
+  // `useSembrarDelServidor`; recrearlo en cada render lo dispararía siempre.
+  //
+  // La condición `&& initialResumen` se conserva tal cual: si el SSR del resumen
+  // falló, la pantalla NO tiene datos del servidor y tiene que pedirlos.
+  const delServidor = useMemo<VentasBundle | undefined>(
+    () =>
+      selectedYear === initialYear && initialResumen
+        ? {
+            resumen: initialResumen,
+            clientes: initialClientes,
+            multi: initialMulti,
+            resumenError: null,
+            clientesError: null,
+          }
+        : undefined,
+    [selectedYear, initialYear, initialResumen, initialClientes, initialMulti],
+  );
+
   // Bundle del Resumen cacheado por SWR, keyed por el año → cada año cachea por
   // separado y volver a un año ya visto pinta al instante (sin re-fetch). El
-  // fallbackData del SSR solo aplica al año inicial (no servir el initial de un
-  // año distinto). dedupe 5min + sin revalidar al volver a la pestaña (módulo
+  // dato del SSR solo aplica al año inicial (no servir el initial de un año
+  // distinto). dedupe 5min + sin revalidar al volver a la pestaña (módulo
   // pesado). La caché vive a nivel app (SWRProvider).
+  //
+  // 🔑 `opcionesDelServidor` es lo que evita pedir de nuevo los 3 endpoints que
+  // el servidor ACABA de resolver (2.150 ms de base de datos por visita). Al
+  // cambiar de año no hay dato del servidor → SWR pide, como siempre.
   const { data, isLoading, mutate } = useSWR<VentasBundle>(
     ["ventas-bundle", selectedYear],
     () => fetchVentasBundle(selectedYear),
     {
       dedupingInterval: 5 * 60_000,
       revalidateOnFocus: false,
-      fallbackData:
-        selectedYear === initialYear && initialResumen
-          ? {
-              resumen: initialResumen,
-              clientes: initialClientes,
-              multi: initialMulti,
-              resumenError: null,
-              clientesError: null,
-            }
-          : undefined,
+      ...opcionesDelServidor(delServidor),
     },
   );
+
+  // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
+  useSembrarDelServidor(mutate, delServidor);
 
   // Red de seguridad: si el refetch del año inicial falló pero el SSR sí trajo
   // data, se sigue mostrando la del SSR (stale) en vez de una pantalla de error.

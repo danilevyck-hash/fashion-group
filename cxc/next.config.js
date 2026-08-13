@@ -88,5 +88,10 @@ module.exports = withSentryConfig(withSerwist(nextConfig), {
   org: "fashion-group",
   project: "fashion-group",
   widenClientFileUpload: true,
-  disableLogger: true,
+  // Saca del bundle del navegador el código de mensajes de depuración del SDK
+  // (`__SENTRY_DEBUG__ = false`). Es exactamente lo que pedía `disableLogger`,
+  // con el nombre que el SDK v10 espera: `disableLogger` está deprecado y avisa
+  // en CADA build. NO se activa la poda del tracing: eso apagaría el
+  // muestreo de trazas, que sí se usa.
+  webpack: { treeshake: { removeDebugLogging: true } },
 });

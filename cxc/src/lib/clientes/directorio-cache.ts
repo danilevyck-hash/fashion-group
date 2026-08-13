@@ -60,24 +60,31 @@ export function invalidarDirectorioServidor(): void {
 }
 
 async function leerDelaBase(provincia: string): Promise<FilaCliente[]> {
-  const filas = await leerTodoPaginado<FilaCliente>(
-    "clientes_master (listado)",
-    (pedirCount, from, to) => {
-      let sel = supabaseServer
-        .from("clientes_master")
-        .select(
-          "id, codigo, nombre, razon_social, telefono, celular, email, provincia",
-          pedirCount ? { count: "exact" } : {},
-        )
-        .eq("deleted", false);
-      if (provincia) sel = sel.eq("provincia", provincia);
-      // Orden de PAGINACIÓN (estable y único), no el de presentación.
-      return sel.order("id", { ascending: true }).range(from, to);
-    },
-  );
-  // El filtro de mundos va acá adentro para que TAMBIÉN quede cacheado: es la
-  // mitad cara del trabajo (los 6.667 de switch_clientes).
-  return soloClientesDelGrupo(filas, await mundosDeClientes());
+  // ⚠️ LAS DOS LECTURAS VAN EN PARALELO, y no es cosmético: son 6 viajes
+  // paginados a `clientes_master` y 7 a `switch_clientes`, y encadenadas suman
+  // 13 esperas de red UNA DETRÁS DE OTRA. No dependen entre sí — el filtro de
+  // mundos necesita las dos listas ya completas, no una para pedir la otra.
+  const [filas, mundos] = await Promise.all([
+    leerTodoPaginado<FilaCliente>(
+      "clientes_master (listado)",
+      (pedirCount, from, to) => {
+        let sel = supabaseServer
+          .from("clientes_master")
+          .select(
+            "id, codigo, nombre, razon_social, telefono, celular, email, provincia",
+            pedirCount ? { count: "exact" } : {},
+          )
+          .eq("deleted", false);
+        if (provincia) sel = sel.eq("provincia", provincia);
+        // Orden de PAGINACIÓN (estable y único), no el de presentación.
+        return sel.order("id", { ascending: true }).range(from, to);
+      },
+    ),
+    // El filtro de mundos va acá adentro para que TAMBIÉN quede cacheado: es la
+    // mitad cara del trabajo (los 6.667 de switch_clientes).
+    mundosDeClientes(),
+  ]);
+  return soloClientesDelGrupo(filas, mundos);
 }
 
 /**

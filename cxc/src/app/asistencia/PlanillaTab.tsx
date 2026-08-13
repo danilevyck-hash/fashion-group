@@ -20,7 +20,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
-import { downloadWorkbook } from "@/lib/excel-export";
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
 import type { ReglasAsistencia } from "@/lib/asistencia/config";
 import {
@@ -32,11 +31,6 @@ import {
   type Quincena,
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
-import {
-  construirExcelPlanilla,
-  construirPdfPlanilla,
-  nombreArchivo,
-} from "@/lib/asistencia/planilla-exportar";
 
 interface Respuesta {
   quincena: Quincena;
@@ -164,15 +158,35 @@ export default function PlanillaTab() {
     };
   }, [data]);
 
-  function bajarExcel() {
+  // Las librerías de Excel y PDF se bajan al TOCAR el botón — ver la nota larga
+  // en `ReporteTab`. ⚠️ Acá `planilla-exportar` ya tenía el cuidado de importar
+  // el tipo de xlsx con `import type`, pero dos líneas más abajo importaba
+  // VALORES de `lib/excel-export`, que sí trae `xlsx-js-style` estático: el
+  // cuidado quedaba anulado. Por eso los dos van dentro del handler.
+  //
+  // `construirPdfPlanilla` se deja SÍNCRONA a propósito (el `await import` va
+  // acá, en el llamador): hay un candado que la busca por el texto
+  // `export function construirPdfPlanilla`.
+  async function bajarExcel() {
     if (!exportables?.lineas.length) return;
-    downloadWorkbook(construirExcelPlanilla(exportables), nombreArchivo(exportables, "xlsx"));
-    toast("Excel listo — revisa tu carpeta de descargas", "success");
+    try {
+      const { downloadWorkbook } = await import("@/lib/excel-export");
+      const { construirExcelPlanilla, nombreArchivo } = await import("@/lib/asistencia/planilla-exportar");
+      downloadWorkbook(construirExcelPlanilla(exportables), nombreArchivo(exportables, "xlsx"));
+      toast("Excel listo — revisa tu carpeta de descargas", "success");
+    } catch {
+      toast("No se pudo armar el Excel. Intenta de nuevo.", "error");
+    }
   }
-  function bajarPdf() {
+  async function bajarPdf() {
     if (!exportables?.lineas.length) return;
-    construirPdfPlanilla(exportables).save(nombreArchivo(exportables, "pdf"));
-    toast("PDF listo — revisa tu carpeta de descargas", "success");
+    try {
+      const { construirPdfPlanilla, nombreArchivo } = await import("@/lib/asistencia/planilla-exportar");
+      construirPdfPlanilla(exportables).save(nombreArchivo(exportables, "pdf"));
+      toast("PDF listo — revisa tu carpeta de descargas", "success");
+    } catch {
+      toast("No se pudo armar el PDF. Intenta de nuevo.", "error");
+    }
   }
 
   const buenas = data?.lineas.filter((l) => l.dinero) ?? [];

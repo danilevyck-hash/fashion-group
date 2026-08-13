@@ -14,15 +14,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import {
+  leerDescuentosEfectivos,
+  totalPorVendedor,
+  mesISO,
+} from "@/lib/comisiones/descuentos";
 
 export const dynamic = "force-dynamic";
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function mesISO(year: number, mes: number): string {
-  return `${year}-${String(mes).padStart(2, "0")}-01`;
-}
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad", "secretaria"]);
@@ -46,51 +47,24 @@ export async function GET(req: NextRequest) {
   // `vendedor` es OPCIONAL: sin él se devuelven los de toda la empresa. Antes
   // era obligatorio y por eso la tabla consolidada no podía mostrar el neto —
   // habría necesitado una llamada por cada vendedor de cada empresa.
-  let q = supabaseServer
-    .from("comision_descuentos_fijos")
-    .select("id, concepto, monto, vendedor_nombre")
-    .eq("empresa_key", empresa)
-    .eq("activo", true);
-  if (vendedor) q = q.eq("vendedor_nombre", vendedor);
-  const { data: fijos, error: e1 } = await q.order("concepto", { ascending: true });
-  if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
-
-  const ids = (fijos ?? []).map((f) => String(f.id));
-  const excById = new Map<string, boolean>();
-  if (ids.length > 0) {
-    const { data: exc, error: e2 } = await supabaseServer
-      .from("comision_descuento_excepciones")
-      .select("descuento_id, activo")
-      .in("descuento_id", ids)
-      .eq("mes", mesISO(year, mes));
-    if (e2) return NextResponse.json({ error: e2.message }, { status: 500 });
-    for (const x of exc ?? []) excById.set(String(x.descuento_id), Boolean(x.activo));
+  //
+  // La lectura y la regla del `activo` efectivo viven en `lib/comisiones/
+  // descuentos`, compartidas con el endpoint consolidado: dos copias serían dos
+  // totales de comisión posibles para el mismo mes.
+  let descuentos;
+  try {
+    descuentos = await leerDescuentosEfectivos([empresa], year, mes, vendedor);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-
-  const descuentos = (fijos ?? []).map((f) => {
-    const id = String(f.id);
-    // Efectivo: excepción del mes si existe; si no, activo por defecto.
-    const activo = excById.has(id) ? excById.get(id)! : true;
-    return {
-      id,
-      concepto: String(f.concepto),
-      monto: Number(f.monto),
-      activo,
-      vendedor: String((f as { vendedor_nombre?: string }).vendedor_nombre ?? ""),
-    };
-  });
 
   // Con vendedor: forma de siempre (la usa el modal de detalle).
   if (vendedor) return NextResponse.json({ descuentos });
 
   // Sin vendedor: además, el total ACTIVO por vendedor ya sumado, que es lo
   // único que la tabla consolidada necesita para mostrar el neto.
-  const porVendedor: Record<string, number> = {};
-  for (const d of descuentos) {
-    if (!d.activo || !d.vendedor) continue;
-    porVendedor[d.vendedor] = Math.round(((porVendedor[d.vendedor] ?? 0) + d.monto) * 100) / 100;
-  }
-  return NextResponse.json({ descuentos, porVendedor });
+  return NextResponse.json({ descuentos, porVendedor: totalPorVendedor(descuentos) });
 }
 
 export async function POST(req: NextRequest) {

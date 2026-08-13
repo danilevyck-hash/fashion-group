@@ -10,8 +10,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import { verifySession } from "@/lib/session-cookie";
 import ClientesListClient, { type Cliente } from "./ClientesListClient";
-import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { mundosDeClientes, soloClientesDelGrupo } from "@/lib/clientes/mundos";
+import { leerClientesDelGrupo, type FilaCliente } from "@/lib/clientes/directorio-cache";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 const PAGE_SIZE = 50;
@@ -49,32 +48,33 @@ export default async function ClientesPage() {
     redirect("/");
   }
 
-  // Fetches paralelos para primer render.
+  // 🚪 SE ENTRA POR LA MISMA PUERTA QUE `/api/clientes`, y eso es todo el
+  // arreglo de esta pantalla (12-ago-2026).
+  //
+  // 🩸 Acá había una SEGUNDA copia de la lectura: `clientes_master` entera
+  // (5.062 filas, 6 viajes paginados) + `switch_clientes` (6.634 filas, 7
+  // viajes) — 11.700 filas y 13 idas a Supabase — con `force-dynamic` y SIN
+  // caché, o sea en CADA apertura de la pantalla. Y el endpoint `/api/clientes`
+  // ya hacía exactamente lo mismo con una caché de 60 s que esta pantalla no
+  // usaba. Medido contra el build de producción: el HTML tardaba 3.215 ms.
+  //
+  // Las columnas son las MISMAS ocho (se compararon una por una antes de tocar
+  // nada), el filtro de mundos es el mismo y el orden de presentación es el
+  // mismo, así que el primer render y el refetch siguen dando el MISMO total —
+  // que es lo que sostiene la paginación.
   //
   // 🩸 La lista se lee ENTERA y se recorta acá, en vez de pedirle a la base la
   // primera página con `count: exact`. Es por las exclusiones del Directorio:
   // los que no son del grupo se quitan DESPUÉS de leer, así que un
   // `count` de la base contaría miles que no se van a mostrar y la paginación
-  // prometería páginas vacías. Mismo criterio que `/api/clientes`, que ya leía
-  // así — el primer render y el refetch tienen que dar el MISMO total.
-  const [todosRes, mundos] = await Promise.all([
-    leerTodoPaginado<Cliente>(
-      "clientes_master (primer render del Directorio)",
-      (pedirCount, from, to) =>
-        supabaseServer
-          .from("clientes_master")
-          .select(
-            "id, codigo, nombre, razon_social, telefono, celular, email, provincia",
-            pedirCount ? { count: "exact" } : {},
-          )
-          .eq("deleted", false)
-          .order("id", { ascending: true })
-          .range(from, to),
-    ).catch(() => [] as Cliente[]),
-    mundosDeClientes(),
-  ]);
+  // prometería páginas vacías.
+  const visiblesCache: FilaCliente[] = await leerClientesDelGrupo("").catch(() => []);
 
-  const visibles = soloClientesDelGrupo(todosRes, mundos);
+  // ⚠️ `.slice()` OBLIGATORIO: `visiblesCache` es el MISMO array que guarda el
+  // caché en memoria, y `sort` ordena EN EL LUGAR. Sin la copia, esta pantalla
+  // mutaría estado compartido entre requests. (Es el mismo cuidado que ya
+  // tomaba `/api/clientes`, y por eso hay un test que lo vigila.)
+  const visibles = visiblesCache.slice() as Cliente[];
   visibles.sort((a, b) => (a.nombre ?? "").localeCompare(b.nombre ?? "", "es"));
   const clientes = visibles.slice(0, PAGE_SIZE);
   const total = visibles.length;

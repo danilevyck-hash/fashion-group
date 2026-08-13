@@ -138,7 +138,15 @@ describe("una sola fuente de verdad", () => {
   ];
 
   it("los consumidores importan el módulo compartido", () => {
-    for (const f of CONSUMIDORES) expect(leer(f), f).toContain("clientes/mundos");
+    // O `clientes/mundos` directo, o `clientes/directorio-cache` — que es la
+    // puerta que aplica ESE MISMO filtro adentro y además lo cachea. Desde el
+    // 12-ago-2026 la pantalla del Directorio entra por la segunda: dejó de
+    // tener su propia copia de la lectura. Lo que el candado protege es que
+    // nadie liste clientes SIN pasar por el filtro de mundos, no por cuál de
+    // las dos rutas llega.
+    for (const f of CONSUMIDORES) {
+      expect(leer(f), f).toMatch(/clientes\/(mundos|directorio-cache)/);
+    }
   });
 
   it("nadie compara contra un nombre de empresa a mano", () => {
