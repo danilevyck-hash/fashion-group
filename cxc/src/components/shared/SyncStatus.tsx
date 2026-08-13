@@ -82,6 +82,35 @@ function buildWarning(stale: StaleEntry[], empresaLabels: Record<string, string>
   return `⚠️ ${parts.join(" · ")}`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 🩸 LA MISMA PANTALLA MONTA ESTE COMPONENTE DOS VECES (12-ago-2026).
+//
+// Ventas dibuja `ResumenView` (escritorio) y `ResumenViewMobile` (celular) al
+// mismo tiempo y esconde una con CSS — pero escondida con `hidden md:block`
+// igual se MONTA, así que las dos piden `/api/sync-status` con la MISMA URL, en
+// el mismo instante. Medido contra el build de producción: `/api/sync-status`
+// ×2 por visita a /ventas, 733 ms sumados. Le pasa lo mismo al CXC
+// (`admin/page.tsx` + `PanelCxcMobile`).
+//
+// Se comparte la petición EN VUELO por URL: dos montajes en el mismo tick
+// esperan la MISMA respuesta. **No hay TTL ni caché de resultado** a propósito —
+// con una ventana de tiempo, el refresco tras "Actualizar ahora" (que dispara un
+// `focus` inmediatamente después del sync) devolvería lo viejo, que es
+// justamente el momento en que este banner tiene que decir la verdad. Apenas la
+// respuesta llega, la entrada se borra y el próximo `focus` vuelve a preguntar.
+// ─────────────────────────────────────────────────────────────────────────────
+const enVuelo = new Map<string, Promise<SyncStatusData>>();
+
+function pedirEstado(url: string): Promise<SyncStatusData> {
+  const yaVa = enVuelo.get(url);
+  if (yaVa) return yaVa;
+  const p = fetch(url, { cache: "no-store" })
+    .then((r) => (r.ok ? (r.json() as Promise<SyncStatusData>) : Promise.reject(r)))
+    .finally(() => { enVuelo.delete(url); });
+  enVuelo.set(url, p);
+  return p;
+}
+
 export default function SyncStatus({
   tabla,
   empresasEsperadas,
@@ -111,8 +140,7 @@ export default function SyncStatus({
     // Mismo fetch de siempre, extraído para poder re-disparar. No cambia el
     // endpoint ni la lógica de stale — solo permite re-consultar.
     const fetchStatus = () => {
-      fetch(url, { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      pedirEstado(url)
         .then((json: SyncStatusData) => {
           if (cancelled) return;
           setData(json);

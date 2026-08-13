@@ -30,6 +30,10 @@ import path from "path";
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8");
 const vista = leer("src/components/ventas/ComisionesConsolidadoView.tsx");
 const ruta = leer("src/app/api/ventas/comisiones/descuentos/route.ts");
+// 12-ago-2026: la lectura de descuentos se mudó a un módulo compartido y la
+// tabla pasó a pedir UNA sola vez, al endpoint consolidado.
+const lib = leer("src/lib/comisiones/descuentos.ts");
+const consolidado = leer("src/app/api/ventas/comisiones/consolidado/route.ts");
 
 // Réplica exacta de la aritmética de la vista, con los números de la captura.
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -68,8 +72,18 @@ describe("🔴 la vista aplica el descuento donde se ve", () => {
   });
 
   it("si la consulta de descuentos falla, la tabla NO se cae", () => {
-    // Preferible una tabla como antes que una pantalla en blanco.
-    expect(vista).toContain("let porVendedor: Record<string, number> = {}");
+    // Preferible una tabla como antes que una pantalla en blanco. El fail-open
+    // se mudó al servidor cuando la tabla pasó a hacer UNA sola llamada: si la
+    // lectura de descuentos revienta, se responde con la lista vacía y la tabla
+    // sale con los descuentos en 0, igual que antes de que existieran.
+    expect(consolidado).toContain("leerDescuentosEfectivos(EMPRESAS_COMISIONAN, year, mes).catch(() => [])");
+  });
+
+  it("un error de las COMISIONES sí se propaga (no se disfraza de tabla vacía)", () => {
+    // Lo contrario del anterior, y a propósito: sin comisiones no hay nada que
+    // mostrar, y una tabla en blanco silenciosa se lee como "este mes no se
+    // vendió nada".
+    expect(consolidado).toMatch(/status:\s*500/);
   });
 });
 
@@ -93,11 +107,68 @@ describe("⚠️ el endpoint sirve a los dos consumidores", () => {
   });
 
   it("sin vendedor agrega el total por vendedor (la tabla)", () => {
-    expect(ruta).toContain("porVendedor[d.vendedor]");
+    expect(ruta).toContain("porVendedor: totalPorVendedor(descuentos)");
+    expect(lib).toContain("porVendedor[d.vendedor]");
   });
 
   it("solo suma los descuentos ACTIVOS del mes", () => {
-    expect(ruta).toContain("if (!d.activo || !d.vendedor) continue;");
+    expect(lib).toContain("if (!d.activo || !d.vendedor) continue;");
+  });
+
+  it("la regla del `activo` efectivo existe UNA sola vez", () => {
+    // Dos copias serían dos totales de comisión posibles para el mismo mes.
+    expect(lib).toContain('excById.has(id) ? excById.get(id)! : true');
+    for (const [nombre, src] of [["descuentos/route", ruta], ["consolidado/route", consolidado]] as const) {
+      expect(src, nombre).toContain("@/lib/comisiones/descuentos");
+      expect(src, nombre).not.toContain('.from("comision_descuentos_fijos")');
+      // Ojo: el POST de `descuentos/route` SÍ escribe en `excepciones` (guarda
+      // la excepción del mes) y eso se queda. Lo que no puede volver a haber es
+      // una segunda LECTURA de la regla.
+      expect(src, nombre).not.toContain('.select("descuento_id, activo")');
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
+  // Medido contra el build de producción: abrir /comisiones disparaba
+  // `/api/ventas/comisiones` ×5 en el mismo milisegundo y
+  // `/api/ventas/comisiones/descuentos` ×5 — 10 peticiones y 15 consultas a la
+  // base donde alcanzaban 1 y 7. La causa nunca fue un `useEffect` inestable:
+  // era el bucle sobre las 5 empresas con un fetch anidado adentro.
+  it("la vista pide UNA sola vez, al endpoint consolidado", () => {
+    expect(vista).toContain("/api/ventas/comisiones/consolidado?year=");
+    expect((vista.match(/await fetch\(/g) ?? []).length).toBe(1);
+  });
+
+  it("la vista NO vuelve a fetchear dentro de un bucle de empresas", () => {
+    expect(vista).not.toMatch(/EMPRESAS\.map\(async/);
+    expect(vista).not.toContain("/api/ventas/comisiones?empresa=");
+    expect(vista).not.toContain("/api/ventas/comisiones/descuentos?empresa=");
+  });
+
+  it("los descuentos de las 5 empresas se leen de una vez, no una por empresa", () => {
+    // `empresa_key` acá es solo un `.eq()` de filtro: nada obligaba a partirlo.
+    expect(lib).toContain('.in("empresa_key", empresas as string[])');
+  });
+
+  it("la lista de empresas que comisionan vive en UN solo lugar", () => {
+    // Estaba escrita idéntica en las dos vistas y ahora la necesita también el
+    // endpoint: tres copias es la forma de que un día se contradigan.
+    expect(leer("src/lib/comisiones/empresas.ts")).toContain('B2B_EMPRESA_KEYS.filter');
+    for (const rel of [
+      "src/components/ventas/ComisionesConsolidadoView.tsx",
+      "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/app/api/ventas/comisiones/consolidado/route.ts",
+    ]) {
+      expect(leer(rel), rel).toContain("EMPRESAS_COMISIONAN");
+      expect(leer(rel), rel).not.toMatch(/filter\(\(k\) => k !== "joystep"\)/);
+    }
+  });
+
+  it("las 5 RPC siguen siendo la MISMA comision_b2b_v5, sin tocar el cálculo", () => {
+    expect(consolidado).toContain('supabaseServer.rpc("comision_b2b_v5"');
+    expect(consolidado).toContain("p_empresa_key: empresa");
   });
 });
 

@@ -114,6 +114,11 @@ describe("BARRIDO ESTÁTICO — nadie se hace su propia lista de clientes", () =
     "src/app/api/clientes/route.ts",
     "src/app/api/cheques/frecuencias/route.ts",
     "src/app/api/guias/frecuencias/route.ts",
+    // 12-ago-2026: la PANTALLA del directorio también. Tenía su propia copia de
+    // la lectura (11.700 filas, 13 viajes, sin caché) mientras el endpoint que
+    // hace lo mismo ya cacheaba 60 s. Estar en esta lista es lo que impide que
+    // vuelva a abrirse por el costado.
+    "src/app/clientes/page.tsx",
   ];
 
   it("la puerta existe y se llama por su nombre", () => {
@@ -134,13 +139,34 @@ describe("BARRIDO ESTÁTICO — nadie se hace su propia lista de clientes", () =
     expect(leer(rel)).not.toContain('.from("clientes_master")');
   });
 
-  it("el primer render del Directorio no hace una SEGUNDA lectura sin filtrar", () => {
+  it("el primer render del Directorio no hace NINGUNA lectura propia", () => {
     // Las provincias del desplegable salían de una consulta aparte, sin paginar
     // y sin filtro de mundo: 1.000 de 5.062 filas, casi todas de Boston. Ahora
     // se derivan de los clientes que SE VEN.
+    //
+    // Y desde el 12-ago-2026 la lista tampoco se lee acá: la pantalla entra por
+    // la misma puerta cacheada que `/api/clientes`. Antes era UNA consulta
+    // propia; ahora tienen que ser CERO.
     const src = leer("src/app/clientes/page.tsx");
-    expect((src.match(/\.from\("clientes_master"\)/g) ?? []).length).toBe(1);
+    expect((src.match(/\.from\("clientes_master"\)/g) ?? []).length).toBe(0);
     expect(src).toContain("visibles.map(c => (c.provincia");
+  });
+
+  it("el Directorio COPIA la lista antes de ordenarla (el array es del caché)", () => {
+    // `sort` ordena EN EL LUGAR y `leerClientesDelGrupo` devuelve el MISMO array
+    // que guarda el caché en memoria: sin la copia, la pantalla mutaría estado
+    // compartido entre requests. Es el mismo cuidado que ya tomaba el endpoint.
+    const src = leer("src/app/clientes/page.tsx");
+    const iSlice = src.indexOf("visiblesCache.slice()");
+    const iSort = src.indexOf("visibles.sort(");
+    expect(iSlice).toBeGreaterThan(-1);
+    expect(iSort).toBeGreaterThan(iSlice);
+  });
+
+  it("la puerta lee las DOS tablas en paralelo, no una detrás de la otra", () => {
+    // Son 6 viajes paginados a clientes_master y 7 a switch_clientes; en serie
+    // son 13 esperas de red seguidas y no dependen entre sí.
+    expect(leer(PUERTA)).toContain("await Promise.all([");
   });
 
   it("ningún consumidor repite la lista de las 6 a mano", () => {

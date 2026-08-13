@@ -7,9 +7,7 @@
 // persona, "4,92 horas" no le dice nada a nadie.
 
 import { useCallback, useEffect, useState } from "react";
-import * as XLSX from "xlsx-js-style";
 import { useToast } from "@/components/ToastSystem";
-import { construirExcel, construirPdf } from "@/lib/asistencia/exportar";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -59,15 +57,38 @@ export default function ReporteTab() {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
-  function bajarExcel() {
+  // 🩸 LAS LIBRERÍAS DE EXCEL Y PDF SE BAJAN AL TOCAR EL BOTÓN, no al abrir la
+  // pantalla (12-ago-2026). Estaban importadas arriba, así que `xlsx-js-style`,
+  // `jspdf` y `jspdf-autotable` entraban al bundle inicial de /asistencia
+  // aunque nadie exportara nada — y quien entra a Asistencia entra a mirar
+  // marcas, no a bajar archivos. Medido contra el build de producción:
+  // /asistencia era la pantalla MÁS PESADA del sistema con 864 KB de JS.
+  //
+  // Es el patrón que ya usan Ventas (`lib/ventas/excel.ts`), Packing Lists y
+  // Catálogos — no uno nuevo. ⚠️ `lib/asistencia/exportar` importa xlsx y jspdf
+  // de forma estática, así que importarlo a él YA arrastra las tres librerías:
+  // por eso el `await import()` tiene que envolverlo a él también, no solo a
+  // xlsx.
+  async function bajarExcel() {
     if (!personas?.length) return;
-    XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), `Asistencia ${desde} a ${hasta}.xlsx`);
-    toast("Excel listo — revisa tu carpeta de descargas", "success");
+    try {
+      const XLSX = (await import("xlsx-js-style")).default;
+      const { construirExcel } = await import("@/lib/asistencia/exportar");
+      XLSX.writeFile(construirExcel({ personas, desde, hasta, reglas: reglas ?? undefined }), `Asistencia ${desde} a ${hasta}.xlsx`);
+      toast("Excel listo — revisa tu carpeta de descargas", "success");
+    } catch {
+      toast("No se pudo armar el Excel. Intenta de nuevo.", "error");
+    }
   }
-  function bajarPdf() {
+  async function bajarPdf() {
     if (!personas?.length) return;
-    construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(`Asistencia ${desde} a ${hasta}.pdf`);
-    toast("PDF listo — revisa tu carpeta de descargas", "success");
+    try {
+      const { construirPdf } = await import("@/lib/asistencia/exportar");
+      construirPdf({ personas, desde, hasta, reglas: reglas ?? undefined }).save(`Asistencia ${desde} a ${hasta}.pdf`);
+      toast("PDF listo — revisa tu carpeta de descargas", "success");
+    } catch {
+      toast("No se pudo armar el PDF. Intenta de nuevo.", "error");
+    }
   }
 
   const tot = (personas ?? []).reduce((a, p) => ({

@@ -17,7 +17,8 @@ import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings } from "lucide-react";
 import type { ExcelApi } from "./ComisionesView";
-import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesConfigModal } from "./ComisionesConfigModal";
@@ -30,7 +31,8 @@ const MESES = [
 ];
 
 // Joystep NO comisiona — fuera del selector de ESTE tab únicamente.
-const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
+// Joystep NO comisiona — la lista vive en `lib/comisiones/empresas`.
+const EMPRESAS = EMPRESAS_COMISIONAN;
 
 interface ComisionVendedor {
   vendedor: string;

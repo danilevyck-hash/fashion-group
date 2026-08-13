@@ -1,11 +1,24 @@
 "use client";
 
 // Vista "Todas las empresas" del tab Comisiones: matriz vendedor × empresa con
-// columna TOTAL destacada. V1 = agregación client-side: 5 llamadas en paralelo a
-// /api/ventas/comisiones (una por empresa que comisiona) pivoteadas por NOMBRE de
-// vendedor. Cada celda = comisión total de esa empresa (ya netea sus negativos);
-// TOTAL = suma de la fila — nunca se redistribuye entre empresas. El detalle por
-// celda (vendedor, empresa) reutiliza el reporte por empresa.
+// columna TOTAL destacada. La agregación (el pivote por NOMBRE de vendedor) se
+// sigue haciendo acá; lo que cambió es de dónde vienen los datos. Cada celda =
+// comisión total de esa empresa (ya netea sus negativos); TOTAL = suma de la
+// fila — nunca se redistribuye entre empresas. El detalle por celda (vendedor,
+// empresa) reutiliza el reporte por empresa.
+//
+// 🩸 ACÁ VIVÍA EL PEOR CASO DE PETICIONES DEL SISTEMA (12-ago-2026). Era un
+// `Promise.all` sobre las 5 empresas con un segundo `fetch` anidado adentro:
+// **10 peticiones por apertura** —`/api/ventas/comisiones` ×5 en el mismo
+// milisegundo y `/api/ventas/comisiones/descuentos` ×5— y **15 consultas a la
+// base**. No era un `useEffect` inestable ni componentes duplicados: las deps
+// del hook siempre fueron 3 primitivos. Era el bucle sobre empresas, y estaba
+// declarado en este mismo comentario desde el día 1.
+//
+// Ahora es UNA llamada a `/api/ventas/comisiones/consolidado`, que hace las 5
+// RPC del lado del servidor y lee los descuentos de las 5 empresas de una sola
+// vez (7 consultas en vez de 15). Los números no cambian: la misma RPC con los
+// mismos argumentos y la misma regla de descuentos.
 //
 // Nota de identidad: el pivote es por nombre exacto (no hay vendedor_id en Switch).
 // Si un mismo vendedor está escrito distinto entre empresas, aparece partido en dos
@@ -17,7 +30,8 @@ import { SkeletonTable } from "@/components/ui";
 import { Coins } from "lucide-react";
 import { Ayuda } from "@/components/shared/Ayuda";
 import type { ExcelApi } from "./ComisionesView";
-import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesConsolidado, type ComisionConsolidadoRow } from "@/lib/ventas/comisionExcel";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
@@ -28,8 +42,8 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// Joystep NO comisiona — fuera de la matriz.
-const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
+// Joystep NO comisiona — la lista vive en `lib/comisiones/empresas`.
+const EMPRESAS = EMPRESAS_COMISIONAN;
 const DEFAULT_VENDEDOR = "DEFAULT"; // centinela "cliente sin dueño"
 
 // Vendedores que NO se muestran en Comisiones. Daniel, 3-ago-2026: *"quita el
@@ -56,6 +70,8 @@ interface ApiVendedor {
 interface ApiResp {
   empresa_key: string;
   vendedores: ApiVendedor[];
+  /** Descuentos fijos ACTIVOS del mes, ya sumados por vendedor. */
+  porVendedor?: Record<string, number>;
 }
 
 interface Row extends ComisionConsolidadoRow {
@@ -88,44 +104,25 @@ export function ComisionesConsolidadoView({ year, mes, onExcel, refreshKey = 0 }
     setLoading(true);
     setError(null);
     try {
-      // 5 llamadas en paralelo (una por empresa que comisiona).
-      const resp = await Promise.all(
-        EMPRESAS.map(async (empresa) => {
-          const res = await fetch(
-            `/api/ventas/comisiones?empresa=${empresa}&year=${year}&mes=${mes}`,
-            { cache: "no-store" },
-          );
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(`${EMPRESA_KEY_TO_NAME[empresa] ?? empresa}: ${body.error ?? `HTTP ${res.status}`}`);
-          }
-          const comisiones = (await res.json()) as ApiResp;
-
-          // Descuentos fijos ACTIVOS del mes, de todos los vendedores de la
-          // empresa. 🩸 La tabla mostraba el subtotal ANTES de descuentos
-          // mientras el detalle sí restaba: Fashion Shoes de Reinaldo decía
-          // $2.859,65 cuando lo que se paga son $1.286,57. Daniel: *"me sale en
-          // el web el total, y no me resta el descuento"*.
-          //
-          // Si esta llamada falla NO se tumba la pantalla: se sigue con
-          // descuentos en 0 y la tabla queda como estaba antes. Un total de
-          // comisiones visible vale más que una pantalla en blanco.
-          let porVendedor: Record<string, number> = {};
-          try {
-            const rd = await fetch(
-              `/api/ventas/comisiones/descuentos?empresa=${empresa}&year=${year}&mes=${mes}`,
-              { cache: "no-store" },
-            );
-            if (rd.ok) {
-              const body = (await rd.json()) as { porVendedor?: Record<string, number> };
-              porVendedor = body.porVendedor ?? {};
-            }
-          } catch {
-            /* se queda en 0 */
-          }
-          return { ...comisiones, porVendedor };
-        }),
+      // UNA llamada. El servidor corre las 5 RPC y trae los descuentos de las 5
+      // empresas juntos.
+      //
+      // Los descuentos siguen fallando ABIERTO del lado del servidor: si su
+      // lectura se cae, `porVendedor` llega vacío y la tabla queda como estaba
+      // antes de que existieran. 🩸 La tabla mostraba el subtotal ANTES de
+      // descuentos mientras el detalle sí restaba: Fashion Shoes de Reinaldo
+      // decía $2.859,65 cuando lo que se paga son $1.286,57. Daniel: *"me sale
+      // en el web el total, y no me resta el descuento"*.
+      const res = await fetch(
+        `/api/ventas/comisiones/consolidado?year=${year}&mes=${mes}`,
+        { cache: "no-store" },
       );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(String(body.error ?? `HTTP ${res.status}`));
+      }
+      const { empresas } = (await res.json()) as { empresas?: ApiResp[] };
+      const resp = empresas ?? [];
 
       // Pivot por nombre de vendedor.
       const byName = new Map<string, Row>();

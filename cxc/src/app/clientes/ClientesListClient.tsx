@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import useSWR from "swr";
+import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -81,12 +82,22 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
     ? (["clientes-list", page, qDebounced, provinciaDebounced] as const)
     : null;
 
-  // fallbackData SOLO para la página 1 sin filtros = lo que entregó el SSR
-  // (initialClientes) → cero parpadeo en la primera carga, sin re-fetch redundante.
+  // Los datos del servidor sirven SOLO para la página 1 sin filtros. Cualquier
+  // otra vista (página 2, una búsqueda, una provincia) NO los tiene y tiene que
+  // pedirlos: por eso `opcionesDelServidor` recibe `undefined` ahí y SWR pide
+  // como siempre. Apagar la revalidación inicial sin esa distinción dejaría la
+  // página 2 en blanco para siempre.
+  //
+  // Memoizado porque su REFERENCIA es la señal de "el servidor mandó datos
+  // nuevos" que usa `useSembrarDelServidor`.
   const isInitialView = page === 1 && !qDebounced && !provinciaDebounced;
-  const fallbackData: ClientesPage | undefined = isInitialView
-    ? { clientes: initialClientes, total: initialTotal, page: 1 }
-    : undefined;
+  const delServidor = useMemo<ClientesPage | undefined>(
+    () =>
+      isInitialView
+        ? { clientes: initialClientes, total: initialTotal, page: 1 }
+        : undefined,
+    [isInitialView, initialClientes, initialTotal],
+  );
 
   const { data, isLoading, mutate } = useSWR<ClientesPage>(
     swrKey,
@@ -104,11 +115,14 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
       };
     },
     {
-      fallbackData,
       dedupingInterval: 5 * 60_000,
       revalidateOnFocus: false,
+      ...opcionesDelServidor(delServidor),
     },
   );
+
+  // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
+  useSembrarDelServidor(mutate, delServidor);
 
   const clientes = data?.clientes ?? [];
   const total = data?.total ?? 0;

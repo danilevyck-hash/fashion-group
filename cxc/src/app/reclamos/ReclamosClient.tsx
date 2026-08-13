@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import useSWR from "swr";
+import { opcionesDelServidor, useSembrarDelServidor } from "@/lib/swr-servidor";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
@@ -107,11 +108,17 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // no pega a /api/reclamos antes de confirmar rol. dedupingInterval 60s evita
   // refetch redundante en re-navegaciones rápidas. keepPreviousData (global,
   // SWRProvider) mantiene en pantalla el último dato al revalidar (cero flash).
+  //
+  // 🔑 `opcionesDelServidor` apaga SOLO la petición inicial — la que repetía la
+  // consulta que el server component ACABA de hacer (481 ms medidos por visita).
+  // `revalidateOnFocus: true` SE QUEDA, y no es un detalle: los reclamos los
+  // editan varias personas a la vez y no hay realtime, así que volver a la
+  // pestaña es cómo cada uno se entera de lo que hicieron los demás.
   const { data: reclamosData, isLoading: reclamosLoading, mutate: mutateReclamos } = useSWR<Reclamo[]>(
     authChecked ? SWR_KEY : null,
     fetchReclamos,
     {
-      fallbackData: initialData.reclamos,
+      ...opcionesDelServidor(initialData.reclamos),
       dedupingInterval: 60_000,
       revalidateOnFocus: true,
       onError: (err: FetchError) => {
@@ -122,6 +129,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       },
     },
   );
+  // Que un render nuevo del servidor gane sobre lo que quedó en caché (sin red).
+  useSembrarDelServidor(mutateReclamos, initialData.reclamos);
+
   const reclamos = reclamosData ?? [];
   const loading = reclamosLoading; // con fallbackData hay dato → false; sin flash al revalidar
   // loadReclamos → revalidación forzada (mutate). Mismo nombre para no tocar los
