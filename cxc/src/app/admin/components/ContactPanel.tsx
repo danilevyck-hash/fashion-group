@@ -56,7 +56,8 @@ export default function ContactPanel({
                   <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
                   <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
                   <th className="text-right py-1.5 font-medium">Total</th>
-                  <th className="text-right py-1.5 font-medium" title="Cobro real más reciente del cliente en esta empresa (excluye retenciones)">Último pago</th>
+                  <th className="text-right py-1.5 font-medium" title="Cobro real más reciente del cliente en esta empresa (excluye retenciones y recibos en cero)">Último pago</th>
+                  <th className="text-right py-1.5 font-medium" title="Última factura del cliente en esta empresa (las notas de crédito no son compras)">Última compra</th>
                 </tr>
               </thead>
               <tbody>
@@ -68,6 +69,7 @@ export default function ContactPanel({
                   const tipCurrent = `0-30: $${fmt(d.d0_30)} · 31-60: $${fmt(d.d31_60)} · 61-90: $${fmt(d.d61_90)}`;
                   const tipOverdue = `121-180: $${fmt(d.d121_180)} · 181-270: $${fmt(d.d181_270)} · 271-365: $${fmt(d.d271_365)} · +365: $${fmt(d.mas_365)}`;
                   const ultDias = daysSince(d.ultimoPagoFecha);
+                  const compraDias = daysSince(d.ultimaCompraFecha);
                   return (
                     <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
@@ -85,6 +87,26 @@ export default function ContactPanel({
                               <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>
                             )}
                             <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                      {/* Última compra: MISMO formato que el último pago (monto ·
+                          N d). Los días van en gris y NO con daysAgingColor: en
+                          esta pantalla el rojo significa "plata vencida", y una
+                          compra vieja no es plata en riesgo — pintarla igual
+                          diría algo que no es. */}
+                      <td
+                        className="text-right py-1.5 tabular-nums whitespace-nowrap"
+                        title={d.ultimaCompraFecha ? `Última compra: ${fmtDate(d.ultimaCompraFecha)}` : "Sin compras registradas"}
+                      >
+                        {d.ultimaCompraFecha ? (
+                          <span>
+                            {d.ultimaCompraMonto != null && (
+                              <span className="text-gray-600">${fmt(d.ultimaCompraMonto)} · </span>
+                            )}
+                            <span className="text-gray-500">{compraDias != null ? `${compraDias} d` : ""}</span>
                           </span>
                         ) : (
                           <span className="text-gray-300">—</span>

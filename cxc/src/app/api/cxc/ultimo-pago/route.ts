@@ -37,6 +37,24 @@ const PAGE = 1000;
 // dos lados (hay 10 clientes así, medidos el 27-jul-2026).
 const EMPRESAS_CXC = empresasConCxc();
 
+// UN RECIBO DE $0,00 NO ES UN PAGO — red de seguridad hasta que corra la DDL.
+//
+// La regla vive en la VISTA (20260813170000: `COALESCE(r.total,0) <> 0`), que es
+// donde tiene que vivir para que TODA superficie la herede. Pero las migraciones
+// las corre Daniel A MANO y hasta entonces la vista sigue devolviendo el recibo
+// de $0,00 como "último pago" — que es el bug que Daniel cazó: D-25/fashion_wear
+// mostraba "$0.00 hace 15 días" en vez de los $187.651,51 del 22-jul.
+//
+// Descartar acá la fila de $0 no puede recuperar el pago bueno (la vista ya
+// colapsó a una fila por cliente), pero convierte una MENTIRA en un "Sin pagos
+// registrados" honesto. Cuando la DDL corra, este filtro es un no-op medible.
+//
+// Un recibo de $0 es una aplicación/cruce (NC o saldo a favor aplicado contra
+// facturas) o un recibo anulado: `switch_estadocuenta` no tiene UNA sola fila de
+// tipo 'Recibo' con total 0 — el estado de cuenta de Switch nunca los muestra.
+const esPagoDeVerdad = (fila: unknown): boolean =>
+  Number((fila as { ultimo_pago_monto?: unknown }).ultimo_pago_monto) !== 0;
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, CXC_ROLES);
   if (auth instanceof NextResponse) return auth;
@@ -55,7 +73,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Error al leer últimos pagos" }, { status: 500 });
     }
     if (!data || data.length === 0) break;
-    all.push(...data);
+    all.push(...data.filter(esPagoDeVerdad));
     if (data.length < PAGE) break; // última página
   }
   return NextResponse.json(all);

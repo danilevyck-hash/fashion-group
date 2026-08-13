@@ -61,11 +61,20 @@ export interface ConsolidatedClient {
       d271_365: number;
       mas_365: number;
       total: number;
-      /** Último pago (recibo más reciente) del cliente en ESA empresa, desde
-       *  switch_ultimo_pago_cliente_v2 (historial completo de recibos, incluye
-       *  retenciones como actividad de pago). null si no hay recibo. */
+      /** Último pago del cliente en ESA empresa, desde
+       *  switch_ultimo_pago_cliente_v2 (historial completo de recibos).
+       *  Un COBRO REAL: excluye retenciones de ITBMS y recibos de $0,00
+       *  (aplicaciones/cruces y anulados, que no mueven un centavo).
+       *  null cuando el cliente no tiene ningún pago — se dice así, no se
+       *  inventa uno. */
       ultimoPagoFecha?: string | null;
       ultimoPagoMonto?: number | null;
+      /** Última COMPRA del cliente en ESA empresa: la última **Factura** de
+       *  switch_facturas (vía switch_ultima_compra_cliente_v1), con ITBMS,
+       *  en día Panamá. Las notas de crédito NO son compras. null cuando no
+       *  tiene ninguna factura registrada. */
+      ultimaCompraFecha?: string | null;
+      ultimaCompraMonto?: number | null;
     };
   };
   correo: string;
