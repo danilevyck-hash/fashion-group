@@ -69,6 +69,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
+// 🔑 Un motivo de justificación puede significar "trabajó, pero no acá". El
+// motor lo necesita para NO contar esos días como ausencias justificadas.
+import { esTrabajoFuera } from "./motivos";
 // 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
 // que un import normal armaría un ciclo en tiempo de ejecución; `import type`
 // se borra al compilar y no queda ninguno.
@@ -201,7 +204,22 @@ export interface PersonaReporte {
   resumen: {
     diasTrabajados: number;
     ausenciasSinJustificar: number;
+    /**
+     * Días sin marcas cubiertos por una justificación que SÍ es una ausencia
+     * (vacaciones, incapacidad, permiso, luto, otro).
+     *
+     * 🔑 NO incluye los de «Trabajo fuera de la oficina»: esos van aparte en
+     * `diasTrabajandoFuera`. Los dos conjuntos son DISJUNTOS a propósito —
+     * sumarlos bajo la misma etiqueta es justo lo que este motivo vino a
+     * eliminar. Ningún número histórico se mueve: hasta hoy ese motivo no
+     * existía, así que no había un solo día que sacar de acá.
+     */
     ausenciasJustificadas: number;
+    /**
+     * Días sin marcas en los que la persona estaba TRABAJANDO, fuera de la
+     * oficina. No son ausencias y no se cuentan como tales.
+     */
+    diasTrabajandoFuera: number;
     vecesTarde: number;
     minutosTarde: number;
     /** De `minutosTarde`, cuántos salen de días mal marcados. Ver regla 5. */
@@ -548,7 +566,10 @@ export function armarReporte(opts: {
     const resumen = {
       diasTrabajados: conMarcas.length,
       ausenciasSinJustificar: dias.filter((d) => d.ausente).length,
-      ausenciasJustificadas: dias.filter((d) => !d.marcas.length && d.justificado).length,
+      ausenciasJustificadas: dias.filter(
+        (d) => !d.marcas.length && d.justificado && !esTrabajoFuera(d.justificado),
+      ).length,
+      diasTrabajandoFuera: dias.filter((d) => !d.marcas.length && esTrabajoFuera(d.justificado)).length,
       vecesTarde: conMarcas.filter((d) => d.tardeMin > 0).length,
       minutosTarde: conMarcas.reduce((a, d) => a + d.tardeMin, 0),
       minutosTardeDeDiasARevisar: conMarcas.filter((d) => d.revisar).reduce((a, d) => a + d.tardeMin, 0),
