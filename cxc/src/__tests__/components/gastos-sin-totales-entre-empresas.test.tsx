@@ -132,6 +132,7 @@ const empresasEgresos: EmpresaEgresosResumen[] = [
     nombre: "Vistana International",
     resumen: resumenEgresos(A_CENT),
     ultimoMesConMovimientos: "2026-01",
+    alDia: { estado: "al_dia", mes: "2026-01" },
     descargaAutomatica: true,
   },
   {
@@ -139,6 +140,7 @@ const empresasEgresos: EmpresaEgresosResumen[] = [
     nombre: "Confecciones Boston",
     resumen: resumenEgresos(B_CENT),
     ultimoMesConMovimientos: "2026-01",
+    alDia: { estado: "al_dia", mes: "2026-01" },
     // Boston con la descarga automática APAGADA: es su estado real desde el
     // 13-ago-2026, y la regla de no sumar tiene que valer igual.
     descargaAutomatica: false,

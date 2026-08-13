@@ -8,6 +8,7 @@
 
 import { centAUsd, type Aviso, type ResumenMes } from "@/lib/mayor/gastos";
 import type { ResumenEgresosMes } from "@/lib/egresos/reglas";
+import type { AlDia } from "@/lib/egresos/al-dia";
 import { fmt } from "@/lib/format";
 
 export const API_BASE = "/api/gastos-contabilidad";
@@ -73,6 +74,9 @@ export interface EmpresaEgresosResumen {
   resumen: ResumenEgresosMes;
   /** Último mes con movimientos de esa empresa (`YYYY-MM`), o `null`. */
   ultimoMesConMovimientos: string | null;
+  /** Hasta qué mes está al día — el avance de la contadora. Derivado del dato
+   *  (`src/lib/egresos/al-dia.ts`), nunca de una lista escrita a mano. */
+  alDia: AlDia;
   /** ¿El cron baja sola esta empresa? `false` en Confecciones Boston (pedido de
    *  Daniel: su usuario del panel es el de él). La pantalla TIENE que decirlo —
    *  una empresa vacía sin explicación se lee como un error del sistema. */

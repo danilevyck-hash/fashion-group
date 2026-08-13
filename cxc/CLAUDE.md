@@ -90,6 +90,46 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
 - **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* y *Saldos de banco*), Préstamos, Cheques
 
+> ## HASTA QUÉ MES ESTÁ AL DÍA CADA EMPRESA — el avance de la contadora, en una línea (13-ago-2026)
+>
+> Daniel confirmó que los gastos de las 8 empresas SÍ se registran en el mismo lugar y que lo que falta es que la contadora se ponga al día. Textual: ***"por ahi mismo pero no esta acutalizado aun, estamos en eso"***. Este indicador existe por UNA razón: **que él vea ese avance sin preguntárselo a nadie**. Vive en la pestaña *Gastos*, debajo del nombre de cada empresa, en las dos formas de la lista (tarjetas y tabla) y **siempre** — no solo cuando el mes que se está mirando está vacío.
+>
+> ```
+> Vistana International  [Al día]     Cargado hasta julio 2026
+> Fashion Wear           [Al día]     Cargado hasta mayo 2026 · ese mes va en $257.43
+>                                     y lo habitual acá es $2,482.05: puede estar a medio cargar   ← ámbar
+> Active Shoes      [Sin movimientos] Todavía no hay gastos registrados
+> ```
+>
+> 🔴 **LA LÍNEA DE LA HONESTIDAD, que es de lo que trata todo esto:** lo único que se AFIRMA es lo que el dato dice literalmente — **hasta qué mes hay renglones cargados**. **"Ese mes está incompleto" NO se puede afirmar con egresos**: son pagos sueltos, no tienen un asiento de cierre que diga "terminé" (eso sí existe en el mayor, `esAsientoDeCierre`). Así que **no hay semáforo inventado**: hay un mes y, cuando el historial de la PROPIA empresa lo justifica, una sospecha declarada como tal (*"puede estar a medio cargar"*, nunca *"está"*) **con los dos números a la vista** para que se pueda juzgar.
+>
+> 🩸 **EL CASO REAL, medido en producción sobre los 441 renglones de `egresos_varios`** (`scripts/_diag-gastos-al-dia.ts`, solo lectura): `fashion_wear` viene de $6.482,97 en enero y su último mes cargado, mayo, trae **$257,43 — el 10% de lo habitual**. No PRUEBA que esté a medias (una empresa puede gastar menos), pero es exactamente lo que hay que poner delante de los ojos.
+>
+> | Empresa | Cargado hasta | ¿Marcada? |
+> |---|---|---|
+> | vistana | **julio** ($13.276,86, el 92% de su mediana) | no |
+> | fashion_wear | **mayo** ($257,43 contra $2.482,05) | **sí, 10%** |
+> | fashion_shoes | **abril** ($2.250, el 75%) | no |
+> | active_wear | **abril** ($0,00 contra $416,95) | **sí, 0%** |
+> | active_shoes · joystep · american_classic | — | *"Todavía no hay gastos registrados"* |
+> | confecciones_boston | *(sin línea)* | no se baja sola — su explicación ya lo dice |
+>
+> - **LA FUENTE ES EGRESOS VARIOS, y se eligió MIDIENDO las dos.** El mayor contable tiene 135 filas y solo enero; los números de la tabla de arriba cuadran **exacto** con `egresos_varios`. **El indicador NO se puso en la pestaña del mayor**: ahí el dato no es el que la contadora está poniendo al día, y una segunda línea diciendo "cargado hasta enero" al lado de ésta se leería como una contradicción. (Y con el retiro del mayor esa pestaña desaparece.)
+> - **La regla, en `src/lib/egresos/al-dia.ts` (módulo PURO):** se marca cuando el último mes trae **menos del 25%** (`UMBRAL_INCOMPLETO`) de la **MEDIANA** de los meses previos, y solo con **3+ meses previos** (`MIN_MESES_PREVIOS`) — con uno o dos, "lo habitual de esta empresa" no existe todavía y la sospecha sería ruido. **MEDIANA y no promedio**: vistana tiene un marzo de $37.404 entre meses de ~$13.000, y con promedio su julio queda en 75% mientras con mediana da 92% — un solo mes atípico no puede mover la vara. El 25% está calibrado contra los datos reales **en las dos direcciones**: marca a fashion_wear y active_wear, y **NO** marca a fashion_shoes (75%) ni a vistana (92%). Un umbral flojo marcaría a las cuatro y el aviso dejaría de leerse.
+> - 🔴 **"Todavía no hay gastos registrados", NUNCA $0.00.** Un cero le diría a Daniel que esas empresas no gastaron; gastan, lo que falta es que estén cargadas. Es la misma regla que ya rige para Boston.
+> - **El mes EN CURSO es un hecho del calendario, no una sospecha** (*"que todavía va corriendo"*), y **gana** sobre la estadística: sin ese orden, el primer día de cada mes las 8 empresas dirían "puede estar a medio cargar" — verdadero e inútil, y el aviso se quemaría.
+> - **La serie es de GASTO (grupo 6), no de todo lo que salió de caja.** Es el mismo criterio con el que la pantalla pinta "De eso, gastos": comparar contra las transferencias entre cuentas propias sería comparar contra un número que no está a la vista.
+> - **Boston queda SIN línea**, a propósito: su vacío no es atraso de la contadora sino la decisión de Daniel de que no se baje sola, y su explicación ya lo dice entera. Acusarla de un atraso que no tiene sería peor que no decir nada.
+> - 🔴 **DICE "CARGADO HASTA", NO "AL DÍA HASTA".** La píldora de la MISMA fila ya usa **"Al día"** para otra cosa (que el mes que estás mirando tuvo movimientos): dos frases parecidas diciendo cosas distintas en el mismo renglón es el defecto que este módulo ya pagó con "Gastos de Empresa" vs "Gastos por Empresa". La píldora es anterior y **no se toca**; se renombró el texto nuevo.
+> - **De paso se podó una repetición:** la coletilla *"Lo último que hay es de mayo 2026"* del estado `sin_datos` **se fue** — la línea nueva dice exactamente eso, y decía DOS VECES el mismo mes en la misma tarjeta.
+> - ⚠️ **SIN CONSULTA NUEVA NI DDL.** La serie mensual sale de la MISMA lectura que ya traía "los meses con movimiento" (se le sumaron 2 columnas, `cuenta` y `total`, a un `leerTodoPaginado` que ya recorría la tabla). Cero consultas extra contra una base en compute Micro.
+>
+> **Los 3 anchos, en el navegador contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-gastos-al-dia.mjs`, solo lectura, en un mes CON datos y en uno casi vacío): **390 · 834 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px**; el único "recortado" es el `h1.sr-only`, que ya estaba. La línea crece hacia abajo. El script **falla** si no encuentra las 8 empresas, si falta el texto de la empresa sin gastos, o si una empresa sin nada aparece con un `$0.00`.
+>
+> **Candados:** `gastos-al-dia.test.ts` (17, con los datos REALES de producción), **`gastos-al-dia-lectura.test.ts`** (6, ejecuta `leerEgresosMes` con la base mockeada) y **`components/gastos-al-dia-pantalla.test.tsx`** (12, **pinta la lista y lee las filas**).
+> - 🩸 **DOS mutaciones pasaban en verde, y las dos vivían en la capa de LECTURA, que no tenía un solo test:** borrar la línea que agrega `alDia` (la pantalla se quedaba sin el indicador entero, **en silencio** — `fraseAlDia` tolera un `alDia` ausente, que es correcto para un payload viejo de SWR y acá era el tapón perfecto) y dejar de filtrar la serie a grupo 6. Por eso existe `gastos-al-dia-lectura.test.ts`. ⚠️ Y el fixture de esa segunda tuvo que **rehacerse**: con transferencias en un solo mes la mediana no se movía y el candado pasaba igual — un test que no discrimina no es un candado.
+> - **Verificado por mutación, 15 de 15 cazadas:** que la línea no se dibuje en las tarjetas (6) o en la tabla (1) · que la empresa sin nada se muestre en $0.00 (1) · que la sospecha pierda los dos números (1) · que deje de ir en ámbar (1) · que Boston se acuse de atraso (1) · que vuelva el "Al día hasta" que choca con la píldora (5) · aflojar el umbral al 80% (2) · comparar contra el promedio (1) · sospechar con 1 mes previo (1) · tratar el mes en curso como sospecha (3) · inventar los meses vacíos como $0 (3) · que la serie deje de ser solo gasto (2) · que la ruta deje de mandar `alDia` (5) · calcular el `alDia` sobre el mes mirado en vez de sobre toda la historia (3).
+
 > ## 🔴 EN GASTOS LAS EMPRESAS SE VEN TODAS, PERO NO SE SUMAN — LA REGLA, TEXTUAL (13-ago-2026)
 >
 > Daniel, palabra por palabra, cuando se le preguntó si Confecciones Boston tenía que quedar en el módulo: *"si quiero ver gastos de boston, pero **cada compañia por separado, sin juntar los gastos entre todos** me explico?"*
