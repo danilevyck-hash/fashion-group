@@ -232,7 +232,11 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
     // El candado que sostiene el orden: sin él no quedaría ningún módulo de
     // gastos, y ahora además se llevaría puestos los saldos, que son su pestaña.
     expect(existsSync(join(raiz, "src/app/gastos-contabilidad/page.tsx"))).toBe(true);
-    expect(existsSync(join(raiz, "src/app/api/gastos-contabilidad/resumen/route.ts"))).toBe(true);
+    // 🔴 La ruta cambió al retirarse el mayor (13-ago-2026): la que sostiene el
+    // módulo es la de Egresos Varios, que es la ÚNICA fuente que queda. El
+    // candado no se aflojó — sigue exigiendo que el módulo de gastos tenga una
+    // API viva antes de dar por bueno el retiro de nada.
+    expect(existsSync(join(raiz, "src/app/api/gastos-contabilidad/egresos/route.ts"))).toBe(true);
   });
 
   it("los saldos de banco NO se fueron con él: siguen vivos, ahora como pestaña", () => {

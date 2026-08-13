@@ -299,14 +299,17 @@ describe("E. 🔴 LAS DOS FUENTES NO SE SUMAN — enero está en las dos", () =>
     expect(culpables).toEqual([]);
   });
 
-  it("la pantalla pide UNA fuente por vez, no las dos", () => {
-    // Desde el 13-ago-2026 hay una condición MÁS (`enGastos`): estando en la
-    // pestaña de Saldos de banco no se pide ninguna de las dos. El invariante
-    // que importa no cambió — cada `pedir*` sigue exigiendo SU fuente, así que
-    // nunca se piden las dos a la vez.
+  it("🔴 la pantalla ya no puede pedir el mayor: no hay segunda fuente", () => {
+    // El mayor se retiró el 13-ago-2026 y con él el selector de fuente. La regla
+    // de "no se suman" no se relajó: se volvió TRIVIAL, porque ya no hay dos
+    // fuentes que sumar. Lo que se vigila ahora es que no vuelva por la ventana.
     const cliente = soloCodigo(leer(path.join("app", "gastos-contabilidad", "GastosContabilidadClient.tsx")));
-    expect(cliente).toMatch(/pedirMayor\s*=\s*authChecked && enGastos && fuente === "mayor"/);
-    expect(cliente).toMatch(/pedirEgresos\s*=\s*authChecked && enGastos && fuente === "egresos"/);
+    expect(cliente).not.toMatch(/pedirMayor/);
+    expect(cliente).not.toMatch(/RespuestaResumen/);
+    expect(cliente).not.toMatch(/SelectorFuente/);
+    // Y la única lectura que queda sigue apagada fuera de su pestaña: la base
+    // está en compute Micro.
+    expect(cliente).toMatch(/pedirEgresos\s*=\s*authChecked && enGastos/);
   });
 
   it("y la ruta de egresos no devuelve nada del mayor", () => {

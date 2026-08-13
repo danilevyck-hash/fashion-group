@@ -22,8 +22,8 @@
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
-import { montoACentavos } from "@/lib/mayor/parser";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { montoACentavos } from "@/lib/contable/csv";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { empresasConEgresosEnCron } from "@/lib/switch-api/empresas";
 import { leerNombresDeCuentas, type NombresPorEmpresa } from "@/lib/cuentas/leer";
 import type { EgresoLinea } from "./parser";

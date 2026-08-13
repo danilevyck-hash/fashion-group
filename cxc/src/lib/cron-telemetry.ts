@@ -449,14 +449,13 @@ export const SEED_TOLERANT_CRONS = [
   // Mayor contable de las 8 empresas (09:05 UTC = 04:05 a.m. Panamá).
   // Desplegado el 10-ago-2026: seed-tolerante hasta que siembre su fila.
   // Promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
-  "sync-mayor",
   // Egresos varios (caja y banco) de las 8 empresas (10:35 UTC = 05:35 a.m.
   // Panamá). Desplegado el 13-ago-2026: seed-tolerante DOBLE, igual que
   // calvin-catalogo — además de la siembra normal, mientras la DDL
   // 20260813120000 no corra el cron se omite limpio (503, sin heartbeat y sin
   // tocar Switch): fila ausente = pendiente, no caído. Promover a
   // CRONS_FAIL_CLOSED cuando la DDL esté corrida y el heartbeat lleve días
-  // sembrado (el mismo camino que recorrieron Tommy y el mayor).
+  // sembrado (el mismo camino que recorrió Tommy).
   "sync-egresos-varios",
 ];
 
@@ -556,18 +555,18 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // en la 00:20-05:20 UTC, que en Panamá es la tarde-noche (19:20-00:20).
   // Toca las 8 empresas: queda a 25 min de switch-articulos (08:40) y a 25 de
   // sync-proveedores (09:30), sobre los 15 de SEPARACION_MINIMA_MIN.
-  { cron: "sync-mayor", hhmmUtc: "0905", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
   // EGRESOS VARIOS de las 8 empresas (10:35 UTC = 05:35 a.m. Panamá). Abre
   // sesión web con changesession=SI, o sea que EXPULSA a quien esté en el panel
   // — por eso va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma
-  // donde ya viven sync-utilidad, boston-cartera y sync-mayor.
+  // donde ya viven sync-utilidad y boston-cartera (sync-mayor se retiró el
+  // 13-ago-2026 y liberó su franja de las 09:05).
   //
   // Toca SIETE empresas, y la vecina que manda es `switch-reconciliacion` 10:00:
   // puede abrir la sesión de cualquiera hasta 12 min (RECOVERY_BUDGET_MS 740 s),
   // así que los 35 min de separación dejan 23 de aire real. Por delante,
   // joybees-catalogo 11:00 (solo joystep) a 25 min. Los otros crons de las 8
-  // quedan a 90 (sync-mayor 09:05) y 65 min (sync-proveedores 09:30).
+  // queda a 65 min de sync-proveedores (09:30).
   //
   // 🔴 SIN `confecciones_boston`, y por eso se DERIVA en vez de escribir
   // CRON_EMPRESAS_TODAS: Daniel pidió que su usuario no se toque solo

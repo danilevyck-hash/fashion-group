@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { leerEgresosMes } from "@/lib/egresos/leer";
 import { mesEgresosValido } from "@/lib/egresos/reglas";
 import type { RespuestaEgresos } from "@/app/gastos-contabilidad/components/tipos";

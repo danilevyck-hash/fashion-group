@@ -35,13 +35,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 
-import ResumenEmpresas from "@/app/gastos-contabilidad/components/ResumenEmpresas";
 import ResumenEgresos from "@/app/gastos-contabilidad/components/ResumenEgresos";
-import type {
-  EmpresaResumen,
-  EmpresaEgresosResumen,
-} from "@/app/gastos-contabilidad/components/tipos";
-import type { ResumenMes } from "@/lib/mayor/gastos";
+import type { EmpresaEgresosResumen } from "@/app/gastos-contabilidad/components/tipos";
 import type { ResumenEgresosMes } from "@/lib/egresos/reglas";
 
 afterEach(cleanup);
@@ -51,52 +46,11 @@ const A_CENT = 10_000;
 const B_CENT = 20_000;
 const SUMA = "$300.00";
 
-// ── El mayor ────────────────────────────────────────────────────────────────
-
-function resumenMayor(totalCent: number): ResumenMes {
-  return {
-    mes: "2026-01",
-    estado: "cerrado",
-    cuentas: [
-      {
-        cuenta: "6.02.01.00.00",
-        corta: "6.02.01",
-        nombre: "SALARIOS",
-        debitoCent: totalCent,
-        creditoCent: 0,
-        netoCent: totalCent,
-        esIsr: false,
-        sinSalidaDeCaja: false,
-      },
-    ],
-    isr: [],
-    totalOperacionCent: totalCent,
-    totalIsrCent: 0,
-    totalCent,
-    totalSinSalidaDeCajaCent: 0,
-    // Con salarios en 0 el mes no sería "mostrable" y no se pintaría el monto.
-    salarios: { fijoCent: totalCent, comisionesCent: 0, otrosCent: 0, totalCent },
-    lineasTotal: 1,
-    lineasGasto: 1,
-  };
-}
-
-const empresasMayor: EmpresaResumen[] = [
-  {
-    empresaKey: "vistana",
-    nombre: "Vistana International",
-    resumen: resumenMayor(A_CENT),
-    avisos: [],
-    ultimoMesCerrado: "2026-01",
-  },
-  {
-    empresaKey: "confecciones_boston",
-    nombre: "Confecciones Boston",
-    resumen: resumenMayor(B_CENT),
-    avisos: [],
-    ultimoMesCerrado: "2026-01",
-  },
-];
+// 🔴 EL MAYOR SE RETIRÓ (13-ago-2026) y con él su fixture y su bloque de tests.
+// LA REGLA NO SE AFLOJÓ — sigue valiendo entera sobre la fuente que queda, que
+// es la única que la pantalla puede pintar. Y de paso se volvió más difícil de
+// romper: con una sola fuente ya no existe la forma más obvia de inventar un
+// total entre empresas, que era sumar las dos.
 
 // ── Egresos varios ──────────────────────────────────────────────────────────
 
@@ -146,29 +100,6 @@ const empresasEgresos: EmpresaEgresosResumen[] = [
     descargaAutomatica: false,
   },
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 la lista del MAYOR no suma empresas", () => {
-  it("Boston SE VE, con su propio número", () => {
-    // La otra mitad de la regla: la empresa no se esconde, se muestra aparte.
-    render(<ResumenEmpresas empresas={empresasMayor} onAbrir={() => {}} />);
-    expect(screen.getAllByText("Confecciones Boston").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Vistana International").length).toBeGreaterThan(0);
-  });
-
-  it("cada empresa muestra LO SUYO", () => {
-    render(<ResumenEmpresas empresas={empresasMayor} onAbrir={() => {}} />);
-    // Si esto fallara, el test de abajo pasaría por no pintar nada.
-    expect(screen.getAllByText("$100.00").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("$200.00").length).toBeGreaterThan(0);
-  });
-
-  it("y el TOTAL de las dos ($300.00) no aparece por ningún lado", () => {
-    const { container } = render(<ResumenEmpresas empresas={empresasMayor} onAbrir={() => {}} />);
-    expect(screen.queryByText(SUMA)).toBeNull();
-    expect(container.textContent).not.toContain(SUMA);
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 la lista de EGRESOS VARIOS no suma empresas", () => {
@@ -222,13 +153,7 @@ describe("🔴 y el dato que viaja tampoco trae un total de grupo", () => {
     return fuera;
   }
 
-  it("la respuesta del mayor solo lleva instalado, mes y empresas[]", () => {
-    const payload = { instalado: true, mes: "2026-01", empresas: empresasMayor };
-    expect(numerosFueraDeEmpresas(payload)).toEqual([]);
-    expect(Object.keys(payload).sort()).toEqual(["empresas", "instalado", "mes"]);
-  });
-
-  it("la de egresos varios, igual", () => {
+  it("la respuesta de egresos varios solo lleva instalado, mes y empresas[]", () => {
     const payload = { instalado: true, mes: "2026-01", empresas: empresasEgresos };
     expect(numerosFueraDeEmpresas(payload)).toEqual([]);
     expect(Object.keys(payload).sort()).toEqual(["empresas", "instalado", "mes"]);

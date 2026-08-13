@@ -55,7 +55,7 @@ import { particionarFilas } from "./monto-guard";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { empresasConEgresosEnCron } from "./empresas";
 import { hoyPanama } from "@/lib/fecha-panama";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { syncCuentasContables, type ResultadoCuentas } from "./sync-cuentas-contables";
 
 /**

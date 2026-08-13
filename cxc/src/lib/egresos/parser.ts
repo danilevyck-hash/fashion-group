@@ -49,7 +49,7 @@
  * mismo repo son dos redondeos posibles para el mismo número.
  */
 
-import { montoACentavos, normalizarTexto, CUENTA_RE } from "@/lib/mayor/parser";
+import { montoACentavos, normalizarTexto, CUENTA_RE } from "@/lib/contable/csv";
 
 /** Un egreso ya parseado. Monto en centavos enteros. */
 export interface EgresoLinea {

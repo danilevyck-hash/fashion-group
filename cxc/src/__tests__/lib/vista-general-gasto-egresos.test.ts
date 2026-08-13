@@ -26,8 +26,13 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+
+/** El archivo SIN comentarios. Los barridos de "esto ya no está" tienen que
+ *  mirar CÓDIGO: la nota que documenta un retiro nombra justo lo retirado. */
+const plano = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 import {
   gastoEgresosMostrable,
   textoSinGastoEgresos,
@@ -295,14 +300,82 @@ describe("la ruta de Vista General ya no toca el MAYOR", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("⚠️ el MAYOR no se apagó: sigue vivo para el módulo Gastos", () => {
-  it("`lib/mayor` conserva sus dos piezas", () => {
-    expect(leer("src/lib/mayor/leer.ts")).toContain("export async function leerMayorMes");
-    expect(leer("src/lib/mayor/gastos.ts")).toContain("export function gastoMostrable");
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL MAYOR SE RETIRÓ — y este bloque cambió de dirección EL MISMO DÍA
+//
+// Cuando Vista General salió del mayor (#536), este candado exigía que el mayor
+// SIGUIERA VIVO: el módulo Gastos todavía lo ofrecía como segunda fuente y
+// apagarlo de paso habría sido un recorte que nadie pidió. Horas después Daniel,
+// viendo que Vista General ya usaba Egresos Varios y que el mayor iba 7 meses
+// atrás, cerró el tema: *"y entonces borra Mayor contable en el sistema"*.
+//
+// El candado no se aflojó: se dio vuelta. Antes protegía que no se apagara sin
+// decisión; ahora protege que **no vuelva a encenderse sin decisión**, y que el
+// retiro no se haya llevado por delante lo que comparte con Egresos Varios.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🔴 el MAYOR se retiró, y lo COMPARTIDO sobrevivió", () => {
+  it("`lib/mayor` ya no existe", () => {
+    for (const p of ["src/lib/mayor", "src/lib/switch-api/sync-mayor.ts", "src/app/api/cron/sync-mayor"]) {
+      expect(existsSync(join(raiz, p)), `${p} debía retirarse`).toBe(false);
+    }
   });
 
-  it("y el módulo Gastos lo sigue leyendo", () => {
-    const resumen = leer("src/app/api/gastos-contabilidad/resumen/route.ts");
-    expect(resumen).toContain("leerMayorMes");
+  it("🩸 lo que Egresos Varios COMPARTÍA con el mayor se mudó, no se borró", () => {
+    // `lib/mayor/` no era solo del mayor: SEIS módulos vivos dependían de él.
+    // Borrar la carpeta sin mudar esto primero habría roto la única fuente de
+    // gasto que queda, y la degradación limpia de tres tablas más.
+    expect(leer("src/lib/contable/tabla-ausente.ts")).toContain("export function esTablaAusente");
+    expect(leer("src/lib/contable/csv.ts")).toContain("export function montoACentavos");
+    expect(leer("src/lib/contable/cuentas.ts")).toContain("export const esGasto");
+    // Y los consumidores apuntan a la casa nueva.
+    for (const f of [
+      "src/lib/egresos/reglas.ts",
+      "src/lib/egresos/parser.ts",
+      "src/lib/egresos/leer.ts",
+      "src/lib/cuentas/leer.ts",
+      "src/lib/inventario/leer.ts",
+      "src/lib/switch-api/sync-egresos-varios.ts",
+    ]) {
+      expect(leer(f), `${f} sigue colgado de lib/mayor`).not.toMatch(/from "@\/lib\/mayor\//);
+    }
+  });
+
+  it("🔴 el login web COMPARTIDO no se tocó: egresos y el catálogo de cuentas siguen entrando", () => {
+    // `web-client.ts` lo usan los dos syncs que quedan. Retirar el mayor no
+    // podía llevarse por delante el login, el token CSRF ni `/cierresesion`.
+    // 🩸 SIN COMENTARIOS. El archivo EXPLICA en su cabecera qué se llevó el
+    // retiro, y esos nombres bastaban para que `not.toContain` fallara con el
+    // código ya limpio — un candado que se rompe con su propia explicación es
+    // tan inútil como uno que se cumple con ella.
+    const wc = plano(leer("src/lib/switch-api/web-client.ts"));
+    for (const f of ["loginSwitchWeb", "cerrarSesionWeb", "fetchEgresosVarios", "fetchCatalogoCuentas"]) {
+      expect(wc, `${f} es compartido y no se podía retirar`).toContain(`export async function ${f}`);
+    }
+    // Y lo que SOLO el mayor llamaba, se fue.
+    expect(wc).not.toContain("fetchMayorAsientos");
+    expect(wc).not.toContain("pareceCsvDelMayor");
+  });
+
+  it("🔴 LA TABLA `mayor_lineas` NO SE BORRA — apagar la escritura se deshace en un minuto", () => {
+    // Tiene 135 filas reales de enero. Es la misma decisión que se tomó con
+    // `multifashion_tickets` y con `empresa_gastos_mensuales`: borrar datos es
+    // irreversible, apagar el sync no.
+    const dir = join(raiz, "supabase", "migrations");
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".sql")) continue;
+      const sql = readFileSync(join(dir, f), "utf8")
+        .split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+      for (const t of ["mayor_lineas", "mayor_importaciones"]) {
+        expect(sql, `${f} no puede borrar ${t}`).not.toMatch(new RegExp(`DROP\\s+TABLE[^;]*${t}`, "i"));
+      }
+    }
+  });
+
+  it("el cron `sync-mayor` se fue de vercel.json Y del registro, los dos", () => {
+    // `cron-registro.test.ts` exige la biyección: tocar uno solo pone el build
+    // rojo. Acá se verifica que se tocaron los dos.
+    expect(leer("vercel.json")).not.toContain("sync-mayor");
+    expect(leer("src/lib/cron-telemetry.ts")).not.toMatch(/"sync-mayor"/);
   });
 });
