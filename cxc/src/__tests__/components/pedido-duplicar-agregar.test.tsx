@@ -1,13 +1,19 @@
 // Duplicar eligiendo el cliente + agregar artículos a un pedido existente
 // (pedido de Daniel, 12-ago-2026). Se renderizan los modales REALES:
 //
-//  · DuplicarPedidoModal — UNA sola decisión: "¿Para quién es el pedido
-//    nuevo?" con el SELECTOR DE CLIENTE DE SWITCH, que es OBLIGATORIO: sin
-//    elegir no se puede duplicar (Daniel: *"un vendedor TIENE que elegir un
-//    cliente de switch, todos siempre"*). 🩸 El campo de NOMBRE LIBRE se fue:
-//    preguntaba lo mismo que el selector y lo contradecía (venía pre-llenado
-//    con el cliente del pedido VIEJO mientras el botón decía "Elige el
-//    cliente"). El nombre del pedido nuevo ES el del cliente elegido.
+//  · DuplicarPedidoModal — el SELECTOR DE CLIENTE DE SWITCH, que es
+//    OBLIGATORIO: sin elegir no se puede duplicar (Daniel: *"un vendedor TIENE
+//    que elegir un cliente de switch, todos siempre"*).
+//    🔴 TOCAR EL CLIENTE LO ELIGE; EL BOTÓN LO CONFIRMA (13-ago-2026). Daniel:
+//    *"al seleccionar un cliente de una se agrega, enves de tener un boton para
+//    confirmar el cliente, se siente mas natural asi"*. Antes el toque en la
+//    fila DISPARABA el duplicado y un dedo en el cliente de al lado ya dejaba
+//    el pedido creado a nombre de otro. Lo que confirma el botón es el CLIENTE
+//    —por eso dice "Usar este cliente" y no "Duplicar"—, y el elegido se ve
+//    escrito antes de aplicarlo.
+//    🩸 El campo de NOMBRE LIBRE se fue y no vuelve: preguntaba lo mismo que el
+//    selector y lo contradecía (venía pre-llenado con el cliente del pedido
+//    VIEJO). El nombre del pedido nuevo ES el del cliente elegido.
 //    Lo usan el Duplicar de la lista y "Duplicar y corregir" del pedido
 //    bloqueado por Switch.
 // Además, candados estáticos: el draftIdKey muerto no puede volver, y el
@@ -73,7 +79,7 @@ function botonesDelModal(): string[] {
 describe("DuplicarPedidoModal", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("🔴 pregunta UNA sola cosa: ni campo de nombre libre ni botón de confirmar", async () => {
+  it("🔴 pregunta UNA sola cosa: sin campo de nombre libre, y el único botón de acción confirma el CLIENTE", async () => {
     stubClientes();
     renderDup();
     expect(screen.getByText("Duplicar pedido PED-100")).toBeTruthy();
@@ -83,33 +89,73 @@ describe("DuplicarPedidoModal", () => {
     expect(screen.queryAllByRole("textbox")).toEqual([]);
     expect(screen.getAllByRole("searchbox").length).toBe(1);
     expect(screen.queryByText(/Nombre que sale en el pedido/)).toBeNull();
-    // 🔴 Y NINGÚN segundo toque: no hay "Duplicar" ni "Elige el cliente".
+    // 🔴 UN solo paso más, y ni uno más: la lista, el botón que confirma el
+    // cliente y Cancelar. Nada de re-elegir ni de pantalla intermedia.
     await screen.findByText("Sporting Shoes");
     expect(botonesDelModal()).toEqual([
       "Contado (mostrador)",
       "Sporting ShoesD-42",
       "City Mall DavidD-77",
+      "Usar este cliente",
       "Cancelar",
     ]);
   });
 
-  it("🔴 TOCAR el cliente duplica en el acto (un solo toque)", async () => {
+  it("🔴 TOCAR el cliente lo ELIGE — no duplica nada todavía", async () => {
     stubClientes();
     const onElegir = vi.fn();
     renderDup({ onElegir });
     fireEvent.click(await screen.findByText("Sporting Shoes"));
-    // Sin tocar nada más: el padre ya está duplicando.
+    // El dedo equivocado ya no crea el pedido: solo eligió.
+    expect(onElegir).not.toHaveBeenCalled();
+    // Y se VE cuál eligió, escrito, además de la fila marcada.
+    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Sporting Shoes");
+    expect(screen.getByRole("button", { name: /Sporting Shoes/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("🔴 el botón confirma el cliente elegido, y RECIÉN AHÍ duplica", async () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
+    fireEvent.click(await screen.findByText("Sporting Shoes"));
+    fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
     expect(onElegir).toHaveBeenCalledTimes(1);
     expect(onElegir).toHaveBeenCalledWith("Sporting Shoes", { id: 42, nombre: "Sporting Shoes", codigo: "D-42" });
   });
 
-  it("Contado es una OPCIÓN de un toque, no un default silencioso", () => {
+  it("🔴 sin cliente elegido el botón va APAGADO (abrir la ventana no duplica nada)", async () => {
     stubClientes();
     const onElegir = vi.fn();
     renderDup({ onElegir });
-    // Abrir la ventana no duplica nada: hay que TOCAR.
+    const btn = screen.getByRole("button", { name: "Usar este cliente" }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    expect(onElegir).not.toHaveBeenCalled();
+    // Y no hay ningún "Cliente elegido:" mintiendo antes de elegir.
+    expect(screen.queryByText(/Cliente elegido:/)).toBeNull();
+  });
+
+  it("🔴 el toque equivocado SE CORRIGE sin salir: elegir otro cliente reemplaza al anterior", async () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
+    fireEvent.click(await screen.findByText("Sporting Shoes"));
+    fireEvent.click(screen.getByText("City Mall David"));
+    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("City Mall David");
+    fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
+    expect(onElegir).toHaveBeenCalledTimes(1);
+    expect(onElegir).toHaveBeenCalledWith("City Mall David", { id: 77, nombre: "City Mall David", codigo: "D-77" });
+  });
+
+  it("Contado es una OPCIÓN que se elige y se confirma, no un default silencioso", () => {
+    stubClientes();
+    const onElegir = vi.fn();
+    renderDup({ onElegir });
     expect(onElegir).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
+    expect(onElegir).not.toHaveBeenCalled();
+    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Contado (mostrador)");
+    fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
     expect(onElegir).toHaveBeenCalledWith("Contado (mostrador)", { id: null, nombre: "Contado (mostrador)", codigo: null });
   });
 
@@ -120,13 +166,15 @@ describe("DuplicarPedidoModal", () => {
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Sporting" } });
     await waitFor(() => expect(screen.getByText("Sporting Shoes")).toBeTruthy());
     expect(onElegir).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "Usar este cliente" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("mientras duplica lo dice EN la fila tocada y no acepta un segundo toque", async () => {
+  it("mientras duplica lo dice EN el botón y no acepta un segundo toque", async () => {
     stubClientes();
     const onElegir = vi.fn();
     const { rerender } = renderDup({ onElegir });
     fireEvent.click(await screen.findByText("Sporting Shoes"));
+    fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
     rerender(
       <DuplicarPedidoModal
         orderNumber="PED-100"
@@ -137,11 +185,13 @@ describe("DuplicarPedidoModal", () => {
         onCancel={() => {}}
       />,
     );
+    const btn = screen.getByRole("button", { name: "Duplicando..." }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    fireEvent.click(btn);
+    // Y las filas quedan apagadas: no se cambia de cliente a mitad de camino.
     const fila = screen.getByRole("button", { name: /Sporting Shoes/ }) as HTMLButtonElement;
-    expect(fila.textContent).toContain("Duplicando...");
     expect(fila.disabled).toBe(true);
     fireEvent.click(fila);
-    fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
     expect(onElegir).toHaveBeenCalledTimes(1);
   });
 
@@ -196,6 +246,11 @@ describe("DuplicarPedidoModal", () => {
 
 const SRC = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
 
+/** El código SIN comentarios — un candado no se puede cumplir a sí mismo con
+ *  el comentario que lo explica. */
+const sinComentarios = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 describe("candados estáticos", () => {
   it("el draftIdKey muerto no vuelve (nadie lo leía: solo se escribía)", () => {
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).not.toContain("draftIdKey");
@@ -229,24 +284,26 @@ describe("candados estáticos", () => {
     expect(modal).not.toMatch(/setNombre|useState\(nombre/);
     // El nombre del pedido nuevo se DERIVA del cliente elegido, con la misma
     // función que dibuja el texto en pantalla (una sola fuente).
-    expect(modal).toMatch(/onElegir\(nombreDeCliente\(c\), c\)/);
+    expect(modal).toMatch(/onElegir\(nombreDeCliente\(cliente\), cliente\)/);
     // Y ningún padre le pasa el nombre del pedido viejo.
     for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
       expect(SRC(`src/components/catalogo/${p}.tsx`)).not.toContain("nombreInicial");
     }
   });
 
-  it("🔴 el SEGUNDO toque tampoco puede volver: tocar el cliente ES duplicar", () => {
+  it("🔴 el toque en la fila NO puede volver a duplicar solo: el selector solo ELIGE", () => {
     const modal = SRC("src/components/catalogo/DuplicarPedidoModal.tsx");
-    // Nada de botón de confirmar ni de su estado apagado.
-    expect(modal).not.toContain("Elige el cliente");
-    expect(modal).not.toMatch(/function confirmar/);
-    // Un solo <button> en toda la ventana, y es Cancelar: el segundo toque no
-    // puede volver escondido detrás de otro nombre.
-    expect((modal.match(/<button/g) || []).length).toBe(1);
-    // El disparo cuelga del onElegir del selector, que es el toque de la fila.
-    expect(modal).toMatch(/onElegir=\{elegir\}/);
-    // Los dos padres reciben la elección por onElegir (no por un confirmar).
+    // El `onElegir` del selector escribe estado y nada más — si volviera a
+    // llamar al del padre, el dedo equivocado crearía el pedido otra vez.
+    expect(modal).toMatch(/onElegir=\{setCliente\}/);
+    expect(modal).not.toMatch(/onElegir=\{elegir\}/);
+    // El disparo vive en un confirmar propio, que exige cliente elegido.
+    expect(modal).toMatch(/function confirmar\(\)/);
+    expect(modal).toMatch(/if \(duplicando \|\| !cliente\) return/);
+    // Y el botón está apagado mientras no haya cliente.
+    expect(modal).toMatch(/disabled=\{duplicando \|\| !cliente\}/);
+    // Los dos padres siguen recibiendo la elección por onElegir (el contrato no
+    // cambió): el paso nuevo vive DENTRO del modal, uno solo para los dos.
     for (const p of ["PedidosListClient", "PedidoDetalleClient"]) {
       const src = SRC(`src/components/catalogo/${p}.tsx`);
       expect(src).toMatch(/onElegir=\{/);
@@ -254,11 +311,26 @@ describe("candados estáticos", () => {
     }
   });
 
+  it("🔴 lo que el botón confirma es el CLIENTE, no la duplicación", () => {
+    // Sin comentarios: un candado que se cumple con su propia explicación da
+    // permiso para romperlo (lección de `ventas-poda-textos`).
+    const modal = sinComentarios(SRC("src/components/catalogo/DuplicarPedidoModal.tsx"));
+    // Daniel: *"aqui me refiero al seleccionar un cliente… enves de tener un
+    // boton para confirmar el cliente"*. El texto tiene que hablar del cliente:
+    // un "¿Duplicar PED-100?" volvería a pedir dos veces la misma decisión.
+    expect(modal).toMatch(/\{duplicando \? "Duplicando\.\.\." : "Usar este cliente"\}/);
+    // El botón apagado no vuelve a explicarse con la etiqueta que se retiró.
+    expect(modal).not.toContain("Elige el cliente");
+    // Y el elegido se LEE antes de aplicarlo (el selector tiene scroll propio:
+    // la fila marcada se puede quedar fuera de vista).
+    expect(modal).toContain("Cliente elegido:");
+  });
+
   it("los DOS caminos mandan el cliente de Switch elegido al servidor", () => {
     // Lista → POST /orders ; detalle → POST /duplicar. Si alguno dejara de
     // mandarlo, el pedido nacería en Contado aunque la pantalla mostrara otro.
     expect(SRC("src/components/catalogo/PedidosListClient.tsx")).toMatch(
-      /\$\{theme\.api\}\/orders[\s\S]{0,400}cliente_switch_id/,
+      /\$\{theme\.api\}\/orders[\s\S]{0,800}cliente_switch_id/,
     );
     expect(SRC("src/components/catalogo/PedidoDetalleClient.tsx")).toMatch(
       /orders\/\$\{id\}\/duplicar[\s\S]{0,300}cliente_switch_id/,

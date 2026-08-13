@@ -51,13 +51,9 @@ interface Props {
   onElegir: (c: ClienteSwitchOpcion) => void;
   /** Deshabilita todo mientras el padre tiene algo en vuelo. */
   disabled?: boolean;
-  /** Texto pegado a la opción elegida mientras el padre trabaja con ella
-   *  (ej. "Duplicando..."): el estado va EN la fila que se tocó, no en un
-   *  spinner global que no dice sobre qué. */
-  notaEnElegido?: string | null;
 }
 
-export default function ClienteSwitchPicker({ api, directorioLabel, valor, onElegir, disabled, notaEnElegido }: Props) {
+export default function ClienteSwitchPicker({ api, directorioLabel, valor, onElegir, disabled }: Props) {
   const [query, setQuery] = useState("");
   const [resultados, setResultados] = useState<FilaCliente[]>([]);
   const [buscando, setBuscando] = useState(true);
@@ -110,9 +106,6 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
           }`}
         >
           Contado (mostrador)
-          {notaEnElegido && elegido && valor!.id == null && (
-            <span className="text-xs text-white/70 ml-2">{notaEnElegido}</span>
-          )}
         </button>
         {error ? (
           <div className="px-3 py-2.5 text-xs text-red-600">
@@ -144,7 +137,6 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
                 {c.codigo && (
                   <span className={`text-xs font-mono ml-2 ${activo ? "text-white/60" : "text-gray-400"}`}>{c.codigo}</span>
                 )}
-                {notaEnElegido && activo && <span className="text-xs text-white/70 ml-2">{notaEnElegido}</span>}
               </button>
             );
           })
