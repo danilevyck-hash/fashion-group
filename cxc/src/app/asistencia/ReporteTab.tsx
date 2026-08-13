@@ -12,6 +12,7 @@ import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type Persona
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { esTrabajoFuera, textoDiaJustificado } from "@/lib/asistencia/motivos";
+import { hoyPanama } from "@/lib/fecha-panama";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
@@ -36,8 +37,12 @@ const n = (v: number) =>
 
 export default function ReporteTab() {
   const { toast } = useToast();
-  const hoy = new Date(Date.now() - 5 * 3600_000).toISOString().slice(0, 10);
-  const [desde, setDesde] = useState(new Date(Date.now() - 5 * 3600_000 - 14 * 86_400_000).toISOString().slice(0, 10));
+  // 🔑 EL MISMO "hoy" QUE USA EL SERVIDOR. Acá había una segunda cuenta a mano
+  // (`Date.now() - 5h`), correcta pero aparte: si las dos se separaran, la
+  // pantalla podría pedir hasta un día y el servidor marcar como "en curso"
+  // otro. Una sola definición de hoy, y es `hoyPanama()`.
+  const hoy = hoyPanama();
+  const [desde, setDesde] = useState(hoyPanama(new Date(Date.now() - 14 * 86_400_000)));
   const [hasta, setHasta] = useState(hoy);
   const [q, setQ] = useState("");
   const [personas, setPersonas] = useState<PersonaReporte[] | null>(null);
@@ -54,6 +59,10 @@ export default function ReporteTab() {
   const [puedeCorregir, setPuedeCorregir] = useState(false);
   const [avisoCorreccion, setAvisoCorreccion] = useState<string | null>(null);
   const [corrigiendo, setCorrigiendo] = useState<MarcaParaCorregir | null>(null);
+  // Cuántas personas quedaron fuera por no estar trabajando en este rango, y
+  // cuál es el día que todavía va corriendo (`null` si el rango ya cerró).
+  const [fueraDelRango, setFueraDelRango] = useState(0);
+  const [diaEnCurso, setDiaEnCurso] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError(null);
@@ -69,6 +78,8 @@ export default function ReporteTab() {
       setCorrecciones(data.correcciones ?? { correcciones: 0, dias: 0, agregadas: 0 });
       setPuedeCorregir(Boolean(data.correccionesDisponible));
       setAvisoCorreccion(data.avisoCorrecciones ?? null);
+      setFueraDelRango(data.fueraDelRango ?? 0);
+      setDiaEnCurso(data.diaEnCurso ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setPersonas(null);
@@ -168,6 +179,28 @@ export default function ReporteTab() {
         </p>
       )}
 
+      {/* 🔴 EL DÍA QUE NO TERMINÓ NO ES UN ERROR, Y SE DICE. Sin esta línea,
+          quien mire a las 3 de la tarde vería a media oficina con 3 marcas y
+          "A revisar" en cero, y pensaría que el cuadro se equivoca. El día se
+          ve entero —las marcas están—; lo único que no se hace es juzgarlo. */}
+      {diaEnCurso && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+          Hoy ({fechaCorta(diaEnCurso)}) todavía va corriendo: sus marcas se ven, pero el día
+          <b> no se cuenta como mal marcado ni como ausencia</b> hasta que termine.
+        </p>
+      )}
+
+      {/* Quien no estaba trabajando en el rango no sale — y se dice cuántos son,
+          para que nadie busque a una persona que la pantalla decidió no mostrar. */}
+      {fueraDelRango > 0 && (
+        <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+          <b>{fueraDelRango}</b>{" "}
+          {fueraDelRango === 1 ? "persona no aparece" : "personas no aparecen"} porque no
+          estaba trabajando en estas fechas (entró después o ya se había ido). Sus marcaciones
+          siguen guardadas y salen si consultas el rango en que sí trabajaba.
+        </p>
+      )}
+
       {/* Sin la migración corrida la pantalla NO ofrece corregir, y lo dice: un
           botón que siempre falla es peor que no tenerlo. */}
       {avisoCorreccion && (
@@ -233,7 +266,10 @@ export default function ReporteTab() {
             Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
             tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
             {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
-            <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
+            <b>&quot;A revisar&quot;</b> es un día TERMINADO sin las 4 marcas: los minutos igual
+            cuentan. El día de <b>hoy</b> nunca entra ahí —sigue corriendo, así que todavía no
+            se le puede decir que está mal marcado—, y el reporte muestra solo a quien estaba
+            trabajando en las fechas que pediste.
             Estos números se cambian en <b>Configuración</b>.{" "}
             <b>Corregir una hora</b> no borra lo que marcó el reloj: la corrección va encima,
             con quién la puso y por qué, y se puede deshacer.
@@ -434,6 +470,18 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
               {d.revisar && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">Revisar</span>
               )}
+              {/* 🔴 GRIS, NUNCA ÁMBAR. El color es la mitad del mensaje: ámbar
+                  dice "hay algo que corregir" y acá no lo hay — el día sigue
+                  corriendo. Se dice igual, para que un día sin las 4 marcas y
+                  sin "Revisar" no se lea como un cuadro que se equivoca. */}
+              {/* 🔑 12 px, no 11. El chip «Revisar» de al lado mide 11 y está
+                  ahí desde antes —eso no se toca—, pero un texto NUEVO no baja
+                  de 12 (misma decisión que en el PR de correcciones). Y no se
+                  ven raros juntos porque NUNCA aparecen juntos: un día es "en
+                  curso" o es "a revisar", nunca los dos. */}
+              {d.enCurso && (
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">En curso</span>
+              )}
               {/* Agregar la marca que falta. Es el caso más común de todos: quien
                   olvidó marcar no tiene nada que corregir. */}
               {puedeCorregir && (
@@ -455,6 +503,9 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
                   {textoDiaJustificado(d.justificado)}
                 </span>
               )
+              // 🔴 Hoy sin marcas NO es una falta: a las 8:59 nadie faltó
+              // todavía. En rojo diría lo contrario, así que va en gris.
+              : d.enCurso ? <span className="text-gray-500">Todavía no marcó — el día va corriendo</span>
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
             {puedeCorregir && !d.feriado && (
               <button type="button" onClick={agregar}

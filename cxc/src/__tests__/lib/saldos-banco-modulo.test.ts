@@ -228,7 +228,7 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
     }
   });
 
-  it("🔴 el módulo del mayor TIENE que estar publicado para que esto sea seguro", () => {
+  it("🔴 el módulo de Gastos TIENE que estar publicado para que esto sea seguro", () => {
     // El candado que sostiene el orden: sin él no quedaría ningún módulo de
     // gastos, y ahora además se llevaría puestos los saldos, que son su pestaña.
     expect(existsSync(join(raiz, "src/app/gastos-contabilidad/page.tsx"))).toBe(true);

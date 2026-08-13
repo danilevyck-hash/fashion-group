@@ -615,7 +615,17 @@ describe("🔴 la planilla y el reporte aplican las correcciones", () => {
       expect(codigo).toContain("aplicarCorrecciones(");
       // Y lo que entra al motor son las EFECTIVAS, no la lista cruda: si se le
       // pasara `marcaciones`, corregir una hora no cambiaría un centavo.
-      expect(codigo).toMatch(/marcaciones:\s*(efectivas\.marcaciones|visibles)/);
+      // ⚠️ `enRango` (13-ago-2026) es `visibles` sin la gente que no trabajaba
+      // en el rango — sigue saliendo de `efectivas`, así que vale igual. Lo que
+      // NO puede pasar es que se le entregue la lista cruda: eso se prohíbe
+      // aparte, abajo, para que agregar un nombre a la lista de arriba no abra
+      // la puerta sin querer.
+      expect(codigo).toMatch(/marcaciones:\s*(efectivas\.marcaciones|visibles|enRango)/);
+      expect(codigo, "el motor no puede recibir la lista CRUDA").not.toMatch(
+        // Acotado con `[,}]`: sin eso, el `marcaciones: marcaciones.length` del
+        // payload de respuesta de la planilla lo hacía saltar en falso.
+        /marcaciones:\s*marcaciones\s*[,}]/,
+      );
       // El `id` tiene que venir en el select, o ninguna corrección se ata.
       expect(codigo).toMatch(/"id, empleado_codigo, empleado_nombre, ocurrio_en"/);
     });

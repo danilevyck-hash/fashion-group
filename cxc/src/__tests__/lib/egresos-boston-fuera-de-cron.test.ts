@@ -106,10 +106,30 @@ describe("🔴 y el vigía no la reporta como caída", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🩸 la PANTALLA lo dice — una empresa vacía sin explicación es un error del sistema", () => {
-  it("sin descarga automática, la frase explica por qué y manda a la otra fuente", () => {
+  it("sin descarga automática, la frase explica por qué y dice qué hacer", () => {
     const t = explicacionEgresos("sin_datos", null, false);
     expect(t).toMatch(/no se traen solos de Switch/i);
-    expect(t).toMatch(/Lo que cerró la contadora/i);
+    // Termina en lo único accionable que queda: traerlos a mano otra vez.
+    expect(t).toMatch(/traerlos a mano/i);
+  });
+
+  it("🩸 y NO manda a la pestaña del mayor, que se retiró el 13-ago-2026", () => {
+    // El texto viejo decía *"En 'Lo que cerró la contadora' sí se ven"* y esa
+    // perilla ya no existe: quien lo leyera se iba a buscar una segunda fuente
+    // que no está. Se prueba sobre los TRES estados, no sobre uno: la rama de
+    // Boston los recorre todos y el final de la frase es común a los tres.
+    for (const estado of ["con_movimientos", "sin_movimientos", "sin_datos"] as const) {
+      for (const ultimo of [null, "2026-03"]) {
+        const t = explicacionEgresos(estado, ultimo, false);
+        expect(t).not.toMatch(/cerró la contadora/i);
+        expect(t).not.toMatch(/mayor/i);
+      }
+    }
+  });
+
+  it("🔴 y dice que ÉSTA es la única fuente — no promete otra pantalla", () => {
+    const t = explicacionEgresos("sin_datos", null, false);
+    expect(t).toMatch(/único lugar donde se ven/i);
   });
 
   it("🔴 y NO se ve igual que un 'no traído' cualquiera", () => {
