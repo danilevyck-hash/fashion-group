@@ -128,8 +128,18 @@ export default function BostonTab() {
                    focus:outline-none focus:ring-2 focus:ring-gray-900/10"
       />
 
-      {/* 5 píldoras: 3+2 en iPhone, una sola línea desde iPad. */}
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
+      {/* 4 píldoras, todas FILTRAN: 2+2 en iPhone, una sola línea desde iPad.
+          🩸 Acá vivía una 5ª tarjeta, "Cobrado julio · $35,392.49 · 126", con el
+          monto y la cuenta ESCRITOS A MANO en el código. No filtraba nada y no
+          se podía calcular: los cobros de Boston no entran a este sistema
+          (`recibos: false` en EMPRESA_SYNC_CAPABILITIES — su cartera va por
+          Brand It, ver la nota de arriba de este archivo y cxc/CLAUDE.md). O
+          sea que iba a decir "julio" para siempre, al lado de cuatro cifras que
+          sí se actualizan solas: en octubre se leía como si fuera de octubre.
+          Daniel aprobó quitarla. NO reponerla con otro mes escrito a mano ni
+          encender el sync de recibos de Boston para "poder calcularla" — eso es
+          una decisión de negocio, no un arreglo. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         {pills.map((p) => {
           const activa = riskFilter === p.key;
           return (
@@ -152,17 +162,6 @@ export default function BostonTab() {
             </button>
           );
         })}
-        {/* Cobrado del mes: informativo, no filtra la lista. */}
-        <div className="min-h-[44px] px-3 py-2 rounded-xl border border-gray-200 bg-white">
-          <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-gray-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            Cobrado julio
-          </span>
-          <span className="block text-base sm:text-lg font-semibold tabular-nums text-blue-700">
-            ${fmt(35392.49)}
-            <span className="text-xs font-normal text-gray-400"> · 126</span>
-          </span>
-        </div>
       </div>
 
       <p className="text-sm text-gray-500 mb-3">
