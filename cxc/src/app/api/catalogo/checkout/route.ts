@@ -19,11 +19,11 @@ import {
   errorVendedorNoExiste,
   listarVendedores,
   parsearVendedorSwitchId,
+  vendedorDelUsuario,
 } from "@/lib/catalogo/vendedor-switch";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { requireRole } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
@@ -75,15 +75,10 @@ async function handleCheckout(req: NextRequest): Promise<NextResponse> {
   // Lo nuevo es que el body puede traer `vendedor_id`: se valida contra la lista
   // EN VIVO de Switch de ESTA empresa (los ids son por empresa — uno de otra
   // empresa le acreditaría la venta, y la comisión, a otra persona).
-  const { data: mapping } = await supabaseServer
-    .from("fg_user_switch_vendedor")
-    .select("vendedor_id, vendedor_nombre")
-    .eq("user_id", auth.userId ?? "")
-    .eq("empresa_key", cfg.empresaKey)
-    .maybeSingle();
+  const mapeado = await vendedorDelUsuario(auth.userId, cfg.empresaKey);
 
-  let vendedorId: number | null = mapping?.vendedor_id ?? null;
-  let vendedorNombre: string | null = mapping?.vendedor_nombre ?? null;
+  let vendedorId: number | null = mapeado?.id ?? null;
+  let vendedorNombre: string | null = mapeado?.nombre ?? null;
 
   const elegido = parsearVendedorSwitchId(body?.vendedor_id);
   if (body?.vendedor_id != null) {

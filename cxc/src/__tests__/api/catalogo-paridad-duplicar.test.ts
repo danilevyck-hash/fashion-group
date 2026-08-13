@@ -10,9 +10,13 @@
 //     trazabilidad reemplaza_a en el update posterior
 //   · body {client_name}: nombre CAMBIADO → clon con nombre nuevo y SIN
 //     cliente_switch_id; nombre igual (espacios/mayúsculas) → se copia
+//   · vendedor: el de QUIEN DUPLICA (13-ago-2026) y, sin mapeo en esa empresa,
+//     el del original — nunca null
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { readFileSync } from "fs";
+import path from "path";
 import { makeDb, type MockDb } from "../helpers/catalogo-mock-db";
 
 let reebokDb: MockDb;
@@ -26,6 +30,14 @@ vi.mock("@/lib/joybees-supabase-server", () => ({
 let tommyDb: MockDb;
 vi.mock("@/lib/tommy-supabase-server", () => ({
   tommyServer: { from: (t: string) => tommyDb.from(t), rpc: (...a: unknown[]) => tommyDb.rpc(...a) },
+}));
+
+// Proyecto PRINCIPAL: ahí vive fg_user_switch_vendedor (el mapeo login →
+// vendedor de Switch). Sin cola, `.maybeSingle()` devuelve {data:null} = quien
+// duplica NO tiene vendedor mapeado en esa empresa.
+let mainDb: MockDb;
+vi.mock("@/lib/supabase-server", () => ({
+  supabaseServer: { from: (t: string) => mainDb.from(t), rpc: (...a: unknown[]) => mainDb.rpc(...a) },
 }));
 
 let categoryMap = new Map<string, string>();
@@ -56,6 +68,7 @@ beforeEach(() => {
   reebokDb = makeDb();
   joybeesDb = makeDb();
   tommyDb = makeDb();
+  mainDb = makeDb();
   categoryMap = new Map();
 });
 
@@ -277,7 +290,7 @@ describe("POST /orders/[id]/duplicar", () => {
     expect(pItems.every((i) => !("is_preorder" in i))).toBe(true);
   });
 
-  it("nombre CAMBIADO en el body → clon con el nombre nuevo y SIN cliente_switch_id (vendedor sí viaja)", async () => {
+  it("nombre CAMBIADO en el body → clon con el nombre nuevo y SIN cliente_switch_id (sin mapeo, el vendedor del original)", async () => {
     queueOriginalReebok();
     const res = await rDuplicar(
       makeReq("/x", { method: "POST", role: "secretaria", body: { client_name: "Otro Cliente" } }),
@@ -348,5 +361,191 @@ describe("POST /orders/[id]/duplicar", () => {
     });
     expect(res.status).toBe(400);
     expect(reebokDb.rpc).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 EL VENDEDOR DEL CLON — LAS DOS DIRECCIONES (13-ago-2026)
+//
+// Hasta hoy el clon heredaba el `vendedor_switch_id` del ORIGINAL, o sea que
+// duplicar un pedido de Edwin le acreditaba la COMISIÓN a Edwin aunque el
+// pedido lo estuviera armando otra persona. Ahora queda a nombre de quien lo
+// duplica. Las dos direcciones importan y las dos están acá:
+//   · CON mapeo en esa empresa → su vendedor, y su nombre LITERAL.
+//   · SIN mapeo → el del original. NUNCA null: un clon sin vendedor quedaría
+//     bloqueado al enviarlo a Switch (422 SIN_VENDEDOR) por un duplicado que
+//     antes salía sin problema.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** El mapeo de quien duplica en la empresa de la marca. */
+function queueMiVendedor(id: number, nombre: string | null) {
+  mainDb.queue("fg_user_switch_vendedor", { data: { vendedor_id: id, vendedor_nombre: nombre } });
+}
+
+/** El último update sobre reebok_orders (el de trazabilidad). */
+function ultimoUpdateReebok(): Record<string, unknown> {
+  const chains = reebokDb.chainsFor("reebok_orders");
+  return chains[chains.length - 1]._calls.update[0][0] as Record<string, unknown>;
+}
+
+describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
+  it("🔴 CON mapeo: el clon queda a nombre de QUIEN DUPLICA, no del vendedor del original", async () => {
+    queueOriginalReebok(); // el original es del vendedor 2
+    queueMiVendedor(9, "Beto Ruiz");
+
+    const res = await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(200);
+
+    expect(ultimoUpdateReebok().vendedor_switch_id).toBe(9);
+    // Y el nombre que se ve en el pedido acompaña al id — si se copiara el del
+    // original, la pantalla diría un vendedor y la comisión iría a otro.
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("Beto Ruiz");
+  });
+
+  it("🔴 SIN mapeo en esa empresa: se CONSERVA el del original — nunca queda sin vendedor", async () => {
+    queueOriginalReebok(); // vendedor 2, vendor_name "Vend"
+    // mainDb sin cola → {data:null} = esta persona no tiene vendedor mapeado.
+
+    const res = await rDuplicar(makeReq("/x", { method: "POST", role: "secretaria" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(200);
+
+    const payload = ultimoUpdateReebok();
+    expect(payload.vendedor_switch_id).toBe(2);
+    expect(payload.vendedor_switch_id).not.toBeNull();
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("Vend");
+  });
+
+  it("⚠️ el nombre se guarda LITERAL: joystep tiene 'DANIEL LEVY ' CON espacio final y Switch parea contra eso", async () => {
+    joybeesDb.queue(
+      "joybees_orders",
+      { data: { id: OID, reemplaza_a: null } },
+      { data: null },
+      {
+        data: {
+          id: OID,
+          order_number: "JBP-100",
+          client_name: "C",
+          vendor_name: "Otro",
+          client_email: null,
+          comment: null,
+          cliente_switch_id: null,
+          vendedor_switch_id: 4,
+          joybees_order_items: [
+            { product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 1, unit_price: 5 },
+          ],
+        },
+      },
+      { data: null, error: null },
+    );
+    joybeesDb.queue("joybees_switch_envios", { data: { estado: "enviado", numero_interno: "N2" } });
+    joybeesDb.queueRpc({ data: { order_id: NEW_ID, order_number: "JBP-101" } });
+    queueMiVendedor(1, "DANIEL LEVY ");
+
+    const res = await jDuplicar(makeReq("/x", { method: "POST", role: "admin" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(200);
+    const [, args] = joybeesDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("DANIEL LEVY ");
+  });
+
+  it("el mapeo se busca por user_id Y por la empresa de ESA marca (los ids de vendedor son por empresa)", async () => {
+    queueOriginalReebok();
+    queueMiVendedor(9, "Beto Ruiz");
+    await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), { params: { id: OID } });
+
+    const chain = mainDb.chainsFor("fg_user_switch_vendedor")[0];
+    expect(chain._calls.eq).toEqual([
+      ["user_id", "u-test"],
+      ["empresa_key", "active_shoes"], // la empresa Switch de Reebok
+    ]);
+  });
+
+  it("mapeo sin nombre → cae al nombre de la sesión, NUNCA al del vendedor del original", async () => {
+    queueOriginalReebok(); // vendor_name del original: "Vend"
+    queueMiVendedor(9, null);
+
+    await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), { params: { id: OID } });
+
+    expect(ultimoUpdateReebok().vendedor_switch_id).toBe(9);
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("Tester");
+  });
+
+  it("original SIN vendedor y quien duplica SIN mapeo → el clon sale como salía antes (sin la columna)", async () => {
+    reebokDb.queue(
+      "reebok_orders",
+      { data: { id: OID, reemplaza_a: null } },
+      { data: null },
+      {
+        data: {
+          id: OID,
+          order_number: "PED-100",
+          client_name: "Cliente",
+          vendor_name: null,
+          client_email: null,
+          comment: null,
+          cliente_switch_id: null,
+          vendedor_switch_id: null,
+          reebok_order_items: [
+            { product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 1, unit_price: 10 },
+          ],
+        },
+      },
+      { data: null, error: null },
+    );
+    reebokDb.queue("reebok_switch_envios", { data: { estado: "enviado", numero_interno: "N1" } });
+    reebokDb.queueRpc({ data: { order_id: NEW_ID, order_number: "PED-202" } });
+
+    const res = await rDuplicar(makeReq("/x", { method: "POST", role: "admin" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(200);
+    // Nada que heredar y nada que asignar: el update no escribe un null encima.
+    expect("vendedor_switch_id" in ultimoUpdateReebok()).toBe(false);
+  });
+
+  it("el mapeo NO se consulta cuando el duplicado ni siquiera se crea (dedupe)", async () => {
+    reebokDb.queue(
+      "reebok_orders",
+      { data: { id: OID, reemplaza_a: null } },
+      { data: { id: NEW_ID, order_number: "PED-201" } }, // reemplazo ya existente
+    );
+    reebokDb.queue("reebok_switch_envios", { data: { estado: "enviado", numero_interno: "N1" } });
+    queueMiVendedor(9, "Beto Ruiz");
+
+    const res = await rDuplicar(makeReq("/x", { method: "POST", role: "admin" }), {
+      params: { id: OID },
+    });
+    expect((await res.json()).yaExistia).toBe(true);
+    expect(mainDb.chainsFor("fg_user_switch_vendedor")).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 UNA SOLA DEFINICIÓN de "cuál es mi vendedor"
+//
+// El checkout y el duplicar tienen que resolverlo con la MISMA función. Dos
+// consultas equivalentes escritas por separado se separan de verdad con el
+// tiempo, y lo que se decide acá es a quién se le paga la comisión.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 candado: el duplicar y el checkout comparten la resolución del vendedor", () => {
+  it("ninguno de los dos consulta fg_user_switch_vendedor por su cuenta", () => {
+    const dup = readFileSync(path.join(process.cwd(), "src/lib/catalogo/duplicar-pedido.ts"), "utf8");
+    const checkout = readFileSync(
+      path.join(process.cwd(), "src/app/api/catalogo/checkout/route.ts"),
+      "utf8",
+    );
+    for (const [nombre, src] of [["duplicar", dup], ["checkout", checkout]] as const) {
+      // Nombrar la tabla en un comentario está bien; consultarla acá NO.
+      expect(src.replace(/\/\/.*$/gm, ""), nombre).not.toMatch(/fg_user_switch_vendedor/);
+      expect(src, nombre).toContain("vendedorDelUsuario");
+    }
   });
 });

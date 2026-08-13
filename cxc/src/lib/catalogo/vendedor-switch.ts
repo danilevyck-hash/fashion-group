@@ -120,6 +120,53 @@ export function parsearVendedorSwitchId(
   return { ok: true, id: n };
 }
 
+/** El vendedor de Switch que tiene mapeado UNA persona en UNA empresa. */
+export interface VendedorMapeado {
+  id: number;
+  /** El nombre TAL CUAL está en la tabla — ver la advertencia de abajo. */
+  nombre: string | null;
+}
+
+/**
+ * "¿Cuál es MI vendedor en esta empresa?" — la definición ÚNICA.
+ *
+ * 🔴 UNA SOLA CONSULTA PARA TODOS LOS CAMINOS. Lo usan el checkout (el vendedor
+ * por defecto del pedido nuevo) y el duplicar (el pedido clonado queda a nombre
+ * de quien lo duplica). Dos consultas equivalentes escritas por separado se
+ * separan de verdad con el tiempo, y acá lo que se decide es a quién se le
+ * acredita la venta — o sea la comisión.
+ *
+ * ⚠️ EL NOMBRE SE DEVUELVE LITERAL, sin recortar ni normalizar. En la tabla
+ * conviven `"DANIEL LEVY"` (vistana) y `"DANIEL LEVY "` (joystep, CON espacio
+ * al final), y `Rodrigo` es el único en Mixed Case. Switch parea contra ese
+ * texto: "limpiarlo" rompe el pareo.
+ *
+ * Devuelve `null` si no hay mapeo, si no hay sesión, o si la lectura falla
+ * (tabla ausente por DDL pendiente, etc.). Quien llama decide qué hacer con
+ * eso — nunca se inventa un vendedor.
+ *
+ * El client de Supabase se importa PEREZOSAMENTE por la misma razón que
+ * `traerVendedoresDeSwitch`: este módulo lo importan componentes del navegador
+ * (que solo usan `nombreDeVendedor`) y no deben arrastrar la base entera.
+ */
+export async function vendedorDelUsuario(
+  userId: string | null | undefined,
+  empresaKey: string,
+): Promise<VendedorMapeado | null> {
+  if (!userId) return null;
+  const { supabaseServer } = await import("@/lib/supabase-server");
+  const { data, error } = await supabaseServer
+    .from("fg_user_switch_vendedor")
+    .select("vendedor_id, vendedor_nombre")
+    .eq("user_id", userId)
+    .eq("empresa_key", empresaKey)
+    .maybeSingle();
+  if (error || !data) return null;
+  const id = Number(data.vendedor_id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return { id, nombre: (data.vendedor_nombre as string | null) ?? null };
+}
+
 /** Busca un vendedor en una lista ya leída (puro). */
 export function buscarVendedor(
   vendedores: readonly VendedorSwitch[],
