@@ -1018,6 +1018,57 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > `BASE=… node scripts/_medir-correcciones-anchos.mjs` (solo lectura), en **5 estados** — reporte cerrado, detalle abierto, ventana de corregir, de deshacer y de agregar: **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px NUEVOS** en los 20 casos. El único recorte es el `H1.sr-only` y los textos de 10,5/10/11 px son las etiquetas de columna y el chip «Revisar» que el módulo ya tenía — **medidos IDÉNTICOS con y sin correcciones**, o sea que este cambio no agregó ni un texto chico (la primera versión sí: el chip y los «Agregar hora» salieron a 11 px y se subieron a 12). Modal con el patrón de la casa: `createPortal` + `inset-0` + `useBodyScrollLock`, **sin `autoFocus`**.
 > - 🩸 **La tabla no existe todavía en producción, así que la medición INTERCEPTA la respuesta de `/api/asistencia/reporte`** y le inyecta UNA corrección con la forma exacta que va a tener. Los datos siguen siendo los de producción y el componente medido es el REAL; no se toca la base ni se aprieta ningún botón que guarde. Sin eso no habría nada que medir y el script pasaría en verde sin haber mirado nada — por eso **falla** si no encuentra el aviso, el chip, la línea con la hora del reloj o el botón de guardar apagado.
 
+## 🔴 Asistencia — «TRABAJO FUERA DE LA OFICINA»: el motivo que NO es una ausencia (13-ago-2026)
+
+> El caso: **RODRIGO MIRANDA (código 13, vistana, $800/mes) no marca desde el 31 de julio porque está trabajando FUERA de la empresa.** Daniel, textual: *"rodrigo esta trabajando fuera de la empresa (justificado)"*. Los cinco motivos que había —`Vacaciones · Incapacidad · Permiso · Luto · Otro`— describen a alguien que **NO trabajó**. Rodrigo **sí trabajó**.
+>
+> | | Vacaciones | Trabajo fuera |
+> |---|---|---|
+> | ¿se le paga? | sí | sí |
+> | **¿trabajó ese día?** | **NO** | **SÍ** |
+> | ¿le consume días de vacaciones? | **SÍ** | no |
+>
+> Metidos como lo mismo, en tres meses nadie puede distinguir quién estuvo de vacaciones de quién estuvo trabajando afuera — y las vacaciones son un derecho que se acumula y se gasta.
+>
+> 🩸 **SE DICE «OFICINA» Y NO «EMPRESA», aunque la palabra de Daniel fuera "empresa".** En castellano *"está fuera de la empresa"* se lee, con la misma naturalidad, como *"ya no trabaja acá"* — la confusión más cara posible justo en la pantalla que decide un pago. "Fuera de la oficina" dice lo mismo sin esa segunda lectura.
+>
+> ### ⚠️ NO HIZO FALTA NINGUNA DDL — y está COMPROBADO contra producción, no deducido
+>
+> `asistencia_justificaciones.motivo` es un `text NOT NULL` **sin CHECK** (`20260805120000_asistencia_reglas.sql`). Pero "las migraciones dicen" no es "la base hace": `npx tsx scripts/_probe-motivo-check.ts` **inserta los 6 motivos de verdad y los borra**, verificando que no quede ninguna fila (PostgREST no expone `information_schema`, así que no hay forma de leer un CHECK). Medido: **6/6 aceptados, 2 filas antes y 2 después.** El centinela es un código imposible (`__PROBE_MOTIVO__`) con fechas de 1900.
+>
+> ### 🔴 EL PAGO ES EXACTAMENTE EL DE UNA JUSTIFICACIÓN DE HOY — medido contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-motivo-trabajo-fuera.ts` (**solo lectura**; la justificación de Rodrigo se calcula EN MEMORIA, no se escribe). Corre el motor **VIEJO** —sacado de `origin/main` AL EJECUTAR, no una copia versionada que envejece— y el nuevo sobre los MISMOS datos. Medido el 13-ago-2026, 3 quincenas × 3 empresas:
+>
+> - **El código no mueve nada: 114 líneas · 1.880 cifras de dinero · 0 diferencias 🟢**
+> - **Nadie más se mueve al justificar a Rodrigo: 0 personas ajenas movidas 🟢**
+> - 🔴 **«Vacaciones» y «Trabajo fuera de la oficina» pagan IDÉNTICO: 94 personas comparadas campo por campo, 0 diferencias 🟢.** Es la prueba directa de "no se descuenta", y no depende de leer un `if`.
+> - **Casos reales de "descontado → no descontado"**, con los dos números: HECTOR LEONEL PEREZ **$245,22 → $267,00** (ausencia $24,48 → $0,00) · SAMIR POLO **$207,29 → $228,80** · GABRIELA JARAMILLO **$206,62 → $228,41** · YEISHKA DIAZ **$133,34 → $155,13**. En los cuatro, con «Vacaciones» el neto es EL MISMO.
+> - ⚠️ **CERO HORAS EXTRA, y es lo correcto:** sin marcaciones no hay horas que medir. `extraDiurnoMin`, `extraNocturnoMin`, `domingoMin` y `feriadoMin` quedan en 0 — ni se le inventan 8 horas ni se le quitan las de los días que sí trabajó.
+>
+> 🩸 **HALLAZGO — RODRIGO NUNCA ESTUVO "DESCONTADO", Y LA JUSTIFICACIÓN NO LE CAMBIA EL NÚMERO.** Con **cero marcaciones en toda la quincena** no llega a existir en el reporte, así que la planilla lo lista con `dinero: null` y `faltaConfigurar = ["no marcó ni un día en esta quincena"]` — **antes y después de la justificación, exactamente igual**. Medido, y **ELOYN MENDOZA (29) con «Vacaciones» 16-jul→13-ago sale idéntico**: `dinero=NO · falta=[no marcó ni un día]`. O sea que el motivo nuevo **hereda** el comportamiento que ya había, no estrena uno. Es una decisión deliberada y escrita en `planilla.ts`: *"Descontarle la quincena entera en automático sería inventarle una renuncia; pagarle completo, inventarle unas vacaciones. Se lista y lo decide una persona."* **NO se tocó.** Si Daniel quiere que una quincena 100% justificada se pague sola, es una decisión suya y cambia a los cinco motivos de golpe, no solo a éste.
+>
+> ### El reporte lo DISTINGUE, que es el punto de haberlo agregado
+>
+> - El renglón del día dice **«Trabajando fuera de la oficina»**, sin la palabra *ausencia* — el genérico habría sido *"Ausencia justificada — Trabajo fuera de la oficina"*, que afirma lo contrario de lo que pasó. Fuente única: `textoDiaJustificado()` en `motivos.ts`, usada por la pantalla **y** por el Excel.
+> - 🔴 **Chip en la fila de la persona: «N días trabajando fuera», SIN abrir nada.** Sin él, quien trabajó todo el mes afuera aparece con «0 días trabajados» y ninguna explicación: idéntico a alguien que no vino.
+> - **`resumen.diasTrabajandoFuera` va APARTE de `ausenciasJustificadas`, y los dos conjuntos son DISJUNTOS.** Ningún número histórico se mueve: hasta hoy el motivo no existía, así que no había un solo día que sacar de ahí.
+> - **Excel:** la columna «Ausencia» del Detalle pasó a **«Ausencia / justificación»** (a secas ya no alcanzaba), el Resumen gana **«Días trabajando fuera»** en columna propia, y la hoja «Cómo se calcula» explica que **NO es una ausencia**. ⚠️ Al insertar la columna, el índice de la celda que se pinta en ROJO se corrió de 8 a **9**: pintar la de al lado teñiría los minutos tarde, que no son una advertencia.
+> - **PDF (el que se firma):** en el papel esa persona sale con «Días 0», así que el pie lo dice — *"N días son de trabajo fuera de la oficina: la persona trabajó (no marcó porque no estaba acá), no se descuenta y no genera extras"*.
+>
+> ### Los 3 anchos (+ el iPad acostado)
+>
+> `BASE=… node scripts/_medir-trabajo-fuera-anchos.mjs` (solo lectura), en 3 estados — reporte cerrado, detalle abierto y Justificaciones: **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px NUEVOS** en los 12 casos. El único recorte es el `H1.sr-only` (77 px) y los textos de 10,5 px son las etiquetas de columna que el módulo ya tenía. El chip mide 20 px de alto y no ensancha la fila.
+> - 🩸 **En producción todavía no hay ninguna justificación con este motivo**, así que la medición **INTERCEPTA** `/api/asistencia/reporte` y le inyecta días con la forma exacta que van a tener; los datos siguen siendo los de producción y el componente medido es el REAL. Sin eso el script pasaría en verde sin haber mirado nada — por eso **falla** si no encuentra el chip, el renglón o la opción en el desplegable, y **también si encuentra «Ausencia justificada — Trabajo fuera»**.
+>
+> ### Candados
+>
+> `src/__tests__/lib/asistencia-motivo-trabajo-fuera.test.ts` (23) y **`src/__tests__/components/asistencia-trabajo-fuera-pantalla.test.tsx` (6, RENDERIZA `ReporteTab` y `JustificacionesTab` de verdad)**. Ninguno busca texto en un archivo: corren el motor, corren la planilla, arman el Excel y el PDF y leen las celdas. **Verificado por mutación, 15 de 15 cazadas:** `esTrabajoFuera` siempre false (6) · el texto vuelve al genérico en el módulo (2) o en la pantalla (1) · el día cuenta como ausencia justificada (3) · `diasTrabajandoFuera` siempre 0 (3) · el día se marca como AUSENTE, o sea toca el pago (7) · el motivo sale de la lista (1 + 1) · la celda roja del Excel vuelve al índice 8 (1) · el Excel Detalle vuelve al genérico (2) · se quita la columna del Resumen (3) o su valor, que desalinea el TOTAL (1) · se cae el pie del PDF (1) o su total (1) · se cae el chip (2) o queda siempre en plural (1) · se borra la fila de «Cómo se calcula» (1).
+>
+> ### ❓ NO existe cuenta de días de vacaciones — y NO se construyó
+>
+> Barrido completo (`supabase/migrations/` y `src/`): **no hay columna, ni tabla, ni cálculo** que lleve el saldo de vacaciones de nadie. `asistencia_personas` tiene nombre, salario, jornada, empresa, activo, fechas de ingreso/salida y `servicio_profesional` — nada de vacaciones. Lo único que existe es la justificación con motivo «Vacaciones» como un rango suelto: **nadie cuenta cuántos días se ganaron ni cuántos se gastaron.** Es una decisión de Daniel y no se construyó.
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`

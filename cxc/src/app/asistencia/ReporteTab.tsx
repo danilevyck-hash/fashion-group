@@ -11,6 +11,7 @@ import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type DiaReporte, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
+import { esTrabajoFuera, textoDiaJustificado } from "@/lib/asistencia/motivos";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
@@ -280,6 +281,14 @@ function FilaPersona({ p, abierta, onToggle, puedeCorregir, onCorregir }: {
               {r.diasCorregidos} {r.diasCorregidos === 1 ? "día corregido" : "días corregidos"}
             </span>
           )}
+          {/* 🔴 Se ve SIN abrir nada. Sin este chip, quien trabajó todo el mes
+              fuera de la oficina aparece con «0 días trabajados» y ninguna
+              explicación: idéntico a alguien que simplemente no vino. */}
+          {r.diasTrabajandoFuera > 0 && (
+            <span className="ml-1.5 whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700">
+              {r.diasTrabajandoFuera} {r.diasTrabajandoFuera === 1 ? "día" : "días"} trabajando fuera
+            </span>
+          )}
         </td>
         <td className="px-2 py-2.5 text-center tabular-nums text-gray-500">{p.salida}</td>
         <td className="px-2 py-2.5 text-right tabular-nums text-gray-700">{r.diasTrabajados}</td>
@@ -438,7 +447,14 @@ function FilaDia({ d, codigo, persona, puedeCorregir, onCorregir }: {
         ) : (
           <td colSpan={8} className="px-2 py-1.5 text-gray-500">
             {d.feriado ? <>Feriado — {d.feriado}</>
-              : d.justificado ? <>Ausencia justificada — {d.justificado}</>
+              : d.justificado ? (
+                // 🔴 «Trabajando fuera de la oficina», NO «Ausencia justificada
+                // — Trabajo fuera…». Quien trabajó afuera no estuvo ausente, y
+                // el renglón tiene que decir eso.
+                <span className={esTrabajoFuera(d.justificado) ? "text-gray-700" : undefined}>
+                  {textoDiaJustificado(d.justificado)}
+                </span>
+              )
               : <span className="font-medium text-red-700">Ausencia sin justificar</span>}
             {puedeCorregir && !d.feriado && (
               <button type="button" onClick={agregar}
