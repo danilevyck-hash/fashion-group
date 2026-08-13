@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
 import { VENDOR_MAP } from "@/lib/vendors";
+import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
 import type { VendorMap } from "@/lib/vendors";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
 
@@ -35,9 +36,9 @@ async function fetchAdminData(): Promise<AdminData> {
       fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/cxc/overrides", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`/api/cxc/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-      fetch("/api/cxc/contact-log", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`/api/cxc/contact-log?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
 
   // Vendor map (global VENDOR_MAP) — opcional.

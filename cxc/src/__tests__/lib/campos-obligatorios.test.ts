@@ -380,15 +380,20 @@ describe("POST /api/guias — fecha es NOT NULL sin default y solo la validaba e
 });
 
 describe("POST /api/overrides — se alineó con su ruta hermana /api/cxc/overrides", () => {
+  // `cartera` es obligatoria desde el #523 (las anotaciones del CXC se separan
+  // por cartera): va en todos los casos para que lo que se mida acá siga siendo
+  // la validación de `nombre_normalized` y no el 400 de la cartera faltante.
   it("sin nombre_normalized → 400 (era la llave del onConflict, sin validar)", async () => {
     tablaComoPostgres("cxc_client_overrides");
-    const res = await postOverride(req("/api/overrides", { correo: "a@b.com" }));
+    const res = await postOverride(req("/api/overrides", { correo: "a@b.com", cartera: "grupo" }));
     expect(res.status).toBe(400);
   });
 
   it("caso feliz", async () => {
     const recibido = tablaComoPostgres("cxc_client_overrides");
-    const res = await postOverride(req("/api/overrides", { nombre_normalized: "xtreme shoes", correo: "a@b.com" }));
+    const res = await postOverride(
+      req("/api/overrides", { nombre_normalized: "xtreme shoes", correo: "a@b.com", cartera: "grupo" }),
+    );
     expect(res.status).toBe(200);
     expect(recibido[0].nombre_normalized).toBe("xtreme shoes");
   });
@@ -496,7 +501,18 @@ describe("ninguna de las rutas arregladas vuelve al 500 mudo", () => {
       // El GET puede seguir con su 500 genérico (no escribe nada); lo que no
       // puede quedar es un `.insert`/`.upsert`/`.update` con un catch mudo.
       const escrituras = fuente.match(/\.(insert|upsert|update)\([\s\S]{0,600}?if \(error\)[^\n]*/g) ?? [];
-      expect(escrituras.length).toBeGreaterThan(0);
+
+      if (escrituras.length === 0) {
+        // La ruta DELEGA su escritura en un módulo compartido (`/api/overrides`
+        // pasó a escribir por `lib/cxc/anotaciones.ts` en el #523, para que
+        // ninguna consulta a las tablas de anotaciones nazca sin cartera).
+        // El requisito no cambia, cambia dónde se cumple: el `catch` que
+        // envuelve la llamada tiene que terminar en `respuestaErrorEscritura`.
+        // 🩸 El `> 0` de antes existía para que este chequeo no fuera vacuo;
+        // esta rama conserva esa garantía exigiendo el catch en vez de saltear.
+        expect(fuente).toMatch(/catch[\s\S]{0,400}?respuestaErrorEscritura\(/);
+        return;
+      }
       for (const bloque of escrituras) {
         expect(bloque).toContain("respuestaErrorEscritura");
       }

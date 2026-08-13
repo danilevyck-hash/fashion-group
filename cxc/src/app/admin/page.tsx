@@ -21,6 +21,7 @@ import PanelCxcMobile from "./components/PanelCxcMobile";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
+import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import {
@@ -198,7 +199,7 @@ function AdminDashboardInner() {
   // Load favorites from DB (overrides localStorage on success)
   useEffect(() => {
     if (!authChecked) return;
-    fetch("/api/cxc/favorites")
+    fetch(`/api/cxc/favorites?cartera=${CARTERA_GRUPO}`)
       .then((r) => r.ok ? r.json() : Promise.reject(r))
       .then((data: { favorites: string[] }) => {
         const dbSet = new Set(data.favorites);
@@ -222,7 +223,7 @@ function AdminDashboardInner() {
     fetch("/api/cxc/favorites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientName: name }),
+      body: JSON.stringify({ clientName: name, cartera: CARTERA_GRUPO }),
     }).then(res => {
       if (!res.ok) throw new Error("Server error");
     }).catch(() => {
@@ -417,7 +418,7 @@ function AdminDashboardInner() {
         const res = await fetch("/api/cxc/contact-log", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre_normalized: clientName, method }),
+          body: JSON.stringify({ nombre_normalized: clientName, method, cartera: CARTERA_GRUPO }),
         });
         if (!res.ok) {
           showToast("No se pudo registrar el contacto. Intenta de nuevo.");
@@ -442,7 +443,7 @@ function AdminDashboardInner() {
     const res = await fetch("/api/cxc/overrides", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombre_normalized: nombre, ...data }),
+      body: JSON.stringify({ nombre_normalized: nombre, ...data, cartera: CARTERA_GRUPO }),
     });
     if (!res.ok) {
       showToast("Error al guardar contacto");
