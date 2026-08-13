@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { MARCAS_CONFIG, type MarcaKey } from "@/lib/catalogo/marcas";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { tommyDdlPendiente } from "@/lib/switch-api/sync-catalogo-tommy";
 import { calvinDdlPendiente } from "@/lib/switch-api/sync-catalogo-calvin";
 import {
@@ -36,6 +37,18 @@ export interface FotosResumenResult {
  * Códigos visibles sin foto de una marca, ordenados por disponibilidad desc
  * (lo más vendible primero — las 3 tablas tienen la columna, la escribe el
  * motor de sync). Lanza si la query falla (el caller decide alertar).
+ *
+ * PAGINADO (12-ago-2026). Esta lectura no paginaba: hoy la marca más grande es
+ * Tommy con 453 activos, pero a partir de la fila 1.001 PostgREST cortaría en
+ * seco —sin error y sin señal— y el aviso semanal diría "faltan N fotos"
+ * quedándose corto. Un aviso que subestima es peor que no tenerlo. Es el mismo
+ * bug de `db-max-rows` que este repo ya pagó en recibos y en CXC.
+ *
+ * EL ORDEN DE NEGOCIO SE CONSERVA: sigue mandando `disponibilidad` desc (lo más
+ * vendible primero, que es lo que se lee en el Telegram). Sólo se le agrega
+ * `sku` como DESEMPATE — es `text UNIQUE NOT NULL` en las cuatro tablas, así
+ * que el orden queda total y la paginación no puede repetir ni saltear filas
+ * entre páginas.
  */
 async function codigosSinFotoDe(marca: MarcaKey): Promise<string[]> {
   const cfg = MARCAS_CONFIG[marca];
@@ -43,15 +56,20 @@ async function codigosSinFotoDe(marca: MarcaKey): Promise<string[]> {
   // proyecto donde vive la tabla) — el de lectura de Reebok es anon y podría
   // quedar corto por RLS en un cron sin sesión.
   const db = await cfg.products.writeDb();
-  const { data, error } = await db
-    .from(cfg.productsTable)
-    .select("sku, image_url")
-    .eq("active", true)
-    .order("disponibilidad", { ascending: false, nullsFirst: false });
-  if (error) throw new Error(`leer ${cfg.productsTable}: ${error.message}`);
-  return (data ?? [])
-    .filter((p) => !tieneFotoProducto(p as { image_url: string | null }))
-    .map((p) => String((p as { sku: string | null }).sku ?? ""))
+  const filas = await leerTodoPaginado<{ sku: string | null; image_url: string | null }>(
+    `leer ${cfg.productsTable}`,
+    (pedirCount, desde, hasta) =>
+      db
+        .from(cfg.productsTable)
+        .select("sku, image_url", pedirCount ? { count: "exact" } : {})
+        .eq("active", true)
+        .order("disponibilidad", { ascending: false, nullsFirst: false })
+        .order("sku", { ascending: true })
+        .range(desde, hasta),
+  );
+  return filas
+    .filter((p) => !tieneFotoProducto(p))
+    .map((p) => String(p.sku ?? ""))
     .filter(Boolean);
 }
 
