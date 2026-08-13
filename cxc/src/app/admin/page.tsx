@@ -63,10 +63,24 @@ function buildEmailBody(client: ConsolidatedClient) {
     lines.push(`${co.name} (${co.brand}): $${fmt(d.total)}`);
   }
   lines.push(``);
-  if (client.current > 0) lines.push(`Por vencer (0-90d): $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`Vencido reciente (91-120d): $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`VENCIDO CRITICO (+120d): $${fmt(client.overdue)}`);
-  lines.push(`TOTAL: $${fmt(client.total)}`);
+  // 🔴 ESTE TEXTO LO LEE EL CLIENTE (botón "Copiar mensaje" → WhatsApp/correo, y
+  // el mailto de "Enviar email"), así que le rige la MISMA regla que al correo
+  // de estado de cuenta: **la palabra "vencido"/"vencida" está PROHIBIDA**
+  // (ver el encabezado de `lib/cxc/estado-cuenta-email.ts`).
+  //
+  // 🩸 Decía, en mayúsculas y al cliente, `VENCIDO CRITICO (+120d)`. Y no es
+  // solo tono: `dias` es la EDAD del documento desde su emisión, NO días de
+  // mora — no sabemos el plazo de crédito de cada factura, así que llamar
+  // "vencido" a un documento de 121 días es afirmar algo que el dato no dice.
+  // Se rotula por ANTIGÜEDAD, exactamente como la columna "Más de 90 días" del
+  // correo aprobado.
+  //
+  // ⚠️ LOS TRAMOS Y LAS CIFRAS NO CAMBIAN: siguen siendo current / watch /
+  // overdue (0-90 · 91-120 · 121+), los mismos campos que suma la pantalla.
+  if (client.current > 0) lines.push(`Hasta 90 días: $${fmt(client.current)}`);
+  if (client.watch > 0) lines.push(`De 91 a 120 días: $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`Más de 120 días: $${fmt(client.overdue)}`);
+  lines.push(`Total: $${fmt(client.total)}`);
   lines.push(``);
   lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
   lines.push(``);
@@ -79,7 +93,10 @@ function buildEmailBody(client: ConsolidatedClient) {
 
 function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: string, companyLabel?: string) {
   const date = new Date().toISOString().slice(0, 10);
-  const meta = `Reporte CXC Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros`;
+  // "Cuentas por Cobrar", no "Reporte CXC": mismo criterio que el PDF — es como
+  // se llama la pantalla, y "CXC" es jerga. (El NOMBRE del archivo se deja como
+  // está: Daniel ya tiene esos CSV archivados con ese prefijo.)
+  const meta = `Cuentas por Cobrar · Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros`;
   const header = ["Cliente", "0-30d", "31-60d", "61-90d", "91-120d", "121d+", "Total", "Estado", "Correo", "Telefono", "Celular", "Contacto"];
   const rows = data.map((c) => {
     const estado = c.overdue > 0 ? "Vencido crítico" : c.watch > 0 ? "Vencido reciente" : "Por vencer";
@@ -599,7 +616,9 @@ function AdminDashboardInner() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                   <div>
                     <div className="text-sm font-medium text-gray-800">CSV (Excel)</div>
-                    <div className="text-xs text-gray-400 mt-0.5">Hoja de calculo con aging detallado</div>
+                    {/* "aging" era jerga en inglés en el menú que describe el
+                        papel. Se dice lo que trae el archivo. */}
+                    <div className="text-xs text-gray-400 mt-0.5">Hoja de cálculo con el detalle por tramo de días</div>
                   </div>
                 </button>
                 <button
@@ -629,7 +648,7 @@ function AdminDashboardInner() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
                   <div>
                     <div className="text-sm font-medium text-gray-800">PDF Detallado</div>
-                    <div className="text-xs text-gray-400 mt-0.5">Desglose completo por empresa y aging</div>
+                    <div className="text-xs text-gray-400 mt-0.5">Desglose completo por empresa y tramo de días</div>
                   </div>
                 </button>
               </div>

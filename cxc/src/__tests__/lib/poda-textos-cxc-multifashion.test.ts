@@ -282,7 +282,58 @@ const SE_FUE_DE_LA_VISTA: { archivo: string; que: string; texto: string }[] = [
   { archivo: "components/NotificationCenter.tsx", que: "Toda la app · 'Notificaciones' en el panel de la campanita", texto: "Notificaciones" },
   { archivo: "components/multifashion/VendedorasSubtab.tsx", que: "Multifashion · 'Vendedoras · <período>' bajo la pestaña Vendedoras", texto: "Vendedoras · {chipLabel[chip]}" },
   { archivo: "components/multifashion/ClientesMultifashionSubtab.tsx", que: "Multifashion · 'Clientes · <período>' bajo la pestaña Clientes", texto: "Clientes · {periodoStr}" },
+  // El último de los 27 títulos de la auditoría, y el único que quedó sin podar
+  // en el #510 porque era un h1. Se poda SOLO el nombre de la pantalla; el
+  // número de PL se queda A LA VISTA (ver el bloque de abajo, que es el que de
+  // verdad importa acá).
+  { archivo: "app/packing-lists/[id]/page.tsx", que: "Packing Lists · 'Índice de Estilos por Bulto' es el nombre de la tabla que está debajo", texto: "Índice de Estilos por Bulto —" },
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2-ter. 🔴 EL IDENTIFICADOR NO ES EL NOMBRE DE LA PANTALLA — Packing Lists
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// El h1 decía DOS cosas pegadas: "Índice de Estilos por Bulto" (el nombre de lo
+// que se está mirando, podable) y "PL #12345" (CUÁL packing list, que no lo es).
+//
+// 🔴 A 390 px el número NO está en ningún otro lado: la miga de pan de AppHeader
+// es `hidden sm:flex` y la barra pegajosa dice "Packing Lists" en todas. Es la
+// regla 2 de la poda del #510, la misma que le dejó su título a Nueva/Editar
+// guía. Pasar el h1 ENTERO a sr-only —copiando el patrón sin mirar— habría
+// dejado al usuario del iPhone sin saber cuál está abriendo.
+
+describe("🔴 Packing Lists · se podó el nombre de la pantalla, NO el número de PL", () => {
+  const PL = "app/packing-lists/[id]/page.tsx";
+
+  it("el número de PL sigue VISIBLE (fuera de cualquier sr-only)", () => {
+    const fuente = plano(leer(PL));
+    // El h1 de la pantalla, con el número afuera del span escondido.
+    expect(fuente).toContain(
+      '<h1 className="text-lg font-semibold"> <span className="sr-only">Índice de Estilos por Bulto — </span> PL #{pl.numero_pl || "—"} </h1>',
+    );
+  });
+
+  it("…y el nombre de la pantalla sigue existiendo para un lector de pantalla", () => {
+    const fuente = plano(leer(PL));
+    const enSrOnly = [...fuente.matchAll(/<(\w+)[^<>]*\bsr-only\b[^<>]*>([\s\S]*?)<\/\1>/g)].some((m) =>
+      m[2].includes("Índice de Estilos por Bulto"),
+    );
+    expect(enSrOnly, "el nombre de la pantalla se borró en vez de esconderse").toBe(true);
+  });
+
+  it("la pantalla conserva UN solo h1", () => {
+    expect((plano(leer(PL)).match(/<h1\b/g) || []).length).toBe(1);
+  });
+
+  it("⚠️ EL PAPEL NO SE TOCA: el PDF sigue escribiendo el número en su encabezado", () => {
+    // Lo que se imprime de esta pantalla es el PDF de "Descargar PDF" — la
+    // impresión del navegador ni siquiera pasa por acá (`@media print` de
+    // globals.css solo hace visible `#print-document`, y esto es
+    // `#pl-print-area`). Si el número se cayera del PDF, el papel dejaría de
+    // decir de qué packing list es.
+    expect(plano(leer(PL))).toContain("`Indice de Estilos por Bulto - PL #${pl.numero_pl}`");
+  });
+});
 
 describe("lo que se fue DE LA VISTA sigue teniendo nombre para un lector", () => {
   for (const { archivo, que, texto } of SE_FUE_DE_LA_VISTA) {
