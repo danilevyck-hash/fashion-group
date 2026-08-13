@@ -33,8 +33,9 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
-  // Duplicar: el botón abre el mini-modal y TOCAR el cliente duplica — el POST
-  // /orders de siempre sale con ese cliente y su nombre.
+  // Duplicar: el botón abre el mini-modal, se elige el cliente y el botón
+  // "Usar este cliente" confirma — el POST /orders de siempre sale con ese
+  // cliente y su nombre.
   const [dupTarget, setDupTarget] = useState<Order | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
@@ -68,8 +69,9 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   }
 
   // Duplica copiando los items del original y creando un pedido NUEVO a nombre
-  // del CLIENTE DE SWITCH que se tocó en el mini-modal. Nada se hereda del
-  // original: el cliente es siempre una elección explícita (`null` = Contado).
+  // del CLIENTE DE SWITCH que se eligió en el mini-modal. El cliente es siempre
+  // una elección explícita (`null` = Contado); el VENDEDOR, en cambio, se
+  // hereda del original y lo resuelve el servidor (ver `duplicar_de` abajo).
   async function duplicateOrder(order: Order, clientName: string, cliente: ClienteSwitchOpcion) {
     setDuplicating(true);
     setDupError(null);
@@ -87,7 +89,11 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       }));
       const createRes = await fetch(`${theme.api}/orders`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: clientName, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items, cliente_switch_id: cliente.id }),
+        // `duplicar_de` es el pedido del que se copia: el servidor lee de ESA
+        // fila el vendedor y lo hereda (Daniel: *"el vendedor debe de ser el
+        // mismo que el otro por default"*). El id del vendedor NO se manda
+        // desde acá — de él depende la comisión.
+        body: JSON.stringify({ client_name: clientName, vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items, cliente_switch_id: cliente.id, duplicar_de: order.id }),
       });
       if (createRes.ok) {
         const newOrder = await createRes.json();

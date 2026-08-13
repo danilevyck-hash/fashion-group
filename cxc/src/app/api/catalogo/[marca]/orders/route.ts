@@ -20,6 +20,12 @@ import {
   resolverClienteSwitch,
   traeEleccionDeCliente,
 } from "@/lib/catalogo/cliente-switch";
+import {
+  guardarVendedorSwitchEnPedido,
+  leerVendedorDePedido,
+  vendedorParaDuplicado,
+  type VendedorDePedido,
+} from "@/lib/catalogo/vendedor-switch";
 
 const VIEW_ROLES = ["admin", "secretaria", "vendedor"];
 
@@ -152,6 +158,35 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   }
 
   const dbPedido = await cfg.db();
+
+  // ── DUPLICAR: el pedido nuevo hereda el VENDEDOR del original (13-ago-2026) ──
+  // Daniel, textual: *"al duplicar el pedido el vendedor debe de ser el mismo
+  // que el otro por default, si lo quiere cambiar que lo cambie despues"*. Este
+  // endpoint es el que usa el botón "Duplicar" de la lista de pedidos.
+  //
+  // 🔴 EL ID DEL VENDEDOR NO VIAJA EN EL BODY, y no es un detalle: de ese id
+  // depende la COMISIÓN. Lo que llega es el pedido del que se duplica y el
+  // vendedor se LEE de esa fila, en la base de ESTA marca — un id mandado desde
+  // el navegador le acreditaría la venta a cualquiera. La regla (y el caso del
+  // original sin vendedor) vive en `vendedorParaDuplicado`, la misma que usa
+  // "Duplicar y corregir".
+  const duplicarDe = typeof body.duplicar_de === "string" ? body.duplicar_de.trim() : "";
+  let vendedorPedido: VendedorDePedido = {
+    vendedor_switch_id: null,
+    vendor_name: vendor_name || session.userName || null,
+  };
+  if (duplicarDe) {
+    const original = await leerVendedorDePedido(dbPedido, cfg.ordersTable, duplicarDe);
+    if (original) {
+      vendedorPedido = await vendedorParaDuplicado(
+        original,
+        session.userId,
+        cfg.empresaKey,
+        session.userName,
+      );
+    }
+  }
+
   const resumenPed = await resumenDePedido(cfg, dbPedido as never, typedItems);
   const total = resumenPed.total;
 
@@ -162,7 +197,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
   const db = dbPedido;
   const { data: result, error } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: client_name,
-    p_vendor_name: vendor_name || session.userName || null,
+    p_vendor_name: vendedorPedido.vendor_name,
     p_client_email: client_email || null,
     p_total: total,
     p_idempotency_key: idempotency_key || null,
@@ -197,6 +232,28 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
     }
   }
 
+  // Vendedor heredado del pedido que se duplicó → se guarda en el recién
+  // creado. Tolerante a la DDL 20260705120000 pendiente.
+  //
+  // 🩸 UN FALLO ACÁ NO PUEDE TUMBAR EL DUPLICADO: el pedido YA existe, y
+  // devolver un error haría que la pantalla no navegue y que la persona vuelva
+  // a tocar "Duplicar" — o sea un SEGUNDO pedido. El vendedor se ve en el
+  // detalle (bloque propio, #513) y se cambia de un toque, así que quedar sin
+  // él es visible y corregible; un pedido duplicado no.
+  if (vendedorPedido.vendedor_switch_id != null && !already_created) {
+    try {
+      await guardarVendedorSwitchEnPedido(
+        db,
+        cfg.ordersTable,
+        order_id,
+        vendedorPedido.vendedor_switch_id,
+        vendedorPedido.vendor_name,
+      );
+    } catch {
+      /* el pedido queda sin vendedor asignado; se elige en el detalle */
+    }
+  }
+
   // Telegram solo en creación real (un retry idempotente NO reenvía la alerta).
   // Este endpoint es SIEMPRE el camino del vendedor: la RPC de creación deja
   // origen_original en su default 'mio' (el 'link' solo lo escribe la RPC de
@@ -206,7 +263,7 @@ export async function POST(req: NextRequest, { params }: { params: { marca: stri
       avisoPedidoDeVendedor({
         emoji: cfg.telegramEmoji,
         label: cfg.label,
-        vendedor: vendor_name || session.userName || null,
+        vendedor: vendedorPedido.vendor_name,
         cliente: client_name,
         total,
         numero: order_number,

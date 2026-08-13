@@ -167,6 +167,55 @@ export async function vendedorDelUsuario(
   return { id, nombre: (data.vendedor_nombre as string | null) ?? null };
 }
 
+/** Lo que un pedido guarda de su vendedor (el id manda; el nombre acompaña). */
+export interface VendedorDePedido {
+  vendedor_switch_id: number | null;
+  vendor_name: string | null;
+}
+
+/**
+ * El vendedor que le toca a un pedido DUPLICADO — la definición ÚNICA, y la
+ * usan los DOS caminos de duplicar (el "Duplicar" de la lista, que crea con
+ * `POST /orders`, y el "Duplicar y corregir" de `POST /duplicar`).
+ *
+ * 🔴 EL DEL ORIGINAL, POR DEFECTO. Daniel, textual (13-ago-2026): *"al duplicar
+ * el pedido el vendedor debe de ser el mismo que el otro por default, si lo
+ * quiere cambiar que lo cambie despues"*. Un duplicado es el MISMO pedido otra
+ * vez: la venta sigue siendo de quien la hizo, y quien lo duplica puede ser una
+ * secretaria que no vende. Cambiarlo después es UN toque en el selector de
+ * vendedor del detalle (#513), que muestra a nombre de quién va el pedido.
+ *
+ * 🔴 SI EL ORIGINAL NO TIENE, EL DE QUIEN DUPLICA. Pasa con los pedidos viejos
+ * (anteriores a la columna) y con los del link público, que nacen sin vendedor.
+ * Dejar el clon en null lo bloquearía al enviarlo a Switch (422 SIN_VENDEDOR),
+ * y quien duplica es la única persona que el sistema puede nombrar con
+ * fundamento en ese momento.
+ *
+ * ⚠️ EL NOMBRE ACOMPAÑA AL ID QUE SE GUARDA. Si el clon hereda el id del
+ * original, hereda TAMBIÉN su `vendor_name`: mezclarlos dejaría la pantalla
+ * diciendo un vendedor y la comisión yendo a otro. El nombre de la sesión solo
+ * entra cuando no hay id heredado, y el del mapeo va LITERAL (joystep guarda
+ * "DANIEL LEVY " CON espacio final y Switch parea contra eso).
+ *
+ * El mapeo NO se consulta cuando el original ya trae vendedor: no hay nada que
+ * resolver.
+ */
+export async function vendedorParaDuplicado(
+  original: VendedorDePedido,
+  userId: string | null | undefined,
+  empresaKey: string,
+  nombreDeLaSesion?: string | null,
+): Promise<VendedorDePedido> {
+  if (original.vendedor_switch_id != null) {
+    return { vendedor_switch_id: original.vendedor_switch_id, vendor_name: original.vendor_name };
+  }
+  const mio = await vendedorDelUsuario(userId, empresaKey);
+  if (mio) {
+    return { vendedor_switch_id: mio.id, vendor_name: mio.nombre || nombreDeLaSesion || null };
+  }
+  return { vendedor_switch_id: null, vendor_name: original.vendor_name || nombreDeLaSesion || null };
+}
+
 /** Busca un vendedor en una lista ya leída (puro). */
 export function buscarVendedor(
   vendedores: readonly VendedorSwitch[],
@@ -211,6 +260,41 @@ export async function traerVendedoresDeSwitch(empresaKey: string): Promise<Vende
 /** Lista cacheada de UNA empresa, con la fuente real de Switch. */
 export function listarVendedores(empresaKey: string): Promise<ListaVendedores> {
   return vendedoresDeEmpresa(empresaKey, () => traerVendedoresDeSwitch(empresaKey));
+}
+
+/**
+ * Lee el vendedor guardado en un pedido (para heredarlo al duplicarlo).
+ *
+ * Tolera la DDL 20260705120000 pendiente: sin la columna se devuelve el pedido
+ * con `vendedor_switch_id: null`, que es exactamente lo que significa. Devuelve
+ * `null` solo si el pedido no existe o la lectura falló — quien llama decide,
+ * nunca se inventa un vendedor.
+ */
+export async function leerVendedorDePedido(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  ordersTable: string,
+  orderId: string,
+): Promise<VendedorDePedido | null> {
+  const { data, error } = await db
+    .from(ordersTable)
+    .select("vendedor_switch_id, vendor_name")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!error && data) {
+    return {
+      vendedor_switch_id: (data.vendedor_switch_id as number | null) ?? null,
+      vendor_name: (data.vendor_name as string | null) ?? null,
+    };
+  }
+  if (!error || !/vendedor_switch_id|column/i.test(error.message ?? "")) return null;
+  const { data: soloNombre } = await db
+    .from(ordersTable)
+    .select("vendor_name")
+    .eq("id", orderId)
+    .maybeSingle();
+  if (!soloNombre) return null;
+  return { vendedor_switch_id: null, vendor_name: (soloNombre.vendor_name as string | null) ?? null };
 }
 
 /**

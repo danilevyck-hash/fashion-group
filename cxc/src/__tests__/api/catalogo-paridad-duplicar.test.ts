@@ -45,6 +45,9 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
   fetchReebokCategoryMap: vi.fn(async () => categoryMap),
 }));
 
+// El "Duplicar" de la lista crea con POST /orders, que avisa por Telegram.
+vi.mock("@/lib/telegram", () => ({ sendTelegramAlert: vi.fn(async () => {}) }));
+
 // PR-1: rutas dinámicas [marca] — un solo handler por endpoint; los wrappers
 // inyectan la marca del segmento (mismas aserciones que el arnés de PR-0).
 import type { NextRequest } from "next/server";
@@ -53,6 +56,8 @@ type IdCtx = { params: { id: string } };
 const rDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "reebok", ...ctx.params } });
 const jDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "joybees", ...ctx.params } });
 const tDuplicar = (req: NextRequest, ctx: IdCtx) => duplicarPost(req, { params: { marca: "tommy", ...ctx.params } });
+import { POST as ordersPost } from "@/app/api/catalogo/[marca]/orders/route";
+const rCrear = (req: NextRequest) => ordersPost(req, { params: { marca: "reebok" } });
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
 
 beforeAll(() => {
@@ -367,19 +372,49 @@ describe("POST /orders/[id]/duplicar", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔴 EL VENDEDOR DEL CLON — LAS DOS DIRECCIONES (13-ago-2026)
 //
-// Hasta hoy el clon heredaba el `vendedor_switch_id` del ORIGINAL, o sea que
-// duplicar un pedido de Edwin le acreditaba la COMISIÓN a Edwin aunque el
-// pedido lo estuviera armando otra persona. Ahora queda a nombre de quien lo
-// duplica. Las dos direcciones importan y las dos están acá:
-//   · CON mapeo en esa empresa → su vendedor, y su nombre LITERAL.
-//   · SIN mapeo → el del original. NUNCA null: un clon sin vendedor quedaría
-//     bloqueado al enviarlo a Switch (422 SIN_VENDEDOR) por un duplicado que
-//     antes salía sin problema.
+// Daniel: *"al duplicar el pedido el vendedor debe de ser el mismo que el otro
+// por default, si lo quiere cambiar que lo cambie despues"*. Un duplicado es el
+// MISMO pedido otra vez: la venta sigue siendo de quien la hizo, y quien lo
+// duplica puede ser una secretaria que no vende. Las dos direcciones importan y
+// las dos están acá:
+//   · ORIGINAL CON vendedor → ése, con su nombre — aunque quien duplica tenga
+//     mapeo propio en esa empresa.
+//   · ORIGINAL SIN vendedor (pedidos viejos, pedidos del link público) → el de
+//     quien duplica, con su nombre LITERAL. NUNCA se deja en null a propósito:
+//     un clon sin vendedor queda bloqueado al enviarlo a Switch (422
+//     SIN_VENDEDOR).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** El mapeo de quien duplica en la empresa de la marca. */
 function queueMiVendedor(id: number, nombre: string | null) {
   mainDb.queue("fg_user_switch_vendedor", { data: { vendedor_id: id, vendedor_nombre: nombre } });
+}
+
+/** Un original SIN vendedor propio (pedido viejo o del link público). */
+function queueOriginalReebokSinVendedor() {
+  reebokDb.queue(
+    "reebok_orders",
+    { data: { id: OID, reemplaza_a: null } },
+    { data: null },
+    {
+      data: {
+        id: OID,
+        order_number: "PED-100",
+        client_name: "Cliente Original",
+        vendor_name: "Vend",
+        client_email: null,
+        comment: null,
+        cliente_switch_id: 7,
+        vendedor_switch_id: null,
+        reebok_order_items: [
+          { product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 2, unit_price: 10, is_preorder: false },
+        ],
+      },
+    },
+    { data: null, error: null },
+  );
+  reebokDb.queue("reebok_switch_envios", { data: { estado: "enviado", numero_interno: "N1" } });
+  reebokDb.queueRpc({ data: { order_id: NEW_ID, order_number: "PED-202" } });
 }
 
 /** El último update sobre reebok_orders (el de trazabilidad). */
@@ -389,25 +424,36 @@ function ultimoUpdateReebok(): Record<string, unknown> {
 }
 
 describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
-  it("🔴 CON mapeo: el clon queda a nombre de QUIEN DUPLICA, no del vendedor del original", async () => {
-    queueOriginalReebok(); // el original es del vendedor 2
-    queueMiVendedor(9, "Beto Ruiz");
+  it("🔴 el clon lleva el vendedor del ORIGINAL, aunque quien duplica tenga el suyo", async () => {
+    queueOriginalReebok(); // el original es del vendedor 2, vendor_name "Vend"
+    queueMiVendedor(9, "Beto Ruiz"); // quien duplica SÍ tiene mapeo propio
 
     const res = await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), {
       params: { id: OID },
     });
     expect(res.status).toBe(200);
 
-    expect(ultimoUpdateReebok().vendedor_switch_id).toBe(9);
-    // Y el nombre que se ve en el pedido acompaña al id — si se copiara el del
-    // original, la pantalla diría un vendedor y la comisión iría a otro.
+    expect(ultimoUpdateReebok().vendedor_switch_id).toBe(2);
+    // Y el nombre que se ve en el pedido acompaña al id — si se copiara el de
+    // quien duplica, la pantalla diría un vendedor y la comisión iría a otro.
     const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
-    expect(args.p_vendor_name).toBe("Beto Ruiz");
+    expect(args.p_vendor_name).toBe("Vend");
   });
 
-  it("🔴 SIN mapeo en esa empresa: se CONSERVA el del original — nunca queda sin vendedor", async () => {
-    queueOriginalReebok(); // vendedor 2, vendor_name "Vend"
-    // mainDb sin cola → {data:null} = esta persona no tiene vendedor mapeado.
+  it("🔴 con el original ya identificado, el mapeo de quien duplica NI SE CONSULTA", async () => {
+    queueOriginalReebok();
+    queueMiVendedor(9, "Beto Ruiz");
+
+    await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), { params: { id: OID } });
+
+    // No hay nada que resolver: preguntarlo sería una consulta cuyo resultado
+    // no se puede usar (y la puerta por la que se colaría el vendedor de otro).
+    expect(mainDb.chainsFor("fg_user_switch_vendedor")).toHaveLength(0);
+  });
+
+  it("🔴 ORIGINAL SIN vendedor: entra el de quien duplica — nunca queda sin vendedor", async () => {
+    queueOriginalReebokSinVendedor();
+    queueMiVendedor(9, "Beto Ruiz");
 
     const res = await rDuplicar(makeReq("/x", { method: "POST", role: "secretaria" }), {
       params: { id: OID },
@@ -415,10 +461,10 @@ describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
     expect(res.status).toBe(200);
 
     const payload = ultimoUpdateReebok();
-    expect(payload.vendedor_switch_id).toBe(2);
+    expect(payload.vendedor_switch_id).toBe(9);
     expect(payload.vendedor_switch_id).not.toBeNull();
     const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
-    expect(args.p_vendor_name).toBe("Vend");
+    expect(args.p_vendor_name).toBe("Beto Ruiz");
   });
 
   it("⚠️ el nombre se guarda LITERAL: joystep tiene 'DANIEL LEVY ' CON espacio final y Switch parea contra eso", async () => {
@@ -435,7 +481,7 @@ describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
           client_email: null,
           comment: null,
           cliente_switch_id: null,
-          vendedor_switch_id: 4,
+          vendedor_switch_id: null, // sin vendedor propio → entra el del mapeo
           joybees_order_items: [
             { product_id: P1, sku: "S1", name: "P", image_url: null, quantity: 1, unit_price: 5 },
           ],
@@ -456,7 +502,7 @@ describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
   });
 
   it("el mapeo se busca por user_id Y por la empresa de ESA marca (los ids de vendedor son por empresa)", async () => {
-    queueOriginalReebok();
+    queueOriginalReebokSinVendedor();
     queueMiVendedor(9, "Beto Ruiz");
     await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), { params: { id: OID } });
 
@@ -468,7 +514,7 @@ describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
   });
 
   it("mapeo sin nombre → cae al nombre de la sesión, NUNCA al del vendedor del original", async () => {
-    queueOriginalReebok(); // vendor_name del original: "Vend"
+    queueOriginalReebokSinVendedor(); // vendor_name del original: "Vend"
     queueMiVendedor(9, null);
 
     await rDuplicar(makeReq("/x", { method: "POST", role: "vendedor" }), { params: { id: OID } });
@@ -529,23 +575,168 @@ describe("POST /orders/[id]/duplicar — el vendedor del clon", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🔴 UNA SOLA DEFINICIÓN de "cuál es mi vendedor"
+// 🔴 EL OTRO CAMINO DE DUPLICAR: el botón de la LISTA (POST /orders)
 //
-// El checkout y el duplicar tienen que resolverlo con la MISMA función. Dos
-// consultas equivalentes escritas por separado se separan de verdad con el
-// tiempo, y lo que se decide acá es a quién se le paga la comisión.
+// No pasa por `/duplicar` (ése exige un pedido bloqueado por Switch): copia los
+// items y crea con `POST /orders`. Es el camino de todos los días —el ícono de
+// duplicar de cada fila— y tiene que llevar el MISMO vendedor.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 candado: el duplicar y el checkout comparten la resolución del vendedor", () => {
-  it("ninguno de los dos consulta fg_user_switch_vendedor por su cuenta", () => {
-    const dup = readFileSync(path.join(process.cwd(), "src/lib/catalogo/duplicar-pedido.ts"), "utf8");
-    const checkout = readFileSync(
-      path.join(process.cwd(), "src/app/api/catalogo/checkout/route.ts"),
-      "utf8",
+
+const ITEMS_NUEVO = [{ product_id: P1, sku: "S1", name: "N1", quantity: 1, unit_price: 10 }];
+
+/** Cola de la creación (categorías por producto + la RPC que numera). */
+function colaCrearReebok() {
+  reebokDb.queue("products", { data: [] });
+  reebokDb.queueRpc({ data: { order_id: NEW_ID, order_number: "PED-9", already_created: false } });
+}
+
+/** Lo que se escribió sobre reebok_orders después de crear. */
+function updatesReebok(): Record<string, unknown>[] {
+  return reebokDb
+    .chainsFor("reebok_orders")
+    .flatMap((c) => (c._calls.update || []).map((a: unknown[]) => a[0] as Record<string, unknown>));
+}
+
+describe("POST /orders — el vendedor cuando se duplica desde la lista", () => {
+  it("🔴 con `duplicar_de`, el pedido nuevo lleva el vendedor del ORIGINAL", async () => {
+    colaCrearReebok();
+    reebokDb.queue(
+      "reebok_orders",
+      { data: { vendedor_switch_id: 2, vendor_name: "Vend" } }, // el original
+      { data: null, error: null }, // update del vendedor heredado
+      { data: { id: NEW_ID, order_number: "PED-9" } }, // respuesta al front
     );
-    for (const [nombre, src] of [["duplicar", dup], ["checkout", checkout]] as const) {
+    queueMiVendedor(9, "Beto Ruiz"); // quien duplica tiene otro vendedor
+
+    const res = await rCrear(
+      makeReq("/x", {
+        method: "POST",
+        role: "vendedor",
+        body: { client_name: "Otro Cliente", items: ITEMS_NUEVO, vendor_name: "Beto Ruiz", duplicar_de: OID },
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    expect(updatesReebok()).toContainEqual(
+      expect.objectContaining({ vendedor_switch_id: 2, vendor_name: "Vend" }),
+    );
+    // Y el nombre del pedido acompaña al id: el que mandó el navegador (el de
+    // quien duplica) NO puede pisar al del vendedor que se hereda.
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("Vend");
+  });
+
+  it("🔴 el original SIN vendedor → el de quien duplica (nunca queda sin vendedor)", async () => {
+    colaCrearReebok();
+    reebokDb.queue(
+      "reebok_orders",
+      { data: { vendedor_switch_id: null, vendor_name: "Vend" } },
+      { data: null, error: null },
+      { data: { id: NEW_ID, order_number: "PED-9" } },
+    );
+    queueMiVendedor(9, "Beto Ruiz");
+
+    const res = await rCrear(
+      makeReq("/x", {
+        method: "POST",
+        role: "vendedor",
+        body: { client_name: "Otro Cliente", items: ITEMS_NUEVO, duplicar_de: OID },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updatesReebok()).toContainEqual(
+      expect.objectContaining({ vendedor_switch_id: 9, vendor_name: "Beto Ruiz" }),
+    );
+  });
+
+  it("un pedido NUEVO (sin `duplicar_de`) no cambia en nada: ni lee un original ni escribe vendedor", async () => {
+    colaCrearReebok();
+    reebokDb.queue("reebok_orders", { data: { id: NEW_ID, order_number: "PED-9" } });
+
+    const res = await rCrear(
+      makeReq("/x", {
+        method: "POST",
+        role: "vendedor",
+        body: { client_name: "Cliente", items: ITEMS_NUEVO, vendor_name: "Angela" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updatesReebok()).toEqual([]);
+    const [, args] = reebokDb.rpc.mock.calls[0] as [string, Record<string, unknown>];
+    expect(args.p_vendor_name).toBe("Angela");
+    expect(mainDb.chainsFor("fg_user_switch_vendedor")).toHaveLength(0);
+  });
+
+  it("si el original no se puede leer, el duplicado se crea igual (no se tumba por el vendedor)", async () => {
+    colaCrearReebok();
+    reebokDb.queue(
+      "reebok_orders",
+      { data: null }, // el original no apareció
+      { data: { id: NEW_ID, order_number: "PED-9" } },
+    );
+
+    const res = await rCrear(
+      makeReq("/x", {
+        method: "POST",
+        role: "vendedor",
+        body: { client_name: "Cliente", items: ITEMS_NUEVO, vendor_name: "Angela", duplicar_de: OID },
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(updatesReebok()).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 UNA SOLA DEFINICIÓN de "cuál es mi vendedor" y de "a nombre de quién queda
+//    un duplicado"
+//
+// El checkout resuelve "mi vendedor" con `vendedorDelUsuario`, y los DOS
+// caminos de duplicar —el "Duplicar" de la lista (`POST /orders`) y el
+// "Duplicar y corregir" (`POST /duplicar`)— resuelven el vendedor del clon con
+// `vendedorParaDuplicado`. Escritas por separado, dos reglas equivalentes se
+// separan de verdad con el tiempo, y lo que se decide acá es a quién se le paga
+// la comisión.
+// ─────────────────────────────────────────────────────────────────────────────
+const LEER = (p: string) => readFileSync(path.join(process.cwd(), p), "utf8");
+
+describe("🔴 candado: una sola resolución del vendedor", () => {
+  const ARCHIVOS = {
+    duplicar: "src/lib/catalogo/duplicar-pedido.ts",
+    checkout: "src/app/api/catalogo/checkout/route.ts",
+    orders: "src/app/api/catalogo/[marca]/orders/route.ts",
+  } as const;
+
+  it("ninguno consulta fg_user_switch_vendedor por su cuenta", () => {
+    for (const [nombre, ruta] of Object.entries(ARCHIVOS)) {
       // Nombrar la tabla en un comentario está bien; consultarla acá NO.
-      expect(src.replace(/\/\/.*$/gm, ""), nombre).not.toMatch(/fg_user_switch_vendedor/);
-      expect(src, nombre).toContain("vendedorDelUsuario");
+      expect(LEER(ruta).replace(/\/\/.*$/gm, ""), nombre).not.toMatch(/fg_user_switch_vendedor/);
     }
+  });
+
+  it("el checkout resuelve MI vendedor con la función compartida", () => {
+    expect(LEER(ARCHIVOS.checkout)).toContain("vendedorDelUsuario");
+  });
+
+  it("🔴 los DOS caminos de duplicar usan la MISMA regla del vendedor del clon", () => {
+    for (const ruta of [ARCHIVOS.duplicar, ARCHIVOS.orders]) {
+      expect(LEER(ruta), ruta).toContain("vendedorParaDuplicado");
+    }
+    // Y ninguno decide por su cuenta qué pasa cuando el original no tiene
+    // vendedor: esa rama vive en `vendedor-switch.ts` y en ningún otro lado.
+    for (const ruta of [ARCHIVOS.duplicar, ARCHIVOS.orders]) {
+      expect(LEER(ruta).replace(/\/\/.*$/gm, ""), ruta).not.toMatch(/vendedor_switch_id\s*!=\s*null\s*\?/);
+    }
+  });
+
+  it("🔴 el 'Duplicar' de la lista NO acepta el id del vendedor desde el navegador", () => {
+    // De ese id depende la COMISIÓN: el servidor lo LEE del pedido original
+    // (`duplicar_de`), nunca lo recibe hecho.
+    const orders = LEER(ARCHIVOS.orders).replace(/\/\/.*$/gm, "");
+    expect(orders).toContain("body.duplicar_de");
+    expect(orders).not.toMatch(/body\.vendedor_switch_id|body\.vendedor_id/);
+    const lista = LEER("src/components/catalogo/PedidosListClient.tsx").replace(/\/\/.*$/gm, "");
+    expect(lista).toContain("duplicar_de: order.id");
+    expect(lista).not.toMatch(/vendedor_switch_id|vendedor_id/);
   });
 });
