@@ -11,6 +11,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
+import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export type Severity = "ok" | "info" | "warning" | "critical";
 
@@ -120,7 +121,20 @@ async function checkLastUploadAge(): Promise<CheckResult[]> {
   for (const [name, table] of [
     ["last_upload_age_cxc", "switch_estadocuenta"],
   ] as const) {
-    const maxFecha = (await supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1)).data?.[0]?.synced_at ?? null;
+    // SOLO EL GRUPO. En `switch_estadocuenta` conviven las 6 del grupo y
+    // `confecciones_boston`, que lleva cartera aparte y se sincroniza por su
+    // propio camino (`/api/cron/boston-cartera`). Sin el filtro, este check
+    // pregunta "¿hace cuánto se actualizó el CXC?" y le contesta la fila más
+    // nueva de CUALQUIERA: un sync de Boston taparía un atraso real del grupo,
+    // y el check quedaría en verde justo cuando hay que mirarlo. Hoy no se nota
+    // porque Boston va 13 h más atrasada que el grupo (medido 12-ago-2026), o
+    // sea que el defecto es LATENTE — el peor tipo de defecto para un vigía.
+    const maxFecha = (await supabaseServer
+      .from("switch_estadocuenta")
+      .select("synced_at")
+      .in("empresa_key", CXC_GRUPO_EMPRESA_KEYS)
+      .order("synced_at", { ascending: false })
+      .limit(1)).data?.[0]?.synced_at ?? null;
     if (!maxFecha) {
       results.push({
         check_name: name, table_name: table,
