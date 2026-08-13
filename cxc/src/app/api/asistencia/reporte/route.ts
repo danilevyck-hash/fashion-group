@@ -11,10 +11,16 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import {
   armarReporte,
-  type Marcacion,
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
+import {
+  aplicarCorrecciones,
+  avisoMigracionCorrecciones,
+  contarCorrecciones,
+  type MarcacionConId,
+} from "@/lib/asistencia/correcciones";
+import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
 import { leerReglas, leerDirectorio } from "@/lib/asistencia/config-server";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +56,14 @@ export async function GET(req: NextRequest) {
     // Paginado con verificación contra el COUNT: un mes de dos relojes con 4
     // marcas diarias pasa de 1.000 filas, y PostgREST corta ahí EN SILENCIO.
     // Un reporte de horas recortado sin avisar es peor que uno que falla.
-    const marcaciones = await leerTodoPaginado<Marcacion>(
+    const marcaciones = await leerTodoPaginado<MarcacionConId>(
       "asistencia_marcaciones (reporte)",
       (pedirCount, from, to) => {
         let sel = supabaseServer
           .from("asistencia_marcaciones")
-          .select("empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
+          // 🔑 El `id` es lo que ata la corrección a SU marcación. Sin él no se
+          // podría saber cuál de las 4 marcas del día se corrigió.
+          .select("id, empleado_codigo, empleado_nombre, ocurrio_en", pedirCount ? { count: "exact" } : {})
           .gte("ocurrio_en", iDesde)
           .lte("ocurrio_en", iHasta);
         if (dispositivo) sel = sel.eq("dispositivo", dispositivo);
@@ -67,7 +75,13 @@ export async function GET(req: NextRequest) {
     // defecto en vez de tirar: el reporte tiene que salir igual.
     // El directorio, en el mismo viaje: es el único lugar que traduce el código
     // del reloj a un nombre, y de él salen también el Excel y el PDF.
-    const [{ reglas }, { directorio }] = await Promise.all([leerReglas(), leerDirectorio()]);
+    const [{ reglas }, { directorio }, correcciones] = await Promise.all([
+      leerReglas(),
+      leerDirectorio(),
+      // Sin la tabla corrida devuelve CERO correcciones, o sea exactamente los
+      // números que este reporte daba antes de que las correcciones existieran.
+      leerCorrecciones(desde, hasta),
+    ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
     );
@@ -82,11 +96,20 @@ export async function GET(req: NextRequest) {
     if (jRes.error) throw new Error(jRes.error.message);
     if (fRes.error) throw new Error(fRes.error.message);
 
+    // 🔴 LAS CORRECCIONES SE APLICAN ANTES DE CALCULAR NADA. Lo que se le pasa
+    // al motor es la lista EFECTIVA: la del reloj con las horas corregidas
+    // encima, más las marcaciones que el reloj nunca registró. La tabla
+    // `asistencia_marcaciones` queda intacta — acá solo se toca una COPIA.
+    const efectivas = aplicarCorrecciones(marcaciones, correcciones.correcciones);
+
+    // 🔑 El filtro va DESPUÉS de aplicar: una marcación AGREGADA no trae nombre
+    // del reloj, así que filtrarla antes la dejaría fuera de la búsqueda por
+    // nombre justo en el día que alguien acaba de corregir.
     // 🩸 La búsqueda mira el nombre del DIRECTORIO además del código. Buscando
     // solo en la marcación, escribir "BRICEIDA" no encontraba nada: el reloj
     // manda `empleado_nombre` vacío en las 3.287 filas cargadas.
     const visibles = q
-      ? marcaciones.filter((m) => {
+      ? efectivas.marcaciones.filter((m) => {
           const cod = (m.empleado_codigo ?? "").trim();
           return (
             cod.toLowerCase().includes(q) ||
@@ -94,7 +117,7 @@ export async function GET(req: NextRequest) {
             (nombres.get(cod) ?? "").toLowerCase().includes(q)
           );
         })
-      : marcaciones;
+      : efectivas.marcaciones;
 
     const personas = armarReporte({
       marcaciones: visibles,
@@ -110,12 +133,21 @@ export async function GET(req: NextRequest) {
       hasta,
       reglas,
       nombres,
+      // Solo para MOSTRAR: las horas corregidas ya vienen dentro de `visibles`.
+      correccionesPorDia: efectivas.porDia,
     });
 
     return NextResponse.json({
       personas,
       desde,
       hasta,
+      // Lo que la pantalla necesita para que NADIE lea un total sin enterarse
+      // de que hay horas tocadas a mano.
+      correcciones: contarCorrecciones(efectivas.porDia),
+      // Sin la migración corrida la pantalla NO ofrece corregir y lo dice: un
+      // botón que siempre falla es peor que no tenerlo.
+      correccionesDisponible: !correcciones.faltaMigracion,
+      avisoCorrecciones: correcciones.faltaMigracion ? avisoMigracionCorrecciones() : null,
       // Se devuelven para que la pantalla, el Excel y el PDF digan los MISMOS
       // números que usó el motor. Un pie de página que dice "5 de tolerancia"
       // mientras el cálculo usa 10 es peor que no decir nada.

@@ -17,7 +17,7 @@ import * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "./reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type DiaReporte, type PersonaReporte, type ReglasReporte } from "./reporte";
 import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
 
@@ -54,6 +54,25 @@ const n0 = (v: number) => (v === 0 ? "" : Math.round(v * 100) / 100);
  * justo el que se manda por correo y sobrevive a la discusión.
  */
 const quien = (p: PersonaReporte) => etiquetaPersona(p.codigo, p.nombre);
+
+/**
+ * Lo que se tocó a mano ese día, en una celda.
+ *
+ * 🔴 SE ESCRIBE LA HORA DEL RELOJ TAMBIÉN. Poner solo la corregida haría que el
+ * Excel enseñara una hora escrita por una persona como si la hubiera registrado
+ * el reloj — y este archivo es el que se manda por correo y sobrevive a la
+ * conversación donde se explicó.
+ */
+function textoCorrecciones(d: { correcciones: DiaReporte["correcciones"] }): string {
+  if (!d.correcciones.length) return "";
+  return d.correcciones
+    .map((c) =>
+      c.agregada
+        ? `AGREGADA ${c.hora} (el reloj no registró nada) — "${c.motivo}" — ${c.creadaPor}`
+        : `Reloj ${c.relojHora} → ${c.hora} — "${c.motivo}" — ${c.creadaPor}`,
+    )
+    .join(" · ");
+}
 
 const HEAD = { font: { bold: true, sz: 9, color: { rgb: "6B7280" } }, alignment: { horizontal: "left" } };
 const HEAD_R = { ...HEAD, alignment: { horizontal: "right" } };
@@ -95,7 +114,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
   const detalle: unknown[][] = [[
     "Persona","Código","Día","Entrada","Sale almuerzo","Vuelve","Salida",
     "Tarde (min)","Exceso almuerzo (min)","Salida temprana (min)","Extra (min)",
-    "Trabajado (min)","Revisar","Ausencia",
+    "Trabajado (min)","Revisar","Ausencia","Corregido a mano",
   ]];
   for (const p of personas) {
     for (const d of p.dias) {
@@ -108,12 +127,17 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
         n0(d.trabajadoMin),
         d.revisar ? "Revisar" : "",
         d.ausente ? "Sin justificar" : d.justificado ? `Justificada — ${d.justificado}` : d.feriado ? `Feriado — ${d.feriado}` : "",
+        // 🔴 El archivo es el que se manda por correo y sobrevive a la
+        // discusión: si la pantalla avisa que una hora se tocó a mano y el
+        // Excel no, el Excel es el que va a decidir un pago con menos
+        // información que la pantalla.
+        textoCorrecciones(d),
       ]);
     }
   }
   const h1 = XLSX.utils.aoa_to_sheet(detalle);
   h1["!cols"] = [{wch:24},{wch:8},{wch:12},{wch:9},{wch:13},{wch:9},{wch:9},
-                 {wch:11},{wch:19},{wch:19},{wch:11},{wch:14},{wch:9},{wch:24}];
+                 {wch:11},{wch:19},{wch:19},{wch:11},{wch:14},{wch:9},{wch:24},{wch:52}];
   h1["!freeze"] = { xSplit: 0, ySplit: 1 };
   for (let c = 0; c < detalle[0].length; c++) {
     const ref = XLSX.utils.encode_cell({ r: 0, c });
@@ -126,7 +150,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     "Persona","Código","Sale","Días trabajados","Ausencias sin justificar",
     "Ausencias justificadas","Veces tarde","Minutos tarde","…de días a revisar",
     "Exceso almuerzo (min)","Salida temprana (min)","Tiempo no trabajado (min)",
-    "Extras (min)","Días a revisar",
+    "Extras (min)","Días a revisar","Días corregidos a mano",
   ]];
   for (const p of personas) {
     const r = p.resumen;
@@ -135,7 +159,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
       r.diasTrabajados, n0(r.ausenciasSinJustificar), n0(r.ausenciasJustificadas),
       n0(r.vecesTarde), n0(r.minutosTarde), n0(r.minutosTardeDeDiasARevisar),
       n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin), n0(r.tiempoNoTrabajadoMin),
-      n0(r.extraMin), n0(r.diasARevisar),
+      n0(r.extraMin), n0(r.diasARevisar), n0(r.diasCorregidos),
     ]);
   }
   const t = personas.reduce((a, p) => ({
@@ -150,14 +174,15 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
     extra: a.extra + p.resumen.extraMin,
     rev: a.rev + p.resumen.diasARevisar,
-  }), { dias:0,aus:0,ausJ:0,veces:0,tarde:0,tardeRev:0,almz:0,temp:0,noTrab:0,extra:0,rev:0 });
+    corr: a.corr + p.resumen.diasCorregidos,
+  }), { dias:0,aus:0,ausJ:0,veces:0,tarde:0,tardeRev:0,almz:0,temp:0,noTrab:0,extra:0,rev:0,corr:0 });
   resumen.push([]);
   resumen.push(["TOTAL", "", "", t.dias, t.aus, t.ausJ, t.veces, t.tarde, t.tardeRev,
-                t.almz, t.temp, t.noTrab, t.extra, t.rev]);
+                t.almz, t.temp, t.noTrab, t.extra, t.rev, t.corr]);
 
   const h2 = XLSX.utils.aoa_to_sheet(resumen);
   h2["!cols"] = [{wch:24},{wch:8},{wch:7},{wch:16},{wch:23},{wch:22},{wch:12},
-                 {wch:14},{wch:18},{wch:20},{wch:21},{wch:24},{wch:13},{wch:15}];
+                 {wch:14},{wch:18},{wch:20},{wch:21},{wch:24},{wch:13},{wch:15},{wch:22}];
   h2["!freeze"] = { xSplit: 0, ySplit: 1 };
   for (let c = 0; c < resumen[0].length; c++) {
     const ref = XLSX.utils.encode_cell({ r: 0, c });
@@ -188,6 +213,7 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     ["Horas extra", `Mínimo ${g.extraMinimoMin} minutos, y se le resta el atraso del mismo día.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
     ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
+    ["Corregido a mano", "La hora que marcó el reloj NUNCA se borra: la corrección va encima y es la que cuenta. La columna dice la hora del reloj, la corregida, por qué y quién la puso."],
     [],
     ["Todo en MINUTOS, no en horas decimales."],
   ];
@@ -222,12 +248,16 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
     noTrab: a.noTrab + p.resumen.tiempoNoTrabajadoMin,
     extra: a.extra + p.resumen.extraMin,
     rev: a.rev + p.resumen.diasARevisar,
-  }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0 });
+    corr: a.corr + p.resumen.diasCorregidos,
+  }), { aus: 0, tarde: 0, noTrab: 0, extra: 0, rev: 0, corr: 0 });
 
   autoTable(doc, {
     startY: 27,
+    // 🔴 «Corregidos» va en el papel QUE SE FIRMA. Este PDF es el que llega a
+    // planilla: un total que se lee sin saber que hay horas escritas a mano es
+    // exactamente lo que no puede pasar.
     head: [["Persona", "Sale", "Días", "Ausen.", "Veces\ntarde", "Min\ntarde",
-            "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar"]],
+            "Exceso\nalmuerzo", "Salida\ntemprana", "No trabajado\n(min)", "Extras\n(min)", "A\nrevisar", "Días\ncorreg."]],
     body: personas.map((p) => {
       const r = p.resumen;
       return [
@@ -235,9 +265,10 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
         r.ausenciasSinJustificar || "", r.vecesTarde || "", n0(r.minutosTarde),
         n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin),
         n0(r.tiempoNoTrabajadoMin), n0(r.extraMin), r.diasARevisar || "",
+        r.diasCorregidos || "",
       ];
     }),
-    foot: [["TOTAL", "", "", t.aus || "", "", n0(t.tarde), "", "", n0(t.noTrab), n0(t.extra), t.rev || ""]],
+    foot: [["TOTAL", "", "", t.aus || "", "", n0(t.tarde), "", "", n0(t.noTrab), n0(t.extra), t.rev || "", t.corr || ""]],
     theme: "plain",
     styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [31, 41, 55], lineColor: [229, 231, 235], lineWidth: 0.1 },
     headStyles: { fontStyle: "bold", fontSize: 6.8, textColor: [107, 114, 128], lineWidth: { bottom: 0.3 }, valign: "bottom" },
@@ -247,6 +278,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" },
       5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" },
       8: { halign: "right", fontStyle: "bold" }, 9: { halign: "right" }, 10: { halign: "right" },
+      11: { halign: "right" },
     },
     margin: { left: 14, right: 14 },
     didDrawPage: () => {
@@ -255,7 +287,10 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       doc.text(
         `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · ` +
         `extras desde ${g.extraMinimoMin} min, menos el atraso del día · ` +
-        "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
+        "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)" +
+        (t.corr > 0
+          ? ` · ${t.corr} ${t.corr === 1 ? "día tiene" : "días tienen"} una hora corregida a mano (la del reloj se conserva; el detalle está en el Excel)`
+          : ""),
         14, h - 8,
       );
       doc.text(`Página ${doc.getNumberOfPages()}`, w - 14, h - 8, { align: "right" });

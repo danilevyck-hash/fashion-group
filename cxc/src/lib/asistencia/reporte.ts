@@ -52,6 +52,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
+// 🔑 SOLO EL TIPO. `correcciones.ts` importa `diaPanama` de acá (un valor), así
+// que un import normal armaría un ciclo en tiempo de ejecución; `import type`
+// se borra al compilar y no queda ninguno.
+import type { CorreccionVisible } from "./correcciones";
 
 /** Panamá es UTC−5 fijo, sin horario de verano. */
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -82,6 +86,15 @@ export interface Marcacion {
   empleado_codigo: string | null;
   empleado_nombre: string | null;
   ocurrio_en: string;
+  /**
+   * El `id` de la fila en `asistencia_marcaciones`.
+   *
+   * Opcional a propósito: los tests del motor y cualquier consumidor viejo
+   * siguen andando sin él. Lo usan las CORRECCIONES, para poder decir cuál de
+   * las marcas del día se está corrigiendo. Una marca AGREGADA a mano no tiene
+   * `id` —no existe en la tabla del reloj— y eso es lo que la distingue.
+   */
+  id?: string | null;
 }
 
 export interface HorarioPersona {
@@ -102,6 +115,15 @@ export interface DiaReporte {
   fecha: string;
   /** Horas HH:MM en orden. Normalmente 4. */
   marcas: string[];
+  /**
+   * El `id` de cada marca de `marcas`, en el MISMO orden. `null` = esa marca no
+   * viene del reloj (se agregó a mano con una corrección), así que no hay una
+   * fila que corregir: se deshace la corrección que la creó.
+   *
+   * 🔑 Existe para que la pantalla sepa QUÉ corregir al tocar una hora. No entra
+   * en ninguna cuenta.
+   */
+  marcasIds: (string | null)[];
   entrada: string | null;
   salida: string | null;
   tardeMin: number;
@@ -123,6 +145,17 @@ export interface DiaReporte {
    * detecta la ausencia se los tragaría a todos.
    */
   habil: boolean;
+  /**
+   * Las horas de este día que se tocaron a mano (`asistencia_correcciones`).
+   *
+   * 🔴 ES INFORMATIVO Y NADA MÁS: cuando este arreglo trae algo, las horas
+   * corregidas YA vienen dentro de `marcas` —la corrección se aplica ANTES de
+   * llegar acá, en `aplicarCorrecciones`— así que ningún número de arriba se
+   * calcula con este campo. Existe para que el reporte pueda mostrar las dos
+   * horas (la del reloj y la corregida) sin que nadie tenga que abrir otra
+   * pantalla, y para que no haya forma de leer un total sin enterarse.
+   */
+  correcciones: CorreccionVisible[];
 }
 
 export interface PersonaReporte {
@@ -150,6 +183,10 @@ export interface PersonaReporte {
     extraMin: number;
     diasARevisar: number;
     tiempoNoTrabajadoMin: number;
+    /** Días de esta persona con al menos una hora corregida a mano. */
+    diasCorregidos: number;
+    /** Cuántas horas se tocaron a mano en total, en todo el rango. */
+    correcciones: number;
   };
 }
 
@@ -291,6 +328,15 @@ export function armarReporte(opts: {
    * El Reporte no lo pasa y sigue viendo exactamente lo que veía antes.
    */
   incluirNoHabiles?: boolean;
+  /**
+   * Qué horas se tocaron a mano, por `codigo|fecha` (ver `llaveDia`).
+   *
+   * 🔴 ES SOLO PARA MOSTRAR. Las horas corregidas ya vienen dentro de
+   * `marcaciones` (las aplica `aplicarCorrecciones` antes de llamar acá): este
+   * mapa NO entra en ninguna cuenta. Sin él, el motor da EXACTAMENTE los mismos
+   * números que daba antes de que las correcciones existieran.
+   */
+  correccionesPorDia?: ReadonlyMap<string, readonly CorreccionVisible[]>;
 }): PersonaReporte[] {
   const { marcaciones, horarios, justificaciones, feriados, desde, hasta, nombres } = opts;
 
@@ -307,19 +353,38 @@ export function armarReporte(opts: {
   const habiles = diasDelRango(desde, hasta, opts.incluirNoHabiles === true);
 
   // Agrupar marcaciones por persona y día.
-  const porPersona = new Map<string, { nombre: string | null; dias: Map<string, number[]> }>();
+  const porPersona = new Map<
+    string,
+    {
+      nombre: string | null;
+      dias: Map<string, number[]>;
+      /**
+       * `dia` → (segundo del día → id de la marcación). Es lo único que se
+       * agrega a la agrupación, y NO toca la aritmética: los cálculos siguen
+       * leyendo `dias`, el mismo arreglo de números de siempre. Sirve para que
+       * la pantalla sepa qué fila corregir al tocar una hora.
+       */
+      ids: Map<string, Map<number, string>>;
+    }
+  >();
   for (const m of marcaciones) {
     const cod = (m.empleado_codigo ?? m.empleado_nombre ?? "").trim();
     if (!cod || !m.ocurrio_en) continue;
     const dia = diaPanama(m.ocurrio_en);
     if (dia < desde || dia > hasta) continue;
     let p = porPersona.get(cod);
-    if (!p) { p = { nombre: m.empleado_nombre, dias: new Map() }; porPersona.set(cod, p); }
+    if (!p) { p = { nombre: m.empleado_nombre, dias: new Map(), ids: new Map() }; porPersona.set(cod, p); }
     if (!p.nombre && m.empleado_nombre) p.nombre = m.empleado_nombre;
     const lista = p.dias.get(dia);
     // 🔑 SEGUNDOS, no minutos: el instante exacto que marcó la persona.
-    if (lista) lista.push(segundosDelDia(m.ocurrio_en));
-    else p.dias.set(dia, [segundosDelDia(m.ocurrio_en)]);
+    const seg = segundosDelDia(m.ocurrio_en);
+    if (lista) lista.push(seg);
+    else p.dias.set(dia, [seg]);
+    if (m.id) {
+      const del = p.ids.get(dia);
+      if (del) del.set(seg, String(m.id));
+      else p.ids.set(dia, new Map([[seg, String(m.id)]]));
+    }
   }
 
   const out: PersonaReporte[] = [];
@@ -344,14 +409,18 @@ export function armarReporte(opts: {
       const habil = esHabil(fecha);
       // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
+      // Informativo: qué horas de este día se tocaron a mano. No entra en
+      // ninguna cuenta — ver la nota de `correccionesPorDia`.
+      const correcciones = [...(opts.correccionesPorDia?.get(`${codigo}|${fecha}`) ?? [])];
       // Sin marcas: ausente, salvo que sea feriado, esté justificado… o
       // simplemente no sea día de trabajo. 🔑 Lo último solo puede pasar con
       // `incluirNoHabiles`, y sin el guard un domingo libre contaría como falta.
       if (crudas.length === 0) {
         dias.push({
-          fecha, marcas: [], entrada: null, salida: null,
+          fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
           revisar: false, ausente: habil && !feriado && !justificado, justificado, feriado, habil,
+          correcciones,
         });
         continue;
       }
@@ -402,11 +471,14 @@ export function armarReporte(opts: {
       dias.push({
         fecha,
         marcas: crudas.map(fmt),
+        // `null` = esa marca no vino del reloj (la agregó una corrección).
+        marcasIds: crudas.map((seg) => p.ids.get(fecha)?.get(seg) ?? null),
         entrada: fmt(ent),
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
         revisar, ausente: false, justificado, feriado, habil,
+        correcciones,
       });
     }
 
@@ -423,6 +495,11 @@ export function armarReporte(opts: {
       extraMin: conMarcas.reduce((a, d) => a + d.extraMin, 0),
       diasARevisar: conMarcas.filter((d) => d.revisar).length,
       tiempoNoTrabajadoMin: 0,
+      // 🔑 Sobre TODOS los días, no solo `conMarcas`: si algún día una
+      // corrección pudiera existir sobre un día sin marcas, contarla solo en
+      // los que tienen marcas la escondería justo donde más raro sería.
+      diasCorregidos: dias.filter((d) => d.correcciones.length > 0).length,
+      correcciones: dias.reduce((a, d) => a + d.correcciones.length, 0),
     };
     // El número de planilla: todo lo que no se trabajó, junto.
     resumen.tiempoNoTrabajadoMin =
