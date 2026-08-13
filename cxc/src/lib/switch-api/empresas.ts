@@ -223,6 +223,45 @@ export function empresasConEstadoCuentaEnCron(): EmpresaKey[] {
 }
 
 /**
+ * Empresas cuyos EGRESOS VARIOS no se bajan por CRON.
+ *
+ * 🔴 `confecciones_boston` — LO PIDIÓ DANIEL, 13-ago-2026, textual: *"ve
+ * avanzando con todas menos boston, ese usuario es mio y no entrare"*.
+ *
+ * El login web de Egresos Varios usa `changesession="SI"`, que TOMA la sesión y
+ * EXPULSA a quien esté en el panel de esa empresa. En Boston el usuario
+ * configurado es el de Daniel y él **sí** trabaja ahí, así que una corrida
+ * automática le arrebataría la sesión sin que nadie se lo pida.
+ *
+ * ⚠️ **BOSTON NO SE RETIRA DEL MÓDULO.** Dos mensajes antes, Daniel dijo *"si
+ * quiero ver gastos de boston"*: su pestaña sigue existiendo, sigue mostrando lo
+ * que tenga del mayor, y `EGRESOS_EMPRESA_KEYS` sigue siendo las 8. Lo único que
+ * se apaga es la DESCARGA automática — el sync MANUAL
+ * (`/api/cron/sync-egresos-varios?empresas=confecciones_boston`) la sigue
+ * aceptando, para el día que él quiera traerla a propósito.
+ *
+ * **Lista explícita y no un `if` suelto**, igual que
+ * `EMPRESAS_ESTADOCUENTA_FUERA_DE_CRON`: es una decisión de negocio con nombre y
+ * motivo, no una condición perdida dentro de un route. Y por la misma razón NO
+ * es una capability: la capability diría "de esta empresa no traemos egresos", y
+ * eso es falso — se pueden traer, solo que no solos.
+ *
+ * **El vigía no la reporta como caída:** el heartbeat de `sync-egresos-varios`
+ * es del CRON, no del par empresa; y `SWITCH_CRON_ENTRADAS` declara para esa
+ * entrada exactamente las empresas que corre, así que Boston tampoco aparece en
+ * el cronograma de sesión única.
+ */
+export const EMPRESAS_EGRESOS_FUERA_DE_CRON: readonly EmpresaKey[] = [
+  "confecciones_boston",
+];
+
+/** Las empresas a las que el cron de egresos varios SÍ entra: las 7 que no son
+ *  Boston. Es la lista por defecto del cron; el módulo sigue mostrando las 8. */
+export function empresasConEgresosEnCron(): EmpresaKey[] {
+  return ALL_KEYS.filter((k) => !EMPRESAS_EGRESOS_FUERA_DE_CRON.includes(k));
+}
+
+/**
  * Empresas de las que traemos cartera pero que NO son cartera del grupo:
  * hoy, solo `confecciones_boston`. Su plata se muestra en su propia pestaña y
  * no se suma con nada.

@@ -24,6 +24,8 @@ import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { montoACentavos } from "@/lib/mayor/parser";
 import { esTablaAusente } from "@/lib/mayor/leer";
+import { empresasConEgresosEnCron } from "@/lib/switch-api/empresas";
+import { leerNombresDeCuentas, type NombresPorEmpresa } from "@/lib/cuentas/leer";
 import type { EgresoLinea } from "./parser";
 import { resumirMesEgresos, type Cobertura, type ResumenEgresosMes } from "./reglas";
 
@@ -35,6 +37,14 @@ export interface EmpresaEgresos {
   /** Último mes con movimientos que tiene esa empresa (`YYYY-MM`), o `null`.
    *  Es lo que permite decir "los egresos llegan hasta …" en vez de un cero. */
   ultimoMesConMovimientos: string | null;
+  /** ¿El cron baja sola esta empresa?
+   *
+   *  🔴 `false` en `confecciones_boston` por pedido de Daniel — su usuario de
+   *  Switch es el de él y no quiere que nada se lo tome. Viaja al navegador
+   *  porque **una empresa que se ve vacía sin explicación se lee como un error
+   *  del sistema**: la pantalla tiene que poder decir que sus gastos no se están
+   *  trayendo de esta fuente, no dejar un "No traído" mudo. */
+  descargaAutomatica: boolean;
 }
 
 export interface LecturaEgresos {
@@ -162,11 +172,33 @@ export async function leerEgresosMes(mes: string): Promise<LecturaEgresos> {
     if (!previo || bucket > previo) ultimoMes.set(r.empresa_key, bucket);
   }
 
+  // Los NOMBRES de las cuentas, en una sola pasada para las 8 empresas y sólo
+  // por los códigos que este mes usa. Falla ABIERTO: sin nombres la pantalla
+  // muestra los códigos, que es como se veía antes del catálogo.
+  const usadas = new Map<string, string[]>();
+  for (const [key, lineas] of porEmpresa) {
+    usadas.set(key, [...new Set(lineas.map((l) => l.cuenta))]);
+  }
+  let nombres: NombresPorEmpresa = new Map();
+  try {
+    nombres = await leerNombresDeCuentas(usadas);
+  } catch (e) {
+    console.error("[egresos/leer] nombres de cuenta:", e);
+  }
+
+  const enCron = new Set<string>(empresasConEgresosEnCron());
+
   const empresas: EmpresaEgresos[] = ALL_EMPRESA_KEYS.map((key) => ({
     empresaKey: key,
     nombre: EMPRESA_KEY_TO_NAME[key] ?? key,
-    resumen: resumirMesEgresos(mes, porEmpresa.get(key) ?? [], coberturas.get(key) ?? []),
+    resumen: resumirMesEgresos(
+      mes,
+      porEmpresa.get(key) ?? [],
+      coberturas.get(key) ?? [],
+      nombres.get(key),
+    ),
     ultimoMesConMovimientos: ultimoMes.get(key) ?? null,
+    descargaAutomatica: enCron.has(key),
   }));
 
   return { instalado: true, mes, empresas };

@@ -27,7 +27,7 @@ import {
   ETIQUETA_SIN_GASTO,
   type MotivoSinGasto,
 } from "@/lib/mayor/gastos";
-import { rentabilidadGrupo } from "@/lib/vista-general-calc";
+import { rentabilidadEmpresa } from "@/lib/vista-general-calc";
 import type { MayorLinea } from "@/lib/mayor/parser";
 
 const raiz = join(__dirname, "..", "..", "..");
@@ -178,42 +178,41 @@ describe("el texto que ve el usuario dice la verdad y no pide lo que no existe",
 // 3. La rentabilidad no mezcla universos
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("rentabilidadGrupo: utilidad y gasto SIEMPRE de las mismas empresas", () => {
-  const OCHO = [
-    { key: "a", ventas: 100_000, utilidad: 30_000, gasto: 20_000 },
-    { key: "b", ventas: 80_000, utilidad: 25_000, gasto: 15_000 },
-    // Estas seis no tienen el mes cerrado.
-    ...["c", "d", "e", "f", "g", "h"].map((key) => ({
-      key, ventas: 50_000, utilidad: 20_000, gasto: null,
-    })),
-  ];
-
-  it("🩸 con 2 de 8 empresas, la utilidad de las otras 6 NO entra", () => {
-    const r = rentabilidadGrupo(OCHO)!;
-    expect(r.empresasConGasto).toBe(2);
-    expect(r.utilidad).toBe(55_000); // 30k + 25k, NO 175k
-    expect(r.gastos).toBe(35_000);
-    expect(r.monto).toBe(20_000);
-    // El error que se quiere impedir daría 175.000 − 35.000 = 140.000.
-    expect(r.monto).not.toBe(140_000);
+describe("rentabilidadEmpresa: cada empresa contra LO SUYO", () => {
+  it("🩸 es utilidad − gasto DE LA MISMA empresa", () => {
+    const r = rentabilidadEmpresa({ ventas: 100_000, utilidad: 30_000, gasto: 20_000 })!;
+    expect(r.monto).toBe(10_000);
+    expect(r.pct).toBeCloseTo(10_000 / 100_000, 12);
   });
 
-  it("el % se mide sobre las ventas de ESAS empresas, no sobre las del grupo", () => {
-    const r = rentabilidadGrupo(OCHO)!;
-    expect(r.ventas).toBe(180_000);
-    expect(r.pct).toBeCloseTo(20_000 / 180_000, 12);
+  it("🔴 sin gasto cargado devuelve null — NUNCA la utilidad bruta pelada", () => {
+    // Es el error que da un número precioso y falso: tratar el gasto ausente
+    // como cero deja `rentabilidad = utilidad`, indistinguible de una empresa
+    // que de verdad gana plata.
+    expect(rentabilidadEmpresa({ ventas: 50_000, utilidad: 20_000, gasto: null })).toBeNull();
   });
 
-  it("sin ninguna empresa utilizable → null, nunca $0", () => {
-    const nada = OCHO.map((e) => ({ ...e, gasto: null }));
-    expect(rentabilidadGrupo(nada)).toBeNull();
-    expect(rentabilidadGrupo([])).toBeNull();
-  });
-
-  it("una empresa con gasto 0 SÍ cuenta (cero es un dato, null es la ausencia)", () => {
-    const r = rentabilidadGrupo([{ key: "a", ventas: 10, utilidad: 5, gasto: 0 }])!;
-    expect(r.empresasConGasto).toBe(1);
+  it("gasto 0 SÍ cuenta (cero es un dato, null es la ausencia)", () => {
+    const r = rentabilidadEmpresa({ ventas: 10, utilidad: 5, gasto: 0 })!;
     expect(r.monto).toBe(5);
+  });
+
+  it("sin ventas no se inventa un porcentaje", () => {
+    const r = rentabilidadEmpresa({ ventas: 0, utilidad: 0, gasto: 500 })!;
+    expect(r.monto).toBe(-500);
+    expect(r.pct).toBeNull();
+  });
+
+  it("🔴 la función NO puede ver otras empresas: recibe UNA sola", () => {
+    // El candado estructural de la regla de Daniel. `rentabilidadGrupo` recibía
+    // un array y por eso podía sumar universos distintos; ésta recibe un objeto
+    // con tres números y no tiene con qué mezclarlos con los de nadie.
+    expect(rentabilidadEmpresa.length).toBe(1);
+    const uno = rentabilidadEmpresa({ ventas: 100, utilidad: 30, gasto: 10 })!;
+    const otro = rentabilidadEmpresa({ ventas: 900, utilidad: 300, gasto: 100 })!;
+    // Los dos resultados son independientes: ninguno cambia por el otro.
+    expect(uno.monto).toBe(20);
+    expect(otro.monto).toBe(200);
   });
 });
 

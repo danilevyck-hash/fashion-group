@@ -73,6 +73,10 @@ export interface EmpresaEgresosResumen {
   resumen: ResumenEgresosMes;
   /** Último mes con movimientos de esa empresa (`YYYY-MM`), o `null`. */
   ultimoMesConMovimientos: string | null;
+  /** ¿El cron baja sola esta empresa? `false` en Confecciones Boston (pedido de
+   *  Daniel: su usuario del panel es el de él). La pantalla TIENE que decirlo —
+   *  una empresa vacía sin explicación se lee como un error del sistema. */
+  descargaAutomatica: boolean;
 }
 
 export interface RespuestaEgresos {

@@ -44,9 +44,16 @@
  *
  * Las empresas van SECUENCIALES, una sesión por empresa, cerrada al terminar.
  *
+ * ── 🔴 BOSTON NO ENTRA EN LA CORRIDA AUTOMÁTICA ────────────────────────────
+ * Daniel, textual (13-ago-2026): *"ve avanzando con todas menos boston, ese
+ * usuario es mio y no entrare"*. El cron corre las **7** de
+ * `EGRESOS_EMPRESA_KEYS_CRON`. Boston **sigue en el módulo** (su pestaña se ve,
+ * con lo que tenga del mayor) y **sigue aceptándose a mano** con
+ * `?empresas=confecciones_boston`. Ver `EMPRESAS_EGRESOS_FUERA_DE_CRON`.
+ *
  * Auth: `Authorization: Bearer ${CRON_SECRET}`.
  * Query params (opcionales, uso manual):
- *   empresas=a,b     solo esas empresas.
+ *   empresas=a,b     solo esas empresas (acepta las 8, Boston incluida).
  *   anio=2025        otro año (backfill).
  *   desde=&hasta=    rango exacto (para certificar contra un archivo bajado a
  *                    mano). Los dos o ninguno.
@@ -57,6 +64,7 @@ import {
   syncAllEgresos,
   egresosInstalado,
   EGRESOS_EMPRESA_KEYS,
+  EGRESOS_EMPRESA_KEYS_CRON,
   type ResultadoEgresosEmpresa,
 } from "@/lib/switch-api/sync-egresos-varios";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -100,9 +108,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const sp = req.nextUrl.searchParams;
   const pedidas = sp.get("empresas")?.split(",").map((s) => s.trim()).filter(Boolean);
+  // 🔴 Sin `?empresas=` corren las 7 del cron: Boston queda FUERA de la descarga
+  // automática (`EMPRESAS_EGRESOS_FUERA_DE_CRON`). Pedida a propósito SÍ corre —
+  // el universo que se valida es el de las 8, no el del cron. Mismo patrón que
+  // `empresasConEstadoCuentaEnCron()`.
   const empresas = pedidas?.length
     ? pedidas.filter((e) => EGRESOS_EMPRESA_KEYS.includes(e))
-    : EGRESOS_EMPRESA_KEYS;
+    : EGRESOS_EMPRESA_KEYS_CRON;
 
   const anioParam = sp.get("anio");
   const anio =

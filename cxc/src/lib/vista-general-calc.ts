@@ -31,60 +31,51 @@ export function estadoSemaforo(
   return "verde";
 }
 
-// ── Rentabilidad del grupo ───────────────────────────────────────────────────
+// ── Rentabilidad POR EMPRESA ─────────────────────────────────────────────────
+//
+// 🔴 LA REGLA DE DANIEL, textual (13-ago-2026):
+//     "no quiero Rentabilidad del grupo, lo quiero por empresa"
+//
+// 🩸 Y ACÁ ESTABA `rentabilidadGrupo`, QUE SE BORRÓ ENTERA. Sumaba la utilidad y
+// el gasto de todas las empresas con el mes utilizable y devolvía UN número. Se
+// borró en vez de dejarla sin llamar: una función que calcula el número que
+// Daniel pidió no tener es una función que alguien vuelve a enganchar. La
+// pantalla ahora muestra una fila por empresa (`RentabilidadPorEmpresa.tsx`).
+//
+// ⚠️ Lo que sí se conserva es la LECCIÓN que aquella función encapsulaba: nunca
+// mezclar los universos de dos empresas. Antes eso significaba "acumulá ventas,
+// utilidad y gasto en el mismo bucle"; ahora significa algo más fuerte y más
+// simple — esta función recibe UNA empresa y no tiene forma de ver las otras.
 
-/** Una empresa con sus ventas, su utilidad bruta y su gasto del mes. */
+/** Las tres cifras de UNA empresa. */
 export interface EmpresaConGasto {
-  key: string;
   ventas: number;
   utilidad: number;
   /** `null` = el mes de ESA empresa no se puede mostrar (sin cerrar, sin planilla…). */
   gasto: number | null;
 }
 
-export interface RentabilidadGrupo {
+export interface RentabilidadEmpresa {
+  /** `utilidad − gasto`, los dos de ESTA empresa. */
   monto: number;
+  /** Sobre las ventas de ESTA empresa. `null` si no vendió nada. */
   pct: number | null;
-  /** Ventas, utilidad y gasto SÓLO de las empresas contadas. */
-  ventas: number;
-  utilidad: number;
-  gastos: number;
-  empresasConGasto: number;
 }
 
 /**
- * Rentabilidad consolidada = utilidad bruta − gasto, **sobre las mismas
- * empresas**.
+ * Rentabilidad de UNA empresa = su utilidad bruta − su gasto.
  *
- * 🩸 EL ERROR QUE ESTA FUNCIÓN EXISTE PARA IMPEDIR. Con 4 de 8 empresas con el
- * mes cerrado, restarle el gasto de esas 4 a la utilidad de las 8 da una
- * rentabilidad inflada que se ve perfectamente normal — nada en pantalla
- * delataría que la resta mezcló dos universos. Por eso las tres cifras
- * (`ventas`, `utilidad`, `gastos`) se acumulan en el MISMO bucle, y sólo entra
- * la empresa cuyo `gasto` no es `null`.
- *
- * Devuelve `null` si ninguna empresa tiene gasto utilizable: no hay nada honesto
- * que mostrar, y un $0 se leería como "no gasté nada".
+ * 🔴 Devuelve `null` cuando a la empresa le FALTA el gasto, y eso es lo más
+ * importante de la función. Tratar el gasto ausente como cero daría
+ * `rentabilidad = utilidad bruta`: un número precioso, indistinguible del de una
+ * empresa que de verdad gana plata. La contadora va meses atrasada de forma
+ * distinta en cada empresa, así que ese caso no es raro — es el normal. Con
+ * `null`, la pantalla está obligada a escribir el motivo en palabras.
  */
-export function rentabilidadGrupo(rows: EmpresaConGasto[]): RentabilidadGrupo | null {
-  let ventas = 0, utilidad = 0, gastos = 0, n = 0;
-  for (const e of rows) {
-    if (e.gasto === null) continue;
-    ventas += e.ventas;
-    utilidad += e.utilidad;
-    gastos += e.gasto;
-    n++;
-  }
-  if (n === 0) return null;
-  const monto = utilidad - gastos;
-  return {
-    monto,
-    pct: ventas > 0 ? monto / ventas : null,
-    ventas,
-    utilidad,
-    gastos,
-    empresasConGasto: n,
-  };
+export function rentabilidadEmpresa(e: EmpresaConGasto): RentabilidadEmpresa | null {
+  if (e.gasto === null) return null;
+  const monto = e.utilidad - e.gasto;
+  return { monto, pct: e.ventas > 0 ? monto / e.ventas : null };
 }
 
 // ── Lo que se retiró de este archivo (11-ago-2026) ───────────────────────────

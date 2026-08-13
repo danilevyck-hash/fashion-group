@@ -40,6 +40,11 @@
  */
 
 import { esGasto } from "@/lib/mayor/gastos";
+import {
+  codigoVisible,
+  nombreDeCuenta,
+  type NombresDeCuentas,
+} from "@/lib/cuentas/catalogo";
 import type { EgresoLinea } from "./parser";
 
 export { esGasto };
@@ -78,8 +83,16 @@ export const ETIQUETA_ESTADO_EGRESOS: Record<EstadoEgresos, string> = {
 export interface CuentaEgreso {
   /** Código completo de 5 segmentos: la llave contra la contabilidad. */
   cuenta: string;
-  /** Los 3 segmentos que se muestran ("6.03.98"). */
+  /** Los 3 segmentos que agrupan la cuenta ("6.03.98"). Es la llave de las
+   *  reglas de negocio (ISR, cuentas sin salida de caja), NO lo que se pinta. */
   corta: string;
+  /** El código como lo enseña Switch, sin los ceros de relleno del final y
+   *  nunca por debajo de 3 segmentos ("2.01.04.02"). Es lo que se PINTA, y va
+   *  al mismo nivel que `nombre` para que código y nombre no se contradigan. */
+  visible: string;
+  /** Nombre de la cuenta, del catálogo de Switch (o del mayor, como respaldo).
+   *  `null` cuando no se sabe: **nunca se inventa** — ver `lib/cuentas/catalogo`. */
+  nombre: string | null;
   /** Grupo contable ("6" = gasto). */
   grupo: string;
   /** ¿Es gasto? (grupo 6). Mismo criterio que el mayor. */
@@ -143,11 +156,18 @@ export function mesTocado(mes: string, coberturas: readonly Cobertura[]): boolea
 
 const MAX_EJEMPLOS = 3;
 
-/** Resume UN mes a partir de sus renglones. */
+/**
+ * Resume UN mes a partir de sus renglones.
+ *
+ * `nombres` es el diccionario de esa EMPRESA (código completo → nombre). Es
+ * opcional: sin él las cuentas salen con `nombre: null` y la pantalla muestra el
+ * código pelado, que es como se veía antes de que existiera el catálogo.
+ */
 export function resumirMesEgresos(
   mes: string,
   lineasDelMes: readonly EgresoLinea[],
   coberturas: readonly Cobertura[],
+  nombres: NombresDeCuentas = new Map(),
 ): ResumenEgresosMes {
   const estado: EstadoEgresos =
     lineasDelMes.length > 0
@@ -169,6 +189,8 @@ export function resumirMesEgresos(
       porCuenta.set(l.cuenta, {
         cuenta: l.cuenta,
         corta: cuentaCorta(l.cuenta),
+        visible: codigoVisible(l.cuenta),
+        nombre: nombreDeCuenta(l.cuenta, nombres),
         grupo: grupoDeCuenta(l.cuenta),
         esGasto: esGasto(l.cuenta),
         totalCent: l.totalCent,

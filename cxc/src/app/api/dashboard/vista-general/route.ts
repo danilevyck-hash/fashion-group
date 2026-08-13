@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
-import { estadoSemaforo, rentabilidadGrupo } from "@/lib/vista-general-calc";
+import { estadoSemaforo, rentabilidadEmpresa } from "@/lib/vista-general-calc";
 import { leerMayorMes } from "@/lib/mayor/leer";
 import {
   centAUsd,
@@ -283,32 +283,16 @@ export async function GET(req: NextRequest) {
     porEmpresa: gastosPorEmpresa,
   };
 
-  // ── RENTABILIDAD (utilidad bruta − gasto) ──
+  // ── 🔴 LA RENTABILIDAD DEL GRUPO YA NO SE CALCULA (13-ago-2026) ──
   //
-  // 🔴 SOBRE EL MISMO SUBCONJUNTO DE EMPRESAS, siempre. Restarle el gasto de 4
-  // empresas a la utilidad de las 8 daría una rentabilidad inflada que se ve
-  // perfectamente normal. Las ventas, la utilidad y el gasto salen de las MISMAS
-  // empresas, y el payload dice cuántas son para que la pantalla lo escriba.
-  // Sin ninguna empresa con el mes utilizable → `null`: no hay nada honesto que
-  // mostrar. (Antes había un "fallback al último mes completo": se retiró porque
-  // exigía que las 8 empresas tuvieran el mismo mes, y la contadora va meses
-  // atrasada de forma DISTINTA en cada una — Boston está en junio 2025 y Vistana
-  // en enero 2026. Nunca hay un mes completo, y retroceder mezclaba meses.)
-  const gastoPorKey = new Map(gastosPorEmpresa.map((g) => [g.key, g.gasto]));
-  const rentBase = rentabilidadGrupo(
-    byEmpresa.map((e) => ({
-      key: e.key,
-      ventas: e.ventas,
-      utilidad: e.utilidad,
-      gasto: gastoPorKey.get(e.key) ?? null,
-    })),
-  );
-  const rentabilidad = rentBase === null ? null : {
-    mes: mesSelStr,
-    ...rentBase,
-    parcial: mesSelStr === mesActualPanama,
-    empresasTotal: ALL_EMPRESA_KEYS.length,
-  };
+  // Daniel, textual: *"no quiero Rentabilidad del grupo, lo quiero por
+  // empresa"*. Antes acá se armaba `utilidad − gasto` sumando las empresas que
+  // tuvieran el mes utilizable, y el payload lo mandaba como `rentabilidad`.
+  //
+  // No se deja "por si acaso": mientras el número exista en la respuesta, la
+  // pantalla puede volver a pintarlo sin que nadie lo note. Lo que viaja es la
+  // rentabilidad POR EMPRESA, en `semaforo[]`, y cada una compara SU venta
+  // contra SU gasto (ver abajo).
 
   // ── DISPONIBILIDAD (último saldo bancario por empresa) ──
   const bancoRows = (bancosRes.data as BancoRow[] | null) ?? [];
@@ -339,7 +323,10 @@ export async function GET(req: NextRequest) {
   const semaforo = ALL_EMPRESA_KEYS.map((key) => {
     const e = byEmpresaByKey.get(key)!;
     const g = gastoByKey.get(key)!;
-    const rent = g.gasto !== null ? e.utilidad - g.gasto : null;
+    // 🩸 LAS TRES CIFRAS SON DE LA MISMA EMPRESA. `rentabilidadEmpresa` recibe
+    // UNA empresa y no tiene forma de ver las otras: es lo que hace imposible
+    // el error de restarle a la utilidad de una el gasto de otra.
+    const r = rentabilidadEmpresa({ ventas: e.ventas, utilidad: e.utilidad, gasto: g.gasto });
     return {
       key,
       name: e.name,
@@ -349,9 +336,9 @@ export async function GET(req: NextRequest) {
       motivo: g.motivo,
       texto: g.texto,
       ultimoMesCerrado: g.ultimoMesCerrado,
-      rentabilidad: rent,
-      pct: rent !== null && e.ventas > 0 ? rent / e.ventas : null,
-      estado: estadoSemaforo(rent, e.ventas),
+      rentabilidad: r?.monto ?? null,
+      pct: r?.pct ?? null,
+      estado: estadoSemaforo(r?.monto ?? null, e.ventas),
     };
   });
 
@@ -419,7 +406,7 @@ export async function GET(req: NextRequest) {
     generadoEn: new Date().toISOString(),
     ms: Date.now() - t0,
     mes: mesSelStr,
-    ventas, margen, gastos, rentabilidad, disponibilidad, semaforo,
+    ventas, margen, gastos, disponibilidad, semaforo,
     cxc, cxp, reclamos,
   });
 }

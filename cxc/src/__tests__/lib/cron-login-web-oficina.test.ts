@@ -165,6 +165,13 @@ describe("C. quién importa web-client", () => {
       // es responsable de hacerlo en la madrugada de Panamá y de mirar el
       // calendario, porque no hay ningún cron que se lo haga cumplir.
       path.join("app", "api", "diag", "egresos-varios", "route.ts"),
+      // 🔑 CATÁLOGO DE CUENTAS — importa `web-client` pero **NO ABRE SESIÓN**:
+      // recibe una `WebSession` ya abierta y sólo hace un GET. Viaja pegado al
+      // sync de egresos, en la MISMA sesión de las 10:35 UTC, justamente para
+      // no sumar ni un login más (cada uno expulsa a Daniel del panel). Por eso
+      // NO le corresponde horario propio ni COLATERALES_LOGIN_WEB, y por eso el
+      // test de abajo exige que nunca llame a `loginSwitchWeb`.
+      path.join("lib", "switch-api", "sync-cuentas-contables.ts"),
       // Egresos varios (caja y banco): corre 10:35 UTC = 05:35 a.m. Panamá
       // (madrugada, igual que los otros tres). NO es colateral de la
       // reconciliación, así que no entra en COLATERALES_LOGIN_WEB — como
@@ -177,6 +184,23 @@ describe("C. quién importa web-client", () => {
       path.join("lib", "switch-api", "sync-mayor.ts"),
       path.join("lib", "switch-api", "sync-utilidad.ts"),
     ]);
+  });
+
+  it("🔑 el catálogo de cuentas REUSA la sesión: no puede abrir una propia", () => {
+    // Es lo que lo mantiene fuera del calendario. Si algún día llamara a
+    // `loginSwitchWeb`, serían 7 expulsiones más por día para traer una lista
+    // de nombres que casi nunca cambia — y este test se pone ROJO antes.
+    const fuente = fs.readFileSync(
+      path.join(SRC, "lib", "switch-api", "sync-cuentas-contables.ts"),
+      "utf8",
+    );
+    const sinComentarios = fuente
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(sinComentarios).not.toMatch(/loginSwitchWeb/);
+    expect(sinComentarios).not.toMatch(/cerrarSesionWeb/);
+    // Recibe la sesión de afuera.
+    expect(sinComentarios).toMatch(/session:\s*WebSession/);
   });
 
   it("sync-recibos NO abre el login web: de sync-utilidad solo saca fechas", () => {
