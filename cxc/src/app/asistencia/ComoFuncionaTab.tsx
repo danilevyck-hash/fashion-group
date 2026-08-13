@@ -7,7 +7,7 @@
 // está al lado del número que genera la discusión. Sin jerga y sin fórmulas.
 
 import { useEffect, useState } from "react";
-import { REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
+import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "@/lib/asistencia/config";
 
 /** Los minutos de la tolerancia salen de la CONFIGURACIÓN, no de un texto fijo.
  *  🩸 Este cartel decía "8:05" con la tolerancia en 5; la contable la subió a 10
@@ -26,8 +26,8 @@ const reglasDe = (r: ReglasAsistencia): Array<{ t: string; d: string }> => {
     d: `Marcar hasta las ${limite} no cuenta como tarde. Pasadas las ${limite}, se cuentan los minutos desde las 8:00 — o sea que llegar ${unoMas} son ${tol + 1} minutos, no 1.`,
   },
   {
-    t: `El almuerzo es de ${r.almuerzoDefaultMin} minutos`,
-    d: "Se mide entre la salida a almorzar y el regreso. Lo que pase de ahí cuenta como tiempo no trabajado. Algunas personas tienen 60 minutos.",
+    t: `El almuerzo es de ${ALMUERZO_FIJO_MIN} minutos, igual para todos`,
+    d: "Se mide entre la salida a almorzar y el regreso. Lo que pase de ahí cuenta como tiempo no trabajado.",
   },
   {
     t: "La hora de salida depende de cada quien",

@@ -713,6 +713,38 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 
 **Para revisar redacción sin spamear el chat real:** `npx tsx scripts/_dryrun-alertas.ts` (no manda nada).
 
+## Asistencia — el almuerzo es FIJO y quién marca sin ir en planilla (13-ago-2026)
+
+> Daniel va a usar la **planilla** de verdad (calcular pago, horas extra, tardanzas), así que estas dos cosas dejaron de ser cosméticas.
+>
+> ### 1. EL ALMUERZO ES SIEMPRE 30 MINUTOS — una sola fuente
+>
+> Daniel, textual: *"todos 30 minutos de almuerzo (puedes quitar la opcion de elegir tiempo de almuerzo, siempre es fijo 30 mins)"*.
+>
+> 🩸 **HABÍA DOS PERILLAS PARA EL MISMO DATO**, y es la forma conocida de que dos números se separen: la columna `asistencia_horarios.almuerzo_minutos` (por persona, con botones de 30 y 60 en Horarios) y la regla `almuerzo_default_min` de `asistencia_reglas` (una casilla más en «Reglas del cálculo»). **Medido en producción el 13-ago-2026: las 33 personas con horario tienen 30, sin UNA excepción en toda la historia de la tabla, y la regla también vale 30.** Era una perilla que nadie usó nunca y que solo podía quedar mal puesta.
+> - **Fuente única: `ALMUERZO_FIJO_MIN` (`src/lib/asistencia/config.ts`).** `almuerzoDefaultMin` salió de `ReglasAsistencia`, de `validarReglas`, de `reglasDesdeFila` y de `reglasHaciaFila`: mandarlo en el cuerpo ahora se **ignora**, y una fila vieja de la base con otro valor **ya no se lee**.
+> - 🔴 **LA COLUMNA POR PERSONA NO SE BORRA Y EL CÁLCULO LA SIGUE LEYENDO** (lo pidió Daniel). Borrar una columna es irreversible y no compra nada: lo que se retira es la POSIBILIDAD DE ELEGIR MAL. La pantalla de Horarios la muestra como dato (`30 minutos`) y **el PUT escribe `ALMUERZO_FIJO_MIN` mire lo que mire el cuerpo** — esconder los botones sin cerrar la ruta habría sido cosmético, y el almuerzo entra en la jornada con la que se valúa una ausencia, o sea en plata.
+> - `asistencia_reglas.almuerzo_default_min` **queda en la base con su 30** (el upsert solo pisa lo que manda) y nadie la lee. En la pantalla, el almuerzo pasó de ser una CASILLA a ser una regla declarada en «Esto no se cambia desde acá», junto a las otras tres.
+>
+> ### 2. «SERVICIO PROFESIONAL» — marca en el reloj y NO va en planilla
+>
+> Daniel sobre **YULISSA JUAREZ** (código 26): *"yulissa es servicio profesional, no esta en planilla pero quiero medir asistencia"*.
+>
+> 🩸 **El módulo no sabía decir eso.** Una ficha sin salario era, para TODAS las pantallas, un dato PENDIENTE: salía en «les falta el salario», en la píldora «Falta configurar» y en la sección ámbar de la planilla — o sea que una decisión de negocio se veía **idéntica a un olvido, para siempre**. Y peor: el día que alguien le escribiera un salario "para que deje de molestar", el sistema le habría calculado quincena, seguros y neto sin que nadie lo pidiera.
+> - **Las dos mitades:** FUERA de todo cálculo de pago · **DENTRO** del control de asistencia (marcaciones, tardanzas, ausencias, horas y reportes). La segunda es la que Daniel quiere conservar, y por eso **esto NO se resuelve dando de baja a la persona**: la baja la sacaría también del reporte.
+> - 🔴 **EL CANDADO DEL PAGO ES `armarLinea` (`planilla.ts`), no la falta de sueldo:** el `if` pregunta por la BANDERA, así que una ficha marcada **con salario cargado tampoco produce un centavo**. `LineaPlanilla.fueraDePlanilla` es un tercer estado —ni pagada ni pendiente—: `totalizar` lo cuenta aparte de `sinConfigurar`, `faltantesDe` deja de pedirle salario y jornada (la **empresa sí** se sigue pidiendo: separa las tres planillas), y en pantalla/Excel/PDF va en **gris**, nunca en ámbar (el color es la mitad del mensaje).
+> - **Por qué una bandera y no "no tiene salario":** un salario en blanco es AMBIGUO y hoy conviven los dos casos — YULISSA es servicio profesional, y GABRIELA JARAMILLO (53) y YEISHKA DIAZ MARKHAM (54) son altas de Boston a las que **todavía les falta el sueldo**.
+> - ⚠️ **DDL ADITIVA PENDIENTE — `supabase/migrations/20260813120000_asistencia_servicio_profesional.sql`, la corre Daniel A MANO. La app funciona ANTES de que corra** (patrón `cols-opcionales`): `leerPersonas` es ahora una ESCALERA (todo → sin `servicio_profesional` → sin las columnas de baja → sin tabla) y cada peldaño se baja solo si el error NOMBRA la columna que ese peldaño quita. Sin la columna nadie queda fuera de planilla y la pantalla dice qué archivo falta; el PUT **no guarda a medias**: si se estaba marcando a alguien devuelve 503 con el aviso, y si no, reintenta sin la columna para que poner un nombre o un salario siga funcionando igual que ayer.
+>
+> ### La prueba de que NO se movió un centavo
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-planilla-no-se-movio.ts` (solo lectura) corre el motor **VIEJO** —sacado de `origin/main` al ejecutar, no una copia versionada que envejece— y el NUEVO sobre los MISMOS datos de producción. Medido el 13-ago-2026, 4 quincenas × 3 empresas: **148 líneas, 2.040 cifras de dinero, 0 diferencias** (netos idénticos: Boston $4.282,97 / $4.595,93 / $4.255,86 · Vistana $1.704,88 / $1.990,38 / $1.837,13 · Fashion Wear $1.745,14 / $1.544,76 / $1.345,97). La 2ª pasada marca al código 26 y demuestra lo que importa del cambio 2: **0 cambios en las otras personas y los totales de las 3 empresas idénticos**; lo único que se mueve en Yulissa es que pierde «falta el salario», gana `fueraDePlanilla` y **conserva sus horas exactamente iguales**.
+>
+> **Los 3 anchos, en el navegador contra el build de producción y CONTRA `origin/main`** (`BASE=… ETAPA=antes|despues node scripts/_medir-asistencia-almuerzo-planilla.mjs`, solo lectura): **390 · 834 · 1440 → 0 px de arrastre y 0 blancos táctiles bajo 44 px en las 4 pantallas** (ficha, Horarios, Reglas y Planilla), y los recortes y textos chicos **idénticos elemento por elemento a main** (el `h1.sr-only` y los `truncate` del nombre; los 10,5 px son las etiquetas de columna que el módulo ya tenía). Lo único que cambió en pantalla: **78 botones de almuerzo → 0** y «Almuerzo por defecto» fuera de las reglas.
+> - 🩸 **Gotchas de medición, los dos costaron una vuelta:** esta app **no tiene `<main>`**, y quedarse con el primer `div[class*="transition-"]` agarra un overlay VACÍO del menú → 0 en todo y verde sin haber mirado nada (se elige el contenedor con más texto); y la pestaña vive en la URL (`?tab=configuracion`), no en un clic.
+>
+> Candados: `src/__tests__/lib/asistencia-almuerzo-fijo.test.ts` (13) y `asistencia-servicio-profesional.test.ts` (20). **Ejecutan la conducta, no buscan texto**: llaman a los PUT REALES con supabase mockeado y miran qué fila se escribe. **Verificado por mutación, 10 de 10 cazadas:** calcularle pago al servicio profesional (4 tests), volver a pedirle el salario (2), contarlo como pendiente (1), que el PUT acepte el almuerzo del cuerpo (2), que el almuerzo vuelva a entrar por reglas (2), dejar de leer la columna por persona (2), que la pantalla vuelva a pedir el salario (1), guardar a medias sin la columna (1), mezclarlo en el orden con los que cobran (1) y que la pantalla deje de declarar el almuerzo fijo (1).
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`

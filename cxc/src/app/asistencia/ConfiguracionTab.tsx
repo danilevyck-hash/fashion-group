@@ -9,7 +9,7 @@
 //      jornada y EMPRESA. La empresa es lo que más pesa: Confecciones Boston,
 //      Vistana y Fashion Wear comparten el mismo reloj, así que sin ese dato los
 //      minutos de las tres salen en un solo montón y no hay planilla posible.
-//   2. HORARIOS.  Hora de salida y almuerzo, persona por persona.
+//   2. HORARIOS.  Hora de salida, persona por persona. El almuerzo es fijo.
 //   3. FERIADOS.  Los días que no cuentan como ausencia de nadie.
 //   4. REGLAS.    Daniel: *"todos los calculos deben de ser configurables en caso
 //      de que algo cambie"*. Todos los números del cálculo se editan acá.
@@ -33,6 +33,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 import {
+  ALMUERZO_FIJO_MIN,
   EMPRESAS_ASISTENCIA,
   JORNADAS,
   etiquetaEmpresa,
@@ -45,6 +46,12 @@ import {
   fraseFalta,
 } from "@/lib/asistencia/configuracion-avisos";
 import { hoyPanama } from "@/lib/fecha-panama";
+import {
+  ETIQUETA_EN_PLANILLA,
+  ETIQUETA_SERVICIO_PROFESIONAL,
+  EXPLICACION_SERVICIO_PROFESIONAL,
+  PREGUNTA_PARTICIPACION,
+} from "@/lib/asistencia/participacion";
 import {
   fraseBaja,
   marcoDespuesDeLaBaja,
@@ -64,6 +71,8 @@ interface Persona {
   empresa: string | null;
   configurado: boolean;
   faltaSalario: boolean;
+  /** `true` = marca en el reloj pero NO va en planilla (servicio profesional). */
+  servicioProfesional: boolean;
   marcaciones: number;
   ultimaMarca: string | null;
   rataHora: number | null;
@@ -85,6 +94,7 @@ interface Resumen {
   sinSalario: number;
   conMarcaciones: number;
   bajas: number;
+  servicioProfesional: number;
 }
 
 interface Datos {
@@ -96,6 +106,8 @@ interface Datos {
   avisoMigracionBajas: string | null;
   puedeDarDeBaja: boolean;
   avisoBajas: { titulo: string; detalle: string[] } | null;
+  avisoMigracionServicioProfesional: string | null;
+  puedeMarcarServicioProfesional: boolean;
 }
 
 /** El formulario guarda TEXTO: hay que poder borrar un campo para reescribirlo.
@@ -117,6 +129,8 @@ interface Borrador {
   fechaSalida: string;
   /** Obligatorio si hay fecha de salida: los dos, o ninguno. */
   motivoSalida: string;
+  /** `true` = servicio profesional: se le mide la asistencia y no se le paga. */
+  servicioProfesional: boolean;
 }
 
 const CAMPO =
@@ -148,7 +162,6 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
   return {
     toleranciaTardanzaMin: String(r.toleranciaTardanzaMin),
     extraMinimoMin: String(r.extraMinimoMin),
-    almuerzoDefaultMin: String(r.almuerzoDefaultMin),
     recargoExtraDiurno: String(r.recargoExtraDiurno),
     recargoExtraNocturno: String(r.recargoExtraNocturno),
     horaCorteNocturno: r.horaCorteNocturno,
@@ -166,7 +179,7 @@ function reglasAForm(r: ReglasAsistencia): FormReglas {
  *  el `blur` de un campo dispara justo después de que la píldora ya guardó. */
 const firma = (b: Borrador) =>
   `${b.nombre.trim()}|${b.salario.trim()}|${b.jornada}|${b.empresa}`
-  + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}`;
+  + `|${b.fechaIngreso}|${b.fechaSalida}|${b.motivoSalida}|${b.servicioProfesional}`;
 
 /**
  * ¿La baja está completa? La fecha y el motivo VIAJAN JUNTOS: una baja sin
@@ -226,6 +239,7 @@ export default function ConfiguracionTab() {
       fechaIngreso: p.fechaIngreso ?? "",
       fechaSalida: p.fechaSalida ?? "",
       motivoSalida: p.motivoSalida ?? "",
+      servicioProfesional: p.servicioProfesional,
     };
     setAbierta(p.codigo);
     setBorrador(b);
@@ -280,6 +294,7 @@ export default function ConfiguracionTab() {
             fechaIngreso: b.fechaIngreso,
             fechaSalida: b.fechaSalida,
             motivoSalida: b.motivoSalida,
+            servicioProfesional: b.servicioProfesional,
           }),
         });
         const d = await res.json();
@@ -298,6 +313,7 @@ export default function ConfiguracionTab() {
               fechaIngreso?: string | null;
               fechaSalida?: string | null;
               motivoSalida?: MotivoSalida | null;
+              servicioProfesional?: boolean;
             }
           | undefined;
         const salarioTexto = b.salario.trim().replace(",", ".");
@@ -311,6 +327,7 @@ export default function ConfiguracionTab() {
           fechaIngreso: b.fechaIngreso || null,
           fechaSalida: b.fechaSalida || null,
           motivoSalida: (b.motivoSalida || null) as MotivoSalida | null,
+          servicioProfesional: b.servicioProfesional,
         };
         // La vigencia que quedó guardada, ya normalizada por el servidor.
         const vig = {
@@ -330,7 +347,11 @@ export default function ConfiguracionTab() {
                   jornadaSemanal: p.jornadaSemanal,
                   empresa: p.empresa,
                   configurado: true,
-                  faltaSalario: p.salarioMensual === null,
+                  servicioProfesional: p.servicioProfesional === true,
+                  // 🔴 La MISMA regla del servidor: a quien no va en planilla no
+                  // le falta el salario. Dos reglas distintas para lo mismo es
+                  // una pantalla que se contradice al recargar.
+                  faltaSalario: p.servicioProfesional !== true && p.salarioMensual === null,
                   // La MISMA función que usa la planilla para multiplicar.
                   rataHora: rataPorHoraCalculo(p.salarioMensual, p.jornadaSemanal, prev.reglas),
                   ...vig,
@@ -354,6 +375,7 @@ export default function ConfiguracionTab() {
               bajas: personas.filter((x) => !x.activo).length,
               sinConfigurar: personas.filter((x) => x.activo && !x.configurado).length,
               sinSalario: personas.filter((x) => x.activo && x.faltaSalario).length,
+              servicioProfesional: personas.filter((x) => x.activo && x.servicioProfesional).length,
             },
           };
         });
@@ -406,6 +428,9 @@ export default function ConfiguracionTab() {
             fechaIngreso: p.fechaIngreso ?? "",
             fechaSalida,
             motivoSalida,
+            // El PUT es un upsert de la fila entera: sin esto, dar de baja
+            // devolvería a la persona a la planilla sin que nadie lo pidiera.
+            servicioProfesional: p.servicioProfesional,
           }),
         });
         const d = await res.json();
@@ -585,6 +610,12 @@ export default function ConfiguracionTab() {
               </p>
             )}
 
+            {datos.avisoMigracionServicioProfesional && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+                {datos.avisoMigracionServicioProfesional}
+              </p>
+            )}
+
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setFiltro("todos")}
                 className={`${PILL_BASE} ${filtro === "todos" ? PILL_ON : PILL_OFF}`}>
@@ -653,7 +684,7 @@ export default function ConfiguracionTab() {
                             {money(p.rataHora)}
                           </span>
                           <span className="text-right">
-                            <Indicador falta={falta.length} />
+                            <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
                           </span>
                         </span>
 
@@ -661,7 +692,7 @@ export default function ConfiguracionTab() {
                         <span className="block lg:hidden">
                           <span className="flex items-start justify-between gap-3">
                             <NombrePersona p={p} />
-                            <Indicador falta={falta.length} />
+                            <Indicador falta={falta.length} fueraDePlanilla={p.servicioProfesional} />
                           </span>
                           <span className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
                             <Dato etiqueta="Empresa" valor={p.empresa ? etiquetaEmpresa(p.empresa) : "—"} />
@@ -698,15 +729,32 @@ export default function ConfiguracionTab() {
                               <Etiqueta texto="Salario mensual" />
                               {/* «Déjalo vacío si todavía no lo sabes» vive en el
                                   propio campo: es una instrucción de un campo
-                                  obvio, no algo que haya que leer aparte. */}
+                                  obvio, no algo que haya que leer aparte.
+
+                                  🔴 Apagado cuando no va en planilla: a esa
+                                  persona no se le calcula pago, así que un campo
+                                  de sueldo activo prometería algo que no pasa.
+                                  El candado de verdad NO es este `disabled` —es
+                                  `armarLinea`, que no produce dinero aunque el
+                                  salario esté cargado. */}
                               <input
                                 type="text" inputMode="decimal"
                                 value={borrador.salario}
+                                disabled={borrador.servicioProfesional}
                                 onChange={(e) => setBorrador({ ...borrador, salario: e.target.value })}
                                 onBlur={() => void guardar(p.codigo, borrador)}
-                                placeholder="850.00 — vacío si no lo sabes"
-                                className={`${CAMPO} tabular-nums`}
+                                placeholder={
+                                  borrador.servicioProfesional
+                                    ? "No se le calcula pago"
+                                    : "850.00 — vacío si no lo sabes"
+                                }
+                                className={`${CAMPO} tabular-nums disabled:bg-gray-100 disabled:text-gray-400`}
                               />
+                              {borrador.servicioProfesional && (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  No se le pide: no va en la planilla.
+                                </p>
+                              )}
                             </div>
                             <div>
                               <Etiqueta texto="Jornada por semana" />
@@ -731,6 +779,43 @@ export default function ConfiguracionTab() {
                                   </button>
                                 ))}
                               </div>
+                            </div>
+                            <div>
+                              {/* 🔴 CÓMO SE LE PAGA. Daniel, textual: *"yulissa es
+                                  servicio profesional, no esta en planilla pero
+                                  quiero medir asistencia"*. Antes eso no se podía
+                                  decir: una ficha sin sueldo se veía igual que un
+                                  olvido, para siempre. */}
+                              <Etiqueta
+                                texto={PREGUNTA_PARTICIPACION}
+                                ayuda={EXPLICACION_SERVICIO_PROFESIONAL}
+                              />
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button"
+                                  onClick={() => cambiarYGuardar(p.codigo, { servicioProfesional: false })}
+                                  className={`${PILL_BASE} ${!borrador.servicioProfesional ? PILL_ON : PILL_OFF}`}>
+                                  {ETIQUETA_EN_PLANILLA}
+                                </button>
+                                <button type="button"
+                                  disabled={!datos.puedeMarcarServicioProfesional}
+                                  onClick={() => cambiarYGuardar(p.codigo, { servicioProfesional: true })}
+                                  className={`${PILL_BASE} ${borrador.servicioProfesional ? PILL_ON : PILL_OFF} disabled:opacity-40`}>
+                                  {ETIQUETA_SERVICIO_PROFESIONAL}
+                                </button>
+                              </div>
+                              {borrador.servicioProfesional && (
+                                <p className="mt-1 text-[12px] text-gray-500">
+                                  {EXPLICACION_SERVICIO_PROFESIONAL}
+                                </p>
+                              )}
+                              {/* El aviso de que todavía no se puede guardar NO se
+                                  esconde: se dice antes de tocar, no al fallar. */}
+                              {!datos.puedeMarcarServicioProfesional && (
+                                <p className="mt-1 text-[12px] text-amber-800">
+                                  Todavía no se puede marcar servicio profesional: falta correr el
+                                  archivo de la base de datos.
+                                </p>
+                              )}
                             </div>
                             <div>
                               {/* ⚠️ Se GUARDA y no reparte el salario. La regla de
@@ -845,7 +930,7 @@ export default function ConfiguracionTab() {
           {/* ── 2. HORARIOS ──────────────────────────────────────────────── */}
           <Seccion
             titulo="Horarios"
-            resumen="Hora de salida y almuerzo, persona por persona"
+            resumen="Hora de salida, persona por persona"
             abierta={!!seccion.horarios}
             onToggle={() => alternar("horarios")}
           >
@@ -880,16 +965,19 @@ export default function ConfiguracionTab() {
                   </Ayuda>
                 </div>
 
-                <Bloque titulo="Tardanzas, almuerzo y horas extra">
+                {/* 🔴 «Almuerzo por defecto» SE FUE de acá (13-ago-2026). Era la
+                    SEGUNDA perilla del mismo dato —la otra estaba en Horarios,
+                    persona por persona— y dos perillas para un solo número es la
+                    forma de que terminen diciendo cosas distintas. Ahora el
+                    almuerzo es fijo en 30 minutos y se declara abajo, en «Esto no
+                    se cambia desde acá». */}
+                <Bloque titulo="Tardanzas y horas extra">
                   <Campo label="Tolerancia de tardanza" ayuda="Minutos de gracia a la entrada. Pasados, la tardanza se cuenta desde las 8:00."
                     sufijo="minutos" valor={form.toleranciaTardanzaMin}
                     onChange={(v) => set("toleranciaTardanzaMin", v)} />
                   <Campo label="Mínimo para contar hora extra" ayuda="Quedarse menos de esto no cuenta como extra."
                     sufijo="minutos" valor={form.extraMinimoMin}
                     onChange={(v) => set("extraMinimoMin", v)} />
-                  <Campo label="Almuerzo por defecto" ayuda="Se usa para quien no tenga uno propio en Horarios."
-                    sufijo="minutos" valor={form.almuerzoDefaultMin}
-                    onChange={(v) => set("almuerzoDefaultMin", v)} />
                 </Bloque>
 
                 <Bloque titulo="Recargos">
@@ -965,6 +1053,7 @@ export default function ConfiguracionTab() {
                     </Ayuda>
                   </div>
                   <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-gray-600">
+                    <li>· El almuerzo es de {ALMUERZO_FIJO_MIN} minutos, igual para todos.</li>
                     <li>· La ausencia se descuenta como horas × valor de la hora.</li>
                     <li>· La quincena va del 1 al 15 y del 16 al 30.</li>
                     <li>· El día 31 no se paga, pero sí se descuenta si se falta.</li>
@@ -1125,15 +1214,29 @@ function BloqueBaja({
   );
 }
 
-/** UN indicador por fila, no tres. El detalle de qué falta se lee al abrirla. */
-function Indicador({ falta }: { falta: number }) {
-  return falta > 0 ? (
-    <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-800">
-      Falta
-    </span>
-  ) : (
-    <span className="text-[12px] text-gray-300">Listo</span>
-  );
+/**
+ * UN indicador por fila, no tres. El detalle de qué falta se lee al abrirla.
+ *
+ * 🔴 «No va en planilla» va en GRIS y solo cuando NO falta nada: es un dato de
+ * cómo se le paga, no una alarma. En ámbar se leería como un pendiente, que es
+ * exactamente lo que este cambio vino a dejar de decir de YULISSA.
+ */
+function Indicador({ falta, fueraDePlanilla }: { falta: number; fueraDePlanilla?: boolean }) {
+  if (falta > 0) {
+    return (
+      <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-800">
+        Falta
+      </span>
+    );
+  }
+  if (fueraDePlanilla) {
+    return (
+      <span className="inline-block whitespace-nowrap rounded bg-gray-100 px-1.5 py-0.5 text-[12px] text-gray-600">
+        No va en planilla
+      </span>
+    );
+  }
+  return <span className="text-[12px] text-gray-300">Listo</span>;
 }
 
 /** Un par etiqueta/valor de la tarjeta de celular. En la tabla del escritorio la

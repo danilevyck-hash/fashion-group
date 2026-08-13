@@ -72,6 +72,8 @@ export interface PersonaPendiente {
   nombre: string | null;
   empresa: string | null;
   salarioMensual: number | null;
+  /** `true` = marca pero no va en planilla. Ver `participacion.ts`. */
+  servicioProfesional?: boolean;
 }
 
 /**
@@ -80,12 +82,22 @@ export interface PersonaPendiente {
  *
  * La fila colapsada NO muestra esta lista: muestra un solo indicador («Falta»).
  * Esto es lo que se lee al abrirla, que es cuando sirve saber el detalle.
+ *
+ * 🔴 A QUIEN NO VA EN PLANILLA NO SE LE PIDE EL SALARIO. No es que lo tenga
+ * pendiente: no lo necesita, porque no se le calcula pago. Es la MISMA regla que
+ * aplica `faltantesDe` en `planilla.ts`; si acá dijera otra cosa, la ficha se
+ * vería en ámbar mientras la planilla la da por lista.
  */
 export function faltaEnPersona(p: PersonaPendiente): string[] {
   const falta: string[] = [];
   if (!p.nombre || !p.nombre.trim()) falta.push("el nombre");
   if (!p.empresa) falta.push("la empresa");
-  if (p.salarioMensual === null || !Number.isFinite(p.salarioMensual)) falta.push("el salario");
+  if (
+    p.servicioProfesional !== true
+    && (p.salarioMensual === null || !Number.isFinite(p.salarioMensual))
+  ) {
+    falta.push("el salario");
+  }
   return falta;
 }
 

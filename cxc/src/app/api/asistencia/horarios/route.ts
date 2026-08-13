@@ -13,7 +13,8 @@ import { asistenciaRoles } from "@/lib/asistencia/roles";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { salidaSugerida, minutosDelDia, diaPanama, ALMUERZO_DEFAULT_MIN } from "@/lib/asistencia/reporte";
+import { salidaSugerida, minutosDelDia, diaPanama } from "@/lib/asistencia/reporte";
+import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { leerDirectorio } from "@/lib/asistencia/config-server";
 import { compararPersonas } from "@/lib/asistencia/directorio";
 
@@ -89,7 +90,9 @@ export async function GET(req: NextRequest) {
         configurado: p.configurado,
         entrada: g ? String(g.entrada).slice(0, 5) : "08:00",
         salida: g ? String(g.salida).slice(0, 5) : sug,
-        almuerzoMinutos: g?.almuerzo_minutos ?? ALMUERZO_DEFAULT_MIN,
+        // Se sigue devolviendo lo GUARDADO (la columna no se toca), pero ya no
+        // se puede cambiar: la pantalla lo muestra como dato, no como opción.
+        almuerzoMinutos: g?.almuerzo_minutos ?? ALMUERZO_FIJO_MIN,
         // `false` = todavía es la sugerencia, nadie la confirmó. La pantalla lo
         // marca para que Daniel sepa qué le falta revisar.
         guardado: !!g,
@@ -113,17 +116,15 @@ export async function PUT(req: NextRequest) {
   const auth = requireRole(req, asistenciaRoles());
   if (auth instanceof NextResponse) return auth;
 
-  let body: { codigo?: string; nombre?: string | null; salida?: string; almuerzoMinutos?: number };
+  // ⚠️ `almuerzoMinutos` YA NO SE ACEPTA. Lo único que se guarda de acá es la
+  // hora de salida; el almuerzo es fijo (ver abajo).
+  let body: { codigo?: string; nombre?: string | null; salida?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "JSON inválido" }, { status: 400 }); }
 
   const codigo = (body.codigo ?? "").trim();
   if (!codigo) return NextResponse.json({ error: "Falta la persona" }, { status: 400 });
   const salida = (body.salida ?? "").trim();
   if (!/^\d{2}:\d{2}$/.test(salida)) return NextResponse.json({ error: "Hora de salida inválida" }, { status: 400 });
-  const almuerzo = Number(body.almuerzoMinutos);
-  if (!Number.isInteger(almuerzo) || almuerzo < 0 || almuerzo > 240) {
-    return NextResponse.json({ error: "Minutos de almuerzo inválidos" }, { status: 400 });
-  }
 
   const { error } = await supabaseServer.from("asistencia_horarios").upsert(
     {
@@ -131,7 +132,11 @@ export async function PUT(req: NextRequest) {
       empleado_nombre: body.nombre ?? null,
       entrada: "08:00",
       salida,
-      almuerzo_minutos: almuerzo,
+      // 🔴 EL ALMUERZO SE ESCRIBE FIJO Y NO SE LEE DEL CUERPO. Es lo que hace que
+      // "ya no se puede elegir" sea verdad: esconder los botones de la pantalla
+      // es cosmético —cualquiera manda un PUT con 60— y el almuerzo entra en la
+      // jornada con la que se valúa una ausencia, o sea en plata.
+      almuerzo_minutos: ALMUERZO_FIJO_MIN,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "empleado_codigo" },

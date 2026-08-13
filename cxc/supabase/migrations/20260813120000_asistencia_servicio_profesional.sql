@@ -1,0 +1,76 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ASISTENCIA — QUIEN MARCA PERO NO VA EN PLANILLA ("servicio profesional")
+--
+-- ── 🩸 EL AGUJERO QUE TAPA ───────────────────────────────────────────────────
+--
+-- Daniel, textual (13-ago-2026), sobre YULISSA JUAREZ (codigo 26): *"yulissa es
+-- servicio profesional, no esta en planilla pero quiero medir asistencia"*.
+--
+-- El modulo no sabia decir eso. Una ficha sin salario era, para TODAS las
+-- pantallas, un dato PENDIENTE: salia en el aviso "les falta el salario para
+-- poder calcular", en la pildora "Falta configurar" y en la seccion amarilla de
+-- la planilla. O sea que una decision de negocio -a esta persona se le paga por
+-- fuera- se veia identica a un olvido, para siempre. Y peor: el dia que alguien
+-- le escribiera un salario "para que deje de molestar", el sistema le habria
+-- calculado quincena, seguros y neto sin que nadie lo pidiera.
+--
+-- ── LAS DOS MITADES ──────────────────────────────────────────────────────────
+--
+--   FUERA de todo calculo de pago  -> sin quincenal, sin extras, sin
+--                                     deducciones y sin entrar al total.
+--   DENTRO del control de asistencia -> marcaciones, tardanzas, ausencias,
+--                                     horas y reportes, igual que antes.
+--
+-- La segunda mitad es la que Daniel quiere conservar, y por eso esto NO se
+-- resuelve dando de baja a la persona: la baja la sacaria tambien del reporte de
+-- asistencia, que es justo lo que el pidio medir.
+--
+-- ── ⚠️ POR QUE UNA BANDERA Y NO "no tiene salario" ───────────────────────────
+--
+-- Porque un salario en blanco es AMBIGUO: puede ser "no va en planilla" o
+-- "todavia no me lo dijeron". Medido en produccion el 13-ago-2026, entre los
+-- activos hay las dos cosas a la vez: YULISSA JUAREZ (26) es servicio
+-- profesional, y GABRIELA JARAMILLO (53) y YEISHKA DIAZ MARKHAM (54) son altas
+-- recientes de Boston a las que todavia les falta el sueldo. El dato tiene que
+-- decir la INTENCION, no deducirse de una ausencia.
+--
+-- ── DONDE VIVE EL EFECTO ─────────────────────────────────────────────────────
+--
+-- El candado del pago NO esta en esta columna: esta en `armarLinea`
+-- (src/lib/asistencia/planilla.ts), que devuelve `dinero: null` cuando la
+-- bandera esta puesta AUNQUE LA FICHA TENGA SALARIO. Esta columna solo guarda
+-- la decision; el CHECK de abajo no existe porque no hay nada que restringir:
+-- un booleano ya es una lista cerrada de dos valores.
+--
+-- Aditiva e idempotente: no toca una sola fila existente, y `DEFAULT false`
+-- deja a las 38 fichas exactamente como estaban (todas en planilla).
+-- ⚠️ La app FUNCIONA SIN ESTA MIGRACION: `leerPersonas` relee sin la columna,
+-- nadie queda fuera de planilla y la pantalla dice que falta correr el archivo.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE asistencia_personas
+  ADD COLUMN IF NOT EXISTS servicio_profesional boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN asistencia_personas.servicio_profesional IS
+  'true = marca en el reloj pero NO va en planilla (servicio profesional). Queda FUERA de todo calculo de pago -sin quincenal, extras ni deducciones, y sin entrar al total- y DENTRO del control de asistencia -marcaciones, tardanzas, ausencias y reportes-. NO se le pide salario: a esta persona no se le calcula pago aunque tenga uno cargado.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ⛔ LO QUE ESTA MIGRACION NO HACE, A PROPOSITO
+--
+--   1. NO marca a nadie. Ni siquiera a YULISSA: quien va en planilla y quien no
+--      es una decision de negocio y se toma en la pantalla, no en un UPDATE a
+--      ciegas. El renglon de abajo esta comentado; Daniel lo corre si quiere
+--      dejarlo aplicado sin abrir la app.
+--   2. NO borra ni una ficha, ni toca salarios, ni la columna `activo`.
+--   3. NO toca `asistencia_planilla_manual`: los montos escritos a mano de una
+--      quincena vieja siguen ahi y se siguen leyendo igual.
+--
+-- Aplicar YULISSA (codigo 26) sin abrir la app -descomentar y correr:
+--
+--   UPDATE asistencia_personas
+--      SET servicio_profesional = true, updated_at = now()
+--    WHERE empleado_codigo = '26';
+--
+-- ⚠️ Es la MISMA fila que la pantalla escribe al tocar "Servicio profesional",
+-- asi que hacerlo por cualquiera de los dos caminos da el mismo resultado.
+-- ─────────────────────────────────────────────────────────────────────────────

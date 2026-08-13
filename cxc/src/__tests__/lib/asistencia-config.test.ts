@@ -56,7 +56,6 @@ const MIGRACION = `supabase/migrations/${MIGRACION_CONFIGURACION}`;
 const REGLAS_COMPLETAS: Record<string, unknown> = {
   toleranciaTardanzaMin: "10",
   extraMinimoMin: "15",
-  almuerzoDefaultMin: "30",
   recargoExtraDiurno: "1.25",
   recargoExtraNocturno: "1.5",
   horaCorteNocturno: "18:00",
@@ -92,7 +91,6 @@ describe("los valores por defecto son los que confirmó la contable", () => {
     expect(REGLAS_DEFAULT.seguroSocialPct).toBe(9.75);
     expect(REGLAS_DEFAULT.seguroEducativoPct).toBe(1.25);
     expect(REGLAS_DEFAULT.extraMinimoMin).toBe(15);
-    expect(REGLAS_DEFAULT.almuerzoDefaultMin).toBe(30);
   });
 
   it("el excedente: 3 horas y factor 2.625 (= 1.5 × 1.75)", () => {
@@ -503,7 +501,6 @@ describe("validarReglas — se guardan TODAS juntas", () => {
   const cuerpo: Record<string, unknown> = {
     toleranciaTardanzaMin: "10",
     extraMinimoMin: "15",
-    almuerzoDefaultMin: "30",
     recargoExtraDiurno: "1.25",
     recargoExtraNocturno: "1.50",
     horaCorteNocturno: "18:00",
@@ -747,15 +744,22 @@ describe("🔴 la tolerancia es CONFIGURABLE de punta a punta", () => {
     expect(conExtra("17:20", { extraMinimoMin: 30 })).toBe(0);
   });
 
-  it("el almuerzo por defecto también", () => {
+  // 🔴 EL ALMUERZO YA NO ES CONFIGURABLE (13-ago-2026). Era la única regla que
+  // vivía en DOS lugares —la casilla de «Reglas del cálculo» y la columna por
+  // persona— y Daniel la fijó en 30 para todos. Acá se prueba lo contrario de
+  // antes: que mandarlo por `reglas` NO cambie nada.
+  it("el almuerzo NO se puede cambiar por reglas: siempre 30", () => {
     const sinHorarioPropio = (reglas?: Parameters<typeof armarReporte>[0]["reglas"]) =>
       armarReporte({
         marcaciones: [marca("08:00"), marca("12:00"), marca("13:00"), marca("17:00")],
         horarios: [], justificaciones: [], feriados: new Map(),
         desde: "2026-07-13", hasta: "2026-07-13", reglas,
       })[0].dias[0].excesoAlmuerzoMin;
-    expect(sinHorarioPropio()).toBe(30);                          // 60 tomados − 30
-    expect(sinHorarioPropio({ almuerzoDefaultMin: 60 })).toBe(0); // 60 tomados − 60
+    expect(sinHorarioPropio()).toBe(30); // 60 tomados − 30
+    // Aunque alguien meta el campo viejo en el cuerpo, se ignora.
+    expect(
+      sinHorarioPropio({ almuerzoDefaultMin: 60 } as Parameters<typeof armarReporte>[0]["reglas"]),
+    ).toBe(30);
   });
 });
 

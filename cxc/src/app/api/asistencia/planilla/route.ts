@@ -18,7 +18,13 @@ import {
   type HorarioPersona,
   type Justificacion,
 } from "@/lib/asistencia/reporte";
-import { leerReglas, leerPersonas, vigenciasDeFilas } from "@/lib/asistencia/config-server";
+import {
+  leerReglas,
+  leerPersonas,
+  vigenciasDeFilas,
+  servicioProfesionalDeFila,
+} from "@/lib/asistencia/config-server";
+import { avisoMigracionServicioProfesional } from "@/lib/asistencia/participacion";
 import {
   avisoMigracionBajas,
   codigosFueraDeRango,
@@ -148,6 +154,9 @@ export async function GET(req: NextRequest) {
         salarioMensual: f.salario_mensual === null ? null : Number(f.salario_mensual),
         jornadaSemanal: f.jornada_semanal ?? null,
         empresa: f.empresa ?? null,
+        // 🔴 Sin esto la bandera no llegaría al motor y a un servicio profesional
+        // con salario cargado se le calcularía la quincena entera.
+        servicioProfesional: servicioProfesionalDeFila(f),
       });
     }
     const nombres = new Map<string, string>();
@@ -219,6 +228,13 @@ export async function GET(req: NextRequest) {
         faltaMigracionBajas:
           !personasDb.faltaMigracion && personasDb.faltaColumnasBajas
             ? avisoMigracionBajas()
+            : null,
+        // Sin la columna nadie puede estar fuera de planilla —todos entran al
+        // cuadro, como hoy— pero se dice: quien ya marcó a alguien como servicio
+        // profesional en su cabeza va a esperar no verlo acá.
+        faltaMigracionServicioProfesional:
+          !personasDb.faltaMigracion && personasDb.faltaColumnaServicioProfesional
+            ? avisoMigracionServicioProfesional()
             : null,
         // Cuántas personas se quedaron afuera de ESTA quincena por su fecha de
         // salida (o porque todavía no habían entrado). Sirve para que un cuadro
