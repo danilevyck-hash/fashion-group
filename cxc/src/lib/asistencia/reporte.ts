@@ -160,12 +160,37 @@ export function diaPanama(iso: string): string {
   return new Date(Date.parse(iso) - PANAMA_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-/** Minutos desde medianoche, en hora de Panamá. */
-export function minutosDelDia(iso: string): number {
+/**
+ * SEGUNDOS desde medianoche, en hora de Panamá. Es la unidad con la que se mide
+ * todo el día: el instante exacto que marcó la persona, sin tocar.
+ *
+ * 🩸 ACÁ ESTABA EL REDONDEO QUE DANIEL CAZÓ (13-ago-2026), textual: *"y la
+ * marcancion tiene que ser al segundo, porque redondeas minutos"*. Esta función
+ * devolvía MINUTOS y empujaba los segundos al minuto más cercano
+ * (`segundos >= 30 ? 1 : 0`), con el argumento de que "discutir por segundos es
+ * lo que la tolerancia evita". El argumento confundía dos cosas: **medir** y
+ * **perdonar**. La tolerancia perdona 10 minutos a la entrada y sigue igual; lo
+ * que no se puede es medir mal a la salida, porque ahí no hay nada que perdonar
+ * y el error se paga: hasta 30 segundos por marca, cuatro marcas al día, en
+ * horas extra que se multiplican por 1.25 o 1.50.
+ *
+ * El dato SIEMPRE estuvo completo — las marcaciones de producción traen los
+ * segundos —: lo que se perdía era acá, en el cálculo.
+ */
+export function segundosDelDia(iso: string): number {
   const d = new Date(Date.parse(iso) - PANAMA_OFFSET_MS);
-  // Los segundos se redondean al minuto más cercano: 08:05:31 es más 8:06 que
-  // 8:05, y discutir por segundos es exactamente lo que la tolerancia evita.
-  return d.getUTCHours() * 60 + d.getUTCMinutes() + (d.getUTCSeconds() >= 30 ? 1 : 0);
+  return d.getUTCHours() * 3600 + d.getUTCMinutes() * 60 + d.getUTCSeconds();
+}
+
+/**
+ * Minutos ENTEROS desde medianoche, redondeados.
+ *
+ * ⚠️ NO se usa para calcular nada de plata. Su único consumidor es la SUGERENCIA
+ * de hora de salida (`salidaSugerida`), que elige entre 16:30 y 17:00 con la
+ * mediana de las últimas marcas: ahí los segundos no cambian ninguna decisión.
+ */
+export function minutosDelDia(iso: string): number {
+  return Math.round(segundosDelDia(iso) / 60);
 }
 
 export function horaPanama(iso: string): string {
@@ -173,9 +198,36 @@ export function horaPanama(iso: string): string {
   return `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
 }
 
+/**
+ * "HH:MM" o "HH:MM:SS" → minutos, CON DECIMALES.
+ *
+ * 🔑 Los segundos entran como fracción de minuto en vez de descartarse: esta
+ * función también parsea las horas de las MARCAS (que ahora traen segundos), y
+ * truncarlas acá devolvería el redondeo por la puerta de atrás.
+ */
 function hhmmAMin(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
+  const [h, m, sg] = String(hhmm ?? "").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0) + (sg || 0) / 60;
+}
+
+/** Segundos desde medianoche de una hora "HH:MM" (o "HH:MM:SS"). */
+function hhmmASeg(hhmm: string): number {
+  return Math.round(hhmmAMin(hhmm) * 60);
+}
+
+/**
+ * Un tiempo en minutos, como se MUESTRA.
+ *
+ * 🔑 Se calcula al segundo y se muestra con 2 decimales cuando hay fracción.
+ * Es la forma que no miente y además SUMA: en una columna de minutos, "30.48"
+ * más "12.02" da lo que dice el total, cosa que no pasa si cada celda se
+ * redondea al entero. Los enteros se siguen viendo enteros («30 min»), que es
+ * el 99% de los casos en pantalla.
+ */
+export function fmtMin(min: number): string {
+  if (!Number.isFinite(min)) return "0";
+  const r = Math.round(min * 100) / 100;
+  return Number.isInteger(r) ? String(r) : r.toFixed(2);
 }
 
 /** ¿La fecha cae de lunes a viernes? Nadie trabaja sábado de rutina: medido. */
@@ -265,24 +317,32 @@ export function armarReporte(opts: {
     if (!p) { p = { nombre: m.empleado_nombre, dias: new Map() }; porPersona.set(cod, p); }
     if (!p.nombre && m.empleado_nombre) p.nombre = m.empleado_nombre;
     const lista = p.dias.get(dia);
-    if (lista) lista.push(minutosDelDia(m.ocurrio_en));
-    else p.dias.set(dia, [minutosDelDia(m.ocurrio_en)]);
+    // 🔑 SEGUNDOS, no minutos: el instante exacto que marcó la persona.
+    if (lista) lista.push(segundosDelDia(m.ocurrio_en));
+    else p.dias.set(dia, [segundosDelDia(m.ocurrio_en)]);
   }
 
   const out: PersonaReporte[] = [];
   for (const [codigo, p] of porPersona) {
     const h = horarioDe.get(codigo);
-    const entradaProg = hhmmAMin(h?.entrada ?? ENTRADA_DEFAULT);
-    const salidaProg = hhmmAMin(h?.salida ?? SALIDA_DEFAULT);
+    // 🔑 TODO EL DÍA SE MIDE EN SEGUNDOS. Los umbrales de negocio siguen siendo
+    // en minutos (la tolerancia, el mínimo de extra, el almuerzo) y se escalan
+    // acá: medir fino y perdonar en minutos es lo correcto.
+    const entradaProgSeg = hhmmASeg(h?.entrada ?? ENTRADA_DEFAULT);
+    const salidaProgSeg = hhmmASeg(h?.salida ?? SALIDA_DEFAULT);
     // 🔑 La columna por persona SE SIGUE LEYENDO —es lo que Daniel pidió que no
     // se tocara— y solo cae al fijo quien todavía no tiene horario guardado.
     const almuerzoProg = h?.almuerzo_minutos ?? ALMUERZO_FIJO_MIN;
+    const almuerzoProgSeg = almuerzoProg * 60;
+    const toleranciaSeg = toleranciaMin * 60;
+    const extraMinimoSeg = extraMinimoMin * 60;
 
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {
       const feriado = feriados.get(fecha) ?? null;
       const justificado = justificacionDe(justificaciones, codigo, fecha);
       const habil = esHabil(fecha);
+      // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
       // Sin marcas: ausente, salvo que sea feriado, esté justificado… o
       // simplemente no sea día de trabajo. 🔑 Lo último solo puede pasar con
@@ -296,7 +356,11 @@ export function armarReporte(opts: {
         continue;
       }
 
-      const fmt = (min: number) => `${p2(Math.floor(min / 60))}:${p2(min % 60)}`;
+      // 🔴 LAS MARCAS SE MUESTRAN CON SEGUNDOS. Son el dato crudo del que salen
+      // todos los números de abajo: si el papel dijera 08:00 y 17:04, nadie
+      // podría reproducir a mano las horas que la planilla paga.
+      const fmt = (seg: number) =>
+        `${p2(Math.floor(seg / 3600))}:${p2(Math.floor((seg % 3600) / 60))}:${p2(seg % 60)}`;
       const ent = crudas[0];
       // 🩸 CON UNA SOLA MARCA NO SE SABE A QUÉ HORA SE FUE. Antes se tomaba esa
       // misma hora como entrada Y como salida, y salían disparates: en el
@@ -312,23 +376,25 @@ export function armarReporte(opts: {
 
       // Regla 1. Tolerancia para CLASIFICAR; una vez pasada, se cuenta desde
       // la hora de entrada, no desde el fin de la tolerancia.
-      const tardeMin = ent > entradaProg + toleranciaMin ? ent - entradaProg : 0;
+      const tardeMin = ent > entradaProgSeg + toleranciaSeg ? (ent - entradaProgSeg) / 60 : 0;
 
       // Regla 2. Solo se puede medir con 4 marcas (o más): las del medio son
       // el almuerzo. Con 2 marcas no hay almuerzo que medir.
       let excesoAlmuerzoMin = 0;
       let almuerzoTomado = 0;
       if (crudas.length >= 4) {
-        almuerzoTomado = crudas[2] - crudas[1];
-        excesoAlmuerzoMin = Math.max(0, almuerzoTomado - almuerzoProg);
+        almuerzoTomado = crudas[2] - crudas[1]; // segundos
+        excesoAlmuerzoMin = Math.max(0, (almuerzoTomado - almuerzoProgSeg) / 60);
       }
 
-      const salidaTempranaMin = soloUna ? 0 : Math.max(0, salidaProg - sal);
-      // Regla 3. Mínimo 15 min y neto del atraso del mismo día.
-      const bruto = soloUna ? 0 : Math.max(0, sal - salidaProg);
-      const extraMin = bruto < extraMinimoMin ? 0 : Math.max(0, bruto - tardeMin);
+      const salidaTempranaMin = soloUna ? 0 : Math.max(0, (salidaProgSeg - sal) / 60);
+      // Regla 3. Mínimo 15 min y neto del atraso del mismo día. El mínimo se
+      // compara en segundos contra el umbral en minutos: quedarse 14:59 sigue
+      // sin ser hora extra, igual que antes.
+      const brutoSeg = soloUna ? 0 : Math.max(0, sal - salidaProgSeg);
+      const extraMin = brutoSeg < extraMinimoSeg ? 0 : Math.max(0, brutoSeg / 60 - tardeMin);
 
-      const trabajadoMin = soloUna ? 0 : Math.max(0, sal - ent - almuerzoTomado);
+      const trabajadoMin = soloUna ? 0 : Math.max(0, (sal - ent - almuerzoTomado) / 60);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero
       // los números se calculan igual.
       const revisar = crudas.length !== 4;

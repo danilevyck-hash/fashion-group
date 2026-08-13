@@ -38,6 +38,7 @@ import {
   aHoras,
   FORMULA_NETO,
   type LineaPlanilla,
+  type Periodo,
   type Quincena,
   type TotalesPlanilla,
 } from "./planilla";
@@ -46,6 +47,8 @@ export interface DatosPlanillaExport {
   lineas: readonly LineaPlanilla[];
   totales: TotalesPlanilla;
   quincena: Quincena;
+  /** El período pedido. Ausente = es la quincena de siempre. */
+  periodo?: Periodo;
   empresaEtiqueta: string | null;
   reglas: ReglasAsistencia;
 }
@@ -53,6 +56,12 @@ export interface DatosPlanillaExport {
 /** El subtítulo que llevan los dos archivos. */
 function subtitulo(d: DatosPlanillaExport): string {
   const emp = d.empresaEtiqueta ?? "Todas las empresas";
+  // 🔴 UN RANGO LIBRE SE ANUNCIA EN EL PAPEL, no solo en la pantalla: el archivo
+  // se manda por correo y sobrevive a la conversación en la que se explicó.
+  if (d.periodo && !d.periodo.esQuincena) {
+    return `${emp} · del ${d.periodo.etiqueta} · NO es una quincena: `
+      + `sueldo base al ${(d.periodo.factorBase * 100).toFixed(1)} % y SIN los montos escritos a mano`;
+  }
   return `${emp} · quincena del ${d.quincena.etiqueta}`;
 }
 
@@ -61,13 +70,18 @@ const c0 = (v: number): number | null => (v === 0 ? null : v);
 
 /** El nombre del archivo. Kebab-case con la quincena, como el resto del sistema. */
 export function nombreArchivo(d: DatosPlanillaExport, ext: "xlsx" | "pdf"): string {
+  // El rango libre lleva las fechas en el nombre: dos archivos del mismo mes no
+  // pueden llamarse igual y tapar uno al otro en la carpeta de descargas.
   const emp = (d.empresaEtiqueta ?? "todas")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
-  return `planilla-${emp}-${d.quincena.clave}.${ext}`;
+  const periodo = d.periodo && !d.periodo.esQuincena
+    ? `${d.periodo.desde}_${d.periodo.hasta}`
+    : d.quincena.clave;
+  return `planilla-${emp}-${periodo}.${ext}`;
 }
 
 // ── Las 19 columnas del cuadro, en el orden de la contable ───────────────────
@@ -197,7 +211,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         h.diasTrabajados,
         c0(aHoras(h.extraDiurnoMin)), c0(aHoras(h.extraNocturnoMin)), c0(aHoras(h.excedenteMin)),
         c0(aHoras(h.domingoMin)), c0(aHoras(h.feriadoMin)),
-        c0(h.tardanzaMin), c0(h.tardanzaDeDiasARevisarMin),
+        // Minutos AL SEGUNDO: se redondean a 2 decimales solo para la celda.
+        c0(Math.round(h.tardanzaMin * 100) / 100),
+        c0(Math.round(h.tardanzaDeDiasARevisarMin * 100) / 100),
         c0(h.ausenciaDias), c0(aHoras(h.ausenciaMin)),
         c0(aHoras(h.sabadoMin)), c0(h.diasARevisar),
         l.fueraDePlanilla
@@ -240,6 +256,9 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
       ["Quien aparece en gris", `No va en planilla. ${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga.`],
+      ["Período", d.periodo && !d.periodo.esQuincena
+        ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena.`
+        : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
       ["⚠ Sábados", "Si alguien trabajó un sábado, las horas se muestran en la hoja de horas pero NO se pagan en ninguna columna: el cuadro no tiene una para el sábado."],
     ] as ReportCell[][],
   });

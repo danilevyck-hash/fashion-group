@@ -35,7 +35,15 @@ function rango(desde: string, hasta: string): string {
   return `${f(desde)} — ${f(hasta)}`;
 }
 /** 0 se muestra vacío, no como "0": una columna de ceros esconde lo que importa. */
-const n0 = (v: number) => (v === 0 ? "" : v);
+/**
+ * Un número de celda: el 0 se deja VACÍO —una columna de ceros esconde lo que sí
+ * importa— y lo demás va con 2 decimales como mucho.
+ *
+ * 🔑 Los minutos se calculan AL SEGUNDO desde el 13-ago-2026, así que traen
+ * fracción. Se redondea a 2 decimales SOLO para escribir la celda (0,6 s de
+ * resolución): dejar el número largo llenaría el Excel de 30,483333333333.
+ */
+const n0 = (v: number) => (v === 0 ? "" : Math.round(v * 100) / 100);
 
 /**
  * La columna «Persona» de los dos archivos.
@@ -224,12 +232,12 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       const r = p.resumen;
       return [
         quien(p), p.salida, r.diasTrabajados,
-        r.ausenciasSinJustificar || "", r.vecesTarde || "", r.minutosTarde || "",
-        r.excesoAlmuerzoMin || "", r.salidaTempranaMin || "",
-        r.tiempoNoTrabajadoMin || "", r.extraMin || "", r.diasARevisar || "",
+        r.ausenciasSinJustificar || "", r.vecesTarde || "", n0(r.minutosTarde),
+        n0(r.excesoAlmuerzoMin), n0(r.salidaTempranaMin),
+        n0(r.tiempoNoTrabajadoMin), n0(r.extraMin), r.diasARevisar || "",
       ];
     }),
-    foot: [["TOTAL", "", "", t.aus || "", "", t.tarde || "", "", "", t.noTrab || "", t.extra || "", t.rev || ""]],
+    foot: [["TOTAL", "", "", t.aus || "", "", n0(t.tarde), "", "", n0(t.noTrab), n0(t.extra), t.rev || ""]],
     theme: "plain",
     styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [31, 41, 55], lineColor: [229, 231, 235], lineWidth: 0.1 },
     headStyles: { fontStyle: "bold", fontSize: 6.8, textColor: [107, 114, 128], lineWidth: { bottom: 0.3 }, valign: "bottom" },

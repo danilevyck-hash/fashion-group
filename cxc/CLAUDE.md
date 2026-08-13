@@ -759,6 +759,44 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > Candados: `src/__tests__/lib/asistencia-almuerzo-fijo.test.ts` (13) y `asistencia-servicio-profesional.test.ts` (20). **Ejecutan la conducta, no buscan texto**: llaman a los PUT REALES con supabase mockeado y miran qué fila se escribe. **Verificado por mutación, 10 de 10 cazadas:** calcularle pago al servicio profesional (4 tests), volver a pedirle el salario (2), contarlo como pendiente (1), que el PUT acepte el almuerzo del cuerpo (2), que el almuerzo vuelva a entrar por reglas (2), dejar de leer la columna por persona (2), que la pantalla vuelva a pedir el salario (1), guardar a medias sin la columna (1), mezclarlo en el orden con los que cobran (1) y que la pantalla deje de declarar el almuerzo fijo (1).
 
+## Asistencia — la planilla por RANGO de fechas y la marcación AL SEGUNDO (13-ago-2026)
+
+> Daniel pidió dos cosas el mismo día, y las dos son de plata.
+>
+> ### 3. LA PLANILLA POR UN RANGO DE FECHAS CUALQUIERA
+>
+> Antes solo se podía pedir por quincena. Ahora el selector tiene dos modos —**Quincena** (lo que se mira el 95% de las veces, y sigue siendo lo que abre la pantalla) y **Rango de fechas**— y las horas, extras, tardanzas y ausencias se cuentan solo dentro de esas fechas.
+>
+> 🔴 **EL SUELDO ES MENSUAL, ASÍ QUE PRORRATEARLO NECESITA UNA REGLA. LA ELEGIDA: la fracción de QUINCENA que el rango cubre**, no la de mes ni la de días hábiles. Se eligió por una razón verificable: **es la única que deja la quincena en factor exactamente 1**. El negocio paga medio sueldo por quincena sin importar que tenga 15 o 16 días (`salario ÷ 2`, y el día 31 no paga base); prorratear por días del MES daría 15/31 = 0,4839 para la primera de julio — **un 3% menos en TODAS las planillas por haber agregado una pantalla**. Para un rango partido, cada quincena aporta su parte: del 25-jul al 10-ago = **7/16 + 10/15 = 1,104167**.
+> - **`factorBase` viaja hasta `calcularDinero` y su valor por defecto es 1**, así que todo lo que ya existía sigue dando el mismo número sin tocar una llamada. `× 1` no cambia un número IEEE-754: con el factor por defecto es literalmente el `centavos(salarioMensual / 2)` de siempre.
+> - 🩸 **Un factor `NaN`/0/negativo cae en 1, NUNCA en $0** — y el guard va en `calcularDinero`, no solo en `armarPlanilla`: `centavos(NaN)` devuelve 0, o sea una planilla de $0 que se paga en silencio. Ante la duda se paga la quincena completa, que es lo que se pagaba ayer.
+> - ⚠️ **LOS MONTOS ESCRITOS A MANO NO SE REPARTEN.** Viven por quincena —`asistencia_planilla_manual.quincena` tiene un CHECK que solo acepta `2026-07-2`— así que en un rango libre **no se aplican y las celdas se muestran apagadas**, con el aviso en ámbar arriba de todo: repartir un ISR por días sería inventar plata. Para pagar, se elige la quincena.
+> - **El aviso del rango libre va PRIMERO y no se esconde detrás de un ⓘ**: dice cuántos días son, qué porcentaje del sueldo quincenal se está pagando y que los montos a mano no entran. También viaja al **Excel y al PDF** (subtítulo + hoja «Cómo se calcula»): el papel se manda por correo y sobrevive a la conversación donde se explicó.
+> - **El camino viejo NO se tocó:** `?quincena=2026-07-2` sigue funcionando igual, y si el rango COINCIDE con una quincena, `periodoDesdeRango` devuelve el período de ESA quincena (misma clave de montos manuales, factor 1). **Medido contra la ruta real en el build de producción: los dos caminos dan el MISMO cuadro, campo por campo, en 6 combinaciones** (2 quincenas × 3 empresas).
+> - **Tope de 366 días** y validación de fechas (`2026-02-31` → 400): cada consulta pagina TODAS las marcaciones del rango, y un rango de diez años sería una forma de tumbar la base desde la barra de direcciones.
+>
+> ### 4. LA MARCACIÓN SE MIDE AL SEGUNDO
+>
+> Daniel, textual: *"y la marcancion tiene que ser al segundo, porque redondeas minutos"*.
+>
+> 🩸 **EL DATO SIEMPRE ESTUVO COMPLETO** (medido: 198 de las últimas 200 marcaciones traen segundos ≠ 00). Lo que redondeaba era el CÁLCULO: `minutosDelDia` devolvía minutos enteros y empujaba los segundos al minuto más cercano, con un comentario al lado que decía *"discutir por segundos es exactamente lo que la tolerancia evita"* — un argumento que **confunde medir con perdonar**. La tolerancia perdona 10 minutos a la entrada y sigue igual; lo que no se puede es medir mal a la salida, porque ahí no hay nada que perdonar y el error se paga a 1,25 o 1,50.
+> - **`segundosDelDia` es la unidad del día entero.** Los umbrales de negocio siguen en MINUTOS y se escalan: tolerancia, mínimo de hora extra y almuerzo no cambiaron ni un número. `minutosDelDia` sigue existiendo **solo** para sugerir la hora de salida (elegir entre 16:30 y 17:00 con la mediana no cambia por 29 segundos, y no toca plata).
+> - 🔴 **LAS MARCAS SE MUESTRAN CON SEGUNDOS** (`08:04:39`, en pantalla y en el papel). Son el dato del que sale todo: si el papel dijera 08:04, nadie podría reproducir a mano las horas que la planilla paga.
+> - **Los minutos se muestran con 2 decimales cuando tienen fracción** (`fmtMin`, fuente única de pantalla y exports). Redondear cada celda al entero haría que la columna no sumara su propio total.
+> - ⚠️ **EL REDONDEO DEL DINERO NO SE TOCÓ.** `centavos` y su corrección de coma flotante quedaron intactos — eso es de plata, no de tiempo.
+>
+> ### La prueba de que ninguna regla se movió, y el impacto REAL
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-planilla-segundos-impacto.ts` (solo lectura). 🔴 **Acá no se espera un cero —medir mejor cambia números, ese es el punto—: lo que se prueba es más fuerte.** Se le dan al motor NUEVO las marcas REDONDEADAS al minuto (lo que hacía el viejo) y se exige que dé **EXACTAMENTE lo mismo que `origin/main`, campo por campo**. Medido el 13-ago sobre 3 quincenas × 3 empresas: **🟢 idéntico**. Toda la diferencia viene de la precisión del reloj y de nada más.
+> - 🩸 **Una tolerancia de "30 s por marca" NO servía, y medirlo lo demostró: en un UMBRAL, 29 segundos mueven MINUTOS.** Los 3 casos reales: quien marcó **8:10:15** pasa de 0 a **10,25 min** de tardanza (la gracia son 10 minutos y el atraso se cuenta DESDE las 8:00 — regla vieja, sin cambios; lo que cambió es de qué lado del umbral cae el segundo), y quien se quedó hasta **17:29:31** pierde los 30 minutos de extra porque no alcanza el mínimo de 30 (en producción `extra_minimo_min` = 30). Un tope por marca habría marcado eso como "regla rota" **y habría dejado pasar un error real de 1 minuto**.
+> - **Impacto en dólares, 3 quincenas × 3 empresas: $22.918,02 → $22.914,74 (−$3,28).** Los tres más movidos: ANDREA PEREZ −$1,73 (−29,43 min de extra), CARLOS BALTODANO −$1,05, ANDRES GONZALEZ −$0,64. Las otras 34 personas se mueven ±$0,09 o menos.
+> - ⚠️ **Si Daniel prefiere que 8:10:15 no sea tarde, NO hay que tocar código: se sube la tolerancia a 11 minutos en «Reglas del cálculo».** Ya es configurable.
+>
+> **Los 3 anchos, en el navegador contra el build de producción** (`BASE=… node scripts/_medir-asistencia-rango-segundos.mjs`, solo lectura): **390 · 834 · 1440 → 0 px de arrastre y 0 blancos táctiles bajo 44 px** en Planilla (modo quincena y modo rango) y en el Reporte con el detalle abierto. Los recortes (3 a 390, 1 en los otros) y los textos de 10,5 px son **los mismos que ya medía el módulo antes de este PR**.
+> - 🩸 **Dos gotchas más de medición, y los dos daban verde sin haber mirado nada:** contar `tbody tr` a secas mezcla las filas de la tabla ANIDADA del detalle con las de las personas —el índice deja de significar "la persona i" y los clics terminan abriendo y cerrando a la misma—, y buscar horas con segundos en `document.body` encuentra la del banner del reloj aunque el detalle esté vacío (se cuentan solo dentro de la tabla anidada). El script **falla** si no encuentra el selector, el aviso del rango libre o una marca con segundos.
+>
+> Candados: `asistencia-planilla-rango.test.ts` (17) y `asistencia-segundos.test.ts` (15). **Verificado por mutación, 6 de 6 cazadas:** prorratear por días del mes rompe 6, volver a redondear la marca al minuto rompe 9, quitarle la tolerancia a la tardanza rompe 6, quitar el guard del factor (NaN → planilla de $0) rompe 1, aplicar los montos manuales en un rango libre rompe 1, y descartar los segundos en la frontera de las 18:00 rompe 1.
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`

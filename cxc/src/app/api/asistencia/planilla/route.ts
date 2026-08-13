@@ -41,10 +41,13 @@ import {
   jornadaDiariaMin,
   JORNADA_DIARIA_DEFAULT_MIN,
   normalizarManuales,
+  periodoDeQuincena,
+  periodoDesdeRango,
   quincenaDesdeClave,
   totalizar,
   type FichaPlanilla,
   type ManualesLinea,
+  type Periodo,
 } from "@/lib/asistencia/planilla";
 import {
   avisoMigracionPlanilla,
@@ -56,6 +59,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const PANAMA = "-05:00";
+/** Tope del rango libre. Un año cubre cualquier pregunta real del negocio. */
+const DIAS_MAX = 366;
 
 function instante(dia: string, fin: boolean): string {
   return new Date(
@@ -68,13 +73,48 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;
-  const q = quincenaDesdeClave(sp.get("quincena") ?? "");
-  if (!q) {
-    return NextResponse.json(
-      { error: "Quincena inválida. Se espera algo como 2026-07-2." },
-      { status: 400 },
-    );
+
+  // ── QUÉ PERÍODO SE PIDIÓ ────────────────────────────────────────────────────
+  //
+  // Dos caminos, y el viejo NO se toca: `?quincena=2026-07-2` sigue funcionando
+  // igual que siempre (lo usan los enlaces guardados y cualquier cosa que ya
+  // apunte acá). El nuevo es `?desde=…&hasta=…`.
+  //
+  // 🔑 Y si el rango COINCIDE con una quincena, `periodoDesdeRango` devuelve el
+  // período de esa quincena: misma clave de montos manuales y factor 1. Los dos
+  // caminos dan el MISMO cuadro hasta el centavo, y hay un test que lo exige.
+  const desdeRaw = (sp.get("desde") ?? "").trim();
+  const hastaRaw = (sp.get("hasta") ?? "").trim();
+  let periodo: Periodo | null = null;
+
+  if (desdeRaw || hastaRaw) {
+    periodo = periodoDesdeRango(desdeRaw, hastaRaw);
+    if (!periodo) {
+      return NextResponse.json(
+        { error: "Fechas inválidas. Se esperan dos fechas como 2026-07-25, y la de inicio no puede ser posterior a la del final." },
+        { status: 400 },
+      );
+    }
+    // ⚠️ Tope de un año. No es capricho: cada consulta pagina TODAS las
+    // marcaciones del rango, y un rango de diez años sería una forma de tumbar
+    // la base desde la barra de direcciones.
+    if (periodo.diasCalendario > DIAS_MAX) {
+      return NextResponse.json(
+        { error: `El rango es muy largo: ${periodo.diasCalendario} días. El máximo es ${DIAS_MAX}.` },
+        { status: 400 },
+      );
+    }
+  } else {
+    const quincena = quincenaDesdeClave(sp.get("quincena") ?? "");
+    if (!quincena) {
+      return NextResponse.json(
+        { error: "Quincena inválida. Se espera algo como 2026-07-2." },
+        { status: 400 },
+      );
+    }
+    periodo = periodoDeQuincena(quincena);
   }
+  const q = periodo;
   const empresaRaw = (sp.get("empresa") ?? "").trim();
   const empresa =
     empresaRaw && (EMPRESAS_ASISTENCIA as readonly string[]).includes(empresaRaw)
@@ -104,7 +144,9 @@ export async function GET(req: NextRequest) {
     const [{ reglas }, personasDb, manualesLeidos, hRes, jRes, fRes] = await Promise.all([
       leerReglas(),
       leerPersonas(),
-      leerManuales(q.clave),
+      // ⚠️ En un rango libre NO hay montos manuales: se guardan por quincena y
+      // repartir un ISR por días sería inventar plata. Se avisa en la respuesta.
+      q.claveManuales ? leerManuales(q.claveManuales) : Promise.resolve({ porCodigo: new Map(), faltaMigracion: false }),
       supabaseServer
         .from("asistencia_horarios")
         .select("empleado_codigo, entrada, salida, almuerzo_minutos"),
@@ -208,10 +250,15 @@ export async function GET(req: NextRequest) {
       jornadaDiariaMin: jornadaDeCodigo,
       reglas,
       empresa,
+      // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
+      factorBase: q.factorBase,
     });
 
     return NextResponse.json({
-      quincena: q,
+      // `quincena` se mantiene con el mismo nombre y forma para no romper a
+      // nadie que ya lo lea; `periodo` es lo que la pantalla usa ahora.
+      quincena: q.quincena ?? q,
+      periodo: q,
       empresa,
       empresaEtiqueta: empresa ? etiquetaEmpresa(empresa) : null,
       lineas,
@@ -252,6 +299,10 @@ export async function GET(req: NextRequest) {
         // Sábados trabajados: el cuadro no tiene columna y acá no se inventa
         // un recargo. Se avisa para que lo resuelva una persona.
         conSabado: lineas.filter((l) => l.horas.sabadoMin > 0).length,
+        // 🔴 Lo que hay que saber ANTES de pagar por un rango libre.
+        rangoLibre: !q.esQuincena,
+        factorBase: q.factorBase,
+        diasCalendario: q.diasCalendario,
       },
       marcaciones: marcaciones.length,
     });

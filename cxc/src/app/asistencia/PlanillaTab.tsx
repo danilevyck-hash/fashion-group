@@ -32,12 +32,15 @@ import {
   quincenasHasta,
   type LineaPlanilla,
   type ManualesLinea,
+  type Periodo,
   type Quincena,
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
+import { fmtMin } from "@/lib/asistencia/reporte";
 
 interface Respuesta {
   quincena: Quincena;
+  periodo: Periodo;
   empresa: string | null;
   empresaEtiqueta: string | null;
   lineas: LineaPlanilla[];
@@ -58,6 +61,10 @@ interface Respuesta {
     salidaAsumida: string;
     horasAusenciaDefault: number;
     conSabado: number;
+    /** El período pedido NO es una quincena: hay cosas que cambian. */
+    rangoLibre: boolean;
+    factorBase: number;
+    diasCalendario: number;
   };
 }
 
@@ -92,6 +99,11 @@ export default function PlanillaTab() {
   const quincenas = useMemo(() => quincenasHasta(hoy, 12), [hoy]);
 
   const [clave, setClave] = useState(quincenas[0].clave);
+  // 🔑 El rango libre es un SEGUNDO camino, no el principal: la quincena es lo
+  // que se mira el 95% de las veces y sigue siendo lo que abre la pantalla.
+  const [modo, setModo] = useState<"quincena" | "rango">("quincena");
+  const [desde, setDesde] = useState(quincenas[0].desde);
+  const [hasta, setHasta] = useState(quincenas[0].hasta);
   const [empresa, setEmpresa] = useState<string>(EMPRESAS_ASISTENCIA[0]);
   const [data, setData] = useState<Respuesta | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -102,7 +114,9 @@ export default function PlanillaTab() {
     setCargando(true);
     setError(null);
     try {
-      const p = new URLSearchParams({ quincena: clave, empresa });
+      const p = modo === "rango"
+        ? new URLSearchParams({ desde, hasta, empresa })
+        : new URLSearchParams({ quincena: clave, empresa });
       const res = await fetch(`/api/asistencia/planilla?${p}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "No se pudo cargar");
@@ -113,7 +127,7 @@ export default function PlanillaTab() {
     } finally {
       setCargando(false);
     }
-  }, [clave, empresa]);
+  }, [clave, desde, empresa, hasta, modo]);
 
   useEffect(() => { void cargar(); }, [cargar]);
 
@@ -158,6 +172,7 @@ export default function PlanillaTab() {
       lineas: data.lineas,
       totales: data.totales,
       quincena: data.quincena,
+      periodo: data.periodo,
       empresaEtiqueta: data.empresaEtiqueta,
       reglas: data.reglas,
     };
@@ -206,18 +221,64 @@ export default function PlanillaTab() {
     <div className="space-y-4">
       {/* ── Filtros ── */}
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Quincena</span>
-          <select
-            value={clave}
-            onChange={(e) => setClave(e.target.value)}
-            className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
-          >
-            {quincenas.map((q) => (
-              <option key={q.clave} value={q.clave}>{q.etiqueta}</option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">Período</span>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quincena / Rango de fechas. La quincena manda: es con lo que se
+                paga. El rango es para PREGUNTAR («¿cuánto trabajó del 25 al 10?»)
+                y la pantalla dice qué cambia cuando se usa. */}
+            <div className="flex overflow-hidden rounded-lg border border-gray-200">
+              {([["quincena", "Quincena"], ["rango", "Rango de fechas"]] as const).map(([k, t]) => (
+                <button
+                  key={k} type="button"
+                  onClick={() => {
+                    // Al pasar a rango se arranca con la quincena que estaba a
+                    // la vista: el primer cuadro que se ve es el MISMO, y de ahí
+                    // se mueven las fechas. Nadie empieza con la pantalla vacía.
+                    if (k === "rango" && modo === "quincena") {
+                      const q = quincenas.find((x) => x.clave === clave);
+                      if (q) { setDesde(q.desde); setHasta(q.hasta); }
+                    }
+                    setModo(k);
+                  }}
+                  className={`min-h-[44px] px-3 text-sm transition ${
+                    modo === k ? "bg-black text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {modo === "quincena" ? (
+              <select
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                className="min-h-[44px] rounded-lg border border-gray-200 px-3 text-base outline-none transition focus:border-black sm:text-sm"
+              >
+                {quincenas.map((q) => (
+                  <option key={q.clave} value={q.clave}>{q.etiqueta}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date" value={desde} max={hasta}
+                  onChange={(e) => setDesde(e.target.value)}
+                  aria-label="Desde"
+                  className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
+                />
+                <span className="text-xs text-gray-400">a</span>
+                <input
+                  type="date" value={hasta} min={desde}
+                  onChange={(e) => setHasta(e.target.value)}
+                  aria-label="Hasta"
+                  className="min-h-[44px] rounded-lg border border-gray-200 px-2 text-base tabular-nums outline-none transition focus:border-black sm:text-sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">Empresa</span>
@@ -249,6 +310,29 @@ export default function PlanillaTab() {
       </div>
 
       {/* ── Avisos: todo lo que hay que saber ANTES de descontarle plata a nadie ── */}
+      {/* 🔴 EL AVISO DEL RANGO LIBRE. Va PRIMERO y no se esconde detrás de un ⓘ:
+          en un rango que no es una quincena, el sueldo base se reparte y los
+          montos escritos a mano no entran. Quien imprima este cuadro para pagar
+          tiene que leer eso antes que cualquier otra cosa. */}
+      {data?.avisos.rangoLibre && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+          <b>Este cuadro NO es una quincena.</b> Son {data.avisos.diasCalendario} días
+          ({data.periodo.etiqueta}).
+          <ul className="mt-1 space-y-0.5 text-amber-800">
+            <li>
+              · El <b>sueldo base se reparte</b>: se paga{" "}
+              <b>{(data.avisos.factorBase * 100).toFixed(1)} %</b> de un sueldo quincenal,
+              que es la parte de quincena que cubren estas fechas.
+            </li>
+            <li>
+              · El <b>ISR, el préstamo, los terceros, la mercancía y los otros servicios
+              NO entran</b>: se escriben por quincena y repartirlos por días sería inventar
+              plata. Para pagar, elige la quincena.
+            </li>
+            <li>· Las horas, las extras, las tardanzas y las ausencias sí son las de estas fechas.</li>
+          </ul>
+        </div>
+      )}
       {data?.avisos.faltaMigracionConfiguracion && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-[13px] text-red-800">
           {data.avisos.faltaMigracionConfiguracion}
@@ -340,7 +424,13 @@ export default function PlanillaTab() {
                 </thead>
                 <tbody>
                   {buenas.map((l) => (
-                    <Fila key={l.codigo} l={l} onGuardar={guardar} />
+                    <Fila
+                      key={l.codigo} l={l} onGuardar={guardar}
+                      // En un rango libre no hay dónde guardarlos (la tabla los
+                      // guarda por quincena): se muestran apagados, no se
+                      // esconden — su ausencia es parte de lo que hay que ver.
+                      manualesBloqueados={!!data.avisos.rangoLibre}
+                    />
                   ))}
                   {/* Fuera de planilla a propósito: en GRIS, no en ámbar. El
                       color es la mitad del mensaje — ámbar dice "arreglame". */}
@@ -399,6 +489,7 @@ export default function PlanillaTab() {
                 abierta={abierta === l.codigo}
                 onToggle={() => setAbierta(abierta === l.codigo ? null : l.codigo)}
                 onGuardar={guardar}
+                manualesBloqueados={!!data.avisos.rangoLibre}
               />
             ))}
             {fueraDePlanilla.map((l) => (
@@ -478,9 +569,10 @@ type OnGuardar = (codigo: string, campo: keyof ManualesLinea, valor: string) => 
 
 /** Una celda de dinero que se escribe a mano. Guarda al salir del campo. */
 function CeldaManual({
-  codigo, campo, valor, onGuardar, ancho = "w-20",
+  codigo, campo, valor, onGuardar, ancho = "w-20", bloqueada,
 }: {
-  codigo: string; campo: keyof ManualesLinea; valor: number; onGuardar: OnGuardar; ancho?: string;
+  codigo: string; campo: keyof ManualesLinea; valor: number; onGuardar: OnGuardar;
+  ancho?: string; bloqueada?: boolean;
 }) {
   // 🔑 Estado local mientras se escribe: si el valor viniera del padre en cada
   // tecla, el recargo de la fila pisaría lo que la persona está tecleando.
@@ -489,16 +581,21 @@ function CeldaManual({
 
   return (
     <input
-      type="text" inputMode="decimal" value={texto} placeholder="—"
+      type="text" inputMode="decimal" value={bloqueada ? "" : texto}
+      placeholder={bloqueada ? "por quincena" : "—"}
+      disabled={bloqueada}
+      title={bloqueada ? "Se escribe por quincena, no por rango de fechas" : undefined}
       onChange={(e) => setTexto(e.target.value)}
       onBlur={() => onGuardar(codigo, campo, texto)}
       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-      className={`${ancho} min-h-[44px] rounded border border-gray-200 bg-white px-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black`}
+      className={`${ancho} min-h-[44px] rounded border border-gray-200 bg-white px-1.5 text-right text-sm tabular-nums outline-none transition focus:border-black disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-[10px]`}
     />
   );
 }
 
-function Fila({ l, onGuardar }: { l: LineaPlanilla; onGuardar: OnGuardar }) {
+function Fila({
+  l, onGuardar, manualesBloqueados,
+}: { l: LineaPlanilla; onGuardar: OnGuardar; manualesBloqueados?: boolean }) {
   const d = l.dinero!;
   const num = (v: number, extra = "") => (
     <td className={`px-2 py-1.5 text-right tabular-nums ${extra}`}>
@@ -524,12 +621,14 @@ function Fila({ l, onGuardar }: { l: LineaPlanilla; onGuardar: OnGuardar }) {
       {num(d.seguroEducativo)}
       {MANUALES.slice(0, 4).map(([campo]) => (
         <td key={campo} className="px-1 py-1.5 text-right">
-          <CeldaManual codigo={l.codigo} campo={campo} valor={l.manuales[campo]} onGuardar={onGuardar} />
+          <CeldaManual codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
+            onGuardar={onGuardar} bloqueada={manualesBloqueados} />
         </td>
       ))}
       {num(d.totalDeducciones)}
       <td className="px-1 py-1.5 text-right">
-        <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios} onGuardar={onGuardar} />
+        <CeldaManual codigo={l.codigo} campo="otrosServicios" valor={l.manuales.otrosServicios}
+          onGuardar={onGuardar} bloqueada={manualesBloqueados} />
       </td>
       {num(d.netoPagar, "font-semibold text-gray-900")}
     </tr>
@@ -537,9 +636,10 @@ function Fila({ l, onGuardar }: { l: LineaPlanilla; onGuardar: OnGuardar }) {
 }
 
 function Tarjeta({
-  l, abierta, onToggle, onGuardar,
+  l, abierta, onToggle, onGuardar, manualesBloqueados,
 }: {
   l: LineaPlanilla; abierta: boolean; onToggle: () => void; onGuardar: OnGuardar;
+  manualesBloqueados?: boolean;
 }) {
   const d = l.dinero!;
   const h = l.horas;
@@ -582,7 +682,9 @@ function Tarjeta({
           {linea(`Domingos (${aHoras(h.domingoMin)} h)`, d.domingos)}
           {linea(`Feriados (${aHoras(h.feriadoMin)} h)`, d.feriados)}
           {linea(`Ausencias (${h.ausenciaDias} días · ${aHoras(h.ausenciaMin)} h)`, d.ausencias, true)}
-          {linea(`Tardanzas (${h.tardanzaMin} min)`, d.tardanzas, true)}
+          {/* 🔑 `fmtMin`: los minutos se calculan AL SEGUNDO, así que acá pueden
+              traer fracción. Se muestran con 2 decimales cuando la tienen. */}
+          {linea(`Tardanzas (${fmtMin(h.tardanzaMin)} min)`, d.tardanzas, true)}
           <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 font-semibold">
             <span>Total bruto</span>
             <span className="tabular-nums">${$(d.totalBruto)}</span>
@@ -610,7 +712,7 @@ function Tarjeta({
                 </span>
                 <CeldaManual
                   codigo={l.codigo} campo={campo} valor={l.manuales[campo]}
-                  onGuardar={onGuardar} ancho="w-full"
+                  onGuardar={onGuardar} ancho="w-full" bloqueada={manualesBloqueados}
                 />
               </label>
             ))}
@@ -635,7 +737,7 @@ function Tarjeta({
             <p className="mt-2 rounded bg-amber-50 px-2 py-1.5 text-[12px] text-amber-800">
               <b>{h.diasARevisar}</b> {h.diasARevisar === 1 ? "día" : "días"} sin las 4 marcas
               {h.tardanzaDeDiasARevisarMin > 0 && (
-                <> — de ahí salen <b>{h.tardanzaDeDiasARevisarMin}</b> de los {h.tardanzaMin} minutos
+                <> — de ahí salen <b>{fmtMin(h.tardanzaDeDiasARevisarMin)}</b> de los {fmtMin(h.tardanzaMin)} minutos
                 de tardanza. Míralos antes de descontar.</>
               )}
             </p>
