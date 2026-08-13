@@ -90,6 +90,20 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
 - **Operación:** Guías de Despacho, Packing Lists, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos**, **Saldos de Banco**, Préstamos, Cheques
 
+> ## 🔴 EN GASTOS LAS EMPRESAS SE VEN TODAS, PERO NO SE SUMAN — LA REGLA, TEXTUAL (13-ago-2026)
+>
+> Daniel, palabra por palabra, cuando se le preguntó si Confecciones Boston tenía que quedar en el módulo: *"si quiero ver gastos de boston, pero **cada compañia por separado, sin juntar los gastos entre todos** me explico?"*
+>
+> **Son DOS afirmaciones y las dos son la regla:**
+> 1. **Boston SE VE en Gastos.** Las **8** empresas están en el módulo, Boston y Multifashion incluidas. No se esconde ninguna.
+> 2. **NUNCA existe un número que sume los gastos de más de una empresa.** Ni una fila "Total del grupo", ni un gran total al pie de una tabla, ni un "todas las empresas", ni una suma en un export. Si algún día hay un selector "Todas", muestra las empresas **una al lado de la otra**, jamás sumadas.
+>
+> ⚠️ **NO ES LA REGLA DE CXC, y copiarla de más sería un error.** Ahí Daniel dijo de Boston *"no deben de ni convivir juntos"* y su cartera va en una pestaña aparte (ver arriba). Acá el matiz es el contrario en su primera mitad: en Gastos Boston **sí convive en la misma pantalla**; lo único prohibido es **mezclar los números entre empresas**. Aislar a Boston de la vista sería aislar de más.
+>
+> **Estado medido al escribir la regla (13-ago-2026):** el módulo ya cumplía —no tenía ni un total de grupo, ni exports— así que no hubo que quitar nada. Lo que se agregó es el **candado**: `src/__tests__/components/gastos-sin-totales-entre-empresas.test.tsx` **PINTA** la lista con dos empresas de $100 y $200 y exige que **$300 no aparezca por ningún lado**, en las dos fuentes (mayor y egresos varios) y en las dos formas (tarjetas y tabla). Verificado por mutación: una fila `<tfoot>` con el total y un total suelto en las tarjetas lo ponen rojo. **Es un test de CONDUCTA a propósito** — un barrido de texto sobre el archivo no sirve, y en este mismo PR se comprobó por qué: el guard del cero silencioso de egresos se pudo desarmar (`if (false)`) sin que nada se pusiera rojo, porque el barrido encontraba el mensaje del `throw` ya inalcanzable.
+>
+> ⚠️ **PENDIENTE DE DECISIÓN DE DANIEL — Vista General sí suma gastos entre empresas.** `api/dashboard/vista-general` calcula `gastos.total` sumando el gasto de las empresas cuyo mes es mostrable, y de ahí sale la Rentabilidad del grupo. **NO se tocó**: es otro módulo, la suma es deliberada y documentada (ventas, utilidad y gasto salen del MISMO subconjunto de empresas justamente para no inflarla), y quitarla desarma el tablero del dueño. Si la regla de "no juntar" también vale ahí, hay que decidirlo y rehacer esas tarjetas — no es un descuido que se arregle de paso.
+
 > **UN SOLO MÓDULO DE GASTOS: "Gastos" — y los saldos de banco viven aparte (11-ago-2026).** Decisión de Daniel, textual: *"o simplemente gastos y eliminar el otro"*. Se hizo en DOS PRs sobre el módulo del mayor (#463), y el orden no era negociable.
 >
 > ```
