@@ -165,13 +165,27 @@ describe("colaSinFoto", () => {
 
 // ── Agregación del resumen (fotos-resumen.ts con clients mockeados) ──────────
 
-// Fake mínimo de supabase: from().select().eq().order() → { data, error }.
+// Fake mínimo de supabase, ahora PAGINADO:
+// from().select(cols, opts).eq().order(negocio).order(desempate).range(d, h).
+// Devuelve la rebanada pedida y el COUNT exacto sólo cuando se lo piden — que
+// es justo lo que `leerTodoPaginado` exige para poder garantizar que están
+// todas las filas.
 function fakeDb(rows: Array<{ sku: string | null; image_url: string | null }>) {
-  const order = vi.fn().mockResolvedValue({ data: rows, error: null });
+  const range = vi.fn();
+  const orderDesempate = vi.fn().mockReturnValue({ range });
+  const order = vi.fn().mockReturnValue({ order: orderDesempate });
   const eq = vi.fn().mockReturnValue({ order });
-  const select = vi.fn().mockReturnValue({ eq });
+  const select = vi.fn((_cols: string, opts?: { count?: string }) => {
+    const pidioCount = opts?.count === "exact";
+    range.mockImplementation(async (desde: number, hasta: number) => ({
+      data: rows.slice(desde, hasta + 1),
+      error: null,
+      count: pidioCount ? rows.length : null,
+    }));
+    return { eq };
+  });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from }, spies: { from, select, eq, order } };
+  return { client: { from }, spies: { from, select, eq, order, orderDesempate, range } };
 }
 
 const reebokRows = [
@@ -239,16 +253,43 @@ describe("calcularFotosResumen (agregación con clients mockeados)", () => {
         "Reebok (2): R1, R3",
     );
 
-    // La query filtra visibles (active=true) y ordena por disponibilidad desc.
+    // La query filtra visibles (active=true) y CONSERVA el orden de negocio
+    // (disponibilidad desc), con `sku` sólo como desempate para paginar.
     expect(reebokFake.spies.from).toHaveBeenCalledWith("products");
     expect(reebokFake.spies.eq).toHaveBeenCalledWith("active", true);
     expect(reebokFake.spies.order).toHaveBeenCalledWith("disponibilidad", {
       ascending: false,
       nullsFirst: false,
     });
+    expect(reebokFake.spies.orderDesempate).toHaveBeenCalledWith("sku", { ascending: true });
+    // Y pide el COUNT exacto en la primera página: sin él no hay garantía.
+    expect(reebokFake.spies.select).toHaveBeenCalledWith("sku, image_url", { count: "exact" });
     // Con la DDL de Tommy/Calvin pendiente NO se consultan sus tablas.
     expect(tommyFake.spies.from).not.toHaveBeenCalled();
     expect(calvinFake.spies.from).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 🩸 EL BUG QUE MATA ESTE CANDADO, por MUTACIÓN: con 1.200 productos activos
+   * sin foto, la lectura vieja (una sola página) devolvía 1.000 y el aviso
+   * semanal decía "faltan 1.000 fotos" — 200 menos, sin error y sin señal. Un
+   * aviso que se queda corto es peor que no tenerlo.
+   */
+  it("con MÁS de 1.000 filas las cuenta TODAS (el aviso no se queda corto)", async () => {
+    const muchos = Array.from({ length: 1200 }, (_, i) => ({
+      sku: `S${String(i).padStart(4, "0")}`,
+      image_url: null as string | null,
+    }));
+    const grande = fakeDb(muchos);
+    reebokFake.client.from = grande.client.from;
+
+    const { calcularFotosResumen } = await import("@/lib/catalogos/fotos-resumen");
+    const r = await calcularFotosResumen();
+
+    expect(r.marcas[0].codigos).toHaveLength(1200);
+    expect(r.totalSinFoto).toBe(1200);
+    // Dos páginas de 1.000, con el COUNT pedido sólo en la primera.
+    expect(grande.spies.range.mock.calls).toEqual([[0, 999], [1000, 1999]]);
   });
 });
 

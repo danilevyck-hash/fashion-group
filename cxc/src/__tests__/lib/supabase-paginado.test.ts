@@ -106,6 +106,15 @@ const SANEADOS = [
   // meses. Sin paginar leería 1.000 y la pestaña mostraría el 5% de las ventas
   // SIN UN SOLO ERROR — el peor de los casos de este bug.
   "src/app/api/multifashion/productos/route.ts",
+  // Fidelización ACS: paginaba SIN `.order()`, que no arregla nada — con filas
+  // empatadas PostgREST puede repetir o saltear entre páginas, y esta ruta
+  // AGREGA, así que un salteo se ve como un número más chico. `switch_facturas`
+  // de ACS ya va en 1.273 filas (medido 12-ago-2026): la 2ª página se pide.
+  "src/app/api/multifashion/fidelizacion/route.ts",
+  // Resumen SEMANAL de fotos faltantes: no paginaba. Hoy la marca más grande
+  // (Tommy) tiene 453 activos, pero desde la fila 1.001 el aviso diría "faltan
+  // N fotos" quedándose corto — sin error y sin señal.
+  "src/lib/catalogos/fotos-resumen.ts",
 ];
 
 /** Quita comentarios: varios archivos CITAN el anti-patrón para explicarlo. */

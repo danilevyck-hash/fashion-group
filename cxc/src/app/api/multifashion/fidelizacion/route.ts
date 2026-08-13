@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { waLink } from "@/lib/phone-wa";
 
 export const dynamic = "force-dynamic";
@@ -44,16 +45,23 @@ const normNombre = (s: unknown): string =>
 const addDays = (isoDay: string, days: number): string =>
   new Date(new Date(`${isoDay}T00:00:00Z`).getTime() + days * 86400000).toISOString().slice(0, 10);
 
-async function fetchAll<T>(build: (from: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await build(from);
-    if (error) throw new Error(error.message);
-    out.push(...(data ?? []));
-    if ((data ?? []).length < 1000) break;
-  }
-  return out;
-}
+/**
+ * ORDEN DE PAGINACIÓN (12-ago-2026). Esta ruta paginaba SIN `.order()`, que es
+ * el peor disfraz del bug de `db-max-rows`: con filas empatadas PostgREST puede
+ * repetir o saltear filas entre páginas, y como acá todo se AGREGA, un salteo
+ * se ve como un número más chico — sin error y sin señal. `switch_facturas` de
+ * ACS ya está en 1.273 filas, o sea que la segunda página se pide de verdad.
+ *
+ * Se ordena por `id` (uuid PK, único y estable) en las dos lecturas. NO se pisa
+ * ningún orden de negocio: esta ruta no tiene uno. `clientes[]` no se presenta
+ * en el orden en que sale de acá — el único consumidor
+ * (ClientesMultifashionSubtab) lo convierte en un Map por `nombre_norm` y el
+ * orden de la lista lo pone el ranking de retail. Lo único que el orden decide
+ * es el desempate de `nombreFactura` en los huérfanos (el primer
+ * `cliente_nombre` no nulo gana); hoy eso ya era arbitrario y ahora es
+ * determinista. Medido contra producción: cards y las 953 filas de `clientes`
+ * dan IDÉNTICO antes y después.
+ */
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "gerente_acs"]);
@@ -66,15 +74,19 @@ export async function GET(req: NextRequest) {
     const mesActual = hoy.slice(0, 7);
 
     // ── Directorio de clientes registrados ─────────────────────────────────
-    const registrados = await fetchAll<{
+    const registrados = await leerTodoPaginado<{
       cliente_switch_id: number; nombre: string | null; telefono: string | null;
       celular: string | null; raw_data: { fechaCreacion?: string } | null;
-    }>((from) =>
+    }>("switch_clientes (fidelización ACS)", (pedirCount, desde, hasta) =>
       supabaseServer.from("switch_clientes")
-        .select("cliente_switch_id, nombre, telefono, celular, raw_data")
+        .select(
+          "cliente_switch_id, nombre, telefono, celular, raw_data",
+          pedirCount ? { count: "exact" } : {},
+        )
         .eq("empresa_key", EMPRESA_KEY)
         .neq("cliente_switch_id", MOSTRADOR_ID)
-        .range(from, from + 999)
+        .order("id", { ascending: true })
+        .range(desde, hasta)
     );
 
     // ── Facturas de clientes identificados (visitas + uso del 5%) ──────────
@@ -82,27 +94,41 @@ export async function GET(req: NextRequest) {
     let detalleActivo = true;
     let facturas: FacturaRow[];
     try {
-      facturas = await fetchAll<FacturaRow>((from) =>
-        supabaseServer.from("switch_facturas")
-          .select("cliente_switch_id, cliente_nombre, fecha, descuento_global_pct")
-          .eq("empresa_key", EMPRESA_KEY)
-          .eq("tipo_comprobante", "Factura")
-          .not("cliente_switch_id", "is", null)
-          .neq("cliente_switch_id", MOSTRADOR_ID)
-          .range(from, from + 999)
+      facturas = await leerTodoPaginado<FacturaRow>(
+        "switch_facturas (fidelización ACS)",
+        (pedirCount, desde, hasta) =>
+          supabaseServer.from("switch_facturas")
+            .select(
+              "cliente_switch_id, cliente_nombre, fecha, descuento_global_pct",
+              pedirCount ? { count: "exact" } : {},
+            )
+            .eq("empresa_key", EMPRESA_KEY)
+            .eq("tipo_comprobante", "Factura")
+            .not("cliente_switch_id", "is", null)
+            .neq("cliente_switch_id", MOSTRADOR_ID)
+            .order("id", { ascending: true })
+            .range(desde, hasta),
       );
     } catch (err) {
       // Migración pendiente (columna ausente) → degradar sin uso del 5%.
+      // `leerTodoPaginado` prefija la etiqueta pero conserva el mensaje de
+      // PostgREST, así que el nombre de la columna sigue estando en el texto.
       if (!(err instanceof Error && /descuento_global_pct/.test(err.message))) throw err;
       detalleActivo = false;
-      facturas = await fetchAll<FacturaRow>((from) =>
-        supabaseServer.from("switch_facturas")
-          .select("cliente_switch_id, cliente_nombre, fecha")
-          .eq("empresa_key", EMPRESA_KEY)
-          .eq("tipo_comprobante", "Factura")
-          .not("cliente_switch_id", "is", null)
-          .neq("cliente_switch_id", MOSTRADOR_ID)
-          .range(from, from + 999)
+      facturas = await leerTodoPaginado<FacturaRow>(
+        "switch_facturas (fidelización ACS, pre-DDL)",
+        (pedirCount, desde, hasta) =>
+          supabaseServer.from("switch_facturas")
+            .select(
+              "cliente_switch_id, cliente_nombre, fecha",
+              pedirCount ? { count: "exact" } : {},
+            )
+            .eq("empresa_key", EMPRESA_KEY)
+            .eq("tipo_comprobante", "Factura")
+            .not("cliente_switch_id", "is", null)
+            .neq("cliente_switch_id", MOSTRADOR_ID)
+            .order("id", { ascending: true })
+            .range(desde, hasta),
       );
     }
 
