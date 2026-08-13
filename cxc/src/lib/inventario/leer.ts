@@ -22,7 +22,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
 import { B2B_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { esFuncionAusente } from "@/lib/multifashion/productos-lectura";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import {
   agregarInventario,
   armarInventario,

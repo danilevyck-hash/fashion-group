@@ -248,7 +248,11 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   //   · Saldos de Banco: la segunda mitad se queda (amarra con Vista General).
   //   · Asistencia: el botón que abre la ayuda y el "Cómo funciona la
   //     marcación" de adentro se quedan; se fue el del MEDIO.
-  { archivo: "lib/mayor/gastos.ts", que: "Gastos · el mes cerrado ya lo dice su etiqueta (salía 7 veces)", texto: "La contadora ya cerró este mes." },
+  // 🔴 "La contadora ya cerró este mes." vivía en `lib/mayor/gastos.ts`, que se
+  // RETIRÓ ENTERO el 13-ago-2026 con el mayor contable. La poda no se aflojó:
+  // el archivo que la alojaba ya no existe, así que el texto no puede volver
+  // por esa ventana — y el barrido de abajo pondría el build rojo si alguien
+  // recreara el archivo con la frase adentro.
   { archivo: "app/referencia/ReferenciaClient.tsx", que: "Referencia · la bajada narraba la ficha que está debajo", texto: "pegá tu lista: cuánto llegó" },
   { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · el % ya está arriba como '% del fondo'", texto: "% gastado" },
   { archivo: "app/caja/components/PeriodoDetailHeader.tsx", que: "Caja · 'Disponible' bajo el saldo", texto: 'sub="Disponible"' },

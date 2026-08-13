@@ -39,7 +39,7 @@
  * `sumarFuentes` no existe. Un gasto contado dos veces es peor que uno que falta.
  */
 
-import { esGasto } from "@/lib/mayor/gastos";
+import { esGasto } from "@/lib/contable/cuentas";
 import {
   codigoVisible,
   nombreDeCuenta,

@@ -6,65 +6,25 @@
 // 🔴 Los montos viajan en CENTAVOS ENTEROS y se convierten a dólares UNA vez,
 // acá, al pintarlos. Nada de sumar dólares en coma flotante por el camino.
 
-import { centAUsd, type Aviso, type ResumenMes } from "@/lib/mayor/gastos";
+import { centAUsd } from "@/lib/contable/cuentas";
 import type { ResumenEgresosMes } from "@/lib/egresos/reglas";
 import type { AlDia } from "@/lib/egresos/al-dia";
 import { fmt } from "@/lib/format";
 
 export const API_BASE = "/api/gastos-contabilidad";
 
-// ── Las DOS fuentes ──────────────────────────────────────────────────────────
+// ── UNA sola fuente: EGRESOS VARIOS ─────────────────────────────────────────
 //
-// 🔴 NUNCA SE SUMAN. Son dos formas de medir lo mismo, no dos pedazos de un
-// total: el MAYOR es contabilidad devengada (y solo existe cuando la contadora
-// cierra el mes); EGRESOS VARIOS es caja (lo que salió, al día). Enero-2026 está
-// en las dos, así que sumarlas contaría enero dos veces — y un gasto contado dos
-// veces es peor que uno que falta. Por eso la pantalla muestra UNA a la vez y
-// dice cuál. Ver `src/lib/egresos/reglas.ts`.
-
-export type FuenteGastos = "egresos" | "mayor";
-
-/** La fuente por defecto: la que está al día. */
-export const FUENTE_POR_DEFECTO: FuenteGastos = "egresos";
-
-export const esFuenteValida = (f: string): f is FuenteGastos =>
-  f === "egresos" || f === "mayor";
-
-export const FUENTES: ReadonlyArray<{
-  clave: FuenteGastos;
-  etiqueta: string;
-  /** Qué es, en una línea, sin jerga contable. */
-  explicacion: string;
-}> = [
-  {
-    clave: "egresos",
-    etiqueta: "Lo que salió de caja y banco",
-    explicacion:
-      "Cada pago que salió de caja o del banco, al día. Es lo que Switch llama Egresos Varios.",
-  },
-  {
-    clave: "mayor",
-    etiqueta: "Lo que cerró la contadora",
-    explicacion:
-      "El mayor contable: solo tiene los meses que la contadora ya cerró, así que va meses atrasado.",
-  },
-];
-
-export interface EmpresaResumen {
-  empresaKey: string;
-  nombre: string;
-  resumen: ResumenMes;
-  avisos: Aviso[];
-  /** Último mes CERRADO que tiene esa empresa (`YYYY-MM`), o `null`. */
-  ultimoMesCerrado: string | null;
-}
-
-export interface RespuestaResumen {
-  /** `false` mientras la migración del mayor no haya corrido. */
-  instalado: boolean;
-  mes: string;
-  empresas: EmpresaResumen[];
-}
+// 🔴 EL MAYOR CONTABLE SE RETIRÓ (13-ago-2026). Daniel, textual: *"y entonces
+// borra Mayor contable en el sistema"*. Eran dos formas de medir lo mismo —el
+// mayor es contabilidad devengada y solo existe cuando la contadora cierra el
+// mes; egresos es caja, al día— y el mayor iba SIETE MESES atrás: 135 filas,
+// solo enero. Con el selector se fueron `FuenteGastos`, `FUENTES`,
+// `EmpresaResumen` y `RespuestaResumen`.
+//
+// ⚠️ La regla que las mantenía separadas NO se relaja, se vuelve trivial: había
+// UNA sola forma de contar un gasto dos veces (sumar las dos fuentes) y ahora
+// no hay dos fuentes que sumar.
 
 // ── Egresos varios ───────────────────────────────────────────────────────────
 

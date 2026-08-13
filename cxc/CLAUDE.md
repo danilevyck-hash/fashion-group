@@ -88,7 +88,48 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 ## Módulos (src/lib/modules.ts)
 Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home, jul-2026):
 - **Ventas y clientes:** Vista General, Ventas, CXC (`/admin`), Multifashion, Clientes/Directorio (`/clientes`), Proveedores, Catálogos (Reebok, Joybees, Tommy Hilfiger — las 3 marcas ENCENDIDAS: tarjeta en el hub /catalogos/marcas, catálogo público compartible /catalogo-publico/tommy y pedido público /pedido-tommy/[id] accesibles sin sesión, cron tommy-catalogo bajo vigilancia estricta)
-- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* y *Saldos de banco*), Préstamos, Cheques
+- **Operación:** Guías de Despacho, Packing Lists, **Asistencia y Planilla**, Reclamos, Depurador (`/productos/cargar`), Comisiones, Marketing, Caja Menuda, **Gastos** (2 pestañas: *Gastos* —Egresos Varios, fuente ÚNICA desde el 13-ago-2026— y *Saldos de banco*), Préstamos, Cheques
+
+> ## 🔴 EL MAYOR CONTABLE SE RETIRÓ — queda UNA sola fuente de gasto (13-ago-2026)
+>
+> Daniel, textual, después de entender que Vista General usaba el mayor y el módulo de Gastos usa Egresos Varios: ***"y entonces borra Mayor contable en el sistema"***.
+>
+> **Por qué:** eran dos formas de medir lo mismo y el mayor iba **siete meses atrás** — `mayor_lineas` tiene **135 filas y solo enero**, contra los 441 renglones de `egresos_varios` que llegan hasta julio. El módulo ya mostraba Egresos Varios por defecto; el mayor era una fuente ALTERNATIVA que había que elegir a mano.
+>
+> 🔴 **EL ORDEN IMPORTABA Y SE RESPETÓ.** Este retiro esperó a que **#536 (Vista General sale del mayor) estuviera MERGEADO en `main`** — se verificó en el commit, no de palabra. Sacarlo antes le habría roto el tablero al dueño. Cuando se revisó por primera vez, #536 seguía abierta y el trabajo se frenó.
+>
+> ### Qué se retiró
+>
+> El cron **`sync-mayor`** (09:05 UTC — un login web menos por día contra Switch, y cada login puede expulsar a Daniel del panel), su route, `lib/switch-api/sync-mayor.ts`, `lib/mayor/` entero, la **fuente "mayor"** del módulo con su **selector** y el **`?fuente=`** de la URL, la ruta `api/gastos-contabilidad/resumen`, los componentes `ResumenEmpresas` · `DetalleEmpresa` · `EstadoMesTag` · `AvisosDelMes` · `SelectorFuente`, `fetchMayorAsientos` y `pareceCsvDelMayor` de `web-client.ts`, y los tests y scripts que solo probaban esa fuente. **66 → 65 crons.** Un `?fuente=mayor` guardado en un marcador es **INERTE**: la pantalla lo ignora.
+>
+> 🩸 **`lib/mayor/` NO ERA SOLO DEL MAYOR, y borrarlo de una habría roto la única fuente de gasto que queda.** El barrido encontró **SEIS módulos vivos** colgados de esa carpeta: `esTablaAusente` (la degradación limpia de `cuentas/leer`, `egresos/leer`, `inventario/leer`, `sync-cuentas-contables`, `sync-egresos-varios` y la ruta de egresos), `montoACentavos`/`normalizarTexto`/`CUENTA_RE` (`egresos/parser` y `egresos/leer`) y **`esGasto`** (`egresos/reglas`, que lo importaba **a propósito** para que el criterio de gasto fuera EL MISMO en las dos fuentes). Nunca fueron del mayor: son del formato en que Switch exporta contabilidad, y estaban ahí porque el mayor llegó primero. Se **MUDARON** a `src/lib/contable/` (`tabla-ausente.ts`, `csv.ts`, `cuentas.ts`) con los **cuerpos EXACTOS, sin reescribir** — volver a escribir `montoACentavos` habría estrenado una segunda forma de leer un monto, y su modo de fallo es un gasto perdido en silencio.
+>
+> ⚠️ **`web-client.ts` ES COMPARTIDO y no se tocó de más.** El login web, el token CSRF, `/cierresesion`, `fetchEgresosVarios` y `fetchCatalogoCuentas` son de Egresos Varios y del catálogo de cuentas: los dos siguen vivos. Solo se quitó lo que **únicamente el mayor** llamaba. La lección del mecanismo tampoco se pierde: el rango de fechas viaja en un POST previo y el servidor **se lo guarda en la sesión**, así que saltarse ese paso devuelve un CSV perfecto del período EQUIVOCADO sin un solo error — está escrito en el bloque de EGRESOS VARIOS, que hace exactamente lo mismo.
+>
+> ### 🔴 Lo que NO se borró
+>
+> - **LA TABLA `mayor_lineas` (135 filas) y `mayor_importaciones` QUEDAN.** Misma decisión que con `multifashion_tickets` y `empresa_gastos_mensuales`: **borrar datos es irreversible, apagar la escritura se deshace en un minuto.** Un test recorre TODAS las migraciones y pone el build **rojo** si alguna intenta un `DROP TABLE` de las dos.
+> - **El backup las sigue copiando** mientras las filas existan. Se sacan del backup en el MISMO cambio que borre las tablas, nunca antes.
+> - **`"mayor"` sigue en `SYNC_LOG_TYPES`**: el CHECK de `switch_sync_log` lo admite y hay filas históricas con ese valor. Sacarlo del TS sin una DDL que reescriba el CHECK haría **divergir el código de la base**, que es justo lo que ese candado vigila. Barrer el CHECK es higiene opcional, no un pendiente.
+>
+> ### ✅ Los nombres de las cuentas NO dependían ya del mayor — medido
+>
+> `cuentas/leer.ts` busca el nombre en `cuentas_contables` y **cae de respaldo a `mayor_lineas.cuenta_nombre`**, así que cortar el mayor podía dejar la pantalla mostrando códigos pelados. Medido (`scripts/_diag-nombres-sin-mayor.ts`, solo lectura): `cuentas_contables` (987 filas, sync `success` el 13-ago 17:47) cubre **las 64 de 64 cuentas** que Egresos Varios usa. **No se pierde ni un nombre.**
+> - 🩸 **La primera corrida dio 0 de 64 y era EL SCRIPT, no el dato:** paginaba con `.order("id")` —columna que esa tabla no tiene— y un `.catch(() => [])` convertía el error de PostgREST en *"el catálogo no cubre nada"*. **Medir cero y darlo por bueno es el peor resultado posible**; se quitó el catch y el orden va por `(empresa_key, cuenta)`, que es la llave real.
+>
+> ### ⚠️ Qué pierde Daniel, y cómo volver a encenderlo
+>
+> El mayor era **"lo que la contadora cerró"** — contabilidad devengada, con el ISR en su línea, las cuatro cuentas sin salida de caja y el estado del mes (cerrado / incompleto / sin cerrar / no traído). **Esa vista desaparece.** Es lo que él pidió, y el motivo es que iba 7 meses atrás mientras Egresos Varios está vivo; pero es una pérdida real y queda escrita.
+> - **Para volver a encenderlo: `git revert` del PR "el mayor contable se retira".** Trae de una sola vez el cron, `vercel.json`, el registro de crons, la librería, la ruta, los cuatro componentes y el selector. **Los datos ya están** (las tablas nunca se borraron), así que el módulo vuelve con enero cargado. Habría que borrar también el candado `vista-general-gasto-egresos.test.ts` → *"el MAYOR se retiró"*, que es lo que hace fallar el build si alguien lo reenciende sin querer.
+>
+> ### Ningún número del módulo cambió — medido
+>
+> **`BASE=… OTRO=… node scripts/_verif-gastos-no-cambian.mjs`** lee la MISMA API en los DOS builds (esta rama y `origin/main`) y compara **campo por campo, por POSICIÓN** (como conjunto, dos empresas intercambiadas se verían idénticas): **6 meses · 1.813 campos · 0 diferencias.** Vista General: **359 campos, 0 diferencias reales** (solo `generadoEn` y `ms`, que son el reloj), con **Disponibilidad $629.531,03 · 7 cuentas · al 31 jul**.
+>
+> **Los 3 anchos** (`scripts/_medir-gastos-al-dia.mjs`, en un mes con datos y en uno casi vacío): **390 · 834 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px, 0 textos bajo 12 px.**
+>
+> **Candados:** `vista-general-gasto-egresos.test.ts` **cambió de dirección el mismo día** — cuando #536 salió del mayor, exigía que el mayor SIGUIERA VIVO (apagarlo de paso habría sido un recorte que nadie pidió); ahora exige que **no vuelva a encenderse sin decisión**, que lo compartido se haya mudado, que el login web compartido siga entero, que ninguna migración dropee las tablas y que el cron se haya ido de vercel.json **y** del registro (la biyección de `cron-registro.test.ts` pone el build rojo si se toca uno solo).
+> - 🩸 **Un candado volvió a fallar por leer comentarios:** `not.toContain("fetchMayorAsientos")` sobre `web-client.ts` fallaba **con el código ya limpio**, porque la nota que documenta el retiro nombra justo lo retirado. El barrido ahora borra los comentarios primero — tercera vez que este repo paga lo mismo.
 
 > ## HASTA QUÉ MES ESTÁ AL DÍA CADA EMPRESA — el avance de la contadora, en una línea (13-ago-2026)
 >
@@ -460,7 +501,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-66 entradas configuradas (53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+65 entradas configuradas (66 hasta el 13-ago-2026, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|

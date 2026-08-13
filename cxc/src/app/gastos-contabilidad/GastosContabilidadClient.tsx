@@ -1,12 +1,13 @@
 "use client";
 
-// Gastos según la contabilidad (el mayor que trae Switch), POR EMPRESA.
+// Gastos: lo que SALIÓ de caja y del banco (Egresos Varios de Switch), POR EMPRESA.
 //
 // Daniel, textual: "deberiamos de ver los gastos o la info por empresa no total
 // del grupo" y "los top key importante de info nada mas". Por eso no hay fila de
 // total del grupo y la primera pantalla son cuatro números por empresa.
 //
-// 🔑 Un mes sin contabilidad NO se ve como $0 — ver `EstadoMesTag`.
+// 🔑 Un mes sin dato NO se ve como $0 — ver `explicacionEgresos` en
+// `ResumenEgresos.tsx`: "no salió plata" y "no sabemos" no pueden verse iguales.
 //
 // DOS PESTAÑAS desde el 13-ago-2026 (Daniel, sobre Gastos y Saldos de Banco:
 // *"y debeeria estar en un solo modulo"*): *Gastos* y *Saldos de banco*. La 2ª
@@ -23,18 +24,11 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import {
   API_BASE,
-  FUENTE_POR_DEFECTO,
-  esFuenteValida,
   mesActual,
   mesValido,
-  type FuenteGastos,
   type RespuestaEgresos,
-  type RespuestaResumen,
 } from "./components/tipos";
 import SelectorMes from "./components/SelectorMes";
-import SelectorFuente from "./components/SelectorFuente";
-import ResumenEmpresas from "./components/ResumenEmpresas";
-import DetalleEmpresa from "./components/DetalleEmpresa";
 import ResumenEgresos from "./components/ResumenEgresos";
 import DetalleEgresos from "./components/DetalleEgresos";
 import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
@@ -88,56 +82,37 @@ function GastosContabilidadInner() {
   // navegador vuelva a la lista y el historial sea espejo del breadcrumb.
   const [empresaParam, setEmpresaParam] = useUrlState("empresa", "", { history: "push" });
 
-  // ?fuente= es un filtro del MISMO nivel → replace. Y va en la URL a propósito:
-  // es lo que hace COMPARTIBLE la comparación entre las dos fuentes (el motivo
-  // por el que el mayor no se apagó todavía).
-  const [fuenteParam, setFuenteParam] = useUrlState<string>("fuente", FUENTE_POR_DEFECTO);
-  const fuente: FuenteGastos = esFuenteValida(fuenteParam) ? fuenteParam : FUENTE_POR_DEFECTO;
+  // 🔴 `?fuente=` SE RETIRÓ con el mayor (13-ago-2026). Existía para poder
+  // COMPARTIR la comparación entre las dos fuentes, y sin dos fuentes no hay
+  // nada que comparar. Un `?fuente=mayor` en un marcador viejo es INERTE: la
+  // pantalla lo ignora y muestra lo único que hay.
 
   // ¿El desglose se abrió tocando una empresa en ESTA sesión? Si sí, "Volver"
   // deshace el push del historial. Si se llegó por deep link no hay nada que
   // deshacer y hacer back sacaría a la persona de la app.
   const abiertoDesdeLista = useRef(false);
 
-  // Se pide SOLO la fuente elegida, y SOLO si la pestaña de gastos está a la
-  // vista. Traer las dos fuentes y esconder una haría el doble de consultas
-  // contra una base en compute Micro para pintar la mitad — y, peor, dejaría las
-  // dos cifras en la misma pantalla listas para que alguien las sume. Lo mismo
-  // vale para la pestaña: estando en Saldos, el mayor no se pide.
-  const pedirMayor = authChecked && enGastos && fuente === "mayor";
-  const pedirEgresos = authChecked && enGastos && fuente === "egresos";
+  // Se pide SOLO si la pestaña de gastos está a la vista: estando en Saldos de
+  // banco, esta consulta no se hace. La base está en compute Micro.
+  const pedirEgresos = authChecked && enGastos;
 
-  const mayor = useSWR<RespuestaResumen>(
-    pedirMayor ? `${API_BASE}/resumen?mes=${mes}` : null,
-    fetcher<RespuestaResumen>,
-    { revalidateOnFocus: true },
-  );
   const egresos = useSWR<RespuestaEgresos>(
     pedirEgresos ? `${API_BASE}/egresos?mes=${mes}` : null,
     fetcher<RespuestaEgresos>,
     { revalidateOnFocus: true },
   );
 
-  const activo = fuente === "mayor" ? mayor : egresos;
-  const { error, isLoading, mutate } = activo;
-  const data = activo.data;
+  const { error, isLoading, mutate } = egresos;
+  const data = egresos.data;
 
   // Hooks ANTES de cualquier return condicional (regla del repo).
-  const empresaMayor = useMemo(
-    () => mayor.data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
-    [mayor.data, empresaParam],
-  );
   const empresaEgresos = useMemo(
     () => egresos.data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
     [egresos.data, empresaParam],
   );
   // El breadcrumb de la empresa abierta solo tiene sentido dentro de Gastos: en
   // Saldos de banco anunciaría un lugar donde no se está.
-  const nombreAbierto = !enGastos
-    ? null
-    : fuente === "mayor"
-      ? (empresaMayor?.nombre ?? null)
-      : (empresaEgresos?.nombre ?? null);
+  const nombreAbierto = !enGastos ? null : (empresaEgresos?.nombre ?? null);
   const hayEmpresaAbierta = Boolean(nombreAbierto);
 
   if (!authChecked) return null;
@@ -187,24 +162,16 @@ function GastosContabilidadInner() {
         {esperandoDeepLink ? (
           <Esqueleto />
         ) : hayEmpresaAbierta ? (
-          fuente === "mayor" && empresaMayor ? (
-            <DetalleEmpresa empresa={empresaMayor} onVolver={volver} />
-          ) : empresaEgresos ? (
-            <DetalleEgresos empresa={empresaEgresos} onVolver={volver} />
-          ) : null
+          empresaEgresos ? <DetalleEgresos empresa={empresaEgresos} onVolver={volver} /> : null
         ) : (
           <>
             <div className="mb-4">
-              {/* La bajada se QUEDA: dice qué se está viendo y su corte mensual.
-                  De DÓNDE sale el número lo dice el selector de fuente, que es lo
-                  único que puede decirlo ahora que hay dos. */}
+              {/* La bajada dice qué se está viendo y su corte mensual. Con el
+                  mayor retirado vuelve a decir de DÓNDE sale el número, que
+                  antes era trabajo del selector de fuente. */}
               <p className="text-sm text-gray-600">
-                Lo que salió de cada empresa, mes por mes.
+                Cada pago que salió de caja o del banco, mes por mes.
               </p>
-            </div>
-
-            <div className="mb-4">
-              <SelectorFuente fuente={fuente} onCambiar={setFuenteParam} />
             </div>
 
             <div className="mb-4">
@@ -231,14 +198,11 @@ function GastosContabilidadInner() {
                   Esta parte todavía no está encendida.
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  {fuente === "egresos"
-                    ? "Falta el último paso de instalación para ver lo que sale de caja y banco. Mientras tanto podés ver lo que cerró la contadora."
-                    : "Falta el último paso de instalación. Cuando esté listo, acá vas a ver lo que gastó cada empresa mes por mes."}
+                  Falta el último paso de instalación. Cuando esté listo, acá vas
+                  a ver lo que salió de caja y del banco de cada empresa, mes por mes.
                 </p>
               </div>
-            ) : fuente === "mayor" && mayor.data ? (
-              <ResumenEmpresas empresas={mayor.data.empresas} onAbrir={abrirEmpresa} />
-            ) : fuente === "egresos" && egresos.data ? (
+            ) : egresos.data ? (
               <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} />
             ) : null}
           </>

@@ -147,7 +147,7 @@ describe("B. el silenciamiento sigue la misma regla", () => {
 });
 
 describe("C. quién importa web-client", () => {
-  it("SOLO sync-utilidad, sync-estadocuenta-web, sync-mayor y sync-egresos-varios", () => {
+  it("SOLO sync-utilidad, sync-estadocuenta-web y sync-egresos-varios", () => {
     const importadores = archivosFuente()
       .filter((f) => !f.endsWith(path.join("switch-api", "web-client.ts")))
       .filter((f) => /from\s+["'][^"']*web-client["']/.test(fs.readFileSync(f, "utf8")))
@@ -175,13 +175,13 @@ describe("C. quién importa web-client", () => {
       // Egresos varios (caja y banco): corre 10:35 UTC = 05:35 a.m. Panamá
       // (madrugada, igual que los otros tres). NO es colateral de la
       // reconciliación, así que no entra en COLATERALES_LOGIN_WEB — como
-      // sync-mayor y boston-cartera.
+      // boston-cartera.
       path.join("lib", "switch-api", "sync-egresos-varios.ts"),
       path.join("lib", "switch-api", "sync-estadocuenta-web.ts"),
-      // Mayor contable: corre 09:05 UTC = 04:05 a.m. Panamá (madrugada, igual
-      // que los otros dos). NO es colateral de la reconciliación, así que no
-      // entra en COLATERALES_LOGIN_WEB — como boston-cartera.
-      path.join("lib", "switch-api", "sync-mayor.ts"),
+      // 🔴 `sync-mayor.ts` SE RETIRÓ el 13-ago-2026 (Daniel: *"y entonces borra
+      // Mayor contable en el sistema"*) y con él su login web de las 09:05 UTC:
+      // una sesión menos por día contra Switch, que es un login menos que puede
+      // expulsar a Daniel del panel.
       path.join("lib", "switch-api", "sync-utilidad.ts"),
     ]);
   });

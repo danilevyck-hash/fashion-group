@@ -40,9 +40,14 @@ export const SYNC_LOG_TYPES = [
   "catalogo_joybees",
   "catalogo_tommy",
   "catalogo_calvin",
-  "mayor",
   "egresos_varios",
   "cuentas_contables",
+  // ⚠️ RETIRADO el 13-ago-2026: ningún sync escribe ya este tipo. Se QUEDA en la
+  // lista porque el CHECK de `switch_sync_log` sí lo admite y hay filas
+  // históricas con ese valor; sacarlo de acá sin una DDL que reescriba el CHECK
+  // haría divergir el código de la base — que es exactamente lo que este candado
+  // vigila. Barrer el CHECK es higiene opcional, no un pendiente.
+  "mayor",
 ] as const;
 
 export type SyncLogType = (typeof SYNC_LOG_TYPES)[number];

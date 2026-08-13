@@ -22,7 +22,7 @@
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 import { armarNombres, codigosCandidatos, type NombresDeCuentas } from "./catalogo";
 
 /** Nombres por empresa: `empresa_key` → (`cuenta` completa → nombre). */

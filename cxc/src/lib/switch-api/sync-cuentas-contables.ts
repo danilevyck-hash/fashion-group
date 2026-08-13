@@ -35,7 +35,7 @@ import {
   catalogoUtilizable,
   MINIMO_CUENTAS,
 } from "@/lib/cuentas/catalogo";
-import { esTablaAusente } from "@/lib/mayor/leer";
+import { esTablaAusente } from "@/lib/contable/tabla-ausente";
 
 /** Cuántas cuentas se mandan por sentencia. El catálogo de una empresa ronda las
  *  centenas; 500 es el mismo tamaño que usa el resto del repo. */
