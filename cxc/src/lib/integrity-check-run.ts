@@ -11,7 +11,11 @@ import { runAllChecks, persistCheckResults, summarize, type CheckResult } from "
 import { sendTelegramAlert } from "@/lib/telegram";
 import { enviarSistema } from "@/lib/alertas/canal";
 
-const DASHBOARD_URL = "https://fashiongr.com/admin/data-health";
+// Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026). El link de la
+// alerta apunta DIRECTO a la pestaña; `/admin/data-health` sigue redirigiendo
+// (next.config.js) para los mensajes viejos que ya están en el Telegram de
+// Daniel, que no se pueden reescribir.
+const DASHBOARD_URL = "https://fashiongr.com/admin/usuarios?tab=data-health";
 
 function buildCriticalAlert(criticals: CheckResult[]): string {
   const lineas = criticals

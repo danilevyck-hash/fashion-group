@@ -176,7 +176,11 @@ export default function HomePage() {
               ? "border-red-200 bg-red-50 text-red-800"
               : "border-amber-200 bg-amber-50 text-amber-900"
           }`}>
-            <button onClick={() => router.push("/admin/data-health")} className="text-left font-medium hover:underline">
+            {/* Data Health es la 2ª pestaña de Usuarios (13-ago-2026). El link
+                va DIRECTO a la pestaña: el redirect de `/admin/data-health`
+                existe para los marcadores viejos, no para que la app siga
+                usando una dirección que ya no es la suya. */}
+            <button onClick={() => router.push("/admin/usuarios?tab=data-health")} className="text-left font-medium hover:underline">
               {dhAlert.critical > 0
                 ? `${dhAlert.critical} check${dhAlert.critical === 1 ? "" : "s"} crítico${dhAlert.critical === 1 ? "" : "s"} en Data Health`
                 : `${dhAlert.warning} check${dhAlert.warning === 1 ? "" : "s"} en alerta en Data Health`} — toca para revisar

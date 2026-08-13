@@ -65,6 +65,14 @@ const nextConfig = {
         destination: "/referencia",
         permanent: false,
       },
+      // Data Health dejó de ser un módulo suelto (13-ago-2026): vive como 2ª
+      // PESTAÑA de Usuarios, con la MISMA pantalla. La dirección vieja la tienen
+      // en marcadores y la escriben las alertas de integridad
+      // (`integrity-check-run.ts` mandó ese link a Telegram durante meses), así
+      // que tiene que seguir llegando — acá, y no con un `page.tsx` que
+      // redirige, para que ni siquiera se descargue la pantalla equivocada.
+      // Temporal (307) como los demás: no se quema en el caché del navegador.
+      { source: "/admin/data-health", destination: "/admin/usuarios?tab=data-health", permanent: false },
     ];
   },
   experimental: {

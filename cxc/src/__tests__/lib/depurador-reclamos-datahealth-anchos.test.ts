@@ -44,7 +44,10 @@ const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf8"
 const CARGAR = "src/app/productos/cargar/page.tsx";
 const HISTORIAL = "src/app/productos/cargar/HistorialView.tsx";
 const FORMULAS = "src/app/productos/cargar/FormulasConfig.tsx";
-const DATAHEALTH = "src/app/admin/data-health/page.tsx";
+// Data Health dejó de ser un módulo suelto el 13-ago-2026: es la 2ª PESTAÑA
+// de Usuarios. La pantalla es la MISMA (mudanza, no recorte), así que estos
+// candados siguen valiendo tal cual — solo cambió dónde vive el archivo.
+const DATAHEALTH = "src/app/admin/usuarios/DataHealthTab.tsx";
 const RECLAMO_DETALLE = "src/app/reclamos/components/ReclamoDetail.tsx";
 const EMPRESA_LIST = "src/app/reclamos/components/EmpresaList.tsx";
 const GUIA_DETAIL = "src/app/guias/components/GuiaDetail.tsx";

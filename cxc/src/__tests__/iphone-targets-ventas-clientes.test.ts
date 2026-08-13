@@ -22,7 +22,9 @@ import path from "path";
 
 const leer = (rel: string) => readFileSync(path.join(process.cwd(), "src", rel), "utf-8");
 
-const dataHealth = leer("app/admin/data-health/page.tsx");
+// Data Health vive dentro de Usuarios desde el 13-ago-2026 (2ª pestaña). El
+// contrato táctil no cambió: es el mismo marcado, movido de archivo.
+const dataHealth = leer("app/admin/usuarios/DataHealthTab.tsx");
 const usuarios = leer("app/admin/usuarios/page.tsx");
 const panelCxc = leer("app/admin/components/PanelCxcMobile.tsx");
 const clientes = leer("app/clientes/ClientesListClient.tsx");

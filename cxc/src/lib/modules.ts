@@ -31,7 +31,6 @@ import {
   Briefcase,
   BarChart3,
   Settings,
-  ShieldCheck,
   Coins,
   Building2,
   LayoutDashboard,
@@ -105,8 +104,24 @@ export const ALL_MODULES: AppModule[] = [
   { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
   // Administración
+  //
+  // 🔴 UN SOLO MÓDULO, Y EL GRUPO SE QUEDA (13-ago-2026). "Data Health" dejó de
+  // ser una ficha suelta y pasó a ser la 2ª PESTAÑA de Usuarios
+  // (`/admin/usuarios?tab=data-health`; la dirección vieja redirige en
+  // next.config.js). No se perdió nada: la pantalla es la misma, movida.
+  //
+  // Por qué el grupo NO se disuelve mudando Usuarios a "Operación":
+  //   · "Administración" es admin-only — el único que lo ve es Daniel. Mudarlo a
+  //     Operación metería un módulo suyo entre los 13 que usan todos los días
+  //     secretaria/bodega/vendedor/contabilidad: no lo acerca, lo entierra.
+  //   · Borrar el grupo rompe `/g/administracion` (y encadena el redirect viejo
+  //     `/g/sistema` a una URL muerta) — un segundo marcador roto en el mismo PR,
+  //     justo lo contrario de la regla de que la dirección vieja siga andando.
+  //   · Lo que se pidió fue MENOS MÓDULOS en el menú, y eso ya está: el grupo
+  //     pasa de 2 fichas a 1.
+  // El auto-redirect de "rol con un solo módulo" NO se toca: cuenta MÓDULOS
+  // VISIBLES, no grupos, y admin está exento (`if (role === "admin") return`).
   { key: "usuarios",    label: "Usuarios",    href: "/admin/usuarios",    icon: Users,       roles: ["admin"], group: "administracion" },
-  { key: "data-health", label: "Data Health", href: "/admin/data-health", icon: ShieldCheck, roles: ["admin"], group: "administracion" },
 ];
 
 /** Lista de keys de todos los módulos del sistema. */
