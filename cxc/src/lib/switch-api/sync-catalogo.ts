@@ -97,6 +97,49 @@ const MAX_PAGES = 250;
  */
 const STOCK_CONCURRENCIA = 4;
 
+/**
+ * Cuántas páginas de `/apiarticulos/lista` se piden a la vez.
+ *
+ * 🩸 POR QUÉ EXISTE (13-ago-2026). Daniel: *"hay manera que al actualizar en el
+ * sistema en catalogo, ventas, cxc, ect, sea mas rapido la sincronizacion?"*.
+ * Medido contra `switch_sync_log` (7 días): los catálogos tardan 135-200 s y la
+ * CXC 109 s; las ventas ya salen en 7 s. Medido después contra Switch fase por
+ * fase (`scripts/_probe-sync-lento.ts`), el barrido de páginas EN SERIE es la
+ * fase que se come el catálogo: vistana tiene 8.173 artículos = 164 páginas de
+ * 50, una esperando a la otra.
+ *
+ * **PRIMERO se intentó pedir MENOS páginas, y no se puede.** Medido contra
+ * `vistana` el 13-ago-2026:
+ *   · `porPagina` está CAPADO EN 50 — pedir 100, 200, 500 o 1000 devuelve 50
+ *     igual (y el propio endpoint informa `paginacion.total = 8173`);
+ *   · el parámetro `filtro` —que el cliente acepta y nadie usaba— NO acota por
+ *     marca: `filtro=8` devuelve 50 artículos de marcaId 2 y 3, y
+ *     `filtro="CK FOOTWEAR"` devuelve 0. No sirve para pedir una sola marca.
+ * O sea que las 164 páginas son irreducibles y lo único que queda es acortar el
+ * tiempo de pared, igual que con `/stock`.
+ *
+ * **LA CURVA, con páginas DISJUNTAS** (reusar el mismo lote mide la caché de
+ * Switch y da aceleraciones imposibles — ver STOCK_CONCURRENCIA), 16 páginas por
+ * nivel, ms/página efectivo y **0 errores y 0 páginas vacías en todos**:
+ *
+ *     serial ×1  1053 ms   —
+ *     ×2          321 ms   3,3×
+ *     ×4          160 ms   6,6×
+ *     ×6          118 ms   8,9×   ← acá
+ *     ×8           98 ms  10,8×
+ *     ×12          91 ms  11,6×   ← la curva ya está plana
+ *
+ * **Se elige 6 y no 12** aunque 12 mida un poco mejor: entre 8 y 12 la mejora es
+ * del 8%, o sea que el borde está ahí, y la regla es quedarse POR DEBAJO del
+ * borde. Es el mismo criterio con el que se eligió 4 para `/stock`: el cuello de
+ * botella es un ERP ajeno del que no controlamos ni el dimensionamiento ni el
+ * límite de peticiones, y comprar 4 segundos apretando al proveedor no vale.
+ *
+ * ⚠️ Requiere el de-dup de login de `client.ts` (`loginEnVuelo`), igual que
+ * `/stock`: Switch admite UNA sesión por empresa.
+ */
+const PAGINAS_CONCURRENCIA = 6;
+
 export interface CatalogoEmpresaScope {
   empresaKey: string;
   /** Categorías existentes a leer para matchear por SKU. [] = leer TODA la tabla
@@ -201,27 +244,102 @@ function num(s: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-async function fetchAllArticulos(empresaKey: string): Promise<SwitchArticulo[]> {
-  const client = createSwitchClient(empresaKey);
+/**
+ * Barre TODAS las páginas del catálogo, de a `concurrencia` a la vez.
+ *
+ * 🔴 LA GARANTÍA DEL #498 NO SE AFLOJA, y en paralelo hay que sostenerla a mano:
+ * el corte legítimo sigue siendo la PÁGINA CORTA (`arr.length < PER_PAGE`) y
+ * llegar al tope sin verla sigue siendo un ERROR, nunca un éxito a medias. Lo
+ * que cambia es que las páginas se piden en TANDAS: dentro de una tanda pueden
+ * llegar desordenadas, así que los resultados se recorren SIEMPRE en orden de
+ * página y todo lo que venga después de la página corta se descarta.
+ *
+ * 🩸 Y aparece un caso que en serie era INVISIBLE: que una página corta tenga
+ * páginas NO VACÍAS detrás. En serie el barrido cortaba ahí y perdía el resto
+ * EN SILENCIO — el mismo modo de fallo del db-max-rows. Acá se ve, porque la
+ * tanda ya las pidió, y se trata como lo que es: el catálogo se movió (o Switch
+ * devolvió una página trunca) mientras barríamos. Se lanza y no se escribe nada.
+ * Es estrictamente más seguro que lo de antes, no menos.
+ *
+ * ⚠️ Ese guard SOLO es correcto porque se MIDIÓ qué contesta Switch más allá del
+ * final, y no se podía suponer: si el endpoint CLAMPEARA a la última página
+ * (devolver lo mismo otra vez, que es lo que hacen muchos ERP), la señal sería
+ * ruido y el sync erroraría en cada corrida. Medido el 13-ago-2026 contra
+ * vistana, cuyo catálogo termina en la página 164: las páginas **165, 167 y 184
+ * devuelven 0 artículos**. También se verificó, página por página en las 164,
+ * que **todas las intermedias traen exactamente 50** y solo la última trae menos
+ * (23) — o sea que el corte por página corta de este archivo es correcto acá.
+ * (Ojo: `sync-articulo-marca.ts` y `sync-articulo-info.ts` documentan lo
+ * contrario para SU empresa y por eso cortan por página VACÍA. No se tocaron.)
+ *
+ * `traerPagina` se inyecta para poder probar el barrido sin red.
+ */
+export async function barrerPaginasArticulos(
+  traerPagina: (pagina: number) => Promise<SwitchArticulo[]>,
+  opts: {
+    empresaKey: string;
+    perPage?: number;
+    maxPages?: number;
+    concurrencia?: number;
+  },
+): Promise<SwitchArticulo[]> {
+  const perPage = opts.perPage ?? PER_PAGE;
+  const maxPages = opts.maxPages ?? MAX_PAGES;
+  const concurrencia = Math.max(1, opts.concurrencia ?? PAGINAS_CONCURRENCIA);
+
   const all: SwitchArticulo[] = [];
   let vioElFinal = false;
-  for (let pagina = 1; pagina <= MAX_PAGES; pagina++) {
-    const data = await client.getArticulos({ porPagina: PER_PAGE, paginaActual: pagina });
-    const arr = data?.articulos ?? [];
-    all.push(...arr);
-    if (arr.length < PER_PAGE) {
-      vioElFinal = true;
-      break;
+  let paginaCorta = 0;
+  let primeraPagina = 1;
+
+  while (!vioElFinal && primeraPagina <= maxPages) {
+    const tanda: number[] = [];
+    for (let k = 0; k < concurrencia && primeraPagina + k <= maxPages; k++) {
+      tanda.push(primeraPagina + k);
     }
+    // enParalelo devuelve EN EL ORDEN DE ENTRADA, así que `respuestas[i]` es la
+    // página `tanda[i]` sin importar en qué orden contestó Switch.
+    const respuestas = await enParalelo(tanda, concurrencia, (p) => traerPagina(p));
+    for (let i = 0; i < tanda.length; i++) {
+      const arr = respuestas[i] ?? [];
+      if (vioElFinal) {
+        if (arr.length > 0) {
+          throw new Error(
+            `El barrido de artículos de ${opts.empresaKey} vio corta la página ${paginaCorta} y la página ` +
+              `${tanda[i]} igual trajo ${arr.length} artículos — el catálogo cambió mientras se barría o Switch ` +
+              `devolvió una página trunca. No se escribe nada.`,
+          );
+        }
+        continue;
+      }
+      all.push(...arr);
+      if (arr.length < perPage) {
+        vioElFinal = true;
+        paginaCorta = tanda[i];
+      }
+    }
+    primeraPagina += tanda.length;
   }
+
   if (!vioElFinal) {
     // Un catálogo a medias escribiría "agregados: pocos" con cara de success —
     // el mismo silencio del db-max-rows. Mejor la corrida en error y el dato intacto.
     throw new Error(
-      `El barrido de artículos de ${empresaKey} llegó al tope de ${MAX_PAGES} páginas sin ver la última — catálogo incompleto, no se escribe nada.`,
+      `El barrido de artículos de ${opts.empresaKey} llegó al tope de ${maxPages} páginas sin ver la última — catálogo incompleto, no se escribe nada.`,
     );
   }
   return all;
+}
+
+async function fetchAllArticulos(empresaKey: string): Promise<SwitchArticulo[]> {
+  const client = createSwitchClient(empresaKey);
+  return barrerPaginasArticulos(
+    async (pagina) => {
+      const data = await client.getArticulos({ porPagina: PER_PAGE, paginaActual: pagina });
+      return data?.articulos ?? [];
+    },
+    { empresaKey },
+  );
 }
 
 export async function syncCatalogo(
