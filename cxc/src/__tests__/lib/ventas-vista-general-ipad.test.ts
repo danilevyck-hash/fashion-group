@@ -184,10 +184,11 @@ describe("Vista General › Rentabilidad por empresa — tarjetas en iPhone, tab
   it("el desglose se dibuja UNA vez para las dos formas", () => {
     expect(vistaGeneral).toContain("function Desglose(");
     // Dos copias del mismo párrafo es como divergen los números entre pantallas.
-    // (El desglose pasó a ser "utilidad − gastos de contabilidad" cuando el gasto
-    // dejó de venir de la carga manual y empezó a salir del mayor de Switch: ya
-    // no hay gasto de "grupo" que prorratear, cada gasto trae su empresa.)
-    expect(vistaGeneral.match(/Gastos de contabilidad/g) ?? []).toHaveLength(1);
+    // (El desglose es "utilidad bruta − gastos": ya no hay gasto de "grupo" que
+    // prorratear, cada gasto trae su empresa. El rótulo dejó de decir "de
+    // contabilidad" el 13-ago-2026, cuando la fuente pasó del mayor a Egresos
+    // Varios — lo que se cuenta ahora es lo que SALIÓ de caja y banco.)
+    expect(vistaGeneral.match(/\{" − "\}Gastos /g) ?? []).toHaveLength(1);
     expect(vistaGeneral).toContain("function VerGastosLink");
   });
 

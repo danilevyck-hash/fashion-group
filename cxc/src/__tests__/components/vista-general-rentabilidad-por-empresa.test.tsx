@@ -83,9 +83,12 @@ function fila(
 const FILAS: RentabilidadEmpresaRow[] = [
   fila("vistana", "Vistana International", A),
   fila("fashion_wear", "Fashion Wear", B),
+  // 🔴 Motivo de EGRESOS VARIOS, la fuente desde el 13-ago-2026. Boston no la
+  // baja el cron (decisión de Daniel), así que su fila dice eso y no "sin
+  // traer" — que haría creer que alguien se lo va a traer.
   fila("confecciones_boston", "Confecciones Boston", C, {
-    motivo: "sin_cerrar",
-    texto: "Todavía no hay contabilidad de este mes. La contabilidad llega hasta enero 2026.",
+    motivo: "no_automatico",
+    texto: "Los gastos de esta empresa no se traen solos de Switch, así que todavía no hay nada.",
   }),
 ];
 
@@ -164,8 +167,8 @@ describe("🩸 la empresa SIN gasto cargado no muestra un número lindo", () => 
 
   it("y en su lugar la pantalla DICE POR QUÉ", () => {
     pintar();
-    // La píldora trae el motivo exacto: "Sin cerrar" no es "Falta planilla".
-    expect(screen.getAllByText("Sin cerrar").length).toBeGreaterThan(0);
+    // La píldora trae el motivo exacto: "No se baja sola" no es "Sin cargar".
+    expect(screen.getAllByText("No se baja sola").length).toBeGreaterThan(0);
   });
 
   it("al abrirla, el desglose explica en palabras en vez de restar", () => {
@@ -173,7 +176,7 @@ describe("🩸 la empresa SIN gasto cargado no muestra un número lindo", () => 
     const fila = container.querySelector('[data-fila-semaforo="confecciones_boston"]');
     expect(fila).toBeTruthy();
     fireEvent.click(fila!.querySelector("button") ?? fila!);
-    expect(screen.getAllByText(/La contabilidad llega hasta enero 2026/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/no se traen solos de Switch/).length).toBeGreaterThan(0);
   });
 
   it("mientras que una empresa CON gasto sí muestra la resta, con sus dos cifras", () => {

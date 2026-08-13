@@ -174,16 +174,24 @@ describe("🔴 sin dato NO va un cero", () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // 🩸 Montos elegidos para que CUALQUIER suma sea inconfundible:
-//   100.000 + 200.000 = 300.000 · con la tercera (0) sigue dando 300.000.
+//   100.000 + 200.000 = 300.000 · con las otras (0) sigue dando 300.000.
+//
+// 🔴 LOS MOTIVOS SON LOS DE EGRESOS VARIOS, la fuente desde el 13-ago-2026.
+// Los cuatro están representados a propósito: el que más importa es `sin_gasto`
+// —salió plata pero NADA quedó registrado como gasto—, que es el caso REAL de
+// active_wear en abril-2026 (1 renglón, $278,20 de salida, $0,00 de gasto) y el
+// único donde el módulo "Gastos" sí pinta un $0,00 y el tablero del dueño NO
+// puede, porque acá ese número se le RESTA a la utilidad bruta.
 const GASTOS: GastosData = {
   disponible: true,
   empresasConGasto: 2,
-  empresasTotal: 4,
+  empresasTotal: 5,
   porEmpresa: [
-    { key: "vistana", name: "Vistana International", gasto: 100_000, motivo: null, texto: null, ultimoMesCerrado: "2026-08" },
-    { key: "fashion_wear", name: "Fashion Wear", gasto: 200_000, motivo: null, texto: null, ultimoMesCerrado: "2026-08" },
-    { key: "fashion_shoes", name: "Fashion Shoes", gasto: null, motivo: "sin_cerrar", texto: "La contabilidad de esta empresa llega hasta enero 2026.", ultimoMesCerrado: "2026-01" },
-    { key: "joystep", name: "Joystep", gasto: null, motivo: "sin_planilla", texto: "A este mes le falta el gasto de planilla, así que el total quedaría corto.", ultimoMesCerrado: "2026-08" },
+    { key: "vistana", name: "Vistana International", gasto: 100_000, motivo: null, texto: null, ultimoMesCerrado: "2026-07" },
+    { key: "fashion_wear", name: "Fashion Wear", gasto: 200_000, motivo: null, texto: null, ultimoMesCerrado: "2026-07" },
+    { key: "fashion_shoes", name: "Fashion Shoes", gasto: null, motivo: "sin_movimientos", texto: "Los gastos de esta empresa llegan hasta abril 2026.", ultimoMesCerrado: "2026-04" },
+    { key: "active_wear", name: "Active Wear", gasto: null, motivo: "sin_gasto", texto: "Este mes salió plata, pero nada de eso quedó registrado como gasto.", ultimoMesCerrado: "2026-04" },
+    { key: "confecciones_boston", name: "Confecciones Boston", gasto: null, motivo: "no_automatico", texto: "Los gastos de esta empresa no se traen solos de Switch, así que todavía no hay nada.", ultimoMesCerrado: null },
   ],
 };
 
@@ -204,32 +212,63 @@ describe("🔴 el gasto es POR EMPRESA y no existe ningún número que las junte
 
   it("y la pantalla DICE que no hay total, para que nadie lo sume de cabeza", () => {
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
-    expect(textoPintado()).toContain("No hay un total");
+    expect(textoPintado()).toContain("no hay un total");
   });
 });
 
 describe("🩸 a la empresa sin gasto NO se le pinta $0: se le pinta el MOTIVO", () => {
-  it("y el motivo es el exacto — 'Sin cerrar' ≠ 'Falta planilla'", () => {
+  it("y el motivo es el exacto — los tres se distinguen entre sí", () => {
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
+
     const shoes = document.querySelector('[data-fila-gasto="fashion_shoes"]')!;
     expect(shoes.querySelector('[data-col="gasto"]')).toBeNull();
-    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin cerrar");
-    expect(shoes.textContent).toContain("llega hasta enero 2026");
+    expect(shoes.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Sin cargar");
+    expect(shoes.textContent).toContain("llegan hasta abril 2026");
     expect(shoes.textContent).not.toContain("$0");
 
-    const joy = document.querySelector('[data-fila-gasto="joystep"]')!;
-    expect(joy.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Falta planilla");
-    expect(joy.textContent).not.toContain("$0");
+    const boston = document.querySelector('[data-fila-gasto="confecciones_boston"]')!;
+    expect(boston.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("No se baja sola");
+    expect(boston.textContent).toContain("no se traen solos de Switch");
+    expect(boston.textContent).not.toContain("$0");
   });
 
-  it("la cobertura se dice con todas las letras: 2 de 4", () => {
+  it("🩸 el mes que salió plata pero NADA fue gasto tampoco pinta $0", () => {
+    // Es el caso REAL de active_wear en abril-2026. Un $0 acá se le restaría a
+    // la utilidad bruta y dejaría la rentabilidad igual a ella — o sea, verde.
     render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
-    expect(document.querySelector('[data-col="cobertura"]')!.textContent).toBe("2 de 4 con el mes cerrado");
+    const aw = document.querySelector('[data-fila-gasto="active_wear"]')!;
+    expect(aw.querySelector('[data-col="gasto"]')).toBeNull();
+    expect(aw.querySelector('[data-col="sin-gasto"]')!.textContent).toBe("Nada es gasto");
+    expect(aw.textContent).toContain("nada de eso quedó registrado como gasto");
+    expect(aw.textContent).not.toContain("$0");
   });
 
-  it("sin contabilidad conectada lo dice, y no pinta ningún monto", () => {
+  it("la cobertura se dice con todas las letras: 2 de 5", () => {
+    render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
+    expect(document.querySelector('[data-col="cobertura"]')!.textContent).toBe("2 de 5 con gastos cargados");
+  });
+
+  it("🔴 la pantalla dice DE DÓNDE sale el número, y que las transferencias no cuentan", () => {
+    // Sin esto, "gastos" es ambiguo: ¿lo que la contadora cerró o lo que salió
+    // del banco? Y el reporte trae TODO lo que sale, no sólo el gasto.
+    render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
+    expect(textoPintado()).toContain("Lo que salió de caja y banco");
+    expect(textoPintado()).toContain("sin contar transferencias ni préstamos");
+  });
+
+  it("🔴 el vocabulario del MAYOR no aparece por ningún lado", () => {
+    // "Sin cerrar" / "Falta planilla" hablan de un cierre contable que esta
+    // fuente no tiene: dejarlos explicaría la fuente equivocada.
+    render(<GastosPorEmpresa gastos={GASTOS} mes="2026-08" />);
+    const t = textoPintado();
+    for (const viejo of ["Sin cerrar", "Falta planilla", "contadora", "mes cerrado"]) {
+      expect(t, `sobrevivió el vocabulario del mayor: "${viejo}"`).not.toContain(viejo);
+    }
+  });
+
+  it("sin los gastos conectados lo dice, y no pinta ningún monto", () => {
     render(<GastosPorEmpresa gastos={{ ...GASTOS, disponible: false }} mes="2026-08" />);
-    expect(textoPintado()).toContain("todavía no está conectada");
+    expect(textoPintado()).toContain("todavía no están conectados");
     expect(document.querySelector('[data-col="gasto"]')).toBeNull();
   });
 });

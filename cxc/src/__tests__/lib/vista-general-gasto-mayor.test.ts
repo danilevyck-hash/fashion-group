@@ -220,9 +220,17 @@ describe("rentabilidadEmpresa: cada empresa contra LO SUYO", () => {
 // 4. Barridos estáticos: una sola fuente, y el copy imposible no vuelve
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("una sola lectura del mayor, y una sola pantalla que la usa", () => {
+// ⚠️ ESTE BLOQUE CAMBIÓ DE SUJETO EL 13-ago-2026 y no es un ajuste cosmético.
+//
+// Hasta ese día exigía que **Vista General leyera el MAYOR**. Daniel decidió lo
+// contrario (*"no deberia de ser egresos varios y ya?"*), así que lo que aquel
+// candado protegía pasó a ser justamente lo que no puede volver: el mayor va 7
+// meses atrás y **no producía un número para ninguna empresa en ningún mes**.
+// El mayor SIGUE VIVO para el módulo "Gastos" —eso es lo que se sigue probando
+// acá abajo—; lo que se fue es su papel en el tablero del dueño.
+describe("el mayor sigue siendo del módulo Gastos, y de nadie más", () => {
   const RUTA_VG = "src/app/api/dashboard/vista-general/route.ts";
-  const PAGE_VG = "src/app/vista-general/page.tsx";
+  const RUTA_GASTOS = "src/app/api/gastos-contabilidad/resumen/route.ts";
 
   it("Vista General NO vuelve a leer la carga manual de gastos", () => {
     const vg = leer(RUTA_VG);
@@ -232,27 +240,40 @@ describe("una sola lectura del mayor, y una sola pantalla que la usa", () => {
     expect(vg).toContain('.from("bancos_saldos")');
   });
 
-  it("Vista General lee el mayor por `leerMayorMes`, no con su propia consulta", () => {
-    const vg = leer(RUTA_VG);
-    expect(vg).toContain("leerMayorMes");
+  it("🔴 Vista General ya NO lee el mayor", () => {
+    const vg = sinComentarios(leer(RUTA_VG));
+    expect(vg).not.toContain("leerMayorMes");
+    expect(vg).not.toMatch(/from\s+["']@\/lib\/mayor\//);
     expect(vg).not.toContain('.from("mayor_lineas")');
-    expect(vg).not.toContain('.from("mayor_importaciones")');
+  });
+
+  it("el módulo Gastos SÍ lo sigue leyendo, y por `leerMayorMes`", () => {
+    const g = leer(RUTA_GASTOS);
+    expect(g).toContain("leerMayorMes");
+    expect(g).not.toContain('.from("mayor_lineas")');
   });
 
   it("🔴 la consulta al mayor vive en UN solo archivo", () => {
     // Dos consultas para el mismo gasto es como dos pantallas empiezan a decir
     // números distintos, y ahí Daniel deja de creerle a las dos.
-    for (const rel of [RUTA_VG, "src/app/api/gastos-contabilidad/resumen/route.ts"]) {
+    for (const rel of [RUTA_VG, RUTA_GASTOS]) {
       expect(leer(rel)).not.toContain('.from("mayor_lineas")');
     }
     expect(leer("src/lib/mayor/leer.ts")).toContain('.from("mayor_lineas")');
   });
 
-  it("el módulo Gastos y Vista General resumen el mes con la MISMA función", () => {
+  it("el mayor NO se borró: sus dos piezas siguen enteras", () => {
     expect(leer("src/lib/mayor/leer.ts")).toContain("resumirMes");
-    expect(leer(RUTA_VG)).toContain("gastoMostrable");
+    expect(leer("src/lib/mayor/gastos.ts")).toContain("export function gastoMostrable");
   });
 });
+
+/** Barrido sobre CÓDIGO, no sobre comentarios: un comentario que explica por qué
+ *  algo se fue contiene justamente las palabras que el barrido busca, y sin esto
+ *  el candado se cumpliría a sí mismo. */
+function sinComentarios(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
 
 describe("el punto de equilibrio se retiró entero (no quedó a medias)", () => {
   it("no está en la pantalla", () => {

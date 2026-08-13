@@ -23,20 +23,33 @@
 // lo que hace creer que el dato ya está.
 //
 // El mecanismo NO es nuevo: es el MISMO que ya usa "Rentabilidad por empresa"
-// (`motivo` + `texto`, armados en el servidor con `textoSinGasto` para todas
+// (`motivo` + `texto`, armados en el servidor con la misma función para todas
 // las empresas por igual). Acá se reusa; no se inventa un segundo.
+//
+// ── 🔴 LA FUENTE ES EGRESOS VARIOS, NO EL MAYOR (13-ago-2026) ───────────────
+//
+// Daniel: *"no deberia de ser egresos varios y ya?"*. El mayor es lo que la
+// contadora CERRÓ (va 7 meses atrás y no daba número para NADIE); Egresos
+// Varios es lo que SALIÓ de caja y banco, y está vivo. Por eso los motivos
+// cambiaron de vocabulario: acá no hay "mes cerrado" ni "falta planilla" —
+// hay plata que salió, o que todavía no se cargó. Ver
+// `src/lib/egresos/gasto-mostrable.ts`.
 
 import Link from "next/link";
-import { ETIQUETA_SIN_GASTO, type MotivoSinGasto } from "@/lib/mayor/gastos";
+import {
+  ETIQUETA_SIN_GASTO_EGRESOS,
+  type MotivoSinGastoEgresos,
+} from "@/lib/egresos/gasto-mostrable";
 import { money } from "./formato";
 
 export interface GastoEmpresaRow {
   key: string;
   name: string;
-  /** Gasto del mayor. `null` cuando el mes de ESA empresa no se puede mostrar. */
+  /** Gasto de caja (grupo 6). `null` cuando el mes de ESA empresa no se puede mostrar. */
   gasto: number | null;
-  motivo: MotivoSinGasto | null;
+  motivo: MotivoSinGastoEgresos | null;
   texto: string | null;
+  /** Hasta qué mes llegan los egresos de ESA empresa (`YYYY-MM`), o `null`. */
   ultimoMesCerrado: string | null;
 }
 
@@ -50,7 +63,9 @@ export interface GastosData {
 /** La píldora de una empresa: el motivo exacto, nunca un genérico. */
 export function pillGasto(g: GastoEmpresaRow): { label: string; cls: string } | null {
   if (g.gasto !== null) return null;
-  if (g.motivo) return { label: ETIQUETA_SIN_GASTO[g.motivo], cls: "bg-stone-100 text-stone-500" };
+  if (g.motivo) {
+    return { label: ETIQUETA_SIN_GASTO_EGRESOS[g.motivo], cls: "bg-stone-100 text-stone-500" };
+  }
   return { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" };
 }
 
@@ -60,20 +75,21 @@ export default function GastosPorEmpresa({ gastos, mes }: { gastos: GastosData; 
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-xs font-semibold text-stone-700">Gastos por empresa</h3>
         <span data-col="cobertura" className="text-xs text-stone-400 tabular-nums">
-          {gastos.empresasConGasto} de {gastos.empresasTotal} con el mes cerrado
+          {gastos.empresasConGasto} de {gastos.empresasTotal} con gastos cargados
         </span>
       </div>
-      {/* La bajada NO es decorativa: dice que no hay total, y por qué. Sin ella,
-          alguien suma las filas de cabeza y se arma el número del grupo que
-          Daniel pidió no tener. */}
+      {/* La bajada NO es decorativa: dice DE DÓNDE sale el número y que no hay
+          total. Sin lo primero, "gastos" es ambiguo (¿lo que la contadora cerró
+          o lo que salió del banco?); sin lo segundo, alguien suma las filas de
+          cabeza y se arma el número del grupo que Daniel pidió no tener. */}
       <p className="mt-0.5 text-xs text-stone-500">
-        Cada empresa con lo suyo. No hay un total: la contabilidad va atrasada distinto en cada una,
-        así que sumarlas daría un número que no es de ninguna.
+        Lo que salió de caja y banco, sin contar transferencias ni préstamos. Cada empresa con lo
+        suyo: no hay un total, porque los gastos van cargados hasta un mes distinto en cada una.
       </p>
 
       {!gastos.disponible ? (
         <p className="mt-3 text-sm text-stone-500">
-          La contabilidad de Switch todavía no está conectada.
+          Los gastos de Switch todavía no están conectados.
         </p>
       ) : (
         <div className="mt-3 space-y-2">
