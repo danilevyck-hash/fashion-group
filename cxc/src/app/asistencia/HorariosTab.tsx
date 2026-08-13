@@ -1,6 +1,14 @@
 "use client";
 
-// Hora de salida y almuerzo POR PERSONA.
+// Hora de salida POR PERSONA. El almuerzo es fijo y se muestra como dato.
+//
+// 🔴 EL ALMUERZO DEJÓ DE SER UNA OPCIÓN (13-ago-2026). Daniel, textual: *"todos
+// 30 minutos de almuerzo (puedes quitar la opcion de elegir tiempo de almuerzo,
+// siempre es fijo 30 mins)"*. Había dos botones —30 y 60— y las 33 personas con
+// horario tenían 30, sin una sola excepción en toda la historia de la tabla: era
+// una perilla que nadie usó nunca y que solo podía quedar mal puesta. El valor
+// vive en `ALMUERZO_FIJO_MIN` y el PUT lo escribe él, mire lo que mire el cuerpo
+// del pedido — esconder el control sin cerrar la ruta habría sido cosmético.
 //
 // 🩸 No es una pantalla de configuración cualquiera: el `Turno` de iVMS está mal
 // en 12 de 31 personas (medido contra los 3 archivos reales). Ángela García
@@ -13,6 +21,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
+import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { Ayuda } from "@/components/shared/Ayuda";
 
 interface Fila {
@@ -22,6 +31,7 @@ interface Fila {
   /** `false` = todavía no tiene ficha; se muestra el código y se avisa. */
   configurado?: boolean;
   salida: string;
+  /** Lo GUARDADO. Se muestra, no se elige: la pantalla no puede cambiarlo. */
   almuerzoMinutos: number;
   guardado: boolean;
   sugerida: string;
@@ -29,7 +39,6 @@ interface Fila {
 }
 
 const SALIDAS = ["16:30", "17:00"];
-const ALMUERZOS = [30, 60];
 
 export default function HorariosTab() {
   const { toast } = useToast();
@@ -61,10 +70,8 @@ export default function HorariosTab() {
       const res = await fetch("/api/asistencia/horarios", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          codigo: f.codigo, nombre: f.nombre,
-          salida: nuevo.salida, almuerzoMinutos: nuevo.almuerzoMinutos,
-        }),
+        // Solo viaja la salida: el almuerzo lo pone el servidor.
+        body: JSON.stringify({ codigo: f.codigo, nombre: f.nombre, salida: nuevo.salida }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "No se pudo guardar");
@@ -85,6 +92,10 @@ export default function HorariosTab() {
           <p>
             Lo que fijes acá manda sobre lo que diga el reloj. Arranca con la hora a la que
             <b> cada quien sale de verdad</b>, medida de sus marcaciones.
+          </p>
+          <p className="mt-1.5">
+            El <b>almuerzo es de {ALMUERZO_FIJO_MIN} minutos para todos</b> y no se elige. Lo único
+            que se fija persona por persona es la hora de salida.
           </p>
         </Ayuda>
       </div>
@@ -136,15 +147,9 @@ export default function HorariosTab() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-1">
-                      {ALMUERZOS.map((a) => (
-                        <button key={a} type="button" onClick={() => void guardar(f, { almuerzoMinutos: a })}
-                          className={`min-h-[44px] rounded-md border px-2.5 text-[13px] tabular-nums transition active:scale-[0.97] ${
-                            f.almuerzoMinutos === a ? "border-black bg-black text-white" : "border-gray-200 text-gray-600 hover:border-gray-400"
-                          }`}>{a} min</button>
-                      ))}
-                    </div>
+                  {/* Dato, no control: el almuerzo es igual para todos. */}
+                  <td className="px-3 py-2 text-[13px] tabular-nums text-gray-500">
+                    {ALMUERZO_FIJO_MIN} minutos
                   </td>
                   <td className="px-3 py-2 text-[12px]">
                     {guardando === f.codigo ? <span className="text-gray-400">Guardando…</span>

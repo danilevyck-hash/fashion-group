@@ -17,7 +17,8 @@ import * as XLSX from "xlsx-js-style";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, ALMUERZO_DEFAULT_MIN, type PersonaReporte, type ReglasReporte } from "./reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "./reporte";
+import { ALMUERZO_FIJO_MIN } from "./config";
 import { etiquetaPersona } from "./directorio";
 
 const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -72,7 +73,6 @@ function conDefaults(r: Partial<ReglasReporte> | undefined): ReglasReporte {
   return {
     toleranciaTardanzaMin: n(r?.toleranciaTardanzaMin, TOLERANCIA_MIN),
     extraMinimoMin: n(r?.extraMinimoMin, EXTRA_MINIMO_MIN),
-    almuerzoDefaultMin: n(r?.almuerzoDefaultMin, ALMUERZO_DEFAULT_MIN),
   };
 }
 
@@ -175,7 +175,8 @@ export function construirExcel({ personas, desde, hasta, reglas }: DatosExport):
     [],
     ["Cómo se calcula"],
     ["Entrada", `8:00 a.m. con ${g.toleranciaTardanzaMin} minutos de tolerancia. Pasados los ${g.toleranciaTardanzaMin}, se cuenta desde las 8:00.`],
-    ["Almuerzo", `${g.almuerzoDefaultMin} minutos por defecto. Se mide entre la 2ª y la 3ª marca del día.`],
+    // El almuerzo NO sale de `reglas`: es fijo para todos (ver ALMUERZO_FIJO_MIN).
+    ["Almuerzo", `${ALMUERZO_FIJO_MIN} minutos, igual para todos. Se mide entre la 2ª y la 3ª marca del día.`],
     ["Horas extra", `Mínimo ${g.extraMinimoMin} minutos, y se le resta el atraso del mismo día.`],
     ["Ausencia", "Día hábil sin ninguna marca, que no sea feriado ni tenga justificación."],
     ["Días a revisar", "El día no tiene las 4 marcas. Los minutos SÍ cuentan; la marca es para corregirlo."],
@@ -244,7 +245,7 @@ export function construirPdf({ personas, desde, hasta, reglas }: DatosExport): j
       const h = doc.internal.pageSize.getHeight();
       doc.setFontSize(7); doc.setTextColor(156, 163, 175);
       doc.text(
-        `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${g.almuerzoDefaultMin} min · ` +
+        `Entrada 8:00 (${g.toleranciaTardanzaMin} min de tolerancia) · almuerzo ${ALMUERZO_FIJO_MIN} min · ` +
         `extras desde ${g.extraMinimoMin} min, menos el atraso del día · ` +
         "\"A revisar\" = el día no tiene las 4 marcas (los minutos igual cuentan)",
         14, h - 8,

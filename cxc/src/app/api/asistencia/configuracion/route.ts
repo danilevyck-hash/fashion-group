@@ -38,7 +38,14 @@ import {
   TABLA_PERSONAS,
   DIAS_VENTANA_PERSONAS,
   vigenciaDeFila,
+  servicioProfesionalDeFila,
 } from "@/lib/asistencia/config-server";
+import {
+  avisoMigracionServicioProfesional,
+  COLUMNA_SERVICIO_PROFESIONAL,
+  esColumnaServicioProfesionalFaltante,
+  validarServicioProfesional,
+} from "@/lib/asistencia/participacion";
 import { crearDirectorio, compararPersonas } from "@/lib/asistencia/directorio";
 import {
   avisoMarcasPosteriores,
@@ -91,7 +98,12 @@ export async function GET(req: NextRequest) {
 
     const [
       { reglas, faltaMigracion: faltaReglas },
-      { filas, faltaMigracion: faltaPersonas, faltaColumnasBajas },
+      {
+        filas,
+        faltaMigracion: faltaPersonas,
+        faltaColumnasBajas,
+        faltaColumnaServicioProfesional,
+      },
     ] = await Promise.all([leerReglas(), leerPersonas()]);
 
     // El día de hoy en Panamá. Solo decide cómo se REDACTA la baja («Renunció»
@@ -155,6 +167,9 @@ export async function GET(req: NextRequest) {
       // La baja de esta persona, si la tiene. Sin las columnas corridas sale
       // vacía y todo el mundo queda activo — que es como está hoy.
       const vig = f ? vigenciaDeFila(f) : null;
+      // 🔴 Sin ficha NO se puede estar fuera de planilla: la bandera vive en la
+      // ficha. Un código que marca y nadie configuró sigue siendo un pendiente.
+      const servicioProfesional = f ? servicioProfesionalDeFila(f) : false;
       const ultimaMarca = v ? diaPanama(v.ultima) : null;
       const etiqueta = directorio.nombre(codigo) ?? v?.nombreReloj ?? `Código ${codigo}`;
       if (vig && marcoDespuesDeLaBaja(vig, ultimaMarca)) {
@@ -177,9 +192,18 @@ export async function GET(req: NextRequest) {
         // `false` = el código marca en el reloj pero nadie dijo quién es. Es
         // exactamente lo que la pantalla tiene que destacar.
         configurado: !!f,
+        // 🔴 «Va en planilla» o «servicio profesional». La segunda mitad del
+        // dato: sigue en el control de asistencia, fuera de todo cálculo de pago.
+        servicioProfesional,
         // Falta el sueldo, pero la empresa ya está: se puede emitir la planilla
         // de las otras y saber a quién le falta el dato.
-        faltaSalario: !!f && (salario === null || !Number.isFinite(salario as number)),
+        //
+        // 🔴 A QUIEN NO VA EN PLANILLA NO LE FALTA EL SALARIO: no lo necesita.
+        // Sin esta condición, YULISSA saldría para siempre en «les falta el
+        // salario» y ese aviso —el que la contable usa para saber cuánto le
+        // queda— dejaría de significar algo.
+        faltaSalario:
+          !!f && !servicioProfesional && (salario === null || !Number.isFinite(salario as number)),
         marcaciones: v?.marcaciones ?? 0,
         ultimaMarca,
         dispositivo: v?.dispositivo ?? null,
@@ -233,6 +257,8 @@ export async function GET(req: NextRequest) {
         conMarcaciones: activos.filter((p) => p.marcaciones > 0).length,
         /** Los que ya no trabajan acá. Se ven aparte, no mezclados. */
         bajas: personas.length - activos.length,
+        /** Marcan y no van en planilla. No son pendientes de nadie. */
+        servicioProfesional: activos.filter((p) => p.servicioProfesional).length,
       },
       faltaMigracion: faltaPersonas || faltaReglas,
       avisoMigracion: faltaPersonas || faltaReglas ? avisoMigracion() : null,
@@ -240,6 +266,13 @@ export async function GET(req: NextRequest) {
       // de dar de baja no puede guardar: se dice de entrada y no al fallar.
       avisoMigracionBajas: !faltaPersonas && faltaColumnasBajas ? avisoMigracionBajas() : null,
       puedeDarDeBaja: !faltaPersonas && !faltaColumnasBajas,
+      // Igual que arriba, un escalón más abajo: sin la columna todo el mundo
+      // aparece en la planilla y se dice de entrada, no al fallar el guardado.
+      avisoMigracionServicioProfesional:
+        !faltaPersonas && faltaColumnaServicioProfesional
+          ? avisoMigracionServicioProfesional()
+          : null,
+      puedeMarcarServicioProfesional: !faltaPersonas && !faltaColumnaServicioProfesional,
       // 🩸 El que no se puede esconder: dada de baja y sigue marcando.
       avisoBajas: avisoMarcasPosteriores(marcasPosteriores),
     });
@@ -277,6 +310,12 @@ export async function PUT(req: NextRequest) {
   if (!rv.ok) return NextResponse.json({ error: rv.error }, { status: 400 });
   const v = rv.valor;
 
+  // Lo mismo con "va en planilla / servicio profesional": es OTRA pregunta —cómo
+  // se le paga— y no debería poder tumbar el guardado de un nombre.
+  const rs = validarServicioProfesional(body);
+  if (!rs.ok) return NextResponse.json({ error: rs.error }, { status: 400 });
+  const servicioProfesional = rs.valor;
+
   const base = {
     empleado_codigo: p.codigo,
     nombre: p.nombre,
@@ -291,10 +330,33 @@ export async function PUT(req: NextRequest) {
     fecha_salida: v.fechaSalida,
     motivo_salida: v.motivoSalida,
   };
+  const conTodo = {
+    ...conVigencia,
+    [COLUMNA_SERVICIO_PROFESIONAL]: servicioProfesional,
+  };
 
-  const { error } = await supabaseServer
+  let { error } = await supabaseServer
     .from(TABLA_PERSONAS)
-    .upsert(conVigencia, { onConflict: "empleado_codigo" });
+    .upsert(conTodo, { onConflict: "empleado_codigo" });
+
+  // 🩸 FALTA LA COLUMNA DE SERVICIO PROFESIONAL. Misma bifurcación que la baja,
+  // y por la misma razón:
+  //  · si NO se estaba marcando a nadie como servicio profesional, se reintenta
+  //    sin la columna para que poner un nombre o un salario siga funcionando;
+  //  · si SÍ se estaba marcando, NO se guarda a medias y se dice qué falta. Un
+  //    "guardado" que se traga la bandera dejaría a la persona en la planilla y
+  //    nadie sabría por qué.
+  if (error && esColumnaServicioProfesionalFaltante(error)) {
+    if (servicioProfesional) {
+      return NextResponse.json(
+        { error: avisoMigracionServicioProfesional(), faltaMigracionServicioProfesional: true },
+        { status: 503 },
+      );
+    }
+    ({ error } = await supabaseServer
+      .from(TABLA_PERSONAS)
+      .upsert(conVigencia, { onConflict: "empleado_codigo" }));
+  }
 
   if (error) {
     // 🔴 LA COLUMNA SE PREGUNTA ANTES QUE LA TABLA, y no es un detalle de estilo:
@@ -321,7 +383,11 @@ export async function PUT(req: NextRequest) {
         .from(TABLA_PERSONAS)
         .upsert(base, { onConflict: "empleado_codigo" });
       if (!reintento.error) {
-        return NextResponse.json({ ok: true, persona: { ...p, ...v }, faltaMigracionBajas: true });
+        return NextResponse.json({
+          ok: true,
+          persona: { ...p, ...v, servicioProfesional },
+          faltaMigracionBajas: true,
+        });
       }
       console.error("[asistencia/configuracion PUT]", reintento.error.message);
       return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
@@ -337,5 +403,5 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "No se pudo guardar. Intenta de nuevo." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, persona: { ...p, ...v } });
+  return NextResponse.json({ ok: true, persona: { ...p, ...v, servicioProfesional } });
 }

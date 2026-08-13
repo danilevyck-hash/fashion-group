@@ -21,6 +21,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { Ayuda } from "@/components/shared/Ayuda";
 import { EMPRESAS_ASISTENCIA, etiquetaEmpresa } from "@/lib/asistencia/config";
+import {
+  EXPLICACION_SERVICIO_PROFESIONAL,
+  MOTIVO_FUERA_DE_PLANILLA,
+} from "@/lib/asistencia/participacion";
 import type { ReglasAsistencia } from "@/lib/asistencia/config";
 import {
   aHoras,
@@ -43,6 +47,7 @@ interface Respuesta {
     faltaMigracionConfiguracion: string | null;
     faltaMigracionManual: string | null;
     faltaMigracionBajas: string | null;
+    faltaMigracionServicioProfesional: string | null;
     /** Fichas que no entran a ESTA quincena: ya se habían ido, o todavía no
      *  habían entrado. Una quincena vieja NO cambia por esto: se compara contra
      *  las fechas de la quincena, nunca contra hoy. */
@@ -190,7 +195,12 @@ export default function PlanillaTab() {
   }
 
   const buenas = data?.lineas.filter((l) => l.dinero) ?? [];
-  const pendientes = data?.lineas.filter((l) => !l.dinero) ?? [];
+  // 🔴 TRES grupos, no dos. Quien no va en planilla tampoco produce dinero, pero
+  // NO es un pendiente: mezclarlo con los ámbar diría que hay algo que arreglar
+  // donde solo hay una decisión ya tomada, y la lista de pendientes —la que la
+  // contable usa para saber qué le falta— dejaría de significar algo.
+  const fueraDePlanilla = data?.lineas.filter((l) => l.fueraDePlanilla) ?? [];
+  const pendientes = data?.lineas.filter((l) => !l.dinero && !l.fueraDePlanilla) ?? [];
 
   return (
     <div className="space-y-4">
@@ -252,6 +262,11 @@ export default function PlanillaTab() {
       {data?.avisos.faltaMigracionBajas && (
         <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
           {data.avisos.faltaMigracionBajas}
+        </p>
+      )}
+      {data?.avisos.faltaMigracionServicioProfesional && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.faltaMigracionServicioProfesional}
         </p>
       )}
       {/* 🩸 Que alguien siga marcando después de darse de baja no se esconde:
@@ -327,6 +342,19 @@ export default function PlanillaTab() {
                   {buenas.map((l) => (
                     <Fila key={l.codigo} l={l} onGuardar={guardar} />
                   ))}
+                  {/* Fuera de planilla a propósito: en GRIS, no en ámbar. El
+                      color es la mitad del mensaje — ámbar dice "arreglame". */}
+                  {fueraDePlanilla.map((l) => (
+                    <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-500">
+                        {l.etiqueta}
+                        <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
+                      </td>
+                      <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-500">
+                        {MOTIVO_FUERA_DE_PLANILLA} · se le mide la asistencia, no se le calcula pago
+                      </td>
+                    </tr>
+                  ))}
                   {pendientes.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 bg-amber-50/50 last:border-0">
                       <td className="sticky left-0 z-10 bg-amber-50 px-3 py-2.5 text-gray-900">
@@ -373,6 +401,16 @@ export default function PlanillaTab() {
                 onGuardar={guardar}
               />
             ))}
+            {fueraDePlanilla.map((l) => (
+              <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
+                <p className="font-medium text-gray-700">
+                  {l.etiqueta} <span className="text-xs text-gray-400">{l.codigo}</span>
+                </p>
+                <p className="mt-0.5 text-[13px] text-gray-500">
+                  {MOTIVO_FUERA_DE_PLANILLA} · se le mide la asistencia, no se le calcula pago
+                </p>
+              </div>
+            ))}
             {pendientes.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="font-medium text-gray-900">
@@ -396,6 +434,15 @@ export default function PlanillaTab() {
               </p>
             </div>
           </div>
+
+          {!!fueraDePlanilla.length && (
+            <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+              <b>{fueraDePlanilla.length}</b>{" "}
+              {fueraDePlanilla.length === 1 ? "persona no va" : "personas no van"} en la planilla
+              (servicio profesional). {EXPLICACION_SERVICIO_PROFESIONAL} Se cambia en{" "}
+              <b>Configuración</b>.
+            </p>
+          )}
 
           {!!pendientes.length && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">

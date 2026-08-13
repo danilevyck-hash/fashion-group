@@ -31,6 +31,10 @@ import {
 } from "@/lib/excel-export";
 import type { ReglasAsistencia } from "./config";
 import {
+  EXPLICACION_SERVICIO_PROFESIONAL,
+  MOTIVO_FUERA_DE_PLANILLA,
+} from "./participacion";
+import {
   aHoras,
   FORMULA_NETO,
   type LineaPlanilla,
@@ -96,8 +100,24 @@ const COLUMNAS: ReportColumn[] = [
 
 /** El motivo, en la columna del salario, en rojo. Nunca un cero. */
 const PENDIENTE = { fg: "A3352A", bold: true } as const;
+/**
+ * Quien no va en planilla, en GRIS y sin el «⚠».
+ * 🔴 El color es la mitad del mensaje: en rojo se leería como un error que hay
+ * que corregir, y es una decisión ya tomada.
+ */
+const FUERA = { fg: "6B7280" } as const;
 
 function filaPlanilla(l: LineaPlanilla): ReportCell[] {
+  if (l.fueraDePlanilla) {
+    // Sale en el archivo —omitirla sería peor: el papel sobrevive a la
+    // discusión— con el motivo escrito y las 18 columnas de dinero vacías.
+    return [
+      { v: l.etiqueta, ...FUERA },
+      l.codigo,
+      { v: MOTIVO_FUERA_DE_PLANILLA, ...FUERA },
+      ...Array<ReportCell>(17).fill(null),
+    ];
+  }
   if (!l.dinero) {
     // 🔴 Se lista, se dice POR QUÉ, y las 18 columnas de dinero quedan vacías.
     return [
@@ -180,7 +200,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         c0(h.tardanzaMin), c0(h.tardanzaDeDiasARevisarMin),
         c0(h.ausenciaDias), c0(aHoras(h.ausenciaMin)),
         c0(aHoras(h.sabadoMin)), c0(h.diasARevisar),
-        l.faltaConfigurar.length ? { v: l.faltaConfigurar.join(" · "), ...PENDIENTE } : "",
+        l.fueraDePlanilla
+          ? { v: MOTIVO_FUERA_DE_PLANILLA, ...FUERA }
+          : l.faltaConfigurar.length
+            ? { v: l.faltaConfigurar.join(" · "), ...PENDIENTE }
+            : "",
       ] as ReportCell[];
     }),
   });
@@ -215,6 +239,7 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
+      ["Quien aparece en gris", `No va en planilla. ${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga.`],
       ["⚠ Sábados", "Si alguien trabajó un sábado, las horas se muestran en la hoja de horas pero NO se pagan en ninguna columna: el cuadro no tiene una para el sábado."],
     ] as ReportCell[][],
   });
@@ -259,6 +284,13 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
     ]],
     body: d.lineas.map((l) => {
+      if (l.fueraDePlanilla) {
+        return [
+          `${l.etiqueta} (${l.codigo})`,
+          MOTIVO_FUERA_DE_PLANILLA,
+          ...Array<string>(17).fill(""),
+        ];
+      }
       if (!l.dinero) {
         // 🔑 SIN el «⚠» del Excel: la fuente base del PDF no tiene ese glifo y
         // lo imprimía como un «&». La fila igual se distingue —va en rojo— y
@@ -303,10 +335,10 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
     didParseCell: (data) => {
       if (data.section !== "body") return;
       const l = d.lineas[data.row.index];
-      if (l && !l.dinero) {
-        data.cell.styles.textColor = [163, 53, 42];
-        if (data.column.index === 1) data.cell.styles.halign = "left";
-      }
+      if (!l || l.dinero) return;
+      // Gris para quien no va en planilla, rojo para el pendiente de verdad.
+      data.cell.styles.textColor = l.fueraDePlanilla ? [107, 114, 128] : [163, 53, 42];
+      if (data.column.index === 1) data.cell.styles.halign = "left";
     },
     margin: { left: 10, right: 10 },
     didDrawPage: () => {
@@ -315,7 +347,8 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       doc.setTextColor(156, 163, 175);
       doc.text(FORMULA_NETO, 10, h - 8);
       doc.text(
-        "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.",
+        "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.  "
+        + "En gris: no va en planilla (servicio profesional); se le mide la asistencia y no se le calcula pago.",
         10, h - 5,
       );
       doc.text(`Página ${doc.getNumberOfPages()}`, w - 10, h - 8, { align: "right" });

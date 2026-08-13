@@ -7,10 +7,14 @@
 //
 // ── LOS NÚMEROS YA NO SON CONSTANTES ─────────────────────────────────────────
 // Daniel, 6-ago-2026: *"todos los calculos deben de ser configurables en caso de
-// que algo cambie"*. La tolerancia, el mínimo de horas extra y el almuerzo por
-// defecto entran por parámetro (`reglas`) y salen de `asistencia_reglas`. Lo que
-// queda acá es el VALOR POR DEFECTO —el confirmado por la contable— para que el
-// motor siga siendo puro y testeable sin base.
+// que algo cambie"*. La tolerancia y el mínimo de horas extra entran por
+// parámetro (`reglas`) y salen de `asistencia_reglas`. Lo que queda acá es el
+// VALOR POR DEFECTO —el confirmado por la contable— para que el motor siga
+// siendo puro y testeable sin base.
+//
+// ⚠️ EL ALMUERZO ES LA EXCEPCIÓN, y por pedido del propio Daniel (13-ago-2026):
+// es FIJO en 30 minutos para todo el mundo, así que no entra por `reglas`. Ver
+// `ALMUERZO_FIJO_MIN` en `config.ts`.
 //
 // ── LAS REGLAS, acordadas con Daniel el 5-ago-2026 ───────────────────────────
 //
@@ -21,8 +25,10 @@
 //    🩸 La tolerancia arrancó en 5 y la contable la subió a 10 (6-ago-2026). Se
 //    cambia en UN lugar: el default de `config.ts` o la fila de la base.
 //
-// 2. ALMUERZO 30 MINUTOS por defecto, configurable por persona.
-//    Medido contra los 3 archivos reales: la mayoría toma entre 23 y 30.
+// 2. ALMUERZO 30 MINUTOS, IGUAL PARA TODOS. Se sigue leyendo de
+//    `asistencia_horarios.almuerzo_minutos` (medido: las 33 personas con
+//    horario tienen 30), y quien todavía no tenga fila cae en el mismo 30.
+//    Ya no se puede elegir otro valor desde ninguna pantalla.
 //
 // 3. HORAS EXTRA: mínimo 15 minutos, y MENOS EL ATRASO DEL MISMO DÍA.
 //    🩸 Lo segundo es lo que evita pagar dos veces: el que llegó 20 minutos
@@ -45,7 +51,7 @@
 //    marcados mal — para que nadie descuente sobre un dato sin haberlo mirado.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
+import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
 
 /** Panamá es UTC−5 fijo, sin horario de verano. */
 const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -54,7 +60,14 @@ const PANAMA_OFFSET_MS = 5 * 60 * 60 * 1000;
 // pasan reglas, se comporta como la configuración confirmada por la contable.
 // Se re-exportan desde acá para que quien ya los importaba no tenga dos fuentes.
 export const TOLERANCIA_MIN = REGLAS_DEFAULT.toleranciaTardanzaMin;
-export const ALMUERZO_DEFAULT_MIN = REGLAS_DEFAULT.almuerzoDefaultMin;
+/**
+ * El almuerzo de quien todavía no tiene fila en `asistencia_horarios`.
+ *
+ * 🔑 Ya NO sale de las reglas configurables: es fijo en 30 minutos y se lee de
+ * `ALMUERZO_FIJO_MIN`, la única fuente. Se re-exporta con el nombre de siempre
+ * para no partir en dos a quien ya lo importaba.
+ */
+export const ALMUERZO_DEFAULT_MIN = ALMUERZO_FIJO_MIN;
 export const EXTRA_MINIMO_MIN = REGLAS_DEFAULT.extraMinimoMin;
 export const ENTRADA_DEFAULT = "08:00";
 export const SALIDA_DEFAULT = "17:00";
@@ -62,7 +75,7 @@ export const SALIDA_DEFAULT = "17:00";
 /** Lo único de `asistencia_reglas` que el reporte de minutos usa hoy. */
 export type ReglasReporte = Pick<
   ReglasAsistencia,
-  "toleranciaTardanzaMin" | "extraMinimoMin" | "almuerzoDefaultMin"
+  "toleranciaTardanzaMin" | "extraMinimoMin"
 >;
 
 export interface Marcacion {
@@ -236,7 +249,7 @@ export function armarReporte(opts: {
     typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : def;
   const toleranciaMin = num(opts.reglas?.toleranciaTardanzaMin, TOLERANCIA_MIN);
   const extraMinimoMin = num(opts.reglas?.extraMinimoMin, EXTRA_MINIMO_MIN);
-  const almuerzoDefaultMin = num(opts.reglas?.almuerzoDefaultMin, ALMUERZO_DEFAULT_MIN);
+  // ⛔ El almuerzo NO entra por `reglas`: es fijo (ver `ALMUERZO_FIJO_MIN`).
 
   const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
   const habiles = diasDelRango(desde, hasta, opts.incluirNoHabiles === true);
@@ -261,7 +274,9 @@ export function armarReporte(opts: {
     const h = horarioDe.get(codigo);
     const entradaProg = hhmmAMin(h?.entrada ?? ENTRADA_DEFAULT);
     const salidaProg = hhmmAMin(h?.salida ?? SALIDA_DEFAULT);
-    const almuerzoProg = h?.almuerzo_minutos ?? almuerzoDefaultMin;
+    // 🔑 La columna por persona SE SIGUE LEYENDO —es lo que Daniel pidió que no
+    // se tocara— y solo cae al fijo quien todavía no tiene horario guardado.
+    const almuerzoProg = h?.almuerzo_minutos ?? ALMUERZO_FIJO_MIN;
 
     const dias: DiaReporte[] = [];
     for (const fecha of habiles) {

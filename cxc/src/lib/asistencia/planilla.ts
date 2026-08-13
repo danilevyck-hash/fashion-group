@@ -6,6 +6,12 @@
  *
  * ── LAS DOS COSAS QUE ESTE ARCHIVO NO HACE, Y SON LO MÁS IMPORTANTE ──────────
  *
+ * 0. NO LE CALCULA PAGO A QUIEN NO VA EN PLANILLA. Quien está marcado como
+ *    servicio profesional (`servicioProfesional`, ver `participacion.ts`) sale
+ *    con `dinero: null` **aunque tenga salario cargado** y con
+ *    `fueraDePlanilla: true`, que NO es lo mismo que "falta configurar": sus
+ *    horas se miden igual y su fila no es un pendiente de nadie.
+ *
  * 1. NO INVENTA UN NÚMERO CUANDO LE FALTA UN DATO. Una persona sin salario o
  *    sin jornada NO produce una línea de $0: produce una línea con
  *    `faltaConfigurar` lleno y SIN dinero, y los totales la dejan afuera.
@@ -400,6 +406,12 @@ export interface FichaPlanilla {
   salarioMensual: number | null;
   jornadaSemanal: number | null;
   empresa: EmpresaAsistencia | string | null;
+  /**
+   * `true` = marca en el reloj pero NO va en planilla (servicio profesional).
+   * Ver `participacion.ts`. Ausente o `false` = va en planilla, que es como
+   * estaban las 38 fichas antes de que este campo existiera.
+   */
+  servicioProfesional?: boolean;
 }
 
 export interface DineroLinea {
@@ -441,6 +453,14 @@ export interface LineaPlanilla {
    * 🩸 Nunca un $0 silencioso, nunca omitida de la lista.
    */
   faltaConfigurar: string[];
+  /**
+   * 🔴 `true` = NO va en planilla (servicio profesional). `dinero` es `null` y
+   * NO entra a los totales, pero **no es un pendiente**: no se pinta en ámbar,
+   * no se cuenta en «falta configurar» y no hay nada que arreglarle. Es una
+   * decisión de negocio, no un dato faltante — y la diferencia es justo la que
+   * este campo existe para sostener.
+   */
+  fueraDePlanilla: boolean;
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }
@@ -464,16 +484,27 @@ export const FALTA = {
   sinMarcaciones: "no marcó ni un día en esta quincena",
 } as const;
 
-/** Qué le falta a una ficha. Lista vacía = se puede calcular. */
+/**
+ * Qué le falta a una ficha. Lista vacía = se puede calcular.
+ *
+ * 🔴 A QUIEN NO VA EN PLANILLA NO SE LE PIDE SALARIO NI JORNADA. No es que le
+ * "falten": no los necesita, porque no se le calcula pago. Sin esto, YULISSA
+ * saldría para siempre en la lista de «les falta el salario» y esa lista dejaría
+ * de servir para lo que existe — decirle a la contable qué le queda por llenar.
+ */
 export function faltantesDe(f: FichaPlanilla, reglas: ReglasAsistencia): string[] {
   const out: string[] = [];
   const sinNada = !f.nombre && f.salarioMensual == null && f.jornadaSemanal == null && !f.empresa;
   if (sinNada) return [FALTA.ficha];
-  if (f.salarioMensual == null || !Number.isFinite(f.salarioMensual) || f.salarioMensual <= 0) {
-    out.push(FALTA.salario);
+  if (f.servicioProfesional !== true) {
+    if (f.salarioMensual == null || !Number.isFinite(f.salarioMensual) || f.salarioMensual <= 0) {
+      out.push(FALTA.salario);
+    }
+    if (f.jornadaSemanal !== 40 && f.jornadaSemanal !== 48) out.push(FALTA.jornada);
+    else if (divisorDe(f.jornadaSemanal, reglas) === null) out.push(FALTA.divisor);
   }
-  if (f.jornadaSemanal !== 40 && f.jornadaSemanal !== 48) out.push(FALTA.jornada);
-  else if (divisorDe(f.jornadaSemanal, reglas) === null) out.push(FALTA.divisor);
+  // La empresa se sigue pidiendo SIEMPRE: es lo que separa las tres planillas
+  // del mismo reloj, y también decide en qué lista de asistencia aparece.
   if (!f.empresa) out.push(FALTA.empresa);
   return out;
 }
@@ -588,12 +619,20 @@ export function armarLinea(
   reglas: ReglasAsistencia,
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
+  // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
+  // profesional NO produce dinero **aunque tenga salario cargado**: el `if` no
+  // pregunta por el sueldo, pregunta por la bandera. Si mañana alguien le
+  // escribe un salario por error —o queda uno viejo de cuando sí iba en
+  // planilla—, sigue sin calculársele un centavo. Sus HORAS, en cambio, se
+  // miden y viajan igual: es la mitad que Daniel quiere conservar.
+  const fueraDePlanilla = ficha.servicioProfesional === true;
   const dinero =
-    faltaConfigurar.length === 0
+    !fueraDePlanilla && faltaConfigurar.length === 0
       ? calcularDinero(ficha.salarioMensual as number, ficha.jornadaSemanal as number, horas, manuales, reglas)
       : null;
 
   return {
+    fueraDePlanilla,
     codigo: ficha.codigo,
     etiqueta: etiquetaPersona(ficha.codigo, ficha.nombre),
     nombre: ficha.nombre ?? null,
@@ -670,6 +709,13 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       : { ...HORAS_CERO, jornadaDiariaMin: jornadaDiariaMin(cod) };
 
     const linea = armarLinea(ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas);
+    // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
+    // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
+    // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
+    if (linea.fueraDePlanilla) {
+      lineas.push(linea);
+      continue;
+    }
     // Con ficha completa pero sin una sola marca no se inventa nada: se lista.
     if (!p && linea.faltaConfigurar.length === 0) {
       lineas.push({ ...linea, faltaConfigurar: [FALTA.sinMarcaciones], dinero: null });
@@ -691,6 +737,13 @@ export type TotalesPlanilla = Omit<DineroLinea, "rataHora" | "valorMinuto"> & {
   personas: number;
   /** Cuántas quedaron afuera por falta de configuración. */
   sinConfigurar: number;
+  /**
+   * Cuántas están fuera de planilla a propósito (servicio profesional).
+   * 🔴 Se cuentan APARTE de `sinConfigurar`: meterlas ahí diría que hay trabajo
+   * pendiente donde no lo hay, y ese número es el que la contable usa para saber
+   * cuánto le falta.
+   */
+  fueraDePlanilla: number;
 };
 
 export const TOTALES_CERO: TotalesPlanilla = {
@@ -698,7 +751,7 @@ export const TOTALES_CERO: TotalesPlanilla = {
   domingos: 0, feriados: 0, ausencias: 0, tardanzas: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
-  personas: 0, sinConfigurar: 0,
+  personas: 0, sinConfigurar: 0, fueraDePlanilla: 0,
 };
 
 /**
@@ -711,6 +764,9 @@ export const TOTALES_CERO: TotalesPlanilla = {
 export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
   const t: TotalesPlanilla = { ...TOTALES_CERO };
   for (const l of lineas) {
+    // Fuera de planilla a propósito: no suma plata y TAMPOCO cuenta como
+    // pendiente. Se pregunta primero para que no caiga en el `sinConfigurar`.
+    if (l.fueraDePlanilla) { t.fueraDePlanilla += 1; continue; }
     if (!l.dinero) { t.sinConfigurar += 1; continue; }
     t.personas += 1;
     const d = l.dinero;
@@ -736,14 +792,23 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
   return t;
 }
 
-/** El orden del cuadro: alfabético por nombre, y los pendientes al final. */
+/**
+ * El orden del cuadro: primero los que se pagan, después los que no van en
+ * planilla, y al final los pendientes.
+ *
+ * 🔑 Los tres grupos van separados porque el Excel y el PDF recorren esta lista
+ * tal cual: si los de servicio profesional quedaran mezclados entre los que sí
+ * cobran, en el papel se leerían como filas con las columnas de dinero vacías.
+ */
 export function ordenarLineas(lineas: readonly LineaPlanilla[]): LineaPlanilla[] {
+  const grupo = (l: LineaPlanilla) =>
+    l.fueraDePlanilla ? 1 : l.faltaConfigurar.length === 0 ? 0 : 2;
   return [...lineas].sort((a, b) => {
-    const aOk = a.faltaConfigurar.length === 0;
-    const bOk = b.faltaConfigurar.length === 0;
-    if (aOk !== bOk) return aOk ? -1 : 1;
-    if (aOk) return a.etiqueta.localeCompare(b.etiqueta, "es", { sensitivity: "base" });
-    return a.codigo.localeCompare(b.codigo, "es", { numeric: true, sensitivity: "base" });
+    const ga = grupo(a);
+    const gb = grupo(b);
+    if (ga !== gb) return ga - gb;
+    if (ga === 2) return a.codigo.localeCompare(b.codigo, "es", { numeric: true, sensitivity: "base" });
+    return a.etiqueta.localeCompare(b.etiqueta, "es", { sensitivity: "base" });
   });
 }
 

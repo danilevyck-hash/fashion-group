@@ -398,7 +398,6 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     const casos: Array<[string, RegExp]> = [
       ["Tolerancia de tardanza", /Minutos de gracia a la entrada/],
       ["Mínimo para contar hora extra", /Quedarse menos de esto no cuenta como extra/],
-      ["Almuerzo por defecto", /para quien no tenga uno propio en Horarios/],
       ["Hora extra de día", /1\.25 es la hora y cuarto/],
       ["Hora extra de noche", /Aplica pasada la hora de corte/],
       ["Hora de corte de la tarde", /la misma frontera que marca la jornada nocturna/],
@@ -417,10 +416,14 @@ describe("Configuración — metodología al ⓘ, pendientes y bajas en pantalla
     expect(nota.className).toContain("text-amber-800");
   });
 
-  it("las 3 reglas que no se pueden cambiar siguen a la vista; solo el porqué pasó al ⓘ", async () => {
+  it("las reglas que no se pueden cambiar siguen a la vista; solo el porqué pasó al ⓘ", async () => {
     await abrirConfiguracion();
     fireEvent.click(screen.getByText("Reglas del cálculo"));
     expect(screen.getByText(/La quincena va del 1 al 15 y del 16 al 30/)).toBeTruthy();
+    // 🔴 El almuerzo pasó de ser una CASILLA a ser una regla declarada: es lo
+    // que impide que vuelva a haber dos lugares diciendo cuánto dura.
+    expect(screen.getByText(/El almuerzo es de 30 minutos, igual para todos/)).toBeTruthy();
+    expect(screen.queryByText("Almuerzo por defecto")).toBeNull();
     esperaDetrasDelInfo("Por qué no se pueden cambiar", /es la forma del cálculo/);
   });
 

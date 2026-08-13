@@ -59,8 +59,6 @@ export interface ReglasAsistencia {
   toleranciaTardanzaMin: number;
   /** Menos de esto no se cuenta como hora extra. */
   extraMinimoMin: number;
-  /** Almuerzo de quien no tenga uno propio en Horarios. */
-  almuerzoDefaultMin: number;
   /** Recargo de la hora extra hasta la hora de corte. */
   recargoExtraDiurno: number;
   /** Recargo de la hora extra pasada la hora de corte. */
@@ -132,7 +130,6 @@ export interface ReglasAsistencia {
 export const REGLAS_DEFAULT: ReglasAsistencia = {
   toleranciaTardanzaMin: 10,
   extraMinimoMin: 15,
-  almuerzoDefaultMin: 30,
   recargoExtraDiurno: 1.25,
   recargoExtraNocturno: 1.5,
   horaCorteNocturno: "18:00",
@@ -145,10 +142,37 @@ export const REGLAS_DEFAULT: ReglasAsistencia = {
   recargoExcedenteNocturnaMixta: 2.625,
 };
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * EL ALMUERZO ES SIEMPRE DE 30 MINUTOS — UNA sola fuente, y es ésta.
+ *
+ * Daniel, textual (13-ago-2026): *"todos 30 minutos de almuerzo (puedes quitar
+ * la opcion de elegir tiempo de almuerzo, siempre es fijo 30 mins)"*.
+ *
+ * 🩸 ANTES HABÍA DOS LUGARES QUE PODÍAN DECIR COSAS DISTINTAS: la columna
+ * `asistencia_horarios.almuerzo_minutos` (por persona, con dos botones de 30 y
+ * 60 en la pantalla) y la regla `almuerzo_default_min` de `asistencia_reglas`
+ * (una casilla más en «Reglas del cálculo»). Dos perillas para el mismo dato es
+ * la forma de que se separen: alguien mueve una, se olvida de la otra, y la
+ * jornada de una persona empieza a durar media hora distinta según por dónde se
+ * la mire — un error que solo se ve el día de pago.
+ *
+ * Medido en producción el 13-ago-2026: las 33 personas con horario tienen
+ * `almuerzo_minutos = 30`, sin UNA sola excepción en toda la historia de la
+ * tabla, y `asistencia_reglas.almuerzo_default_min` también vale 30. O sea que
+ * fijar el valor acá no mueve un solo minuto de ninguna quincena.
+ *
+ * ⚠️ LA COLUMNA DE LA BASE NO SE BORRA Y EL CÁLCULO LA SIGUE LEYENDO. Borrar una
+ * columna es irreversible y no compra nada: lo que se retira es la POSIBILIDAD
+ * DE ELEGIR MAL. La pantalla de Horarios muestra el almuerzo como dato fijo, el
+ * PUT escribe siempre este número (mire lo que mire el cuerpo del pedido) y la
+ * casilla de «Reglas del cálculo» desapareció.
+ * ────────────────────────────────────────────────────────────────────────── */
+export const ALMUERZO_FIJO_MIN = 30;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ⛔ LO QUE NO ES CONFIGURABLE, A PROPÓSITO — y por qué no debe volverse un campo
 //
-// Estas tres NO son números sueltos: son la FORMA del cálculo. Ponerlas en la
+// Estas cuatro NO son números sueltos: son la FORMA del cálculo. Ponerlas en la
 // pantalla sería darle a Daniel una perilla para romper la planilla sin querer,
 // y el daño no se vería hasta el día de pago.
 //
@@ -159,9 +183,12 @@ export const REGLAS_DEFAULT: ReglasAsistencia = {
 //   3. EL DÍA 31 NO SE PAGA, PERO SÍ SE DESCUENTA SI SE FALTA. Es asimétrico a
 //      propósito y así lo trabaja la contable; expresarlo como una casilla
 //      invitaría a "arreglar" la asimetría, que es justo lo que no hay que hacer.
+//   4. EL ALMUERZO ES DE 30 MINUTOS PARA TODO EL MUNDO (`ALMUERZO_FIJO_MIN`).
+//      Lo fijó Daniel y es igual en las 33 personas con horario; tener dos
+//      perillas para eso solo servía para que dijeran cosas distintas.
 //
-// Si algún día alguna de las tres cambia, se cambia EN CÓDIGO y con un test que
-// la respalde. Que a nadie se le ocurra "mejorar" esta pantalla agregándolas.
+// Si algún día alguna de las cuatro cambia, se cambia EN CÓDIGO y con un test
+// que la respalde. Que a nadie se le ocurra "mejorar" esta pantalla agregándolas.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Rangos, cada uno con su porqué ───────────────────────────────────────────
@@ -420,7 +447,9 @@ export function validarReglas(body: unknown): Resultado<ReglasAsistencia> {
   const pasos: Array<[keyof ReglasAsistencia, Resultado<number | string | null>]> = [
     ["toleranciaTardanzaMin", validarTolerancia(b.toleranciaTardanzaMin)],
     ["extraMinimoMin", validarMinutos(b.extraMinimoMin, "El mínimo para contar hora extra", "15")],
-    ["almuerzoDefaultMin", validarMinutos(b.almuerzoDefaultMin, "El almuerzo por defecto", "30")],
+    // ⛔ El almuerzo NO se valida acá porque ya no es un campo: es fijo en 30
+    // minutos (`ALMUERZO_FIJO_MIN`). Si alguien manda `almuerzoDefaultMin` en el
+    // cuerpo, se ignora — que es exactamente lo que tiene que pasar.
     ["recargoExtraDiurno", validarRecargo(b.recargoExtraDiurno, "El recargo de hora extra de día", "1.25")],
     ["recargoExtraNocturno", validarRecargo(b.recargoExtraNocturno, "El recargo de hora extra de noche", "1.50")],
     ["horaCorteNocturno", validarHora(b.horaCorteNocturno, "La hora de corte de la noche")],
@@ -455,7 +484,9 @@ export function reglasDesdeFila(fila: Record<string, unknown> | null | undefined
   return {
     toleranciaTardanzaMin: num("tolerancia_tardanza_min", REGLAS_DEFAULT.toleranciaTardanzaMin),
     extraMinimoMin: num("extra_minimo_min", REGLAS_DEFAULT.extraMinimoMin),
-    almuerzoDefaultMin: num("almuerzo_default_min", REGLAS_DEFAULT.almuerzoDefaultMin),
+    // 🔑 `almuerzo_default_min` SE IGNORA aunque la columna siga en la tabla: el
+    // almuerzo vive en `ALMUERZO_FIJO_MIN` y en `asistencia_horarios`. Leerla
+    // acá devolvería la segunda perilla por la puerta de atrás.
     recargoExtraDiurno: num("recargo_extra_diurno", REGLAS_DEFAULT.recargoExtraDiurno),
     recargoExtraNocturno: num("recargo_extra_nocturno", REGLAS_DEFAULT.recargoExtraNocturno),
     horaCorteNocturno:
@@ -481,7 +512,8 @@ export function reglasHaciaFila(r: ReglasAsistencia): Record<string, unknown> {
     id: 1,
     tolerancia_tardanza_min: r.toleranciaTardanzaMin,
     extra_minimo_min: r.extraMinimoMin,
-    almuerzo_default_min: r.almuerzoDefaultMin,
+    // `almuerzo_default_min` NO se escribe: la columna queda con el 30 que ya
+    // tiene (el upsert solo pisa las columnas que se mandan) y nadie la lee.
     recargo_extra_diurno: r.recargoExtraDiurno,
     recargo_extra_nocturno: r.recargoExtraNocturno,
     hora_corte_nocturno: r.horaCorteNocturno,

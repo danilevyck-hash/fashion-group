@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
+import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { Ayuda } from "@/components/shared/Ayuda";
 import RangoFechas from "./RangoFechas";
 import EstadoReloj from "./EstadoReloj";
@@ -188,7 +189,7 @@ export default function ReporteTab() {
         <Ayuda titulo="Cómo se leen estos números" etiqueta="Cómo se leen estos números">
           <p>
             Todo en minutos. Entrada 8:00 con {reglas?.toleranciaTardanzaMin ?? TOLERANCIA_MIN} de
-            tolerancia · almuerzo según cada persona · extras desde{" "}
+            tolerancia · almuerzo de {ALMUERZO_FIJO_MIN} minutos · extras desde{" "}
             {reglas?.extraMinimoMin ?? EXTRA_MINIMO_MIN} min, menos el atraso del día.{" "}
             <b>&quot;A revisar&quot;</b> es un día sin las 4 marcas: los minutos igual cuentan.
             Estos números se cambian en <b>Configuración</b>.
