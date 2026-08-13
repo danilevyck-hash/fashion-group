@@ -190,7 +190,13 @@ describe("Reporte — la metodología al ⓘ, el estado del reloj en pantalla", 
     expect(screen.queryByText(/Todo en minutos/)).toBeNull();
     abrirAyuda("Cómo se leen estos números");
     expect(screen.getByText(/Todo en minutos/)).toBeTruthy();
-    expect(screen.getByText(/es un día sin las 4 marcas/)).toBeTruthy();
+    // 🔴 Dice "TERMINADO" desde el 13-ago-2026, y no es un adorno: es la
+    // diferencia entre un día mal marcado y un día que sigue corriendo. Sin esa
+    // palabra, el ⓘ contradice lo que la tabla hace.
+    expect(screen.getByText(/es un día TERMINADO sin las 4 marcas/)).toBeTruthy();
+    // El texto va partido por un <b>hoy</b>, así que se busca el trozo que vive
+    // entero en un solo nodo.
+    expect(screen.getByText(/nunca entra ahí/)).toBeTruthy();
   });
 
   it("🔴 «se asume 5:00 p.m.» sigue en pantalla — es plata", async () => {

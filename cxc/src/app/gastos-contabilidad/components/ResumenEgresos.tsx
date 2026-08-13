@@ -73,8 +73,15 @@ export const muestraMontoEgresos = (e: EstadoEgresos): boolean => e === "con_mov
  * automática por pedido de Daniel (su usuario del panel es el de él), así que su
  * fila va a decir "No traído" mes tras mes. **Una empresa vacía sin explicación
  * se lee como un error del sistema** — y peor: como que esa empresa no gastó
- * nada. Por eso, cuando no hay descarga automática, la frase lo DICE y además
- * manda a la otra fuente, que sí tiene sus números.
+ * nada. Por eso, cuando no hay descarga automática, la frase lo DICE y termina
+ * con lo único que se puede hacer al respecto: traerlos a mano otra vez.
+ *
+ * 🩸 EL FINAL DE ESA FRASE MANDABA A UNA PESTAÑA QUE YA NO EXISTE. Decía *"En
+ * 'Lo que cerró la contadora' sí se ven"*, y esa perilla se fue con el mayor
+ * contable (13-ago-2026). Quien la leyera se iba a buscar una segunda fuente
+ * que no está: **hoy Egresos Varios es la única**, así que la frase no puede
+ * seguir prometiendo otra. Un texto que manda a un lugar inexistente es peor
+ * que uno que no dice nada, porque hace perder el tiempo con confianza.
  */
 export function explicacionEgresos(
   estado: EstadoEgresos,
@@ -87,8 +94,11 @@ export function explicacionEgresos(
         ? "Lo que ves es de la última vez que se trajo a mano."
         : ultimoMesConMovimientos
           ? `Lo último que se trajo a mano es de ${mesLargo(ultimoMesConMovimientos)}.`
-          : "Todavía no se ha traído nada de esta fuente.";
-    return `Los gastos de esta empresa no se traen solos de Switch, para no quitarle el panel a quien lo esté usando. ${traido} En “Lo que cerró la contadora” sí se ven.`;
+          // 🔴 Decía "nada de esta fuente", y "esta fuente" solo tenía sentido
+          // mientras hubiera otra. Con el mayor retirado, nombrarla insinúa una
+          // segunda que no existe — justo lo que este arreglo vino a sacar.
+          : "Todavía no se ha traído nada.";
+    return `Los gastos de esta empresa no se traen solos de Switch, para no quitarle el panel a quien lo esté usando. ${traido} Esta pantalla es el único lugar donde se ven: para ponerlos al día hay que traerlos a mano otra vez.`;
   }
   switch (estado) {
     case "con_movimientos":
