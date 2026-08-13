@@ -109,6 +109,10 @@
       "schedule": "5 9 * * *"
     },
     {
+      "path": "/api/cron/sync-egresos-varios",
+      "schedule": "35 10 * * *"
+    },
+    {
       "path": "/api/cron/acs-fidelizacion",
       "schedule": "30 11 * * *"
     },

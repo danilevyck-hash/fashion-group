@@ -71,7 +71,8 @@ export type FamiliaMonto =
   | "recibo"
   | "proveedor"
   | "producto"
-  | "articulo_info";
+  | "articulo_info"
+  | "egreso_vario";
 
 export interface DefinicionGuard {
   /** Tabla donde vive la historia con la que se calibra. */
@@ -226,6 +227,29 @@ export const GUARDS: Readonly<Record<FamiliaMonto, DefinicionGuard>> = {
     record: 850.0,
     porEmpresa: true,
     que: "el precio de etiqueta de un artículo",
+  },
+  // Récord REAL medido (13-ago-2026) sobre el ÚNICO archivo que existe de esta
+  // fuente: los 378 egresos de Vistana del 1-ene al 13-ago-2026 ($243.342,48 en
+  // total). El egreso más grande es **$11.700,95** (pago de impuestos,
+  // 22-jun-2026); los 378 son positivos y el segundo más grande es $9.000,00.
+  //
+  // ⚠️ EL PISO ES DELIBERADAMENTE HOLGADO, Y NO ES PEREZA. Un egreso vario NO es
+  // un gasto: el reporte incluye TRANSFERENCIAS ENTRE CUENTAS PROPIAS y pagos a
+  // proveedores intercompañía (grupo 1, 40 de los 378 renglones, $83.439,75).
+  // Es exactamente la familia `proveedor`, cuyo récord LEGÍTIMO resultó ser
+  // $2.074.195,21 y donde copiar un piso ajustado habría rechazado datos buenos
+  // el primer día. Acá solo se midió UNA empresa de ocho, así que el piso de $1M
+  // —85× el récord medido, el mismo que factura/utilidad/costo— frena la clase
+  // $1.000.000.049,22 y el punto decimal corrido sin poder trabar un pago real.
+  // Cuando haya historia de las 8 empresas, el 20× relativo lo aprieta solo.
+  egreso_vario: {
+    tabla: "egresos_varios",
+    anclaje: "total",
+    columnas: ["total"],
+    piso: 1_000_000,
+    record: 11_700.95,
+    porEmpresa: true,
+    que: "el monto de un egreso de caja o banco",
   },
 };
 

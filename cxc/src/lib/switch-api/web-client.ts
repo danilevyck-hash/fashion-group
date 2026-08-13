@@ -23,6 +23,10 @@
  */
 
 import { resolveSwitchEnvKey } from "./empresas";
+// El reconocedor del CSV de egresos vive con SU parser, no acá: acá solo se
+// baja el archivo. Una segunda copia de "¿esto es el CSV bueno?" es una que
+// alguien corrige y otra que se queda vieja.
+import { pareceCsvDeEgresos } from "@/lib/egresos/parser";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
@@ -656,6 +660,169 @@ export async function fetchMayorAsientos(
   }
 
   return { csv, rutaUsada: MAYOR_EXPORT, asientosDeclarados, rondas: ronda };
+}
+
+// ─── EGRESOS VARIOS (Caja y Bancos → Reportes → Egresos Varios) ─────────────
+//
+// Es el mismo reporte que Daniel baja a mano desde `/caja/listaegresosvarios`.
+// Devuelve un CSV con una fila por EGRESO, separador `;`, fecha `YYYY-MM-DD`, y
+// el archivo con la forma `listadoegresovario_<sucursal>_<ddmmyyyyhhmmss>.csv`.
+//
+// ─── EL MECANISMO, SACADO DEL JS PÚBLICO DE LA PROPIA PÁGINA ────────────────
+// `/assets/js/caja/listaegresosvarios.js` es un asset PÚBLICO: se lee sin
+// sesión, así que descubrirlo no costó ni una expulsión del panel (la misma
+// puerta por la que se descubrió el mayor).
+//
+// 🔑 **ACÁ SON DOS PASOS, NO TRES — Y ESA ES LA DIFERENCIA CON EL MAYOR.**
+// `descargarreporte()` manda `desde`/`hasta` EN EL PROPIO POST del exportador:
+//
+//     $.post(BASEURL+'caja/egresosvariosexportar',
+//            {chunk, key, file, sucursal, desde, hasta, searchInput,
+//             comprascategoria, comprassubcategoria, _token})
+//
+// El mayor, en cambio, NO lleva fechas en su descarga: las lee de la SESIÓN, y
+// por eso necesita el paso intermedio `/asientos/lista` que se las fija. Copiar
+// ese paso acá sería llamar a un endpoint que no hace falta; y al revés —
+// asumir que el mayor tampoco lo necesita— es el error caro que ya está
+// documentado allá arriba. Cada reporte tiene su mecanismo y se lee del JS.
+//
+//   1. GET  /caja/listaegresosvarios     → HTML con el `_token`.
+//   2. POST /caja/egresosvariosexportar  → ACUMULADOR, igual que
+//      `/estadodecuenta/obtener` y `/asientos/exportasientos`: mientras responda
+//      `response:true` se repide con `key += chunk`, y la ronda que responde
+//      `response:false` deja el archivo en `GET /log/<file>`.
+//
+// ⚠️ `sucursal` va VACÍO a propósito = TODAS las sucursales. El `#sucursal` de
+// la página es un `<select>` cuyo valor por defecto es la opción vacía, que es
+// justo lo que mandó el navegador de Daniel cuando bajó el archivo con el que se
+// certifica esto. Fijarlo en "1" traería solo la sucursal PRINCIPAL y, en una
+// empresa con más de una, perdería egresos SIN UN SOLO ERROR.
+//
+// ⚠️ Los tres filtros de texto/categoría van vacíos = sin filtrar. `"null"` NO
+// es lo mismo que vacío en estos endpoints: `fetchCarteraAntiguedad` ya se quemó
+// con eso (con `pais:"null"` contesta 200 con la cartera VACÍA, el peor modo de
+// fallo posible). Vacío es lo que manda la página cuando el usuario no elige.
+
+/** La página que entrega el `_token` del reporte. */
+const EGRESOS_PAGINA = "/caja/listaegresosvarios";
+/** El acumulador que arma el CSV, y que LLEVA EL RANGO. */
+const EGRESOS_EXPORT = "/caja/egresosvariosexportar";
+/** Lo que manda el JS de la página. No se toca: es el tamaño que el servidor espera. */
+const EGRESOS_CHUNK = 500;
+/** Techo del acumulador — frena un bucle infinito si nunca dijera `response:false`. */
+const EGRESOS_MAX_RONDAS = 4000;
+
+export interface EgresosDescarga {
+  csv: string;
+  /** Qué ruta entregó el archivo — queda registrada en `switch_sync_log`. */
+  rutaUsada: string;
+  /** Cuántas rondas del acumulador hicieron falta (telemetría). */
+  rondas: number;
+  /** Nombre del archivo que armó Switch (`listadoegresovario_…csv`). */
+  archivo: string;
+}
+
+/**
+ * Baja los egresos varios de un rango de fechas (inclusive), como CSV crudo.
+ * NO parsea: de eso se encarga `src/lib/egresos/parser.ts`, que es puro y
+ * testeado contra el archivo real.
+ */
+export async function fetchEgresosVarios(
+  session: WebSession,
+  desde: string, // YYYY-MM-DD
+  hasta: string, // YYYY-MM-DD
+): Promise<EgresosDescarga> {
+  const { empresaKey, baseUrl, cookies } = session;
+
+  // ── 1) la página, que trae el `_token` ────────────────────────────────────
+  const { res: pgRes, text: pgHtml } = await webFetch(`${baseUrl}${EGRESOS_PAGINA}`, cookies, {
+    headers: { Accept: "text/html" },
+  });
+  if (pgRes.status !== 200) {
+    throw new SwitchWebError(
+      empresaKey,
+      "egresos-pagina",
+      `${EGRESOS_PAGINA} devolvió ${pgRes.status}`,
+    );
+  }
+  const token = extractToken(pgHtml);
+  if (!token) {
+    throw new SwitchWebError(empresaKey, "egresos-token", "no se encontró el _token del reporte");
+  }
+
+  // ── 2) el acumulador (con el rango adentro) ───────────────────────────────
+  let key = 0;
+  let file = "";
+  let ronda = 0;
+  while (ronda < EGRESOS_MAX_RONDAS) {
+    ronda++;
+    const body = new URLSearchParams({
+      chunk: String(EGRESOS_CHUNK),
+      key: String(key),
+      file,
+      // Vacío = todas las sucursales. Ver el comentario de arriba.
+      sucursal: "",
+      desde,
+      hasta,
+      searchInput: "",
+      comprascategoria: "",
+      comprassubcategoria: "",
+      _token: token,
+    }).toString();
+
+    const { res, text } = await webFetch(`${baseUrl}${EGRESOS_EXPORT}`, cookies, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "application/json",
+        Origin: baseUrl,
+        Referer: `${baseUrl}${EGRESOS_PAGINA}`,
+      },
+    });
+
+    let j: { response?: boolean; file?: string };
+    try {
+      j = JSON.parse(text) as { response?: boolean; file?: string };
+    } catch {
+      throw new SwitchWebError(
+        empresaKey,
+        "egresos-descarga",
+        `${EGRESOS_EXPORT} respondió algo que no es JSON en la ronda ${ronda} (status ${res.status})`,
+      );
+    }
+    if (j.file) file = j.file;
+    if (j.response === true) {
+      key += EGRESOS_CHUNK;
+      continue;
+    }
+    break;
+  }
+  if (!file) {
+    throw new SwitchWebError(empresaKey, "egresos-descarga", "el servidor nunca devolvió un archivo");
+  }
+  if (ronda >= EGRESOS_MAX_RONDAS) {
+    throw new SwitchWebError(
+      empresaKey,
+      "egresos-descarga",
+      `el reporte no terminó en ${EGRESOS_MAX_RONDAS} rondas; no se usa un archivo a medias`,
+    );
+  }
+
+  // ── 3) recoger el archivo ─────────────────────────────────────────────────
+  const { res: dlRes, text: csv } = await webFetch(`${baseUrl}/log/${file}`, cookies, {
+    headers: { Accept: "text/csv,application/octet-stream,*/*" },
+  });
+  if (dlRes.status !== 200 || !pareceCsvDeEgresos(csv)) {
+    throw new SwitchWebError(
+      empresaKey,
+      "egresos-descarga",
+      `/log/${file} devolvió ${dlRes.status} y ${csv.length} bytes que no son el CSV de egresos varios`,
+    );
+  }
+
+  return { csv, rutaUsada: EGRESOS_EXPORT, rondas: ronda, archivo: file };
 }
 
 /**
