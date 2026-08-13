@@ -226,7 +226,13 @@ describe("`/admin/data-health` sigue funcionando", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("la pantalla de Data Health llegó entera", () => {
-  const src = leer(PESTANA);
+  // 🩸 SIN COMENTARIOS, Y NO ES UN DETALLE. La primera versión de este bloque
+  // leía el archivo crudo, y el comentario de cabecera de `DataHealthTab.tsx`
+  // enumera justamente las piezas que hay que conservar ("…el detalle en modal
+  // y el botón «Correr checks ahora»"). Verificado por mutación: borrar el
+  // BOTÓN dejaba el test en VERDE, porque se daba por satisfecho con su propia
+  // explicación. Un candado así da permiso para romper.
+  const src = plano(leer(PESTANA));
 
   it("existe como pestaña y la página la monta", () => {
     expect(existsSync(join(raiz, PESTANA))).toBe(true);
@@ -269,9 +275,8 @@ describe("la pantalla de Data Health llegó entera", () => {
   });
 
   it("dejó de ser una página: sin AppHeader y sin su propio guard", () => {
-    const p = plano(src);
-    expect(p).not.toContain("AppHeader");
-    expect(p).not.toContain("useAuth");
+    expect(src).not.toContain("AppHeader");
+    expect(src).not.toContain("useAuth");
   });
 });
 
