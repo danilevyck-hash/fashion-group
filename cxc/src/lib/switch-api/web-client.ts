@@ -825,6 +825,84 @@ export async function fetchEgresosVarios(
   return { csv, rutaUsada: EGRESOS_EXPORT, rondas: ronda, archivo: file };
 }
 
+// ─── CATÁLOGO DE CUENTAS (Contabilidad → Catálogo de cuentas) ───────────────
+//
+// Es lo que le pone NOMBRE a los códigos que trae Egresos Varios (que manda el
+// código pelado). Ver `src/lib/cuentas/catalogo.ts` para el porqué.
+//
+// ─── EL MECANISMO, SACADO DEL JS PÚBLICO DE LA PROPIA PÁGINA ────────────────
+// `/assets/js/cuentacontable/cuentacontable.js` es un asset PÚBLICO: se lee sin
+// sesión, así que descubrirlo no costó ni una expulsión del panel (la misma
+// puerta por la que se descubrieron el mayor y los egresos). Ahí está:
+//
+//     $.get(BASEURL+'cuentacontable/cuentas', {})
+//       → {response: true, contacuentacontable: [{cuenta, nombreCuenta, nivel, …}]}
+//
+// 🔑 **ACÁ ES UN SOLO GET, SIN `_token` Y SIN ACUMULADOR — y esa es la
+// diferencia con el mayor y con los egresos.** Los dos reportes arman un archivo
+// por rondas (`chunk`/`key`/`file`) porque son un REPORTE de un rango; el
+// catálogo de cuentas es una lista fija y la página se la trae entera de una.
+// Copiar el acumulador acá sería llamar a un endpoint que no hace falta.
+//
+// La página también ofrece `POST /cuentacontable/exportcuentas`, que SÍ es el
+// acumulador de siempre y deja un CSV en `/log/<file>`. **No se usa**: sería
+// bajar un archivo, parsearlo y adivinar su encabezado para conseguir lo mismo
+// que ya viene en JSON con los campos nombrados.
+//
+// ⚠️ Sin sesión, `/cuentacontable/cuentas` responde **302 a `/users`**; una ruta
+// inexistente responde 200 con el HTML de excepción de Switch. Por eso el código
+// de estado no alcanza para validar nada y lo que se mira es el CONTENIDO.
+
+/** El endpoint del catálogo. */
+const CUENTAS_LISTA = "/cuentacontable/cuentas";
+
+export interface CatalogoCuentasDescarga {
+  /** Los nodos crudos, tal como los mandó Switch. Normalizarlos es de
+   *  `lib/cuentas/catalogo.ts`, que es puro y testeado. */
+  nodos: unknown[];
+  /** Qué ruta entregó los datos — queda en `switch_sync_log`. */
+  rutaUsada: string;
+}
+
+/**
+ * Baja el catálogo de cuentas de una empresa. NO parsea ni valida el contenido
+ * de cada nodo: sólo que la respuesta sea la del catálogo y no otra cosa.
+ */
+export async function fetchCatalogoCuentas(
+  session: WebSession,
+): Promise<CatalogoCuentasDescarga> {
+  const { empresaKey, baseUrl, cookies } = session;
+
+  const { res, text } = await webFetch(`${baseUrl}${CUENTAS_LISTA}`, cookies, {
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      Accept: "application/json",
+      Referer: `${baseUrl}/cuentacontable`,
+    },
+  });
+
+  let json: { response?: unknown; contacuentacontable?: unknown };
+  try {
+    json = JSON.parse(text) as typeof json;
+  } catch {
+    // Un 302 a /users (sesión caída) y el HTML de excepción llegan los dos acá.
+    throw new SwitchWebError(
+      empresaKey,
+      "cuentas-fetch",
+      `${CUENTAS_LISTA} respondió algo que no es JSON (status ${res.status}, ${text.length} bytes)`,
+    );
+  }
+  if (!Array.isArray(json.contacuentacontable)) {
+    throw new SwitchWebError(
+      empresaKey,
+      "cuentas-fetch",
+      `${CUENTAS_LISTA} devolvió JSON sin la lista de cuentas (response=${String(json.response)})`,
+    );
+  }
+
+  return { nodos: json.contacuentacontable, rutaUsada: CUENTAS_LISTA };
+}
+
 /**
  * Cierra la sesión web. El login usa `changesession=SI`, que EXPULSA a quien
  * esté trabajando en el panel de esa empresa; dejar la sesión abierta alarga ese

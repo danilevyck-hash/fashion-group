@@ -24,11 +24,29 @@ export const muestraMontoEgresos = (e: EstadoEgresos): boolean => e === "con_mov
 /**
  * La frase de abajo. `sin_movimientos` y `sin_datos` NO pueden verse iguales:
  * el primero dice "no salió plata" (un hecho), el segundo "no sabemos".
+ *
+ * 🔴 Y hay un tercer caso que no puede verse como ninguno de los dos: la empresa
+ * que **no se baja sola**. Confecciones Boston quedó fuera de la descarga
+ * automática por pedido de Daniel (su usuario del panel es el de él), así que su
+ * fila va a decir "No traído" mes tras mes. **Una empresa vacía sin explicación
+ * se lee como un error del sistema** — y peor: como que esa empresa no gastó
+ * nada. Por eso, cuando no hay descarga automática, la frase lo DICE y además
+ * manda a la otra fuente, que sí tiene sus números.
  */
 export function explicacionEgresos(
   estado: EstadoEgresos,
   ultimoMesConMovimientos: string | null,
+  descargaAutomatica: boolean = true,
 ): string {
+  if (!descargaAutomatica) {
+    const traido =
+      estado === "con_movimientos"
+        ? "Lo que ves es de la última vez que se trajo a mano."
+        : ultimoMesConMovimientos
+          ? `Lo último que se trajo a mano es de ${mesLargo(ultimoMesConMovimientos)}.`
+          : "Todavía no se ha traído nada de esta fuente.";
+    return `Los gastos de esta empresa no se traen solos de Switch, para no quitarle el panel a quien lo esté usando. ${traido} En “Lo que cerró la contadora” sí se ven.`;
+  }
   switch (estado) {
     case "con_movimientos":
       return "";
@@ -45,6 +63,9 @@ interface Fila {
   empresa: EmpresaEgresosResumen;
   estado: EstadoEgresos;
   hayMonto: boolean;
+  /** Lo que dice la píldora Y el lugar del monto cuando no hay número: los dos
+   *  salen de acá para que no puedan decir cosas distintas. */
+  etiquetaEstado: string;
   salidaTexto: string;
   gastoTexto: string;
   explicacion: string;
@@ -54,29 +75,42 @@ function armarFilas(empresas: EmpresaEgresosResumen[]): Fila[] {
   return empresas.map((empresa) => {
     const estado = empresa.resumen.estado;
     const hayMonto = muestraMontoEgresos(estado);
+    // Una empresa que no se baja sola no está "No traída" por un problema: es
+    // que no se pide. La etiqueta lo dice y la frase de abajo lo explica.
+    const etiquetaEstado =
+      empresa.descargaAutomatica || hayMonto
+        ? ETIQUETA_ESTADO_EGRESOS[estado]
+        : "No se baja sola";
     return {
       empresa,
       estado,
       hayMonto,
-      salidaTexto: hayMonto
-        ? usd(empresa.resumen.totalSalidaCent)
-        : ETIQUETA_ESTADO_EGRESOS[estado],
+      etiquetaEstado,
+      salidaTexto: hayMonto ? usd(empresa.resumen.totalSalidaCent) : etiquetaEstado,
       gastoTexto: hayMonto ? usd(empresa.resumen.totalGastoCent) : "—",
-      explicacion: explicacionEgresos(estado, empresa.ultimoMesConMovimientos),
+      explicacion: explicacionEgresos(
+        estado,
+        empresa.ultimoMesConMovimientos,
+        empresa.descargaAutomatica,
+      ),
     };
   });
 }
 
-function EstadoTag({ estado }: { estado: EstadoEgresos }) {
-  const color =
-    estado === "con_movimientos"
+function EstadoTag({ fila }: { fila: Fila }) {
+  // Gris, no ámbar, cuando la empresa no se baja sola: el ámbar es "esto está
+  // pendiente y hay que mirarlo", y acá no hay nada que mirar — es la decisión
+  // que tomó Daniel.
+  const color = !fila.empresa.descargaAutomatica && !fila.hayMonto
+    ? "border-gray-200 bg-gray-50 text-gray-600"
+    : fila.estado === "con_movimientos"
       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-      : estado === "sin_movimientos"
+      : fila.estado === "sin_movimientos"
         ? "border-gray-200 bg-gray-50 text-gray-600"
         : "border-amber-200 bg-amber-50 text-amber-700";
   return (
     <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-sm ${color}`}>
-      {ETIQUETA_ESTADO_EGRESOS[estado]}
+      {fila.etiquetaEstado}
     </span>
   );
 }
@@ -114,7 +148,7 @@ function Tarjeta({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => void
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-semibold text-gray-900">{empresa.nombre}</span>
-        <EstadoTag estado={fila.estado} />
+        <EstadoTag fila={fila} />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
@@ -164,7 +198,7 @@ function FilaTabla({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => vo
       <td className="px-3 py-3 align-top">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-900">{empresa.nombre}</span>
-          <EstadoTag estado={fila.estado} />
+          <EstadoTag fila={fila} />
         </div>
         {fila.explicacion && (
           <p className="mt-1 max-w-sm text-sm text-gray-600">{fila.explicacion}</p>

@@ -12,9 +12,13 @@
 //    es.
 //  · Los montos NEGATIVOS (reversos) se muestran negativos. Nunca valor
 //    absoluto: su firma es que la diferencia da exactamente el doble.
-//  · El CSV de egresos NO trae el nombre de la cuenta, solo el código — por eso
-//    debajo va la REFERENCIA de los pagos, que es el dato humano que sí trae
-//    ("DANIEL LEVY", "MUNICIOIO DE PANAMA").
+//  · El reporte de egresos NO trae el nombre de la cuenta, sólo el código. El
+//    nombre sale del CATÁLOGO DE CUENTAS (`lib/cuentas/`), y cuando no se sabe
+//    va el código SOLO — nunca un nombre deducido: `6.02.01` parece "salarios"
+//    por vecindad con 6.01 y en realidad es SERVICIOS PROFESIONALES, el gasto
+//    más grande de Vistana.
+//  · La REFERENCIA de los pagos se queda igual ("DANIEL LEVY", "MUNICIOIO DE
+//    PANAMA"): es de qué se trató el pago, no de qué cuenta salió.
 
 import type { CuentaEgreso } from "@/lib/egresos/reglas";
 import type { EmpresaEgresosResumen } from "./tipos";
@@ -25,14 +29,24 @@ function FilaCuenta({ c }: { c: CuentaEgreso }) {
   return (
     <div className="flex items-start justify-between gap-3 border-t border-gray-100 py-2.5 first:border-t-0">
       <div className="min-w-0">
+        {/* El NOMBRE manda y el código va de apoyo: "6.02.01" no le dice nada a
+            nadie, "SERVICIOS PROFESIONALES" sí. Sin nombre queda el código
+            solo, en el mismo lugar y con el mismo peso que tenía antes. */}
         <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-sm tabular-nums text-gray-500">{c.corta}</span>
+          {c.nombre ? (
+            <>
+              <span className="text-sm font-medium text-gray-900">{c.nombre}</span>
+              <span className="text-sm tabular-nums text-gray-500">{c.visible}</span>
+            </>
+          ) : (
+            <span className="text-sm font-medium tabular-nums text-gray-900">{c.visible}</span>
+          )}
           <span className="text-sm text-gray-600">
             {c.renglones} {c.renglones === 1 ? "pago" : "pagos"}
           </span>
         </div>
         {c.ejemplos.length > 0 && (
-          <p className="mt-0.5 text-sm text-gray-900">{c.ejemplos.join(" · ")}</p>
+          <p className="mt-0.5 text-sm text-gray-600">{c.ejemplos.join(" · ")}</p>
         )}
       </div>
       <span className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
@@ -78,7 +92,11 @@ interface Props {
 export default function DetalleEgresos({ empresa, onVolver }: Props) {
   const r = empresa.resumen;
   const hayMonto = muestraMontoEgresos(r.estado);
-  const explicacion = explicacionEgresos(r.estado, empresa.ultimoMesConMovimientos);
+  const explicacion = explicacionEgresos(
+    r.estado,
+    empresa.ultimoMesConMovimientos,
+    empresa.descargaAutomatica,
+  );
 
   return (
     <div>

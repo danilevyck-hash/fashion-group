@@ -21,6 +21,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   empresasConCxc,
   empresasConCxp,
+  empresasConEgresosEnCron,
   empresasConFacturas,
   empresasConRecibos,
   empresasConUtilidad,
@@ -479,6 +480,8 @@ const CRON_EMPRESAS_UTILIDAD = empresasConUtilidad();
 const CRON_EMPRESAS_RECIBOS = empresasConRecibos();
 /** Empresas del cron sync-proveedores (09:30). */
 const CRON_EMPRESAS_CXP = empresasConCxp();
+/** Empresas del cron sync-egresos-varios (10:35): las 7 que no son Boston. */
+const CRON_EMPRESAS_EGRESOS = empresasConEgresosEnCron();
 /** Las 8 del grupo: switch-articulos y la reconciliación pueden tocar cualquiera. */
 const CRON_EMPRESAS_TODAS = ALL_EMPRESA_KEYS;
 /**
@@ -560,12 +563,18 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // — por eso va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma
   // donde ya viven sync-utilidad, boston-cartera y sync-mayor.
   //
-  // Toca las 8 empresas, y la vecina que manda es `switch-reconciliacion` 10:00:
+  // Toca SIETE empresas, y la vecina que manda es `switch-reconciliacion` 10:00:
   // puede abrir la sesión de cualquiera hasta 12 min (RECOVERY_BUDGET_MS 740 s),
   // así que los 35 min de separación dejan 23 de aire real. Por delante,
   // joybees-catalogo 11:00 (solo joystep) a 25 min. Los otros crons de las 8
   // quedan a 90 (sync-mayor 09:05) y 65 min (sync-proveedores 09:30).
-  { cron: "sync-egresos-varios", hhmmUtc: "1035", empresas: CRON_EMPRESAS_TODAS },
+  //
+  // 🔴 SIN `confecciones_boston`, y por eso se DERIVA en vez de escribir
+  // CRON_EMPRESAS_TODAS: Daniel pidió que su usuario no se toque solo
+  // (`EMPRESAS_EGRESOS_FUERA_DE_CRON`). Declarar acá una empresa que la entrada
+  // no corre le reservaría a Boston una ventana de sesión única que nadie usa —
+  // y este cronograma es justamente lo que decide si un sync manual se rechaza.
+  { cron: "sync-egresos-varios", hhmmUtc: "1035", empresas: CRON_EMPRESAS_EGRESOS },
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
   { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },

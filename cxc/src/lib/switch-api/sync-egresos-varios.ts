@@ -53,11 +53,14 @@ import { duplicadosExactos, claveIdentidad, esGasto } from "@/lib/egresos/reglas
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
 import { particionarFilas } from "./monto-guard";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { empresasConEgresosEnCron } from "./empresas";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { esTablaAusente } from "@/lib/mayor/leer";
+import { syncCuentasContables, type ResultadoCuentas } from "./sync-cuentas-contables";
 
 /**
- * Las MISMAS 8 empresas del mayor.
+ * Las MISMAS 8 empresas del mayor. Es el universo que el módulo MUESTRA y el que
+ * el sync manual ACEPTA — no el que corre solo.
  *
  * El pedido hablaba de 7 (las 6 de Fashion Group + american_classic), pero el
  * módulo Gastos muestra 8 desde que existe —`confecciones_boston` incluida, con
@@ -65,8 +68,17 @@ import { esTablaAusente } from "@/lib/mayor/leer";
  * sincroniza. Dejarla afuera de la fuente nueva haría imposible justo lo que
  * este cambio viene a permitir: comparar las dos fuentes empresa por empresa.
  * Boston va aparte en CXC, no en gastos.
+ *
+ * ⚠️ **Boston SÍ está acá y NO está en el CRON.** Daniel, 13-ago-2026: *"ve
+ * avanzando con todas menos boston, ese usuario es mio y no entrare"*. La
+ * descarga automática la acota `EMPRESAS_EGRESOS_FUERA_DE_CRON` (ver
+ * `empresas.ts`); esta lista se queda en 8 para que la pestaña siga existiendo y
+ * para que el sync manual la siga aceptando.
  */
 export const EGRESOS_EMPRESA_KEYS = [...ALL_EMPRESA_KEYS] as string[];
+
+/** Las que el CRON baja solo: las 7 que no son Boston. */
+export const EGRESOS_EMPRESA_KEYS_CRON = empresasConEgresosEnCron() as string[];
 
 /** Tope de sanidad. Vistana hace ~380 renglones al año; 200.000 es absurdo. */
 const MAX_LINEAS = 200_000;
@@ -102,6 +114,9 @@ export interface ResultadoEgresosEmpresa {
   duplicados?: number;
   /** Renglones rechazados por el guard de montos imposibles. */
   montosImposibles?: number;
+  /** Qué pasó con el catálogo de cuentas, que viaja en la MISMA sesión.
+   *  Nunca cambia `ok`: los nombres son cómo se lee la plata, no la plata. */
+  cuentas?: ResultadoCuentas;
 }
 
 /** El rango que se le pide a Switch: el año entero. */
@@ -158,8 +173,15 @@ export async function syncEmpresaEgresos(
     totalGastoCent: 0,
   };
 
+  // El catálogo de cuentas viaja en ESTA MISMA sesión (ver
+  // `sync-cuentas-contables.ts`): es un GET y cero logins extra. Va acá arriba,
+  // apenas hay sesión, para que los nombres se refresquen también los días en
+  // que los egresos fallan — y NUNCA lanza, así que no puede tocar la plata.
+  let cuentas: ResultadoCuentas | undefined;
+
   try {
     session = await loginSwitchWeb(empresaKey);
+    cuentas = await syncCuentasContables(session);
     const { csv, rutaUsada } = await fetchEgresosVarios(session, desde, hasta);
 
     const parsed = parsearEgresosCsv(csv);
@@ -299,11 +321,12 @@ export async function syncEmpresaEgresos(
       erroresParseo: parsed.errores.length,
       duplicados: duplicados.length,
       montosImposibles: rechazadas.length,
+      cuentas,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await finishSwitchSyncLog(logId, "error", { errorMessage: msg });
-    return { ...vacio, ok: false, error: msg };
+    return { ...vacio, ok: false, error: msg, cuentas };
   } finally {
     // Siempre: dejar la sesión abierta alarga el despojo a Daniel.
     if (session) await cerrarSesionWeb(session);

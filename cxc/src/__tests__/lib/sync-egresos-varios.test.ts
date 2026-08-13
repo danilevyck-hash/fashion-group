@@ -246,8 +246,17 @@ describe("D. no se estrena una cuarta alerta de sistema", () => {
   it("y su DDL reescribe el CHECK en la misma migración", () => {
     expect(MIGRACION).toMatch(/switch_sync_log_sync_type_check/);
     expect(MIGRACION).toMatch(/'egresos_varios'/);
-    // Y no puede perder ningún tipo por el camino: el CHECK se reescribe entero.
-    for (const t of SYNC_LOG_TYPES) expect(MIGRACION).toContain(`'${t}'`);
+
+    // 🔑 Y no inventa tipos: todo lo que este CHECK admite tiene que estar en
+    // SYNC_LOG_TYPES. Al revés NO se puede exigir acá — una migración vieja no
+    // puede conocer un tipo que se estrenó después (`cuentas_contables` llegó
+    // en 20260813180000, que reescribe el CHECK otra vez). Que el CHECK
+    // **VIGENTE** —el de la migración más nueva— tenga la lista COMPLETA lo
+    // verifica `sync-log-tipos-check.test.ts`, que es su dueño.
+    const bloque = MIGRACION.slice(MIGRACION.indexOf("switch_sync_log_sync_type_check"));
+    const admitidos = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    expect(admitidos.length).toBeGreaterThan(10);
+    for (const t of admitidos) expect(SYNC_LOG_TYPES).toContain(t);
   });
 });
 

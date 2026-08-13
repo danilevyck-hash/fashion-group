@@ -8,27 +8,15 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 // Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
 // hay número" salen del MISMO lugar que las usa el servidor.
-import { ETIQUETA_SIN_GASTO, type MotivoSinGasto } from "@/lib/mayor/gastos";
+import type { MotivoSinGasto } from "@/lib/mayor/gastos";
+import RentabilidadPorEmpresa, {
+  type RentabilidadEmpresaRow,
+} from "./RentabilidadPorEmpresa";
+import { money, moneyK, pct } from "./formato";
 
 // ── Tipos del API ─────────────────────────────────────────────────────────────
 
 interface EmpresaVentas { key: string; name: string; ventas: number; utilidad: number }
-
-interface SemaforoRow {
-  key: string;
-  name: string;
-  ventas: number;
-  utilidad: number;
-  /** Gasto del mayor. `null` cuando el mes de ESA empresa no se puede mostrar. */
-  gasto: number | null;
-  motivo: MotivoSinGasto | null;
-  /** Frase honesta cuando no hay número. */
-  texto: string | null;
-  ultimoMesCerrado: string | null;
-  rentabilidad: number | null;
-  pct: number | null;
-  estado: "verde" | "ambar" | "rojo" | "sin_gastos";
-}
 
 interface GastoEmpresa {
   key: string;
@@ -50,13 +38,12 @@ interface VistaGeneral {
     empresasTotal: number;
     porEmpresa: GastoEmpresa[];
   };
-  rentabilidad: null | {
-    mes: string; monto: number; pct: number | null; parcial: boolean;
-    ventas: number; utilidad: number; gastos: number;
-    empresasConGasto: number; empresasTotal: number;
-  };
+  // 🔴 NO HAY `rentabilidad` DE GRUPO, y es a propósito. Daniel, textual
+  // (13-ago-2026): "no quiero Rentabilidad del grupo, lo quiero por empresa".
+  // El número por empresa vive en `semaforo[]`, cada una con SU venta contra SU
+  // gasto. Ver `RentabilidadPorEmpresa.tsx`.
   disponibilidad: null | { total: number; fechaMasVieja: string; cuentas: number };
-  semaforo: SemaforoRow[];
+  semaforo: RentabilidadEmpresaRow[];
   cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
   cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; saldo: number }[] };
   reclamos: { antiguos: { id: string; nro: string; empresa: string; estado: string; dias: number }[]; total: number };
@@ -107,24 +94,6 @@ function fechaCorta(iso: string): string {
 }
 
 // ── Helpers de formato ───────────────────────────────────────────────────────
-
-function money(n: number): string {
-  const sign = n < 0 ? "-" : "";
-  return `${sign}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
-
-function moneyK(n: number): string {
-  const sign = n < 0 ? "-" : "";
-  const a = Math.abs(n);
-  if (a >= 1_000_000) return `${sign}$${(a / 1_000_000).toFixed(1)}M`;
-  if (a >= 1_000) return `${sign}$${(a / 1_000).toFixed(0)}k`;
-  return `${sign}$${a.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-}
-
-function pct(n: number | null): string {
-  if (n == null) return "—";
-  return `${(n * 100).toFixed(1)}%`;
-}
 
 const fetcher = (url: string) => fetch(url).then((r) => { if (!r.ok) throw new Error("err"); return r.json(); });
 
@@ -203,7 +172,7 @@ function VistaGeneralInner() {
         ) : data ? (
           <>
             <KpiGrid data={data} mes={mes} />
-            <Semaforo rows={data.semaforo} mes={mes} />
+            <RentabilidadPorEmpresa rows={data.semaforo} mes={mes} />
             <Atencion data={data} />
           </>
         ) : null}
@@ -215,7 +184,7 @@ function VistaGeneralInner() {
 // ── KPIs ─────────────────────────────────────────────────────────────────────
 
 function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
-  const { ventas, margen, gastos, rentabilidad, disponibilidad, cxc, cxp } = data;
+  const { ventas, margen, gastos, disponibilidad, cxc, cxp } = data;
   const mesPrevAnio = mesLabelMin(sumarMeses(mes, -12));
   // Cuántas empresas tienen la contabilidad de ESTE mes lista. Es el número que
   // decide si un total se puede leer como "el gasto del grupo" o como "el gasto
@@ -280,23 +249,16 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         }
       />
 
-      {/* Rentabilidad — utilidad bruta − gastos, SIEMPRE de las mismas empresas.
-          Con 4 de 8 empresas cerradas, restarle su gasto a la utilidad de las 8
-          daría un número inflado que se ve perfectamente normal. */}
-      <KpiCard
-        href={`/gastos-contabilidad?mes=${mes}`}
-        label="Rentabilidad"
-        hoverLabel="Ir a Gastos"
-        value={rentabilidad ? moneyK(rentabilidad.monto) : "—"}
-        valueClass={rentabilidad ? (rentabilidad.monto >= 0 ? "text-green-600" : "text-red-600") : undefined}
-        tags={rentabilidad ? [
-          ...tagEmpresas,
-          ...(rentabilidad.parcial ? ["mes en curso"] : []),
-        ] : []}
-        sub={rentabilidad
-          ? <span className="text-stone-400">{pct(rentabilidad.pct)} sobre sus ventas</span>
-          : <span className="text-stone-400">Sin gasto de contabilidad de {mesLabelMin(mes)}</span>}
-      />
+      {/* 🔴 ACÁ ESTABA LA TARJETA "Rentabilidad" DEL GRUPO. SE FUE (13-ago-2026).
+          Daniel, textual: "no quiero Rentabilidad del grupo, lo quiero por
+          empresa". Era `utilidad − gasto` sumando las empresas que tuvieran el
+          mes cerrado: un solo número que no era de nadie.
+
+          El reemplazo NO es otra tarjeta: es la lista "Rentabilidad por empresa"
+          de más abajo, donde cada empresa compara SU venta contra SU gasto y la
+          que no tiene gasto cargado lo DICE en vez de mostrar un número lindo.
+          Por eso tampoco queda como fila del grupo: no hay ninguna forma de
+          escribir ese número que no sea la que él pidió no tener. */}
 
       {/* Disponibilidad — sale de los saldos de banco, que ahora tienen módulo
           propio. El NÚMERO no cambia: lo sigue calculando la misma ruta sobre
@@ -369,256 +331,6 @@ function KpiCard({ href, label, hoverLabel, value, valueClass, tags = [], sub }:
         <span className="hidden group-hover:inline text-teal-600 font-medium">{hoverLabel} →</span>
       </div>
     </Link>
-  );
-}
-
-// ── Semáforo por empresa ─────────────────────────────────────────────────────
-//
-// 🔴 EL "PUNTO DE EQUILIBRIO" SE RETIRÓ DE ESTA PANTALLA (11-ago-2026).
-// Su fórmula es `gastos fijos ÷ margen`, y la marca de "fijo" venía de la carga
-// manual de gastos, que ya no existe. El mayor contable no la trae. Antes de
-// retirarlo, la tarjeta le pedía al usuario que cargara los gastos del mes en
-// un módulo que ya no existe, y calcularlo con una clasificación
-// de cuentas que Daniel no aprobó habría dado un "necesitás vender $X" con un X
-// inventado. Vuelve el día que exista esa clasificación aprobada.
-
-const SEMAFORO_DOT: Record<SemaforoRow["estado"], string> = {
-  verde: "bg-green-500",
-  ambar: "bg-amber-500",
-  rojo: "bg-red-500",
-  sin_gastos: "bg-stone-300",
-};
-
-const SEMAFORO_PILL: Record<SemaforoRow["estado"], { label: string; cls: string }> = {
-  verde: { label: "Sana", cls: "bg-green-50 text-green-700" },
-  ambar: { label: "Al límite", cls: "bg-amber-50 text-amber-700" },
-  rojo: { label: "Pierde plata", cls: "bg-red-50 text-red-700" },
-  // Sin gasto utilizable la píldora DICE POR QUÉ (ver `pillDe`); esto es sólo el
-  // caso en que ni siquiera hay contabilidad conectada.
-  sin_gastos: { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" },
-};
-
-/**
- * La píldora de una empresa. Cuando no hay número, en vez de un genérico dice el
- * motivo exacto — "Sin cerrar" no es lo mismo que "Falta planilla", y confundir
- * los dos es lo que haría que alguien crea que ya tiene el dato.
- */
-function pillDe(e: SemaforoRow): { label: string; cls: string } {
-  if (e.rentabilidad !== null) return SEMAFORO_PILL[e.estado];
-  if (e.motivo) return { label: ETIQUETA_SIN_GASTO[e.motivo], cls: "bg-stone-100 text-stone-500" };
-  return SEMAFORO_PILL.sin_gastos;
-}
-
-function Semaforo({ rows, mes }: { rows: SemaforoRow[]; mes: string }) {
-  const [abierta, setAbierta] = useState<string | null>(null);
-
-  return (
-    <div className="mb-8">
-      <h2 className="text-sm font-semibold text-stone-900 mb-3">Semáforo por empresa</h2>
-
-      {/* ─── Tarjetas (< md): iPhone ──────────────────────────────────────
-          🩸 POR QUÉ. Medido con scripts/_ancho-util-ventas.mjs: la tabla necesita
-          530 px como MÍNIMO absoluto (con el navegador partiendo cada texto
-          donde puede) contra 356 disponibles en un iPhone de 390. Eran los 204 px
-          de arrastre del censo. No hay relleno que sacar que cierre 174 px, y de
-          las cuatro columnas la que más pesa es la píldora de Estado ("Sin
-          gastos cargados"), que es justo la que no se puede abreviar sin cambiar
-          un texto que ve el usuario. Va a tarjetas.
-
-          De `md` para arriba la tabla se queda como estaba: a 834 px el útil es
-          576 y el mínimo 530 — entra, y de hecho ya medía 0. */}
-      <div className="space-y-2 md:hidden">
-        {rows.length === 0 ? (
-          <div className="rounded-[14px] border border-stone-200 bg-white px-4 py-6 text-center text-stone-400">
-            Sin datos este mes.
-          </div>
-        ) : rows.map((e) => {
-          const abiertaEsta = abierta === e.key;
-          return (
-            <SemaforoTarjeta
-              key={e.key}
-              e={e}
-              pill={pillDe(e)}
-              abierta={abiertaEsta}
-              onToggle={() => setAbierta(abiertaEsta ? null : e.key)}
-              mes={mes}
-            />
-          );
-        })}
-      </div>
-
-      <div className="hidden rounded-[14px] border border-stone-200 bg-white overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-xs text-stone-400 border-b border-stone-100">
-              <th className="text-left font-medium px-3 py-2.5">Empresa</th>
-              <th className="text-right font-medium px-3 py-2.5">Ventas</th>
-              <th className="text-right font-medium px-3 py-2.5">Rentabilidad</th>
-              <th className="text-right font-medium px-3 py-2.5">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-6 text-center text-stone-400">Sin datos este mes.</td></tr>
-            ) : rows.map((e) => {
-              const pill = pillDe(e);
-              const abiertaEsta = abierta === e.key;
-              return (
-                <SemaforoFila
-                  key={e.key}
-                  e={e}
-                  pill={pill}
-                  abierta={abiertaEsta}
-                  onToggle={() => setAbierta(abiertaEsta ? null : e.key)}
-                  mes={mes}
-                />
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Desglose de una empresa. Se dibuja UNA sola vez para las dos formas (la fila
- * desplegada de la tabla y la tarjeta abierta): tener dos copias del mismo
- * párrafo es exactamente como divergen los números entre pantallas.
- */
-function SemaforoDesglose({ e }: { e: SemaforoRow }) {
-  // 🔑 Sin número, la pantalla DICE POR QUÉ — y no le pide al usuario que cargue
-  // nada, porque no hay dónde cargarlo. El texto lo arma el servidor con la
-  // misma función para todas las empresas (`textoSinGasto`).
-  if (e.rentabilidad == null || e.gasto == null) {
-    return (
-      <p data-col="sin-gasto" className="text-sm text-stone-500">
-        {e.texto ?? "Todavía no hay gasto de contabilidad de esta empresa para este mes."}
-      </p>
-    );
-  }
-  return (
-    <p className="text-sm text-stone-700 tabular-nums">
-      Utilidad bruta <span data-col="utilidad" className="font-medium">{money(e.utilidad)}</span>
-      {" − "}Gastos de contabilidad <span data-col="gastos" className="font-medium">{money(e.gasto)}</span>
-      {" = "}Rentabilidad <span data-col="rentabilidad-detalle" className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
-    </p>
-  );
-}
-
-/** Enlace "Ver gastos de X →". 44 px de alto en las dos formas. */
-function VerGastosLink({ e, mes }: { e: SemaforoRow; mes: string }) {
-  return (
-    <Link
-      href={`/gastos-contabilidad?mes=${mes}&empresa=${e.key}`}
-      onClick={(ev) => ev.stopPropagation()}
-      className="inline-flex min-h-[44px] items-center text-xs text-teal-600 hover:text-teal-700 font-medium"
-    >
-      Ver gastos de {e.name} →
-    </Link>
-  );
-}
-
-/** Tarjeta (< md) equivalente a SemaforoFila: mismos cuatro datos de la fila
- *  cerrada y el mismo desglose al abrirla. */
-function SemaforoTarjeta({ e, pill, abierta, onToggle, mes }: {
-  e: SemaforoRow;
-  pill: { label: string; cls: string };
-  abierta: boolean;
-  onToggle: () => void;
-  mes: string;
-}) {
-  return (
-    <div data-fila-semaforo={e.key} className="rounded-[14px] border border-stone-200 bg-white">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={abierta}
-        className="flex min-h-[44px] w-full items-center gap-2.5 px-4 py-3 text-left active:bg-stone-50"
-      >
-        <span className={`w-2 h-2 rounded-full shrink-0 ${SEMAFORO_DOT[e.estado]}`} />
-        <span data-col="empresa" className="min-w-0 flex-1 font-medium text-stone-800">{e.name}</span>
-        <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-      </button>
-
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1.5 px-4 pb-3 text-sm">
-        <span className="text-xs text-stone-400">Ventas</span>
-        <span data-col="ventas" className="tabular-nums text-stone-700">{moneyK(e.ventas)}</span>
-        <span className="text-xs text-stone-400">Rentabilidad</span>
-        <span data-col="rentabilidad" className="tabular-nums">
-          {e.rentabilidad == null ? (
-            <span className="text-stone-400">—</span>
-          ) : (
-            <>
-              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
-              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
-            </>
-          )}
-        </span>
-        <span data-col="estado" className={`ml-auto inline-block text-xs font-medium rounded-full px-2.5 py-1 ${pill.cls}`}>{pill.label}</span>
-      </div>
-
-      {abierta && (
-        <div className="border-t border-stone-100 bg-stone-50/60 px-4 py-3">
-          <SemaforoDesglose e={e} />
-          <div className="mt-0.5">
-            <VerGastosLink e={e} mes={mes} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SemaforoFila({ e, pill, abierta, onToggle, mes }: {
-  e: SemaforoRow;
-  pill: { label: string; cls: string };
-  abierta: boolean;
-  onToggle: () => void;
-  mes: string;
-}) {
-  return (
-    <>
-      {/* `data-fila-semaforo` es el ancla estable que cruza tarjeta y fila en el
-          verificador — no una clase de breakpoint. */}
-      <tr
-        data-fila-semaforo={e.key}
-        onClick={onToggle}
-        className="border-b border-stone-50 last:border-0 hover:bg-stone-50 cursor-pointer transition"
-      >
-        <td className="px-3 py-3">
-          <span className="inline-flex items-center gap-2.5">
-            <span className={`w-2 h-2 rounded-full shrink-0 ${SEMAFORO_DOT[e.estado]}`} />
-            <span data-col="empresa" className="font-medium text-stone-800">{e.name}</span>
-            <svg className={`w-3.5 h-3.5 shrink-0 text-stone-300 transition-transform ${abierta ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-          </span>
-        </td>
-        <td data-col="ventas" className="px-3 py-3 text-right tabular-nums text-stone-700">{moneyK(e.ventas)}</td>
-        <td data-col="rentabilidad" className="px-3 py-3 text-right tabular-nums">
-          {e.rentabilidad == null ? (
-            <span className="text-stone-400">—</span>
-          ) : (
-            <>
-              <span className={`font-semibold ${e.rentabilidad >= 0 ? "text-stone-900" : "text-red-600"}`}>{moneyK(e.rentabilidad)}</span>
-              <span data-col="pct" className="text-xs text-stone-400 ml-1.5">{pct(e.pct)}</span>
-            </>
-          )}
-        </td>
-        <td className="px-3 py-3 text-right">
-          <span data-col="estado" className={`inline-block text-xs font-medium rounded-full px-2.5 py-1 whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
-        </td>
-      </tr>
-      {abierta && (
-        <tr className="border-b border-stone-50 last:border-0 bg-stone-50/60">
-          <td colSpan={4} className="px-3 py-3">
-            <SemaforoDesglose e={e} />
-            <div className="mt-0.5">
-              <VerGastosLink e={e} mes={mes} />
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 

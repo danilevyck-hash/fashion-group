@@ -38,7 +38,13 @@ const utilidad = read(path.join(ventas, "UtilidadView.tsx"));
 const clienteSheet = read(path.join(ventas, "ClienteSheet.tsx"));
 const sortSheet = read(path.join(ventas, "SortSheet.tsx"));
 const shell = read(path.join(app, "ventas/VentasShell.tsx"));
-const vistaGeneral = read(path.join(app, "vista-general/page.tsx"));
+// La sección "Rentabilidad por empresa" (antes "Semáforo por empresa") vive en
+// su propio archivo desde el 13-ago-2026, para poder pintarla en un test sin
+// montar la página entera. Estas mediciones son de LA PANTALLA, así que leen las
+// dos partes juntas: partir el archivo no puede aflojar el candado del ancho.
+const vistaGeneral =
+  read(path.join(app, "vista-general/page.tsx")) +
+  read(path.join(app, "vista-general/RentabilidadPorEmpresa.tsx"));
 
 describe("Ventas › Clientes — el iPad deja de recibir la tabla de escritorio", () => {
   it("la tabla es lg+, no md+ (con md, un iPad de 834 px cae del lado de la tabla)", () => {
@@ -163,20 +169,20 @@ describe("Ventas › Productos — la tabla ENTRA, así que se queda tabla", () 
   });
 });
 
-describe("Vista General › Semáforo — tarjetas en iPhone, tabla desde md", () => {
+describe("Vista General › Rentabilidad por empresa — tarjetas en iPhone, tabla desde md", () => {
   it("hay tarjetas debajo de md y la tabla arranca en md", () => {
     expect(vistaGeneral).toContain('<div className="space-y-2 md:hidden">');
     expect(vistaGeneral).toContain("overflow-x-auto md:block");
-    expect(vistaGeneral).toContain("function SemaforoTarjeta");
+    expect(vistaGeneral).toContain("function Tarjeta(");
   });
 
   it("la tabla perdió su min-w-[560px] (mínimo real 498, útil a 834 = 552)", () => {
-    const semaforo = vistaGeneral.slice(vistaGeneral.indexOf("function Semaforo("));
+    const semaforo = vistaGeneral.slice(vistaGeneral.indexOf("function RentabilidadPorEmpresa("));
     expect(semaforo).not.toContain("min-w-[560px]");
   });
 
   it("el desglose se dibuja UNA vez para las dos formas", () => {
-    expect(vistaGeneral).toContain("function SemaforoDesglose");
+    expect(vistaGeneral).toContain("function Desglose(");
     // Dos copias del mismo párrafo es como divergen los números entre pantallas.
     // (El desglose pasó a ser "utilidad − gastos de contabilidad" cuando el gasto
     // dejó de venir de la carga manual y empezó a salir del mayor de Switch: ya
