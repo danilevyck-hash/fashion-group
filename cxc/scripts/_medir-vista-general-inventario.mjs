@@ -27,6 +27,10 @@ import crypto from "crypto";
 
 const BASE = process.env.BASE ?? "http://localhost:3186";
 const OUT = process.env.OUT ?? "/tmp/vg-inventario";
+// El MES importa: en agosto ninguna empresa tiene gasto y en enero cuatro sí, o
+// sea que el panel de Gastos se dibuja distinto. Medir sólo el mes por defecto
+// dejaría sin medir la forma que tiene cuando hay números.
+const MES = process.env.MES ?? "";
 mkdirSync(OUT, { recursive: true });
 
 const ANCHOS = [
@@ -128,7 +132,7 @@ async function main() {
           await route.fulfill({ response: res, json: transformar(j) });
         });
       }
-      await pag.goto(`${BASE}/vista-general`, { waitUntil: "networkidle" });
+      await pag.goto(`${BASE}/vista-general${MES ? `?mes=${MES}` : ""}`, { waitUntil: "networkidle" });
       await pag.waitForTimeout(700);
       const m = await pag.evaluate(MEDIR);
       resultado.estados[estado][a.nombre] = m;
@@ -150,7 +154,7 @@ async function main() {
       for (const t of m.tactiles) console.log(`      táctil ${t.alto}px  "${t.txt}"`);
       for (const t of m.textosChicos) console.log(`      texto ${t.px}px  "${t.txt}"`);
 
-      await pag.screenshot({ path: `${OUT}/${estado}-${a.w}.png`, fullPage: true });
+      await pag.screenshot({ path: `${OUT}/${estado}-${MES || "hoy"}-${a.w}.png`, fullPage: true });
       await ctx.close();
     }
   }

@@ -14,17 +14,19 @@
 //
 // ── 🩸 CADA EMPRESA COMPARA SU VENTA CONTRA SU GASTO ────────────────────────
 //
-// Es lo único que hace honesto este número. La contadora va meses atrasada de
-// forma DISTINTA en cada empresa (Boston está en junio 2025 y Vistana en enero
-// 2026), así que en cualquier mes hay empresas con gasto y empresas sin gasto.
-// A la que NO tiene gasto cargado no se le puede restar cero: su rentabilidad
-// saldría igual a su utilidad bruta —o sea, preciosa— y se vería exactamente
-// igual que la de una empresa que de verdad gana plata.
+// Es lo único que hace honesto este número. Los gastos van cargados hasta un mes
+// DISTINTO en cada empresa (medido el 13-ago-2026: vistana hasta julio,
+// fashion_wear hasta mayo, fashion_shoes y active_wear hasta abril, y
+// active_shoes, joystep, Boston y Multifashion sin nada), así que en cualquier
+// mes hay empresas con gasto y empresas sin gasto. A la que NO tiene gasto
+// cargado no se le puede restar cero: su rentabilidad saldría igual a su
+// utilidad bruta —o sea, preciosa— y se vería exactamente igual que la de una
+// empresa que de verdad gana plata.
 //
 // Por eso, cuando falta el gasto, acá NO va un número: va el motivo en palabras
-// ("Sin cerrar" no es lo mismo que "Falta planilla", y confundirlos es lo que
+// ("Sin cargar" no es lo mismo que "Nada es gasto", y confundirlos es lo que
 // haría creer que el dato ya está). El texto lo arma el servidor con la misma
-// función para todas (`textoSinGasto`).
+// función para todas (`textoSinGastoEgresos`).
 //
 // ── EL PUNTO DE EQUILIBRIO SE RETIRÓ (11-ago-2026) ─────────────────────────
 // Su fórmula es `gastos fijos ÷ margen`, y la marca de "fijo" venía de la carga
@@ -34,7 +36,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ETIQUETA_SIN_GASTO, type MotivoSinGasto } from "@/lib/mayor/gastos";
+import {
+  ETIQUETA_SIN_GASTO_EGRESOS,
+  type MotivoSinGastoEgresos,
+} from "@/lib/egresos/gasto-mostrable";
 import { money, moneyK, pct } from "./formato";
 
 /** Una empresa con SU venta, SU utilidad y SU gasto — nunca los de otra. */
@@ -43,11 +48,18 @@ export interface RentabilidadEmpresaRow {
   name: string;
   ventas: number;
   utilidad: number;
-  /** Gasto del mayor. `null` cuando el mes de ESA empresa no se puede mostrar. */
+  /**
+   * Gasto de CAJA (Egresos Varios, grupo 6). `null` cuando el mes de ESA
+   * empresa no se puede mostrar.
+   * 🔴 Cambió de fuente el 13-ago-2026: antes era el mayor contable, que va 7
+   * meses atrás y no producía número para ninguna empresa. Ver
+   * `src/lib/egresos/gasto-mostrable.ts`.
+   */
   gasto: number | null;
-  motivo: MotivoSinGasto | null;
+  motivo: MotivoSinGastoEgresos | null;
   /** Frase honesta cuando no hay número. */
   texto: string | null;
+  /** Hasta qué mes llegan los egresos de ESA empresa (`YYYY-MM`), o `null`. */
   ultimoMesCerrado: string | null;
   /** `utilidad − gasto` de ESTA empresa. `null` si le falta el gasto. */
   rentabilidad: number | null;
@@ -67,18 +79,22 @@ const PILL: Record<RentabilidadEmpresaRow["estado"], { label: string; cls: strin
   ambar: { label: "Al límite", cls: "bg-amber-50 text-amber-700" },
   rojo: { label: "Pierde plata", cls: "bg-red-50 text-red-700" },
   // Sin gasto utilizable la píldora DICE POR QUÉ (ver `pillDe`); esto es sólo el
-  // caso en que ni siquiera hay contabilidad conectada.
+  // caso en que ni siquiera hay gastos conectados.
   sin_gastos: { label: "Sin conectar", cls: "bg-stone-100 text-stone-500" },
 };
 
 /**
  * La píldora de una empresa. Cuando no hay número, en vez de un genérico dice el
- * motivo exacto — "Sin cerrar" no es lo mismo que "Falta planilla", y confundir
- * los dos es lo que haría que alguien crea que ya tiene el dato.
+ * motivo exacto — "Sin cargar" (todavía no hay egresos de ese mes) no es lo
+ * mismo que "Nada es gasto" (salió plata pero nada quedó registrado como gasto)
+ * ni que "No se baja sola" (Boston, que no entra al cron por decisión de
+ * Daniel). Confundirlos es lo que haría creer que el dato ya está.
  */
 export function pillDe(e: RentabilidadEmpresaRow): { label: string; cls: string } {
   if (e.rentabilidad !== null) return PILL[e.estado];
-  if (e.motivo) return { label: ETIQUETA_SIN_GASTO[e.motivo], cls: "bg-stone-100 text-stone-500" };
+  if (e.motivo) {
+    return { label: ETIQUETA_SIN_GASTO_EGRESOS[e.motivo], cls: "bg-stone-100 text-stone-500" };
+  }
   return PILL.sin_gastos;
 }
 
@@ -178,14 +194,14 @@ function Desglose({ e }: { e: RentabilidadEmpresaRow }) {
   if (e.rentabilidad == null || e.gasto == null) {
     return (
       <p data-col="sin-gasto" className="text-sm text-stone-500">
-        {e.texto ?? "Todavía no hay gasto de contabilidad de esta empresa para este mes."}
+        {e.texto ?? "Todavía no hay gastos cargados de esta empresa para este mes."}
       </p>
     );
   }
   return (
     <p className="text-sm text-stone-700 tabular-nums">
       Utilidad bruta <span data-col="utilidad" className="font-medium">{money(e.utilidad)}</span>
-      {" − "}Gastos de contabilidad <span data-col="gastos" className="font-medium">{money(e.gasto)}</span>
+      {" − "}Gastos <span data-col="gastos" className="font-medium">{money(e.gasto)}</span>
       {" = "}Rentabilidad <span data-col="rentabilidad-detalle" className={`font-semibold ${e.rentabilidad >= 0 ? "text-green-600" : "text-red-600"}`}>{money(e.rentabilidad)}</span>
     </p>
   );

@@ -5,13 +5,13 @@ import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { variacionPct } from "@/lib/variacion";
 import { estadoSemaforo, rentabilidadEmpresa } from "@/lib/vista-general-calc";
-import { leerMayorMes } from "@/lib/mayor/leer";
+import { leerEgresosMes } from "@/lib/egresos/leer";
+import { centAUsd } from "@/lib/egresos/reglas";
 import {
-  centAUsd,
-  gastoMostrable,
-  textoSinGasto,
-  type MotivoSinGasto,
-} from "@/lib/mayor/gastos";
+  gastoEgresosMostrable,
+  textoSinGastoEgresos,
+  type MotivoSinGastoEgresos,
+} from "@/lib/egresos/gasto-mostrable";
 import { leerInventarioValorizado, type LecturaInventario } from "@/lib/inventario/leer";
 
 export const dynamic = "force-dynamic";
@@ -27,11 +27,11 @@ export const dynamic = "force-dynamic";
 //     MV diaria, para cuadrar al centavo con /admin). 6 empresas. Vencido = ≥91d.
 //   - CXP: switch_proveedor_estadocuenta (6 empresas que tienen CXP). Vencido = ≥91d.
 //   - Reclamos: sin pagar antiguos.
-//   - Gastos / Rentabilidad / Semáforo: el MAYOR CONTABLE de Switch, leído con
-//     `leerMayorMes` (src/lib/mayor/leer.ts) — la MISMA función que alimenta el
-//     módulo "Gastos". El gasto es `débito − crédito` de las cuentas que
-//     empiezan con `6.`, y puede ser negativo en alguna cuenta: es un reverso,
-//     no un error.
+//   - Gastos / Rentabilidad / Semáforo: **EGRESOS VARIOS** de Switch, leídos con
+//     `leerEgresosMes` (src/lib/egresos/leer.ts) — la MISMA función que alimenta
+//     el módulo "Gastos". El gasto es `totalGastoCent`: SÓLO el grupo 6 del
+//     reporte de caja y banco, ya separado por `resumirMesEgresos`. Ver el
+//     bloque "🔴 EL GASTO YA NO SALE DEL MAYOR" más abajo.
 //   - Disponibilidad: bancos_saldos (sin cambios).
 //   - Inventario valorizado: switch_articulo_info (existencia × costo), sumado
 //     por Postgres. Las 6 empresas de Fashion Group — Boston y Multifashion no
@@ -57,6 +57,47 @@ export const dynamic = "force-dynamic";
 // supuestos propios daría un "necesitas vender $X" con un X inventado. Se
 // prefiere no mostrarlo antes que inventarlo. Vuelve el día que exista esa
 // clasificación aprobada.
+//
+// ── 🔴 EL GASTO YA NO SALE DEL MAYOR: SALE DE EGRESOS VARIOS (13-ago-2026) ──
+//
+// Daniel, textual, cuando se le explicó que ESTA pantalla usaba el mayor y el
+// módulo "Gastos" usaba Egresos Varios: *"esto no entendi bien, no deberia de
+// ser egresos varios y ya?"*. Sí — y las dos razones son medibles:
+//
+//   · El **MAYOR** es lo que la contadora CERRÓ formalmente: 135 renglones en
+//     todo 2026, casi todos de enero, o sea 7 meses atrás. Medido el 13-ago con
+//     `scripts/_diag-gasto-mayor-vs-egresos.ts`: **no produce un número para
+//     NINGUNA empresa en NINGÚN mes de 2026** — las 8 caen siempre en
+//     `sin_planilla`, `sin_cerrar` o `parcial`. El tablero del dueño se
+//     alimentaba de una fuente que nunca le dio de comer, y la Rentabilidad por
+//     empresa mostraba "—" en las ocho filas, todos los meses.
+//   · **EGRESOS VARIOS** es lo que SALIÓ de caja y banco, y está vivo: vistana
+//     hasta julio ($118.753,76 de gasto en 7 meses), fashion_wear hasta mayo,
+//     fashion_shoes y active_wear hasta abril. Daniel confirmó que los gastos de
+//     todas las empresas se registran ahí — *"por ahi mismo pero no esta
+//     acutalizado aun, estamos en eso"*—, así que la fuente es la correcta y los
+//     meses van a ir llegando solos.
+//
+// Y la razón de fondo: **dos "gasto" distintos para la misma empresa en dos
+// pantallas** es lo que había que eliminar. Ahora las dos leen `leerEgresosMes`.
+//
+// 🔴 SÓLO EL GRUPO 6 CUENTA COMO GASTO, y ese criterio NO se escribe acá: llega
+// ya calculado en `totalGastoCent`. El reporte trae TODO lo que sale de caja y
+// banco — medido sobre los 378 renglones reales de vistana, de **$243.342,48
+// que salieron sólo $118.753,76 son gasto**; el resto son transferencias entre
+// cuentas propias, planilla por pagar y pagos intercompañía. Usar el total
+// contaría un préstamo devuelto como gasto.
+//
+// ⚠️ **EL MAYOR NO SE APAGA NI SE BORRA.** `src/lib/mayor/*` sigue vivo y sigue
+// siendo una de las dos pestañas del módulo "Gastos" — el #525 las dejó
+// conviviendo a propósito para poder compararlas, y esa comparación sigue
+// valiendo: son dos formas distintas de medir (devengado contra caja) y enero
+// está en las dos con números que no coinciden (vistana: $11.685,66 el mayor
+// contra $11.862,74 la caja). Esa diferencia ES información. Lo único que cambió
+// es quién alimenta el tablero del dueño; acá se dejó de llamar a
+// `leerMayorMes`, y nada más. **Las dos fuentes NUNCA se suman** (ver el
+// encabezado de `src/lib/egresos/reglas.ts`): enero está en las dos y sumarlas
+// lo contaría dos veces.
 
 // Tramos de aging IDÉNTICOS para CXC y CXP. Partición LIMPIA en 2 que suma al
 // total: Corriente (0-90) + Vencido (≥91 = "+90 días") = Total. La columna
@@ -95,10 +136,17 @@ interface GastoEmpresa {
   name: string;
   /** Dólares. `null` cuando el mes NO se puede mostrar como número. */
   gasto: number | null;
-  motivo: MotivoSinGasto | null;
+  motivo: MotivoSinGastoEgresos | null;
   /** Frase honesta para el usuario cuando no hay número. */
   texto: string | null;
-  /** Último mes cerrado de ESA empresa (`YYYY-MM`), o `null`. */
+  /**
+   * Último mes de ESA empresa con egresos cargados (`YYYY-MM`), o `null`.
+   * ⚠️ El nombre del campo NO cambió (`ultimoMesCerrado`) pero **su significado
+   * sí**: antes era el último mes que la contadora había CERRADO en el mayor;
+   * ahora es hasta dónde llegan los egresos de caja. Se conserva el nombre
+   * porque es el contrato con la pantalla y renombrarlo no compra nada; lo que
+   * importa es que el TEXTO que lo acompaña diga la verdad nueva.
+   */
   ultimoMesCerrado: string | null;
 }
 
@@ -138,7 +186,7 @@ export async function GET(req: NextRequest) {
   const anioSel = parseInt(mesSelStr.slice(0, 4), 10);
   const mesSelNum = parseInt(mesSelStr.slice(5, 7), 10);
 
-  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, mayorRes, bancosRes, inventarioRes] = await Promise.all([
+  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, egresosRes, bancosRes, inventarioRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: anioSel }),
     // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
@@ -159,12 +207,12 @@ export async function GET(req: NextRequest) {
     supabaseServer.from("ventas_rollup_mensual_mv")
       .select("empresa_key,mes_num,ventas_netas,utilidad")
       .eq("anio", anioSel - 1),
-    // EL GASTO: el mayor contable de Switch, con la MISMA función que usa el
+    // EL GASTO: EGRESOS VARIOS de Switch, con la MISMA función que usa el
     // módulo "Gastos". Falla ABIERTO: si la migración no corrió o la lectura se
     // cae, la pantalla se dibuja entera y el gasto dice por qué no está — jamás
     // un $0, que es indistinguible de un dato bueno.
-    leerMayorMes(mesSelStr).catch((e) => {
-      console.error("[vista-general] mayor:", e);
+    leerEgresosMes(mesSelStr).catch((e) => {
+      console.error("[vista-general] egresos:", e);
       return null;
     }),
     // Saldos bancarios: orden fecha_dato DESC → el primero por empresa es el
@@ -249,37 +297,43 @@ export async function GET(req: NextRequest) {
     margen = { pct: ventasTotal > 0 ? utilidadTotal / ventasTotal : null, utilidad: utilidadTotal };
   }
 
-  // ── GASTOS del mes seleccionado (mayor contable de Switch) ──
+  // ── GASTOS del mes seleccionado (EGRESOS VARIOS de Switch) ──
   //
-  // 🔑 LA REGLA QUE MANDA ACÁ: un mes sin cerrar, incompleto o sin el asiento de
-  // planilla NO produce número. `gastoMostrable` (módulo puro, `mayor/gastos.ts`)
-  // es quien lo decide, y es la MISMA función que usa el módulo "Gastos". Un
-  // gasto corto se ve igual que uno bueno; por eso, cuando no se puede, va el
-  // motivo en palabras y NUNCA un $0.
-  const mayorInstalado = mayorRes?.instalado === true;
-  const mayorPorEmpresa = new Map(
-    (mayorRes?.empresas ?? []).map((e) => [e.empresaKey, e]),
+  // 🔑 LA REGLA QUE MANDA ACÁ: un mes del que no salió ni un egreso, o del que
+  // salió plata pero NADA quedó registrado como gasto, NO produce número.
+  // `gastoEgresosMostrable` (módulo puro, `egresos/gasto-mostrable.ts`) es quien
+  // lo decide. Un gasto corto se ve igual que uno bueno; por eso, cuando no se
+  // puede, va el motivo en palabras y NUNCA un $0.
+  //
+  // 🔴 El número que se usa es `totalGastoCent` — **sólo el grupo 6**, ya
+  // separado por `resumirMesEgresos`. NO `totalSalidaCent`, que incluye
+  // transferencias entre cuentas propias y préstamos devueltos.
+  const egresosInstalado = egresosRes?.instalado === true;
+  const egresosPorEmpresa = new Map(
+    (egresosRes?.empresas ?? []).map((e) => [e.empresaKey, e]),
   );
 
   const gastosPorEmpresa: GastoEmpresa[] = ALL_EMPRESA_KEYS.map((key) => {
     const name = EMPRESA_KEY_TO_NAME[key] ?? key;
-    const m = mayorPorEmpresa.get(key);
-    if (!m) {
-      // Sin mayor (migración sin correr, o la lectura se cayó): no se sabe nada.
+    const e = egresosPorEmpresa.get(key);
+    if (!e) {
+      // Sin egresos (migración sin correr, o la lectura se cayó): no se sabe nada.
       return {
         key, name, gasto: null, motivo: null,
-        texto: "La contabilidad de Switch todavía no está conectada.",
+        texto: "Los gastos de Switch todavía no están conectados.",
         ultimoMesCerrado: null,
       };
     }
-    const g = gastoMostrable(m.resumen);
+    const g = gastoEgresosMostrable(e.resumen, e.descargaAutomatica);
     return {
       key,
       name,
       gasto: g.usable ? centAUsd(g.totalCent ?? 0) : null,
       motivo: g.motivo,
-      texto: g.motivo ? textoSinGasto(g.motivo, mesLargo(m.ultimoMesCerrado)) : null,
-      ultimoMesCerrado: m.ultimoMesCerrado,
+      texto: g.motivo
+        ? textoSinGastoEgresos(g.motivo, mesLargo(e.ultimoMesConMovimientos))
+        : null,
+      ultimoMesCerrado: e.ultimoMesConMovimientos,
     };
   });
 
@@ -302,8 +356,8 @@ export async function GET(req: NextRequest) {
   // Lo que viaja es `porEmpresa`, cada una con SU gasto o SU motivo.
   const conGasto = gastosPorEmpresa.filter((g) => g.gasto !== null);
   const gastos = {
-    /** `false` = el mayor no está conectado o no se pudo leer. */
-    disponible: mayorInstalado,
+    /** `false` = los egresos no están conectados o no se pudieron leer. */
+    disponible: egresosInstalado,
     /** Cuántas empresas tienen el mes utilizable. Es un CONTEO, no plata. */
     empresasConGasto: conGasto.length,
     empresasTotal: ALL_EMPRESA_KEYS.length,
