@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
+import { TOLERANCIA_MIN, EXTRA_MINIMO_MIN, fmtMin, type PersonaReporte, type ReglasReporte } from "@/lib/asistencia/reporte";
 import { etiquetaPersona } from "@/lib/asistencia/directorio";
 import { ALMUERZO_FIJO_MIN } from "@/lib/asistencia/config";
 import { Ayuda } from "@/components/shared/Ayuda";
@@ -22,7 +22,15 @@ function fechaCorta(iso: string): string {
   return `${DOW[new Date(Date.UTC(a, m - 1, d)).getUTCDay()]} ${d} ${MESES[m - 1]}`;
 }
 /** 0 se muestra como raya: una columna de ceros esconde lo que sí importa. */
-const n = (v: number) => (v ? <span className="tabular-nums">{v}</span> : <span className="text-gray-300">—</span>);
+/**
+ * Un número de la tabla. Cero es una raya, no un 0 que compite por la vista.
+ *
+ * 🔑 Los minutos se calculan AL SEGUNDO desde el 13-ago-2026, así que pueden
+ * traer fracción: `fmtMin` los muestra con 2 decimales solo cuando la tienen.
+ * Redondear al entero en cada celda haría que la columna no sumara el total.
+ */
+const n = (v: number) =>
+  v ? <span className="tabular-nums">{fmtMin(v)}</span> : <span className="text-gray-300">—</span>;
 
 export default function ReporteTab() {
   const { toast } = useToast();
@@ -223,7 +231,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
           : <span className="text-gray-300">—</span>}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.vecesTarde)}</td>
         <td className="px-2 py-2.5 text-right">{r.minutosTarde
-          ? <span className="font-medium tabular-nums text-amber-700">{r.minutosTarde}</span>
+          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(r.minutosTarde)}</span>
           : <span className="text-gray-300">—</span>}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.excesoAlmuerzoMin)}</td>
         <td className="px-2 py-2.5 text-right text-gray-700">{n(r.salidaTempranaMin)}</td>
@@ -240,7 +248,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
               nadie descuente sin saber de dónde sale el número. */}
           {r.minutosTardeDeDiasARevisar > 0 && (
             <p className="mb-2 text-[13px] text-amber-800">
-              De los <b>{r.minutosTarde}</b> minutos tarde, <b>{r.minutosTardeDeDiasARevisar}</b> vienen
+              De los <b>{fmtMin(r.minutosTarde)}</b> minutos tarde, <b>{fmtMin(r.minutosTardeDeDiasARevisar)}</b> vienen
               de días sin las 4 marcas. Míralos antes de descontar.
             </p>
           )}
@@ -268,7 +276,7 @@ function FilaPersona({ p, abierta, onToggle }: { p: PersonaReporte; abierta: boo
                         <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">{d.marcas.length >= 4 ? d.marcas[2] : "—"}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums">{d.marcas.length > 1 ? d.marcas[d.marcas.length - 1] : "—"}</td>
                         <td className="px-2 py-1.5 text-right">{d.tardeMin
-                          ? <span className="font-medium tabular-nums text-amber-700">{d.tardeMin}</span>
+                          ? <span className="font-medium tabular-nums text-amber-700">{fmtMin(d.tardeMin)}</span>
                           : <span className="text-gray-300">—</span>}</td>
                         <td className="px-2 py-1.5 text-right text-gray-600">{n(d.excesoAlmuerzoMin)}</td>
                         <td className="px-2 py-1.5 text-right text-gray-600">{n(d.extraMin)}</td>

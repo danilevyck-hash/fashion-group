@@ -118,6 +118,23 @@ async function main() {
     const { data: fer } = await db.from("asistencia_feriados")
       .select("fecha, nombre").gte("fecha", q.desde).lte("fecha", q.hasta);
     const feriados = new Map((fer ?? []).map((f: any) => [String(f.fecha), String(f.nombre)]));
+    // 🔑 Los montos escritos a mano ENTRAN a la comparación. Sin ellos los dos
+    // motores igual darían lo mismo (comparten el dato), pero los números no
+    // cuadrarían contra lo que la pantalla muestra en producción — y entonces
+    // no se podría distinguir "el cálculo no cambió" de "medí otra cosa".
+    const manuales = new Map<string, any>();
+    {
+      const { data } = await db.from("asistencia_planilla_manual")
+        .select("empleado_codigo, isr, prestamo, terceros, mercancia, otros_servicios")
+        .eq("quincena", q.clave);
+      for (const m of (data ?? []) as any[]) {
+        manuales.set(String(m.empleado_codigo), {
+          isr: Number(m.isr ?? 0), prestamo: Number(m.prestamo ?? 0),
+          terceros: Number(m.terceros ?? 0), mercancia: Number(m.mercancia ?? 0),
+          otrosServicios: Number(m.otros_servicios ?? 0),
+        });
+      }
+    }
 
     for (const empresa of EMPRESAS) {
       // Quién entra: la MISMA regla de vigencia de la ruta, escrita una vez y
@@ -163,11 +180,11 @@ async function main() {
       const jornadaNuevo = (c: string) => NUEVO_PLANILLA.jornadaDiariaMin(horarioDe.get(c) as any);
 
       const lv = VIEJO_PLANILLA.armarPlanilla({
-        personas: pViejo, fichas: fichasViejo, jornadaDiariaMin: jornadaViejo,
+        personas: pViejo, fichas: fichasViejo, manuales, jornadaDiariaMin: jornadaViejo,
         reglas: rViejo, empresa,
       } as any);
       const ln = NUEVO_PLANILLA.armarPlanilla({
-        personas: pNuevo, fichas: fichasNuevo, jornadaDiariaMin: jornadaNuevo,
+        personas: pNuevo, fichas: fichasNuevo, manuales, jornadaDiariaMin: jornadaNuevo,
         reglas: rNuevo, empresa,
       } as any);
 
@@ -287,12 +304,12 @@ async function main() {
       const horarioDe = new Map(horarios.map((h) => [h.empleado_codigo, h]));
 
       const lv = VIEJO_PLANILLA.armarPlanilla({
-        personas: pViejo, fichas: fichasViejo,
+        personas: pViejo, fichas: fichasViejo, manuales,
         jornadaDiariaMin: (c: string) => VIEJO_PLANILLA.jornadaDiariaMin(horarioDe.get(c) as any),
         reglas: rViejo, empresa,
       } as any);
       const lm = NUEVO_PLANILLA.armarPlanilla({
-        personas: pNuevo, fichas: fichasMarcada,
+        personas: pNuevo, fichas: fichasMarcada, manuales,
         jornadaDiariaMin: (c: string) => NUEVO_PLANILLA.jornadaDiariaMin(horarioDe.get(c) as any),
         reglas: rNuevo, empresa,
       } as any);

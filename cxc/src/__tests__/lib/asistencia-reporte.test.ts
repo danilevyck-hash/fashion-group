@@ -241,7 +241,7 @@ describe("🔴 con UNA sola marca no se inventa la salida", () => {
   const unaSola = correr([marca("2026-07-13", "07:04")]);
 
   it("la salida queda vacía, no repetida", () => {
-    expect(unaSola[0].dias[0].entrada).toBe("07:04");
+    expect(unaSola[0].dias[0].entrada).toBe("07:04:00");
     expect(unaSola[0].dias[0].salida).toBeNull();
   });
 
@@ -265,7 +265,7 @@ describe("🔴 con UNA sola marca no se inventa la salida", () => {
 
   it("con DOS marcas la salida sí se calcula", () => {
     const dos = correr([marca("2026-07-13", "08:00"), marca("2026-07-13", "16:00")]);
-    expect(dos[0].dias[0].salida).toBe("16:00");
+    expect(dos[0].dias[0].salida).toBe("16:00:00");
     expect(dos[0].dias[0].salidaTempranaMin).toBe(60);
   });
 });

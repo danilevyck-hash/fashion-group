@@ -164,6 +164,171 @@ export function quincenasHasta(hoy: string, cuantas = 12): Quincena[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// EL PERÍODO — la quincena de siempre, o un rango de fechas cualquiera
+//
+// Daniel (13-ago-2026): quiere poder pedir la planilla por un rango cualquiera,
+// no solo por quincena.
+//
+// ── 🔴 EL SUELDO ES MENSUAL: PRORRATEARLO NECESITA UNA REGLA, Y ES ÉSTA ──────
+//
+// Se paga **la fracción de QUINCENA que el rango cubre**, no la fracción de mes
+// ni de días hábiles. Se eligió así por una razón que se puede verificar:
+//
+//   🔑 ES LA ÚNICA REGLA QUE DEJA LA QUINCENA EXACTAMENTE COMO ESTÁ HOY.
+//      El negocio paga MEDIO SUELDO por quincena, sin importar que tenga 15 o
+//      16 días (`salario ÷ 2`, y el día 31 no paga base). Prorratear por días
+//      del mes daría 15/31 = 0,4839 del sueldo para la primera quincena de
+//      julio: un 3 % menos que hoy, en TODAS las planillas, por haber agregado
+//      una pantalla. Con esta regla, un rango que es una quincena da factor
+//      **exactamente 1** y ni un centavo se mueve.
+//
+//   Para un rango partido, cada quincena que toca aporta su parte:
+//      factor = Σ (días del rango dentro de esa quincena ÷ días de esa quincena)
+//   Ejemplo: del 25-jul al 10-ago = 7/16 (julio, 2ª) + 10/15 (agosto, 1ª).
+//
+// ⚠️ ESTO ES UNA DECISIÓN DE PLATA Y ESTÁ A LA VISTA EN LA PANTALLA. No se
+// prorratea con `fecha_ingreso` (esa regla sigue sin estar definida y quien
+// entra a mitad de quincena cobra completo): acá el prorrateo es del PERÍODO que
+// se pidió, no de la persona.
+//
+// ⚠️ LOS MONTOS ESCRITOS A MANO (ISR, préstamo, terceros, mercancía, otros
+// servicios) VIVEN POR QUINCENA —la tabla los guarda con la clave "2026-07-2" y
+// su CHECK no acepta otra cosa—. En un rango libre NO se aplican y se dice en
+// pantalla y en el papel: repartir un ISR por días sería inventar plata.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Periodo {
+  desde: string;
+  hasta: string;
+  /** Lo que se le muestra a la gente. */
+  etiqueta: string;
+  /** `true` = el rango es EXACTAMENTE una quincena; todo se comporta como hoy. */
+  esQuincena: boolean;
+  /** La quincena, cuando lo es. Es la que da la clave de los montos manuales. */
+  quincena: Quincena | null;
+  /** La clave de `asistencia_planilla_manual`. `null` en un rango libre. */
+  claveManuales: string | null;
+  diasCalendario: number;
+  /** Cuánto del sueldo quincenal se paga. 1 = una quincena entera. */
+  factorBase: number;
+}
+
+const DIA_MS = 86_400_000;
+
+/** Los días de calendario de `desde` a `hasta`, ambos incluidos. */
+export function diasDelRango(desde: string, hasta: string): number {
+  const a = Date.parse(`${desde}T12:00:00Z`);
+  const b = Date.parse(`${hasta}T12:00:00Z`);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return 0;
+  return Math.round((b - a) / DIA_MS) + 1;
+}
+
+/** ¿Es una fecha `YYYY-MM-DD` de calendario de verdad? (`2026-02-31` no lo es.) */
+export function esFechaDeCalendario(v: unknown): v is string {
+  const s = typeof v === "string" ? v.trim() : "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const [anio, mes, dia] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (anio < 2000 || anio > 2099) return false;
+  const d = new Date(Date.UTC(anio, mes - 1, dia));
+  return d.getUTCFullYear() === anio && d.getUTCMonth() === mes - 1 && d.getUTCDate() === dia;
+}
+
+/** Las quincenas que TOCA un rango, de la más vieja a la más nueva. */
+function quincenasDelRango(desde: string, hasta: string): Quincena[] {
+  const out: Quincena[] = [];
+  let anio = Number(desde.slice(0, 4));
+  let mes = Number(desde.slice(5, 7));
+  const finAnio = Number(hasta.slice(0, 4));
+  const finMes = Number(hasta.slice(5, 7));
+  // Tope duro: 24 meses. Sin esto, un rango con una fecha tecleada mal
+  // («2099-…») haría girar el bucle miles de veces.
+  for (let i = 0; i < 24 && (anio < finAnio || (anio === finAnio && mes <= finMes)); i++) {
+    out.push(quincena(anio, mes, 1));
+    out.push(quincena(anio, mes, 2));
+    mes += 1;
+    if (mes === 13) { mes = 1; anio += 1; }
+  }
+  return out;
+}
+
+/**
+ * Cuánto del sueldo quincenal se paga por este rango.
+ *
+ * 🔑 Una quincena entera da **exactamente 1** (sus días ÷ sus días), y por eso
+ * `salario ÷ 2 × factor` es idéntico al `salario ÷ 2` de siempre — sin arrastre
+ * de coma flotante, porque multiplicar por 1 no cambia un número IEEE-754.
+ */
+export function factorBaseDeRango(desde: string, hasta: string): number {
+  if (!esFechaDeCalendario(desde) || !esFechaDeCalendario(hasta) || hasta < desde) return 0;
+  let factor = 0;
+  for (const q of quincenasDelRango(desde, hasta)) {
+    const ini = desde > q.desde ? desde : q.desde;
+    const fin = hasta < q.hasta ? hasta : q.hasta;
+    if (fin < ini) continue;
+    const dias = diasDelRango(ini, fin);
+    const totales = diasDelRango(q.desde, q.hasta);
+    if (totales <= 0) continue;
+    factor += dias / totales;
+  }
+  return factor;
+}
+
+const MESES_CORTOS = [
+  "ene", "feb", "mar", "abr", "may", "jun",
+  "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+/** "2026-07-25" → "25 jul 2026". Lo que lee una persona. */
+export function fechaCorta(f: string): string {
+  const [a, m, d] = f.split("-").map(Number);
+  return `${d} ${MESES_CORTOS[m - 1] ?? "?"} ${a}`;
+}
+
+/** El período de una quincena. Todo se comporta EXACTAMENTE como antes. */
+export function periodoDeQuincena(q: Quincena): Periodo {
+  return {
+    desde: q.desde,
+    hasta: q.hasta,
+    etiqueta: q.etiqueta,
+    esQuincena: true,
+    quincena: q,
+    claveManuales: q.clave,
+    diasCalendario: diasDelRango(q.desde, q.hasta),
+    factorBase: 1,
+  };
+}
+
+/**
+ * El período de un rango cualquiera. `null` si las fechas no sirven.
+ *
+ * 🔑 Si el rango COINCIDE con una quincena, devuelve el período de esa quincena
+ * —misma clave de montos manuales, mismo factor 1—: pedir «16 al 31 de julio»
+ * por el camino nuevo tiene que dar el MISMO cuadro que elegir esa quincena en
+ * la lista, hasta el centavo. Hay un test que lo exige.
+ */
+export function periodoDesdeRango(desde: string, hasta: string): Periodo | null {
+  if (!esFechaDeCalendario(desde) || !esFechaDeCalendario(hasta)) return null;
+  if (hasta < desde) return null;
+
+  for (const q of quincenasDelRango(desde, hasta)) {
+    if (q.desde === desde && q.hasta === hasta) return periodoDeQuincena(q);
+  }
+  return {
+    desde,
+    hasta,
+    etiqueta: `${fechaCorta(desde)} al ${fechaCorta(hasta)}`,
+    esQuincena: false,
+    quincena: null,
+    // ⚠️ `null` a propósito: los montos manuales se guardan por quincena y su
+    // CHECK no acepta otra clave. En un rango libre no se aplican, y se avisa.
+    claveManuales: null,
+    diasCalendario: diasDelRango(desde, hasta),
+    factorBase: factorBaseDeRango(desde, hasta),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LAS HORAS — lo que el reloj dice, ya clasificado
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -206,9 +371,18 @@ export const HORAS_CERO: HorasPersona = {
   tardanzaDeDiasARevisarMin: 0, jornadaDiariaMin: 0,
 };
 
+/**
+ * "HH:MM" o "HH:MM:SS" → minutos, CON DECIMALES.
+ *
+ * 🔴 Los segundos entran como fracción de minuto. Acá se parsea la hora de
+ * SALIDA de un día —que desde el 13-ago-2026 trae segundos— para partir la
+ * ventana de hora extra en las 18:00; descartarlos devolvería el redondeo por
+ * la puerta de atrás, justo en la frontera que decide si un minuto se paga a
+ * 1.25 o a 1.50.
+ */
 function hhmmAMin(hhmm: string): number {
-  const [h, m] = String(hhmm ?? "").split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
+  const [h, m, sg] = String(hhmm ?? "").split(":").map(Number);
+  return (h || 0) * 60 + (m || 0) + (sg || 0) / 60;
 }
 
 /**
@@ -549,6 +723,13 @@ export function calcularDinero(
   horas: HorasPersona,
   manuales: ManualesLinea,
   reglas: ReglasAsistencia,
+  /**
+   * Cuánto del sueldo quincenal paga el período. **1 = una quincena entera**, y
+   * es el valor por defecto justamente para que todo lo que ya existía siga
+   * dando el mismo número sin tocar una sola llamada.
+   * Ver `factorBaseDeRango` y la nota larga del PERÍODO.
+   */
+  factorBase = 1,
 ): DineroLinea | null {
   const divisor = divisorDe(jornadaSemanal, reglas);
   if (divisor === null || !(salarioMensual > 0)) return null;
@@ -557,7 +738,14 @@ export function calcularDinero(
   const valorMinuto = rataHora / 60;
   const h = (min: number) => min / 60;
 
-  const salarioQuincenal = centavos(salarioMensual / 2);
+  // 🩸 EL GUARD DEL FACTOR VA ACÁ TAMBIÉN, no solo en `armarPlanilla`. Un `NaN`
+  // no da error: `centavos(NaN)` devuelve 0, o sea una planilla de $0 que se
+  // paga en silencio — el mismo error que esta pantalla existe para no cometer.
+  // Ante la duda se paga la quincena COMPLETA, que es lo que se pagaba ayer.
+  const factor = Number.isFinite(factorBase) && factorBase > 0 ? factorBase : 1;
+  // 🔑 `× 1` no cambia un número IEEE-754: con el factor por defecto esto es
+  // literalmente el `centavos(salarioMensual / 2)` de siempre.
+  const salarioQuincenal = centavos((salarioMensual / 2) * factor);
   const extraDiurno = centavos(h(horas.extraDiurnoMin) * reglas.recargoExtraDiurno * rataHora);
   const extraNocturno = centavos(h(horas.extraNocturnoMin) * reglas.recargoExtraNocturno * rataHora);
   const excedente = centavos(h(horas.excedenteMin) * reglas.recargoExcedenteNocturnaMixta * rataHora);
@@ -617,6 +805,8 @@ export function armarLinea(
   horas: HorasPersona,
   manuales: ManualesLinea,
   reglas: ReglasAsistencia,
+  /** Fracción de quincena que paga el período. 1 = una quincena entera. */
+  factorBase = 1,
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
   // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
@@ -628,7 +818,10 @@ export function armarLinea(
   const fueraDePlanilla = ficha.servicioProfesional === true;
   const dinero =
     !fueraDePlanilla && faltaConfigurar.length === 0
-      ? calcularDinero(ficha.salarioMensual as number, ficha.jornadaSemanal as number, horas, manuales, reglas)
+      ? calcularDinero(
+        ficha.salarioMensual as number, ficha.jornadaSemanal as number,
+        horas, manuales, reglas, factorBase,
+      )
       : null;
 
   return {
@@ -665,6 +858,11 @@ export interface OpcionesPlanilla {
   reglas: ReglasAsistencia;
   /** La empresa del cuadro. `null` = todas. */
   empresa?: string | null;
+  /**
+   * Fracción de quincena que paga el período pedido. Por defecto **1**, que es
+   * una quincena entera: sin pasarlo, el cuadro es idéntico al de siempre.
+   */
+  factorBase?: number;
 }
 
 /**
@@ -686,6 +884,7 @@ export interface OpcionesPlanilla {
 export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
   const { personas, fichas, jornadaDiariaMin, reglas } = opts;
   const empresa = opts.empresa ?? null;
+  const factorBase = Number.isFinite(opts.factorBase) ? (opts.factorBase as number) : 1;
   const reporteDe = new Map(personas.map((p) => [p.codigo, p]));
 
   const codigos = new Set<string>();
@@ -708,7 +907,7 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       ? medirHoras(p, reglas, jornadaDiariaMin(cod))
       : { ...HORAS_CERO, jornadaDiariaMin: jornadaDiariaMin(cod) };
 
-    const linea = armarLinea(ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas);
+    const linea = armarLinea(ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase);
     // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
     // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
     // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
