@@ -27,7 +27,9 @@ import { esTablaAusente } from "@/lib/mayor/leer";
 import { empresasConEgresosEnCron } from "@/lib/switch-api/empresas";
 import { leerNombresDeCuentas, type NombresPorEmpresa } from "@/lib/cuentas/leer";
 import type { EgresoLinea } from "./parser";
-import { resumirMesEgresos, type Cobertura, type ResumenEgresosMes } from "./reglas";
+import { esGasto, resumirMesEgresos, type Cobertura, type ResumenEgresosMes } from "./reglas";
+import { alDiaDe, serieDeGasto, type AlDia } from "./al-dia";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 /** El mes de UNA empresa, ya resumido. */
 export interface EmpresaEgresos {
@@ -37,6 +39,10 @@ export interface EmpresaEgresos {
   /** Último mes con movimientos que tiene esa empresa (`YYYY-MM`), o `null`.
    *  Es lo que permite decir "los egresos llegan hasta …" en vez de un cero. */
   ultimoMesConMovimientos: string | null;
+  /** Hasta qué mes está al día esa empresa — el avance de la contadora, para
+   *  que Daniel lo vea sin preguntarlo. Se DERIVA del dato (ver `./al-dia.ts`),
+   *  nunca de una lista escrita a mano. */
+  alDia: AlDia;
   /** ¿El cron baja sola esta empresa?
    *
    *  🔴 `false` en `confecciones_boston` por pedido de Daniel — su usuario de
@@ -134,15 +140,18 @@ export async function leerEgresosMes(mes: string): Promise<LecturaEgresos> {
         .order("id", { ascending: true })
         .range(desde, hasta),
     ),
-    // Para el "los egresos llegan hasta …". Solo dos columnas: traer los meses
-    // enteros serían decenas de miles de filas para responder una pregunta de
-    // una línea por empresa.
-    leerTodoPaginado<{ empresa_key: string; mes: string }>(
+    // Para el "hasta qué mes está al día". Cuatro columnas, NO la fila entera:
+    // traer los meses completos serían decenas de miles de filas para responder
+    // una pregunta de una línea por empresa. `cuenta` y `total` se suman a
+    // `empresa_key, mes` porque la sospecha de "mes a medio cargar" se mide
+    // contra el GASTO de los meses previos de esa misma empresa — sin el monto
+    // solo se podría decir hasta qué mes hay algo, no si ese mes se ve raro.
+    leerTodoPaginado<{ empresa_key: string; mes: string; cuenta: string; total: number | string | null }>(
       "egresos_varios (meses con movimiento)",
       (pedirCount, desde, hasta) =>
         supabaseServer
           .from("egresos_varios")
-          .select("empresa_key, mes", pedirCount ? { count: "exact" } : {})
+          .select("empresa_key, mes, cuenta, total", pedirCount ? { count: "exact" } : {})
           .order("id", { ascending: true })
           .range(desde, hasta),
     ),
@@ -165,12 +174,24 @@ export async function leerEgresosMes(mes: string): Promise<LecturaEgresos> {
     porEmpresa.set(r.empresa_key, arr);
   }
 
+  // Último mes con movimientos, y la serie mensual de GASTO de cada empresa —
+  // las dos salen de la MISMA lectura, en una sola pasada.
+  //
+  // ⚠️ La serie es de GASTO (grupo 6), no de todo lo que salió: un mes puede
+  // estar lleno de transferencias entre cuentas propias y no tener un peso de
+  // gasto. Es el mismo criterio con el que la pantalla pinta "De eso, gastos".
   const ultimoMes = new Map<string, string>();
+  const renglonesPorEmpresa = new Map<string, { mes: string; gastoCent: number }[]>();
   for (const r of mesesConMovimiento) {
     const bucket = String(r.mes).slice(0, 7);
     const previo = ultimoMes.get(r.empresa_key);
     if (!previo || bucket > previo) ultimoMes.set(r.empresa_key, bucket);
+
+    const arr = renglonesPorEmpresa.get(r.empresa_key) ?? [];
+    arr.push({ mes: bucket, gastoCent: esGasto(r.cuenta) ? centDe(r.total) : 0 });
+    renglonesPorEmpresa.set(r.empresa_key, arr);
   }
+  const mesEnCurso = hoyPanama().slice(0, 7);
 
   // Los NOMBRES de las cuentas, en una sola pasada para las 8 empresas y sólo
   // por los códigos que este mes usa. Falla ABIERTO: sin nombres la pantalla
@@ -198,6 +219,7 @@ export async function leerEgresosMes(mes: string): Promise<LecturaEgresos> {
       nombres.get(key),
     ),
     ultimoMesConMovimientos: ultimoMes.get(key) ?? null,
+    alDia: alDiaDe(serieDeGasto(renglonesPorEmpresa.get(key) ?? []), mesEnCurso),
     descargaAutomatica: enCron.has(key),
   }));
 

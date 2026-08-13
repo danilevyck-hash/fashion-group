@@ -15,8 +15,51 @@
 // quedan ~610 útiles — más angosto que un iPhone acostado.
 
 import { ETIQUETA_ESTADO_EGRESOS, type EstadoEgresos } from "@/lib/egresos/reglas";
+import type { AlDia } from "@/lib/egresos/al-dia";
 import type { EmpresaEgresosResumen } from "./tipos";
 import { mesLargo, usd } from "./tipos";
+
+/**
+ * HASTA QUÉ MES ESTÁ AL DÍA esta empresa — el avance de la contadora, en una
+ * línea, para que Daniel lo vea sin preguntárselo a nadie.
+ *
+ * 🔴 DICE "CARGADO HASTA", NO "AL DÍA HASTA", Y NO ES UN CAPRICHO: la píldora
+ * de la MISMA fila ya usa "Al día" para otra cosa —que el mes que estás mirando
+ * tuvo movimientos—, así que "Al día" + "Al día hasta mayo" en el mismo renglón
+ * son dos frases parecidas diciendo cosas distintas. La píldora es anterior y
+ * no se toca; lo que se renombra es el texto nuevo.
+ *
+ * 🔴 SE DICE LO QUE EL DATO DICE, Y NADA MÁS. "Hasta qué mes hay renglones" es
+ * un hecho. "Ese mes está incompleto" NO se puede afirmar con egresos —son pagos
+ * sueltos, no tienen asiento de cierre— así que cuando el historial de la propia
+ * empresa lo justifica se dice **"puede estar a medio cargar"**, con los dos
+ * números a la vista para que se pueda juzgar. Nunca un semáforo inventado.
+ *
+ * ⚠️ Devuelve `null` para la empresa que NO se baja sola (Boston): ahí el vacío
+ * no es atraso de la contadora sino una decisión de Daniel, y su explicación ya
+ * lo dice entera. Repetirlo como "todavía no hay gastos registrados" la
+ * acusaría de un atraso que no existe.
+ */
+export function fraseAlDia(alDia: AlDia | undefined, descargaAutomatica: boolean): string | null {
+  // ⚠️ `undefined` es posible de verdad y NO es un caso teórico: SWR sirve el
+  // payload cacheado de la visita anterior mientras revalida, y ese payload
+  // puede venir de la versión de la app que todavía no mandaba este campo. Sin
+  // dato no se dice nada — inventar una línea sería peor que no tenerla.
+  if (!alDia || !descargaAutomatica) return null;
+  switch (alDia.estado) {
+    // 🔴 NUNCA "$0.00". Cero es un hecho contable; esto es ausencia de dato.
+    case "sin_nada":
+      return "Todavía no hay gastos registrados";
+    case "al_dia":
+      return `Cargado hasta ${mesLargo(alDia.mes)}`;
+    // El mes que todavía corre no puede estar completo, y eso lo dice el
+    // calendario — no hace falta ninguna estadística para afirmarlo.
+    case "mes_en_curso":
+      return `Cargado hasta ${mesLargo(alDia.mes)}, que todavía va corriendo`;
+    case "quizas_incompleto":
+      return `Cargado hasta ${mesLargo(alDia.mes)} · ese mes va en ${usd(alDia.gastoCent)} y lo habitual acá es ${usd(alDia.habitualCent)}: puede estar a medio cargar`;
+  }
+}
 
 /** Sólo `con_movimientos` autoriza a pintar el número como un hecho. */
 export const muestraMontoEgresos = (e: EstadoEgresos): boolean => e === "con_movimientos";
@@ -53,9 +96,11 @@ export function explicacionEgresos(
     case "sin_movimientos":
       return "Este mes no salió plata de caja ni del banco.";
     case "sin_datos":
-      return ultimoMesConMovimientos
-        ? `Este mes todavía no se ha traído de Switch. Lo último que hay es de ${mesLargo(ultimoMesConMovimientos)}.`
-        : "Este mes todavía no se ha traído de Switch.";
+      // 🔴 La coletilla "Lo último que hay es de …" SE FUE (13-ago-2026): la
+      // línea de "Cargado hasta …" que ahora lleva cada empresa dice exactamente
+      // eso, y decía DOS VECES el mismo mes en la misma tarjeta. El parámetro
+      // se queda porque la rama de "no se baja sola" (arriba) sí lo usa.
+      return "Este mes todavía no se ha traído de Switch.";
   }
 }
 
@@ -69,6 +114,11 @@ interface Fila {
   salidaTexto: string;
   gastoTexto: string;
   explicacion: string;
+  /** "Cargado hasta julio 2026". `null` en la empresa que no se baja sola. */
+  alDiaTexto: string | null;
+  /** ¿Esa línea es una sospecha (mes a medio cargar) y no un hecho? Solo cambia
+   *  el color: ámbar es "mirá esto", gris es "así está". */
+  alDiaDudoso: boolean;
 }
 
 function armarFilas(empresas: EmpresaEgresosResumen[]): Fila[] {
@@ -93,8 +143,22 @@ function armarFilas(empresas: EmpresaEgresosResumen[]): Fila[] {
         empresa.ultimoMesConMovimientos,
         empresa.descargaAutomatica,
       ),
+      alDiaTexto: fraseAlDia(empresa.alDia, empresa.descargaAutomatica),
+      alDiaDudoso: empresa.alDia?.estado === "quizas_incompleto",
     };
   });
+}
+
+/** La línea de "hasta dónde llega esta empresa". Va DEBAJO del nombre, en las
+ *  dos formas (tarjeta y tabla), y siempre — no solo cuando el mes elegido está
+ *  vacío. Es lo único que contesta "¿por dónde va la contadora?" de un vistazo. */
+function AlDiaLinea({ fila }: { fila: Fila }) {
+  if (!fila.alDiaTexto) return null;
+  return (
+    <p className={`text-sm ${fila.alDiaDudoso ? "text-amber-700" : "text-gray-500"}`}>
+      {fila.alDiaTexto}
+    </p>
+  );
 }
 
 function EstadoTag({ fila }: { fila: Fila }) {
@@ -147,7 +211,10 @@ function Tarjeta({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => void
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-gray-900">{empresa.nombre}</span>
+        <div className="min-w-0">
+          <span className="text-sm font-semibold text-gray-900">{empresa.nombre}</span>
+          <AlDiaLinea fila={fila} />
+        </div>
         <EstadoTag fila={fila} />
       </div>
 
@@ -199,6 +266,9 @@ function FilaTabla({ fila, onAbrir }: { fila: Fila; onAbrir: (key: string) => vo
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-gray-900">{empresa.nombre}</span>
           <EstadoTag fila={fila} />
+        </div>
+        <div className="mt-0.5">
+          <AlDiaLinea fila={fila} />
         </div>
         {fila.explicacion && (
           <p className="mt-1 max-w-sm text-sm text-gray-600">{fila.explicacion}</p>
