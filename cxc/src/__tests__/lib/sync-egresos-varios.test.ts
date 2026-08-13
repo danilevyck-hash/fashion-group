@@ -300,9 +300,13 @@ describe("E. 🔴 LAS DOS FUENTES NO SE SUMAN — enero está en las dos", () =>
   });
 
   it("la pantalla pide UNA fuente por vez, no las dos", () => {
+    // Desde el 13-ago-2026 hay una condición MÁS (`enGastos`): estando en la
+    // pestaña de Saldos de banco no se pide ninguna de las dos. El invariante
+    // que importa no cambió — cada `pedir*` sigue exigiendo SU fuente, así que
+    // nunca se piden las dos a la vez.
     const cliente = soloCodigo(leer(path.join("app", "gastos-contabilidad", "GastosContabilidadClient.tsx")));
-    expect(cliente).toMatch(/pedirMayor\s*=\s*authChecked && fuente === "mayor"/);
-    expect(cliente).toMatch(/pedirEgresos\s*=\s*authChecked && fuente === "egresos"/);
+    expect(cliente).toMatch(/pedirMayor\s*=\s*authChecked && enGastos && fuente === "mayor"/);
+    expect(cliente).toMatch(/pedirEgresos\s*=\s*authChecked && enGastos && fuente === "egresos"/);
   });
 
   it("y la ruta de egresos no devuelve nada del mayor", () => {

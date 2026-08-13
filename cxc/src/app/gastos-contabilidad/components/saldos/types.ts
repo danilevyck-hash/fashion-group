@@ -1,12 +1,18 @@
-// Formas y helpers de "Saldos de Banco".
+// Formas y helpers de los saldos de banco.
 //
 // Este archivo es la CASA de los helpers de saldo bancario (empresa, fecha,
-// monto). Vivían dentro de `app/gastos-empresa/components/types.ts` porque los
-// saldos eran una sección de esa pantalla; al mudarse a su propio módulo se
-// mudaron con ella. Ese módulo ya se retiró: ésta es la única casa que tienen.
+// monto). Se mudó DOS veces con su pantalla y nunca se copió: vivía en
+// `app/gastos-empresa/components/types.ts` (cuando los saldos eran una sección
+// de "Gastos de Empresa"), pasó a `app/saldos-banco/components/` los dos días
+// que fue módulo suelto, y desde el 13-ago-2026 vive acá — los saldos son la 2ª
+// PESTAÑA de "Gastos". Nunca hubo dos copias.
+//
+// ⚠️ La API NO se mudó: sigue siendo `/api/saldos-banco`. Mover una ruta viva
+// solo para que el nombre haga juego sería churn sin comprar nada.
 
 import { ALL_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { fmt } from "@/lib/format";
+import type { CargaSaldo } from "@/lib/saldos-banco/historial";
 
 /** Base de la API del módulo. */
 export const API_BASE = "/api/saldos-banco";
@@ -17,10 +23,14 @@ export interface BancoSaldo {
   fecha_dato: string; // YYYY-MM-DD
 }
 
-/** Lo que devuelve GET /api/saldos-banco: el último saldo de cada empresa. */
+/** Lo que devuelve GET /api/saldos-banco: el último saldo de cada empresa y el
+ *  historial completo de cargas, por empresa, de la más nueva a la más vieja. */
 export interface RespuestaSaldos {
   bancos: BancoSaldo[];
+  historial?: Record<string, CargaSaldo[]>;
 }
+
+export type { CargaSaldo };
 
 // ── Empresas ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +49,15 @@ export function fechaCorta(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
   if (!m) return iso || "";
   return `${Number(m[3])} ${MESES_CORTOS[Number(m[2]) - 1] ?? ""}`;
+}
+
+/** "2026-07-15" → "15 jul 2026". El historial CRUZA años (hoy va de ene a ago
+ *  2026, pero crece ~12 filas por empresa por año), y una lista de fechas sin
+ *  año es una lista donde "31 ene" aparece dos veces sin poder distinguirlas. */
+export function fechaConAnio(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!m) return iso || "";
+  return `${fechaCorta(iso)} ${m[1]}`;
 }
 
 export function diasDesde(iso: string): number {

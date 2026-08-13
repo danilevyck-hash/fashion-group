@@ -223,7 +223,12 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/caja/components/PeriodoList.tsx", que: "Caja Menuda · h1 grande 'Caja Menuda' (38 px de alto)", texto: "clamp(28px, 4vw, 38px)" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", que: "Marketing · h1 grande 'Marketing'", texto: 'text-xl font-semibold text-gray-900">Marketing' },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", que: "Gastos · h1 grande 'Gastos'", texto: 'text-xl font-semibold tracking-tight text-gray-900' },
-  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", que: "Saldos de Banco · h1 grande 'Saldos de Banco'", texto: 'text-gray-900">Saldos de Banco' },
+  // Los saldos dejaron de ser una PÁGINA el 13-ago-2026: son la 2ª pestaña de
+  // Gastos, así que su encabezado ahora es el de Gastos. El invariante no se
+  // aflojó — se mudó de archivo y encima se volvió más estricto: hay un test
+  // aparte (`saldos-banco-modulo.test.ts`) que exige que `SaldosBancoTab.tsx`
+  // NO tenga h1, para que la página no termine con dos.
+  { archivo: "app/gastos-contabilidad/components/saldos/SaldosBancoTab.tsx", que: "Saldos de banco · h1 grande 'Saldos de Banco'", texto: 'text-gray-900">Saldos de Banco' },
 
   // Poda de PALABRAS OBVIAS en todo el sistema (12-ago-2026, aprobada por
   // Daniel). La vara: quitarlo no le quita información a una secretaria, un
@@ -260,7 +265,7 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/marketing/components/FacturasSection.tsx", que: "Marketing · señalaba el botón de agregar, que está a la vista", texto: "Agrega la primera factura" },
   { archivo: "app/error.tsx", que: "Toda la app · señalaba el botón Recargar, que está justo debajo", texto: "Recarga la página para continuar." },
   { archivo: "app/global-error.tsx", que: "Toda la app · lo mismo en el error de raíz", texto: "Recarga la página para continuar." },
-  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", que: "Saldos de Banco · la PRIMERA mitad (la segunda amarra con Vista General y se queda)", texto: "Lo que hay en el banco de cada empresa" },
+  { archivo: "app/gastos-contabilidad/components/saldos/SaldosBancoTab.tsx", que: "Saldos de banco · la PRIMERA mitad (la segunda amarra con Vista General y se queda)", texto: "Lo que hay en el banco de cada empresa" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -384,7 +389,6 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/prestamos/PrestamosClient.tsx", nombre: "Préstamos" },
   { archivo: "app/marketing/components/InicioMarketing.tsx", nombre: "Marketing" },
   { archivo: "app/gastos-contabilidad/GastosContabilidadClient.tsx", nombre: "Gastos" },
-  { archivo: "app/saldos-banco/SaldosBancoClient.tsx", nombre: "Saldos de Banco" },
 ];
 
 describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {

@@ -246,11 +246,15 @@ const MODULOS_POR_ROL_ESPERADOS: Record<string, string[]> = {
   // 52 filas de `bancos_saldos` están firmadas "Contabilidad".
   // Y el 11-ago `gastos-empresa` SE FUE: publicado el módulo automático, la
   // carga manual (0 filas en toda su historia) se retiró.
+  // El 13-ago-2026 sale también `saldos-banco`, y por el motivo CONTRARIO a una
+  // pérdida: DEJÓ DE SER UN MÓDULO — los saldos son la 2ª PESTAÑA de "Gastos"
+  // (Daniel: *"y debeeria estar en un solo modulo"*). Contabilidad NO perdió
+  // nada: entra por `gastos-contabilidad`, que ya tenía, y adentro toca la
+  // pestaña. Pedir la key acá ya no probaría nada: no hay key que pedir.
   // Cambio DELIBERADO: el candado hizo lo suyo y frenó el build hasta acá.
   contabilidad: [
     "proveedores",
     "gastos-contabilidad",
-    "saldos-banco",
     "prestamos",
     "asistencia",
   ],
@@ -278,8 +282,11 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
     // `data-health-dentro-de-usuarios.test.ts`, que exige que NINGÚN rol (ni con
     // permisos puestos a mano) llegue a esa pantalla. Pedirlo acá como "módulo"
     // ya no probaría nada: no hay key que pedir.
+    // `saldos-banco` sale de esta lista el 13-ago-2026 por lo mismo que
+    // `data-health`: dejó de ser un módulo (es pestaña de "Gastos"). Lo que
+    // ahora cierra esa puerta es `gastos-contabilidad`, que sigue en la lista.
     const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
-      "gastos-contabilidad", "saldos-banco", "prestamos", "usuarios"];
+      "gastos-contabilidad", "prestamos", "usuarios"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {
       expect(suyos, `secretaria no debe tener ${m}`).not.toContain(m);

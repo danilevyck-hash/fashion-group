@@ -73,6 +73,14 @@ const nextConfig = {
       // redirige, para que ni siquiera se descargue la pantalla equivocada.
       // Temporal (307) como los demás: no se quema en el caché del navegador.
       { source: "/admin/data-health", destination: "/admin/usuarios?tab=data-health", permanent: false },
+      // Saldos de Banco dejó de ser un módulo suelto (13-ago-2026): vive como 2ª
+      // PESTAÑA de Gastos, con la MISMA pantalla. Daniel: *"y debeeria estar en
+      // un solo modulo"*. La dirección vieja la tiene la tarjeta
+      // "Disponibilidad" de Vista General (y cualquier marcador), así que tiene
+      // que seguir llegando — acá, y no con un `page.tsx` que redirige, para que
+      // ni siquiera se descargue la pantalla equivocada. Temporal (307) como los
+      // demás: no se quema en el caché del navegador.
+      { source: "/saldos-banco", destination: "/gastos-contabilidad?tab=saldos-banco", permanent: false },
     ];
   },
   experimental: {
