@@ -1,0 +1,92 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: índice de PREFIJO para la búsqueda de Referencia
+--
+-- Aditiva y reversible: SOLO crea un índice. Ninguna función cambia, ninguna
+-- cifra de la app cambia. La app funciona IGUAL si esta migración todavía no
+-- corrió — solo más lenta cuando Daniel pega su lista de 50 códigos.
+--
+-- ── DIAGNÓSTICO (MEDIDO 12-ago-2026 contra producción, read-only) ───────────
+--
+-- `/api/ventas/referencia` resuelve CADA código pegado por PREFIJO
+-- (`codigo LIKE 'X%'`), venga solo o en lista de 50 — con 50 códigos es UNA
+-- consulta con un OR de 50 `LIKE`, no 50 consultas.
+--
+-- `switch_articulo_diario` tiene 197.128 filas y ya tiene
+-- `idx_sad_empresa_codigo (empresa_key, codigo)`. Ese btree NO sirve para
+-- `LIKE 'X%'`: el collation de la base no es "C", así que el orden del índice no
+-- es el orden byte-a-byte que el prefijo necesita. Postgres lo ignora y evalúa
+-- los 50 patrones fila por fila.
+--
+-- La medición que lo prueba — MISMOS 48 códigos, MISMAS ~420 filas devueltas,
+-- mediana de 4 corridas, contra producción (base de red ≈ 200-245 ms desde
+-- Panamá, que es el piso de cualquier consulta):
+--
+--   50 códigos con `.in()`            (igualdad, usa el índice)     196 ms
+--   50 códigos con `LIKE 'X'` sin %   (Postgres lo reescribe a =)   279 ms
+--   50 códigos con `LIKE 'X%'`        (prefijo, SIN índice)         768 ms
+--
+-- O sea: el costo NO es el volumen ni el OR — es EL PATTERN MATCHING del
+-- prefijo. Quitale el `%` y el mismo OR de 50 vuelve a ser gratis.
+--
+-- El escalado confirma que cada prefijo barre la tabla entera (count exact):
+--
+--    1 prefijo  253 ms   (≈  8 ms sobre la base)
+--   10 prefijos 365 ms   (≈ 120 ms)
+--   25 prefijos 524 ms   (≈ 280 ms)
+--   50 prefijos 592 ms   (≈ 347 ms)
+--
+-- Costo ∝ (nº de prefijos × filas de la tabla): la firma de "cada patrón se
+-- evalúa contra cada fila".
+--
+-- Punta a punta hoy (build de producción → base de producción, mediana de 3):
+--   1 código 0,69 s · 10 códigos 0,95 s · 50 códigos 2,3 s.
+--
+-- Y el barrido se paga VARIAS veces por búsqueda. Filas que devuelve el filtro
+-- (medido): 1 código → 1 fila · 10 códigos → 11 · 50 códigos → 1.775. Como
+-- `leerTodoPaginado` lee de a 1.000, con 50 códigos `switch_articulo_diario`
+-- se recorre TRES veces: el pre-conteo + 2 páginas. Ahí está el grueso de los
+-- 2,3 s. (`switch_ingresos_mercancia` 165 filas y `switch_articulo_info` 97:
+-- una página cada una.)
+--
+-- ── EL ARREGLO ──────────────────────────────────────────────────────────────
+--
+-- `text_pattern_ops` indexa por comparación byte-a-byte, que es exactamente lo
+-- que `LIKE 'X%'` necesita: cada prefijo pasa a ser un RANGO del índice, y los
+-- 50 se resuelven con un BitmapOr de 50 rangos en vez de 50 patrones por fila.
+--
+-- Solo `codigo` (sin `empresa_key` adelante) A PROPÓSITO: el filtro
+-- `empresa_key IN (las 6 de FG)` no discrimina casi nada — prácticamente todas
+-- las filas de la tabla son de esas 6 empresas — así que rankear primero por
+-- prefijo y filtrar empresa después es el plan barato. Poner `empresa_key`
+-- de líder obligaría a 6 × 50 = 300 recorridos.
+--
+-- SIN `CONCURRENTLY` a propósito: son 197k filas, el índice se construye en un
+-- par de segundos. `CONCURRENTLY` no puede correr dentro de un bloque de
+-- transacción (el editor SQL de Supabase lo envuelve) y si falla deja un índice
+-- INVÁLIDO que hay que limpiar a mano. El bloqueo de escrituras de ~2 s es
+-- preferible; correr fuera de las ventanas de cron (23:50-00:20 y 05:50-06:10
+-- UTC) y listo.
+--
+-- Las otras dos fuentes NO llevan índice: medidas, el prefijo les cuesta
+-- +20 ms (`switch_articulo_info`, 16.179 filas) y +32 ms
+-- (`switch_ingresos_mercancia`, 34.736 filas) con 50 códigos. Son tablas chicas
+-- y las escriben los syncs; un índice ahí cuesta más en escritura de lo que
+-- ahorra en lectura.
+--
+-- Verificación después de correrla (debe bajar de ~768 ms a decenas de ms):
+--   EXPLAIN ANALYZE
+--   SELECT count(*) FROM switch_articulo_diario
+--   WHERE empresa_key IN ('vistana','fashion_wear','fashion_shoes',
+--                         'active_shoes','active_wear','joystep')
+--     AND (codigo LIKE '4D5029G%' OR codigo LIKE '4D5077G%');
+--   -- Se espera "Bitmap Index Scan on idx_sad_codigo_prefijo", no "Seq Scan".
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_sad_codigo_prefijo
+  ON switch_articulo_diario (codigo text_pattern_ops);
+
+COMMENT ON INDEX idx_sad_codigo_prefijo IS
+  'Busqueda por PREFIJO del tab Referencia (codigo LIKE ''X%''). El btree normal '
+  '(empresa_key, codigo) no sirve para prefijos porque el collation no es C. '
+  'Medido 12-ago-2026: 50 prefijos costaban 768 ms vs 196 ms los mismos 50 '
+  'codigos por igualdad.';
