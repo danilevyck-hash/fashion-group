@@ -187,17 +187,17 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
 });
 
 describe("registro del cron tommy-catalogo en todos los sitios", () => {
-  it("vercel.json: 2 slots (12:40 y 17:40 UTC)", () => {
+  it("vercel.json: 3 slots (12:40, 17:40 y 20:05 UTC)", () => {
     const vercel = JSON.parse(
       readFileSync(path.join(process.cwd(), "vercel.json"), "utf8"),
     ) as { crons: { path: string; schedule: string }[] };
     const tommy = vercel.crons.filter((c) => c.path === "/api/cron/tommy-catalogo");
-    expect(tommy.map((c) => c.schedule).sort()).toEqual(["40 12 * * *", "40 17 * * *"]);
+    expect(tommy.map((c) => c.schedule).sort()).toEqual(["40 12 * * *", "40 17 * * *", "5 20 * * *"]);
   });
 
-  it("SWITCH_CRON_ENTRADAS: 1240 y 1740 sobre fashion_shoes", () => {
+  it("SWITCH_CRON_ENTRADAS: 1240, 1740 y 2005 sobre fashion_shoes", () => {
     const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === "tommy-catalogo");
-    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1240", "1740"]);
+    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1240", "1740", "2005"]);
     for (const e of entradas) expect(e.empresas).toEqual(["fashion_shoes"]);
   });
 

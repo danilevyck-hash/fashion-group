@@ -2,10 +2,14 @@
  * Cron diario: catálogo Joybees (joybees_products) auto-actualizado desde Switch
  * (empresa joystep, que vende EXCLUSIVAMENTE Joybees). Mismo patrón que reebok-catalogo.
  *
- * Schedule: 0 11 * * * y 5 17 * * * UTC (2 corridas/día, paridad con reebok-catalogo)
- * — cada corrida a ≥50min de los crons que tocan joystep (11:00: reconciliacion
- * 10:00; 17:05: estadocuenta 16:00 y reconciliacion 18:00). reebok-catalogo 17:00
- * va a 5 min pero toca solo active_shoes (empresas disjuntas, patrón 05:30/05:35/05:40).
+ * Schedule: 0 11 * * *, 5 17 * * * y 35 20 * * * UTC (3 corridas/día desde el
+ * 13-ago-2026, paridad con reebok-catalogo) — cada corrida a ≥45min de los crons
+ * que tocan joystep (11:00: reconciliacion 10:00; 17:05: estadocuenta 16:00 y
+ * reconciliacion 18:00; 20:35: estadocuenta 21:20 y sync-recibos 19:15).
+ * reebok-catalogo 17:00 va a 5 min pero toca solo active_shoes (empresas
+ * disjuntas, patrón 05:30/05:35/05:40).
+ * El slot 20:35 (3:35 p.m. Panamá) es el tercer pase; va ÚLTIMO de los cuatro
+ * catálogos porque es el más corto (26 s medidos el 12-ago-2026).
  *
  * Refresca precio/existencia/disponibilidad, oculta los que quedan en existencia 0,
  * auto-agrega los nuevos con existencia >= 1, y alerta por Telegram los nuevos sin

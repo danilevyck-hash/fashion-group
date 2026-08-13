@@ -52,7 +52,8 @@ import type { SyncLogType } from "./sync-log-tipos";
 //   1. el candado EXPIRA por tiempo (esta constante) — nadie que llegue después
 //      queda bloqueado por un run que ya no existe;
 //   2. la expiración NO depende de que vuelva a correr el MISMO par
-//      (`barrerRunningAtascados`, barrido global) — `catalogo_tommy` corre 2×/día,
+//      (`barrerRunningAtascados`, barrido global) — `catalogo_tommy` corría
+//      entonces 2×/día (hoy 3×),
 //      así que un atasco a las 18:52 bloqueaba hasta las 12:40 del día siguiente.
 
 /** Techo de vida de una función en Vercel Pro + Fluid Compute. Pasado esto el

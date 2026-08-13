@@ -249,19 +249,26 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
 // mínima de COLATERAL_RECOVER_AFTER_HOUR_UTC sigue mandando: nunca se recupera
 // antes de su primer slot del día.
 
-/** Horarios UTC (HH:MM) de los crons de catálogo — espejo de vercel.json (2
- *  entradas cada uno). Un test compara ambos para que no diverjan. */
+/** Horarios UTC (HH:MM) de los crons de catálogo — espejo de vercel.json (3
+ *  entradas cada uno desde el 13-ago-2026). Un test compara ambos para que no
+ *  diverjan. */
 export const CATALOGO_CRON_SLOTS_UTC: Record<string, readonly string[]> = {
-  "joybees-catalogo": ["11:00", "17:05"],
-  "reebok-catalogo": ["12:10", "17:00"],
-  "tommy-catalogo": ["12:40", "17:40"],
-  "calvin-catalogo": ["12:50", "16:40"],
+  "joybees-catalogo": ["11:00", "17:05", "20:35"],
+  "reebok-catalogo": ["12:10", "17:00", "20:25"],
+  "tommy-catalogo": ["12:40", "17:40", "20:05"],
+  "calvin-catalogo": ["12:50", "16:40", "20:15"],
 };
 
 /** Ciclo del catálogo en horas: el hueco MÁS LARGO entre dos corridas
- *  consecutivas de su horario, dando la vuelta al día (Tommy 12:40/17:40 → 19h,
- *  el salto de la tarde a la mañana siguiente). null si el cron no es un
- *  catálogo con horario declarado. */
+ *  consecutivas de su horario, dando la vuelta al día (Tommy
+ *  12:40/17:40/20:05 → 16h35, el salto de la tarde a la mañana siguiente). null
+ *  si el cron no es un catálogo con horario declarado.
+ *
+ *  Con la 3ª pasada (13-ago-2026) los ciclos se ACORTAN: joybees 14h25, reebok
+ *  15h45, tommy y calvin 16h35. Siguen por encima del hueco reconciliación
+ *  18:00 → slot de la mañana (un success del propio día jamás se declara
+ *  perdido) y por debajo del peor caso legítimo (última pasada de ayer + la de
+ *  la mañana perdida), que es lo que SÍ hay que detectar. */
 export function catalogoCicloHoras(cronName: string): number | null {
   const slots = CATALOGO_CRON_SLOTS_UTC[cronName];
   if (!slots || slots.length === 0) return null;
@@ -605,6 +612,32 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
   { cron: "switch-sync facturas", hhmmUtc: "1900", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "1915", empresas: CRON_EMPRESAS_RECIBOS },
+  // ─── TERCERA pasada de los 4 catálogos: 20:05-20:35 UTC = 3:05-3:35 p.m. de
+  // Panamá (decisión de Daniel, 13-ago-2026: "si subelo a 3").
+  //
+  // POR QUÉ ESA FRANJA. Las dos pasadas viejas caen entre las 11:00 y las 17:40
+  // UTC = 6:00 a.m. y 12:40 p.m. de Panamá, o sea que TODA la tarde de Panamá
+  // quedaba con el catálogo de la mañana. Media tarde es cuando entra mercancía
+  // y cuando se arman pedidos, así que es el pase que más sirve.
+  //
+  // Y por qué 20:0x-20:3x y no otra hora de la tarde: la banda 19:30-21:00 UTC
+  // es la única sin sesiones de Switch de estas 4 empresas. Por detrás quedan
+  // las ventas de las 19:00 y `sync-recibos` 19:15; por delante, el bloque de
+  // estadocuenta 21:10/21:15/21:20. Cada catálogo queda a ≥50 min de su vecino
+  // de atrás y a ≥45 del de adelante — muy por encima de los 15 de
+  // SEPARACION_MINIMA_MIN, que hace falta porque el test mide inicio contra
+  // inicio y estos vecinos NO son instantáneos.
+  //
+  // El orden dentro de la franja es por DURACIÓN MEDIDA (12-ago-2026, después
+  // del paralelismo): Tommy 156 s, Calvin 70 s, Reebok 49 s, Joybees 26 s. El
+  // más largo va primero y se lleva el mayor margen contra el estadocuenta que
+  // viene después. Los 10 min entre uno y otro no los pide el test (son
+  // empresas disjuntas): son para no apilar cuatro barridos simultáneos sobre
+  // una base en compute Micro.
+  { cron: "tommy-catalogo", hhmmUtc: "2005", empresas: ["fashion_shoes"] },
+  { cron: "calvin-catalogo", hhmmUtc: "2015", empresas: ["vistana"] },
+  { cron: "reebok-catalogo", hhmmUtc: "2025", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "2035", empresas: ["joystep"] },
   { cron: "switch-sync facturas", hhmmUtc: "2100", empresas: ["american_classic"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2115", empresas: ["fashion_shoes", "fashion_wear"] },

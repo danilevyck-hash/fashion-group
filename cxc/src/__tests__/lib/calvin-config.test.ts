@@ -206,22 +206,26 @@ describe("MARCA_THEME.calvin — blanco/negro minimalista, completo y coherente"
 });
 
 describe("registro del cron calvin-catalogo en todos los sitios", () => {
-  it("vercel.json: 2 slots (12:50 y 16:40 UTC)", () => {
+  it("vercel.json: 3 slots (12:50, 16:40 y 20:15 UTC)", () => {
     const vercel = JSON.parse(
       readFileSync(path.join(process.cwd(), "vercel.json"), "utf8"),
     ) as { crons: { path: string; schedule: string }[] };
     const calvin = vercel.crons.filter((c) => c.path === "/api/cron/calvin-catalogo");
-    expect(calvin.map((c) => c.schedule).sort()).toEqual(["40 16 * * *", "50 12 * * *"]);
+    expect(calvin.map((c) => c.schedule).sort()).toEqual([
+      "15 20 * * *",
+      "40 16 * * *",
+      "50 12 * * *",
+    ]);
   });
 
-  it("SWITCH_CRON_ENTRADAS: 1250 y 1640 sobre vistana", () => {
+  it("SWITCH_CRON_ENTRADAS: 1250, 1640 y 2015 sobre vistana", () => {
     const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === "calvin-catalogo");
-    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1250", "1640"]);
+    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1250", "1640", "2015"]);
     for (const e of entradas) expect(e.empresas).toEqual(["vistana"]);
   });
 
   it("CATALOGO_CRON_SLOTS_UTC espeja vercel.json (ciclo del colateral)", () => {
-    expect(CATALOGO_CRON_SLOTS_UTC["calvin-catalogo"]).toEqual(["12:50", "16:40"]);
+    expect(CATALOGO_CRON_SLOTS_UTC["calvin-catalogo"]).toEqual(["12:50", "16:40", "20:15"]);
   });
 
   it("recuperación colateral desde las 13 UTC + vigilancia seed-tolerante", () => {

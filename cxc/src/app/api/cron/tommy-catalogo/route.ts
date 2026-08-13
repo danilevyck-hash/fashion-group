@@ -3,7 +3,8 @@
  * Switch (empresa fashion_shoes, artículos con marcaId=3). Mismo patrón que
  * reebok-catalogo / joybees-catalogo.
  *
- * Schedule: 40 12 * * * y 40 17 * * * UTC (2 corridas/día, decisión Daniel).
+ * Schedule: 40 12 * * *, 40 17 * * * y 5 20 * * * UTC (3 corridas/día desde el
+ * 13-ago-2026, decisión Daniel: "si subelo a 3").
  * fashion_shoes también la tocan: all 05:35, utilidad 07:00, recibos
  * 07:50/15:15/19:15/23:15, articulos 08:40, proveedores 09:30, ventas
  * 15:00/19:00/23:00, estadocuenta 16:05/21:15 y la reconciliación 10/14/18. El
@@ -11,6 +12,10 @@
  * el 17:40 queda a 20 min de la reconciliación de las 18:00 — aceptado: el
  * sync tarda ~2-3 min y cierra su sesión al terminar (/cierresesion), y la
  * reconciliación solo abre fashion_shoes si tiene pares que recuperar.
+ * El slot 20:05 (3:05 p.m. Panamá) es el tercer pase: cubre la tarde de Panamá,
+ * que era la franja sin refresco. Va PRIMERO de los cuatro catálogos porque es
+ * el más largo (156 s medidos el 12-ago-2026, tras el paralelismo del #540), y
+ * queda a 50 min de sync-recibos 19:15 y a 70 del estadocuenta de las 21:15.
  *
  * Refresca precio/existencia/disponibilidad, deriva nombres
  * ("{codigo} · {categoría} {género}", respetando nombre_manual), oculta los que

@@ -509,7 +509,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // invocación y nadie lo reintentaba).
     cronName: "joybees-catalogo",
     label: "joybees-catalogo",
-    successSinceIso: cicloCatalogo("joybees-catalogo"), // ciclo 17:55h (11:00/17:05)
+    successSinceIso: cicloCatalogo("joybees-catalogo"), // ciclo 14:25h (11:00/17:05/20:35)
     recover: async () => {
       const r = await syncCatalogoJoybees();
       // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
@@ -526,16 +526,17 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Catálogo Reebok (active_shoes). DOS slots diarios (12:10/17:00) pero el
-    // heartbeat es de granularidad diaria → la reconciliación detecta "catálogo
-    // fuera de su ciclo" (>19:10h sin success), no cada slot por separado.
+    // Catálogo Reebok (active_shoes). TRES slots diarios (12:10/17:00/20:25)
+    // pero el heartbeat es de granularidad diaria → la reconciliación detecta
+    // "catálogo fuera de su ciclo" (>15:45h sin success), no cada slot por
+    // separado.
     // Hora mínima en el mapa compartido (patrón cheques-alert): solo recuperar
     // cuando el primer slot ya debió correr. Si el slot de la tarde se pierde
     // con el primero exitoso, no hay señal (heartbeat fresco) — aceptable: ese
     // slot es solo refresh intradía. Idempotente y fail-safe igual que Joybees.
     cronName: "reebok-catalogo",
     label: "reebok-catalogo",
-    successSinceIso: cicloCatalogo("reebok-catalogo"), // ciclo 19:10h (12:10/17:00)
+    successSinceIso: cicloCatalogo("reebok-catalogo"), // ciclo 15:45h (12:10/17:00/20:25)
     recover: async () => {
       const r = await syncCatalogoReebok();
       // Mismo aviso de "nuevos sin foto" que el cron: la recuperación puede ser
@@ -552,9 +553,9 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Catálogo Tommy Hilfiger (fashion_shoes). DOS slots diarios (12:40/17:40),
-    // mismas reglas que reebok-catalogo (hora mínima 13 en el mapa compartido,
-    // ciclo de 19h). Es el más caro de los tres (~490 artículos = ~490 /stock),
+    // Catálogo Tommy Hilfiger (fashion_shoes). TRES slots diarios
+    // (12:40/17:40/20:05), mismas reglas que reebok-catalogo (hora mínima 13 en
+    // el mapa compartido, ciclo de 16:35h). Es el más caro de los tres (~490 artículos = ~490 /stock),
     // así que va último y su ventana de ciclo es la que evita el re-sync inútil.
     // PRE-DDL (migración 20260724150000 pendiente): syncCatalogoTommy se omite
     // limpio SIN tocar Switch (ddlPendiente) → se reporta ok con detalle para
@@ -562,7 +563,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // heartbeat sembrado se vuelve real apenas la DDL corra).
     cronName: "tommy-catalogo",
     label: "tommy-catalogo",
-    successSinceIso: cicloCatalogo("tommy-catalogo"), // ciclo 19h (12:40/17:40)
+    successSinceIso: cicloCatalogo("tommy-catalogo"), // ciclo 16:35h (12:40/17:40/20:05)
     recover: async () => {
       const r = await syncCatalogoTommy();
       if (r.ddlPendiente) {
@@ -582,8 +583,8 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Catálogo Calvin Klein (vistana, marcaId 8). DOS slots diarios (12:50 y
-    // 16:40), mismas reglas que tommy-catalogo (hora mínima 13 en el mapa
+    // Catálogo Calvin Klein (vistana, marcaId 8). TRES slots diarios (12:50,
+    // 16:40 y 20:15), mismas reglas que tommy-catalogo (hora mínima 13 en el mapa
     // compartido, ciclo por CATALOGO_CRON_SLOTS_UTC). PRE-DDL (migración
     // 20260812150000 pendiente): syncCatalogoCalvin se omite limpio SIN tocar
     // Switch (ddlPendiente) → se reporta ok con detalle para NO alertar a
@@ -591,7 +592,7 @@ const COLATERAL_CRONS: ColateralCron[] = [
     // se vuelve real apenas la DDL corra).
     cronName: "calvin-catalogo",
     label: "calvin-catalogo",
-    successSinceIso: cicloCatalogo("calvin-catalogo"), // ciclo 20:10h (12:50/16:40)
+    successSinceIso: cicloCatalogo("calvin-catalogo"), // ciclo 16:35h (12:50/16:40/20:15)
     recover: async () => {
       const r = await syncCatalogoCalvin();
       if (r.ddlPendiente) {
@@ -869,7 +870,8 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   //
   //     🩸 27-jul-2026. Hasta hoy una fila 'running' huérfana solo la cerraba la
   //     corrida SIGUIENTE DEL MISMO PAR. Para los pares que corren pocas veces al
-  //     día eso es una eternidad: `catalogo_tommy` corre 12:40 y 17:40 UTC, así
+  //     día eso es una eternidad: `catalogo_tommy` corría entonces 12:40 y 17:40
+  //     UTC (hoy suma 20:05, ver CATALOGO_CRON_SLOTS_UTC), así
   //     que la fila que quedó abierta a las 18:52 iba a mantener el candado
   //     puesto hasta las 12:40 del día siguiente (17 h 48 min), bloqueando
   //     "Actualizar ahora" mientras tanto. Ahora cualquier pasada de este cron

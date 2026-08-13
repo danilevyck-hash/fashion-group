@@ -66,7 +66,8 @@ describe("CATALOGO_CRON_SLOTS_UTC — espejo de vercel.json", () => {
           return `${hora.padStart(2, "0")}:${min.padStart(2, "0")}`;
         })
         .sort();
-      expect(enVercel.length, `${cronName} debe tener 2 entradas en vercel.json`).toBe(2);
+      // 3 desde el 13-ago-2026 (la 3ª pasada de media tarde de Panamá).
+      expect(enVercel.length, `${cronName} debe tener 3 entradas en vercel.json`).toBe(3);
       expect([...CATALOGO_CRON_SLOTS_UTC[cronName]].sort()).toEqual(enVercel);
     }
   });
@@ -86,9 +87,12 @@ describe("CATALOGO_CRON_SLOTS_UTC — espejo de vercel.json", () => {
 
 describe("catalogoCicloHoras", () => {
   it("es el hueco MÁS LARGO entre corridas (da la vuelta al día)", () => {
-    expect(catalogoCicloHoras("tommy-catalogo")).toBe(19); // 17:40 → 12:40 del día siguiente
-    expect(catalogoCicloHoras("reebok-catalogo")).toBeCloseTo(19 + 10 / 60, 5); // 17:00 → 12:10
-    expect(catalogoCicloHoras("joybees-catalogo")).toBeCloseTo(17 + 55 / 60, 5); // 17:05 → 11:00
+    // Con la 3ª pasada (20:0x-20:3x UTC) el hueco largo es el de la noche:
+    // última corrida de la tarde → primera de la mañana siguiente.
+    expect(catalogoCicloHoras("tommy-catalogo")).toBeCloseTo(16 + 35 / 60, 5); // 20:05 → 12:40
+    expect(catalogoCicloHoras("reebok-catalogo")).toBeCloseTo(15 + 45 / 60, 5); // 20:25 → 12:10
+    expect(catalogoCicloHoras("joybees-catalogo")).toBeCloseTo(14 + 25 / 60, 5); // 20:35 → 11:00
+    expect(catalogoCicloHoras("calvin-catalogo")).toBeCloseTo(16 + 35 / 60, 5); // 20:15 → 12:50
   });
 
   it("cron sin horario de catálogo → null (el caller usa su ventana por defecto)", () => {
@@ -99,12 +103,28 @@ describe("catalogoCicloHoras", () => {
   it("todos los ciclos caen entre 1 y 2 corridas: > 13h y < 20h", () => {
     // Cota inferior: más que el hueco entre la pasada de las 18:00 y el slot de
     // la mañana → un success del propio día nunca se declara perdido.
-    // Cota superior: menos que el peor caso legítimo (slot de la tarde de ayer
-    // + pérdida del slot de la mañana = ~20:20h) → esa pérdida SÍ se detecta.
+    // Cota superior: menos que el peor caso legítimo (última corrida de ayer +
+    // pérdida del slot de la mañana) → esa pérdida SÍ se detecta.
     for (const cronName of CATALOGOS) {
       const h = catalogoCicloHoras(cronName)!;
       expect(h, cronName).toBeGreaterThan(13);
       expect(h, cronName).toBeLessThan(20);
+    }
+  });
+
+  it("el ciclo sigue siendo MÁS LARGO que el hueco última-corrida-de-ayer → pasada de las 14:00", () => {
+    // Es el invariante que hace falta con la 3ª pasada: si el ciclo se acortara
+    // por debajo de ese hueco, un catálogo que corrió bien a las 20:0x y perdió
+    // su slot de la mañana quedaría "al día" y NADIE lo recuperaría.
+    for (const cronName of CATALOGOS) {
+      const ultimaDeAyer = Math.max(
+        ...CATALOGO_CRON_SLOTS_UTC[cronName].map((s) => {
+          const [h, m] = s.split(":").map(Number);
+          return h + m / 60;
+        }),
+      );
+      const huecoHastaLas14 = 24 - ultimaDeAyer + 14;
+      expect(catalogoCicloHoras(cronName)!, cronName).toBeLessThan(huecoHastaLas14);
     }
   });
 });
@@ -138,6 +158,23 @@ describe("la recuperación legítima NO se rompe", () => {
     expect(seRecupera("tommy-catalogo", ayerTarde, PASADA_14)).toBe(true);
     expect(seRecupera("reebok-catalogo", "2026-07-24T17:03:00.000Z", PASADA_14)).toBe(true);
     expect(seRecupera("joybees-catalogo", "2026-07-24T17:08:00.000Z", PASADA_14)).toBe(true);
+  });
+
+  it("el peor caso REAL con 3 pasadas: éxito a las 20:0x de ayer + slot de la mañana perdido", () => {
+    // Es el caso que el ciclo acortado tiene que seguir cazando. El success de
+    // ayer es el de la ÚLTIMA pasada del día (la nueva), o sea el más reciente
+    // posible antes de la pérdida.
+    expect(seRecupera("tommy-catalogo", "2026-07-24T20:07:00.000Z", PASADA_14)).toBe(true);
+    expect(seRecupera("reebok-catalogo", "2026-07-24T20:26:00.000Z", PASADA_14)).toBe(true);
+    expect(seRecupera("joybees-catalogo", "2026-07-24T20:36:00.000Z", PASADA_14)).toBe(true);
+  });
+
+  it("un día sano con las 3 pasadas NO se re-corre en ninguna pasada", () => {
+    // El success de la 3ª pasada de AYER no debe alcanzar para declarar fresco
+    // al catálogo de hoy — eso lo cubre el test de arriba —, pero el de HOY sí.
+    expect(seRecupera("tommy-catalogo", "2026-07-25T12:43:00.000Z", PASADA_14)).toBe(false);
+    expect(seRecupera("reebok-catalogo", "2026-07-25T12:13:00.000Z", PASADA_14)).toBe(false);
+    expect(seRecupera("joybees-catalogo", "2026-07-25T11:03:00.000Z", PASADA_18)).toBe(false);
   });
 
   it("si lleva días caído, se recupera igual", () => {

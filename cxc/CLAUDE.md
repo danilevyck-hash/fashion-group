@@ -501,7 +501,7 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-65 entradas configuradas (66 hasta el 13-ago-2026, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
+73 entradas configuradas (+4 el 13-ago-2026 al pasar los 4 catálogos de 2 a 3 pasadas diarias — decisión de Daniel: "si subelo a 3"; 66 hasta ese mismo día, cuando se retiró `sync-mayor`; 53 hasta el 26-jul-2026 cuando se retiró `multifashion-sync`, +11 del vigía `db-salud` el 27-jul, −6 al bajar `db-salud` a 5, +3 al pasar `asistencia-vigia` de 1 pasada L-V a 4 diarias el 10-ago, −1 al quitarle la pasada de las 13:45 UTC ese mismo día — ver abajo). **Una entrada = una ocurrencia al día**: para frecuencia sub-diaria se agregan entradas separadas del mismo path, NUNCA una lista de horas (`0 15,19,23 * * *`), que Vercel Pro sí acepta — ver la nota de slots más abajo. Límite Vercel Pro: 100 cron jobs/proyecto.
 
 | Cron | Schedule (UTC) |
 |------|----------------|
@@ -545,10 +545,11 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 | /api/cron/sync-recibos (pagos) | 07:50, 15:15, 19:15, 23:15 (4 entradas — corridas REALES, no "segunda oportunidad": el route no tiene guard no-op y re-lee la ventana rodante de 3 meses cada vez, pero desde el 26-jul-2026 solo ESCRIBE lo que cambió — ver "escritura selectiva" en Base de datos. Las 3 de la tarde van 15 min DESPUÉS de las ventas porque comparten 6 empresas) |
 | /api/cron/switch-articulos | 08:40 |
 | /api/cron/acs-fidelizacion | 11:30, 16:30 (2 entradas — la 2ª es "segunda oportunidad": no-op si la 1ª ya registró success hoy; 11:30 esquiva sync-recibos 07:50 y switch-articulos 08:40 en american_classic) |
-| /api/cron/reebok-catalogo | 12:10, 17:00 (2 entradas — solo toca active_shoes en Switch; 12:10 esquiva sync-utilidad 07:00 en active_shoes) |
+| /api/cron/reebok-catalogo | 12:10, 17:00, **20:25** (3 entradas — solo toca active_shoes en Switch; 12:10 esquiva sync-utilidad 07:00 en active_shoes) |
 | /api/cron/sync-proveedores | 09:30 |
-| /api/cron/joybees-catalogo | 11:00, 17:05 (2 entradas — solo toca joystep en Switch) |
-| /api/cron/tommy-catalogo | 12:40, 17:40 (2 entradas — solo toca fashion_shoes; artículos marcaId=3; mientras la DDL 20260724150000 no corra se omite limpio sin tocar Switch) |
+| /api/cron/joybees-catalogo | 11:00, 17:05, **20:35** (3 entradas — solo toca joystep en Switch) |
+| /api/cron/tommy-catalogo | 12:40, 17:40, **20:05** (3 entradas — solo toca fashion_shoes; artículos marcaId=3; mientras la DDL 20260724150000 no corra se omite limpio sin tocar Switch) |
+| /api/cron/calvin-catalogo | 12:50, 16:40, **20:15** (3 entradas — solo toca vistana; artículos marcaId=8 = CK FOOTWEAR; mientras la DDL 20260812150000 no corra se omite limpio sin tocar Switch) |
 | /api/cron/integrity-check | 12:00 |
 | /api/cron/cheques-alert | **14:15** (9:15 a.m. Panamá — aviso de cheques por vencer, ver nota abajo) |
 | /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
@@ -626,8 +627,16 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **Regla de espaciado (sesión única Switch por empresa):** crons que tocan la MISMA empresa en Switch van **≥15 min** separados (`SEPARACION_MINIMA_MIN` en cron-telemetry.ts; era 50 y bajó el 26-jul-2026 con las duraciones medidas bajo Pro: facturas 4-8 s/empresa, costo 1-2 s, y el route cierra sesiones con `/cierresesion` en su `finally`). Crons de empresas disjuntas pueden ir a la misma hora (patrón 05:30/05:35/05:40, y ventas ACS 17:00 junto a reebok-catalogo 17:00). **`src/__tests__/lib/cron-calendario.test.ts` recorre los 453 pares de `SWITCH_CRON_ENTRADAS` que comparten empresa y falla si alguien mete un choque** — es la red que protege el calendario a futuro.
 >
-> Ojo con los crons LARGOS, donde el margen real es menor que la distancia inicio-contra-inicio que mide el test: `estadocuenta` ~152 s/empresa (máx), catálogos 79 s (joybees) / 162 s (reebok) / **433 s (tommy)**, y la reconciliación hasta 740 s. Esas parejas se dejaron a ≥50 min a propósito. Las dos más ajustadas son pre-existentes o benignas: `tommy-catalogo` 17:40 → reconciliación 18:00 (20 min, documentado en docs/cron-reliability-recovery.md) y `acs-fidelizacion` 16:30 → ventas ACS 17:00 (30 min, y la de 16:30 es no-op si la de 11:30 salió bien).
+> Ojo con los crons LARGOS, donde el margen real es menor que la distancia inicio-contra-inicio que mide el test: `estadocuenta` ~152 s/empresa (máx), catálogos —tras el paralelismo del #540, medidos el 12-ago-2026— 26 s (joybees) / 49 s (reebok) / 70 s (calvin) / **156 s (tommy)**, y la reconciliación hasta 740 s. Esas parejas se dejaron a ≥50 min a propósito. Las dos más ajustadas son pre-existentes o benignas: `tommy-catalogo` 17:40 → reconciliación 18:00 (20 min, documentado en docs/cron-reliability-recovery.md) y `acs-fidelizacion` 16:30 → ventas ACS 17:00 (30 min, y la de 16:30 es no-op si la de 11:30 salió bien).
 >
+> **LOS 4 CATÁLOGOS PASARON DE 2 A 3 PASADAS DIARIAS (13-ago-2026).** Daniel, textual: *"si subelo a 3"*. La tercera va **20:05 / 20:15 / 20:25 / 20:35 UTC = 3:05-3:35 p.m. de Panamá** (tommy · calvin · reebok · joybees).
+> - **Por qué a esa hora.** Las dos pasadas viejas caían entre las 11:00 y las 17:40 UTC, o sea **6:00 a.m. y 12:40 p.m. de Panamá**: toda la tarde de Panamá se miraba con el catálogo de la mañana, y la tarde es cuando entra mercancía y se arman pedidos. Y **19:30-21:00 UTC es la única banda del día sin sesiones de Switch de esas 4 empresas**: por detrás quedan las ventas de las 19:00 y `sync-recibos` 19:15, por delante el bloque de `estadocuenta` 21:10/21:15/21:20.
+> - **Márgenes reales medidos** (inicio contra inicio, que es lo que mide el test): tommy 50/70 min · calvin 60/55 · reebok 70/55 · **joybees 45 min, el más ajustado** — y joybees dura 26 s. Muy por encima de los 15 de `SEPARACION_MINIMA_MIN`, que hace falta justamente porque los vecinos NO son instantáneos.
+> - **El orden dentro de la franja es por DURACIÓN**: el más largo primero (Tommy 156 s) para que se lleve el mayor margen contra el `estadocuenta` que viene después. Los 10 min entre uno y otro **no los pide el test** (son empresas disjuntas): son para no apilar cuatro barridos simultáneos sobre una base en compute Micro.
+> - **Los ciclos de recuperación se ACORTAN, y eso es lo que hubo que revisar**: joybees 17h55 → **14h25**, reebok 19h10 → **15h45**, tommy 19h → **16h35**, calvin 20h10 → **16h35**. Siguen por encima del hueco "reconciliación 18:00 → slot de la mañana" (un success del propio día jamás se declara perdido) y por debajo del hueco "última corrida de ayer → pasada de las 14:00" (esa pérdida SÍ se detecta). Hay un test que fija ese segundo invariante en vez de un número suelto.
+> - ⚠️ **Una falla de la 3ª pasada NO se recupera el mismo día**: la última pasada de `switch-reconciliacion` es a las 18:00 UTC. Es aceptable — las otras dos pasadas del día ya refrescaron el catálogo, y al día siguiente el ciclo lo vuelve a cubrir.
+> - **Costo extra estimado, por día:** **+4 corridas** (una por catálogo) = **~301 s de función** (26+49+70+156) y **~4 sesiones más de Switch** (una por empresa, serial, cerrada con `/cierresesion`). En escrituras, los syncs de catálogo son **UPSERT de lo que cambió**, no reescritura completa: en una tarde normal son **decenas de filas**, no miles. Comparado con lo que ya corre —73 crons, `switch_articulo_diario` con 197k filas, el backup diario— es ruido; el riesgo real de la compute Micro no está acá.
+
 > **Frescura del dato con el calendario del 26-jul-2026** (hueco más largo entre dos refrescos consecutivos):
 >
 > | Dato | Antes | Ahora | En horario laboral (10:00-18:00 Panamá) |

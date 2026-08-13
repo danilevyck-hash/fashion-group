@@ -1,9 +1,12 @@
 /**
  * Cron diario: catálogo Reebok (products) auto-actualizado desde Switch.
  *
- * Schedule: 45 6 * * * UTC — DESPUÉS de los switch-sync de Active Wear/Shoes
- * (05:30 / 05:40) para no chocar con la sesión única de Switch, y en un minuto
- * libre (06:00 backup, 06:30 ocupado).
+ * Schedule: 10 12 * * *, 0 17 * * * y 25 20 * * * UTC (3 corridas/día desde el
+ * 13-ago-2026) — cada una lejos de los otros crons que abren la sesión única de
+ * active_shoes (12:10: ventas 11:50 a 20 min; 17:00: estadocuenta 16:00 y
+ * reconciliación 18:00; 20:25: sync-recibos 19:15 a 70 min y estadocuenta 21:20
+ * a 55). El slot 20:25 (3:25 p.m. Panamá) es el tercer pase, el que cubre la
+ * tarde de Panamá. Barrido medido: 49 s (12-ago-2026, tras el #540).
  *
  * Refresca precio/existencia/disponibilidad de los productos visibles, oculta
  * los que quedan en existencia 0, auto-agrega los nuevos con existencia >= 1, y

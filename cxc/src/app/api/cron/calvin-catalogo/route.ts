@@ -3,14 +3,18 @@
  * Switch (empresa vistana, artículos con marcaId=8 = CK FOOTWEAR). Mismo patrón
  * que reebok/joybees/tommy-catalogo.
  *
- * Schedule: 50 12 * * * y 40 16 * * * UTC (2 corridas/día, como Tommy).
+ * Schedule: 50 12 * * *, 40 16 * * * y 15 20 * * * UTC (3 corridas/día desde el
+ * 13-ago-2026, como Tommy).
  * vistana también la tocan: articulo-info 04:30, all 05:30, utilidad 07:00,
  * recibos 07:50/15:15/19:15/23:15, mayor 09:05, proveedores 09:30, ventas
  * 11:50/15/19/23, estadocuenta 16:10/21:10 y la reconciliación 10/14/18.
  * El slot 12:50 queda a 60 min de las ventas de 11:50 y a 70 de la
  * reconciliación de las 14:00; el 16:40 a 30 min del estadocuenta de las 16:10
  * y a 80 de la reconciliación de las 18:00 — ninguno hereda el par ajustado de
- * 20 min que Tommy aceptó con la reconciliación. El barrido de vistana midió
+ * 20 min que Tommy aceptó con la reconciliación. El slot 20:15 (3:15 p.m.
+ * Panamá) es el tercer pase, en la banda 19:30-21:00 UTC que es la única sin
+ * sesiones de Switch de estas empresas: a 60 min de sync-recibos 19:15 y a 55
+ * del estadocuenta de vistana de las 21:10. El barrido de vistana midió
  * 103 s (164 páginas, 12-ago-2026) + ~80 consultas de stock: entra holgado.
  *
  * Refresca precio/existencia/disponibilidad, deriva nombres
