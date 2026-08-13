@@ -172,7 +172,13 @@ export function buildEstadoCuentaPDF(data: EstadoCuenta, nombre: string): { doc:
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(255, 255, 255);
-  doc.text("TOTAL ADEUDADO", 23, y + 6);
+  // 🔴 "Total", no "TOTAL ADEUDADO" (12-ago-2026). Es el MISMO número que el
+  // cliente ve rotulado "Total" en la fila final de la tabla del correo que
+  // lleva este PDF adjunto (`buildResumenHtml`), y el mismo que Daniel ve
+  // rotulado "Total" en el pie del drawer de Estado de cuenta desde donde se
+  // manda. El papel era la única de las tres superficies que le decía otra
+  // cosa —y a los gritos— al mismo número.
+  doc.text("Total", 23, y + 6);
   doc.text(money(data.total), w - 23, y + 6, { align: "right" });
 
   addFooter(doc);

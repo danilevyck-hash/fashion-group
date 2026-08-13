@@ -447,8 +447,31 @@ export default function PackingListDetailPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
+            {/* Poda del nombre de la pantalla (12-ago-2026). "Índice de Estilos
+                por Bulto" es el nombre de LO QUE SE ESTÁ MIRANDO: la tabla de
+                abajo es exactamente eso. Mismo criterio que los 23 títulos del
+                #510 y que el hub de catálogos del #502.
+
+                🔴 EL NÚMERO DE PL SE QUEDA A LA VISTA, y no es una excepción
+                caprichosa: es la regla 2 de esa misma poda (la que dejó su
+                título a Nueva/Editar guía). A 390 px NO está en ningún otro
+                lado — la miga de pan de AppHeader es `hidden sm:flex` y la
+                barra pegajosa dice "Packing Lists" en TODAS las packing lists.
+                Sin él, en el iPhone no habría forma de saber CUÁL se está
+                mirando. Por eso se va de la vista solo el nombre de la
+                pantalla, dentro de un `sr-only`: la página conserva UN h1
+                completo para quien navega con lector.
+
+                ⚠️ EL PAPEL NO SE TOCA. Lo que se imprime es el PDF de
+                "Descargar PDF", que escribe su PROPIO encabezado
+                ("Indice de Estilos por Bulto - PL #…", más arriba en este
+                archivo) y no lee este h1. La impresión del navegador tampoco
+                pasa por acá: el `@media print` de globals.css solo hace
+                visible `#print-document`, y esta pantalla usa
+                `#pl-print-area`. */}
             <h1 className="text-lg font-semibold">
-              Índice de Estilos por Bulto — PL #{pl.numero_pl || "—"}
+              <span className="sr-only">Índice de Estilos por Bulto — </span>
+              PL #{pl.numero_pl || "—"}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {pl.empresa}
@@ -485,7 +508,9 @@ export default function PackingListDetailPage() {
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <button
               onClick={() => setMuestrasOpen(!muestrasOpen)}
-              className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              /* min-h-[44px]: medía 41 px de alto, por debajo del mínimo táctil
+                 de la casa. El ancho ya sobraba. */
+              className="w-full flex items-center justify-between px-3 py-2.5 min-h-[44px] bg-gray-50 hover:bg-gray-100 transition-colors text-left"
             >
               <span className="text-sm font-semibold text-[#1e3a5f]">
                 Vista para sacar muestras ({bultoGroups.length} bulto{bultoGroups.length !== 1 ? "s" : ""})

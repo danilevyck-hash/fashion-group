@@ -3,6 +3,29 @@ import autoTable from "jspdf-autotable";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import { AGING, type AgingKey } from "@/lib/cxc-aging";
+
+// 🔴 EL PAPEL NO ESCRIBE SUS PROPIOS RÓTULOS: los DERIVA de `cxc-aging.ts`, la
+// misma fuente que rotula las píldoras KPI, las columnas de la tabla y las
+// tarjetas del celular (12-ago-2026).
+//
+// 🩸 Por qué. Este PDF sale del botón "Exportar" de la pantalla de Cuentas por
+// Cobrar, y decía tres cosas distintas del MISMO tramo — en el mismo documento:
+//
+//   cajas KPI:  "Corriente 0-90d" · "Vigilancia 91-120d" · "Vencido +121d"
+//   barra:      "Corriente"       · "Vigilancia"          · "Vencido"
+//   tabla:      "Por vencer 0-90d"· "Vencido reciente…"   · "Vencido crítico +120d"
+//
+// "Corriente" y "Vigilancia" NO EXISTEN en ninguna otra superficie del sistema
+// —ni en la pantalla, ni en el correo, ni en el CSV—, y el tramo viejo llegó a
+// tener CUATRO redacciones ("+121d", "+120d", "121d+", "Vencido crítico").
+// Derivarlo es lo único que impide que vuelvan a separarse.
+//
+// ⚠️ LOS TRAMOS NO SE TOCAN: 0-90 / 91-120 / 121+ son exactamente los mismos, y
+// las cifras salen de los mismos campos `current`/`watch`/`overdue` que suma la
+// pantalla. "+120d" y "121d+" son dos maneras de escribir EL MISMO corte (más de
+// 120 = 121 en adelante); se elige la de la pantalla, que es la referencia.
+const tramo = (k: AgingKey) => `${AGING[k].label} ${AGING[k].colLabel}`;
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -34,7 +57,10 @@ function addHeader(doc: jsPDF, subtitle?: string) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
-  doc.text(`Reporte CXC — ${fmtDate()}`, w - 19, 18, { align: "right" });
+  // "Cuentas por Cobrar", no "Reporte CXC": es como se llama la pantalla de la
+  // que sale este papel (AppHeader module=), y "CXC" es jerga que la propia
+  // guía de UX del proyecto manda traducir.
+  doc.text(`Cuentas por Cobrar — ${fmtDate()}`, w - 19, 18, { align: "right" });
 
   if (subtitle) {
     doc.setFontSize(9);
@@ -80,10 +106,13 @@ export function generatePDFResumen(data: ConsolidatedClient[], subtitle?: string
   const w = doc.internal.pageSize.getWidth();
   const boxW = (w - 38 - 9) / 4; // 4 boxes with 3mm gaps
   const boxes = [
-    { label: "Total CXC", value: `$${fmt(totalCxc)}`, bg: [249, 250, 251] },
-    { label: "Corriente 0-90d", value: `$${fmt(totalCurrent)}`, bg: [236, 253, 245] },
-    { label: "Vigilancia 91-120d", value: `$${fmt(totalWatch)}`, bg: [255, 251, 235] },
-    { label: "Vencido +121d", value: `$${fmt(totalOverdue)}`, bg: [254, 242, 242] },
+    // "Total pendiente" es como lo rotula la pantalla (píldora de KpiCards, hero
+    // del celular y píldora de Boston). "Total CXC" era jerga y era el único
+    // lugar del sistema que lo llamaba así.
+    { label: "Total pendiente", value: `$${fmt(totalCxc)}`, bg: [249, 250, 251] },
+    { label: tramo("current"), value: `$${fmt(totalCurrent)}`, bg: [236, 253, 245] },
+    { label: tramo("watch"), value: `$${fmt(totalWatch)}`, bg: [255, 251, 235] },
+    { label: tramo("overdue"), value: `$${fmt(totalOverdue)}`, bg: [254, 242, 242] },
   ];
   boxes.forEach((box, i) => {
     const x = 19 + i * (boxW + 3);
@@ -122,9 +151,9 @@ export function generatePDFResumen(data: ConsolidatedClient[], subtitle?: string
   doc.setFontSize(6);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(107, 114, 128);
-  doc.text(`Corriente ${pctCur.toFixed(0)}%`, barX, y + 2.5);
-  doc.text(`Vigilancia ${pctWat.toFixed(0)}%`, barX + barW / 2, y + 2.5, { align: "center" });
-  doc.text(`Vencido ${pctOvr.toFixed(0)}%`, barX + barW, y + 2.5, { align: "right" });
+  doc.text(`${AGING.current.label} ${pctCur.toFixed(0)}%`, barX, y + 2.5);
+  doc.text(`${AGING.watch.label} ${pctWat.toFixed(0)}%`, barX + barW / 2, y + 2.5, { align: "center" });
+  doc.text(`${AGING.overdue.label} ${pctOvr.toFixed(0)}%`, barX + barW, y + 2.5, { align: "right" });
   y += 6;
 
   // Table
@@ -139,9 +168,9 @@ export function generatePDFResumen(data: ConsolidatedClient[], subtitle?: string
   autoTable(doc, {
     startY: y,
     margin: { left: 19, right: 19 },
-    head: [["Cliente", "Por vencer 0-90d", "Vencido reciente 91-120d", "Vencido crítico +120d", "Total"]],
+    head: [["Cliente", tramo("current"), tramo("watch"), tramo("overdue"), "Total"]],
     body: tableData,
-    foot: [["TOTAL", `$${fmt(totalCurrent)}`, `$${fmt(totalWatch)}`, `$${fmt(totalOverdue)}`, `$${fmt(totalCxc)}`]],
+    foot: [["Total", `$${fmt(totalCurrent)}`, `$${fmt(totalWatch)}`, `$${fmt(totalOverdue)}`, `$${fmt(totalCxc)}`]],
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: [17, 24, 39] },
     headStyles: { fillColor: [249, 250, 251], textColor: [107, 114, 128], fontStyle: "bold", fontSize: 7 },
     footStyles: { fillColor: [17, 24, 39], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
