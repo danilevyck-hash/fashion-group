@@ -147,7 +147,7 @@ describe("B. el silenciamiento sigue la misma regla", () => {
 });
 
 describe("C. quién importa web-client", () => {
-  it("SOLO sync-utilidad.ts, sync-estadocuenta-web.ts y sync-mayor.ts", () => {
+  it("SOLO sync-utilidad, sync-estadocuenta-web, sync-mayor y sync-egresos-varios", () => {
     const importadores = archivosFuente()
       .filter((f) => !f.endsWith(path.join("switch-api", "web-client.ts")))
       .filter((f) => /from\s+["'][^"']*web-client["']/.test(fs.readFileSync(f, "utf8")))
@@ -157,6 +157,19 @@ describe("C. quién importa web-client", () => {
     // con agregarlo a la lista: hay que decidir a qué hora corre y, si lo
     // recupera la reconciliación, sumarlo a COLATERALES_LOGIN_WEB.
     expect(importadores).toEqual([
+      // 🔴 NO es un cron: es la ruta de CERTIFICACIÓN de egresos varios, que se
+      // corre A MANO con curl (Bearer CRON_SECRET) para cuadrar contra el
+      // archivo que Daniel bajó del panel. No tiene entrada en vercel.json, así
+      // que no le corresponde horario ni COLATERALES_LOGIN_WEB — pero SÍ abre
+      // una sesión web, y por eso tiene que estar declarada acá: quien la corra
+      // es responsable de hacerlo en la madrugada de Panamá y de mirar el
+      // calendario, porque no hay ningún cron que se lo haga cumplir.
+      path.join("app", "api", "diag", "egresos-varios", "route.ts"),
+      // Egresos varios (caja y banco): corre 10:35 UTC = 05:35 a.m. Panamá
+      // (madrugada, igual que los otros tres). NO es colateral de la
+      // reconciliación, así que no entra en COLATERALES_LOGIN_WEB — como
+      // sync-mayor y boston-cartera.
+      path.join("lib", "switch-api", "sync-egresos-varios.ts"),
       path.join("lib", "switch-api", "sync-estadocuenta-web.ts"),
       // Mayor contable: corre 09:05 UTC = 04:05 a.m. Panamá (madrugada, igual
       // que los otros dos). NO es colateral de la reconciliación, así que no

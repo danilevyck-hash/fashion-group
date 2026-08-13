@@ -14,16 +14,29 @@ import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
-import { API_BASE, mesActual, mesValido, type RespuestaResumen } from "./components/tipos";
+import {
+  API_BASE,
+  FUENTE_POR_DEFECTO,
+  esFuenteValida,
+  mesActual,
+  mesValido,
+  type FuenteGastos,
+  type RespuestaEgresos,
+  type RespuestaResumen,
+} from "./components/tipos";
 import SelectorMes from "./components/SelectorMes";
+import SelectorFuente from "./components/SelectorFuente";
 import ResumenEmpresas from "./components/ResumenEmpresas";
 import DetalleEmpresa from "./components/DetalleEmpresa";
+import ResumenEgresos from "./components/ResumenEgresos";
+import DetalleEgresos from "./components/DetalleEgresos";
 
-const fetcher = (url: string) =>
-  fetch(url, { cache: "no-store" }).then((r) => {
+function fetcher<T>(url: string): Promise<T> {
+  return fetch(url, { cache: "no-store" }).then((r) => {
     if (!r.ok) throw new Error("err");
-    return r.json() as Promise<RespuestaResumen>;
+    return r.json() as Promise<T>;
   });
+}
 
 // useSearchParams (vía useUrlState) exige boundary de Suspense.
 export default function GastosContabilidadClient() {
@@ -50,22 +63,50 @@ function GastosContabilidadInner() {
   // navegador vuelva a la lista y el historial sea espejo del breadcrumb.
   const [empresaParam, setEmpresaParam] = useUrlState("empresa", "", { history: "push" });
 
+  // ?fuente= es un filtro del MISMO nivel → replace. Y va en la URL a propósito:
+  // es lo que hace COMPARTIBLE la comparación entre las dos fuentes (el motivo
+  // por el que el mayor no se apagó todavía).
+  const [fuenteParam, setFuenteParam] = useUrlState<string>("fuente", FUENTE_POR_DEFECTO);
+  const fuente: FuenteGastos = esFuenteValida(fuenteParam) ? fuenteParam : FUENTE_POR_DEFECTO;
+
   // ¿El desglose se abrió tocando una empresa en ESTA sesión? Si sí, "Volver"
   // deshace el push del historial. Si se llegó por deep link no hay nada que
   // deshacer y hacer back sacaría a la persona de la app.
   const abiertoDesdeLista = useRef(false);
 
-  const { data, error, isLoading, mutate } = useSWR<RespuestaResumen>(
-    authChecked ? `${API_BASE}/resumen?mes=${mes}` : null,
-    fetcher,
+  // Se pide SOLO la fuente elegida. Traer las dos y esconder una haría el doble
+  // de consultas contra una base en compute Micro para pintar la mitad — y, peor,
+  // dejaría las dos cifras en la misma pantalla listas para que alguien las sume.
+  const pedirMayor = authChecked && fuente === "mayor";
+  const pedirEgresos = authChecked && fuente === "egresos";
+
+  const mayor = useSWR<RespuestaResumen>(
+    pedirMayor ? `${API_BASE}/resumen?mes=${mes}` : null,
+    fetcher<RespuestaResumen>,
+    { revalidateOnFocus: true },
+  );
+  const egresos = useSWR<RespuestaEgresos>(
+    pedirEgresos ? `${API_BASE}/egresos?mes=${mes}` : null,
+    fetcher<RespuestaEgresos>,
     { revalidateOnFocus: true },
   );
 
+  const activo = fuente === "mayor" ? mayor : egresos;
+  const { error, isLoading, mutate } = activo;
+  const data = activo.data;
+
   // Hooks ANTES de cualquier return condicional (regla del repo).
-  const empresaAbierta = useMemo(
-    () => data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
-    [data, empresaParam],
+  const empresaMayor = useMemo(
+    () => mayor.data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
+    [mayor.data, empresaParam],
   );
+  const empresaEgresos = useMemo(
+    () => egresos.data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
+    [egresos.data, empresaParam],
+  );
+  const nombreAbierto =
+    fuente === "mayor" ? (empresaMayor?.nombre ?? null) : (empresaEgresos?.nombre ?? null);
+  const hayEmpresaAbierta = Boolean(nombreAbierto);
 
   if (!authChecked) return null;
 
@@ -91,24 +132,34 @@ function GastosContabilidadInner() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader
         module="Gastos"
-        breadcrumbs={empresaAbierta ? [{ label: empresaAbierta.nombre }] : undefined}
+        breadcrumbs={nombreAbierto ? [{ label: nombreAbierto }] : undefined}
       />
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
         {esperandoDeepLink ? (
           <Esqueleto />
-        ) : empresaAbierta ? (
-          <DetalleEmpresa empresa={empresaAbierta} onVolver={volver} />
+        ) : hayEmpresaAbierta ? (
+          fuente === "mayor" && empresaMayor ? (
+            <DetalleEmpresa empresa={empresaMayor} onVolver={volver} />
+          ) : empresaEgresos ? (
+            <DetalleEgresos empresa={empresaEgresos} onVolver={volver} />
+          ) : null
         ) : (
           <>
             <div className="mb-4">
               {/* Sin título grande: "Gastos" ya lo dicen la barra sticky
                   (celular) y el breadcrumb (escritorio). Queda sr-only para no
-                  dejar la página sin encabezado. La bajada se QUEDA: dice de
-                  dónde sale el número (la contabilidad) y su corte mensual. */}
+                  dejar la página sin encabezado. La bajada se QUEDA: dice qué se
+                  está viendo y su corte mensual. De DÓNDE sale el número lo dice
+                  el selector de fuente, que es lo único que puede decirlo ahora
+                  que hay dos. */}
               <h1 className="sr-only">Gastos</h1>
               <p className="text-sm text-gray-600">
-                Lo que gastó cada empresa según la contabilidad, mes por mes.
+                Lo que salió de cada empresa, mes por mes.
               </p>
+            </div>
+
+            <div className="mb-4">
+              <SelectorFuente fuente={fuente} onCambiar={setFuenteParam} />
             </div>
 
             <div className="mb-4">
@@ -132,15 +183,18 @@ function GastosContabilidadInner() {
             ) : data && !data.instalado ? (
               <div className="rounded-lg border border-gray-200 bg-white p-4">
                 <p className="text-sm font-medium text-gray-900">
-                  Esta pantalla todavía no está encendida.
+                  Esta parte todavía no está encendida.
                 </p>
                 <p className="mt-1 text-sm text-gray-600">
-                  Falta el último paso de instalación. Cuando esté listo, acá vas a ver lo que
-                  gastó cada empresa mes por mes.
+                  {fuente === "egresos"
+                    ? "Falta el último paso de instalación para ver lo que sale de caja y banco. Mientras tanto podés ver lo que cerró la contadora."
+                    : "Falta el último paso de instalación. Cuando esté listo, acá vas a ver lo que gastó cada empresa mes por mes."}
                 </p>
               </div>
-            ) : data ? (
-              <ResumenEmpresas empresas={data.empresas} onAbrir={abrirEmpresa} />
+            ) : fuente === "mayor" && mayor.data ? (
+              <ResumenEmpresas empresas={mayor.data.empresas} onAbrir={abrirEmpresa} />
+            ) : fuente === "egresos" && egresos.data ? (
+              <ResumenEgresos empresas={egresos.data.empresas} onAbrir={abrirEmpresa} />
             ) : null}
           </>
         )}

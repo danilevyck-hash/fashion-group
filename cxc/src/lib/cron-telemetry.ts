@@ -449,6 +449,14 @@ export const SEED_TOLERANT_CRONS = [
   // Desplegado el 10-ago-2026: seed-tolerante hasta que siembre su fila.
   // Promover a CRONS_FAIL_CLOSED cuando lleve días corriendo.
   "sync-mayor",
+  // Egresos varios (caja y banco) de las 8 empresas (10:35 UTC = 05:35 a.m.
+  // Panamá). Desplegado el 13-ago-2026: seed-tolerante DOBLE, igual que
+  // calvin-catalogo — además de la siembra normal, mientras la DDL
+  // 20260813120000 no corra el cron se omite limpio (503, sin heartbeat y sin
+  // tocar Switch): fila ausente = pendiente, no caído. Promover a
+  // CRONS_FAIL_CLOSED cuando la DDL esté corrida y el heartbeat lleve días
+  // sembrado (el mismo camino que recorrieron Tommy y el mayor).
+  "sync-egresos-varios",
 ];
 
 // ─── Cronograma empresa→horas de los crons que tocan Switch ──────────────────
@@ -547,6 +555,17 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   // sync-proveedores (09:30), sobre los 15 de SEPARACION_MINIMA_MIN.
   { cron: "sync-mayor", hhmmUtc: "0905", empresas: CRON_EMPRESAS_TODAS },
   { cron: "sync-proveedores", hhmmUtc: "0930", empresas: CRON_EMPRESAS_CXP },
+  // EGRESOS VARIOS de las 8 empresas (10:35 UTC = 05:35 a.m. Panamá). Abre
+  // sesión web con changesession=SI, o sea que EXPULSA a quien esté en el panel
+  // — por eso va en la franja de madrugada de Panamá (06:00-11:00 UTC), la misma
+  // donde ya viven sync-utilidad, boston-cartera y sync-mayor.
+  //
+  // Toca las 8 empresas, y la vecina que manda es `switch-reconciliacion` 10:00:
+  // puede abrir la sesión de cualquiera hasta 12 min (RECOVERY_BUDGET_MS 740 s),
+  // así que los 35 min de separación dejan 23 de aire real. Por delante,
+  // joybees-catalogo 11:00 (solo joystep) a 25 min. Los otros crons de las 8
+  // quedan a 90 (sync-mayor 09:05) y 65 min (sync-proveedores 09:30).
+  { cron: "sync-egresos-varios", hhmmUtc: "1035", empresas: CRON_EMPRESAS_TODAS },
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
   { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },
