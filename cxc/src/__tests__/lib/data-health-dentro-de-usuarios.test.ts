@@ -93,7 +93,9 @@ const NO_ADMIN_ESPERADO: Record<string, string[]> = {
   secretaria: ["catalogos", "guias", "packing-lists", "asistencia", "reclamos", "cargar",
     "comisiones", "marketing", "caja", "cheques", "directorio"],
   bodega: ["referencia", "catalogos", "guias", "packing-lists"],
-  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "saldos-banco", "prestamos"],
+  // `saldos-banco` salió el 13-ago-2026: dejó de ser módulo (es la 2ª pestaña
+  // de "Gastos"). La puerta al dato sigue abierta por `gastos-contabilidad`.
+  contabilidad: ["proveedores", "asistencia", "gastos-contabilidad", "prestamos"],
   vendedor: ["referencia", "cxc", "directorio", "catalogos", "guias"],
   gerente_acs: ["multifashion"],
 };

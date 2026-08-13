@@ -36,9 +36,10 @@ const prestamos = read("app", "prestamos", "PrestamosClient.tsx");
 // retiró (el proyecto se autocrea desde "Registrar gasto"), así que su modal
 // quedó sin caller y su chequeo de ✕ se fue con él.
 const empresaSelector = read("app", "reclamos", "components", "EmpresaSelector.tsx");
-// Se mudó con su módulo: los saldos de banco salieron de "Gastos de Empresa"
-// (11-ago-2026). El componente es el MISMO archivo, no una copia.
-const saldosBancarios = read("app", "saldos-banco", "components", "SaldosBancarios.tsx");
+// Se mudó con su módulo, DOS veces, y siempre es el MISMO archivo (nunca una
+// copia): salió de "Gastos de Empresa" (11-ago-2026), fue módulo suelto dos
+// días, y desde el 13-ago-2026 es la 2ª pestaña de "Gastos".
+const saldosBancarios = read("app", "gastos-contabilidad", "components", "saldos", "SaldosBancarios.tsx");
 const mfResumen = read("components", "multifashion", "MultifashionResumenView.tsx");
 const mfView = read("components", "multifashion", "MultifashionView.tsx");
 const mfCharts = read("components", "multifashion", "DetalleMensualCharts.tsx");
@@ -116,7 +117,7 @@ describe("Tamaño de letra · nada por debajo de text-xs (13px)", () => {
   const modulos: Record<string, string[]> = {
     marketing: ["app/marketing"],
     reclamos: ["app/reclamos"],
-    "saldos-banco": ["app/saldos-banco"],
+    "saldos-banco": ["app/gastos-contabilidad/components/saldos"],
     multifashion: ["components/multifashion"],
   };
 

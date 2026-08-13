@@ -29,7 +29,6 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   proveedores: { border: "border-purple-600",  text: "text-purple-600",  hex: "#9333ea" },
   cargar:      { border: "border-teal-600",     text: "text-teal-600",    hex: "#0d9488" },
   "gastos-contabilidad": { border: "border-green-600", text: "text-green-600", hex: "#16a34a" },
-  "saldos-banco":   { border: "border-lime-600",  text: "text-lime-600",  hex: "#65a30d" },
 };
 
 /** Map pathname to module key */
@@ -49,7 +48,6 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/proveedores"))     return "proveedores";
   if (pathname.startsWith("/productos/cargar")) return "cargar";
   if (pathname.startsWith("/gastos-contabilidad")) return "gastos-contabilidad";
-  if (pathname.startsWith("/saldos-banco"))    return "saldos-banco";
   return null;
 }
 

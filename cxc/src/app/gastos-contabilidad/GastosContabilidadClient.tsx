@@ -7,11 +7,18 @@
 // total del grupo y la primera pantalla son cuatro números por empresa.
 //
 // 🔑 Un mes sin contabilidad NO se ve como $0 — ver `EstadoMesTag`.
+//
+// DOS PESTAÑAS desde el 13-ago-2026 (Daniel, sobre Gastos y Saldos de Banco:
+// *"y debeeria estar en un solo modulo"*): *Gastos* y *Saldos de banco*. La 2ª
+// es la pantalla que vivía en `/saldos-banco`, mudada entera; esa dirección
+// redirige acá (next.config.js).
 
 import { Suspense, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import AppHeader from "@/components/AppHeader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Landmark, Receipt } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import {
@@ -30,6 +37,17 @@ import ResumenEmpresas from "./components/ResumenEmpresas";
 import DetalleEmpresa from "./components/DetalleEmpresa";
 import ResumenEgresos from "./components/ResumenEgresos";
 import DetalleEgresos from "./components/DetalleEgresos";
+import SaldosBancoTab from "./components/saldos/SaldosBancoTab";
+
+// Las dos pestañas. `?tab=` en la URL (mismo patrón que Usuarios, Ventas y
+// Multifashion) para que un marcador, un refresh y el back/forward caigan donde
+// estaba la persona — y para que `/saldos-banco` pueda aterrizar en la suya.
+const TABS = ["gastos", "saldos-banco"] as const;
+
+// Misma clase que las pestañas de Usuarios, Ventas y Multifashion. No se
+// inventa un patrón nuevo: subrayado teal, sin píldora, 44px de alto al tacto.
+const TAB_TRIGGER_CLASS =
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-gray-500 sm:px-4 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
 function fetcher<T>(url: string): Promise<T> {
   return fetch(url, { cache: "no-store" }).then((r) => {
@@ -54,6 +72,13 @@ function GastosContabilidadInner() {
   });
   const router = useRouter();
 
+  // ?tab= es un filtro del MISMO nivel → replace (no ensucia el historial). Un
+  // `?tab=` desconocido cae en "gastos", NUNCA en blanco: Radix no dibuja nada
+  // si el `value` no tiene trigger (misma convención que /ventas y /admin).
+  const [tabRaw, setTab] = useUrlState("tab", "gastos");
+  const tab = (TABS as readonly string[]).includes(tabRaw) ? tabRaw : "gastos";
+  const enGastos = tab === "gastos";
+
   const hoyMes = useMemo(() => mesActual(), []);
   // ?mes= es un filtro del MISMO nivel → replace (no ensucia el historial).
   const [mesParam, setMesParam] = useUrlState("mes", hoyMes);
@@ -74,11 +99,13 @@ function GastosContabilidadInner() {
   // deshacer y hacer back sacaría a la persona de la app.
   const abiertoDesdeLista = useRef(false);
 
-  // Se pide SOLO la fuente elegida. Traer las dos y esconder una haría el doble
-  // de consultas contra una base en compute Micro para pintar la mitad — y, peor,
-  // dejaría las dos cifras en la misma pantalla listas para que alguien las sume.
-  const pedirMayor = authChecked && fuente === "mayor";
-  const pedirEgresos = authChecked && fuente === "egresos";
+  // Se pide SOLO la fuente elegida, y SOLO si la pestaña de gastos está a la
+  // vista. Traer las dos fuentes y esconder una haría el doble de consultas
+  // contra una base en compute Micro para pintar la mitad — y, peor, dejaría las
+  // dos cifras en la misma pantalla listas para que alguien las sume. Lo mismo
+  // vale para la pestaña: estando en Saldos, el mayor no se pide.
+  const pedirMayor = authChecked && enGastos && fuente === "mayor";
+  const pedirEgresos = authChecked && enGastos && fuente === "egresos";
 
   const mayor = useSWR<RespuestaResumen>(
     pedirMayor ? `${API_BASE}/resumen?mes=${mes}` : null,
@@ -104,8 +131,13 @@ function GastosContabilidadInner() {
     () => egresos.data?.empresas.find((e) => e.empresaKey === empresaParam) ?? null,
     [egresos.data, empresaParam],
   );
-  const nombreAbierto =
-    fuente === "mayor" ? (empresaMayor?.nombre ?? null) : (empresaEgresos?.nombre ?? null);
+  // El breadcrumb de la empresa abierta solo tiene sentido dentro de Gastos: en
+  // Saldos de banco anunciaría un lugar donde no se está.
+  const nombreAbierto = !enGastos
+    ? null
+    : fuente === "mayor"
+      ? (empresaMayor?.nombre ?? null)
+      : (empresaEgresos?.nombre ?? null);
   const hayEmpresaAbierta = Boolean(nombreAbierto);
 
   if (!authChecked) return null;
@@ -135,6 +167,23 @@ function GastosContabilidadInner() {
         breadcrumbs={nombreAbierto ? [{ label: nombreAbierto }] : undefined}
       />
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[env(safe-area-inset-bottom)]">
+        {/* Sin título grande: "Gastos" ya lo dicen la barra sticky (celular) y el
+            breadcrumb (escritorio). Queda sr-only para no dejar la página sin
+            encabezado, y vive ACÁ —fuera de las pestañas— para que sea UNO solo
+            y esté en las dos (dos h1 en una página serían uno de más). */}
+        <h1 className="sr-only">Gastos</h1>
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="-mx-4 mb-5 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-gray-200 bg-transparent p-0 px-4 md:mx-0 md:px-0">
+            <TabsTrigger value="gastos" className={TAB_TRIGGER_CLASS}>
+              <Receipt className="hidden h-3.5 w-3.5 sm:block" /> Gastos
+            </TabsTrigger>
+            <TabsTrigger value="saldos-banco" className={TAB_TRIGGER_CLASS}>
+              <Landmark className="hidden h-3.5 w-3.5 sm:block" /> Saldos de banco
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="gastos" className="mt-0">
         {esperandoDeepLink ? (
           <Esqueleto />
         ) : hayEmpresaAbierta ? (
@@ -146,13 +195,9 @@ function GastosContabilidadInner() {
         ) : (
           <>
             <div className="mb-4">
-              {/* Sin título grande: "Gastos" ya lo dicen la barra sticky
-                  (celular) y el breadcrumb (escritorio). Queda sr-only para no
-                  dejar la página sin encabezado. La bajada se QUEDA: dice qué se
-                  está viendo y su corte mensual. De DÓNDE sale el número lo dice
-                  el selector de fuente, que es lo único que puede decirlo ahora
-                  que hay dos. */}
-              <h1 className="sr-only">Gastos</h1>
+              {/* La bajada se QUEDA: dice qué se está viendo y su corte mensual.
+                  De DÓNDE sale el número lo dice el selector de fuente, que es lo
+                  único que puede decirlo ahora que hay dos. */}
               <p className="text-sm text-gray-600">
                 Lo que salió de cada empresa, mes por mes.
               </p>
@@ -198,6 +243,12 @@ function GastosContabilidadInner() {
             ) : null}
           </>
         )}
+          </TabsContent>
+
+          <TabsContent value="saldos-banco" className="mt-0">
+            <SaldosBancoTab />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

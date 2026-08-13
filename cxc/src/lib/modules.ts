@@ -18,7 +18,6 @@ import {
   Contact,
   FileText,
   HandCoins,
-  Landmark,
   AlertTriangle,
   ClipboardList,
   TrendingUp,
@@ -89,17 +88,30 @@ export const ALL_MODULES: AppModule[] = [
   // Operación
   { key: "guias",          label: "Guías de Despacho", href: "/guias",            icon: Truck,         roles: ["admin", "secretaria", "bodega", "vendedor"], group: "operacion" },
   { key: "packing-lists",  label: "Packing Lists",     href: "/packing-lists",    icon: ClipboardList, roles: ["admin", "secretaria", "bodega"],             group: "operacion" },
-  { key: "asistencia",     label: "Asistencia",        href: "/asistencia",       icon: Clock,         roles: asistenciaRoles(),                       group: "operacion" },
+  // "Asistencia y Planilla" (13-ago-2026). Daniel, textual: *"y asistencia se
+  // debe de llamar asistencia y planilla"*. El módulo ya calculaba la planilla
+  // (sueldos, extras, deducciones, el Excel y el PDF que firma la contadora) y
+  // el nombre solo hablaba de las marcaciones. 🔴 La `key` NO cambia: está en
+  // `role_permissions` y en `fg_users.modulos_override`, y renombrarla rompería
+  // los permisos sin comprar nada.
+  { key: "asistencia",     label: "Asistencia y Planilla", href: "/asistencia",   icon: Clock,         roles: asistenciaRoles(),                       group: "operacion" },
   { key: "reclamos",       label: "Reclamos",          href: "/reclamos",         icon: AlertTriangle, roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "cargar",         label: "Depurador",         href: "/productos/cargar", icon: PackagePlus,   roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "comisiones",     label: "Comisiones",        href: "/comisiones",       icon: Coins,         roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "marketing",      label: "Marketing",         href: "/marketing",        icon: Megaphone,     roles: ["admin", "secretaria"],                       group: "operacion" },
   { key: "caja",           label: "Caja Menuda",       href: "/caja",             icon: Wallet,        roles: ["admin", "secretaria"],                       group: "operacion" },
-  // "Gastos" a secas: es el ÚNICO módulo de gastos que queda. La `key` sigue
-  // siendo `gastos-contabilidad` a propósito — la migración y la fila de
+  // "Gastos" a secas: es el ÚNICO módulo de gastos que queda, y desde el
+  // 13-ago-2026 tiene DOS pestañas — *Gastos* y *Saldos de banco*. Daniel,
+  // textual: *"y debeeria estar en un solo modulo"*. La `key` sigue siendo
+  // `gastos-contabilidad` a propósito — la migración y la fila de
   // role_permissions ya corrieron con ese nombre y renombrarla no compra nada.
+  //
+  // `saldos-banco` fue módulo suelto SOLO 2 días (#465/#467): existió para que
+  // el módulo viejo "Gastos de Empresa" se pudiera retirar sin dejar a
+  // Contabilidad sin el único dato que usaba. Esa mudanza terminó, así que la
+  // ficha suelta se retira y el dato vive como pestaña. `/saldos-banco`
+  // redirige en next.config.js.
   { key: "gastos-contabilidad", label: "Gastos",         href: "/gastos-contabilidad", icon: Receipt,   roles: ["admin", "contabilidad"],                     group: "operacion" },
-  { key: "saldos-banco",   label: "Saldos de Banco",   href: "/saldos-banco",     icon: Landmark,      roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "prestamos",      label: "Préstamos",         href: "/prestamos",        icon: HandCoins,     roles: ["admin", "contabilidad"],                     group: "operacion" },
   { key: "cheques",        label: "Cheques",           href: "/cheques",          icon: FileText,      roles: ["admin", "secretaria"],                       group: "operacion" },
 
@@ -166,16 +178,25 @@ export function getDefaultModulesForRole(role: string): string[] {
  *  puerta al dato. Este repo tiene DDLs pendientes de correr desde hace
  *  semanas — la pantalla tiene que funcionar ANTES de que corra, como el resto.
  *
- *  Se retira cuando la DDL esté corrida (verificable: `role_permissions` de
- *  contabilidad contiene 'saldos-banco'). Quitarlo antes se ve exactamente
- *  igual que "a contabilidad le desapareció un módulo". */
+ *  Se retira cuando la DDL esté corrida (verificable en `role_permissions`), o
+ *  cuando el módulo prestado deja de existir. Quitarlo antes se ve exactamente
+ *  igual que "a contabilidad le desapareció un módulo".
+ *
+ *  ✅ RETIRADA la entrada `"saldos-banco": "gastos-empresa"` (13-ago-2026), y
+ *  se retira por las DOS razones a la vez, no por una:
+ *    1. `saldos-banco` YA NO ES UN MÓDULO — es una pestaña de "Gastos", así que
+ *       no hay ficha que encender y la entrada quedaba zombi (`fgModulesIncluye`
+ *       solo se pregunta por módulos del catálogo).
+ *    2. La puerta al dato es ahora `gastos-contabilidad`, y contabilidad la
+ *       tiene POR DERECHO PROPIO. Medido en producción el 13-ago-2026:
+ *       `role_permissions.contabilidad.modulos` =
+ *       ["asistencia","gastos-empresa","prestamos","proveedores","ventas",
+ *        "saldos-banco","gastos-contabilidad"]. O sea que ni siquiera hacía
+ *       falta la herencia para el caso que la justificaba.
+ *    (`gastos-empresa` y `saldos-banco` quedan ahí como keys INERTES: no están
+ *     en ALL_MODULES, así que no pintan nada. Las barre la migración
+ *     20260813140000, que NO es bloqueante.) */
 export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
-  // Los saldos de banco eran una sección de "Gastos de Empresa", que ya se
-  // retiró. La key vieja SIGUE en `role_permissions.contabilidad.modulos`
-  // mientras nadie corra la migración, así que la herencia es justamente lo
-  // que hace que retirar el módulo NO le apague el menú a quien carga los
-  // saldos. Se quita cuando la DDL esté corrida y verificada.
-  "saldos-banco": "gastos-empresa",
   // Referencia para vendedor/bodega (12-ago-2026): mientras la DDL
   // 20260812120000 no corra, la ficha se enciende para quien ya tiene
   // `catalogos` — que es el módulo que TODOS los roles destino tienen. El
@@ -193,8 +214,7 @@ export const MODULO_HEREDA_PERMISO_DE: Record<string, string> = {
  *  mandando sin mirar roles — es lo que un admin asignó a mano. Sin este
  *  recorte, "referencia hereda de catalogos" le pintaría la ficha a secretaria
  *  (que tiene catalogos), y una ficha que la página rebota es peor que
- *  ninguna. Para `saldos-banco` no cambia nada: contabilidad está en su
- *  `roles[]`. */
+ *  ninguna. */
 function fgModulesIncluye(fgModules: string[], modulo: AppModule, role: string): boolean {
   if (fgModules.includes(modulo.key)) return true;
   const heredaDe = MODULO_HEREDA_PERMISO_DE[modulo.key];

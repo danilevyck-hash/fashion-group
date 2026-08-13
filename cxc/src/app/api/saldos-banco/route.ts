@@ -4,21 +4,30 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { historialPorEmpresa, ultimoPorEmpresa, type FilaSaldo } from "@/lib/saldos-banco/historial";
 
 export const dynamic = "force-dynamic";
 
-// Saldos de Banco — el último saldo de Banco General de cada empresa.
+// Saldos de Banco — el último saldo de Banco General de cada empresa, y el
+// historial de lo que la contadora cargó.
 //
-// La MISMA tabla `bancos_saldos` y las MISMAS reglas que tenía la sección de
-// saldos dentro de "Gastos de Empresa": el módulo se mudó de casa, el dato no
-// se tocó. `bancos_saldos` tiene UNIQUE(empresa_key, fecha_dato) completo →
-// upsert directo (repetir la misma fecha corrige el saldo del día). Saldos
-// negativos se permiten: los sobregiros existen.
+// La MISMA tabla `bancos_saldos` y las MISMAS reglas de siempre: el módulo se
+// mudó de casa dos veces (era una sección de "Gastos de Empresa", después ficha
+// suelta, y desde el 13-ago-2026 es la 2ª PESTAÑA de "Gastos"), el dato no se
+// tocó. `bancos_saldos` tiene UNIQUE(empresa_key, fecha_dato) completo → upsert
+// directo (repetir la misma fecha CORRIGE el saldo de ese día, nunca duplica ni
+// borra, y no puede pisar el de otra fecha). Saldos negativos se permiten: los
+// sobregiros existen.
 //
-// Este endpoint alimenta la pantalla /saldos-banco. La "Disponibilidad" de
-// Vista General lee `bancos_saldos` por su cuenta y con el mismo criterio
-// (último por empresa) — no pasa por acá, así que nada de lo de este archivo
-// puede moverle un centavo.
+// El GET devuelve DOS cosas derivadas de la MISMA lectura, con las MISMAS
+// funciones puras que usa la pantalla (`lib/saldos-banco/historial.ts`):
+//   · `bancos`    — el último saldo por empresa (lo que ya devolvía).
+//   · `historial` — todas las cargas, por empresa, de la más nueva a la más
+//                   vieja, marcando la que repite EXACTO a la anterior.
+//
+// La "Disponibilidad" de Vista General lee `bancos_saldos` por su cuenta y con
+// el mismo criterio (último por empresa) — no pasa por acá, así que nada de lo
+// de este archivo puede moverle un centavo.
 
 const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -32,6 +41,8 @@ interface BancoRow {
   empresa_key: string;
   saldo: number | string;
   fecha_dato: string;
+  created_by: string | null;
+  created_at: string | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -47,24 +58,38 @@ export async function GET(req: NextRequest) {
     const filas = await leerTodoPaginado<BancoRow>("bancos_saldos (saldos-banco)", (pedirCount, desde, hasta) =>
       supabaseServer
         .from("bancos_saldos")
-        .select("id, empresa_key, saldo, fecha_dato", pedirCount ? { count: "exact" } : {})
+        .select("id, empresa_key, saldo, fecha_dato, created_by, created_at", pedirCount ? { count: "exact" } : {})
         .order("id", { ascending: true })
         .range(desde, hasta),
     );
 
+    // `saldo` llega como string desde PostgREST (es `numeric`): se normaliza UNA
+    // vez, acá, para que las funciones puras comparen números y no textos.
+    const normalizadas: FilaSaldo[] = filas.map((f) => ({
+      empresa_key: f.empresa_key,
+      saldo: Number(f.saldo),
+      fecha_dato: f.fecha_dato,
+      created_by: f.created_by,
+      created_at: f.created_at,
+    }));
+
     // Último saldo por empresa. Mismo criterio que la Disponibilidad de Vista
     // General: la fila con `fecha_dato` más reciente de cada empresa.
-    const ultimo = new Map<string, BancoRow>();
-    for (const f of filas) {
-      const prev = ultimo.get(f.empresa_key);
-      if (!prev || f.fecha_dato > prev.fecha_dato) ultimo.set(f.empresa_key, f);
+    const bancos = ultimoPorEmpresa(normalizadas).map((b) => ({
+      empresa_key: b.empresa_key,
+      saldo: b.saldo,
+      fecha_dato: b.fecha_dato,
+    }));
+
+    // Historial completo por empresa (de la más nueva a la más vieja), con la
+    // marca de "repite exacto al anterior". Hoy son 52 filas: se manda entero
+    // en vez de agregar una segunda ruta que vuelva a leer la misma tabla.
+    const historial: Record<string, unknown[]> = {};
+    for (const [empresa, cargas] of historialPorEmpresa(normalizadas)) {
+      historial[empresa] = cargas;
     }
 
-    const bancos = [...ultimo.values()]
-      .sort((a, b) => (a.fecha_dato < b.fecha_dato ? 1 : a.fecha_dato > b.fecha_dato ? -1 : 0))
-      .map((b) => ({ empresa_key: b.empresa_key, saldo: Number(b.saldo), fecha_dato: b.fecha_dato }));
-
-    return NextResponse.json({ bancos });
+    return NextResponse.json({ bancos, historial });
   } catch (err) {
     console.error("[saldos-banco] GET", err);
     return NextResponse.json(

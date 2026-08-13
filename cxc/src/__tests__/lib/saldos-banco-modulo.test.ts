@@ -1,20 +1,24 @@
 /**
- * Candados de "Saldos de Banco" — el módulo que se separó de "Gastos de Empresa".
+ * Candados de los SALDOS DE BANCO — hoy la 2ª pestaña de "Gastos".
  *
- * CONTEXTO (11-ago-2026). Daniel decidió que de los dos módulos de gastos quede
- * uno solo: **"Gastos"** (el nuevo, que baja el mayor de Switch — PR #463) y que
- * del viejo sobreviva únicamente lo que SÍ se usa: los **saldos de banco**
- * (`bancos_saldos`, 52 filas cargadas por Contabilidad entre ene y ago 2026,
- * 7 empresas). La carga manual de gastos (`empresa_gastos_mensuales`, 0 filas,
- * nunca se usó) se retira DESPUÉS, en otro PR.
+ * CONTEXTO, y son tres pasos que hay que leer juntos para no deshacer ninguno:
+ *   · 11-ago-2026 (#465/#467). De los DOS módulos de gastos quedó uno solo,
+ *     **"Gastos"** (`gastos-contabilidad`, el que baja el mayor de Switch), y
+ *     del viejo "Gastos de Empresa" sobrevivió lo único que SÍ se usaba: los
+ *     **saldos de banco** (`bancos_saldos`, 52 filas cargadas por Contabilidad
+ *     entre ene y ago 2026, 7 empresas). Para poder retirar el viejo SIN dejar a
+ *     Contabilidad sin ese dato, los saldos se publicaron como módulo suelto.
+ *   · 13-ago-2026. Terminada esa mudanza, Daniel pidió lo contrario y fue
+ *     textual: *"y debeeria estar en un solo modulo"*. `saldos-banco` deja de
+ *     ser ficha y pasa a ser **PESTAÑA** de Gastos
+ *     (`/gastos-contabilidad?tab=saldos-banco`). La dirección vieja
+ *     `/saldos-banco` sigue llegando (redirect 307 en next.config.js).
  *
- * 🔴 EL ORDEN NO ES NEGOCIABLE, y estos tests son lo que lo sostiene: este PR
- * NO puede llevarse la carga manual de gastos. Si se fuera antes de que el
- * módulo nuevo esté publicado, Daniel se queda sin NINGUNO de los dos. Por eso
- * hay tests que exigen que el módulo viejo siga ENTERO — un candado "al revés"
- * de lo habitual: protege lo que todavía no se puede borrar.
- */
-import { describe, it, expect } from "vitest";
+ * 🔴 LO QUE ESTOS TESTS PROTEGEN, y no es lo mismo que protegían el 11-ago: la
+ * ficha suelta ya no tiene que existir, pero la PANTALLA sí — entera, con su
+ * carga, su corrección por fecha y su historial — y la puerta de Contabilidad al
+ * dato NO se puede haber cerrado en el camino.
+ */import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import {
@@ -27,120 +31,175 @@ import {
 const raiz = join(__dirname, "..", "..", "..");
 const leer = (p: string) => readFileSync(join(raiz, p), "utf8");
 
+/** El archivo SIN comentarios. 🩸 Hace falta de verdad: el barrido de "esta
+ *  pestaña no tiene h1" pasaba en verde por el comentario de cabecera de
+ *  `SaldosBancoTab.tsx`, que EXPLICA que su `<h1>` se fue. Un candado que se
+ *  cumple a sí mismo con su propia explicación es peor que no tener candado. */
+const plano = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. El módulo existe y hace lo que dice
+// 1. La PESTAÑA existe y la ficha suelta ya no
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Saldos de Banco — el módulo", () => {
-  const saldos = ALL_MODULES.find((m) => m.key === "saldos-banco");
-
-  it("está en el catálogo, con su nombre en español simple", () => {
-    expect(saldos).toBeTruthy();
-    expect(saldos!.label).toBe("Saldos de Banco");
-    expect(saldos!.href).toBe("/saldos-banco");
-    expect(saldos!.group).toBe("operacion");
-  });
-
-  it("lo ven los mismos roles que cargan el dato: admin y contabilidad", () => {
-    // Las 52 filas de bancos_saldos están firmadas `created_by = "Contabilidad"`.
-    // Si el rol se cayera de acá, quien carga los saldos se queda afuera.
-    expect(saldos!.roles).toEqual(["admin", "contabilidad"]);
-    expect(getDefaultModulesForRole("contabilidad")).toContain("saldos-banco");
-    for (const rol of ["secretaria", "bodega", "vendedor", "gerente_acs"]) {
-      expect(getDefaultModulesForRole(rol), `${rol} no debe verlo`).not.toContain("saldos-banco");
+describe("Saldos de banco — la 2ª pestaña de Gastos", () => {
+  it("ya NO es una ficha suelta del menú", () => {
+    // Lo que Daniel pidió es MENOS módulos: si esta key volviera al catálogo,
+    // el menú tendría otra vez dos entradas para lo mismo.
+    expect(ALL_MODULES.find((m) => m.key === "saldos-banco")).toBeUndefined();
+    for (const rol of ["admin", "contabilidad", "secretaria", "bodega", "vendedor", "gerente_acs"]) {
+      expect(getDefaultModulesForRole(rol), `${rol} no puede tener la key retirada`)
+        .not.toContain("saldos-banco");
     }
   });
 
-  it("la pantalla y su API existen", () => {
-    expect(existsSync(join(raiz, "src/app/saldos-banco/page.tsx"))).toBe(true);
-    expect(existsSync(join(raiz, "src/app/saldos-banco/SaldosBancoClient.tsx"))).toBe(true);
-    expect(existsSync(join(raiz, "src/app/saldos-banco/components/SaldosBancarios.tsx"))).toBe(true);
+  it("la pantalla NO se perdió: vive dentro de Gastos, con su API intacta", () => {
+    // Es una MUDANZA, no un recorte. Los archivos son los MISMOS (git mv), no
+    // copias: si alguien los duplicara, habría dos verdades para un mismo saldo.
+    const base = "src/app/gastos-contabilidad/components/saldos";
+    for (const f of ["SaldosBancoTab.tsx", "SaldosBancarios.tsx", "types.ts"]) {
+      expect(existsSync(join(raiz, base, f)), `falta ${f}`).toBe(true);
+    }
     expect(existsSync(join(raiz, "src/app/api/saldos-banco/route.ts"))).toBe(true);
+    // Y la casa vieja quedó vacía: una pantalla en dos lugares se desincroniza.
+    expect(existsSync(join(raiz, "src/app/saldos-banco/page.tsx"))).toBe(false);
+    expect(existsSync(join(raiz, "src/app/saldos-banco/SaldosBancoClient.tsx"))).toBe(false);
+    expect(existsSync(join(raiz, "src/app/saldos-banco/components/SaldosBancarios.tsx"))).toBe(false);
+  });
+
+  it("la pestaña está montada en el módulo de Gastos, con `?tab=` en la URL", () => {
+    const cliente = leer("src/app/gastos-contabilidad/GastosContabilidadClient.tsx");
+    expect(cliente).toContain('import SaldosBancoTab from "./components/saldos/SaldosBancoTab"');
+    expect(cliente).toContain("<SaldosBancoTab />");
+    expect(cliente).toContain('<TabsTrigger value="saldos-banco"');
+    // `?tab=` en la URL es lo que hace que un marcador, un refresh y el
+    // back/forward caigan donde estaba la persona — y lo que le da destino al
+    // redirect de la dirección vieja.
+    expect(cliente).toMatch(/useUrlState\("tab", "gastos"\)/);
+  });
+
+  it("🔴 la dirección vieja `/saldos-banco` TIENE que seguir llegando", () => {
+    // La tarjeta "Disponibilidad" de Vista General apunta ahí, y también
+    // cualquier marcador de Contabilidad. Va en next.config.js —el mecanismo que
+    // ya usa el repo— y no con un page.tsx que redirige: así ni siquiera se
+    // descarga la pantalla equivocada.
+    const cfg = leer("next.config.js");
+    expect(cfg).toMatch(
+      /source:\s*"\/saldos-banco",\s*destination:\s*"\/gastos-contabilidad\?tab=saldos-banco"/,
+    );
+  });
+
+  it("la pestaña NO trae su propio h1: el de la página es UNO solo", () => {
+    // Mismo invariante que DataHealthTab dentro de Usuarios. Dos h1 en una
+    // página no son un encabezado, son un encabezado roto.
+    expect(plano(leer("src/app/gastos-contabilidad/components/saldos/SaldosBancoTab.tsx")))
+      .not.toMatch(/<h1\b/);
+    const cliente = plano(leer("src/app/gastos-contabilidad/GastosContabilidadClient.tsx"));
+    expect((cliente.match(/<h1\b/g) || []).length).toBe(1);
+    expect(cliente).toContain('<h1 className="sr-only">Gastos</h1>');
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. La herencia de permiso — la pantalla funciona ANTES de que corra la DDL
+// 2. EL PERMISO PRESTADO SE RETIRÓ — y quién ve qué no se movió
 //
-// 🩸 `role_permissions.contabilidad.modulos` es una lista de keys guardada en la
-// base, y el login la copia a `fg_modules`. Una key NUEVA no está ahí, así que
-// la ficha no aparece en el menú hasta que alguien corra la migración A MANO —
-// y este repo tiene DDLs pendientes de correr desde hace semanas. Sin la
-// herencia, el día que se retire "Gastos de Empresa" la persona que carga los
-// saldos se queda sin ninguna puerta al dato.
+// 🩸 De dónde venía: `role_permissions.contabilidad.modulos` es una lista de
+// keys guardada en la base, y el login la copia a `fg_modules`. Una key NUEVA no
+// está ahí hasta que alguien corra la migración A MANO — y este repo tiene DDLs
+// pendientes desde hace semanas. Por eso el 11-ago se le prestó a `saldos-banco`
+// el permiso de `gastos-empresa`: sin eso, el día del retiro la persona que
+// carga los saldos (contabilidad: las 52 filas están firmadas por ella) se
+// quedaba sin ninguna puerta al dato.
+//
+// AHORA se retira, y por las DOS razones a la vez:
+//   1. `saldos-banco` ya no es un módulo → la entrada quedaba ZOMBI.
+//   2. La puerta es `gastos-contabilidad`, y contabilidad la tiene POR DERECHO
+//      PROPIO. Medido en producción el 13-ago-2026:
+//      ["asistencia","gastos-empresa","prestamos","proveedores","ventas",
+//       "saldos-banco","gastos-contabilidad"].
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Saldos de Banco — permiso heredado mientras la DDL no corra", () => {
-  it("quien tenía `gastos-empresa` ve `saldos-banco` sin tocar la base", () => {
-    const guardadoHoy = ["asistencia", "gastos-empresa", "prestamos", "proveedores", "ventas"];
-    const visibles = getVisibleModules("contabilidad", guardadoHoy).map((m) => m.key);
-    expect(visibles).toContain("saldos-banco");
-    // Y no le regala nada más de rebote.
+/** Lo que `role_permissions.contabilidad.modulos` tiene HOY en producción,
+ *  medido con `scripts/_diag-gastos-saldos-fusion.ts` (solo lectura) el
+ *  13-ago-2026. Se usa tal cual, con sus keys inertes incluidas: probar con una
+ *  lista idealizada no probaría nada sobre la base real. */
+const CONTABILIDAD_EN_PRODUCCION = [
+  "asistencia", "gastos-empresa", "prestamos", "proveedores", "ventas",
+  "saldos-banco", "gastos-contabilidad",
+];
+
+describe("el permiso prestado se retiró sin cerrarle la puerta a nadie", () => {
+  it("la herencia es una lista CERRADA y ya no incluye `saldos-banco`", () => {
+    // Que no se convierta en un cajón de sastre: cada entrada acá es un permiso
+    // que alguien recibe sin que nadie lo haya escrito en la base.
+    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["referencia"]);
+    expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBeUndefined();
+    expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
+  });
+
+  it("🔴 contabilidad SIGUE llegando al dato — con lo que tiene HOY en la base", () => {
+    const visibles = getVisibleModules("contabilidad", CONTABILIDAD_EN_PRODUCCION).map((m) => m.key);
+    // La puerta: entra a Gastos y adentro toca la pestaña.
+    expect(visibles).toContain("gastos-contabilidad");
+    // Y no gana nada de rebote por el camino.
     expect(visibles).not.toContain("cxc");
     expect(visibles).not.toContain("catalogos");
     expect(visibles).not.toContain("usuarios");
   });
 
-  it("con la DDL ya corrida sigue funcionando igual (idempotente)", () => {
-    const conDdl = ["asistencia", "gastos-empresa", "saldos-banco", "prestamos", "proveedores", "ventas"];
-    expect(getVisibleModules("contabilidad", conDdl).map((m) => m.key)).toContain("saldos-banco");
+  it("las keys viejas quedaron INERTES, no rompen ni pintan nada", () => {
+    // `gastos-empresa` y `saldos-banco` siguen en la fila de la base (la
+    // migración 20260811130000 nunca corrió, y la nueva tampoco es bloqueante).
+    // `getVisibleModules` filtra contra ALL_MODULES, así que no pintan ficha.
+    const visibles = getVisibleModules("contabilidad", CONTABILIDAD_EN_PRODUCCION).map((m) => m.key);
+    expect(visibles).not.toContain("gastos-empresa");
+    expect(visibles).not.toContain("saldos-banco");
+    expect(visibles.sort()).toEqual(
+      ["asistencia", "gastos-contabilidad", "prestamos", "proveedores", "ventas"].sort(),
+    );
   });
 
-  it("si `gastos-empresa` se va de la lista GUARDADA, la herencia ya no alcanza → ahí sí la DDL es obligatoria", () => {
-    const sinElViejo = ["asistencia", "prestamos", "proveedores", "ventas"];
-    expect(getVisibleModules("contabilidad", sinElViejo).map((m) => m.key)).not.toContain("saldos-banco");
+  it("con la DDL nueva ya corrida ve EXACTAMENTE lo mismo (idempotente)", () => {
+    // Después de 20260813140000 la fila queda sin las dos keys muertas. Si el
+    // menú cambiara al correrla, la migración sería bloqueante — y no lo es.
+    const conDdl = ["asistencia", "prestamos", "proveedores", "ventas", "gastos-contabilidad"];
+    expect(getVisibleModules("contabilidad", conDdl).map((m) => m.key).sort()).toEqual(
+      getVisibleModules("contabilidad", CONTABILIDAD_EN_PRODUCCION).map((m) => m.key).sort(),
+    );
   });
 
-  it("quien NUNCA tuvo el módulo viejo tampoco hereda el nuevo", () => {
-    expect(getVisibleModules("bodega", ["guias", "packing-lists", "catalogos"]).map((m) => m.key))
-      .not.toContain("saldos-banco");
+  it("🔴 nadie más gana la puerta a los saldos: rol por rol, antes y después", () => {
+    // Los saldos son plata de la empresa. La pestaña vive dentro de Gastos, así
+    // que quien no tiene Gastos no la ve — y Gastos es de admin y contabilidad.
+    const mayor = ALL_MODULES.find((m) => m.key === "gastos-contabilidad")!;
+    expect(mayor.roles).toEqual(["admin", "contabilidad"]);
+    for (const rol of ["secretaria", "bodega", "vendedor", "gerente_acs"]) {
+      expect(getDefaultModulesForRole(rol), `${rol} no debe ver Gastos`)
+        .not.toContain("gastos-contabilidad");
+    }
+    // Y la API tampoco se abrió: mismos dos roles que siempre.
+    expect(leer("src/app/api/saldos-banco/route.ts"))
+      .toMatch(/requireRole\(req,\s*\["admin",\s*"contabilidad"\]\)/);
   });
 
-  it("la herencia es una lista CERRADA y cada entrada apunta al módulo del que salió", () => {
-    // Que no se convierta en un cajón de sastre: cada entrada acá es un permiso
-    // que alguien recibe sin que nadie lo haya escrito en la base.
-    // `referencia` se sumó el 12-ago-2026 (Daniel: *"habilita referencia para
-    // los vendedores y bodega"*) mientras su DDL 20260812120000 no corra.
-    expect(Object.keys(MODULO_HEREDA_PERMISO_DE).sort()).toEqual(["referencia", "saldos-banco"]);
-    expect(MODULO_HEREDA_PERMISO_DE["saldos-banco"]).toBe("gastos-empresa");
-    expect(MODULO_HEREDA_PERMISO_DE["referencia"]).toBe("catalogos");
-  });
-
-  it("🔴 la herencia solo alcanza a los roles que el módulo declara: secretaria tiene catalogos y NO ve referencia", () => {
-    // Sin este recorte, "referencia hereda de catalogos" le pintaría la ficha
-    // a secretaria — una ficha que la página le rebota es peor que ninguna.
-    const secretaria = ["upload", "guias", "caja", "reclamos", "cheques", "directorio", "catalogos"];
-    expect(getVisibleModules("secretaria", secretaria).map((m) => m.key)).not.toContain("referencia");
-    // Vendedor y bodega SÍ están en el roles[] del módulo: la heredan.
-    expect(getVisibleModules("vendedor", ["cxc", "catalogos"]).map((m) => m.key)).toContain("referencia");
-    expect(getVisibleModules("bodega", ["guias", "catalogos"]).map((m) => m.key)).toContain("referencia");
-    // Y sin `catalogos` en la lista guardada no hay de dónde heredar.
-    expect(getVisibleModules("vendedor", ["cxc", "guias"]).map((m) => m.key)).not.toContain("referencia");
-  });
-
-  it("existe la migración que agrega la key, y NO toca bancos_saldos", () => {
+  it("la migración que barre las keys muertas existe, y NO toca bancos_saldos", () => {
     const dir = join(raiz, "supabase", "migrations");
-    const archivo = readdirSync(dir).find((f) => f.includes("modulo_saldos_banco"));
-    expect(archivo, "falta la migración del módulo saldos-banco").toBeTruthy();
+    const archivo = readdirSync(dir).find((f) => f.includes("retirar_modulo_saldos_banco"));
+    expect(archivo, "falta la migración que retira la key `saldos-banco`").toBeTruthy();
     const sql = readFileSync(join(dir, archivo!), "utf8");
+    const sentencias = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
 
-    expect(sql).toMatch(/UPDATE\s+role_permissions/i);
-    expect(sql).toContain("saldos-banco");
+    // Asegura la key que reemplaza ANTES de sacar las viejas — al revés dejaría
+    // al rol sin ningún módulo de gastos.
+    const iAppend = sentencias.indexOf("array_append(modulos, 'gastos-contabilidad')");
+    const iRemove = sentencias.indexOf("array_remove(modulos, 'saldos-banco')");
+    expect(iAppend).toBeGreaterThan(-1);
+    expect(iRemove === -1 || iAppend < iRemove).toBe(true);
 
-    // 🔴 El dato NO se toca. Ni la tabla de saldos, ni la de gastos, ni las
-    // categorías: esta migración solo reparte una key de menú.
-    const sentencias = sql
-      .split("\n")
-      .filter((l) => !l.trim().startsWith("--"))
-      .join("\n");
+    // 🔴 El dato NO se toca.
     for (const prohibido of [
-      /\bDROP\b/i,
-      /\bDELETE\s+FROM\b/i,
-      /\bTRUNCATE\b/i,
-      /\bALTER\s+TABLE\b/i,
-      /bancos_saldos/i,
-      /empresa_gastos_mensuales/i,
-      /gastos_categorias/i,
+      /\bDROP\b/i, /\bDELETE\s+FROM\b/i, /\bTRUNCATE\b/i, /\bALTER\s+TABLE\b/i,
+      /bancos_saldos/i, /empresa_gastos_mensuales/i, /gastos_categorias/i,
     ]) {
       expect(sentencias, `la migración no puede contener ${prohibido}`).not.toMatch(prohibido);
     }
@@ -148,7 +207,7 @@ describe("Saldos de Banco — permiso heredado mientras la DDL no corra", () => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. 🔴 EL ORDEN DE MERGE — la carga manual de gastos NO se va en este PR
+// 3. 🔴 EL ORDEN DE MERGE del 11-ago — sigue valiendo hacia atrás
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () => {
@@ -169,16 +228,15 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
     }
   });
 
-  it("🔴 el módulo nuevo TIENE que estar publicado para que esto sea seguro", () => {
-    // El candado que sostiene el orden: si esto se mergeara sin el módulo del
-    // mayor, no quedaría ningún módulo de gastos y Daniel se queda sin ninguno.
+  it("🔴 el módulo del mayor TIENE que estar publicado para que esto sea seguro", () => {
+    // El candado que sostiene el orden: sin él no quedaría ningún módulo de
+    // gastos, y ahora además se llevaría puestos los saldos, que son su pestaña.
     expect(existsSync(join(raiz, "src/app/gastos-contabilidad/page.tsx"))).toBe(true);
     expect(existsSync(join(raiz, "src/app/api/gastos-contabilidad/resumen/route.ts"))).toBe(true);
   });
 
-  it("los saldos de banco NO se fueron con él: siguen teniendo su módulo", () => {
-    expect(ALL_MODULES.find((m) => m.key === "saldos-banco")).toBeTruthy();
-    expect(existsSync(join(raiz, "src/app/saldos-banco/components/SaldosBancarios.tsx"))).toBe(true);
+  it("los saldos de banco NO se fueron con él: siguen vivos, ahora como pestaña", () => {
+    expect(existsSync(join(raiz, "src/app/gastos-contabilidad/components/saldos/SaldosBancarios.tsx"))).toBe(true);
     expect(existsSync(join(raiz, "src/app/api/saldos-banco/route.ts"))).toBe(true);
   });
 
@@ -188,9 +246,7 @@ describe("la carga manual de gastos YA se retiró (y el orden se respetó)", () 
     //
     // ⚠️ Desde el 11-ago-2026 Vista General YA NO LAS LEE — su gasto sale del
     // mayor contable de Switch. Que nadie las lea NO es lo mismo que borrarlas,
-    // y este candado protege lo segundo, que es lo irreversible. Por eso lo que
-    // se verifica es que ninguna migración las dropee, no que alguien las
-    // consulte.
+    // y este candado protege lo segundo, que es lo irreversible.
     const dir = join(raiz, "supabase", "migrations");
     for (const f of readdirSync(dir)) {
       if (!f.endsWith(".sql")) continue;
@@ -323,6 +379,9 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
     // igual que su módulo es otra cosa (es su sección principal), no un choque.
     const TIRAS: Record<string, string[]> = {
       Usuarios: ["Usuarios", "Data Health"],
+      // Gastos estrenó su 2ª pestaña el 13-ago-2026. "Gastos" vs "Saldos de
+      // banco" no comparten ni una palabra que distinga: no hay confusión.
+      Gastos: ["Gastos", "Saldos de banco"],
       Ventas: ["Resumen", "Clientes", "Productos", "Utilidad"],
       Multifashion: ["Resumen", "Vendedoras", "Productos", "Clientes", "Caja"],
     };
@@ -351,6 +410,27 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
       }
     }
     expect(choques, `la pestaña se confunde con un módulo:\n${choques.join("\n")}`).toEqual([]);
+  });
+
+  it("🔴 \"Asistencia y Planilla\" no choca con nada del catálogo", () => {
+    // Daniel, textual (13-ago-2026): *"y asistencia se debe de llamar asistencia
+    // y planilla"*. El módulo ya calculaba la planilla; el nombre solo hablaba
+    // de las marcaciones. Se verifica CONTRA EL CATÁLOGO REAL, no contra una
+    // lista escrita a mano: un módulo nuevo llamado "Planilla" a secas —o
+    // "Asistencia del reloj"— tiene que poner el build rojo.
+    const asistencia = ALL_MODULES.find((m) => m.key === "asistencia")!;
+    expect(asistencia.label).toBe("Asistencia y Planilla");
+    // 🔴 La KEY no cambia: está en `role_permissions` y en
+    // `fg_users.modulos_override`, y renombrarla rompería los permisos.
+    expect(asistencia.href).toBe("/asistencia");
+    for (const otro of ALL_MODULES) {
+      if (otro.key === "asistencia") continue;
+      expect(seConfunden(asistencia.label, otro.label), `choca con "${otro.label}"`).toBe(false);
+    }
+    // Y la "y" del medio no puede contar como palabra propia: sin eso,
+    // "Asistencia" y "Asistencia y Planilla" se leerían como distintas por dos.
+    expect(seConfunden("Asistencia", "Asistencia y Planilla")).toBe(true);
+    expect(seConfunden("Asistencia y Planilla", "Planilla")).toBe(true);
   });
 
   it("cada módulo tiene key, ruta y nombre únicos", () => {
