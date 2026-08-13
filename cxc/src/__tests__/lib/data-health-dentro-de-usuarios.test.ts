@@ -270,7 +270,12 @@ describe("la pantalla de Data Health llegó entera", () => {
       "aging_dias_anomalo",
       "switch_facturas_continuidad",
     ]) {
-      expect(src, `se perdió la explicación de ${check}`).toContain(check);
+      // 🩸 Se exige la ENTRADA del diccionario, no el texto suelto. Con un
+      // `toContain(check)` a secas, renombrar la clave a `aging_dias_anomalo_XX`
+      // —que rompe el pareo con `check_name` y deja el check sin explicación en
+      // pantalla— seguía pasando en verde: el nombre viejo es prefijo del nuevo.
+      // Verificado por mutación.
+      expect(src, `se perdió la explicación de ${check}`).toContain(`${check}: {`);
     }
   });
 
