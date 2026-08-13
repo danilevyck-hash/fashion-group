@@ -90,7 +90,15 @@ function config(db: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getArticulos.mockResolvedValue({ articulos: [ART] });
+  // 🩸 PAGINADO DE VERDAD, no la misma página para siempre (13-ago-2026). Antes
+  // esto era `mockResolvedValue({ articulos: [ART] })`, o sea un endpoint que
+  // devuelve el mismo artículo en la página 1, en la 2 y en la 40. Ese Switch no
+  // existe, y modelarlo así escondía lo que pasa cuando el barrido pide páginas
+  // por delante del final — que es exactamente lo que hace desde que barre en
+  // paralelo. La intención del test (que `image_url` no se pise) no cambia.
+  getArticulos.mockImplementation(async ({ paginaActual }: { paginaActual: number }) => ({
+    articulos: paginaActual === 1 ? [ART] : [],
+  }));
   // Forma real de /stock: filas por bodega que el motor suma.
   getStock.mockResolvedValue({ stock: [{ saldo: 10, disponible: 8 }] });
 });

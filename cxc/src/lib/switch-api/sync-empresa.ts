@@ -27,6 +27,7 @@ import { supabaseServer } from "../supabase-server";
 import { clearStaleRunning } from "./sync-log";
 import { particionarFilas, campoSkip } from "./monto-guard";
 import { calibrarUmbral, detallesDeRechazo, avisarMontosImposibles } from "./monto-guard-io";
+import { enParalelo } from "./en-paralelo";
 
 import type { SwitchTotalVentasDia } from "./types";
 
@@ -60,6 +61,56 @@ const UPSERT_BATCH = 100;
 const MAX_PAGES = 1000;
 const CLIENTES_PAGE = 200;
 const MAX_CLIENTES_PAGES = 2000;
+
+/**
+ * Cuántos `/apiestadocuenta` (uno por cliente) se piden a la vez.
+ *
+ * 🩸 POR QUÉ EXISTE (13-ago-2026). La cartera es el segundo sync que hace
+ * esperar a Daniel mirando: **109 s de mediana** sobre 145 corridas de 7 días,
+ * y la forma es la misma que ya costó cara dos veces (Boston 4.912 llamadas /
+ * 54 min, Tommy 478 llamadas = 72% de su cron): **una llamada HTTP por cliente,
+ * en serie**. Las 6 empresas del grupo tienen 136-140 clientes cada una.
+ *
+ * **No hay forma masiva de pedirlo por la API** — el reporte web del panel
+ * (`estadocuenta-web.ts`) sí la tiene, pero está reservado a Boston por una
+ * razón que no aplica acá: abre una SEGUNDA sesión (la del panel web) que
+ * expulsa a quien esté usando Switch, y para 136 clientes no compra nada frente
+ * a la concurrencia. Así que lo que se acorta es el tiempo de pared.
+ *
+ * **LA CURVA, con clientes DISJUNTOS** (`scripts/_probe-sync-lento.ts`, vistana,
+ * 20 clientes por nivel, ms/cliente efectivo, **0 errores en todos**):
+ *
+ *     serial ×1  442 ms   —
+ *     ×2         216 ms   2,1×
+ *     ×4         117 ms   3,8×
+ *     ×6          81 ms   5,4×   ← acá
+ *     ×8          66 ms   6,7×
+ *     ×12         53 ms   8,4×
+ *
+ * Se elige 6 quedándose por debajo del borde, mismo criterio conservador que
+ * `STOCK_CONCURRENCIA`. Con 139 clientes eso son ~12 s contra los ~63 s del
+ * barrido serial medido el mismo día.
+ *
+ * ⚠️ Requiere el de-dup de login de `client.ts` (`loginEnVuelo`): Switch admite
+ * UNA sesión por empresa y N llamadas concurrentes que encuentren el token
+ * vencido dispararían N `/autenticacion` matándose el token entre sí (0006).
+ */
+const ESTADOCUENTA_CONCURRENCIA = 6;
+
+/**
+ * Cuántos clientes se leen antes de volver a escribir.
+ *
+ * NO es la concurrencia: es el tamaño del bocado. Con un lote igual a la
+ * concurrencia, cada vuelta espera al cliente MÁS LENTO del grupo antes de
+ * pedir el siguiente, y esa espera se paga 137/6 = 23 veces. Con un lote más
+ * grande la pileta de `enParalelo` sigue llena y el rezagado se absorbe.
+ *
+ * ⚠️ No se lee TODO de una: la memoria queda acotada y las escrituras siguen
+ * siendo incrementales, igual que antes de paralelizar. `switch_estadocuenta`
+ * es lo que Daniel mira para cobrar; no es el lugar para estrenar un
+ * read-all-then-write.
+ */
+const ESTADOCUENTA_LOTE = ESTADOCUENTA_CONCURRENCIA * 4;
 
 // ─── Log helper (resiliente a skip_details ausente) ──────────────────────────
 
@@ -842,66 +893,96 @@ export async function syncEmpresaEstadoCuenta(
     let buffer: EstadoCuentaRow[] = [];
     let procesados = 0;
     const failedClienteIds: number[] = [];
-    for (const cliente of clientes) {
-      if (typeof cliente.id !== "number") {
-        // 🟡-11: no skip silencioso — un cliente sin id numérico se omite pero
-        // queda registrado en switch_sync_log.skip_details.
-        skipped++;
-        skipDetails.push({ facturaId: null, secuencial: cliente.codigo ?? null, campo: "cliente_id_no_numerico", valorCrudo: cliente.id });
-        console.error(`[sync ${empresaKey} cxc] cliente sin id numérico omitido: codigo=${cliente.codigo ?? "?"} id=${JSON.stringify(cliente.id)}`);
-        continue;
-      }
-      let ec;
-      try {
-        ec = await client.getEstadoCuenta(cliente.id);
-      } catch (err) {
-        // Un cliente que falla no aborta todo el run; se loguea como skip y se
-        // excluye del reconcile (abajo) para no corromper su saldo a 0.
-        skipped++;
-        failedClienteIds.push(cliente.id);
-        skipDetails.push({ facturaId: cliente.id, secuencial: null, campo: "getEstadoCuenta", valorCrudo: err instanceof Error ? err.message : String(err) });
-        console.error(`[sync ${empresaKey} cxc] cliente ${cliente.id} falló: ${err instanceof Error ? err.message : String(err)}`);
-        continue;
-      }
-      const elements = ec?.estadocuenta?.elements ?? [];
-      for (const el of elements) {
-        const res = mapEstadoCuentaElement(empresaKey, cliente, el);
-        if (!res.ok) {
+    // Las LECTURAS van de a ESTADOCUENTA_CONCURRENCIA; el PROCESADO y las
+    // escrituras siguen en serie y en el orden original de `clientes`. Un
+    // orden que cambia entre corridas vuelve el sync irreproducible al depurar,
+    // y el buffer de UPSERT depende de acumular en un orden estable.
+    //
+    // 🔴 El error de UN cliente NO puede abortar la tanda: `enParalelo` propaga
+    // el primer rechazo, así que el fallo se atrapa DENTRO y viaja como dato.
+    // Los demás clientes de la tanda se procesan igual, exactamente como cuando
+    // esto era un `try/catch` dentro del `for` serial.
+    type LecturaEc =
+      | { tipo: "ok"; cliente: SwitchCliente; ec: Awaited<ReturnType<typeof client.getEstadoCuenta>> }
+      | { tipo: "error"; cliente: SwitchCliente; error: unknown }
+      | { tipo: "sin-id"; cliente: SwitchCliente };
+
+    for (let i = 0; i < clientes.length; i += ESTADOCUENTA_LOTE) {
+      const tanda = clientes.slice(i, i + ESTADOCUENTA_LOTE);
+      const lecturas = await enParalelo<SwitchCliente, LecturaEc>(
+        tanda,
+        ESTADOCUENTA_CONCURRENCIA,
+        async (cliente) => {
+          if (typeof cliente.id !== "number") return { tipo: "sin-id", cliente };
+          try {
+            return { tipo: "ok", cliente, ec: await client.getEstadoCuenta(cliente.id) };
+          } catch (error) {
+            return { tipo: "error", cliente, error };
+          }
+        },
+      );
+
+      for (const lectura of lecturas) {
+        const cliente = lectura.cliente;
+        if (lectura.tipo === "sin-id") {
+          // 🟡-11: no skip silencioso — un cliente sin id numérico se omite pero
+          // queda registrado en switch_sync_log.skip_details.
           skipped++;
-          skipDetails.push(res.skip);
+          skipDetails.push({ facturaId: null, secuencial: cliente.codigo ?? null, campo: "cliente_id_no_numerico", valorCrudo: cliente.id });
+          console.error(`[sync ${empresaKey} cxc] cliente sin id numérico omitido: codigo=${cliente.codigo ?? "?"} id=${JSON.stringify(cliente.id)}`);
           continue;
         }
-        // Guard de montos imposibles. Un saldo corrupto acá infla la cartera y
-        // dispara alertas de cobranza falsas. Se rechaza el documento entero
-        // (upsert: el último valor bueno sobrevive); los demás documentos del
-        // mismo cliente se guardan igual.
-        const p = particionarFilas(
-          "cxc",
-          [res.row],
-          umbralCxc,
-          (f) => `${f.secuencial ?? f.ccte_id} · ${f.cliente_nombre ?? ""}`.trim(),
-        );
-        if (p.rechazadas.length > 0) {
+        if (lectura.tipo === "error") {
+          // Un cliente que falla no aborta todo el run; se loguea como skip y se
+          // excluye del reconcile (abajo) para no corromper su saldo a 0.
+          const err = lectura.error;
           skipped++;
-          rechazadasCxc.push(...p.rechazadas);
-          skipDetails.push(...detallesDeRechazo("cxc", p.rechazadas, umbralCxc));
-          console.error(
-            `[sync ${empresaKey} cxc] MONTO IMPOSIBLE ccte=${res.row.ccte_id} (umbral ${umbralCxc})`,
-            p.rechazadas[0].columnas,
+          failedClienteIds.push(cliente.id as number);
+          skipDetails.push({ facturaId: cliente.id, secuencial: null, campo: "getEstadoCuenta", valorCrudo: err instanceof Error ? err.message : String(err) });
+          console.error(`[sync ${empresaKey} cxc] cliente ${cliente.id} falló: ${err instanceof Error ? err.message : String(err)}`);
+          continue;
+        }
+        const ec = lectura.ec;
+        const elements = ec?.estadocuenta?.elements ?? [];
+        for (const el of elements) {
+          const res = mapEstadoCuentaElement(empresaKey, cliente, el);
+          if (!res.ok) {
+            skipped++;
+            skipDetails.push(res.skip);
+            continue;
+          }
+          // Guard de montos imposibles. Un saldo corrupto acá infla la cartera y
+          // dispara alertas de cobranza falsas. Se rechaza el documento entero
+          // (upsert: el último valor bueno sobrevive); los demás documentos del
+          // mismo cliente se guardan igual.
+          const p = particionarFilas(
+            "cxc",
+            [res.row],
+            umbralCxc,
+            (f) => `${f.secuencial ?? f.ccte_id} · ${f.cliente_nombre ?? ""}`.trim(),
           );
-          continue;
+          if (p.rechazadas.length > 0) {
+            skipped++;
+            rechazadasCxc.push(...p.rechazadas);
+            skipDetails.push(...detallesDeRechazo("cxc", p.rechazadas, umbralCxc));
+            console.error(
+              `[sync ${empresaKey} cxc] MONTO IMPOSIBLE ccte=${res.row.ccte_id} (umbral ${umbralCxc})`,
+              p.rechazadas[0].columnas,
+            );
+            continue;
+          }
+          buffer.push(res.row);
         }
-        buffer.push(res.row);
-      }
-      while (buffer.length >= UPSERT_BATCH) {
-        const b = buffer.splice(0, UPSERT_BATCH);
-        const r = await persistEstadoCuentaBatch(empresaKey, b, runStamp);
-        inserted += r.inserted;
-        updated += r.updated;
-      }
-      procesados++;
-      if (procesados % 100 === 0) {
-        console.error(`[sync ${empresaKey} cxc] ${procesados}/${clientes.length} clientes — ins=${inserted} upd=${updated}`);
+        while (buffer.length >= UPSERT_BATCH) {
+          const b = buffer.splice(0, UPSERT_BATCH);
+          const r = await persistEstadoCuentaBatch(empresaKey, b, runStamp);
+          inserted += r.inserted;
+          updated += r.updated;
+        }
+        procesados++;
+        if (procesados % 100 === 0) {
+          console.error(`[sync ${empresaKey} cxc] ${procesados}/${clientes.length} clientes — ins=${inserted} upd=${updated}`);
+        }
       }
     }
     if (buffer.length > 0) {
