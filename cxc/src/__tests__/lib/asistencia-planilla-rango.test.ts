@@ -38,6 +38,7 @@ import {
   type FichaPlanilla,
 } from "@/lib/asistencia/planilla";
 import { REGLAS_DEFAULT } from "@/lib/asistencia/config";
+import { armarReporte } from "@/lib/asistencia/reporte";
 
 const ficha = (over: Partial<FichaPlanilla> = {}): FichaPlanilla => ({
   codigo: "6",
@@ -219,36 +220,41 @@ describe("las quincenas de la lista siguen intactas", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("🔴 LA REGLA DE PRORRATEO DE DANIEL — MEDIDA, NO IMPLEMENTADA", () => {
-  // Daniel, textual (13-ago-2026), respondiendo cómo se prorratea un sueldo
-  // mensual si alguien trabaja del 5 al 20:
-  //   *"8 horas por dias por los total de dia trabajado"*
-  //
-  // 🔴 NO ESTÁ IMPLEMENTADA, Y NO ES UN OLVIDO: aplicarla con los días hábiles
-  // del calendario CAMBIA TODAS LAS QUINCENAS, medido contra producción con
-  // `scripts/_medir-prorrateo-daniel.ts` (36 personas activas, 3 quincenas):
+describe("✅ LA REGLA DE PRORRATEO — CERRADA POR LA CONTADORA (13-ago-2026)", () => {
+  // Daniel había contestado *"8 horas por dias por los total de dia trabajado"*,
+  // y eso NO es lo que hace el módulo. Antes de tocar el cálculo se midió contra
+  // producción (`scripts/_medir-prorrateo-daniel.ts`, 36 activos, 3 quincenas):
   //
   //     quincena            hábiles   hoy (salario ÷ 2)   8 h × días hábiles
   //     1 al 15 de julio      11          $9.647,40           $9.204,80   (−4,6 %)
   //     16 al 31 de julio     12          $9.647,40          $10.041,60   (+4,1 %)
   //     1 al 15 de agosto     10          $9.647,40           $8.368,00  (−13,3 %)
   //
-  // O sea: el mismo sueldo pagaría 13 % menos en una quincena que en otra según
-  // cuántos lunes-a-viernes le tocaron. Eso NO es un ajuste técnico: es una
-  // decisión de negocio, y la planilla de hoy está calculada con la otra regla.
+  // O sea que el mismo sueldo habría pagado 13 % menos en una quincena que en
+  // otra según cuántos lunes-a-viernes le tocaron. Se paró y se preguntó.
   //
-  // 🩸 Y HAY UNA CONTRADICCIÓN DE FONDO QUE HAY QUE RESOLVER ANTES: 13 personas
-  // están cargadas con jornada de 48 h/semana —divisor 208 = 26 días × 8 h, o
-  // sea SEIS días por semana— pero NADIE marca sábado (medido: 0 sábados con
-  // marca en 6 semanas, ni los de 48 h ni los de 40 h). Con 8 h × días hábiles,
-  // a esas 13 personas les faltarían ~4 días al mes y cobrarían ~15 % menos.
+  // 🟢 LA CONTADORA CONTESTÓ QUE EL CÁLCULO YA ES EXACTO. Daniel, textual:
+  // *"pero me dijo mi contable que el calculo dio exacto, solo le falto elegir
+  // la fecha exacta y no redonear minutos"* — o sea que lo que faltaba eran las
+  // DOS cosas que ya se construyeron (el rango de fechas y medir al segundo), y
+  // **la matemática de la planilla no se toca**.
   //
-  // Hasta que Daniel conteste, ESTOS TESTS FIJAN LO QUE HAY HOY.
+  // ⛔ QUE A NADIE SE LE OCURRA "ARREGLAR" ESTO DESPUÉS. Las tres dudas que
+  // habían quedado abiertas están contestadas, y ninguna era un bug:
+  //   1. Las 13 personas de 48 h/semana están BIEN cargadas. Daniel: *"no"*, no
+  //      se pasan a 40 — su jornada CONTRATADA es de 48 horas.
+  //   2. La media hora de los que salen 17:00 NO es hora extra. Daniel: *"los
+  //      que salen a las 5 no es mediahora extra, sino que eso es un reemplzao
+  //      de sus horas para completar 48 mensuales… aun q alfinal no se
+  //      completa"*. Se quedan media hora de lunes a viernes para REPONER el
+  //      sábado que no trabajan; no completan las 48 y está bien así.
+  //   3. Días trabajados = días con marcación, y la incapacidad justificada SÍ
+  //      SE PAGA (ver el describe de abajo, que lo prueba con dinero).
 
   it("🔴 la quincena NO depende de cuántos días hábiles tenga", () => {
     // Julio 1ª tiene 11 hábiles, julio 2ª tiene 12 y agosto 1ª tiene 10: las
-    // tres pagan la MISMA base. Es la regla del negocio hoy —medio sueldo por
-    // quincena— y es lo que la contable cuadra contra su Excel.
+    // tres pagan la MISMA base. Es la regla del negocio, la que la contadora
+    // acaba de dar por exacta, y este test es lo que impide volver a moverla.
     const base = (clave: string) => {
       const q = quincenaDesdeClave(clave)!;
       const p = periodoDesdeRango(q.desde, q.hasta)!;
@@ -259,16 +265,93 @@ describe("🔴 LA REGLA DE PRORRATEO DE DANIEL — MEDIDA, NO IMPLEMENTADA", () 
     expect(base("2026-08-1")).toBe(261.74);
   });
 
-  it("⚠️ el divisor sigue siendo el único puente entre sueldo mensual y hora", () => {
-    // La regla de Daniel («8 h × días») y la de hoy son la MISMA fórmula si los
-    // días se cuentan con la jornada de cada quien: para 48 h/semana el divisor
-    // 208 implica 26 días de 8 h al mes → 13 por quincena → 8 × 13 × (S/208) =
-    // S/2 EXACTO. Para 40 h/semana implica 21,67 días → 10,83 por quincena, que
-    // no es un número entero de días. Por eso la elección de "qué es un día
-    // trabajado" mueve plata y no se puede adivinar.
+  it("⚠️ el divisor es el único puente entre sueldo mensual y hora, y no se toca", () => {
+    // Las dos reglas son la MISMA fórmula si los días se cuentan con la jornada
+    // de cada quien: para 48 h/semana el divisor 208 implica 26 días de 8 h al
+    // mes → 13 por quincena → 8 × 13 × (S/208) = S/2 EXACTO. La aparente
+    // contradicción («nadie marca sábado») no era un error de carga: la jornada
+    // contratada es de 48 h y la media hora diaria repone el sábado.
     const S = 523.47;
     expect(centavos(8 * 13 * (S / 208))).toBe(centavos(S / 2));
     expect(centavos(8 * (173.33 / 16) * (S / 173.33))).toBe(centavos(S / 2));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 LA INCAPACIDAD JUSTIFICADA SE PAGA — con dinero, no con un booleano", () => {
+  // Daniel lo confirmó el 13-ago-2026, y el módulo YA lo hacía: un día
+  // justificado no es `ausente`, así que no entra a `ausenciaMin` y no se
+  // descuenta. No había un candado que lo probara EN DÓLARES — y sin eso, la
+  // diferencia entre "no se descuenta" y "se descuenta" es un `!justificado`
+  // que alguien puede borrar sin que se caiga un solo test.
+  //
+  // 🩸 Caso REAL de producción que lo confirma (quincena 1-15 de agosto):
+  // MARTHA ASUCENA CHAVARRIA Z. (código 43) tiene DOS días sin marcas —el 4 de
+  // agosto con «Incapacidad» y el 14 sin justificar—. Medido contra el módulo:
+  // el 4 sale `ausente=false` y NO se le descuenta; el 14 sale `ausente=true` y
+  // sí. Se le descuenta UN día, no dos.
+
+  const dia = (fecha: string) => fecha;
+  const correr = (justificaciones: Array<{ empleado_codigo: string; desde: string; hasta: string; motivo: string }>) => {
+    const personas = armarReporte({
+      // Marca lunes 3 y miércoles 5; el martes 4 falta.
+      marcaciones: [
+        { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: "2026-08-03T08:00:00-05:00" },
+        { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: "2026-08-03T17:00:00-05:00" },
+        { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: "2026-08-05T08:00:00-05:00" },
+        { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: "2026-08-05T17:00:00-05:00" },
+      ],
+      horarios: [{ empleado_codigo: "43", entrada: "08:00", salida: "17:00", almuerzo_minutos: 30 }],
+      justificaciones,
+      feriados: new Map(),
+      desde: dia("2026-08-03"),
+      hasta: dia("2026-08-05"),
+      reglas: REGLAS_DEFAULT,
+      incluirNoHabiles: true,
+    });
+    return armarPlanilla({
+      personas,
+      fichas: new Map([["43", ficha({ codigo: "43", nombre: "MARTHA" })]]),
+      jornadaDiariaMin: () => 480,
+      reglas: REGLAS_DEFAULT,
+      empresa: "confecciones_boston",
+    })[0];
+  };
+
+  it("sin justificación, el día que faltó SE DESCUENTA", () => {
+    const l = correr([]);
+    expect(l.horas.ausenciaDias).toBe(1);
+    expect(l.dinero!.ausencias).toBeGreaterThan(0);
+  });
+
+  it("🔴 con la incapacidad cargada, NO se descuenta ni un centavo", () => {
+    const l = correr([{ empleado_codigo: "43", desde: "2026-08-04", hasta: "2026-08-04", motivo: "Incapacidad" }]);
+    expect(l.horas.ausenciaDias).toBe(0);
+    expect(l.horas.ausenciaMin).toBe(0);
+    expect(l.dinero!.ausencias).toBe(0);
+    // …y se sigue viendo que faltó: se cuenta aparte, no desaparece.
+    expect(l.horas.ausenciaJustificadaDias).toBe(1);
+  });
+
+  it("el neto con incapacidad es el MISMO que si hubiera trabajado ese día", () => {
+    const conIncapacidad = correr([{ empleado_codigo: "43", desde: "2026-08-04", hasta: "2026-08-04", motivo: "Incapacidad" }]);
+    const sinFaltar = armarPlanilla({
+      personas: armarReporte({
+        marcaciones: ["03", "04", "05"].flatMap((d) => [
+          { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: `2026-08-${d}T08:00:00-05:00` },
+          { empleado_codigo: "43", empleado_nombre: null, ocurrio_en: `2026-08-${d}T17:00:00-05:00` },
+        ]),
+        horarios: [{ empleado_codigo: "43", entrada: "08:00", salida: "17:00", almuerzo_minutos: 30 }],
+        justificaciones: [], feriados: new Map(),
+        desde: "2026-08-03", hasta: "2026-08-05",
+        reglas: REGLAS_DEFAULT, incluirNoHabiles: true,
+      }),
+      fichas: new Map([["43", ficha({ codigo: "43", nombre: "MARTHA" })]]),
+      jornadaDiariaMin: () => 480,
+      reglas: REGLAS_DEFAULT,
+      empresa: "confecciones_boston",
+    })[0];
+    expect(conIncapacidad.dinero!.netoPagar).toBe(sinFaltar.dinero!.netoPagar);
   });
 });
 
