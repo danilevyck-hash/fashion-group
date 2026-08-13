@@ -94,6 +94,22 @@ const MAX_PAGES = 250;
  * admite UNA sesión por empresa; sin ese candado, N llamadas concurrentes que
  * encuentren el token vencido dispararían N `/autenticacion` y se matarían el
  * token entre sí (code 0006). Subir este número sin ese candado rompe el sync.
+ *
+ * 📌 **RE-MEDIDO el 13-ago-2026 y SE DEJA EN 4 — no se re-litiga sin decisión
+ * de Daniel.** Al paralelizar el barrido de páginas se volvió a levantar la
+ * curva contra fashion_shoes, con lotes disjuntos y deriva de solo −4% (o sea,
+ * la medición más limpia que tuvo este número): serial 424 ms/llamada · ×4
+ * 99 ms · ×6 79 ms · ×8 58 ms · ×12 52 ms, **0 errores y 0 respuestas vacías en
+ * todos**. Traducido a las 478 llamadas de Tommy: **serial 203 s · ×4 47 s ·
+ * ×6 38 s · ×8 28 s**. Subir de 4 a 8 compraría ~19 s.
+ *
+ * El motivo escrito arriba para quedarse en 4 era el presupuesto del CRON. La
+ * información NUEVA es que Daniel también espera MIRANDO este sync. Aun así el
+ * número no se toca acá: es una decisión documentada a propósito y ~19 s no
+ * justifican cambiarla de costado. Y sobre todo, **19 s no es donde está el
+ * tiempo de Tommy**: con 14 páginas de catálogo (666 artículos) y 47 s de
+ * /stock, lo que queda de sus ~196 s son las **~490 UPDATE de a uno** contra
+ * Supabase. Ese es el próximo cuello, y es de la base, no de Switch.
  */
 const STOCK_CONCURRENCIA = 4;
 
