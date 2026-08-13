@@ -797,6 +797,44 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 >
 > Candados: `asistencia-planilla-rango.test.ts` (17) y `asistencia-segundos.test.ts` (15). **Verificado por mutación, 6 de 6 cazadas:** prorratear por días del mes rompe 6, volver a redondear la marca al minuto rompe 9, quitarle la tolerancia a la tardanza rompe 6, quitar el guard del factor (NaN → planilla de $0) rompe 1, aplicar los montos manuales en un rango libre rompe 1, y descartar los segundos en la frontera de las 18:00 rompe 1.
 
+## 🔴 Asistencia — LA REGLA DE PRORRATEO ESTÁ ABIERTA (13-ago-2026). NO la implementes adivinando
+
+> Daniel contestó cómo se prorratea un sueldo mensual si alguien trabaja del 5 al 20, textual:
+> *"8 horas por dias por los total de dia trabajado. Décimo tercer mes y vacaciones se registran cuando se pagan. Seguro social y educativo los porcentajes son los correctos."*
+>
+> **Lo que está implementado hoy NO es eso**: el rango libre paga la fracción de QUINCENA que cubre (ver la sección de arriba). Se midió la regla de Daniel contra producción antes de tocar nada, y **hay que parar**: no es un ajuste técnico, es una decisión de negocio.
+>
+> ### Lo medido (`scripts/_medir-prorrateo-daniel.ts`, solo lectura, 36 activos)
+>
+> | quincena | días hábiles | hoy (`salario ÷ 2`) | 8 h × días hábiles |
+> |---|---|---|---|
+> | 1 al 15 de julio | 11 | $9.647,40 | $9.204,80 (**−4,6 %**) |
+> | 16 al 31 de julio | 12 | $9.647,40 | $10.041,60 (**+4,1 %**) |
+> | 1 al 15 de agosto | 10 | $9.647,40 | $8.368,00 (**−13,3 %**) |
+>
+> O sea: **el mismo sueldo pagaría 13 % menos en una quincena que en otra según cuántos lunes-a-viernes le tocaron.** Hoy el quincenal es fijo (`salario ÷ 2`) justamente para que eso no pase, y es lo que la contable cuadra contra su Excel.
+>
+> ### 🩸 La contradicción de fondo, que hay que resolver ANTES
+>
+> **13 personas están cargadas con jornada de 48 h/semana** —divisor 208 = 26 días × 8 h, o sea SEIS días por semana— **pero NADIE marca sábado**: medido, **0 sábados con marca en 6 semanas**, ni los de 48 h ni los de 40 h. Todos marcan de lunes a viernes.
+> - Con «8 h × días hábiles», a esas 13 personas les faltarían ~4 días al mes y cobrarían **~15 % menos** (por eso sus Δ son de −$23 a −$65 por quincena, mientras los de 40 h SUBEN entre $4 y $32).
+> - Y hay un efecto que ya está vivo aunque nadie prorratee nada: **su rata por hora se calcula con 208 en vez de 173,33, un 20 % más baja**, y esa rata multiplica horas extra, tardanzas y ausencias.
+>
+> ### Las tres preguntas que hay que contestar (y NO adivinar)
+>
+> 1. 🔴 **¿Las 13 personas de 48 h/semana trabajan de verdad 6 días?** Si marcan lun-vie, ¿su jornada es 40 h y su divisor 173,33? Eso les sube la rata 20 % y cambia sus extras.
+> 2. **¿El pago debe depender de cuántos días hábiles caiga la quincena** (10, 11 o 12) **o seguir siendo medio sueldo fijo?**
+> 3. **¿Qué es "días trabajados"?** ¿Los días con marcación —y entonces una incapacidad justificada NO se paga, que es un cambio contra la gente— o los días hábiles menos las ausencias sin justificar, que es lo que paga hoy?
+>
+> ### Lo que SÍ quedó confirmado y con candado (`asistencia-planilla-rango.test.ts`)
+>
+> - **Décimo tercer mes y vacaciones NO se provisionan.** Se verificó el cálculo línea por línea: no existía ninguna provisión, así que no hubo nada que sacar. El test fija las 20 columnas exactas de `DineroLinea` y la fórmula del bruto: el día que alguien agregue una provisión, se entera ahí y no en la planilla de la contable.
+> - **Los porcentajes de seguro (9,75 % y 1,25 %) son los correctos y no se tocan.** Test que los fija y comprueba que salen del BRUTO.
+> - **La quincena no depende de sus días hábiles** (10, 11 o 12 → la misma base). Es el candado contra implementar la regla nueva sin preguntar.
+> - 🩸 **Y la reconciliación, escrita como fórmula:** las dos reglas son la MISMA si los días se cuentan con la jornada de cada quien — `8 × 13 × (S/208) = S/2` exacto para 48 h/semana, y `8 × 10,8331 × (S/173,33) = S/2` para 40 h. El problema no es la fórmula: es que «día trabajado» hoy significa dos cosas distintas (día de calendario vs día de la jornada).
+>
+> **La distinción de la que salió el CAMBIO 2 ya existe en la contabilidad del negocio:** a Daniel y a David se les paga por **SERVICIOS PROFESIONALES (6.02.01)**, que es otra cuenta que **SALARIOS POR PAGAR (2.01.05.01)**. Va en el ⓘ de la ficha, donde la contable reconoce los números de cuenta.
+
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`

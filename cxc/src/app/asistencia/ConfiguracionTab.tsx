@@ -47,6 +47,7 @@ import {
 } from "@/lib/asistencia/configuracion-avisos";
 import { hoyPanama } from "@/lib/fecha-panama";
 import {
+  CUENTAS_CONTABLES,
   ETIQUETA_EN_PLANILLA,
   ETIQUETA_SERVICIO_PROFESIONAL,
   EXPLICACION_SERVICIO_PROFESIONAL,
@@ -786,9 +787,12 @@ export default function ConfiguracionTab() {
                                   quiero medir asistencia"*. Antes eso no se podía
                                   decir: una ficha sin sueldo se veía igual que un
                                   olvido, para siempre. */}
+                              {/* El ⓘ trae también los números de cuenta: la
+                                  contable los reconoce y son la prueba de que
+                                  esta distinción ya existía en el negocio. */}
                               <Etiqueta
                                 texto={PREGUNTA_PARTICIPACION}
-                                ayuda={EXPLICACION_SERVICIO_PROFESIONAL}
+                                ayuda={`${EXPLICACION_SERVICIO_PROFESIONAL} ${CUENTAS_CONTABLES}`}
                               />
                               <div className="flex flex-wrap gap-2">
                                 <button type="button"

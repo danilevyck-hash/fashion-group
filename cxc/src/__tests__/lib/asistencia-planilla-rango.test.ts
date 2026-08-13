@@ -217,3 +217,98 @@ describe("las quincenas de la lista siguen intactas", () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 LA REGLA DE PRORRATEO DE DANIEL — MEDIDA, NO IMPLEMENTADA", () => {
+  // Daniel, textual (13-ago-2026), respondiendo cómo se prorratea un sueldo
+  // mensual si alguien trabaja del 5 al 20:
+  //   *"8 horas por dias por los total de dia trabajado"*
+  //
+  // 🔴 NO ESTÁ IMPLEMENTADA, Y NO ES UN OLVIDO: aplicarla con los días hábiles
+  // del calendario CAMBIA TODAS LAS QUINCENAS, medido contra producción con
+  // `scripts/_medir-prorrateo-daniel.ts` (36 personas activas, 3 quincenas):
+  //
+  //     quincena            hábiles   hoy (salario ÷ 2)   8 h × días hábiles
+  //     1 al 15 de julio      11          $9.647,40           $9.204,80   (−4,6 %)
+  //     16 al 31 de julio     12          $9.647,40          $10.041,60   (+4,1 %)
+  //     1 al 15 de agosto     10          $9.647,40           $8.368,00  (−13,3 %)
+  //
+  // O sea: el mismo sueldo pagaría 13 % menos en una quincena que en otra según
+  // cuántos lunes-a-viernes le tocaron. Eso NO es un ajuste técnico: es una
+  // decisión de negocio, y la planilla de hoy está calculada con la otra regla.
+  //
+  // 🩸 Y HAY UNA CONTRADICCIÓN DE FONDO QUE HAY QUE RESOLVER ANTES: 13 personas
+  // están cargadas con jornada de 48 h/semana —divisor 208 = 26 días × 8 h, o
+  // sea SEIS días por semana— pero NADIE marca sábado (medido: 0 sábados con
+  // marca en 6 semanas, ni los de 48 h ni los de 40 h). Con 8 h × días hábiles,
+  // a esas 13 personas les faltarían ~4 días al mes y cobrarían ~15 % menos.
+  //
+  // Hasta que Daniel conteste, ESTOS TESTS FIJAN LO QUE HAY HOY.
+
+  it("🔴 la quincena NO depende de cuántos días hábiles tenga", () => {
+    // Julio 1ª tiene 11 hábiles, julio 2ª tiene 12 y agosto 1ª tiene 10: las
+    // tres pagan la MISMA base. Es la regla del negocio hoy —medio sueldo por
+    // quincena— y es lo que la contable cuadra contra su Excel.
+    const base = (clave: string) => {
+      const q = quincenaDesdeClave(clave)!;
+      const p = periodoDesdeRango(q.desde, q.hasta)!;
+      return linea(ficha(), p.factorBase).dinero!.salarioQuincenal;
+    };
+    expect(base("2026-07-1")).toBe(261.74);
+    expect(base("2026-07-2")).toBe(261.74);
+    expect(base("2026-08-1")).toBe(261.74);
+  });
+
+  it("⚠️ el divisor sigue siendo el único puente entre sueldo mensual y hora", () => {
+    // La regla de Daniel («8 h × días») y la de hoy son la MISMA fórmula si los
+    // días se cuentan con la jornada de cada quien: para 48 h/semana el divisor
+    // 208 implica 26 días de 8 h al mes → 13 por quincena → 8 × 13 × (S/208) =
+    // S/2 EXACTO. Para 40 h/semana implica 21,67 días → 10,83 por quincena, que
+    // no es un número entero de días. Por eso la elección de "qué es un día
+    // trabajado" mueve plata y no se puede adivinar.
+    const S = 523.47;
+    expect(centavos(8 * 13 * (S / 208))).toBe(centavos(S / 2));
+    expect(centavos(8 * (173.33 / 16) * (S / 173.33))).toBe(centavos(S / 2));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("⚠️ décimo tercer mes y vacaciones: NO se provisionan", () => {
+  // Daniel, textual (13-ago-2026): *"Décimo tercer mes y vacaciones se registran
+  // cuando se pagan"*. O sea que NO se acumulan mes a mes.
+  //
+  // 🔑 Hoy el cálculo no provisiona nada de eso —se verificó línea por línea— y
+  // este test existe para que siga así: el día que alguien agregue una columna
+  // de provisión, se entera acá y no en la planilla de la contable.
+  it("el desglose del dinero tiene EXACTAMENTE estas columnas, sin provisiones", () => {
+    const d = linea(ficha()).dinero!;
+    expect(Object.keys(d).sort()).toEqual([
+      "ausencias", "domingos", "excedente", "extraDiurno", "extraNocturno",
+      "feriados", "isr", "mercancia", "netoPagar", "otrosServicios", "prestamo",
+      "rataHora", "salarioQuincenal", "seguroEducativo", "seguroSocial",
+      "tardanzas", "terceros", "totalBruto", "totalDeducciones", "valorMinuto",
+    ].sort());
+  });
+
+  it("el bruto es exactamente la fórmula de la contable, sin un término de más", () => {
+    const horas = {
+      ...HORAS_CERO,
+      extraDiurnoMin: 120, domingoMin: 480, feriadoMin: 240,
+      tardanzaMin: 30, ausenciaMin: 480,
+    };
+    const d = armarLinea(ficha(), horas, MANUALES_CERO, REGLAS_DEFAULT).dinero!;
+    expect(d.totalBruto).toBe(centavos(
+      d.salarioQuincenal + d.extraDiurno + d.extraNocturno + d.excedente
+      + d.domingos + d.feriados - d.ausencias - d.tardanzas,
+    ));
+  });
+
+  it("⚠️ los porcentajes de seguro son los que están cargados: no se tocan", () => {
+    // Daniel: *"Seguro social y educativo los porcentajes son los correctos"*.
+    expect(REGLAS_DEFAULT.seguroSocialPct).toBe(9.75);
+    expect(REGLAS_DEFAULT.seguroEducativoPct).toBe(1.25);
+    const d = linea(ficha()).dinero!;
+    expect(d.seguroSocial).toBe(centavos(d.totalBruto * 0.0975));
+    expect(d.seguroEducativo).toBe(centavos(d.totalBruto * 0.0125));
+  });
+});

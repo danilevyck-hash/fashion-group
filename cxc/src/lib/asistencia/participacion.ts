@@ -65,6 +65,21 @@ export const EXPLICACION_SERVICIO_PROFESIONAL =
 /** Lo que se muestra donde antes iba «falta configurar». No es un pendiente. */
 export const MOTIVO_FUERA_DE_PLANILLA = "no va en planilla — servicio profesional";
 
+/**
+ * 🩸 LA DISTINCIÓN YA EXISTE EN EL NEGOCIO, NO LA INVENTAMOS NOSOTROS, y decirlo
+ * importa: es lo que convierte esta bandera de "una casilla más" en el reflejo
+ * de cómo se paga de verdad. En la contabilidad son DOS CUENTAS distintas, y a
+ * Daniel y a David se les paga por la segunda.
+ *
+ * Se le muestra a la contable —que es quien usa esta pantalla y quien reconoce
+ * los números de cuenta— detrás del ⓘ, no en la etiqueta: quien no lleva la
+ * contabilidad no necesita leer un código de cuenta para elegir bien.
+ */
+export const CUENTAS_CONTABLES =
+  "En la contabilidad son dos cuentas distintas: lo de planilla va a SALARIOS POR "
+  + "PAGAR (2.01.05.01) y el servicio profesional a SERVICIOS PROFESIONALES "
+  + "(6.02.01) — que es como se les paga a Daniel y a David.";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DATO
 // ─────────────────────────────────────────────────────────────────────────────
