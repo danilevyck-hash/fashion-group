@@ -16,6 +16,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole, type SessionPayload } from "@/lib/requireRole";
 import { CXC_GRUPO_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
+import { leerCorreoDeOverride } from "@/lib/cxc/anotaciones";
 import { fetchEstadoCuentaData, type EstadoCuentaResult } from "@/lib/cxc/estado-cuenta-data";
 import {
   buildResumenHtml,
@@ -94,12 +96,12 @@ function resolveEmpresas(auth: SessionPayload, user: CurrentUser | null, empresa
 // Switch (por código) > email de clientes_master (por código, último fallback).
 async function resolveDestinatario(nombreNormalizado: string, codigo: string): Promise<string> {
   if (nombreNormalizado) {
-    const { data } = await supabaseServer
-      .from("cxc_client_overrides")
-      .select("correo")
-      .eq("nombre_normalized", nombreNormalizado)
-      .maybeSingle();
-    const correo = (data?.correo as string | null)?.trim();
+    // 🔴 Esta ruta manda el estado de cuenta del GRUPO (acota por
+    // CXC_GRUPO_EMPRESA_KEYS, ver `empresasDelParametro` arriba), así que el
+    // correo que puede pisar el del directorio es el de la cartera del GRUPO.
+    // Sin la cartera, un correo cargado en Boston para un nombre que existe en
+    // las dos —`CITY MALL PASO CANOA`— desviaría el estado de cuenta del grupo.
+    const correo = await leerCorreoDeOverride(CARTERA_GRUPO, nombreNormalizado);
     if (correo) return correo;
   }
   const { data: sc } = await supabaseServer

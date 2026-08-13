@@ -17,6 +17,7 @@ import TimeGroupHeader from "@/components/TimeGroupHeader";
 import { getCompanyDisplay } from "@/lib/companies";
 import { getVencenSemanaRange } from "@/lib/cheques-dates";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
 import { borrarBorrador } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
@@ -494,7 +495,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             const linea = `⚠ Cheque rebotado ${todayStr()}: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`;
             let previo = "";
             try {
-              const existingRes = await fetch("/api/overrides", { cache: "no-store" });
+              const existingRes = await fetch(`/api/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" });
               if (existingRes.ok) {
                 const all: Array<{ nombre_normalized: string; resultado_contacto?: string | null }> = await existingRes.json();
                 previo = (all.find(o => o.nombre_normalized === nombre)?.resultado_contacto || "").trim();
@@ -507,7 +508,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               const ovRes = await fetch("/api/overrides", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nombre_normalized: nombre, resultado_contacto }),
+                body: JSON.stringify({ nombre_normalized: nombre, resultado_contacto, cartera: CARTERA_GRUPO }),
               });
               if (!ovRes.ok) showToast("Cheque rebotado, pero no se pudo registrar la nota en CXC.");
             } catch {

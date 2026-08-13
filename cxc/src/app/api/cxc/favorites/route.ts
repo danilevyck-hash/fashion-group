@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole, SessionPayload } from "@/lib/requireRole";
-import { supabaseServer } from "@/lib/supabase-server";
+import { alternarFavorito, leerFavoritos } from "@/lib/cxc/anotaciones";
+import { carteraDeBody, carteraDeQuery, respuestaSiCarteraNoDisponible } from "@/lib/cxc/cartera-http";
 
 /**
- * GET /api/cxc/favorites
- * Returns the list of favorited client names for the current user.
+ * Favoritos (⭐) del CXC, por usuario **y por CARTERA**.
+ *
+ * La cartera es OBLIGATORIA en los dos verbos: sin ella, una estrella puesta en
+ * Boston aparecería también en el grupo (ver `lib/cxc/cartera.ts`). Las
+ * consultas viven en `lib/cxc/anotaciones.ts` — este route no toca la tabla.
  */
 export const dynamic = "force-dynamic";
 
@@ -14,73 +18,48 @@ export async function GET(req: NextRequest) {
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";
 
-  const { data, error } = await supabaseServer
-    .from("cxc_favorites")
-    .select("nombre_normalized")
-    .eq("user_id", userId);
+  const cartera = carteraDeQuery(req);
+  if (cartera instanceof NextResponse) return cartera;
 
-  if (error) {
-    console.error("cxc_favorites GET error:", error);
+  try {
+    return NextResponse.json({ favorites: await leerFavoritos(cartera, userId) });
+  } catch (e) {
+    const noDisponible = respuestaSiCarteraNoDisponible(e);
+    if (noDisponible) return noDisponible;
+    console.error("cxc_favorites GET error:", e);
     return NextResponse.json({ error: "Error al cargar favoritos" }, { status: 500 });
   }
-
-  const names = (data || []).map((r: { nombre_normalized: string }) => r.nombre_normalized);
-  return NextResponse.json({ favorites: names });
 }
 
-/**
- * POST /api/cxc/favorites
- * Toggle a favorite for a client. Body: { clientName: string }
- * If already favorited, removes it. If not, adds it.
- */
+/** Toggle. Body: `{ clientName: string, cartera: "grupo" | "boston" }`. */
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";
 
-  let body: { clientName?: string };
+  let body: { clientName?: string; cartera?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
+  const cartera = carteraDeBody(body);
+  if (cartera instanceof NextResponse) return cartera;
+
   const clientName = body.clientName?.trim();
   if (!clientName) {
     return NextResponse.json({ error: "clientName requerido" }, { status: 400 });
   }
 
-  // Check if already favorited
-  const { data: existing } = await supabaseServer
-    .from("cxc_favorites")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("nombre_normalized", clientName)
-    .maybeSingle();
-
-  if (existing) {
-    // Remove favorite
-    const { error } = await supabaseServer
-      .from("cxc_favorites")
-      .delete()
-      .eq("id", existing.id);
-
-    if (error) {
-      console.error("cxc_favorites DELETE error:", error);
-      return NextResponse.json({ error: "Error al quitar favorito" }, { status: 500 });
-    }
-    return NextResponse.json({ action: "removed", clientName });
-  } else {
-    // Add favorite
-    const { error } = await supabaseServer
-      .from("cxc_favorites")
-      .insert({ user_id: userId, nombre_normalized: clientName });
-
-    if (error) {
-      console.error("cxc_favorites INSERT error:", error);
-      return NextResponse.json({ error: "Error al guardar favorito" }, { status: 500 });
-    }
-    return NextResponse.json({ action: "added", clientName });
+  try {
+    const action = await alternarFavorito(cartera, userId, clientName);
+    return NextResponse.json({ action, clientName });
+  } catch (e) {
+    const noDisponible = respuestaSiCarteraNoDisponible(e);
+    if (noDisponible) return noDisponible;
+    console.error("cxc_favorites POST error:", e);
+    return NextResponse.json({ error: "Error al guardar favorito" }, { status: 500 });
   }
 }
