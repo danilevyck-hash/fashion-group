@@ -49,6 +49,23 @@
 //    atraso. Es un número duro a propósito: si no doliera, nadie corregiría.
 //    Por eso el resumen ADEMÁS separa cuántos de esos minutos vienen de días
 //    marcados mal — para que nadie descuente sobre un dato sin haberlo mirado.
+//
+// 6. 🔴 EL DÍA QUE TODAVÍA NO TERMINÓ NO ES UN DÍA MAL MARCADO, Y NO ES UNA
+//    AUSENCIA. Es la regla 5 leída con el reloj en la mano: "no tiene 4 marcas"
+//    solo significa algo cuando el día se acabó.
+//    🩸 Medido el 13-ago-2026 a las ~15:00: **27 de 32 personas tenían 3
+//    marcas** —entraron, almorzaron, volvieron y todavía no se habían ido— y el
+//    reporte contaba a las 27 como error. Toda la oficina en rojo, todas las
+//    tardes, todos los días. Un aviso que suena siempre deja de leerse, y de
+//    paso empujaba el porcentaje de días mal marcados del 17% al 26%.
+//    Lo mismo con la ausencia: a las 8:59 nadie faltó todavía.
+//    ⚠️ Las marcas del día SÍ se muestran y sus minutos SÍ se calculan — lo
+//    único que se suspende hasta que el día cierre es el JUICIO sobre él.
+//    ⚠️ Entra por parámetro (`diaEnCurso`) y por defecto NO se aplica: la
+//    PLANILLA no lo pasa y sigue dando exactamente los mismos números. Quien lo
+//    pasa es el Reporte, con el día-calendario de PANAMÁ (`hoyPanama()`) — en
+//    UTC pelado, entre las 7 p.m. y la medianoche el día salta y el reporte se
+//    equivoca todas las noches.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
@@ -133,6 +150,17 @@ export interface DiaReporte {
   trabajadoMin: number;
   /** El día no tiene 4 marcas: los números salen igual, pero hay que revisarlo. */
   revisar: boolean;
+  /**
+   * El día TODAVÍA NO TERMINÓ (es hoy, en hora de Panamá). Ver regla 6.
+   *
+   * 🔴 Mientras esto sea `true`, `revisar` y `ausente` van SIEMPRE en `false`:
+   * no se puede juzgar un día que sigue corriendo. Las marcas y los minutos se
+   * calculan y se muestran igual — lo único que se suspende es el veredicto.
+   *
+   * `false` en toda la PLANILLA: no pasa `diaEnCurso`, así que ningún día suyo
+   * es "en curso" y su cálculo queda idéntico al de siempre.
+   */
+  enCurso: boolean;
   ausente: boolean;
   justificado: string | null;
   feriado: string | null;
@@ -182,6 +210,15 @@ export interface PersonaReporte {
     salidaTempranaMin: number;
     extraMin: number;
     diasARevisar: number;
+    /**
+     * Cuántos días del rango son "hoy" y siguen corriendo (0 ó 1). Ver regla 6.
+     *
+     * 🔑 Se devuelve para que la pantalla pueda decir *"hoy va en curso"* en vez
+     * de esconderlo: un día que desaparece de la cuenta sin explicación se lee
+     * como un número que no cuadra. Va SIEMPRE aparte de `diasARevisar`, nunca
+     * sumado.
+     */
+    diasEnCurso: number;
     tiempoNoTrabajadoMin: number;
     /** Días de esta persona con al menos una hora corregida a mano. */
     diasCorregidos: number;
@@ -329,6 +366,19 @@ export function armarReporte(opts: {
    */
   incluirNoHabiles?: boolean;
   /**
+   * El día que TODAVÍA NO TERMINÓ, en formato `YYYY-MM-DD` y **en hora de
+   * Panamá** (`hoyPanama()`). Ver regla 6.
+   *
+   * 🔴 NO se calcula acá a propósito: este módulo es PURO y no puede mirar el
+   * reloj, o los tests dependerían de la hora a la que se corran. Lo pasa quien
+   * llama, y solo el Reporte lo pasa.
+   *
+   * ⚠️ No hace falta comprobar que caiga dentro de `[desde, hasta]`: si el rango
+   * termina antes de hoy, ningún día del recorrido coincide y no hay nada que
+   * excluir. Ése es justamente el borde — un rango pasado no tiene día en curso.
+   */
+  diaEnCurso?: string | null;
+  /**
    * Qué horas se tocaron a mano, por `codigo|fecha` (ver `llaveDia`).
    *
    * 🔴 ES SOLO PARA MOSTRAR. Las horas corregidas ya vienen dentro de
@@ -407,6 +457,8 @@ export function armarReporte(opts: {
       const feriado = feriados.get(fecha) ?? null;
       const justificado = justificacionDe(justificaciones, codigo, fecha);
       const habil = esHabil(fecha);
+      // Regla 6. El día de hoy sigue corriendo: no se lo juzga.
+      const enCurso = !!opts.diaEnCurso && fecha === opts.diaEnCurso;
       // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
       // Informativo: qué horas de este día se tocaron a mano. No entra en
@@ -419,7 +471,14 @@ export function armarReporte(opts: {
         dias.push({
           fecha, marcas: [], marcasIds: [], entrada: null, salida: null,
           tardeMin: 0, excesoAlmuerzoMin: 0, salidaTempranaMin: 0, extraMin: 0, trabajadoMin: 0,
-          revisar: false, ausente: habil && !feriado && !justificado, justificado, feriado, habil,
+          revisar: false,
+          enCurso,
+          // 🔴 Regla 6, la otra mitad: a las 8:59 de la mañana NADIE faltó
+          // todavía. Sin este guard, el día en curso metía a media oficina en
+          // "ausencias sin justificar" cada mañana — el mismo error que el de
+          // los días mal marcados, con otro nombre.
+          ausente: !enCurso && habil && !feriado && !justificado,
+          justificado, feriado, habil,
           correcciones,
         });
         continue;
@@ -466,7 +525,10 @@ export function armarReporte(opts: {
       const trabajadoMin = soloUna ? 0 : Math.max(0, (sal - ent - almuerzoTomado) / 60);
       // Regla 5. 4 marcas es lo normal; cualquier otra cosa se revisa —pero
       // los números se calculan igual.
-      const revisar = crudas.length !== 4;
+      // Regla 6. Salvo que el día siga corriendo: quien entró, almorzó y volvió
+      // tiene 3 marcas a las 3 de la tarde y todavía le falta irse. Eso no es un
+      // día mal marcado, es un día a medias.
+      const revisar = !enCurso && crudas.length !== 4;
 
       dias.push({
         fecha,
@@ -477,7 +539,7 @@ export function armarReporte(opts: {
         // `null` y no la hora de entrada: no sabemos cuándo se fue.
         salida: soloUna ? null : fmt(sal),
         tardeMin, excesoAlmuerzoMin, salidaTempranaMin, extraMin, trabajadoMin,
-        revisar, ausente: false, justificado, feriado, habil,
+        revisar, enCurso, ausente: false, justificado, feriado, habil,
         correcciones,
       });
     }
@@ -494,6 +556,10 @@ export function armarReporte(opts: {
       salidaTempranaMin: conMarcas.reduce((a, d) => a + d.salidaTempranaMin, 0),
       extraMin: conMarcas.reduce((a, d) => a + d.extraMin, 0),
       diasARevisar: conMarcas.filter((d) => d.revisar).length,
+      // 🔴 APARTE, NUNCA SUMADO A `diasARevisar`. Se cuenta sobre TODOS los
+      // días y no solo sobre los que tienen marcas: hoy, a las 8:59, la persona
+      // todavía no marcó y ese día también está en curso.
+      diasEnCurso: dias.filter((d) => d.enCurso).length,
       tiempoNoTrabajadoMin: 0,
       // 🔑 Sobre TODOS los días, no solo `conMarcas`: si algún día una
       // corrección pudiera existir sobre un día sin marcas, contarla solo en

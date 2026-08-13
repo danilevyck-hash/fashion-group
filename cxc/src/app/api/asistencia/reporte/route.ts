@@ -21,7 +21,9 @@ import {
   type MarcacionConId,
 } from "@/lib/asistencia/correcciones";
 import { leerCorrecciones } from "@/lib/asistencia/correcciones-server";
-import { leerReglas, leerDirectorio } from "@/lib/asistencia/config-server";
+import { leerReglas, leerDirectorio, leerPersonas, vigenciasDeFilas } from "@/lib/asistencia/config-server";
+import { codigosFueraDeRango } from "@/lib/asistencia/vigencia";
+import { hoyPanama } from "@/lib/fecha-panama";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -75,12 +77,14 @@ export async function GET(req: NextRequest) {
     // defecto en vez de tirar: el reporte tiene que salir igual.
     // El directorio, en el mismo viaje: es el único lugar que traduce el código
     // del reloj a un nombre, y de él salen también el Excel y el PDF.
-    const [{ reglas }, { directorio }, correcciones] = await Promise.all([
+    const [{ reglas }, { directorio }, correcciones, personasDb] = await Promise.all([
       leerReglas(),
       leerDirectorio(),
       // Sin la tabla corrida devuelve CERO correcciones, o sea exactamente los
       // números que este reporte daba antes de que las correcciones existieran.
       leerCorrecciones(desde, hasta),
+      // Las fichas: de acá sale QUIÉN estaba trabajando en el rango. Ver abajo.
+      leerPersonas(),
     ]);
     const nombres = new Map<string, string>(
       directorio.codigos().map((c) => [c, directorio.etiqueta(c)]),
@@ -119,8 +123,43 @@ export async function GET(req: NextRequest) {
         })
       : efectivas.marcaciones;
 
+    // ── 🔴 QUIÉN SALE: EL QUE ESTABA TRABAJANDO EN EL RANGO CONSULTADO ────────
+    //
+    // Daniel se dio de baja y siguió apareciendo en su propio reporte de "quién
+    // marca mal" — textual: *"ya te dije q eliminares a DANIEL LEVY"*. Las
+    // marcaciones históricas de un dado de baja NO se borran (son la prueba de
+    // lo que pasó), pero la persona no tiene por qué salir en el reporte de hoy.
+    //
+    // 🔑 LA REGLA NO ES "ESCONDER A LOS INACTIVOS". Alguien que trabajó en julio
+    // y se fue en agosto **tiene que seguir saliendo en el reporte de julio**: si
+    // no, la planilla de julio y el reporte de julio dejan de cuadrar y no habría
+    // forma de auditar el mes que ya se pagó. La pregunta correcta es *¿estaba
+    // trabajando durante ESTE rango?* y la contesta `trabajaEnRango`
+    // (`fecha_ingreso` / `fecha_salida`), la MISMA que ya usa la planilla — no
+    // una segunda regla que pueda decir otra cosa.
+    //
+    // ⚠️ FALLA ABIERTO, en las dos formas en que puede fallar: sin la migración
+    // de altas/bajas corrida las fichas vienen sin fechas y nadie queda fuera, y
+    // un código que marca pero todavía no tiene ficha tampoco (`trabajaEnRango`
+    // devuelve `true` sin ficha). Esconder a alguien por no haber podido leer su
+    // ficha sería peor que mostrarlo de más.
+    const vigencias = vigenciasDeFilas(personasDb.filas);
+    const fuera = codigosFueraDeRango(vigencias, desde, hasta);
+    const enRango = fuera.size
+      ? visibles.filter((m) => !fuera.has((m.empleado_codigo ?? "").trim()))
+      : visibles;
+    // Cuántas personas se sacaron: la pantalla lo DICE. Una persona que
+    // desaparece sin explicación se lee como un dato que falta.
+    const fueraDelRango = fuera.size
+      ? new Set(
+          visibles
+            .map((m) => (m.empleado_codigo ?? "").trim())
+            .filter((c) => fuera.has(c)),
+        ).size
+      : 0;
+
     const personas = armarReporte({
-      marcaciones: visibles,
+      marcaciones: enRango,
       horarios: (hRes.data ?? []).map((h) => ({
         ...h,
         // Postgres devuelve time como "08:00:00"; el motor compara "HH:MM".
@@ -133,7 +172,17 @@ export async function GET(req: NextRequest) {
       hasta,
       reglas,
       nombres,
-      // Solo para MOSTRAR: las horas corregidas ya vienen dentro de `visibles`.
+      // 🔴 EL DÍA EN CURSO ES EL DE PANAMÁ (UTC−5 fijo), no el de UTC. Calculado
+      // en UTC pelado, entre las 7 p.m. y la medianoche el día salta al
+      // siguiente: el reporte dejaría de proteger el día real y empezaría a
+      // "proteger" mañana, o sea se equivocaría todas las noches. `hoyPanama()`
+      // ya existe y es la única definición de "hoy" del sistema — no se escribe
+      // una segunda acá.
+      // ⚠️ Se pasa SIEMPRE, sin mirar si cae dentro del rango: si el rango
+      // termina antes de hoy, ningún día del recorrido coincide y no hay nada
+      // que excluir. El borde se resuelve solo.
+      diaEnCurso: hoyPanama(),
+      // Solo para MOSTRAR: las horas corregidas ya vienen dentro de `enRango`.
       correccionesPorDia: efectivas.porDia,
     });
 
@@ -155,7 +204,13 @@ export async function GET(req: NextRequest) {
       // Para que la pantalla pueda avisar si alguien no tiene horario fijado:
       // sin él se asume 17:00 y el número puede estar mal.
       sinHorario: personas.filter((p) => !(hRes.data ?? []).some((h) => h.empleado_codigo === p.codigo)).length,
-      marcaciones: visibles.length,
+      marcaciones: enRango.length,
+      // Cuántas personas quedaron fuera por no estar trabajando en este rango
+      // (se fueron antes o entraron después). La pantalla lo dice en una línea.
+      fueraDelRango,
+      // El día que sigue corriendo, si cae dentro del rango. `null` cuando el
+      // rango termina antes de hoy: ahí no hay nada en curso que aclarar.
+      diaEnCurso: hoyPanama() >= desde && hoyPanama() <= hasta ? hoyPanama() : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
