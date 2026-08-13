@@ -16,6 +16,10 @@
 // las dos reglas de arriba — se elige, no se arrastra. La regla de no heredar a
 // ciegas se CONSERVA para el POST sin ese campo (el histórico).
 //
+// Desde el 13-ago-2026 el clon queda a nombre de QUIEN LO DUPLICA (antes
+// heredaba el vendedor del original, o sea que duplicar un pedido de Edwin le
+// acreditaba la comisión a Edwin). Ver el bloque "VENDEDOR DEL CLON" abajo.
+//
 // Si ya existe un reemplazo activo del mismo original, devuelve ESE en vez de
 // crear otro (yaExistia=true) — evita duplicados por doble click o dos users.
 //
@@ -35,6 +39,7 @@ import {
   resolverClienteSwitch,
   traeEleccionDeCliente,
 } from "@/lib/catalogo/cliente-switch";
+import { vendedorDelUsuario } from "@/lib/catalogo/vendedor-switch";
 
 const DUP_ROLES = ["admin", "secretaria", "vendedor"];
 
@@ -184,12 +189,40 @@ export async function handleDuplicarPedido(
   const clienteCambio = nombreClienteCambio(nombrePedido, original.client_name);
   const clientNameClon = clienteCambio ? nombrePedido!.trim() : original.client_name || "Sin nombre";
 
+  // ── VENDEDOR DEL CLON: el de QUIEN DUPLICA ──
+  //
+  // Antes se heredaba el del original ("cambiar de cliente no cambia quién
+  // vende"), y eso significaba que duplicar un pedido de Edwin le acreditaba la
+  // COMISIÓN a Edwin aunque el pedido lo estuviera armando otra persona. Ahora
+  // el pedido queda a nombre de quien lo hace: es lo que uno espera sin que se
+  // lo expliquen, y el selector de vendedor del detalle lo MUESTRA, así que el
+  // caso raro se ve y se corrige en un toque. No agrega ni un paso ni una
+  // pregunta al duplicar.
+  //
+  // 🔴 SIN MAPEO EN ESA EMPRESA SE CONSERVA EL DEL ORIGINAL. Dejar el clon sin
+  // vendedor lo bloquearía al enviarlo a Switch (422 SIN_VENDEDOR) por un
+  // duplicado que antes salía sin problema: degradar al comportamiento viejo es
+  // lo correcto acá. Nunca queda en null por culpa de este cambio.
+  //
+  // Es la MISMA resolución que usa el checkout (`vendedorDelUsuario`), no una
+  // segunda consulta: dos definiciones de "cuál es mi vendedor" se separan con
+  // el tiempo, y acá lo que se decide es a quién se le paga la comisión.
+  const mio = await vendedorDelUsuario(auth.userId, cfg.empresaKey);
+  const vendedorClonId = mio ? mio.id : original.vendedor_switch_id;
+  // El nombre que se ve en el pedido y sale en el papel tiene que ser el del id
+  // que se guarda — si se copiara el del original, se contradirían. El nombre
+  // del mapeo va LITERAL (joystep guarda "DANIEL LEVY " con espacio final y
+  // Switch parea contra eso).
+  const vendorNameClon = mio
+    ? mio.nombre || session?.userName || null
+    : original.vendor_name || session?.userName || null;
+
   // ── Creación atómica vía RPC de la marca (numera PED-### sin race). El
   //    dedupe real es el chequeo de reemplazo activo de arriba; el token
   //    lleva sufijo para no chocar con reemplazos borrados y re-duplicados. ──
   const { data: created, error: rpcErr } = await db.rpc(cfg.createOrderRpc, {
     p_client_name: clientNameClon,
-    p_vendor_name: original.vendor_name || session?.userName || null,
+    p_vendor_name: vendorNameClon,
     p_client_email: original.client_email || null,
     p_total: total,
     p_idempotency_key: `dup-${orderId}-${Date.now().toString(36)}`,
@@ -214,12 +247,13 @@ export async function handleDuplicarPedido(
   //    · Sin elección (POST histórico) se conserva la regla vieja: con el
   //      nombre CAMBIADO el cliente NO se hereda (iría a Switch bajo el cliente
   //      viejo) y queda null → se re-elige en el detalle.
-  //    El vendedor sí se copia siempre: cambiar de cliente no cambia quién vende. ──
+  //    El vendedor es el de quien duplica (ver el bloque de arriba); sin mapeo
+  //    en esa empresa, el del original. ──
   const update: Record<string, unknown> = { reemplaza_a: orderId };
   if (original.comment) update.comment = original.comment;
   if (eligioCliente) update.cliente_switch_id = clienteElegido;
   else if (!clienteCambio && original.cliente_switch_id != null) update.cliente_switch_id = original.cliente_switch_id;
-  if (original.vendedor_switch_id != null) update.vendedor_switch_id = original.vendedor_switch_id;
+  if (vendedorClonId != null) update.vendedor_switch_id = vendedorClonId;
   let upErr = (await db.from(cfg.ordersTable).update(update).eq("id", order_id)).error;
   if (upErr && /cliente_switch_id|vendedor_switch_id/i.test(upErr.message)) {
     const soloTraza: Record<string, unknown> = { reemplaza_a: orderId };
