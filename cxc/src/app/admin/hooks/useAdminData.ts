@@ -31,13 +31,14 @@ async function fetchAdminData(): Promise<AdminData> {
   // overrides/últimopago/contact-log: antes eran lecturas anon directas a Supabase;
   // ahora rutas server con service_role (RLS de esas tablas cerrada). No-críticas
   // (resuelven a [] si fallan); solo /api/cxc/aging puede rechazar → error.
-  const [vendorRows, upRows, agingJson, overrides, pagos, log] =
+  const [vendorRows, upRows, agingJson, overrides, pagos, compras, log] =
     await Promise.all([
       fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/cxc/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch("/api/cxc/ultima-compra", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch(`/api/cxc/contact-log?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
 
@@ -80,6 +81,22 @@ async function fetchAdminData(): Promise<AdminData> {
     }
   }
 
+  // Última compra por empresa+cliente (vista switch_ultima_compra_cliente_v1,
+  // la última Factura de switch_facturas). Mismo join y misma forma que el
+  // último pago. Si la DDL todavía no corrió, la ruta devuelve [] y el mapa
+  // queda vacío: cada empresa muestra "Sin compras registradas" y no cambia
+  // NADA más de la pantalla.
+  const compraMap = new Map<string, { fecha: string; monto: number }>();
+  if (Array.isArray(compras)) {
+    for (const c of compras) {
+      if (!c.cliente_codigo) continue;
+      compraMap.set(`${c.empresa_key}|${c.cliente_codigo}`, {
+        fecha: c.ultima_compra_fecha,
+        monto: Number(c.ultima_compra_monto) || 0,
+      });
+    }
+  }
+
   const map = new Map<string, ConsolidatedClient>();
   if (rows) {
     for (const r of rows as CxcRow[]) {
@@ -112,6 +129,7 @@ async function fetchAdminData(): Promise<AdminData> {
         existing.mas_365 += r.mas_365; existing.total += r.total;
       } else {
         const pago = pagoMap.get(`${r.company_key}|${r.codigo}`);
+        const compra = compraMap.get(`${r.company_key}|${r.codigo}`);
         client.companies[r.company_key] = {
           nombre: r.nombre, codigo: r.codigo,
           d0_30: r.d0_30, d31_60: r.d31_60, d61_90: r.d61_90,
@@ -120,6 +138,8 @@ async function fetchAdminData(): Promise<AdminData> {
           mas_365: r.mas_365, total: r.total,
           ultimoPagoFecha: pago?.fecha ?? null,
           ultimoPagoMonto: pago?.monto ?? null,
+          ultimaCompraFecha: compra?.fecha ?? null,
+          ultimaCompraMonto: compra?.monto ?? null,
         };
       }
 

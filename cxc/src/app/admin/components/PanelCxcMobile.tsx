@@ -31,13 +31,29 @@ import {
   type RiskFilter,
 } from "@/lib/cxc-orden";
 
-// "Último pago $X · hace N días" por empresa, o "Sin pagos registrados".
-function ultimoPagoLabel(fecha: string | null, monto: number | null): string {
-  if (!fecha) return "Sin pagos registrados";
+// "hoy" / "ayer" / "hace N días" — la forma relativa que ya usaba esta pantalla.
+function haceCuanto(fecha: string): string {
   const d = new Date(fecha + "T00:00:00");
   const days = Math.floor((new Date().getTime() - d.getTime()) / 86400000);
-  const rel = days <= 0 ? "hoy" : days === 1 ? "ayer" : `hace ${days} días`;
+  return days <= 0 ? "hoy" : days === 1 ? "ayer" : `hace ${days} días`;
+}
+
+// "Último pago $X · hace N días" por empresa, o "Sin pagos registrados".
+// Sin pago NO se muestra $0.00: un recibo de $0 es una aplicación/cruce, no un
+// pago, y decir "$0.00 hace 15 días" es justo el bug que Daniel cazó.
+function ultimoPagoLabel(fecha: string | null, monto: number | null): string {
+  if (!fecha) return "Sin pagos registrados";
+  const rel = haceCuanto(fecha);
   return monto != null ? `Último pago $${fmt(monto)} · ${rel}` : `Último pago · ${rel}`;
+}
+
+// "Última compra $X · hace N días" — la última FACTURA, en el MISMO formato que
+// el último pago. Sin factura registrada se dice, no se muestra $0 ni una fecha
+// vacía.
+function ultimaCompraLabel(fecha: string | null, monto: number | null): string {
+  if (!fecha) return "Sin compras registradas";
+  const rel = haceCuanto(fecha);
+  return monto != null ? `Última compra $${fmt(monto)} · ${rel}` : `Última compra · ${rel}`;
 }
 
 interface PanelCxcMobileProps {
@@ -606,6 +622,8 @@ function MobileClientExpanded({
         overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
         ultimoPagoFecha: d.ultimoPagoFecha ?? null,
         ultimoPagoMonto: d.ultimoPagoMonto ?? null,
+        ultimaCompraFecha: d.ultimaCompraFecha ?? null,
+        ultimaCompraMonto: d.ultimaCompraMonto ?? null,
       }))
       .sort((a, b) => b.total - a.total);
   }, [client.companies, nameByKey]);
@@ -642,6 +660,11 @@ function MobileClientExpanded({
             </div>
             <p className={`mt-1.5 text-xs ${row.ultimoPagoFecha ? "text-gray-500" : "text-gray-400"}`}>
               {ultimoPagoLabel(row.ultimoPagoFecha, row.ultimoPagoMonto)}
+            </p>
+            {/* Crece hacia ABAJO, no a lo ancho: en 390 px una segunda columna
+                empujaría la tarjeta y traería arrastre horizontal. */}
+            <p className={`mt-0.5 text-xs ${row.ultimaCompraFecha ? "text-gray-500" : "text-gray-400"}`}>
+              {ultimaCompraLabel(row.ultimaCompraFecha, row.ultimaCompraMonto)}
             </p>
           </li>
         ))}

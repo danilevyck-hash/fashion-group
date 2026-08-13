@@ -53,18 +53,41 @@ export async function GET(req: NextRequest) {
   // Último pago por cliente. Se acota a Boston explícitamente: la vista
   // `switch_ultimo_pago_cliente_v2` no filtra empresa (devuelve toda empresa con
   // filas en switch_recibos), así que sin el `.eq` traería también al grupo.
+  //
+  // 🩸 PAGINADO (13-ago-2026): esta lectura NO paginaba, y ya truncaba.
+  // `db-max-rows` = 1000 corta EN SILENCIO y Boston tiene **1.947 filas** en la
+  // vista: se leían 1.000 y las 947 restantes se veían en pantalla como "sin
+  // último pago" — un cliente que pagó ayer parecía no haber pagado nunca. Orden
+  // estable por `cliente_switch_id` (es la llave del DISTINCT ON de la vista, y
+  // acotada a una empresa es única) para no repetir ni saltear filas.
+  //
+  // Un recibo de $0,00 NO es un pago: mismo criterio que /api/cxc/ultimo-pago,
+  // red de seguridad hasta que corra la DDL 20260813170000 que lo pone en la
+  // vista. Boston es el más afectado: 138 de los 166 clientes con un "último
+  // pago" que no es un pago son suyos, algunos con fechas de 2024.
   const pagos = new Map<string, { fecha: string; monto: number }>();
-  const { data: up, error: upErr } = await supabaseServer
-    .from("switch_ultimo_pago_cliente_v2")
-    .select("cliente_switch_id,ultimo_pago_fecha,ultimo_pago_monto")
-    .eq("empresa_key", "confecciones_boston");
-  if (upErr) console.error(`[cxc/boston] último pago: ${upErr.message}`);
-  for (const p of up ?? []) {
-    if (p.cliente_switch_id == null) continue;
-    pagos.set(String(p.cliente_switch_id), {
-      fecha: p.ultimo_pago_fecha as string,
-      monto: Number(p.ultimo_pago_monto) || 0,
-    });
+  for (let from = 0; ; from += PAGE) {
+    const { data: up, error: upErr } = await supabaseServer
+      .from("switch_ultimo_pago_cliente_v2")
+      .select("cliente_switch_id,ultimo_pago_fecha,ultimo_pago_monto")
+      .eq("empresa_key", "confecciones_boston")
+      .order("cliente_switch_id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (upErr) {
+      console.error(`[cxc/boston] último pago: ${upErr.message}`);
+      break; // no-crítico: la cartera se muestra igual, sin la columna
+    }
+    if (!up || up.length === 0) break;
+    for (const p of up) {
+      if (p.cliente_switch_id == null) continue;
+      const monto = Number(p.ultimo_pago_monto) || 0;
+      if (monto === 0) continue; // aplicación/cruce o recibo anulado
+      pagos.set(String(p.cliente_switch_id), {
+        fecha: p.ultimo_pago_fecha as string,
+        monto,
+      });
+    }
+    if (up.length < PAGE) break;
   }
 
   // Chip "también en el grupo". Es SOLO una marca visual: dice que ese nombre
