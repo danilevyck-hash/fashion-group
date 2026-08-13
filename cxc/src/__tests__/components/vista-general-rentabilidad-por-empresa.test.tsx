@@ -220,7 +220,11 @@ describe("🔴 y el dato que viaja tampoco trae una rentabilidad de grupo", () =
     mes: "2026-08",
     ventas: { total: 700_000, empresasCount: 3, byEmpresa: [] },
     margen: { pct: 0.2, utilidad: 160_000 },
-    gastos: { disponible: true, total: 90_000, empresasConGasto: 2, empresasTotal: 8, porEmpresa: [] },
+    // 🔴 Sin `total`: la suma de gastos entre empresas se retiró del payload el
+    // 13-ago-2026 (ver `GastosPorEmpresa.tsx`). El fixture refleja la respuesta
+    // REAL — si volviera a traer un total, este arnés dejaría de parecerse a la
+    // pantalla que dice probar.
+    gastos: { disponible: true, empresasConGasto: 2, empresasTotal: 8, porEmpresa: [] },
     disponibilidad: { total: 629_531.03, fechaMasVieja: "2026-08-01", cuentas: 8 },
     semaforo: FILAS,
     cxc: { total: 1, corriente: 1, vigilancia: 0, vencido: 0, empresasCount: 6, topClientes: [] },

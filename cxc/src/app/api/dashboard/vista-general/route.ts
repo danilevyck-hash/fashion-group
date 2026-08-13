@@ -12,6 +12,7 @@ import {
   textoSinGasto,
   type MotivoSinGasto,
 } from "@/lib/mayor/gastos";
+import { leerInventarioValorizado, type LecturaInventario } from "@/lib/inventario/leer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,9 @@ export const dynamic = "force-dynamic";
 //     empiezan con `6.`, y puede ser negativo en alguna cuenta: es un reverso,
 //     no un error.
 //   - Disponibilidad: bancos_saldos (sin cambios).
+//   - Inventario valorizado: switch_articulo_info (existencia × costo), sumado
+//     por Postgres. Las 6 empresas de Fashion Group — Boston y Multifashion no
+//     sincronizan catálogo y la pantalla lo DICE en vez de mostrarlas en cero.
 // Cada KPI reporta SOLO las empresas que tienen ese módulo (empresasCount), sin
 // inventar data de las que no lo tienen.
 //
@@ -134,7 +138,7 @@ export async function GET(req: NextRequest) {
   const anioSel = parseInt(mesSelStr.slice(0, 4), 10);
   const mesSelNum = parseInt(mesSelStr.slice(5, 7), 10);
 
-  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, mayorRes, bancosRes] = await Promise.all([
+  const [summaryRes, agingRes, cxpRes, reclamosRes, mvPrevRes, mayorRes, bancosRes, inventarioRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: anioSel }),
     // CXC: vista base LIVE (igual que el módulo /admin), NO la MV diaria. La MV
     // (switch_estadocuenta_aging_mv) refresca 1×/día (06:30 UTC) y queda atrás de
@@ -168,6 +172,13 @@ export async function GET(req: NextRequest) {
     supabaseServer.from("bancos_saldos")
       .select("empresa_key,saldo,fecha_dato")
       .order("fecha_dato", { ascending: false }),
+    // INVENTARIO VALORIZADO. Falla ABIERTO, igual que el mayor: si la lectura
+    // se cae, la pantalla se dibuja entera y la tarjeta dice que no se pudo
+    // medir — nunca un $0, que se ve idéntico a "no tengo mercancía".
+    leerInventarioValorizado(Date.now()).catch((e) => {
+      console.error("[vista-general] inventario:", e);
+      return null;
+    }),
   ]);
 
   // ── VENTAS + MARGEN del MES SELECCIONADO (8 empresas) ──
@@ -272,12 +283,28 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // ── 🔴 `gastos.total` YA NO EXISTE (13-ago-2026) ──
+  //
+  // Daniel, textual: *"La tarjeta de Gastos de Vista General también por
+  // empresa"*, coherente con lo que ya pidió para la Rentabilidad. Y la regla
+  // del módulo Gastos, también textual: *"cada compañia por separado, **sin
+  // juntar los gastos entre todos**"*.
+  //
+  // Antes acá se sumaba el gasto de las empresas cuyo mes fuera mostrable, y esa
+  // suma era el número grande de la tarjeta. Era un número que no era de nadie:
+  // en cualquier mes la contadora va atrasada de forma DISTINTA en cada empresa,
+  // así que el total juntaba 3 empresas un mes y 5 al siguiente y se leía como
+  // "el gasto del grupo" en los dos casos.
+  //
+  // 🔴 NO SE DEJA "POR SI ACASO". Mientras el número exista en la respuesta, la
+  // pantalla puede volver a pintarlo sin que nadie lo note — es exactamente la
+  // razón por la que `rentabilidad` del grupo se borró de acá y no se comentó.
+  // Lo que viaja es `porEmpresa`, cada una con SU gasto o SU motivo.
   const conGasto = gastosPorEmpresa.filter((g) => g.gasto !== null);
   const gastos = {
     /** `false` = el mayor no está conectado o no se pudo leer. */
     disponible: mayorInstalado,
-    /** Suma SÓLO de las empresas cuyo mes se puede mostrar. `null` si son cero. */
-    total: conGasto.length > 0 ? conGasto.reduce((s, g) => s + (g.gasto ?? 0), 0) : null,
+    /** Cuántas empresas tienen el mes utilizable. Es un CONTEO, no plata. */
     empresasConGasto: conGasto.length,
     empresasTotal: ALL_EMPRESA_KEYS.length,
     porEmpresa: gastosPorEmpresa,
@@ -402,11 +429,15 @@ export async function GET(req: NextRequest) {
     .slice(0, 8);
   const reclamos = { antiguos: reclamosAntiguos, total: reclamoRows.length };
 
+  // `null` = la lectura del inventario se cayó. La pantalla lo dice; no hay
+  // ningún camino que lo pinte como cero.
+  const inventario = inventarioRes as LecturaInventario | null;
+
   return NextResponse.json({
     generadoEn: new Date().toISOString(),
     ms: Date.now() - t0,
     mes: mesSelStr,
-    ventas, margen, gastos, disponibilidad, semaforo,
+    ventas, margen, gastos, disponibilidad, inventario, semaforo,
     cxc, cxp, reclamos,
   });
 }
