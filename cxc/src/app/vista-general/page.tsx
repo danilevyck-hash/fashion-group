@@ -8,41 +8,38 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 // Módulo PURO (no arrastra supabase al navegador): las etiquetas de "por qué no
 // hay número" salen del MISMO lugar que las usa el servidor.
-import type { MotivoSinGasto } from "@/lib/mayor/gastos";
 import RentabilidadPorEmpresa, {
   type RentabilidadEmpresaRow,
 } from "./RentabilidadPorEmpresa";
-import { money, moneyK, pct } from "./formato";
+import GastosPorEmpresa, { type GastosData } from "./GastosPorEmpresa";
+import InventarioPorEmpresa, {
+  InventarioKpiValue,
+  piezas,
+  textoFrescura,
+  type InventarioData,
+} from "./InventarioPorEmpresa";
+import { moneyK, pct } from "./formato";
 
 // ── Tipos del API ─────────────────────────────────────────────────────────────
 
 interface EmpresaVentas { key: string; name: string; ventas: number; utilidad: number }
 
-interface GastoEmpresa {
-  key: string;
-  name: string;
-  gasto: number | null;
-  motivo: MotivoSinGasto | null;
-  texto: string | null;
-  ultimoMesCerrado: string | null;
-}
-
 interface VistaGeneral {
   mes: string;
   ventas: null | { total: number; prevYear: number | null; yoyPct: number | null; parcial: boolean; empresasCount: number; byEmpresa: EmpresaVentas[] };
   margen: null | { pct: number | null; utilidad: number };
-  gastos: {
-    disponible: boolean;
-    total: number | null;
-    empresasConGasto: number;
-    empresasTotal: number;
-    porEmpresa: GastoEmpresa[];
-  };
+  // 🔴 NO HAY `gastos.total`, y es a propósito. Daniel, textual (13-ago-2026):
+  // "La tarjeta de Gastos de Vista General también por empresa". El número por
+  // empresa vive en `porEmpresa`, cada una con SU gasto o SU motivo. Ver
+  // `GastosPorEmpresa.tsx`.
+  gastos: GastosData;
   // 🔴 NO HAY `rentabilidad` DE GRUPO, y es a propósito. Daniel, textual
   // (13-ago-2026): "no quiero Rentabilidad del grupo, lo quiero por empresa".
   // El número por empresa vive en `semaforo[]`, cada una con SU venta contra SU
   // gasto. Ver `RentabilidadPorEmpresa.tsx`.
   disponibilidad: null | { total: number; fechaMasVieja: string; cuentas: number };
+  /** `null` = la lectura se cayó. NUNCA se pinta como $0. */
+  inventario: InventarioData | null;
   semaforo: RentabilidadEmpresaRow[];
   cxc: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topClientes: { nombre: string; codigo: string | null; empresa: string; saldo: number }[] };
   cxp: { total: number; corriente: number; vigilancia: number; vencido: number; empresasCount: number; topProveedores: { nombre: string; empresa: string; saldo: number }[] };
@@ -172,6 +169,13 @@ function VistaGeneralInner() {
         ) : data ? (
           <>
             <KpiGrid data={data} mes={mes} />
+            {/* Los dos paneles que reemplazan a una tarjeta con un total: el
+                inventario abierto por empresa (con lo que NO se midió dicho en
+                palabras) y el gasto de cada empresa contra lo suyo. */}
+            <div className="grid grid-cols-1 gap-3 mb-8 lg:grid-cols-2">
+              <InventarioPorEmpresa inv={data.inventario} />
+              <GastosPorEmpresa gastos={data.gastos} mes={mes} />
+            </div>
             <RentabilidadPorEmpresa rows={data.semaforo} mes={mes} />
             <Atencion data={data} />
           </>
@@ -184,15 +188,8 @@ function VistaGeneralInner() {
 // ── KPIs ─────────────────────────────────────────────────────────────────────
 
 function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
-  const { ventas, margen, gastos, disponibilidad, cxc, cxp } = data;
+  const { ventas, margen, disponibilidad, inventario, cxc, cxp } = data;
   const mesPrevAnio = mesLabelMin(sumarMeses(mes, -12));
-  // Cuántas empresas tienen la contabilidad de ESTE mes lista. Es el número que
-  // decide si un total se puede leer como "el gasto del grupo" o como "el gasto
-  // de estas N empresas" — y por eso viaja pegado a las dos tarjetas.
-  const nConGasto = gastos.empresasConGasto;
-  const nTotal = gastos.empresasTotal;
-  const tagEmpresas = nConGasto > 0 && nConGasto < nTotal ? [`${nConGasto} de ${nTotal} empresas`] : [];
-  const faltan = nTotal - nConGasto;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
@@ -225,29 +222,15 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         sub={margen ? <span className="text-stone-400">{moneyK(margen.utilidad)} utilidad bruta</span> : <span className="text-stone-400">Sin datos</span>}
       />
 
-      {/* Gastos — el mayor contable de Switch. NUNCA muestra $0 cuando lo que
-          pasa es que la contadora no cerró el mes: en ese caso va "—" y el
-          subtítulo dice por qué. Un cero y un total corto se ven idénticos. */}
-      <KpiCard
-        href={`/gastos-contabilidad?mes=${mes}`}
-        label="Gastos"
-        hoverLabel="Ir a Gastos"
-        value={gastos.total != null ? moneyK(gastos.total) : "—"}
-        tags={tagEmpresas}
-        sub={
-          !gastos.disponible ? (
-            <span className="text-stone-400">La contabilidad de Switch todavía no está conectada</span>
-          ) : nConGasto === 0 ? (
-            <span className="text-stone-400">Ninguna empresa tiene {mesLabelMin(mes)} cerrado</span>
-          ) : faltan === 0 ? (
-            <span className="text-stone-400">las {nTotal} empresas, mes cerrado</span>
-          ) : (
-            <span className="text-amber-600 font-medium">
-              faltan {faltan}: su contabilidad no llega a {mesLabelMin(mes)}
-            </span>
-          )
-        }
-      />
+      {/* 🔴 ACÁ ESTABA LA TARJETA "Gastos" CON UN TOTAL DEL GRUPO. SE FUE
+          (13-ago-2026). Daniel, textual: "La tarjeta de Gastos de Vista General
+          también por empresa". Era la suma de las empresas que tuvieran el mes
+          utilizable: tres un mes, cinco al siguiente, y siempre leída como "el
+          gasto del grupo". El reemplazo es el panel "Gastos por empresa" de más
+          abajo, donde cada empresa muestra SU gasto y la que no lo tiene DICE
+          por qué. Igual que con la Rentabilidad, el total tampoco quedó en el
+          payload: mientras el número exista, la pantalla puede volver a
+          pintarlo sin que nadie lo note. */}
 
       {/* 🔴 ACÁ ESTABA LA TARJETA "Rentabilidad" DEL GRUPO. SE FUE (13-ago-2026).
           Daniel, textual: "no quiero Rentabilidad del grupo, lo quiero por
@@ -271,6 +254,29 @@ function KpiGrid({ data, mes }: { data: VistaGeneral; mes: string }) {
         sub={disponibilidad
           ? <span className="text-stone-400">al {fechaCorta(disponibilidad.fechaMasVieja)}</span>
           : <span className="text-stone-400">Sin saldos cargados</span>}
+      />
+
+      {/* Inventario — al lado de la Disponibilidad a propósito: son las dos
+          formas en que la plata está parada (en el banco y en la bodega).
+          🔴 EL NÚMERO ES EL COSTO, y la etiqueta viaja pegada: los $4,06M a
+          precio de etiqueta son potencial y viven en el panel de abajo. */}
+      <KpiCard
+        href="/referencia"
+        label="Inventario"
+        hoverLabel="Ir a Referencia"
+        value={InventarioKpiValue({ inv: inventario })}
+        tags={inventario?.disponible ? ["al costo"] : []}
+        sub={
+          !inventario ? (
+            <span className="text-stone-400">No se pudo medir</span>
+          ) : !inventario.disponible ? (
+            <span className="text-stone-400">Todavía no está conectado</span>
+          ) : (
+            <span className={inventario.viejo ? "text-amber-600 font-medium" : "text-stone-400"}>
+              {piezas(inventario.totalUnidades)} piezas · {textoFrescura(inventario.medidoEn, inventario.viejo)}
+            </span>
+          )
+        }
       />
 
       {/* CXC */}
