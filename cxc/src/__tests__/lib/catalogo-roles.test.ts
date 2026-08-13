@@ -272,8 +272,14 @@ describe("catálogos — los otros roles quedaron EXACTAMENTE igual", () => {
   });
 
   it("a la secretaria NO se le abrió ningún módulo nuevo", () => {
+    // `data-health` sale de esta lista el 13-ago-2026 porque DEJÓ DE SER UN
+    // MÓDULO: pasó a ser la 2ª pestaña de Usuarios. El invariante no se aflojó
+    // — se mudó y se volvió más fuerte, a
+    // `data-health-dentro-de-usuarios.test.ts`, que exige que NINGÚN rol (ni con
+    // permisos puestos a mano) llegue a esa pantalla. Pedirlo acá como "módulo"
+    // ya no probaría nada: no hay key que pedir.
     const prohibidos = ["cxc", "ventas", "vista-general", "multifashion", "proveedores",
-      "gastos-contabilidad", "saldos-banco", "prestamos", "usuarios", "data-health"];
+      "gastos-contabilidad", "saldos-banco", "prestamos", "usuarios"];
     const suyos = getDefaultModulesForRole("secretaria");
     for (const m of prohibidos) {
       expect(suyos, `secretaria no debe tener ${m}`).not.toContain(m);

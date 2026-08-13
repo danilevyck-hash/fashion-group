@@ -315,6 +315,44 @@ describe("los nombres de los módulos no se confunden entre sí", () => {
     expect(seConfunden("Ventas", "Ventas por Empresa")).toBe(true);
   });
 
+  it("las PESTAÑAS de un módulo tampoco se confunden entre sí", () => {
+    // La regla nació para las fichas del menú, pero el defecto es el mismo en
+    // cualquier lista que el usuario lee de un vistazo — y desde el 13-ago-2026
+    // hay módulos con pestañas adentro (Usuarios estrenó "Data Health" como 2ª).
+    // Se compara cada tira de pestañas CONSIGO MISMA: que una pestaña se llame
+    // igual que su módulo es otra cosa (es su sección principal), no un choque.
+    const TIRAS: Record<string, string[]> = {
+      Usuarios: ["Usuarios", "Data Health"],
+      Ventas: ["Resumen", "Clientes", "Productos", "Utilidad"],
+      Multifashion: ["Resumen", "Vendedoras", "Productos", "Clientes", "Caja"],
+    };
+    const choques: string[] = [];
+    for (const [modulo, pestanas] of Object.entries(TIRAS)) {
+      for (let i = 0; i < pestanas.length; i += 1) {
+        for (let j = i + 1; j < pestanas.length; j += 1) {
+          if (seConfunden(pestanas[i], pestanas[j])) {
+            choques.push(`${modulo}: "${pestanas[i]}" vs "${pestanas[j]}"`);
+          }
+        }
+      }
+    }
+    expect(choques, `pestañas demasiado parecidas:\n${choques.join("\n")}`).toEqual([]);
+  });
+
+  it("una pestaña tampoco se puede confundir con OTRO módulo del menú", () => {
+    // "Data Health" no puede parecerse a ninguna ficha que no sea la suya: si
+    // se pareciera, quien busca el módulo terminaría adentro de otro.
+    const propias = new Set(["Usuarios"]); // el módulo anfitrión de la pestaña
+    const choques: string[] = [];
+    for (const pestana of ["Data Health"]) {
+      for (const m of ALL_MODULES) {
+        if (propias.has(m.label)) continue;
+        if (seConfunden(pestana, m.label)) choques.push(`"${pestana}" vs "${m.label}" (${m.key})`);
+      }
+    }
+    expect(choques, `la pestaña se confunde con un módulo:\n${choques.join("\n")}`).toEqual([]);
+  });
+
   it("cada módulo tiene key, ruta y nombre únicos", () => {
     const keys = ALL_MODULES.map((m) => m.key);
     const hrefs = ALL_MODULES.map((m) => m.href);

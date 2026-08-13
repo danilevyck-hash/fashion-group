@@ -1,8 +1,25 @@
 "use client";
 
+// Data Health — SEGUNDA PESTAÑA de Usuarios (13-ago-2026).
+//
+// Era un módulo suelto en `/admin/data-health`, con su propia ficha en el grupo
+// "Administración". Daniel pidió menos módulos en el menú y aprobó que viviera
+// acá dentro. Es una MUDANZA, no un recorte: la pantalla es la de siempre,
+// entera — los 4 KPI de severidad, la lista de checks (tarjetas hasta `lg`,
+// tabla desde `lg`), el mapa de 30 días (puntos envueltos hasta `xl`), el
+// detalle en modal y el botón "Correr checks ahora".
+//
+// Lo único que se le quitó es lo que la CONVERTÍA en página y ahora lo pone el
+// shell: `AppHeader`, el guard de `useAuth`, el `<h1>` y el contenedor
+// `max-w-6xl`. El h1 se fue A PROPÓSITO: la página tiene UNO solo, "Usuarios",
+// y dos h1 en el mismo documento dejan de ser un encabezado.
+//
+// 🔴 QUIÉN ENTRA NO CAMBIÓ, y no depende de este archivo: el shell exige
+// `hasModuleAccess("admin", ["admin"])` (= solo rol admin) y solo monta esta
+// pestaña si `role === "admin"`. La API `/api/admin/data-health` ya era
+// `requireRole(req, ["admin"])` y no se tocó.
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import AppHeader from "@/components/AppHeader";
-import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ModalOverlay } from "@/components/ui";
 import { useEscapeClose } from "@/lib/hooks/useModalDismiss";
 
@@ -108,8 +125,7 @@ function buildLast30Days(): string[] {
   return days;
 }
 
-export default function DataHealthPage() {
-  const { authChecked } = useAuth({ moduleKey: "data-health", allowedRoles: ["admin"] });
+export default function DataHealthTab() {
   const [data, setData] = useState<DataHealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -135,10 +151,11 @@ export default function DataHealthPage() {
     }
   }, []);
 
+  // La pestaña solo se monta cuando ya hay sesión de admin (el shell no la
+  // dibuja antes), así que carga al montar sin esperar a ningún `authChecked`.
   useEffect(() => {
-    if (!authChecked) return;
     loadData();
-  }, [authChecked, loadData]);
+  }, [loadData]);
 
   async function runChecksNow() {
     setRunning(true);
@@ -157,8 +174,6 @@ export default function DataHealthPage() {
 
   const days30 = useMemo(buildLast30Days, []);
 
-  if (!authChecked) return null;
-
   const summary = data?.latest.reduce<Record<Severity, number>>(
     (acc, r) => { acc[r.severity]++; return acc; },
     { critical: 0, warning: 0, info: 0, ok: 0 },
@@ -166,17 +181,15 @@ export default function DataHealthPage() {
 
   return (
     <div>
-      <AppHeader module="Data Health" />
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <>
         {/* Header con resumen + botón */}
         {/* Sin subtítulo: cada check ya muestra su "Último check" en la lista
-            de abajo, y el mapa de 30 días ya muestra las corridas. Y sin título
-            grande: "Data Health" ya lo dicen la barra sticky (celular) y el
-            breadcrumb (escritorio). Queda sr-only para no dejar la página sin
-            encabezado, y la fila pasa a `justify-end` para que el botón no se
-            corra a la izquierda al quedar solo. */}
+            de abajo, y el mapa de 30 días ya muestra las corridas. Y sin título:
+            "Data Health" ya lo dice la pestaña que trae acá, y el h1 de la
+            página es "Usuarios" — uno solo por documento. La fila queda en
+            `justify-end` para que el botón no se corra a la izquierda al ser lo
+            único que hay en ella. */}
         <div className="flex flex-wrap items-start justify-end gap-4 mb-6">
-          <h1 className="sr-only">Data Health</h1>
           <button
             onClick={runChecksNow}
             disabled={running}
@@ -456,7 +469,7 @@ export default function DataHealthPage() {
         )}
 
         <Toast message={toast} />
-      </div>
+      </>
     </div>
   );
 }

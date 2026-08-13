@@ -206,7 +206,12 @@ const SE_FUE: { archivo: string; que: string; texto: string }[] = [
   { archivo: "app/admin/components/PanelCxcMobile.tsx", que: "CXC celular · h1 grande 'Cuentas por Cobrar' (el de escritorio ya se había ido)", texto: "text-[22px] font-medium leading-tight" },
   { archivo: "app/clientes/ClientesListClient.tsx", que: "Clientes · h1 grande 'Clientes'", texto: 'tracking-tight">Clientes' },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", que: "Proveedores · h1 grande 'Proveedores'", texto: 'tracking-tight">Proveedores' },
-  { archivo: "app/admin/data-health/page.tsx", que: "Data Health · h1 grande 'Data Health'", texto: 'text-2xl font-semibold text-gray-900">Data Health' },
+  // Data Health pasó a ser la 2ª pestaña de Usuarios (13-ago-2026): el archivo
+  // se mudó y el h1 se fue del todo (la página tiene UNO solo, "Usuarios").
+  { archivo: "app/admin/usuarios/DataHealthTab.tsx", que: "Data Health · h1 grande 'Data Health'", texto: 'text-2xl font-semibold text-gray-900">Data Health' },
+  // Usuarios estrenó pestañas en el mismo cambio, y su h1 visible decía la
+  // misma palabra que la pestaña de al lado: pasa a `sr-only`.
+  { archivo: "app/admin/usuarios/page.tsx", que: "Usuarios · h1 grande 'Usuarios' (la pestaña ya lo dice)", texto: 'text-2xl sm:text-[28px] text-gray-900' },
   { archivo: "app/guias/components/GuiasList.tsx", que: "Guías · h1 grande 'Guías de Despacho'", texto: 'tracking-tight">Guías de Despacho' },
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", que: "Reclamos · h1 grande 'Reclamos'", texto: 'tracking-tight">Reclamos' },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", que: "Reclamos · h1 grande 'Nuevo Reclamo' (su breadcrumb propio ya lo dice en todos los anchos)", texto: 'text-[21px] font-medium tracking-tight">Nuevo Reclamo' },
@@ -362,7 +367,12 @@ const ENCABEZADO_SR_ONLY: { archivo: string; nombre: string }[] = [
   { archivo: "app/admin/components/PanelCxcMobile.tsx", nombre: "Cuentas por Cobrar" },
   { archivo: "app/clientes/ClientesListClient.tsx", nombre: "Clientes" },
   { archivo: "app/proveedores/ProveedoresListClient.tsx", nombre: "Proveedores" },
-  { archivo: "app/admin/data-health/page.tsx", nombre: "Data Health" },
+  // Data Health dejó de ser una PÁGINA el 13-ago-2026: es la 2ª pestaña de
+  // Usuarios, así que su encabezado ahora es el de Usuarios. El invariante no
+  // se aflojó — se mudó de archivo y encima se volvió más estricto: hay un test
+  // aparte que exige que `DataHealthTab.tsx` NO tenga h1, para que la página no
+  // termine con dos.
+  { archivo: "app/admin/usuarios/page.tsx", nombre: "Usuarios" },
   { archivo: "app/guias/components/GuiasList.tsx", nombre: "Guías de Despacho" },
   { archivo: "app/reclamos/components/EmpresaSelector.tsx", nombre: "Reclamos" },
   { archivo: "app/reclamos/components/ReclamoForm.tsx", nombre: "Nuevo Reclamo" },
@@ -397,7 +407,6 @@ describe("🔴 podar el título NO deja la pantalla sin encabezado", () => {
     const filasQueQuedaronConUnSoloBoton = [
       "app/clientes/ClientesListClient.tsx",
       "app/proveedores/ProveedoresListClient.tsx",
-      "app/admin/data-health/page.tsx",
       "app/guias/components/GuiasList.tsx",
       "app/reclamos/components/EmpresaSelector.tsx",
       "app/cheques/ChequesClient.tsx",
