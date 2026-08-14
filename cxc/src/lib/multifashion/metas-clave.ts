@@ -165,6 +165,51 @@ export function agruparVendedoras(filas: FilaVendedor[]): VendedoraAgrupada[] {
     .sort((a, b) => b.ventas - a.ventas || a.clave.localeCompare(b.clave));
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// LO QUE NO ES DE NADIE — por qué los aportes de una meta grupal no dan 100%
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Desde qué porción se explica el faltante. Debajo de medio punto redondearía a
+ * "0%" y una frase que dice "el 0% que falta" se lee como un error del sistema.
+ */
+export const APORTE_NO_ASIGNADO_MINIMO = 0.005;
+
+/**
+ * La línea que explica por qué los aportes NO suman 100%, o `null` cuando sí
+ * suman (entonces no hay nada que explicar y la línea no se dibuja).
+ *
+ * 🔴 EXISTE PORQUE LA CONSECUENCIA HAY QUE MOSTRARLA, NO ESCONDERLA. Una meta
+ * grupal mide la tienda entera, así que lo facturado con el código de gente que
+ * ya no trabaja acá entra en el avance y no le pertenece a ninguna participante.
+ * Medido may-jul 2026: las 4 vendedoras pusieron el 95,9% y el 4,1% restante
+ * salió de códigos viejos que siguen abiertos en Switch. Sin esta línea, una
+ * lista que suma 96% se lee como una cuenta mal hecha y se desconfía del número
+ * entero.
+ *
+ * ⚠️ El porcentaje ENTRA calculado del período de la meta — acá no hay ningún 4%
+ * escrito a mano. El día que esos códigos se cierren, la línea desaparece sola.
+ *
+ * ⚠️ LA FRASE AFIRMA EL HECHO Y OFRECE LA CAUSA COMO LO HABITUAL, no como una
+ * certeza. Lo que SIEMPRE es cierto es que esa venta salió con el código de
+ * alguien que no está en la lista; que sea gente que ya no trabaja acá es lo que
+ * pasa hoy (medido) pero no lo que pasa siempre — sobre sep-dic 2025, con estas
+ * mismas 4 elegidas, el faltante da 59,3% y ahí son personas que en ese momento
+ * sí trabajaban. Escribir la causa como afirmación haría que la pantalla mienta
+ * en cuanto cambie el período.
+ *
+ * Vive en el módulo puro para que la tarjeta y la pestaña de Vendedoras digan
+ * exactamente lo mismo: dos redacciones del mismo hecho se separan con el tiempo.
+ */
+export function textoAporteNoAsignado(fraccion: number): string | null {
+  if (!Number.isFinite(fraccion) || fraccion < APORTE_NO_ASIGNADO_MINIMO) return null;
+  const pct = Math.round(Math.min(1, fraccion) * 100);
+  return (
+    `El ${pct}% que falta son ventas hechas con el código de alguien que no está en ` +
+    `esta lista — casi siempre, gente que ya no trabaja acá. Cuentan para la meta igual.`
+  );
+}
+
 /**
  * Suma las ventas de las claves elegidas. Lo que no está elegido NO suma —
  * incluido `DEFAULT` y cualquier nombre que Daniel no haya marcado.

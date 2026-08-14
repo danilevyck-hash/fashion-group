@@ -19,7 +19,11 @@
 //
 // ── LAS DOS VISTAS, según el tipo de meta ───────────────────────────────────
 // · GRUPAL      → el APORTE de cada una al avance. No hay meta personal y no se
-//                 inventa ninguna.
+//                 inventa ninguna. 🔴 El avance es LA TIENDA ENTERA: marcar
+//                 participantes elige a quién se le muestra el aporte, no qué se
+//                 mide. Por eso los aportes suman ~96% y hay una línea que dice
+//                 por qué (el resto se facturó con códigos de gente que ya no
+//                 trabaja acá).
 // · POR VENDEDORA → la meta de cada una (la que Daniel escribió a mano) y su
 //                 avance contra ella.
 //
@@ -34,6 +38,7 @@
 import useSWR from "swr";
 import { Target } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
+import { textoAporteNoAsignado } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 
 interface Respuesta {
@@ -95,12 +100,12 @@ export function MetasEnVendedoras() {
 
           {meta.tipo === "grupal" && (
             <p className="mb-2 text-xs text-gray-600">
-              Entre todas llevan{" "}
+              La tienda lleva{" "}
               <span className="font-mono tabular-nums text-gray-800">
                 {fmtMoney(meta.avance.vendido)}
               </span>{" "}
-              de {fmtMoney(meta.avance.objetivo)}. Esta meta es de todas juntas: acá se ve
-              lo que puso cada una, no una meta personal.
+              de {fmtMoney(meta.avance.objetivo)}. Esta meta cuenta toda la venta de la
+              tienda: acá se ve lo que puso cada una, no una meta personal.
             </p>
           )}
 
@@ -148,6 +153,15 @@ export function MetasEnVendedoras() {
               </li>
             ))}
           </ul>
+
+          {/* 🔴 POR QUÉ NO SUMA 100% — la misma frase que la tarjeta de Metas,
+              del mismo módulo puro, para que las dos pantallas no puedan decir
+              cosas distintas del mismo hecho. */}
+          {meta.tipo === "grupal" && textoAporteNoAsignado(meta.aporteNoAsignado) != null && (
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+              {textoAporteNoAsignado(meta.aporteNoAsignado)}
+            </p>
+          )}
         </div>
       ))}
     </section>

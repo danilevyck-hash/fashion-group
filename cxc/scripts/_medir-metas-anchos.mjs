@@ -63,7 +63,9 @@ const PARTICIPANTES = VENDEDORAS.slice(0, 4).map((v) => ({
 
 function meta({ vendido, cumplida }) {
   const objetivo = 420000;
-  const aportes = [0.31, 0.28, 0.22, 0.19];
+  // Las proporciones REALES medidas (may-jul 2026): suman 95,9%, no 100%.
+  // El 4,1% que falta son códigos viejos que siguen abiertos en Switch.
+  const aportes = [0.324, 0.28, 0.239, 0.116];
   return {
     id: cumplida ? "meta-cumplida" : "meta-viva",
     nombre: "Meta del viaje",
@@ -77,6 +79,7 @@ function meta({ vendido, cumplida }) {
     participantes: PARTICIPANTES,
     fuente: "rpc",
     temporadaDisponible: true,
+    aporteNoAsignado: 0.041,
     avance: {
       vendido, objetivo,
       falta: Math.max(0, objetivo - vendido),
@@ -196,7 +199,14 @@ for (const estado of ["en-curso", "cumplida"]) {
     //    `innerText` los devuelve YA en mayúsculas. Comparar tal cual daba un
     //    falso hallazgo — el texto estaba, con otra caja.
     const textoLower = texto.toLowerCase();
-    for (const exigido of ["de $420,000.00", "premio", "aportó cada una"]) {
+    for (const exigido of [
+      "de $420,000.00",
+      "premio",
+      "aportó cada una",
+      // 🔴 Lo nuevo: que se mide la tienda entera y por qué los aportes dan 96%.
+      "la meta cuenta toda la venta de la tienda",
+      "el 4% que falta son ventas hechas con el código",
+    ]) {
       if (!textoLower.includes(exigido)) fallos.push(`@${a.w}: falta "${exigido}" en la tarjeta`);
     }
     if (estado === "en-curso" && !textoLower.includes("así como van, cierran en")) {
@@ -222,6 +232,19 @@ for (const estado of ["en-curso", "cumplida"]) {
       if (!tf.includes("En Switch está escrita de 2 formas")) {
         fallos.push(`@${a.w}: el formulario no avisa del nombre partido en dos`);
       }
+      if (!tf.includes("Cuenta toda la venta de la tienda.")) {
+        fallos.push(`@${a.w}: la opción grupal no dice que se mide la tienda entera`);
+      }
+      if (!tf.includes("marques a quien marques")) {
+        fallos.push(`@${a.w}: el formulario no aclara que marcar no recorta la meta`);
+      }
+      for (const viejo of [
+        "Se suma lo que venden todas juntas",
+        "Si no marcas a nadie, la meta cuenta toda la venta",
+        "usa el monto de arriba",
+      ]) {
+        if (tf.includes(viejo)) fallos.push(`@${a.w}: sigue el texto viejo "${viejo}"`);
+      }
       await medir(page, '[data-medir="meta-form"]', "formulario", a.w);
       await page.screenshot({ path: `/tmp/metas-form-${a.w}.png` });
       await page.keyboard.press("Escape");
@@ -234,6 +257,12 @@ for (const estado of ["en-curso", "cumplida"]) {
       await page.waitForTimeout(1200);
       const tv = await page.evaluate(() => document.body.innerText);
       if (!tv.includes("del avance")) fallos.push(`@${a.w}: Vendedoras no muestra el aporte`);
+      if (!tv.includes("Esta meta cuenta toda la venta de la tienda")) {
+        fallos.push(`@${a.w}: Vendedoras no dice que la meta mide la tienda entera`);
+      }
+      if (!tv.includes("El 4% que falta son ventas hechas con el código")) {
+        fallos.push(`@${a.w}: Vendedoras no explica por qué los aportes no suman 100%`);
+      }
       for (const prohibido of ["🥇", "🥈", "🥉"]) {
         if (tv.includes(prohibido)) fallos.push(`@${a.w}: apareció un podio (${prohibido}) en Vendedoras`);
       }

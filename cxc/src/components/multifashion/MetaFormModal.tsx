@@ -21,6 +21,12 @@
 // decide quién es vendedora — eso lo elige Daniel marcando casillas. (Por eso
 // `Angel pizza` aparece: aparece y no se marca.)
 //
+// ── 🔴 EN UNA META GRUPAL, MARCAR NO CAMBIA LO QUE SE MIDE ──────────────────
+// Se mide la TIENDA ENTERA, siempre. Las marcadas son a quiénes se les MUESTRA
+// el aporte. Los textos de esta pantalla lo dicen al elegir, no después: antes
+// decían "se suma lo que venden todas juntas" y "si no marcas a nadie, la meta
+// cuenta toda la venta", que juntos hacían creer lo contrario.
+//
 // Modal con el patrón de la casa: `createPortal` + `inset-0` +
 // `useBodyScrollLock`, y SIN `autoFocus` (en iPhone levanta el teclado y tapa
 // media pantalla apenas abre).
@@ -313,8 +319,8 @@ export function MetaFormModal({
                 className={`${CAMPO} font-mono tabular-nums`}
               />
               <p className="mt-1 text-xs text-gray-500">
-                Es la venta de mostrador sin ITBMS, con los descuentos ya aplicados y las
-                devoluciones restadas — el mismo número que muestra el Resumen.
+                Es toda la venta de mostrador de la tienda, sin ITBMS, con los descuentos ya
+                aplicados y las devoluciones restadas — el mismo número que muestra el Resumen.
               </p>
             </div>
           ) : (
@@ -338,7 +344,12 @@ export function MetaFormModal({
             <div className="flex flex-wrap gap-2">
               {(
                 [
-                  ["grupal", "Entre todas", "Se suma lo que venden todas juntas."],
+                  // 🔴 EN GRUPAL SE MIDE LA TIENDA ENTERA, y hay que decirlo
+                  // ACÁ. Antes decía "se suma lo que venden todas juntas", que
+                  // hacía creer que marcar participantes recorta lo que cuenta.
+                  // No lo recorta: marcar solo elige a quién se le muestra su
+                  // aporte. Que quede claro al elegir, no después.
+                  ["grupal", "Entre todas", "Cuenta toda la venta de la tienda."],
                   ["vendedora", "Cada una la suya", "Cada vendedora tiene su propio monto."],
                 ] as const
               ).map(([valor, rotulo, ayuda]) => (
@@ -398,10 +409,21 @@ export function MetaFormModal({
                 ({elegidas.size} {elegidas.size === 1 ? "elegida" : "elegidas"})
               </span>
             </p>
+            {/* 🔴 EN GRUPAL, MARCAR NO CAMBIA LO QUE SE MIDE. El texto viejo
+                ("si no marcas a nadie, la meta cuenta toda la venta") daba a
+                entender lo contrario: que marcar recortaba la meta a esas
+                personas. Hoy la meta cuenta la tienda entera SIEMPRE.
+
+                🩸 Y el paréntesis del otro caso MENTÍA: decía que un monto
+                vacío "usa el monto de arriba", y no lo usa — `avanceDeMeta`
+                deja `objetivo` en `null` a propósito (Daniel: *"Las metas
+                personales las pongo yo a mano"*), así que esa vendedora se
+                quedaba SIN meta. El código está bien; el texto era el que
+                llevaba a dejar campos vacíos sin darse cuenta. */}
             <p className="mb-2 text-xs text-gray-500">
               {tipo === "grupal"
-                ? "Si no marcas a nadie, la meta cuenta toda la venta de la tienda."
-                : "Marca a cada vendedora y ponle su monto (si lo dejas vacío, usa el monto de arriba)."}
+                ? "La meta cuenta toda la venta de la tienda, marques a quien marques. A las que marques se les muestra cuánto aportó cada una."
+                : "Marca a cada vendedora y ponle su monto. La que quede sin monto no tiene meta."}
             </p>
 
             <ul className="divide-y divide-gray-100 overflow-hidden rounded-md border border-gray-200">
@@ -468,7 +490,9 @@ export function MetaFormModal({
                           onChange={(e) =>
                             setIndividuales((p) => ({ ...p, [v.clave]: e.target.value }))
                           }
-                          placeholder={objetivo || "el monto de arriba"}
+                          // Mismo motivo que el texto de arriba: el placeholder
+                          // decía "el monto de arriba" y ese monto NO se hereda.
+                          placeholder="sin esto no tiene meta"
                           className="min-h-[44px] w-40 rounded-md border border-gray-300 px-2 py-1 font-mono text-sm tabular-nums outline-none focus:border-teal-600"
                         />
                       </div>

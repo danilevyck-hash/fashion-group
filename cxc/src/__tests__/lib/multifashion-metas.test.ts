@@ -15,24 +15,30 @@
 //   Cindy De Gracia / CINDY DE GRACIA  → partidas en dos
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import path from "path";
 
-// `metas-lectura` importa el cliente de Supabase al cargarse. Este archivo solo
-// ejercita sus funciones PURAS (`esFuncionAusente`, `totalDe`,
-// `totalDeParticipantes`), así que alcanza con que el módulo exista: nada de
-// este test toca la red ni la base.
-vi.mock("@/lib/supabase-server", () => ({
-  supabaseServer: {
-    from: () => {
-      throw new Error("este test no debe tocar la base");
-    },
-    rpc: () => {
-      throw new Error("este test no debe tocar la base");
-    },
-  },
+// `metas-lectura` importa el cliente de Supabase al cargarse.
+//
+// Por defecto el doble REVIENTA: casi todo este archivo ejercita funciones
+// PURAS y ninguna debe tocar la base. El bloque que prueba `avanceDeMeta` de
+// verdad (§4ter) le pone una implementación en su `beforeEach` y la devuelve a
+// reventar al terminar — así una lectura que se escape en otro test sigue
+// fallando en vez de recibir datos de mentira.
+const REVIENTA = () => {
+  throw new Error("este test no debe tocar la base");
+};
+const dobleSupabase = vi.hoisted(() => ({
+  from: vi.fn(() => {
+    throw new Error("este test no debe tocar la base");
+  }),
+  rpc: vi.fn(() => {
+    throw new Error("este test no debe tocar la base");
+  }),
 }));
+
+vi.mock("@/lib/supabase-server", () => ({ supabaseServer: dobleSupabase }));
 
 import {
   claveVendedora,
@@ -40,6 +46,8 @@ import {
   nombreParaMostrar,
   agruparVendedoras,
   ventasDeParticipantes,
+  textoAporteNoAsignado,
+  APORTE_NO_ASIGNADO_MINIMO,
   CLAVE_SISTEMA,
 } from "@/lib/multifashion/metas-clave";
 
@@ -62,7 +70,13 @@ import {
   ROLES_LECTURA_METAS,
 } from "@/lib/multifashion/metas-permiso";
 
-import { esFuncionAusente, totalDe, totalDeParticipantes } from "@/lib/multifashion/metas-lectura";
+import {
+  esFuncionAusente,
+  totalDe,
+  totalDeParticipantes,
+  avanceDeMeta,
+  type Meta,
+} from "@/lib/multifashion/metas-lectura";
 
 // Los pesos REALES de la temporada sep-dic 2025 (medidos).
 const TEMPORADA_2025: PesoMes[] = [
@@ -494,7 +508,10 @@ describe("lectura del período", () => {
     expect(totalDe(filas)).toBe(46772.03);
   });
 
-  it("con participantes elegidos suma SOLO a esas personas, juntando sus dos formas", () => {
+  it("el desglose por persona suma SOLO a esas personas, juntando sus dos formas", () => {
+    // ⚠️ Esto es a quién se le ACREDITA cada venta, NO lo que la meta mide. En
+    // una meta grupal el avance es el total de la tienda pase lo que pase con
+    // esta lista — ver §4ter.
     const out = totalDeParticipantes(filas, ["ANA TREJOS"]);
     expect(out.get("ANA TREJOS")).toBe(44998.17);
   });
@@ -512,6 +529,227 @@ describe("lectura del período", () => {
     expect(esFuncionAusente({ code: "42501", message: "permission denied" })).toBe(false);
     expect(esFuncionAusente({ message: "fetch failed" })).toBe(false);
     expect(esFuncionAusente(null)).toBe(false);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4ter. 🔴 UNA META GRUPAL MIDE LA TIENDA ENTERA
+//
+// Es un test de CONDUCTA: corre `avanceDeMeta` de verdad con la base doblada y
+// mira el número que sale. Un barrido de texto no serviría — la regla vieja y
+// la nueva se distinguen por UNA línea, y este repo ya pagó tres veces el
+// candado que se cumple leyendo su propio comentario.
+//
+// Los datos son los MEDIDOS contra producción (may-jul 2026,
+// `scripts/_verif-meta-mide-la-tienda.ts`): la tienda vendió 147.737,77 y las 4
+// vendedoras 141.705,00 = 95,9%. El 4,1% que falta (6.032,77) son códigos
+// viejos que siguen abiertos en Switch.
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("🔴 el avance de una meta GRUPAL es la tienda entera", () => {
+  // Medido el 14-ago-2026 contra producción.
+  const MAY_JUL = [
+    { vendedor: "Sheynee Batista", mes: "2026-05", ventas: 47857.0, documentos: 900, ultima: "2026-07-31" },
+    { vendedor: "Milagros Torres", mes: "2026-05", ventas: 41416.1, documentos: 800, ultima: "2026-07-31" },
+    { vendedor: "Jailine", mes: "2026-05", ventas: 35260.48, documentos: 700, ultima: "2026-07-31" },
+    { vendedor: "Jennifer Miranda", mes: "2026-05", ventas: 17171.42, documentos: 300, ultima: "2026-07-31" },
+    // Los cuatro códigos que ya no son de vendedoras vivas.
+    { vendedor: "YEISIBETH MUÑOZ", mes: "2026-05", ventas: 2042.21, documentos: 40, ultima: "2026-06-29" },
+    { vendedor: "ANA TREJOS", mes: "2026-07", ventas: 1786.77, documentos: 35, ultima: "2026-07-21" },
+    { vendedor: "CINDY DE GRACIA", mes: "2026-06", ventas: 1607.98, documentos: 30, ultima: "2026-08-11" },
+    { vendedor: "DEFAULT", mes: "2026-05", ventas: 595.81, documentos: 12, ultima: "2026-05-30" },
+  ];
+  const TIENDA = 147737.77;
+  const LAS_CUATRO = 141705.0;
+
+  const LAS_4 = ["SHEYNEE BATISTA", "MILAGROS TORRES", "JAILINE", "JENNIFER MIRANDA"].map((clave) => ({
+    clave,
+    nombre: clave,
+    objetivoIndividual: null,
+  }));
+
+  const meta = (over: Partial<Meta> = {}): Meta => ({
+    id: "m1",
+    nombre: "Meta del viaje",
+    desde: "2026-05-01",
+    hasta: "2026-07-31",
+    objetivo: 420000,
+    tipo: "grupal",
+    premio: "Un viaje para todas",
+    premioMonto: 2000,
+    activa: true,
+    participantes: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    dobleSupabase.rpc.mockImplementation((async (fn: string) => {
+      if (fn === "multifashion_meta_ventas_v1") return { data: MAY_JUL, error: null };
+      // Sin temporada del año pasado: la proyección se cae a los días y lo dice.
+      // Acá no se está probando la proyección, así que se deja fuera del medio.
+      if (fn === "multifashion_overview_serie_v1") return { data: { meses: [] }, error: null };
+      throw new Error(`RPC inesperada: ${fn}`);
+    }) as never);
+  });
+
+  afterEach(() => {
+    dobleSupabase.rpc.mockImplementation(REVIENTA as never);
+  });
+
+  it("🔴 CON las 4 elegidas, el avance sigue siendo el TOTAL de la tienda", async () => {
+    // El candado que este PR viene a poner. Con la regla vieja daba 141.705,00
+    // —los 6.032,77 de los códigos viejos desaparecían de la meta— y sobre los
+    // 420.000 eso son ~17.000: la diferencia entre ganarse el viaje y no.
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    expect(con.avance.vendido).toBe(TIENDA);
+    expect(con.avance.vendido).not.toBe(LAS_CUATRO);
+  });
+
+  it("elegir participantes NO cambia el avance: con las 4 y sin nadie da lo mismo", async () => {
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    const sin = await avanceDeMeta(meta({ participantes: [] }), "2026-08-14");
+    expect(con.avance.vendido).toBe(sin.avance.vendido);
+  });
+
+  it("los aportes se miden CONTRA la tienda, así que suman ~96% y no 100%", async () => {
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    const suma = con.porVendedora.reduce((a, v) => a + v.aporte, 0);
+    expect(suma).toBeCloseTo(LAS_CUATRO / TIENDA, 10);
+    expect(Math.round(suma * 100)).toBe(96);
+  });
+
+  it("🔑 lo que falta para el 100% viaja calculado, no supuesto", async () => {
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    const suma = con.porVendedora.reduce((a, v) => a + v.aporte, 0);
+    expect(con.aporteNoAsignado).toBeCloseTo(1 - suma, 10);
+    expect(Math.round(con.aporteNoAsignado * 100)).toBe(4);
+  });
+
+  it("⚠️ el % que falta NO es un 4% fijo: cambia con el período", async () => {
+    // Con solo dos de las cuatro elegidas, lo no asignado tiene que crecer. Un
+    // 4% hardcodeado pasaría el test de arriba y fallaría acá.
+    const con = await avanceDeMeta(meta({ participantes: LAS_4.slice(0, 2) }), "2026-08-14");
+    expect(con.aporteNoAsignado).toBeGreaterThan(0.3);
+  });
+
+  it("cada aporte individual es su porción de la TIENDA, no del grupo elegido", async () => {
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    const sheynee = con.porVendedora.find((v) => v.clave === "SHEYNEE BATISTA")!;
+    expect(sheynee.vendido).toBe(47857.0);
+    expect(sheynee.aporte).toBeCloseTo(47857.0 / TIENDA, 10); // 32,4%
+    expect(sheynee.aporte).not.toBeCloseTo(47857.0 / LAS_CUATRO, 10); // NO 33,8%
+  });
+
+  it("🔴 en una meta POR VENDEDORA no cambia nada: se mide la suma de las elegidas", async () => {
+    // Ahí cada una tiene su objetivo escrito a mano y se mide contra el suyo.
+    const con = await avanceDeMeta(
+      meta({
+        tipo: "vendedora",
+        participantes: LAS_4.map((p) => ({ ...p, objetivoIndividual: 40000 })),
+      }),
+      "2026-08-14",
+    );
+    expect(con.avance.vendido).toBe(LAS_CUATRO);
+    expect(con.aporteNoAsignado).toBe(0);
+    const suma = con.porVendedora.reduce((a, v) => a + v.aporte, 0);
+    expect(suma).toBeCloseTo(1, 10);
+  });
+
+  it("la meta grupal no le inventa objetivo a nadie, ni siquiera midiendo la tienda", async () => {
+    const con = await avanceDeMeta(meta({ participantes: LAS_4 }), "2026-08-14");
+    expect(con.porVendedora.every((v) => v.objetivo === null && v.avance === null)).toBe(true);
+  });
+});
+
+describe("la línea que explica por qué los aportes no suman 100%", () => {
+  it("dice el porcentaje REAL que se le pasa, no uno escrito a mano", () => {
+    expect(textoAporteNoAsignado(0.041)).toContain("El 4%");
+    expect(textoAporteNoAsignado(0.128)).toContain("El 13%");
+    expect(textoAporteNoAsignado(0.593)).toContain("El 59%");
+  });
+
+  it("🔴 explica en español simple, sin jerga ni nombres de tabla", () => {
+    const t = textoAporteNoAsignado(0.041)!;
+    expect(t).toContain("código");
+    expect(t).toContain("no está en esta lista");
+    expect(t).toContain("Cuentan para la meta igual");
+    for (const jerga of ["DEFAULT", "Switch", "vendedor_id", "%", "NULL", "sin asignar"]) {
+      if (jerga === "%") continue;
+      expect(t, `la línea no puede decir "${jerga}"`).not.toContain(jerga);
+    }
+  });
+
+  it("⚠️ la causa va como LO HABITUAL, no como una certeza", () => {
+    // Sobre sep-dic 2025 con estas mismas 4 el faltante da 59,3%, y ahí son
+    // personas que en ese momento SÍ trabajaban. Afirmar la causa haría que la
+    // pantalla mienta en cuanto cambie el período.
+    const t = textoAporteNoAsignado(0.593)!;
+    expect(t).toContain("casi siempre");
+  });
+
+  it("cuando sí suman 100% no hay nada que explicar: no se dibuja", () => {
+    expect(textoAporteNoAsignado(0)).toBeNull();
+    expect(textoAporteNoAsignado(0.0001)).toBeNull();
+  });
+
+  it("🩸 nunca dice 'el 0% que falta' — eso se lee como un error del sistema", () => {
+    expect(textoAporteNoAsignado(APORTE_NO_ASIGNADO_MINIMO - 0.0001)).toBeNull();
+    expect(textoAporteNoAsignado(APORTE_NO_ASIGNADO_MINIMO)).toContain("El 1%");
+    expect(textoAporteNoAsignado(NaN)).toBeNull();
+  });
+
+  it("las DOS pantallas la sacan del mismo lugar — no hay dos redacciones", () => {
+    for (const f of [
+      "src/components/multifashion/MetaAvanceCard.tsx",
+      "src/components/multifashion/MetasEnVendedoras.tsx",
+    ]) {
+      const src = readFileSync(path.join(process.cwd(), f), "utf-8");
+      expect(src, `${f} no muestra la línea`).toContain("textoAporteNoAsignado");
+      expect(src, `${f} escribe la frase a mano`).not.toContain("que ya no trabajan acá.");
+    }
+  });
+});
+
+describe("el formulario dice la regla al ELEGIR, no después", () => {
+  const leer = (rel: string) => readFileSync(path.join(process.cwd(), rel), "utf-8");
+  const sinComentarios = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  it("🔴 la opción grupal ya no promete que se suma 'lo que venden todas juntas'", () => {
+    const src = sinComentarios(leer("src/components/multifashion/MetaFormModal.tsx"));
+    expect(src).not.toContain("Se suma lo que venden todas juntas");
+    expect(src).toContain("Cuenta toda la venta de la tienda.");
+  });
+
+  it("y el texto de participantes dice que marcar no recorta la meta", () => {
+    const src = sinComentarios(leer("src/components/multifashion/MetaFormModal.tsx"));
+    expect(src).not.toContain("Si no marcas a nadie, la meta cuenta toda la venta");
+    expect(src).toContain("marques a quien marques");
+  });
+
+  it("🩸 y ya no MIENTE con que un monto vacío hereda el del grupo", () => {
+    // `avanceDeMeta` deja `objetivo` en null a propósito (Daniel: "Las metas
+    // personales las pongo yo a mano"), así que un monto vacío deja a esa
+    // vendedora SIN meta. El código está bien; el texto era el que llevaba a
+    // dejar campos vacíos sin darse cuenta.
+    const src = sinComentarios(leer("src/components/multifashion/MetaFormModal.tsx"));
+    expect(src).not.toContain("usa el monto de arriba");
+    expect(src).not.toContain("el monto de arriba");
+    expect(src).toContain("La que quede sin monto no tiene meta.");
+  });
+
+  it("🔑 y no se puede guardar una meta por vendedora con montos vacíos", () => {
+    // Ya estaba cubierto en `falta`, y se fija acá para que siga estándolo: una
+    // meta individual sin un solo monto no mide nada.
+    const src = sinComentarios(leer("src/components/multifashion/MetaFormModal.tsx"));
+    expect(src).toMatch(/sinMonto\s*=\s*useMemo/);
+    expect(src).toMatch(/else if \(sinMonto > 0\)/);
+    expect(src).toMatch(/disabled=\{falta\.length > 0 \|\| guardando\}/);
+  });
+
+  it("la pantalla de Metas dice que la meta cuenta toda la tienda", () => {
+    const card = leer("src/components/multifashion/MetaAvanceCard.tsx");
+    expect(card).toContain("La meta cuenta toda la venta de la tienda");
   });
 });
 

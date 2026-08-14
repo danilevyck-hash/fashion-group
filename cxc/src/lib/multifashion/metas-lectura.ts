@@ -89,6 +89,9 @@ export interface AvanceParticipante {
    * *"Jailine $28,140 · 29% del avance"*. No hay objetivo personal detrás ni
    * hay que inventarle uno — el premio de una meta grupal es colectivo
    * (*"el viaje es de todas o de ninguna"*).
+   *
+   * ⚠️ En una meta grupal el denominador es LA TIENDA ENTERA, así que los
+   * aportes NO suman 100%: lo que falta es `aporteNoAsignado`.
    */
   aporte: number;
   /** Solo en metas por vendedora. En una meta grupal es SIEMPRE `null`. */
@@ -99,6 +102,19 @@ export interface AvanceParticipante {
 export interface MetaConAvance extends Meta {
   avance: Avance;
   porVendedora: AvanceParticipante[];
+  /**
+   * Qué parte del avance NO es de ninguna de las participantes elegidas (0..1).
+   *
+   * 🔴 EXISTE PARA QUE LA PANTALLA PUEDA EXPLICAR POR QUÉ LOS APORTES NO SUMAN
+   * 100%. En una meta grupal se mide la tienda entera, así que lo facturado con
+   * códigos de gente que ya no trabaja acá queda dentro del avance y fuera de
+   * la lista de aportes. Medido may-jul 2026: 4,1%.
+   *
+   * Es un número CALCULADO del período de cada meta, nunca una constante: el día
+   * que esos códigos se cierren en Switch, baja solo hasta 0 y la línea
+   * desaparece de la pantalla. En una meta por vendedora es siempre 0.
+   */
+  aporteNoAsignado: number;
   /** De dónde salieron las ventas: para poder auditar sin adivinar. */
   fuente: "rpc" | "paginado";
   /** `false` si no se pudo armar la temporada → la proyección es por días. */
@@ -375,6 +391,9 @@ export async function leerMetas(): Promise<Meta[] | null> {
 /**
  * 🔴 EL AVANCE SE CALCULA SIEMPRE ENTERO, SOBRE EL PERÍODO QUE DICE LA META.
  *
+ * Y en una meta GRUPAL, sobre la TIENDA ENTERA: elegir participantes decide a
+ * quién se le muestra el aporte, no qué se mide (ver el bloque de abajo).
+ *
  * Quién puede verlo es una pregunta DISTINTA y vive en `metas-permiso.ts`. Acá
  * no se mira ni un rol: si el permiso se metiera en la cuenta (por ejemplo
  * recortando el rango), el avance de la meta pasaría a depender de quién
@@ -388,21 +407,35 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
 
   const claves = meta.participantes.map((p) => p.clave);
   const porClave = totalDeParticipantes(filas, claves);
+  const vendidoDeParticipantes = centavos(
+    [...porClave.values()].reduce((a, b) => a + b, 0),
+  );
 
-  // Sin participantes elegidos, una meta grupal mide LA TIENDA ENTERA.
+  // ── 🔴 UNA META GRUPAL MIDE SIEMPRE LA TIENDA ENTERA ───────────────────────
   //
-  // 🔑 Y es el total PELADO, sin descontar nada — el MISMO número que devuelve
-  // `leerRetailRango` para ese rango, que es contra lo que Daniel verifica
-  // (retail ene-jul 2026 = 305.092,60, medido). Sacarle el marcador `DEFAULT`
-  // haría que la meta de la tienda no cuadrara con la venta de la tienda por
-  // 1.773,86 al año, y una meta que no cuadra con el número de al lado no se
-  // usa: se desconfía de las dos.
+  // Elegir participantes NO recorta lo que se mide: solo decide **a quién se le
+  // MUESTRA su aporte** en la lista de abajo. El avance es el total PELADO del
+  // período —el MISMO número que devuelve `leerRetailRango` y que Daniel
+  // verifica en la pantalla de Ventas— con `DEFAULT` incluido.
   //
-  // Con participantes elegidos sí manda la elección: suma SOLO a esas personas.
+  // 🩸 POR QUÉ, medido contra producción (may-jul 2026): la tienda vendió
+  // 147.737,77 y las 4 vendedoras 141.705,00, o sea el 95,9%. El 4,1% restante
+  // (6.032,77) son ventas facturadas con **códigos viejos que siguen abiertos en
+  // Switch** —YEISIBETH MUÑOZ 2.042,21 (última 29-jun), ANA TREJOS 1.786,77
+  // (21-jul), CINDY DE GRACIA 1.607,98 (11-ago) y DEFAULT 595,81—: gente que ya
+  // no es vendedora y cuyos usuarios alguien sigue usando para facturar.
+  //
+  // Sobre los 420.000 de la meta eso son ~17.000, y la proyección al ritmo real
+  // cierra en 378.654: esos 17.000 deciden si el viaje se gana o no. **Una venta
+  // de la tienda no puede desaparecer del viaje porque se facturó con el código
+  // equivocado.**
+  //
+  // ⚠️ En una meta POR VENDEDORA no cambia nada: ahí cada una tiene su objetivo
+  // escrito a mano y se mide contra el suyo, así que el "grupo" ES la suma de
+  // las elegidas (que es lo que hace cuadrar la barra del conjunto).
+  const vendidoTienda = totalDe(filas);
   const vendidoGrupal =
-    claves.length > 0
-      ? centavos([...porClave.values()].reduce((a, b) => a + b, 0))
-      : totalDe(filas);
+    meta.tipo === "vendedora" && claves.length > 0 ? vendidoDeParticipantes : vendidoTienda;
 
   const avance = avanceMeta({
     desde: meta.desde,
@@ -454,10 +487,19 @@ export async function avanceDeMeta(meta: Meta, hoy: string): Promise<MetaConAvan
       : b.vendido - a.vendido,
   );
 
+  // Lo que el avance mide y NADIE de la lista puso. Se calcula del período de
+  // ESTA meta —no es un 4% escrito a mano— y se acota a [0,1] por si un mes de
+  // puras devoluciones dejara los números al revés.
+  const aporteNoAsignado =
+    vendidoGrupal > 0
+      ? Math.min(1, Math.max(0, 1 - vendidoDeParticipantes / vendidoGrupal))
+      : 0;
+
   return {
     ...meta,
     avance,
     porVendedora,
+    aporteNoAsignado,
     fuente,
     temporadaDisponible: pesos.some((p) => p.ventas > 0),
   };
