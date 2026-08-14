@@ -51,6 +51,12 @@ import { logCronError } from "@/lib/cron-telemetry";
 import { esVisibleEnCatalogo } from "@/lib/catalogos/visibilidad";
 import { invalidarCatalogoPublico } from "@/lib/catalogo/cache";
 import { enParalelo } from "./en-paralelo";
+import {
+  filaIgual,
+  todoSalteado,
+  detalleEscrituras,
+  type ContadoresEscritura,
+} from "./catalogo-igualdad";
 import type { MarcaKey } from "@/lib/catalogo/marcas";
 
 const PER_PAGE = 50;
@@ -248,6 +254,19 @@ export interface CatalogoSyncConfig {
   /** Columnas de stock a escribir en UPDATE e INSERT — mapea existencia/
    *  disponibilidad a las columnas de cada tabla (Joybees agrega stock=existencia). */
   stockFields: (existencia: number, disponibilidad: number) => Record<string, unknown>;
+  /**
+   * Columnas que el UPDATE de esta marca escribe y que NO están en `COLS_BASE`
+   * (`stockFields`, `articuloFields`, `derive.updateFields`). Se piden en LA
+   * MISMA consulta que ya leía los productos —no es una lectura extra, es la de
+   * siempre con más columnas— para poder comparar antes de escribir y saltear
+   * el UPDATE que guardaría lo que ya está (ver `catalogo-igualdad.ts`).
+   *
+   * ⚠️ Olvidar una columna acá NO rompe nada: esa fila nunca se dará por igual y
+   * se seguirá escribiendo siempre, o sea el comportamiento de antes. La
+   * dirección insegura —dar por igual algo que no se leyó— es imposible por
+   * construcción (`filaIgual` exige que la columna esté presente en la fila).
+   */
+  columnasEscritas?: readonly string[];
   /** Campos fijos extra en el INSERT de nuevos (Reebok: {on_sale:false};
    *  Joybees: {gender:"adults_m"} porque gender es NOT NULL). */
   insertExtras?: Record<string, unknown>;
@@ -305,6 +324,12 @@ export interface CatalogoSyncResultEmpresa {
   /** Precios que esta corrida alineó a Switch (antes → después), logueados
    *  además en cron_email_errors (tipo catalogo_precio_cambios). */
   preciosCambiados: CatalogoPrecioCambio[];
+  /** Productos existentes que pasaron por la comparación previa al UPDATE. */
+  comparados: number;
+  /** UPDATE que SÍ se hicieron (algo había cambiado de verdad). */
+  escrituras: number;
+  /** UPDATE que se ahorraron porque la base ya tenía exactamente ese valor. */
+  sinCambios: number;
   error?: string;        // si está, NO se tocó el catálogo de esta empresa
 }
 
@@ -431,6 +456,7 @@ export async function syncCatalogo(
       empresaKey: emp.empresaKey, switchCount: 0, stockChecks: 0,
       actualizados: 0, agregados: 0, ocultados: 0, reactivados: 0, nuevosSinFoto: [],
       preciosCambiados: [],
+      comparados: 0, escrituras: 0, sinCambios: 0,
     };
     // Corrida por empresa en switch_sync_log (streak 401 de alert-policy.ts).
     // Los dry-run no se registran: no son corridas reales y ensuciarían el streak.
@@ -493,11 +519,34 @@ export async function syncCatalogo(
       // Columnas opcionales: oculto_manual + las extraCols del hook derive
       // (p.ej. nombre_manual de Tommy). Mismo fallback pre-migración para todas.
       const optionalCols = ["oculto_manual", ...(config.derive?.extraCols ?? [])];
-      let { data: existing, error: exErr } = await readExisting(
-        [COLS_BASE, ...optionalCols].join(", "),
-      );
-      if (exErr && optionalCols.some((c) => exErr!.message.includes(c))) {
-        ({ data: existing, error: exErr } = await readExisting(COLS_BASE));
+      // Columnas que el UPDATE escribe (stock, derivadas de marca…) y que no se
+      // pedían porque nadie las leía. Se suman a LA MISMA consulta —no hay una
+      // consulta más— para poder comparar antes de escribir.
+      const yaPedidas = new Set([...COLS_BASE.split(",").map((c) => c.trim()), ...optionalCols]);
+      const colsComparacion = (config.columnasEscritas ?? []).filter((c) => !yaPedidas.has(c));
+      // 🩸 ESCALERA, y NO el fallback de un solo escalón que había antes. Con un
+      // único "si algo falla, pedí solo COLS_BASE", una columna de comparación
+      // ausente (p.ej. `bulto_pzas` antes de su DDL) se habría llevado puesto
+      // también `nombre_manual` — y sin `nombre_manual` el sync PISA el nombre
+      // editado a mano. O sea: una optimización de velocidad borrando trabajo
+      // manual, exactamente lo que este cambio no puede hacer. Cada escalón
+      // quita lo menos posible y solo se baja si el error NOMBRA una columna
+      // opcional; un error ajeno (permisos, red) se propaga como siempre.
+      const escalones = [
+        [COLS_BASE, ...optionalCols, ...colsComparacion],
+        [COLS_BASE, ...optionalCols],
+        [COLS_BASE],
+      ];
+      const todasOpcionales = [...optionalCols, ...colsComparacion];
+      let existing: unknown[] | null = null;
+      let exErr: { message: string } | null = null;
+      for (let i = 0; i < escalones.length; i++) {
+        const r = await readExisting(escalones[i].join(", "));
+        existing = r.data as unknown[] | null;
+        exErr = r.error;
+        if (!exErr) break;
+        if (i === escalones.length - 1) break;
+        if (!todasOpcionales.some((c) => exErr!.message.includes(c))) break;
       }
       if (exErr) throw new Error(`leer ${productsTable}: ${exErr.message}`);
       const bySku = new Map<string, ExistingProduct>();
@@ -559,27 +608,48 @@ export async function syncCatalogo(
           if (precioOk != null && (p.price == null || Math.abs(Number(p.price) - precio) > 0.004)) {
             out.preciosCambiados.push({ sku: codigo, antes: p.price, despues: precio });
           }
+          // 🔴 EL PAYLOAD NO CAMBIÓ NI UNA COLUMNA NI UN VALOR — es el MISMO
+          // objeto que se escribía antes, solo que ahora tiene nombre para poder
+          // compararlo contra lo guardado. Si algún día hay que tocar QUÉ se
+          // escribe, se toca acá y se declara el tipo de la columna en
+          // `TIPOS_CAMPO_CATALOGO`; una columna sin declarar se escribe SIEMPRE.
+          const cambios: Record<string, unknown> = {
+            // Precio imposible → NO se escribe la columna: el producto
+            // conserva el último precio bueno y el resto se actualiza igual.
+            ...(precioOk != null ? { price: precioOk } : {}),
+            name: nameFinal,
+            active: shouldShow,
+            ...config.stockFields(existencia, disponibilidad),
+            ...(config.articuloFields ? config.articuloFields(art) : {}),
+            // Hook derive por-marca (Tommy): puede pisar name mirando la fila
+            // existente (respeta nombre_manual). {} en Reebok/Joybees.
+            ...(config.derive?.updateFields
+              ? config.derive.updateFields(art, p as unknown as Record<string, unknown>)
+              : {}),
+            // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
+          };
+          // ¿Este UPDATE guardaría exactamente lo que ya está? Se compara contra
+          // la fila que el read-all-then-write YA tenía en memoria: comparar no
+          // cuesta ni una lectura más. Ante cualquier duda, `igual` es false y se
+          // escribe igual que ayer (ver el encabezado de catalogo-igualdad.ts).
+          const igualdad = filaIgual(cambios, p as unknown as Record<string, unknown>);
+          out.comparados++;
+          if (igualdad.igual) out.sinCambios++;
+          else out.escrituras++;
           if (!dryRun) {
             // supabase-js NO lanza ante error de DB: devuelve { error }. Si no lo
             // chequeamos, un fallo de escritura (p.ej. columna inexistente) queda
             // invisible → contadores mentirosos + heartbeat verde. Throw → aborta
             // la empresa, setea out.error, dispara alerta Telegram (sin falso éxito).
-            const { error: upErr } = await db.from(productsTable).update({
-              // Precio imposible → NO se escribe la columna: el producto
-              // conserva el último precio bueno y el resto se actualiza igual.
-              ...(precioOk != null ? { price: precioOk } : {}),
-              name: nameFinal,
-              active: shouldShow,
-              ...config.stockFields(existencia, disponibilidad),
-              ...(config.articuloFields ? config.articuloFields(art) : {}),
-              // Hook derive por-marca (Tommy): puede pisar name mirando la fila
-              // existente (respeta nombre_manual). {} en Reebok/Joybees.
-              ...(config.derive?.updateFields
-                ? config.derive.updateFields(art, p as unknown as Record<string, unknown>)
-                : {}),
-              // image_url y category INTENCIONALMENTE ausentes — jamás se sobreescriben.
-            }).eq("id", p.id);
-            if (upErr) throw new Error(`update ${productsTable} sku=${codigo}: ${upErr.message}`);
+            if (!igualdad.igual) {
+              const { error: upErr } = await db.from(productsTable).update(cambios).eq("id", p.id);
+              if (upErr) throw new Error(`update ${productsTable} sku=${codigo}: ${upErr.message}`);
+            }
+            // ⚠️ El inventario de Reebok se sigue escribiendo SIEMPRE, aunque el
+            // producto no haya cambiado: saber si ya tiene esa cantidad exigiría
+            // LEER `inventory`, y eso sí sería una consulta nueva. Se prefiere la
+            // escritura de más antes que una lectura de más contra una base en
+            // compute Micro.
             if (inventoryTable) {
               const { error: invErr } = await db.from(inventoryTable).upsert(
                 { product_id: p.id, size: "UNICA", quantity: existencia },
@@ -723,14 +793,38 @@ export async function syncCatalogo(
     } catch (err) {
       out.error = err instanceof Error ? err.message : String(err);
     }
+    // ── Cuántas escrituras se hicieron y cuántas se ahorraron, POR CORRIDA ──
+    // Va en `switch_sync_log.skip_details` (jsonb, sin DDL: la columna ya existe
+    // y ya la usan los guards de montos con SU propio `campo`). Los contadores
+    // de siempre NO cambian de significado: `records_updated` sigue siendo los
+    // productos PROCESADOS y `records_skipped` los ocultados — reinterpretarlos
+    // habría movido el piso de `/api/sync-status` y del verificador.
+    const contadores: ContadoresEscritura = {
+      comparados: out.comparados,
+      escrituras: out.escrituras,
+      sinCambios: out.sinCambios,
+    };
+    if (todoSalteado(contadores) && !out.error) {
+      // GUARD DE SANIDAD, a propósito NO fail-closed (ver `todoSalteado`): un
+      // catálogo que de verdad no se movió entre dos pasadas del mismo día es
+      // posible, y tumbar la corrida sería estrenar la alerta que suena para
+      // siempre. Lo que no puede es pasar inadvertido: si esto sale TODOS los
+      // días en TODOS los catálogos, la comparación se rompió y el catálogo se
+      // está congelando en silencio.
+      console.warn(
+        `[${config.syncLogType} ${emp.empresaKey}] ⚠️ se saltearon las ${contadores.comparados} escrituras (100%): ` +
+          `ningún producto cambió. Normal entre dos pasadas seguidas; sospechoso si se repite corrida tras corrida.`,
+      );
+    }
+    const detalles = dryRun ? undefined : [...(skipDetailsPrecio ?? []), detalleEscrituras(contadores)];
     if (out.error) {
-      await finishSwitchSyncLog(logId, "error", { errorMessage: out.error, skipDetails: skipDetailsPrecio });
+      await finishSwitchSyncLog(logId, "error", { errorMessage: out.error, skipDetails: detalles });
     } else {
       await finishSwitchSyncLog(logId, "success", {
         inserted: out.agregados,
         updated: out.actualizados + out.reactivados,
         skipped: out.ocultados,
-        skipDetails: skipDetailsPrecio,
+        skipDetails: detalles,
       });
     }
     empresasOut.push(out);

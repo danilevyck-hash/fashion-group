@@ -46,6 +46,9 @@ export function syncCatalogoJoybees(
     articuloFilter: isJoybeesArticulo, // solo proveedor JCBBRANDS (excluye basura contable)
     // sin inventoryTable: el stock vive en el producto
     stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
+    // Las columnas que el UPDATE escribe además de price/name/active, para poder
+    // comparar antes de escribir (misma consulta, sin lecturas nuevas).
+    columnasEscritas: ["existencia", "disponibilidad", "stock"],
     insertExtras: { gender: "adults_m" }, // gender NOT NULL; editable en el admin
   }, opts);
 }
