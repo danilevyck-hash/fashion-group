@@ -65,29 +65,36 @@ export default function ClientTable({
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
   const { show: showContextMenu } = useContextMenu();
 
-  // Build context menu items for a CXC client row
-  const buildClientContextMenu = useCallback((client: ConsolidatedClient): ContextMenuItem[] => {
-    const hasEmail = !!client.correo;
-    return [
-      {
-        label: "Email",
-        shortcut: "E",
-        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
-        onClick: () => onOpenEmail(client),
-        hidden: !hasEmail,
-        dividerAfter: true,
-      },
-      {
-        label: "Ver en directorio",
-        shortcut: "D",
-        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-        onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); },
-      },
-    ];
-  }, [onOpenEmail]);
+  // Menú de CLICK DERECHO (solo escritorio) de una fila del CXC.
+  //
+  // 🔑 Dice lo MISMO que el menú "···", con las MISMAS palabras: es la misma
+  // fila y no puede tener dos vocabularios ni dos juegos de opciones. Por eso
+  // "Ver en directorio" también se fue de acá (14-ago-2026): el #550 la retiró
+  // del "···" y ésta quedó viva, que es justo la incoherencia que se vino a
+  // arreglar. Con ella se fueron su ícono y su `window.open` — no la usaba nadie
+  // más (el `?search=` de `/clientes` sigue funcionando para un enlace pegado a
+  // mano, pero ya no lo alimenta ninguna pantalla).
+  //
+  // 🩸 Y no se esconde cuando el cliente no tiene correo: el modal resuelve el
+  // destinatario y deja escribirlo si falta (`EnviarEmailModal`), así que el
+  // `hidden` era una herencia del viejo `mailto:`. Con una sola opción, ese
+  // `hidden` dejaba el click derecho SIN menú alguno en esas filas mientras el
+  // "···" de la misma fila sí ofrecía la acción.
+  const buildClientContextMenu = useCallback((client: ConsolidatedClient): ContextMenuItem[] => [
+    {
+      label: "Enviar correo",
+      shortcut: "E",
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+      onClick: () => onOpenEmail(client),
+    },
+  ], [onOpenEmail]);
 
   // Menú "···" visible en cada fila: las CUATRO cosas que se hacen para cobrar,
   // alcanzables en touch (el menú de click-derecho no existe en iPad).
+  //
+  // 🔑 Dice "Enviar correo", no "Enviar email" (14-ago-2026): la app se lee en
+  // español simple y el resto del módulo ya dice correo (el modal, el botón que
+  // manda, el aviso de "Correo enviado"). "Email" era la palabra que quedó.
   //
   // 🔴 Eran 7 y quedaron 4 (14-ago-2026). Se retiraron "Ya contacté · Llamada"
   // y "Ya contacté · Visita" —escribían en `cxc_contact_log` y el resultado no
@@ -98,7 +105,7 @@ export default function ClientTable({
   const buildRowMenuItems = useCallback((client: ConsolidatedClient): OverflowMenuItem[] => [
     { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
-    { label: "Enviar email", onClick: () => onOpenEmail(client) },
+    { label: "Enviar correo", onClick: () => onOpenEmail(client) },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
   ], [onOpenEstado, onWhatsApp, onOpenEmail, onCopyMessage]);
 

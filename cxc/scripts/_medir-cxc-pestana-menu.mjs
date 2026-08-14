@@ -23,9 +23,12 @@ mkdirSync(OUT, { recursive: true });
 const ANCHOS = [390, 834, 1024, 1440];
 const ROLES = ["admin", "secretaria", "vendedor"];
 
-const MENU_ESPERADO = ["Estado de cuenta", "WhatsApp", "Enviar email", "Copiar mensaje"];
+const MENU_ESPERADO = ["Estado de cuenta", "WhatsApp", "Enviar correo", "Copiar mensaje"];
 
-/** Textos que YA NO pueden aparecer en el menú. */
+/** Lo que ofrece el menú de CLICK DERECHO (solo escritorio), con SU vocabulario. */
+const CONTEXTO_ESPERADO = ["Enviar correo"];
+
+/** Textos que YA NO pueden aparecer en NINGUNO de los dos menús. */
 const RETIRADOS = ["Ya contacté", "Ver en directorio"];
 
 const MODULOS = JSON.stringify(["cxc", "clientes", "catalogos", "guias"]);
@@ -162,10 +165,64 @@ async function main() {
       if (items.length === 0) fallar(`${ancho}: el menú no abrió (no se midió nada)`);
       if (JSON.stringify(items) !== JSON.stringify(MENU_ESPERADO)) fallar(`${ancho}: el menú no es exactamente las 4 esperadas`);
       for (const r of RETIRADOS) if (items.some((i) => i.includes(r))) fallar(`${ancho}: volvió "${r}"`);
+      if (items.some((i) => /email/i.test(i))) fallar(`${ancho}: el menú todavía dice "email"`);
       if (bajos > 0) fallar(`${ancho}: ${bajos} opción(es) por debajo de 44px`);
       if (fuera && (fuera.izq < 0 || fuera.der < 0)) fallar(`${ancho}: el menú se sale de la pantalla`);
       if (m.arrastre > 0) fallar(`${ancho}: ${m.arrastre}px de arrastre con el menú abierto`);
       await page.screenshot({ path: `${OUT}/menu-${ancho}.png` });
+      await page.close();
+    }
+  }
+
+  // ── 4. El menú de CLICK DERECHO (solo escritorio) ─────────────────────────
+  //
+  // Los dos menús de la MISMA fila tienen que decir lo mismo: acá se comprueba
+  // que ofrece "Enviar correo" con esa palabra y que "Ver en directorio" no
+  // volvió. ⚠️ La regla de los 44px NO le aplica: este menú no existe en touch
+  // (`ContextMenuProvider` lo apaga en cuanto detecta un `touchstart`), así que
+  // lo que se mide es que entre entero en pantalla.
+  console.log("\n### 4. MENÚ DE CLICK DERECHO DE UNA FILA (escritorio)\n");
+  {
+    const cookie = readFileSync("/tmp/fg-t198-cookie-admin.txt", "utf8").trim();
+    await ctx.clearCookies();
+    await ctx.addCookies([{ name: "cxc_session", value: cookie, domain: "localhost", path: "/" }]);
+
+    for (const ancho of [1024, 1440]) {
+      const page = await abrir(ctx, "admin", ancho, `${BASE}/admin`);
+      // El asidero del nombre es el `title` de la fila; la grilla de escritorio
+      // es la SEGUNDA (la primera es la tarjeta de celular, que no tiene menú).
+      const fila = page.locator('.sm\\:grid [title]:visible').first();
+      await fila.waitFor({ timeout: 30000 });
+      await fila.click({ button: "right" });
+      await page.waitForTimeout(400);
+      const items = await page.evaluate(`(() => {
+        const menu = document.querySelector('[data-menu="contexto"]');
+        if (!menu) return null;
+        return [...menu.querySelectorAll('[data-label]')].map(s => s.textContent.trim());
+      })()`);
+      const fuera = await page.evaluate(`(() => {
+        const menu = document.querySelector('[data-menu="contexto"]');
+        if (!menu) return null;
+        const r = menu.getBoundingClientRect();
+        return { izq: Math.round(r.left), der: Math.round(innerWidth - r.right), arriba: Math.round(r.top), abajo: Math.round(innerHeight - r.bottom) };
+      })()`);
+      const m = await page.evaluate(MEDIR);
+
+      console.log(
+        `  ${String(ancho).padStart(4)}px  ${items ? items.length : 0} opciones: [${(items ?? []).join(" | ")}]` +
+        `  · dentro de pantalla izq ${fuera?.izq} / der ${fuera?.der} / arriba ${fuera?.arriba} / abajo ${fuera?.abajo}` +
+        ` · arrastre ${m.arrastre}px`,
+      );
+      if (!items || items.length === 0) fallar(`${ancho}: el menú de click derecho no abrió (no se midió nada)`);
+      else {
+        if (JSON.stringify(items) !== JSON.stringify(CONTEXTO_ESPERADO)) fallar(`${ancho}: el menú de click derecho no es exactamente lo esperado`);
+        for (const r of RETIRADOS) if (items.some((i) => i.includes(r))) fallar(`${ancho}: volvió "${r}" al click derecho`);
+        if (items.some((i) => /email/i.test(i))) fallar(`${ancho}: el click derecho todavía dice "email"`);
+        for (const i of items) if (!MENU_ESPERADO.includes(i)) fallar(`${ancho}: "${i}" no existe en el menú "···"`);
+      }
+      if (fuera && (fuera.izq < 0 || fuera.der < 0 || fuera.arriba < 0 || fuera.abajo < 0)) fallar(`${ancho}: el menú de click derecho se sale de la pantalla`);
+      if (m.arrastre > 0) fallar(`${ancho}: ${m.arrastre}px de arrastre con el click derecho abierto`);
+      await page.screenshot({ path: `${OUT}/contexto-${ancho}.png` });
       await page.close();
     }
   }

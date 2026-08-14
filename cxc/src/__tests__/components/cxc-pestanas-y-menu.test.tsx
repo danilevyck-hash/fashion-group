@@ -13,11 +13,19 @@
  *     directorio" tampoco servía. Daniel, textual: *"sobre darle seguimiento no
  *     es algo que quiero para ese módulo, llamo al cliente por fuera y ya"*.
  *
+ * 🔑 Y desde el 14-ago-2026, LOS DOS MENÚS DE LA FILA DICEN LO MISMO. El "···"
+ * y el de CLICK DERECHO son la misma fila: no pueden tener dos vocabularios
+ * ("Email" en uno y "Enviar email" en el otro) ni dos juegos de opciones ("Ver
+ * en directorio" seguía viva en el de click derecho, porque el #550 solo podó
+ * el "···"). Hoy el "···" dice "Enviar correo" y el de click derecho ofrece esa
+ * MISMA opción con esa MISMA palabra.
+ *
  * 🩸 POR QUÉ PINTA DE VERDAD y no barre el archivo: el menú se arma en DOS
- * componentes (la tabla del escritorio y la tarjeta del celular) y solo existe
- * DESPUÉS de tocar el "···" — un menú que queda con 5 opciones en una de las dos
- * pantallas se ve normal en el código y está mal en la mano de quien cobra. Acá
- * se abre el menú y se leen las opciones.
+ * componentes (la tabla del escritorio y la tarjeta del celular), el de click
+ * derecho en un TERCER lugar, y ninguno existe hasta que se toca la fila — un
+ * menú que queda con 5 opciones, o que dice otra palabra, se ve normal en el
+ * código y está mal en la mano de quien cobra. Acá se abren los menús y se leen
+ * las opciones.
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -37,10 +45,16 @@ import { ContextMenuProvider } from "@/components/ui";
 import { ROLES_BOSTON } from "@/lib/cxc/boston-roles";
 
 /** Las 4 que quedan, en su orden, iguales en las dos pantallas. */
-const MENU_ESPERADO = ["Estado de cuenta", "WhatsApp", "Enviar email", "Copiar mensaje"];
+const MENU_ESPERADO = ["Estado de cuenta", "WhatsApp", "Enviar correo", "Copiar mensaje"];
 
-/** Las que se retiraron: si alguna vuelve, esto se pone rojo. */
+/** Lo que ofrece el menú de CLICK DERECHO (solo escritorio), con SU vocabulario. */
+const CONTEXTO_ESPERADO = ["Enviar correo"];
+
+/** Las que se retiraron: si alguna vuelve, a cualquiera de los menús, esto se pone rojo. */
 const RETIRADAS = ["Ya contacté · Llamada", "Ya contacté · Visita", "Ver en directorio"];
+
+/** La palabra que se fue: la app se lee en español simple. */
+const PALABRA_PROHIBIDA = /email/i;
 
 const SIN_BOSTON = ["vendedor", "bodega", "contabilidad", "gerente_acs"] as const;
 
@@ -113,6 +127,30 @@ function opcionesDelMenu(): string[] {
   return screen.getAllByRole("menuitem").map((b) => b.textContent!);
 }
 
+/**
+ * Hace CLICK DERECHO sobre la fila y devuelve las etiquetas del menú que sale.
+ *
+ * El asidero es `data-menu="contexto"`, no una clase de Tailwind: buscar por
+ * clase devuelve vacío en cuanto alguien toca el estilo, el test compararía
+ * CERO opciones y pasaría en verde sin haber mirado nada. Devuelve `null`
+ * cuando NO se abrió ningún menú — que es un resultado distinto de "se abrió
+ * vacío" y hay un caso que lo mira.
+ */
+function opcionesClickDerecho(nombre = CLIENTE.nombre_normalized): string[] | null {
+  // ⚠️ ClientRow pinta el nombre DOS veces —la tarjeta de celular y la grilla de
+  // escritorio— y el `onContextMenu` vive SOLO en la de escritorio, que en el
+  // DOM va segunda. Quedarse con la primera coincidencia mide la de celular, el
+  // menú no abre nunca y el test se cae por el motivo equivocado. Se hace click
+  // derecho en las dos: si ninguna abre menú, es que la fila lo perdió.
+  const filas = document.querySelectorAll(`[title="${nombre}"]`);
+  expect(filas.length).toBeGreaterThan(0); // se pintó una fila de verdad
+  for (const fila of filas) fireEvent.contextMenu(fila);
+  const menu = document.querySelector('[data-menu="contexto"]');
+  if (!menu) return null;
+  // `data-label` es el texto que se lee: sin el ícono ni el atajo de teclado.
+  return [...menu.querySelectorAll("[data-label]")].map((s) => s.textContent!.trim());
+}
+
 function pintarEscritorio() {
   return render(
     <ContextMenuProvider>
@@ -181,6 +219,13 @@ describe.each([
     for (const retirada of RETIRADAS) expect(items).not.toContain(retirada);
     expect(items.some((i) => /contact|seguimiento|directorio/i.test(i))).toBe(false);
   });
+
+  it("🔑 dice 'Enviar correo' — la palabra 'email' no se le muestra a nadie", () => {
+    pintar();
+    const items = opcionesDelMenu();
+    expect(items).toContain("Enviar correo");
+    for (const item of items) expect(item).not.toMatch(PALABRA_PROHIBIDA);
+  });
 });
 
 describe("las dos pantallas ofrecen lo MISMO", () => {
@@ -192,6 +237,69 @@ describe("las dos pantallas ofrecen lo MISMO", () => {
 
     pintarCelular();
     expect(opcionesDelMenu()).toEqual(escritorio);
+  });
+});
+
+// ──────────────── 2b. EL MENÚ DE CLICK DERECHO (solo escritorio) ────────────────
+
+describe("el menú de CLICK DERECHO de una fila", () => {
+  it("🔴 ofrece EXACTAMENTE esto, y 'Ver en directorio' YA NO está", () => {
+    pintarEscritorio();
+    const items = opcionesClickDerecho();
+    expect(items).toEqual(CONTEXTO_ESPERADO);
+    for (const retirada of RETIRADAS) expect(items).not.toContain(retirada);
+    expect(items!.some((i) => /directorio|contact|seguimiento/i.test(i))).toBe(false);
+  });
+
+  it("🔑 usa las MISMAS palabras que el menú '···' — ni una opción de su propia cosecha", () => {
+    pintarEscritorio();
+    const contexto = opcionesClickDerecho();
+    expect(contexto!.length).toBeGreaterThan(0); // se leyó algo real
+    // Cada opción del click derecho tiene que existir, TAL CUAL, en el "···".
+    for (const item of contexto!) expect(MENU_ESPERADO).toContain(item);
+    for (const item of contexto!) expect(item).not.toMatch(PALABRA_PROHIBIDA);
+  });
+
+  it("🩸 sale igual cuando el cliente NO tiene correo registrado (el modal lo pide)", () => {
+    // Con una sola opción escondida, el click derecho no abriría NADA — mientras
+    // el "···" de esa misma fila sí ofrece la acción. Dos juegos de opciones
+    // para la misma fila es justo lo que este candado impide.
+    expect(CLIENTE.correo).toBe("");
+    pintarEscritorio();
+    expect(opcionesClickDerecho()).toEqual(CONTEXTO_ESPERADO);
+  });
+
+  it("la opción llama a onOpenEmail (abre el modal, no un mailto)", () => {
+    const llamados: string[] = [];
+    render(
+      <ContextMenuProvider>
+        <ClientTable
+          filtered={[CLIENTE]}
+          roleCompanies={EMPRESAS}
+          roleClients={[CLIENTE]}
+          companyFilter="all"
+          setCompanyFilter={noop}
+          riskFilter="all"
+          setRiskFilter={noop}
+          search=""
+          setSearch={noop}
+          sortKey="total"
+          sortDir="desc"
+          toggleSort={noop}
+          sortArrow={() => ""}
+          userRole="admin"
+          onOpenEmail={() => llamados.push("email")}
+          onSaveEdit={noop}
+          onWhatsApp={noop}
+          onCopyMessage={noop}
+          onOpenEstado={noop}
+        />
+      </ContextMenuProvider>,
+    );
+    expect(opcionesClickDerecho()).toEqual(CONTEXTO_ESPERADO);
+    const menu = document.querySelector('[data-menu="contexto"]')!;
+    fireEvent.click(menu.querySelectorAll("button")[0]);
+    expect(llamados).toEqual(["email"]);
   });
 });
 
