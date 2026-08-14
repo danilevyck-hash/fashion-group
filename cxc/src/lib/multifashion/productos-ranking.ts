@@ -368,7 +368,7 @@ export interface RangoFechas {
  * más el mes en curso, y el rótulo de la pantalla lo dice con esas dos fechas.
  *
  * PURO: recibe `ahora` explícito (nunca `new Date()` adentro) para poder probarlo
- * con fechas fijas, igual que `ventana-gerente.ts`.
+ * con fechas fijas — el bug de un borde de mes solo aparece 1 día de cada 30.
  */
 export function rango12Meses(ahora: Date): RangoFechas {
   const hoy = diaPanama(ahora);

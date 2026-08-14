@@ -20,18 +20,11 @@
 //
 // ── LAS CUATRO COSAS QUE ESTA RUTA NO PUEDE HACER MAL ───────────────────────
 //
-// 1. LA VENTANA DE `gerente_acs` SE ACOTA ACÁ, EN EL SERVIDOR. Jennifer ve el
-//    mes en curso y el mismo mes del año pasado. Esconder el selector en la UI
-//    no cierra nada: con su cookie se llama a esta URL a mano. (Ver
-//    src/lib/multifashion/ventana-gerente.ts y el candado
-//    multifashion-ventana-gerente.test.ts, que exige el clamp en toda ruta nueva.)
-//
-//    ⚠️ **SON DOS RANGOS, y los DOS pasan por el clamp.** El comparativo contra
-//    el año pasado es un período NUEVO: se deriva del ya acotado y encima vuelve
-//    a validarse con `clampRangoComparativo`. La regla de esta ruta no es "la
-//    ruta tiene un clamp", es **ningún rango llega a la DB sin que el rol lo
-//    haya aprobado** — un `.gte()/.lte()` nuevo sin su clamp es una fuga, aunque
-//    el clamp de arriba siga en su lugar.
+// 1. LA EMPRESA ES UNA CONSTANTE, NO UN PARÁMETRO. Multifashion ES
+//    american_classic; aceptarla por query abriría el resto del grupo a quien
+//    solo tiene este módulo. (El recorte de PERÍODO que tenía `gerente_acs` se
+//    levantó el 13-ago-2026 — ver CLAUDE.md § Roles. Lo que NO cambió es quién
+//    entra: el módulo sigue siendo el único suyo.)
 //
 // 2. LAS NOTAS DE CRÉDITO RESTAN. La tabla guarda MAGNITUDES positivas y el
 //    signo lo pone la lectura, mirando `tipo`. La matemática vive en
@@ -78,8 +71,7 @@
 //    reparten en las 5 marcas reales (+ "Otros") y viajan particionadas en
 //    `porMarca`; el navegador filtra sin red. Dos razones, y las dos pesan:
 //    · un `?marca=TH` sería un rango más contra la base por cada toque —20.445
-//      filas, 7,6 s— y encima una superficie nueva que tendría que pasar por el
-//      clamp del punto 1;
+//      filas, 7,6 s— contra una base que ya se cayó por saturación;
 //    · "un toque" con espera de 2 s no es un toque.
 //    Lo que Switch llama "marca" son 32 valores que en realidad son MARCA +
 //    DEPARTAMENTO (`TH MENSWEAR`); las marcas de verdad son cinco. El mapa es
@@ -90,11 +82,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
-import {
-  clampPeriodoProductos,
-  clampRangoComparativo,
-  type PeriodoProductos,
-} from "@/lib/multifashion/ventana-gerente";
 // `agregarProductos` (agrupador por MARCA) sigue igual: su `FilaArticuloDiario`
 // es un subconjunto de la de acá (le sobra `costo_total`), así que la MISMA
 // lectura alimenta a los dos sin copiar filas ni pedirlas dos veces.
@@ -181,17 +168,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "periodo inválido (mes | 12m)" }, { status: 400 });
   }
 
-  // CANDADO gerente_acs — ver el punto 1 del encabezado. Admin no cambia en nada.
-  // Se acota el PERÍODO, no solo year/mes: con `periodo=12m` la ruta ni mira
-  // year/mes, así que un clamp que solo tocara esos dos no cerraría nada.
-  const acotado = clampPeriodoProductos(
-    auth.role,
-    { periodo: periodoParam as PeriodoProductos, year: yearPedido, mes: mesPedido },
-    now,
-  );
-  const periodo = acotado.periodo;
-  const year = acotado.year;
-  const mes = acotado.mes as number;
+  // Los tres parámetros viajan tal como los pidió la pantalla: la ventana
+  // acotada de `gerente_acs` se levantó el 13-ago-2026 (ver CLAUDE.md § Roles).
+  // Lo que queda arriba es la validación de rango/enumerado, que protege a la
+  // base de un parámetro absurdo y no depende del rol.
+  const periodo: "mes" | "12m" = periodoParam;
+  const year = yearPedido;
+  const mes = mesPedido;
 
   // `fecha` es DATE pelado, así que el período se acota con dos fechas de
   // calendario (nada de timestamps ni zonas horarias: no hay hora que correr).
@@ -203,16 +186,11 @@ export async function GET(req: NextRequest) {
       : `${year}-${dd(mes)}-${dd(new Date(Date.UTC(year, mes, 0)).getUTCDate())}`;
 
   // ── El MISMO período un año antes (ver el punto 4 del encabezado). Se deriva
-  //    del período YA ACOTADO, y aun así vuelve a pasar por el clamp: es un
-  //    rango nuevo contra la base, y en esta ruta ningún rango llega a la DB sin
-  //    que `auth.role` lo haya aprobado. `null` = no se consulta y no hay
-  //    comparación (la pantalla se dibuja igual).
+  //    del período pedido y se consulta SIEMPRE: hasta el 13-ago-2026 podía
+  //    apagarse para `gerente_acs` por caer fuera de su ventana; esa ventana ya
+  //    no existe. Lo que sí sigue apagando la comparación es un fallo de esa
+  //    lectura (ver el `catch` de abajo).
   const compRango = rangoComparativo(periodo, { year, mes, desde, hasta }, now);
-  const compPermitido = clampRangoComparativo(
-    auth.role,
-    { inicio: compRango.desde, fin: compRango.hasta },
-    now,
-  );
 
   /** El período, agrupado por Postgres. UNA llamada — ver el punto 3. */
   const leerPeriodoRpc = async (d: string, h: string): Promise<LecturaPeriodo> => {
@@ -295,13 +273,11 @@ export async function GET(req: NextRequest) {
 
     const [periodo1, periodoComp, dicc] = await Promise.all([
       leerPeriodoRpc(desde, hasta),
-      compPermitido
-        ? leerPeriodoRpc(compPermitido.inicio, compPermitido.fin).catch(err => {
-            fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
-            console.error("[multifashion/productos] comparativo no disponible", err);
-            return null;
-          })
-        : Promise.resolve(null),
+      leerPeriodoRpc(compRango.desde, compRango.hasta).catch(err => {
+        fallo.comparativo = err instanceof Error ? err.message : "error inesperado";
+        console.error("[multifashion/productos] comparativo no disponible", err);
+        return null;
+      }),
       leerMarcas().catch(err => {
         marcaDisponible = false;
         marcaError = err instanceof Error ? err.message : "error inesperado";

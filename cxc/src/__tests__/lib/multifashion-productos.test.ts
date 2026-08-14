@@ -236,13 +236,14 @@ describe("candado estático — /api/multifashion/productos", () => {
     expect(src).not.toMatch(/tipo\s*===\s*["']NC["']/);
   });
 
-  it("acota la ventana de gerente_acs en el SERVIDOR", () => {
-    expect(src).toContain('from "@/lib/multifashion/ventana-gerente"');
-    // El clamp pasó de `clampAnioMes` a `clampPeriodoProductos` cuando la ruta
-    // ganó el parámetro `periodo`: acotar year/mes ya no alcanzaba, porque con
-    // `periodo=12m` la ruta ni los mira. Lo que se exige sigue siendo lo mismo
-    // — que el rol de la SESIÓN acote el período ANTES de tocar la base.
-    expect(src).toMatch(/clampPeriodoProductos\(\s*\n?\s*auth\.role/);
+  it("valida el período aunque ya no lo recorte por rol", () => {
+    // La ventana acotada de `gerente_acs` se levantó el 13-ago-2026 (ver
+    // `multifashion-acceso.test.ts`). Lo que NO se fue con ella es la
+    // validación del enumerado: `periodo` solo puede ser "mes" o "12m", y eso
+    // protege a la base de un parámetro absurdo, no a Jennifer de un dato.
+    expect(src, "el clamp retirado no puede volver por la ventana")
+      .not.toContain("@/lib/multifashion/ventana-gerente");
+    expect(src).toMatch(/periodo inválido \(mes \| 12m\)/);
   });
 
   it("la empresa es una CONSTANTE, no un parámetro de la URL", () => {

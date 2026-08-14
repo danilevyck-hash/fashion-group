@@ -353,8 +353,8 @@ describe("ventana de 12 meses", () => {
 //   · `rango12Meses` con el offset de Panamá en 0 (UTC pelado) ........ 1 rojo
 //   · los márgenes null puestos primero en vez de al final ............ 1 rojo
 // En los candados vecinos, sobre la MISMA ruta:
-//   · pasarle "admin" fijo al clamp en vez de `auth.role` ............. 6 rojos
-//     (multifashion-ventana-gerente + multifashion-productos)
+//   (el clamp de la ventana de `gerente_acs` se retiró el 13-ago-2026 — ver
+//    multifashion-acceso.test.ts)
 //   · cambiar el `.range()` paginado por un `.limit(5000)` ............ 1 rojo
 //   · paginar sin `.order()` estable .................................. 1 rojo
 //     (los dos en supabase-paginado.test.ts)

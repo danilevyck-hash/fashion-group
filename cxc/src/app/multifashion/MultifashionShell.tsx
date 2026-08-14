@@ -23,7 +23,6 @@ import { VentaHoyCard } from "@/components/multifashion/VentaHoyCard";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
-import { esRolAcotado } from "@/lib/multifashion/ventana-gerente";
 import type { Multifashion } from "@/components/ventas/types";
 
 // Fetcher puro del overview por año. Misma llamada que tenía el onYearChange
@@ -49,17 +48,13 @@ export function MultifashionShell({
   const currentYear = new Date().getFullYear();
   // Mientras no esté chequeado no renderizamos contenido para no parpadear
   // data a un rol sin acceso (useAuth redirige si no pasa).
-  const { authChecked, role } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
+  const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin", "gerente_acs"] });
 
-  // Ventana acotada (gerente_acs): mes en curso + mismo mes del año pasado. Acá
-  // solo se DIBUJA menos — el candado real vive en /api/multifashion/* (ver
-  // src/lib/multifashion/ventana-gerente.ts). Esconder controles no cierra nada:
-  // es exactamente el error que ya se cometió en Catálogos (CLAUDE.md).
-  const ventanaAcotada = esRolAcotado(role);
-  const añosVisibles = ventanaAcotada
-    ? availableYears.filter(y => y === currentYear || y === currentYear - 1)
-    : availableYears;
-  const años = añosVisibles.length > 0 ? añosVisibles : [currentYear];
+  // Todos los años con datos, para todos los roles del módulo. El 13-ago-2026
+  // se levantó la ventana acotada de `gerente_acs` — Daniel, textual:
+  // *"abrile Multifashion completo"* (ver CLAUDE.md § Roles). Lo que NO cambió:
+  // Multifashion sigue siendo su ÚNICO módulo.
+  const años = availableYears.length > 0 ? availableYears : [currentYear];
 
   // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
   const [selectedYear, setSelectedYear] = useState(initialYear);
@@ -168,9 +163,7 @@ export function MultifashionShell({
       {/* Venta del día — lo PRIMERO que se ve, arriba de los sub-tabs y del
           selector de mes: es la pregunta con la que se abre el módulo. Se pide
           aparte del overview (que es anual y pesado) para que aparezca sin
-          esperarlo, y se re-pide tras un "Actualizar ahora". No se le pasa
-          `ventanaAcotada`: "hoy" está dentro de la ventana de gerente_acs, y
-          el recorte real de los comparativos lo hace el servidor. */}
+          esperarlo, y se re-pide tras un "Actualizar ahora". */}
       <VentaHoyCard syncTick={syncTick} habilitado={authChecked} />
 
       {fetchError && (
@@ -185,7 +178,6 @@ export function MultifashionShell({
           selectedYear={selectedYear}
           isClosedYear={isClosedYear}
           syncTick={syncTick}
-          ventanaAcotada={ventanaAcotada}
         />
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">

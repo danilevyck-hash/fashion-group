@@ -7,15 +7,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  TrendingUp, Users, UserCircle, Wallet, Package, ChevronLeft, ChevronRight,
+  TrendingUp, Users, UserCircle, Wallet, Package, Target, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { ventanaGerente } from "@/lib/multifashion/ventana-gerente";
 import type { Multifashion } from "@/components/ventas/types";
 import { VendedorasSubtab } from "./VendedorasSubtab";
 import { MultifashionResumenView } from "./MultifashionResumenView";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 import { ProductosSubtab } from "./ProductosSubtab";
 import { CajaSubtab } from "./CajaSubtab";
+import { MetasSubtab } from "./MetasSubtab";
 
 // iPhone: los 4 sub-tabs medían 36px de alto (py-2 + text-xs) — por debajo de
 // los 44 de la regla táctil, y son el control que más se toca del módulo. Con
@@ -23,19 +23,29 @@ import { CajaSubtab } from "./CajaSubtab";
 // más angosto, "Caja", ya medía 69px de ancho). Los tabs de /ventas ya iban en
 // 44 por su py-3: esto los empareja.
 //
-// 🩸 EL ÍCONO SE ESCONDE EN CELULAR, y no es capricho: con el 5º sub-tab
-// (Productos) la tira pasó a medir 484 px contra los 390 del iPhone — 94 px
-// MEDIDOS en el navegador, o sea que "Caja" quedaba fuera de la pantalla y solo
-// se alcanzaba arrastrando la tira. Cada ícono se lleva 18 px (12 del `h-3 w-3`
-// + 6 del `gap-1.5`, que un hijo con `display:none` deja de generar) y el `px`
-// 4 más por pestaña: 5 × 22 = 110 px, suficiente para volver a 0. El ícono es
-// decoración —el rótulo queda entero— y a partir de `sm` vuelve a aparecer.
+// 🩸 EL ÍCONO SE ESCONDE HASTA `lg`, Y NO ES CAPRICHO: es lo que hace que las
+// pestañas ENTREN. Con el 5º sub-tab (Productos) la tira ya había pasado de 390
+// px y hubo que esconder el ícono en celular; con el 6º (Metas) volvió a pasar,
+// **medido en el navegador**: 433 px contra 390 (desborda 43) y 565 contra 554
+// en el iPad (desborda 11). Una tira que desborda deja la última pestaña fuera
+// de la pantalla, alcanzable solo arrastrando — que es exactamente el defecto
+// que ya se corrigió una vez.
+//
+// Cada ícono se lleva 18 px (12 del `h-3 w-3` + 6 del `gap-1.5`, que un hijo con
+// `display:none` deja de generar): 6 × 18 = 108 px. Con eso el iPad pasa de 565
+// a 457 sobre 554 disponibles. En celular los íconos ya estaban ocultos, así que
+// ahí lo que cierra la cuenta es el relleno: `px-1.5` en vez de `px-2.5` son 8 px
+// por pestaña × 6 = 48 px → 385 sobre 390. El ícono es DECORACIÓN (el rótulo
+// queda entero) y desde `lg` vuelve a aparecer, donde sobra ancho de sobra.
+//
+// ⚠️ NO se acortó ningún rótulo: son texto que el personal lee, y cambiarlos es
+// decisión de Daniel.
 const SUBTAB_TRIGGER_CLASS =
-  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2.5 py-2 text-xs text-gray-500 sm:px-3 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
+  "min-h-[44px] gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-1.5 py-2 text-xs text-gray-500 lg:px-3 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-gray-950 data-[state=active]:shadow-none";
 
-/** El ícono de cada sub-tab: decorativo, y oculto en celular para que las 5
- *  pestañas entren en 390 px sin arrastrar. Ver la nota de arriba. */
-const SUBTAB_ICON_CLASS = "hidden h-3 w-3 sm:inline-block";
+/** El ícono de cada sub-tab: decorativo, y oculto hasta `lg` para que las 6
+ *  pestañas entren sin arrastrar en celular Y en iPad. Ver la nota de arriba. */
+const SUBTAB_ICON_CLASS = "hidden h-3 w-3 lg:inline-block";
 
 interface MultifashionViewProps {
   data: Multifashion;
@@ -44,12 +54,9 @@ interface MultifashionViewProps {
   /** Sube +1 cada vez que el header corre un "Actualizar ahora" con éxito. Se
    *  pasa tal cual al Resumen para que re-pida el detalle del mes. */
   syncTick?: number;
-  /** gerente_acs: mes en curso + mismo mes del año pasado, nada más. Acá solo
-   *  quita controles que igual no funcionarían — el candado está en la API. */
-  ventanaAcotada?: boolean;
 }
 
-export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, ventanaAcotada = false }: MultifashionViewProps) {
+export function MultifashionView({ data, selectedYear, isClosedYear, syncTick }: MultifashionViewProps) {
   // Sub-tab activo en la URL (?subtab=resumen|vendedoras|clientes). Key distinta
   // a "tab" del shell para no chocar. Persiste en refresh/back-forward. Los tabs
   // viejos "overview" y "mes" (fusionados en "resumen") se normalizan acá para no
@@ -75,13 +82,6 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
   //     Dic (año cerrado) / mes calendario (año en curso).
   const { minMonth, maxMonth, mesDefault } = useMemo(() => {
     const now = new Date();
-    // Ventana acotada: un solo mes navegable — el mes en curso de Panamá (UTC-5
-    // fijo, el mismo que calcula el clamp del servidor). Con min = max = ese
-    // mes, las flechas quedan deshabilitadas y el dropdown no se dibuja.
-    if (ventanaAcotada) {
-      const m = ventanaGerente(now).mes;
-      return { minMonth: m, maxMonth: m, mesDefault: m };
-    }
     const isCurrentYear = selectedYear === now.getFullYear();
     const currentCalMonth = now.getMonth() + 1;
     const withData: number[] = [];
@@ -94,7 +94,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
       : (withData.length > 0 ? withData[withData.length - 1] : 12);
     const def = max;
     return { minMonth: min, maxMonth: max, mesDefault: def };
-  }, [data.retail.meses, selectedYear, isClosedYear, ventanaAcotada]);
+  }, [data.retail.meses, selectedYear, isClosedYear]);
 
   const [mes, setMes] = useUrlState("mfMes", mesDefault);
 
@@ -118,10 +118,8 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
   // selector de mes compartido tiene sentido o no: con "Últimos 12 meses" el mes
   // no elige nada, y dejar los dos controles en pantalla es la forma más fácil
   // de mirar un período creyendo que se mira otro (la advertencia que ya estaba
-  // escrita en este archivo). El rol acotado no puede pedir 12 meses.
-  const [periodoProductos, setPeriodoProductos] = useState<"mes" | "12m">(
-    ventanaAcotada ? "mes" : "12m",
-  );
+  // escrita en este archivo).
+  const [periodoProductos, setPeriodoProductos] = useState<"mes" | "12m">("12m");
 
   // Sub-tabs que se manejan con el selector de mes compartido.
   const usaSelectorMes =
@@ -161,23 +159,11 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
           año lo fija ese selector global; aquí solo el mes. Se muestra en Resumen
           (vista unificada del mes); Vendedoras tiene su propio control y Clientes
           usa pills propias. */}
-      {/* Ventana acotada: no hay nada que elegir — el mes es el mes en curso y
-          el servidor lo impone igual. Se muestra como etiqueta para que quede
-          claro QUÉ período se está viendo, en vez de un control muerto. */}
       {/* Los sub-tabs que leen el MES del selector compartido. Vendedoras tiene
           sus propios chips y Clientes sus pills de rango relativo: mostrarles
           este selector sería un control que no hace nada. Productos sí lo usa —
           es el mismo mes del Resumen, a propósito: son la misma pregunta. */}
-      {usaSelectorMes && ventanaAcotada && (
-        <div className="mb-4 flex items-center justify-end gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
-          <span className="inline-flex min-h-[44px] items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-xs font-medium text-gray-700">
-            {MES_FULL_OVERVIEW[mes - 1]} {selectedYear}
-          </span>
-        </div>
-      )}
-
-      {usaSelectorMes && !ventanaAcotada && (
+      {usaSelectorMes && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Mes</span>
@@ -241,6 +227,9 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
           <TabsTrigger value="caja" className={SUBTAB_TRIGGER_CLASS}>
             <Wallet className={SUBTAB_ICON_CLASS} /> Caja
           </TabsTrigger>
+          <TabsTrigger value="metas" className={SUBTAB_TRIGGER_CLASS}>
+            <Target className={SUBTAB_ICON_CLASS} /> Metas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-5">
@@ -253,28 +242,31 @@ export function MultifashionView({ data, selectedYear, isClosedYear, syncTick, v
           />
         </TabsContent>
         <TabsContent value="vendedoras" className="mt-5">
-          <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} ventanaAcotada={ventanaAcotada} />
+          <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} />
         </TabsContent>
         <TabsContent value="productos" className="mt-5">
-          {/* `ventanaAcotada` esconde la píldora de "Últimos 12 meses", que cae
-              entera fuera de lo que Jennifer puede ver. Esconderla NO es el
-              candado: el servidor aplasta `periodo=12m` a "mes"
-              (clampPeriodoProductos en /api/multifashion/productos). */}
           <ProductosSubtab
             selectedYear={selectedYear}
             mes={mes}
             periodo={periodoProductos}
             onPeriodoChange={setPeriodoProductos}
-            ventanaAcotada={ventanaAcotada}
           />
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
-          <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} ventanaAcotada={ventanaAcotada} />
+          <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} />
         </TabsContent>
         <TabsContent value="caja" className="mt-5">
           {/* Cuadre diario: independiente del año/mes global — usa su propio
               selector de día (default hoy). */}
-          <CajaSubtab ventanaAcotada={ventanaAcotada} />
+          <CajaSubtab />
+        </TabsContent>
+        <TabsContent value="metas" className="mt-5">
+          {/* Metas: el período de una meta lo define la meta, no un selector —
+              no hay control de período que pasarle. Quién puede VER el avance se
+              decide en el servidor, en src/lib/multifashion/metas-permiso.ts.
+              Si esta pestaña llega vacía para alguien, es porque el servidor no
+              le mandó metas, no porque la UI las haya escondido. */}
+          <MetasSubtab />
         </TabsContent>
       </Tabs>
     </div>

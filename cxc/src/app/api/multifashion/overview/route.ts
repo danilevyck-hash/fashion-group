@@ -11,7 +11,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { fetchMultifashion } from "@/lib/ventas/queries";
-import { clampAnioMes } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 // Overview anual cruza el empalme switch_facturas/ventas_raw (blend pesado); el
@@ -41,23 +40,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  // CANDADO gerente_acs: año en {actual, anterior} y mes = mes en curso. Admin
-  // no cambia. Ver src/lib/multifashion/ventana-gerente.ts.
-  //
-  // LA SERIE ANUAL SE DEJA COMPLETA A PROPÓSITO — esto NO es un olvido.
-  // `multifashion_overview_serie_v1(p_year)` devuelve los 12 meses del año, así
-  // que el clamp limita QUÉ años se pueden pedir pero no recorta el payload a un
-  // mes. Y así se queda: la ventana que pidió Daniel es sobre QUÉ PERÍODO se
-  // puede consultar, y el gráfico anual del año en curso es parte de ver el mes
-  // en curso (es el contexto donde se lee — sin él el número del mes no dice si
-  // fue bueno o malo). Recortar la serie vaciaría el gráfico del Resumen: le
-  // sacaría una pantalla que hoy funciona, sin cerrar nada que importe — los dos
-  // años pedibles siguen siendo {actual, anterior} y ningún año viejo entra.
-  // Si alguna vez se decide lo contrario, es una decisión de PRODUCTO de Daniel,
-  // no una fuga que quedó abierta.
-  const acotado = clampAnioMes(auth.role, { year: yearPedido, mes: mesPedido }, now);
-  const year = acotado.year;
-  const mes = acotado.mes as number;
+  // `gerente_acs` ve el histórico COMPLETO desde el 13-ago-2026 (decisión de
+  // Daniel: *"abrile Multifashion completo"*). Lo que queda arriba es la
+  // validación de rango del parámetro, que protege a la base de un `year=99999`
+  // y NO tiene nada que ver con el rol. Ver CLAUDE.md § Roles.
+  const year = yearPedido;
+  const mes = mesPedido;
 
   try {
     const multi = await fetchMultifashion({ year, mes });

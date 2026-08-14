@@ -33,7 +33,6 @@ import {
   movimientos,
   type RenglonComparativo,
 } from "@/lib/multifashion/productos-resumen";
-import { clampRangoComparativo } from "@/lib/multifashion/ventana-gerente";
 
 /** Renglón ya agregado. Solo se nombra lo que el caso está probando. */
 function r(p: Partial<RenglonRanking> & { clave: string }): RenglonRanking {
@@ -317,46 +316,10 @@ describe("movimientos — en DÓLARES, no en porcentaje", () => {
   });
 });
 
-// ═════════════════════════════════════════════════════════════════════════════
-// 6. El rango de comparación también pasa por la ventana de `gerente_acs`
-// ═════════════════════════════════════════════════════════════════════════════
-
-describe("clampRangoComparativo — un rango NUEVO no es un rango libre", () => {
-  // 7-ago-2026: ventana = agosto 2026 (1→7) + agosto 2025 (mes completo).
-  const AHORA = new Date("2026-08-07T18:00:00.000Z");
-
-  it("admin no cambia en NADA", () => {
-    const rango = { inicio: "2019-01-01", fin: "2019-12-31" };
-    expect(clampRangoComparativo("admin", rango, AHORA)).toEqual(rango);
-    expect(clampRangoComparativo(null, rango, AHORA)).toEqual(rango);
-  });
-
-  it("gerente_acs: el mes de comparación es justo lo que SÍ puede ver", () => {
-    // Es el rango que `rangoComparativo` produce para su mes en curso.
-    const rango = { inicio: "2025-08-01", fin: "2025-08-07" };
-    expect(clampRangoComparativo("gerente_acs", rango, AHORA)).toEqual(rango);
-  });
-
-  it("gerente_acs: cualquier otro período se apaga (null), no se recorta", () => {
-    expect(clampRangoComparativo("gerente_acs", { inicio: "2025-07-01", fin: "2025-07-31" }, AHORA)).toBeNull();
-    expect(clampRangoComparativo("gerente_acs", { inicio: "2024-09-01", fin: "2025-08-07" }, AHORA)).toBeNull();
-  });
-
-  it("🩸 un rango que abarca los DOS meses permitidos NO pasa", () => {
-    // Sus dos puntas están "dentro de la ventana" y aun así se lleva los once
-    // meses del medio: la ventana son dos meses DISJUNTOS, no un intervalo.
-    expect(clampRangoComparativo("gerente_acs", { inicio: "2025-08-01", fin: "2026-08-07" }, AHORA)).toBeNull();
-  });
-
-  it("un rango que se pasa UN DÍA del mes permitido tampoco pasa", () => {
-    expect(clampRangoComparativo("gerente_acs", { inicio: "2025-07-31", fin: "2025-08-07" }, AHORA)).toBeNull();
-    expect(clampRangoComparativo("gerente_acs", { inicio: "2026-08-01", fin: "2026-08-08" }, AHORA)).toBeNull();
-  });
-});
-
 // ─────────────────────────────────────────────────────────────────────────────
-// VERIFICADO POR MUTACIÓN (7-ago-2026), contando también los candados de
-// `multifashion-ventana-gerente.test.ts`, que ahora miran las DOS lecturas:
+// VERIFICADO POR MUTACIÓN (7-ago-2026). La sección 6 —el rango de comparación
+// pasando por la ventana de `gerente_acs`— se retiró el 13-ago-2026 junto con la
+// ventana misma (ver `multifashion-acceso.test.ts`):
 //   · comparar contra el mes COMPLETO (quitar el recorte por día) → rompe 2
 //   · comparar contra el mes ANTERIOR en vez del año anterior      → rompe 7
 //   · devolver pct sobre una base ≤ 0 (dividir igual)              → rompe 1
@@ -365,5 +328,4 @@ describe("clampRangoComparativo — un rango NUEVO no es un rango libre", () => 
 //   · quitar el corte de "entre los primeros N"                    → rompe 3
 //   · rankear los movimientos por pct en vez de por dólares        → rompe 2
 //   · no recorrer los grupos que solo existen en el año pasado     → rompe 1
-//   · aceptar el rango de comparación sin mirar el rol             → rompe 3
 // ─────────────────────────────────────────────────────────────────────────────
