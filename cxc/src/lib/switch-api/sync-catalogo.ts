@@ -81,37 +81,72 @@ const MAX_PAGES = 250;
  * o -1 responde 200 con body vacío, que en Switch es "esa forma no existe". O
  * sea que la salida de Boston (un reporte del panel web) no está disponible acá.
  *
- * **4 es conservador a propósito.** Medido contra Switch con lotes DISJUNTOS
- * (reusar el mismo lote medía la caché del servidor y daba un 13,6× imposible):
- * ×3 → 2,8× · ×5 → 4,7× · ×8 → 6,8×, con **0 errores y 0 respuestas vacías** en
- * los tres. La curva sigue subiendo en 8, y aun así se eligió 4: el cuello de
- * botella es un ERP ajeno del que no controlamos ni el dimensionamiento ni el
- * límite de peticiones, y la diferencia entre 4 y 8 son ~30 s sobre un
- * presupuesto de 800 — no vale comprarlos apretando al proveedor. Con 4 alcanza
- * de sobra para el margen que hacía falta.
+ * **Nació en 4, conservador a propósito** (30-jul-2026). Medido con lotes
+ * DISJUNTOS (reusar el mismo lote medía la caché del servidor y daba un 13,6×
+ * imposible): ×3 → 2,8× · ×5 → 4,7× · ×8 → 6,8×, **0 errores y 0 respuestas
+ * vacías** en los tres. La curva ya subía en 8 y aun así se eligió 4, porque el
+ * único argumento entonces era el presupuesto del CRON (800 s) y ahí sobraba.
  *
  * ⚠️ **Requiere el de-dup de login de `client.ts` (`loginEnVuelo`).** Switch
  * admite UNA sesión por empresa; sin ese candado, N llamadas concurrentes que
  * encuentren el token vencido dispararían N `/autenticacion` y se matarían el
  * token entre sí (code 0006). Subir este número sin ese candado rompe el sync.
+ * Candado: `catalogo-stock-paralelo.test.ts`.
  *
- * 📌 **RE-MEDIDO el 13-ago-2026 y SE DEJA EN 4 — no se re-litiga sin decisión
- * de Daniel.** Al paralelizar el barrido de páginas se volvió a levantar la
- * curva contra fashion_shoes, con lotes disjuntos y deriva de solo −4% (o sea,
- * la medición más limpia que tuvo este número): serial 424 ms/llamada · ×4
- * 99 ms · ×6 79 ms · ×8 58 ms · ×12 52 ms, **0 errores y 0 respuestas vacías en
- * todos**. Traducido a las 478 llamadas de Tommy: **serial 203 s · ×4 47 s ·
- * ×6 38 s · ×8 28 s**. Subir de 4 a 8 compraría ~19 s.
+ * ═══ 📌 SUBIDO DE 4 A 8 EL 14-AGO-2026, POR DECISIÓN DE DANIEL ═══
  *
- * El motivo escrito arriba para quedarse en 4 era el presupuesto del CRON. La
- * información NUEVA es que Daniel también espera MIRANDO este sync. Aun así el
- * número no se toca acá: es una decisión documentada a propósito y ~19 s no
- * justifican cambiarla de costado. Y sobre todo, **19 s no es donde está el
- * tiempo de Tommy**: con 14 páginas de catálogo (666 artículos) y 47 s de
- * /stock, lo que queda de sus ~196 s son las **~490 UPDATE de a uno** contra
- * Supabase. Ese es el próximo cuello, y es de la base, no de Switch.
+ * Textual: *"sobre tommy solo mejoralo si no hay riesgo"*. Lo que cambió no es
+ * la matemática sino QUIÉN espera: el presupuesto del cron nunca fue el
+ * problema, pero **Daniel también espera mirando** este sync desde "Actualizar
+ * ahora", y Tommy es el más largo del sistema por lejos — **455 llamadas
+ * `/stock` contra las 127 de Reebok**.
+ *
+ * **LA CURVA, medida contra `fashion_shoes` con lotes DISJUNTOS y niveles
+ * INTERCALADOS** (`N=30 NIVELES=6,8,12,6,8,12 npx tsx scripts/_probe-stock-tommy.ts`),
+ * la corrida más limpia (deriva del serial de control: **−1%**), ms/llamada:
+ *
+ *     ×6   71 · 61
+ *     ×8   58 · 54     ← acá
+ *     ×12  59 · 54     ← la curva YA NO BAJA
+ *
+ * y el 4 contra el 8, intercalado ×3 en otra corrida: **×4 107 · 126 ms** contra
+ * **×8 66 · 74 ms**. **0 errores y 0 respuestas vacías en TODOS los niveles de
+ * las cuatro corridas, ×12 incluido.**
+ *
+ * **Se elige 8 porque es donde la curva SE APLANA, no porque sea el máximo
+ * probado.** De 8 a 12 la mejora es de 1 ms sobre 55: el borde está en 8, y la
+ * regla de esta casa es quedarse en el borde y no pasarlo — el cuello es un ERP
+ * ajeno del que no controlamos ni el dimensionamiento ni el límite de
+ * peticiones.
+ *
+ * 🩸 **POR QUÉ EL DISEÑO INTERCALADO, y no medir los niveles uno tras otro.**
+ * La primera corrida de ese día, con los niveles en orden (4, 6, 8, 12), midió
+ * **×8 en 404 ms y ×12 en 281** — peor que ×4 —, con 0 errores y 0 vacías. No se
+ * reprodujo ni una vez más: fue un bache del propio Switch (entre corridas, el
+ * serial de base saltó de 513 a 1.491 ms/llamada, y el control final de una
+ * corrida acusó **−47% de deriva**). Con los niveles en orden, un bache se ve
+ * IDÉNTICO a "este nivel es malo"; intercalados, la deriva le pega igual a los
+ * dos y la comparación sobrevive. Por eso `_probe-stock-tommy.ts` acepta
+ * `NIVELES` repetidos y `FASE` (carril de artículos frío, para que repetir el
+ * probe no mida la caché de Switch).
+ *
+ * ⛔ **LO QUE ESTE CAMBIO NO TOCA, y es la mitad de por qué se pudo hacer.** Es
+ * un número: no cambia QUÉ se escribe ni CÓMO. Siguen intactos el read-all-
+ * then-write (una `/stock` fallida aborta la empresa sin escribir), los 5 campos
+ * que Daniel pone A MANO y que el sync respeta (`image_url`, `badge`,
+ * `nombre_manual`, `oculto_manual`, `bulto_pzas`), la regla de que un precio
+ * imposible NO se escribe y el producto conserva el último bueno, y los guards
+ * del barrido de páginas. **Agrupar las escrituras es OTRO día, con su propia
+ * verificación**: un `upsert` mal armado se lleva puestas las fotos de 490
+ * productos.
+ *
+ * 📊 **Y DÓNDE QUEDA EL TIEMPO DE TOMMY DESPUÉS DE ESTO.** Medido en producción
+ * con `?dryRun=1` —que corre el motor ENTERO contra Switch y no escribe nada—,
+ * la resta `corrida real − dryRun` da el costo de las **455 UPDATE de a uno**
+ * contra Supabase. Ese es el próximo cuello y es de la BASE, no de Switch. Ver
+ * `scripts/_medir-catalogo-escrituras.ts`.
  */
-const STOCK_CONCURRENCIA = 4;
+const STOCK_CONCURRENCIA = 8;
 
 /**
  * Cuántas páginas de `/apiarticulos/lista` se piden a la vez.
