@@ -55,9 +55,13 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
   const [provincia, setProvincia] = useState("");
   const [provinciaDebounced, setProvinciaDebounced] = useState("");
 
-  // Pre-llenar búsqueda desde ?search= (enlaces como "Ver en directorio" de
-  // CXC, antes apuntaban a /directorio?search=). Se lee tras montar para no
-  // romper la hidratación (el render del server usa q="").
+  // Pre-llenar búsqueda desde ?search=. Se lee tras montar para no romper la
+  // hidratación (el render del server usa q="").
+  //
+  // ⚠️ Desde el 14-ago-2026 NINGUNA pantalla arma este enlace: lo alimentaba el
+  // "Ver en directorio" del CXC, retirado de sus dos menús. Se queda porque un
+  // `?search=` pegado a mano o guardado en un marcador tiene que seguir
+  // llegando — quitarlo rompería enlaces vivos sin comprar nada.
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get("search");
     if (s) setQ(s);

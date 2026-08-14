@@ -900,6 +900,11 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
       {menu && (
         <div
           ref={menuRef}
+          // `data-menu="contexto"` es el asidero del candado y de la medición:
+          // buscar este menú por sus clases de Tailwind devuelve vacío en cuanto
+          // alguien toca el estilo, y un chequeo que compara CERO pasa en verde
+          // sin haber mirado nada. No pinta: es solo un asidero.
+          data-menu="contexto"
           className="fixed z-[100] bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] max-w-[280px]"
           style={{ left: menu.x, top: menu.y }}
         >
@@ -910,7 +915,9 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
                 className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition group/item"
               >
                 {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center text-gray-400 group-hover/item:text-gray-600">{item.icon}</span>}
-                <span className="flex-1">{item.label}</span>
+                {/* `data-label` marca el texto que se LEE (sin el ícono ni el
+                    atajo) para que el candado compare exactamente eso. */}
+                <span data-label className="flex-1">{item.label}</span>
                 {item.shortcut && <span className="text-xs text-gray-300 ml-3 font-mono">{item.shortcut}</span>}
               </button>
               {item.dividerAfter && <div className="border-t border-gray-100 my-1" />}

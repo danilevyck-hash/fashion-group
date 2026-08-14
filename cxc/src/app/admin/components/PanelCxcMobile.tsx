@@ -7,7 +7,7 @@
 // entre breakpoints.
 //
 // Contacto: cada card tiene menú "···" con las MISMAS acciones que la tabla
-// desktop (estado de cuenta / WhatsApp / email / copiar mensaje) — pedido de
+// desktop (estado de cuenta / WhatsApp / correo / copiar mensaje) — pedido de
 // Daniel 4-jul-2026 (antes se excluía a propósito). El desglose por empresa
 // muestra total exacto + último pago, y "Ver facturas pendientes" enlaza a la
 // ficha.
@@ -134,13 +134,14 @@ export default function PanelCxcMobile({
   const [expandedName, setExpandedName] = useState<string | null>(null);
 
   // Mismo menú "···" que la tabla del escritorio (ClientTable.buildRowMenuItems):
-  // las MISMAS 4 opciones, en el MISMO orden. Las dos "Ya contacté" se
-  // retiraron el 14-ago-2026 junto con el seguimiento de cobro — ver el
-  // comentario largo en ClientTable.
+  // las MISMAS 4 opciones, con las MISMAS palabras y en el MISMO orden. Las dos
+  // "Ya contacté" se retiraron el 14-ago-2026 junto con el seguimiento de cobro,
+  // y "Enviar email" pasó a "Enviar correo" el mismo día — ver el comentario
+  // largo en ClientTable.
   const buildRowMenuItems = (client: ConsolidatedClient): OverflowMenuItem[] => [
     { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
-    { label: "Enviar email", onClick: () => onOpenEmail(client) },
+    { label: "Enviar correo", onClick: () => onOpenEmail(client) },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
   ];
 

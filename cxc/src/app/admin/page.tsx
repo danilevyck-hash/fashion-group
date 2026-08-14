@@ -64,8 +64,8 @@ function buildEmailBody(client: ConsolidatedClient) {
     lines.push(`${co.name} (${co.brand}): $${fmt(d.total)}`);
   }
   lines.push(``);
-  // 🔴 ESTE TEXTO LO LEE EL CLIENTE (botón "Copiar mensaje" → WhatsApp/correo, y
-  // el mailto de "Enviar email"), así que le rige la MISMA regla que al correo
+  // 🔴 ESTE TEXTO LO LEE EL CLIENTE (botones "WhatsApp" y "Copiar mensaje" del
+  // menú "···"), así que le rige la MISMA regla que al correo
   // de estado de cuenta: **la palabra "vencido"/"vencida" está PROHIBIDA**
   // (ver el encabezado de `lib/cxc/estado-cuenta-email.ts`).
   //
