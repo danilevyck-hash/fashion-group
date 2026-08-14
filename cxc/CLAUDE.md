@@ -452,6 +452,42 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **Diagnóstico read-only contra producción:** `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-guias-entrega-directa.ts`.
 
+> ## 🔴 LAS OBSERVACIONES SE LEEN DONDE SE CARGA EL CAMIÓN (14-ago-2026)
+>
+> La observación se escribe al crear la guía y **no aparecía en `/guias/[id]`, la pantalla donde se despacha**: vivía solo en el acordeón de la lista y en el papel impreso, así que quien carga el camión tenía que volver a la lista y abrir la guía ahí para leerla. **El dato ya viajaba a esa pantalla — solo no se dibujaba** (`GET /api/guias/[id]` hace `select("*")`).
+>
+> **Va pegada a los envíos y ARRIBA de los campos que se llenan al despachar** (placa, recibido por, cédula): se lee antes de trabajar, no después. Hay candado de posición en las dos direcciones.
+>
+> **El nombre es «Observaciones».** Daniel, textual: *«Nota de entrega sí cambia a observaciones»* — 🩸 se lo habían mockeado como «Nota de entrega» y **corrigió**: no es un campo de dirección.
+>
+> ### 🔑 EL DISEÑO SALIÓ DE MEDIR EL CAMPO, NO DE SUPONERLO
+>
+> Medido contra producción el 14-ago-2026 (`scripts/_diag-guias-observaciones.ts`, solo lectura) sobre las **186 guías vivas**:
+> - **36 notas de trabajo reales** · **96 guías sin nada** · **54 con el texto administrativo** *"Cerrada en bloque el 3-ago-2026…"*
+> - **mediana 32 caracteres · la más larga 83** (GT-137) · **máximo 2 líneas**, y una sola nota tiene salto de línea
+> - o sea: **es texto CORTO y variado, no un párrafo.** Se lee de un vistazo y **no se trunca** (`whitespace-pre-wrap break-words`, sin `truncate` ni `line-clamp`). Hay candado que lee las clases del DOM.
+>
+> **Qué dicen de verdad** — el campo está haciendo **tres trabajos**: qué va adentro del bulto (`"Keriddine son muebles"`, `"1 TANQUE DE PINTURA PARA AMERICAN CLASSICS"`, `"NOVA LUX 17 PANELES - PLAZA LOS ANGELES 3 MUEBLES DE CALVIN KLEIN"`), dónde entregar (`"TIENDA 9 ALBROK MALL PASILLO DEL DELFIN"`, `"Pasillo del dinosaurio"`) y **quién retira** (`"RETIRO EN BODEGA POR PARTE DEL CLIENTE."`, `"EL CLIENTE RETIRA EN BODEGA"`, 2 guías).
+>
+> 🔑 **HALLAZGO PARA DANIEL, NO CONSTRUIDO: ese tercer uso es un MODO DE ENTREGA que no tiene campo propio** y por eso se escribe en la nota. Hoy esas dos guías salen con un transportista que no existe. **Es decisión de negocio** — no se construyó nada.
+>
+> ### Lo que NO hace
+>
+> - ⚠️ **Si la guía no tiene observación, NO se dibuja nada.** Nada de una caja vacía diciendo "sin observaciones": son **96 de 186**. Texto de solo espacios cuenta como vacío.
+> - ⚠️ **Es de SOLO LECTURA acá.** La observación se edita donde se editaba; esta pantalla la muestra, no la cambia. Candado: dentro de la caja no puede haber `input`, `textarea` ni `button`.
+> - ⚠️ **Se muestra TAL CUAL está guardada.** Hay basura en el campo (**GT-124 = `"|"`**, **GT-001 = `"S1373259"`**) y **no se filtra ni se "limpia"**: limpiar datos es decisión de Daniel. Hay candado — un `replace` que se coma la basura pone el build rojo.
+> - **También se ve en una guía YA despachada**, que es donde viven las 36 notas reales (las 36 son de guías `Completada`).
+>
+> ### Medición y candados
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción y con guías REALES** (`BASE=… node scripts/_medir-guias-observaciones.mjs`, solo lectura, **nunca toca "Despachar"**): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px** en los **20 casos** (GT-137 la más larga · GT-188 Nova Lux · GT-194 corta · GT-124 la basura · GT-201 sin nota). La caja **crece hacia abajo**: 98 px de alto a 390 con la nota más larga (2 líneas) y 77 px cuando entra en una. Los 3 recortes de GT-201 son los 8 px del `-mx-2` de `SignatureCanvas`, **PRE-EXISTENTES** (solo salen ahí porque es la única guía pendiente, o sea la única que dibuja las firmas). El script **falla** si la caja no aparece donde debe, si el texto no coincide carácter por carácter, si sale cortado, si es editable, o si aparece en la guía sin observación.
+> - 🩸 **Gotcha de medición, el de siempre:** el rótulo lleva `uppercase` **por CSS**, así que `innerText` lo devuelve en MAYÚSCULAS y compararlo tal cual da SIEMPRE `false` — el chequeo pasaría en verde sin haber mirado nada.
+>
+> **Candado: `src/__tests__/components/guias-observaciones-despacho.test.tsx` (16).** **RENDERIZA la página real y lee el DOM** — un barrido de texto sobre el archivo se cumple con su propio comentario, que en este repo ya falló cuatro veces. Los fixtures son las notas REALES de producción.
+> - **Verificado por mutación, 6 de 6 cazadas** (dentro de `bash scripts/_mutar-candados-guias.sh`, que sube a **35 de 35**): la observación deja de dibujarse · se dibuja la caja aunque no haya observación · el texto se trunca a una línea · vuelve el rótulo «Nota de entrega» · la pantalla filtra la basura · la observación se vuelve editable acá.
+>
+> **Diagnóstico read-only contra producción:** `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-guias-observaciones.ts`.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
