@@ -232,17 +232,43 @@ const STOCK_CONCURRENCIA = 8;
  * Y el peor caso del acierto es benigno: si se saltea una actualización que
  * hacía falta, los 4 catálogos corren **4×/día** y la siguiente la agarra.
  *
- * **EL ANTES/DESPUÉS, en producción, 5 corridas de cada lado y MEDIANA** (la
- * dispersión de Switch es grande: las 5 de Tommy de este mismo día fueron
- * 77/84/87/95/86 s antes):
+ * **EL ANTES/DESPUÉS REAL, en producción** — no en la laptop: se dispara el cron
+ * de verdad y se lee la duración que queda en `switch_sync_log`
+ * (`scripts/_verif-stock-concurrencia.ts`). **5 corridas de cada lado, medianas**
+ * (antes 06:17-06:38 UTC sobre `main`; después 08:05-08:23, ya deployado):
  *
- *     catálogo   UPDATE/corrida       antes      después
- *     Joybees      83 →   0            36 s       ~
- *     Reebok      127 →   0            41 s       ~
- *     Calvin       79 →   0            56 s       ~
- *     Tommy       455 →   0            84 s       ~
+ *     catálogo   UPDATE/corrida    antes    después
+ *     Joybees       83 →  0         15 s      8 s    −47%
+ *     Reebok       127 →  0         53 s     28 s    −47%
+ *     Calvin        79 →  0         56 s     57 s     ~
+ *     Tommy        455 →  0         87 s     65 s    −25%
  *
- * (los números de "después" quedan escritos abajo, en el bloque de resultados)
+ * Las 5 corridas, una por una:
+ *     antes    joybees 36·41·15·15·15 · reebok 41·38·64·53·63
+ *              calvin  56·56·60·106·46 · tommy  77·84·87·109·116
+ *     después  joybees  8·28· 7·22· 7 · reebok 57·28·27·39·27
+ *              calvin  47·106·57·47·90 · tommy  37·64·65·65·65
+ *
+ * ⚠️ **CALVIN NO SE MUEVE, Y ES LO ESPERADO** — son 79 escrituras contra el
+ * barrido de las **164 páginas** del catálogo de `vistana` (8.173 artículos),
+ * que es lo que se come su sync y no tiene nada que ver con esto. Mismo motivo
+ * por el que Reebok y Calvin casi no se movieron cuando se subió
+ * `STOCK_CONCURRENCIA`.
+ *
+ * ⚠️ **Y EL NÚMERO DE TOMMY ES MÁS CHICO QUE LOS ~50 s QUE SE ESPERABAN.** Los
+ * ~50 s salían de una medición de otro horario; en esta franja (01:00-03:30 a.m.
+ * Panamá) la base contesta más rápido y las 455 escrituras costaban ~22 s. Lo que
+ * sí mejoró mucho es la **dispersión**: Tommy pasó de 77-116 s a 37-65 s, o sea
+ * que el peor caso —que es el que ve Daniel esperando en "Actualizar ahora"— se
+ * partió casi al medio.
+ *
+ * **LA IDENTIDAD, campo por campo, primera foto contra última**: la foto de las
+ * 06:17 (antes de todo, con el código viejo) contra la de las 08:23, con **10
+ * corridas de sync de por medio** (5 de cada lado) — `joybees_products` 83 filas
+ * · `products` 284 · `inventory` 284 · `calvin_products` 80 · `tommy_products`
+ * 497 = **1.228 filas y 17.672 campos → 🟢 IDÉNTICO, cero cambios**, con las 493
+ * fotos de Tommy y las 283 de Reebok en su lugar. Y en cada una de las 20
+ * corridas el log dejó `escrituras=0 · sinCambios=744`.
  */
 
 /**

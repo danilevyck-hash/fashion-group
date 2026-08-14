@@ -67,7 +67,14 @@ function dbConUnaFilaMovida(real: SupabaseClient, tabla: string, columna: string
     const filas = r?.data;
     if (info.hecho || !Array.isArray(filas) || filas.length === 0) return r;
     if (!(columna in (filas[0] as object))) return r;
-    const fila = (filas.find((x: any) => x?.[columna] != null) ?? filas[0]) as Record<string, unknown>;
+    // 🩸 TIENE QUE SER UN PRODUCTO **ACTIVO**. El loop que compara solo recorre
+    // el set de `/stock` = { activos } ∪ { disponible>=1 }: mover una fila que
+    // no está ahí no produce ninguna escritura y el script diría "no escribe lo
+    // que cambió" siendo mentira. Pasó en la primera corrida (FW0FW06158-DW5,
+    // inactivo): el veredicto rojo era del ARNÉS, no del motor.
+    const fila = (filas.find((x: any) => x?.active === true && x?.[columna] != null) ??
+      filas.find((x: any) => x?.[columna] != null) ??
+      filas[0]) as Record<string, unknown>;
     info.sku = String(fila.sku ?? "?");
     info.antes = fila[columna];
     info.despues = Number(fila[columna] ?? 0) + 1;

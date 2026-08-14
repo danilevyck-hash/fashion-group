@@ -689,6 +689,59 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > Los saldos de CXC NO se tocaron a propósito (paso 2, pendiente): cuestan ~101-152 s por empresa contra 4-8 s de las ventas, y son los que el 25-jul reventaron la base con `canceling statement due to statement timeout`.
 
+## 🔴 Catálogos — LAS ESCRITURAS QUE NO CAMBIAN NADA NO SE HACEN (14-ago-2026)
+
+> Daniel lo autorizó con una condición textual: ***"solo si no me daña nada"***. **Lo único que cambia es CUÁNTAS escrituras se hacen: el `UPDATE` que guardaría exactamente el mismo valor que ya está en la base, no se hace.**
+>
+> 🩸 **EL DATO.** El sync de Tommy manda **455 UPDATE de a uno** por corrida (Reebok 127, Joybees 79→83, Calvin 79) y esas escrituras eran cerca de la mitad de su tiempo. Medido con `_verif-stock-concurrencia.ts`, que saca foto de las 5 tablas antes y después de cada corrida: **en las 5 vueltas previas al cambio, 1.228 filas y 17.672 campos → 🟢 IDÉNTICO**. O sea que las **744 escrituras de cada vuelta le escribían a la base exactamente lo que ya tenía.**
+>
+> ### ⛔ LO QUE NO SE HIZO, y es la mitad de por qué se pudo hacer
+>
+> En ese write path viven la **foto** (`image_url` / `foto_manual`), el **nombre editado** (`nombre_manual`), la **etiqueta** (`badge`), el **"ocultar"** (`oculto_manual`) y el **bulto** (`bulto_pzas`) — trabajo hecho A MANO que **no vuelve de Switch si se pierde**: 389 fotos de Tommy subidas una por una y 493 productos con foto.
+> - **NO se agruparon las escrituras en lotes.** Un `upsert` mal armado se lleva puestas las fotos de 490 productos. *"Agrupar las escrituras es OTRO día"* sigue siendo cierto — y ya no hace falta.
+> - **NO cambió QUÉ columnas escribe un UPDATE ni con qué valores.** El payload es el MISMO objeto de siempre; lo único que ganó es un nombre (`cambios`) para poder compararlo antes de mandarlo.
+> - **NO se reordenó el write path**, ni se tocaron el read-all-then-write, el guard del barrido de páginas (#498), el guard de precios imposibles ni la regla de visibilidad.
+> - **El `inventory` de Reebok se sigue escribiendo SIEMPRE**, aunque el producto no cambie: saber si ya tiene esa cantidad exigiría **leer** `inventory`, y eso sí sería una consulta nueva contra una base en compute Micro.
+>
+> **Comparar no cuesta una lectura extra** — eso se VERIFICÓ antes de avanzar: el motor ya hacía read-all-then-write. Lo único que se agregó son **columnas a la consulta que ya existía** (`existencia`, `disponibilidad`, `stock`, `category`, `gender`, `bulto_pzas`, `codigo_barra_id`): misma consulta, mismo viaje, más columnas. Cero consultas nuevas.
+>
+> ### 🩸 EL RIESGO REAL NO ES ESCRIBIR DE MÁS: ES NO ESCRIBIR NUNCA
+>
+> Si la comparación se equivoca diciendo "igual", se saltea el 100% y **el catálogo se congela sin un solo error** — el "cero silencioso" que este repo ya pagó. Tres cosas lo cubren:
+> 1. **Comparación por tipo EXPLÍCITO** (`src/lib/switch-api/catalogo-igualdad.ts`, módulo PURO): `entero` / `monto` / `texto` / `booleano` declarados **columna por columna** contra el tipo REAL de la base. 🔴 `campoIgual` devuelve `true` **solo cuando puede PROBAR la igualdad**: columna sin declarar, columna que no se leyó o tipo inesperado ⇒ **se escribe**, o sea el comportamiento de ayer. Los pares que engañan están todos en el test: `0` vs `"0.00"` (iguales, es la misma plata) · `null` vs `""` (**DISTINTOS**) · `"10"` vs `10` (iguales en un entero) · `"Sandals "` vs `"Sandals"` (**DISTINTOS**: el write path escribe el texto tal cual). Los montos se comparan **al centavo con aritmética de texto**, no con `Math.round(n*100)` — en coma flotante `16.555*100` da `1655.4999…` y el precio no se saltearía nunca.
+> 2. **Contadores POR CORRIDA**: `comparados` / `escrituras` / `sinCambios` en el resultado (y en el JSON de los 4 routes) y en **`switch_sync_log.skip_details`** con el campo `catalogo_escrituras`. **Sin DDL**: la columna ya existe y los guards de montos ya la usan con SU propio `campo`. `records_updated` y `records_skipped` **no cambiaron de significado** (siguen siendo procesados y ocultados).
+> 3. **Guard de sanidad**: saltearse el **100%** queda registrado (`skip_details` + `console.warn`) y **NO falla cerrado, a propósito**: un catálogo que de verdad no se movió entre dos pasadas del mismo día es posible —Joybees son 83 artículos y las 4 pasadas están a 2-3 h—, así que tumbar la corrida sería estrenar la alerta que suena para siempre. Si esto sale todos los días en todos los catálogos, la comparación se rompió.
+>
+> Y el peor caso del acierto es benigno: si se saltea una actualización que hacía falta, los 4 catálogos corren **4×/día** y la siguiente la agarra. **No existe un camino donde esto borre una foto**, porque no cambia lo que hace una escritura.
+>
+> 🩸 **LA ESCALERA DE LECTURA, y por qué no alcanzaba el fallback que había.** El motor tenía UN fallback pre-migración: si el SELECT fallaba, se releía con `COLS_BASE` a secas. Con las columnas nuevas adentro, una que todavía no exista (`bulto_pzas` antes de su DDL) habría disparado ese fallback y se habría llevado puesto también **`nombre_manual`** — y sin `nombre_manual` el sync **PISA el nombre editado a mano**. O sea: una optimización de velocidad borrando trabajo manual, justo lo que este cambio no podía hacer. Ahora son **tres escalones** que quitan lo menos posible, y un error ajeno (permisos, red) se propaga como siempre.
+>
+> ### EL ANTES/DESPUÉS, en producción, 5 corridas de cada lado y MEDIANA
+>
+> | catálogo | UPDATE/corrida | antes | después | |
+> |---|---:|---:|---:|---|
+> | Joybees | 83 → **0** | 15 s | **8 s** | −47% |
+> | Reebok | 127 → **0** | 53 s | **28 s** | −47% |
+> | Calvin | 79 → **0** | 56 s | **57 s** | ~ |
+> | Tommy | 455 → **0** | 87 s | **65 s** | −25% |
+>
+> Las 5 corridas una por una — antes (06:17-06:38 UTC, sobre `main`) y después (08:05-08:23, ya deployado):
+> `antes` joybees 36·41·15·15·15 · reebok 41·38·64·53·63 · calvin 56·56·60·106·46 · tommy 77·84·87·109·116
+> `después` joybees 8·28·7·22·7 · reebok 57·28·27·39·27 · calvin 47·106·57·47·90 · tommy 37·64·65·65·65
+> - ⚠️ **Calvin no se mueve, y es lo esperado**: son 79 escrituras contra el barrido de las **164 páginas** de `vistana` (8.173 artículos), que es lo que se come su sync. Mismo motivo por el que casi no se movió cuando se subió `STOCK_CONCURRENCIA`.
+> - ⚠️ **Tommy mejora menos que los ~50 s que se esperaban**: esa cifra salía de una medición de otro horario; en esta franja (01:00-03:30 a.m. Panamá) la base contesta más rápido y las 455 escrituras costaban ~22 s. Lo que sí mejoró mucho es la **dispersión**: de 77-116 s a 37-65 s, o sea que el peor caso —el que ve Daniel esperando en "Actualizar ahora"— se partió casi al medio.
+>
+> ### 🔴 La identidad, campo por campo — primera foto contra última
+>
+> La foto de las **06:17** (antes de todo, con el código viejo) contra la de las **08:23**, con **10 corridas de sync de por medio**: `joybees_products` 83 · `products` 284 · `inventory` 284 · `calvin_products` 80 · `tommy_products` 497 = **1.228 filas y 17.672 campos → 🟢 IDÉNTICO, cero cambios**, con las 493 fotos de Tommy y las 283 de Reebok en su lugar. `image_url`, `foto_manual`, el nombre, la etiqueta, `oculto_manual` y el bulto están **fuera** de la lista de movimiento legítimo del verificador: si alguno se hubiera movido, sería un fallo y no un resultado. En las 20 corridas el log dejó `escrituras=0 · sinCambios=744`.
+>
+> ### Candados
+>
+> `src/__tests__/lib/catalogo-sin-escrituras-iguales.test.ts` (51 casos). **Son de CONDUCTA, no de texto**: corren el motor REAL contra un Supabase simulado que **proyecta a las columnas pedidas** (como PostgREST) y miran los payloads exactos de cada escritura. Uno recorre las **4 marcas reales** y exige que toda columna del UPDATE esté declarada con su tipo **y** se lea en la misma consulta — si mañana alguien agrega una columna al write path y se olvida, ese catálogo vuelve a escribir siempre (seguro) y el test lo dice.
+> - **Verificado por mutación, 14 de 14 cazadas** (`bash scripts/_mutar-candados-catalogo.sh`): `campoIgual` siempre true · "no la leí" = "es igual" · comparación laxa (`null` == `""` == `0`) · textos normalizados · montos en coma flotante · payload vacío = igual · el guard del 100% no marca · el motor no escribe nunca · el motor escribe siempre · la escalera pierde su escalón intermedio · los contadores no se registran · el inventario deja de escribirse · Tommy deja de declarar sus columnas · una columna del UPDATE sin tipo.
+> - 🔴 **La prueba de que SÍ actualiza lo que cambió**: `MARCA=tommy DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-catalogo-escribe-lo-que-cambio.ts` corre el motor REAL contra los **productos REALES de producción** y el **Switch REAL**, en `dryRun` (cero escrituras), dos veces: control y con **UNA** columna movida en la RESPUESTA de la lectura (no en la base). Medido el 14-ago-2026: **CONTROL 455 comparados · 0 escrituras · 455 sinCambios** · **MUTADO `T1XH343351800` disponibilidad 20→21 ⇒ 455 comparados · 1 escritura · 454 sinCambios**, y la base quedó **INTACTA** (`disponibilidad=20`). Un solo campo distinto ⇒ exactamente una escritura más.
+>   - 🩸 **La primera corrida dio 🔴 y era EL SCRIPT, no el motor**: eligió `FW0FW06158-DW5`, un producto **inactivo**. El loop que compara solo recorre el set de `/stock` (= activos ∪ disponible≥1), así que mover una fila que no está ahí no produce ninguna escritura y el veredicto habría acusado al motor de algo que no hacía. Ahora elige un producto **activo**. Un verificador que miente en cualquiera de las dos direcciones es peor que no tenerlo.
+
 ## Catálogos — auto-recorte del fondo al subir (12-ago-2026)
 
 > **Las fotos del banco B2B de PVH vienen con el producto CHICO abajo y un fondo enorme; en la tarjeta se ven diminutas al lado de las buenas.** Caso real de Daniel: `HW0HW02958AEF.jpg`, **1364×1819**, una sandalia que ocupa el **9% del área** y el resto es fondo gris en degradado. Fuente única: **`src/lib/catalogos/foto-recorte.ts`** — núcleo PURO (fondo, caja, guardas, plan de encuadre) + un envoltorio de canvas que solo dibuja lo que el plan ya decidió.
