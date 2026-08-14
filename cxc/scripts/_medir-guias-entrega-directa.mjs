@@ -2,7 +2,6 @@
 // SOLO LECTURA. Mide los TRES anchos (+ el iPad acostado) de lo que cambió en
 // Guías:
 //   · /guias con una guía PENDIENTE abierta  — el botón dice "Despachar"
-//   · /guias/[id] pendiente, transportista    — los juegos del transportista
 //   · /guias/[id] pendiente, entrega directa  — sin placa ni N° de transportista
 //   · /guias/nueva                            — la dirección como 1ª opción
 //
@@ -120,17 +119,11 @@ for (const ancho of ANCHOS) {
       hayCambiar: [...document.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Cambiar"),
       hayPlaca: !!document.getElementById("despacho-placa"),
       hayTransp: !!document.getElementById("transp-0"),
-      juegos: [...document.querySelectorAll("button")].filter((b) => /·/.test(b.textContent || "") && /min-h-\[44px\]/.test(b.className)).length,
-      // ⚠️ el encabezado lleva `uppercase` por CSS: innerText lo devuelve en
-      // MAYÚSCULAS, así que comparar tal cual da SIEMPRE false (y el chequeo
-      // pasaría en verde sin haber mirado nada).
-      textoJuegos: document.body.innerText.toUpperCase().includes("ÚLTIMOS DESPACHOS CON ESTE TRANSPORTISTA"),
     }));
     informe[de("guia-pendiente-externo")] = { ...(await page.evaluate(MEDIR)), ...estado };
     await page.screenshot({ path: `${SALIDA}/guia-externo-${ancho}.png` });
     if (!estado.hayCambiar) problemas.push(`${ancho}: la página de la guía no muestra el modo con un "Cambiar"`);
     if (!estado.hayPlaca) problemas.push(`${ancho}: con transportista externo debería pedir placa`);
-    if (!estado.textoJuegos) problemas.push(`${ancho}: no se ofrecen los últimos despachos de este transportista`);
 
     // ── 3. La MISMA guía, cambiada a entrega directa ───────────────────────
     await page.evaluate(() => {
@@ -151,7 +144,6 @@ for (const ancho of ANCHOS) {
       // ⚠️ el encabezado lleva `uppercase` por CSS: innerText lo devuelve en
       // MAYÚSCULAS, así que comparar tal cual da SIEMPRE false (y el chequeo
       // pasaría en verde sin haber mirado nada).
-      textoJuegos: document.body.innerText.toUpperCase().includes("ÚLTIMOS DESPACHOS CON ESTE TRANSPORTISTA"),
       explicacion: document.body.innerText.includes("nuestro propio camión"),
     }));
     informe[de("guia-pendiente-directa")] = { ...(await page.evaluate(MEDIR)), ...directa };
@@ -160,7 +152,6 @@ for (const ancho of ANCHOS) {
     if (directa.hayPlaca) problemas.push(`🔴 ${ancho}: en entrega directa SIGUE pidiendo placa`);
     if (directa.hayTransp) problemas.push(`🔴 ${ancho}: en entrega directa SIGUE pidiendo N° de transportista`);
     if (!directa.hayChofer) problemas.push(`${ancho}: en entrega directa debería pedir chofer`);
-    if (directa.textoJuegos) problemas.push(`🔴 ${ancho}: los juegos del transportista aparecen en entrega directa`);
     if (!directa.explicacion) problemas.push(`${ancho}: falta la explicación de por qué no lleva placa`);
   }
 

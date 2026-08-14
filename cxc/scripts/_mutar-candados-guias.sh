@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # VERIFICACIÓN POR MUTACIÓN de los candados de Guías (entrega directa, dirección
-# sugerida, juegos por transportista y el botón "Despachar").
+# sugerida y el botón "Despachar").
 #
 # Rompe UNA cosa por vez, corre los tests de guías y exige que se pongan ROJOS.
 # Un candado que pasa estando mutado no protege nada — en este repo ya pasó
@@ -18,21 +18,18 @@ cd "$(dirname "$0")/.."
 TESTS=(
   src/__tests__/lib/guias-modo-despacho.test.ts
   src/__tests__/lib/guias-direccion-sugerida.test.ts
-  src/__tests__/lib/guias-juegos-despacho.test.ts
   src/__tests__/lib/guias-despacho-una-sola-puerta.test.ts
   src/__tests__/lib/guias-placa-entrega-directa.test.ts
   src/__tests__/lib/guia-pdf-compartir.test.ts
   src/__tests__/lib/guias-frecuencias-ruta.test.ts
   src/__tests__/components/guias-entrega-directa.test.tsx
-  src/__tests__/components/guias-direccion-y-juegos.test.tsx
+  src/__tests__/components/guias-direccion-primera.test.tsx
 )
 
 ARCHIVOS=(
   src/app/api/guias/frecuencias/route.ts
-  src/app/api/guias/despachos-recientes/route.ts
   src/lib/guias/modo-despacho.ts
   src/lib/guias/direccion-sugerida.ts
-  src/lib/guias/juegos-despacho.ts
   src/lib/guias/pdf-guia.ts
   src/app/guias/components/PrintDocument.tsx
   src/app/guias/components/DespachoForm.tsx
@@ -196,44 +193,6 @@ caso "la ruta deja de mandar las direcciones" \
   src/app/api/guias/frecuencias/route.ts \
   '    return NextResponse.json({ clientes, empresas, direcciones });' \
   '    return NextResponse.json({ clientes, empresas });'
-
-echo "── 7. Los juegos por transportista ────────────────────────────────────"
-caso "la identidad del juego vuelve a ser el NOMBRE (Jocsan ≠ Jocsan murillo)" \
-  src/lib/guias/juegos-despacho.ts \
-  '  return ced ? `C:${ced}|P:${placa}` : `R:${normalizarNombre(j.receptor)}|P:${placa}`;' \
-  '  return `R:${normalizarNombre(j.receptor)}|C:${ced}|P:${placa}`;'
-
-caso "los juegos dejan de normalizar guiones y mayúsculas" \
-  src/lib/guias/juegos-despacho.ts \
-  '  return sinTildes(String(s ?? "")).toUpperCase().replace(/[^A-Z0-9]/g, "");' \
-  '  return String(s ?? "");'
-
-caso "entran juegos de guías que TODAVÍA NO SALIERON" \
-  src/lib/guias/juegos-despacho.ts \
-  '      (g.estado === "Completada" || g.estado === "Rechazada") &&' \
-  '      true &&'
-
-caso "entran juegos INCOMPLETOS (no llenan los tres campos)" \
-  src/lib/guias/juegos-despacho.ts \
-  '      lleno(g.receptor_nombre) &&
-      lleno(g.cedula) &&
-      lleno(g.placa),' \
-  '      true,'
-
-caso "se guarda el valor NORMALIZADO en vez del original" \
-  src/lib/guias/juegos-despacho.ts \
-  '      receptor: String(g.receptor_nombre ?? "").trim(),' \
-  '      receptor: normalizarNombre(g.receptor_nombre),'
-
-caso "los juegos aparecen también en entrega directa" \
-  src/app/guias/components/DespachoForm.tsx \
-  '        {externo && juegos.length > 0 && onUsarJuego && (' \
-  '        {juegos.length > 0 && onUsarJuego && ('
-
-caso "la ruta deja de acotar por transportista (juegos de cualquiera)" \
-  src/app/api/guias/despachos-recientes/route.ts \
-  '      .eq("transportista_id", transportista)' \
-  '      .not("transportista_id", "is", null)'
 
 echo
 echo "═══════════════════════════════════════════════════════════════════════"
