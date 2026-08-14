@@ -76,7 +76,7 @@ beforeEach(() => {
 
 // ─── sync-status ─────────────────────────────────────────────────────────────
 
-describe("GET /sync-status — última corrida del cron de catálogo", () => {
+describe("GET /sync-status — última sincronización del catálogo", () => {
   it("401 sin sesión — ambas marcas", async () => {
     expect((await rSyncStatus(makeReq("/x"))).status).toBe(401);
     expect((await jSyncStatus(makeReq("/x"))).status).toBe(401);
@@ -87,22 +87,21 @@ describe("GET /sync-status — última corrida del cron de catálogo", () => {
     expect((await jSyncStatus(makeReq("/x", { role: "bodega" }))).status).toBe(403);
   });
 
-  it("cada marca consulta SU cron en cron_heartbeats y responde {lastSync}", async () => {
-    mainDb.queue("cron_heartbeats", { data: { last_success_at: "2026-07-23T12:10:00Z" } });
+  it("cada marca consulta SU (empresa, sync_type) en switch_sync_log y responde {lastSync}", async () => {
+    mainDb.queue("switch_sync_log", { data: { finished_at: "2026-07-23T12:10:00Z" } });
     const rRes = await rSyncStatus(makeReq("/x", { role: "vendedor" }));
     expect(await rRes.json()).toEqual({ lastSync: "2026-07-23T12:10:00Z" });
-    expect(mainDb.chainsFor("cron_heartbeats")[0]._calls.eq).toContainEqual([
-      "cron_name",
-      "reebok-catalogo",
-    ]);
+    const rEq = mainDb.chainsFor("switch_sync_log")[0]._calls.eq;
+    expect(rEq).toContainEqual(["empresa_key", "active_shoes"]);
+    expect(rEq).toContainEqual(["sync_type", "catalogo_reebok"]);
+    expect(rEq).toContainEqual(["status", "success"]);
 
-    mainDb.queue("cron_heartbeats", { data: null });
+    mainDb.queue("switch_sync_log", { data: null });
     const jRes = await jSyncStatus(makeReq("/x", { role: "admin" }));
     expect(await jRes.json()).toEqual({ lastSync: null });
-    expect(mainDb.chainsFor("cron_heartbeats")[1]._calls.eq).toContainEqual([
-      "cron_name",
-      "joybees-catalogo",
-    ]);
+    const jEq = mainDb.chainsFor("switch_sync_log")[1]._calls.eq;
+    expect(jEq).toContainEqual(["empresa_key", "joystep"]);
+    expect(jEq).toContainEqual(["sync_type", "catalogo_joybees"]);
   });
 });
 
