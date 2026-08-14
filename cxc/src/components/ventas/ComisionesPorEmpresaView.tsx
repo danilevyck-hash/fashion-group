@@ -30,8 +30,8 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// Joystep NO comisiona — fuera del selector de ESTE tab únicamente.
-// Joystep NO comisiona — la lista vive en `lib/comisiones/empresas`.
+// Las 6 empresas con CXC — joystep incluida desde el 14-ago-2026. La lista
+// vive en `lib/comisiones/empresas`, nunca se filtra acá.
 const EMPRESAS = EMPRESAS_COMISIONAN;
 
 interface ComisionVendedor {

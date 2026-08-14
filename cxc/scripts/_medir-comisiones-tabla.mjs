@@ -31,7 +31,7 @@ import path from "path";
 const BASE = process.env.BASE ?? "http://localhost:3164";
 const SALIDA = process.env.SALIDA ?? "/Users/daniellevy/.claude/jobs/5b66fe8c/tmp";
 const ETAPA = process.env.ETAPA ?? "antes";
-const COOKIE = readFileSync("/tmp/fg-cookie.txt", "utf8").trim();
+const COOKIE = readFileSync(process.env.COOKIE_FILE ?? "/tmp/fg-cookie.txt", "utf8").trim();
 
 // El iPad tiene DOS orientaciones y hay dos generaciones vivas, así que no
 // alcanza con "834 y 1440": 1024 es el iPad 10.9" horizontal y 1180 el iPad
