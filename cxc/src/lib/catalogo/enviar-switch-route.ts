@@ -3,13 +3,16 @@
 // el envío al motor enviarPedidoSwitch. El caller cierra la sesión de Switch en
 // su finally.
 //
-// Orden de resolución de cliente/vendedor (el primero que aplique):
-//   1. los guardados en el pedido (checkout del vendedor, y desde 25-jul-2026
-//      también la confirmación pública del link),
-//   2. los defaults del piloto — SOLO Reebok legacy (Contado 1 + Reinaldo 2),
-//   3. los del link público (publico-switch-actor: contado + vendedor DEFAULT
-//      de la empresa). Sin esto, un pedido del link de Joybees/Tommy sin ids
-//      quedaba 422 y NO se podía reintentar desde el admin.
+// EL CLIENTE SIEMPRE SALE DEL PEDIDO. Sin él, 422 y no se llama a Switch — para
+// cualquier origen, interno o del link (ver `cliente-elegido.ts`).
+//
+// Orden de resolución del VENDEDOR (el primero que aplique):
+//   1. el guardado en el pedido (checkout del vendedor, o el que se eligió en
+//      el detalle),
+//   2. el default del piloto — SOLO Reebok legacy (Reinaldo 2),
+//   3. el vendedor DEFAULT de la empresa (publico-switch-actor). Sin esto, un
+//      pedido de Joybees/Tommy/Calvin sin vendedor quedaba 422 y NO se podía
+//      mandar desde el admin.
 
 import { NextRequest, NextResponse } from "next/server";
 import { leerCategoriaYBulto } from "./bulto-productos";
@@ -124,8 +127,13 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   // exactamente cómo 15 pedidos por $53.124 se fueron a Switch a nombre de
   // Contado sin que nadie lo decidiera.
   //
-  // ⚠️ Esas redes NO se quitan y siguen sirviendo para lo que se hicieron: el
-  // pedido del LINK, donde el mostrador es la regla del sistema y no un olvido.
+  // ⚠️ Esas redes NO se quitan, pero desde el 14-ago-2026 (2ª vuelta) TAMPOCO
+  // alcanzan al pedido del LINK: Daniel pidió que ése también espere a que una
+  // persona le ponga el cliente. Lo que sobrevive de ellas es el VENDEDOR —
+  // `resolvePublicoSwitchActor` sigue resolviendo el vendedor DEFAULT de la
+  // empresa cuando el pedido no trae uno, y `fg_catalogo_publico_switch` sigue
+  // siendo la manija por empresa.
+  //
   // `tieneClienteElegido` es la MISMA función que apaga el botón — una segunda
   // definición del mismo `if` se separaría de la pantalla y volveríamos a tener
   // un botón verde con un servidor que rechaza (o peor, al revés).
@@ -136,8 +144,9 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
     );
   }
 
-  // Cliente/vendedor: los del pedido, los defaults del piloto (Reebok legacy) o,
-  // como última red, los del link público (ver cabecera).
+  // Cliente: SIEMPRE el del pedido — el candado de arriba ya garantizó que hay
+  // uno, así que las redes de abajo nunca lo inventan. Vendedor: el del pedido,
+  // el default del piloto (Reebok legacy) o el DEFAULT de la empresa.
   let clienteId = order.cliente_switch_id ?? cfg.fallback?.clienteId ?? null;
   let vendedorId = order.vendedor_switch_id ?? cfg.fallback?.vendedorId ?? null;
   if (clienteId == null || vendedorId == null) {

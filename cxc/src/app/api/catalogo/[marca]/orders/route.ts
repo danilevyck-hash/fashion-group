@@ -1,4 +1,31 @@
-// Pedidos internos del catálogo (lista + creación), dirigido por MARCAS_CONFIG.
+// Pedidos del catálogo (lista + creación), dirigido por MARCAS_CONFIG.
+//
+// 🔴 LA LISTA INCLUYE LOS PEDIDOS DEL LINK (14-ago-2026)
+//
+// Daniel, textual: *"si yo mando el link al público quiero que el que lo use
+// pueda hacer su pedido, mandar al vendedor el pedido con nombre… así cuando
+// alguien interno le llega el pedido por WhatsApp, pueda entrar al sistema
+// interno"*. Hasta hoy ese pedido SOLO se veía en el panel de admin/secretaria
+// (`/catalogos/admin/[marca]` → tab Pedidos, vía `pedidos-unificado`, que es
+// admin+secretaria): el vendedor que comparte el link y recibe el WhatsApp
+// **no lo encontraba en el sistema**. Medido el 14-ago-2026: 7 pedidos
+// públicos vivos sin convertir (5 Reebok + 2 Joybees) invisibles para él.
+//
+// Ahora este GET devuelve las dos cosas, con `fuente` y `del_link` para que la
+// pantalla sepa qué es cada fila:
+//   · `fuente: "orders"`   → pedido interno. Puede venir del link (convertido):
+//                            ahí `del_link` es true y `id` es su uuid.
+//   · `fuente: "publicos"` → pedido del link TODAVÍA SIN CONVERTIR. `id` es el
+//                            short_id y `order_number` es null (no tiene: se lo
+//                            asigna la conversión).
+//
+// ⚠️ Un pedido del link SIN convertir es un BORRADOR (`en_switch: false`), y no
+// puede ser otra cosa: la pestaña la decide tener envío activo en Switch
+// (#558/#560, ver `switch-lock.ts`) y una fila pública no tiene envío.
+//
+// ⚠️ FAIL-OPEN: si la lectura de los públicos falla, la lista sale con los
+// pedidos internos de siempre. Perder el catálogo de borradores del link es
+// peor que no verlos, pero dejar sin lista a quien ya tenía una es peor todavía.
 //
 // QUIRKS heredados (unificar con OK de Daniel):
 //   · QUIRK 1: la lista de Joybees filtra deleted=false; la de Reebok NO.
@@ -11,6 +38,7 @@ import { leerCategoriaYBulto } from "@/lib/catalogo/bulto-productos";
 import { resumirDesdeItems } from "@/lib/catalogo/lineas-pedido";
 import { getSession } from "@/lib/require-auth";
 import { getMarcaConfig, type MarcaConfig } from "@/lib/catalogo/marcas";
+import { esPedidoDelLink } from "@/lib/catalogo/cliente-elegido";
 import { avisoPedidoDeVendedor } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio } from "@/lib/alertas/canal";
 import {
@@ -42,20 +70,44 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   }
 
   const db = await cfg.db();
-  let query = db
-    .from(cfg.ordersTable)
-    .select(
-      `id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status${cfg.ordersSelectExtra}, ${cfg.itemsRelation}(id, product_id, quantity, unit_price)`,
-    );
-  // QUIRK 1: solo Joybees filtra los soft-deleted en la query de la lista.
-  if (cfg.listaFiltraDeleted) query = query.eq("deleted", false);
-  const { data, error } = await query.order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  // `origen_short_id` marca los pedidos que VINIERON del link. Solo Reebok lo
+  // trae en su select base (`ordersSelectExtra`); en las demás se pide aparte y
+  // se reintenta sin él si la columna no existiera — el mismo escalón tolerante
+  // que usa el GET del detalle.
+  const extraOrigen = cfg.ordersSelectExtra.includes("origen_short_id") ? "" : ", origen_short_id";
+  const colsBase = `id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status${cfg.ordersSelectExtra}`;
+  let data: Record<string, unknown>[] | null = null;
+  for (const extra of [extraOrigen, ""]) {
+    let query = db
+      .from(cfg.ordersTable)
+      .select(`${colsBase}${extra}, ${cfg.itemsRelation}(id, product_id, quantity, unit_price)`);
+    // QUIRK 1: solo Joybees filtra los soft-deleted en la query de la lista.
+    if (cfg.listaFiltraDeleted) query = query.eq("deleted", false);
+    const res = await query.order("created_at", { ascending: false });
+    if (!res.error) {
+      data = (res.data || []) as unknown as Record<string, unknown>[];
+      break;
+    }
+    if (extra === "") return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+  if (!data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+
+  // Los pedidos del LINK sin convertir se leen ACÁ ARRIBA a propósito: sus
+  // productos tienen que entrar en la MISMA resolución de categorías que los
+  // internos. Resolverlos aparte dejaría a Reebok calculando sus totales con el
+  // fallback apparel (bulto 6) y la lista del vendedor diría un número distinto
+  // del que muestra el panel del admin para el mismo pedido.
+  const filasPublicas = await leerFilasPublicasSinConvertir(cfg);
 
   // Reebok: una sola query batch para resolver category de todos los items.
-  const allProductIds = (data || []).flatMap((o) =>
-    ((o as unknown as Record<string, unknown>)[cfg.itemsRelation] as { product_id: string }[] | null || []).map((i) => i.product_id),
-  );
+  const allProductIds = [
+    ...(data || []).flatMap((o) =>
+      ((o as unknown as Record<string, unknown>)[cfg.itemsRelation] as { product_id: string }[] | null || []).map((i) => i.product_id),
+    ),
+    ...filasPublicas.flatMap((f) =>
+      (Array.isArray(f.items) ? (f.items as { product_id?: string }[]) : []).map((i) => i.product_id).filter(Boolean) as string[],
+    ),
+  ];
   const categoryMap = cfg.categoryLookup ? await cfg.categoryLookup(allProductIds) : new Map<string, string>();
   // Las piezas por bulto son del ESTILO (Tommy): sin esto la lista mostraba el
   // total con el bulto por default, distinto del que abre el detalle.
@@ -89,10 +141,103 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       // sigue estando en Switch, y esconderlo en Borradores sería mentira.
       en_switch: numerosSwitch.has(idPedido),
       switch_numero: numerosSwitch.get(idPedido) ?? null,
+      fuente: "orders" as const,
+      // El MISMO `esPedidoDelLink` que usa el detalle para no pisarle el nombre
+      // a quien lo escribió. Una segunda definición de "vino del link" se
+      // separaría de aquélla.
+      del_link: esPedidoDelLink({
+        origen_original: (row.origen_original as string) ?? null,
+        origen_short_id: (row.origen_short_id as string) ?? null,
+      }),
       [cfg.itemsRelation]: undefined,
     };
   });
-  return NextResponse.json(orders);
+
+  const delLinkSinConvertir = filasPublicas.map((f) => filaPublicaComoPedido(cfg, f, categoryMap));
+
+  // Una sola lista, la más nueva arriba (el orden que ya traía la query).
+  const todos = [...orders, ...delLinkSinConvertir].sort(
+    (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
+  );
+  return NextResponse.json(todos);
+}
+
+/**
+ * Filas CRUDAS de los pedidos del LINK que todavía no se convirtieron — los que
+ * hasta hoy solo veía el admin.
+ *
+ * ⚠️ FAIL-OPEN en todos los escalones: cualquier error devuelve `[]` y la lista
+ * queda exactamente como estaba. Y `deleted`/`confirmado_cliente_at` se piden en
+ * un escalón tolerante: son de migraciones posteriores a la tabla.
+ */
+async function leerFilasPublicasSinConvertir(cfg: MarcaConfig): Promise<Record<string, unknown>[]> {
+  try {
+    const publicosDb = await cfg.publicosDb();
+    const COLS_FULL = "short_id, cliente_nombre, items, created_at, convertida, deleted, confirmado_cliente_at";
+    const COLS_BASE = "short_id, cliente_nombre, items, created_at, convertida";
+    for (const cols of [COLS_FULL, COLS_BASE]) {
+      const res = await publicosDb
+        .from(cfg.publicosTable)
+        .select(cols)
+        .order("created_at", { ascending: false });
+      if (!res.error) {
+        return ((res.data || []) as unknown as Record<string, unknown>[]).filter(
+          (f) => !f.convertida && !f.deleted,
+        );
+      }
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Una fila pública con la MISMA forma que un pedido interno, para que la lista
+ * no tenga que saber de dos formatos. `fuente: "publicos"` es lo que le dice a
+ * la pantalla que primero hay que convertirlo.
+ */
+function filaPublicaComoPedido(
+  cfg: MarcaConfig,
+  f: Record<string, unknown>,
+  categoryMap: Map<string, string>,
+): Record<string, unknown> {
+  const items = (Array.isArray(f.items) ? f.items : []) as {
+    product_id?: string;
+    quantity?: number;
+    unit_price?: number;
+    category?: string;
+  }[];
+  // Mismo recálculo que la lista unificada del admin: nunca el `total`
+  // guardado, que en pedidos viejos quedó subvaluado.
+  const total = cfg.calcTotal(
+    items.map((i) => ({
+      quantity: Number(i.quantity) || 0,
+      unit_price: Number(i.unit_price) || 0,
+      ...(cfg.categoryLookup
+        ? { category: (i.product_id && categoryMap.get(i.product_id)) || i.category || cfg.fallbackCategory || undefined }
+        : {}),
+    })),
+  );
+  return {
+    // El id de una fila pública es su short_id: la pantalla lo usa para
+    // convertirla, no para abrir un detalle interno que todavía no existe.
+    id: String(f.short_id),
+    // No tiene número todavía — se lo asigna la conversión. Va null en vez de
+    // inventar uno: un "PED-?" en la lista sería mentira.
+    order_number: null,
+    client_name: (f.cliente_nombre as string) || "Sin nombre",
+    vendor_name: null,
+    status: "borrador",
+    total,
+    item_count: items.length,
+    created_at: String(f.created_at),
+    en_switch: false,
+    switch_numero: null,
+    fuente: "publicos" as const,
+    del_link: true,
+    confirmado_cliente_at: (f.confirmado_cliente_at as string) ?? null,
+  };
 }
 
 interface IncomingItem {

@@ -5,6 +5,13 @@
 // TOM-### (decisión cerrada): llama la RPC atómica existente de conversión — el
 // pedido entra directo al pipeline del admin. WhatsApp queda como aviso OPCIONAL.
 //
+// 🔴 LO QUE NO HACE (14-ago-2026): NO manda el pedido a Switch. Entre el
+// 25-jul y el 14-ago sí lo hacía, en el mismo instante de la confirmación y a
+// nombre del cliente de MOSTRADOR. Daniel pidió que el pedido del link espere a
+// una persona (*"ponerle el nombre del cliente para así mandarlo a Switch"*), y
+// además era la única forma de que se pudiera editar: en Switch queda
+// bloqueado. Ver `ConfirmarDeps.alQuedarNumerado`.
+//
 // SIN MODAL DE STOCK (25-jul-2026): antes, si alguna línea tenía menos piezas
 // de las pedidas, esto respondía 409 'stock_corto' y el cliente tenía que
 // reenviar con aceptar_stock=true. Ese paso se ELIMINÓ: el pedido se confirma
@@ -185,16 +192,23 @@ export interface ConfirmarDeps {
   /** RPC atómica de conversión existente. Idempotente. */
   convertir(pedido: PedidoPublicoRow): Promise<{ numero: string; yaConvertida: boolean }>;
   /**
-   * Envío del pedido ya convertido al ERP Switch (motor enviarPedidoSwitch).
-   * REGLAS:
+   * Qué pasa con el pedido interno recién numerado.
+   *
+   * 🔴 SE LLAMABA `enviarSwitch` Y MANDABA EL PEDIDO AL ERP EN ESE MISMO
+   * INSTANTE (25-jul → 14-ago-2026). Ya no: un pedido del link entra al sistema
+   * como BORRADOR y espera a que una persona le ponga el cliente REAL y lo
+   * mande. Es lo que pidió Daniel — *"pueda entrar al sistema interno, escoger,
+   * editar precio, agregar o quitar y ponerle el nombre del cliente para así
+   * mandarlo a Switch"*— y además es la única forma de que se pueda: un pedido
+   * que ya está en Switch queda BLOQUEADO para editar (`switch-lock`).
+   *
+   * Hoy lo único que hace es dejarlo listo para esa revisión (status
+   * 'confirmado' = lo confirmó el cliente). REGLAS que se conservan:
    *   · NUNCA rompe la confirmación: el core lo llama dentro de try/catch. El
-   *     pedido ya está guardado; si Switch está caído queda el "Reintentar"
-   *     del admin (y la alerta a Telegram del propio motor).
-   *   · Idempotente aguas abajo (índice parcial + 'ya_enviado'), por eso se
-   *     llama TAMBIÉN cuando el pedido ya estaba convertido: así un reintento
-   *     del cliente tras un timeout recupera un envío que nunca salió.
+   *     pedido del cliente ya está guardado pase lo que pase acá.
+   *   · Idempotente: se llama TAMBIÉN cuando el pedido ya estaba convertido.
    */
-  enviarSwitch(numero: string, pedido: PedidoPublicoRow): Promise<void>;
+  alQuedarNumerado(numero: string, pedido: PedidoPublicoRow): Promise<void>;
 }
 
 export type ConfirmarResult =
@@ -216,10 +230,9 @@ export async function confirmarPedidoPublico(
 
   // Idempotente: ya convertido → mismo número, sin tocar nada (la foto de
   // stock ya quedó guardada en la confirmación original: no se re-escribe con
-  // el stock de hoy). El envío a Switch SÍ se reintenta: es idempotente y así
-  // se recupera solo un envío que se perdió por timeout o por Switch caído.
+  // el stock de hoy).
   if (pedido.convertida && pedido.ped_order_number) {
-    await enviarSinRomper(deps, pedido.ped_order_number, pedido);
+    await sinRomper(deps, pedido.ped_order_number, pedido);
     return { status: 200, numero: pedido.ped_order_number, ya_confirmado: true, stock: [] };
   }
 
@@ -247,21 +260,22 @@ export async function confirmarPedidoPublico(
     return { status: 500, error: "No se pudo confirmar el pedido. Intenta de nuevo." };
   }
 
-  // Y de ahí DERECHO al ERP. Un fallo aquí no le quita el pedido al cliente.
-  await enviarSinRomper(deps, numero, pedido);
+  // Y queda listo para que una persona lo revise. Un fallo aquí no le quita el
+  // pedido al cliente.
+  await sinRomper(deps, numero, pedido);
 
   return { status: 200, numero, ya_confirmado: yaConvertida, stock };
 }
 
-/** El envío al ERP jamás puede tumbar la confirmación del cliente. */
-async function enviarSinRomper(
+/** Nada de lo que pase con el pedido interno puede tumbar la confirmación. */
+async function sinRomper(
   deps: ConfirmarDeps,
   numero: string,
   pedido: PedidoPublicoRow,
 ): Promise<void> {
   try {
-    await deps.enviarSwitch(numero, pedido);
+    await deps.alQuedarNumerado(numero, pedido);
   } catch (err) {
-    console.error("[confirmar-pedido] envío a Switch falló (el pedido queda guardado):", err);
+    console.error("[confirmar-pedido] post-conversión falló (el pedido queda guardado):", err);
   }
 }

@@ -13,9 +13,7 @@ import {
 import { formatBultosPiezas } from "@/lib/catalogo/piezas";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
 import { shortError } from "@/lib/telegram";
-import { enviarPedidoSwitch, type EnvioItem } from "@/lib/catalogo/switch-envio";
 import { logoutAllSwitchSessions } from "@/lib/switch-api/client";
-import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
 import { avisoPedidoDelLink } from "@/lib/catalogo/telegram-pedido";
 import { enviarNegocio, enviarSistema } from "@/lib/alertas/canal";
 
@@ -39,14 +37,31 @@ export const maxDuration = 300;
 // Stock por marca: Reebok suma `inventory` (piezas por talla) en su proyecto;
 // Joybees y Tommy leen la columna stock de su tabla de catálogo.
 //
-// ENVÍO A SWITCH (25-jul-2026): hasta ahora este endpoint convertía el pedido y
-// ahí moría — el pedido quedaba en 'borrador' y NUNCA llegaba al ERP (TOM-001,
-// tommy_switch_envios con 0 filas). Ahora, igual que el checkout del vendedor:
-// se marca el pedido 'confirmado' con el cliente/vendedor de Switch resueltos
-// (publico-switch-actor: contado + vendedor DEFAULT de la empresa, sin sesión
-// que los aporte) y se dispara enviarPedidoSwitch. Si Switch falla, el pedido
-// YA está guardado y confirmado: el cliente ve su número igual y el envío se
-// recupera con el "Reintentar" del admin (Telegram avisa).
+// 🔴 EL PEDIDO DEL LINK YA NO SALE SOLO A SWITCH (14-ago-2026)
+//
+// Entre el 25-jul y el 14-ago este endpoint, además de convertir, marcaba el
+// pedido 'confirmado' con el cliente de MOSTRADOR + el vendedor DEFAULT de la
+// empresa (publico-switch-actor) y disparaba `enviarPedidoSwitch` en el acto.
+//
+// Daniel lo pidió al revés, textual: *"cuando alguien interno le llega el
+// pedido por WhatsApp, pueda entrar al sistema interno, escoger, editar precio,
+// agregar o quitar y **ponerle el nombre del cliente para así mandarlo a
+// Switch**"*. Y no es solo preferencia: un pedido que ya está en Switch queda
+// BLOQUEADO para editar (`switch-lock` responde 409), así que con el
+// auto-envío puesto **nada de lo que él pidió era posible**. Medido en
+// producción: PED-022 "Nathalie" es el único pedido del link que llegó al ERP,
+// salió a nombre del mostrador y hoy no se puede tocar.
+//
+// AHORA: se convierte igual (el cliente ve su número al instante), se marca
+// 'confirmado' —lo confirmó él— y ahí termina. Cliente y vendedor de Switch
+// quedan VACÍOS a propósito: los pone la persona que lo revisa, y sin cliente
+// el envío responde 422 (`cliente-elegido.ts`). El aviso de Telegram dice que
+// falta ese paso.
+//
+// ⚠️ `resolvePublicoSwitchActor` NO se borró: sigue siendo la red del
+// `handlePostEnvio` para el VENDEDOR cuando el pedido no tiene uno, y la manija
+// `fg_catalogo_publico_switch` sigue vigente. Lo que dejó de existir es que
+// resuelva el CLIENTE por descarte.
 
 /** Total para la RPC: misma maquinaria que el convertir del admin (Reebok:
  *  categoría real vía products con fallback apparel; Joybees: bulto 12). */
@@ -68,20 +83,27 @@ async function resumenParaConvertir(cfg: MarcaConfig, db: any, items: PedidoPubl
 }
 
 /**
- * Convierte el pedido recién numerado en un pedido de Switch:
- *   1. resuelve cliente/vendedor (no hay sesión que los aporte),
- *   2. los guarda en el pedido + status 'confirmado' — así el "Reintentar" del
- *      admin funciona sin pedirle nada a la secretaria,
- *   3. dispara el motor compartido enviarPedidoSwitch.
- * Cualquier problema se avisa por Telegram y se deja recuperable. NO lanza.
+ * Deja el pedido recién numerado LISTO PARA QUE UNA PERSONA LO REVISE.
+ *
+ * Lo único que escribe es `status = 'confirmado'` — que quiere decir "el
+ * cliente lo confirmó", no "salió al ERP". La pestaña de la lista NO se decide
+ * por este campo sino por tener envío activo en Switch (`switch-lock.ts`), así
+ * que el pedido aparece en **Borradores** hasta que alguien lo mande.
+ *
+ * 🔴 CLIENTE Y VENDEDOR DE SWITCH SE QUEDAN VACÍOS, y es el punto entero del
+ * cambio: escribir acá el mostrador volvería a poner un default silencioso —
+ * quien abra el pedido vería "Contado" ya puesto y lo aceptaría sin mirar, que
+ * es exactamente el problema que se midió (15 pedidos internos por $53.124 y
+ * PED-022 del link). Sin cliente, el envío responde 422 y la pantalla dice
+ * "Falta: elegir el cliente".
+ *
+ * NO lanza: la confirmación del cliente nunca se cae por esto.
  */
-async function enviarPedidoDelLinkASwitch(
+async function dejarPedidoListoParaRevision(
   cfg: MarcaConfig,
   numero: string,
-  pedido: PedidoPublicoRow,
 ): Promise<void> {
   const db = await cfg.db();
-  const mainDb = await cfg.mainDb();
 
   // El pedido que acaba de crear la RPC (por número: la RPC devuelve order_id
   // pero el core solo propaga el número, que es único).
@@ -92,80 +114,19 @@ async function enviarPedidoDelLinkASwitch(
     .maybeSingle();
   if (orderErr || !order?.id) {
     await enviarSistema(
-      `🚨 ${cfg.label} ${numero}: no se pudo ubicar el pedido para mandarlo a Switch (${shortError(orderErr?.message || "sin fila")}). Enviarlo a mano desde el admin.`,
+      `🚨 ${cfg.label} ${numero}: no se pudo ubicar el pedido del link para dejarlo listo (${shortError(orderErr?.message || "sin fila")}). Revisarlo en la lista de pedidos.`,
     );
     return;
   }
-  const orderId = String(order.id);
 
-  const resuelto = await resolvePublicoSwitchActor(mainDb, cfg.empresaKey);
-  if (!resuelto.ok) {
-    await enviarSistema(
-      `⚠️ ${cfg.label} ${numero} (pedido del link) NO salió a Switch: ${resuelto.motivo}. El pedido está guardado — usar "Reintentar" en el admin cuando esté el dato.`,
-    );
-    return;
-  }
-  const { clienteId, clienteNombre, vendedorId, vendedorNombre } = resuelto.actor;
-
-  // Confirmado + cliente/vendedor guardados (mismo patrón que el checkout, con
-  // la misma tolerancia a la DDL 20260705120000).
   const { error: updErr } = await db
     .from(cfg.ordersTable)
-    .update({ status: "confirmado", cliente_switch_id: clienteId, vendedor_switch_id: vendedorId })
-    .eq("id", orderId);
+    .update({ status: "confirmado" })
+    .eq("id", String(order.id));
   if (updErr) {
-    console.error(`[${cfg.marca}/confirmar] update cliente/vendedor falló (${updErr.message}) — reintento solo status`);
-    await db.from(cfg.ordersTable).update({ status: "confirmado" }).eq("id", orderId);
-  }
-
-  // Items del pedido interno (los de la fila pública ya están saneados, pero
-  // los del pedido son la fuente de verdad de lo que se envía).
-  const itemCols = `product_id, sku, name, quantity, unit_price${cfg.itemsHasPreorder ? ", is_preorder" : ""}`;
-  const { data: itemRows } = await db
-    .from(cfg.itemsRelation)
-    .select(itemCols)
-    .eq("order_id", orderId);
-  const items = (itemRows || []) as unknown as EnvioItem[];
-  if (!items.length) {
-    await enviarSistema(`🚨 ${cfg.label} ${numero}: sin productos al mandarlo a Switch. Revisar en el admin.`);
-    return;
-  }
-
-  const { categoryByProduct, bultoPzasByProduct } = await leerCategoriaYBulto(
-    db as never,
-    cfg.productsTable,
-    items.map((i) => i.product_id),
-  );
-
-  const result = await enviarPedidoSwitch({
-    empresaKey: cfg.empresaKey,
-    enviosTable: cfg.enviosTable,
-    db,
-    orderId,
-    orderNumber: numero,
-    marcaLabel: cfg.label,
-    items,
-    bultoSize: cfg.bultoSize,
-    categoryByProduct,
-    bultoPzasByProduct,
-    clienteId,
-    clienteNombre,
-    vendedorId,
-    vendedorNombre,
-  });
-
-  // 'ok' y 'ya_enviado' ya alertan (o no hace falta). El resto sí: el pedido
-  // quedó guardado pero sin salir, y alguien tiene que reintentarlo.
-  const pendiente: Record<string, string> = {
-    preorders: "tiene productos en preventa",
-    prevalidacion: "no pasa la pre-validación de Switch (SKU sin código de barra o precio 0)",
-    switch_caido: "Switch no respondió a la consulta previa",
-    carrera: "ya había un envío en curso",
-  };
-  if (result.kind in pendiente) {
-    await enviarSistema(
-      `⚠️ ${cfg.label} ${numero} (pedido del link de ${pedido.cliente_nombre || "sin nombre"}) NO salió a Switch: ${pendiente[result.kind]}. Usar "Reintentar" en el admin.`,
-    );
+    // No se avisa a Telegram: el pedido existe, tiene su número y se ve en la
+    // lista. Lo único que queda es el rótulo interno del estado.
+    console.error(`[${cfg.marca}/confirmar] no se pudo marcar 'confirmado' (${updErr.message})`);
   }
 }
 
@@ -303,11 +264,10 @@ async function handleConfirmar(
         }
       },
 
-      // El pedido del link entra al ERP igual que el del vendedor. Nunca lanza
-      // hacia arriba: el core ya lo envuelve, y aquí además se traduce cada
-      // resultado a una alerta accionable.
-      async enviarSwitch(numero, pedido) {
-        await enviarPedidoDelLinkASwitch(cfg, numero, pedido);
+      // El pedido del link queda esperando a una persona (ver la cabecera).
+      // Nunca lanza hacia arriba: el core ya lo envuelve.
+      async alQuedarNumerado(numero) {
+        await dejarPedidoListoParaRevision(cfg, numero);
       },
 
       // Misma maquinaria que el convertir del admin: total con helpers JS +
@@ -389,7 +349,10 @@ async function handleConfirmar(
 
 // Higiene de SESIÓN ÚNICA de Switch (un 2do login mata el token del 1ro y
 // tumba los crons de la empresa): al terminar —éxito o fallo— se cierra la
-// sesión que este proceso pudo abrir, igual que el checkout del vendedor.
+// sesión que este proceso pudo abrir. Desde que este endpoint dejó de mandar el
+// pedido al ERP ya no abre ninguna, así que recorre una caché vacía y es un
+// no-op; se conserva para que reencender un camino a Switch acá no nazca
+// dejando sesiones abiertas.
 export async function POST(
   req: NextRequest,
   ctx: { params: { marca: string; id: string } },

@@ -1,21 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PARIDAD 3 MARCAS — los pedidos del LINK PÚBLICO llegan a Switch.
+// PARIDAD 3 MARCAS — el pedido del LINK PÚBLICO **NO** sale solo a Switch.
 //
-// BUG que fija (25-jul-2026): el endpoint público de confirmación marcaba
-// confirmado_cliente_at, llamaba la RPC de conversión (que deja el pedido en
-// 'borrador', sin cliente ni vendedor de Switch) y mandaba un Telegram — pero
-// NUNCA llamaba a enviarPedidoSwitch. Resultado en producción: TOM-001 en
-// 'borrador' y tommy_switch_envios con CERO filas; nada del link llegó jamás al
-// ERP en ninguna de las 3 marcas.
+// 🔴 ESTE ARCHIVO CAMBIÓ DE DIRECCIÓN EL 14-ago-2026, y el cambio es el punto
+// del PR. Desde el 25-jul fijaba lo contrario: que confirmar dejara el pedido
+// 'confirmado' con el cliente de MOSTRADOR + el vendedor DEFAULT guardados y
+// disparara `enviarPedidoSwitch` en el acto.
+//
+// Daniel pidió al revés, textual: *"cuando alguien interno le llega el pedido
+// por WhatsApp, pueda entrar al sistema interno, escoger, editar precio,
+// agregar o quitar y **ponerle el nombre del cliente para así mandarlo a
+// Switch**"*. Y no era solo preferencia: un pedido que ya está en Switch queda
+// BLOQUEADO para editar (`switch-lock` responde 409), así que con el auto-envío
+// puesto **nada de lo que pidió era posible**. Medido en producción
+// (`scripts/_diag-pedidos-link.ts`): PED-022 "Nathalie" es el único pedido del
+// link que llegó al ERP, salió a nombre del mostrador y hoy no se puede tocar.
 //
 // Contrato que fijan estos tests, IGUAL para Reebok, Joybees y Tommy:
-//   · confirmar deja el pedido en 'confirmado' con cliente_switch_id y
-//     vendedor_switch_id guardados (así el "Reintentar" del admin funciona),
-//   · dispara enviarPedidoSwitch contra la empresa Switch de la marca,
-//   · si Switch falla el cliente NO pierde el pedido (200 con su número) y el
-//     equipo recibe una alerta accionable,
-//   · cierra la sesión de Switch en el finally (sesión única por empresa: un
-//     2do login mata el token del 1ro y tumba los crons).
+//   · confirmar numera el pedido y responde 200 con su número (el cliente NO
+//     pierde nada de lo que ya tenía),
+//   · NO llama a enviarPedidoSwitch — ni una vez, en ninguna marca,
+//   · deja el pedido 'confirmado' (lo confirmó el cliente) pero SIN
+//     cliente_switch_id ni vendedor_switch_id: escribir ahí el mostrador
+//     volvería a poner el default silencioso que este cambio vino a sacar,
+//   · ni siquiera consulta el mostrador ni el vendedor DEFAULT,
+//   · el aviso a Telegram PIDE el paso que falta,
+//   · sigue cerrando la sesión de Switch en el finally (hoy no abre ninguna,
+//     pero la higiene se conserva por si mañana vuelve a haber un camino).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -132,8 +142,7 @@ const pedidoRow = () => ({
   items: [{ product_id: P1, sku: "S1", name: "P", quantity: 2, unit_price: 10, category: "footwear" }],
 });
 
-function seed(m: (typeof MARCAS)[number], opts: { conVendedor?: boolean } = {}) {
-  const { conVendedor = true } = opts;
+function seed(m: (typeof MARCAS)[number]) {
   // Fila pública: lectura + update de confirmación.
   const publicosDb = m.marca === "reebok" ? mainDb : marcaDb;
   publicosDb.queue(m.publicos, { data: pedidoRow() }, { data: null, error: null });
@@ -145,10 +154,11 @@ function seed(m: (typeof MARCAS)[number], opts: { conVendedor?: boolean } = {}) 
   marcaDb.queue(m.orders, { data: { id: ORDER_ID, order_number: m.numero } }, { data: null, error: null });
   marcaDb.queue(m.items, { data: [{ product_id: P1, sku: "S1", name: "P", quantity: 2, unit_price: 10 }] });
   marcaDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
-  // Cliente/vendedor REALES que resuelve publico-switch-actor.
+  // 🔴 El mostrador y el vendedor DEFAULT se dejan DISPONIBLES a propósito: así
+  // el test prueba que la ruta no los usa aunque los tenga a mano, y no que
+  // simplemente no estaban.
   mainDb.queue("switch_clientes", { data: { cliente_switch_id: 1, nombre: "Contado" } });
-  mainDb.queue("vendedores", conVendedor ? { data: { switch_id: 3, nombre: "DEFAULT" } } : { data: null });
-  if (!conVendedor) mainDb.queue("fg_user_switch_vendedor", { data: null });
+  mainDb.queue("vendedores", { data: { switch_id: 3, nombre: "DEFAULT" } });
 }
 
 beforeEach(() => {
@@ -158,69 +168,62 @@ beforeEach(() => {
   mockEnviar.mockResolvedValue({ kind: "ok" });
 });
 
-describe("confirmar del link → Switch (las 3 marcas)", () => {
+describe("confirmar del link — NO sale solo a Switch (las 3 marcas)", () => {
   for (const m of MARCAS) {
-    it(`${m.marca}: confirma, deja el pedido 'confirmado' con cliente/vendedor y lo MANDA a ${m.empresa}`, async () => {
+    it(`🔴 ${m.marca}: numera el pedido y NO manda NADA a ${m.empresa}`, async () => {
       seed(m);
       const res = await confirmar(m.marca);
       expect(res.status).toBe(200);
       expect((await res.json()).numero).toBe(m.numero);
 
-      // 1) el envío se disparó contra la empresa correcta de la marca
-      expect(mockEnviar).toHaveBeenCalledOnce();
-      const args = mockEnviar.mock.calls[0][0];
-      expect(args).toMatchObject({
-        empresaKey: m.empresa,
-        enviosTable: m.envios,
-        orderId: ORDER_ID,
-        orderNumber: m.numero,
-        clienteId: 1,
-        vendedorId: 3,
-      });
-      expect(args.items).toHaveLength(1);
+      // LO QUE MÁS IMPORTA: el ERP no se tocó.
+      expect(mockEnviar).not.toHaveBeenCalled();
 
-      // 2) el pedido quedó 'confirmado' con los ids guardados (sin eso el
-      //    "Reintentar" del admin responde 422)
+      // Sesión única: la higiene del finally se conserva.
+      expect(mockLogout).toHaveBeenCalledOnce();
+    });
+
+    it(`🔴 ${m.marca}: queda 'confirmado' pero SIN cliente ni vendedor de Switch`, async () => {
+      seed(m);
+      await confirmar(m.marca);
       const updates = marcaDb
         .chainsFor(m.orders)
         .flatMap((c) => (c._calls.update || []) as unknown[][]);
-      expect(updates[0]?.[0]).toMatchObject({
-        status: "confirmado",
-        cliente_switch_id: 1,
-        vendedor_switch_id: 3,
-      });
-
-      // 3) sesión única: se cierra la sesión de Switch pase lo que pase
-      expect(mockLogout).toHaveBeenCalledOnce();
+      expect(updates[0]?.[0]).toEqual({ status: "confirmado" });
+      // Ni por asomo el mostrador puesto por el sistema: ése es el default
+      // silencioso que este cambio vino a sacar.
+      for (const u of updates) {
+        expect(u[0]).not.toHaveProperty("cliente_switch_id");
+        expect(u[0]).not.toHaveProperty("vendedor_switch_id");
+      }
     });
 
-    it(`${m.marca}: si Switch rechaza, el cliente NO pierde el pedido y queda reintentable`, async () => {
+    it(`🔴 ${m.marca}: ni siquiera consulta el mostrador ni el vendedor DEFAULT`, async () => {
       seed(m);
-      mockEnviar.mockResolvedValue({ kind: "prevalidacion" } as unknown as { kind: "ok" });
-      const res = await confirmar(m.marca);
-      expect(res.status).toBe(200); // el pedido ya está guardado y numerado
-      expect((await res.json()).numero).toBe(m.numero);
-      const alertas = mockTelegram.mock.calls.map((c) => String(c[0]));
-      expect(alertas.some((a) => a.includes("NO salió a Switch") && a.includes("Reintentar"))).toBe(true);
-      expect(mockLogout).toHaveBeenCalledOnce();
+      await confirmar(m.marca);
+      // `resolvePublicoSwitchActor` lee estas tres tablas. Si alguna se
+      // consultara, es que alguien volvió a resolver un cliente por descarte.
+      expect(mainDb.chainsFor("switch_clientes")).toHaveLength(0);
+      expect(mainDb.chainsFor("vendedores")).toHaveLength(0);
+      expect(mainDb.chainsFor("fg_catalogo_publico_switch")).toHaveLength(0);
     });
 
-    it(`${m.marca}: si el motor lanza (Switch caído), la confirmación igual responde 200`, async () => {
+    it(`${m.marca}: el aviso a Telegram PIDE el paso que falta`, async () => {
       seed(m);
-      mockEnviar.mockRejectedValue(new Error("ECONNRESET"));
+      await confirmar(m.marca);
+      const avisos = mockTelegram.mock.calls.map((c) => String(c[0]));
+      expect(avisos.some((a) => a.includes("Falta ponerle el cliente y mandarlo a Switch"))).toBe(true);
+      expect(avisos.some((a) => a.includes("Entra a Switch como Contado"))).toBe(false);
+    });
+
+    it(`${m.marca}: si el post-conversión falla, la confirmación igual responde 200`, async () => {
+      seed(m);
+      // El pedido recién numerado no aparece → no se puede marcar 'confirmado'.
+      marcaDb.queue(m.orders, { data: null, error: { message: "sin fila" } });
       const res = await confirmar(m.marca);
       expect(res.status).toBe(200);
       expect((await res.json()).numero).toBe(m.numero);
       expect(mockLogout).toHaveBeenCalledOnce();
-    });
-
-    it(`${m.marca}: sin vendedor mapeado NO inventa ids — no envía y avisa`, async () => {
-      seed(m, { conVendedor: false });
-      const res = await confirmar(m.marca);
-      expect(res.status).toBe(200);
-      expect(mockEnviar).not.toHaveBeenCalled();
-      const alertas = mockTelegram.mock.calls.map((c) => String(c[0]));
-      expect(alertas.some((a) => a.includes("NO salió a Switch"))).toBe(true);
     });
   }
 });

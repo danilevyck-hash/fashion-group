@@ -35,9 +35,9 @@
 //
 //   2. DEL LINK público (el cliente lo arma solo y lo confirma desde
 //      /pedido-<marca>/[short_id]): no hay sesión que aporte cliente ni
-//      vendedor, así que entra a Switch con el cliente de mostrador/CONTADO y
-//      el vendedor "DEFAULT" de la empresa — la casa, no una persona (ver
-//      publico-switch-actor.ts). NO genera comisión para nadie.
+//      vendedor, así que entra al sistema como BORRADOR y sin cliente, y espera
+//      a que una persona le ponga el cliente real y lo mande al ERP
+//      (14-ago-2026; antes salía solo con el mostrador puesto).
 //
 // El origen no se adivina: cada camino tiene su builder y es el propio endpoint
 // el que llama al suyo. En la DB queda el espejo del mismo dato —
@@ -170,9 +170,14 @@ export interface AvisoPedidoLink {
 
 /**
  * Pedido que el CLIENTE armó y confirmó solo desde el link público. No se
- * nombra vendedor (no hay uno real) y se dice explícitamente cómo entra a
- * Switch, porque es la diferencia que le importa a quien lee: nadie cobra
- * comisión por este.
+ * nombra vendedor (no hay uno real).
+ *
+ * 🔴 LA LÍNEA EXTRA CAMBIÓ EL 14-ago-2026 Y ES LA PARTE QUE MÁS IMPORTA. Decía
+ * *"Entra a Switch como Contado y sin vendedor — no paga comisión"*, que era
+ * cierto mientras el pedido del link salía SOLO al ERP. Desde que espera a una
+ * persona (ver `pedido-publico/[id]/confirmar/route.ts`), el aviso tiene que
+ * PEDIR ese paso: es lo único que hay entre el pedido y el ERP, y sin decirlo
+ * un pedido podría quedarse quieto sin que nadie se entere.
  */
 export function avisoPedidoDelLink(a: AvisoPedidoLink): string {
   return cuerpoAvisoPedido({
@@ -183,7 +188,9 @@ export function avisoPedidoDelLink(a: AvisoPedidoLink): string {
     cliente: a.cliente,
     total: a.total,
     resumen: a.resumen,
-    extras: ["Entra a Switch como Contado y sin vendedor — no paga comisión."],
+    extras: [
+      "Falta ponerle el cliente y mandarlo a Switch — está en Borradores.",
+    ],
   });
 }
 

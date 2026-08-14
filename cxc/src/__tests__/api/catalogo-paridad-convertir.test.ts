@@ -57,15 +57,38 @@ beforeEach(() => {
 });
 
 describe("POST /pedidos-publicos/[short_id]/convertir", () => {
-  it("401 sin sesión y 403 vendedor (solo admin/secretaria) — ambas marcas", async () => {
+  it("401 sin sesión — ambas marcas", async () => {
     for (const [post, param] of [
       [rConvertir, { params: { short_id: SID } }],
       [jConvertir, { params: { short_id: SID } }],
     ] as const) {
       expect((await post(makeReq("/x", { method: "POST" }), param)).status).toBe(401);
-      expect((await post(makeReq("/x", { method: "POST", role: "vendedor" }), param)).status).toBe(
-        403,
-      );
+    }
+  });
+
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026. Antes exigía 403 al vendedor.
+  // Daniel, preguntado explícitamente por los roles: *"los 3, bodega no"*. El
+  // vendedor es quien comparte el link y a quien le llega el pedido por
+  // WhatsApp; convertir era el ÚNICO paso del flujo que no tenía.
+  it("🔴 el VENDEDOR convierte (no 403) — ambas marcas", async () => {
+    for (const [post, param, db, tabla] of [
+      [rConvertir, { params: { short_id: SID } }, () => mainDb, "reebok_pedidos_publicos"],
+      [jConvertir, { params: { short_id: SID } }, () => joybeesDb, "joybees_pedidos_publicos"],
+    ] as const) {
+      db().queue(tabla, { data: null });
+      // 404 = pasó el rol y llegó a buscar el pedido. Lo que se prueba es que
+      // NO se queda en 403.
+      expect((await post(makeReq("/x", { method: "POST", role: "vendedor" }), param)).status).toBe(404);
+    }
+  });
+
+  // 🔴 BODEGA NO GANA NADA. Ve el catálogo (CATALOGO_ROLES) y punto.
+  it("🔴 BODEGA sigue en 403 — ambas marcas", async () => {
+    for (const [post, param] of [
+      [rConvertir, { params: { short_id: SID } }],
+      [jConvertir, { params: { short_id: SID } }],
+    ] as const) {
+      expect((await post(makeReq("/x", { method: "POST", role: "bodega" }), param)).status).toBe(403);
     }
   });
 

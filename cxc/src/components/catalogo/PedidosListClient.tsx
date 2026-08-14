@@ -21,6 +21,20 @@
 // escrito aunque la llamada falle. Por eso la pestaña la decide `en_switch`
 // —tener envío activo— y NO `status`. El número a la vista es la prueba: con
 // él, la etiqueta no puede mentir. Ver `lib/catalogo/switch-lock.ts`.
+//
+// ── Y ACÁ TAMBIÉN SE VEN LOS PEDIDOS DEL LINK (14-ago-2026) ──
+//
+// Daniel: *"si yo mando el link al público… mandar al vendedor el pedido con
+// nombre, para que así cuando alguien interno le llega el pedido por WhatsApp,
+// pueda entrar al sistema interno"*. Antes el pedido del link solo existía en el
+// panel de admin/secretaria, así que el vendedor que comparte el link y recibe
+// el WhatsApp no lo encontraba. Ahora aparece acá, en **Borradores** (no tiene
+// envío a Switch, así que no puede estar en la otra pestaña) y con el chip
+// "Del link".
+//
+// El primer toque de un pedido del link SIN convertir lo numera (la RPC
+// idempotente de siempre) y recién ahí abre su detalle — el mismo camino que el
+// botón "Editar" del admin, ni uno nuevo ni uno paralelo.
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -33,7 +47,7 @@ import type { ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPic
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
 interface Order {
-  id: string; order_number: string; client_name: string; vendor_name: string | null;
+  id: string; order_number: string | null; client_name: string; vendor_name: string | null;
   status: string; total: number; item_count: number; created_at: string;
   /** ¿Tiene envío ACTIVO en Switch? Decide la pestaña. Lo calcula el GET
    *  /orders con el mismo criterio que el candado de edición. */
@@ -42,6 +56,11 @@ interface Order {
    *  Switch pero se perdió el número (hoy 0 casos): se muestra como problema,
    *  nunca se esconde en Borradores. */
   switch_numero?: string | null;
+  /** Tabla física. 'publicos' = pedido del LINK todavía SIN convertir: `id` es
+   *  su short_id y no tiene número. Ver la cabecera del GET /orders. */
+  fuente?: "orders" | "publicos";
+  /** ¿Vino por el link compartible? Vale también para los ya convertidos. */
+  del_link?: boolean;
 }
 
 type Pestana = "borradores" | "switch";
@@ -49,6 +68,10 @@ type Pestana = "borradores" | "switch";
 /** Está en Switch ⇔ tiene envío activo. NO se mira `status`: mentía en 8
  *  pedidos de 100 (ver la cabecera del archivo). */
 const enSwitch = (o: Order) => o.en_switch === true;
+
+/** Pedido del link que todavía no tiene número: hay que convertirlo antes de
+ *  poder abrirlo, y no se puede duplicar ni borrar por la ruta de los internos. */
+const sinConvertir = (o: Order) => o.fuente === "publicos";
 
 export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -69,6 +92,8 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   // El error se ve DENTRO del modal: tocar el cliente ya es la acción, así que
   // un fallo silencioso se sentiría como "no pasó nada".
   const [dupError, setDupError] = useState<string | null>(null);
+  /** short_id del pedido del link que se está numerando (un toque a la vez). */
+  const [convirtiendo, setConvirtiendo] = useState<string | null>(null);
 
   const [role, setRole] = useState("");
 
@@ -90,10 +115,36 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   async function deleteOrder() {
     if (!deleteTarget) return;
     setDeleting(true);
-    await fetch(`${theme.api}/orders/${deleteTarget.id}`, { method: "DELETE" });
+    // Borrado SOFT por tabla física: un pedido del link sin convertir vive en
+    // <marca>_pedidos_publicos, no en <marca>_orders — mandarlo a la ruta de
+    // los internos borraría nada en silencio. Mismo criterio que el admin.
+    const url = sinConvertir(deleteTarget)
+      ? `${theme.api}/pedidos-publicos/${deleteTarget.id}`
+      : `${theme.api}/orders/${deleteTarget.id}`;
+    await fetch(url, { method: "DELETE" });
     setDeleting(false);
     setDeleteTarget(null);
     load();
+  }
+
+  // ── Abrir un pedido ──
+  // Interno → su detalle. Del link SIN convertir → primero se numera (RPC
+  // idempotente, la MISMA que usa "Editar" en el panel del admin) y después se
+  // abre el detalle interno, que es donde se elige el cliente, se corrige el
+  // precio y se manda a Switch.
+  async function abrirPedido(o: Order) {
+    if (!sinConvertir(o)) { router.push(`/catalogo/${marca}/pedido/${o.id}`); return; }
+    if (convirtiendo) return;
+    setConvirtiendo(o.id);
+    try {
+      const res = await fetch(`${theme.api}/pedidos-publicos/${o.id}/convertir`, { method: "POST" });
+      const data = res.ok ? await res.json() : null;
+      if (!data?.order_id) throw new Error("sin order_id");
+      router.push(`/catalogo/${marca}/pedido/${data.order_id}`);
+    } catch {
+      toast("No se pudo abrir el pedido. Intenta de nuevo.", "error");
+      setConvirtiendo(null);
+    }
   }
 
   // Duplica copiando los items del original y creando un pedido NUEVO a nombre
@@ -158,7 +209,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       if (!search) return true;
       const s = search.toLowerCase();
       return o.client_name.toLowerCase().includes(s)
-        || o.order_number.toLowerCase().includes(s)
+        || (o.order_number || "").toLowerCase().includes(s)
         || (o.vendor_name || "").toLowerCase().includes(s);
     })
     .filter(o => (pestana === "switch" ? enSwitch(o) : !enSwitch(o)))
@@ -217,14 +268,25 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (
-            <div key={o.id} data-pedido={o.order_number}
-              onClick={() => router.push(`/catalogo/${marca}/pedido/${o.id}`)}
-              className="flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-gray-300 transition cursor-pointer">
+            <div key={`${o.fuente ?? "orders"}-${o.id}`} data-pedido={o.order_number ?? o.id}
+              data-fuente={o.fuente ?? "orders"}
+              onClick={() => abrirPedido(o)}
+              className={`flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-gray-300 transition cursor-pointer ${convirtiendo === o.id ? "opacity-50" : ""}`}>
               <div className="flex-1 min-w-0">
                 {/* El nombre se queda con la línea ENTERA. La píldora de
                     estado ("Confirmado") se fue: decía lo contrario de la
-                    verdad en 8 pedidos de 100. */}
-                <div className="text-sm font-medium truncate">{o.client_name}</div>
+                    verdad en 8 pedidos de 100.
+                    El chip "Del link" SÍ va acá arriba: dice de dónde vino el
+                    pedido, que es lo primero que se pregunta quien lo abre. */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm font-medium truncate">{o.client_name}</span>
+                  {o.del_link && (
+                    <span data-chip="del-link"
+                      className="flex-shrink-0 inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      Del link
+                    </span>
+                  )}
+                </div>
                 {/* 🩸 EL NÚMERO VA EN LA SEGUNDA LÍNEA, Y NO ES COSMÉTICA.
                     Puesto al lado del nombre, medido a 390 px: el chip mide
                     168 px, el renglón 158, y el nombre del cliente quedaba
@@ -233,7 +295,14 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
                     el nombre recupera su línea. Tampoco dice "Switch #…": la
                     pestaña ya se llama "Pedidos a Switch". */}
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-gray-400 font-mono">{o.order_number}</span>
+                  {/* Un pedido del link sin convertir TODAVÍA NO TIENE número:
+                      se lo pone la conversión. Se dice, en vez de inventar un
+                      "PED-?" que después no coincidiría con nada. */}
+                  {o.order_number ? (
+                    <span className="text-xs text-gray-400 font-mono">{o.order_number}</span>
+                  ) : (
+                    <span className="text-xs text-gray-400">Sin número todavía</span>
+                  )}
                   <span className="text-xs text-gray-300">·</span>
                   <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
                   <span className="text-xs text-gray-300">·</span>
@@ -262,9 +331,14 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
               </div>
               <span className="text-sm font-semibold tabular-nums">${fmt(o.total)}</span>
               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                {/* Duplicar copia los items del pedido INTERNO: uno del link
+                    sin convertir todavía no existe como tal, así que el botón
+                    no se muestra (tocarlo pediría un pedido que no está). */}
+                {!sinConvertir(o) && (
                 <button onClick={() => setDupTarget(o)} className="text-xs text-gray-300 hover:text-blue-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Duplicar">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
+                )}
                 {canDelete && (
                   <button onClick={() => setDeleteTarget(o)} className="text-xs text-gray-300 hover:text-red-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Eliminar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
@@ -278,7 +352,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
 
       {dupTarget && (
         <DuplicarPedidoModal
-          orderNumber={dupTarget.order_number}
+          orderNumber={dupTarget.order_number ?? ""}
           api={theme.api}
           directorioLabel={theme.switchDirectorioLabel}
           duplicando={duplicating}

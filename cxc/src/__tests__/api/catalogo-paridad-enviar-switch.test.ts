@@ -188,8 +188,31 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
     expect(mockLogout).toHaveBeenCalledTimes(1); // higiene de sesión igual
   });
 
-  it("reebok del LINK sin ids: SÍ cae a los defaults del piloto (Contado id=1 + Reinaldo id=2)", async () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026 (2ª vuelta). Antes exigía que un
+  // pedido del LINK sin cliente cayera a los defaults del piloto (Contado id=1
+  // + Reinaldo id=2) y saliera igual. Daniel pidió que el del link también
+  // espere a una persona: *"ponerle el nombre del cliente para así mandarlo a
+  // Switch"*. Medido: PED-022 "Nathalie" salió así, a nombre del mostrador, y
+  // quedó bloqueado para editar.
+  it("🔴 pedido DEL LINK sin cliente: 422 igual que uno interno, NO cae al Contado", async () => {
     reebokDb.queue("reebok_orders", { data: confirmedOrder({ origen_short_id: "ab12cd34" }) });
+    const res = await rEnvioPost(makeReq("/x", { method: "POST", role: "vendedor" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toContain("Elige el cliente");
+    expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+
+  // ⚠️ EL FALLBACK NO SE BORRÓ: sigue resolviendo el VENDEDOR. Con el cliente
+  // ya elegido (acá, el mostrador REAL id=1, tocado a propósito), un pedido del
+  // link sale y el vendedor lo pone el default del piloto.
+  it("🔴 pedido DEL LINK con cliente elegido: sale, y el VENDEDOR lo sigue poniendo el fallback", async () => {
+    reebokDb.queue("reebok_orders", {
+      data: confirmedOrder({ origen_short_id: "ab12cd34", cliente_switch_id: 1 }),
+    });
+    mainDb.queue("switch_clientes", { data: { nombre: "Contado" } });
     reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
     mockEnviar.mockResolvedValueOnce({
       kind: "ok",
@@ -203,16 +226,8 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
       params: { id: OID },
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      ok: true,
-      numeroInterno: "16-000000500",
-      pedidoSwitchId: 500,
-      verificado: true,
-      warnings: [],
-    });
     const args = mockEnviar.mock.calls[0][0] as Record<string, unknown>;
     expect(args.clienteId).toBe(1);
-    expect(args.clienteNombre).toBe("Contado");
     expect(args.vendedorId).toBe(2);
     expect(args.vendedorNombre).toBe("Reinaldo Espinosa");
     expect(args.empresaKey).toBe("active_shoes");
