@@ -203,8 +203,6 @@ export default function GuiaPage() {
                 setBCedula={s.setBCedula}
                 bChofer={s.bChofer}
                 setBChofer={s.setBChofer}
-                juegos={s.juegos}
-                onUsarJuego={s.usarJuego}
                 bSaving={s.bSaving}
                 onConfirmar={(f1, f2) => { void s.confirmarDespacho(f1, f2); }}
                 pendingFirma1={s.pendingFirma1}
