@@ -31,6 +31,7 @@
 
 import { Pencil, Trophy, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
+import { textoAporteNoAsignado } from "@/lib/multifashion/metas-clave";
 import type { MetaConAvance } from "@/lib/multifashion/metas-lectura";
 
 const FMT_FECHA = new Intl.DateTimeFormat("es-PA", {
@@ -58,6 +59,8 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
   // El ancho de la barra se topa en 100% para que superar la meta no la haga
   // desbordar la tarjeta; el número de al lado sí muestra el porcentaje real.
   const anchoBarra = Math.min(100, Math.max(0, a.pctVendido * 100));
+
+  const restoTexto = textoAporteNoAsignado(meta.aporteNoAsignado);
 
   const tono = a.cumplida
     ? "border-emerald-300 bg-emerald-50/70"
@@ -208,6 +211,10 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
           · Meta GRUPAL → cuánto APORTÓ cada una al avance. No hay meta
             personal y no se inventa ninguna: Daniel fue explícito en que una
             meta grupal NO genera metas individuales.
+            🔴 Y la lista NO decide qué se mide: el avance es la TIENDA ENTERA,
+            elegir participantes solo elige a quién se le muestra su aporte. Por
+            eso los porcentajes suman ~96% y no 100%, y por eso hay una línea
+            que lo explica al pie.
           · Meta POR VENDEDORA → la meta de cada una (la que él escribió a
             mano) y su avance contra ella.
 
@@ -221,6 +228,11 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">
             {meta.tipo === "vendedora" ? "La meta de cada una" : "Cuánto aportó cada una"}
           </p>
+          {meta.tipo === "grupal" && (
+            <p className="mb-2 text-xs leading-relaxed text-gray-500">
+              La meta cuenta toda la venta de la tienda, no solo la de ellas.
+            </p>
+          )}
           <ul className="space-y-1.5">
             {meta.porVendedora.map((v) => (
               <li key={v.clave} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -246,6 +258,17 @@ export function MetaAvanceCard({ meta, puedeEditar, onEditar }: Props) {
               </li>
             ))}
           </ul>
+
+          {/* 🔴 LOS APORTES NO SUMAN 100%, Y LA PANTALLA DICE POR QUÉ.
+              La meta mide la tienda entera, así que lo facturado con el código
+              de gente que ya no trabaja acá está DENTRO del avance y no es de
+              nadie de la lista. Sin esta línea, una lista que suma 96% se lee
+              como un error del sistema y se deja de creer el número entero. El
+              porcentaje sale del período de ESTA meta: no hay un 4% escrito a
+              mano, y el día que esos códigos se cierren la línea desaparece. */}
+          {meta.tipo === "grupal" && restoTexto != null && (
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">{restoTexto}</p>
+          )}
         </div>
       )}
     </section>
