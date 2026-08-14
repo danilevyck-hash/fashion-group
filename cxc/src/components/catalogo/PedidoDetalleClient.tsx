@@ -4,6 +4,20 @@
 // todas las marcas, parametrizada por MARCA_THEME (los gemelos diferían ~9%:
 // bulto por categoría vs fijo, orden de items, guard legacy rol 'cliente',
 // draft-id de Joybees y micro-clases del tema).
+//
+// 🔴 EL CLIENTE ES UNO SOLO, Y MANDA EL PICKER (14-ago-2026).
+// Había DOS nombres de cliente que no se hablaban: el título del pedido era un
+// `<input>` de texto libre con sugerencias, y más abajo una caja aparte
+// "Cliente de Switch" con su propio "Cambiar" — y elegir ahí NO tocaba el
+// título. Medido en producción: **PED-004 quedó con
+// `client_name = "CITY MALL PASO CANOA"` y `cliente_switch_id = null`**, o sea
+// el nombre correcto en pantalla y NINGÚN cliente atrás. Ahora el picker es el
+// único control: al elegir se guarda el cliente Y se escribe el título.
+//
+// ⚠️ EXCEPCIÓN REAL, NO SE ROMPE: los pedidos que entran por el LINK PÚBLICO.
+// Ahí la persona escribe su nombre a mano y eso es legítimo (medido: PED-022,
+// `client_name = "Nathalie"`), así que en esos el campo de texto SE QUEDA. El
+// origen se distingue con `esPedidoDelLink`, nunca a ojo.
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
@@ -22,6 +36,12 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { hrefCatalogoAgregando } from "@/lib/catalogo/modo-pedido";
 import { avisosBloqueantes, type AvisoEnvio } from "@/lib/catalogo/switch-prevalidacion";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import {
+  SIN_CLIENTE_ELEGIDO,
+  esPedidoDelLink,
+  textoFaltaEnviar,
+  tieneClienteElegido,
+} from "@/lib/catalogo/cliente-elegido";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string;
   /** Precio de lista del catálogo (`<marca>_products.price`, sincronizado de
@@ -30,7 +50,13 @@ interface OrderItem { id?: string; product_id: string; sku: string; name: string
   /** Foto del stock al confirmar el pedido del link (piezas que HABÍA en ese
    *  momento). undefined = pedido presencial o DDL 20260725130000 pendiente. */
   disponible_pzas?: number; bulto_pzas?: number; }
-interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; created_at: string; updated_at?: string | null; [itemsField: string]: unknown; }
+interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; created_at: string; updated_at?: string | null;
+  /** Origen del pedido. `origen_original` solo viaja en el select base de
+   *  Reebok; `origen_short_id` lo devuelve el GET en las 4 marcas. Ver
+   *  `esPedidoDelLink` — mirar uno solo dejaría 3 marcas leyendo un pedido del
+   *  link como si fuera interno. */
+  origen_original?: string | null; origen_short_id?: string | null;
+  [itemsField: string]: unknown; }
 interface DirClient { nombre: string; empresa: string; }
 interface SwitchEnvio { estado: string; pedido_switch_id: number | null; numero_interno: string | null; error_detalle: string | null; }
 interface SwitchPreviewLinea { sku: string; descripcionSwitch: string; bultos: number; piezas: number; precioCatalogo: number; precioSwitch: number; }
@@ -209,8 +235,23 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); load(); }, [load]);
 
-  // Client autocomplete (directorio de clientes, 300ms debounce)
+  // ── ¿Vino por el link público? ──
+  // De esto dependen las DOS mitades de la regla: en un pedido del link el
+  // nombre a mano es legítimo (lo escribió el cliente) y su cliente de
+  // mostrador lo pone el sistema por regla, no por olvido. En uno interno el
+  // cliente lo elige una persona, siempre.
+  const delLink = esPedidoDelLink(order);
+  const clienteElegido = tieneClienteElegido({
+    cliente_switch_id: clienteSwitch?.id ?? null,
+    origen_original: order?.origen_original ?? null,
+    origen_short_id: order?.origen_short_id ?? null,
+  });
+
+  // Client autocomplete (directorio de clientes, 300ms debounce). Solo tiene
+  // sentido donde el nombre se teclea: en los internos no hay campo que
+  // autocompletar y pedirlo sería una consulta por tecla para nadie.
   useEffect(() => {
+    if (!delLink) { setSuggestions([]); setShowSugg(false); return; }
     if (clientName.length < 2) { setSuggestions([]); return; }
     const t = setTimeout(async () => {
       try {
@@ -220,7 +261,7 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     }, 300);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientName]);
+  }, [clientName, delLink]);
 
   useEffect(() => {
     function h(e: MouseEvent) { if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowSugg(false); }
@@ -401,6 +442,11 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
   // status==='confirmado'.
   async function enviarASwitch() {
     if (enviandoRef.current) return; // doble toque: el segundo no hace nada
+    // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
+    // y no se puede verificar por mutación (React no despacha el click de un
+    // botón deshabilitado). El que no se puede saltear está en el SERVIDOR:
+    // `handlePostEnvio` responde 422 sin cliente elegido.
+    if (!clienteElegido) return;
     enviandoRef.current = true;
     setConfirming(true);
     setSwitchProblema(null);
@@ -530,7 +576,17 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
     setShowClienteModal(true);
   }
 
-  // Asigna (o quita, con Contado) el cliente Switch del pedido.
+  // Asigna el cliente Switch del pedido — y, en los pedidos INTERNOS, escribe
+  // el título con lo elegido.
+  //
+  // 🩸 Antes esto guardaba el cliente y NO tocaba el título: por eso PED-004
+  // terminó diciendo "CITY MALL PASO CANOA" arriba con `cliente_switch_id` en
+  // null abajo. El nombre se pone por REF antes del PUT (`clientNameRef`), que
+  // es el mecanismo que este archivo ya usa para que el guardado nunca mande un
+  // valor viejo por culpa de un closure.
+  //
+  // ⚠️ En los pedidos del LINK el título NO se pisa: ahí el nombre lo escribió
+  // la persona que hizo el pedido y es el dato bueno.
   async function asignarClienteSwitch(c: ClienteSwitchOpcion) {
     setClienteGuardando(true);
     try {
@@ -540,9 +596,18 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       });
       const d = await res.json();
       if (res.ok && d.ok) {
-        setClienteSwitch(c.id != null ? { id: c.id, nombre: c.nombre, codigo: c.codigo } : null);
+        // El nombre bueno es el que devuelve el servidor (el del directorio de
+        // Switch); el del selector es el respaldo.
+        const elegido: ClienteSwitchOpcion = { id: c.id, nombre: (d.nombre as string | null) ?? c.nombre, codigo: (d.codigo as string | null) ?? c.codigo };
+        setClienteSwitch(elegido.id != null ? { id: elegido.id, nombre: elegido.nombre, codigo: elegido.codigo } : null);
         setShowClienteModal(false);
-        showToast(`Cliente Switch: ${nombreDeCliente(c)}`);
+        if (!delLink) {
+          const titulo = nombreDeCliente(elegido);
+          clientNameRef.current = titulo;
+          setClientName(titulo);
+          await performSave();
+        }
+        showToast(`Cliente: ${nombreDeCliente(elegido)}`);
       } else {
         showToast(d.error || "No se pudo guardar el cliente. Intenta de nuevo.");
       }
@@ -687,6 +752,9 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   // El candado post-envío a Switch deja TODO el contenido de solo lectura.
   const canEdit = isEditorRole && !switchLock;
+  // El nombre se teclea SOLO en los pedidos del link. En los internos el título
+  // sale del picker — dos campos para el mismo dato era la mitad del bug.
+  const nombreEditableAMano = canEdit && delLink;
   const canDelete = ["admin", "secretaria"].includes(role);
   const isConfirmed = order?.status === "confirmado";
   // El cliente solo se cambia mientras el pedido NO tenga un envío vivo en el
@@ -722,6 +790,13 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
 
   const suggList = theme.pedido.suggLimit ? suggestions.slice(0, theme.pedido.suggLimit) : suggestions;
 
+  // Qué falta para poder mandarlo. Acá el vendedor NO entra: el pedido ya nace
+  // con uno puesto (el del login) y el servidor lo resuelve si faltara — a
+  // diferencia del cliente, que sin elección explícita no existe.
+  const faltaEnviar: string[] = [];
+  if (!items.length) faltaEnviar.push("agregar productos");
+  if (!clienteElegido) faltaEnviar.push("elegir el cliente");
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Back button */}
@@ -732,8 +807,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3" ref={theme.pedido.nameRefEnContenedor ? nameRef : undefined}>
           <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
+          {/* 🔴 EL TÍTULO ES EL CLIENTE, Y EL CLIENTE LO PONE EL PICKER.
+              En los pedidos INTERNOS acá no se teclea nada: el nombre sale de
+              lo que se eligió abajo. El campo de texto libre sobrevive SOLO en
+              los del link, donde lo escribió la persona que hizo el pedido. */}
           <div className="relative flex-1" ref={theme.pedido.nameRefEnContenedor ? undefined : nameRef}>
-            {canEdit ? (
+            {nombreEditableAMano ? (
               <>
                 <input value={clientName} onChange={e => setClientName(e.target.value)}
                   onFocus={() => { if (suggestions.length) setShowSugg(true); }}
@@ -748,8 +827,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                   </div>
                 )}
               </>
+            ) : !delLink && !clienteElegido ? (
+              <span data-medir="titulo-pedido" className="text-xl font-semibold text-amber-800">{SIN_CLIENTE_ELEGIDO}</span>
             ) : (
-              <span className="text-xl font-semibold">{clientName}</span>
+              <span data-medir="titulo-pedido" className="text-xl font-semibold">{clientName}</span>
             )}
           </div>
         </div>
@@ -917,21 +998,36 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
           Con un envío activo a Switch NO se puede cambiar: el pedido YA vive en
           el ERP con el cliente con que se envió (el server responde 409). */}
       {isEditorRole && (
-        <div className="border border-gray-200 rounded-lg px-4 py-3 mb-4">
+        <div data-medir="cliente-detalle"
+          className={`border rounded-lg px-4 py-3 mb-4 ${clienteElegido ? "border-gray-200" : "border-amber-300 bg-amber-50/40"}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-xs uppercase tracking-wide text-gray-400">Cliente de Switch</div>
-              <div className="text-sm text-gray-800 mt-0.5">
-                {nombreDeCliente(clienteSwitch)}
-                {clienteSwitch?.codigo && clienteSwitch.nombre ? (
-                  <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span>
-                ) : null}
-              </div>
+              {/* Se llama "Cliente" a secas: es el ÚNICO cliente de la
+                  pantalla. Mientras decía "Cliente de Switch" al lado de un
+                  título con otro nombre, parecían dos cosas distintas. */}
+              <div className="text-xs uppercase tracking-wide text-gray-400">Cliente</div>
+              {clienteElegido ? (
+                <div className="text-sm text-gray-800 mt-0.5">
+                  {nombreDeCliente(clienteSwitch)}
+                  {clienteSwitch?.codigo && clienteSwitch.nombre ? (
+                    <span className="text-gray-400 font-mono text-xs"> · {clienteSwitch.codigo}</span>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-sm font-medium text-amber-800 mt-0.5">{SIN_CLIENTE_ELEGIDO}</div>
+              )}
+              {!delLink && (
+                <div className="text-xs text-gray-400 mt-0.5">Es el nombre con el que sale el pedido.</div>
+              )}
             </div>
             {puedeCambiarCliente ? (
               <button onClick={abrirClienteModal}
-                className="flex-shrink-0 border border-gray-200 rounded-md px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-400 transition">
-                Cambiar
+                className={`flex-shrink-0 border rounded-md px-3 min-h-[44px] text-sm transition ${
+                  clienteElegido
+                    ? "border-gray-200 text-gray-700 hover:border-gray-400"
+                    : "border-amber-400 bg-white text-amber-900 hover:border-amber-500"
+                }`}>
+                {clienteElegido ? "Cambiar" : "Elegir"}
               </button>
             ) : (
               <span className="flex-shrink-0 text-xs text-gray-400">ya está en Switch</span>
@@ -1041,8 +1137,10 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                 )}
 
                 {/* UN SOLO TOQUE: confirma, revisa contra Switch y crea el
-                    pedido. Solo se detiene si hay algo que decidir. */}
-                <button onClick={enviarASwitch} disabled={confirming || !items.length}
+                    pedido. Solo se detiene si hay algo que decidir.
+                    🔴 Y APAGADO SIN CLIENTE ELEGIDO: es el mismo candado que
+                    el checkout, con la misma regla compartida. */}
+                <button onClick={enviarASwitch} disabled={confirming || !items.length || !clienteElegido}
                   className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition disabled:opacity-40">
                   {confirming
                     ? (pasoSwitch ?? "Enviando a Switch...")
@@ -1050,6 +1148,12 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
                       ? "Reintentar envío a Switch"
                       : "Enviar a Switch"}
                 </button>
+                {/* Apagado, DICE qué falta — acá mismo, no en un toast. */}
+                {!confirming && faltaEnviar.length > 0 && (
+                  <p data-medir="falta-enviar" className="text-xs text-amber-800 mt-2 text-center">
+                    {textoFaltaEnviar(faltaEnviar)}
+                  </p>
+                )}
                 {/* El aviso va ANTES del toque, no en un modal después. */}
                 <p className="text-xs text-gray-500 mt-2 text-center">
                   Crea el pedido de verdad en Switch ({theme.empresaKey}). Si sale mal, hay que borrarlo a mano en el panel de Switch.
@@ -1212,12 +1316,15 @@ export default function PedidoDetalleClient({ marca }: { marca: MarcaUiKey }) {
       {showClienteModal && (
         <ModalOverlay onBackdropClick={() => { if (!clienteGuardando) setShowClienteModal(false); }}>
           <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-lg w-full mx-0 sm:mx-4 border border-gray-200 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-medium mb-1">Cliente de Switch del pedido</h3>
+            <h3 className="text-base font-medium mb-1">Cliente del pedido</h3>
             <p className="text-xs text-gray-500 mb-3">El pedido se creará en Switch a nombre de este cliente.</p>
+            {/* 🔴 `undefined` cuando no hay cliente: NADA viene preseleccionado.
+                Pasar `{id:null}` marcaba "Contado" como si ya se hubiera
+                elegido — el mismo default silencioso, de otra forma. */}
             <ClienteSwitchPicker
               api={theme.api}
               directorioLabel={theme.switchDirectorioLabel}
-              valor={clienteSwitch ? { id: clienteSwitch.id, nombre: clienteSwitch.nombre, codigo: clienteSwitch.codigo } : { id: null, nombre: null, codigo: null }}
+              valor={clienteSwitch ? { id: clienteSwitch.id, nombre: clienteSwitch.nombre, codigo: clienteSwitch.codigo } : undefined}
               onElegir={asignarClienteSwitch}
               disabled={clienteGuardando}
             />

@@ -16,6 +16,7 @@ import { requireRole } from "@/lib/requireRole";
 import { getMarcaConfig } from "@/lib/catalogo/marcas";
 import { clienteSwitchRoles } from "@/lib/catalogo/roles";
 import { errorClienteNoExiste, parsearClienteSwitchId, resolverClienteSwitch } from "@/lib/catalogo/cliente-switch";
+import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 
 function esColumnaAusente(err: { message?: string | null } | null): boolean {
   return /cliente_switch_id|column/i.test(err?.message ?? "");
@@ -77,7 +78,31 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   }
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  return NextResponse.json({ clientes: data ?? [] });
+
+  // 🔴 LA VENTA DE MOSTRADOR, CON SU ID DE VERDAD (14-ago-2026).
+  //
+  // El selector siempre ofreció "Contado" con `id: null`, y `null` en la
+  // columna significa las DOS cosas a la vez: "elegí mostrador" y "nadie eligió
+  // nada". Con esa ambigüedad no hay forma de exigir que el cliente se elija a
+  // propósito — que es justo lo que costó $53.124 en 15 pedidos.
+  //
+  // Devolviendo acá el cliente de mostrador REAL de la empresa (su código
+  // propio de Switch, TCKCTA — el mismo que ya usa el link público), elegirlo
+  // guarda un id y deja de parecerse a un olvido. Medido: existe en las 4
+  // empresas y es el id 1 (active_shoes "Contado" · joystep "Contado" ·
+  // fashion_shoes "VENTAS LOCA" · vistana "VENTAS").
+  //
+  // Si no se pudiera resolver va `null` y el selector se comporta como siempre:
+  // ante la duda se ofrece la opción, nunca se esconde.
+  const { data: contado } = await supabaseServer
+    .from("switch_clientes")
+    .select("cliente_switch_id, codigo, nombre")
+    .eq("empresa_key", cfg.empresaKey)
+    .eq("codigo", CODIGO_CLIENTE_CONTADO)
+    .limit(1)
+    .maybeSingle();
+
+  return NextResponse.json({ clientes: data ?? [], contado: contado ?? null });
 }
 
 // ─── PATCH: asignar/quitar cliente Switch de un pedido ───────────────────────

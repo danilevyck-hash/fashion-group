@@ -742,6 +742,55 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - 🔴 **La prueba de que SÍ actualiza lo que cambió**: `MARCA=tommy DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-catalogo-escribe-lo-que-cambio.ts` corre el motor REAL contra los **productos REALES de producción** y el **Switch REAL**, en `dryRun` (cero escrituras), dos veces: control y con **UNA** columna movida en la RESPUESTA de la lectura (no en la base). Medido el 14-ago-2026: **CONTROL 455 comparados · 0 escrituras · 455 sinCambios** · **MUTADO `T1XH343351800` disponibilidad 20→21 ⇒ 455 comparados · 1 escritura · 454 sinCambios**, y la base quedó **INTACTA** (`disponibilidad=20`). Un solo campo distinto ⇒ exactamente una escritura más.
 >   - 🩸 **La primera corrida dio 🔴 y era EL SCRIPT, no el motor**: eligió `FW0FW06158-DW5`, un producto **inactivo**. El loop que compara solo recorre el set de `/stock` (= activos ∪ disponible≥1), así que mover una fila que no está ahí no produce ninguna escritura y el veredicto habría acusado al motor de algo que no hacía. Ahora elige un producto **activo**. Un verificador que miente en cualquiera de las dos direcciones es peor que no tenerlo.
 
+## 🔴 Pedidos — EL CLIENTE SE ELIGE, NUNCA VIENE PUESTO (14-ago-2026)
+
+> El checkout del catálogo nacía con **`Contado` PUESTO** y "Enviar a Switch" no exigía tocar nada: se armaba el pedido, se apretaba, y salía a nombre de Contado sin que nadie lo notara. Daniel, textual: ***"Que arranque vacío y el botón apagado hasta elegir cliente."***
+>
+> 🩸 **EL DATO, medido contra producción y reproducido al centavo** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-pedidos-sin-cliente.ts`, solo lectura): **18 de 33 pedidos vivos (55%) sin cliente real · 15 ya confirmados y en Switch por $53.124**, ocho de $1.000 o más (TOM-002 $16.920 · TOM-017 $16.722 · TOM-003 $7.254 · PED-017 $2.760 · PED-006 $2.100 · CKP-005 $1.704 · TOM-001 $1.584 · PED-015 $1.560). **Ninguno era venta de mostrador**, y los 18 son INTERNOS — ni uno del link.
+>
+> ⚠️ **"Sin cliente real" son DOS formas del mismo olvido:** `cliente_switch_id` en NULL (4 pedidos) **o** apuntando al cliente de mostrador (14). Contar solo los NULL da 4 de 33 y esconde el problema.
+>
+> ### Las dos mitades del arreglo
+>
+> **1. El checkout arranca VACÍO.** `useState<Cliente | undefined>(undefined)`, la caja dice **"Elige el cliente"** en ámbar y el botón va apagado **diciendo qué falta** (*"Falta: elegir el cliente"*, el patrón de Guías: apagado Y explicado, no un toast por vez). 🔴 **Contado NO desaparece** — sigue primero en la lista, rotulado **"Contado (venta de mostrador)"** con todas las letras, pero hay que TOCARLO; dejó de decir "(default)" porque ya no lo es.
+>
+> **2. En el detalle el cliente es UNO SOLO.** Había DOS nombres que no se hablaban: el título era un `<input>` de texto libre con sugerencias y más abajo una caja aparte "Cliente de Switch" cuyo "Cambiar" NO tocaba el título. Medido: **PED-004 quedó con `client_name = "CITY MALL PASO CANOA"` y `cliente_switch_id = null`** — el nombre correcto en pantalla y NINGÚN cliente atrás. Ahora manda el picker: al elegir se guarda el cliente **y** se escribe el título (por `clientNameRef`, el mecanismo que este archivo ya usa para que el guardado nunca mande un valor viejo).
+>
+> ### ⚠️ LA EXCEPCIÓN REAL: EL LINK PÚBLICO, y no se rompe
+>
+> En un pedido del link no hay sesión que aporte cliente: la persona escribe su nombre a mano y el sistema le asigna el mostrador de la empresa (`publico-switch-actor`, código TCKCTA). **Eso es la regla del sistema, no un olvido** — medido: **PED-022 vive con `client_name = "Nathalie"` y `cliente_switch_id = 1`**. Ahí el texto libre se queda y el envío no se traba.
+> - **El origen se mira por `origen_original` Y por `origen_short_id`**, nunca por uno solo: el primero solo viaja en el select base de **Reebok**, así que mirarlo solo dejaría a Joybees/Tommy/Calvin leyendo un pedido del link como interno y **cerrándole el campo al cliente**.
+>
+> ### 🔴 EL CANDADO QUE NO SE PUEDE SALTEAR VIVE EN EL SERVIDOR
+>
+> `handlePostEnvio` responde **422** si un pedido interno no tiene cliente. Hacía falta porque justo debajo hay **tres redes que INVENTAN un cliente cuando falta** (el fallback del piloto Reebok y `resolvePublicoSwitchActor`) — exactamente cómo los 15 pedidos se fueron a Switch. **Esas redes NO se retiran**: siguen sirviendo para el pedido del link, que es para lo que se hicieron.
+> - ⚠️ **Un candado viejo CAMBIÓ DE DIRECCIÓN**: `catalogo-paridad-enviar-switch.test.ts` exigía que un pedido interno sin cliente cayera al Contado del piloto. **Eso ERA el agujero.** Ahora exige 422, y un test nuevo (con `origen_short_id`) prueba que el fallback sigue vivo para el link.
+> - ⚠️ **Los `return` de guarda del NAVEGADOR son segunda capa y NO son verificables por mutación**: React no despacha el click de un botón deshabilitado ni forzándole `disabled = false` (medido). Está dicho así en el código; el candado es el del servidor.
+>
+> ### 🔴 CONTADO PASA A USAR EL ID REAL — y el destino NO se movió
+>
+> `null` significaba las DOS cosas a la vez ("elegí mostrador" / "nadie eligió"), y con esa ambigüedad no hay forma de exigir una elección deliberada. Ahora `GET /[marca]/clientes-switch` devuelve el `contado` de la empresa (código **TCKCTA**, el mismo que ya usa el link público) y elegirlo guarda un id.
+> - **Verificado en las 4 empresas antes de mergear** (`scripts/_diag-contado-por-empresa.ts`, solo lectura): TCKCTA es **único** en cada una, **es el id 1 en las cuatro** (o sea que el cambio **no mueve el destino**, es idéntico al `1` escrito a mano), **no hay ningún otro cliente con nombre confundible** (0 candidatos), y las cuatro tienen facturación real de mostrador: `active_shoes "Contado"` 43 · `joystep "Contado"` 65 · `fashion_shoes "VENTAS LOCA"` 388 · `vistana "VENTAS"` 500 facturas.
+> - 🩸 **La primera medición dijo "0 facturas" en las 4 y era EL SCRIPT**: preguntaba por `cliente_id`, columna que no existe (es `cliente_switch_id`), y devolvía 0 **sin error visible**. Un cero que parece un dato y no es ninguno.
+> - **El mostrador se dice SIEMPRE con la misma frase** aunque en Switch cada empresa lo llame distinto: se toca "Contado (venta de mostrador)" y eso mismo se ve después. El nombre que viaja a Switch NO sale de ahí — lo lee el servidor del directorio.
+> - **Efecto en las 4 marcas**: el picker es compartido, así que Reebok · Joybees · Tommy · Calvin se comportan igual. **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok.**
+>
+> ### Medición
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción y con pedidos REALES** (`BASE=… node scripts/_medir-cliente-pedido-anchos.mjs`, solo lectura, 5 estados): **390 · 834 · 1024 · 1440 → las cajas del cliente dan 0 px de arrastre, 0 recorte, 0 táctil <44 y 0 texto <12px** en los 20 casos. El script **falla** si no encuentra "Elige el cliente", el "Falta:", el botón apagado o el nombre del pedido del link.
+> - 🔴 **Los tocables <44px que quedan en el resto de la pantalla se COMPARARON contra `origin/main`** (`scripts/_medir-tactiles-comparar.mjs`, mismo script en las dos ramas): **main 42 · esta rama 39**, y la ÚNICA diferencia es que este cambio **quitó 3** (el input de texto libre del pedido interno). Todo lo demás —`← Catálogo`, `← Volver a Pedidos`, la `x` de quitar línea, `Eliminar pedido`, el precio por pieza y **los inputs de cantidad de 48×26 / 56×26**— está **idéntico en main: es PRE-EXISTENTE y NO se tocó** (Daniel no aprobó arreglarlo; los inputs de cantidad son el hallazgo conocido de Tommy/Calvin/Joybees).
+> - 🩸 **Dos falsos hallazgos del MEDIDOR, no del producto:** `innerText` **no incluye el valor de un `<input>`**, así que acusaba al pedido del link de haber perdido "Nathalie" con el campo escrito; y el caso "pedido del link EDITABLE" **no se puede simular en el navegador** — al neutralizar el candado de Switch el autoguardado dispara un PUT, el SERVIDOR (que sí sabe que el pedido está en Switch) responde 409 y el candado vuelve. Se retiró del script y se dice de frente: ese caso lo cubre el candado de conducta. **En el estado REAL no sale ningún PUT, ni acá ni en main** (medido en las dos ramas).
+>
+> ### Candados
+>
+> `src/__tests__/components/pedido-cliente-obligatorio.test.tsx` (19) y `cliente-elegido.test.ts` (16). **Son de CONDUCTA**: renderizan las pantallas reales, tocan los botones reales y cuentan qué salió por `fetch` — el `disabled` y el `return` se pueden mutar sin cambiar una palabra del archivo.
+> - **Verificado por mutación, 16 de 16 cazadas** (`bash scripts/_mutar-candados-cliente-pedido.sh`): el checkout vuelve a arrancar con Contado · el botón deja de exigir lo que falta · deja de decir qué falta · Contado vuelve a un id escrito a mano · el detalle deja mandar sin cliente · elegir cliente deja de escribir el título · vuelve el texto libre en los internos · el picker vuelve a preseleccionar el mostrador · **el SERVIDOR deja pasar un pedido sin cliente** · el servidor deja de leer el origen · el origen se mira solo por `origen_original` · el pedido del link se traba · `null` vuelve a contar como elegido · el selector ignora el mostrador real · las dos etiquetas.
+> - 🩸 **LA PRIMERA CORRIDA DIO 16/16 **MINTIENDO**.** El script restauraba con `git checkout` y `cliente-elegido.ts` es un archivo NUEVO: git **aborta el comando entero** y no restaura NADA, así que las mutaciones se **apilaban** y ninguna se probó por separado. Con restauración por copia el resultado honesto fue **13/16**, y las 3 brechas se cerraron (una era un barrido de texto cuyo regex no matcheaba nunca). **Un verificador que miente en verde es peor que no tenerlo.**
+>
+> ### 🔴 Lo que NO se tocó
+>
+> El flujo de ~10 toques a 3 (#504/#506/#508/#509) · **Duplicar sigue preguntando el cliente y agregándolo DE UNA, sin botón de confirmar** · el modo pedido `?agregarA=` · **los 15 pedidos que ya están en Switch NO se corrigen desde acá** (es data en Switch y la decide Daniel aparte) · y nada más del informe de auditoría (precio por pieza/bulto, ITBMS, cantidad escribible en el catálogo público, renombrar los productos de Tommy).
+
 ## Catálogos — auto-recorte del fondo al subir (12-ago-2026)
 
 > **Las fotos del banco B2B de PVH vienen con el producto CHICO abajo y un fondo enorme; en la tarjeta se ven diminutas al lado de las buenas.** Caso real de Daniel: `HW0HW02958AEF.jpg`, **1364×1819**, una sandalia que ocupa el **9% del área** y el resto es fondo gris en degradado. Fuente única: **`src/lib/catalogos/foto-recorte.ts`** — núcleo PURO (fondo, caja, guardas, plan de encuadre) + un envoltorio de canvas que solo dibuja lo que el plan ya decidió.

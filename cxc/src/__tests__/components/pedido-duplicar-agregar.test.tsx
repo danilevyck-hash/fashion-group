@@ -93,7 +93,7 @@ describe("DuplicarPedidoModal", () => {
     // cliente y Cancelar. Nada de re-elegir ni de pantalla intermedia.
     await screen.findByText("Sporting Shoes");
     expect(botonesDelModal()).toEqual([
-      "Contado (mostrador)",
+      "Contado (venta de mostrador)",
       "Sporting ShoesD-42",
       "City Mall DavidD-77",
       "Usar este cliente",
@@ -152,11 +152,11 @@ describe("DuplicarPedidoModal", () => {
     const onElegir = vi.fn();
     renderDup({ onElegir });
     expect(onElegir).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Contado (mostrador)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Contado (venta de mostrador)" }));
     expect(onElegir).not.toHaveBeenCalled();
-    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Contado (mostrador)");
+    expect(screen.getByText(/Cliente elegido:/).textContent).toContain("Contado (venta de mostrador)");
     fireEvent.click(screen.getByRole("button", { name: "Usar este cliente" }));
-    expect(onElegir).toHaveBeenCalledWith("Contado (mostrador)", { id: null, nombre: "Contado (mostrador)", codigo: null });
+    expect(onElegir).toHaveBeenCalledWith("Contado (venta de mostrador)", { id: null, nombre: "Contado (venta de mostrador)", codigo: null });
   });
 
   it("buscar NO es elegir: escribir en el buscador no duplica nada", async () => {
@@ -200,7 +200,7 @@ describe("DuplicarPedidoModal", () => {
     renderDup({ error: "No se pudo duplicar el pedido. Intenta de nuevo." });
     expect(screen.getByText("No se pudo duplicar el pedido. Intenta de nuevo.")).toBeTruthy();
     // Y se puede volver a intentar: las opciones siguen tocables.
-    expect((screen.getByRole("button", { name: "Contado (mostrador)" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Contado (venta de mostrador)" }) as HTMLButtonElement).disabled).toBe(false);
     await screen.findByText("Sporting Shoes");
   });
 
@@ -238,7 +238,7 @@ describe("DuplicarPedidoModal", () => {
       expect(screen.getByText(/No se pudo cargar el directorio de clientes/)).toBeTruthy(),
     );
     // Contado sigue disponible: es la única opción que no depende del directorio.
-    expect(screen.getByRole("button", { name: "Contado (mostrador)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Contado (venta de mostrador)" })).toBeTruthy();
   });
 });
 

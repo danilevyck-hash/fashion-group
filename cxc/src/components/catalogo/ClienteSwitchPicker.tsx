@@ -15,12 +15,23 @@
 // seguir. Ese es el pedido de Daniel — *"un vendedor TIENE que elegir un
 // cliente de switch, todos siempre"*— y por eso el componente no preselecciona
 // nada por su cuenta (`valor === undefined` = todavía no eligió).
+//
+// 🩸 Y DESDE EL 14-ago-2026 CONTADO GUARDA UN ID DE VERDAD. Antes se guardaba
+// `null`, y `null` en `cliente_switch_id` significaba las DOS cosas a la vez:
+// "elegí mostrador" y "nadie eligió nada". Con esa ambigüedad no había forma de
+// exigir una elección deliberada — el agujero que costó $53.124 en 15 pedidos.
+// El id sale del propio directorio (`contado` de la API: el cliente con código
+// TCKCTA de la empresa, el MISMO que ya usa el link público). Si no se puede
+// resolver se cae al `null` de siempre: ante la duda se ofrece la opción,
+// nunca se esconde.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
+import { LABEL_CONTADO } from "@/lib/catalogo/cliente-elegido";
+import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
 
 export interface ClienteSwitchOpcion {
-  /** null = Contado (mostrador). */
+  /** El cliente de mostrador de la empresa; `null` solo si no se pudo resolver. */
   id: number | null;
   nombre: string | null;
   codigo: string | null;
@@ -32,12 +43,24 @@ interface FilaCliente {
   nombre: string | null;
 }
 
-export const CONTADO: ClienteSwitchOpcion = { id: null, nombre: "Contado (mostrador)", codigo: null };
+/** Respaldo cuando el directorio no resuelve el cliente de mostrador. */
+export const CONTADO: ClienteSwitchOpcion = { id: null, nombre: LABEL_CONTADO, codigo: null };
 
-/** Texto de UNA opción, igual en el selector y en donde se muestra lo elegido. */
+/**
+ * Texto de UNA opción, igual en el selector, en donde se muestra lo elegido y
+ * en el título del pedido.
+ *
+ * ⚠️ El cliente de mostrador se dice SIEMPRE con la misma frase, aunque en
+ * Switch cada empresa lo tenga con otro nombre ("Contado" en dos, "VENTAS LOCA"
+ * y "VENTAS" en las otras dos). Se toca "Contado (venta de mostrador)" y eso
+ * mismo es lo que se ve después: si volviera "VENTAS LOCA", el usuario creería
+ * que eligió otra cosa. El nombre que viaja a Switch NO sale de acá — lo lee el
+ * servidor del directorio (`enviar-switch-route`).
+ */
 export function nombreDeCliente(c: ClienteSwitchOpcion | null | undefined): string {
-  if (!c) return "Contado (mostrador)";
-  if (c.id == null) return "Contado (mostrador)";
+  if (!c) return LABEL_CONTADO;
+  if (c.id == null) return LABEL_CONTADO;
+  if ((c.codigo || "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO) return LABEL_CONTADO;
   return c.nombre || c.codigo || `Cliente ${c.id}`;
 }
 
@@ -58,6 +81,8 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
   const [resultados, setResultados] = useState<FilaCliente[]>([]);
   const [buscando, setBuscando] = useState(true);
   const [error, setError] = useState(false);
+  /** El cliente de mostrador REAL de la empresa (código TCKCTA). */
+  const [contado, setContado] = useState<ClienteSwitchOpcion>(CONTADO);
 
   // Debounce 300ms. Con el query vacío lista los primeros — así el selector
   // nunca abre en blanco y Contado no es la única opción visible.
@@ -70,7 +95,16 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
         if (!vivo) return;
         if (r.ok) {
           const d = await r.json();
-          setResultados(d.clientes || []);
+          // La venta de mostrador ya tiene su opción arriba: dejarla también
+          // adentro de la lista serían DOS formas de elegir lo mismo, con otro
+          // nombre según la empresa.
+          setResultados(((d.clientes || []) as FilaCliente[]).filter(
+            (c) => (c.codigo || "").trim().toUpperCase() !== CODIGO_CLIENTE_CONTADO,
+          ));
+          const c = d.contado as FilaCliente | null | undefined;
+          if (c && typeof c.cliente_switch_id === "number" && c.cliente_switch_id > 0) {
+            setContado({ id: c.cliente_switch_id, nombre: c.nombre, codigo: c.codigo });
+          }
           setError(false);
         } else {
           setError(true);
@@ -84,6 +118,11 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
   }, [api, query]);
 
   const elegido = valor !== undefined;
+  /** ¿Lo elegido ES la venta de mostrador? Por código, no por id: el id lo
+   *  resuelve el directorio y cambiar de empresa cambia el número. */
+  const esMostrador = (c: ClienteSwitchOpcion | undefined): boolean =>
+    !!c && (c.id == null || (c.codigo || "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO);
+  const contadoActivo = elegido && esMostrador(valor);
 
   return (
     <div>
@@ -98,14 +137,14 @@ export default function ClienteSwitchPicker({ api, directorioLabel, valor, onEle
       <div className="border border-gray-100 rounded-md divide-y divide-gray-50 max-h-56 overflow-y-auto">
         <button
           type="button"
-          onClick={() => onElegir(CONTADO)}
+          onClick={() => onElegir(contado)}
           disabled={disabled}
-          aria-pressed={elegido && valor!.id == null}
+          aria-pressed={contadoActivo}
           className={`w-full text-left px-3 py-2.5 min-h-[44px] text-sm transition disabled:opacity-40 ${
-            elegido && valor!.id == null ? "bg-black text-white" : "hover:bg-gray-50"
+            contadoActivo ? "bg-black text-white" : "hover:bg-gray-50"
           }`}
         >
-          Contado (mostrador)
+          {LABEL_CONTADO}
         </button>
         {error ? (
           <div className="px-3 py-2.5 text-xs text-red-600">

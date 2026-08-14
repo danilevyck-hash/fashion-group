@@ -18,6 +18,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { enviarPedidoSwitch, type EnvioItem, type EnvioResult } from "@/lib/catalogo/switch-envio";
 import { resolvePublicoSwitchActor } from "@/lib/catalogo/publico-switch-actor";
+import { tieneClienteElegido } from "@/lib/catalogo/cliente-elegido";
 
 // El vendedor también puede consultar/reintentar el envío: crear+enviar desde
 // el checkout ya es suyo — el Reintentar es la misma operación tras un fallo.
@@ -30,6 +31,9 @@ interface OrderRow {
   status: string;
   cliente_switch_id?: number | null;
   vendedor_switch_id?: number | null;
+  /** Origen del pedido — de esto depende si el mostrador es regla u olvido. */
+  origen_original?: string | null;
+  origen_short_id?: string | null;
   items: EnvioItem[];
 }
 
@@ -38,9 +42,11 @@ async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | nu
   const db = await cfg.db();
   const itemCols = `product_id, sku, name, quantity, unit_price${marca === "reebok" ? ", is_preorder" : ""}`;
   // cliente/vendedor_switch_id pueden no existir aún (DDL 20260705120000
-  // pendiente) → reintentar sin esas columnas (modo legacy).
+  // pendiente) → reintentar sin esas columnas (modo legacy). `origen_short_id`
+  // existe en las 4 marcas, pero se pide en el MISMO escalón tolerante: si
+  // faltara, el pedido se lee igual y se trata como interno.
   for (const withIds of [true, false]) {
-    const cols = `id, order_number, client_name, status${withIds ? ", cliente_switch_id, vendedor_switch_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
+    const cols = `id, order_number, client_name, status${withIds ? ", cliente_switch_id, vendedor_switch_id, origen_short_id" : ""}, ${cfg.itemsRelation}(${itemCols})`;
     const { data, error } = await db.from(cfg.ordersTable).select(cols).eq("id", orderId).single();
     if (!error && data) {
       const row = data as unknown as Record<string, unknown>;
@@ -51,10 +57,12 @@ async function fetchOrder(marca: string, orderId: string): Promise<OrderRow | nu
         status: String(row.status),
         cliente_switch_id: (row.cliente_switch_id as number) ?? null,
         vendedor_switch_id: (row.vendedor_switch_id as number) ?? null,
+        origen_original: (row.origen_original as string) ?? null,
+        origen_short_id: (row.origen_short_id as string) ?? null,
         items: (row[cfg.itemsRelation] as EnvioItem[]) ?? [],
       };
     }
-    if (error && !/cliente_switch_id|vendedor_switch_id|column/i.test(error.message)) return null;
+    if (error && !/cliente_switch_id|vendedor_switch_id|origen_short_id|column/i.test(error.message)) return null;
   }
   return null;
 }
@@ -105,6 +113,27 @@ export async function handlePostEnvio(req: NextRequest, marca: string, orderId: 
   }
   if (!order.items.length) {
     return NextResponse.json({ error: "El pedido no tiene productos" }, { status: 400 });
+  }
+
+  // ── 🔴 EL CANDADO: sin cliente elegido a propósito, no sale ──
+  //
+  // Es la capa que NO se puede saltear. La pantalla apaga el botón, pero un
+  // botón apagado solo protege a quien mira la pantalla: este endpoint se puede
+  // llamar igual. Y justo debajo hay tres redes que INVENTAN un cliente cuando
+  // falta (el fallback del piloto Reebok y `resolvePublicoSwitchActor`), que es
+  // exactamente cómo 15 pedidos por $53.124 se fueron a Switch a nombre de
+  // Contado sin que nadie lo decidiera.
+  //
+  // ⚠️ Esas redes NO se quitan y siguen sirviendo para lo que se hicieron: el
+  // pedido del LINK, donde el mostrador es la regla del sistema y no un olvido.
+  // `tieneClienteElegido` es la MISMA función que apaga el botón — una segunda
+  // definición del mismo `if` se separaría de la pantalla y volveríamos a tener
+  // un botón verde con un servidor que rechaza (o peor, al revés).
+  if (!tieneClienteElegido(order)) {
+    return NextResponse.json(
+      { error: "Este pedido no tiene cliente. Elige el cliente antes de mandarlo a Switch." },
+      { status: 422 },
+    );
   }
 
   // Cliente/vendedor: los del pedido, los defaults del piloto (Reebok legacy) o,

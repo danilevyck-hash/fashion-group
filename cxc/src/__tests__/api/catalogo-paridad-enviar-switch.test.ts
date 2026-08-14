@@ -170,8 +170,26 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
     expect(mockEnviar).not.toHaveBeenCalled();
   });
 
-  it("reebok LEGACY: sin ids cae a los defaults del piloto (Contado id=1 + Reinaldo id=2)", async () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026, y es el punto del cambio.
+  //
+  // Antes este test exigía que un pedido INTERNO sin cliente cayera al Contado
+  // del piloto. Eso ES el agujero: medido en producción, 15 pedidos por $53.124
+  // salieron a Switch a nombre de Contado sin que nadie lo decidiera. El
+  // fallback NO se retira —sigue siendo la regla del pedido del LINK, ver el
+  // test de abajo—, pero deja de aplicarse a un pedido que armó una persona.
+  it("🔴 pedido INTERNO sin cliente: 422, y NO cae al Contado del piloto", async () => {
     reebokDb.queue("reebok_orders", { data: confirmedOrder() });
+    const res = await rEnvioPost(makeReq("/x", { method: "POST", role: "vendedor" }), {
+      params: { id: OID },
+    });
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toContain("Elige el cliente");
+    expect(mockEnviar).not.toHaveBeenCalled(); // nada llegó al ERP
+    expect(mockLogout).toHaveBeenCalledTimes(1); // higiene de sesión igual
+  });
+
+  it("reebok del LINK sin ids: SÍ cae a los defaults del piloto (Contado id=1 + Reinaldo id=2)", async () => {
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ origen_short_id: "ab12cd34" }) });
     reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
     mockEnviar.mockResolvedValueOnce({
       kind: "ok",
@@ -204,7 +222,9 @@ describe("POST enviar-switch — validaciones previas al motor", () => {
   });
 
   it("dry:true = solo pre-validación → preview del motor", async () => {
-    reebokDb.queue("reebok_orders", { data: confirmedOrder() });
+    // Con cliente elegido: pre-validar un pedido sin cliente ya no llega acá.
+    reebokDb.queue("reebok_orders", { data: confirmedOrder({ cliente_switch_id: 42 }) });
+    mainDb.queue("switch_clientes", { data: { nombre: "Sporting Shoes" } });
     reebokDb.queue("products", { data: [{ id: P1, category: "footwear" }] });
     mockEnviar.mockResolvedValueOnce({ kind: "preview", preview: { lineas: 1 } });
 
