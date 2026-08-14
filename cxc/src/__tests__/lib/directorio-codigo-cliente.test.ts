@@ -213,7 +213,6 @@ describe("el reintento sin la columna es ACOTADO", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("BARRIDO ESTÁTICO — el formulario y la migración", () => {
-  const UI = "src/components/catalogo/ClientesClient.tsx";
   const MIGRACION = "supabase/migrations/20260808180000_directorio_clientes_codigo.sql";
 
   /** El WHERE del UPDATE de backfill, SIN comentarios: es lo único que ejecuta. */
@@ -228,20 +227,13 @@ describe("BARRIDO ESTÁTICO — el formulario y la migración", () => {
     return sql.slice(i, fin === -1 ? undefined : fin);
   }
 
-  it("el formulario NO manda los cuatro campos que no edita", () => {
-    const src = leer(UI);
-    const i = src.indexOf("async function save()");
-    const cuerpo = src.slice(i, i + 1200);
-    for (const c of ["telefono:", "celular:", "contacto:", "notas:"]) {
-      expect(cuerpo, `save() no debe mandar ${c}`).not.toContain(c);
-    }
-  });
-
-  it("el formulario ofrece vincular con un cliente real", () => {
-    const src = leer(UI);
-    expect(src).toContain("ClienteTypeahead");
-    expect(src).toContain("cliente_codigo");
-  });
+  // ⚠️ Los dos tests que leían `ClientesClient.tsx` se fueron con la pantalla
+  // (borrada el 14-ago-2026: `/catalogo/[marca]/clientes`, huérfana — cero
+  // enlaces desde el sistema; Daniel: *"no entendí qué es eso, no lo conocía"*).
+  // Lo que protegían —que el PUT no borre los campos que el formulario no
+  // edita— NO se perdió: lo cubre el bloque de arriba, que llama al PUT REAL.
+  // La tabla `directorio_clientes` NO se tocó y la sigue leyendo el buscador
+  // global, el autocomplete del detalle de pedido y `/api/directorio/sync`.
 
   it("la migración es ADITIVA y no destructiva", () => {
     const sql = leer("supabase/migrations/20260808180000_directorio_clientes_codigo.sql");

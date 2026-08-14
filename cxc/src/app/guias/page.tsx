@@ -152,7 +152,6 @@ export default function GuiasPage() {
           onEdit={(id) => router.push(`/guias/${id}`)}
           onPrint={(id) => router.push(`/guias/${id}/imprimir`)}
           onDelete={s.requestDeleteGuia}
-          onReject={s.rejectGuia}
           onAtarCliente={s.abrirAtarCliente}
           nombresPorCodigo={nombresPorCodigo}
           readOnly={guiasReadonly}

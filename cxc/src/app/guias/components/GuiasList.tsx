@@ -11,6 +11,7 @@ import TimeGroupHeader from "@/components/TimeGroupHeader";
 import {
   ETIQUETA_TIPO_DESPACHO,
   esEntregaDirecta,
+  guiaYaDespachada,
   sinCeroPelado,
   tipoDespachoEfectivo,
 } from "@/lib/guias/modo-despacho";
@@ -34,7 +35,6 @@ interface GuiasListProps {
   onEdit: (id: string) => void;
   onPrint: (id: string) => void;
   onDelete: (id: string) => void;
-  onReject: (id: string, motivo: string) => void;
   /** Abrir la ventana de "¿a qué cliente fue esta línea?". Sin esto, el enlace
    *  no se ofrece (rol de solo lectura). */
   onAtarCliente?: (item: GuiaItem) => void;
@@ -102,14 +102,13 @@ function ChipCliente({
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
 const CREATE_ROLES = ["admin", "secretaria", "bodega"];
 const DELETE_ROLES = ["admin", "secretaria"];
-const REJECT_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
   guias, loading, error, search, setSearch,
   showPending, setShowPending, role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
-  onEdit, onPrint, onDelete, onReject, onAtarCliente,
+  onEdit, onPrint, onDelete, onAtarCliente,
   nombresPorCodigo,
   readOnly,
 }: GuiasListProps) {
@@ -119,8 +118,6 @@ export default function GuiasList({
   const puedeAtarCliente = Boolean(onAtarCliente) && !readOnly && DESPACHO_ROLES.includes(role || "");
   const [visibleCount, setVisibleCount] = useState(15);
   const [groupedView, setGroupedView] = useState(true);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [rejectMotivo, setRejectMotivo] = useState("");
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -149,7 +146,6 @@ export default function GuiasList({
   const canCreate = !readOnly && role && CREATE_ROLES.includes(role);
   const canDelete = !readOnly && role && DELETE_ROLES.includes(role);
   const canEdit = !readOnly && role && ["admin", "secretaria", "bodega"].includes(role);
-  const canReject = !readOnly && role && REJECT_ROLES.includes(role);
 
   return (
     <div>
@@ -315,16 +311,21 @@ export default function GuiasList({
                 const _gg = groupedView ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias") : null;
                 const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;
-                      const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
+                      // Fuente ÚNICA del "ya salió" (incluye la "Rechazada"
+                      // heredada, que sigue siendo historia). Escribirlo a mano
+                      // acá era una segunda definición del mismo estado.
+                      const isDispatched = guiaYaDespachada(g.estado);
 
                       // Status-based left border color
-                      const statusBorderClass = g.estado === "Completada"
+                      // El borde rojo de "Rechazada" se fue con el rechazo
+                      // (14-ago-2026). `isDispatched` ya la trata como historia,
+                      // así que una fila heredada se ve despachada, no pendiente
+                      // — que es lo que es.
+                      const statusBorderClass = isDispatched
                         ? "border-l-4 border-l-emerald-400"
-                        : g.estado === "Rechazada"
-                          ? "border-l-4 border-l-red-400"
-                          : (g.estado === "Confirmada" || g.estado === "Despachada")
-                            ? "border-l-4 border-l-blue-400"
-                            : "border-l-4 border-l-amber-400";
+                        : (g.estado === "Confirmada" || g.estado === "Despachada")
+                          ? "border-l-4 border-l-blue-400"
+                          : "border-l-4 border-l-amber-400";
 
                       const cardContent = (
                         <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
@@ -350,7 +351,7 @@ export default function GuiasList({
                                 {g.total_bultos} <span className="text-gray-400">bultos</span>
                               </span>
                               <span className="w-24 shrink-0">
-                                <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
+                                <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
                               </span>
                               <svg
                                 className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
@@ -383,7 +384,7 @@ export default function GuiasList({
                                 <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
                                 <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
                                 <span className="ml-auto">
-                                  <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
+                                  <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
                                 </span>
                               </div>
                               {/* Cliente + destino visibles sin expandir (bodega ve a quién va) */}
@@ -480,12 +481,7 @@ export default function GuiasList({
                                       Imprimir
                                     </button>
                                     {(() => {
-                                      const canRejectThis =
-                                        canReject && isDispatched && expandedGuia.estado !== "Rechazada";
                                       const menuItems = [
-                                        ...(canRejectThis
-                                          ? [{ label: "Rechazar/Devolver", onClick: () => setRejectingId(expandedGuia.id) }]
-                                          : []),
                                         ...(canDelete
                                           ? [{ label: "Eliminar guía", onClick: () => onDelete(expandedGuia.id), destructive: true }]
                                           : []),
@@ -567,14 +563,6 @@ export default function GuiasList({
                                     <p className="text-xs text-gray-500 mt-3 italic">{expandedGuia.observaciones}</p>
                                   )}
 
-                                  {/* Motivo de rechazo */}
-                                  {expandedGuia.estado === "Rechazada" && expandedGuia.motivo_rechazo && (
-                                    <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
-                                      <p className="text-xs font-medium uppercase tracking-wide text-red-500">Motivo de rechazo</p>
-                                      <p className="text-xs text-red-700 mt-0.5">{expandedGuia.motivo_rechazo}</p>
-                                    </div>
-                                  )}
-
                                   {/* Dispatched: read-only despacho data */}
                                   {isDispatched && (
                                     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -633,20 +621,6 @@ export default function GuiasList({
                                     </div>
                                   )}
 
-                                  {/* Rechazar (solo en despachadas no-rechazadas) — queda abajo porque
-                                      requiere flujo con input de motivo */}
-                                  {/* Input de motivo de rechazo — se dispara desde "Rechazar/Devolver"
-                                      en el menú "···". */}
-                                  {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && rejectingId === expandedGuia.id && (
-                                    <div className="mt-6 pt-4 border-t border-gray-200">
-                                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                        {/* text-base en móvil: con text-xs (12px) Safari hace zoom al enfocar. */}
-                                        <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-2 text-base md:text-xs outline-none w-full max-w-[200px] min-h-[44px]" autoFocus />
-                                        <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40 inline-flex items-center justify-center min-h-[44px] px-2 shrink-0">Confirmar</button>
-                                        <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition inline-flex items-center justify-center min-h-[44px] px-2 shrink-0">Cancelar</button>
-                                      </div>
-                                    </div>
-                                  )}
                                 </>
                               ) : null}
                             </div>

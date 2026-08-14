@@ -1,10 +1,24 @@
 "use client";
 
 // Filtros del catálogo (búsqueda + chips + orden), parametrizados por
-// MARCA_THEME: opciones de género/categoría y clases vienen del tema; los
-// chips de Oferta/Nuevo/Próximamente son feature (saleFilter, hoy solo Reebok),
-// y el chip "2 bultos o más" + el select de precio son feature (filtroBultos /
+// MARCA_THEME: opciones de género/categoría y clases vienen del tema, y el
+// chip "2 bultos o más" + el select de precio son feature (filtroBultos /
 // filtroPrecio, hoy solo Tommy — ver lib/catalogo/filtros-extra).
+//
+// ── LOS CHIPS «OFERTA / NUEVO / PRÓXIMAMENTE» SE FUERON (14-ago-2026) ──
+//
+// Daniel, textual: *"eliminas filtros de reebok desde la raíz los de
+// oferta/nuevo/proximamente"*. Medido contra producción: la columna `badge`
+// está VACÍA en los 944 productos de las 4 marcas (products 284 · joybees 83 ·
+// tommy 497 · calvin 80, las 944 en NULL), o sea que los 3 chips nunca
+// devolvieron un solo resultado desde que existen. Se fue el chip, el
+// filtrado, el tipo `SaleFilter`, el desplegable de celular y la bandera
+// `features.saleFilter` que los encendía.
+//
+// ⚠️ La COLUMNA `badge` NO se borra, y el admin la sigue pudiendo escribir
+// (`ProductosTarjetas` / `ProductosBatch` / `photoUpload.updateProductBadge`).
+// De ella cuelga la PREVENTA (`is_preorder = badge === "proximamente"`), que
+// es una función de negocio: ver el comentario en CatalogoVendedorPage.
 //
 // ── 📱 EN CELULAR Y iPAD LOS FILTROS SON DESPLEGABLES, NO UNA FILA QUE SE ARRASTRA ──
 //
@@ -64,16 +78,6 @@ import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { BULTOS_CHIP_LABEL, PRECIO_RANGO_OPTIONS, type PrecioRango } from "@/lib/catalogo/filtros-extra";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import { grupoTieneOpciones, type OpcionFiltro } from "@/lib/catalogo/filtros-derivados";
-
-export type SaleFilter = "" | "oferta" | "nuevo" | "proximamente";
-
-/** Chips de Oferta/Nuevo/Próximamente, como lista para el desplegable móvil. */
-const SALE_OPTIONS: { value: SaleFilter; label: string }[] = [
-  { value: "", label: "Todos" },
-  { value: "oferta", label: "Oferta" },
-  { value: "nuevo", label: "Nuevo" },
-  { value: "proximamente", label: "Próximamente" },
-];
 
 interface FiltroDesplegableProps {
   /** Nombre del grupo, tal cual se lee en el botón: "Género", "Categoría"… */
@@ -169,8 +173,6 @@ interface CatalogoFiltersProps {
   onGenderChange: (v: string) => void;
   category: string;
   onCategoryChange: (v: string) => void;
-  saleFilter?: SaleFilter;
-  onSaleFilterChange?: (v: SaleFilter) => void;
   bultosFilter?: boolean;
   onBultosFilterChange?: (v: boolean) => void;
   precioRango?: PrecioRango;
@@ -191,7 +193,6 @@ export default function CatalogoFilters({
   searchInput, onSearchChange,
   gender, onGenderChange,
   category, onCategoryChange,
-  saleFilter = "", onSaleFilterChange,
   bultosFilter = false, onBultosFilterChange,
   precioRango = "", onPrecioRangoChange,
   sortBy, onSortByChange,
@@ -207,13 +208,11 @@ export default function CatalogoFilters({
   const categoriaOpts = categoryOptions ?? f.categoryOptions;
   const conGenero = grupoTieneOpciones(generoOpts);
   const conCategorias = theme.features.categoryChips && grupoTieneOpciones(categoriaOpts);
-  const conSale = theme.features.saleFilter && !!onSaleFilterChange;
   const conBultos = theme.features.filtroBultos && !!onBultosFilterChange;
   const conPrecio = theme.features.filtroPrecio && !!onPrecioRangoChange;
 
   const hasActiveFilters = !!(
     searchInput || gender || category ||
-    (conSale && saleFilter) ||
     (conBultos && bultosFilter) ||
     (conPrecio && precioRango)
   );
@@ -282,16 +281,6 @@ export default function CatalogoFilters({
           />
         )}
 
-        {conSale && (
-          <FiltroDesplegable
-            etiqueta="Estado"
-            valor={saleFilter}
-            opciones={SALE_OPTIONS}
-            onChange={v => onSaleFilterChange!(v as SaleFilter)}
-            chipActive={f.chipActive}
-            chipInactive={f.chipInactive}
-          />
-        )}
       </div>
 
       {/* ── iPAD HORIZONTAL Y ESCRITORIO (lg+): la fila de píldoras, que ENVUELVE ──
@@ -371,43 +360,6 @@ export default function CatalogoFilters({
           </>
         )}
 
-        {conSale && (
-          <>
-            <div className={f.divider} />
-
-            {/* Sale/New/Próximamente toggle chips (feature saleFilter) */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => onSaleFilterChange!(saleFilter === "oferta" ? "" : "oferta")}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                  saleFilter === "oferta"
-                    ? "bg-[#E4002B] text-white shadow-sm"
-                    : "bg-white text-[#E4002B]/70 border border-[#E4002B]/20 hover:border-[#E4002B]/40"
-                }`}
-              >
-                Oferta
-              </button>
-              <button
-                onClick={() => onSaleFilterChange!(saleFilter === "nuevo" ? "" : "nuevo")}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                  saleFilter === "nuevo" ? f.chipActive : f.chipInactive
-                }`}
-              >
-                Nuevo
-              </button>
-              <button
-                onClick={() => onSaleFilterChange!(saleFilter === "proximamente" ? "" : "proximamente")}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[44px] ${
-                  saleFilter === "proximamente"
-                    ? "bg-amber-500 text-white shadow-sm"
-                    : "bg-white text-amber-700 border border-amber-300 hover:border-amber-400"
-                }`}
-              >
-                Próximamente
-              </button>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Sort + count + clear.

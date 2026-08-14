@@ -146,7 +146,6 @@ export interface MarcaTheme {
   pedidosHref: string;
   checkoutHref: string;
   confirmacionBase: string;
-  clientesHref: string;
   /** Link público compartible (copiar link del vendedor). */
   publicoShareUrl: string;
   /** Base de la página permanente del pedido público (/pedido-<marca>). */
@@ -206,8 +205,6 @@ export interface MarcaTheme {
   features: {
     /** Pre-orden / badge "proximamente" (solo Reebok). */
     preorder: boolean;
-    /** Chips Oferta/Nuevo/Próximamente en filtros (solo Reebok). */
-    saleFilter: boolean;
     /** Grid agrupada por modelo + secciones por género (Joybees groupByModel). */
     agrupacionPorModelo: boolean;
     /** Inventario por talla en endpoint aparte (Reebok /inventory). */
@@ -516,7 +513,6 @@ const REEBOK: MarcaTheme = {
   pedidosHref: "/catalogo/reebok/pedidos",
   checkoutHref: "/catalogo/reebok/checkout",
   confirmacionBase: "/catalogo/reebok/confirmacion",
-  clientesHref: "/catalogo/reebok/clientes",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/reebok",
   pedidoPublicoBase: "/pedido-reebok",
 
@@ -534,7 +530,6 @@ const REEBOK: MarcaTheme = {
 
   features: {
     preorder: true,
-    saleFilter: true,
     agrupacionPorModelo: false,
     inventarioPorTalla: true,
     categoryChips: true,
@@ -840,7 +835,6 @@ const JOYBEES: MarcaTheme = {
   pedidosHref: "/catalogo/joybees/pedidos",
   checkoutHref: "/catalogo/joybees/checkout",
   confirmacionBase: "/catalogo/joybees/confirmacion",
-  clientesHref: "/catalogo/joybees/clientes",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/joybees",
   pedidoPublicoBase: "/pedido-joybees",
 
@@ -858,7 +852,6 @@ const JOYBEES: MarcaTheme = {
 
   features: {
     preorder: false,
-    saleFilter: false,
     agrupacionPorModelo: true,
     inventarioPorTalla: false,
     categoryChips: false,
@@ -1140,7 +1133,7 @@ const JOYBEES: MarcaTheme = {
 // blanca (#F6F7F9) con cards blancas — look limpio "prep" de la marca. Grid
 // PLANA (sin agrupación por modelo), ficha simple por variantes, admin estilo
 // batch (648 productos calzado con TODAS las fotos pendientes → subida masiva
-// nombre-de-archivo=SKU es el flujo dominante). Sin pre-orden ni saleFilter.
+// nombre-de-archivo=SKU es el flujo dominante). Sin pre-orden.
 // Chips de categoría = las categorías parseadas de Switch (tommy-nombres.ts).
 const TOMMY: MarcaTheme = {
   marca: "tommy",
@@ -1154,7 +1147,6 @@ const TOMMY: MarcaTheme = {
   pedidosHref: "/catalogo/tommy/pedidos",
   checkoutHref: "/catalogo/tommy/checkout",
   confirmacionBase: "/catalogo/tommy/confirmacion",
-  clientesHref: "/catalogo/tommy/clientes",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/tommy",
   pedidoPublicoBase: "/pedido-tommy",
 
@@ -1179,7 +1171,6 @@ const TOMMY: MarcaTheme = {
 
   features: {
     preorder: false,        // sin pre-orden (decisión Daniel, como Joybees)
-    saleFilter: false,
     agrupacionPorModelo: false, // grid PLANA
     inventarioPorTalla: false,
     categoryChips: true,    // categorías parseadas de la descripcion Switch
@@ -1487,7 +1478,7 @@ const TOMMY: MarcaTheme = {
 // negro pleno). Wordmark OFICIAL "Calvin Klein" (public/calvin/
 // calvin-wordmark*.png, derivado del master que mandó Daniel el 12-ago-2026
 // con scripts/_generar-logo-calvin.mjs).
-// Grid PLANA, admin estilo batch, sin pre-orden ni saleFilter — espejo
+// Grid PLANA, admin estilo batch, sin pre-orden — espejo
 // funcional de Tommy: mismo flujo de fotos B2B Dash de PVH, bulto 8/12 por
 // producto (default 12), name editable (nombre_manual). Chips de categoría =
 // las categorías parseadas de Switch (calvin-nombres.ts, 13 valores medidos).
@@ -1505,7 +1496,6 @@ const CALVIN: MarcaTheme = {
   pedidosHref: "/catalogo/calvin/pedidos",
   checkoutHref: "/catalogo/calvin/checkout",
   confirmacionBase: "/catalogo/calvin/confirmacion",
-  clientesHref: "/catalogo/calvin/clientes",
   publicoShareUrl: "https://www.fashiongr.com/catalogo-publico/calvin",
   pedidoPublicoBase: "/pedido-calvin",
 
@@ -1530,7 +1520,6 @@ const CALVIN: MarcaTheme = {
 
   features: {
     preorder: false,        // sin pre-orden (decisión Daniel, solo Reebok)
-    saleFilter: false,
     agrupacionPorModelo: false, // grid PLANA
     inventarioPorTalla: false,
     categoryChips: true,    // categorías parseadas de la descripcion Switch

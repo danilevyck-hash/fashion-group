@@ -1,0 +1,209 @@
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * «RECHAZAR / DEVOLVER» SE FUE DE GUÍAS (14-ago-2026)
+ *
+ * Daniel, textual: *"en la guia si quitar rechazar, una guia se marca como
+ * despachado / se edita / se imprime / pdf"* — o sea, ése es el flujo completo
+ * y rechazar no es parte.
+ *
+ * EL DATO, medido contra producción el 14-ago-2026:
+ *   · 0 guías en estado "Rechazada" de 186 (185 Completada + 1 Pendiente Bodega)
+ *   · `motivo_rechazo` lleno en 0 filas
+ *   · 5 meses de historia
+ * Estaba tan escondido que solo aparecía con `canReject && isDispatched &&
+ * estado !== "Rechazada"`, dentro del panel desplegado de una guía YA
+ * despachada. Nunca se usó.
+ *
+ * 🔴 EL CANDADO ES DE CONDUCTA, NO DE TEXTO. En este repo los barridos que
+ * buscan un literal dentro de un archivo pasan ESTANDO MUTADOS: el comentario
+ * que explica lo retirado contiene el texto que el barrido busca, y el barrido
+ * se da por satisfecho con su propia explicación. Ya pasó cuatro veces (el
+ * `revalidateOnFocus` de Reclamos, el `<h1>` de Saldos, el `fetchMayorAsientos`
+ * del mayor y el aporte de Metas). Así que acá se RENDERIZA y se lee el DOM.
+ *
+ * ⚠️ LO QUE **NO** SE TOCÓ, y está probado abajo:
+ *   · La columna `motivo_rechazo` y el estado "Rechazada" SIGUEN en la base.
+ *   · `guiaYaDespachada("Rechazada")` sigue devolviendo `true`: una fila
+ *     heredada sigue siendo HISTORIA (no editable). Aflojar eso volvería
+ *     editable una guía rechazada — el lado peligroso.
+ *   · Despachar, editar e imprimir siguen intactos.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+import { describe, it, expect, afterEach } from "vitest";
+import { render, cleanup } from "@testing-library/react";
+import GuiasList from "@/app/guias/components/GuiasList";
+import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
+import type { Guia, GuiaItem } from "@/app/guias/components/types";
+
+afterEach(cleanup);
+
+const ITEMS: GuiaItem[] = [
+  {
+    id: "i1",
+    cliente: "City Mall Paso Canoa",
+    direccion: "Paso Canoas",
+    bultos: 4,
+    facturas: "F-1",
+  } as GuiaItem,
+];
+
+function guia(over: Partial<Guia> = {}): Guia {
+  return {
+    id: "g1",
+    numero: 190,
+    fecha: "2026-08-11",
+    transportista: "Transporte Rápido",
+    modo_entrega: "transportista",
+    transportista_id: null,
+    placa: "AB1234",
+    observaciones: "",
+    total_bultos: 4,
+    item_count: 1,
+    monto_total: 0,
+    estado: "Completada",
+    entregado_por: "Julio",
+    numero_guia_transp: "TR-1",
+    receptor_nombre: "Nicolás",
+    cedula: "8-888-888",
+    guia_items: ITEMS,
+    ...over,
+  } as Guia;
+}
+
+/** La lista con UNA guía, ya desplegada — que es donde vivía "Rechazar". */
+function lista(over: Partial<Guia> = {}, role = "admin") {
+  const g = guia(over);
+  return render(
+    <GuiasList
+      guias={[g]}
+      loading={false}
+      error={null}
+      search=""
+      setSearch={() => {}}
+      showPending={false}
+      setShowPending={() => {}}
+      role={role}
+      onNewGuia={() => {}}
+      expandedId="g1"
+      expandedGuia={g}
+      expandedLoading={false}
+      onToggleExpand={() => {}}
+      onEdit={() => {}}
+      onPrint={() => {}}
+      onDelete={() => {}}
+    />,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("🔴 el camino para rechazar una guía no existe en la pantalla", () => {
+  // Los dos roles que PODÍAN rechazar (REJECT_ROLES era ["admin","secretaria"]).
+  for (const role of ["admin", "secretaria"]) {
+    it(`${role}: una guía despachada no ofrece "Rechazar/Devolver"`, () => {
+      const { container } = lista({ estado: "Completada" }, role);
+      const textos = Array.from(container.querySelectorAll("button, [role='menuitem'], a"))
+        .map((e) => (e.textContent || "").trim());
+      expect(textos.some((t) => /Rechazar|Devolver/i.test(t))).toBe(false);
+      // Y tampoco por texto suelto en ningún lado del panel.
+      expect(container.textContent || "").not.toMatch(/Rechazar|Devolver/i);
+    });
+  }
+
+  it("no hay campo para escribir un motivo de rechazo", () => {
+    const { container } = lista({ estado: "Completada" });
+    for (const input of Array.from(container.querySelectorAll("input"))) {
+      expect((input.getAttribute("placeholder") || "").toLowerCase()).not.toContain("motivo");
+    }
+    expect(container.textContent || "").not.toMatch(/Motivo de rechazo/i);
+  });
+
+  it("una guía heredada 'Rechazada' NO muestra su motivo ni pinta de rojo", () => {
+    // No existe ninguna en producción (0 de 186), pero el estado sigue
+    // siendo válido en la base: si apareciera, no debe reabrir el camino.
+    const { container } = lista({
+      estado: "Rechazada",
+      motivo_rechazo: "llegó rota",
+    } as Partial<Guia>);
+    expect(container.textContent || "").not.toContain("llegó rota");
+    expect(container.textContent || "").not.toMatch(/Rechazar|Devolver|Motivo de rechazo/i);
+    expect(container.querySelector(".border-l-red-400")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("⚠️ lo que NO se tocó sigue en pie", () => {
+  it("una 'Rechazada' heredada sigue siendo HISTORIA (no se vuelve editable)", () => {
+    // Aflojar esto es el lado peligroso: dejaría reabrir el despacho de una
+    // guía que ya salió. La bandera vive en lib/guias/modo-despacho.ts.
+    expect(guiaYaDespachada("Rechazada")).toBe(true);
+    expect(guiaYaDespachada("Completada")).toBe(true);
+    expect(guiaYaDespachada("Pendiente Bodega")).toBe(false);
+  });
+
+  it("una 'Rechazada' se ve como despachada, NO como pendiente", () => {
+    // Al quitarle su rama al borde, el peligro era que cayera en el `else`
+    // ámbar de "pendiente" — una guía que ya salió mostrándose por despachar.
+    const { container } = lista({ estado: "Rechazada" });
+    expect(container.querySelector(".border-l-emerald-400")).not.toBeNull();
+    expect(container.querySelector(".border-l-amber-400")).toBeNull();
+  });
+
+  // El flujo que Daniel describió, entero: "se marca como despachado / se
+  // edita / se imprime / pdf". Los tres estados, con sus botones REALES.
+  const botones = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll("button"))
+      .map((b) => (b.textContent || "").trim())
+      .filter(Boolean);
+
+  it("Pendiente Bodega → Despachar + Imprimir", () => {
+    const { container } = lista({ estado: "Pendiente Bodega" });
+    const t = botones(container);
+    expect(t.some((x) => /^Despachar$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
+  });
+
+  it("Confirmada (legacy, sin despachar) → Editar + Imprimir", () => {
+    const { container } = lista({ estado: "Confirmada" });
+    const t = botones(container);
+    expect(t.some((x) => /^Editar$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
+  });
+
+  it("Completada → solo Imprimir (una guía despachada sigue cerrada a edición)", () => {
+    // ⚠️ Esto NO lo cambió el retiro del rechazo: una guía que ya salió y se
+    // firmó no se edita, y ese candado es anterior (ver `useDespachoGuia`).
+    const { container } = lista({ estado: "Completada" });
+    const t = botones(container);
+    expect(t.some((x) => /^Imprimir$/i.test(x))).toBe(true);
+    expect(t.some((x) => /^Editar$/i.test(x))).toBe(false);
+    expect(t.some((x) => /^Despachar$/i.test(x))).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("la base NO se toca", () => {
+  it("el tipo de Guía conserva `motivo_rechazo` (la columna sigue en la base)", async () => {
+    // Daniel: las columnas NO se borran. El tipo la sigue declarando para que
+    // una fila heredada no se lea como dato desconocido.
+    const src = await import("node:fs").then((fs) =>
+      fs.readFileSync(process.cwd() + "/src/app/guias/components/types.ts", "utf8"),
+    );
+    expect(src).toContain("motivo_rechazo");
+  });
+
+  it("ninguna migración dropea la columna ni el estado", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const dir = path.join(process.cwd(), "supabase/migrations");
+    for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".sql"))) {
+      const sql = fs
+        .readFileSync(path.join(dir, f), "utf8")
+        .split("\n")
+        .filter((l) => !l.trimStart().startsWith("--"))
+        .join("\n");
+      expect(sql, `${f} dropea motivo_rechazo`).not.toMatch(
+        /DROP\s+COLUMN\s+(IF\s+EXISTS\s+)?motivo_rechazo/i,
+      );
+    }
+  });
+});

@@ -17,7 +17,7 @@ import {
 import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
-import CatalogoFilters, { type SaleFilter } from "./CatalogoFilters";
+import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
 import CatalogoStickyCartBar from "./CatalogoStickyCartBar";
@@ -49,9 +49,6 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  const [saleFilter, setSaleFilter] = useState<SaleFilter>(
-    theme.features.saleFilter ? ((searchParams.get("filter") as SaleFilter) || "") : "",
-  );
   // Filtros extra (hoy solo Tommy). El valor del query es dato no confiable:
   // el rango se valida contra las opciones reales antes de entrar al estado.
   const [bultosFilter, setBultosFilter] = useState(
@@ -109,6 +106,8 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
         // mientras el cliente arma el pedido, lo que ya agregó sigue cotizando
         // como cuando lo vio.
         nuevo.bulto_pzas = product.bulto_pzas ?? null;
+        // ⚠️ LA PREVENTA CUELGA DE `badge`, Y SE QUEDA — ver el comentario
+        // largo en CatalogoVendedorPage: se retiró el FILTRO, no la etiqueta.
         if (theme.features.preorder) nuevo.is_preorder = product.badge === "proximamente";
       }
       return [...prev, nuevo];
@@ -135,14 +134,13 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     if (gender) params.set("gender", gender);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
-    if (theme.features.saleFilter && saleFilter) params.set("filter", saleFilter);
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
     if (theme.features.filtroPrecio && precioRango) params.set("precio", precioRango);
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gender, category, search, saleFilter, bultosFilter, precioRango]);
+  }, [gender, category, search, bultosFilter, precioRango]);
 
   // Load products
   // `loadError` separa "no cargó" de "no hay resultados": hasta jul-2026 el
@@ -266,7 +264,6 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
-    .filter(p => !saleFilter || p.badge === saleFilter)
     // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
     // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
     // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
@@ -337,7 +334,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setSaleFilter(""); setBultosFilter(false); setPrecioRango("");
+    setBultosFilter(false); setPrecioRango("");
     setSortBy("relevancia");
   }
 
@@ -463,7 +460,7 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
 
   // ¿El cliente puso ALGÚN filtro? Decide cuál de los tres vacíos se muestra.
   const hayFiltros = !!(
-    search || gender || category || saleFilter || bultosFilter || precioRango
+    search || gender || category || bultosFilter || precioRango
   );
 
   // Tres estados distintos, porque las tres causas se arreglan distinto:
@@ -595,8 +592,6 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
           onGenderChange={setGender}
           category={category}
           onCategoryChange={setCategory}
-          saleFilter={saleFilter}
-          onSaleFilterChange={theme.features.saleFilter ? setSaleFilter : undefined}
           bultosFilter={bultosFilter}
           onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
           precioRango={precioRango}
