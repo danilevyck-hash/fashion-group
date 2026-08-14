@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # VERIFICACIÓN POR MUTACIÓN de los candados de Guías (entrega directa, dirección
-# sugerida, juegos MÁS FRECUENTES y el botón "Despachar").
+# sugerida, juegos MÁS FRECUENTES, el botón "Despachar" y las observaciones).
 #
 # Rompe UNA cosa por vez, corre los tests de guías y exige que se pongan ROJOS.
 # Un candado que pasa estando mutado no protege nada — en este repo ya pasó
@@ -25,6 +25,7 @@ TESTS=(
   src/__tests__/lib/guias-frecuencias-ruta.test.ts
   src/__tests__/components/guias-entrega-directa.test.tsx
   src/__tests__/components/guias-direccion-y-juegos.test.tsx
+  src/__tests__/components/guias-observaciones-despacho.test.tsx
 )
 
 ARCHIVOS=(
@@ -39,6 +40,7 @@ ARCHIVOS=(
   src/app/guias/components/GuiaForm.tsx
   src/app/guias/components/GuiasList.tsx
   src/app/guias/components/useDespachoGuia.ts
+  src/app/guias/[id]/page.tsx
 )
 
 TMP="$(mktemp -d)"
@@ -249,6 +251,41 @@ caso "la ruta cuenta sobre una VENTANA de las 60 más recientes" \
   src/app/api/guias/despachos-frecuentes/route.ts \
   '      .limit(1000);' \
   '      .limit(60);'
+
+echo "── 8. Las observaciones en la pantalla de despacho ────────────────────"
+caso "la observación deja de dibujarse (vuelve a vivir solo en la lista)" \
+  "src/app/guias/[id]/page.tsx" \
+  '            {String(g.observaciones ?? "").trim() && (' \
+  '            {false && ('
+
+caso "se dibuja la caja aunque la guía NO tenga observación" \
+  "src/app/guias/[id]/page.tsx" \
+  '            {String(g.observaciones ?? "").trim() && (' \
+  '            {true && ('
+
+caso "el texto se trunca a una línea" \
+  "src/app/guias/[id]/page.tsx" \
+  '                <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">' \
+  '                <p className="text-sm text-amber-900 truncate">'
+
+caso "vuelve el rótulo que Daniel corrigió" \
+  "src/app/guias/[id]/page.tsx" \
+  '                  Observaciones
+                </span>' \
+  '                  Nota de entrega
+                </span>'
+
+caso "la pantalla FILTRA la basura del campo en vez de mostrarla" \
+  "src/app/guias/[id]/page.tsx" \
+  '                  {String(g.observaciones ?? "").trim()}' \
+  '                  {String(g.observaciones ?? "").trim().replace(/^[^a-zA-Z0-9]+$/, "")}'
+
+caso "la observación se vuelve editable acá" \
+  "src/app/guias/[id]/page.tsx" \
+  '                <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">
+                  {String(g.observaciones ?? "").trim()}
+                </p>' \
+  '                <textarea className="text-sm text-amber-900 w-full" defaultValue={String(g.observaciones ?? "").trim()} />'
 
 echo
 echo "═══════════════════════════════════════════════════════════════════════"

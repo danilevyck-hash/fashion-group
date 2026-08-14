@@ -141,6 +141,37 @@ export default function GuiaPage() {
               </ul>
             </div>
 
+            {/* 🔴 LAS OBSERVACIONES, DONDE SE CARGA EL CAMIÓN.
+                Se escriben al crear la guía y vivían SOLO en el acordeón de la
+                lista y en el papel: quien despacha tenía que volver a la lista
+                y abrir la guía ahí para leerlas. El dato ya viajaba a esta
+                pantalla — solo no se dibujaba.
+
+                Va acá, pegado a los envíos y ARRIBA de los campos que se
+                llenan al despachar: se lee antes de trabajar, no después.
+
+                ⚠️ Es de SOLO LECTURA. La observación se edita donde se
+                editaba; esta pantalla la muestra, no la cambia.
+
+                ⚠️ Y se muestra TAL CUAL está guardada. Hay basura adentro
+                (GT-124 tiene "|", GT-001 tiene "S1373259"): filtrarla o
+                "limpiarla" es decisión de Daniel, no de esta pantalla. */}
+            {String(g.observaciones ?? "").trim() && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <span className="text-xs uppercase tracking-wide text-amber-700 block mb-1">
+                  Observaciones
+                </span>
+                {/* Medido sobre las 36 notas reales de producción: mediana 32
+                    caracteres, la más larga 83, máximo 2 líneas. Es texto
+                    CORTO — se lee de un vistazo y NO se trunca (`break-words`
+                    parte una palabra larga en vez de desbordar; `pre-wrap`
+                    respeta el salto de línea de la única nota que lo tiene). */}
+                <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">
+                  {String(g.observaciones ?? "").trim()}
+                </p>
+              </div>
+            )}
+
             {s.despachada ? (
               /* Ya despachada: lo que se firmó, de solo lectura. */
               <div className="rounded-lg border border-gray-200 bg-white p-4">
