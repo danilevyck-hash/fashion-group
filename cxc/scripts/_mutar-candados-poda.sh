@@ -5,7 +5,7 @@
 # pasa estando mutado no es un candado — y en este repo eso ya pasó cuatro
 # veces con barridos que leían sus propios comentarios.
 #
-#   bash scripts/_mutar-candados-t203.sh
+#   bash scripts/_mutar-candados-poda.sh
 #
 # 🩸 LA RESTAURACIÓN NO USA `git checkout --`: con el trabajo sin commitear eso
 # revierte los CAMBIOS PROPIOS, no la mutación. Ya pasó una vez en este PR y se

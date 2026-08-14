@@ -1,6 +1,6 @@
 /**
  * READ-ONLY. Detalle de los casos donde "confirmado" y "salió a Switch" NO coinciden.
- *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_t203-confirmado2.ts
+ *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-pedidos-confirmado-detalle.ts
  */
 import { supabaseServer } from "../src/lib/supabase-server";
 

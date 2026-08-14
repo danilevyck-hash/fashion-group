@@ -5,7 +5,7 @@
  *  3. `directorio_clientes` (fichas, D-XXX, whatsapp)
  *  4. Guías: estado "Rechazada" y `motivo_rechazo`
  *
- *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_t203-verif.ts
+ *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-poda-cuatro.ts
  */
 import { supabaseServer } from "../src/lib/supabase-server";
 

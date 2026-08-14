@@ -2,7 +2,7 @@
  * READ-ONLY. ¿"confirmado" == "salió a Switch"?
  * Cruza los pedidos con su tabla de envíos a Switch (<marca>_switch_envios).
  *
- *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_t203-confirmado.ts
+ *   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-pedidos-confirmado-vs-switch.ts
  */
 import { supabaseServer } from "../src/lib/supabase-server";
 
