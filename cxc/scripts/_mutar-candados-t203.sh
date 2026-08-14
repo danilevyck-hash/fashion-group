@@ -6,8 +6,24 @@
 # veces con barridos que leían sus propios comentarios.
 #
 #   bash scripts/_mutar-candados-t203.sh
+#
+# 🩸 LA RESTAURACIÓN NO USA `git checkout --`: con el trabajo sin commitear eso
+# revierte los CAMBIOS PROPIOS, no la mutación. Ya pasó una vez en este PR y se
+# perdieron tres archivos. Se copia a /tmp y se restaura desde ahí, así que el
+# script es seguro con o sin commit.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+
+RESPALDO="$(mktemp -d)"
+trap 'restaurar_todo; rm -rf "$RESPALDO"' EXIT
+
+guardar() { for f in "$@"; do mkdir -p "$RESPALDO/$(dirname "$f")"; cp "$f" "$RESPALDO/$f"; done; }
+restaurar_todo() {
+  [ -d "$RESPALDO" ] || return 0
+  (cd "$RESPALDO" && find . -type f -print0) 2>/dev/null | while IFS= read -r -d "" f; do
+    cp "$RESPALDO/${f#./}" "${f#./}"
+  done
+}
 
 FILTROS="src/components/catalogo/CatalogoFilters.tsx"
 VENDEDOR="src/components/catalogo/CatalogoVendedorPage.tsx"
@@ -17,9 +33,11 @@ MODO="src/lib/guias/modo-despacho.ts"
 T_FILTROS="src/__tests__/catalogo-filtros-desplegable.test.ts"
 T_GUIAS="src/__tests__/components/guias-sin-rechazo.test.tsx"
 
+guardar "$FILTROS" "$VENDEDOR" "$GUIAS" "$MODO"
+
 ok=0; fail=0
 
-restaurar() { git checkout -- "$@" 2>/dev/null; }
+restaurar() { for f in "$@"; do cp "$RESPALDO/$f" "$f"; done; }
 
 # $1 = nombre  $2 = archivo de test  $3... = archivos mutados
 correr() {
@@ -156,6 +174,5 @@ echo
 echo "════════════════════════════════════════════"
 echo "  cazadas: $ok   ·   NO cazadas: $fail"
 echo "════════════════════════════════════════════"
-git status --short -- "$FILTROS" "$VENDEDOR" "$GUIAS" "$MODO" | grep -q . && {
-  echo "⚠️  quedaron archivos mutados — restaurando"; restaurar "$FILTROS" "$VENDEDOR" "$GUIAS" "$MODO"; }
+restaurar "$FILTROS" "$VENDEDOR" "$GUIAS" "$MODO"
 [ "$fail" -eq 0 ]

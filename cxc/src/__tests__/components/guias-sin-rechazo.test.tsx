@@ -30,7 +30,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, fireEvent } from "@testing-library/react";
 import GuiasList from "@/app/guias/components/GuiasList";
 import { guiaYaDespachada } from "@/lib/guias/modo-despacho";
 import type { Guia, GuiaItem } from "@/app/guias/components/types";
@@ -97,15 +97,39 @@ function lista(over: Partial<Guia> = {}, role = "admin") {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("🔴 el camino para rechazar una guía no existe en la pantalla", () => {
+  /**
+   * 🩸 EL MENÚ «···» NO PINTA SUS ÍTEMS HASTA QUE SE ABRE (`{open && …}` en
+   * `ui/OverflowMenu`), así que mirar el DOM con el menú cerrado NO prueba
+   * nada: la primera versión de este candado PASÓ con "Rechazar/Devolver"
+   * puesto de vuelta en el menú. Hay que ABRIRLO. Lo cazó la corrida de
+   * mutación, no la lectura del código.
+   */
+  function abrirMenus(container: HTMLElement) {
+    for (const t of Array.from(
+      container.querySelectorAll('[aria-haspopup="menu"]'),
+    )) {
+      fireEvent.click(t);
+    }
+    // Los ítems van en un portal: se buscan en el documento, no en el container.
+    return Array.from(
+      container.ownerDocument.querySelectorAll('[role="menuitem"]'),
+    ).map((e) => (e.textContent || "").trim());
+  }
+
   // Los dos roles que PODÍAN rechazar (REJECT_ROLES era ["admin","secretaria"]).
   for (const role of ["admin", "secretaria"]) {
-    it(`${role}: una guía despachada no ofrece "Rechazar/Devolver"`, () => {
+    it(`${role}: el menú «···» abierto NO ofrece "Rechazar/Devolver"`, () => {
       const { container } = lista({ estado: "Completada" }, role);
-      const textos = Array.from(container.querySelectorAll("button, [role='menuitem'], a"))
-        .map((e) => (e.textContent || "").trim());
-      expect(textos.some((t) => /Rechazar|Devolver/i.test(t))).toBe(false);
-      // Y tampoco por texto suelto en ningún lado del panel.
-      expect(container.textContent || "").not.toMatch(/Rechazar|Devolver/i);
+      const items = abrirMenus(container);
+      // El menú tiene que existir de verdad, o el candado no mira nada:
+      // "Eliminar guía" sigue estando para estos dos roles.
+      expect(items.length, "el menú «···» no se abrió — el candado no probó nada")
+        .toBeGreaterThan(0);
+      expect(items.some((t) => /Rechazar|Devolver/i.test(t))).toBe(false);
+      // Y tampoco suelto en ningún lado de la pantalla.
+      expect(container.ownerDocument.body.textContent || "").not.toMatch(
+        /Rechazar|Devolver/i,
+      );
     });
   }
 
@@ -124,8 +148,10 @@ describe("🔴 el camino para rechazar una guía no existe en la pantalla", () =
       estado: "Rechazada",
       motivo_rechazo: "llegó rota",
     } as Partial<Guia>);
-    expect(container.textContent || "").not.toContain("llegó rota");
-    expect(container.textContent || "").not.toMatch(/Rechazar|Devolver|Motivo de rechazo/i);
+    abrirMenus(container);
+    const doc = container.ownerDocument.body.textContent || "";
+    expect(doc).not.toContain("llegó rota");
+    expect(doc).not.toMatch(/Rechazar|Devolver|Motivo de rechazo/i);
     expect(container.querySelector(".border-l-red-400")).toBeNull();
   });
 });
