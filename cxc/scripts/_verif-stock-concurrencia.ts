@@ -127,7 +127,7 @@ function comparar(antes: Fila[], despues: Fila[], llave: string, etiqueta: strin
 async function ultimaCorrida(m: Marca, desdeIso: string) {
   const { data } = await supabaseServer
     .from("switch_sync_log")
-    .select("status, started_at, finished_at, records_inserted, records_updated, records_skipped, error_message")
+    .select("status, started_at, finished_at, records_inserted, records_updated, records_skipped, error_message, skip_details")
     .eq("empresa_key", m.empresa)
     .eq("sync_type", m.syncType)
     .gte("started_at", desdeIso)
@@ -136,7 +136,14 @@ async function ultimaCorrida(m: Marca, desdeIso: string) {
   const r = data?.[0];
   if (!r) return null;
   const s = r.finished_at ? (+new Date(r.finished_at) - +new Date(r.started_at)) / 1000 : null;
-  return { ...r, segundos: s };
+  // Contadores de escritura del #549 (viajan en skip_details, sin DDL): cuántos
+  // UPDATE se hicieron de verdad y cuántos se ahorraron por ya estar iguales.
+  const det = Array.isArray(r.skip_details)
+    ? (r.skip_details as Array<{ campo?: string; valorCrudo?: Record<string, number> }>).find(
+        (d) => d?.campo === "catalogo_escrituras",
+      )?.valorCrudo
+    : undefined;
+  return { ...r, segundos: s, escrituras: det?.escrituras, sinCambios: det?.sinCambios };
 }
 
 async function dispararCron(path: string) {
@@ -183,6 +190,9 @@ async function main() {
       console.log(
         `   HTTP ${r.status} · pared ${r.pared.toFixed(1)} s · ⏱️  PRODUCCIÓN ${seg ?? "?"} s · ${log?.status}` +
           ` · ins=${log?.records_inserted} upd=${log?.records_updated} skip=${log?.records_skipped}` +
+          (log?.escrituras !== undefined
+            ? ` · ✍️ escrituras=${log.escrituras} sinCambios=${log.sinCambios}`
+            : "") +
           (log?.error_message ? ` · ⚠️ ${log.error_message}` : ""),
       );
       if (r.status !== 200) console.log(`   respuesta: ${r.txt}`);
