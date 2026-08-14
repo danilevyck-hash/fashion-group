@@ -117,20 +117,68 @@
       "schedule": "30 16 * * *"
     },
     {
-      "path": "/api/cron/reebok-catalogo",
-      "schedule": "10 12 * * *"
-    },
-    {
-      "path": "/api/cron/joybees-catalogo",
-      "schedule": "0 11 * * *"
-    },
-    {
       "path": "/api/cron/tommy-catalogo",
-      "schedule": "40 12 * * *"
+      "schedule": "30 14 * * *"
     },
     {
       "path": "/api/cron/calvin-catalogo",
-      "schedule": "50 12 * * *"
+      "schedule": "35 14 * * *"
+    },
+    {
+      "path": "/api/cron/reebok-catalogo",
+      "schedule": "40 14 * * *"
+    },
+    {
+      "path": "/api/cron/joybees-catalogo",
+      "schedule": "45 14 * * *"
+    },
+    {
+      "path": "/api/cron/tommy-catalogo",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/calvin-catalogo",
+      "schedule": "5 17 * * *"
+    },
+    {
+      "path": "/api/cron/reebok-catalogo",
+      "schedule": "10 17 * * *"
+    },
+    {
+      "path": "/api/cron/joybees-catalogo",
+      "schedule": "15 17 * * *"
+    },
+    {
+      "path": "/api/cron/tommy-catalogo",
+      "schedule": "40 19 * * *"
+    },
+    {
+      "path": "/api/cron/calvin-catalogo",
+      "schedule": "45 19 * * *"
+    },
+    {
+      "path": "/api/cron/reebok-catalogo",
+      "schedule": "50 19 * * *"
+    },
+    {
+      "path": "/api/cron/joybees-catalogo",
+      "schedule": "55 19 * * *"
+    },
+    {
+      "path": "/api/cron/tommy-catalogo",
+      "schedule": "55 21 * * *"
+    },
+    {
+      "path": "/api/cron/calvin-catalogo",
+      "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/reebok-catalogo",
+      "schedule": "5 22 * * *"
+    },
+    {
+      "path": "/api/cron/joybees-catalogo",
+      "schedule": "10 22 * * *"
     },
     {
       "path": "/api/cron/sync-clientes-master",
@@ -173,24 +221,8 @@
       "schedule": "10 16 * * *"
     },
     {
-      "path": "/api/cron/reebok-catalogo",
-      "schedule": "0 17 * * *"
-    },
-    {
       "path": "/api/cron/switch-sync?tipo=facturas&empresa=american_classic&slot=facturas-1700",
       "schedule": "0 17 * * *"
-    },
-    {
-      "path": "/api/cron/joybees-catalogo",
-      "schedule": "5 17 * * *"
-    },
-    {
-      "path": "/api/cron/tommy-catalogo",
-      "schedule": "40 17 * * *"
-    },
-    {
-      "path": "/api/cron/calvin-catalogo",
-      "schedule": "40 16 * * *"
     },
     {
       "path": "/api/cron/switch-sync?tipo=facturas&empresas=american_classic,vistana,fashion_wear,fashion_shoes,active_shoes,active_wear,joystep,confecciones_boston&slot=facturas-1900",

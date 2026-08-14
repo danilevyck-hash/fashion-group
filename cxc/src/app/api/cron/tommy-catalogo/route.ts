@@ -3,14 +3,24 @@
  * Switch (empresa fashion_shoes, artículos con marcaId=3). Mismo patrón que
  * reebok-catalogo / joybees-catalogo.
  *
- * Schedule: 40 12 * * * y 40 17 * * * UTC (2 corridas/día, decisión Daniel).
+ * Schedule: 30 14, 0 17, 40 19 y 55 21 UTC = **9:30 a.m. · 12:00 p.m. · 2:40 p.m.
+ * · 4:55 p.m. de Panamá** (4 corridas/día desde el 13-ago-2026). Las cuatro caen
+ * DENTRO de la ventana de uso del catálogo (10 a.m. - 6 p.m., dato de Daniel).
+ * Ver `CATALOGO_CRON_SLOTS_UTC`.
+ *
  * fashion_shoes también la tocan: all 05:35, utilidad 07:00, recibos
  * 07:50/15:15/19:15/23:15, articulos 08:40, proveedores 09:30, ventas
- * 15:00/19:00/23:00, estadocuenta 16:05/21:15 y la reconciliación 10/14/18. El
- * slot 12:40 va a ≥1h de todos;
- * el 17:40 queda a 20 min de la reconciliación de las 18:00 — aceptado: el
- * sync tarda ~2-3 min y cierra su sesión al terminar (/cierresesion), y la
- * reconciliación solo abre fashion_shoes si tiene pares que recuperar.
+ * 15:00/19:00/23:00, estadocuenta 16:05/21:15 y la reconciliación 10/14/18.
+ *
+ * Va PRIMERO de los cuatro catálogos en cada banda porque es el más largo
+ * (**156 s** medidos el 12-ago-2026, tras el paralelismo del #540): así se lleva
+ * el mayor margen contra el vecino peligroso de su tramo. Márgenes: 14:30 →
+ * reconciliación 14:00 a 30 min (que puede correr 740 s → 18 min de aire REAL) y
+ * ventas 15:00 a 30 · 17:00 → estadocuenta 16:05 a 55 y reconciliación 18:00 a
+ * **60** · 19:40 → recibos 19:15 a 25 · 21:55 → estadocuenta 21:15 a 40.
+ *
+ * ✅ **El par ajustado de 20 min que este cron aceptaba (17:40 → reconciliación
+ * 18:00) DEJÓ DE EXISTIR**: era el más apretado del calendario y ahora son 60 min.
  *
  * Refresca precio/existencia/disponibilidad, deriva nombres
  * ("{codigo} · {categoría} {género}", respetando nombre_manual), oculta los que

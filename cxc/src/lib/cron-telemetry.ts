@@ -216,10 +216,28 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
   // Sigue en NUNCA_SILENCIAR: los watchdogs jamás lo silencian por "recuperación
   // en camino" (demasiado esporádico para asumirla).
   "grupo-resumen-mensual": 14,
-  "joybees-catalogo": 12, // su cron corre 11:00 UTC
-  "reebok-catalogo": 13, // slot temprano 12:10 + ~1h (no adelantarse a su run normal)
-  "tommy-catalogo": 13, // slot temprano 12:40 (no adelantarse a su run normal)
-  "calvin-catalogo": 13, // slot temprano 12:50 (no adelantarse a su run normal)
+  // Los CUATRO catálogos corren ahora dentro de la ventana de uso de Panamá
+  // (14:30-22:10 UTC = 9:30 a.m. - 5:10 p.m.), así que su primer slot del día
+  // (14:3x) cae DESPUÉS de la pasada de reconciliación de las 14:00. Hora mínima
+  // 15 → **solo la pasada de las 18:00 los recupera**.
+  //
+  // Por qué 15 y no 14 (que el test de "no antes de su primer slot" también
+  // aceptaría): a las 14:00 el último success posible es el de las 21:5x/22:1x de
+  // AYER, o sea 16h05-16h10 de antigüedad contra un ciclo de 16h35. Son 25-30 min
+  // de margen: cualquier retoque futuro del horario que acorte el ciclo por debajo
+  // de ese hueco haría que la pasada de las 14:00 re-sincronizara los CUATRO
+  // catálogos TODOS LOS DÍAS sin necesidad — el incidente del 25-jul-2026 exacto
+  // (tommy re-corrido en cada pasada hasta reventar la invocación). Con 15 esa
+  // aritmética deja de existir: la única pasada que los mira es la de las 18:00,
+  // y ahí un día sano tiene su success de las 17:0x a una hora de distancia.
+  //
+  // ⚠️ CONSECUENCIA ESCRITA, no escondida: los slots de las 19:4x y 21:5x/22:1x
+  // NO tienen recuperación el mismo día (la última pasada de la reconciliación es
+  // 18:00). Ver el comentario de CATALOGO_CRON_SLOTS_UTC.
+  "joybees-catalogo": 15,
+  "reebok-catalogo": 15,
+  "tommy-catalogo": 15,
+  "calvin-catalogo": 15,
   // catalogos-fotos-resumen: run normal lunes 13:30 UTC → hora mínima 14
   // (patrón cheques-alert, no adelantarse) y su recuperación solo aplica los
   // lunes (recoverOnlyIf en la reconciliación). Sigue en NUNCA_SILENCIAR:
@@ -249,19 +267,69 @@ export const COLATERAL_RECOVER_AFTER_HOUR_UTC: Record<string, number> = {
 // mínima de COLATERAL_RECOVER_AFTER_HOUR_UTC sigue mandando: nunca se recupera
 // antes de su primer slot del día.
 
-/** Horarios UTC (HH:MM) de los crons de catálogo — espejo de vercel.json (2
- *  entradas cada uno). Un test compara ambos para que no diverjan. */
+/**
+ * Horarios UTC (HH:MM) de los crons de catálogo — espejo de vercel.json (**4
+ * entradas cada uno** desde el 13-ago-2026). Un test compara ambos para que no
+ * diverjan.
+ *
+ * ── LOS CUATRO PASES VIVEN DENTRO DE LA VENTANA DE USO ──────────────────────
+ * Daniel, textual: *"se usa catalogo mas de 10am a 6pm aproximadamente"*. Con
+ * ese dato, el pase de las 6-7 a.m. de Panamá **no le servía a nadie**: quien
+ * abría el catálogo a las 10 lo veía con 4 horas encima. Los pases no se
+ * agregaron: se **MUDARON** adentro de la franja en que la gente mira, y se sumó
+ * uno. De 2 pasadas a 4, todas entre las **9:30 a.m. y las 5:10 p.m. de Panamá**
+ * (UTC−5 fijo, sin horario de verano):
+ *
+ * | Catálogo | Empresa       | Panamá                          | UTC                     |
+ * |----------|---------------|---------------------------------|-------------------------|
+ * | tommy    | fashion_shoes | 9:30a · 12:00p · 2:40p · 4:55p  | 14:30 17:00 19:40 21:55 |
+ * | calvin   | vistana       | 9:35a · 12:05p · 2:45p · 5:00p  | 14:35 17:05 19:45 22:00 |
+ * | reebok   | active_shoes  | 9:40a · 12:10p · 2:50p · 5:05p  | 14:40 17:10 19:50 22:05 |
+ * | joybees  | joystep       | 9:45a · 12:15p · 2:55p · 5:10p  | 14:45 17:15 19:55 22:10 |
+ *
+ * **Los minutos NO son decorativos.** Cada banda es la única ventana libre de su
+ * tramo con ≥15 min (`SEPARACION_MINIMA_MIN`) contra TODO cron que toque la misma
+ * empresa: 14:00 y 18:00 reconciliación · 15:00/19:00 ventas · 15:15/19:15
+ * recibos · 16:00/16:05/16:10 y 21:10/21:15/21:20 estadocuenta · 23:00 ventas.
+ * O sea que las bandas posibles son 14:15-14:45 · 16:15-17:45 · 19:30-20:55 ·
+ * 21:35-22:45, y las cuatro elegidas caen adentro con margen.
+ *
+ * **El orden dentro de cada banda es por DURACIÓN, el más largo primero**
+ * (medido el 12-ago-2026 tras el paralelismo del #540: tommy 156 s · calvin 70 ·
+ * reebok 49 · joybees 26). Los 5 min entre uno y otro **no los pide el test** —
+ * son cuatro empresas disjuntas — sino la base en compute Micro: apilar cuatro
+ * barridos en el mismo minuto es lo que no se quiere. Es el mismo patrón de
+ * 05:30/05:35/05:40 y de estadocuenta 16:00/16:05/16:10.
+ *
+ * 🔴 **La banda de la mañana arranca a las 14:30 y no a las 14:15** (que la regla
+ * de los 15 min permitiría): la reconciliación de las 14:00 puede correr hasta
+ * **740 s** (`RECOVERY_BUDGET_MS`), o sea terminar 14:12. Entrar a las 14:15
+ * dejaría 3 minutos de aire real contra un cron que abre la sesión de cualquier
+ * empresa. A las 14:30 el más largo (tommy) arranca 18 min después del peor caso
+ * y termina 14:32:36, con 27 min libres antes de las ventas de las 15:00.
+ *
+ * ⚠️ **LO QUE SE PIERDE, dicho de frente: el hueco de la noche pasa de ~19h a
+ * 16h35** (última pasada 21:55-22:10 → primera 14:30-14:45 del día siguiente), y
+ * **los pases de las 19:4x y 21:5x/22:1x no se recuperan el mismo día** porque la
+ * última pasada de `switch-reconciliacion` es a las 18:00. Con 4 pases pesa menos
+ * (si falla el de las 19:40, el de las 21:55 lo tapa, y al revés el de la mañana
+ * siguiente), pero es real. Ninguna de las dos cosas dispara una alerta: el
+ * umbral de heartbeat es `CRON_STALE_HOURS_DEFAULT` = 26 h (9h25 de margen sobre
+ * el hueco nuevo, contra 7h de antes) y la regla de "dato viejo" de 24 h
+ * (`datos-frescos.ts`) solo vigila **cartera y ventas**, no los catálogos.
+ */
 export const CATALOGO_CRON_SLOTS_UTC: Record<string, readonly string[]> = {
-  "joybees-catalogo": ["11:00", "17:05"],
-  "reebok-catalogo": ["12:10", "17:00"],
-  "tommy-catalogo": ["12:40", "17:40"],
-  "calvin-catalogo": ["12:50", "16:40"],
+  "tommy-catalogo": ["14:30", "17:00", "19:40", "21:55"],
+  "calvin-catalogo": ["14:35", "17:05", "19:45", "22:00"],
+  "reebok-catalogo": ["14:40", "17:10", "19:50", "22:05"],
+  "joybees-catalogo": ["14:45", "17:15", "19:55", "22:10"],
 };
 
 /** Ciclo del catálogo en horas: el hueco MÁS LARGO entre dos corridas
- *  consecutivas de su horario, dando la vuelta al día (Tommy 12:40/17:40 → 19h,
- *  el salto de la tarde a la mañana siguiente). null si el cron no es un
- *  catálogo con horario declarado. */
+ *  consecutivas de su horario, dando la vuelta al día. Con los 4 pases dentro de
+ *  la ventana de uso, ese hueco es SIEMPRE el de la noche (21:55 → 14:30 del día
+ *  siguiente = 16h35, igual para los cuatro). null si el cron no es un catálogo
+ *  con horario declarado. */
 export function catalogoCicloHoras(cronName: string): number | null {
   const slots = CATALOGO_CRON_SLOTS_UTC[cronName];
   if (!slots || slots.length === 0) return null;
@@ -576,39 +644,74 @@ export const SWITCH_CRON_ENTRADAS: SwitchCronEntrada[] = [
   { cron: "sync-egresos-varios", hhmmUtc: "1035", empresas: CRON_EMPRESAS_EGRESOS },
   // La reconciliación puede recuperar pares faltantes de CUALQUIER empresa.
   { cron: "switch-reconciliacion", hhmmUtc: "1000", empresas: CRON_EMPRESAS_TODAS },
-  { cron: "joybees-catalogo", hhmmUtc: "1100", empresas: ["joystep"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1130", empresas: ["american_classic"] },
   // Ventas de la mañana temprana (06:50 Panamá): quien entra a trabajar a las
   // 8 a.m. ya no ve el dato de la madrugada. Ver CRON_EMPRESAS_VENTAS.
   { cron: "switch-sync facturas", hhmmUtc: "1150", empresas: CRON_EMPRESAS_VENTAS },
-  { cron: "reebok-catalogo", hhmmUtc: "1210", empresas: ["active_shoes"] },
-  { cron: "tommy-catalogo", hhmmUtc: "1240", empresas: ["fashion_shoes"] },
-  // Catálogo Calvin (vistana): 60 min después de las ventas de 11:50 y 70 antes
-  // de la reconciliación de las 14:00. Barrido medido 103 s (12-ago-2026).
-  { cron: "calvin-catalogo", hhmmUtc: "1250", empresas: ["vistana"] },
   { cron: "switch-sync facturas", hhmmUtc: "1300", empresas: ["american_classic"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1400", empresas: CRON_EMPRESAS_TODAS },
+  // ── CATÁLOGOS, PASE 1 de 4: 9:30-9:45 a.m. de Panamá ──────────────────────
+  // Los cuatro catálogos viven ahora DENTRO de la ventana de uso (10 a.m. - 6
+  // p.m. de Panamá, dato de Daniel): este pase deja el dato con 15-30 min de
+  // antigüedad cuando la gente empieza a mirar. Ver CATALOGO_CRON_SLOTS_UTC para
+  // el calendario completo y por qué cada minuto.
+  //
+  // La banda libre de este tramo es 14:15-14:45 (≥15 min de la reconciliación de
+  // las 14:00 y de las ventas de las 15:00). Arranca a las 14:30 y no a las 14:15
+  // porque la reconciliación puede correr 740 s: a las 14:15 quedarían 3 min de
+  // aire REAL contra un cron que abre la sesión de cualquier empresa.
+  // Orden por duración, el más largo primero (tommy 156 s · calvin 70 · reebok 49
+  // · joybees 26, medidos el 12-ago-2026): así el que más tarda se lleva el mayor
+  // margen contra la reconciliación, y el más corto (joybees) es el que queda a
+  // los 15 min justos de las ventas de las 15:00 — corre 26 s y termina 14:45:26.
+  { cron: "tommy-catalogo", hhmmUtc: "1430", empresas: ["fashion_shoes"] },
+  { cron: "calvin-catalogo", hhmmUtc: "1435", empresas: ["vistana"] },
+  { cron: "reebok-catalogo", hhmmUtc: "1440", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "1445", empresas: ["joystep"] },
   { cron: "switch-sync facturas", hhmmUtc: "1500", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "1515", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1600", empresas: ["active_shoes", "joystep"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1605", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "1610", empresas: ["vistana", "active_wear"] },
   { cron: "acs-fidelizacion", hhmmUtc: "1630", empresas: ["american_classic"] },
-  // Catálogo Calvin, refresh de la tarde: 30 min después del estadocuenta de
-  // vistana (16:10) y 80 antes de la reconciliación de las 18:00 — sin heredar
-  // el par ajustado de 20 min que Tommy aceptó (17:40 → 18:00).
-  { cron: "calvin-catalogo", hhmmUtc: "1640", empresas: ["vistana"] },
-  { cron: "reebok-catalogo", hhmmUtc: "1700", empresas: ["active_shoes"] },
+  // ── CATÁLOGOS, PASE 2 de 4: 12:00-12:15 p.m. de Panamá ────────────────────
+  // Banda libre 16:15-17:45 (después del estadocuenta de cada par, antes de la
+  // reconciliación de las 18:00). Mismo orden por duración. Tommy GANA margen
+  // contra la reconciliación: pasa de los 20 min ajustados que aceptaba a las
+  // 17:40 a **60 min** — el par más apretado del calendario viejo deja de existir.
+  { cron: "tommy-catalogo", hhmmUtc: "1700", empresas: ["fashion_shoes"] },
   { cron: "switch-sync facturas", hhmmUtc: "1700", empresas: ["american_classic"] },
-  { cron: "joybees-catalogo", hhmmUtc: "1705", empresas: ["joystep"] },
-  { cron: "tommy-catalogo", hhmmUtc: "1740", empresas: ["fashion_shoes"] },
+  { cron: "calvin-catalogo", hhmmUtc: "1705", empresas: ["vistana"] },
+  { cron: "reebok-catalogo", hhmmUtc: "1710", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "1715", empresas: ["joystep"] },
   { cron: "switch-reconciliacion", hhmmUtc: "1800", empresas: CRON_EMPRESAS_TODAS },
   { cron: "switch-sync facturas", hhmmUtc: "1900", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "1915", empresas: CRON_EMPRESAS_RECIBOS },
+  // ── CATÁLOGOS, PASE 3 de 4: 2:40-2:55 p.m. de Panamá ──────────────────────
+  // Banda libre 19:30-20:55: por detrás quedan las ventas de las 19:00 y los
+  // recibos de las 19:15 (25-40 min), por delante el bloque de estadocuenta de
+  // las 21:1x (75+ min). Es la franja de la tarde que el calendario viejo dejaba
+  // sin un solo refresco.
+  { cron: "tommy-catalogo", hhmmUtc: "1940", empresas: ["fashion_shoes"] },
+  { cron: "calvin-catalogo", hhmmUtc: "1945", empresas: ["vistana"] },
+  { cron: "reebok-catalogo", hhmmUtc: "1950", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "1955", empresas: ["joystep"] },
   { cron: "switch-sync facturas", hhmmUtc: "2100", empresas: ["american_classic"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2110", empresas: ["vistana", "active_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2115", empresas: ["fashion_shoes", "fashion_wear"] },
   { cron: "switch-sync estadocuenta", hhmmUtc: "2120", empresas: ["active_shoes", "joystep"] },
+  // ── CATÁLOGOS, PASE 4 de 4: 4:55-5:10 p.m. de Panamá ──────────────────────
+  // El último pase antes de que la oficina cierre. Cada uno va DESPUÉS del
+  // estadocuenta de SU propia empresa (fashion_shoes 21:15 → tommy 21:55 a 40 min;
+  // vistana 21:10 → calvin 22:00 a 50; active_shoes/joystep 21:20 → reebok 22:05 y
+  // joybees 22:10 a 45 y 50). El estadocuenta mide ~152 s por empresa en el peor
+  // caso, o sea que el bloque de las 21:1x cierra ~21:25: 30 min de aire real
+  // contra el primero de estos cuatro. Por delante, las ventas de las 23:00 quedan
+  // a 50-65 min.
+  { cron: "tommy-catalogo", hhmmUtc: "2155", empresas: ["fashion_shoes"] },
+  { cron: "calvin-catalogo", hhmmUtc: "2200", empresas: ["vistana"] },
+  { cron: "reebok-catalogo", hhmmUtc: "2205", empresas: ["active_shoes"] },
+  { cron: "joybees-catalogo", hhmmUtc: "2210", empresas: ["joystep"] },
   { cron: "switch-sync facturas", hhmmUtc: "2300", empresas: CRON_EMPRESAS_VENTAS },
   { cron: "sync-recibos", hhmmUtc: "2315", empresas: CRON_EMPRESAS_RECIBOS },
   { cron: "switch-sync facturas", hhmmUtc: "0015", empresas: ["american_classic"] },

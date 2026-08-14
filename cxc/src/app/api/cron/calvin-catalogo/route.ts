@@ -3,15 +3,18 @@
  * Switch (empresa vistana, artículos con marcaId=8 = CK FOOTWEAR). Mismo patrón
  * que reebok/joybees/tommy-catalogo.
  *
- * Schedule: 50 12 * * * y 40 16 * * * UTC (2 corridas/día, como Tommy).
+ * Schedule: 35 14, 5 17, 45 19 y 0 22 UTC = **9:35 a.m. · 12:05 p.m. · 2:45 p.m.
+ * · 5:00 p.m. de Panamá** (4 corridas/día desde el 13-ago-2026, como Tommy). Las
+ * cuatro caen DENTRO de la ventana de uso del catálogo (10 a.m. - 6 p.m., dato de
+ * Daniel). Ver `CATALOGO_CRON_SLOTS_UTC`.
+ *
  * vistana también la tocan: articulo-info 04:30, all 05:30, utilidad 07:00,
- * recibos 07:50/15:15/19:15/23:15, mayor 09:05, proveedores 09:30, ventas
+ * recibos 07:50/15:15/19:15/23:15, proveedores 09:30, egresos 10:35, ventas
  * 11:50/15/19/23, estadocuenta 16:10/21:10 y la reconciliación 10/14/18.
- * El slot 12:50 queda a 60 min de las ventas de 11:50 y a 70 de la
- * reconciliación de las 14:00; el 16:40 a 30 min del estadocuenta de las 16:10
- * y a 80 de la reconciliación de las 18:00 — ninguno hereda el par ajustado de
- * 20 min que Tommy aceptó con la reconciliación. El barrido de vistana midió
- * 103 s (164 páginas, 12-ago-2026) + ~80 consultas de stock: entra holgado.
+ * Márgenes: 14:35 → ventas 15:00 a 25 min y reconciliación 14:00 a 35 · 17:05 →
+ * estadocuenta 16:10 a 55 y reconciliación 18:00 a 55 · 19:45 → recibos 19:15 a
+ * 30 · 22:00 → estadocuenta 21:10 a 50 y ventas 23:00 a 60. El barrido de vistana
+ * midió **70 s** (12-ago-2026, tras el paralelismo del #540): entra holgado.
  *
  * Refresca precio/existencia/disponibilidad, deriva nombres
  * ("{Género}-{Categoría}", respetando nombre_manual), oculta los que quedan en

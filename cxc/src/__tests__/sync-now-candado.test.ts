@@ -140,14 +140,14 @@ describe("proximoCronParaEmpresa — espejo de vercel.json", () => {
     expect(p?.horaPanama).toBe("11:10");
   });
 
-  it("active_shoes a las 11:55 UTC → reebok-catalogo 12:10", () => {
-    // Era 11:50, pero desde el 26-jul-2026 esa es la hora de la corrida
-    // temprana de ventas (las 8 empresas) → el instante quedaba justo sobre un
-    // cron y el resultado dependía del empate. 11:55 no tiene esa ambigüedad.
-    const p = proximoCronParaEmpresa("active_shoes", new Date("2026-07-23T11:55:00Z"));
+  it("active_shoes a las 14:30 UTC → reebok-catalogo 14:40", () => {
+    // El catálogo de Reebok se mudó a la ventana de uso de Panamá el 13-ago-2026
+    // (14:40/17:10/19:50/22:05 UTC). Antes este caso era 11:55 → 12:10; a esa
+    // hora ahora lo que viene es la reconciliación de las 14:00.
+    const p = proximoCronParaEmpresa("active_shoes", new Date("2026-07-23T14:30:00Z"));
     expect(p?.cron).toBe("reebok-catalogo");
-    expect(p?.hhmmUtc).toBe("1210");
-    expect(p?.enMinutos).toBe(15);
+    expect(p?.hhmmUtc).toBe("1440");
+    expect(p?.enMinutos).toBe(10);
   });
 
   it("american_classic tarde en la noche cruza al 00:15 del día siguiente", () => {

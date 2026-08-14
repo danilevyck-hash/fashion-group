@@ -187,22 +187,32 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
 });
 
 describe("registro del cron tommy-catalogo en todos los sitios", () => {
-  it("vercel.json: 2 slots (12:40 y 17:40 UTC)", () => {
+  it("vercel.json: 4 slots (14:30, 17:00, 19:40 y 21:55 UTC)", () => {
+    // 13-ago-2026: los pases se mudaron DENTRO de la ventana de uso de Panamá
+    // (9:30 a.m. - 4:55 p.m. para Tommy) y pasaron de 2 a 4.
     const vercel = JSON.parse(
       readFileSync(path.join(process.cwd(), "vercel.json"), "utf8"),
     ) as { crons: { path: string; schedule: string }[] };
     const tommy = vercel.crons.filter((c) => c.path === "/api/cron/tommy-catalogo");
-    expect(tommy.map((c) => c.schedule).sort()).toEqual(["40 12 * * *", "40 17 * * *"]);
+    expect(tommy.map((c) => c.schedule).sort()).toEqual([
+      "0 17 * * *",
+      "30 14 * * *",
+      "40 19 * * *",
+      "55 21 * * *",
+    ]);
   });
 
-  it("SWITCH_CRON_ENTRADAS: 1240 y 1740 sobre fashion_shoes", () => {
+  it("SWITCH_CRON_ENTRADAS: 1430, 1700, 1940 y 2155 sobre fashion_shoes", () => {
     const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === "tommy-catalogo");
-    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1240", "1740"]);
+    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1430", "1700", "1940", "2155"]);
     for (const e of entradas) expect(e.empresas).toEqual(["fashion_shoes"]);
   });
 
-  it("recuperación colateral desde las 13 UTC + vigilancia estricta en health", () => {
-    expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["tommy-catalogo"]).toBe(13);
+  it("recuperación colateral desde las 15 UTC + vigilancia estricta en health", () => {
+    // 13 → 15: su primer slot del día (14:30) cae DESPUÉS de la pasada de las
+    // 14:00, así que solo la de las 18:00 puede recuperarlo. Ver el porqué en
+    // COLATERAL_RECOVER_AFTER_HOUR_UTC.
+    expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["tommy-catalogo"]).toBe(15);
     // Promovido en el PR "encender Tommy": ya NO es seed-tolerante (la DDL corrió
     // y el heartbeat lleva días sembrado) → vigilancia fail-closed 26h. La lista
     // era EXPECTED_CRONS dentro de health-crons y se mudó a CRONS_FAIL_CLOSED
