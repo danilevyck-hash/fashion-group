@@ -71,9 +71,13 @@ describe("avisos de pedido: las 4 obligatorias en TODO evento y TODA marca", () 
       });
       exigirLasCuatro(t, "Zapatería Central");
       expect(t.startsWith(`${cfg.telegramEmoji} ${cfg.label} · X-006 — pedido DEL LINK, lo confirmó el cliente`)).toBe(true);
-      // Lo que diferencia al link: cómo entra a Switch (sin comisión) y que NO
-      // nombra un vendedor que no existe.
-      expect(t).toContain("Entra a Switch como Contado y sin vendedor — no paga comisión.");
+      // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026. Decía "Entra a Switch como
+      // Contado y sin vendedor — no paga comisión", que era cierto mientras el
+      // pedido del link salía SOLO al ERP. Ahora espera a una persona, y el
+      // aviso tiene que PEDIR ese paso: es lo único que hay entre el pedido y
+      // Switch, y sin decirlo el pedido podría quedarse quieto.
+      expect(t).toContain("Falta ponerle el cliente y mandarlo a Switch — está en Borradores.");
+      expect(t).not.toContain("Entra a Switch como Contado");
       expect(t).not.toContain("Vendedor:");
     });
 

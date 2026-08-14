@@ -343,8 +343,21 @@ describe("Detalle del pedido — el cliente es UNO SOLO", () => {
     expect(input.value).toBe("Nathalie");
   });
 
-  it("🔴 el pedido del LINK no se traba, ni siquiera sin cliente guardado", async () => {
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026 (2ª vuelta). Antes exigía que el
+  // pedido del LINK se pudiera mandar SIN cliente. Daniel pidió que ése también
+  // espere a que una persona le ponga el cliente real — es literalmente lo que
+  // describe: *"ponerle el nombre del cliente para así mandarlo a Switch"*.
+  it("🔴 el pedido del LINK sin cliente TAMBIÉN tiene el botón apagado, y dice qué falta", async () => {
     const llamadas = await pintarDetalle({ origenShortId: "ab12cd34", clientName: "Nathalie", clienteSwitchId: null });
+    const boton = screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    expect(document.querySelector('[data-medir="falta-enviar"]')?.textContent).toContain("elegir el cliente");
+    await act(async () => { fireEvent.click(boton); });
+    expect(enviosASwitch(llamadas)).toHaveLength(0);
+  });
+
+  it("🔴 el pedido del LINK con cliente elegido sale igual que uno interno", async () => {
+    const llamadas = await pintarDetalle({ origenShortId: "ab12cd34", clientName: "Nathalie", clienteSwitchId: 1, clienteCodigo: "TCKCTA", clienteNombre: "VENTAS LOCA" });
     const boton = screen.getByRole("button", { name: /Enviar a Switch/ }) as HTMLButtonElement;
     expect(boton.disabled).toBe(false);
     await act(async () => { fireEvent.click(boton); });

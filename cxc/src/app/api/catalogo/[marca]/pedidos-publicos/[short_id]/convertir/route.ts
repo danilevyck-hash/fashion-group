@@ -32,7 +32,23 @@ export async function POST(
   const cfg = getMarcaConfig(params.marca);
   if (!cfg) return NextResponse.json({ error: "Marca desconocida" }, { status: 404 });
 
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  // ── QUIÉN CONVIERTE: admin, secretaria y VENDEDOR (14-ago-2026) ──
+  //
+  // Daniel, preguntado explícitamente por los roles: *"los 3, bodega no"*.
+  // El vendedor es quien comparte el link y a quien le llega el pedido por
+  // WhatsApp; convertir es el ÚNICO paso que le faltaba para poder trabajarlo
+  // (editar precio, agregar/quitar líneas, elegir cliente y mandarlo a Switch
+  // ya eran suyos: orders PUT, item PATCH, clientes-switch y enviar-switch
+  // aceptan 'vendedor' desde antes).
+  //
+  // 🔴 BODEGA NO. Conserva lo que tenía —ver el catálogo— y no gana nada acá:
+  // `CATALOGO_ROLES` la incluye para VER, nunca para armar ni mover pedidos.
+  //
+  // Convertir NO es destructivo ni irreversible: la RPC es idempotente y lo
+  // único que hace es numerar el pedido del link como <prefijo>-###. Borrar
+  // (orders DELETE, pedidos-publicos DELETE, bulk-delete) y exportar siguen
+  // siendo de admin/secretaria: no son parte de este flujo.
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
 
   const shortId = params.short_id;

@@ -74,12 +74,31 @@ describe("tieneClienteElegido", () => {
     expect(tieneClienteElegido(undefined)).toBe(false);
   });
 
-  it("🔴 EL PEDIDO DEL LINK NO SE TRABA — su mostrador lo pone el sistema por regla", () => {
-    // Medido: PED-022 vive con client_name "Nathalie". Bloquearlo dejaría los
-    // pedidos del link sin poder salir a Switch nunca.
-    expect(tieneClienteElegido({ origen_short_id: "ab12cd34", cliente_switch_id: null })).toBe(true);
-    expect(tieneClienteElegido({ origen_original: "link", cliente_switch_id: null })).toBe(true);
+  // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026 (2ª vuelta), y es el punto del cambio.
+  //
+  // Antes este test exigía que un pedido del LINK pasara SIEMPRE, con el
+  // argumento de que su mostrador lo pone el sistema por regla. Daniel pidió lo
+  // contrario, textual: *"pueda entrar al sistema interno, escoger, editar
+  // precio, agregar o quitar y ponerle el nombre del cliente para así mandarlo
+  // a Switch"*. Medido: PED-022 "Nathalie" salió SOLO a Switch a nombre del
+  // mostrador y quedó bloqueado para editar — lo que él quiere hacer con ese
+  // pedido no se podía.
+  it("🔴 EL PEDIDO DEL LINK TAMBIÉN EXIGE CLIENTE — el origen ya no lo exime", () => {
+    expect(tieneClienteElegido({ origen_short_id: "ab12cd34", cliente_switch_id: null })).toBe(false);
+    expect(tieneClienteElegido({ origen_original: "link", cliente_switch_id: null })).toBe(false);
+  });
+
+  it("🔴 y con cliente puesto sale igual que uno interno (incluido el mostrador)", () => {
     expect(tieneClienteElegido({ origen_short_id: "ab12cd34", cliente_switch_id: 1 })).toBe(true);
+    expect(tieneClienteElegido({ origen_original: "link", cliente_switch_id: 42 })).toBe(true);
+  });
+
+  it("🔴 la regla NO mira el origen: mismo cliente, mismo veredicto", () => {
+    for (const id of [null, 0, 1, 42]) {
+      const interno = tieneClienteElegido({ cliente_switch_id: id });
+      expect(tieneClienteElegido({ cliente_switch_id: id, origen_short_id: "ab12cd34" })).toBe(interno);
+      expect(tieneClienteElegido({ cliente_switch_id: id, origen_original: "link" })).toBe(interno);
+    }
   });
 });
 

@@ -18,12 +18,32 @@
 // 🔴 CONTADO NO DESAPARECE. Sigue siendo una opción, y una opción legítima —
 // la venta de mostrador existe. Lo único que cambia es que hay que TOCARLA.
 //
-// ⚠️ LA EXCEPCIÓN REAL: EL LINK PÚBLICO. En un pedido que entra por el link
-// compartible no hay sesión que aporte cliente: la persona escribe su nombre a
-// mano y el sistema le asigna el cliente de mostrador de la empresa
-// (`publico-switch-actor`, código TCKCTA). Eso NO es un olvido, es la regla del
-// sistema — medido: PED-022 vive con `client_name = "Nathalie"` y
-// `cliente_switch_id = 1`. Ahí el texto libre se queda y el envío no se traba.
+// 🔴 EL PEDIDO DEL LINK YA NO ES UNA EXCEPCIÓN (14-ago-2026, 2ª vuelta).
+//
+// Hasta hoy este módulo dejaba pasar SIEMPRE un pedido venido del link público,
+// con el argumento de que ahí el mostrador es la regla del sistema y no un
+// olvido. Daniel pidió lo contrario, textual: *"cuando alguien interno le llega
+// el pedido por WhatsApp, pueda entrar al sistema interno, escoger, editar
+// precio, agregar o quitar y ponerle el nombre del cliente **para así mandarlo
+// a Switch**"*. O sea: el pedido del link también espera a que una persona le
+// ponga el cliente REAL, y esa persona es quien lo manda.
+//
+// Medido en producción el 14-ago-2026 (`scripts/_diag-pedidos-link.ts`, solo
+// lectura): de los pedidos del link, **PED-022 "Nathalie" es el único que llegó
+// a Switch — automáticamente, a nombre del MOSTRADOR (cliente_switch_id=1
+// "Contado") y en el mismo instante en que el cliente confirmó**. Y como salió
+// a Switch, el candado de edición (`switch-lock`) lo dejó de solo lectura: lo
+// que Daniel quiere hacer con él —cambiar precio, agregar líneas, ponerle el
+// cliente— ya no se puede. Por eso el auto-envío de la confirmación pública se
+// apagó (ver `pedido-publico/[id]/confirmar/route.ts`).
+//
+// ⚠️ LO QUE NO CAMBIÓ: `esPedidoDelLink` sigue existiendo y sigue decidiendo lo
+// suyo — que el NOMBRE que escribió la persona a mano se conserva y se muestra
+// tal cual, sin que el picker se lo pise (ver `asignarClienteSwitch` en
+// PedidoDetalleClient). Ese nombre es lo único que dice quién pidió.
+//
+// ⚠️ Y "Contado (venta de mostrador)" SIGUE SIENDO ELEGIBLE. Lo que se prohíbe
+// no es el mostrador: es que sea el default silencioso.
 //
 // Este módulo es PURO y es la ÚNICA definición de la regla: la usan el checkout
 // del catálogo y el detalle del pedido. Dos copias del mismo `if` se separan
@@ -55,20 +75,22 @@ export function esPedidoDelLink(p: PedidoParaCliente | null | undefined): boolea
 }
 
 /**
- * ¿Hay un cliente elegido a propósito?
+ * ¿Hay un cliente elegido a propósito? La MISMA pregunta para los dos orígenes:
+ * solo si el pedido tiene `cliente_switch_id`.
  *
- * · Pedido del LINK → **sí**, siempre: su cliente de mostrador lo pone el
- *   sistema por regla, no por descarte, y el nombre a mano queda en
- *   `client_name`. Bloquearlo dejaría los pedidos del link sin poder salir.
- * · Pedido INTERNO → solo si tiene `cliente_switch_id`. `null` significa
- *   exactamente "nadie lo eligió": desde este cambio, tocar
- *   "Contado (venta de mostrador)" guarda el id REAL del cliente de mostrador
- *   de la empresa, así que ya no hay forma de que una elección deliberada se
- *   vea igual que un olvido.
+ * `null` significa exactamente "nadie lo eligió". Tocar
+ * "Contado (venta de mostrador)" guarda el id REAL del cliente de mostrador de
+ * la empresa, así que una elección deliberada NO se puede ver igual que un
+ * olvido — y por eso el link tampoco necesita una excepción: si de verdad es
+ * venta de mostrador, alguien toca el mostrador y listo.
+ *
+ * 🔴 NO se pregunta por el origen a propósito. Mientras el link pasaba siempre,
+ * la única forma de que un pedido saliera con el mostrador puesto por el
+ * sistema era la que ya está medida: PED-022 en Switch sin que nadie lo
+ * decidiera (ver la cabecera).
  */
 export function tieneClienteElegido(p: PedidoParaCliente | null | undefined): boolean {
   if (!p) return false;
-  if (esPedidoDelLink(p)) return true;
   const id = p.cliente_switch_id;
   return typeof id === "number" && Number.isInteger(id) && id > 0;
 }

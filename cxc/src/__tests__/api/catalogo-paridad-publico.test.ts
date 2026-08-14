@@ -414,9 +414,11 @@ describe("POST /pedido-publico/[id]/confirmar — auto-conversión del cliente",
     });
     expect(mainDb.rpc).not.toHaveBeenCalled();
     expect(mockTelegram).not.toHaveBeenCalled();
-    // …pero el envío al ERP SÍ se reintenta: es idempotente aguas abajo, así se
-    // recupera solo un pedido que se convirtió y nunca llegó a Switch.
-    expect(mockEnviar).toHaveBeenCalledOnce();
+    // 🔴 CAMBIÓ DE DIRECCIÓN EL 14-ago-2026: antes acá se exigía que el envío
+    // al ERP se REINTENTARA en cada confirmación repetida. Desde que el pedido
+    // del link espera a una persona, el ERP no se toca nunca desde este
+    // endpoint — repetir la confirmación tampoco lo despierta.
+    expect(mockEnviar).not.toHaveBeenCalled();
   });
 
   it("fail-open de stock: si inventory no responde, confirma sin aviso (reebok)", async () => {
