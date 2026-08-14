@@ -37,11 +37,13 @@ import {
 import {
   aHoras,
   FORMULA_NETO,
+  grupoDeLinea,
   type LineaPlanilla,
   type Periodo,
   type Quincena,
   type TotalesPlanilla,
 } from "./planilla";
+import type { AvisoPeriodoAbierto } from "./periodo";
 
 export interface DatosPlanillaExport {
   lineas: readonly LineaPlanilla[];
@@ -51,6 +53,14 @@ export interface DatosPlanillaExport {
   periodo?: Periodo;
   empresaEtiqueta: string | null;
   reglas: ReglasAsistencia;
+  /**
+   * El período todavía no terminó. 🔴 VA IMPRESO: si el archivo se manda por
+   * correo, quien lo abra tiene que saber que faltan días y que los que no
+   * pasaron no se contaron. Ausente = ya cerró, o no se supo.
+   */
+  periodoAbierto?: AvisoPeriodoAbierto | null;
+  /** Los códigos que marcaron y no tienen ficha, dicho una sola vez. */
+  avisoSinFicha?: string | null;
 }
 
 /** El subtítulo que llevan los dos archivos. */
@@ -121,7 +131,26 @@ const PENDIENTE = { fg: "A3352A", bold: true } as const;
  */
 const FUERA = { fg: "6B7280" } as const;
 
+/** El motivo tal como se lee, con el quincenal que le tocaría al lado. */
+function textoDecidir(l: LineaPlanilla): string {
+  const base = l.decidirAMano ?? "lo decide una persona";
+  return l.quincenalReferencia === null
+    ? base
+    : `${base} — la quincena completa le daría ${l.quincenalReferencia.toFixed(2)}`;
+}
+
 function filaPlanilla(l: LineaPlanilla): ReportCell[] {
+  // 🔴 En GRIS y sin el «⚠»: no es un pendiente, es una decisión. En rojo se
+  // leería como un error que hay que corregir en Configuración, que es
+  // exactamente lo que este cambio vino a dejar de decir.
+  if (grupoDeLinea(l) === "decidir") {
+    return [
+      { v: l.etiqueta, ...FUERA },
+      l.codigo,
+      { v: textoDecidir(l), ...FUERA },
+      ...Array<ReportCell>(17).fill(null),
+    ];
+  }
   if (l.fueraDePlanilla) {
     // Sale en el archivo —omitirla sería peor: el papel sobrevive a la
     // discusión— con el motivo escrito y las 18 columnas de dinero vacías.
@@ -218,9 +247,11 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
         c0(aHoras(h.sabadoMin)), c0(h.diasARevisar),
         l.fueraDePlanilla
           ? { v: MOTIVO_FUERA_DE_PLANILLA, ...FUERA }
-          : l.faltaConfigurar.length
-            ? { v: l.faltaConfigurar.join(" · "), ...PENDIENTE }
-            : "",
+          : grupoDeLinea(l) === "decidir"
+            ? { v: textoDecidir(l), ...FUERA }
+            : l.faltaConfigurar.length
+              ? { v: l.faltaConfigurar.join(" · "), ...PENDIENTE }
+              : "",
       ] as ReportCell[];
     }),
   });
@@ -255,7 +286,12 @@ export function construirExcelPlanilla(d: DatosPlanillaExport): XLSX.WorkBook {
       ["Neto a pagar", "Total bruto − total deducciones + otros servicios."],
       [""],
       ["⚠ Quien aparece en rojo", "No tiene todo lo que hace falta para calcularle un número. NO vale $0: quedó fuera del total y hay que configurarlo en la pestaña Configuración."],
-      ["Quien aparece en gris", `No va en planilla. ${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga.`],
+      ["Quien aparece en gris", `No va en planilla (${EXPLICACION_SERVICIO_PROFESIONAL} No es un pendiente: es como se le paga), o lo decide una persona: está justificada, o entró o salió a mitad del período. En ese caso el motivo va escrito en su fila, junto con lo que le daría la quincena completa; para pagarle lo suyo se usa el rango de fechas.`],
+      ["Quien entró o salió a mitad del período", "NO se le calcula pago, ni completo ni prorrateado. Pagarle la quincena entera sería regalarle los días en que no trabajaba acá; descontársela entera, inventarle una renuncia. Lo decide una persona y se saca con el rango de fechas."],
+      ["Días que todavía no pasaron", d.periodoAbierto
+        ? `${d.periodoAbierto.texto} Un día que no pasó no cuenta como falta ni como presente: todavía no existe.`
+        : "Este período ya terminó: todos sus días se contaron."],
+      ...(d.avisoSinFicha ? [["Códigos sin ficha", d.avisoSinFicha]] : []),
       ["Período", d.periodo && !d.periodo.esQuincena
         ? `Del ${d.periodo.desde} al ${d.periodo.hasta} (${d.periodo.diasCalendario} días). NO es una quincena: el salario base se pagó al ${(d.periodo.factorBase * 100).toFixed(1)} % —la parte de quincena que cubren estas fechas— y los montos escritos a mano (ISR, préstamo, terceros, mercancía, otros servicios) NO se aplicaron, porque se cargan por quincena.`
         : `Quincena del ${d.quincena.etiqueta}. Salario base completo (salario mensual ÷ 2).`],
@@ -303,6 +339,13 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       "Mercan-\ncía", "Total\ndeducc.", "Otros\nserv. (+)", "Neto a\npagar",
     ]],
     body: d.lineas.map((l) => {
+      if (grupoDeLinea(l) === "decidir") {
+        return [
+          `${l.etiqueta} (${l.codigo})`,
+          textoDecidir(l),
+          ...Array<string>(17).fill(""),
+        ];
+      }
       if (l.fueraDePlanilla) {
         return [
           `${l.etiqueta} (${l.codigo})`,
@@ -355,8 +398,11 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       if (data.section !== "body") return;
       const l = d.lineas[data.row.index];
       if (!l || l.dinero) return;
-      // Gris para quien no va en planilla, rojo para el pendiente de verdad.
-      data.cell.styles.textColor = l.fueraDePlanilla ? [107, 114, 128] : [163, 53, 42];
+      // Gris para quien no va en planilla y para lo que decide una persona;
+      // rojo SOLO para el pendiente de verdad. El color es la mitad del mensaje.
+      const g = grupoDeLinea(l);
+      data.cell.styles.textColor =
+        g === "fuera" || g === "decidir" ? [107, 114, 128] : [163, 53, 42];
       if (data.column.index === 1) data.cell.styles.halign = "left";
     },
     margin: { left: 10, right: 10 },
@@ -364,10 +410,15 @@ export function construirPdfPlanilla(d: DatosPlanillaExport): jsPDF {
       const h = doc.internal.pageSize.getHeight();
       doc.setFontSize(6.5);
       doc.setTextColor(156, 163, 175);
+      // 🔴 Lo que no puede perderse al mandar el papel por correo. Va arriba de
+      // la fórmula porque es lo que cambia la lectura del cuadro entero.
+      const avisos = [d.periodoAbierto?.texto, d.avisoSinFicha].filter(Boolean).join("  ");
+      if (avisos) doc.text(avisos, 10, h - 11);
       doc.text(FORMULA_NETO, 10, h - 8);
       doc.text(
         "En rojo: falta configurar a esa persona — no vale $0 y NO entra al total.  "
-        + "En gris: no va en planilla (servicio profesional); se le mide la asistencia y no se le calcula pago.",
+        + "En gris: no se le calcula pago — o no va en planilla (servicio profesional), "
+        + "o lo decide una persona (justificada, o entró o salió a mitad del período).",
         10, h - 5,
       );
       doc.text(`Página ${doc.getNumberOfPages()}`, w - 10, h - 8, { align: "right" });

@@ -170,6 +170,51 @@ export function codigosFueraDeRango(
   return fuera;
 }
 
+/**
+ * ¿Esta persona entró o salió A MITAD del período? Devuelve el motivo escrito
+ * («entró el 10 de agosto de 2026») o `null` si trabajó el período entero.
+ *
+ * ── 🔴 EL ARREGLO OBVIO ES EL EQUIVOCADO ─────────────────────────────────────
+ *
+ * YEISHKA DIAZ (código 54) entró el 10 de agosto y en la quincena del 1 al 15
+ * salía **ausente el 3, 4, 5, 6 y 7** —días en que no trabajaba acá— con un neto
+ * de **$133,34 sobre un quincenal de $300**. Dejar de contarle esos días como
+ * ausencia la deja cobrando **$300 completos**, que es PEOR: trabajó 6 días de
+ * 15. Las dos cuentas automáticas están mal, y por lados opuestos.
+ *
+ * 🔑 LO QUE DEVUELVE ESTA FUNCIÓN NO ES UN PRORRATEO: ES UNA ABSTENCIÓN. Es la
+ * MISMA regla que el módulo ya aplica y que está escrita en `planilla.ts`:
+ * cuando el sistema no puede saber, se abstiene y lo decide una persona.
+ * *"Descontarle la quincena entera en automático sería inventarle una renuncia;
+ * pagarle completo, inventarle unas vacaciones."* La contadora saca lo suyo con
+ * el rango de fechas libre (del 10 al 15), que ya existe.
+ *
+ * ⚠️ **29 de las 38 fichas no tienen `fecha_ingreso` cargada** (medido). Con
+ * ésas no se puede saber nada y devuelve `null`: se comportan EXACTAMENTE como
+ * hoy. Esto solo alcanza a quien SÍ tiene la fecha y cae dentro del período.
+ *
+ * ⚠️ Las comparaciones son ESTRICTAS contra los bordes: quien entró justo el
+ * primer día del período (o salió justo el último) trabajó el período COMPLETO
+ * y no necesita que nadie decida nada por él.
+ */
+export function motivoPeriodoParcial(
+  v: Vigencia | null | undefined,
+  desde: string,
+  hasta: string,
+): string | null {
+  if (!v) return null;
+  const partes: string[] = [];
+  const ingreso = v.fechaIngreso;
+  const salida = v.fechaSalida;
+  if (esFechaValida(ingreso) && ingreso! > desde && ingreso! <= hasta) {
+    partes.push(`entró el ${fechaLegible(ingreso)}`);
+  }
+  if (esFechaValida(salida) && salida! >= desde && salida! < hasta) {
+    partes.push(`salió el ${fechaLegible(salida)}`);
+  }
+  return partes.length ? partes.join(" y ") : null;
+}
+
 /** ¿Ya tiene fecha de salida puesta? (Aunque sea de mañana: la baja ya se cargó.) */
 export function tieneBaja(v: Vigencia | null | undefined): boolean {
   return !!v && esFechaValida(v.fechaSalida);

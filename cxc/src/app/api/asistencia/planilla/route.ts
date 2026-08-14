@@ -34,8 +34,16 @@ import {
   avisoMigracionBajas,
   codigosFueraDeRango,
   marcoDespuesDeLaBaja,
+  motivoPeriodoParcial,
   ultimoDiaConMarcas,
 } from "@/lib/asistencia/vigencia";
+import {
+  avisoPeriodoAbierto,
+  textoCodigosSinFicha,
+  textoJustificacion,
+  type CodigoSinFicha,
+} from "@/lib/asistencia/periodo";
+import { hoyPanama } from "@/lib/fecha-panama";
 import {
   avisoMigracion,
   EMPRESAS_ASISTENCIA,
@@ -49,6 +57,7 @@ import {
   periodoDeQuincena,
   periodoDesdeRango,
   quincenaDesdeClave,
+  separarSinFicha,
   totalizar,
   type FichaPlanilla,
   type ManualesLinea,
@@ -222,6 +231,20 @@ export async function GET(req: NextRequest) {
     // no se toca: `aplicarCorrecciones` devuelve una COPIA.
     const efectivas = aplicarCorrecciones(marcaciones, correcciones.correcciones);
 
+    // 🔴 EL DÍA QUE NO PASÓ NO PUEDE SER UNA AUSENCIA, Y ESTA LÍNEA ES TODO EL
+    // ARREGLO. La planilla NO pasaba `diaEnCurso` —el Reporte sí— así que hoy y
+    // todos los días que faltan de la quincena salían como falta de las 33
+    // personas. Medido el 14-ago-2026 sobre la quincena del 1 al 15: de los
+    // $1.127,78 que se descontaban por ausencia, **$866,99 eran del 14**.
+    //
+    // 🔑 EL DÍA ES EL DE PANAMÁ (UTC−5 fijo). En UTC pelado, entre las 7 p.m. y
+    // la medianoche el día salta al siguiente y "hoy" pasaría a ser mañana:
+    // agrupar por UTC ya dio números falsos dos veces en este módulo.
+    // ⚠️ Se pasa SIEMPRE, sin mirar si cae dentro del período: una quincena
+    // vieja no tiene ningún día que lo alcance y su cálculo no se mueve un
+    // centavo. Eso es lo que hace que reimprimir julio siga dando lo de julio.
+    const hoy = hoyPanama();
+
     const personas = armarReporte({
       marcaciones: efectivas.marcaciones,
       horarios,
@@ -232,6 +255,7 @@ export async function GET(req: NextRequest) {
       reglas,
       nombres,
       incluirNoHabiles: true,
+      diaEnCurso: hoy,
       // Solo para mostrar: las horas corregidas ya están adentro de arriba.
       correccionesPorDia: efectivas.porDia,
     });
@@ -260,7 +284,35 @@ export async function GET(req: NextRequest) {
       marcoDespuesDeLaBaja(vigencias.get(p.codigo), ultimoDiaConMarcas(p.dias)),
     ).length;
 
-    const lineas = armarPlanilla({
+    // ── QUIÉN NECESITA QUE LO DECIDA UNA PERSONA ─────────────────────────────
+    //
+    // 🔴 (a) QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO. No se le calcula pago, ni
+    // completo ni prorrateado: las dos cuentas automáticas están mal por lados
+    // opuestos (ver `motivoPeriodoParcial`). Sale con el motivo escrito y fuera
+    // del total, y la contadora saca lo suyo con el rango de fechas libre.
+    const decidirAMano = new Map<string, string>();
+    for (const [codigo, v] of vigencias) {
+      if (fuera.has(codigo)) continue;
+      const motivo = motivoPeriodoParcial(v, q.desde, q.hasta);
+      if (motivo) decidirAMano.set(codigo, motivo);
+    }
+
+    // 🔴 (b) QUIEN TIENE UNA JUSTIFICACIÓN VIVA Y NO MARCÓ NI UN DÍA. RODRIGO
+    // MIRANDA (trabajo fuera de la oficina) y ELOYN MENDOZA (vacaciones) salían
+    // en ámbar diciendo «falta configurarles algo… se arreglan en Configuración»
+    // y en Configuración no hay NADA que arreglarles: sus justificaciones ya
+    // están cargadas y son correctas.
+    // ⚠️ `armarPlanilla` solo mira este mapa cuando la persona no tiene UNA sola
+    // marca en el período: quien se tomó dos días y trabajó trece cobra normal.
+    const justificados = new Map<string, string>();
+    for (const j of (jRes.data ?? []) as Justificacion[]) {
+      const codigo = String(j.empleado_codigo);
+      const texto = textoJustificacion(String(j.motivo), String(j.desde), String(j.hasta));
+      const previo = justificados.get(codigo);
+      justificados.set(codigo, previo ? `${previo} · ${texto}` : texto);
+    }
+
+    const todasLasLineas = armarPlanilla({
       personas: personasVigentes,
       fichas,
       manuales: manualesLeidos.porCodigo,
@@ -269,7 +321,24 @@ export async function GET(req: NextRequest) {
       empresa,
       // 🔴 Lo que prorratea el sueldo. 1 cuando el período es una quincena.
       factorBase: q.factorBase,
+      decidirAMano,
+      justificados,
     });
+
+    // 🔴 EL CÓDIGO SIN FICHA SALE DEL CUADRO DE CADA EMPRESA Y SE MUESTRA UNA
+    // SOLA VEZ. Entra a las tres empresas a propósito —no se le puede adivinar
+    // la suya— y por eso aparecía tres veces, como si fueran tres personas.
+    // La intención de que NO DESAPAREZCA se conserva: viaja aparte, arriba.
+    const { lineas, sinFicha } = separarSinFicha(todasLasLineas);
+    const marcasPorCodigo = new Map<string, number>();
+    for (const m of marcaciones) {
+      const c = String(m.empleado_codigo ?? m.empleado_nombre ?? "").trim();
+      if (c) marcasPorCodigo.set(c, (marcasPorCodigo.get(c) ?? 0) + 1);
+    }
+    const codigosSinFicha: CodigoSinFicha[] = sinFicha.map((l) => ({
+      codigo: l.codigo,
+      marcaciones: marcasPorCodigo.get(l.codigo) ?? 0,
+    }));
 
     return NextResponse.json({
       // `quincena` se mantiene con el mismo nombre y forma para no romper a
@@ -316,6 +385,14 @@ export async function GET(req: NextRequest) {
         // Sábados trabajados: el cuadro no tiene columna y acá no se inventa
         // un recargo. Se avisa para que lo resuelva una persona.
         conSabado: lineas.filter((l) => l.horas.sabadoMin > 0).length,
+        // 🔴 EL PERÍODO TODAVÍA NO TERMINÓ. Va arriba del cuadro: los días que
+        // no pasaron dejaron de descontarse, y un número que baja sin
+        // explicación se lee como un número que no cuadra.
+        periodoAbierto: avisoPeriodoAbierto(q.desde, q.hasta, hoy, q.esQuincena),
+        // 🔴 Los códigos que marcaron y no tienen ficha, UNA sola vez y fuera
+        // del cuadro de cada empresa.
+        sinFicha: codigosSinFicha,
+        avisoSinFicha: textoCodigosSinFicha(codigosSinFicha),
         // 🔴 Lo que hay que saber ANTES de pagar por un rango libre.
         rangoLibre: !q.esQuincena,
         factorBase: q.factorBase,

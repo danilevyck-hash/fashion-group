@@ -1002,6 +1002,60 @@ Daniel divide los mensajes en dos, textual: **"tengo dividido los mensajes en in
 > **La distinción del servicio profesional ya existía en la contabilidad:** a Daniel y a David se les paga por **SERVICIOS PROFESIONALES (6.02.01)**, otra cuenta que **SALARIOS POR PAGAR (2.01.05.01)**. Va en el ⓘ de la ficha, donde la contable reconoce los números de cuenta.
 
 
+## 🔴 Asistencia — EL 90% DE LO QUE LA PLANILLA DESCONTABA POR AUSENCIA ERA FALSO (14-ago-2026)
+
+> La contadora corre la primera quincena real en 2 días. Una auditoría medida contra producción encontró que de los **$1.127,78** que la planilla descontaba por ausencia en la quincena del 1 al 15 de agosto, **$1.013,87 (el 90%) eran falsos**. Reales: **$113,91**.
+>
+> 🔴 **NINGUNO DE LOS TRES ARREGLOS TOCA EL MOTOR DE CÁLCULO.** `planilla.ts` está cotejado al centavo contra el Excel de la contadora y su matemática NO se tocó: ni una fórmula, ni un redondeo, ni un recargo. Los tres son sobre **qué días entran** al cálculo y **de quién se abstiene el sistema**.
+>
+> ### 1. El día que no terminó no puede ser ausencia
+>
+> `armarReporte` sabía callarse el día en curso desde el 13-ago —lo usaba el Reporte— y **la Planilla no le pasaba `diaEnCurso`**: un `grep` sobre `route.ts`, `PlanillaTab.tsx`, `planilla.ts` y `planilla-exportar.ts` daba **cero**. Resultado medido: las **33 personas** salían ausentes el **14-ago (hoy)** = **$866,99**.
+> - 🔴 **Y NO ALCANZABA CON EXCLUIR HOY.** `diaEnCurso` excluía UNO solo (`fecha === diaEnCurso`): abierta la quincena un día 3, quedaban ~9 días hábiles futuros contándose como falta **a ~$870 cada uno**. La comparación pasó a **`fecha >= diaEnCurso`** — *"de acá en adelante todavía no pasó nada"*. Un día futuro no es que "no terminó": es que ni siquiera empezó.
+> - **El día es el de PANAMÁ (`hoyPanama()`, UTC−5 fijo).** Agrupar por UTC ya dio números falsos dos veces en este módulo: entre las 7 p.m. y la medianoche el día salta y "hoy" pasaría a ser mañana.
+> - ⚠️ **Se pasa SIEMPRE, sin mirar si cae dentro del período.** Una quincena vieja no tiene ningún día que lo alcance y su cálculo no se mueve un centavo: eso es lo que hace que reimprimir julio siga dando lo de julio.
+> - 🔑 **Lo que ya se trabajó se sigue midiendo**: quien llegó tarde HOY se lo cobra igual. Lo único que se suspende es el veredicto (`ausente` y `revisar`), no la medición.
+> - **Aviso arriba del cuadro** (`avisoPeriodoAbierto`, azul): *«Esta quincena todavía no termina — falta 1 día hábil. Los días que no pasaron no se cuentan.»* Desaparece solo cuando el período cierra — un cartel permanente se deja de leer.
+>
+> ### 2. Quien entró o salió a mitad del período NO recibe un número inventado
+>
+> **YEISHKA DIAZ (54)**, ingreso 10-ago, salía ausente el 3, 4, 5, 6 y 7 —días en que no trabajaba acá— y su neto quedaba en **$133,34 sobre un quincenal de $300**. **GABRIELA JARAMILLO (53)**, ingreso 4-ago, ausente el 3.
+> - 🔴 **EL ARREGLO OBVIO ES EL EQUIVOCADO, y hay un test que lo demuestra en dólares:** medirla solo desde su ingreso le borra las ausencias y le paga **$300 completos** por 4 días trabajados de 10 hábiles. Las dos cuentas automáticas están mal por lados opuestos.
+> - **Lo que Daniel decidió: el sistema NO le calcula pago.** Sale en **«Decidilo vos»** con la leyenda *«entró el 10 de agosto de 2026»*, con el quincenal que le correspondería a la vista, y **fuera del total**. La contadora usa el **rango de fechas libre** (10 al 15), que ya existe. Textual: *«pero igual nos pagan por quincena, no? Solo hay que escoger cada vez de qué fecha a qué fecha se calcula y ya»*.
+> - 🔑 **Es la MISMA regla que el módulo ya aplica** y que está escrita en `planilla.ts`: cuando el sistema no puede saber, se abstiene. *"Descontarle la quincena entera en automático sería inventarle una renuncia; pagarle completo, inventarle unas vacaciones."* **NO SE CONSTRUYÓ PRORRATEO.** La única cifra que se muestra es la quincena COMPLETA, rotulada como lo que le TOCARÍA — nunca una fracción calculada por el sistema.
+> - **El candado del pago vive en `armarLinea`, en el MISMO `if` que el de servicio profesional**: no pregunta por el sueldo ni por los días, pregunta por el motivo. Con salario cargado, marcando todos los días, sigue sin producir un centavo.
+> - ⚠️ **29 de 38 fichas no tienen `fecha_ingreso`** (medido): con ésas `motivoPeriodoParcial` devuelve `null` y se comportan EXACTAMENTE como hoy. Los bordes son ESTRICTOS: quien entró el primer día del período (o salió el último) trabajó el período completo.
+>
+> ### 3. Quien tiene justificación viva sale del cajón «falta configurar»
+>
+> **RODRIGO MIRANDA** (Trabajo fuera de la oficina, 1→13 ago) y **ELOYN MENDOZA** (Vacaciones, 16-jul→13-ago) salían los dos en ámbar diciendo *«falta configurarles algo… se arreglan en Configuración»* — **y en Configuración no hay nada que arreglarles**.
+> - **La bolsa ámbar se partió en DOS grupos con nombre propio** (`grupoDeLinea`, fuente ÚNICA usada por la pantalla, el orden, los totales, el Excel y el PDF): **«Falta un dato»** (ámbar, con el botón a Configuración) y **«Decidilo vos»** (GRIS, con el motivo escrito —*«Vacaciones del 16 jul 2026 al 13 ago 2026»*— y el quincenal que les correspondería). El color es la mitad del mensaje: ámbar dice "arreglame".
+> - ⚠️ **La justificación solo cuenta cuando la persona NO marcó NI UN DÍA.** Quien se tomó dos días y trabajó trece **cobra normal**: confundir los dos casos le quitaría la quincena entera a quien sí vino. Hay candado.
+> - **El código 50** (sin ficha) aparecía **tres veces, una por empresa** — `armarPlanilla` los mete en todas a propósito para que nadie los borre en silencio. Ahora sale del cuadro (`separarSinFicha`) y se muestra **una sola vez arriba**: *«1 código marcó N veces y no tiene ficha (código 50). Hasta saber quién es, no se le puede calcular pago.»* **La intención de que no desaparezca se conserva; lo que cambia es dónde se muestra.**
+> - **Los avisos viajan al Excel y al PDF**: el papel se manda por correo y sobrevive a la conversación donde se explicó.
+>
+> ### La medición contra producción
+>
+> `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-planilla-dias-que-no-pasaron.ts` (solo lectura) corre la lógica de la ruta **VIEJA** —sacada de `origin/main` AL EJECUTAR, no una copia versionada que envejece— y la nueva sobre los MISMOS datos:
+>
+> | | antes | después |
+> |---|---:|---:|
+> | Ausencias (3 empresas) | **$1.127,78** | **$113,91** |
+> | Neto | $7.194,92 | $7.583,01 |
+> | Yeishka (54) | neto $133,34 | **sin número** · «entró el 10 de agosto» · quincena completa $300,00 |
+> | Gabriela (53) | neto $206,62 | **sin número** · «entró el 4 de agosto» · quincena completa $300,00 |
+> | Rodrigo (13) | ámbar «no marcó ni un día» | **gris** · «Trabajo fuera de la oficina del 1 ago al 13 ago» · $400,00 |
+> | Eloyn (29) | ámbar «no marcó ni un día» | **gris** · «Vacaciones del 16 jul al 13 ago» · $283,26 |
+> | Código 50 | 3 filas (una por empresa) | 1 aviso arriba |
+>
+> 🔴 **Y LAS DOS QUINCENAS YA CERRADAS DE JULIO NO SE MOVIERON: 1.264 cifras comparadas, 0 diferencias** (Boston $4.264,23 y $4.550,78 · Vistana $2.092,04 y $2.379,29 · Fashion Wear $1.699,15 y $1.500,22, idénticos antes y después). El script **falla** si una sola cifra cambia, si Yeishka cobra, o si el código sin ficha sigue adentro del cuadro. Para reproducir la auditoría desde cero: `scripts/_diag-planilla-dias-que-no-pasaron.ts`.
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-planilla-dias-que-no-pasaron.mjs`, solo lectura, en las 3 empresas): **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 blancos táctiles bajo 44 px y 0 textos NUEVOS bajo 12 px** en los 12 casos. Los únicos recortes son el `H1.sr-only` (77 px) y el `truncate` del nombre en la tarjeta de celular — los dos PRE-EXISTENTES, en código que este PR no toca; los textos de 10-11 px son las etiquetas de columna que el módulo ya tenía. El script **falla** si la planilla sale vacía, si falta alguno de los tres avisos, o si el del código sin ficha aparece más de una vez.
+>
+> **Candados:** `src/__tests__/lib/asistencia-dias-que-no-pasaron.test.ts` (38, incluido un bloque que llama al **handler REAL de la ruta** — el bug original era que la ruta no pasaba el parámetro, y eso ninguna prueba del motor puede verlo) y **`src/__tests__/components/asistencia-planilla-decidir-pantalla.test.tsx` (10), que RENDERIZA `PlanillaTab`** y lee los renglones: que `grupoDeLinea` devuelva "decidir" no prueba nada sobre lo que la contadora ve.
+> - **Verificado por mutación, 16 de 16 cazadas:** volver a `===` en el motor (1) · que la ruta deje de pasar el día de hoy (1) · quitarle a `armarLinea` el candado de la abstención (7) · que `armarPlanilla` deje de pasar el motivo (7) · que la ruta deje de armar el mapa de vigencia (1) o el de justificaciones (1) · contar «decidir» como pendiente (2) · que `separarSinFicha` no separe (1) o que la ruta no lo llame (1) · `quincenalReferencia` siempre null (3) · aflojar el borde del ingreso (1) · aplicar la justificación a quien SÍ marcó (1) · que la pantalla vuelva a una sola bolsa ámbar (5) · que pierda el aviso del período (1) o el del código sin ficha (2) · que la ruta deje de mandar el aviso (1).
+> - 🔑 **Ningún candado busca texto en un archivo**: todos ejecutan la conducta y miran los dólares o el DOM. En este repo ya fallaron varios candados por leer sus propios comentarios.
+
 ## 🔴 Asistencia — LA MARCACIÓN DEL RELOJ NUNCA SE BORRA NI SE EDITA (13-ago-2026)
 
 > Daniel, textual: *"en asistencia- reporte, quiero poder editar el registro de marcacion en caso de caso especial, se puede? o enrreda mucho?"*. Y a las dos preguntas del diseño: **"1. todos pueden corregir. 2. si"** (la razón es obligatoria).
