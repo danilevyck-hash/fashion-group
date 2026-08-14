@@ -55,6 +55,8 @@ import AddNewInline from "./AddNewInline";
 import ClientePicker from "@/components/ClientePicker";
 import { ScrollableTable } from "@/components/ui";
 import { EMPRESAS_CANONICAS, claveCampo, opcionesEmpresa } from "./guia-form-logic";
+import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
+import { sugerenciasDireccion } from "@/lib/guias/direccion-sugerida";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -214,6 +216,10 @@ export default function GuiaForm({
   // canónicas, ambos por frecuencia de uso en guías. Aditivo y best-effort.
   const [clientesTop, setClientesTop] = useState<{ codigo: string; nombre: string }[]>([]);
   const [empresaOptions, setEmpresaOptions] = useState<string[]>([]);
+  // Código de cliente → última dirección a la que se le despachó. Ver
+  // `@/lib/guias/direccion-sugerida`. Best-effort: sin esto, la lista de
+  // direcciones es la de siempre.
+  const [direccionPorCliente, setDireccionPorCliente] = useState<Record<string, string>>({});
   useEffect(() => {
     let cancel = false;
     fetch("/api/guias/frecuencias", { cache: "no-store" })
@@ -222,11 +228,28 @@ export default function GuiaForm({
         if (cancel || !d) return;
         if (Array.isArray(d.clientes)) setClientesTop(d.clientes);
         if (Array.isArray(d.empresas)) setEmpresaOptions(d.empresas);
+        if (d.direcciones && typeof d.direcciones === "object") setDireccionPorCliente(d.direcciones);
       })
       .catch(() => { /* offline: cae a las 8 canónicas en su orden de siempre */ });
     return () => { cancel = true; };
   }, []);
   const empresaOpts = empresaOptions.length > 0 ? empresaOptions : EMPRESAS_CANONICAS;
+
+  // 🔴 UNA LISTA POR CLIENTE, con SU última dirección primera. Daniel:
+  // *«Ponerla sola, pero sí como primera opción.»* — aparece arriba de todo,
+  // lista para tomarla de un toque; NO se escribe sola en el campo, y el campo
+  // sigue siendo editable como siempre.
+  //
+  // ⚠️ La EMPRESA no entra acá y no debe: medido contra producción, la empresa
+  // anterior de un cliente solo acierta el 34% de las veces (la dirección, el
+  // 80%). Autocompletarla metería el dato equivocado en dos de cada tres envíos.
+  const codigosConDireccion = [...new Set(
+    items.map((i) => (i.cliente_codigo || "").trim()).filter((c) => c && direccionPorCliente[c]),
+  )];
+  const idListaDirecciones = (codigo: string | undefined) => {
+    const c = (codigo || "").trim();
+    return c && direccionPorCliente[c] ? `direcciones-list-${c}` : "direcciones-list";
+  };
 
   // Undo delete row — vuelve la fila ENTERA (incluido cliente_codigo) a SU lugar.
   const [undoRow, setUndoRow] = useState<{ idx: number; item: GuiaItem; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -346,7 +369,7 @@ export default function GuiaForm({
       <>
         <input
           id={idCampo(item, "direccion", layout)}
-          list="direcciones-list"
+          list={idListaDirecciones(item.cliente_codigo)}
           type="text"
           value={item.direccion}
           placeholder="Ciudad o destino"
@@ -498,13 +521,16 @@ export default function GuiaForm({
                 type="button"
                 onClick={() => { setModoEntrega("transportista"); marcarTocado("transportista"); }}
                 className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${modoEntrega === "transportista" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
-                Transportista
+                {/* 🔴 LAS MISMAS PALABRAS QUE AL DESPACHAR. Acá decía
+                    "Transportista" y dos pantallas después "Transportista
+                    externo": dos nombres para lo mismo en el mismo flujo. */}
+                {ETIQUETA_TIPO_DESPACHO.externo}
               </button>
               <button
                 type="button"
                 onClick={() => { setModoEntrega("entrega_directa"); setTransportistaId(null); }}
                 className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${modoEntrega === "entrega_directa" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
-                Entrega directa
+                {ETIQUETA_TIPO_DESPACHO.directo}
               </button>
             </div>
             {modoEntrega === "transportista" ? (
@@ -523,7 +549,8 @@ export default function GuiaForm({
               </>
             ) : (
               <p className="text-xs text-gray-500 italic">
-                Esta guía se entrega directamente, sin transportista externo.
+                Sale en nuestro propio camión: no lleva placa ni N° de guía de
+                transportista.
               </p>
             )}
           </Campo>
@@ -580,7 +607,16 @@ export default function GuiaForm({
           <StatusBadge />
         </div>
 
+        {/* La lista de siempre, para las filas sin cliente del directorio. */}
         <datalist id="direcciones-list">{direcciones.map(d => <option key={d} value={d} />)}</datalist>
+        {/* Y una por cliente atado, con SU última dirección arriba de todo. */}
+        {codigosConDireccion.map((codigo) => (
+          <datalist key={codigo} id={`direcciones-list-${codigo}`}>
+            {sugerenciasDireccion(direccionPorCliente[codigo], direcciones).map((d) => (
+              <option key={d} value={d} />
+            ))}
+          </datalist>
+        ))}
 
         {validationErrors.has("items-empty") && (
           <p className="text-red-500 text-xs mb-3">Agrega al menos un envío con todos los campos completos.</p>

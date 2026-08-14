@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { isCanvasClear } from "./canvasUtils";
 import SignatureCanvas from "./SignatureCanvas";
 import type { GuiaItem } from "./types";
@@ -9,6 +9,8 @@ import {
   textoFalta,
   type TipoDespacho,
 } from "@/lib/guias/falta-para-despachar";
+import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
+import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DESPACHO — ahora vive en la PÁGINA de la guía, no dentro de la lista.
@@ -32,6 +34,21 @@ import {
 // contestaba con un toast por vez, que además se iba solo a los 3 segundos.
 // Las reglas de qué falta viven en `@/lib/guias/falta-para-despachar` — las
 // mismas que aplica el servidor.
+//
+// 🔴 EL MODO NO SE VUELVE A PREGUNTAR: SE MUESTRA, CON UN "CAMBIAR" AL LADO.
+// Ya se eligió al crear la guía. Preguntarlo de nuevo, con "Transportista
+// externo" preseleccionado, es lo que produjo que **50 de 51 guías creadas como
+// entrega directa quedaran grabadas como transportista externo** (medido en
+// producción el 14-ago-2026). Cambiarlo sigue siendo posible —a veces llega el
+// camión de un tercero— pero es un acto deliberado, no el camino por defecto.
+//
+// 🔴 EN ENTREGA DIRECTA NO SE PIDEN PLACA NI N° DE GUÍA DEL TRANSPORTISTA.
+// Daniel, textual: *«Entrega directa no debería de llevar placa, ya que es
+// directo con nuestro propio camión.»* No son "opcionales": no existe un
+// transportista al que pedirle esos datos. Se ESCONDEN. Cuando eran opcionales
+// pero visibles, alguien tecleó "0" en los dos para poder apretar el botón —
+// GT-194, GT-195 y GT-196, las únicas tres placas "0" de toda la base— y ese
+// "0" salía impreso en el papel que se firma.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface DespachoFormProps {
@@ -49,6 +66,9 @@ interface DespachoFormProps {
   setBCedula: (v: string) => void;
   bChofer: string;
   setBChofer: (v: string) => void;
+  /** Últimos juegos usados con ESTE transportista. Vacío = no se dibuja nada. */
+  juegos?: readonly JuegoDespacho[];
+  onUsarJuego?: (j: JuegoDespacho) => void;
   bSaving: boolean;
   onConfirmar: (firma1: string, firma2: string) => void;
   pendingFirma1?: string | null;
@@ -69,11 +89,14 @@ export default function DespachoForm({
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer,
+  juegos = [], onUsarJuego,
   bSaving, onConfirmar,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
 }: DespachoFormProps) {
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
   const canvas2Ref = useRef<HTMLCanvasElement>(null);
+  // El selector aparece solo si se toca "Cambiar". Ver la cabecera.
+  const [cambiandoModo, setCambiandoModo] = useState(false);
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(
@@ -127,41 +150,95 @@ export default function DespachoForm({
 
   return (
     <div className="space-y-4">
-      {/* Cómo sale la mercancía */}
+      {/* Cómo sale la mercancía — se MUESTRA lo que ya se eligió al crearla. */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
           Cómo sale
         </span>
-        <div className="flex rounded-lg bg-gray-100 p-0.5">
-          <button
-            type="button"
-            onClick={() => setTipoDespacho("externo")}
-            className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${externo ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Transportista externo
-          </button>
-          <button
-            type="button"
-            onClick={() => setTipoDespacho("directo")}
-            className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${!externo ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            Entrega directa
-          </button>
-        </div>
+        {cambiandoModo ? (
+          <div className="flex rounded-lg bg-gray-100 p-0.5">
+            <button
+              type="button"
+              onClick={() => { setTipoDespacho("externo"); setCambiandoModo(false); }}
+              className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${externo ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {ETIQUETA_TIPO_DESPACHO.externo}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTipoDespacho("directo"); setCambiandoModo(false); }}
+              className={`flex-1 text-sm px-3 rounded-md transition font-medium inline-flex items-center justify-center min-h-[44px] ${!externo ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              {ETIQUETA_TIPO_DESPACHO.directo}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-sm font-medium break-words">
+              {ETIQUETA_TIPO_DESPACHO[tipoDespacho]}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCambiandoModo(true)}
+              className="text-sm text-blue-700 hover:text-blue-900 transition inline-flex items-center min-h-[44px] px-2 shrink-0"
+            >
+              Cambiar
+            </button>
+          </div>
+        )}
+        {!externo && !cambiandoModo && (
+          <p className="text-xs text-gray-500 mt-1">
+            Sale en nuestro propio camión: no lleva placa ni N° de guía de transportista.
+          </p>
+        )}
       </div>
 
       {/* Quién recibe y en qué se va */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="despacho-placa" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">
-              {externo ? "Placa del vehículo" : (
-                <>Placa del vehículo <span className="normal-case text-gray-400">(opcional)</span></>
-              )}
-            </label>
-            <input id="despacho-placa" type="text" value={bPlaca}
-              onChange={(e) => setBPlaca(e.target.value)} className={CAMPO} />
+        {/* 🔴 LOS ÚLTIMOS DESPACHOS DE ESTE TRANSPORTISTA, de un toque.
+            Los tres campos de abajo se tecleaban en blanco cada vez, en un
+            teléfono, y el mismo dato terminaba guardado de dos formas: la
+            cédula `810102403` y `8-1010-2403` son la misma persona, y la placa
+            `DG7115` convivía con un `Dg7738`. Tomando el juego de una guía
+            anterior, sale escrito IGUAL que la vez pasada.
+            ⚠️ Solo con transportista externo: en entrega directa no hay
+            transportista ni placa. Ver `@/lib/guias/juegos-despacho`. */}
+        {externo && juegos.length > 0 && onUsarJuego && (
+          <div className="mb-4">
+            <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
+              Últimos despachos con este transportista
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {juegos.map((j, i) => (
+                <button
+                  key={`${j.receptor}|${j.cedula}|${j.placa}|${i}`}
+                  type="button"
+                  onClick={() => onUsarJuego(j)}
+                  className="text-left text-sm rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99] transition min-h-[44px] max-w-full"
+                >
+                  <span className="font-medium break-words">{j.receptor}</span>
+                  <span className="block text-xs text-gray-500 break-words">
+                    {j.cedula} · {j.placa}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Tócalo y se llenan los tres campos. Puedes cambiarlos después.
+            </p>
           </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* ⚠️ La placa SOLO existe con transportista externo. Ver la cabecera. */}
+          {externo && (
+            <div>
+              <label htmlFor="despacho-placa" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">
+                Placa del vehículo
+              </label>
+              <input id="despacho-placa" type="text" value={bPlaca}
+                onChange={(e) => setBPlaca(e.target.value)} className={CAMPO} />
+            </div>
+          )}
           {!externo && (
             <div>
               <label htmlFor="despacho-chofer" className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Chofer</label>

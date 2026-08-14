@@ -22,7 +22,13 @@ import { Toast } from "@/components/ui";
 import DespachoForm from "../components/DespachoForm";
 import { useDespachoGuia } from "../components/useDespachoGuia";
 import { fmtDate, fmtGuia } from "@/lib/format";
-import { numeroTranspDeLinea } from "@/lib/guias/falta-para-despachar";
+import {
+  ETIQUETA_TIPO_DESPACHO,
+  esEntregaDirecta,
+  numeroTranspImpreso,
+  sinCeroPelado,
+  tipoDespachoEfectivo,
+} from "@/lib/guias/modo-despacho";
 
 /** Los mismos que ya podían despachar desde la lista. Vendedor mira, no toca. */
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
@@ -121,7 +127,7 @@ export default function GuiaPage() {
                         <span className="block text-xs text-gray-500 mt-0.5">
                           N° guía transportista:{" "}
                           <span className="font-medium text-gray-700">
-                            {numeroTranspDeLinea(item.numero_guia_transp, g.numero_guia_transp) || "—"}
+                            {numeroTranspImpreso(item.numero_guia_transp, g.numero_guia_transp) || "—"}
                           </span>
                         </span>
                       )}
@@ -142,8 +148,9 @@ export default function GuiaPage() {
                   {g.estado === "Rechazada" ? "Esta guía fue rechazada" : "Ya despachada"}
                 </span>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <Dato etiqueta="Cómo salió" valor={g.tipo_despacho === "directo" ? "Entrega directa" : "Transportista externo"} />
-                  <Dato etiqueta="Placa" valor={g.placa || ""} />
+                  <Dato etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
+                  {/* En entrega directa no hay placa, y un "0" no es una placa. */}
+                  {!esEntregaDirecta(g) && <Dato etiqueta="Placa" valor={sinCeroPelado(g.placa)} />}
                   {g.nombre_chofer && <Dato etiqueta="Chofer" valor={g.nombre_chofer} />}
                   <Dato etiqueta="Recibido por" valor={g.receptor_nombre || ""} />
                   <Dato etiqueta="Cédula" valor={g.cedula || ""} />
@@ -158,7 +165,7 @@ export default function GuiaPage() {
                   {g.firma_base64 && (
                     <div>
                       <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                        {g.tipo_despacho === "directo" ? "Firma del chofer" : "Firma del transportista"}
+                        {esEntregaDirecta(g) ? "Firma del chofer" : "Firma del transportista"}
                       </span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={g.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
@@ -167,7 +174,7 @@ export default function GuiaPage() {
                   {g.firma_entregador_base64 && (
                     <div>
                       <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                        {g.tipo_despacho === "directo" ? "Firma del cliente" : "Firma del entregador"}
+                        {esEntregaDirecta(g) ? "Firma del cliente" : "Firma del entregador"}
                       </span>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={g.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
@@ -196,6 +203,8 @@ export default function GuiaPage() {
                 setBCedula={s.setBCedula}
                 bChofer={s.bChofer}
                 setBChofer={s.setBChofer}
+                juegos={s.juegos}
+                onUsarJuego={s.usarJuego}
                 bSaving={s.bSaving}
                 onConfirmar={(f1, f2) => { void s.confirmarDespacho(f1, f2); }}
                 pendingFirma1={s.pendingFirma1}

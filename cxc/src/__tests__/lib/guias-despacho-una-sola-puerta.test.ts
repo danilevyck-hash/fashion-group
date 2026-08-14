@@ -71,16 +71,20 @@ describe("🔴 la lista NO despacha: ni deslizando ni desplegando el formulario"
     }
   });
 
-  it("queda UN botón para entrar a la guía, y dice 'Editar'", () => {
-    // Nada de "Despachar" + "Editar" uno al lado del otro: eso es exactamente
-    // lo que Daniel pidió sacar.
+  it("queda UN SOLO botón para entrar a la guía — lo que cambia es cómo se llama", () => {
+    // ⚠️ Lo que Daniel pidió sacar era tener "Despachar" Y "Editar" uno al lado
+    // del otro. Eso NO se aflojó: sigue habiendo un solo `onEdit`. Lo que sí
+    // cambió (ago-2026) es el rótulo: en "Pendiente Bodega" dice "Despachar",
+    // porque 185 de las 186 guías terminaron despachadas y ésa es LA acción del
+    // día para bodega. Ver `guias-entrega-directa.test.tsx`, que lo prueba
+    // pintando la lista.
     const acciones = LISTA.slice(
       LISTA.indexOf("{/* Acciones rápidas (header de la card expandida) */}"),
       LISTA.indexOf("{/* Items table */}")
     );
     expect(acciones).toContain("Editar");
+    expect(acciones).toContain("Despachar");
     expect(acciones).toContain("Imprimir");
-    expect(acciones).not.toContain(">Despachar<");
     expect((acciones.match(/onEdit\(/g) ?? []).length).toBe(1);
   });
 
@@ -151,15 +155,19 @@ describe("🔴 el N° del transportista es POR LÍNEA", () => {
   });
 
   it("el papel imprime el de CADA línea, no el de la cabecera repetido", () => {
-    expect(IMPRESO).toContain("numeroTranspDeLinea(item.numero_guia_transp, g.numero_guia_transp)");
-    expect(PDF).toContain("numeroTranspDeLinea(it.numero_guia_transp, g.numero_guia_transp)");
+    // ⚠️ Desde ago-2026 los papeles llaman al envoltorio `numeroTranspImpreso`,
+    // que es la MISMA herencia línea → cabecera pasada por `sinCeroPelado`: un
+    // "0" no es un número de guía, es lo que alguien tecleó para poder apretar
+    // el botón. La regla de herencia sigue viviendo en `falta-para-despachar`.
+    expect(IMPRESO).toContain("numeroTranspImpreso(item.numero_guia_transp, g.numero_guia_transp)");
+    expect(PDF).toContain("numeroTranspImpreso(it.numero_guia_transp, g.numero_guia_transp)");
   });
 
   it("el encabezado del papel solo anuncia un número cuando hay UNO solo", () => {
     // Con varios distintos, poner uno arriba sería una mentira impresa en un
     // documento que alguien firma.
-    expect(IMPRESO).toContain("numeroTranspUnico(guiaItems, g.numero_guia_transp)");
-    expect(PDF).toContain("numeroTranspUnico(items, g.numero_guia_transp)");
+    expect(IMPRESO).toContain("numeroTranspUnicoImpreso(guiaItems, g.numero_guia_transp)");
+    expect(PDF).toContain("numeroTranspUnicoImpreso(items, g.numero_guia_transp)");
     expect(IMPRESO).not.toContain("{g.numero_guia_transp && (");
   });
 
