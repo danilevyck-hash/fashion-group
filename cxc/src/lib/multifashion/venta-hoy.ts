@@ -80,10 +80,10 @@ export interface VentaHoy {
   hayVentas: boolean;
   /** El día todavía no cerró (antes de las 7pm de Panamá). */
   enCurso: boolean;
-  /** Titular: mismo día de la semana, hace 7 días. null si no es consultable. */
-  semanaPasada: Comparativo | null;
-  /** Secundario. null si no es consultable. */
-  ayer: Comparativo | null;
+  /** Titular: mismo día de la semana, hace 7 días. */
+  semanaPasada: Comparativo;
+  /** Secundario. */
+  ayer: Comparativo;
   sync: {
     /** ISO del último sync exitoso que cubre `fecha`. null = no hubo ninguno. */
     ultimo: string | null;
@@ -161,11 +161,11 @@ interface OpcionesVentaHoy {
   /** Día de negocio a reportar (Panamá). */
   fecha: string;
   ahora: Date;
-  /** Días comparativos ya filtrados por la ventana del rol: `null` = no se
-   *  consulta (ver `clampDiaComparable`). El filtro lo hace la RUTA, antes de
-   *  llamar acá — este módulo no decide permisos. */
-  semanaPasada: string | null;
-  ayer: string | null;
+  /** Los dos días contra los que se compara (`diasComparativos`). Los calcula
+   *  la RUTA y se piden SIEMPRE: desde que se levantó la ventana acotada de
+   *  `gerente_acs` (13-ago-2026) no hay rol al que se le apague un comparativo. */
+  semanaPasada: string;
+  ayer: string;
 }
 
 function comparativo(fecha: string, r: { ventas: number; documentos: number }, hoy: number): Comparativo {
@@ -175,8 +175,8 @@ function comparativo(fecha: string, r: { ventas: number; documentos: number }, h
 export async function calcularVentaHoy(op: OpcionesVentaHoy): Promise<VentaHoy> {
   const [dia, prevSemana, prevDia, ultimo] = await Promise.all([
     leerRetailRango(op.fecha, op.fecha),
-    op.semanaPasada ? leerRetailRango(op.semanaPasada, op.semanaPasada) : Promise.resolve(null),
-    op.ayer ? leerRetailRango(op.ayer, op.ayer) : Promise.resolve(null),
+    leerRetailRango(op.semanaPasada, op.semanaPasada),
+    leerRetailRango(op.ayer, op.ayer),
     ultimoSyncFacturasAcs(op.fecha),
   ]);
 
@@ -188,8 +188,8 @@ export async function calcularVentaHoy(op: OpcionesVentaHoy): Promise<VentaHoy> 
     documentos: dia.documentos,
     hayVentas: dia.documentos > 0,
     enCurso: horaPanama(op.ahora) < HORA_CIERRE_TIENDA,
-    semanaPasada: prevSemana && op.semanaPasada ? comparativo(op.semanaPasada, prevSemana, dia.ventas) : null,
-    ayer: prevDia && op.ayer ? comparativo(op.ayer, prevDia, dia.ventas) : null,
+    semanaPasada: comparativo(op.semanaPasada, prevSemana, dia.ventas),
+    ayer: comparativo(op.ayer, prevDia, dia.ventas),
     sync: { ultimo, estado, minutos },
   };
 }

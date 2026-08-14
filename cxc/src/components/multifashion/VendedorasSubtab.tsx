@@ -31,6 +31,7 @@ import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { variacionPctDesdeRatio } from "@/lib/variacion";
 import { cn } from "@/lib/utils";
 import { BonosSection } from "./BonosSection";
+import { MetasEnVendedoras } from "./MetasEnVendedoras";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -57,12 +58,9 @@ interface VendedorasSubtabProps {
    *  conserva el prop por compatibilidad con el llamador. */
   mes: number;
   onMesChange: (mes: number) => void;
-  /** gerente_acs: solo el mes en curso. Mes cerrado, YTD y las ventanas rolling
-   *  de 3/6/12 meses no se ofrecen — y el servidor las aplasta a 'mes' igual. */
-  ventanaAcotada?: boolean;
 }
 
-export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) {
   const year = selectedYear;
 
   // Meses base relativos a hoy. Para año cerrado, "en curso" = Dic.
@@ -71,8 +69,7 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
   const enCursoMes = isCurrentYear ? now.getMonth() + 1 : 12;
   const mesAnteriorMes = Math.max(1, enCursoMes - 1);
 
-  const [chipRaw, setChip] = useState<ChipKey>("en_curso");
-  const chip: ChipKey = ventanaAcotada ? "en_curso" : chipRaw;
+  const [chip, setChip] = useState<ChipKey>("en_curso");
 
   // Ventana rolling (botones "Últimos N meses"): periodo='ultimos', N meses
   // terminando en el mes en curso. Δ vs misma ventana del año anterior; sin bono.
@@ -181,27 +178,21 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
         <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
       )}
 
-      {/* Chips de período: mes en curso · mes cerrado · YTD · ventanas rolling.
-          Con ventana acotada queda solo el mes en curso (los demás períodos los
-          recorta el servidor igual — clampPeriodoVendedoras). */}
+      {/* Chips de período: mes en curso · mes cerrado · YTD · ventanas rolling. */}
       <div className="flex flex-wrap items-center gap-2">
         <ChipPill active={chip === "en_curso"} onClick={() => setChip("en_curso")}>
           {`${MES_FULL[enCursoMes - 1]} (en curso)`}
         </ChipPill>
-        {!ventanaAcotada && (
-          <>
-            <ChipPill active={chip === "mes_anterior"} onClick={() => setChip("mes_anterior")}>
-              {`${MES_FULL[mesAnteriorMes - 1]} (cerrado)`}
-            </ChipPill>
-            <ChipPill active={chip === "ytd"} onClick={() => setChip("ytd")}>
-              {`YTD ${year}`}
-            </ChipPill>
-            <span className="mx-1 h-4 w-px bg-gray-200" aria-hidden />
-            <ChipPill active={chip === "ultimos_3"} onClick={() => setChip("ultimos_3")}>Últimos 3 meses</ChipPill>
-            <ChipPill active={chip === "ultimos_6"} onClick={() => setChip("ultimos_6")}>Últimos 6 meses</ChipPill>
-            <ChipPill active={chip === "ultimos_12"} onClick={() => setChip("ultimos_12")}>Últimos 12 meses</ChipPill>
-          </>
-        )}
+        <ChipPill active={chip === "mes_anterior"} onClick={() => setChip("mes_anterior")}>
+          {`${MES_FULL[mesAnteriorMes - 1]} (cerrado)`}
+        </ChipPill>
+        <ChipPill active={chip === "ytd"} onClick={() => setChip("ytd")}>
+          {`YTD ${year}`}
+        </ChipPill>
+        <span className="mx-1 h-4 w-px bg-gray-200" aria-hidden />
+        <ChipPill active={chip === "ultimos_3"} onClick={() => setChip("ultimos_3")}>Últimos 3 meses</ChipPill>
+        <ChipPill active={chip === "ultimos_6"} onClick={() => setChip("ultimos_6")}>Últimos 6 meses</ChipPill>
+        <ChipPill active={chip === "ultimos_12"} onClick={() => setChip("ultimos_12")}>Últimos 12 meses</ChipPill>
       </div>
 
       {/* Subtitle */}
@@ -265,6 +256,12 @@ export function VendedorasSubtab({ data, selectedYear, ventanaAcotada = false }:
           </div>
         </div>
       )}
+
+      {/* Las metas andando, al final y sin tocar nada de lo de arriba.
+          · Meta GRUPAL      → cuánto APORTÓ cada una al avance (sin podio).
+          · Meta POR VENDEDORA → la meta de cada una y su avance.
+          Si no hay metas instaladas o no hay ninguna andando, no dibuja nada. */}
+      <MetasEnVendedoras />
     </div>
   );
 }

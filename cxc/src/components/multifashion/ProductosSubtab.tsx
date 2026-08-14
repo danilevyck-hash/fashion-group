@@ -252,9 +252,6 @@ interface ProductosSubtabProps {
    *  uno de los dos siempre está mintiendo. */
   periodo: Periodo;
   onPeriodoChange: (p: Periodo) => void;
-  /** gerente_acs: solo el mes en curso. Acá se DIBUJA menos; el candado real
-   *  vive en el servidor (clampPeriodoProductos). */
-  ventanaAcotada?: boolean;
 }
 
 export function ProductosSubtab({
@@ -262,7 +259,6 @@ export function ProductosSubtab({
   mes,
   periodo,
   onPeriodoChange,
-  ventanaAcotada = false,
 }: ProductosSubtabProps) {
   const [vista, setVista] = useState<Vista>("categoria");
   const [orden, setOrden] = useState<{ col: ColumnaRanking; dir: DireccionOrden }>(ORDEN_DEFAULT);
@@ -462,23 +458,18 @@ export function ProductosSubtab({
       )}
 
       {/* Período. Va PRIMERO porque enmarca todo lo de abajo: los tres números
-          del pulso dependen de él y no del agrupador. Se esconde para la ventana
-          acotada — ahí solo existe el mes en curso, y una píldora que no se puede
-          elegir es ruido. Esconderla NO es el candado: el servidor aplasta
-          `periodo=12m` a "mes" para ese rol. */}
-      {!ventanaAcotada && (
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período">
-          <Pill activo={periodo === "12m"} onClick={() => cambiarPeriodo("12m")}>
-            Últimos 12 meses
-          </Pill>
-          {/* "Un mes" y no "Agosto 2026": al elegirlo aparece arriba el selector
-              de mes, que es el que dice CUÁL. Repetir el nombre acá dejaba dos
-              rótulos del mismo período, y uno se desactualiza. */}
-          <Pill activo={periodo === "mes"} onClick={() => cambiarPeriodo("mes")}>
-            Un mes
-          </Pill>
-        </div>
-      )}
+          del pulso dependen de él y no del agrupador. */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Período">
+        <Pill activo={periodo === "12m"} onClick={() => cambiarPeriodo("12m")}>
+          Últimos 12 meses
+        </Pill>
+        {/* "Un mes" y no "Agosto 2026": al elegirlo aparece arriba el selector
+            de mes, que es el que dice CUÁL. Repetir el nombre acá dejaba dos
+            rótulos del mismo período, y uno se desactualiza. */}
+        <Pill activo={periodo === "mes"} onClick={() => cambiarPeriodo("mes")}>
+          Un mes
+        </Pill>
+      </div>
 
       {/* MARCA. Va arriba de todo lo demás porque filtra todo lo demás — el
           mismo lugar y la misma lógica que el período. Y no es solo un control:

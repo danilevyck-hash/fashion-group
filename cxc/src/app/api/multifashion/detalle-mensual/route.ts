@@ -15,7 +15,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
-import { clampAnioMes } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 // Hace 2 llamados al RPC mensual (año actual + año anterior para la comparación
@@ -45,12 +44,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  // CANDADO gerente_acs: mes en curso + mismo mes del año pasado, impuesto acá
-  // (la UI que esconde el selector es cortesía, no candado). Admin no cambia.
-  // Ver src/lib/multifashion/ventana-gerente.ts.
-  const acotado = clampAnioMes(auth.role, { year: yearPedido, mes: mesPedido }, now);
-  const year = acotado.year;
-  const mes = acotado.mes as number;
+  // `gerente_acs` ve cualquier mes desde el 13-ago-2026 (ver CLAUDE.md § Roles).
+  // Los rangos de arriba se validan igual: son la protección de la base contra
+  // un parámetro absurdo, no un recorte por rol.
+  const year = yearPedido;
+  const mes = mesPedido;
 
   // Rango del mes para el desacople retail/mayoreo. El RPC de detalle ya da el
   // retail (totales.ventas, is_wholesale=false). El mayoreo lo sumamos aparte de

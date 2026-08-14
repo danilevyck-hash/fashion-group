@@ -19,7 +19,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { createSwitchClient, type SwitchDiarioVentas } from "@/lib/switch-api/client";
-import { clampFechaDia } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -50,17 +49,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (auth instanceof NextResponse) return auth;
 
   const hoy = hoyPanama();
-  const fechaPedida = req.nextUrl.searchParams.get("fecha") || hoy;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPedida)) {
+  // Cualquier día pasado, para todos los roles del módulo: la ventana acotada de
+  // `gerente_acs` se levantó el 13-ago-2026 (ver CLAUDE.md § Roles). Las dos
+  // validaciones de abajo se quedan — un día futuro no existe para nadie.
+  const fecha = req.nextUrl.searchParams.get("fecha") || hoy;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return NextResponse.json({ error: "Fecha inválida (YYYY-MM-DD)" }, { status: 400 });
   }
-  if (fechaPedida > hoy) {
+  if (fecha > hoy) {
     return NextResponse.json({ error: "La fecha no puede ser futura" }, { status: 400 });
   }
-
-  // CANDADO gerente_acs: un día fuera del mes en curso o del mismo mes del año
-  // pasado cae a hoy. Admin no cambia. Ver src/lib/multifashion/ventana-gerente.ts.
-  const fecha = clampFechaDia(auth.role, fechaPedida, new Date()).fecha;
 
   // 1. Caché (si la tabla existe). Día cerrado = permanente; hoy = TTL.
   let cached: CacheRow | null = null;

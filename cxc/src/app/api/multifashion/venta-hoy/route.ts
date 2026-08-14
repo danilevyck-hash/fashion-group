@@ -6,25 +6,18 @@
 //
 // El monto sale de la MISMA función que arma ese Telegram
 // (`@/lib/multifashion/retail-dia`), y la lógica del día vive en
-// `@/lib/multifashion/venta-hoy` — acá sólo se resuelve sesión, ventana y
-// serialización.
+// `@/lib/multifashion/venta-hoy` — acá sólo se resuelve sesión y serialización.
 //
-// ── CANDADO gerente_acs ──────────────────────────────────────────────────────
-// "Hoy" cae dentro del mes en curso, así que para Jennifer SIEMPRE está dentro
-// de su ventana y el clamp nunca lo mueve. Igual va: la regla del módulo es que
-// TODA ruta de /api/multifashion/* acota sus fechas con `auth.role` ANTES de
-// tocar la base, y una ruta que se salta el clamp "porque su fecha siempre
-// entra" es exactamente la que se rompe el día que alguien le agregue un
-// parámetro. Los DÍAS COMPARATIVOS sí se caen de la ventana los primeros días
-// de cada mes (el 3 de agosto, "hace 7 días" es julio): `clampDiaComparable`
-// devuelve null y ese comparativo no se consulta ni se muestra.
+// Los DOS comparativos (hace 7 días y ayer) se piden SIEMPRE, para todos los
+// roles. Hasta el 13-ago-2026 los primeros días de cada mes se apagaban para
+// `gerente_acs` porque caían fuera de su ventana; esa ventana se levantó (ver
+// CLAUDE.md § Roles), así que ya no hay un rol que vea la tarjeta a medias.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { hoyPanama } from "@/lib/fecha-panama";
 import { calcularVentaHoy, diasComparativos } from "@/lib/multifashion/venta-hoy";
-import { clampFechaDia, clampDiaComparable } from "@/lib/multifashion/ventana-gerente";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -35,19 +28,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (auth instanceof NextResponse) return auth;
 
   const ahora = new Date();
-  const hoy = hoyPanama(ahora);
-
-  // El día reportado pasa por el clamp igual que cualquier otra fecha del
-  // módulo (para el rol acotado es un no-op: hoy siempre está en su ventana).
-  const fecha = clampFechaDia(auth.role, hoy, ahora).fecha;
+  const fecha = hoyPanama(ahora);
   const dias = diasComparativos(fecha);
 
   try {
     const data = await calcularVentaHoy({
       fecha,
       ahora,
-      semanaPasada: clampDiaComparable(auth.role, dias.semanaPasada, ahora),
-      ayer: clampDiaComparable(auth.role, dias.ayer, ahora),
+      semanaPasada: dias.semanaPasada,
+      ayer: dias.ayer,
     });
     return NextResponse.json(data);
   } catch (err) {

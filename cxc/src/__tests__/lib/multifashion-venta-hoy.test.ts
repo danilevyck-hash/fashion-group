@@ -130,7 +130,6 @@ import {
   REZAGO_MS,
   HORA_CIERRE_TIENDA,
 } from "@/lib/multifashion/venta-hoy";
-import { clampDiaComparable } from "@/lib/multifashion/ventana-gerente";
 import { GET as ventaHoyGet } from "@/app/api/multifashion/venta-hoy/route";
 import { signSession } from "@/lib/session-cookie";
 
@@ -340,45 +339,37 @@ describe("ruta /api/multifashion/venta-hoy", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4. La ventana de gerente_acs también acota los COMPARATIVOS
+// 4. LOS DOS COMPARATIVOS VAN SIEMPRE, para todos los roles
 // ═════════════════════════════════════════════════════════════════════════════
+//
+// Hasta el 13-ago-2026 `gerente_acs` los perdía los primeros días de cada mes:
+// el 3 de agosto, "hace 7 días" es julio y caía fuera de su ventana, así que la
+// ruta apagaba ese comparativo (`clampDiaComparable` devolvía null). Esa ventana
+// se levantó — Daniel: *"abrile Multifashion completo"* — y con ella el único
+// motivo por el que la tarjeta podía salir a medias.
 
-describe("ventana gerente_acs — los días comparativos no se cuelan", () => {
-  it("clampDiaComparable devuelve null fuera de la ventana, no 'hoy'", () => {
-    const ahora = new Date("2026-08-03T18:00:00Z"); // 1 pm del 3-ago en Panamá
-    // 🩸 Devolver "hoy" sería comparar hoy contra hoy: un 0% falso.
-    expect(clampDiaComparable("gerente_acs", "2026-07-27", ahora)).toBeNull();
-    expect(clampDiaComparable("gerente_acs", "2026-08-02", ahora)).toBe("2026-08-02");
-    // Admin no cambia en NADA.
-    expect(clampDiaComparable("admin", "2019-01-01", ahora)).toBe("2019-01-01");
-  });
-
-  it("el 3-ago Jennifer ve 'ayer' pero NO 'hace 7 días' (cae en julio)", async () => {
+describe("los comparativos no dependen del rol", () => {
+  it("el 3-ago los DOS días se consultan, también para gerente_acs", async () => {
     vi.setSystemTime(new Date("2026-08-03T18:00:00Z"));
     const body = await (await ventaHoyGet(req("gerente_acs"))).json();
     expect(body.fecha).toBe("2026-08-03");
-    expect(body.semanaPasada).toBeNull();
-    expect(body.ayer).not.toBeNull();
+    // "hace 7 días" cae en JULIO y ahora sí se pide.
+    expect(body.semanaPasada.fecha).toBe("2026-07-27");
     expect(body.ayer.fecha).toBe("2026-08-02");
-    // Y la vista NUNCA se consultó por un día de julio.
-    const lecturas = vistasConsultadas.filter(v => v.tabla === "_multifashion_sf_vw");
-    for (const l of lecturas) {
-      expect(String(l.filtros["gte:fecha"]) >= "2026-08-01", `fuga: ${l.filtros["gte:fecha"]}`).toBe(true);
-    }
   });
 
-  it("a mitad de mes Jennifer ve los dos comparativos (la ventana no la ciega)", async () => {
+  it("a mitad de mes, igual", async () => {
     vi.setSystemTime(new Date("2026-08-20T18:00:00Z"));
     const body = await (await ventaHoyGet(req("gerente_acs"))).json();
     expect(body.semanaPasada.fecha).toBe("2026-08-13");
     expect(body.ayer.fecha).toBe("2026-08-19");
   });
 
-  it("admin sí ve los dos el 3-ago (el clamp es sólo para el rol acotado)", async () => {
+  it("gerente_acs y admin reciben EXACTAMENTE lo mismo", async () => {
     vi.setSystemTime(new Date("2026-08-03T18:00:00Z"));
-    const body = await (await ventaHoyGet(req("admin"))).json();
-    expect(body.semanaPasada.fecha).toBe("2026-07-27");
-    expect(body.ayer.fecha).toBe("2026-08-02");
+    const comoGerente = await (await ventaHoyGet(req("gerente_acs"))).text();
+    const comoAdmin = await (await ventaHoyGet(req("admin"))).text();
+    expect(comoGerente).toBe(comoAdmin);
   });
 });
 
