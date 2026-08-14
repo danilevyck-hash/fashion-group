@@ -373,6 +373,68 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > Candados: `src/__tests__/lib/guias-despacho-una-sola-puerta.test.ts` (la lista no puede volver a despachar ni por swipe ni por formulario, el hook de la lista no puede recuperar estado de despacho, el papel tiene que imprimir el de cada línea, y el "Falta:" del mockup aprobado) y `guias-placa-entrega-directa.test.ts`, que pasó a probar las reglas sobre el módulo puro en vez de sobre los `if` del formulario.
 
+> ## 🔴 ENTREGA DIRECTA NO LLEVA PLACA NI TRANSPORTISTA — y `tipo_despacho` NO dice cómo sale una guía (14-ago-2026)
+>
+> Daniel, textual: *«Entrega directa no debería de llevar placa, ya que es directo con nuestro propio camión.»*
+>
+> 🩸 **EL BUG, Y POR QUÉ UN `??` NO LO ARREGLABA.** `useDespachoGuia` arrancaba con `(g.tipo_despacho as TipoDespacho) || "externo"` y **nunca miraba `modo_entrega`**, que es lo que la persona ya eligió al crear la guía. La trampa: **`guia_transporte.tipo_despacho` tiene DEFAULT `'externo'` en la base**, así que esa rama de respaldo es **inalcanzable** — medido el 14-ago-2026, las **186 guías vivas** traen la columna con valor, incluida la única PENDIENTE (GT-201, sin placa ni chofer). Un `g.tipo_despacho ?? derivado` habría sido un no-op perfecto.
+>
+> **El daño, medido:** de **51 guías creadas como entrega directa, 50 quedaron grabadas como transportista externo** (la única bien es GT-186). Y seguía pasando: **GT-194, GT-195 y GT-196 (11-ago)** tienen `placa = "0"` y `numero_guia_transp = "0"` —alguien tecleó ceros para poder apretar el botón— y son **las únicas tres placas "0" de toda la base**. El papel firmado salía diciendo `TIPO: Transportista externo · PLACA: 0 · N GUIA TRANSP.: 0`.
+>
+> ### 🔴 LA REGLA, y las dos mitades importan (`src/lib/guias/modo-despacho.ts`, módulo PURO)
+>
+> - **Guía SIN despachar → manda `modo_entrega`**, que es lo único que alguien decidió a propósito.
+> - **Guía YA despachada (Completada/Rechazada) → manda `tipo_despacho`**, que es lo que realmente pasó y quedó firmado.
+>
+> ⚠️ **La segunda mitad es la que evita una mentira NUEVA.** Con el botón "Cambiar", alguien puede crear una guía como entrega directa y despacharla con el camión de un tercero. Si `modo_entrega` ganara siempre, ESA guía saldría impresa como "Entrega directa" con una placa ajena al lado: se cambiaría un papel que miente por otro que miente distinto. Hay candado en las dos direcciones.
+>
+> ### Qué cambió en pantalla
+>
+> - **El modo arranca en lo que se eligió al crear la guía**, y **no se vuelve a preguntar: se MUESTRA, con un "Cambiar" al lado.** Preguntarlo de nuevo con "Transportista externo" preseleccionado es lo que produjo las 50 guías mal grabadas.
+> - **En entrega directa NO se piden placa ni N° de guía del transportista.** No son "opcionales": no existe un transportista. **Se esconden.** Cuando eran opcionales pero visibles, alguien tecleó "0" en los dos.
+> - **Y tampoco se ESCRIBEN**: el despacho manda `placa: ""`, `numero_guia_transp: ""` y limpia el número de cada línea. **Se mandan vacíos a propósito, no se omiten** — omitirlos dejaría pegada la placa de un tercero si alguien empezó en modo externo y después tocó "Cambiar".
+> - **Las MISMAS palabras en las dos pantallas.** Al crear decía "Transportista" y al despachar "Transportista externo". Fuente única: `ETIQUETA_TIPO_DESPACHO`. Gana "Transportista externo" porque ya es lo que dicen el papel, el PDF, la lista y la ficha — y "externo" es justo lo que lo distingue de nuestro camión.
+> - **Los DOS papeles dicen la verdad**: `PrintDocument.tsx` y `pdf-guia.ts` derivan el modo del mismo módulo, y en entrega directa no imprimen PLACA, ni el N° de la cabecera, ni la columna "N GUIA TRANSP." de la tabla.
+> - 🔴 **Un "0" pelado se trata como vacío EN EL PAPEL** (`sinCeroPelado`). No toca la base: ninguna placa de Panamá es "0", e imprimirlo en un documento que alguien firma es afirmar algo falso. **Nada que CONTENGA un 0 se pierde** (`EK0700`, `TR-0`, `00` quedan intactos) — hay candado.
+>
+> ⚠️ **LAS 50 GUÍAS YA GRABADAS MAL NO SE TOCAN.** Son Completada con `tipo_despacho='externo'` y su papel las sigue mostrando así: reinterpretarlas es otra decisión de Daniel. Lo único que se limpia en su papel es el "0".
+>
+> ### 🔴 La dirección del cliente, como PRIMERA OPCIÓN
+>
+> Daniel, textual: *«Ponerla sola, pero sí como primera opción.»* — **aparece arriba de todo en la lista de sugerencias; NO se escribe sola en el campo**, y el campo sigue editable. `src/lib/guias/direccion-sugerida.ts` devuelve una LISTA y no expone ningún "elegido" del que alguien pueda deducir un auto-completado.
+>
+> **Medido contra producción (491 envíos vivos, 200 guías desde el 25-mar):** 380 envíos atados a un cliente del directorio · **47 clientes atados, 37 con UNA SOLA dirección** en toda su historia · *"la anterior acierta"* **267/333 = 80,2%** · 78 direcciones distintas (Paso Canoas 192 · David 98 · Santiago 26 · Changinola 21 · Guabito 11).
+>
+> ⚠️ **ESTO NO APLICA A LA EMPRESA, y está medido con el mismo método: acierta 114/333 = 34,2%.** Autocompletarla metería el dato equivocado en dos de cada tres envíos. La empresa es POR ENVÍO. Hay candado que impide que la ruta empiece a devolverla.
+> - **Solo por `cliente_codigo`**, no por nombre a mano: por nombre normalizado el acierto baja a 67,2%.
+> - **"Última" es cronológica**, y `guia_items` no tiene fecha propia: se ordena por la `fecha` de la GUÍA y se desempata por `numero` (correlativo). Ordenar por `id` sería ordenar por un uuid.
+> - Viaja en `/api/guias/frecuencias` (campo `direcciones`), **sin consulta nueva de ítems**: se le agregaron columnas a la lectura que ya existía, más una lectura de ~200 guías para tener la fecha.
+>
+> ### El botón de la fila dice «Despachar»
+>
+> **185 de las 186 guías terminaron despachadas.** Despachar es *la* acción del día para bodega; editar es el camino secundario y vive un nivel más adentro ("Cambiar los envíos de esta guía"). En "Pendiente Bodega" el botón dice **Despachar** con un camión; en los demás estados sigue diciendo **Editar** con el lápiz. ⚠️ **Sigue siendo UN SOLO botón** (un solo `onEdit`): lo que Daniel pidió sacar era tener "Despachar" Y "Editar" uno al lado del otro, y eso no se aflojó.
+>
+> ### 🔴 Recordar placa + quién recibe + cédula, POR TRANSPORTISTA
+>
+> Daniel, textual: *«Sí quiero»*. Al despachar con transportista externo se ofrecen **los últimos 3 juegos completos** (recibido por + cédula + placa) usados **con ese transportista**; **un toque llena los tres** y quedan editables.
+>
+> 🔑 **El beneficio grande no es el tecleo: es que el dato deje de guardarse de dos formas.** Medido: la MISMA cédula como `810102403` (5 veces) y `8-1010-2403` (4) · `8-918-246` (7) y `8918246` (3) · `172744` (4) y `1-727-44` (4) · el mismo receptor como `Jocsan murillo` (5) y `Jocsan` (5), `Aníbal arauz` (5) y `Anibal arauz` (2), `Alan` (8) y `alan` (1) · y GT-202 con la placa guardada como `Dg7738` mientras `DG7115` se repite 11 veces. Tomando el juego de una guía anterior, sale escrito **igual** que la vez pasada.
+> - 🔑 **LA IDENTIDAD DE UN JUEGO ES LA CÉDULA + LA PLACA, no el nombre.** `Jocsan murillo` y `Jocsan` son la misma persona y **ninguna** normalización de mayúsculas/tildes/guiones los junta: son textos distintos. Lo que sí los junta es el documento. Se conserva **el más reciente** (la forma que va a quedar escrita de ahora en adelante). Sin cédula cae al nombre, para no fusionar a dos personas por compartir camión.
+> - ⚠️ **Se guarda el valor ORIGINAL, no el normalizado**: guardar el normalizado estrenaría una TERCERA forma de escribir el mismo dato.
+> - Solo de guías **ya despachadas** y solo juegos **completos** (el valor es llenar los tres de un toque). **En entrega directa no aparece** — no hay transportista ni placa.
+> - `GET /api/guias/despachos-recientes?transportista=<uuid>`, acotada en el servidor y **fail-ABIERTA**: si falla, los campos se escriben a mano como siempre.
+>
+> ### Medición y candados
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción y con datos de producción** (`BASE=… GUIA_PENDIENTE=… node scripts/_medir-guias-entrega-directa.mjs`, solo lectura, **nunca toca "Despachar"**): **390 · 834 · 1024 · 1440 → 0 px de arrastre de página y 0 textos bajo 12 px** en los 20 casos (lista con la pendiente abierta · guía con transportista · la misma cambiada a entrega directa · los renglones con el cliente atado · guía nueva). Los recortes y los blancos táctiles que quedan son **PRE-EXISTENTES**: los 8 px del `-mx-2` de `SignatureCanvas`, el `w-40 truncate` del resumen de la fila, el input de búsqueda de 39 px y los campos densos de `pointer:fine` en escritorio. El script **falla** si no encuentra el botón "Despachar", el bloque de juegos, la explicación de la entrega directa o la dirección sugerida primera.
+> - 🩸 **Gotcha de medición, y daba verde sin haber mirado nada:** el encabezado del bloque de juegos lleva `uppercase` **por CSS**, así que `innerText` lo devuelve en MAYÚSCULAS y compararlo tal cual daba SIEMPRE `false` — o sea que el chequeo de "los juegos NO aparecen en entrega directa" habría pasado con el bloque a la vista.
+>
+> **Candados:** `guias-modo-despacho.test.ts` (17 + el PDF **generado de verdad** y leído), `guias-direccion-sugerida.test.ts`, `guias-juegos-despacho.test.ts`, **`guias-frecuencias-ruta.test.ts`** (llama al handler REAL) y **dos de CONDUCTA que PINTAN la pantalla**: `components/guias-entrega-directa.test.tsx` y `components/guias-direccion-y-juegos.test.tsx`.
+> - 🩸 **Dos candados de texto pasaban en verde con la mutación puesta, y los dos por lo de siempre: leían sus propios comentarios.** El barrido de `guia-pdf-compartir` veía `g.tipo_despacho` dentro de la nota que documenta que el papel DEJÓ de mirarlo, y exigía al PDF dibujar un campo que ninguno de los dos dibuja ya. Y sacarle la placa al PDF, o sacar `direcciones` del `return` de la ruta, **no ponía rojo NADA**. Por eso los barridos borran los comentarios primero, el PDF se genera y se lee, y la ruta se ejecuta.
+> - **Verificado por mutación, 26 de 26 cazadas** (`bash scripts/_mutar-candados-guias.sh`): el modo vuelve a salir de `tipo_despacho` · `modo_entrega` gana siempre y le pisa la historia a una despachada · sin `modo_entrega` inventa una directa · el "0" vuelve a imprimirse · `sinCeroPelado` se come cualquier cosa con un 0 · la hoja y el PDF vuelven a imprimir PLACA en directa · el PDF se separa del papel · vuelve a pedir placa o N° de transportista en directa · vuelve a PREGUNTAR el modo · el despacho vuelve a mandar la placa · el alta vuelve a decir "Transportista" · el botón vuelve a decir "Editar" con la guía pendiente · la dirección deja de ir primera · la sugerencia se ESCRIBE SOLA · la última dirección sale de la guía más vieja · la ruta deja de mandar las direcciones · la identidad del juego vuelve a ser el nombre · los juegos dejan de normalizar · entran juegos de guías que no salieron · entran juegos incompletos · se guarda el valor normalizado · los juegos aparecen en entrega directa · la ruta deja de acotar por transportista.
+>
+> **Diagnóstico read-only contra producción:** `DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_diag-guias-entrega-directa.ts`.
+
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`

@@ -23,8 +23,19 @@ import { fmtGuia } from "@/lib/format";
 import type { Guia } from "@/app/guias/components/types";
 
 const raiz = process.cwd();
-const hoja = readFileSync(path.join(raiz, "src/app/guias/components/PrintDocument.tsx"), "utf8");
-const pdf = readFileSync(path.join(raiz, "src/lib/guias/pdf-guia.ts"), "utf8");
+
+// 🩸 LOS COMENTARIOS SE BORRAN ANTES DE BARRER. Este repo ya pagó cuatro veces
+// el candado que se cumple —o se rompe— con su propia explicación: acá, la nota
+// que documenta que el papel DEJÓ de mirar `g.tipo_despacho` hacía que el
+// barrido creyera que la hoja sigue pintando ese campo, y exigía al PDF dibujar
+// algo que ninguno de los dos dibuja ya.
+const sinComentarios = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+const hoja = sinComentarios(
+  readFileSync(path.join(raiz, "src/app/guias/components/PrintDocument.tsx"), "utf8"),
+);
+const pdf = sinComentarios(readFileSync(path.join(raiz, "src/lib/guias/pdf-guia.ts"), "utf8"));
 const detalle = readFileSync(path.join(raiz, "src/app/guias/components/GuiaDetail.tsx"), "utf8");
 const compartir = readFileSync(path.join(raiz, "src/lib/compartir-archivo.ts"), "utf8");
 
@@ -85,9 +96,20 @@ describe("🔴 el PDF no se puede separar del papel", () => {
   });
 
   it("distingue entrega directa de transportista externo, igual que la hoja", () => {
-    expect(pdf).toContain('g.tipo_despacho === "directo"');
-    expect(pdf).toContain("Entrega directa");
-    expect(pdf).toContain("Transportista externo");
+    // ⚠️ Los DOS papeles preguntan por lo MISMO, y ya no es `g.tipo_despacho`
+    // suelto: esa columna trae DEFAULT 'externo' en la base, así que una guía
+    // sin despachar salía impresa como "Transportista externo" aunque se
+    // hubiera creado como entrega directa. La regla vive en `modo-despacho.ts`
+    // y la usan la hoja y el PDF — si uno se saliera de ahí, los dos papeles
+    // podrían decir cosas distintas de la misma guía.
+    for (const archivo of [hoja, pdf]) {
+      expect(archivo).toContain("esEntregaDirecta(g)");
+      expect(archivo).toContain("tipoDespachoEfectivo(g)");
+      expect(archivo).not.toContain('g.tipo_despacho === "directo"');
+    }
+    // Las palabras salen de UNA fuente, para que no se puedan separar.
+    expect(pdf).toContain("ETIQUETA_TIPO_DESPACHO");
+    expect(hoja).toContain("ETIQUETA_TIPO_DESPACHO");
     expect(pdf).toContain("Recibido Conforme — Transportista");
   });
 });

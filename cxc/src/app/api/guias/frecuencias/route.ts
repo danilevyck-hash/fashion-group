@@ -3,6 +3,7 @@ import { getSession } from "@/lib/require-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { leerClientesDelGrupo } from "@/lib/clientes/directorio-cache";
 import { leerTodoPaginado } from "@/lib/supabase-paginado";
+import { ultimaDireccionPorCliente } from "@/lib/guias/direccion-sugerida";
 import {
   ALL_EMPRESA_KEYS,
   EMPRESA_KEY_TO_NAME,
@@ -37,6 +38,13 @@ function empresaKeyFromDirty(s: string): string | null {
 //     como [{ codigo, nombre }] ordenado desc.
 //   - empresas: las 8 empresas canónicas (nombres display) ordenadas por
 //     frecuencia de uso en guías (mapeando strings sucios a las 8 para contar).
+//   - direcciones: código de cliente → la ÚLTIMA dirección a la que se le
+//     despachó, para que aparezca PRIMERA en la lista de sugerencias del campo
+//     "Dirección". Ver `@/lib/guias/direccion-sugerida`.
+//
+// ⚠️ NO se devuelve nada equivalente para la EMPRESA, y es a propósito: medido
+// contra producción, la empresa anterior de un cliente acierta el 34% de las
+// veces (la dirección, el 80%). La empresa es POR ENVÍO.
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !GUIAS_ROLES.includes(session.role)) {
@@ -49,12 +57,33 @@ export async function GET(req: NextRequest) {
     // SILENCIO. A partir de la línea 1.001 los "más usados" habrían empezado a
     // envejecer sin error ni señal — es el bug que este repo ya pagó una vez.
     const rows = await leerTodoPaginado<{
+      guia_id: string;
       cliente_codigo: string | null;
       empresa: string | null;
+      direccion: string | null;
+      deleted: boolean | null;
     }>("guia_items (frecuencias)", (pedirCount, from, to) =>
       supabaseServer
         .from("guia_items")
-        .select("cliente_codigo, empresa", pedirCount ? { count: "exact" } : {})
+        .select(
+          "guia_id, cliente_codigo, empresa, direccion, deleted",
+          pedirCount ? { count: "exact" } : {}
+        )
+        .order("id", { ascending: true })
+        .range(from, to)
+    );
+
+    // La fecha de un envío vive en su GUÍA (`guia_items` no la tiene), y sin
+    // fecha no hay "última dirección". Son ~200 filas, una sola página.
+    const guias = await leerTodoPaginado<{
+      id: string;
+      fecha: string | null;
+      numero: number | null;
+      deleted: boolean | null;
+    }>("guia_transporte (frecuencias)", (pedirCount, from, to) =>
+      supabaseServer
+        .from("guia_transporte")
+        .select("id, fecha, numero, deleted", pedirCount ? { count: "exact" } : {})
         .order("id", { ascending: true })
         .range(from, to)
     );
@@ -100,7 +129,10 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.count - a.count || a.idx - b.idx)
       .map((e) => mapEmpresaName(e.key));
 
-    return NextResponse.json({ clientes, empresas });
+    // ── Dirección: código de cliente → la última a la que se le despachó ──
+    const direcciones = ultimaDireccionPorCliente(rows, guias);
+
+    return NextResponse.json({ clientes, empresas, direcciones });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error interno";
     console.error("[api/guias/frecuencias] GET:", message);

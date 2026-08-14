@@ -36,7 +36,14 @@ import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia } from "@/app/guias/components/types";
-import { numeroTranspDeLinea, numeroTranspUnico } from "@/lib/guias/falta-para-despachar";
+import {
+  ETIQUETA_TIPO_DESPACHO,
+  esEntregaDirecta,
+  numeroTranspImpreso,
+  numeroTranspUnicoImpreso,
+  sinCeroPelado,
+  tipoDespachoEfectivo,
+} from "@/lib/guias/modo-despacho";
 
 const PAGE_W = 216; // Letter
 const MARGIN = 15;
@@ -148,7 +155,9 @@ export function construirPdfGuia(g: Guia): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "letter", orientation: "portrait" });
   const items = g.guia_items ?? [];
   const bultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
-  const esDirecta = g.tipo_despacho === "directo";
+  // Ver `PrintDocument.tsx`: el modo sale de `modo_entrega` mientras la guía no
+  // haya salido, porque `tipo_despacho` trae DEFAULT 'externo' en la base.
+  const esDirecta = esEntregaDirecta(g);
 
   // ── Encabezado ────────────────────────────────────────────────────────────
   try {
@@ -165,14 +174,16 @@ export function construirPdfGuia(g: Guia): jsPDF {
     ["N GUIA:", fmtGuia(g.numero)],
     ["FECHA:", fmtDate(g.fecha)],
     ["TRANSPORTISTA:", g.transportista ?? ""],
-    ["PLACA / VEHICULO:", g.placa ?? ""],
-    ["DESPACHADO POR:", g.entregado_por ?? ""],
-    ["TIPO:", esDirecta ? "Entrega directa" : "Transportista externo"],
   ];
+  // En entrega directa no hay placa que declarar (nuestro propio camión), y un
+  // "0" no es una placa: es lo que alguien tecleó para pasar la validación.
+  if (!esDirecta) campos.push(["PLACA / VEHICULO:", sinCeroPelado(g.placa)]);
+  campos.push(["DESPACHADO POR:", g.entregado_por ?? ""]);
+  campos.push(["TIPO:", ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]]);
   // ⚠️ Solo se anuncia arriba cuando hay UN número en toda la guía; con varios
   // por línea, un encabezado con uno de ellos mentiría. Ver `PrintDocument`.
-  const transpUnico = numeroTranspUnico(items, g.numero_guia_transp);
-  if (transpUnico) campos.push(["N GUIA TRANSP.:", transpUnico]);
+  const transpUnico = numeroTranspUnicoImpreso(items, g.numero_guia_transp);
+  if (!esDirecta && transpUnico) campos.push(["N GUIA TRANSP.:", transpUnico]);
   if (esDirecta && g.nombre_chofer) campos.push(["CHOFER:", g.nombre_chofer]);
 
   let y = bloqueCampos(doc, campos, 32);
@@ -184,30 +195,41 @@ export function construirPdfGuia(g: Guia): jsPDF {
   autoTable(doc, {
     startY: y + 2,
     margin: { left: MARGIN, right: MARGIN },
-    head: [["#", "CLIENTE", "DIRECCION", "EMPRESA", "FACTURA(S)", "BULTOS", "N GUIA TRANSP."]],
+    head: [
+      esDirecta
+        ? ["#", "CLIENTE", "DIRECCION", "EMPRESA", "FACTURA(S)", "BULTOS"]
+        : ["#", "CLIENTE", "DIRECCION", "EMPRESA", "FACTURA(S)", "BULTOS", "N GUIA TRANSP."],
+    ],
     body: [
-      ...items.map((it, i) => [
-        String(i + 1),
-        it.cliente ?? "",
-        it.direccion ?? "",
-        it.empresa ?? "",
-        it.facturas ?? "",
-        it.bultos ? String(it.bultos) : "",
-        numeroTranspDeLinea(it.numero_guia_transp, g.numero_guia_transp),
-      ]),
+      ...items.map((it, i) => {
+        const fila = [
+          String(i + 1),
+          it.cliente ?? "",
+          it.direccion ?? "",
+          it.empresa ?? "",
+          it.facturas ?? "",
+          it.bultos ? String(it.bultos) : "",
+        ];
+        // La columna del transportista no se dibuja en entrega directa: no hay
+        // transportista que le dé un número a cada envío.
+        if (!esDirecta) fila.push(numeroTranspImpreso(it.numero_guia_transp, g.numero_guia_transp));
+        return fila;
+      }),
       [
         { content: "TOTAL DE BULTOS DESPACHADOS", colSpan: 5, styles: { halign: "right" as const, fontStyle: "bold" as const } },
         { content: String(bultos), styles: { halign: "center" as const, fontStyle: "bold" as const } },
-        "",
+        ...(esDirecta ? [] : [""]),
       ],
     ],
     styles: { fontSize: 7, cellPadding: 1.5, lineColor: [180, 180, 180], lineWidth: 0.1 },
     headStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: "bold", fontSize: 7 },
-    columnStyles: {
-      0: { cellWidth: 7, halign: "center" },
-      5: { cellWidth: 13, halign: "center" },
-      6: { cellWidth: 24 },
-    },
+    columnStyles: esDirecta
+      ? { 0: { cellWidth: 7, halign: "center" }, 5: { cellWidth: 13, halign: "center" } }
+      : {
+          0: { cellWidth: 7, halign: "center" },
+          5: { cellWidth: 13, halign: "center" },
+          6: { cellWidth: 24 },
+        },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

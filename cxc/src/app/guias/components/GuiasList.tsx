@@ -8,6 +8,12 @@ import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTab
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
+import {
+  ETIQUETA_TIPO_DESPACHO,
+  esEntregaDirecta,
+  sinCeroPelado,
+  tipoDespachoEfectivo,
+} from "@/lib/guias/modo-despacho";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -419,10 +425,19 @@ export default function GuiasList({
                                       tarjeta: dos caminos para lo mismo. Daniel,
                                       textual: *"solo quiero una y en boton de
                                       editar para entrar a la guia y terminarla"*.
-                                      "Editar" lleva a `/guias/[id]`, y ahí se
-                                      corrige y se despacha. No agregar un botón
-                                      "Despachar" al lado: eso es exactamente lo
-                                      que se vino a sacar. */}
+                                      El botón lleva a `/guias/[id]`, y ahí se
+                                      corrige y se despacha. Sigue siendo UNO
+                                      SOLO: lo único que cambia es cómo se
+                                      llama.
+
+                                      🔴 Y SE LLAMA "DESPACHAR" CUANDO LA GUÍA
+                                      ESTÁ PENDIENTE. Medido: 185 de las 186
+                                      guías terminaron despachadas. Despachar es
+                                      LA acción del día para bodega; editar es
+                                      el camino secundario y vive un nivel más
+                                      adentro ("Cambiar los envíos de esta
+                                      guía"). En los demás estados sigue
+                                      diciendo "Editar". */}
                                   <div className="flex items-center justify-end gap-3 pt-3">
                                     {canEdit && !isDispatched && (
                                       <button
@@ -430,11 +445,25 @@ export default function GuiasList({
                                         onClick={() => onEdit(expandedGuia.id)}
                                         className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
                                       >
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M12 20h9" />
-                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-                                        </svg>
-                                        Editar
+                                        {expandedGuia.estado === "Pendiente Bodega" ? (
+                                          <>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                              <rect x="1" y="3" width="15" height="13" />
+                                              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                                              <circle cx="5.5" cy="18.5" r="2.5" />
+                                              <circle cx="18.5" cy="18.5" r="2.5" />
+                                            </svg>
+                                            Despachar
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M12 20h9" />
+                                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                                            </svg>
+                                            Editar
+                                          </>
+                                        )}
                                       </button>
                                     )}
                                     <button
@@ -552,18 +581,19 @@ export default function GuiasList({
                                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                         <div>
                                           <span className="text-gray-400 block">Tipo</span>
-                                          <span className="font-medium">{expandedGuia.tipo_despacho === "directo" ? "Entrega directa" : "Transportista externo"}</span>
+                                          <span className="font-medium">{ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(expandedGuia)]}</span>
                                         </div>
-                                        {expandedGuia.placa && (
+                                        {/* Sin placa en entrega directa, y un "0" no es una placa. */}
+                                        {!esEntregaDirecta(expandedGuia) && sinCeroPelado(expandedGuia.placa) && (
                                           <div>
                                             <span className="text-gray-400 block">Placa</span>
-                                            <span className="font-medium">{expandedGuia.placa}</span>
+                                            <span className="font-medium">{sinCeroPelado(expandedGuia.placa)}</span>
                                           </div>
                                         )}
-                                        {expandedGuia.tipo_despacho !== "directo" && (
+                                        {!esEntregaDirecta(expandedGuia) && (
                                           <div>
                                             <span className="text-gray-400 block">N° guía transp.</span>
-                                            <span className="font-medium">{expandedGuia.numero_guia_transp || "—"}</span>
+                                            <span className="font-medium">{sinCeroPelado(expandedGuia.numero_guia_transp) || "—"}</span>
                                           </div>
                                         )}
                                         {expandedGuia.nombre_chofer && (
@@ -586,7 +616,7 @@ export default function GuiasList({
                                         {expandedGuia.firma_base64 && (
                                           <div>
                                             <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                                              {expandedGuia.tipo_despacho === "directo" ? "Firma del chofer" : "Firma del transportista"}
+                                              {esEntregaDirecta(expandedGuia) ? "Firma del chofer" : "Firma del transportista"}
                                             </span>
                                             <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
                                           </div>
@@ -594,7 +624,7 @@ export default function GuiasList({
                                         {expandedGuia.firma_entregador_base64 && (
                                           <div>
                                             <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
-                                              {expandedGuia.tipo_despacho === "directo" ? "Firma del cliente" : "Firma del entregador"}
+                                              {esEntregaDirecta(expandedGuia) ? "Firma del cliente" : "Firma del entregador"}
                                             </span>
                                             <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
                                           </div>

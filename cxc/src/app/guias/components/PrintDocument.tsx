@@ -1,5 +1,12 @@
 import { fmtDate, fmtGuia } from "@/lib/format";
-import { numeroTranspDeLinea, numeroTranspUnico } from "@/lib/guias/falta-para-despachar";
+import {
+  ETIQUETA_TIPO_DESPACHO,
+  esEntregaDirecta,
+  numeroTranspImpreso,
+  numeroTranspUnicoImpreso,
+  sinCeroPelado,
+  tipoDespachoEfectivo,
+} from "@/lib/guias/modo-despacho";
 import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import type { Guia } from "./types";
 
@@ -10,13 +17,19 @@ interface PrintDocumentProps {
 export default function PrintDocument({ guia: g }: PrintDocumentProps) {
   const guiaItems = g.guia_items || [];
   const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
-  const isDirect = g.tipo_despacho === "directo";
+  // 🔴 EL PAPEL TIENE QUE DECIR LA VERDAD. Acá decía `g.tipo_despacho ===
+  // "directo"`, y esa columna trae DEFAULT 'externo' en la base: una guía sin
+  // despachar salía impresa como "Transportista externo" aunque se hubiera
+  // creado como entrega directa. Ver `modo-despacho.ts`.
+  const isDirect = esEntregaDirecta(g);
   // ⚠️ EL N° DEL TRANSPORTISTA ES POR LÍNEA. El encabezado solo lo anuncia
   // cuando en toda la guía hay UNO SOLO — que es el caso de las guías viejas,
   // donde el mismo número se repetía en todos los renglones. Con varios
   // números distintos, un encabezado con uno de ellos sería una mentira
   // impresa en un documento que alguien firma.
-  const transpUnico = numeroTranspUnico(guiaItems, g.numero_guia_transp);
+  const transpUnico = numeroTranspUnicoImpreso(guiaItems, g.numero_guia_transp);
+  // Un "0" no es una placa: es lo que alguien tecleó para pasar la validación.
+  const placa = sinCeroPelado(g.placa);
 
   return (
     <>
@@ -69,12 +82,15 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <span className="font-medium">TRANSPORTISTA:</span>
             <span className="border-b border-gray-300 flex-1 text-center">{g.transportista}</span>
           </div>
-          <div className="flex gap-2">
-            <span className="font-medium">PLACA / VEHICULO:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">
-              {g.placa || "\u00A0"}
-            </span>
-          </div>
+          {/* En entrega directa no existe placa que declarar: es nuestro cami\u00F3n. */}
+          {!isDirect && (
+            <div className="flex gap-2">
+              <span className="font-medium">PLACA / VEHICULO:</span>
+              <span className="border-b border-gray-300 flex-1 text-center">
+                {placa || "\u00A0"}
+              </span>
+            </div>
+          )}
           <div className="flex gap-2">
             <span className="font-medium">DESPACHADO POR:</span>
             <span className="border-b border-gray-300 flex-1 text-center">
@@ -84,10 +100,10 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
           <div className="flex gap-2">
             <span className="font-medium">TIPO:</span>
             <span className="border-b border-gray-300 flex-1 text-center">
-              {isDirect ? "Entrega directa" : "Transportista externo"}
+              {ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]}
             </span>
           </div>
-          {transpUnico && (
+          {!isDirect && transpUnico && (
             <div className="flex gap-2">
               <span className="font-medium">N GUIA TRANSP.:</span>
               <span className="border-b border-gray-300 flex-1 text-center">
@@ -116,7 +132,9 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">EMPRESA</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">FACTURA(S)</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium w-16 text-center">BULTOS</th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N GUIA TRANSP.</th>
+              {!isDirect && (
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N GUIA TRANSP.</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -128,9 +146,11 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
                 <td className="border border-gray-300 px-2 py-1">{item.facturas}</td>
                 <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {numeroTranspDeLinea(item.numero_guia_transp, g.numero_guia_transp) || "\u00A0"}
-                </td>
+                {!isDirect && (
+                  <td className="border border-gray-300 px-2 py-1">
+                    {numeroTranspImpreso(item.numero_guia_transp, g.numero_guia_transp) || "\u00A0"}
+                  </td>
+                )}
               </tr>
             ))}
             <tr className="font-bold bg-gray-50">
@@ -138,7 +158,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
                 Total de bultos despachados
               </td>
               <td className="border border-gray-300 px-2 py-1.5 text-center">{bultos}</td>
-              <td className="border border-gray-300"></td>
+              {!isDirect && <td className="border border-gray-300"></td>}
             </tr>
           </tbody>
         </table>
