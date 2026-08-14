@@ -140,11 +140,36 @@ const MAX_PAGES = 250;
  * verificación**: un `upsert` mal armado se lleva puestas las fotos de 490
  * productos.
  *
- * 📊 **Y DÓNDE QUEDA EL TIEMPO DE TOMMY DESPUÉS DE ESTO.** Medido en producción
- * con `?dryRun=1` —que corre el motor ENTERO contra Switch y no escribe nada—,
- * la resta `corrida real − dryRun` da el costo de las **455 UPDATE de a uno**
- * contra Supabase. Ese es el próximo cuello y es de la BASE, no de Switch. Ver
- * `scripts/_medir-catalogo-escrituras.ts`.
+ * **EL ANTES/DESPUÉS REAL, en producción** — no en la laptop: se dispara el cron
+ * de verdad y se lee la duración que queda en `switch_sync_log`
+ * (`scripts/_verif-stock-concurrencia.ts`). **5 corridas por catálogo de cada
+ * lado**, medianas:
+ *
+ *     catálogo   llamadas /stock    ×4       ×8
+ *     Joybees          83          17 s     11 s
+ *     Reebok          127          48 s     46 s
+ *     Calvin           79          59 s     61 s
+ *     Tommy           455         138 s    107 s   ← −31 s (−22%)
+ *
+ * ⚠️ **Reebok y Calvin casi no se mueven, y es lo esperado**: su set de `/stock`
+ * son 127 y 79 artículos. Lo que se come el sync de Calvin es el barrido de las
+ * 164 páginas del catálogo de `vistana` (8.173 artículos), que ya se paralelizó
+ * en el #540 y no toca este número. **La dispersión de Switch es grande** (las
+ * 5 corridas de Tommy antes fueron 180/127/141/122/138 y después
+ * 100/107/95/109/151): por eso 5 muestras y mediana, y no un antes y un después.
+ *
+ * 📊 **DÓNDE QUEDA EL TIEMPO DE TOMMY DESPUÉS DE ESTO.** Medido en producción
+ * con `?dryRun=1` —que corre el motor ENTERO contra Switch y **no escribe
+ * nada**—, la resta `corrida real − dryRun` es el costo de las **455 UPDATE de a
+ * uno** contra Supabase (`scripts/_medir-catalogo-escrituras.ts`):
+ *
+ *     fase Switch (dryRun)   ×4 107 s  →  ×8  57 s     ← esto es lo que compró
+ *     escrituras (resta)         ~31-50 s, sin cambio
+ *     corrida completa       ×4 138 s  →  ×8 106 s
+ *
+ * O sea que de los ~107 s que le quedan a Tommy, **cerca de la mitad son las
+ * escrituras**, y ese es el próximo cuello: es de la BASE, no de Switch. Bajarlo
+ * pide agrupar los UPDATE, que es lo que este PR NO hizo a propósito.
  */
 const STOCK_CONCURRENCIA = 8;
 
