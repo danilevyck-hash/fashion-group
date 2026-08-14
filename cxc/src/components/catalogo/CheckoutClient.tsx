@@ -1,13 +1,22 @@
 "use client";
 
-// Checkout ÚNICO de los catálogos (Reebok y Joybees) — mockup aprobado:
+// Checkout ÚNICO de los catálogos (las 4 marcas) — mockup aprobado:
 // carrito → esta pantalla → confirmación. Items editables, cliente del
-// directorio Switch (default Contado), vendedor con el del login PUESTO por
-// defecto y cambiable (12-ago-2026 — antes era automático y sin salida), total y
-// UN botón "Enviar a Switch". SIN validación de stock aquí
-// (decisión de Daniel 5-jul: el stock del sync <24h basta; flujo rápido).
+// directorio Switch, vendedor con el del login PUESTO por defecto y cambiable
+// (12-ago-2026 — antes era automático y sin salida), total y UN botón
+// "Enviar a Switch". SIN validación de stock aquí (decisión de Daniel 5-jul: el
+// stock del sync <24h basta; flujo rápido).
 // El carrito vive en la SESIÓN de la pestaña (lib/catalogo/carrito.ts) y NUNCA
 // se limpia antes de que el pedido quede guardado en DB.
+//
+// 🔴 EL CLIENTE ARRANCA VACÍO Y EL BOTÓN APAGADO (14-ago-2026).
+// Hasta hoy esta pantalla nacía con `Contado` PUESTO y "Enviar a Switch" no
+// exigía tocar nada: se armaba el pedido, se apretaba, y salía a nombre de
+// Contado. Medido contra producción: 18 de 33 pedidos vivos sin cliente real,
+// 15 ya en Switch por $53.124 — ninguno era venta de mostrador. Daniel,
+// textual: *"Que arranque vacío y el botón apagado hasta elegir cliente."*
+// La regla vive en `lib/catalogo/cliente-elegido.ts`, compartida con el detalle
+// del pedido; acá NO se vuelve a escribir el `if`.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { resolverLineas } from "@/lib/catalogo/lineas-pedido";
@@ -19,6 +28,13 @@ import { getMarcaTheme, type MarcaTheme, type MarcaUiKey } from "@/lib/catalogo/
 import { leerCarrito, guardarCarrito, limpiarCarrito } from "@/lib/catalogo/carrito";
 import VendedorSwitchPicker from "@/components/catalogo/VendedorSwitchPicker";
 import { nombreDeVendedor } from "@/lib/catalogo/vendedor-switch";
+import { CODIGO_CLIENTE_CONTADO } from "@/lib/catalogo/publico-switch-actor";
+import {
+  LABEL_CONTADO,
+  SIN_CLIENTE_ELEGIDO,
+  faltaParaEnviar,
+  textoFaltaEnviar,
+} from "@/lib/catalogo/cliente-elegido";
 
 export interface CheckoutCartItem {
   product_id: string;
@@ -58,7 +74,20 @@ function brandCfg(theme: MarcaTheme): BrandCfg {
 
 interface Cliente { id: number; codigo: string | null; nombre: string }
 
-const CONTADO: Cliente = { id: 1, codigo: null, nombre: "Contado" };
+// La venta de mostrador de la empresa. El `id` histórico es 1 y está medido:
+// el cliente con código TCKCTA es el id 1 en las 4 empresas (active_shoes
+// "Contado" · joystep "Contado" · fashion_shoes "VENTAS LOCA" · vistana
+// "VENTAS"). Igual NO se confía en la constante: cuando el directorio carga se
+// busca el TCKCTA de verdad (`contadoDelDirectorio`) y se usa ESE id.
+//
+// ⚠️ El `nombre` se queda en "Contado" a propósito: es lo que se escribe en
+// `client_name` desde el primer día y cambiarlo cambiaría el dato de los
+// pedidos, no la pantalla. Lo que se ve en pantalla es `LABEL_CONTADO`.
+const CONTADO: Cliente = { id: 1, codigo: CODIGO_CLIENTE_CONTADO, nombre: "Contado" };
+
+/** ¿Lo elegido es la venta de mostrador? (para rotularlo con todas las letras) */
+const esContado = (c: Cliente | undefined): boolean =>
+  !!c && (c.codigo === CODIGO_CLIENTE_CONTADO || c.nombre === CONTADO.nombre);
 
 export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -67,7 +96,9 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   const [cart, setCart] = useState<CheckoutCartItem[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [cliente, setCliente] = useState<Cliente>(CONTADO);
+  // 🔴 ARRANCA VACÍO. `undefined` = todavía no eligió, y sin elección no hay
+  // envío. Ver la cabecera del archivo: el default puesto costó $53.124.
+  const [cliente, setCliente] = useState<Cliente | undefined>(undefined);
   const [clientes, setClientes] = useState<Cliente[] | null>(null);
   const [clientePickerOpen, setClientePickerOpen] = useState(false);
   const [clienteQuery, setClienteQuery] = useState("");
@@ -121,7 +152,23 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
   const total = lineas.reduce((s, l) => s + l.subtotal, 0);
   const totalPiezas = lineas.reduce((s, l) => s + l.piezas, 0);
   const preorders = lineas.filter((l) => l.is_preorder === true);
-  const puedeConfirmar = loaded && cart.length > 0 && vendedor != null && preorders.length === 0 && !sending;
+  // Qué falta, en el orden en que se lee la pantalla. Sale del módulo puro
+  // compartido: el botón se apaga Y dice qué falta, como en Guías.
+  const falta = faltaParaEnviar({
+    clienteElegido: cliente !== undefined,
+    vendedorElegido: vendedor != null,
+    hayItems: cart.length > 0,
+    preordersEnCarrito: preorders.length,
+  });
+  const puedeConfirmar = loaded && falta.length === 0 && !sending;
+
+  // La venta de mostrador REAL de la empresa: se busca por su código de Switch
+  // (TCKCTA) en el directorio que ya se cargó. Si no aparece se usa el id
+  // histórico — nunca se deja al usuario sin la opción.
+  const contado: Cliente = useMemo(() => {
+    const real = (clientes ?? []).find((c) => (c.codigo || "").trim().toUpperCase() === CODIGO_CLIENTE_CONTADO);
+    return real ? { ...CONTADO, id: real.id } : CONTADO;
+  }, [clientes]);
 
   const setQty = (productId: string, qty: number) => {
     if (qty <= 0) persistCart(cart.filter((i) => i.product_id !== productId));
@@ -139,7 +186,11 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   // ── Enviar a Switch ──
   async function confirmar() {
-    if (!puedeConfirmar) return;
+    // Segunda capa contra un cambio futuro del `disabled`. ⚠️ NO es el candado
+    // y no se puede verificar por mutación: React no despacha el click de un
+    // botón deshabilitado (medido). El candado que no se puede saltear vive en
+    // el SERVIDOR (`enviar-switch-route`) y en el 400 de `/api/catalogo/checkout`.
+    if (!puedeConfirmar || cliente === undefined) return;
     setSending(true);
     setError(null);
     setErroresDetalle([]);
@@ -177,9 +228,14 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
 
   const clientesFiltrados = useMemo(() => {
     if (!clientes) return [];
+    // La venta de mostrador ya tiene su propia opción arriba: dejarla también
+    // adentro de la lista serían DOS formas de elegir lo mismo, con nombres
+    // distintos según la empresa ("Contado" en dos, "VENTAS LOCA" y "VENTAS"
+    // en las otras dos) — justo la confusión que este cambio vino a sacar.
+    const sinContado = clientes.filter((c) => (c.codigo || "").trim().toUpperCase() !== CODIGO_CLIENTE_CONTADO);
     const q = clienteQuery.trim().toLowerCase();
-    if (!q) return clientes;
-    return clientes.filter((c) => c.nombre.toLowerCase().includes(q) || (c.codigo || "").toLowerCase().includes(q));
+    if (!q) return sinContado;
+    return sinContado.filter((c) => c.nombre.toLowerCase().includes(q) || (c.codigo || "").toLowerCase().includes(q));
   }, [clientes, clienteQuery]);
 
   if (!loaded) return null;
@@ -278,15 +334,30 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
             })}
           </section>
 
-          {/* Cliente */}
-          <section className="rounded-lg border border-gray-200 bg-white p-4">
+          {/* Cliente — ARRANCA VACÍO. Mientras no se elija, el borde va en
+              ámbar: es lo único que falta para poder mandar el pedido y tiene
+              que verse sin leer. */}
+          <section data-medir="cliente-checkout"
+            className={`rounded-lg border bg-white p-4 ${cliente === undefined ? "border-amber-300 bg-amber-50/40" : "border-gray-200"}`}>
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Cliente</div>
-                <div className="mt-0.5 text-sm font-medium">{cliente.nombre}{cliente.codigo ? <span className="ml-1.5 text-xs text-gray-400">{cliente.codigo}</span> : null}</div>
+                {cliente === undefined ? (
+                  <div className="mt-0.5 text-sm font-medium text-amber-800">{SIN_CLIENTE_ELEGIDO}</div>
+                ) : (
+                  <div className="mt-0.5 text-sm font-medium">
+                    {esContado(cliente) ? LABEL_CONTADO : cliente.nombre}
+                    {cliente.codigo && !esContado(cliente) ? <span className="ml-1.5 text-xs text-gray-400">{cliente.codigo}</span> : null}
+                  </div>
+                )}
               </div>
-              <button onClick={() => setClientePickerOpen((v) => !v)} className="rounded-md border border-gray-200 px-3 min-h-[44px] text-sm text-gray-700 hover:border-gray-300 transition">
-                {clientePickerOpen ? "Cerrar" : "Cambiar"}
+              <button onClick={() => setClientePickerOpen((v) => !v)}
+                className={`shrink-0 rounded-md border px-3 min-h-[44px] text-sm transition ${
+                  cliente === undefined
+                    ? "border-amber-400 bg-white text-amber-900 hover:border-amber-500"
+                    : "border-gray-200 text-gray-700 hover:border-gray-300"
+                }`}>
+                {clientePickerOpen ? "Cerrar" : cliente === undefined ? "Elegir" : "Cambiar"}
               </button>
             </div>
             {clientePickerOpen && (
@@ -299,16 +370,20 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                   className="w-full border border-gray-200 rounded-md px-3 min-h-[44px] text-sm outline-none focus:border-black transition"
                 />
                 <ul className="mt-2 max-h-56 overflow-y-auto divide-y divide-gray-50">
+                  {/* 🔴 Contado SIGUE EXISTIENDO, y sigue primero en la lista
+                      para que la venta de mostrador cueste un solo toque. Lo
+                      que ya no es, es el valor de arranque: dejó de decir
+                      "(default)" porque ya no lo es. */}
                   <li>
-                    <button onClick={() => { setCliente(CONTADO); setClientePickerOpen(false); }} className="w-full px-2 py-2.5 text-left text-sm hover:bg-gray-50 transition">
-                      Contado <span className="text-xs text-gray-400">(default)</span>
+                    <button onClick={() => { setCliente(contado); setClientePickerOpen(false); }} className="w-full px-2 min-h-[44px] py-2.5 text-left text-sm hover:bg-gray-50 transition">
+                      {LABEL_CONTADO}
                     </button>
                   </li>
                   {clientes === null ? (
                     <li className="px-2 py-3 text-sm text-gray-400">Cargando directorio…</li>
                   ) : clientesFiltrados.map((c) => (
                     <li key={c.id}>
-                      <button onClick={() => { setCliente(c); setClientePickerOpen(false); }} className="w-full px-2 py-2.5 text-left text-sm hover:bg-gray-50 transition">
+                      <button onClick={() => { setCliente(c); setClientePickerOpen(false); }} className="w-full px-2 min-h-[44px] py-2.5 text-left text-sm hover:bg-gray-50 transition">
                         {c.nombre} {c.codigo && <span className="text-xs text-gray-400">{c.codigo}</span>}
                       </button>
                     </li>
@@ -388,13 +463,23 @@ export default function CheckoutClient({ marca }: { marca: MarcaUiKey }) {
                 <div className="text-2xl font-semibold tabular-nums">${fmt(total)}</div>
                 <div className="text-xs text-gray-400 tabular-nums">{cart.length} producto(s) · {totalPiezas} piezas</div>
               </div>
-              <button
-                onClick={confirmar}
-                disabled={!puedeConfirmar}
-                className="rounded-md bg-black px-5 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40"
-              >
-                {sending ? "Enviando…" : "Enviar a Switch"}
-              </button>
+              <div className="shrink-0 text-right">
+                <button
+                  onClick={confirmar}
+                  disabled={!puedeConfirmar}
+                  className="rounded-md bg-black px-5 min-h-[48px] text-sm font-medium text-white hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-40"
+                >
+                  {sending ? "Enviando…" : "Enviar a Switch"}
+                </button>
+                {/* El botón apagado DICE qué falta, acá mismo. Un botón que se
+                    deja tocar y contesta con un toast obliga a tocarlo una vez
+                    por cada cosa que falta (misma regla que Guías). */}
+                {!sending && falta.length > 0 && (
+                  <p data-medir="falta-enviar" className="mt-1.5 text-xs text-amber-800 max-w-[10rem] ml-auto">
+                    {textoFaltaEnviar(falta)}
+                  </p>
+                )}
+              </div>
             </div>
           </section>
         </div>
