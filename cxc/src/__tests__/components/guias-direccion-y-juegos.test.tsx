@@ -1,18 +1,23 @@
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * LA DIRECCIÓN DEL CLIENTE COMO PRIMERA OPCIÓN.
+ * LA DIRECCIÓN COMO PRIMERA OPCIÓN, Y EL JUEGO DEL TRANSPORTISTA DE UN TOQUE.
  *
- * Es un comportamiento de pantalla, así que se prueba PINTANDO y leyendo el
- * DOM. Con funciones puras no se puede ver lo que de verdad importa: que la
- * dirección del cliente quede PRIMERA en la lista **y que el campo siga
- * vacío** — Daniel pidió *«Ponerla sola, pero sí como primera opción»*, no que
- * se escriba sola.
+ * Los dos son comportamientos de pantalla, así que se prueban PINTANDO y
+ * leyendo el DOM. Con funciones puras no se puede ver lo que de verdad importa:
+ *
+ *  · que la dirección del cliente quede PRIMERA en la lista **y que el campo
+ *    siga vacío** — Daniel pidió *«Ponerla sola, pero sí como primera opción»*,
+ *    no que se escriba sola;
+ *  · que el juego MÁS USADO quede primero y que tocarlo llene los TRES campos.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import GuiaForm from "@/app/guias/components/GuiaForm";
+import DespachoForm from "@/app/guias/components/DespachoForm";
 import type { GuiaItem } from "@/app/guias/components/types";
+import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
 const DIRECCIONES_BASE = ["David", "Paso Canoas", "Santiago", "Changinola"];
 // Medido en producción: D-25 (City Mall Paso Canoa) despacha siempre a Paso
@@ -157,5 +162,110 @@ describe("🔴 la dirección del cliente aparece PRIMERA en la lista", () => {
     await waitFor(() => {
       expect(opcionesDeLaFila(container)).toEqual(DIRECCIONES_BASE);
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Valores REALES de producción, ya agrupados y ordenados por frecuencia.
+const JUEGOS: JuegoDespacho[] = [
+  { receptor: "Eric", cedula: "8-930", placa: "Ek0700", veces: 10 },
+  { receptor: "Jocsan murillo", cedula: "8-918-246", placa: "DG7115", veces: 4 },
+  { receptor: "Jose castillo", cedula: "4-803-1102", placa: "Dg7738", veces: 1 },
+];
+
+/** DespachoForm con estado real, para ver que el toque llene los tres campos. */
+function Despacho({ tipo, juegos }: { tipo: "externo" | "directo"; juegos: JuegoDespacho[] }) {
+  const [placa, setPlaca] = useState("");
+  const [receptor, setReceptor] = useState("");
+  const [cedula, setCedula] = useState("");
+  const [chofer, setChofer] = useState("");
+  return (
+    <DespachoForm
+      items={[fila({ id: "i1", cliente: "CITY MALL" })]}
+      numerosTransp={[""]}
+      setNumeroTransp={() => {}}
+      tipoDespacho={tipo}
+      setTipoDespacho={() => {}}
+      bPlaca={placa} setBPlaca={setPlaca}
+      bReceptor={receptor} setBReceptor={setReceptor}
+      bCedula={cedula} setBCedula={setCedula}
+      bChofer={chofer} setBChofer={setChofer}
+      juegos={juegos}
+      onUsarJuego={(j) => { setReceptor(j.receptor); setCedula(j.cedula); setPlaca(j.placa); }}
+      bSaving={false}
+      onConfirmar={() => {}}
+    />
+  );
+}
+
+describe("🔴 un toque llena los TRES campos", () => {
+  const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+
+  it("los que más usa ese transportista se ofrecen con los tres datos", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    expect(screen.getByText(/Los que más usa este transportista/i)).toBeTruthy();
+    const boton = screen.getByRole("button", { name: /Eric/ });
+    expect(boton.textContent).toContain("8-930");
+    expect(boton.textContent).toContain("Ek0700");
+  });
+
+  it("🔴 el más usado va PRIMERO, y dice cuántas veces", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    const botones = screen.getAllByRole("button").filter((b) => /·/.test(b.textContent ?? ""));
+    expect(botones[0].textContent).toContain("Eric");
+    expect(botones[0].textContent).toContain("10 veces");
+    expect(botones[1].textContent).toContain("Jocsan murillo");
+    expect(botones[1].textContent).toContain("4 veces");
+    // Con una sola vez no se dice "1 veces".
+    expect(botones[2].textContent).not.toContain("veces");
+  });
+
+  it("tocarlo llena recibido por + cédula + placa de una vez", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
+    expect(val("despacho-receptor")).toBe("Eric");
+    expect(val("despacho-cedula")).toBe("8-930");
+    expect(val("despacho-placa")).toBe("Ek0700");
+  });
+
+  it("…y los tres siguen siendo editables", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
+    fireEvent.change(document.getElementById("despacho-placa") as HTMLElement, { target: { value: "EL6433" } });
+    expect(val("despacho-placa")).toBe("EL6433");
+    expect(val("despacho-receptor")).toBe("Eric");
+  });
+
+  it("se puede cambiar de juego: el segundo pisa al primero, entero", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    fireEvent.click(screen.getByRole("button", { name: /Eric/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Jocsan murillo/ }));
+    expect(val("despacho-receptor")).toBe("Jocsan murillo");
+    expect(val("despacho-cedula")).toBe("8-918-246");
+    expect(val("despacho-placa")).toBe("DG7115");
+  });
+
+  it("⚠️ EN ENTREGA DIRECTA NO APARECE: no hay transportista ni placa", () => {
+    render(<Despacho tipo="directo" juegos={JUEGOS} />);
+    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Eric/ })).toBeNull();
+  });
+
+  it("sin juegos guardados no se dibuja nada — la pantalla queda como siempre", () => {
+    render(<Despacho tipo="externo" juegos={[]} />);
+    expect(screen.queryByText(/Los que más usa este transportista/i)).toBeNull();
+    expect(val("despacho-placa")).toBe("");
+  });
+
+  it("nada queda trabado: se puede despachar escribiendo a mano, sin tocar ningún juego", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    fireEvent.change(document.getElementById("despacho-receptor") as HTMLElement, { target: { value: "Alguien nuevo" } });
+    expect(val("despacho-receptor")).toBe("Alguien nuevo");
+  });
+
+  it("los juegos son tocables de verdad: 44 px de alto mínimo (se usa en el celular)", () => {
+    render(<Despacho tipo="externo" juegos={JUEGOS} />);
+    const boton = screen.getByRole("button", { name: /Eric/ });
+    expect(boton.className).toContain("min-h-[44px]");
   });
 });
