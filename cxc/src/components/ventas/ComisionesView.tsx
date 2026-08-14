@@ -29,7 +29,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileSpreadsheet } from "lucide-react";
-import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { EMPRESAS_COMISIONAN } from "@/lib/comisiones/empresas";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import { SYNC_NOW_RECIBOS_OPCIONES } from "@/components/shared/syncNowOpciones";
@@ -51,7 +52,12 @@ const ComisionesPorEmpresaView = dynamic(
   { ssr: false, loading: () => <ViewSkeleton /> },
 );
 
-const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
+// La CUARTA copia de la lista de empresas era esta línea, escrita a mano
+// (`B2B_EMPRESA_KEYS.filter(k => k !== "joystep")`) mientras las otras tres ya
+// leían `EMPRESAS_COMISIONAN`. Justo lo que el módulo `lib/comisiones/empresas`
+// existe para impedir: al entrar joystep a la matriz, las tablas lo mostraban
+// y este banner de "Sincronizado" seguía sin vigilarlo.
+const EMPRESAS = EMPRESAS_COMISIONAN;
 const MODE_KEY = "fg_comisiones_mode";
 
 type Mode = "todas" | "empresa";

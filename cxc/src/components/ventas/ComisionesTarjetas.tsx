@@ -127,7 +127,9 @@ interface PropsConsolidado {
   mostrarInactivos: boolean;
   onToggleInactivos: () => void;
   /** Keys de empresa, en el mismo orden que las columnas de la tabla. */
-  empresas: string[];
+  // `readonly` porque la lista viene de `EMPRESAS_COMISIONAN`, que se deriva de
+  // `B2B_EMPRESA_KEYS` (un `as const`). Estas tarjetas solo la RECORREN.
+  empresas: readonly string[];
   nombreEmpresa: (key: string) => string;
   granTotal: number;
   /** Abre el mismo modal de detalle que la celda de la tabla. */
@@ -207,7 +209,9 @@ function TarjetaVendedorMatriz({
   apagada,
 }: {
   fila: FilaConsolidado;
-  empresas: string[];
+  // `readonly` porque la lista viene de `EMPRESAS_COMISIONAN`, que se deriva de
+  // `B2B_EMPRESA_KEYS` (un `as const`). Estas tarjetas solo la RECORREN.
+  empresas: readonly string[];
   nombreEmpresa: (key: string) => string;
   onDetalle: (empresa: string, vendedor: string) => void;
   italica?: boolean;

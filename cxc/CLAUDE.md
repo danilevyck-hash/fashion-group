@@ -906,6 +906,64 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > El flujo de ~10 toques a 3 (#504/#506/#508/#509) · **Duplicar sigue preguntando el cliente y agregándolo DE UNA, sin botón de confirmar** · el modo pedido `?agregarA=` · **los 15 pedidos que ya están en Switch NO se corrigen desde acá** (es data en Switch y la decide Daniel aparte) · y nada más del informe de auditoría (precio por pieza/bulto, ITBMS, cantidad escribible en el catálogo público, renombrar los productos de Tommy).
 
+## 🔴 Comisiones — FASHION GROUP SON SEIS EMPRESAS, y Multifashion es OTRO módulo (14-ago-2026)
+
+> Daniel, textual: ***"joystep sí debe de tener comisiones al 0.5%"***, y después, para cortar el enredo de raíz: ***"joystep mismo criterio que las otras de fashion group. multifashion es otro módulo de comisiones, ese ya está bien. me explico? no quiero que te enrredes aquí, ponlo en md."***
+>
+> ### 1. Las SEIS empresas de Fashion Group comisionan igual
+>
+> `vistana · fashion_wear · fashion_shoes · active_shoes · active_wear · joystep` — **las seis**, con la MISMA función (`comision_b2b_v5`) y los mismos argumentos. **Joystep no es un caso especial: es la sexta empresa del mismo módulo.**
+>
+> 🔴 **SOBRE QUÉ SE APLICA EL %, porque es fácil decirlo mal:** sobre la **VENTA** (`subtotal_con_descuento`). **La utilidad NO es la base: es el CRITERIO de entrada** — solo comisionan las facturas con `pct_utilidad > 20`, y **las notas de crédito RESTAN**. Está en la línea 53 de `20260703120000_comision_b2b_v5_vendedor_factura.sql`. Decir *"comisionan sobre utilidad"* es incorrecto y ya se dijo mal una vez.
+>
+> **Reglas duras que joystep hereda sin excepción:** las **retenciones NO comisionan** (`r.es_retencion = false`) y **`TCKCTA` (mostrador) queda fuera de la base de cobro**. La RPC **no conoce a joystep**: es la misma función para las seis, así que entrar a la matriz no puede mover a las otras cinco.
+>
+> ### 2. La tasa de joystep es 0,5% — y NO se escribió una sola fila
+>
+> `comision_b2b_v5` ya aplica `COALESCE(t.tasa_venta, 0.0050)` a todo vendedor **sin fila propia** en `comision_vendedor_tasa`. O sea que el 0,5% **ya era el default del cálculo**: entrando a la matriz, joystep lo hereda sin tocar la tabla. **`comision_vendedor_tasa` NO se tocó.**
+>
+> ⚠️ **La tasa es GLOBAL por vendedor, no por empresa** — por eso escribirla habría sido peligroso: la misma fila la usan todas las empresas donde esa persona trabaja. Así conviven Edwin al 0,5% y Reinaldo al 1%. **Cambiarle la tasa a alguien para "poner joystep en 0,5%" le movería la comisión en las otras empresas.**
+>
+> 🔴 **Joystep tiene DOS vendedores y ninguno de los dos es una persona que cobre hoy:** `DEFAULT` (el centinela "cliente sin dueño", sin fila de tasa → 0,5% por default, y es de donde sale TODO el dinero) y `DANIEL LEVY` (**tasa propia 1%, compartida con vistana**, con base **$0,00 en los tres meses medidos**). En pantalla, lo de `DEFAULT` se muestra en la fila **"Sin asignar"**, igual que en las otras cinco — no es una anomalía de joystep: `active_wear` de mayo-2026 tiene $1.259,04 y son 100% DEFAULT.
+>
+> **Medido contra producción (14-ago-2026):** julio **$56,33** · junio **$18,83** · mayo **$50,13**. El de julio **coincide exacto** con lo que midió la auditoría. La fórmula de Multifashion sobre los mismos datos habría dado $21,55 — **no es la de acá**.
+>
+> ### 3. 🔴 MULTIFASHION ES OTRO MÓDULO Y ESTÁ BIEN COMO ESTÁ — NO FUSIONAR
+>
+> Multifashion (`american_classic`) comisiona con **OTRA base**: `SUM(subtotal firmado) × 0.5%`. **No es `comision_b2b_v5` y no debe serlo.**
+>
+> **Que los dos digan "0,5%" es una COINCIDENCIA, no una relación.** Uno es 0,5% de la venta de las facturas que superan el 20% de utilidad; el otro es 0,5% del subtotal firmado, sin filtro de utilidad. **Sobre los mismos datos dan números distintos.** No compartir código entre los dos, no unificar las listas de empresas, no tocar un archivo de Multifashion para "arreglar" comisiones de Fashion Group. Este párrafo existe porque Daniel pidió que quedara escrito ANTES de que alguien lo intente.
+>
+> ### Por qué joystep estaba afuera, y qué lo cambió
+>
+> `EMPRESAS_COMISIONAN` (`src/lib/comisiones/empresas.ts`) restaba joystep **a propósito y documentado** (*"Joystep tiene CXC pero NO comisiona"*). Era un olvido con el mismo perfil que el de recibos y utilidad: **los insumos estaban COMPLETOS desde siempre** —`switch_factura_utilidad` y `switch_recibos` con datos, la RPC devolviendo cifras correctas— y **nadie los veía porque la empresa no se dibujaba**. Es el precedente exacto de este repo: cuando joystep se activó en recibos y utilidad aparecieron **$15.262,00 de cobros de julio invisibles** que llevaban meses sin contarse. **Lo que no se dibuja, no se cuenta.**
+>
+> ### 🔑 La lista se DERIVA, y había una CUARTA copia escrita a mano
+>
+> `EMPRESAS_COMISIONAN = B2B_EMPRESA_KEYS` — sin `.filter`, nunca escrita a mano. El módulo existe justamente para que la lista viva en un solo lugar, y aun así **`ComisionesView.tsx` tenía su propia línea** `B2B_EMPRESA_KEYS.filter((k) => k !== "joystep")` mientras las otras tres ya leían la constante. Alimentaba el banner **"Sincronizado"**: al entrar joystep a la matriz, las tablas lo habrían mostrado y el vigía de frescura habría seguido sin mirarlo. Ya no.
+>
+> ⚠️ El prop `empresas` de `ComisionesTarjetas.tsx` pasó a `readonly string[]`: la lista viene de un `as const` y esas tarjetas solo la RECORREN.
+>
+> ### La prueba de que las otras cinco no se movieron un centavo
+>
+> `node scripts/_verif-joystep-no-mueve-las-otras.mjs` (**solo lectura**) corre la MISMA aritmética que `ComisionesConsolidadoView` —el pivot por vendedor y el descuento restado de LA CELDA de su empresa— sobre datos REALES, dos veces: con la lista de 5 y con la de 6, y compara **celda por celda**. Medido: **93 celdas, 0 distintas**.
+>
+> | período | grupo antes → después | joystep aporta | Sin asignar |
+> |---|---|---:|---|
+> | 2026-07 | $11.394,57 → **$11.450,90** | $56,33 | $245,75 → $302,08 |
+> | 2026-06 | $10.086,82 → **$10.105,65** | $18,83 | $1.197,44 → $1.216,27 |
+> | 2026-05 | $14.340,89 → **$14.391,02** | $50,13 | $1.639,26 → $1.689,39 |
+>
+> El total del grupo sube **exactamente** lo de joystep, y **todo cae en "Sin asignar"**: ninguna persona que cobra cambió de número.
+>
+> **Los 3 anchos (+ los dos iPad acostados), en el navegador contra el build de producción y con datos de producción** (`BASE=… COOKIE_FILE=… node scripts/_medir-comisiones-tabla.mjs`, solo lectura, nunca toca "Actualizar ahora" ni "Excel"): **390 · 834 · 1024 · 1180 · 1440 → 0 px de arrastre de página, 0 px de arrastre interno, 0 px de recorte**, en los dos modos (Todas / Por empresa), y **0 tocables bajo 44 px y 0 textos bajo 12 px**. La 6ª columna **no ensanchó nada**: en celular y iPad la vista ya es de **tarjetas** (`ComisionesTarjetas.tsx`, la tabla va `hidden`), y ahí joystep entra como una fila más que crece **hacia abajo**.
+>
+> ### Candados
+>
+> `src/__tests__/lib/comisiones-joystep-entra.test.ts` (15). Son de **CONDUCTA**: llaman a los handlers REALES de `/api/ventas/comisiones/consolidado` y `/api/ventas/comisiones` con supabase mockeado y **cuentan qué RPC salió de verdad** — que la lista contenga "joystep" no prueba que el endpoint lo pida. El barrido de texto que queda **borra los comentarios primero**: este repo ya pagó cuatro veces el candado que se cumple con su propia explicación.
+> - **Verificado por mutación, 6 de 6 cazadas:** volver a restar joystep en `empresas.ts` (5 tests) · devolver el filtro a mano en `ComisionesView.tsx` (1) · el punto decimal mal en la RPC, `0.0050 → 0.5` (1) · un caso especial por empresa dentro de la RPC (1) · quitarle el guard de retenciones (1) · sacar joystep del consolidado (2).
+> - El candado viejo de `comisiones-consolidado-neto.test.ts` exigía un `.filter` en `empresas.ts` — **era el candado el que fijaba el bug**. Pasó a exigir lo que siempre quiso decir: que la lista se DERIVE de `B2B_EMPRESA_KEYS`, y suma `ComisionesView.tsx` a los archivos vigilados.
+
 ## Catálogos — auto-recorte del fondo al subir (12-ago-2026)
 
 > **Las fotos del banco B2B de PVH vienen con el producto CHICO abajo y un fondo enorme; en la tarjeta se ven diminutas al lado de las buenas.** Caso real de Daniel: `HW0HW02958AEF.jpg`, **1364×1819**, una sandalia que ocupa el **9% del área** y el resto es fondo gris en degradado. Fuente única: **`src/lib/catalogos/foto-recorte.ts`** — núcleo PURO (fondo, caja, guardas, plan de encuadre) + un envoltorio de canvas que solo dibuja lo que el plan ya decidió.

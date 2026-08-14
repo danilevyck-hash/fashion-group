@@ -155,18 +155,23 @@ describe("🔴 UNA llamada, no diez (12-ago-2026)", () => {
   it("la lista de empresas que comisionan vive en UN solo lugar", () => {
     // Estaba escrita idéntica en las dos vistas y ahora la necesita también el
     // endpoint: tres copias es la forma de que un día se contradigan.
-    expect(leer("src/lib/comisiones/empresas.ts")).toContain('B2B_EMPRESA_KEYS.filter');
+    //
+    // 14-ago-2026: la lista dejó de restar joystep, así que dejó de haber un
+    // `.filter` que buscar — lo que este candado siempre quiso decir es que se
+    // DERIVA de `B2B_EMPRESA_KEYS`, y eso ahora se exige directo. `ComisionesView`
+    // se suma a la lista: era la CUARTA copia, escrita a mano.
+    expect(leer("src/lib/comisiones/empresas.ts")).toContain("B2B_EMPRESA_KEYS");
     for (const rel of [
       "src/components/ventas/ComisionesConsolidadoView.tsx",
       "src/components/ventas/ComisionesPorEmpresaView.tsx",
+      "src/components/ventas/ComisionesView.tsx",
       "src/app/api/ventas/comisiones/consolidado/route.ts",
     ]) {
       expect(leer(rel), rel).toContain("EMPRESAS_COMISIONAN");
-      expect(leer(rel), rel).not.toMatch(/filter\(\(k\) => k !== "joystep"\)/);
     }
   });
 
-  it("las 5 RPC siguen siendo la MISMA comision_b2b_v5, sin tocar el cálculo", () => {
+  it("las RPC siguen siendo la MISMA comision_b2b_v5, sin tocar el cálculo", () => {
     expect(consolidado).toContain('supabaseServer.rpc("comision_b2b_v5"');
     expect(consolidado).toContain("p_empresa_key: empresa");
   });
