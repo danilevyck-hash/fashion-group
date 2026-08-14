@@ -102,6 +102,9 @@ export async function syncCatalogoCalvin(
           reactivados: 0,
           nuevosSinFoto: [],
           preciosCambiados: [],
+          comparados: 0,
+          escrituras: 0,
+          sinCambios: 0,
           error:
             "Falta correr la migración 20260812150000 (tablas Calvin) — sync omitido sin tocar Switch",
         },
@@ -122,6 +125,10 @@ export async function syncCatalogoCalvin(
       articuloFilter: isCalvinArticulo, // solo marcaId 8 (CK FOOTWEAR en vistana)
       // sin inventoryTable: el stock vive en el producto (patrón Joybees/Tommy)
       stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
+      // Las columnas que el UPDATE escribe además de price/name/active, para
+      // poder comparar antes de escribir (misma consulta, sin lecturas nuevas).
+      // Paridad exacta con Tommy, que es su plantilla.
+      columnasEscritas: ["existencia", "disponibilidad", "stock", "category", "gender", "bulto_pzas"],
       derive: {
         extraCols: ["nombre_manual"],
         insertFields: (a) => {

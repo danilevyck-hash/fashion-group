@@ -43,6 +43,9 @@ export function syncCatalogoReebok(
     articuloFilter: isReebokArticulo,
     inventoryTable: "inventory",
     stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad }),
+    // Las columnas que el UPDATE escribe además de price/name/active, para poder
+    // comparar antes de escribir (misma consulta, sin lecturas nuevas).
+    columnasEscritas: ["existencia", "disponibilidad", "codigo_barra_id"],
     // Persistir el codigoBarraId de Switch (backfill llega solo con cada corrida del cron).
     articuloFields: (a) => ({ codigo_barra_id: a.codigoBarraId ?? null }),
     insertExtras: { on_sale: false },

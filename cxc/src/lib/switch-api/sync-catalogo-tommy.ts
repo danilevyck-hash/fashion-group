@@ -104,6 +104,9 @@ export async function syncCatalogoTommy(
           reactivados: 0,
           nuevosSinFoto: [],
           preciosCambiados: [],
+          comparados: 0,
+          escrituras: 0,
+          sinCambios: 0,
           error:
             "Falta correr la migración 20260724150000 (tablas Tommy) — sync omitido sin tocar Switch",
         },
@@ -124,6 +127,12 @@ export async function syncCatalogoTommy(
       articuloFilter: isTommyArticulo, // solo marcaId 3 (excluye basura marketing/ajustes)
       // sin inventoryTable: el stock vive en el producto (patrón Joybees)
       stockFields: (existencia, disponibilidad) => ({ existencia, disponibilidad, stock: existencia }),
+      // Las columnas que el UPDATE escribe además de price/name/active, para
+      // poder comparar antes de escribir (misma consulta, sin lecturas nuevas).
+      // `bulto_pzas` solo viaja cuando Switch trae `cantidadPorCaja`; si la
+      // migración 20260806120000 no corrió, la escalera de lectura la deja
+      // afuera y esas filas se siguen escribiendo siempre.
+      columnasEscritas: ["existencia", "disponibilidad", "stock", "category", "gender", "bulto_pzas"],
       derive: {
         extraCols: ["nombre_manual"],
         insertFields: (a) => {
