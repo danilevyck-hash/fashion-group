@@ -10,6 +10,7 @@ import {
   type TipoDespacho,
 } from "@/lib/guias/falta-para-despachar";
 import { ETIQUETA_TIPO_DESPACHO } from "@/lib/guias/modo-despacho";
+import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EL DESPACHO — ahora vive en la PÁGINA de la guía, no dentro de la lista.
@@ -65,6 +66,9 @@ interface DespachoFormProps {
   setBCedula: (v: string) => void;
   bChofer: string;
   setBChofer: (v: string) => void;
+  /** Los juegos MÁS USADOS con ESTE transportista. Vacío = no se dibuja nada. */
+  juegos?: readonly JuegoDespacho[];
+  onUsarJuego?: (j: JuegoDespacho) => void;
   bSaving: boolean;
   onConfirmar: (firma1: string, firma2: string) => void;
   pendingFirma1?: string | null;
@@ -85,6 +89,7 @@ export default function DespachoForm({
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer,
+  juegos = [], onUsarJuego,
   bSaving, onConfirmar,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
 }: DespachoFormProps) {
@@ -190,6 +195,41 @@ export default function DespachoForm({
 
       {/* Quién recibe y en qué se va */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
+        {/* 🔴 LOS QUE MÁS SE USAN CON ESTE TRANSPORTISTA, de un toque.
+            Daniel: *«normalmente mandamos con las mismas 3/4 compañías. Y los
+            que varían a veces son los choferes. Que tenga memoria guía para
+            mostrar los más frecuentes.»* — por FRECUENCIA, no por fecha: son
+            dos órdenes distintos, medido en los 6 transportistas.
+            Los tres campos de abajo se tecleaban en blanco cada vez, en un
+            teléfono, y el mismo dato terminaba guardado de varias formas.
+            ⚠️ Solo con transportista externo: en entrega directa no hay
+            transportista ni placa. Ver `@/lib/guias/juegos-despacho`. */}
+        {externo && juegos.length > 0 && onUsarJuego && (
+          <div className="mb-4">
+            <span className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
+              Los que más usa este transportista
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {juegos.map((j, i) => (
+                <button
+                  key={`${j.receptor}|${j.cedula}|${j.placa}|${i}`}
+                  type="button"
+                  onClick={() => onUsarJuego(j)}
+                  className="text-left text-sm rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99] transition min-h-[44px] max-w-full"
+                >
+                  <span className="font-medium break-words">{j.receptor}</span>
+                  <span className="block text-xs text-gray-500 break-words">
+                    {j.cedula} · {j.placa}
+                    {j.veces > 1 && ` · ${j.veces} veces`}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Tócalo y se llenan los tres campos. Puedes cambiarlos después.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {/* ⚠️ La placa SOLO existe con transportista externo. Ver la cabecera. */}
           {externo && (

@@ -18,6 +18,7 @@ import type { Guia } from "./types";
 import type { TipoDespacho } from "@/lib/guias/falta-para-despachar";
 import { numeroGuiaDeCabecera } from "@/lib/guias/falta-para-despachar";
 import { guiaYaDespachada, tipoDespachoEfectivo } from "@/lib/guias/modo-despacho";
+import type { JuegoDespacho } from "@/lib/guias/juegos-despacho";
 
 interface Draft {
   placa?: string;
@@ -62,6 +63,9 @@ export function useDespachoGuia(id: string | null) {
   const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
   const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
   const [despachada, setDespachada] = useState(false);
+  // Los juegos MÁS USADOS (recibido por + cédula + placa) de ESTE transportista.
+  // Best-effort: si no llegan, los tres campos se escriben a mano como siempre.
+  const [juegos, setJuegos] = useState<JuegoDespacho[]>([]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -136,6 +140,23 @@ export function useDespachoGuia(id: string | null) {
 
   useEffect(() => { void cargar(); }, [cargar]);
 
+  // Los juegos del transportista de ESTA guía, del más usado al menos. Solo
+  // tiene sentido mientras la guía no haya salido: después, lo que se ve es lo
+  // que se firmó.
+  const transportistaId = guia?.transportista_id ?? null;
+  useEffect(() => {
+    if (!transportistaId || despachada) { setJuegos([]); return; }
+    let cancel = false;
+    fetch(`/api/guias/despachos-frecuentes?transportista=${encodeURIComponent(transportistaId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel || !d || !Array.isArray(d.juegos)) return;
+        setJuegos(d.juegos as JuegoDespacho[]);
+      })
+      .catch(() => { /* sin sugerencias: los campos se llenan a mano */ });
+    return () => { cancel = true; };
+  }, [transportistaId, despachada]);
+
   // ── setters que además guardan el borrador ────────────────────────────────
   const setBPlaca = (v: string) => { _setBPlaca(v); if (id) escribirDraft(id, "placa", v); };
   const setBReceptor = (v: string) => { _setBReceptor(v); if (id) escribirDraft(id, "receptor", v); };
@@ -150,6 +171,17 @@ export function useDespachoGuia(id: string | null) {
       return next;
     });
   };
+  /**
+   * Un toque llena los TRES campos — y los tres quedan editables. Pasa por los
+   * setters de siempre, así que el borrador también los guarda: si se corta el
+   * WiFi en la bodega, lo tomado no se pierde.
+   */
+  const usarJuego = (j: JuegoDespacho) => {
+    setBReceptor(j.receptor);
+    setBCedula(j.cedula);
+    setBPlaca(j.placa);
+  };
+
   const setPendingFirma1 = (v: string | null) => {
     _setPendingFirma1(v);
     try {
@@ -245,6 +277,7 @@ export function useDespachoGuia(id: string | null) {
     bReceptor, setBReceptor,
     bCedula, setBCedula,
     bChofer, setBChofer,
+    juegos, usarJuego,
     numerosTransp, setNumeroTransp,
     bSaving, confirmarDespacho,
     pendingFirma1, setPendingFirma1,
