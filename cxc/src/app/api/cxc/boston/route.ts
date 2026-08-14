@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { rolesBoston } from "@/lib/cxc/boston-roles";
 
 // Cartera de Confecciones Boston — la pestaña APARTE del CXC.
 //
@@ -20,16 +21,15 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-// Boston es la cartera del negocio de la familia, no la del grupo: la ven los
-// mismos roles que el CXC, menos `vendedor` — los vendedores del grupo no
-// cobran esta cartera ni comisionan sobre ella.
-const ROLES_BOSTON = ["admin", "secretaria"];
-
+// Quién puede leer esta cartera vive en `lib/cxc/boston-roles.ts` — la MISMA
+// lista de la que la pantalla deriva si dibuja o no la pestaña. Escrita acá a
+// mano, la UI se la copiaba (o no) y el vendedor tocaba una pestaña que siempre
+// le contestaba 403.
 const COLS = "codigo,cliente_switch_id,nombre,nombre_normalized,d0_90,d91_120,d121_plus,total";
 const PAGE = 1000;
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ROLES_BOSTON);
+  const auth = requireRole(req, rolesBoston());
   if (auth instanceof NextResponse) return auth;
 
   // Paginado: PostgREST corta en 1000 filas EN SILENCIO. Hoy Boston tiene 392

@@ -27,10 +27,8 @@ interface Props {
   toggleSort: (key: SortKey) => void;
   sortArrow: (key: SortKey) => string;
   userRole: string;
-  contactLog: Record<string, { date: string; method: string }>;
   onOpenEmail: (client: ConsolidatedClient) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
-  onQuickMarkContacted: (clientName: string, method: string) => void;
   onWhatsApp: (client: ConsolidatedClient) => void;
   onCopyMessage: (client: ConsolidatedClient) => void;
   onOpenEstado: (client: ConsolidatedClient) => void;
@@ -57,7 +55,6 @@ export default function ClientTable({
   userRole,
   onOpenEmail,
   onSaveEdit,
-  onQuickMarkContacted,
   onWhatsApp,
   onCopyMessage,
   onOpenEstado,
@@ -89,18 +86,21 @@ export default function ClientTable({
     ];
   }, [onOpenEmail]);
 
-  // Menú "···" visible en cada fila: mismas acciones que el context menu
-  // (que solo existe con click-derecho) + contacto de cobranza — alcanzable
-  // en touch (iPad no tiene click-derecho).
+  // Menú "···" visible en cada fila: las CUATRO cosas que se hacen para cobrar,
+  // alcanzables en touch (el menú de click-derecho no existe en iPad).
+  //
+  // 🔴 Eran 7 y quedaron 4 (14-ago-2026). Se retiraron "Ya contacté · Llamada"
+  // y "Ya contacté · Visita" —escribían en `cxc_contact_log` y el resultado no
+  // se pintaba en ninguna pantalla; 141 filas, ninguna en los últimos 90 días—
+  // y "Ver en directorio". Daniel, textual: *"sobre darle seguimiento no es algo
+  // que quiero para ese módulo, llamo al cliente por fuera y ya"*. El
+  // seguimiento de cobro NO va a existir acá: no se reemplaza por otra cosa.
   const buildRowMenuItems = useCallback((client: ConsolidatedClient): OverflowMenuItem[] => [
     { label: "Estado de cuenta", onClick: () => onOpenEstado(client) },
-    { label: "Ya contacté · Llamada", onClick: () => onQuickMarkContacted(client.nombre_normalized, "llamada") },
-    { label: "Ya contacté · Visita", onClick: () => onQuickMarkContacted(client.nombre_normalized, "visita") },
     { label: "WhatsApp", onClick: () => onWhatsApp(client) },
     { label: "Enviar email", onClick: () => onOpenEmail(client) },
     { label: "Copiar mensaje", onClick: () => onCopyMessage(client) },
-    { label: "Ver en directorio", onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); } },
-  ], [onOpenEstado, onQuickMarkContacted, onWhatsApp, onOpenEmail, onCopyMessage]);
+  ], [onOpenEstado, onWhatsApp, onOpenEmail, onCopyMessage]);
 
   // (pagination removed — all clients rendered)
 

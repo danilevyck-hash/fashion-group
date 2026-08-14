@@ -119,7 +119,6 @@ function pintarCelular() {
       setCompanyFilter={noop}
       favorites={new Set()}
       onToggleFavorite={noop}
-      onQuickMarkContacted={noop}
       onOpenEmail={noop}
       onWhatsApp={noop}
       onCopyMessage={noop}
