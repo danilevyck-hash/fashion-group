@@ -12,8 +12,17 @@ async function main() {
   )).filter(isTommyArticulo);
   const set = arts.filter((a) => parseFloat(String(a.disponible ?? "0")) >= 1);
   console.log(`\n${arts.length} artículos Tommy · ${set.length} con disponible>=1 (el set real de /stock ronda 478)\n`);
-  const N = 20, niveles = [4, 6, 8, 12];
-  const pool = arts.filter((_, i) => i % Math.max(1, Math.floor(arts.length / (N * (niveles.length + 2)))) === 0);
+  // N = llamadas por nivel. 20 alcanza para ver la forma de la curva; para
+  // DECIDIR un número se corre con N=40.
+  const N = Number(process.env.N ?? 20);
+  const niveles = (process.env.NIVELES ?? "4,6,8,12").split(",").map(Number);
+  // 🩸 REPETIR EL PROBE TAL CUAL MIDE LA CACHÉ, no la concurrencia: la segunda
+  // corrida vuelve a pedir EXACTAMENTE los mismos artículos, ya calientes. Para
+  // que una segunda vuelta siga siendo fría se cambia de CARRIL con FASE: el
+  // pool sale de otra clase de resto, o sea de artículos que nadie tocó.
+  const FASE = Number(process.env.FASE ?? 0);
+  const paso = Math.max(1, Math.floor(arts.length / (N * (niveles.length + 2))));
+  const pool = arts.filter((_, i) => i % paso === FASE % paso);
   const lote = (i: number) => pool.slice(i * N, (i + 1) * N);
   async function correr(conc: number, l: typeof arts) {
     let err = 0, vac = 0; const cola = [...l]; const t = ms();
