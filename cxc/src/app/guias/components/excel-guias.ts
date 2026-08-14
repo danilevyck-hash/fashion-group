@@ -40,8 +40,10 @@ function facturasSummary(items: GuiaItem[]): string {
   return all.join(", ");
 }
 
+// El rojo de "Rechazada" se fue con el rechazo (14-ago-2026): ese estado ya no
+// se puede crear desde la app y no existe en producción (0 de 186 guías).
 function estadoColor(estado: string | undefined): string {
-  return estado === "Completada" ? "15803D" : estado === "Rechazada" ? "DC2626" : "C2410C";
+  return estado === "Completada" ? "15803D" : "C2410C";
 }
 
 const COLUMNS: ReportColumn[] = [

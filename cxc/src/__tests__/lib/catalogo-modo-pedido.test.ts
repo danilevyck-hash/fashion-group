@@ -154,7 +154,6 @@ describe("candados estáticos", () => {
       "src/components/catalogo/CatalogoVendedorPage.tsx",
       "src/components/catalogo/CatalogoPublicoPage.tsx",
       "src/components/catalogo/CheckoutClient.tsx",
-      "src/components/catalogo/ProductoDetalleClient.tsx",
     ];
     for (const f of archivos) {
       const src = SRC(f);

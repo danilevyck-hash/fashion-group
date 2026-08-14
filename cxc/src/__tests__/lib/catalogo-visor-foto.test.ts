@@ -28,7 +28,6 @@ const visor = leer("src/components/catalogo/VisorFoto.tsx");
 const card = leer("src/components/catalogo/CatalogoProductCard.tsx");
 const grouped = leer("src/components/catalogo/CatalogoGroupedCard.tsx");
 const layout = leer("src/app/layout.tsx");
-const ficha = leer("src/components/catalogo/ProductoDetalleClient.tsx");
 
 describe("🔴 tocar la foto la acerca; tocar afuera cierra", () => {
   // 🩸 SEGUNDO BUG, reportado por Daniel: *"no funciona lo de tocar el fondo
@@ -114,17 +113,11 @@ describe("las dos tarjetas usan el MISMO visor", () => {
   });
 });
 
-describe("⚠️ la FICHA de producto también tiene visor", () => {
-  // Estaba sin visor: tocar la foto ahí no hacía absolutamente nada.
-  it("las dos variantes de ficha (tallas y variantes) lo montan", () => {
-    expect(ficha).toContain('import VisorFoto from "./VisorFoto"');
-    expect(ficha.match(/<VisorFoto/g) ?? []).toHaveLength(2);
-  });
-
-  it("y la foto se ve tocable", () => {
-    expect(ficha.match(/cursor-zoom-in/g) ?? []).toHaveLength(2);
-  });
-});
+// La ficha /catalogo/[marca]/producto/[id] SE BORRÓ el 14-ago-2026: era una
+// pantalla huérfana (cero enlaces desde el sistema) que Daniel no conocía
+// — *"tampoco entendí qué es eso, nunca lo había visto"*. Con ella se fueron
+// sus dos visores. El visor de las TARJETAS, que es el que se usa, sigue
+// cubierto por los describe de arriba.
 
 describe("detalles de iPhone", () => {
   it("la X respeta el notch y tiene 44px de área táctil", () => {

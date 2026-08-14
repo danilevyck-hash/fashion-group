@@ -165,30 +165,6 @@ export function useGuiasState() {
     }
   }
 
-  async function rejectGuia(id: string, motivo: string) {
-    let res: Response;
-    try {
-      res = await fetch(`/api/guias/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: "Rechazada", motivo_rechazo: motivo }),
-      });
-    } catch {
-      showToast("Sin conexión. Intenta de nuevo en unos segundos.");
-      return;
-    }
-    if (res.ok) {
-      showToast("Guía rechazada");
-      if (expandedId === id) {
-        const fullRes = await fetch(`/api/guias/${id}`);
-        if (fullRes.ok) setExpandedGuia(await fullRes.json());
-      }
-      loadGuias();
-    } else {
-      showToast("Error al rechazar");
-    }
-  }
-
   return {
     guias, loading, error,
     search, setSearch,
@@ -198,7 +174,6 @@ export function useGuiasState() {
     loadGuias,
     confirmDeleteId, setConfirmDeleteId,
     requestDeleteGuia, confirmDeleteGuia,
-    rejectGuia,
     atarItem, atarGuardando, atarError,
     abrirAtarCliente, cerrarAtarCliente, guardarAtarCliente,
   };

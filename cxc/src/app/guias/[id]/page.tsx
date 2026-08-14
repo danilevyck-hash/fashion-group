@@ -145,7 +145,7 @@ export default function GuiaPage() {
               /* Ya despachada: lo que se firmó, de solo lectura. */
               <div className="rounded-lg border border-gray-200 bg-white p-4">
                 <span className="text-xs uppercase tracking-wide text-gray-400 block mb-3">
-                  {g.estado === "Rechazada" ? "Esta guía fue rechazada" : "Ya despachada"}
+                  Ya despachada
                 </span>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <Dato etiqueta="Cómo salió" valor={ETIQUETA_TIPO_DESPACHO[tipoDespachoEfectivo(g)]} />
@@ -155,12 +155,6 @@ export default function GuiaPage() {
                   <Dato etiqueta="Recibido por" valor={g.receptor_nombre || ""} />
                   <Dato etiqueta="Cédula" valor={g.cedula || ""} />
                 </div>
-                {g.motivo_rechazo && (
-                  <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-red-500">Motivo de rechazo</p>
-                    <p className="text-xs text-red-700 mt-0.5">{g.motivo_rechazo}</p>
-                  </div>
-                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   {g.firma_base64 && (
                     <div>

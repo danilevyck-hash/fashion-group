@@ -307,7 +307,6 @@ describe("🔴 el botón de la fila dice 'Despachar' cuando la guía está pendi
         onEdit={() => {}}
         onPrint={() => {}}
         onDelete={() => {}}
-        onReject={() => {}}
       />,
     );
   }

@@ -58,7 +58,6 @@ function props(marca: MarcaUiKey, extra: Record<string, unknown> = {}) {
     searchInput: "", onSearchChange: () => {},
     gender: "", onGenderChange: () => {},
     category: "", onCategoryChange: () => {},
-    saleFilter: "" as const, onSaleFilterChange: () => {},
     bultosFilter: false, onBultosFilterChange: () => {},
     precioRango: "" as PrecioRango, onPrecioRangoChange: () => {},
     sortBy: "relevancia", onSortByChange: () => {},
@@ -131,11 +130,12 @@ describe("la fila que se arrastraba sale de la pantalla del celular y del iPad",
 // ── Qué grupos aparecen en cada marca ────────────────────────────────────────
 describe("cada marca lleva sus grupos, ni uno más", () => {
   const ESPERADO: Record<MarcaUiKey, string[]> = {
-    // Reebok: género + categoría + los chips de Oferta/Nuevo/Próximamente.
-    reebok: ["Género", "Categoría", "Estado"],
-    // Joybees no tiene categorías (`categoryOptions` vacío) ni saleFilter.
+    // Reebok: género + categoría. El grupo "Estado" (Oferta/Nuevo/
+    // Próximamente) SE RETIRÓ el 14-ago-2026 — ver el bloque de abajo.
+    reebok: ["Género", "Categoría"],
+    // Joybees no tiene categorías (`categoryOptions` vacío).
     joybees: ["Género"],
-    // Tommy no tiene saleFilter; su chip de bultos es un interruptor, no lista.
+    // Tommy: su chip de bultos es un interruptor, no una lista.
     tommy: ["Género", "Categoría"],
   };
 
@@ -249,21 +249,57 @@ describe("el desplegable de un grupo", () => {
     expect(vistos).toEqual([""]);
   });
 
-  it("Reebok mapea el grupo 'Estado' a los chips de Oferta/Nuevo/Próximamente", () => {
-    const vistos: string[] = [];
+});
+
+// ── LOS CHIPS «OFERTA / NUEVO / PRÓXIMAMENTE» SE FUERON ──────────────────────
+//
+// Daniel, 14-ago-2026: *"eliminas filtros de reebok desde la raíz los de
+// oferta/nuevo/proximamente"*. Medido contra producción: `badge` está en NULL
+// en los 944 productos de las 4 marcas, o sea que los 3 chips nunca
+// devolvieron un solo resultado.
+//
+// 🔴 Candados de CONDUCTA: PINTAN la pantalla y leen el DOM. Un barrido de
+// texto sobre el archivo pasaría estando mutado — y encima se cumpliría solo
+// con el comentario que explica el retiro, que es el defecto que este repo ya
+// pagó cuatro veces.
+describe("los chips de Oferta/Nuevo/Próximamente no vuelven", () => {
+  const PROHIBIDOS = ["Oferta", "Nuevo", "Próximamente"];
+
+  for (const marca of MARCAS) {
+    it(`${marca}: ninguno de los 3 se pinta, ni en celular ni en escritorio`, () => {
+      const { container } = render(createElement(CatalogoFilters, props(marca)));
+      const textos = Array.from(container.querySelectorAll("button, [role='option']"))
+        .map(e => (e.textContent || "").trim());
+      for (const p of PROHIBIDOS) expect(textos).not.toContain(p);
+    });
+  }
+
+  it("Reebok ya no tiene el grupo 'Estado' en la fila de celular", () => {
+    const { container } = render(createElement(CatalogoFilters, props("reebok")));
+    const disparadores = within(filaMovil(container))
+      .getAllByRole("button")
+      .map(b => (b.textContent || "").trim());
+    expect(disparadores.some(d => d.startsWith("Estado"))).toBe(false);
+  });
+
+  it("pasarle saleFilter/onSaleFilterChange ya no pinta nada (props muertas)", () => {
+    // Si alguien deja el prop viejo en un llamador, no debe reaparecer el chip.
     const { container } = render(
       createElement(CatalogoFilters, props("reebok", {
-        onSaleFilterChange: (v: string) => vistos.push(v),
+        saleFilter: "oferta", onSaleFilterChange: () => {},
       })),
     );
-    fireEvent.click(disparador(container, "Estado"));
-    const panel = container.ownerDocument.querySelector<HTMLElement>(
-      '[data-desplegable="catalogo-filtro-estado"]',
-    )!;
-    expect(within(panel).getAllByRole("option").map(o => (o.textContent || "").trim()))
-      .toEqual(["Todos", "Oferta", "Nuevo", "Próximamente"]);
-    fireEvent.click(within(panel).getByRole("option", { name: "Próximamente" }));
-    expect(vistos).toEqual(["proximamente"]);
+    const textos = Array.from(container.querySelectorAll("button, [role='option']"))
+      .map(e => (e.textContent || "").trim());
+    for (const p of PROHIBIDOS) expect(textos).not.toContain(p);
+  });
+
+  it("el tipo SaleFilter y SALE_OPTIONS ya no se exportan", () => {
+    const sinComentarios = FUENTE
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+    expect(sinComentarios).not.toContain("SaleFilter");
+    expect(sinComentarios).not.toContain("SALE_OPTIONS");
   });
 });
 

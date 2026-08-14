@@ -27,7 +27,7 @@ import type { CatalogoCartItem, CatalogoProducto } from "./types";
 import { Toast } from "@/components/ui";
 import CatalogoHeader from "./CatalogoHeader";
 import CatalogoSyncNow from "@/components/shared/CatalogoSyncNow";
-import CatalogoFilters, { type SaleFilter } from "./CatalogoFilters";
+import CatalogoFilters from "./CatalogoFilters";
 import CatalogoProductCard from "./CatalogoProductCard";
 import CatalogoGroupedCard from "./CatalogoGroupedCard";
 import CatalogoStickyCartBar from "./CatalogoStickyCartBar";
@@ -63,7 +63,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  const [saleFilter, setSaleFilter] = useState<SaleFilter>("");
   // Filtros extra (hoy solo Tommy). El valor del query es dato no confiable:
   // el rango se valida contra las opciones reales antes de entrar al estado.
   const [bultosFilter, setBultosFilter] = useState(
@@ -119,6 +118,15 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
         // mientras el cliente arma el pedido, lo que ya agregó sigue cotizando
         // como cuando lo vio.
         nuevo.bulto_pzas = product.bulto_pzas ?? null;
+        // ⚠️ LA PREVENTA CUELGA DE `badge`, Y SE QUEDA — decisión NO tomada.
+        // Al retirarse los chips de Oferta/Nuevo/Próximamente (14-ago-2026) se
+        // fue el FILTRO, no la etiqueta: `badge` sigue en la base y el admin la
+        // sigue escribiendo (ProductosTarjetas / ProductosBatch). O sea que un
+        // producto marcado "Próximamente" en el admin SIGUE entrando al carrito
+        // como pre-orden, exactamente igual que antes de este cambio.
+        // Hoy no hay ninguno: medido contra producción, `badge` está en NULL en
+        // los 944 productos de las 4 marcas, así que la preventa está viva pero
+        // sin uso. Retirarla es una decisión de negocio de Daniel, aparte.
         if (theme.features.preorder) nuevo.is_preorder = product.badge === "proximamente";
       }
       return [...prev, nuevo];
@@ -301,7 +309,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => theme.genero.match(p.gender, gender))
     .filter(p => !category || p.category === category)
-    .filter(p => !saleFilter || p.badge === saleFilter)
     // Filtros extra (Tommy). Bultos: se mide contra la DISPONIBILIDAD (lo
     // vendible), nunca la existencia, y el tamaño de bulto sale del tema —
     // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
@@ -398,7 +405,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
     if (gender) params.set("gender", gender);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
-    if (theme.features.saleFilter && saleFilter) params.set("filter", saleFilter);
     // Los filtros extra viajan en el link: si el vendedor comparte "2 bultos o
     // más", el cliente abre el catálogo ya filtrado igual que él.
     if (theme.features.filtroBultos && bultosFilter) params.set("bultos", "1");
@@ -431,8 +437,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
       } else {
         if (gender) filterDesc.push(theme.genero.filterLabel(gender));
         if (category) filterDesc.push(catLabel[category] || category);
-        if (saleFilter === "oferta") filterDesc.push("Oferta");
-        if (saleFilter === "nuevo") filterDesc.push("Nuevo");
         if (search) filterDesc.push(`“${search}”`);
       }
       // Sin filtros el subtítulo va VACÍO (poda, 12-ago-2026): decía "Todos los
@@ -490,7 +494,7 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setSaleFilter(""); setBultosFilter(false); setPrecioRango("");
+    setBultosFilter(false); setPrecioRango("");
     setSortBy("relevancia");
   }
 
@@ -700,8 +704,6 @@ function CatalogoVendedor({ marca }: { marca: MarcaUiKey }) {
           onGenderChange={setGender}
           category={category}
           onCategoryChange={setCategory}
-          saleFilter={saleFilter}
-          onSaleFilterChange={theme.features.saleFilter ? setSaleFilter : undefined}
           bultosFilter={bultosFilter}
           onBultosFilterChange={theme.features.filtroBultos ? setBultosFilter : undefined}
           precioRango={precioRango}

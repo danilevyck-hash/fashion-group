@@ -131,7 +131,6 @@ describe("MARCA_THEME.calvin — blanco/negro minimalista, completo y coherente"
   it("features: paridad Tommy — grid PLANA, categoryChips, filtroBultos y filtroPrecio", () => {
     expect(t.features).toEqual({
       preorder: false,
-      saleFilter: false,
       agrupacionPorModelo: false,
       inventarioPorTalla: false,
       categoryChips: true,

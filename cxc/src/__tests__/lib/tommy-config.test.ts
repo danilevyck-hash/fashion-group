@@ -106,10 +106,9 @@ describe("MARCA_THEME.tommy — theme completo y coherente", () => {
     expect(t.itemsField).toBe("tommy_order_items");
   });
 
-  it("features: grid PLANA, sin pre-orden, sin saleFilter, CON categoryChips", () => {
+  it("features: grid PLANA, sin pre-orden, CON categoryChips", () => {
     expect(t.features).toEqual({
       preorder: false,
-      saleFilter: false,
       agrupacionPorModelo: false,
       inventarioPorTalla: false,
       categoryChips: true,
