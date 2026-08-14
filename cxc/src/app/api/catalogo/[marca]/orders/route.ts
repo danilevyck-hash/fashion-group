@@ -20,6 +20,7 @@ import {
   resolverClienteSwitch,
   traeEleccionDeCliente,
 } from "@/lib/catalogo/cliente-switch";
+import { numerosSwitchPorPedido } from "@/lib/catalogo/switch-lock";
 import {
   guardarVendedorSwitchEnPedido,
   leerVendedorDePedido,
@@ -60,6 +61,15 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
   // total con el bulto por default, distinto del que abre el detalle.
   const { bultoPzasByProduct } = await leerCategoriaYBulto(db as never, cfg.productsTable, allProductIds);
 
+  // ¿Cuáles están en Switch? Mismo criterio que el candado de edición
+  // (envío 'enviado'/'verificado'), en UNA sola query. Decide la pestaña de
+  // la lista y el número que se pinta en la fila — ver `switch-lock.ts`.
+  const numerosSwitch = await numerosSwitchPorPedido(
+    db as never,
+    cfg.enviosTable,
+    (data || []).map((o) => String((o as unknown as Record<string, unknown>).id)),
+  );
+
   const orders = (data || []).map((o) => {
     const row = o as unknown as Record<string, unknown>;
     const items = (row[cfg.itemsRelation] || []) as { product_id: string; quantity: number; unit_price: number }[];
@@ -69,10 +79,16 @@ export async function GET(req: NextRequest, { params }: { params: { marca: strin
       bultoPzasByProduct,
       fallbackCategory: cfg.fallbackCategory,
     });
+    const idPedido = String(row.id);
     return {
       ...row,
       item_count: items.length,
       total: resumen.total,
+      // `en_switch` decide la PESTAÑA; `switch_numero` es lo que se PINTA.
+      // Se separan a propósito: un envío activo sin número (hoy 0 casos)
+      // sigue estando en Switch, y esconderlo en Borradores sería mentira.
+      en_switch: numerosSwitch.has(idPedido),
+      switch_numero: numerosSwitch.get(idPedido) ?? null,
       [cfg.itemsRelation]: undefined,
     };
   });

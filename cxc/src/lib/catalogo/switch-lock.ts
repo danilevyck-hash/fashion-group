@@ -43,6 +43,58 @@ export async function getEnvioActivo(
   };
 }
 
+/**
+ * ── LA PESTAÑA DE LA LISTA DE PEDIDOS SE DECIDE ACÁ ──
+ *
+ * Daniel, 14-ago-2026, textual: *"Tienen q haber dos secciones. Borradores y
+ * pedidos a switch. Y en pedidos a switch tiene que estar el número de switch
+ * en el pedido para saber cuál es cuál."*
+ *
+ * O sea que la pestaña NO la decide el estado interno (`status`), sino si el
+ * pedido TIENE ENVÍO ACTIVO EN SWITCH — el MISMO criterio que el candado de
+ * edición de acá arriba (#236/#237). Una sola definición de "está en Switch"
+ * para las dos cosas: si no se puede editar porque ya salió, entonces está en
+ * la pestaña de los que salieron. Nunca pueden discrepar.
+ *
+ * 🩸 POR QUÉ NO SE USA `status`, medido contra producción el 14-ago-2026:
+ *   · 7 pedidos en `confirmado` NUNCA llegaron a Switch (PED-001/002/003/004
+ *     y TOM-007/008/009, estos tres del 12-ago — no es historia vieja).
+ *   · PED-018 decía `borrador` y SÍ está en Switch (#16-000000506).
+ * `confirmado` se escribe ANTES de llamar a Switch y queda escrito aunque la
+ * llamada falle. Rotular eso "Enviados a Switch" habría mentido sobre 8
+ * pedidos. Con el número a la vista, la etiqueta no puede mentir: el número
+ * ES la prueba.
+ *
+ * El Map devuelve UNA ENTRADA POR PEDIDO CON ENVÍO ACTIVO. La entrada existe
+ * ⇔ el pedido está en Switch. `numero` es null solo si el envío está activo
+ * pero sin `numero_interno` ni `pedido_switch_id` — hoy eso NO pasa (los 31
+ * envíos activos de las 4 marcas están `verificado` y los 31 tienen número),
+ * y se devuelve null en vez de inventar un "?" para que quien lo pinte decida
+ * mostrarlo como el problema que es.
+ */
+export async function numerosSwitchPorPedido(
+  db: SupabaseClient,
+  enviosTable: string,
+  orderIds: string[],
+): Promise<Map<string, string | null>> {
+  const fuera = new Map<string, string | null>();
+  if (orderIds.length === 0) return fuera;
+  const { data, error } = await db
+    .from(enviosTable)
+    .select("order_id, numero_interno, pedido_switch_id")
+    .in("order_id", orderIds)
+    .in("estado", ["enviado", "verificado"]);
+  // Tabla ausente (DDL pendiente) u otro error → nadie queda en "Pedidos a
+  // Switch". Fail-open hacia Borradores: es la lectura conservadora, y el
+  // candado de edición usa la misma tolerancia.
+  if (error || !data) return fuera;
+  for (const e of data) {
+    const num = e.numero_interno || e.pedido_switch_id;
+    fuera.set(String(e.order_id), num ? String(num) : null);
+  }
+  return fuera;
+}
+
 /** 409 estándar cuando se intenta editar contenido de un pedido bloqueado. */
 export function switchLockResponse(envio: EnvioActivo): NextResponse {
   return NextResponse.json(

@@ -2,6 +2,25 @@
 
 // Lista de pedidos internos /catalogo/[marca]/pedidos — única para todas las
 // marcas (los gemelos eran idénticos salvo rutas/API, que vienen del tema).
+//
+// ── DOS PESTAÑAS, Y LAS DECIDE EL NÚMERO DE SWITCH ──
+//
+// Daniel, 14-ago-2026, textual: *"Tienen q haber dos secciones. Borradores y
+// pedidos a switch. Y en pedidos a switch tiene que estar el número de switch
+// en el pedido para saber cuál es cuál."*
+//
+// Antes eran cuatro (Todos · Borrador · Confirmado · Enviado) y la de
+// "Enviado" estaba SIEMPRE en cero: ese estado no lo escribe ni una línea del
+// código (`enviado` es de otra tabla, `*_switch_envios`). 0 de 100 pedidos en
+// toda la historia.
+//
+// 🩸 Y "Confirmado" NO quería decir "salió a Switch". Medido contra
+// producción: 7 pedidos `confirmado` nunca llegaron (PED-001/002/003/004 y
+// TOM-007/008/009 del 12-ago) y PED-018 decía `borrador` estando en Switch
+// (#16-000000506). El estado se escribe ANTES de llamar a Switch y queda
+// escrito aunque la llamada falle. Por eso la pestaña la decide `en_switch`
+// —tener envío activo— y NO `status`. El número a la vista es la prueba: con
+// él, la etiqueta no puede mentir. Ver `lib/catalogo/switch-lock.ts`.
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -13,14 +32,23 @@ import DuplicarPedidoModal from "@/components/catalogo/DuplicarPedidoModal";
 import type { ClienteSwitchOpcion } from "@/components/catalogo/ClienteSwitchPicker";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 
-interface Order { id: string; order_number: string; client_name: string; vendor_name: string | null; status: string; total: number; item_count: number; created_at: string; }
+interface Order {
+  id: string; order_number: string; client_name: string; vendor_name: string | null;
+  status: string; total: number; item_count: number; created_at: string;
+  /** ¿Tiene envío ACTIVO en Switch? Decide la pestaña. Lo calcula el GET
+   *  /orders con el mismo criterio que el candado de edición. */
+  en_switch?: boolean;
+  /** El número que se PINTA en la fila. null con `en_switch` true = está en
+   *  Switch pero se perdió el número (hoy 0 casos): se muestra como problema,
+   *  nunca se esconde en Borradores. */
+  switch_numero?: string | null;
+}
 
-const STATUS_LABELS: Record<string, string> = { borrador: "Borrador", enviado: "Enviado", confirmado: "Confirmado" };
-const STATUS_COLORS: Record<string, string> = {
-  borrador: "bg-gray-100 text-gray-600",
-  enviado: "bg-blue-100 text-blue-700",
-  confirmado: "bg-green-100 text-green-700",
-};
+type Pestana = "borradores" | "switch";
+
+/** Está en Switch ⇔ tiene envío activo. NO se mira `status`: mentía en 8
+ *  pedidos de 100 (ver la cabecera del archivo). */
+const enSwitch = (o: Order) => o.en_switch === true;
 
 export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const theme = getMarcaTheme(marca)!;
@@ -29,7 +57,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [pestana, setPestana] = useState<Pestana>("borradores");
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -118,12 +146,11 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
 
   const canDelete = role === "admin" || role === "secretaria";
 
-  // Status counts for tabs
-  const countByStatus = {
-    todos: orders.length,
-    borrador: orders.filter(o => o.status === "borrador").length,
-    enviado: orders.filter(o => o.status === "enviado").length,
-    confirmado: orders.filter(o => o.status === "confirmado").length,
+  // Conteos de las DOS pestañas. Se suman a `orders.length` siempre: un
+  // pedido está en Switch o no está, no hay tercer balde.
+  const conteo = {
+    borradores: orders.filter(o => !enSwitch(o)).length,
+    switch: orders.filter(o => enSwitch(o)).length,
   };
 
   const filtered = orders
@@ -134,7 +161,7 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
         || o.order_number.toLowerCase().includes(s)
         || (o.vendor_name || "").toLowerCase().includes(s);
     })
-    .filter(o => statusFilter === "todos" || o.status === statusFilter)
+    .filter(o => (pestana === "switch" ? enSwitch(o) : !enSwitch(o)))
     .filter(o => {
       if (!dateFilter) return true;
       const d = new Date(o.created_at);
@@ -148,17 +175,16 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       <Link href={theme.catalogoHref} className="text-xs text-gray-400 hover:text-gray-600 transition">← Catálogo</Link>
       <h1 className="text-2xl font-light mt-2 mb-6">Pedidos</h1>
 
-      {/* Status filter tabs */}
+      {/* DOS pestañas, y nada más: las decide tener número de Switch. */}
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="flex gap-4 flex-wrap">
           {([
-            ["todos", "Todos", countByStatus.todos],
-            ["borrador", "Borrador", countByStatus.borrador],
-            ["enviado", "Enviado", countByStatus.enviado],
-            ["confirmado", "Confirmado", countByStatus.confirmado],
-          ] as [string, string, number][]).map(([key, label, count]) => (
-            <button key={key} onClick={() => setStatusFilter(key)}
-              className={`text-sm transition ${statusFilter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
+            ["borradores", "Borradores", conteo.borradores],
+            ["switch", "Pedidos a Switch", conteo.switch],
+          ] as [Pestana, string, number][]).map(([key, label, count]) => (
+            <button key={key} onClick={() => setPestana(key)}
+              aria-pressed={pestana === key}
+              className={`text-sm transition min-h-[44px] ${pestana === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
               {label} <span className="text-xs text-gray-300 ml-1">{count}</span>
             </button>
           ))}
@@ -181,25 +207,57 @@ export default function PedidosListClient({ marca }: { marca: MarcaUiKey }) {
       {loading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <EmptyState title={search || dateFilter || statusFilter !== "todos" ? "No encontramos pedidos" : "No hay pedidos aun"} subtitle={search || dateFilter || statusFilter !== "todos" ? "Intenta con otros filtros o busqueda" : "Los pedidos aparecerán aquí al crearlos"} />
+        <EmptyState
+          title={search || dateFilter ? "No encontramos pedidos" : pestana === "switch" ? "Todavía no hay pedidos en Switch" : "No hay borradores"}
+          subtitle={search || dateFilter
+            ? "Intenta con otros filtros o busqueda"
+            : pestana === "switch"
+              ? "Acá aparecen los pedidos ya mandados, con su número de Switch"
+              : "Los pedidos aparecerán aquí al crearlos"} />
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (
-            <div key={o.id} onClick={() => router.push(`/catalogo/${marca}/pedido/${o.id}`)}
+            <div key={o.id} data-pedido={o.order_number}
+              onClick={() => router.push(`/catalogo/${marca}/pedido/${o.id}`)}
               className="flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-gray-300 transition cursor-pointer">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium truncate">{o.client_name}</span>
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${STATUS_COLORS[o.status] || STATUS_COLORS.borrador}`}>
-                    {STATUS_LABELS[o.status] || "Borrador"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                {/* El nombre se queda con la línea ENTERA. La píldora de
+                    estado ("Confirmado") se fue: decía lo contrario de la
+                    verdad en 8 pedidos de 100. */}
+                <div className="text-sm font-medium truncate">{o.client_name}</div>
+                {/* 🩸 EL NÚMERO VA EN LA SEGUNDA LÍNEA, Y NO ES COSMÉTICA.
+                    Puesto al lado del nombre, medido a 390 px: el chip mide
+                    168 px, el renglón 158, y el nombre del cliente quedaba
+                    aplastado a 0 px de ancho — invisible — y la fila igual
+                    desbordaba 18 px. Acá abajo entra entero (275 px de 358) y
+                    el nombre recupera su línea. Tampoco dice "Switch #…": la
+                    pestaña ya se llama "Pedidos a Switch". */}
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-xs text-gray-400 font-mono">{o.order_number}</span>
                   <span className="text-xs text-gray-300">·</span>
                   <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
                   <span className="text-xs text-gray-300">·</span>
                   <span className="text-xs text-gray-400">{o.item_count} items</span>
+                  {enSwitch(o) && (
+                    o.switch_numero ? (
+                      <>
+                        <span className="text-xs text-gray-300">·</span>
+                        <span className="text-xs font-medium text-green-700 font-mono whitespace-nowrap">
+                          #{o.switch_numero}
+                        </span>
+                      </>
+                    ) : (
+                      /* Envío activo SIN número. Hoy: 0 casos en los 4
+                         catálogos. No se esconde en Borradores —está en
+                         Switch— pero tampoco se inventa un número. */
+                      <>
+                        <span className="text-xs text-gray-300">·</span>
+                        <span className="text-xs font-medium text-amber-700 whitespace-nowrap">
+                          en Switch, sin número
+                        </span>
+                      </>
+                    )
+                  )}
                 </div>
               </div>
               <span className="text-sm font-semibold tabular-nums">${fmt(o.total)}</span>
