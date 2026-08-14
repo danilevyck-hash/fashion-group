@@ -29,6 +29,7 @@ import type { ReglasAsistencia } from "@/lib/asistencia/config";
 import {
   aHoras,
   FORMULA_NETO,
+  grupoDeLinea,
   quincenasHasta,
   type LineaPlanilla,
   type ManualesLinea,
@@ -36,6 +37,7 @@ import {
   type Quincena,
   type TotalesPlanilla,
 } from "@/lib/asistencia/planilla";
+import type { AvisoPeriodoAbierto, CodigoSinFicha } from "@/lib/asistencia/periodo";
 import { fmtMin } from "@/lib/asistencia/reporte";
 
 interface Respuesta {
@@ -61,6 +63,11 @@ interface Respuesta {
     salidaAsumida: string;
     horasAusenciaDefault: number;
     conSabado: number;
+    /** El período todavía no terminó. `null` cuando ya cerró. */
+    periodoAbierto: AvisoPeriodoAbierto | null;
+    /** Los códigos que marcaron y no tienen ficha. Van UNA vez, fuera del cuadro. */
+    sinFicha: CodigoSinFicha[];
+    avisoSinFicha: string | null;
     /** El período pedido NO es una quincena: hay cosas que cambian. */
     rangoLibre: boolean;
     factorBase: number;
@@ -175,6 +182,10 @@ export default function PlanillaTab() {
       periodo: data.periodo,
       empresaEtiqueta: data.empresaEtiqueta,
       reglas: data.reglas,
+      // Los avisos que no se pueden perder al mandar el archivo por correo: el
+      // papel sobrevive a la conversación donde se explicaron.
+      periodoAbierto: data.avisos.periodoAbierto,
+      avisoSinFicha: data.avisos.avisoSinFicha,
     };
   }, [data]);
 
@@ -209,13 +220,19 @@ export default function PlanillaTab() {
     }
   }
 
-  const buenas = data?.lineas.filter((l) => l.dinero) ?? [];
-  // 🔴 TRES grupos, no dos. Quien no va en planilla tampoco produce dinero, pero
-  // NO es un pendiente: mezclarlo con los ámbar diría que hay algo que arreglar
-  // donde solo hay una decisión ya tomada, y la lista de pendientes —la que la
-  // contable usa para saber qué le falta— dejaría de significar algo.
-  const fueraDePlanilla = data?.lineas.filter((l) => l.fueraDePlanilla) ?? [];
-  const pendientes = data?.lineas.filter((l) => !l.dinero && !l.fueraDePlanilla) ?? [];
+  // 🔴 CUATRO grupos, no dos, y el reparto lo hace `grupoDeLinea` —la MISMA
+  // función que ordena el cuadro, cuenta los totales y arma el Excel y el PDF—.
+  // Con la lista partida acá a mano, la pantalla y el papel podían discrepar
+  // sobre en qué cajón cae una persona.
+  //
+  // 🩸 «Falta un dato» y «Decidilo vos» eran UNA SOLA bolsa ámbar, y por eso
+  // RODRIGO MIRANDA (trabajo fuera de la oficina) y ELOYN MENDOZA (vacaciones)
+  // salían pidiendo que los arreglaran en Configuración, donde no hay nada que
+  // arreglarles. Ámbar dice "arreglame"; esto es una decisión, y va en gris.
+  const buenas = data?.lineas.filter((l) => grupoDeLinea(l) === "pagada") ?? [];
+  const fueraDePlanilla = data?.lineas.filter((l) => grupoDeLinea(l) === "fuera") ?? [];
+  const decidir = data?.lineas.filter((l) => grupoDeLinea(l) === "decidir") ?? [];
+  const pendientes = data?.lineas.filter((l) => grupoDeLinea(l) === "falta") ?? [];
 
   return (
     <div className="space-y-4">
@@ -310,6 +327,24 @@ export default function PlanillaTab() {
       </div>
 
       {/* ── Avisos: todo lo que hay que saber ANTES de descontarle plata a nadie ── */}
+      {/* 🔴 EL PERÍODO NO TERMINÓ. Va arriba de todo: los días que no pasaron
+          dejaron de contarse como falta —eran $866,99 de $1.127,78 el día que
+          se midió— y un número que baja sin explicación se lee como un número
+          que no cuadra. */}
+      {data?.avisos.periodoAbierto && (
+        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-[13px] text-blue-900">
+          {data.avisos.periodoAbierto.texto}
+        </p>
+      )}
+      {/* 🔴 El código que marca y no tiene ficha: UNA vez, arriba, fuera del
+          cuadro de cada empresa. Antes salía tres veces —una por empresa— como
+          si fueran tres personas distintas. */}
+      {data?.avisos.avisoSinFicha && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          {data.avisos.avisoSinFicha}{" "}
+          Se le da de alta en <b>Configuración</b>.
+        </p>
+      )}
       {/* 🔴 EL AVISO DEL RANGO LIBRE. Va PRIMERO y no se esconde detrás de un ⓘ:
           en un rango que no es una quincena, el sueldo base se reparte y los
           montos escritos a mano no entran. Quien imprima este cuadro para pagar
@@ -445,6 +480,24 @@ export default function PlanillaTab() {
                       </td>
                     </tr>
                   ))}
+                  {/* 🔴 DECIDILO VOS: en GRIS, con el motivo escrito y con el
+                      quincenal que le correspondería, para que la contadora no
+                      tenga que calcularlo aparte. No es un error: es una
+                      decisión que el sistema no puede tomar. */}
+                  {decidir.map((l) => (
+                    <tr key={l.codigo} className="border-b border-gray-100 last:border-0">
+                      <td className="sticky left-0 z-10 bg-white px-3 py-2.5 text-gray-700">
+                        {l.etiqueta}
+                        <span className="ml-1.5 text-xs text-gray-400">{l.codigo}</span>
+                      </td>
+                      <td colSpan={18} className="px-2 py-2.5 text-[13px] text-gray-600">
+                        {l.decidirAMano}
+                        {l.quincenalReferencia !== null && (
+                          <> — la quincena completa le daría <b>${$(l.quincenalReferencia)}</b></>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                   {pendientes.map((l) => (
                     <tr key={l.codigo} className="border-b border-gray-100 bg-amber-50/50 last:border-0">
                       <td className="sticky left-0 z-10 bg-amber-50 px-3 py-2.5 text-gray-900">
@@ -502,6 +555,19 @@ export default function PlanillaTab() {
                 </p>
               </div>
             ))}
+            {decidir.map((l) => (
+              <div key={l.codigo} className="rounded-lg border border-gray-200 bg-white p-3">
+                <p className="font-medium text-gray-700">
+                  {l.etiqueta} <span className="text-xs text-gray-400">{l.codigo}</span>
+                </p>
+                <p className="mt-0.5 text-[13px] text-gray-600">
+                  {l.decidirAMano}
+                  {l.quincenalReferencia !== null && (
+                    <> — la quincena completa le daría <b>${$(l.quincenalReferencia)}</b></>
+                  )}
+                </p>
+              </div>
+            ))}
             {pendientes.map((l) => (
               <div key={l.codigo} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="font-medium text-gray-900">
@@ -535,9 +601,21 @@ export default function PlanillaTab() {
             </p>
           )}
 
+          {/* 🔴 DOS listas con nombre propio, no una bolsa. «Decidilo vos» va en
+              GRIS y sin mandar a Configuración: ahí no hay nada que arreglar. */}
+          {!!decidir.length && (
+            <p className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-600">
+              <b>Decidilo vos:</b> {decidir.length}{" "}
+              {decidir.length === 1 ? "persona quedó" : "personas quedaron"} fuera del total porque
+              el sistema no puede saber cuánto le toca —está justificada, o entró o salió a mitad
+              del período—. <b>No es un error y no hay nada que arreglar</b>: al lado de cada una
+              está el motivo y lo que le daría la quincena completa. Para sacar lo suyo, usa{" "}
+              <b>Rango de fechas</b> acá arriba.
+            </p>
+          )}
           {!!pendientes.length && (
             <p className="rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-              <b>{pendientes.length}</b>{" "}
+              <b>Falta un dato:</b> {pendientes.length}{" "}
               {pendientes.length === 1 ? "persona quedó" : "personas quedaron"} fuera del total
               porque falta configurarles algo. <b>No valen $0</b> — se arreglan en la pestaña{" "}
               <b>Configuración</b>.

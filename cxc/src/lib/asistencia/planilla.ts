@@ -19,6 +19,17 @@
  *    alguien reclama su pago. Hoy hay 6 códigos que marcaron en el reloj y no
  *    tienen ficha (48 a 53): tienen que verse, no desaparecer.
  *
+ * 1b. NO LE CALCULA PAGO A QUIEN ENTRÓ O SALIÓ A MITAD DEL PERÍODO
+ *    (`decidirAMano`). Sale con el motivo escrito —«entró el 10 de agosto»—,
+ *    con el quincenal que le correspondería a la vista, y FUERA del total.
+ *    🩸 YEISHKA DIAZ, ingreso 10-ago, salía ausente el 3, 4, 5, 6 y 7 con un
+ *    neto de $133,34 sobre un quincenal de $300. El arreglo obvio —no contarle
+ *    esos días— la deja cobrando los $300 completos, que es PEOR: trabajó 6
+ *    días de 15. Las dos cuentas automáticas están mal por lados opuestos, así
+ *    que el sistema SE ABSTIENE. Es la misma regla del punto 1 y de
+ *    `FALTA.sinMarcaciones`, con otra causa. NO HAY PRORRATEO AUTOMÁTICO ACÁ:
+ *    la contadora saca lo suyo con el rango de fechas libre, que ya existe.
+ *
  * 2. NO TIENE UNA SOLA CIFRA DEL NEGOCIO ESCRITA ADENTRO. Los recargos, los
  *    divisores, la tolerancia, los porcentajes de seguro y la hora de corte
  *    entran por `reglas` y salen de `asistencia_reglas`. Lo único que hay acá
@@ -635,6 +646,30 @@ export interface LineaPlanilla {
    * este campo existe para sostener.
    */
   fueraDePlanilla: boolean;
+  /**
+   * 🔴 EL SISTEMA SE ABSTUVO Y LO DECIDE UNA PERSONA. Trae el motivo escrito,
+   * tal como se muestra: «entró el 10 de agosto de 2026», «Vacaciones del 16
+   * jul 2026 al 13 ago 2026». `dinero` es `null` y NO entra a los totales.
+   *
+   * 🔑 NO ES «FALTA CONFIGURAR», y por eso es un campo aparte y no una entrada
+   * más de `faltaConfigurar`: ahí no hay nada que arreglar en Configuración —la
+   * ficha está completa y la justificación es correcta—. Mandarlo al mismo
+   * cajón es lo que hacía que RODRIGO y ELOYN salieran en ámbar pidiendo un
+   * arreglo que no existe, y una lista de pendientes con cosas que no son
+   * pendientes deja de servir para lo único que sirve.
+   */
+  decidirAMano: string | null;
+  /**
+   * Lo que le tocaría de sueldo quincenal en este período, para que quien
+   * decide no tenga que calcularlo aparte.
+   *
+   * 🔴 SOLO SE MUESTRA. Es `null` en toda línea que SÍ produjo dinero, y no
+   * entra en ninguna suma: `totalizar` no lo mira. Se calcula con la MISMA
+   * fórmula del quincenal (`salario ÷ 2 × factor`, redondeada a centavos) para
+   * que el número que la contadora ve acá y el que la planilla pagaría no
+   * puedan diferir.
+   */
+  quincenalReferencia: number | null;
   dinero: DineroLinea | null;
   manuales: ManualesLinea;
 }
@@ -807,6 +842,11 @@ export function armarLinea(
   reglas: ReglasAsistencia,
   /** Fracción de quincena que paga el período. 1 = una quincena entera. */
   factorBase = 1,
+  /**
+   * El motivo por el que el sistema SE ABSTIENE y lo decide una persona
+   * («entró el 10 de agosto», «Vacaciones del … al …»). `null` = se calcula.
+   */
+  decidirAMano: string | null = null,
 ): LineaPlanilla {
   const faltaConfigurar = faltantesDe(ficha, reglas);
   // 🔴 EL CANDADO DEL PAGO, Y ES ESTA LÍNEA. Quien está marcado como servicio
@@ -816,16 +856,35 @@ export function armarLinea(
   // planilla—, sigue sin calculársele un centavo. Sus HORAS, en cambio, se
   // miden y viajan igual: es la mitad que Daniel quiere conservar.
   const fueraDePlanilla = ficha.servicioProfesional === true;
+  // 🔴 EL SEGUNDO CANDADO, Y ES EL QUE IMPIDE PAGARLE $300 A YEISHKA. Va en el
+  // MISMO `if` que el de arriba a propósito: quien entró o salió a mitad del
+  // período no produce un número, con salario cargado o sin él, marque lo que
+  // marque. Un prorrateo automático acá sería inventar plata; abstenerse es lo
+  // que este archivo ya hace en los otros dos casos que no puede saber.
+  const seAbstiene = typeof decidirAMano === "string" && decidirAMano.trim() !== "";
+  const motivoDecidir = seAbstiene ? decidirAMano!.trim() : null;
   const dinero =
-    !fueraDePlanilla && faltaConfigurar.length === 0
+    !fueraDePlanilla && !seAbstiene && faltaConfigurar.length === 0
       ? calcularDinero(
         ficha.salarioMensual as number, ficha.jornadaSemanal as number,
         horas, manuales, reglas, factorBase,
       )
       : null;
 
+  // 🔑 Lo que le TOCARÍA de quincenal, solo para mostrárselo a quien decide.
+  // Se calcula únicamente cuando no hubo dinero —así no hay dos cifras rivales
+  // en la misma línea— y con la MISMA fórmula del quincenal de verdad.
+  const salario = ficha.salarioMensual;
+  const factorRef = Number.isFinite(factorBase) && factorBase > 0 ? factorBase : 1;
+  const quincenalReferencia =
+    dinero === null && typeof salario === "number" && Number.isFinite(salario) && salario > 0
+      ? centavos((salario / 2) * factorRef)
+      : null;
+
   return {
     fueraDePlanilla,
+    decidirAMano: motivoDecidir,
+    quincenalReferencia,
     codigo: ficha.codigo,
     etiqueta: etiquetaPersona(ficha.codigo, ficha.nombre),
     nombre: ficha.nombre ?? null,
@@ -863,6 +922,23 @@ export interface OpcionesPlanilla {
    * una quincena entera: sin pasarlo, el cuadro es idéntico al de siempre.
    */
   factorBase?: number;
+  /**
+   * Código → motivo por el que el sistema SE ABSTIENE de calcularle pago, sea
+   * lo que sea que haya marcado. Hoy lo llena la capa que lee las fichas con
+   * quien entró o salió a mitad del período (`motivoPeriodoParcial`).
+   *
+   * 🔴 Sin este mapa NADIE queda fuera: el cuadro es idéntico al de siempre.
+   * Es lo que hace que las 29 fichas sin `fecha_ingreso` se comporten como hoy.
+   */
+  decidirAMano?: ReadonlyMap<string, string>;
+  /**
+   * Código → justificación viva, para quien NO marcó ni un día en el período.
+   *
+   * 🔑 Solo se mira cuando la persona no tiene UNA sola marca: alguien con dos
+   * días de vacaciones y trece trabajados cobra normal, y confundir los dos
+   * casos le quitaría la quincena entera a quien sí vino.
+   */
+  justificados?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -907,7 +983,18 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       ? medirHoras(p, reglas, jornadaDiariaMin(cod))
       : { ...HORAS_CERO, jornadaDiariaMin: jornadaDiariaMin(cod) };
 
-    const linea = armarLinea(ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase);
+    // 🔴 EL MOTIVO POR EL QUE EL SISTEMA SE ABSTIENE. Son dos causas distintas
+    // y la diferencia importa: la de vigencia manda SIEMPRE (Yeishka marcó seis
+    // días y aun así no se le calcula), y la de la justificación solo cuando no
+    // hay NI UNA marca en todo el período.
+    const motivo =
+      opts.decidirAMano?.get(cod)
+      ?? (p ? null : opts.justificados?.get(cod))
+      ?? null;
+
+    const linea = armarLinea(
+      ficha, h, normalizarManuales(opts.manuales?.get(cod)), reglas, factorBase, motivo,
+    );
     // 🔑 A quien no va en planilla no se le agrega «no marcó ni un día»: eso es
     // un motivo por el que NO SE PUDO PAGAR, y acá no hay nada que pagar. Si le
     // faltan marcas, se ve en el reporte de asistencia, que es donde importa.
@@ -915,13 +1002,19 @@ export function armarPlanilla(opts: OpcionesPlanilla): LineaPlanilla[] {
       lineas.push(linea);
       continue;
     }
-    // Con ficha completa pero sin una sola marca no se inventa nada: se lista.
-    if (!p && linea.faltaConfigurar.length === 0) {
-      lineas.push({ ...linea, faltaConfigurar: [FALTA.sinMarcaciones], dinero: null });
-    } else if (!p && linea.faltaConfigurar.length > 0) {
-      lineas.push({ ...linea, faltaConfigurar: [...linea.faltaConfigurar, FALTA.sinMarcaciones] });
-    } else {
+    if (p) {
       lineas.push(linea);
+    } else if (linea.faltaConfigurar.length > 0) {
+      lineas.push({ ...linea, faltaConfigurar: [...linea.faltaConfigurar, FALTA.sinMarcaciones] });
+    } else if (motivo) {
+      // 🔴 NO SE LE AGREGA «no marcó ni un día»: ya se sabe POR QUÉ no marcó, y
+      // está escrito al lado. Ese texto mandaba a arreglar algo en Configuración
+      // que no había nada que arreglar — es todo el punto del cambio.
+      lineas.push(linea);
+    } else {
+      // Con ficha completa, sin una sola marca y sin explicación: se lista. No
+      // se inventa ni una renuncia ni unas vacaciones.
+      lineas.push({ ...linea, faltaConfigurar: [FALTA.sinMarcaciones], dinero: null });
     }
   }
   return ordenarLineas(lineas);
@@ -943,6 +1036,13 @@ export type TotalesPlanilla = Omit<DineroLinea, "rataHora" | "valorMinuto"> & {
    * cuánto le falta.
    */
   fueraDePlanilla: number;
+  /**
+   * Cuántas quedaron para que las decida una persona (entró o salió a mitad del
+   * período, o está justificada). 🔴 También APARTE de `sinConfigurar`: no hay
+   * nada que configurarles y contarlas ahí es justo lo que mandaba a la
+   * contadora a buscar en Configuración un arreglo que no existe.
+   */
+  decidirAMano: number;
 };
 
 export const TOTALES_CERO: TotalesPlanilla = {
@@ -950,7 +1050,7 @@ export const TOTALES_CERO: TotalesPlanilla = {
   domingos: 0, feriados: 0, ausencias: 0, tardanzas: 0, totalBruto: 0,
   seguroSocial: 0, seguroEducativo: 0, isr: 0, prestamo: 0, terceros: 0,
   mercancia: 0, totalDeducciones: 0, otrosServicios: 0, netoPagar: 0,
-  personas: 0, sinConfigurar: 0, fueraDePlanilla: 0,
+  personas: 0, sinConfigurar: 0, fueraDePlanilla: 0, decidirAMano: 0,
 };
 
 /**
@@ -966,6 +1066,12 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
     // Fuera de planilla a propósito: no suma plata y TAMPOCO cuenta como
     // pendiente. Se pregunta primero para que no caiga en el `sinConfigurar`.
     if (l.fueraDePlanilla) { t.fueraDePlanilla += 1; continue; }
+    // 🔴 Lo mismo con las que decide una persona, y el orden importa: se
+    // pregunta ANTES que `!l.dinero`, que es el cajón de los pendientes.
+    // ⚠️ `quincenalReferencia` NO se suma acá ni en ningún lado: es lo que le
+    // TOCARÍA, no lo que se le paga. Sumarlo inflaría el total con plata que
+    // nadie decidió pagar todavía.
+    if (grupoDeLinea(l) === "decidir") { t.decidirAMano += 1; continue; }
     if (!l.dinero) { t.sinConfigurar += 1; continue; }
     t.personas += 1;
     const d = l.dinero;
@@ -992,23 +1098,71 @@ export function totalizar(lineas: readonly LineaPlanilla[]): TotalesPlanilla {
 }
 
 /**
- * El orden del cuadro: primero los que se pagan, después los que no van en
- * planilla, y al final los pendientes.
+ * En qué cajón cae una línea. **Fuente ÚNICA**: la usan el orden del cuadro,
+ * los totales, la pantalla, el Excel y el PDF.
  *
- * 🔑 Los tres grupos van separados porque el Excel y el PDF recorren esta lista
- * tal cual: si los de servicio profesional quedaran mezclados entre los que sí
+ * 🔑 Cuatro cajones y no dos, y la diferencia entre los dos últimos es de la que
+ * se queja la contadora: «falta un dato» es algo que ELLA tiene que arreglar en
+ * Configuración; «decidilo vos» es algo que el sistema no puede saber y que
+ * decide una persona. Mezclarlos manda a buscar un arreglo que no existe.
+ *
+ * ⚠️ Si a alguien le falta un dato Y además hay que decidirlo, gana «falta»: sin
+ * la ficha completa no se puede decidir nada tampoco.
+ */
+export type GrupoLinea = "pagada" | "fuera" | "decidir" | "falta";
+
+export function grupoDeLinea(l: LineaPlanilla): GrupoLinea {
+  if (l.fueraDePlanilla) return "fuera";
+  if (l.dinero) return "pagada";
+  if (l.faltaConfigurar.length > 0) return "falta";
+  if (l.decidirAMano) return "decidir";
+  return "falta";
+}
+
+const ORDEN_GRUPO: Record<GrupoLinea, number> = { pagada: 0, fuera: 1, decidir: 2, falta: 3 };
+
+/**
+ * El orden del cuadro: primero los que se pagan, después los que no van en
+ * planilla, después los que decide una persona, y al final los pendientes.
+ *
+ * 🔑 Los grupos van separados porque el Excel y el PDF recorren esta lista tal
+ * cual: si los de servicio profesional quedaran mezclados entre los que sí
  * cobran, en el papel se leerían como filas con las columnas de dinero vacías.
  */
 export function ordenarLineas(lineas: readonly LineaPlanilla[]): LineaPlanilla[] {
-  const grupo = (l: LineaPlanilla) =>
-    l.fueraDePlanilla ? 1 : l.faltaConfigurar.length === 0 ? 0 : 2;
   return [...lineas].sort((a, b) => {
-    const ga = grupo(a);
-    const gb = grupo(b);
+    const ga = ORDEN_GRUPO[grupoDeLinea(a)];
+    const gb = ORDEN_GRUPO[grupoDeLinea(b)];
     if (ga !== gb) return ga - gb;
-    if (ga === 2) return a.codigo.localeCompare(b.codigo, "es", { numeric: true, sensitivity: "base" });
+    if (ga === ORDEN_GRUPO.falta) {
+      return a.codigo.localeCompare(b.codigo, "es", { numeric: true, sensitivity: "base" });
+    }
     return a.etiqueta.localeCompare(b.etiqueta, "es", { sensitivity: "base" });
   });
+}
+
+/**
+ * Saca del cuadro los códigos que marcaron y NO TIENEN FICHA.
+ *
+ * 🩸 `armarPlanilla` los mete en TODAS las empresas a propósito —no se les puede
+ * adivinar cuál es la suya, y filtrarlos por empresa los borraría de las tres
+ * pantallas a la vez—. El efecto colateral era que el código 50 aparecía TRES
+ * veces, una por cuadro, como si fueran tres personas distintas.
+ *
+ * 🔴 LA INTENCIÓN SE CONSERVA ENTERA: no desaparecen, siguen viniendo en el
+ * segundo arreglo del par para mostrarse UNA sola vez, arriba y fuera del cuadro
+ * de cualquier empresa. Lo que cambia es dónde se ven, no si se ven.
+ */
+export function separarSinFicha(lineas: readonly LineaPlanilla[]): {
+  lineas: LineaPlanilla[];
+  sinFicha: LineaPlanilla[];
+} {
+  const dentro: LineaPlanilla[] = [];
+  const sinFicha: LineaPlanilla[] = [];
+  for (const l of lineas) {
+    (l.faltaConfigurar.includes(FALTA.ficha) ? sinFicha : dentro).push(l);
+  }
+  return { lineas: dentro, sinFicha };
 }
 
 /**

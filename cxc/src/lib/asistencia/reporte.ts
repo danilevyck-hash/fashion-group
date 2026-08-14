@@ -50,22 +50,35 @@
 //    Por eso el resumen ADEMÁS separa cuántos de esos minutos vienen de días
 //    marcados mal — para que nadie descuente sobre un dato sin haberlo mirado.
 //
-// 6. 🔴 EL DÍA QUE TODAVÍA NO TERMINÓ NO ES UN DÍA MAL MARCADO, Y NO ES UNA
-//    AUSENCIA. Es la regla 5 leída con el reloj en la mano: "no tiene 4 marcas"
-//    solo significa algo cuando el día se acabó.
+// 6. 🔴 UN DÍA QUE TODAVÍA NO PASÓ NO ES UN DÍA MAL MARCADO, Y NO ES UNA
+//    AUSENCIA. Es la regla 5 leída con el calendario en la mano: "no tiene 4
+//    marcas" solo significa algo cuando el día se acabó.
 //    🩸 Medido el 13-ago-2026 a las ~15:00: **27 de 32 personas tenían 3
 //    marcas** —entraron, almorzaron, volvieron y todavía no se habían ido— y el
 //    reporte contaba a las 27 como error. Toda la oficina en rojo, todas las
 //    tardes, todos los días. Un aviso que suena siempre deja de leerse, y de
 //    paso empujaba el porcentaje de días mal marcados del 17% al 26%.
 //    Lo mismo con la ausencia: a las 8:59 nadie faltó todavía.
+//
+//    🔴 Y NO ES SOLO HOY: SON HOY Y TODOS LOS QUE VIENEN DESPUÉS. Esto empezó
+//    valiendo para un día —`fecha === diaEnCurso`— y esa versión dejaba
+//    entrar por la ventana el mismo error que cerraba por la puerta. Medido
+//    contra producción el 14-ago-2026, quincena del 1 al 15: la planilla
+//    descontaba **$1.127,78** de ausencia y **$866,99 de eso eran del 14, el
+//    día de hoy**, con las 33 personas "ausentes" a media mañana. Excluyendo
+//    solo hoy quedaban los días siguientes: abierta la quincena un día 3, los
+//    ~9 días hábiles que faltan se descuentan **a ~$870 cada uno** por gente
+//    que todavía no tuvo oportunidad de venir a trabajar. Un día futuro no es
+//    que "no terminó": es que ni siquiera empezó.
+//
 //    ⚠️ Las marcas del día SÍ se muestran y sus minutos SÍ se calculan — lo
-//    único que se suspende hasta que el día cierre es el JUICIO sobre él.
-//    ⚠️ Entra por parámetro (`diaEnCurso`) y por defecto NO se aplica: la
-//    PLANILLA no lo pasa y sigue dando exactamente los mismos números. Quien lo
-//    pasa es el Reporte, con el día-calendario de PANAMÁ (`hoyPanama()`) — en
-//    UTC pelado, entre las 7 p.m. y la medianoche el día salta y el reporte se
-//    equivoca todas las noches.
+//    único que se suspende hasta que el día cierre es el JUICIO sobre él. Para
+//    un día futuro no hay nada que calcular: no existe una marca todavía.
+//    ⚠️ Entra por parámetro (`diaEnCurso`) y sin él NADA cambia. Lo pasan el
+//    Reporte y la PLANILLA, los dos con el día-calendario de PANAMÁ
+//    (`hoyPanama()`) — en UTC pelado, entre las 7 p.m. y la medianoche el día
+//    salta y el reporte se equivoca todas las noches. Agrupar por UTC ya dio
+//    números falsos dos veces en este módulo.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { ALMUERZO_FIJO_MIN, REGLAS_DEFAULT, type ReglasAsistencia } from "./config";
@@ -154,14 +167,16 @@ export interface DiaReporte {
   /** El día no tiene 4 marcas: los números salen igual, pero hay que revisarlo. */
   revisar: boolean;
   /**
-   * El día TODAVÍA NO TERMINÓ (es hoy, en hora de Panamá). Ver regla 6.
+   * El día TODAVÍA NO PASÓ: es hoy (que sigue corriendo) o es posterior a hoy,
+   * en hora de Panamá. Ver regla 6.
    *
    * 🔴 Mientras esto sea `true`, `revisar` y `ausente` van SIEMPRE en `false`:
-   * no se puede juzgar un día que sigue corriendo. Las marcas y los minutos se
-   * calculan y se muestran igual — lo único que se suspende es el veredicto.
+   * no se puede juzgar un día que no terminó, y menos uno que no empezó. Las
+   * marcas y los minutos se calculan y se muestran igual — lo único que se
+   * suspende es el veredicto.
    *
-   * `false` en toda la PLANILLA: no pasa `diaEnCurso`, así que ningún día suyo
-   * es "en curso" y su cálculo queda idéntico al de siempre.
+   * `false` en todos los días de un rango que ya cerró: ahí no hay nada que
+   * suspender y el cálculo es idéntico al de siempre.
    */
   enCurso: boolean;
   ausente: boolean;
@@ -229,12 +244,13 @@ export interface PersonaReporte {
     extraMin: number;
     diasARevisar: number;
     /**
-     * Cuántos días del rango son "hoy" y siguen corriendo (0 ó 1). Ver regla 6.
+     * Cuántos días del rango TODAVÍA NO PASARON: hoy más los que vengan
+     * después, si el rango llega hasta allá. Ver regla 6.
      *
-     * 🔑 Se devuelve para que la pantalla pueda decir *"hoy va en curso"* en vez
-     * de esconderlo: un día que desaparece de la cuenta sin explicación se lee
-     * como un número que no cuadra. Va SIEMPRE aparte de `diasARevisar`, nunca
-     * sumado.
+     * 🔑 Se devuelve para que la pantalla pueda decir *"estos días todavía no
+     * pasaron"* en vez de esconderlos: un día que desaparece de la cuenta sin
+     * explicación se lee como un número que no cuadra. Va SIEMPRE aparte de
+     * `diasARevisar`, nunca sumado.
      */
     diasEnCurso: number;
     tiempoNoTrabajadoMin: number;
@@ -384,16 +400,23 @@ export function armarReporte(opts: {
    */
   incluirNoHabiles?: boolean;
   /**
-   * El día que TODAVÍA NO TERMINÓ, en formato `YYYY-MM-DD` y **en hora de
-   * Panamá** (`hoyPanama()`). Ver regla 6.
+   * EL PRIMER DÍA QUE TODAVÍA NO PASÓ: hoy, en formato `YYYY-MM-DD` y **en hora
+   * de Panamá** (`hoyPanama()`). Ese día **y todos los posteriores** dejan de
+   * juzgarse. Ver regla 6.
+   *
+   * 🔴 ES `>=`, NO `===`, Y ESA LETRA VALE $870 POR DÍA. Con la igualdad, abrir
+   * una quincena el día 3 dejaba los ~9 días hábiles que faltan contándose como
+   * falta de las 33 personas. El nombre se conserva —lo usan la ruta del
+   * Reporte y sus tests— pero lo que significa es "de acá en adelante todavía
+   * no pasó nada".
    *
    * 🔴 NO se calcula acá a propósito: este módulo es PURO y no puede mirar el
    * reloj, o los tests dependerían de la hora a la que se corran. Lo pasa quien
-   * llama, y solo el Reporte lo pasa.
+   * llama: el Reporte y la Planilla.
    *
    * ⚠️ No hace falta comprobar que caiga dentro de `[desde, hasta]`: si el rango
-   * termina antes de hoy, ningún día del recorrido coincide y no hay nada que
-   * excluir. Ése es justamente el borde — un rango pasado no tiene día en curso.
+   * termina antes de hoy, ningún día del recorrido lo alcanza y no hay nada que
+   * excluir. Ése es justamente el borde — un rango pasado se juzga entero.
    */
   diaEnCurso?: string | null;
   /**
@@ -475,8 +498,9 @@ export function armarReporte(opts: {
       const feriado = feriados.get(fecha) ?? null;
       const justificado = justificacionDe(justificaciones, codigo, fecha);
       const habil = esHabil(fecha);
-      // Regla 6. El día de hoy sigue corriendo: no se lo juzga.
-      const enCurso = !!opts.diaEnCurso && fecha === opts.diaEnCurso;
+      // Regla 6. Hoy sigue corriendo y mañana ni empezó: no se los juzga.
+      // 🔴 `>=`, no `===`. Ver la nota de `diaEnCurso`.
+      const enCurso = !!opts.diaEnCurso && fecha >= opts.diaEnCurso;
       // Segundos desde medianoche, en orden.
       const crudas = (p.dias.get(fecha) ?? []).slice().sort((a, b) => a - b);
       // Informativo: qué horas de este día se tocaron a mano. No entra en
