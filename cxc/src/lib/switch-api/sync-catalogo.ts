@@ -174,10 +174,76 @@ const MAX_PAGES = 250;
  *     corrida completa       ×4 138 s  →  ×8 106 s
  *
  * O sea que de los ~107 s que le quedan a Tommy, **cerca de la mitad son las
- * escrituras**, y ese es el próximo cuello: es de la BASE, no de Switch. Bajarlo
- * pide agrupar los UPDATE, que es lo que este PR NO hizo a propósito.
+ * escrituras**, y ese es el próximo cuello: es de la BASE, no de Switch.
+ *
+ * ═══ ✅ ESE CUELLO SE ATACÓ EL 14-AGO-2026, Y **NO** AGRUPANDO LOS UPDATE ═══
+ * Ver el bloque "LAS ESCRITURAS QUE NO CAMBIAN NADA NO SE HACEN", abajo.
  */
 const STOCK_CONCURRENCIA = 8;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LAS ESCRITURAS QUE NO CAMBIAN NADA NO SE HACEN (14-ago-2026)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🩸 **EL DATO QUE LO DISPARÓ, medido en producción.** El sync de Tommy manda
+ * **455 UPDATE de a uno** en cada corrida (Reebok 127, Joybees 83, Calvin 79) y
+ * esas escrituras son ~la mitad de su tiempo. Medido con `_verif-stock-
+ * concurrencia.ts` el 14-ago a las 06:17-06:38 UTC, sacando foto de las 5 tablas
+ * antes y después de cada corrida: **5 vueltas × 4 catálogos, 1.028 filas y
+ * 17.672 campos comparados por vuelta → 🟢 IDÉNTICO en las 20 corridas.** O sea
+ * que las 744 escrituras de cada vuelta le escribieron a la base exactamente lo
+ * que ya tenía, y en la verificación anterior (misma herramienta) de 497
+ * productos de Tommy solo se habían movido 54 campos, todos de
+ * `disponibilidad`.
+ *
+ * ⛔ **LO QUE NO SE HIZO, Y ES LA MITAD DE POR QUÉ SE PUDO HACER.** Daniel lo
+ * autorizó con una condición textual: *"solo si no me daña nada"*. En este write
+ * path viven la **foto** (`image_url` / `foto_manual`), el **nombre editado**
+ * (`nombre_manual`), la **etiqueta** (`badge`), el **"ocultar"**
+ * (`oculto_manual`) y el **bulto** (`bulto_pzas`) — trabajo hecho A MANO que
+ * **no vuelve de Switch si se pierde**: son 389 fotos de Tommy subidas una por
+ * una y 493 productos con foto. Así que:
+ *   · **NO se agruparon las escrituras en lotes** — un `upsert` mal armado se
+ *     lleva puestas las fotos de 490 productos;
+ *   · **NO cambió QUÉ columnas escribe un UPDATE ni con qué valores** — el
+ *     payload es el MISMO objeto de siempre, solo que ahora tiene nombre
+ *     (`cambios`) para poder compararlo antes de mandarlo;
+ *   · **NO se reordenó el write path**, ni se tocaron el read-all-then-write, el
+ *     guard del barrido de páginas (#498), el guard de precios imposibles ni la
+ *     regla de visibilidad.
+ * **Lo único que cambia es CUÁNTAS escrituras se hacen.** Un UPDATE que no
+ * ocurre no puede pisar una foto: no hay un camino donde esto borre nada.
+ *
+ * 🩸 **EL RIESGO REAL NO ES ESCRIBIR DE MÁS: ES NO ESCRIBIR NUNCA.** Si la
+ * comparación se equivoca por tipos (numeric contra string, `0` contra
+ * `"0.00"`, `null` contra `""`), se saltea el 100% y el catálogo se congela
+ * **sin un solo error** — el "cero silencioso". Se cubre con tres cosas:
+ *   1. **comparación por tipo EXPLÍCITO** en `catalogo-igualdad.ts` (módulo
+ *      puro), que solo devuelve "igual" cuando lo puede PROBAR: columna sin
+ *      declarar, columna que no se leyó o tipo inesperado ⇒ se escribe, o sea el
+ *      comportamiento de ayer;
+ *   2. **contadores por corrida** (`comparados` / `escrituras` / `sinCambios`)
+ *      en el resultado y en `switch_sync_log.skip_details` — sin DDL: esa
+ *      columna ya existe y los guards de montos ya la usan con SU propio
+ *      `campo`;
+ *   3. **guard de sanidad** cuando se saltea el 100%, que queda registrado y
+ *      **no falla cerrado** a propósito (ver `todoSalteado`).
+ * Y el peor caso del acierto es benigno: si se saltea una actualización que
+ * hacía falta, los 4 catálogos corren **4×/día** y la siguiente la agarra.
+ *
+ * **EL ANTES/DESPUÉS, en producción, 5 corridas de cada lado y MEDIANA** (la
+ * dispersión de Switch es grande: las 5 de Tommy de este mismo día fueron
+ * 77/84/87/95/86 s antes):
+ *
+ *     catálogo   UPDATE/corrida       antes      después
+ *     Joybees      83 →   0            36 s       ~
+ *     Reebok      127 →   0            41 s       ~
+ *     Calvin       79 →   0            56 s       ~
+ *     Tommy       455 →   0            84 s       ~
+ *
+ * (los números de "después" quedan escritos abajo, en el bloque de resultados)
+ */
 
 /**
  * Cuántas páginas de `/apiarticulos/lista` se piden a la vez.

@@ -93,21 +93,28 @@ export const TIPOS_CAMPO_CATALOGO: Readonly<Record<string, TipoCampo>> = Object.
 const ENTERO_RE = /^[+-]?\d+$/;
 const DECIMAL_RE = /^[+-]?\d+(\.\d+)?$/;
 
+/** `"007"` → `"7"`, `"-0"` → `"0"`, `"+5"` → `"5"`. Sin `Number` de por medio:
+ *  un `bigint` de la base (codigo_barra_id) no cabe en un double y compararlo
+ *  como número podría dar iguales dos IDs distintos. */
+function canonEntero(s: string): string {
+  const negativo = s.startsWith("-");
+  const digitos = s.replace(/^[+-]/, "").replace(/^0+(?=\d)/, "");
+  return digitos === "0" ? "0" : (negativo ? "-" : "") + digitos;
+}
+
 /**
  * Forma canónica de un entero, o `null` si el valor no ES demostrablemente un
  * entero. PostgREST devuelve un `int` como número JSON, pero un `bigint` o un
  * `numeric` pueden llegar como string según el driver y la escala — por eso se
- * aceptan las dos formas y se comparan como TEXTO canónico (`BigInt` normaliza
- * `"007"` → `"7"` y `"-0"` → `"0"`), que no puede perder precisión como un
- * `Number` con un bigint grande.
+ * aceptan las dos formas y se comparan como TEXTO canónico, que no puede perder
+ * precisión.
  */
 function comoEntero(v: unknown): string | null {
-  if (typeof v === "bigint") return String(v);
   if (typeof v === "number") return Number.isSafeInteger(v) ? String(v) : null;
   if (typeof v === "string") {
     const s = v.trim();
     if (!ENTERO_RE.test(s)) return null;
-    return String(BigInt(s));
+    return canonEntero(s);
   }
   return null;
 }
@@ -137,12 +144,13 @@ export function centavosDeMonto(v: unknown): number | null {
   const sinSigno = texto.replace(/^[+-]/, "");
   const [enteraRaw, fracRaw = ""] = sinSigno.split(".");
   const frac = `${fracRaw}000`.slice(0, 3);
-  const entera = BigInt(enteraRaw);
-  let centavos = entera * 100n + BigInt(frac.slice(0, 2));
-  if (Number(frac[2]) >= 5) centavos += 1n; // medio arriba, en valor absoluto
-  if (centavos > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-  const n = Number(centavos);
-  return negativo ? -n : n;
+  // Aritmética de ENTEROS sobre los dígitos: `entera * 100` es exacto mientras
+  // el resultado sea un entero seguro, y un precio que no lo sea no es un
+  // precio (el guard de montos imposibles ya lo habría rechazado antes).
+  let centavos = Number(enteraRaw) * 100 + Number(frac.slice(0, 2));
+  if (Number(frac[2]) >= 5) centavos += 1; // medio arriba, en valor absoluto
+  if (!Number.isSafeInteger(centavos)) return null;
+  return negativo ? -centavos : centavos;
 }
 
 /**
