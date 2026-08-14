@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import useSWR from "swr";
 import { VENDOR_MAP } from "@/lib/vendors";
 import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
@@ -11,12 +11,9 @@ import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
 // re-fetch desde cero que había con el fetch-on-mount.
 const SWR_KEY = "cxc-admin-data";
 
-interface ContactEntry { date: string; method: string }
-
 interface AdminData {
   clients: ConsolidatedClient[];
   uploads: Record<string, CxcUpload>;
-  contactLog: Record<string, ContactEntry>;
   ts: number;
 }
 
@@ -31,7 +28,12 @@ async function fetchAdminData(): Promise<AdminData> {
   // overrides/últimopago/contact-log: antes eran lecturas anon directas a Supabase;
   // ahora rutas server con service_role (RLS de esas tablas cerrada). No-críticas
   // (resuelven a [] si fallan); solo /api/cxc/aging puede rechazar → error.
-  const [vendorRows, upRows, agingJson, overrides, pagos, compras, log] =
+  //
+  // 🔴 La bitácora de contactos (`/api/cxc/contact-log`) ya NO se pide: nadie la
+  // dibujaba. Llegaba hasta la tabla y la tarjeta del celular como prop y
+  // ninguna de las dos la desestructuraba. Retirada el 14-ago-2026 junto con las
+  // opciones "Ya contacté" del menú — una petición menos por carga del panel.
+  const [vendorRows, upRows, agingJson, overrides, pagos, compras] =
     await Promise.all([
       fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
@@ -39,7 +41,6 @@ async function fetchAdminData(): Promise<AdminData> {
       fetch(`/api/cxc/overrides?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultimo-pago", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       fetch("/api/cxc/ultima-compra", { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-      fetch(`/api/cxc/contact-log?cartera=${CARTERA_GRUPO}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
     ]);
 
   // Vendor map (global VENDOR_MAP) — opcional.
@@ -169,16 +170,6 @@ async function fetchAdminData(): Promise<AdminData> {
 
   const clientsArr = Array.from(map.values()).filter((c) => c.total !== 0);
 
-  // Último contacto por cliente (cxc_contact_log, ya leído arriba en paralelo).
-  const latestLog: Record<string, ContactEntry> = {};
-  if (Array.isArray(log)) {
-    for (const l of log) {
-      if (!latestLog[l.nombre_normalized]) {
-        latestLog[l.nombre_normalized] = { date: l.contacted_at, method: l.method };
-      }
-    }
-  }
-
   // Frescura = cuándo se MATERIALIZÓ la MV del aging (no la hora del request). El
   // endpoint /api/cxc/aging devuelve refreshedAt (materializado_en de
   // switch_estadocuenta_aging_mv); si cayó al fallback de la view en vivo (sin MV
@@ -187,7 +178,7 @@ async function fetchAdminData(): Promise<AdminData> {
     ? new Date(agingJson.refreshedAt as string).getTime()
     : Date.now();
 
-  return { clients: clientsArr, uploads: latestUploads, contactLog: latestLog, ts: refreshTs };
+  return { clients: clientsArr, uploads: latestUploads, ts: refreshTs };
 }
 
 /**
@@ -207,14 +198,6 @@ export default function useAdminData(authReady: boolean = true) {
     },
   );
 
-  // contactLog como estado local para conservar la actualización OPTIMISTA del
-  // page (setContactLog al marcar contactado). Se re-sincroniza cuando llega
-  // data fresca de SWR (que ya incluye el contacto recién insertado).
-  const [contactLog, setContactLog] = useState<Record<string, ContactEntry>>({});
-  useEffect(() => {
-    if (data?.contactLog) setContactLog(data.contactLog);
-  }, [data]);
-
   // loadData → revalidación forzada (mutate). Lo usan PullToRefresh, Reintentar,
   // y las acciones de escritura (edición de contacto, marcar contactado) para
   // invalidar tras escribir y ver el saldo/estado al toque.
@@ -225,7 +208,6 @@ export default function useAdminData(authReady: boolean = true) {
   return {
     clients: data?.clients ?? [],
     uploads: data?.uploads ?? {},
-    contactLog,
     // Solo "cargando" cuando no hay nada que mostrar todavía (primer arranque).
     // Al volver, data ya está en la caché SWR en memoria → sin spinner.
     loading: isLoading && !data,
@@ -233,7 +215,6 @@ export default function useAdminData(authReady: boolean = true) {
     // muestra eso (stale) en vez de un error en blanco.
     loadError: error && !hasData ? "Error al cargar datos. Intenta de nuevo." : null,
     loadData,
-    setContactLog,
     dataTs: data?.ts ?? null,
     // Mostrando la caché en memoria (dato viejo) porque el refetch falló.
     fromCache: !!error && hasData,

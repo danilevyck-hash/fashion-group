@@ -386,16 +386,25 @@ describe("BARRIDO 2 — toda ruta que expone anotaciones exige la cartera", () =
 describe("BARRIDO 3 — los dos lados están cableados, cada uno con SU cartera", () => {
   const lee = (rel: string) => sinComentarios(fs.readFileSync(path.join(SRC, rel), "utf8"));
 
-  it("el panel del grupo manda cartera=grupo en las 4 llamadas", () => {
+  it("el panel del grupo manda cartera=grupo en todas sus llamadas", () => {
     const panel = lee("app/admin/page.tsx");
     const hook = lee("app/admin/hooks/useAdminData.ts");
     expect(panel).toContain("CARTERA_GRUPO");
     expect(panel).not.toContain("CARTERA_BOSTON");
-    // favoritos (GET + POST), contact-log (POST), overrides (POST)
+    // favoritos (GET + POST) y overrides (POST), más el import.
+    //
+    // ⚠️ El 14-ago-2026 se retiró el POST a contact-log: el menú "···" perdió
+    // las dos opciones "Ya contacté" (Daniel: el seguimiento de cobro NO va a
+    // existir en este módulo) y la bitácora dejó de escribirse desde acá. La
+    // tabla `cxc_contact_log` y sus 141 filas QUEDAN, y la puerta única sigue
+    // exigiendo la cartera — lo que bajó es la cuenta de llamadas, no el rigor.
     expect(panel.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(4);
-    // overrides (GET) y contact-log (GET) viven en el hook
+    // overrides (GET) vive en el hook; el GET de contact-log se retiró el mismo
+    // día (nadie pintaba el resultado: llegaba como prop y no se leía).
     expect(hook).toContain("cartera=${CARTERA_GRUPO}");
-    expect(hook.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(3);
+    expect(hook.match(/CARTERA_GRUPO/g)!.length).toBeGreaterThanOrEqual(2);
+    // Y lo que NO puede pasar: que el panel del grupo pida otra cartera.
+    expect(hook).not.toContain("CARTERA_BOSTON");
   });
 
   it("la pestaña de Boston manda cartera=boston, y NUNCA la del grupo", () => {

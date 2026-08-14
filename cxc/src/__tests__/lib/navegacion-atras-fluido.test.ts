@@ -70,7 +70,13 @@ describe("Tabs principales con URL propia (sobreviven refresh, se comparten)", (
 
   it("un ?tab= desconocido cae en la pestaña por defecto, nunca en blanco", () => {
     // Los tres convertidos hoy validan el valor crudo antes de usarlo.
-    expect(leer("src/app/admin/page.tsx")).toContain('tabRaw === "boston" ? "boston" : "grupo"');
+    //
+    // El CXC lo hace desde el 14-ago-2026 con `tabCxcPermitida`, que además de
+    // caer al grupo ante un valor desconocido mira el ROL: la pestaña de Boston
+    // solo la puede leer admin/secretaria, así que un link con `?tab=boston`
+    // tampoco puede dejar a un vendedor parado ahí. Lo que la función devuelve,
+    // caso por caso, lo prueba `cxc-boston-permiso.test.ts`.
+    expect(leer("src/app/admin/page.tsx")).toContain("tabCxcPermitida(tabRaw, userRole)");
     expect(leer("src/app/asistencia/AsistenciaClient.tsx")).toContain('TABS.some(([k]) => k === tabRaw)');
     expect(leer("src/app/productos/cargar/page.tsx")).toContain("PESTANAS.some((p) => p.id === tabRaw)");
     // Ventas se sumó al retirar la pestaña Referencia (12-ago-2026): sin este

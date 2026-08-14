@@ -12,16 +12,17 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
-import UndoToast from "@/components/UndoToast";
 import BostonTab from "@/components/cxc/BostonTab";
 import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
+import TabsCartera from "./components/TabsCartera";
 import EstadoCuentaDrawer from "./components/EstadoCuentaDrawer";
 import EnviarEmailModal from "./components/EnviarEmailModal";
 import useAdminData from "./hooks/useAdminData";
 import { CARTERA_GRUPO } from "@/lib/cxc/cartera";
+import { tabCxcPermitida } from "@/lib/cxc/boston-roles";
 import SyncStatus from "@/components/shared/SyncStatus";
 import SyncNowButton from "@/components/shared/SyncNowButton";
 import {
@@ -30,7 +31,6 @@ import {
 } from "@/lib/empresa-mapping";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
-import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import {
   ordenEfectivo,
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
-  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData(authChecked);
+  const { clients, uploads, loading, loadError, loadData } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   // Pestaña activa. Las dos carteras NUNCA se ven juntas: son dos consultas a
@@ -147,8 +147,12 @@ function AdminDashboardInner() {
   // Vive en la URL (?tab=boston) para que refresh y compartir-link conserven la
   // vista. Tab del MISMO nivel → replace (default de useUrlState): el Atrás del
   // navegador no cicla por pestañas, sale de la página (convención del sistema).
+  //
+  // 🔴 El permiso lo decide `lib/cxc/boston-roles.ts`, el MISMO que usa el
+  // endpoint: quien no puede leer la cartera de Boston tampoco puede quedarse
+  // parado en su pestaña por un link con `?tab=boston`.
   const [tabRaw, setTab] = useUrlState<"grupo" | "boston">("tab", "grupo");
-  const tab = tabRaw === "boston" ? "boston" : "grupo";
+  const tab = tabCxcPermitida(tabRaw, userRole);
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
   // riskFilter vive en la URL (?risk=) → compartible y sobrevive refresh.
   const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
@@ -188,7 +192,6 @@ function AdminDashboardInner() {
   const [estadoClient, setEstadoClient] = useState<ConsolidatedClient | null>(null);
   const openEstadoCuenta = useCallback((client: ConsolidatedClient) => setEstadoClient(client), []);
   const [emailClient, setEmailClient] = useState<ConsolidatedClient | null>(null);
-  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
@@ -401,43 +404,16 @@ function AdminDashboardInner() {
       .catch(() => showToast("No se pudo copiar. Intenta de nuevo."));
   }
 
-  function handleQuickMarkContacted(clientName: string, method: string) {
-    const prevEntry = contactLog[clientName];
-    const now = new Date().toISOString();
-    const methodLabel: Record<string, string> = {
-      email: "Email", llamada: "Llamada", visita: "Visita",
-    };
-
-    // Optimistic: badge transita a "0d" inmediatamente
-    setContactLog((prev) => ({ ...prev, [clientName]: { date: now, method } }));
-
-    scheduleAction({
-      id: `contact-${clientName}-${now}`,
-      message: `Contacto registrado vía ${methodLabel[method] ?? method}`,
-      execute: async () => {
-        const res = await fetch("/api/cxc/contact-log", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre_normalized: clientName, method, cartera: CARTERA_GRUPO }),
-        });
-        if (!res.ok) {
-          showToast("No se pudo registrar el contacto. Intenta de nuevo.");
-          throw new Error("contact-log POST failed");
-        }
-        // Invalidar la caché SWR tras la escritura → el último contacto del
-        // server reemplaza al optimista al toque (mutate).
-        loadData();
-      },
-      onRevert: () => {
-        setContactLog((prev) => {
-          const next = { ...prev };
-          if (prevEntry) next[clientName] = prevEntry;
-          else delete next[clientName];
-          return next;
-        });
-      },
-    });
-  }
+  // 🔴 EL SEGUIMIENTO DE COBRO NO EXISTE EN ESTE MÓDULO (Daniel, 14-ago-2026,
+  // textual: *"sobre darle seguimiento no es algo que quiero para ese módulo,
+  // llamo al cliente por fuera y ya"*). Acá vivía `handleQuickMarkContacted`,
+  // que escribía en `cxc_contact_log` desde las opciones "Ya contacté ·
+  // Llamada/Visita" del menú "···" — y lo escrito no se pintaba en NINGUNA
+  // parte: `contactLog` llegaba como prop a la tabla y a la tarjeta del celular
+  // y no se desestructuraba en ninguna de las dos. Medido: la tabla tiene 141
+  // filas, todas entre el 22-mar y el 16-abr-2026, cero en los últimos 90 días.
+  // La tabla y sus filas QUEDAN (son historia y no molestan); lo que se retiró
+  // es el camino que las escribía sin que nadie las leyera.
 
   async function handleSaveEdit(nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) {
     const res = await fetch("/api/cxc/overrides", {
@@ -510,32 +486,7 @@ function AdminDashboardInner() {
     <div>
       <AppHeader module="Cuentas por Cobrar" />
 
-      {/* Encabezado compacto: las pestañas viven en la misma línea que Exportar
-          para no gastar alto vertical (pedido de Daniel). Sin título grande. */}
-      <div className="max-w-6xl mx-auto px-4 pt-2">
-        <div className="flex items-center gap-1 border-b border-gray-200">
-          {([["grupo", "Grupo · 6 empresas"], ["boston", "Confecciones Boston"]] as const).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              aria-current={tab === k ? "page" : undefined}
-              className={`min-h-[44px] px-3 text-sm whitespace-nowrap border-b-2 -mb-px transition
-                          ${tab === k ? "border-gray-900 text-gray-900 font-medium" : "border-transparent text-gray-400 hover:text-gray-600"}`}
-            >
-              {label}
-            </button>
-          ))}
-          {/* Solo la coletilla de Boston, que dice algo que la pestaña no dice.
-              La del grupo era "6 empresas" al lado de la pestaña activa
-              "Grupo · 6 empresas": el mismo texto dos veces en la misma línea. */}
-          {tab === "boston" && (
-            <span className="ml-auto hidden md:block text-xs text-gray-400 pr-1">
-              Confecciones Boston · se lleva aparte
-            </span>
-          )}
-        </div>
-      </div>
+      <TabsCartera role={userRole} tab={tab} onTab={setTab} />
 
       {tab === "boston" ? (
         <div className="max-w-6xl mx-auto px-4 py-4 pb-16">
@@ -556,8 +507,6 @@ function AdminDashboardInner() {
         setCompanyFilter={setCompanyFilter}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
-        contactLog={contactLog}
-        onQuickMarkContacted={handleQuickMarkContacted}
         onOpenEmail={openEmail}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
@@ -703,10 +652,8 @@ function AdminDashboardInner() {
         toggleSort={toggleSort}
         sortArrow={sortArrow}
         userRole={userRole}
-        contactLog={contactLog}
         onOpenEmail={openEmail}
         onSaveEdit={handleSaveEdit}
-        onQuickMarkContacted={handleQuickMarkContacted}
         onWhatsApp={openWhatsApp}
         onCopyMessage={copyMessage}
         onOpenEstado={openEstadoCuenta}
@@ -732,9 +679,6 @@ function AdminDashboardInner() {
       />
 
       <Toast message={toast} />
-      {pendingUndo && (
-        <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />
-      )}
     </div>
     </PullToRefresh>
   );
