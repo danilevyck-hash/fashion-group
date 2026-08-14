@@ -136,8 +136,17 @@ export interface MarcaConfig {
   convertRpc: string;
   /** Prefijo de numeración que asigna la RPC (PED-### / JBP-###). */
   numeroPrefijo: string;
-  /** Nombre del cron de catálogo en cron_heartbeats (sync-status). */
+  /** Nombre del cron de catálogo en cron_heartbeats. Es el nombre que VIGILAN
+   *  el watchdog de Telegram y /api/health-crons: dice si el CRON corrió.
+   *  ⚠️ NO es la fuente del indicador "Sincronizado con Switch hace X" — ver
+   *  `syncType` y el encabezado de api/catalogo/[marca]/sync-status. */
   cronName: string;
+  /** `sync_type` de esta marca en switch_sync_log. Lo escribe la MISMA lib de
+   *  sync por los DOS caminos (cron y "Actualizar ahora"), así que es lo único
+   *  que sabe cuándo se actualizó el catálogo lo haya disparado quien lo haya
+   *  disparado. Espejo de `moduloConfig("catalogo-<marca>").syncType`
+   *  (switch-api/sync-now.ts) — hay candado de paridad. */
+  syncType: string;
 
   // ── Clients (lazy) ──
   /** Proyecto de la marca: orders/items/envios/products server-side. */
@@ -282,6 +291,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     convertRpc: "convert_reebok_pedido_publico",
     numeroPrefijo: "PED",
     cronName: "reebok-catalogo",
+    syncType: "catalogo_reebok",
     db: reebokServerDb,
     mainDb: mainServerDb,
     publicosDb: mainServerDb, // quirk heredado: publicos de Reebok en el principal
@@ -366,6 +376,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     convertRpc: "convert_joybees_pedido_publico",
     numeroPrefijo: "JBP",
     cronName: "joybees-catalogo",
+    syncType: "catalogo_joybees",
     db: joybeesServerDb,
     mainDb: mainServerDb,
     publicosDb: joybeesServerDb,
@@ -451,6 +462,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     convertRpc: "convert_tommy_pedido_publico",
     numeroPrefijo: "TOM",
     cronName: "tommy-catalogo",
+    syncType: "catalogo_tommy",
     db: tommyServerDb,
     mainDb: mainServerDb,
     publicosDb: tommyServerDb,
@@ -538,6 +550,7 @@ export const MARCAS_CONFIG: Record<string, MarcaConfig> = {
     convertRpc: "convert_calvin_pedido_publico",
     numeroPrefijo: "CKP",
     cronName: "calvin-catalogo",
+    syncType: "catalogo_calvin",
     db: calvinServerDb,
     mainDb: mainServerDb,
     publicosDb: calvinServerDb,
