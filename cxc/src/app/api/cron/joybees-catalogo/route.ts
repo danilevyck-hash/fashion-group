@@ -2,10 +2,21 @@
  * Cron diario: catálogo Joybees (joybees_products) auto-actualizado desde Switch
  * (empresa joystep, que vende EXCLUSIVAMENTE Joybees). Mismo patrón que reebok-catalogo.
  *
- * Schedule: 0 11 * * * y 5 17 * * * UTC (2 corridas/día, paridad con reebok-catalogo)
- * — cada corrida a ≥50min de los crons que tocan joystep (11:00: reconciliacion
- * 10:00; 17:05: estadocuenta 16:00 y reconciliacion 18:00). reebok-catalogo 17:00
- * va a 5 min pero toca solo active_shoes (empresas disjuntas, patrón 05:30/05:35/05:40).
+ * Schedule: 45 14, 15 17, 55 19 y 10 22 UTC = **9:45 a.m. · 12:15 p.m. · 2:55 p.m.
+ * · 5:10 p.m. de Panamá** (4 corridas/día desde el 13-ago-2026, paridad con
+ * reebok-catalogo). Las cuatro caen DENTRO de la ventana de uso del catálogo
+ * (10 a.m. - 6 p.m., dato de Daniel). Ver `CATALOGO_CRON_SLOTS_UTC`.
+ *
+ * Solo toca `joystep`. Va ÚLTIMO de los cuatro catálogos en cada banda porque es
+ * el más corto (**26 s** medidos el 12-ago-2026): el slot de las 14:45 queda a los
+ * 15 min justos de las ventas de las 15:00 —el mínimo de `SEPARACION_MINIMA_MIN`—
+ * y termina 14:45:26, con 14 min y medio de aire REAL. Los otros: 17:15 →
+ * reconciliación 18:00 a 45 min · 19:55 → recibos 19:15 a 40 · 22:10 →
+ * estadocuenta 21:20 a 50 y ventas 23:00 a 50.
+ *
+ * Los otros tres catálogos corren a 5 min de distancia pero tocan empresas
+ * DISJUNTAS (patrón 05:30/05:35/05:40): el escalonamiento es para no apilar
+ * cuatro barridos sobre la base en compute Micro, no por la sesión de Switch.
  *
  * Refresca precio/existencia/disponibilidad, oculta los que quedan en existencia 0,
  * auto-agrega los nuevos con existencia >= 1, y alerta por Telegram los nuevos sin

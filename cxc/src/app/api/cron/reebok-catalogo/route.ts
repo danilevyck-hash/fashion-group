@@ -1,9 +1,18 @@
 /**
  * Cron diario: catálogo Reebok (products) auto-actualizado desde Switch.
  *
- * Schedule: 45 6 * * * UTC — DESPUÉS de los switch-sync de Active Wear/Shoes
- * (05:30 / 05:40) para no chocar con la sesión única de Switch, y en un minuto
- * libre (06:00 backup, 06:30 ocupado).
+ * Schedule: 40 14, 10 17, 50 19 y 5 22 UTC = **9:40 a.m. · 12:10 p.m. · 2:50 p.m.
+ * · 5:05 p.m. de Panamá** (4 corridas/día desde el 13-ago-2026). Las cuatro caen
+ * DENTRO de la ventana en que se usa el catálogo — Daniel, textual: *"se usa
+ * catalogo mas de 10am a 6pm aproximadamente"*—, así que el pase de la mañana ya
+ * no se gasta a las 6 a.m. contra una oficina cerrada. Ver el calendario
+ * completo, con el porqué de cada minuto, en `CATALOGO_CRON_SLOTS_UTC`
+ * (cron-telemetry.ts).
+ *
+ * Solo toca `active_shoes`. Márgenes contra los crons que abren SU sesión:
+ * 14:40 → ventas 15:00 a 20 min · 17:10 → reconciliación 18:00 a 50 · 19:50 →
+ * recibos 19:15 a 35 · 22:05 → estadocuenta 21:20 a 45 y ventas 23:00 a 55.
+ * Barrido medido: **49 s** (12-ago-2026, tras el paralelismo del #540).
  *
  * Refresca precio/existencia/disponibilidad de los productos visibles, oculta
  * los que quedan en existencia 0, auto-agrega los nuevos con existencia >= 1, y

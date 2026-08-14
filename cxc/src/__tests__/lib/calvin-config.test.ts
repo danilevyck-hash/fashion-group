@@ -206,26 +206,35 @@ describe("MARCA_THEME.calvin — blanco/negro minimalista, completo y coherente"
 });
 
 describe("registro del cron calvin-catalogo en todos los sitios", () => {
-  it("vercel.json: 2 slots (12:50 y 16:40 UTC)", () => {
+  it("vercel.json: 4 slots (14:35, 17:05, 19:45 y 22:00 UTC)", () => {
+    // 13-ago-2026: los pases se mudaron DENTRO de la ventana de uso de Panamá
+    // (9:35 a.m. - 5:00 p.m. para Calvin) y pasaron de 2 a 4.
     const vercel = JSON.parse(
       readFileSync(path.join(process.cwd(), "vercel.json"), "utf8"),
     ) as { crons: { path: string; schedule: string }[] };
     const calvin = vercel.crons.filter((c) => c.path === "/api/cron/calvin-catalogo");
-    expect(calvin.map((c) => c.schedule).sort()).toEqual(["40 16 * * *", "50 12 * * *"]);
+    expect(calvin.map((c) => c.schedule).sort()).toEqual([
+      "0 22 * * *",
+      "35 14 * * *",
+      "45 19 * * *",
+      "5 17 * * *",
+    ]);
   });
 
-  it("SWITCH_CRON_ENTRADAS: 1250 y 1640 sobre vistana", () => {
+  it("SWITCH_CRON_ENTRADAS: 1435, 1705, 1945 y 2200 sobre vistana", () => {
     const entradas = SWITCH_CRON_ENTRADAS.filter((e) => e.cron === "calvin-catalogo");
-    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1250", "1640"]);
+    expect(entradas.map((e) => e.hhmmUtc).sort()).toEqual(["1435", "1705", "1945", "2200"]);
     for (const e of entradas) expect(e.empresas).toEqual(["vistana"]);
   });
 
   it("CATALOGO_CRON_SLOTS_UTC espeja vercel.json (ciclo del colateral)", () => {
-    expect(CATALOGO_CRON_SLOTS_UTC["calvin-catalogo"]).toEqual(["12:50", "16:40"]);
+    expect(CATALOGO_CRON_SLOTS_UTC["calvin-catalogo"]).toEqual(["14:35", "17:05", "19:45", "22:00"]);
   });
 
-  it("recuperación colateral desde las 13 UTC + vigilancia seed-tolerante", () => {
-    expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["calvin-catalogo"]).toBe(13);
+  it("recuperación colateral desde las 15 UTC + vigilancia seed-tolerante", () => {
+    // 13 → 15: su primer slot del día (14:35) cae DESPUÉS de la pasada de las
+    // 14:00, así que solo la de las 18:00 puede recuperarlo.
+    expect(COLATERAL_RECOVER_AFTER_HOUR_UTC["calvin-catalogo"]).toBe(15);
     // Seed-tolerante MIENTRAS la DDL 20260812150000 no corra y el heartbeat no
     // lleve días sembrado — el mismo camino que recorrió Tommy antes de su
     // promoción a fail-closed. Estar en las DOS listas rompería la biyección
