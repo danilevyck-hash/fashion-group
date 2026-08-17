@@ -21,6 +21,15 @@ const MAX_DIMENSION = 1600;
 const JPEG_QUALITY = 0.8;
 const COMPRESSIBLE = ["image/jpeg", "image/png", "image/webp"];
 
+/** Ajustes de `compressImage`. Omitirlos deja EXACTAMENTE el comportamiento de
+ *  siempre (1600 px · JPEG 0.8), que es el que necesitan Reclamos y Mobiliario. */
+export interface OpcionesCompresion {
+  /** Lado mayor máximo, en píxeles. */
+  maxDimension?: number;
+  /** Calidad JPEG, 0-1. */
+  quality?: number;
+}
+
 /** Valida tipo/tamaño ANTES de subir. Devuelve mensaje de error o null si OK. */
 export function validateFotoFile(file: File): string | null {
   if (file.type && !ALLOWED.includes(file.type)) {
@@ -82,13 +91,20 @@ async function decodeImage(file: File): Promise<{ src: CanvasImageSource; w: num
  * resultado no es más liviano conserva el original. Tolerante a fallos: si algo
  * sale mal (formato raro, canvas no disponible) devuelve el archivo tal cual —
  * el manejo de error/413 de la subida sigue cubriendo el caso extremo.
+ *
+ * `opts` permite pedir OTRO tamaño sin escribir un segundo compresor: el
+ * Depurador pega miniaturas dentro de un Excel y necesita ~300 px, no 1600
+ * (203 fotos a 1600 px darían un archivo imposible de abrir). **Sin `opts` el
+ * comportamiento es el de siempre**, así que Reclamos y Mobiliario no cambian.
  */
-export async function compressImage(file: File): Promise<File> {
+export async function compressImage(file: File, opts: OpcionesCompresion = {}): Promise<File> {
+  const maxDimension = opts.maxDimension ?? MAX_DIMENSION;
+  const quality = opts.quality ?? JPEG_QUALITY;
   if (!COMPRESSIBLE.includes(file.type)) return file; // gif/avif → tal cual
   try {
     const { src, w, h, close } = await decodeImage(file);
     const longest = Math.max(w, h);
-    const scale = longest > MAX_DIMENSION ? MAX_DIMENSION / longest : 1; // nunca agranda
+    const scale = longest > maxDimension ? maxDimension / longest : 1; // nunca agranda
     const tw = Math.max(1, Math.round(w * scale));
     const th = Math.max(1, Math.round(h * scale));
     const canvas = document.createElement("canvas");
@@ -98,7 +114,7 @@ export async function compressImage(file: File): Promise<File> {
     if (!ctx) { close(); return file; }
     ctx.drawImage(src, 0, 0, tw, th);
     close();
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", JPEG_QUALITY));
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality));
     if (!blob || blob.size >= file.size) return file; // ya era más chico → conserva original
     const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
     return new File([blob], name, { type: "image/jpeg" });

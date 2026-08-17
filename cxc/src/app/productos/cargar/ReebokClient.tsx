@@ -27,6 +27,15 @@ import {
 } from "@/lib/depurador/reebok";
 import { marcaKey, type Redondeo, type MarcaFormula, type MarcaRubroFormula } from "@/lib/depurador/logic";
 import type { SheetRow } from "@/lib/depurador/logic";
+import {
+  indexarFotos,
+  parearFotos,
+  textoEmparejado,
+  ANCHO_COL_FOTO_WCH,
+  ALTO_FILA_PT,
+} from "@/lib/depurador/fotos-excel";
+import { prepararFotos } from "./fotos-carpeta";
+import { saveAs } from "file-saver";
 import { Ayuda } from "@/components/shared/Ayuda";
 
 type NameMode = "formula" | "fijo";
@@ -76,6 +85,14 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   const [flashName, setFlashName] = useState<string | null>(null);
   const [excOpen, setExcOpen] = useState(false);
   const [excFilter, setExcFilter] = useState("");
+
+  // ── Fotos del pedido (opcional) ─────────────────────────────────────────────
+  // La carpeta se lee del disco de la persona y NO se sube a ningún lado: solo
+  // se achican las fotos que emparejan con un código y se pegan dentro del .xlsx.
+  const carpetaRef = useRef<HTMLInputElement>(null);
+  const [fotosArchivos, setFotosArchivos] = useState<File[] | null>(null);
+  const [fotoProgreso, setFotoProgreso] = useState<{ hechas: number; total: number } | null>(null);
+  const [resumenFotos, setResumenFotos] = useState<string>("");
 
   // Temporada automática: fecha actual, día 1 del mes en curso, formato AAAA-MM
   // (idéntico a CK/TH → logic.ts). Sin campo manual.
@@ -241,6 +258,24 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   // Se filtró y no quedó nada: entregar un Excel vacío en silencio sería lo peor.
   const quedoVacio = filtrarSinPiezas && vista.articulos === 0;
 
+  // Índice de la carpeta: solo NOMBRES, no se lee el contenido de ningún archivo
+  // (la carpeta real son 4.742 fotos y ~800 MB).
+  const fotosIndice = useMemo(
+    () => (fotosArchivos ? indexarFotos(fotosArchivos) : null),
+    [fotosArchivos],
+  );
+  // Emparejado contra las filas que van al Excel, en el MISMO orden que el Excel.
+  const emparejado = useMemo(
+    () => (fotosIndice ? parearFotos(catalogo.map((r) => r.newArticle), fotosIndice.indice) : null),
+    [fotosIndice, catalogo],
+  );
+
+  const quitarFotos = () => {
+    setFotosArchivos(null);
+    setResumenFotos("");
+    if (carpetaRef.current) carpetaRef.current.value = "";
+  };
+
   // ── Excepciones por Name: fila derivada, edición y guardado ──────────────────
   const nameRowFor = (name: string) => {
     const key = marcaKey(name);
@@ -336,20 +371,73 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
   };
 
   // Salida A — Catálogo de clientes (pedido).
+  //
+  // Dos caminos. SIN carpeta de fotos es EXACTAMENTE el de siempre (mismas
+  // columnas, mismos anchos, mismo `writeFile`): lo de las fotos es opcional y
+  // no puede cambiar el archivo que el Depurador ya entrega.
   const downloadCatalogo = async () => {
     if (!items || downloading || quedoVacio) return;
     setDownloading("catalogo");
+    const nombre = `Pedido_ActiveShoes_${monthLabel || temporada}.xlsx`;
     try {
       const XLSX = (await import("xlsx-js-style")).default;
-      const aoa = buildCatalogoAoa(catalogo, monthLabel);
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      // Código de artículo como texto (New Article numérico → evita notación científica).
-      forceTextCols(XLSX, ws as never, [1]);
-      ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 2 ? 26 : i === 1 ? 14 : 13 }));
       const wb = XLSX.utils.book_new();
+
+      if (!emparejado) {
+        const aoa = buildCatalogoAoa(catalogo, monthLabel);
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        // Código de artículo como texto (New Article numérico → evita notación científica).
+        forceTextCols(XLSX, ws as never, [1]);
+        ws["!cols"] = aoa[0].map((_c, i) => ({ wch: i === 2 ? 26 : i === 1 ? 14 : 13 }));
+        XLSX.utils.book_append_sheet(wb, ws, "Pedido");
+        XLSX.writeFile(wb, nombre);
+        return;
+      }
+
+      // Con fotos: primero se achican (es lo que tarda), después se arma el Excel.
+      setFotoProgreso({ hechas: 0, total: emparejado.conFoto });
+      const prep = await prepararFotos(emparejado.pares, (hechas, total) =>
+        setFotoProgreso({ hechas, total }),
+      );
+      setFotoProgreso(null);
+
+      const aoa = buildCatalogoAoa(catalogo, monthLabel, (cod) => prep.conFoto.has(cod));
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      // ⚠️ Con la columna "Foto" adelante, New Article pasó del índice 1 al 2:
+      // forzar el índice viejo dejaría los códigos en notación científica.
+      forceTextCols(XLSX, ws as never, [2]);
+      ws["!cols"] = aoa[0].map((_c, i) => ({
+        wch: i === 0 ? ANCHO_COL_FOTO_WCH : i === 3 ? 26 : i === 2 ? 14 : 13,
+      }));
+      // Filas altas para que la foto entre; el encabezado queda como está.
+      ws["!rows"] = aoa.map((_r, i) => (i === 0 ? {} : { hpt: ALTO_FILA_PT }));
       XLSX.utils.book_append_sheet(wb, ws, "Pedido");
-      XLSX.writeFile(wb, `Pedido_ActiveShoes_${monthLabel || temporada}.xlsx`);
+
+      const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+      // Perezoso: `jszip` solo se descarga cuando de verdad hay fotos que pegar.
+      const { incrustarFotosEnXlsx } = await import("@/lib/depurador/fotos-xlsx");
+      const conFotos = await incrustarFotosEnXlsx(new Uint8Array(bytes), prep.fotos);
+      // Se copia a un ArrayBuffer propio en vez de castear el Uint8Array: `Blob`
+      // no acepta una vista sobre un buffer que TypeScript no puede probar que
+      // sea `ArrayBuffer`, y un cast acá sería mentirle al compilador.
+      const salida = new ArrayBuffer(conFotos.byteLength);
+      new Uint8Array(salida).set(conFotos);
+      saveAs(
+        new Blob([salida], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        nombre,
+      );
+
+      const mb = salida.byteLength / 1048576;
+      const falladas = prep.fallidas.length
+        ? ` · ${prep.fallidas.length} foto(s) no se pudieron leer y quedaron en NO IMAGEN`
+        : "";
+      setResumenFotos(
+        `Listo · ${textoEmparejado(prep.fotos.length, emparejado.pares.length)}${falladas} · el archivo pesa ${mb.toFixed(1)} MB`,
+      );
     } finally {
+      setFotoProgreso(null);
       setDownloading("");
     }
   };
@@ -569,6 +657,81 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
             )}
           </div>
 
+          {/* Fotos del pedido — solo aplica al Excel para el cliente. La plantilla
+              Switch no lleva fotos (se sube a Switch, no la mira nadie). */}
+          {salida === "catalogo" && (
+            <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+              {/* 12 px y no los 11 de los rótulos vecinos: es texto NUEVO y la
+                  regla de los 3 anchos es que nada nuevo baje de 12 px. */}
+              <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-stone-500">
+                Fotos del pedido (opcional)
+              </div>
+              <input
+                ref={carpetaRef}
+                type="file"
+                accept="image/jpeg"
+                multiple
+                className="hidden"
+                aria-label="Carpeta de fotos"
+                onChange={(e) => {
+                  const lista = e.target.files ? Array.from(e.target.files) : [];
+                  setResumenFotos("");
+                  setFotosArchivos(lista.length ? lista : null);
+                }}
+                {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+              />
+              {!emparejado ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => carpetaRef.current?.click()}
+                    className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
+                  >
+                    Elegir carpeta de fotos
+                  </button>
+                  <div className="mt-2 text-[12px] text-stone-500">
+                    Cada foto tiene que llamarse igual que el código: <b>100262385.jpg</b>.
+                    Si no eliges carpeta, el Excel sale como siempre.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[13px] text-stone-700">
+                    <b className="font-semibold text-stone-900">
+                      {fotosIndice!.indice.size.toLocaleString()} fotos
+                    </b>{" "}
+                    en la carpeta · {textoEmparejado(emparejado.conFoto, emparejado.pares.length)}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => carpetaRef.current?.click()}
+                      className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-900 transition hover:border-red-600 hover:text-red-700 active:scale-[0.97]"
+                    >
+                      Cambiar carpeta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={quitarFotos}
+                      className="min-h-[44px] rounded-md border border-stone-300 bg-white px-4 text-sm font-semibold text-stone-600 transition hover:border-stone-400 active:scale-[0.97]"
+                    >
+                      Quitar fotos
+                    </button>
+                  </div>
+                  <div className="mt-2 text-[12px] text-stone-500">
+                    Las fotos se leen de tu computadora y <b>no se suben a ningún lado</b>: se
+                    achican y se pegan dentro del Excel que descargas.
+                  </div>
+                </>
+              )}
+              {resumenFotos && (
+                <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-800">
+                  {resumenFotos}
+                </div>
+              )}
+            </div>
+          )}
+
           {monthColIdx === -1 && (
             <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
               No detecté una columna de mes. Elige arriba cuál tiene las piezas por artículo.
@@ -601,7 +764,13 @@ export default function ReebokClient({ injectedFile, onReset }: ReebokClientProp
                 disabled={!!downloading || quedoVacio}
                 className="rounded-md bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:bg-stone-300"
               >
-                {downloading ? "Generando…" : salida === "catalogo" ? "Descargar pedido" : "Descargar plantilla Switch"}
+                {fotoProgreso
+                  ? `Achicando fotos… ${fotoProgreso.hechas} de ${fotoProgreso.total}`
+                  : downloading
+                    ? "Generando…"
+                    : salida === "catalogo"
+                      ? emparejado ? "Descargar pedido con fotos" : "Descargar pedido"
+                      : "Descargar plantilla Switch"}
               </button>
               <button
                 onClick={reset}

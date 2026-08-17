@@ -10,6 +10,7 @@
 
 import { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar, precioDescripcion, marcaKey } from "./logic";
 import type { Cell, SheetRow, Redondeo, MarcaRubroFormula } from "./logic";
+import { COL_FOTO, TEXTO_SIN_FOTO } from "./fotos-excel";
 
 export { OUT_COLS_DEFAULT, TEXT_COLS, ceilPar };
 
@@ -282,19 +283,33 @@ export function buildCatalogo(items: ReebokItem[], cfg: CatalogoConfig): Catalog
 
 /** AOA del catálogo de clientes. `monthLabel` rotula la columna de piezas (ej. "JULIO").
  *  NO incluye WholesalePrice, Costo ni COLOR NAME (son internos; el cliente solo ve
- *  Precio A/B y piezas). */
-export function buildCatalogoAoa(rows: CatalogoRow[], monthLabel: string): (string | number)[][] {
+ *  Precio A/B y piezas).
+ *
+ *  `tieneFoto` es OPCIONAL y solo lo manda la pantalla cuando se eligió una carpeta
+ *  de fotos: agrega la columna "Foto" ADELANTE (a la izquierda del código, igual que
+ *  el Excel que Daniel arma a mano con el macro). La celda va vacía cuando hay foto
+ *  —la imagen se pega encima— y dice "NO IMAGEN" cuando no la hay: **la fila nunca
+ *  se salta**. 🔴 Sin `tieneFoto` el resultado es EXACTAMENTE el de siempre, columna
+ *  por columna: lo de las fotos es opcional y no puede cambiar el Excel de hoy. */
+export function buildCatalogoAoa(
+  rows: CatalogoRow[],
+  monthLabel: string,
+  tieneFoto?: (newArticle: string) => boolean,
+): (string | number)[][] {
   const head = [
     "PO NAME", "New Article", "Name", "Department", "CATEGORY", "AGE GROUP", "GENDER",
     "Precio A", "Precio B", `Piezas ${monthLabel}`.trim(),
   ];
+  if (tieneFoto) head.unshift(COL_FOTO);
   const aoa: (string | number)[][] = [head];
   const cell = (v: number | null): string | number => (v === null ? "" : v);
   for (const r of rows) {
-    aoa.push([
+    const fila: (string | number)[] = [
       r.po, r.newArticle, r.name, r.department, r.category, r.ageGroup, r.gender,
       cell(r.precioA), cell(r.precioB), r.piezas,
-    ]);
+    ];
+    if (tieneFoto) fila.unshift(tieneFoto(r.newArticle) ? "" : TEXTO_SIN_FOTO);
+    aoa.push(fila);
   }
   return aoa;
 }
