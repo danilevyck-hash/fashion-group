@@ -92,8 +92,11 @@ for (const ancho of ANCHOS) {
       ventanaDentro: r.left >= -1 && r.right <= window.innerWidth + 1,
       anchoVentana: Math.round(r.width),
       altoVentana: Math.round(r.height),
-      haySugerencias: d.textContent.includes("¿Quisiste decir"),
+      // Desde ago-2026 la red la dibuja el SELECTOR y pregunta con todas las
+      // letras: "¿Es City Mall Paso Canoa (D-25)?" (o "¿Es alguno de estos?").
+      haySugerencias: /¿Es /.test(d.textContent),
       hayAvisoSinParecidos: d.textContent.includes("No hay ningún cliente parecido"),
+      textoVentana: (d.textContent || "").replace(/\s+/g, " ").slice(0, 260),
       sugerencias: [...d.querySelectorAll("button")].map((b) => (b.textContent || "").trim()).filter((t) => /D-\d+/.test(t)).slice(0, 4),
       targetsChicos: chicos,
       desbordes,

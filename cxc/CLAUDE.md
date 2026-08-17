@@ -349,6 +349,78 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > Candados: `src/__tests__/lib/guias-reglas-nombres-exactos.test.ts` (18), `clientes-sugerencias.test.ts` (45, todos con TEXTOS REALES de `guia_items` contra CLIENTES REALES) y **`src/__tests__/components/guias-sugerencias-cliente.test.tsx` (11), que RENDERIZA la ventana y toca los botones** — el riesgo de verdad no es la matemática sino que la sugerencia se convierta en un atado, y eso un test de función pura no lo puede ver. **Verificado por mutación: 6 de 6 cazadas** — borrar los dígitos al normalizar (3 tests), cruzar `N2 → D-118` (2), que la vista previa difiera del UPDATE (el archivo entero se pone rojo), dejar de excluir D-201 (3), sacarle al número su peso en el orden (1) y hacer que tocar una sugerencia guarde (3).
 
+## 🔴 UN SOLO SELECTOR DE CLIENTE EN TODO EL SISTEMA — y la salida a mano se llama con todas las letras (17-ago-2026)
+
+> Daniel vio una guía donde alguien **escribió a mano el nombre de un cliente que SÍ estaba en la lista** y el renglón quedó sin atar. Su propuesta, textual: *"que se escriba como un buscador los clientes y solo texto libre si ponen la opción de otros (debería de haber 'un cliente' como otro)"* — *"sin hacer fricción ni complicarlo"*. Y sobre el alcance: ***"sí, todos deben de tener mismo selector, tiene que hacer sentido con el sistema"***.
+>
+> ### 1. La salida a mano dice que es LA SALIDA
+>
+> ```
+> ANTES                                  AHORA
+> Otro — guardar "City Mal" a mano       ➕ No está en la lista — escribir a mano
+>                                           Se guarda "City Mal"
+> chip del campo:  Otro                  chip del campo:  A mano
+> ```
+>
+> 🩸 **"Otro" a secas SE LEE COMO UN CLIENTE MÁS DEL SISTEMA**, y por eso alguien la tocó sin buscar primero. El rótulo nuevo dice lo que es —la salida, no una opción equivalente— y el texto tecleado sigue a la vista, porque es lo que se va a guardar. El distintivo del campo pasó de `Otro` (ámbar) a **`A mano`**, por lo mismo.
+>
+> 🔴 **ELEGIR CLIENTE NO SE VOLVIÓ OBLIGATORIO, y no puede volverse.** Es decisión escrita de Daniel y hay un dato que la sostiene: **272 de los 441 renglones (62%) van a un destino que hoy NO existe en el directorio**. Volverlo obligatorio le traba el trabajo a bodega todos los días. **Lo que cambia es que escribir a mano sea DELIBERADO, no un accidente.**
+>
+> ### 2. La red de seguridad: si escriben a mano algo que SÍ está
+>
+> ```
+> ¿Es Hanna Calzados (D-71)?            ← un solo parecido: se pregunta con todas las letras
+> [ Sí, es Hanna Calzados ] [ No, es otro ]
+>
+> ¿Es alguno de estos?                  ← varios: la lista, con sus avisos
+> City Mall Paso Canoa            D-25
+> City Mall David                 D-24
+> [ No, es otro ]
+> Tocar una solo la elige. Nada se guarda hasta que aprietes Guardar.
+> ```
+>
+> 🔑 **NO SE CONSTRUYÓ UN BUSCADOR NUEVO.** El motor ya existía y se REUSA tal cual: `src/lib/clientes/sugerencias.ts` + `SugerenciasCliente.tsx`, el mismo "¿quisiste decir…?" que se usaba al atar clientes en guías viejas. Lo único que cambió es **quién lo dibuja**: ahora lo dibuja **`ClientePicker`**, o sea que aparece en TODAS las pantallas donde se puede escribir un cliente a mano, y no solo en la ventana de atar. Por eso el componente se mudó de `app/guias/components/` a `src/components/`.
+>
+> **Las reglas del motor NO se tocaron, y hay candado de mutación para cada una:** la sugerencia **NUNCA ata sola** (ni con un único candidato clavado: tocarla solo copia al selector y se escribe recién al apretar Guardar) · **D-201 no se sugiere** (es el duplicado sin respaldo en Switch) · **las diferencias de número se avisan y pesan en el orden** (`Outlet Duty Free N2` y `N3` son tiendas DISTINTAS) · **sin directorio cargado se calla** (decir "no hay ninguno parecido" sin haber podido mirar mandaría a dar de alta un cliente que ya existe).
+>
+> ⚠️ **El "no hay ningún cliente parecido" SOLO lo dice la ventana "Atar cliente"** (`avisarSinParecidos`), donde la tarea entera es encontrar al cliente. En el formulario de una guía va apagado a propósito: con 272 renglones a destinos que no existen, un cartel por fila sería gritarle a bodega lo que acaba de declarar al elegir "escribir a mano" — la fricción que Daniel pidió no meter. Cuando no hay candidatos, se calla.
+>
+> ⚠️ **En la ventana de atar, la sugerencia se MUDÓ de arriba del campo a debajo** — es el mismo bloque, ahora dibujado por el selector. Nada se perdió: los candidatos, sus avisos y el mensaje de "no hay ninguno" siguen ahí.
+>
+> ### 3. El inventario: dónde se elige cliente en todo el sistema
+>
+> | Dónde | Control | ¿Salida a mano? |
+> |---|---|---|
+> | Guías › crear/editar (`GuiaForm`) | **ClientePicker** | **SÍ** — bodega despacha a destinos que no existen |
+> | Guías › "Atar cliente" | **ClientePicker** (+ avisa cuando no hay parecidos) | SÍ |
+> | Cheques › nuevo/editar | **ClientePicker** | SÍ |
+> | Marketing › Registrar gasto | **ClientePicker** `permitirOtro={false}` | **NO** — el cliente amarra sí o sí |
+> | Marketing › Editar proyecto | **ClientePicker** `permitirOtro={false}` | **NO** (antes era texto libre, ver abajo) |
+> | Catálogo › pedidos (detalle, duplicar) | `ClienteSwitchPicker` | otro universo: clientes de **Switch** por empresa, con "Contado" |
+> | Catálogo › checkout del carrito | lista propia sobre el MISMO universo Switch | 🔴 **HALLAZGO, ver abajo** |
+> | Catálogo PÚBLICO › "Tu nombre" | `<input>` libre | **SÍ, a propósito** — el visitante escribe su nombre (#556) |
+>
+> 🩸 **EL HALLAZGO QUE SE ARREGLÓ: `ClienteTypeahead` (Marketing › Editar proyecto).** Era la SEGUNDA forma de elegir cliente que quedaba en pie, y con `onFreeText`: tecleando cualquier cosa y saliéndose, el proyecto quedaba con `tienda` escrita a mano y `tienda_codigo` VACÍO — en el MISMO campo que "Registrar gasto" ya amarraba con `permitirOtro={false}`. **El componente se BORRÓ** (era su único consumidor). ⚠️ Un proyecto viejo con la tienda a mano NO se rompe: el selector solo cambia el valor cuando alguien ELIGE, así que el texto que ya estaba se conserva y se guarda igual; lo que se cierra es escribir uno NUEVO a mano.
+>
+> 🔴 **EL HALLAZGO QUE **NO** SE TOCÓ, y es decisión de Daniel: `CheckoutClient` tiene su propia lista de clientes sobre el mismo universo de Switch que `ClienteSwitchPicker`.** Son dos formas de elegir un cliente de Switch. **No se unificó**: es el checkout de pedidos, recién rehecho (#504-#509, #563), la fuente es otra ruta (`/api/catalogo/switch-clientes` contra `/[marca]/clientes-switch`) y tocarlo ahí es riesgo sobre plata que nadie pidió. Queda anotado como excepción EXPLÍCITA en el candado, o sea que no se puede multiplicar sin que el build se ponga rojo.
+>
+> ### 4. El candado: un barrido que pone el build ROJO si aparece otro selector
+>
+> **`src/__tests__/un-solo-selector-de-cliente.test.ts`.** No es una lista de pantallas a revisar a mano —eso caza lo que ya se conoce y no puede cazar lo que alguien escriba mañana—: es un **detector PURO** sobre el código, con tres señales (llamar al motor de búsqueda del directorio · guardar un cliente elegido con un control propio ofreciendo una lista, sin delegar en el selector compartido · un `<datalist>` de clientes) y **excepciones explícitas con el motivo escrito**, más un test que las declara zombis si el archivo ya no existe o dejó de ser un hallazgo.
+> - ⚠️ **El barrido BORRA LOS COMENTARIOS PRIMERO** — este repo ya pagó cuatro veces el candado que se cumple con su propia explicación, y este archivo nombra `ClienteTypeahead` y `setCliente(` en su encabezado.
+> - 🔑 **El detector se prueba con fuentes SINTÉTICAS**: si solo corriera contra el repo de hoy, un detector roto devolvería cero hallazgos y todo pasaría en verde sin haber mirado nada. Distingue "elegir" de "buscar": un buscador que solo FILTRA una lista (el directorio, la cartera, las ventas) no ata a nadie y no entra.
+>
+> **Los otros candados, todos de CONDUCTA (renderizan y tocan los botones):** `components/cliente-red-de-seguridad.test.tsx` (12), `guia-cliente-desplegable.test.tsx`, `guias-form.test.tsx`, `guias-sugerencias-cliente.test.tsx` y `marketing-registrar-gasto.test.tsx`.
+> - **Verificado por mutación, 11 de 11 cazadas** (`bash scripts/_mutar-candados-selector-cliente.sh`): el rótulo vuelve a "Otro" · el chip vuelve a "Otro" · el selector deja de dibujar la red · la sugerencia ATA SOLA con un único candidato · D-201 vuelve a sugerirse · la diferencia de número deja de avisarse · el "no hay ninguno parecido" se enciende en TODAS las filas · elegir cliente se vuelve obligatorio por defecto · las guías apagan la salida a mano · aparece un segundo selector en el sistema · vuelve `ClienteTypeahead`.
+> - 🩸 **La restauración del script va por COPIA, no por `git checkout`**: hay archivos NUEVOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilan y ninguna se prueba por separado. Ya pasó en este repo.
+>
+> ### 5. Medición
+>
+> **Los 3 anchos, en el navegador contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-selector-cliente.mjs`, solo lectura, nunca toca "Guardar Guía"): **390 · 834 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px** en los dos estados (la lista desplegable con el rótulo nuevo, y la red de seguridad dentro de una fila del formulario). La caja crece **hacia abajo**: 137 px de alto con un candidato y 234-252 con dos. Con el texto real `Hanna Calzado` la pantalla dice **"¿Es Hanna Calzados (D-71)?"** con sus dos botones de 44 px.
+> - La ventana de atar, medida con el script de siempre (`_medir-guias-sugerencias-anchos.mjs`) contra una línea REAL sin atar: `City Shoes` → **"¿Es City Shoes (D-35)?"**, 0 px de arrastre, 0 táctiles bajo 44 y 0 textos bajo 12 en los tres anchos.
+> - 🩸 **Dos gotchas de medición, y los dos daban verde sin haber mirado nada:** a 1440 el formulario dibuja **los DOS layouts** (tarjeta y tabla) y esconde uno con CSS, así que el primer selector del DOM es el INVISIBLE —hay que quedarse con el visible o se mide una caja de 0×0—; y contar los tocables de TODA la pantalla acusa a este cambio de los campos de 34 px que el formulario usa a propósito en escritorio con mouse (`pointer:fine`, ver `CTRL_BASE`).
+
+
 > 🔴 **UNA línea atada a `111380`, que no es del grupo** (GT-183, "American Classic Store"). Se coló por el backfill de jun-2026 (`20260607131000`), que filtraba `cm.codigo IS NOT NULL` en vez de `LIKE 'D-%'` — y Boston/Multifashion usan códigos numéricos pelados. **No se corrigió automáticamente porque no es inequívoco** si va a NULL o a un D-XXX ("American Classic Store" de Boston vs "American Classics" D-201 del grupo no son obviamente el mismo negocio). Se arregla desde la pantalla: `/guias` → GT-183 → tocar el chip `111380` → elegir o "Quitar".
 
 > **DESPACHAR ES UNA PANTALLA, NO UN ACORDEÓN — y el N° del transportista es POR LÍNEA (10-ago-2026).**

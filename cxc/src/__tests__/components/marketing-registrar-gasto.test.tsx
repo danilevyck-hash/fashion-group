@@ -179,11 +179,11 @@ describe("cliente OBLIGATORIO y DE LA LISTA en Factura y Mueble", () => {
     },
   );
 
-  it('acá NO existe la salida "Otro" del picker de Guías', async () => {
+  it("acá NO existe la salida a mano del picker de Guías", async () => {
     abrir();
     fireEvent.click(document.querySelector('[data-camino="factura"]')!);
     await buscarCliente("Cliente inventado");
-    expect(screen.queryByText(/Otro — guardar/)).toBeNull();
+    expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
     expect(
       screen.getByText(/Solo clientes de la lista — si no está, hay que darlo de alta/),
     ).toBeTruthy();

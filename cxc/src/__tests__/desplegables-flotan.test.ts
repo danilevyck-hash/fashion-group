@@ -62,18 +62,6 @@ const EXCEPCIONES: Record<string, string> = {
   // la pantalla. Migrarlo a portal no arreglaría nada y rompería el arrastre.
   "components/ui.tsx": "BottomSheet — panel dentro de su propio fixed inset-0",
 
-  // MEDIDO en el navegador el 30-jul-2026 (Marketing › Nuevo proyecto ›
-  // Cliente, 390 / 834 / 1440 px, con 8 resultados reales): 0 px recortados,
-  // 0 px fuera de pantalla, 0 px de desplazamiento en los tres. Sobrevive
-  // porque Cliente es el PRIMER campo del modal y la lista cae dentro del
-  // cuerpo con scroll. No se toca: no está roto (la regla de este barrido es
-  // arreglar lo que se rompe, no lo que se parece), y el archivo es de un
-  // módulo que tenía trabajo en curso el día del arreglo.
-  // ⚠️ Si algún día el campo Cliente deja de ser el primero, esto se rompe:
-  //     hay que pasarlo a <DesplegableFlotante> y borrar esta excepción.
-  "app/guias/components/ClienteTypeahead.tsx":
-    "typeahead de Marketing — medido sano en los 3 anchos; primer campo del modal",
-
   // Catálogos (Reebok / Joybees / Tommy) tenía trabajo en curso el día del
   // barrido, así que no se tocó. NO está medido: queda anotado como deuda.
   "lib/catalogo/marcas-ui.tsx":
@@ -197,7 +185,6 @@ describe("Las excepciones siguen siendo las que se decidieron", () => {
     // venir acá y explicarse.
     expect(Object.keys(EXCEPCIONES).sort()).toEqual([
       "app/admin/components/PanelCxcMobile.tsx",
-      "app/guias/components/ClienteTypeahead.tsx",
       "components/shared/SyncNowButton.tsx",
       "components/ui.tsx",
       "components/ventas/ComisionesCriterios.tsx",

@@ -22,7 +22,6 @@ import { useEffect, useState } from "react";
 import { ModalOverlay } from "@/components/ui";
 import { Ayuda } from "@/components/shared/Ayuda";
 import ClientePicker from "@/components/ClientePicker";
-import SugerenciasCliente from "./SugerenciasCliente";
 import type { ClienteHit } from "@/lib/hooks/useBusquedaClientes";
 
 interface Props {
@@ -112,21 +111,6 @@ export default function AtarClienteModal({
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">En la guía dice</p>
           <p className="text-sm font-medium text-black mb-4 break-words">{clienteTexto || "—"}</p>
 
-          {/* Las sugerencias van ARRIBA del buscador y solo mientras no haya
-              nada elegido: una vez que hay cliente, seguir ofreciendo otros es
-              invitar a cambiarlo sin motivo. Tocarlas no guarda: llena el
-              campo de abajo y desaparecen. */}
-          {!codigo.trim() && (
-            <SugerenciasCliente
-              clienteTexto={clienteTexto}
-              clientes={clientesDelGrupo ?? []}
-              onElegir={(n, c) => {
-                setNombre(n);
-                setCodigo(c);
-              }}
-            />
-          )}
-
           {/* El "no cambia nada de la guía" NO se borra — es lo que hace que
               alguien se anime a tocar una guía cerrada. Pero se aprende una
               sola vez, así que vive en el ⓘ en vez de gritar cada vez. */}
@@ -141,11 +125,25 @@ export default function AtarClienteModal({
               </p>
             </Ayuda>
           </div>
+          {/* 🔑 Las sugerencias las dibuja el SELECTOR, debajo del campo: es el
+              MISMO "¿Es este cliente?" que ve quien crea una guía o un cheque
+              (`ClientePicker` → `SugerenciasCliente`). Antes vivían acá arriba
+              y eran de Guías solamente; que la red de seguridad exista en una
+              pantalla sí y en otra no es lo que este cambio vino a terminar.
+              Tocarlas NO guarda: llenan el campo y hay que apretar Guardar.
+
+              `avisarSinParecidos` lo enciende SOLO esta ventana: acá la tarea
+              entera es encontrar al cliente, y quedarse muda cuando no hay
+              ninguno parecido manda a buscar durante minutos algo que no está.
+              El directorio se pasa por prop porque esta ventana ya lo tiene
+              cargado — y `[]` significa "no se pudo leer", no "no hay". */}
           <ClientePicker
             id="atar-cliente-picker"
             value={nombre}
             codigo={codigo}
             topClientes={topClientes}
+            clientesDelGrupo={clientesDelGrupo}
+            avisarSinParecidos
             onChange={(n, c) => {
               setNombre(n);
               setCodigo(c);

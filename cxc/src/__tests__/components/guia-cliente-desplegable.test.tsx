@@ -189,14 +189,27 @@ describe("Elegir de la lista deja el cliente VINCULADO", () => {
     expect(screen.getByTitle("Vinculado al directorio (D-170)").className).toContain("emerald");
   });
 
-  it('"Otro" guarda el texto a mano con el chip ÁMBAR', async () => {
+  it("la salida a mano guarda el texto con el chip ÁMBAR, y se llama con todas las letras", async () => {
     render(<EnLaTabla />);
     await escribir("Cliente nuevo");
-    fireEvent.mouseDown(screen.getByText(/Otro — guardar/));
+    // 🔑 Se toca el RÓTULO NUEVO. Decía "Otro", y "Otro" se lee como un cliente
+    // más de la lista: alguien la tocaba sin buscar primero.
+    fireEvent.mouseDown(screen.getByText(/No está en la lista — escribir a mano/));
     expect(campo().value).toBe("Cliente nuevo");
     const chip = screen.getByTitle("Escrito a mano — no está en el directorio");
-    expect(chip.textContent).toBe("Otro");
+    expect(chip.textContent).toBe("A mano");
     expect(chip.className).toContain("amber");
+  });
+
+  it("🔴 la salida a mano NO puede volver a llamarse solo \"Otro\"", async () => {
+    render(<EnLaTabla />);
+    await escribir("Cliente nuevo");
+    const lista = document.querySelector('[data-desplegable="cliente"]')!;
+    expect(lista.textContent).toContain("No está en la lista — escribir a mano");
+    // El texto tecleado se sigue viendo: es lo que se va a guardar.
+    expect(lista.textContent).toContain("Cliente nuevo");
+    // Y en ningún lado queda un "Otro" pelado que se lea como un cliente.
+    expect(lista.textContent).not.toMatch(/(^|[^a-zA-ZáéíóúñÁÉÍÓÚÑ])Otro([^a-zA-ZáéíóúñÁÉÍÓÚÑ]|$)/);
   });
 
   it("los MÁS USADOS siguen apareciendo sin teclear — Daniel los usa", async () => {
