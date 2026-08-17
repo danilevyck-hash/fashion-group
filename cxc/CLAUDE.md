@@ -573,6 +573,63 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - Candado: `src/__tests__/lib/divisor-rango.test.ts` (46 casos, verificado por mutación: desarmar el techo rompe 11). Incluye barrido estático — una ruta que escriba un divisor sin llamar al guard pone el build **ROJO**.
 > - **Barrido del mismo patrón "porcentaje vs fracción" (27-jul):** `comision_vendedor_tasa.tasa_venta` ya está blindada (`config/route.ts:90`, cap `0..0.20`, decimal). `itbms_pct` es un enum cerrado `0|7` (porcentaje entero, siempre `/100` al usarse) y `descuento_global_pct` es solo lectura desde Switch. **El divisor era el único campo de configuración sin tope.**
 
+> ## 🔴 Depurador — EL PEDIDO DE REEBOK SALE CON LAS FOTOS PEGADAS, Y LAS FOTOS NO SE SUBEN (17-ago-2026)
+>
+> Hasta hoy Daniel armaba ese Excel **a mano con un macro de VBA**: pegaba los códigos en una columna, corría el macro, elegía una carpeta y el macro le pegaba la foto de cada código al lado. Lo quiere desde el sistema para que su secretaria (Windows) lo use **sin instalar nada**. Para qué es, textual: ***"interno"*** — nadie más lo usa; esos códigos entran a Switch más adelante, hoy todavía no están.
+>
+> **El flujo:** se carga el Excel del proveedor como siempre → en *Pedido para cliente* aparece **"Fotos del pedido (opcional)"** → se elige la carpeta (selector de carpeta del navegador, `webkitdirectory`) → antes de descargar la pantalla ya dice **"172 de 172 códigos con foto · no falta ninguna"** → el Excel baja con la foto incrustada en la **primera columna**, a la izquierda del código.
+>
+> ### 🔑 LAS FOTOS NO SE SUBEN A NINGÚN LADO — todo pasa en el navegador
+>
+> La carpeta real (`OneDrive-FashionGroup/Reebok/Fotos`) son **4.744 .jpg y ~818 MB**. Subirlas sería otro problema —almacenamiento, sincronización, permisos— que nadie pidió. El emparejado, el achicado y el armado del ZIP ocurren **en la máquina de la persona**: en `fotos-carpeta.ts` no hay un solo `fetch`, y el índice de la carpeta se arma **solo con los NOMBRES** (no se lee el contenido de ningún archivo que no empareje con un código del pedido).
+>
+> ### 🔴 EL EMPAREJADO ES POR NOMBRE EXACTO, SIN MAYÚSCULAS Y NADA MÁS
+>
+> `100262385` ↔ `100262385.jpg`. No se quitan guiones, no se recorta, no se comparan parecidos ni distancias de edición. **Es la lección de `Outlet Duty Free N2` vs `N3`** (ver Guías): dos códigos parecidos son DOS artículos, y pegarle al pedido la foto del artículo de al lado **no deja ningún rastro** — el cliente recibe el catálogo con la foto equivocada y nadie se entera nunca. Un código sin foto exacta sale con **`NO IMAGEN`**, que es la verdad, y **la fila NO se salta** (mismo texto que usa hoy el macro). Hay candado con los casos que engañan: `100073063_black.jpg` no es `100073063`, `T1A8-32600-313.jpg` no es `T1A832600313`, `00100262385.jpg` no es `100262385`.
+>
+> ### ⚠️ `xlsx-js-style` NO SABE INCRUSTAR IMÁGENES — y NO se cambió la librería
+>
+> Verificado abriendo el bundle publicado (`dist/xlsx.bundle.js`, v1.2.0): **cero apariciones** de `xdr:`, `oneCellAnchor`, `twoCellAnchor`, `xl/media`, `drawing1.xml` y `sheet_add_image`. No hay opción escondida.
+>
+> **La salida la sigue armando `xlsx-js-style` exactamente como hoy** (mismas celdas, mismos anchos, mismo forzado a texto de los códigos) y después `src/lib/depurador/fotos-xlsx.ts` le agrega al ZIP las partes que le faltan (`xl/media/*`, `xl/drawings/drawing1.xml` + sus rels, el `<drawing r:id>` de la hoja y el Override de `[Content_Types].xml`). **`jszip` YA era dependencia** (lo usa el ZIP de Marketing) y se importa perezoso, así que solo se descarga cuando de verdad hay fotos. Cambiar de librería de exports habría tocado TODO el sistema por un botón.
+> - La hoja se resuelve por el índice del propio archivo (`workbook.xml` → `workbook.xml.rels`), no adivinando `sheet1.xml`.
+> - El `<drawing>` va al FINAL del `<worksheet>` (después de `<ignoredErrors>`, que es lo último que escribe SheetJS): ese es el orden del esquema.
+> - Si la hoja YA tenía un dibujo, **corta con error en vez de pisarlo**.
+> - Dos filas con la MISMA foto (el mismo artículo en dos PO) comparten un solo archivo dentro del ZIP: medido, **172 anclas contra 109 imágenes**.
+>
+> ### Las fotos se achican REUSANDO `compressImage`, no con un segundo compresor
+>
+> `compressImage` (el de Reclamos) ganó un `opts` OPCIONAL —`{ maxDimension, quality }`— y **sin `opts` se comporta exactamente igual que siempre** (1600 px · JPEG 0.8), así que Reclamos y Mobiliario no cambian. El Depurador le pide **300 px · 0.72**: 203 fotos de 600×600 sin achicar son **20,5 MB** y el Excel sería imposible de mandar por correo.
+> - **La foto se encaja en la celda con UNA SOLA escala para los dos ejes** (`encajar`): dos escalas distintas deforman el producto. Nunca agranda una foto más chica que la caja.
+> - Una foto que no se puede leer NO deja la celda en blanco: ese código sale de `conFoto` y su celda dice `NO IMAGEN`. Una celda vacía se vería igual que "no se pegó y nadie se dio cuenta".
+>
+> ### 🔴 SIN CARPETA, EL EXCEL DE HOY SALE IDÉNTICO
+>
+> `buildCatalogoAoa(rows, mes)` sin el tercer parámetro devuelve **exactamente** las 10 columnas de siempre, y `incrustarFotosEnXlsx` con la lista vacía **devuelve los mismos bytes sin abrir el ZIP** (no lo re-empaqueta "por las dudas"). Medido en el navegador: sin carpeta el archivo pesa **87 KB, primera columna `PO NAME`, 10 columnas, 0 imágenes en el ZIP**.
+> - ⚠️ **Con la columna `Foto` adelante, `New Article` pasó del índice 1 al 2** y el `forceTextCols` se corrió con él: forzar el índice viejo habría dejado los códigos en **notación científica**. Verificado en el archivo descargado: `C2 = "100277416"` con `t="s"`.
+> - **La plantilla Switch NO lleva fotos** (se sube a Switch, no la mira nadie) y el bloque ni se dibuja en ese modo. **El Depurador CK/TH tampoco cambió**: la carpeta de fotos y los códigos son de Reebok.
+> - ⚠️ **No se tocó una sola línea del cálculo de precios** (`TECHO(CIF ÷ divisor) + extra`, `validarDivisor`).
+>
+> ### Medido con la carpeta REAL y el pedido REAL
+>
+> `BASE=… node scripts/_medir-fotos-pedido.mjs` (solo lectura sobre la carpeta). **Se le pasa la CARPETA ENTERA de verdad** —las 4.744 fotos, 818 MB—, que es lo que hace la persona; `MUESTRA=1` arma una copia por enlaces duros (mismos bytes, sin copiar) para iterar más rápido, y da los mismos números. La entrada son los **203 códigos del `1000 fiver excel.xlsm`** de Daniel, puestos en el formato Book4 que el Depurador lee.
+>
+> | | |
+> |---|---|
+> | del clic a que el archivo baja | **906 ms** |
+> | peso del .xlsx | **0,65 MB** (contra **20,5 MB** de originales) |
+> | filas / fotos | 172 filas · **172 de 172 con foto** · 109 imágenes distintas |
+> | elegir la carpeta de 4.744 y emparejar | **299 ms** |
+> | sin carpeta de fotos | 87 KB · `PO NAME` · 10 columnas · 0 imágenes |
+>
+> ⚠️ **Las 172 filas no son un recorte de las 203 líneas del macro:** el Depurador agrupa por PO + artículo y descarta los que no tienen piezas del mes, que es lo que ya hacía antes de este cambio. Y **109 imágenes contra 172 anclas** es el mismo artículo repetido en dos PO, no fotos perdidas.
+>
+> **El archivo se abre de verdad, y con DOS parsers independientes:** `xlsx-js-style` lo relee (172 filas, 1ª columna `Foto`, el código sigue siendo texto) y **`openpyxl` ve las 172 imágenes** ancladas en `col 0`, con `alto de fila 72` y `ancho de columna 14,83`. Una de las miniaturas extraída del ZIP es un JPEG real de 300×300 y 7 KB.
+>
+> **Los 3 anchos (+ el iPad acostado), contra el build de producción:** **390 · 834 · 1024 · 1440 → 0 px de arrastre de página**, y la caja nueva da **0 recorte, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px** en los cuatro (crece hacia abajo: 211 px de alto a 390, 174 a 834, 156 a 1024 y 1440). Su rótulo va a **12 px y no a los 11 de los dos rótulos vecinos**, a propósito: es texto NUEVO. El único recorte de la pantalla es el **scroller declarado de la vista previa** (`DIV.max-h-[440px].overflow-auto`, 291 px a 390 y 71 a 834): es PRE-EXISTENTE y es el mecanismo, no un defecto. El script **falla** si no encuentra la caja, si falta alguna foto, si el archivo no baja o si no se puede abrir.
+>
+> **Candado: `src/__tests__/lib/depurador-fotos-excel.test.ts` (26).** No busca texto en archivos: arma libros de verdad, los incrusta, los vuelve a abrir con la librería de Excel y con JSZip, y lee las anclas. Incluye un bloque que corre contra la **carpeta real** si está en la máquina (y se saltea en CI en vez de dar verde por nada).
+
 - **Soft delete (`deleted` boolean), por módulo:**
   - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
   - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
