@@ -14,6 +14,7 @@ import { validateProductPhoto, uploadProductPhoto, updateProductBadge, togglePro
 import type { AdminProducto, MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { getMarcaTheme } from "@/lib/catalogo/marcas-ui";
 import { fmtPrecio } from "@/lib/catalogo/precio";
+import { compararCodigos } from "@/lib/catalogos/orden-codigo";
 
 /** Saber si un SKU tiene fotos del banco B2B guardadas (lo calcula el shell). */
 /** Cuántas fotos ALTERNATIVAS (distintas a la puesta) tiene el SKU. 0 = no se
@@ -137,8 +138,11 @@ export function CatalogoCompletoTab({
       }
       return true;
     })
-    // Orden alfabético por nombre ascendente (locale es).
-    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    // Orden alfabético por nombre ascendente (locale es), y el CÓDIGO desempata.
+    // ⚠️ Sin el desempate no era "orden alfabético": `sensitivity: "base"` da 0
+    // para todo un bloque de nombres iguales —99 "Women-Flip Flops" en Tommy— y
+    // ahí el orden lo decidía la base. Ver `orden-codigo.ts`.
+    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }) || compararCodigos(a.sku, b.sku));
 
   const categoriaTabs: { key: CategoriaFilter; label: string }[] = [
     { key: "todas", label: "Todas" },

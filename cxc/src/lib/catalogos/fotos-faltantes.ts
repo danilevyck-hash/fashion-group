@@ -10,9 +10,12 @@
 //   3. Resumen SEMANAL de fotos faltantes (cron catalogos-fotos-resumen):
 //      buildResumenSemanalMsg.
 //
-// Módulo puro (sin imports) — importable desde componentes cliente y desde
-// crons server-side, y testeable sin supabase.
+// Módulo puro (su único import es otro módulo puro, `orden-codigo`) —
+// importable desde componentes cliente y desde crons server-side, y testeable
+// sin supabase.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { compararCodigos } from "./orden-codigo";
 
 /** Máximo de códigos listados en los mensajes de Telegram; el resto se agrupa
  *  como "y N más". */
@@ -52,23 +55,13 @@ export function colaSinFoto<T extends ProductoFotoInfo>(products: T[]): T[] {
 /**
  * Orden A-Z de una lista de códigos, sin duplicados y sin vacíos.
  *
- * Deliberadamente NO usa `localeCompare` con opciones: el resultado tiene que
- * ser el mismo en el navegador de Daniel, en Node y en el test, y las tablas de
- * ICU no lo garantizan. Con códigos A-Z0-9 la comparación cruda en MAYÚSCULAS
- * ES el orden alfabético. Lo usan el Excel de la plantilla B2B
+ * La comparación —cruda y en MAYÚSCULAS, sin `localeCompare`— vive en
+ * `orden-codigo.ts` y ahí está el porqué. Lo usan el Excel de la plantilla B2B
  * (dash-busqueda-excel) y el aviso de productos nuevos sin foto.
  */
 export function ordenarCodigosAZ(codigos: readonly (string | null | undefined)[]): string[] {
   const limpios = codigos.map((c) => String(c ?? "").trim()).filter(Boolean);
-  return Array.from(new Set(limpios)).sort((a, b) => {
-    const A = a.toUpperCase();
-    const B = b.toUpperCase();
-    if (A < B) return -1;
-    if (A > B) return 1;
-    // Desempate estable por el código crudo (dos códigos que solo difieren en
-    // mayúsculas/minúsculas no pueden quedar en orden aleatorio).
-    return a < b ? -1 : a > b ? 1 : 0;
-  });
+  return Array.from(new Set(limpios)).sort(compararCodigos);
 }
 
 /** "A, B, C" o —si son más de `limit`— "A, …, O y N más". */

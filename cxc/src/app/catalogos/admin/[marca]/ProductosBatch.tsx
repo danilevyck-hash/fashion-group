@@ -12,6 +12,7 @@ import BultoSelector from "./BultoSelector";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob } from "@/lib/csv-export";
+import { compararCodigos } from "@/lib/catalogos/orden-codigo";
 import { validateProductPhoto, uploadProductPhoto, toggleProductOculto, editProductName } from "./photoUpload";
 import ZipB2BUpload from "./ZipB2BUpload";
 import VariantePicker from "./VariantePicker";
@@ -181,10 +182,15 @@ export function ProductosBatchListTab({
 
   const hayFiltros = !!(genero || categoria || bulto || soloSneakers || search);
 
+  // ⚠️ El admin ordena por su cuenta y NO es el orden del catálogo: acá lo
+  // primero es lo que tiene stock (es una cola de trabajo, no una vitrina).
+  // Lo que sí comparte es el DESEMPATE por código: con 19 nombres para 498
+  // productos, "ordenado por nombre" dejaba bloques enteros en el orden en que
+  // viniera la base. Ver `orden-codigo.ts`.
   const sorted = [...filtered].sort((a, b) => {
     if ((a.stock ?? 0) > 0 && (b.stock ?? 0) === 0) return -1;
     if ((a.stock ?? 0) === 0 && (b.stock ?? 0) > 0) return 1;
-    return a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name) || compararCodigos(a.sku, b.sku);
   });
 
   return (

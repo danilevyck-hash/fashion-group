@@ -1084,6 +1084,67 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > - **Verificado por mutación, 6 de 6 cazadas:** volver a restar joystep en `empresas.ts` (5 tests) · devolver el filtro a mano en `ComisionesView.tsx` (1) · el punto decimal mal en la RPC, `0.0050 → 0.5` (1) · un caso especial por empresa dentro de la RPC (1) · quitarle el guard de retenciones (1) · sacar joystep del consolidado (2).
 > - El candado viejo de `comisiones-consolidado-neto.test.ts` exigía un `.filter` en `empresas.ts` — **era el candado el que fijaba el bug**. Pasó a exigir lo que siempre quiso decir: que la lista se DERIVE de `B2B_EMPRESA_KEYS`, y suma `ComisionesView.tsx` a los archivos vigilados.
 
+## 🔴 Catálogos — EL CÓDIGO DESEMPATA EL ORDEN, y el público ordenaba DISTINTO que el vendedor (17-ago-2026)
+
+> Daniel, mirando el catálogo de **Calvin**: los productos `KCMEENA683`, `KCMEENA004`, `KCMEENA-A210` y `KCMEENAA962` salían **desperdigados** entre los `HW0HW…` y los `KCTO…` en vez de juntos.
+>
+> 🩸 **LA CAUSA: el orden "Relevancia" ordena por categoría → género → NOMBRE, y los cuatro se llaman igual (`Women-Flip Flops`).** Al empatar el nombre, el orden final quedaba **como viniera de la base**, o sea arbitrario. **El código nunca se miraba.**
+>
+> **El nombre no distingue, así que tampoco puede ordenar. Medido contra producción el 17-ago-2026:** Tommy tiene **498 productos con solo 19 nombres distintos** (103 dicen `Women-Sneakers`, 99 `Women-Flip Flops`) y Calvin **81 con 5**. O sea que en Tommy **el 100% de las tarjetas empata con alguna otra**.
+>
+> ### El arreglo: el SKU es el desempate FINAL
+>
+> `compararCodigos()` (`src/lib/catalogos/orden-codigo.ts`, módulo PURO) va **al final de todo**, después de categoría, género y nombre. **No mueve nada que hoy no empate**, y está medido: la secuencia de SECCIONES es idéntica antes y después en las dos marcas — ningún producto sale de su categoría/género.
+> - **También en "Nombre A-Z"**, donde el empate es todavía más obvio.
+> - 🔑 **Y también en "Precio: menor a mayor" y "mayor a menor".** Dos productos del mismo precio también quedaban arbitrarios; es el mismo defecto y va al final igual, así que no cambia el orden de nada que tenga precios distintos.
+> - 🔴 **SON CUATRO `.sort()`, no uno.** Cada pantalla tiene **DOS pipelines** —la lista plana y los GRUPOS (`groupByModel`, que es como se dibuja Joybees)— y el de grupos desempata por el `baseSku` del grupo. Tocar uno solo dejaba la vista agrupada igual de desordenada; hay candado por mutación para los cuatro.
+>
+> ### 🔴 HALLAZGO — el MISMO catálogo salía en orden DISTINTO según quién lo mirara
+>
+> Medido en el navegador contra `origin/main`, mismo build, mismos datos, catálogo de Calvin:
+>
+> | | vendedor `/catalogo/calvin` | público `/catalogo-publico/calvin` |
+> |---|---|---|
+> | dónde caen los 4 `KCMEENA` | repartidos entre **#25 y #33** | repartidos entre **#12 y #31** |
+> | orden entre ellos | `683 · 004 · -A210 · A962` | `A962 · 004 · 683 · -A210` |
+>
+> **El código de orden de las dos pantallas era idéntico byte a byte** — lo que difería era el orden en que cada endpoint devolvía las filas, y al empatar el nombre ESE orden era el que mandaba. O sea: el vendedor compartía un link y el cliente veía el mismo catálogo en otro orden. En Tommy el efecto es mayor: la familia `FW0FW08…` salía en **44 corridas** en el público contra **9** en el vendedor, y las dos desordenadas. **Ahora las dos dan #28–#31 y el mismo orden.** No se unificó nada a la fuerza: el desempate hace que el orden deje de depender de la base, y con eso las dos superficies coinciden solas.
+>
+> ### ⚠️ El ADMIN ordena distinto A PROPÓSITO — se dice, no se fuerza
+>
+> `/catalogos/admin/[marca]` **no** usa el orden del catálogo: ordena por NOMBRE a secas, y la vista de lista pone primero lo que tiene stock. Es una **cola de trabajo, no una vitrina** (se entra a subir fotos, no a vender), así que ese criterio **no se tocó** — unificarlo con el catálogo es una decisión de Daniel, aparte. Lo que sí se le puso es el mismo **desempate por código**, porque tenía el mismo defecto: con 19 nombres para 498 productos, "ordenado por nombre" dejaba bloques enteros en el orden de la base. En `ProductosTarjetas` era peor todavía — `localeCompare(…, { sensitivity: "base" })` devuelve **0** para todo un bloque de nombres iguales, así que no era orden alfabético de nada.
+>
+> ### 🔑 LA COMPARACIÓN ES CRUDA Y EN MAYÚSCULAS — se REUSÓ, no se escribió de nuevo
+>
+> El repo ya tenía esta decisión tomada en `ordenarCodigosAZ` (`fotos-faltantes.ts`, el Excel de la plantilla B2B): **nada de `localeCompare` con opciones**, porque el resultado tiene que ser el mismo en el navegador de Daniel, en Node y en el test, y **las tablas de ICU no lo garantizan**. El cuerpo se **MUDÓ** a `orden-codigo.ts` sin reescribirlo y `ordenarCodigosAZ` ahora lo importa: dos formas de ordenar un código es una que se corrige y otra que se queda vieja.
+>
+> 🔴 **EL GUIÓN NO SE QUITA, Y ESTÁ MEDIDO, NO SUPUESTO.** Tentaba normalizar (`KCMEENA-A210` contra `KCMEENAA962`), pero al ordenar los **579 SKU reales** de Calvin + Tommy en crudo, **los 41 códigos con guión ya caen pegados a su propia familia**: `KCMEENA-A210` justo antes de `KCMEENA004`, `T1A8-32600-313` justo antes de `T1A8-32600313`, `FW0FW06158-DW5` entre `FW0FW06149-DW5` y `FW0FW06447DW5`. Quitarlo sería maquinaria que no cambia **ni un caso real** y que estrenaría una segunda idea de "qué es el mismo código" al lado de la regla de fotos, donde pegar por parecido está **PROHIBIDO** a propósito (la lección de `Outlet Duty Free N2` vs `N3`). Tampoco es numérico (`numeric: true` / `Intl.Collator`): los segmentos de estos SKU son de ancho fijo, así que en crudo `T30400-800 < T30408-800 < T30547-800` ya sale bien, y la comparación numérica es justo la que depende del entorno.
+>
+> ⚠️ **Una familia PUEDE quedar partida y estar BIEN.** `FW0FW08…` vive en **5 secciones** de Tommy (sneakers · flip_flops · sandals · shoes · slippers de mujer) y se parte donde cambia la sección, porque **categoría y género le ganan al código**. Medido: de las familias que quedan partidas después del cambio, **el 100% cruza sección** — dentro de una sección no queda ninguna.
+>
+> ### La medición
+>
+> **Contra producción, el caso de Daniel** (`DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config scripts/_verif-catalogo-orden-codigo.ts`, solo lectura, corre el `.sort()` REAL sobre las filas reales):
+>
+> | | Calvin (81 prod, 5 nombres) | Tommy (498 prod, 19 nombres) |
+> |---|---|---|
+> | los 4 `KCMEENA` | **#17 · #22 · #37 · #39 → #32 · #33 · #34 · #35** | — |
+> | familias (prefijo 7) partidas | **15/18 → 2/18** | **33/38 → 11/38** |
+> | secuencia de secciones | **idéntica ✅** | **idéntica ✅** |
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción, con datos de producción y CONTRA `origin/main`** (`BASE=… node scripts/_medir-catalogo-orden.mjs`, solo lectura, 4 superficies × 4 anchos): **390 · 834 · 1024 · 1440 → 0 px de arrastre en los 16 casos**, y los `KCMEENA` **pegados en #28–#31 en los cuatro anchos, en el vendedor Y en el público**. Los recortes (el `DIV.space-y-3` de los filtros a 1024+), los tocables de 217×38 ("Agregar" a 1440) y los textos de 10 px ("Bulto de 12") son **PRE-EXISTENTES y salen IDÉNTICOS en main, uno por uno**: este cambio **no agrega ni quita un solo elemento del DOM** — reordena tarjetas dentro de un `grid-cols-2 sm:3 lg:4 xl:5`, donde el ancho de la columna lo pone el contenedor (`1fr`), no el contenido.
+> - 🩸 **Gotcha de medición que daba 0 elementos y verde sin haber mirado nada:** `CatalogoAuthGuard` **NO mira el rol** — mira `sessionStorage.fg_modules`. Sin sembrarlo, la pantalla del vendedor redirige al login y el script mide una pantalla vacía. Por eso **falla** si encuentra menos de 10 tarjetas.
+>
+> ### Candados
+>
+> **`src/__tests__/components/catalogo-orden-por-codigo.test.tsx` (10).** Son de **CONDUCTA**: montan `CatalogoVendedorPage` y `CatalogoPublicoPage` de verdad, con los cuatro `KCMEENA` REALES y sus vecinos REALES en el orden en que los devolvía la base, y **leen el orden en que se pintaron las tarjetas**. Un barrido de texto sobre el .tsx no puede ver que los DOS pipelines queden ordenados, y encima se cumple con su propia explicación — este repo ya lo pagó cuatro veces; los barridos que quedan **borran los comentarios primero**.
+> - **Verificado por mutación, 11 de 11 cazadas** (`bash scripts/_mutar-candados-orden-codigo.sh`): la lista plana del vendedor pierde el desempate · la vista AGRUPADA (Joybees) lo pierde · la lista plana del público · la agrupada del público · "Nombre A-Z" · "Precio ascendente" · el admin lista · el admin tarjetas · el comparador se come los guiones · el comparador vuelve a `localeCompare` · el comparador siempre devuelve 0.
+> - 🩸 **El script de mutación restaura por COPIA, no con `git checkout`**: `orden-codigo.ts` es un archivo NUEVO y git aborta el comando entero, así que las mutaciones se apilarían y ninguna se probaría por separado — un verificador que miente en verde es peor que no tenerlo.
+>
+> ### Lo que NO se tocó
+>
+> **Reebok es espejo de Joybees y no se tocó nada propio de Reebok** (el desempate entra por el componente único de las 4 marcas). **La visibilidad no se movió** (`disponibleVendible`, `active`, `oculto_manual`): el conteo de tarjetas es **idéntico en main y acá — 76 en Calvin, 435 en Tommy, en los 4 anchos**. Tampoco el modo pedido, ni el carrito de sesión, ni los precios.
+
 ## Catálogos — auto-recorte del fondo al subir (12-ago-2026)
 
 > **Las fotos del banco B2B de PVH vienen con el producto CHICO abajo y un fondo enorme; en la tarjeta se ven diminutas al lado de las buenas.** Caso real de Daniel: `HW0HW02958AEF.jpg`, **1364×1819**, una sandalia que ocupa el **9% del área** y el resto es fondo gris en degradado. Fuente única: **`src/lib/catalogos/foto-recorte.ts`** — núcleo PURO (fondo, caja, guardas, plan de encuadre) + un envoltorio de canvas que solo dibuja lo que el plan ya decidió.

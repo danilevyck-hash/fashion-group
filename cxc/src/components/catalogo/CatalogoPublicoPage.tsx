@@ -11,6 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { getMarcaTheme, type MarcaUiKey } from "@/lib/catalogo/marcas-ui";
 import { validarNombreCliente } from "@/lib/catalogo/nombre-cliente";
 import { disponibleVendible } from "@/lib/catalogos/disponible";
+import { compararCodigos } from "@/lib/catalogos/orden-codigo";
 import {
   cumpleBultosMinimos, precioEnRango, esPrecioRango, type PrecioRango,
 } from "@/lib/catalogo/filtros-extra";
@@ -269,15 +270,19 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
     // el 12 no se escribe a mano. Precio: por PIEZA, no por bulto.
     .filter(p => !bultosFilter || cumpleBultosMinimos(disponibleVendible(p), theme.bulto(p.category, p.bulto_pzas)))
     .filter(p => precioEnRango(p.price, precioRango))
+    // 🔑 El CÓDIGO desempata SIEMPRE, al final de todo (ver `orden-codigo.ts`).
+    // ⚠️ Este orden es —a propósito— el MISMO byte a byte que el de
+    // `CatalogoVendedorPage`: el cliente que abre el link compartido tiene que
+    // ver el catálogo en el mismo orden que el vendedor que se lo mandó.
     .sort((a, b) => {
-      if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
-      if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
-      if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
+      if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0) || compararCodigos(a.sku, b.sku);
+      if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0) || compararCodigos(a.sku, b.sku);
+      if (sortBy === "nombre-az") return a.name.localeCompare(b.name) || compararCodigos(a.sku, b.sku);
       const ca = catOrder[a.category || ""] ?? 9, cb = catOrder[b.category || ""] ?? 9;
       if (ca !== cb) return ca - cb;
       const ga = theme.genero.groupOrder(a.gender), gb = theme.genero.groupOrder(b.gender);
       if (ga !== gb) return ga - gb;
-      return a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name) || compararCodigos(a.sku, b.sku);
     });
 
   const isGrouped = sortBy === "relevancia";
@@ -305,13 +310,14 @@ function CatalogoPublico({ marca }: { marca: MarcaUiKey }) {
   ) : [];
   const groupsWithSection = allGrouped.map(g => ({ group: g, section: getDisplaySection(g) }));
   const filteredGroups = groupsWithSection.filter(gs => !gender || gs.section === gender);
+  // Mismo desempate por código que la lista plana, acá sobre el `baseSku`.
   const sortedGroups = [...filteredGroups].sort((a, b) => {
-    if (sortBy === "precio-asc") return (a.group.price || 0) - (b.group.price || 0);
-    if (sortBy === "precio-desc") return (b.group.price || 0) - (a.group.price || 0);
-    if (sortBy === "nombre-az") return a.group.name.localeCompare(b.group.name);
+    if (sortBy === "precio-asc") return (a.group.price || 0) - (b.group.price || 0) || compararCodigos(a.group.baseSku, b.group.baseSku);
+    if (sortBy === "precio-desc") return (b.group.price || 0) - (a.group.price || 0) || compararCodigos(a.group.baseSku, b.group.baseSku);
+    if (sortBy === "nombre-az") return a.group.name.localeCompare(b.group.name) || compararCodigos(a.group.baseSku, b.group.baseSku);
     const sa = (SECTION_ORDER[a.section] ?? 99) - (SECTION_ORDER[b.section] ?? 99);
     if (sa !== 0) return sa;
-    return a.group.name.localeCompare(b.group.name);
+    return a.group.name.localeCompare(b.group.name) || compararCodigos(a.group.baseSku, b.group.baseSku);
   });
 
   type SectionGroup = { label: string; section: DisplaySection; items: GroupedProduct[] };
