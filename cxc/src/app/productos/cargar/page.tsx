@@ -6,6 +6,7 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
 import DepuradorDispatcher from "./DepuradorDispatcher";
+import MiExcelFotosClient from "./MiExcelFotosClient";
 import FacturasTiendaClient from "./FacturasTiendaClient";
 import HistorialView from "./HistorialView";
 import FormulasConfig from "./FormulasConfig";
@@ -13,14 +14,18 @@ import ReglasView from "./ReglasView";
 import CurvasView from "./CurvasView";
 import CatalogoDescripcionesAdmin from "./CatalogoDescripcionesAdmin";
 
-type Tab = "depurador" | "facturas" | "curvas" | "formulas" | "reglas" | "historial";
+type Tab = "depurador" | "misfotos" | "facturas" | "curvas" | "formulas" | "reglas" | "historial";
 type FormulasScope = "depurador" | "tienda";
 
-/** Las 6 pestañas, en UN solo lugar: las dibujan tanto el desplegable (angosto)
+/** Las pestañas, en UN solo lugar: las dibujan tanto el desplegable (angosto)
  *  como la fila de píldoras (≥lg), y no pueden desincronizarse. Las etiquetas
- *  son EXACTAMENTE las que ya estaban en pantalla. */
+ *  son EXACTAMENTE las que ya estaban en pantalla.
+ *
+ *  "Fotos a mi Excel" es un camino APARTE (14-ago-2026): no reemplaza al pedido
+ *  de Reebok, que sigue igual en "Depurador". */
 const PESTANAS: { id: Tab; label: string }[] = [
   { id: "depurador", label: "Depurador" },
+  { id: "misfotos", label: "Fotos a mi Excel" },
   { id: "facturas", label: "Facturas Tienda" },
   { id: "curvas", label: "Tallas" },
   { id: "formulas", label: "Fórmulas por marca" },
@@ -170,6 +175,12 @@ function CargarInner() {
       <div className={tab === "depurador" ? "" : "hidden"}>
         <DepuradorDispatcher onDownloaded={handleDownloaded} />
       </div>
+      {/* "Fotos a mi Excel" también queda montada (oculta): el archivo subido y la
+          carpeta elegida sobreviven al cambiar de pestaña — mismo criterio que
+          el Depurador. */}
+      <div className={tab === "misfotos" ? "" : "hidden"}>
+        <MiExcelFotosClient />
+      </div>
       {/* Facturas Tienda también queda montada (oculta) para no perder la factura
           cargada al cambiar de pestaña — mismo criterio que el Depurador. */}
       <div className={tab === "facturas" ? "" : "hidden"}>
@@ -203,7 +214,12 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   return (
     <button
       onClick={onClick}
-      className={`shrink-0 whitespace-nowrap rounded-md px-4 min-h-[44px] text-sm font-medium transition ${
+      // 🩸 El relleno baja a `px-2.5` hasta `xl`: con la pestaña nueva ("Fotos a
+      // mi Excel") la fila pasó de 6 a 7 y a 1024 px —el iPad ACOSTADO, que es
+      // justo donde arranca este layout— desbordaba 24 px, o sea que la última
+      // pestaña quedaba fuera de la pantalla. Medido: con `px-2.5` da 0.
+      // Desde `xl` sobra ancho y vuelve el relleno de siempre.
+      className={`shrink-0 whitespace-nowrap rounded-md px-2.5 xl:px-4 min-h-[44px] text-sm font-medium transition ${
         active ? "bg-teal-600 text-white" : "text-stone-600 hover:bg-stone-100"
       }`}
     >
