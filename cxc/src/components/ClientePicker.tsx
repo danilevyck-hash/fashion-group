@@ -1,8 +1,33 @@
 "use client";
 
-// Selector CERRADO de cliente. COMPARTIDO: lo usan Guías, Cheques y el
-// "Registrar gasto" de Marketing (este último SIN la salida "Otro", ver
-// `permitirOtro` abajo).
+// Selector CERRADO de cliente. **EL ÚNICO del sistema** contra el directorio
+// (`clientes_master`, códigos D-XXX): lo usan Guías, Cheques y los dos
+// formularios de Marketing (Registrar gasto y Editar proyecto, los dos SIN la
+// salida a mano — ver `permitirOtro` abajo).
+//
+// Daniel, textual (ago-2026): *"sí, todos deben de tener mismo selector, tiene
+// que hacer sentido con el sistema"*. Mismo rótulo, misma búsqueda, misma red
+// de seguridad en todas las pantallas; lo único que cambia de una a otra es si
+// la salida a mano existe. El candado que impide que aparezca un segundo
+// selector vive en `src/__tests__/un-solo-selector-de-cliente.test.ts`.
+//
+// ⚠️ Los pedidos del catálogo NO usan este selector y no es un descuido: eligen
+// clientes de **Switch** (`switch_clientes`, por empresa, con "Contado"), que es
+// otro universo — ver `ClienteSwitchPicker`. Y el catálogo PÚBLICO deja que el
+// visitante escriba su nombre a mano a propósito (#556).
+//
+// ── La salida a mano se llama con todas las letras (ago-2026) ───────────────
+//
+// 🩸 Decía **"Otro"**, y "Otro" se lee como UN CLIENTE MÁS de la lista: alguien
+// la tocó sin buscar primero y escribió a mano el nombre de un cliente que SÍ
+// estaba en el directorio. Ahora dice **"➕ No está en la lista — escribir a
+// mano"**, que es lo que es: la salida, no una opción equivalente. Y el
+// distintivo del campo dice **"A mano"** en vez de "Otro", por lo mismo.
+//
+// 🔴 Elegir cliente **NO es obligatorio** y esto no lo cambia (decisión escrita
+// de Daniel: 272 de los 441 renglones de guía —62%— van a destinos que hoy no
+// existen en el directorio). Lo que cambia es que escribir a mano sea
+// DELIBERADO en vez de un accidente.
 //
 // Vivía en `app/guias/components/`. Se movió a `src/components/` en jul-2026,
 // cuando Cheques pidió "que el cliente sea como en Guías": el componente ya era
@@ -10,8 +35,9 @@
 // tenerlo bajo una ruta de módulo obligaba a importarlo cruzado — que es lo que
 // ya venía haciendo Marketing con su hermano `ClienteTypeahead`.
 //
-// La diferencia con el typeahead libre de antes (ClienteTypeahead, que sigue
-// vivo para Marketing) es una sola, y es la que pidió Daniel:
+// La diferencia con el typeahead libre de antes (`ClienteTypeahead`, borrado en
+// ago-2026 cuando Marketing › Editar proyecto —su último consumidor— pasó a
+// este selector) es una sola, y es la que pidió Daniel:
 //
 //   > "quiero que solo se pueda poner un cliente de la lista … o que haya una
 //      opción de otro para texto libre"
@@ -22,7 +48,7 @@
 // el valor de la fila cambia únicamente cuando se elige algo:
 //
 //   • un cliente de la lista  → queda VINCULADO (guarda su código D-XXX)
-//   • la opción "Otro"        → queda a mano, marcado como tal
+//   • "No está en la lista"   → queda a mano, marcado como tal
 //
 // Cerrar sin elegir no cambia nada: el campo vuelve a mostrar lo que había.
 //
@@ -61,14 +87,19 @@
 // los nombres largos del directorio no salgan truncados.
 
 import { useEffect, useId, useRef, useState } from "react";
-import { useBusquedaClientes, type ClienteHit } from "@/lib/hooks/useBusquedaClientes";
+import {
+  useBusquedaClientes,
+  useClientesDelGrupo,
+  type ClienteHit,
+} from "@/lib/hooks/useBusquedaClientes";
 import DesplegableFlotante from "@/components/ui/DesplegableFlotante";
+import SugerenciasCliente from "@/components/SugerenciasCliente";
 import { nombreParaMostrar } from "@/lib/clientes/nombre-display";
 
 interface ClientePickerProps {
   /** Nombre ya guardado en la fila. */
   value: string;
-  /** Código D-XXX ya guardado. "" = a mano ("Otro"). */
+  /** Código D-XXX ya guardado. "" = escrito a mano. */
   codigo: string;
   /** Se llama SOLO cuando el usuario elige. `codigo` vacío = texto a mano. */
   onChange: (nombre: string, codigo: string) => void;
@@ -76,17 +107,17 @@ interface ClientePickerProps {
   topClientes?: ClienteHit[];
   /**
    * Mostrar el distintivo de cómo quedó el cliente: el código D-XXX en verde
-   * (vinculado) o "Otro" en ámbar (a mano).
+   * (vinculado) o "A mano" en ámbar.
    *
    * Solo tiene sentido donde el código SE GUARDA. En Guías sí
    * (`guia_items.cliente_codigo`). En Cheques NO: la tabla `cheques` guarda el
    * nombre como texto y nada más, así que pintar un "D-126" verde prometería un
    * vínculo que no existe en la base — y al reabrir el cheque el mismo cliente
-   * aparecería como "Otro". Ahí se apaga y el campo es, simplemente, el nombre.
+   * aparecería como "A mano". Ahí se apaga y el campo es, simplemente, el nombre.
    */
   mostrarVinculo?: boolean;
   /**
-   * false = SIN la salida "Otro": acá el cliente SOLO puede salir de la lista.
+   * false = SIN la salida a mano: acá el cliente SOLO puede salir de la lista.
    *
    * Lo pidió Daniel para Marketing › Registrar gasto (12-ago-2026), textual:
    * *"donde dice cliente, me deja pasar sin que amarre un cliente de mi lista
@@ -95,9 +126,25 @@ interface ClientePickerProps {
    * lista dice el camino — el cliente que falta se da de alta EN SWITCH (los
    * clientes nacen allá; el directorio se sincroniza de ahí).
    *
-   * Default true: Guías y Cheques quedan EXACTAMENTE como estaban.
+   * Encendido hoy en Guías (bodega despacha a destinos que no existen en el
+   * directorio) y en Cheques. Apagado en los dos formularios de Marketing.
    */
   permitirOtro?: boolean;
+  /**
+   * El directorio del grupo, para la red de seguridad de abajo. Si no se pasa,
+   * el selector lo pide él mismo — al MISMO caché de módulo que su búsqueda, o
+   * sea sin una lectura extra.
+   *
+   * ⚠️ Un arreglo VACÍO significa "no se pudo leer el directorio", y ahí la
+   * sugerencia se calla. Por eso `undefined` (no me lo pases) y `[]` (no hay)
+   * no son lo mismo.
+   */
+  clientesDelGrupo?: readonly ClienteHit[];
+  /**
+   * Decir "no hay ningún cliente parecido" cuando la sugerencia sale vacía.
+   * Solo lo enciende la ventana "Atar cliente" — ver `SugerenciasCliente`.
+   */
+  avisarSinParecidos?: boolean;
   /** Texto del campo vacío. Default: el de siempre ("Buscar cliente…"). */
   placeholder?: string;
   hasError?: boolean;
@@ -162,6 +209,8 @@ export default function ClientePicker({
   topClientes,
   mostrarVinculo = true,
   permitirOtro = true,
+  clientesDelGrupo,
+  avisarSinParecidos = false,
   placeholder: placeholderVacio = "Buscar cliente…",
   hasError = false,
   inputClassName = "",
@@ -169,6 +218,8 @@ export default function ClientePicker({
 }: ClientePickerProps) {
   const [abierto, setAbierto] = useState(false);
   const [query, setQuery] = useState("");
+  /** El texto para el que ya dijeron "No, es otro". */
+  const [descartada, setDescartada] = useState<string | null>(null);
   const idLista = `lista-${useId()}`;
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -177,6 +228,15 @@ export default function ClientePicker({
   const vinculado = mostrarVinculo && Boolean(value.trim() && codigo.trim());
   const aMano = mostrarVinculo && Boolean(value.trim() && !codigo.trim());
   const q = query.trim();
+
+  // ── La red de seguridad ────────────────────────────────────────────────────
+  // 🔑 Daniel vio una guía donde alguien escribió a mano el nombre de un cliente
+  // que SÍ estaba en la lista. El directorio solo se pide cuando hay algo
+  // escrito a mano: una fila vacía no toca la red.
+  const escritoAMano = Boolean(value.trim()) && !codigo.trim();
+  const directorioPropio = useClientesDelGrupo(escritoAMano && clientesDelGrupo === undefined);
+  const directorio = clientesDelGrupo ?? directorioPropio;
+  const mostrarSugerencias = escritoAMano && descartada !== value.trim();
 
   // Ubicar la lista, seguirla al scrollear y cerrarla al tocar afuera es todo
   // de `DesplegableFlotante`. Acá solo queda lo que es de ESTE selector.
@@ -227,13 +287,13 @@ export default function ClientePicker({
           if (e.key === "Enter") {
             e.preventDefault();
             // Enter elige el primer resultado si hay uno; nunca guarda a mano
-            // por accidente (para eso está "Otro", que hay que tocar).
+            // por accidente (para eso está la salida a mano, que hay que tocar).
             const primero = hits[0] ?? listaTop[0];
             if (primero) elegir(primero.nombre, primero.codigo);
           }
         }}
         placeholder={value ? value : placeholderVacio}
-        className={`${inputClassName} ${vinculado ? "pr-14" : aMano ? "pr-12" : ""}`}
+        className={`${inputClassName} ${vinculado || aMano ? "pr-16" : ""}`}
       />
 
       {/* Cómo quedó: vinculado al directorio vs escrito a mano. Tienen que
@@ -251,7 +311,7 @@ export default function ClientePicker({
           className="absolute right-0 top-1/2 -translate-y-1/2 text-xs px-1.5 py-0.5 rounded text-amber-700 bg-amber-50 pointer-events-none"
           title="Escrito a mano — no está en el directorio"
         >
-          Otro
+          A mano
         </span>
       )}
 
@@ -298,7 +358,7 @@ export default function ClientePicker({
 
           {/* La salida de emergencia, SIEMPRE visible y siempre explícita —
               salvo donde el cliente amarra sí o sí (`permitirOtro=false`):
-              ahí no hay "Otro" y el pie dice el camino. */}
+              ahí no hay salida a mano y el pie dice el camino. */}
           <div className="border-t border-gray-100">
             {!permitirOtro ? (
               <div className="px-3 py-2 text-xs text-gray-400">
@@ -307,18 +367,39 @@ export default function ClientePicker({
               </div>
             ) : q ? (
               <Opcion destacada onElegir={() => elegir(q, "")}>
-                <span className="truncate">
-                  Otro — guardar &ldquo;{q}&rdquo; a mano
+                <span className="min-w-0">
+                  <span className="block">➕ No está en la lista — escribir a mano</span>
+                  <span className="block text-xs opacity-80 truncate">
+                    Se guarda &ldquo;{q}&rdquo;
+                  </span>
                 </span>
               </Opcion>
             ) : (
               <div className="px-3 py-2 text-xs text-gray-400">
-                ¿No está en la lista? Escribe el nombre y elige &ldquo;Otro&rdquo;.
+                ¿No está en la lista? Escribe el nombre y elige &ldquo;escribir a
+                mano&rdquo;.
               </div>
             )}
           </div>
         </>
       </DesplegableFlotante>
+
+      {/* 🔑 LA RED DE SEGURIDAD. Escribir a mano un nombre que SÍ está en la
+          lista es el accidente que Daniel encontró en una guía. Acá se pregunta
+          y se ata de un toque. NUNCA ata sola: ver `SugerenciasCliente`. */}
+      {mostrarSugerencias && (
+        <SugerenciasCliente
+          clienteTexto={value}
+          clientes={directorio}
+          avisarSinParecidos={avisarSinParecidos}
+          onDescartar={() => setDescartada(value.trim())}
+          onElegir={(nombre, cod) => {
+            onChange(nombre, cod);
+            setQuery("");
+            setAbierto(false);
+          }}
+        />
+      )}
 
       {/* Solo para que el candado de 44px y los lectores de pantalla vean el
           estado sin abrir nada. */}

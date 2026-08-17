@@ -90,7 +90,9 @@ describe("🔴 la sugerencia NO ata", () => {
 
   it("con un solo candidato clavado, abrir la ventana tampoco guarda", () => {
     const { onGuardar } = abrir();
-    expect(screen.getByText("Hanna Calzados")).toBeTruthy();
+    // Con UNO solo se pregunta con todas las letras: "¿Es Hanna Calzados (D-71)?".
+    expect(screen.getByText(/¿Es Hanna Calzados/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Sí, es Hanna Calzados/ })).toBeTruthy();
     expect(onGuardar).not.toHaveBeenCalled();
   });
 
@@ -104,14 +106,14 @@ describe("🔴 la sugerencia NO ata", () => {
 describe("🔴 el aviso de números se VE en pantalla", () => {
   it("Sporting Shoes N7 muestra el candidato con su advertencia", () => {
     abrir({ clienteTexto: "Sporting Shoes N7 " });
-    expect(screen.getByText(/Sporting Shoes N 4/)).toBeTruthy();
+    expect(screen.getAllByText(/Sporting Shoes N 4/).length).toBeGreaterThan(0);
     expect(screen.getByText(/los números no son los mismos/i)).toBeTruthy();
   });
 
   it("y aun así no ata: hay que tocar y después Guardar", () => {
     const { onGuardar } = abrir({ clienteTexto: "Sporting Shoes N7 " });
     expect(onGuardar).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Sporting Shoes N 4/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sí, es Sporting Shoes N 4/ }));
     expect(onGuardar).not.toHaveBeenCalled();
   });
 });
@@ -128,7 +130,8 @@ describe("🔴 cuando no hay parecidos, la pantalla lo DICE", () => {
     // cliente que quizá ya existe.
     abrir({ clienteTexto: "HOTEL GRAN DAVID", clientesDelGrupo: [] });
     expect(screen.queryByText(/No hay ningún cliente parecido/i)).toBeNull();
-    expect(screen.queryByText(/¿Quisiste decir/i)).toBeNull();
+    expect(screen.queryByText(/¿Es alguno de estos/i)).toBeNull();
+    expect(screen.queryByText(/^¿Es /)).toBeNull();
   });
 });
 
@@ -158,7 +161,8 @@ describe("la ventana sigue haciendo lo de antes", () => {
 
   it("una línea YA atada no ve sugerencias — ofrecer otras invita a cambiarla", () => {
     abrir({ codigoActual: "D-71", nombreActual: "Hanna Calzados" });
-    expect(screen.queryByText(/¿Quisiste decir/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sí, es/ })).toBeNull();
+    expect(screen.queryByText(/¿Es alguno de estos/i)).toBeNull();
   });
 
   it("una línea ya atada conserva el botón Quitar", () => {

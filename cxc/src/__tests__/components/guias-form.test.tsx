@@ -165,7 +165,7 @@ describe("Nadie queda en rojo por MIRAR un campo", () => {
   });
 });
 
-// ── 2. Cliente cerrado, con "Otro" explícito ─────────────────────────────────
+// ── 2. Cliente cerrado, con la salida a mano EXPLÍCITA ───────────────────────
 
 describe("Cliente · cerrado contra la lista", () => {
   it("teclear NO guarda nada: es solo buscar", async () => {
@@ -192,7 +192,7 @@ describe("Cliente · cerrado contra la lista", () => {
     expect(vistos.at(-1)?.[0]).toMatchObject({ cliente: "City Mall", cliente_codigo: "D-101" });
   });
 
-  it('"Otro" guarda el texto a mano, y hay que elegirlo a propósito', () => {
+  it("escribir a mano guarda el texto, y hay que elegirlo a propósito", () => {
     const vistos: GuiaItem[][] = [];
     render(<Harness itemsIniciales={[filaBase()]} onItems={(i) => vistos.push(i)} />);
 
@@ -200,17 +200,18 @@ describe("Cliente · cerrado contra la lista", () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "Tienda del barrio" } });
 
-    const otro = screen.getAllByText(/Otro — guardar/)[0];
-    fireEvent.mouseDown(otro);
+    // 🔑 El rótulo dice que es LA SALIDA, no un cliente más de la lista.
+    const salida = screen.getAllByText(/No está en la lista — escribir a mano/)[0];
+    fireEvent.mouseDown(salida);
 
     expect(vistos.at(-1)?.[0]).toMatchObject({ cliente: "Tienda del barrio", cliente_codigo: "" });
   });
 
-  it('sin escribir nada, "Otro" no se puede elegir — dice qué hacer', () => {
+  it("sin escribir nada, la salida a mano no se puede elegir — dice qué hacer", () => {
     render(<Harness itemsIniciales={[filaBase()]} />);
     fireEvent.focus(campo("cliente", "a"));
     expect(screen.getAllByText(/Escribe el nombre y elige/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Otro — guardar/)).toBeNull();
+    expect(screen.queryByText(/No está en la lista — escribir a mano/)).toBeNull();
   });
 
   it("un cliente vinculado y uno a mano se ven DISTINTO", () => {
@@ -222,7 +223,10 @@ describe("Cliente · cerrado contra la lista", () => {
     cleanup();
     render(<Harness itemsIniciales={[filaBase({ cliente: "Tienda del barrio", cliente_codigo: "" })]} />);
     expect(screen.getAllByTitle(/Escrito a mano/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Otro").length).toBeGreaterThan(0);
+    // 🔴 El distintivo dice "A mano", nunca "Otro" a secas: "Otro" se lee como
+    // un cliente más del sistema, y ése es el accidente que se vino a cerrar.
+    expect(screen.getAllByText("A mano").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Otro")).toBeNull();
   });
 
   it("cerrar sin elegir devuelve el campo al valor guardado", () => {

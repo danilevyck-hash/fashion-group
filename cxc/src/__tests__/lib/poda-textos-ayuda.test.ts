@@ -190,8 +190,8 @@ describe("🔴 lo que FRENA una acción sigue en pantalla, nunca adentro de un �
     // se puede editar".
     ["app/guias/components/GuiasList.tsx", "Solo se puede cambiar el cliente"],
     // La ventana de sugerencias, cuando no hay ningún parecido.
-    ["app/guias/components/SugerenciasCliente.tsx", "No hay ningún cliente parecido en el directorio"],
-    ["app/guias/components/SugerenciasCliente.tsx", "Hay que darlo de alta en Switch"],
+    ["components/SugerenciasCliente.tsx", "No hay ningún cliente parecido en el directorio"],
+    ["components/SugerenciasCliente.tsx", "Hay que darlo de alta en Switch"],
     // Borrar una guía no se deshace.
     ["app/guias/page.tsx", "Esta acción no se puede deshacer"],
     // Packing Lists: validar contra el PDF y la caducidad de 7 días.

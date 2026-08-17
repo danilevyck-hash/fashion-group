@@ -7,7 +7,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui";
 import { useToast } from "@/components/ToastSystem";
-import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
+import ClientePicker from "@/components/ClientePicker";
 import { AyudaClienteVinculado } from "@/components/marketing/AyudaClienteVinculado";
 import type { MkMarca, ProyectoConMarcas } from "@/lib/marketing/types";
 
@@ -89,19 +89,28 @@ export default function EditarProyectoModal({
             </label>
             <AyudaClienteVinculado />
           </div>
-          <ClienteTypeahead
+          {/* 🔑 EL MISMO SELECTOR QUE EL RESTO DEL SISTEMA (ago-2026). Acá vivía
+              `ClienteTypeahead`, el typeahead LIBRE: tecleando cualquier cosa y
+              saliéndose, el proyecto quedaba con `tienda` escrita a mano y
+              `tienda_codigo` vacío. Era la segunda forma de elegir cliente que
+              quedaba en pie, y contradecía la regla del sistema —el campo de
+              cliente amarra al directorio (D-XXX)— justo en el MISMO campo que
+              "Registrar gasto" ya amarraba con `permitirOtro={false}`.
+
+              ⚠️ Un proyecto VIEJO con la tienda escrita a mano NO se rompe: el
+              selector solo cambia el valor cuando alguien ELIGE, así que el
+              texto que ya estaba se conserva y se puede guardar igual. Lo que
+              se cierra es escribir uno NUEVO a mano. */}
+          <ClientePicker
             value={tienda}
             codigo={tiendaCodigo}
-            onSelect={(nombreCliente, codigo) => {
+            onChange={(nombreCliente, codigo) => {
               setTienda(nombreCliente);
               setTiendaCodigo(codigo);
             }}
-            onFreeText={(texto) => {
-              setTienda(texto);
-              setTiendaCodigo("");
-            }}
+            permitirOtro={false}
             placeholder="Busca el cliente en el directorio…"
-            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
+            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 min-h-[44px] pr-16 text-base sm:text-sm focus:border-black focus:outline-none"
           />
         </div>
 

@@ -22,7 +22,7 @@
  * quedó en el PR.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { globSync } from "glob";
 
@@ -34,7 +34,6 @@ const form = guias("GuiaForm.tsx");
 // Compartido desde jul-2026: Cheques usa el MISMO selector, así que vive en
 // src/components/ y ya no bajo app/guias/.
 const picker = read("components", "ClientePicker.tsx");
-const typeahead = guias("ClienteTypeahead.tsx");
 const addNew = guias("AddNewInline.tsx");
 const sidebar = read("components", "Sidebar.tsx");
 const flotante = read("components", "ui", "DesplegableFlotante.tsx");
@@ -229,13 +228,15 @@ describe("Cliente · el desplegable, no solo el campo que lo abre", () => {
     expect(flotante).toContain("anclaRef.current?.contains");
   });
 
-  it("el typeahead libre de Marketing también se arregló (mismo defecto)", () => {
-    const items = typeahead.match(/className="w-full text-left px-3[^"]*"/g) ?? [];
-    expect(items).toHaveLength(2); // resultados de búsqueda + más usados
-    for (const c of items) {
-      expect(c).toContain("min-h-[44px]");
-      expect(c).toContain("flex items-center");
-    }
+  it("el typeahead libre de Marketing YA NO EXISTE — usa este mismo selector", () => {
+    // Se borró en ago-2026: era la segunda forma de elegir cliente que quedaba
+    // en pie (Marketing › Editar proyecto), y con texto libre. Sus 44 px ya no
+    // hay que vigilarlos porque el control es `ClientePicker`, que se vigila
+    // arriba. Lo que sí hay que vigilar es que no vuelva.
+    expect(existsSync(join(src, "app", "guias", "components", "ClienteTypeahead.tsx"))).toBe(false);
+    expect(read("app", "marketing", "components", "EditarProyectoModal.tsx")).toContain(
+      'import ClientePicker from "@/components/ClientePicker"',
+    );
   });
 });
 
