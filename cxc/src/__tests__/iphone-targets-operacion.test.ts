@@ -59,8 +59,15 @@ describe("Depurador · la barra de pestañas no puede volver a desbordar la pág
     }
   });
 
+  // 🩸 Este candado FIJABA `px-4` literal, y el relleno nunca fue el invariante:
+  // lo que protege es que la pestaña mida 44 px de alto, no se comprima y no
+  // parta el texto. Al entrar la 7ª pestaña ("Fotos a mi Excel") el relleno tuvo
+  // que bajar a `px-2.5` hasta `xl` porque a 1024 px la fila desbordaba 24 px —
+  // o sea que el candado exigía justamente lo que producía el defecto. Ahora
+  // exige las tres reglas de verdad, y que SIGA habiendo relleno horizontal
+  // (quitarlo del todo pegaría las pestañas entre sí).
   it("cada pestaña mide 44px de alto y no se comprime ni parte el texto", () => {
-    expect(depurador).toMatch(/shrink-0 whitespace-nowrap rounded-md px-4 min-h-\[44px\]/);
+    expect(depurador).toMatch(/shrink-0 whitespace-nowrap rounded-md px-[\d.]+(?: [a-z]+:px-[\d.]+)? min-h-\[44px\]/);
   });
 });
 

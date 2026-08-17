@@ -630,6 +630,69 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 >
 > **Candado: `src/__tests__/lib/depurador-fotos-excel.test.ts` (26).** No busca texto en archivos: arma libros de verdad, los incrusta, los vuelve a abrir con la librería de Excel y con JSZip, y lee las anclas. Incluye un bloque que corre contra la **carpeta real** si está en la máquina (y se saltea en CI en vez de dar verde por nada).
 
+> ## 🔴 Depurador — "FOTOS A MI EXCEL": un camino APARTE que no calcula nada (17-ago-2026)
+>
+> Daniel, textual: ***"quiero poder subir un excel con el código en la columna B y que también funcione"*** · ***"código en la columna B, y la info en otras columnas pero dejando vacío la columna A para las fotos"*** · ***"es para otro camino, no reemplaza"*** · ***"siempre en la B"***.
+>
+> **Pestaña nueva del Depurador: `Fotos a mi Excel`** (`/productos/cargar?tab=misfotos`). Subir el Excel → elegir la carpeta → descargar **el mismo archivo** con las fotos pegadas en la columna A. El camino de Reebok (#564) **no se tocó**.
+>
+> ### 🔴 LO QUE LO HACE DISTINTO: ACÁ NO SE CALCULA NADA
+>
+> No pasa por el precio (`CEILING(CIF÷divisor)+extra`, `validarDivisor`), no reordena, no agrega ni quita una columna. Es *"tomá mi archivo y ponele las fotos"*. Es exactamente el archivo que hoy resuelve con un macro de VBA (`1000 fiver excel.xlsm`: `NO IMAGEN · New Article · Name · Precio · Piezas · PO NAME`).
+>
+> ### 🔑 POR ESO NO PASA POR `xlsx-js-style` — y esa es la decisión que sostiene todo
+>
+> Leer con SheetJS y volver a escribir produce un archivo **NUEVO**: se pierden el `vbaProject.bin` (o sea **el macro**), los `xr:uid`, las extensiones de Excel y todo lo que la librería no entiende. Acá se abre el **.zip que ES el .xlsx/.xlsm**, se tocan **tres partes** (la hoja, el dibujo y el `[Content_Types]`) y se vuelve a cerrar. **Toda entrada que no se nombra sale byte por byte igual.**
+> - Módulo PURO: `src/lib/depurador/excel-propio.ts` (entra XML como texto, sale XML como texto). El lado archivo: `app/productos/cargar/excel-propio-archivo.ts`. La pantalla: `MiExcelFotosClient.tsx`.
+> - **El emparejador, el compresor y el armador del ZIP se REUSAN** (`fotos-excel.ts`, `prepararFotos`→`compressImage`, `fotos-xlsx.ts`). Si se separaran, dos pantallas pegarían fotos distintas para el mismo código.
+>
+> ### ✅ EL MACRO SE CONSERVA — medido, no supuesto
+>
+> `vbaProject.bin` viaja como una entrada más del zip: **26.624 bytes, byte por byte idéntico**, y el archivo baja como **`.xlsm`**. La pantalla lo dice antes de descargar. `nombreDeSalida(nombre, conservaMacro)` existe igual para el caso contrario: si algún día no se pudiera, baja como `.xlsx` y la pantalla lo avisa.
+>
+> ### 🔴 EL CÓDIGO ESTÁ EN LA COLUMNA B. NO SE BUSCA NI SE ADIVINA
+>
+> `COL_CODIGO_INDICE = 1`, fijo. La fila 1 es el encabezado y no se toca. **Emparejado EXACTO** (`codigo` + `.jpg`, sin mayúsculas, nada de parecidos — la lección de `Outlet Duty Free N2` vs `N3`). Sin foto, la celda A dice **`NO IMAGEN`** y **la fila nunca se salta**. Una foto que no se puede leer también sale como `NO IMAGEN`: una celda vacía se vería igual que "se pegó y nadie se dio cuenta".
+> - Una fila **sin código en B** se deja tal cual (ni foto ni texto) y la pantalla dice cuántas son.
+> - 🔴 **El ancla NO es `i + 1`.** Esa cuenta vale para el pedido Reebok, donde el Excel lo arma el sistema; acá las filas son las del archivo y pueden tener huecos. Vive en `filaAnclaDe()` (módulo puro) para que la pantalla no la vuelva a calcular.
+>
+> ### ⚠️ ORDENAR NO VA A FUNCIONAR, Y ESTÁ DECIDIDO ASÍ
+>
+> Daniel: *"prefiero ordenar no se pueda y quede solo filtrar"*. Se ancla con **`oneCellAnchor`**, así que al **FILTRAR** la foto se esconde con su fila; al **ORDENAR** las fotos **no se mueven**. La pantalla lo dice en una línea, antes de descargar, para que no lo descubra rompiendo un pedido.
+>
+> ### Lo demás que la pantalla DICE antes de descargar (enterarse después no sirve)
+>
+> - **La columna A se reemplaza entera** (es la columna de las fotos) — y si ya tenía algo escrito, dice **cuántas celdas** se van a pisar. Es lo que hace el macro hoy.
+> - **Si la hoja ya tiene fotos pegadas** (el archivo de Daniel YA pasó por el macro), se **reemplazan**: se borra el dibujo viejo y sus imágenes, reusando el mismo part y la misma relación. Sin eso el archivo se llevaría el peso de dos juegos de fotos. ⚠️ Es una opción NUEVA (`reemplazarDibujo`) y **por defecto va apagada**: en el pedido Reebok un dibujo preexistente sigue **cortando con error**, porque ahí solo puede ser algo que escribió alguien más.
+> - **Si el libro tiene varias hojas**, solo se toca la primera y lo dice con su nombre.
+> - **Las fotos no se suben a ningún lado** y el Excel tampoco: en los dos archivos del camino no hay un solo `fetch` (hay candado).
+>
+> ### La celda la mide el ARCHIVO, no una constante
+>
+> El ancho de la columna A y el alto de CADA fila se leen del propio libro (`medirCeldaFoto`), porque este camino **no los cambia**. La foto se encaja con `encajar()` —una sola escala para los dos ejes, nunca agranda— dejando 8 px de margen. Medido en el archivo real: celda **94×101 px** → fotos de **86 px** de lado mayor, centradas.
+>
+> ### Medido con el archivo REAL y la carpeta REAL
+>
+> `BASE=… node scripts/_medir-excel-propio.mjs` (solo lectura; `MUESTRA=1` usa una copia por enlaces duros). Entrada: `1000 fiver excel.xlsm` (203 filas, 1,26 MB, con macro) y la carpeta entera de **4.744 fotos**.
+>
+> | | |
+> |---|---|
+> | leer el Excel y contar los códigos | **45 ms** · 203 de 203 |
+> | elegir la carpeta de 4.744 y emparejar | **292 ms** · **203 de 203 con foto** |
+> | del clic a que el archivo baja | **945 ms** |
+> | peso | 1,26 MB → **0,67 MB** (originales emparejados: 20,5 MB) |
+> | fotos | 203 anclas `oneCellAnchor` · **110 imágenes** (el mismo artículo repetido) |
+>
+> 🔴 **Y la prueba que importa: el archivo vuelve IGUAL.** El script compara **celda por celda contra el original**: **994 celdas fuera de la columna A idénticas · 204 filas en el mismo orden · el macro byte por byte igual**, y el `autoFilter`, el ancho de columna (13,33) y el alto de fila (76 pt) intactos. Verificado además con **openpyxl** (otro parser): 203 imágenes `OneCellAnchor` en la columna 0 y el VBA presente. Verificación fuera del navegador: `npx tsx scripts/_verif-excel-propio.ts <archivo> <carpeta>`.
+>
+> **Los 3 anchos (+ el iPad acostado), contra el build de producción:** **390 · 834 · 1024 · 1440 → 0 px de arrastre, 0 recorte, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px.** El script **falla** si no encuentra los 7 avisos, si falta alguna foto, si el archivo no baja, si el macro no viaja o si alguna celda fuera de la columna A cambió.
+> - 🩸 **La pestaña nueva hizo desbordar la fila de pestañas a 1024 px** (de 6 a 7 fichas: 24 px de más, o sea la última quedaba fuera de la pantalla — el iPad ACOSTADO, que es justo donde arranca ese layout). El relleno de cada pestaña bajó a `px-2.5` hasta `xl`; desde `xl` vuelve el de siempre. **No se acortó ningún rótulo.**
+> - 🩸 **Y un candado viejo FIJABA el defecto**: `iphone-targets-operacion.test.ts` exigía `px-4` LITERAL, cuando lo que protege es que la pestaña mida 44 px, no se comprima y no parta el texto. Pasó a exigir eso.
+>
+> **Candado: `src/__tests__/lib/depurador-excel-propio.test.ts` (32).** No busca texto: arma libros de verdad, los pasa por los mismos módulos que corre la pantalla y los relee con la librería de Excel **y** con JSZip. Incluye un bloque contra el **.xlsm REAL** de Daniel (se saltea si la carpeta no está, en vez de dar verde por nada) y un barrido de reuso que **borra los comentarios primero**.
+> - **Verificado por mutación, 14 de 14 cazadas** (`bash scripts/_mutar-candados-excel-propio.sh`): el código se lee de otra columna · el encabezado entra como código · la celda sin foto queda vacía en vez de decir NO IMAGEN · la celda A se escribe al final de la fila · se pierde su formato · el ancho de columna se inventa · la foto se ancla por índice del par y no por la fila real · las filas sin foto se saltan · Reebok deja de cortar con un dibujo ajeno · las fotos viejas del macro quedan pegadas · el ancla deja de ser `oneCellAnchor` · la pantalla escribe su propio "NO IMAGEN" · la pantalla sube el archivo a algún lado · el `.xlsm` baja como `.xlsx` aunque el macro viaje.
+> - 🩸 **La primera corrida dio 0 de 14 y era EL SCRIPT**: `--reporter=basic` no existe en vitest 4, así que la corrida moría y el conteo de fallos daba vacío → todo "sobrevivió". Y dos mutaciones sobrevivieron de verdad por candados flojos (un ternario que quedaba en pie, y un literal en JSX que el barrido buscaba entre comillas). **Un verificador que miente en cualquiera de las dos direcciones es peor que no tenerlo.**
+
 - **Soft delete (`deleted` boolean), por módulo:**
   - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
   - Préstamos: `prestamos_empleados`, `prestamos_movimientos`

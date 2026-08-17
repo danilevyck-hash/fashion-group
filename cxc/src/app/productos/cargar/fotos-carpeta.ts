@@ -11,11 +11,42 @@
 
 import { compressImage } from "@/app/reclamos/components/fotoUpload";
 import {
+  ALTO_CELDA_PX,
+  ANCHO_CELDA_PX,
   CAJA_FOTO_PX,
   encajar,
   type ParFoto,
 } from "@/lib/depurador/fotos-excel";
 import type { FotoParaExcel } from "@/lib/depurador/fotos-xlsx";
+
+/** La celda del pedido Reebok: el Excel lo arma el sistema, así que su tamaño
+ *  es conocido y fijo. */
+const CELDA_REEBOK = { caja: CAJA_FOTO_PX, ancho: ANCHO_CELDA_PX, alto: ALTO_CELDA_PX } as const;
+
+/** Medidas de la celda donde cae una foto, en píxeles. */
+export interface CeldaFoto {
+  /** Lado mayor que puede ocupar la foto. */
+  caja: number;
+  ancho: number;
+  alto: number;
+}
+
+export interface OpcionesPreparar {
+  /**
+   * En qué fila (0-based) cae `pares[i]`. Por defecto `i + 1`, que es el caso
+   * del pedido Reebok: el Excel lo arma el sistema, la fila 0 es el encabezado
+   * y las filas van pegadas. El camino "mi propio Excel" pasa el mapa REAL,
+   * porque ahí las filas son las del archivo de Daniel y pueden tener huecos
+   * (una fila sin código en la columna B no se toca pero ocupa su número).
+   */
+  filaDe?: (indice: number) => number;
+  /**
+   * Medidas de la celda de esa fila. Por defecto la del pedido Reebok. En "mi
+   * propio Excel" salen del archivo: el alto de fila y el ancho de columna son
+   * de Daniel y ese camino no los cambia.
+   */
+  celdaDe?: (indice: number) => CeldaFoto;
+}
 
 /** Lado mayor de la miniatura que se incrusta. Se pide a `compressImage` en vez
  *  de escribir un segundo compresor. 300 px es el doble de los ~104 px que mide
@@ -69,7 +100,10 @@ async function medir(file: File): Promise<{ w: number; h: number }> {
 export async function prepararFotos(
   pares: readonly ParFoto<File>[],
   onProgreso?: (hechas: number, total: number) => void,
+  opts: OpcionesPreparar = {},
 ): Promise<ResultadoFotos> {
+  const filaDe = opts.filaDe ?? ((i: number) => i + 1);
+  const celdaDe = opts.celdaDe ?? (() => CELDA_REEBOK);
   const total = pares.filter((p) => p.foto !== null).length;
   const fotos: FotoParaExcel[] = [];
   const fallidas: string[] = [];
@@ -93,9 +127,10 @@ export async function prepararFotos(
         yaHecha.set(par.foto, listo);
         bytes += listo.bytes.byteLength;
       }
-      const caja = encajar(listo.w, listo.h, CAJA_FOTO_PX);
+      const celda = celdaDe(i);
+      const caja = encajar(listo.w, listo.h, celda.caja, celda.ancho, celda.alto);
       fotos.push({
-        fila: i + 1, // +1 porque la fila 0 es el encabezado
+        fila: filaDe(i),
         bytes: listo.bytes,
         anchoPx: caja.ancho,
         altoPx: caja.alto,
