@@ -262,6 +262,44 @@ export function useDespachoGuia(id: string | null) {
     }
   }
 
+  /**
+   * 🔴 LA EXCEPCIÓN: anotar el N° del transportista en una guía YA DESPACHADA.
+   *
+   * El número dejó de bloquear el despacho —Daniel: *"a veces el transportista
+   * lo da, a veces no"*— así que hay guías que salieron sin él. Va por
+   * `PATCH /api/guias/[id]/numero-transp`, el MISMO molde que
+   * `…/cliente`: UNA columna de UNA línea, sin mirar el estado. El PUT sigue
+   * rechazando todo lo demás de una guía cerrada.
+   *
+   * Devuelve el mensaje de error, o `null` si se guardó.
+   */
+  async function anotarNumeroTransp(itemId: string, numero: string): Promise<string | null> {
+    if (!id) return "No se pudo guardar. Intenta de nuevo en unos segundos.";
+    try {
+      const res = await fetch(`/api/guias/${id}/numero-transp`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, numero_guia_transp: numero }),
+      });
+      const cuerpo = await res.json().catch(() => ({}));
+      if (!res.ok) return cuerpo.error || "No se pudo guardar. Intenta de nuevo en unos segundos.";
+      const guardado = String(cuerpo.numero_guia_transp ?? "");
+      setGuia((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          guia_items: (prev.guia_items || []).map((it) =>
+            it.id === itemId ? { ...it, numero_guia_transp: guardado } : it
+          ),
+        };
+      });
+      showToast(guardado ? "N° del transportista guardado" : "N° del transportista borrado");
+      return null;
+    } catch {
+      return "Sin conexión. Intenta de nuevo en unos segundos.";
+    }
+  }
+
   async function confirmarDespacho(firma1: string, firma2: string) {
     if (!guia || !id) return;
     setBSaving(true);
@@ -342,7 +380,7 @@ export function useDespachoGuia(id: string | null) {
     bChofer, setBChofer,
     juegos, usarJuego,
     numerosTransp, setNumeroTransp,
-    corregirItem,
+    corregirItem, anotarNumeroTransp,
     bSaving, confirmarDespacho,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,

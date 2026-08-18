@@ -27,7 +27,12 @@ import {
   textoFalta,
   type EstadoDespacho,
 } from "@/lib/guias/falta-para-despachar";
-import { guiaSinNumeroTransp } from "@/lib/guias/modo-despacho";
+import {
+  guiaSinNumeroTransp,
+  numeroTranspImpreso,
+  numeroTranspUnicoImpreso,
+} from "@/lib/guias/modo-despacho";
+import { validarNumeroTransp } from "@/lib/guias/numero-transp-tarde";
 
 /** ⚠️ Los comentarios se borran ANTES de barrer: en este repo ya falló cuatro
  *  veces un candado que se cumplía con su propia explicación. */
@@ -190,5 +195,70 @@ describe("🔴 lo que falta queda MARCADO", () => {
     expect(pendienteNumeroTransp("externo", ["", "  ", null])).toBe(true);
     expect(pendienteNumeroTransp("externo", ["", "TR-2"])).toBe(false);
     expect(pendienteNumeroTransp("directo", [""])).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔴 LA EXCEPCIÓN: el número se puede anotar DESPUÉS, en una guía ya despachada.
+//
+// Daniel, al aprobar: ***"si publicalo y hazle la excepcion para ese numero"***.
+// Lo que se vigila acá es que completarlo tarde **no rompa el papel** —que es un
+// documento que alguien firmó— ni deje la marca encendida para siempre.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("🔴 completar el número TARDE no rompe el papel", () => {
+  it("con UNA sola línea completada, el encabezado la anuncia (hay un solo número)", () => {
+    // Es exactamente lo mismo que pasa hoy cuando se despacha llenando una sola
+    // línea: la regla no cambió, y la marca se apaga.
+    const items = [{ numero_guia_transp: "TR-4471" }, { numero_guia_transp: "" }, { numero_guia_transp: "" }];
+    expect(numeroTranspUnicoImpreso(items, "")).toBe("TR-4471");
+    expect(guiaSinNumeroTransp({
+      estado: "Completada", tipo_despacho: "externo", modo_entrega: "transportista",
+      numero_guia_transp: "", guia_items: items,
+    })).toBe(false);
+  });
+
+  it("al completar una SEGUNDA línea distinta, el encabezado se CALLA", () => {
+    // Con dos números, anunciar uno arriba sería una mentira impresa.
+    const items = [{ numero_guia_transp: "TR-4471" }, { numero_guia_transp: "TR-4472" }];
+    expect(numeroTranspUnicoImpreso(items, "")).toBe("");
+  });
+
+  it("cada línea imprime el SUYO; la que quedó vacía no hereda el del vecino", () => {
+    expect(numeroTranspImpreso("TR-4471", "")).toBe("TR-4471");
+    expect(numeroTranspImpreso("", "")).toBe("");
+  });
+
+  it("un '0' no se puede guardar — si no, la pantalla diría 'guardado' y el aviso seguiría", () => {
+    expect(validarNumeroTransp("0").ok).toBe(false);
+    expect(validarNumeroTransp(" 0 ").ok).toBe(false);
+    // Y nada que CONTENGA un cero se pierde.
+    for (const bueno of ["EK0700", "TR-0", "00"]) {
+      const r = validarNumeroTransp(bueno);
+      expect(r.ok, bueno).toBe(true);
+      if (r.ok) expect(r.numero).toBe(bueno);
+    }
+  });
+
+  it("borrar lo anotado es válido: alguien pudo escribir el número equivocado", () => {
+    for (const vacio of ["", "   ", null, undefined]) {
+      const r = validarNumeroTransp(vacio);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.numero).toBe("");
+    }
+  });
+
+  it("la lista de guías lee el número POR LÍNEA — si no, el chip no se apagaría nunca", () => {
+    // La cabecera `guia_transporte.numero_guia_transp` NO se reescribe al anotar
+    // tarde (este endpoint toca UNA columna de UNA línea), así que el listado
+    // tiene que mirar las líneas.
+    const ruta = leer("src/app/api/guias/route.ts");
+    expect(ruta).toMatch(/guia_items\([^)]*numero_guia_transp[^)]*\)/);
+  });
+
+  it("la pantalla de la guía ofrece anotarlo solo a quien puede escribir, y no en entrega directa", () => {
+    const pagina = leer("src/app/guias/[id]/page.tsx");
+    expect(pagina).toContain("puedeAnotarNumero={s.despachada && puedeDespachar && !esEntregaDirecta(g)}");
+    expect(pagina).toContain("onAnotarNumero={s.anotarNumeroTransp}");
   });
 });
