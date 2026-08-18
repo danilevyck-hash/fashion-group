@@ -98,7 +98,10 @@ const SANEADOS = [
   "src/lib/ventas/queries.ts",
   "src/app/api/upload/route.ts",
   "src/app/api/notification-badges/route.ts",
-  "src/app/api/catalogo/switch-clientes/route.ts",
+  // (`src/app/api/catalogo/switch-clientes/route.ts` se RETIRÓ el 17-ago-2026:
+  //  era la segunda puerta al directorio de clientes de Switch, la que usaba la
+  //  lista propia del checkout. Hoy queda una sola, `[marca]/clientes-switch`,
+  //  que lista con `.limit(20)` por búsqueda y no necesita paginar.)
   "src/app/api/catalogo/[marca]/public/route.ts",
   "src/app/api/catalogo/reebok/stats/route.ts",
   "src/app/api/catalogo/reebok/inventory/route.ts",

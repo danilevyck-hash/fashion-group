@@ -397,12 +397,12 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > | Marketing › Registrar gasto | **ClientePicker** `permitirOtro={false}` | **NO** — el cliente amarra sí o sí |
 > | Marketing › Editar proyecto | **ClientePicker** `permitirOtro={false}` | **NO** (antes era texto libre, ver abajo) |
 > | Catálogo › pedidos (detalle, duplicar) | `ClienteSwitchPicker` | otro universo: clientes de **Switch** por empresa, con "Contado" |
-> | Catálogo › checkout del carrito | lista propia sobre el MISMO universo Switch | 🔴 **HALLAZGO, ver abajo** |
+> | Catálogo › checkout del carrito | **`ClienteSwitchPicker`** (era una lista propia — unificado el 17-ago-2026, ver abajo) | mismo universo de Switch |
 > | Catálogo PÚBLICO › "Tu nombre" | `<input>` libre | **SÍ, a propósito** — el visitante escribe su nombre (#556) |
 >
 > 🩸 **EL HALLAZGO QUE SE ARREGLÓ: `ClienteTypeahead` (Marketing › Editar proyecto).** Era la SEGUNDA forma de elegir cliente que quedaba en pie, y con `onFreeText`: tecleando cualquier cosa y saliéndose, el proyecto quedaba con `tienda` escrita a mano y `tienda_codigo` VACÍO — en el MISMO campo que "Registrar gasto" ya amarraba con `permitirOtro={false}`. **El componente se BORRÓ** (era su único consumidor). ⚠️ Un proyecto viejo con la tienda a mano NO se rompe: el selector solo cambia el valor cuando alguien ELIGE, así que el texto que ya estaba se conserva y se guarda igual; lo que se cierra es escribir uno NUEVO a mano.
 >
-> 🔴 **EL HALLAZGO QUE **NO** SE TOCÓ, y es decisión de Daniel: `CheckoutClient` tiene su propia lista de clientes sobre el mismo universo de Switch que `ClienteSwitchPicker`.** Son dos formas de elegir un cliente de Switch. **No se unificó**: es el checkout de pedidos, recién rehecho (#504-#509, #563), la fuente es otra ruta (`/api/catalogo/switch-clientes` contra `/[marca]/clientes-switch`) y tocarlo ahí es riesgo sobre plata que nadie pidió. Queda anotado como excepción EXPLÍCITA en el candado, o sea que no se puede multiplicar sin que el build se ponga rojo.
+> ✅ **EL HALLAZGO QUE QUEDABA, YA UNIFICADO (17-ago-2026, ver el bloque de abajo).** `CheckoutClient` tenía su propia lista de clientes sobre el MISMO universo de Switch que `ClienteSwitchPicker`, con su propia ruta. Se dejó anotado como excepción explícita del candado y Daniel decidió, textual: ***"si unificalo"***. Hoy el checkout **delega en `ClienteSwitchPicker`**, la excepción se quitó del barrido y la ruta paralela se retiró.
 >
 > ### 4. El candado: un barrido que pone el build ROJO si aparece otro selector
 >
@@ -419,6 +419,50 @@ Fuente única de navegación + permisos de UI. **3 grupos** (rediseño del home,
 > **Los 3 anchos, en el navegador contra el build de producción y con datos de producción** (`BASE=… node scripts/_medir-selector-cliente.mjs`, solo lectura, nunca toca "Guardar Guía"): **390 · 834 · 1440 → 0 px de arrastre de página, 0 recortados, 0 blancos táctiles bajo 44 px y 0 textos bajo 12 px** en los dos estados (la lista desplegable con el rótulo nuevo, y la red de seguridad dentro de una fila del formulario). La caja crece **hacia abajo**: 137 px de alto con un candidato y 234-252 con dos. Con el texto real `Hanna Calzado` la pantalla dice **"¿Es Hanna Calzados (D-71)?"** con sus dos botones de 44 px.
 > - La ventana de atar, medida con el script de siempre (`_medir-guias-sugerencias-anchos.mjs`) contra una línea REAL sin atar: `City Shoes` → **"¿Es City Shoes (D-35)?"**, 0 px de arrastre, 0 táctiles bajo 44 y 0 textos bajo 12 en los tres anchos.
 > - 🩸 **Dos gotchas de medición, y los dos daban verde sin haber mirado nada:** a 1440 el formulario dibuja **los DOS layouts** (tarjeta y tabla) y esconde uno con CSS, así que el primer selector del DOM es el INVISIBLE —hay que quedarse con el visible o se mide una caja de 0×0—; y contar los tocables de TODA la pantalla acusa a este cambio de los campos de 34 px que el formulario usa a propósito en escritorio con mouse (`pointer:fine`, ver `CTRL_BASE`).
+
+## 🔴 EL CLIENTE DE SWITCH TAMBIÉN SE ELIGE DE UN SOLO LUGAR (17-ago-2026)
+
+> El #567 dejó **una excepción anotada a propósito**: el checkout del carrito tenía su PROPIA lista de clientes sobre el MISMO universo de Switch que `ClienteSwitchPicker` —el control del detalle del pedido y de "Duplicar"—, con su propia ruta, su propio buscador y su propia forma de resolver el mostrador. Daniel, textual: ***"si unificalo"***.
+>
+> **Quedó `ClienteSwitchPicker`, y el checkout delega en él.** Dos controles para la misma pregunta se separan solos: el que gana una mejora deja al otro viejo, y acá el otro es el que manda plata a Switch.
+>
+> ### 🔴 LO QUE **NO** CAMBIÓ: CÓMO SE MANDA UN PEDIDO A SWITCH
+>
+> Se verificó ANTES de tocar nada, porque era la condición para hacerlo: el cuerpo del POST a `/api/catalogo/checkout` sigue siendo el MISMO `{ cliente: { id, nombre }, vendedor_id, items, idempotency_key }`, con los MISMOS valores. `switch-envio.ts` no cambió, y el **nombre del cliente que viaja a Switch nunca salió de esta pantalla** — `clienteNombre` solo alimenta el `client_name` local y el aviso de Telegram; lo que Switch recibe es el **id**, y el nombre lo lee el servidor del directorio.
+> - 🔴 **El mostrador se sigue guardando como `"Contado"` a secas**, no como la etiqueta de pantalla. Es lo que se escribe en `<marca>_orders.client_name` desde el primer día; cambiarlo cambiaría el dato de los pedidos NUEVOS, y eso no es parte de unificar un selector. Constante con nombre: `NOMBRE_CONTADO_GUARDADO`.
+> - **Lo único propio que tenía el checkout se MUDÓ, no se reescribió**: convertir lo elegido en `{ id, nombre }` vive en `clienteParaCheckout()` (`lib/catalogo/cliente-elegido.ts`), el módulo que ya definía la regla del cliente elegido.
+>
+> ### 🩸 QUÉ HACÍA EL DEL CHECKOUT QUE EL OTRO NO — y cómo se conservó
+>
+> | | checkout (lo que había) | `ClienteSwitchPicker` (lo que quedó) |
+> |---|---|---|
+> | fuente | `/api/catalogo/switch-clientes?marca=` — el directorio ENTERO, paginado | `/[marca]/clientes-switch?q=` — 20 por búsqueda |
+> | filtrar | en el navegador, sobre la lista ya bajada | en el SERVIDOR, con debounce de 300 ms |
+> | mostrador | id histórico `1` escrito a mano, pisado con el TCKCTA hallado en la lista | el servidor devuelve el `contado` de la empresa |
+> | id sin resolver | **caía al `1`** | devolvía `null` |
+>
+> 🔴 **La única de esas cuatro que se podía PERDER era la última, y se conservó.** Si el directorio no resuelve el mostrador, `ClienteSwitchPicker` entrega `id: null`; con eso el botón se encendería y el servidor contestaría **400 con el cliente ya elegido en pantalla** — la peor forma de fallar. `clienteParaCheckout` cae al `ID_CONTADO_RESPALDO = 1`: ante la duda se conserva la elección de la persona, nunca se inventa una. Hay candado y mutación para eso.
+> - **Lo que se cambió a propósito es el filtrado**: dejó de bajarse el directorio entero (**1.710 filas paginadas por apertura**) para preguntar solo lo que se busca. Menos carga contra una base en compute Micro, y es exactamente lo que ya hacía el detalle.
+> - **La ruta paralela `/api/catalogo/switch-clientes` se RETIRÓ**: sin consumidores, era la segunda puerta al mismo directorio. Con ella se fue el mapa `marca → empresa` como punto de fallo — la ruta que queda deriva la empresa de `getMarcaConfig(marca).empresaKey`, así que **el bug de Calvin no puede volver por construcción**, no por un test.
+>
+> ### 🔴 Lo que NO se puede romper, y sigue intacto
+>
+> **El cliente arranca VACÍO y el botón apagado diciendo qué falta** (`useState<ClienteSwitchOpcion | undefined>(undefined)`, "Elige el cliente" en ámbar, *"Falta: elegir el cliente"*) · **"Contado (venta de mostrador)" sigue elegible, primero en la lista y con el id REAL de su empresa** (TCKCTA), pero hay que TOCARLO — el selector recibe `valor={cliente}` sin respaldo, así que nada viene marcado · **el candado del SERVIDOR (422 si un pedido interno no tiene cliente) no se tocó** · **el pedido del LINK conserva su texto libre y no sale solo** · el flujo de 3 toques, duplicar sin confirmar y el modo pedido `?agregarA=` · **Joybees sigue siendo espejo exacto de Reebok y no se tocó nada propio de Reebok**.
+>
+> ### Verificación contra producción
+>
+> **`BASE=… node scripts/_verif-checkout-selector-unico.mjs`** (solo lectura; **aborta en el navegador cualquier POST a `/api/catalogo/checkout`** y nunca toca "Enviar a Switch"). Con una sesión de **`vendedor`**, en las 4 marcas: el checkout arranca sin cliente y con el botón apagado, dibuja el buscador del selector único, el directorio devuelve **20 clientes**, "Contado (venta de mostrador)" aparece **exactamente una vez**, escribir dispara una consulta al SERVIDOR y elegir un cliente saca "elegir el cliente" del *"Falta:"* (queda *"Falta: elegir el vendedor"*, correcto: ese usuario no tiene vendedor mapeado).
+> - El mostrador se resuelve con el nombre de SU empresa y el mismo id: `active_shoes` "Contado" · `joystep` "Contado" · `fashion_shoes` **"VENTAS LOCA"** · `vistana` **"VENTAS"**, los cuatro `TCKCTA` id **1** — idéntico a lo medido en el #556.
+> - 🩸 **Gotcha de verificación:** exigir que el botón se ENCIENDA al elegir cliente da rojo por nada — al usuario de prueba le falta el vendedor, y eso está bien. Lo que se exige es que el CLIENTE deje de faltar.
+>
+> **Los 3 anchos (+ el iPad acostado), en el navegador contra el build de producción y con pedidos REALES** (`BASE=… node scripts/_medir-cliente-pedido-anchos.mjs`, solo lectura, 5 estados): **390 · 834 · 1024 · 1440 → las cajas del cliente dan 0 px de arrastre, 0 recorte, 0 táctil <44 y 0 texto <12 px** en los 20 casos. Con el selector abierto la caja mide **379 px de alto en los cuatro anchos**: crece **hacia abajo** y no ensancha nada. Los tocables <44 px que el script reporta en el resto de la pantalla (`← Catálogo`, el precio por pieza, `← Volver a Pedidos`, los inputs de cantidad, la `x` y `Eliminar pedido`) son los **PRE-EXISTENTES ya medidos idénticos en `origin/main` en el #556**, en código que este cambio no toca.
+>
+> ### Candados
+>
+> **`src/__tests__/un-solo-selector-de-cliente.test.ts`** — se **quitó la excepción de `CheckoutClient`**, así que si alguien le devuelve su lista propia el build se pone ROJO. Y el barrido se **EXTENDIÓ por el otro costado**: ahora también vigila **quién puede PEDIR el directorio de clientes de Switch** (`clientes-switch?q=`), que es lo que el detector de selectores no podía ver — solo `ClienteSwitchPicker`, con una lista de excepciones VACÍA, más un test que exige que las tres pantallas de pedido lo dibujen y otro que impide que la ruta paralela vuelva. El detector se prueba con fuentes SINTÉTICAS y distingue LISTAR de preguntar por el cliente de UN pedido (`?orderId=`) o asignarlo (PATCH), que el detalle hace a propósito.
+> - **`lib/cliente-elegido.test.ts`** cubre los bordes de `clienteParaCheckout` —incluido que **todo lo que sale de ahí pasa el candado del servidor** (id entero > 0 y nombre no vacío)— y **`components/pedido-cliente-obligatorio.test.tsx`** es el de CONDUCTA: renderiza el checkout REAL, toca los botones REALES y cuenta qué salió por `fetch`.
+> - **Verificado por mutación, 7 de 7 cazadas** (`bash scripts/_mutar-candados-selector-switch.sh`): el checkout vuelve a tener su propia lista · el mostrador viaja con el nombre de su empresa en vez de "Contado" · sin id resuelto se manda un id vacío · el mostrador se reconoce por NOMBRE en vez de por código · el nombre puede viajar vacío · el selector vuelve a preseleccionar el mostrador · el mostrador vuelve a aparecer DOS veces.
+> - 🩸 **La restauración del script va por COPIA, no por `git checkout`**: hay archivos NUEVOS y BORRADOS en la rama y git aborta el comando entero sin restaurar nada, así que las mutaciones se apilarían y ninguna se probaría por separado.
 
 
 > 🔴 **UNA línea atada a `111380`, que no es del grupo** (GT-183, "American Classic Store"). Se coló por el backfill de jun-2026 (`20260607131000`), que filtraba `cm.codigo IS NOT NULL` en vez de `LIKE 'D-%'` — y Boston/Multifashion usan códigos numéricos pelados. **No se corrigió automáticamente porque no es inequívoco** si va a NULL o a un D-XXX ("American Classic Store" de Boston vs "American Classics" D-201 del grupo no son obviamente el mismo negocio). Se arregla desde la pantalla: `/guias` → GT-183 → tocar el chip `111380` → elegir o "Quitar".

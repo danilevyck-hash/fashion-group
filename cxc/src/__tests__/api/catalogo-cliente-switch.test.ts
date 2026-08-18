@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { makeDb, type MockDb } from "../helpers/catalogo-mock-db";
 import { makeReq, TEST_SECRET } from "../helpers/catalogo-request";
@@ -54,7 +54,6 @@ vi.mock("@/lib/reebok-category-lookup", () => ({
 import type { NextRequest } from "next/server";
 import { EMPRESA_POR_MARCA, MARCAS_CONFIG } from "@/lib/catalogo/marcas";
 import { clienteSwitchRoles } from "@/lib/catalogo/roles";
-import { GET as switchClientesGet } from "@/app/api/catalogo/switch-clientes/route";
 import {
   GET as marcaClientesGet,
   PATCH as marcaClientesPatch,
@@ -96,32 +95,46 @@ describe("marca → empresa Switch", () => {
   it("el mapa se DERIVA, no se escribe a mano (candado estático)", () => {
     const marcas = readFileSync(path.join(process.cwd(), "src/lib/catalogo/marcas.ts"), "utf8");
     expect(marcas).toMatch(/EMPRESA_POR_MARCA[\s\S]{0,200}Object\.values\(MARCAS_CONFIG\)[\s\S]{0,120}empresaKey/);
-    // Y el route lo IMPORTA en vez de tener su propio literal — que es
-    // exactamente lo que dejó a Calvin afuera.
-    const route = readFileSync(
-      path.join(process.cwd(), "src/app/api/catalogo/switch-clientes/route.ts"),
-      "utf8",
-    );
-    expect(route).toMatch(/import \{[^}]*EMPRESA_POR_MARCA[^}]*\} from "@\/lib\/catalogo\/marcas"/);
-    expect(route).not.toMatch(/reebok:\s*"active_shoes"/);
-    expect(route).not.toMatch(/tommy:\s*"fashion_shoes"/);
   });
 
-  it("?marca=calvin devuelve el directorio (200), ya no 400", async () => {
+  // 🔴 EL BUG DE CALVIN NO PUEDE VOLVER, Y AHORA POR CONSTRUCCIÓN (17-ago-2026).
+  //
+  // El mapa escrito a mano vivía en `/api/catalogo/switch-clientes`, la ruta que
+  // alimentaba la lista PROPIA del checkout. Esa ruta se RETIRÓ al unificar el
+  // selector: hoy la única puerta al directorio es `[marca]/clientes-switch`,
+  // que saca la empresa de `getMarcaConfig(params.marca).empresaKey` — o sea que
+  // no hay ningún mapa que se pueda olvidar de actualizar.
+  it("🔴 la marca nueva sale sola: la única ruta deriva la empresa de MARCAS_CONFIG", async () => {
+    mainDb.queue("switch_clientes", { data: { cliente_switch_id: 1, codigo: "TCKCTA", nombre: "VENTAS" } });
     mainDb.queue("switch_clientes", {
       data: [{ cliente_switch_id: 9, codigo: "D-9", nombre: "Cliente CK" }],
     });
-    const res = await switchClientesGet(makeReq("/api/catalogo/switch-clientes?marca=calvin", { role: "vendedor" }));
+    const res = await marcaClientesGet(
+      makeReq("/api/catalogo/calvin/clientes-switch?q=ck", { role: "vendedor" }),
+      { params: { marca: "calvin" } },
+    );
     expect(res.status).toBe(200);
-    expect((await res.json()).clientes).toEqual([{ id: 9, codigo: "D-9", nombre: "Cliente CK" }]);
-    // Consultó la empresa correcta.
+    const body = await res.json();
+    expect(body.clientes).toEqual([{ cliente_switch_id: 9, codigo: "D-9", nombre: "Cliente CK" }]);
+    // Consultó la empresa correcta (vistana), no una escrita a mano.
     const eqArgs = mainDb.chainsFor("switch_clientes")[0]._calls.eq.flat();
     expect(eqArgs).toContain("vistana");
   });
 
-  it("una marca que no existe sigue siendo 400", async () => {
-    const res = await switchClientesGet(makeReq("/api/catalogo/switch-clientes?marca=nike", { role: "admin" }));
-    expect(res.status).toBe(400);
+  it("una marca que no existe sigue sin devolver directorio", async () => {
+    const res = await marcaClientesGet(
+      makeReq("/api/catalogo/nike/clientes-switch?q=a", { role: "admin" }),
+      { params: { marca: "nike" } },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("⛔ la ruta paralela `/api/catalogo/switch-clientes` no vuelve", () => {
+    // Era la fuente de la lista propia del checkout: dos puertas al MISMO
+    // directorio de Switch es lo que dejaba que los dos selectores se separaran.
+    expect(
+      existsSync(path.join(process.cwd(), "src/app/api/catalogo/switch-clientes/route.ts")),
+    ).toBe(false);
   });
 });
 
@@ -157,8 +170,9 @@ describe("roles del selector de cliente", () => {
   });
 
   it("sin sesión no entra nadie (el endpoint nunca queda abierto)", async () => {
-    expect((await mGet(makeReq("/x"), "reebok")).status).toBe(401);
-    expect((await switchClientesGet(makeReq("/api/catalogo/switch-clientes?marca=calvin"))).status).toBe(401);
+    for (const marca of Object.keys(MARCAS_CONFIG)) {
+      expect((await mGet(makeReq("/x"), marca)).status, marca).toBe(401);
+    }
   });
 
   it("el rol 'cliente' legacy de Reebok NO recibe el directorio de la empresa", async () => {
